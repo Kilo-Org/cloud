@@ -417,6 +417,11 @@ patchedDependencies:
   # longer re-enter each other until React's nested update limit. Remove once an
   # upstream release carries every guard.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
+  # NativeWind's `react-native` proxy names only the exports its wrapper components
+  # need; every other export, such as the `AssetRegistry` that expo-asset reads, was
+  # `undefined`, which breaks the whole module that imports it. Forward the rest from
+  # the real module. Remove once upstream forwards them itself.
+  react-native-css@3.1.0-rc.1: patches/react-native-css@3.1.0-rc.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

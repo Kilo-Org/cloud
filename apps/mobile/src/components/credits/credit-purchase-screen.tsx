@@ -371,13 +371,13 @@ export function CreditPurchaseScreen() {
 
           {/* The pack area holds at most one card — the account read's
               failure, the store's notice or the empty catalogue — in flow
-              directly under the balance card, and the priced rows render under
-              it whenever the catalogue answered, also while the store is
-              unavailable. The description and the legal links are pinned in the
-              footer below the scroller, so a shorter state ends sooner instead
-              of leaving a reserved blank band under it, while the placeholder
-              rows keep exactly the priced row's height so the list never jumps
-              when the store answers. */}
+              directly under the balance card, and the priced rows follow it
+              only when the store can price the catalogue: the card is the
+              statement, so no unpriced row repeats it. The description and the
+              legal links are pinned in the footer below the scroller, so a
+              shorter state ends sooner instead of leaving a reserved blank band
+              under it, while the placeholder rows keep exactly the priced row's
+              height so the list never jumps when the store answers. */}
           <View className="gap-3">
             {/* The account read gates both catalogue reads, so its failure is
                 the one state where nothing else can settle. It keeps the store

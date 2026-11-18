@@ -433,7 +433,11 @@ async function fakeGateway(answer) {
       body += chunk;
     });
     request.on('end', () => {
-      const parsed = { authorization: request.headers.authorization, body: JSON.parse(body) };
+      const parsed = {
+        authorization: request.headers.authorization,
+        url: request.url,
+        body: JSON.parse(body),
+      };
       requests.push(parsed);
       answer(response, parsed);
     });
@@ -585,11 +589,130 @@ test('body writes the model rewrite when the gateway answers with valid notes', 
     assert.equal(gateway.requests.length, 1, 'one rewrite per version');
     const request = gateway.requests[0];
     assert.equal(request.authorization, 'Bearer test-key');
+    // The briefing's working call: the chat completions route under
+    // `/api/openrouter`, a non-streamed body, and a cap sized for a reasoning
+    // model's hidden tokens before the answer.
+    assert.equal(request.url, '/api/openrouter/chat/completions');
+    assert.equal(request.body.stream, false);
+    assert.equal(request.body.max_tokens, 16_384);
+    assert.equal('temperature' in request.body, false);
     assert.equal(request.body.model, '~deepseek/deepseek-flash-latest');
     const prompt = request.body.messages.map(message => message.content).join('\n');
     assert.match(prompt, /new \| chat \| feat\(chat\): keep the composer visible/);
     assert.match(prompt, /fix \| signIn \| fix\(auth\): link same-email sign-ins/);
     assert.doesNotMatch(prompt, /first \(#100\)/, 'a pre-range commit must not reach the model');
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body reads the answer past a reasoning field, a preamble and a fence', async () => {
+  const dir = rewriteRepo('kilo-notes-reasoning-');
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            reasoning: 'One object, three lists, plain words.',
+            content: [
+              'Here are the notes:',
+              '```json',
+              JSON.stringify({
+                new: ['Keep the composer visible while you read older messages'],
+                changes: [],
+                areas: ['chat'],
+              }),
+              '```',
+              'That is all.',
+            ].join('\n'),
+          },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(
+      result.stdout,
+      [
+        '### New',
+        '',
+        '- Keep the composer visible while you read older messages',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat',
+        '',
+      ].join('\n')
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body names a reasoning-only answer, and does not log its reasoning', async () => {
+  const dir = rewriteRepo('kilo-notes-reasoning-only-');
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'length',
+          message: { role: 'assistant', content: '', reasoning: 'First I read\nthe diff.' },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /invalid JSON/);
+    assert.match(result.stderr, /finish_reason length/);
+    assert.match(result.stderr, /0 content characters/);
+    assert.match(result.stderr, /a reasoning field present/);
+    assert.doesNotMatch(result.stderr, /First I read/, 'the reasoning is not the answer');
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body names a truncated answer with the start of its content', async () => {
+  const dir = rewriteRepo('kilo-notes-truncated-');
+  const truncated = '{"new":["Keep the composer visible while you';
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [{ finish_reason: 'length', message: { role: 'assistant', content: truncated } }],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /invalid JSON/);
+    assert.match(result.stderr, /finish_reason length/);
+    assert.match(result.stderr, new RegExp(`${truncated.length} content characters`));
+    assert.match(result.stderr, /no reasoning field/);
+    // The excerpt is JSON-quoted, so a quote in the model's text cannot end it.
+    assert.ok(
+      result.stderr.includes(`content starts ${JSON.stringify(truncated)}`),
+      `the diagnostic must show the content's start: ${result.stderr}`
+    );
   } finally {
     await gateway.close();
     cleanup(dir);

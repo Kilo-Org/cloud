@@ -91,19 +91,11 @@ export function NewTaskFromPictureButton({
   }, [openComposerWithPicture, showActionSheetWithOptions, userId, themedSheet]);
 
   return (
-    // The filled neutral action paints `--secondary-fill`, which the dark
-    // scheme lifts to stay apart from an outlined control on a sheet's card.
-    // This button sits on the near-black page beside the filled primary, so
-    // there it takes the raised card pair the Explore rows below it use: the
-    // `--secondary` surface with the hairline edge, so the container reads as a
-    // button. The transparent light edge keeps the light fill unchanged.
-    <Button
-      variant="secondary"
-      size="lg"
-      className="w-full border border-transparent dark:border-neutral-700 dark:bg-secondary"
-      onPress={handlePress}
-    >
-      <Camera size={18} color={colors.secondaryForeground} />
+    // The secondary action beside the filled primary: the shared outlined
+    // control, so it carries the same border as every other secondary button on
+    // the page instead of a shadowed grey plate of its own.
+    <Button variant="outline" size="lg" className="w-full" onPress={handlePress}>
+      <Camera size={18} color={colors.foreground} />
       <Text className="shrink text-center font-semibold">{t('home.newTaskFromPicture')}</Text>
     </Button>
   );

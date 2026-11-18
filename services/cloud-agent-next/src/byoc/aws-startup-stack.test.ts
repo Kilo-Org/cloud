@@ -38,7 +38,7 @@ describe('AWS new-allocation stack admission', () => {
     f.pause.mockClear();
     f.read.mockResolvedValue({ ...f.stack, status: 'UPDATE_IN_PROGRESS' });
     await expect(validateAwsStartupStack({ configuration: f.config, ...f })).rejects.toMatchObject({
-      reason: 'byoc_aws_not_ready',
+      reason: 'byoc_aws_stack_unavailable',
     });
     expect(f.read).toHaveBeenCalledTimes(3);
     expect(f.pause.mock.calls).toEqual([[1000], [2000]]);
@@ -55,13 +55,19 @@ describe('AWS new-allocation stack admission', () => {
     const f = fixture();
     f.read.mockRejectedValue(new AwsRequestError(503, 'Unavailable'));
     await expect(validateAwsStartupStack({ configuration: f.config, ...f })).rejects.toMatchObject({
-      reason: 'byoc_aws_not_ready',
+      reason: 'byoc_aws_stack_unavailable',
     });
     expect(f.read).toHaveBeenCalledTimes(3);
     f.read.mockClear();
     f.read.mockRejectedValue(new AwsRequestError(403, 'Forbidden'));
     await expect(validateAwsStartupStack({ configuration: f.config, ...f })).rejects.toMatchObject({
       reason: 'byoc_aws_forbidden',
+    });
+    expect(f.read).toHaveBeenCalledOnce();
+    f.read.mockClear();
+    f.read.mockRejectedValue(new AwsRequestError(422, 'InvalidStackResponse'));
+    await expect(validateAwsStartupStack({ configuration: f.config, ...f })).rejects.toMatchObject({
+      reason: 'byoc_aws_not_ready',
     });
     expect(f.read).toHaveBeenCalledOnce();
   });

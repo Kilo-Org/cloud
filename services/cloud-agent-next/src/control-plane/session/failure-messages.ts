@@ -52,6 +52,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
     'AWS rejected access to your compute account. Check the customer role and ExternalId.',
   byoc_aws_stack_outdated:
     'The AWS stack needs an update. Contact Kilo to update the existing connection.',
+  byoc_aws_stack_unavailable:
+    'The AWS stack is updating or could not be read. Try again in a few minutes.',
   byoc_aws_proxy_unavailable:
     'The AWS security proxy is unavailable. Try again. If it remains unavailable, contact Kilo.',
   byoc_aws_proxy_expired:

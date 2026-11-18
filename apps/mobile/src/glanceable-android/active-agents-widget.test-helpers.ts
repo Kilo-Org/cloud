@@ -159,7 +159,13 @@ export function render(props: AndroidWidgetProps, size: readonly [number, number
       widgetId: 1,
       width,
       height,
-      screenInfo: { screenWidthDp: 400, screenHeightDp: 800, density: 2, densityDpi: 320 },
+      screenInfo: {
+        screenWidthDp: 400,
+        screenHeightDp: 800,
+        density: 2,
+        densityDpi: 320,
+        fontScale: 1,
+      },
     },
     rtl
   ) as { light: Element; dark: Element };

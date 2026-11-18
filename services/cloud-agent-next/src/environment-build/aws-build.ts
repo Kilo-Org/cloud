@@ -37,6 +37,62 @@ import { buildInputMembers } from './build-input.js';
 import { createAwsBuildArchiveStorage, AwsBuildArchiveError } from './aws-archive-storage.js';
 import { BuilderStateInvalidError, BuilderTargetMismatchError } from './builder-errors.js';
 
+/**
+ * Egress authority for one build. A retired grant, or a build that left `preparing`, yields no SCM
+ * grant or live member, and the identity binding changes on retirement to fence in-flight admissions.
+ */
+export function awsBuildEgressContext(
+  env: AwsBuildContextDeps['env'],
+  context: AwsPinnedBuild,
+  available: boolean
+): AwsBuildEgressContext {
+  const { allocation, build, input, state } = context;
+  const operation = state.operation ?? null;
+  const scm = state.scm === 'retired' ? undefined : state.scm;
+  const scmActive = available && scm !== undefined;
+  const providerRef = operation
+    ? operation.ref.provider === 'aws'
+      ? encodeAwsProviderRef(operation.ref)
+      : encodeAwsEcsProviderRef(operation.ref)
+    : null;
+  return {
+    environmentId: allocation.environmentId,
+    buildId: build.id,
+    actorUserId: allocation.actorUserId,
+    sandboxId: allocation.sandboxId,
+    ownerId: allocation.actorUserId,
+    provider: allocation.provider,
+    containmentEnabled: true,
+    available,
+    byoc: { ...awsBuildOwner(allocation.owner), credentialId: allocation.target.credentialId },
+    credentialHash: state.credentialHash,
+    operation,
+    allocation: { active: available, allocationId: allocation.allocationId, providerRef },
+    outboundContainerId: awsBuildOutboundContainerId(allocation),
+    grants: scmActive && scm ? [scm] : [],
+    liveMemberIds: scmActive ? [build.id] : [],
+    identityBinding: JSON.stringify([
+      build.id,
+      build.revision,
+      build.deadline_at,
+      build.input,
+      state.scm === 'retired' ? 'retired' : 'active',
+    ]),
+    allowlist:
+      input.egressPolicy?.egressMode === 'allowlist'
+        ? buildNativeEgressAllowlist({
+            env,
+            allowlist: input.egressPolicy.egressAllowlist ?? [],
+            providerRoutingTargets: operation
+              ? [`https://${operation.config.bucket}.s3.${operation.config.region}.amazonaws.com`]
+              : [],
+          })
+        : undefined,
+    // Build input stores no audit setting, so build egress is not audited.
+    audit: false,
+  };
+}
+
 /** AWS build behavior uses the same compute, archive and admission components as sessions. */
 export function createAwsEnvironmentBuildServices(deps: AwsBuildContextDeps) {
   const contexts = createAwsBuildContexts(deps);
@@ -89,51 +145,7 @@ export function createAwsEnvironmentBuildServices(deps: AwsBuildContextDeps) {
       context = contexts.pinned(buildId);
       available = false;
     }
-    const { allocation, build, input, state } = context;
-    const operation = state.operation ?? null;
-    const scm = state.scm === 'retired' ? undefined : state.scm;
-    const scmActive = available && scm !== undefined;
-    const providerRef = operation
-      ? operation.ref.provider === 'aws'
-        ? encodeAwsProviderRef(operation.ref)
-        : encodeAwsEcsProviderRef(operation.ref)
-      : null;
-    return {
-      environmentId: allocation.environmentId,
-      buildId,
-      actorUserId: allocation.actorUserId,
-      sandboxId: allocation.sandboxId,
-      ownerId: allocation.actorUserId,
-      provider: allocation.provider,
-      containmentEnabled: true,
-      available,
-      byoc: { ...awsBuildOwner(allocation.owner), credentialId: allocation.target.credentialId },
-      credentialHash: state.credentialHash,
-      operation,
-      allocation: { active: available, allocationId: allocation.allocationId, providerRef },
-      outboundContainerId: awsBuildOutboundContainerId(allocation),
-      grants: scmActive && scm ? [scm] : [],
-      liveMemberIds: scmActive ? [buildId] : [],
-      identityBinding: JSON.stringify([
-        build.id,
-        build.revision,
-        build.deadline_at,
-        build.input,
-        state.scm === 'retired' ? 'retired' : 'active',
-      ]),
-      allowlist:
-        input.egressPolicy?.egressMode === 'allowlist'
-          ? buildNativeEgressAllowlist({
-              env: deps.env,
-              allowlist: input.egressPolicy.egressAllowlist ?? [],
-              providerRoutingTargets: operation
-                ? [`https://${operation.config.bucket}.s3.${operation.config.region}.amazonaws.com`]
-                : [],
-            })
-          : undefined,
-      // Build input stores no audit setting, so build egress is not audited.
-      audit: false,
-    };
+    return awsBuildEgressContext(deps.env, context, available);
   }
   const admissions = new Map<string, ReturnType<typeof createAwsBuildEgressAdmission>>();
   function admission(buildId: string) {

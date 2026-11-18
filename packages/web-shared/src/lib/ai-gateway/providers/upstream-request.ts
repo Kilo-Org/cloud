@@ -31,6 +31,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-connection';
 import type { Dispatcher } from 'undici';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -113,6 +115,14 @@ function appendQueryString(apiUrl: string, search: string): string {
 function getProviderTargetHost(apiUrl: string): string {
   try {
     return new URL(apiUrl).host;
+  } catch {
+    return 'invalid_provider_api_url';
+  }
+}
+
+function getProviderOrigin(apiUrl: string): string {
+  try {
+    return new URL(apiUrl).origin;
   } catch {
     return 'invalid_provider_api_url';
   }
@@ -471,7 +481,11 @@ async function sendUpstreamFetch({
     // `targetUrl` is a body field the relay dials itself, so only the policy
     // check applies to it.
     const dispatcher = urlPolicy
-      ? upstreamDispatcherFor(urlPolicy.dialed.hostname, urlPolicy.dialed.addresses)
+      ? upstreamDispatcherFor(
+          urlPolicy.dialed.hostname,
+          urlPolicy.dialed.addresses,
+          urlPolicy.dialed.expiresAt
+        )
       : undefined;
 
     const requestOptions: RequestInit & { duplex: 'half'; dispatcher?: Dispatcher } = {
@@ -673,14 +687,31 @@ export async function upstreamRequest({
   });
 }
 
+/**
+ * Origins whose generation endpoint `fetchGeneration` may call. The request
+ * skips the upstream URL policy and carries the provider key, so it only goes
+ * to these fixed hosts.
+ */
+const GENERATION_LOOKUP_ORIGINS: ReadonlySet<string> = new Set(
+  [OPENROUTER.apiUrl, VERCEL_AI_GATEWAY.apiUrl].map(apiUrl => new URL(apiUrl).origin)
+);
+
 export async function fetchGeneration(messageId: string, provider: Provider) {
+  if (!GENERATION_LOOKUP_ORIGINS.has(getProviderOrigin(provider.apiUrl))) {
+    captureMessage('Skipped generation lookup for a provider outside the gateway origins', {
+      level: 'warning',
+      tags: { source: `${provider.type}_generation_fetch` },
+      extra: { targetHost: getProviderTargetHost(provider.apiUrl) },
+    });
+    return;
+  }
   // We have to delay, openrouter doesn't have the cost immediately
   await new Promise(res => setTimeout(res, 200));
   //ref: https://openrouter.ai/docs/api-reference/get-a-generation
   let response: Response;
   try {
     response = await fetchWithBackoff(
-      `${provider.apiUrl}/generation?id=${messageId}`,
+      `${provider.apiUrl}/generation?id=${encodeURIComponent(messageId)}`,
       {
         method: 'GET',
         headers: {

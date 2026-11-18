@@ -2,7 +2,13 @@ import { getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import type { RequestLogByokFailoverAttempt } from '@/lib/request-logs/routing-details';
 import { DetailSection, ToneBadge } from './detail-primitives';
 import { formatDurationMs } from './format';
-import { gatewayName, isPartnerFailover, partnerName, type StepTone } from './routing-labels';
+import {
+  capitalize,
+  gatewayName,
+  isPartnerFailover,
+  partnerName,
+  type StepTone,
+} from './routing-labels';
 
 const OUTCOMES: Record<string, { label: string; tone: StepTone }> = {
   'failed-over': { label: 'Failed, tried next key', tone: 'rejected' },
@@ -32,7 +38,7 @@ function partnerAttemptName(
   partnerInferenceProvider: string | undefined
 ): string {
   if (attempt.provider_type === 'partner') {
-    return partnerInferenceProvider ? partnerName(partnerInferenceProvider) : 'Partner provider';
+    return capitalize(partnerName(partnerInferenceProvider));
   }
   return (attempt.provider_type && gatewayName(attempt.provider_type)) ?? 'Kilo gateway';
 }
@@ -61,16 +67,16 @@ export function ByokFailoverSection({
   const partner = isPartnerFailover(attempts);
   return (
     <DetailSection
-      title={partner ? 'Partner fallback' : 'BYOK failover'}
+      title={partner ? 'Provider fallback' : 'BYOK failover'}
       description={
         partner
-          ? `${partnerInferenceProvider ? partnerName(partnerInferenceProvider) : 'The partner provider'} returned an error, so Kilo sent the request through its own gateway instead. Both are paid with Kilo credits; only the attempt that served is charged.`
+          ? `${capitalize(partnerName(partnerInferenceProvider))} returned an error, so Kilo sent the request through its own gateway instead. Both are paid with Kilo credits; only the attempt that served is charged.`
           : 'The upstream provider returned an error, so Kilo retried with the next BYOK key in route order. Failover never uses Kilo credits.'
       }
     >
       <ol
         className="flex flex-col gap-1 rounded-md border p-2"
-        aria-label={partner ? 'Partner fallback attempts' : 'BYOK failover attempts'}
+        aria-label={partner ? 'Provider fallback attempts' : 'BYOK failover attempts'}
       >
         {attempts.map((attempt, index) => {
           const outcome = partner ? partnerOutcomeOf(attempt.outcome) : outcomeOf(attempt.outcome);

@@ -19,6 +19,7 @@ import {
   inferenceProviderNames,
   rejectedResultLabel,
   type StepTone,
+  capitalize,
   isPartnerFailover,
   partnerInferenceProviderOf,
   partnerName,
@@ -168,10 +169,6 @@ function failoverStopLabels(stopReason: string | undefined): { title: string; de
   }
 }
 
-function capitalize(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
 function FailoverNote({
   attempts,
   partnerInferenceProvider,
@@ -182,7 +179,7 @@ function FailoverNote({
   if (isPartnerFailover(attempts)) {
     return (
       <p className="text-muted-foreground text-xs">
-        {capitalize(partnerName(partnerInferenceProvider))} failed before this attempt. See Partner
+        {capitalize(partnerName(partnerInferenceProvider))} failed before this attempt. See Provider
         fallback.
       </p>
     );
@@ -237,7 +234,7 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
         </span>
         <p className="text-muted-foreground text-xs">
           {partnerFailed
-            ? "The gateway's error was returned. See Partner fallback."
+            ? "The gateway's error was returned. See Provider fallback."
             : `${stopped.detail} Kilo credits were not used. See BYOK failover.`}
         </p>
       </FlowNode>

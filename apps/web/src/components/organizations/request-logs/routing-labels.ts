@@ -139,11 +139,16 @@ export function partnerInferenceProviderOf(
   return steps.find(step => step.step === 'kilo')?.partner_inference_provider;
 }
 
-/** The display name of a partner, or a generic label when the routing record does not name it. */
+export function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The display name of a partner, or a generic label when the routing record does not name it.
+ * End users never see the word partner; the request log calls it a direct provider. */
 export function partnerName(partnerInferenceProvider: string | undefined): string {
   return partnerInferenceProvider
     ? inferenceProviderNames([partnerInferenceProvider])
-    : 'the partner provider';
+    : 'the direct provider';
 }
 
 function selectedProviderName(
@@ -245,9 +250,9 @@ function describeByokKey(step: RequestLogRoutingStep, failedOver: boolean): stri
 }
 
 const PARTNER_SKIP_REASON_LABELS: Record<string, string> = {
-  'unsupported-api-kind': 'The partner does not support this API.',
+  'unsupported-api-kind': 'This API is not supported.',
   'bounded-spending': 'The request carries a spend ceiling.',
-  'openrouter-disabled': 'The organization gateway settings exclude the partner.',
+  'openrouter-disabled': 'Excluded by the organization gateway settings.',
   'provider-settings': 'Excluded by provider settings.',
 };
 
@@ -324,7 +329,7 @@ export function describeStep(
       };
     }
     case 'partner':
-      return { title: 'Partner provider', detail: describePartnerSkip(step), tone };
+      return { title: 'Direct provider', detail: describePartnerSkip(step), tone };
     case 'kilo':
       return { title: 'Kilo credits', detail: describeKilo(step), tone };
     default:

@@ -223,12 +223,13 @@ describe('RoutingSections partner fallback', () => {
     expect(text).toContain('Sent to Vercel AI Gateway');
     expect(text).toContain('Paid by: Kilo credits');
     expect(text).toContain('Mistral failed before this attempt');
-    expect(text).toContain('Partner fallback');
+    expect(text).toContain('Provider fallback');
     expect(text).toContain('Mistral returned an error, so Kilo sent the request');
+    expect(text).not.toMatch(/partner/i);
     expect(text).not.toContain('BYOK failover');
     expect(text).not.toContain('Failover never uses Kilo credits');
     const attempts = [
-      ...document.querySelectorAll('[aria-label="Partner fallback attempts"] li'),
+      ...document.querySelectorAll('[aria-label="Provider fallback attempts"] li'),
     ].map(row => row.textContent);
     expect(attempts).toEqual([
       expect.stringMatching(/Mistral.*Failed, fell back.*HTTP 400/),
@@ -273,7 +274,7 @@ describe('RoutingSections partner fallback', () => {
     const steps = [...document.querySelectorAll('[aria-label="Provider selection steps"] > li')];
     const text = document.body.textContent ?? '';
     expect(text.includes('Mistral was skipped')).toBe(rendered);
-    expect(steps.some(step => step.textContent?.includes('Partner provider'))).toBe(rendered);
+    expect(steps.some(step => step.textContent?.includes('Direct provider'))).toBe(rendered);
     expect(text).toContain('Kilo credits');
   });
 
@@ -281,6 +282,6 @@ describe('RoutingSections partner fallback', () => {
     const text = render(partnerRouting([])).body.textContent ?? '';
 
     expect(text).toContain('Sent to Mistral');
-    expect(text).not.toContain('Partner fallback');
+    expect(text).not.toContain('Provider fallback');
   });
 });

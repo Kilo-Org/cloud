@@ -44,9 +44,9 @@ describe('describeStep', () => {
   });
 
   test.each([
-    ['unsupported-api-kind', 'the partner does not support this API.'],
+    ['unsupported-api-kind', 'this API is not supported.'],
     ['bounded-spending', 'the request carries a spend ceiling.'],
-    ['openrouter-disabled', 'the organization gateway settings exclude the partner.'],
+    ['openrouter-disabled', 'excluded by the organization gateway settings.'],
     ['provider-settings', 'excluded by provider settings.'],
   ])('explains a partner skipped for %s', (reason, detail) => {
     expect(
@@ -57,7 +57,7 @@ describe('describeStep', () => {
         reason,
       })
     ).toEqual({
-      title: 'Partner provider',
+      title: 'Direct provider',
       detail: `Acme Ai was skipped: ${detail}`,
       tone: 'skipped',
     });
@@ -180,7 +180,7 @@ describe('describeResult for a partner', () => {
 
   test('falls back to a generic label when the partner is not recorded', () => {
     expect(describeResult(partnerResult)).toEqual({
-      title: 'Sent to the partner provider',
+      title: 'Sent to the direct provider',
       paidBy: 'Kilo credits',
     });
   });

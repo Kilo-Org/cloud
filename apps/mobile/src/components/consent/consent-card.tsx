@@ -42,8 +42,8 @@ type ConsentCardProps = {
  * no room left and the second action clips at the sheet bottom.
  *
  * 1.4 is the cap that keeps the sentence within two bounded lines on the
- * smallest supported width (360dp; the card's `px-6` leaves 318dp for the
- * row) now that the copy is `text-sm`. The sentence's longer segment — the
+ * smallest supported width (360dp; the card's 14pt gutter leaves 332dp for
+ * the row) now that the copy is `text-sm`. The sentence's longer segment — the
  * pt-BR lead-in — measures 209.52dp at scale 1 and the link 169.52dp, so at
  * 1.4 the lead-in is 293.3dp and each segment still takes its own line. It
  * also keeps the largest rendered sentence the size it already was: the old

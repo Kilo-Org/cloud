@@ -299,7 +299,7 @@ export function EmptyFilesView({
   const { t } = useTranslation();
   return (
     <CenteredState refreshControl={refreshControl}>
-      <View className="items-center gap-3 px-6">
+      <View className="items-center gap-3 px-4">
         <File size={28} color={colors.mutedForeground} />
         <Text className="text-lg font-semibold text-foreground">
           {t('prReview.noFilesChanged')}

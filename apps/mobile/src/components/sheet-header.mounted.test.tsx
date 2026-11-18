@@ -265,10 +265,17 @@ describe('SheetHeader', () => {
       expect(action?.props.className).toContain('rounded-md');
       expect(action?.props.className).not.toContain('rounded-full');
       expect(action?.props.className).not.toMatch(/(?:^|\s)bg-/);
-      expect(action?.props.className).toContain('px-2 py-2');
+      expect(action?.props.className).toContain('py-2');
       expect(action?.props.className).toContain('active:opacity-70');
       expect(action?.props.accessibilityRole).toBe('button');
     }
+    // Each label sits flush on the sheet's own gutter — Cancel on the start
+    // one, Done on the end one — so the header's first line of content starts
+    // where the body's does instead of 7pt inside a centred target.
+    expect(cancel?.props.className).toContain('items-start');
+    expect(cancel?.props.className).toContain('pe-2');
+    expect(done?.props.className).toContain('items-end');
+    expect(done?.props.className).toContain('ps-2');
     expect(done?.props.onPress).toBe(onDone);
     expect(cancel?.props.onPress).toBe(onCancel);
     const doneLabelClass = renderer.root.findByProps({ children: labels.doneLabel }).props

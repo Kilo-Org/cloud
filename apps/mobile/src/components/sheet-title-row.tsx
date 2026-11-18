@@ -25,7 +25,7 @@ export function SheetTitleRow({
   const colors = useThemeColors();
 
   return (
-    <View className="min-h-11 flex-row items-center gap-x-2 px-5 pb-2">
+    <View className="min-h-11 flex-row items-center gap-x-2 px-4 pb-2">
       <Text accessibilityRole="header" className="min-w-0 flex-1 text-base font-semibold">
         {title}
       </Text>

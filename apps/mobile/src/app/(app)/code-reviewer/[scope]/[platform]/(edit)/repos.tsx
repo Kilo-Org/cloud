@@ -179,13 +179,12 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   } else if (!reposLoading && bitbucketNotReady) {
     const readiness = bitbucketReadiness.data;
     repoState = (
-      <CenteredState>
+      <CenteredState contentContainerClassName="px-4">
         {readiness ? (
           <BitbucketSetupRecovery
             scope={scope}
             readiness={readiness}
             message={t('common.couldNotLoadRepositories')}
-            className="mx-6"
           />
         ) : (
           <Text variant="muted" className="text-center text-xs">

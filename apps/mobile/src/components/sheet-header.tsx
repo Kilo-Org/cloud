@@ -166,7 +166,7 @@ export function SheetHeader({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={resolvedCancelLabel}
-              className="min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50"
+              className="min-h-[48px] min-w-[48px] shrink-0 items-start justify-center rounded-md pe-2 py-2 active:opacity-70 disabled:opacity-50"
             >
               <Text
                 className="text-center text-base font-medium text-foreground"
@@ -216,7 +216,7 @@ export function SheetHeader({
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}
             accessibilityState={{ disabled: doneUnavailable, busy: doneBusy }}
-            className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
+            className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-end justify-center rounded-md ps-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
             {doneMark}
           </Pressable>

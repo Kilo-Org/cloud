@@ -155,11 +155,12 @@ export function ReviewDetailScreen({
   // read stopped, where the same line stays reserved and blank so the title
   // keeps its place without an animation: a retry re-enters the loading state on
   // that line, so neither the failure nor the retry moves the title.
-  const eyebrow: HeaderEyebrow = loadedReview
-    ? { kind: 'ready', text: loadedReview.repo_full_name }
-    : isLoading
-      ? { kind: 'loading' }
-      : { kind: 'held' };
+  let eyebrow: HeaderEyebrow = { kind: 'held' };
+  if (loadedReview) {
+    eyebrow = { kind: 'ready', text: loadedReview.repo_full_name };
+  } else if (isLoading) {
+    eyebrow = { kind: 'loading' };
+  }
   const eyebrowProps = eyebrowHeaderProps(eyebrow);
   const header = <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} {...eyebrowProps} />;
 

@@ -1,7 +1,7 @@
 # AWS BYOC MVP
 
 The AWS MVP keeps Lambda MicroVMs and adds EC2-backed ECS isolated tasks as separate providers.
-The customer owns the VPC, compute and archive bucket. ECS integration remains in progress and is not selectable.
+The customer owns the VPC, compute and archive bucket. Owners in the `BYOC_AWS_IDS` cohort can select either engine after its connection is ready.
 The Worker owns session admission, lifecycle and credential exchange. Real SCM tokens stay in the Worker.
 Workspace disk persistence is outside the MVP.
 
@@ -12,8 +12,8 @@ reached `RUNNING`, then confirmed `TERMINATED`. An ECS Managed Instances Gravito
 `ISOLATED_SANDBOX` reached `RUNNING` and exited with code zero. Its task stopped and its managed host terminated.
 The initial `PendingVerification` account restriction no longer blocks these probes.
 
-The ECS probe proves isolated task launch, not Cloud Agent runtime, preview or credential isolation.
-Its CloudWatch stream had no persisted result events. Full ECS runtime acceptance remains required.
+That spike probe proved isolated task launch only. Later layers add the ECS runtime, preview, egress proxy and prepared environments.
+Its CloudWatch stream had no persisted result events. Live ECS runtime acceptance remains required.
 The initial product allocation uses AMD64, two vCPUs, 8 GiB memory and the fixed 20 GiB task disk.
 ARM64 tool execution passed locally; full ARM64 Kilo execution remains unverified.
 
@@ -123,7 +123,8 @@ Both engines require eight hours of certificate validity before a new allocation
 This reserve checks certificate health; it does not set an ECS compute deadline.
 Proxy policy refresh still checks current allocation, owner, connection, generation and lifecycle authority.
 Policy admission and durable storage now support both engines through shared components.
-ECS onboarding, public selection and full runtime acceptance remain in progress.
+ECS selection, preview, egress proxy and prepared environments are enabled. ECS workspace snapshots remain disabled.
+Live ECS runtime acceptance remains unverified.
 
 Certificate renewal and allocation draining remain operator tasks. This MVP does not promise uninterrupted sessions across certificate rotation.
 A session's practical remaining lifetime depends on the current deployment certificate expiry and managed-host maintenance.

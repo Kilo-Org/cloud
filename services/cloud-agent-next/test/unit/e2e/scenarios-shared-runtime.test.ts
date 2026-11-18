@@ -217,6 +217,7 @@ describe('sendTurn', () => {
   });
 
   it('takes every phase budget from the scenario deadline when no turn budget is given', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
     const stream = fakeStream(terminalEvent());
     mocks.openConnectedStream.mockResolvedValue(stream);
     mocks.sendMessage.mockResolvedValue({ messageId: 'message_1' });

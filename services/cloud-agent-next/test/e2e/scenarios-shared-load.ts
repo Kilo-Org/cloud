@@ -199,13 +199,11 @@ async function runLargeStream(
         LARGE_STREAM_TURN_BUDGET_MS
       );
     } catch (error) {
-      const status = await deadline
-        .within(
-          'failed read evidence',
-          signal => fetchFakeScenarioStatus(scenarioConfig.fakeLlmUrl, readTag, signal),
-          5_000
-        )
-        .catch(() => null);
+      const status = await fetchFakeScenarioStatus(
+        scenarioConfig.fakeLlmUrl,
+        readTag,
+        AbortSignal.timeout(5_000)
+      ).catch(() => null);
       const evidence =
         status === null
           ? 'fake read evidence unavailable'

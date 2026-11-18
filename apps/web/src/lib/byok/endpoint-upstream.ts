@@ -1,5 +1,5 @@
 import { type ByokEndpointCredentials, type ByokEndpointModel } from '@kilocode/db/schema-types';
-import { resolveByokEndpointAuth } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { resolveByokEndpointUpstreamAuth } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint/direct-provider';
 import { parseByokEndpointModelsResponse } from '@/lib/byok/endpoint-models';
 import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 import {
@@ -7,6 +7,10 @@ import {
   isUpstreamUrlPolicyEnforced,
   type UpstreamUrlViolation,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-url-policy';
+import {
+  fetchWithUpstreamUrlPolicy,
+  UpstreamUrlPolicyError,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-policy-fetch';
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
@@ -15,23 +19,20 @@ const ANTHROPIC_VERSION = '2023-06-01';
 /** A failure whose message is safe to show to the organization member who configured the endpoint. */
 export class ByokEndpointRequestError extends Error {}
 
-const URL_VIOLATION_MESSAGES = {
+const URL_POLICY_MESSAGES = {
   invalid_url: 'The endpoint URL is not a valid URL.',
   non_https: 'The endpoint URL must use HTTPS.',
   non_public_host: 'The endpoint URL must point to a public host.',
   non_public_address: 'The endpoint URL host resolves to a non-public address.',
   dns_lookup_failed: 'The endpoint host could not be resolved. Check the URL and try again.',
-} as const satisfies Record<UpstreamUrlViolation, string>;
-
-async function findUrlViolationMessage(url: string): Promise<string | null> {
-  if (!isUpstreamUrlPolicyEnforced()) return null;
-  const decision = await findUpstreamUrlViolation(url);
-  return decision.allowed ? null : URL_VIOLATION_MESSAGES[decision.violation];
-}
+  redirect: 'The endpoint responded with a redirect, which is not followed. Use the final URL.',
+} as const satisfies Record<UpstreamUrlViolation | 'redirect', string>;
 
 /** Why `baseUrl` may not be used for an endpoint. */
-export function findByokEndpointBaseUrlViolation(baseUrl: string): Promise<string | null> {
-  return findUrlViolationMessage(baseUrl);
+export async function findByokEndpointBaseUrlViolation(baseUrl: string): Promise<string | null> {
+  if (!isUpstreamUrlPolicyEnforced()) return null;
+  const decision = await findUpstreamUrlViolation(baseUrl);
+  return decision.allowed ? null : URL_POLICY_MESSAGES[decision.violation];
 }
 
 function credentialSecrets(credentials: ByokEndpointCredentials): string[] {
@@ -46,45 +47,39 @@ function credentialSecrets(credentials: ByokEndpointCredentials): string[] {
   }
 }
 
-/** Headers that authorize the request, and every secret value that went into them. */
+/**
+ * Headers that authorize the request as gateway requests to the endpoint do, and every secret
+ * value that went into them.
+ */
 async function authorizedHeaders({
   url,
   method,
   body,
   credentials,
+  extraHeaders,
 }: {
   url: string;
   method: string;
   body: string;
   credentials: ByokEndpointCredentials;
+  extraHeaders: Record<string, string>;
 }): Promise<{ headers: Headers; secrets: string[] }> {
   const headers = new Headers({ accept: 'application/json' });
   if (body) headers.set('content-type', 'application/json');
-  const auth = await resolveByokEndpointAuth(credentials);
-  const secrets = credentialSecrets(credentials);
-  switch (auth.type) {
-    case 'api_key':
-      if (auth.apiKeyHeader === 'x-api-key') {
-        headers.set('x-api-key', auth.apiKey);
-        headers.set('anthropic-version', ANTHROPIC_VERSION);
-      } else {
-        headers.set('authorization', `Bearer ${auth.apiKey}`);
-      }
-      return { headers, secrets: [...secrets, auth.apiKey] };
-    case 'aws_bedrock':
-      return {
-        headers: await signBedrockRequest({
-          url,
-          method,
-          headers,
-          body,
-          credentials: auth.credentials,
-        }),
-        secrets,
-      };
-    case 'secure_proxy':
-      throw new ByokEndpointRequestError('Endpoints do not support secure proxy credentials.');
+  const auth = await resolveByokEndpointUpstreamAuth(credentials);
+  const secrets = [...credentialSecrets(credentials), auth.apiKey].filter(Boolean);
+  if (auth.apiKeyHeader === 'x-api-key') {
+    headers.set('x-api-key', auth.apiKey);
+    headers.set('anthropic-version', ANTHROPIC_VERSION);
+  } else if (!auth.awsBedrock) {
+    headers.set('authorization', `Bearer ${auth.apiKey}`);
   }
+  for (const [name, value] of Object.entries(extraHeaders)) headers.set(name, value);
+  if (!auth.awsBedrock) return { headers, secrets };
+  return {
+    headers: await signBedrockRequest({ url, method, headers, body, credentials: auth.awsBedrock }),
+    secrets,
+  };
 }
 
 async function readTextWithLimit(response: Response): Promise<string> {
@@ -114,8 +109,8 @@ export type ByokEndpointResponse = {
 };
 
 /**
- * Sends one request to an organization's endpoint with its credentials. The URL policy applies
- * where it is enforced, redirects are refused rather than followed, and the response is capped.
+ * Sends one request to an organization's endpoint with its credentials, under the upstream URL
+ * policy (`fetchWithUpstreamUrlPolicy`). The response is capped.
  */
 export async function fetchByokEndpoint({
   url,
@@ -130,34 +125,32 @@ export async function fetchByokEndpoint({
   credentials: ByokEndpointCredentials;
   headers?: Record<string, string>;
 }): Promise<ByokEndpointResponse> {
-  const violation = await findUrlViolationMessage(url);
-  if (violation) throw new ByokEndpointRequestError(violation);
-
-  const { headers, secrets } = await authorizedHeaders({ url, method, body, credentials });
-  for (const [name, value] of Object.entries(extraHeaders)) headers.set(name, value);
+  const { headers, secrets } = await authorizedHeaders({
+    url,
+    method,
+    body,
+    credentials,
+    extraHeaders,
+  });
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetchWithUpstreamUrlPolicy(url, {
       method,
       headers,
       body: body || undefined,
-      redirect: 'manual',
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
+    if (error instanceof UpstreamUrlPolicyError) {
+      throw new ByokEndpointRequestError(URL_POLICY_MESSAGES[error.rejection]);
+    }
     if (error instanceof Error && error.name === 'TimeoutError') {
       throw new ByokEndpointRequestError('The endpoint did not respond within 15 seconds.');
     }
     throw new ByokEndpointRequestError('The endpoint could not be reached.');
   }
 
-  if (response.status >= 300 && response.status < 400) {
-    await response.body?.cancel().catch(() => undefined);
-    throw new ByokEndpointRequestError(
-      'The endpoint responded with a redirect, which is not followed. Use the final URL.'
-    );
-  }
   return {
     status: response.status,
     ok: response.ok,

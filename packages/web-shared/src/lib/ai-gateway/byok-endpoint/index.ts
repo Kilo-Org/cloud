@@ -12,8 +12,6 @@ import {
   type CustomLlmProvider,
   type ReasoningDetailsTransform,
 } from '@kilocode/db/schema-types';
-import type { DirectUpstreamAuth } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
-import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 
 export { isByokEndpointProviderId, type ByokEndpointProviderId };
 
@@ -88,23 +86,4 @@ export function parseByokEndpointCredentials(decrypted: string): ByokEndpointCre
     return null;
   }
   return ByokEndpointCredentialsSchema.safeParse(json).data ?? null;
-}
-
-export async function resolveByokEndpointAuth(
-  credentials: ByokEndpointCredentials
-): Promise<DirectUpstreamAuth> {
-  switch (credentials.type) {
-    case 'api_key':
-      return { type: 'api_key', apiKey: credentials.api_key, apiKeyHeader: null };
-    case 'x-api-key':
-      return { type: 'api_key', apiKey: credentials.api_key, apiKeyHeader: 'x-api-key' };
-    case 'service_account':
-      return {
-        type: 'api_key',
-        apiKey: await getGoogleServiceAccountAccessToken(credentials),
-        apiKeyHeader: null,
-      };
-    case 'aws_bedrock':
-      return { type: 'aws_bedrock', credentials };
-  }
 }

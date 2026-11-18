@@ -84,6 +84,7 @@ import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-ga
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
+  directByokProviderForKey,
   findDirectByokProvider,
   formatDirectByokModelId,
   listDirectByokCatalogModels,
@@ -953,16 +954,22 @@ export const byokRouter = createTRPCRouter({
       }
 
       if (isByokEndpointProviderId(existingKey.provider_id)) {
-        const definition = readByokEndpointDefinition(existingKey);
-        const credentials = parseByokEndpointCredentials(decryptedKey.decryptedAPIKey);
-        if (!definition || !credentials) {
+        const endpoint = readByokEndpointDefinition(existingKey) ?? undefined;
+        const provider = directByokProviderForKey({ providerId: providerId.data, endpoint });
+        if (!provider || !existingKey.organization_id) {
           return {
             success: false,
             message: 'API key test failed: the stored endpoint configuration is invalid.',
           };
         }
         try {
-          return await testByokEndpoint({ definition, credentials, modelId });
+          return await testByokEndpoint({
+            provider,
+            credential: decryptedKey.decryptedAPIKey,
+            modelId,
+            userId: ctx.user.id,
+            organizationId: existingKey.organization_id,
+          });
         } catch (e) {
           logByokWarning('BYOK endpoint test request failed', {
             providerId: existingKey.provider_id,

@@ -57,14 +57,13 @@ import {
   VERCEL_AI_GATEWAY,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
+  createDirectByokGatewayProvider,
   getDirectByokCatalogModelId,
   getDirectByokKeyLabel,
-  getDirectByokPolicyProviderId,
-  getDirectByokPolicyTarget,
-  getDirectByokUpstreamModelId,
-  type DirectByokPolicyTarget,
   getDirectByokModelChatApis,
+  getDirectByokPolicyTarget,
   supportsCatalogMode,
+  type DirectByokPolicyTarget,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type {
   DirectByokModel,
@@ -185,17 +184,7 @@ async function directByokRoute(
   });
 
   return {
-    provider: {
-      type: 'direct-byok',
-      ...upstream,
-      inferenceProviderId: getDirectByokPolicyProviderId(directByok),
-      directByokKeyLabel: getDirectByokKeyLabel(directByok),
-      async transformRequest(context) {
-        context.request.body.model = getDirectByokUpstreamModelId(directByok, directByokModel);
-        delete context.request.body.provider;
-        directByok.transformRequest(context);
-      },
-    } satisfies Provider,
+    provider: createDirectByokGatewayProvider(directByok, directByokModel, upstream),
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
     isFree: isFreeModel(requestedModel),
     // Organization model and provider policies cover catalog ids. A bespoke id is only served by a

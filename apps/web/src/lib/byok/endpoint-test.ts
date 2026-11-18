@@ -1,10 +1,14 @@
-import type {
-  ByokEndpointCredentials,
-  ByokEndpointDefinition,
-  ByokEndpointModel,
-  CustomLlmApiKind,
-} from '@kilocode/db/schema-types';
-import { getByokEndpointModelClientApiKind } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { parseByokEndpointCredentials } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import {
+  createDirectByokGatewayProvider,
+  formatDirectByokModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { CHAT_API_PATHS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import {
   ByokEndpointRequestError,
   describeByokEndpointError,
@@ -13,68 +17,93 @@ import {
 
 const TEST_PROMPT = 'Say hi';
 const TEST_MAX_TOKENS = 256;
+/** Stands in for the task id clients send, so the request carries what a client's request would. */
+const TEST_TASK_ID = 'byok-endpoint-test';
 
-const API_PATHS = {
-  chat_completions: '/chat/completions',
-  messages: '/messages',
-  responses: '/responses',
-} as const satisfies Record<CustomLlmApiKind, string>;
-
-function testRequestBody(
-  apiKind: CustomLlmApiKind,
+function testRequest(
+  apiKind: GatewayChatApiKind,
   model: string,
   maxTokensField: 'max_tokens' | 'max_completion_tokens'
-): Record<string, unknown> {
+): GatewayRequest {
+  const messages = [{ role: 'user' as const, content: TEST_PROMPT }];
   switch (apiKind) {
     case 'chat_completions':
-      return {
-        model,
-        messages: [{ role: 'user', content: TEST_PROMPT }],
-        [maxTokensField]: TEST_MAX_TOKENS,
-      };
+      return { kind: apiKind, body: { model, messages, [maxTokensField]: TEST_MAX_TOKENS } };
     case 'messages':
-      return {
-        model,
-        max_tokens: TEST_MAX_TOKENS,
-        messages: [{ role: 'user', content: TEST_PROMPT }],
-      };
+      return { kind: apiKind, body: { model, messages, max_tokens: TEST_MAX_TOKENS } };
     case 'responses':
-      return { model, input: TEST_PROMPT, max_output_tokens: TEST_MAX_TOKENS };
+      return {
+        kind: apiKind,
+        body: { model, input: TEST_PROMPT, max_output_tokens: TEST_MAX_TOKENS },
+      };
   }
 }
 
 export type ByokEndpointTestResult = { success: boolean; message: string };
 
 /**
- * Sends a tiny prompt to one model of the endpoint over the API clients use for it. Any 2xx
- * answer counts as success: a reasoning model may spend the small token budget before replying.
+ * Sends a tiny prompt to one model of the endpoint over the API clients use for it, transformed
+ * as the gateway transforms a client's request, so the test sends what real requests send. Any
+ * 2xx answer counts as success: a reasoning model may spend the small token budget before
+ * replying.
  */
 export async function testByokEndpoint({
-  definition,
-  credentials,
+  provider,
+  credential,
   modelId,
+  userId,
+  organizationId,
 }: {
-  definition: ByokEndpointDefinition;
-  credentials: ByokEndpointCredentials;
+  /** The endpoint, as `directByokProviderForKey` builds it. */
+  provider: DirectByokProvider;
+  /** The stored credentials JSON `provider` resolves its upstream from. */
+  credential: string;
   modelId?: string;
+  userId: string;
+  organizationId: string;
 }): Promise<ByokEndpointTestResult> {
-  const model: ByokEndpointModel | undefined = modelId
-    ? definition.models.find(candidate => candidate.id === modelId)
-    : definition.models[0];
-  if (!model) {
-    return { success: false, message: `Endpoint ${definition.name} has no model ${modelId}.` };
+  const models = await provider.models();
+  const model = modelId ? models.find(candidate => candidate.id === modelId) : models[0];
+  const name = provider.organization_endpoint?.name ?? provider.id;
+  if (!model) return { success: false, message: `Endpoint ${name} has no model ${modelId}.` };
+  const credentials = parseByokEndpointCredentials(credential);
+  if (!credentials) {
+    return {
+      success: false,
+      message: 'API key test failed: the stored endpoint configuration is invalid.',
+    };
   }
 
-  const apiKind = getByokEndpointModelClientApiKind(definition, model);
-  const url = definition.base_url + API_PATHS[apiKind];
-  const send = (maxTokensField: 'max_tokens' | 'max_completion_tokens') =>
-    fetchByokEndpoint({
+  // An endpoint names the API clients use for each model; Chat Completions is the default.
+  const apiKind = provider.getModelChatApi?.(model) ?? 'chat_completions';
+  const upstream = await provider.resolveUpstream({ credential, model, stream: false });
+  const gatewayProvider = createDirectByokGatewayProvider(provider, model, upstream);
+  const apiUrl = upstream.apiUrlOverrides[apiKind] ?? upstream.apiUrl;
+  const url = upstream.disableUrlSuffix ? apiUrl : apiUrl + CHAT_API_PATHS[apiKind];
+
+  const send = async (maxTokensField: 'max_tokens' | 'max_completion_tokens') => {
+    const request = testRequest(apiKind, formatDirectByokModelId(provider, model), maxTokensField);
+    applyTrackingIds(request, gatewayProvider, userId, TEST_TASK_ID);
+    const extraHeaders: Record<string, string> = {};
+    await gatewayProvider.transformRequest({
+      provider: gatewayProvider,
+      model: formatDirectByokModelId(provider, model),
+      request,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      extraHeaders,
+      userByok: [{ decryptedAPIKey: credential, providerId: provider.id }],
+      kilo_user_id: userId,
+      organization_id: organizationId,
+      session_id: null,
+    });
+    return fetchByokEndpoint({
       url,
       method: 'POST',
-      body: JSON.stringify(testRequestBody(apiKind, model.internal_id, maxTokensField)),
+      body: JSON.stringify(request.body),
       credentials,
-      headers: apiKind === 'messages' ? { 'anthropic-version': '2023-06-01' } : {},
+      headers: extraHeaders,
     });
+  };
 
   try {
     let response = await send('max_tokens');
@@ -94,7 +123,7 @@ export async function testByokEndpoint({
     }
     return {
       success: true,
-      message: `API key test success. Endpoint: ${definition.name}. Model: ${model.id}.`,
+      message: `API key test success. Endpoint: ${name}. Model: ${model.id}.`,
     };
   } catch (error) {
     if (error instanceof ByokEndpointRequestError) {

@@ -17,6 +17,7 @@ import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encrypti
 import {
   isFakeByokKmsRequest,
   TEST_BYOK_DATA_KEY,
+  testByokEnvelope,
   useFakeByokKms,
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 
@@ -684,11 +685,15 @@ describe('BYOK endpoints', () => {
       });
       expect(upstream.calls[0].url).toBe('https://llm.example.com/v1/chat/completions');
       expect(headersOf(upstream.calls[0]).get('authorization')).toBe('Bearer endpoint-secret');
-      expect(bodyOf(upstream.calls[0])).toMatchObject({
+      const body = bodyOf(upstream.calls[0]);
+      expect(body).toMatchObject({
         model: 'Org/My-Model',
         messages: [{ role: 'user', content: 'Say hi' }],
         max_tokens: 256,
       });
+      // Transformed like a gateway request to the endpoint.
+      expect(body).not.toHaveProperty('user');
+      expect(body).not.toHaveProperty('safety_identifier');
     });
 
     test('retries with max_completion_tokens when the upstream asks for it', async () => {
@@ -715,6 +720,25 @@ describe('BYOK endpoints', () => {
       ).resolves.toMatchObject({ success: true });
       expect(bodyOf(upstream.calls[1])).toMatchObject({ max_completion_tokens: 256 });
       expect(bodyOf(upstream.calls[1])).not.toHaveProperty('max_tokens');
+    });
+
+    test('fails without sending anything when the stored credentials do not parse', async () => {
+      const created = await createEndpoint();
+      await db
+        .update(byok_api_keys)
+        .set({ encrypted_api_key_envelope: testByokEnvelope('not json') })
+        .where(eq(byok_api_keys.id, created.id));
+      const upstream = mockUpstream(() => Response.json({ choices: [] }));
+      restoreFetch = upstream.restore;
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.byok.testApiKey({ organizationId: organization.id, id: created.id })
+      ).resolves.toEqual({
+        success: false,
+        message: 'API key test failed: the stored endpoint configuration is invalid.',
+      });
+      expect(upstream.calls).toEqual([]);
     });
 
     test('sends a Messages request to a chosen model', async () => {

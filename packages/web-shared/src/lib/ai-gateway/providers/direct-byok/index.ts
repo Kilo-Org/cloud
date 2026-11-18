@@ -3,10 +3,14 @@ import {
   type DirectByokAiSdkProvider,
   type DirectByokModel,
   type DirectByokProvider,
+  type DirectByokUpstream,
   type StaticDirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import type { CustomLlmProvider, OpenRouterProvider } from '@kilocode/db/schema-types';
-import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type {
+  GatewayChatApiKind,
+  Provider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import {
@@ -152,6 +156,28 @@ function convertModel(provider: DirectByokProvider, model: DirectByokModel) {
         model.reasoning_options ??
         (model.flags?.includes('reasoning') ? getFallbackReasoningOptions(id) : undefined),
     }),
+  };
+}
+
+/**
+ * The gateway provider that sends a request for `model` to `upstream`, the upstream `directByok`
+ * resolved from the stored credential, under the model's upstream id.
+ */
+export function createDirectByokGatewayProvider(
+  directByok: DirectByokProvider,
+  model: DirectByokModel,
+  upstream: DirectByokUpstream
+): Provider {
+  return {
+    type: 'direct-byok',
+    ...upstream,
+    inferenceProviderId: getDirectByokPolicyProviderId(directByok),
+    directByokKeyLabel: getDirectByokKeyLabel(directByok),
+    async transformRequest(context) {
+      context.request.body.model = getDirectByokUpstreamModelId(directByok, model);
+      delete context.request.body.provider;
+      directByok.transformRequest(context);
+    },
   };
 }
 

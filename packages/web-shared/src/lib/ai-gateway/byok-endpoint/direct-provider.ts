@@ -1,4 +1,5 @@
 import type {
+  ByokEndpointCredentials,
   ByokEndpointDefinition,
   ByokEndpointModel,
   ByokEndpointProviderId,
@@ -8,8 +9,8 @@ import {
   getByokEndpointModelClientApiKind,
   getByokEndpointModelResponseTransform,
   parseByokEndpointCredentials,
-  resolveByokEndpointAuth,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
+import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import {
   credentialHeaders,
   type DirectByokModel,
@@ -40,6 +41,15 @@ function removeTrackingIds(body: Record<string, unknown>) {
   else body.metadata = rest;
 }
 
+function parseCredentials(
+  providerId: ByokEndpointProviderId,
+  credential: string
+): ByokEndpointCredentials {
+  const credentials = parseByokEndpointCredentials(credential);
+  if (!credentials) throw new InvalidByokEndpointCredentialsError(providerId);
+  return credentials;
+}
+
 /** A listed model of the endpoint: its id is the one clients use after the provider id. */
 function toDirectByokModel(model: ByokEndpointModel): DirectByokModel {
   return {
@@ -56,20 +66,22 @@ function toDirectByokModel(model: ByokEndpointModel): DirectByokModel {
   };
 }
 
-async function resolveAuth(
-  providerId: ByokEndpointProviderId,
-  credential: string
+/** The upstream authentication for endpoint credentials. */
+export async function resolveByokEndpointUpstreamAuth(
+  credentials: ByokEndpointCredentials
 ): Promise<Pick<DirectByokUpstream, 'apiKey' | 'apiKeyHeader' | 'awsBedrock'>> {
-  const credentials = parseByokEndpointCredentials(credential);
-  if (!credentials) throw new InvalidByokEndpointCredentialsError(providerId);
-  const auth = await resolveByokEndpointAuth(credentials);
-  switch (auth.type) {
+  switch (credentials.type) {
     case 'api_key':
-      return { apiKey: auth.apiKey, apiKeyHeader: auth.apiKeyHeader };
+      return { apiKey: credentials.api_key, apiKeyHeader: null };
+    case 'x-api-key':
+      return { apiKey: credentials.api_key, apiKeyHeader: 'x-api-key' };
+    case 'service_account':
+      return {
+        apiKey: await getGoogleServiceAccountAccessToken(credentials),
+        apiKeyHeader: null,
+      };
     case 'aws_bedrock':
-      return { apiKey: '', apiKeyHeader: null, awsBedrock: auth.credentials };
-    case 'secure_proxy':
-      throw new InvalidByokEndpointCredentialsError(providerId);
+      return { apiKey: '', apiKeyHeader: null, awsBedrock: credentials };
   }
 }
 
@@ -98,7 +110,7 @@ function createProvider(
         apiUrl: definition.base_url,
         apiUrlOverrides: {},
         disableUrlSuffix: false,
-        ...(await resolveAuth(providerId, credential)),
+        ...(await resolveByokEndpointUpstreamAuth(parseCredentials(providerId, credential))),
         supportedChatApis: getByokEndpointModelApiKinds(definition, served),
         responseTransforms: getByokEndpointModelResponseTransform(definition, served),
       };

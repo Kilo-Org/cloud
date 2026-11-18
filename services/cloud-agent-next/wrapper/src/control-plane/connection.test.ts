@@ -74,7 +74,7 @@ class TestSocket {
   closes = 0;
   constructor(
     _url: string,
-    readonly options?: { headers?: Record<string, string> }
+    readonly options?: { headers?: Record<string, string>; proxy?: string }
   ) {
     if (TestSocket.constructorError) throw TestSocket.constructorError;
     TestSocket.instances.push(this);
@@ -185,7 +185,19 @@ async function withTestSocket(
   }
 }
 
-it('does not log proxy credentials when socket construction fails', () => {
+it('opens the control socket through the configured proxy', () => {
+  withControlledConnection(() => {
+    expect(TestSocket.instances.at(-1)?.options?.proxy).toBeUndefined();
+  });
+  withControlledConnection(
+    () => {
+      expect(TestSocket.instances.at(-1)?.options?.proxy).toBe('http://proxy.test:3128');
+    },
+    { proxyUrl: 'http://proxy.test:3128' }
+  );
+});
+
+it('logs the socket construction failure without proxy credentials', () => {
   const proxy = new URL('http://proxy.test:3128');
   proxy.username = 'kilo';
   proxy.password = 'not-a-real-proxy-token';
@@ -195,7 +207,9 @@ it('does not log proxy credentials when socket construction fails', () => {
       TestSocket.constructorError = new Error(`Cannot connect through ${proxyUrl}`);
       try {
         connection.recycle();
-        expect(logs).toContain('control-plane connection failed');
+        const failure = logs.find(line => line.startsWith('control-plane connection failed: '));
+        expect(failure).toContain('Cannot connect through http://');
+        expect(failure).toContain('proxy.test:3128');
         expect(logs.join('\n')).not.toContain('not-a-real-proxy-token');
       } finally {
         TestSocket.constructorError = undefined;

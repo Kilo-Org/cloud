@@ -24,7 +24,7 @@
   "common": {
     "manageOnWeb": "จัดการบนเว็บ",
     "creditHistory": "ประวัติเครดิต",
-    "sentenceJoiner": ". ",
+    "sentenceJoiner": " ",
     "listJoiner": ", ",
     "cancel": "ยกเลิก",
     "done": "เสร็จสิ้น",

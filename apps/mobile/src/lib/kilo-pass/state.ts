@@ -287,12 +287,15 @@ export type KiloPassCardContentState =
  */
 function joinKiloPassCardSentences(parts: readonly string[]): string {
   const joiner = i18n.t('common.sentenceJoiner');
-  // Every catalog's `common.sentenceJoiner` is one sentence terminator followed
-  // by optional spaces (`. `, `। `, `۔ `, `。`), so its first non-space
-  // character is the exact stop the join already writes between sentences.
+  // A catalog's `common.sentenceJoiner` is the separator it writes between two
+  // sentences: one sentence terminator plus optional spaces in nearly every
+  // catalog (`. `, `। `, `۔ `, `。`), so its first non-space character is the
+  // exact stop the join writes between sentences. Thai writes no sentence
+  // terminator, so its joiner is a plain space and that character is empty.
   const terminator = joiner.trimStart().charAt(0);
-  // A terminatorless joiner would join parts with nothing, which no catalog
-  // declares; the empty-set guard keeps the code provably terminating.
+  // Thai is the one catalog whose copy carries no sentence terminators, so its
+  // joiner has no stop to strip; joining with the catalog's own separator is
+  // exactly the text it writes between two sentences.
   if (terminator === '') {
     return parts.join(joiner);
   }

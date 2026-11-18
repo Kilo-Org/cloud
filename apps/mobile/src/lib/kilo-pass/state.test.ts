@@ -291,6 +291,27 @@ describe('getKiloPassCardContentState', () => {
     );
   });
 
+  it('joins Thai sentences with the space the catalog writes between sentences', async () => {
+    await i18n.changeLanguage('th');
+
+    const state = getKiloPassCardContentState({
+      subscription: undefined,
+      isError: true,
+      isPending: false,
+    });
+
+    if (state.kind !== 'error') {
+      throw new Error(`unexpected state: ${state.kind}`);
+    }
+    const parts = [
+      i18n.t('kiloPass.unavailable'),
+      i18n.t('kiloPass.loadFailedRetry'),
+      i18n.t('common.retry'),
+    ];
+    expect(state.accessibilityLabel).not.toContain('.');
+    expect(state.accessibilityLabel).toBe(parts.join(' '));
+  });
+
   it('tells a subscriber-less account that the app does not offer a pass', () => {
     expect(
       getKiloPassCardContentState({ subscription: null, isError: false, isPending: false })

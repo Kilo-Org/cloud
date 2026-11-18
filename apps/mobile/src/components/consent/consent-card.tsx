@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -324,18 +325,26 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     if (storedLoad.status === 'failed') {
       return (
         <View className="flex-row items-center justify-center gap-1">
+          {/* The load failure seeds `error` with the load key, but a later
+              action on the failed card can write its own key (Decline's failed
+              sign-out, a failed optional-save). The latest error wins: the
+              load error is only the default this state starts from, and a
+              hardcoded copy would hide the real failure. */}
           <AccessibleStatus
-            message={t('consent.couldNotLoadConsentSettings')}
+            message={t(error ?? 'consent.couldNotLoadConsentSettings')}
             className="text-sm"
           />
           <Pressable
             onPress={() => {
               setStoredLoadRetryKey(key => key + 1);
             }}
-            hitSlop={8}
+            hitSlop={LINE_ACTION_HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel={t('common.retry')}
-            className="min-h-[28px] flex-row items-center gap-1 px-1 active:opacity-70"
+            // The shared line-action box: its `-my-[7px]` keeps the row one
+            // line tall, so a failed load grows the reserved slot by nothing
+            // and the actions below it never move.
+            className={`${LINE_ACTION_BOX_CLASS} flex-row items-center gap-1 px-1 active:opacity-70`}
           >
             <Text className="text-sm font-semibold text-primary">{t('common.retry')}</Text>
           </Pressable>

@@ -59,6 +59,17 @@ vi.mock('@/components/consent/consent-row', () => ({ ConsentRow: 'ConsentRow' })
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/dialog', () => ({
+  // The real confirm presents a native sheet, which the string-typed test tree
+  // cannot host. Run the confirm handler directly: the tests here own the
+  // card's behaviour after the decision, not the sheet's.
+  useConfirmDialog: () => ({
+    confirm: (request: { onConfirm: () => void }) => {
+      request.onConfirm();
+    },
+    dialog: null,
+  }),
+}));
 vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://kilo.ai',
 }));
@@ -459,6 +470,30 @@ describe('ConsentCard', () => {
     // The placeholder is gone: the error names the unreliability, so the
     // control is at least operable (a failed toggle reverts with its error).
     expect(singleSwitch(renderer.root)).toBeTruthy();
+  });
+
+  it('replaces the load error with the latest failure on the failed card', async () => {
+    // On a failed stored read the Retry is not the only line in the slot: a
+    // later action writes its own failure (Decline's failed sign-out here),
+    // and the hardcoded load copy would hide it while the card still claims
+    // the failure it no longer has.
+    mockedReadConsent.mockRejectedValue(new Error('keychain read failed'));
+    mockedSignOut.mockRejectedValue(new Error('sign-out failed'));
+    const renderer = mountCard('onboarding');
+    await act(flush);
+    expect(texts(renderer.root)).toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    const decline = findButton(renderer.root, i18n.t('consent.decline'));
+    await act(async () => {
+      (decline.props.onPress as () => void)();
+    });
+    await act(flush);
+    expect(texts(renderer.root)).toContain('Could not sign out. Please try again.');
+    expect(texts(renderer.root)).not.toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    mockedSignOut.mockResolvedValue(undefined);
   });
 
   it('names the wait in the reserved status line while the stored read is in flight', async () => {

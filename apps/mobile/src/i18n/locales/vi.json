@@ -4292,8 +4292,7 @@
       "repoValue": "Kho lưu trữ: {{name}}",
       "profileValue": "Hồ sơ: {{name}}",
       "profileUnavailable": "Hồ sơ này không còn khả dụng. Hãy chọn hồ sơ khác.",
-      "pickerEmptyDescriptionOrganization": "Tạo hồ sơ tổ chức để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Chủ sở hữu hoặc quản trị viên của tổ chức có thể tạo hồ sơ tổ chức."
+      "pickerEmptyDescriptionOrganization": "Tạo hồ sơ tổ chức để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên."
     },
     "variablesDeleteFailed": "Không thể xóa biến",
     "deleteVariable": "Xóa biến {{key}}",

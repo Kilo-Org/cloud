@@ -4292,8 +4292,7 @@
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Profil ini tidak lagi tersedia. Pilih profil lain.",
-      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Pemilik atau pentadbir organisasi boleh membuat profil organisasi."
+      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi."
     },
     "variablesDeleteFailed": "Tidak dapat memadam pembolehubah",
     "deleteVariable": "Padam pembolehubah {{key}}",

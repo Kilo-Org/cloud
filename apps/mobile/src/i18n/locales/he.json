@@ -4358,8 +4358,7 @@
       "repoValue": "מאגר: {{name}}",
       "profileValue": "פרופיל: {{name}}",
       "profileUnavailable": "הפרופיל הזה כבר לא זמין. בחר פרופיל אחר.",
-      "pickerEmptyDescriptionOrganization": "צור פרופיל ארגוני לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "בעלים של ארגון או מנהל יכולים ליצור פרופיל ארגוני."
+      "pickerEmptyDescriptionOrganization": "צור פרופיל ארגוני לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות."
     },
     "variablesDeleteFailed": "לא ניתן למחוק את המשתנה",
     "deleteVariable": "מחק את המשתנה {{key}}",

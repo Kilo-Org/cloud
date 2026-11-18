@@ -4292,8 +4292,7 @@
       "repoValue": "रिपॉज़िटरी: {{name}}",
       "profileValue": "प्रोफ़ाइल: {{name}}",
       "profileUnavailable": "यह प्रोफ़ाइल अब उपलब्ध नहीं है। कोई दूसरी प्रोफ़ाइल चुनें।",
-      "pickerEmptyDescriptionOrganization": "सभी सत्रों में एनवायरनमेंट चर, सेटअप आदेश और कौशल का पुन: उपयोग करने के लिए एक संगठन प्रोफ़ाइल बनाएं।",
-      "pickerEmptyDescriptionOrganizationReadOnly": "संगठन मालिक या एडमिन एक संगठन प्रोफ़ाइल बना सकता है।"
+      "pickerEmptyDescriptionOrganization": "सभी सत्रों में एनवायरनमेंट चर, सेटअप आदेश और कौशल का पुन: उपयोग करने के लिए एक संगठन प्रोफ़ाइल बनाएं।"
     },
     "variablesDeleteFailed": "चर हटाया नहीं जा सका",
     "deleteVariable": "चर {{key}} हटाएँ",

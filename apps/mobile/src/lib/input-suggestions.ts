@@ -17,9 +17,10 @@ import { Platform } from 'react-native';
  * popup, and React Native maps `autoCorrect` to the
  * `TYPE_TEXT_FLAG_AUTO_CORRECT`/`TYPE_TEXT_FLAG_NO_SUGGESTIONS` input-type
  * flags, so keeping autocorrect off on the rewritten fields is the only
- * lever that removes the crash class. The IME's own suggestion strip and
- * its autocorrect keep working; only the in-field spell underline and the
- * framework's tap-the-word popup are disabled there.
+ * lever that removes the crash class. The cost is real: the flag asks the
+ * IME to withhold suggestions for that field, and Gboard honors it by
+ * hiding its suggestion strip and not autocorrecting the field there.
+ * Typing, capitalization, and the keyboard itself work as before.
  *
  * iOS keeps autocorrect on: the crash is Android-only and iOS behavior
  * must not change.

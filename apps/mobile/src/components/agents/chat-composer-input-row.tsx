@@ -250,7 +250,8 @@ export function ChatComposerInputRow({
             // The app rewrites this field's text programmatically (share
             // prefill, voice transcript, paste, clear-on-send), so Android
             // keeps the framework suggestion popup off — it crashes against
-            // rewritten text (see REWRITTEN_INPUT_AUTO_CORRECT).
+            // rewritten text (see REWRITTEN_INPUT_AUTO_CORRECT). The IME
+            // stops suggesting and autocorrecting this field on Android.
             autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
           />
         </View>

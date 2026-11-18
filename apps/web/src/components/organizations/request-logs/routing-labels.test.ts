@@ -26,6 +26,46 @@ describe('describeStep', () => {
     });
   });
 
+  test('names the partner Kilo tries before its gateway', () => {
+    expect(
+      describeStep({
+        step: 'kilo',
+        outcome: 'selected',
+        gateway: 'vercel',
+        partner_inference_provider: 'acme-ai',
+      })
+    ).toEqual({
+      title: 'Kilo credits',
+      detail:
+        'Paid with Kilo credits and sent to Acme Ai directly, with Vercel AI Gateway as the fallback.',
+      tone: 'selected',
+    });
+  });
+
+  test.each([
+    ['unsupported-api-kind', 'The partner does not support this API.'],
+    ['bounded-spending', 'The request carries a spend ceiling.'],
+    ['openrouter-disabled', 'The organization gateway settings exclude the partner.'],
+    ['country-denied', 'The partner is not available in the country the request came from.'],
+    ['provider-settings', 'Excluded by provider settings.'],
+    ['invalid-credentials', 'The partner is temporarily unavailable.'],
+  ])('explains a partner skipped for %s', (reason, detail) => {
+    expect(
+      describeStep({
+        step: 'partner',
+        outcome: 'skipped',
+        inference_provider: 'acme-ai',
+        reason,
+      })
+    ).toEqual({ title: 'Partner provider', detail, tone: 'skipped' });
+  });
+
+  test('shows an unknown partner skip reason as recorded', () => {
+    expect(describeStep({ step: 'partner', outcome: 'skipped', reason: 'new-reason' }).detail).toBe(
+      'new-reason'
+    );
+  });
+
   test('calls custom LLMs promotional models', () => {
     expect(describeStep({ step: 'custom-llm', outcome: 'skipped', reason: 'no-match' })).toEqual({
       title: 'Promotional model',
@@ -109,6 +149,21 @@ describe('describeResult', () => {
         is_free: isFree,
       })
     ).toEqual({ title: "Sent to the promotional model's provider", paidBy });
+  });
+});
+
+describe('describeResult for a partner', () => {
+  test('names the partner provider and bills Kilo credits', () => {
+    expect(
+      describeResult({
+        kind: 'provider',
+        route: 'kilo',
+        provider_type: 'partner',
+        byok_provider_ids: [],
+        payer: 'kilo',
+        is_free: false,
+      })
+    ).toEqual({ title: 'Sent to a Kilo partner provider', paidBy: 'Kilo credits' });
   });
 });
 

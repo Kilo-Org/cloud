@@ -2546,6 +2546,55 @@ describe('logMicrodollarUsage', () => {
     expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
   });
 
+  test('bills partner usage at the partner pricing and records the requested model', async () => {
+    const user = await insertTestUser({
+      id: 'test-partner-priced-user',
+      microdollars_used: 1000,
+      google_user_email: 'partner-priced@example.com',
+    });
+
+    const result = await processTokenData(
+      {
+        ...BASE_USAGE_STATS,
+        model: 'partner-upstream-model',
+        messageId: null,
+        cost_mUsd: 300,
+        cacheDiscount_mUsd: 50,
+      },
+      {
+        ...createBaseUsageContext(user),
+        provider: 'partner',
+        requested_model: 'moonshotai/kimi-k2.6',
+        is_free: false,
+        custom_llm_pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 2,
+              completion_per_million: 10,
+              input_cache_read_per_million: 1,
+              input_cache_write_per_million: 3,
+            },
+          },
+        ],
+      }
+    );
+
+    // 85 uncached * 2 + 10 cache writes * 3 + 5 cache reads * 1 + 50 output * 10
+    const pricedCost = 705;
+    assert(result);
+    const usageRecord = await db.query.microdollar_usage.findFirst({
+      where: eq(microdollar_usage.id, result.usageId),
+    });
+    expect(usageRecord).toMatchObject({
+      provider: 'partner',
+      model: 'moonshotai/kimi-k2.6',
+      requested_model: 'moonshotai/kimi-k2.6',
+      cost: pricedCost,
+    });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
+  });
+
   test.each([
     ['custom', 'deleted'],
     ['custom', 'unavailable'],

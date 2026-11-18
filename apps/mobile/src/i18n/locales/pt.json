@@ -26,6 +26,7 @@
     "creditHistory": "Histórico de créditos",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancelar",
     "done": "Concluir",
     "retry": "Tentar novamente",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Alterações",
     "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
-    "privateRepositoryA11y": "{{name}}, repositório privado"
+    "privateRepositoryA11y": "{{name}}, repositório privado",
+    "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês."
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -481,7 +483,14 @@
       "viewReceipt": "Ver comprovativo"
     },
     "changelog": "Novidades",
-    "changelogVersionPending": "As notas desta versão vêm na próxima atualização da app."
+    "changelogVersionPending": "As notas da versão {{version}} vêm na próxima atualização da app.",
+    "changelogGroupNew": "Novidades",
+    "changelogFixesIn": "Correções e melhorias em {{areas}}.",
+    "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
+    "changelogAreas": {
+      "signIn": "Início de sessão",
+      "profileOrganizations": "Perfil e organizações"
+    }
   },
   "preferences": {
     "general": "Geral",
@@ -1377,7 +1386,8 @@
       "managedOnWeb": "A ligação ao Bitbucket desta organização é gerida na Web, a partir de um computador.",
       "description": "Cria um token de acesso ao espaço de trabalho com as permissões necessárias e cola-o abaixo.",
       "scopes": "Conta: leitura · Repositórios: leitura/escrita · Pedidos de integração: leitura · Webhooks: leitura/escrita",
-      "tokenPlaceholder": "Token de acesso ao espaço de trabalho"
+      "tokenPlaceholder": "Token de acesso ao espaço de trabalho",
+      "tokenRefused": "O Bitbucket não aceitou este token de acesso ao espaço de trabalho. Verifica se tem as permissões acima e tenta novamente."
     },
     "scopeList": {
       "personalStillAvailable": "Os repositórios pessoais ainda estão disponíveis abaixo.",
@@ -1489,7 +1499,8 @@
       "repositoryLine": "Revisões: {{reviews}} · Ocorrências: {{findings}}",
       "empty": "Ainda não há revisões com estatísticas",
       "emptyDescription": "As estatísticas registam revisões concluídas enquanto estão ativadas para a organização.",
-      "off": "As estatísticas estão desativadas para esta organização.",
+      "offTitle": "As estatísticas estão desativadas para {{platform}}",
+      "offDescription": "Ativa-as nas definições da organização na Web para registar revisões concluídas.",
       "couldNotLoad": "Não foi possível carregar as estatísticas"
     },
     "council": {
@@ -3388,6 +3399,7 @@
       "manageOnWeb": "Definições de faturação na Web",
       "changePlan": "Alterar plano",
       "buySeats": "Comprar lugares",
+      "managedOnWeb": "O plano, os lugares e o carregamento automático são geridos na Web.",
       "setupAutoTopUp": "Configurar carregamento automático",
       "manageAutoTopUp": "Gerir carregamento automático",
       "opensOnWeb": "Abre na web"
@@ -3536,12 +3548,10 @@
       "requestLogs": "Registos de pedidos"
     },
     "requestLogs": {
-      "hint": "Pedidos da hora anterior ao fim do intervalo, mais recentes primeiro.",
       "older": "Hora anterior",
       "newer": "Hora seguinte",
       "truncated": "Esta hora tem mais pedidos do que os apresentados na lista.",
       "emptyTitle": "Sem pedidos",
-      "emptyDescription": "Não há pedidos ao gateway nesta hora.",
       "loadError": "Não foi possível carregar os registos de pedidos.",
       "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização pode consultar os respetivos registos de pedidos.",
       "tokens": "{{input}} de entrada · {{output}} de saída",
@@ -4545,7 +4555,6 @@
     "dismiss": "Ignorar relatório",
     "offline": "Offline · relatório guardado",
     "cached": "Relatório guardado · atualização indisponível",
-    "window": "{{start}} – {{end}}",
     "summary": "Resumo de IA",
     "summaryPending": "Resumo de IA em curso. Será anexado aqui quando estiver pronto.",
     "summaryUnavailable": "Resumo de IA indisponível. O seu relatório estruturado continua disponível.",
@@ -4664,6 +4673,7 @@
       "title": "Acionadores e webhooks",
       "subtitle": "Automatize execuções do Cloud Agent a partir de uma chamada de webhook ou de uma programação.",
       "new": "Novo acionador",
+      "create": "Criar acionador",
       "emptyTitle": "Ainda não há acionadores",
       "emptyDescription": "Crie um acionador para iniciar uma execução do Cloud Agent a partir de uma chamada de webhook ou segundo uma programação.",
       "loadFailedTitle": "Não foi possível carregar os acionadores",

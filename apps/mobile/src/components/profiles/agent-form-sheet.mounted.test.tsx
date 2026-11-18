@@ -215,6 +215,7 @@ function mountSheetWith(
       },
       onSave: payload => {
         h.onSave(payload);
+        return Promise.resolve();
       },
     })
   );

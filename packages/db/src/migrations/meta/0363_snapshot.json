@@ -1,5 +1,5 @@
 {
-  "id": "beaed61b-10a5-4511-af01-8b214be16d24",
+  "id": "d7a5bb6b-ad0f-4b19-b427-609e28c46136",
   "prevId": "b5ef6f99-a139-49b7-be22-f1d9b583706e",
   "version": "7",
   "dialect": "postgresql",
@@ -35195,33 +35195,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_session_step_up_proofs_user_session_binding": {
-          "name": "idx_session_step_up_proofs_user_session_binding",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "session_id_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "action_binding_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

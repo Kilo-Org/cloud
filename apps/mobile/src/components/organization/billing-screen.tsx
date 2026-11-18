@@ -3,30 +3,29 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import {
-  formatSeatCount,
   getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
   getScheduledSeatChange,
+  seatCountReadout,
 } from '@/components/organization/billing-model';
-import { ExternalBillingLink } from '@/components/organization/external-billing-link';
+import { BillingWebSettings } from '@/components/organization/billing-web-settings';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { getOrgKiloPassRowState } from '@/components/organization/org-kilo-pass-row-state';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { SectionLabel } from '@/components/organization/section-label';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { WEB_BASE_URL } from '@/lib/config';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatNumber } from '@/lib/format';
 import {
   isMoneyRole,
   useOrgBoundary,
@@ -83,22 +82,14 @@ function BillingCardError({
   );
 }
 
-function SectionLabel({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-      {children}
-    </Text>
-  );
-}
-
 /**
  * The organization's billing readout: the plan and its subscription state, the
  * seats in use, auto top-up, and the organization's Kilo Pass.
  *
  * Nothing here changes a plan. Buying seats, changing the plan and setting up
  * auto top-up exist only on the web, so those controls lead there — a link only
- * on an iOS build in the US storefront, plain text everywhere else, the rule
- * `useCanLinkExternalPurchase` owns.
+ * on an iOS build in the US storefront, a statement of where the setting lives
+ * everywhere else, the rule `useCanLinkExternalPurchase` owns.
  */
 export function OrganizationBillingScreen() {
   const { t } = useTranslation();
@@ -150,16 +141,15 @@ export function OrganizationBillingScreen() {
   const scheduledSeatChange = subscription.data ? getScheduledSeatChange(subscription.data) : null;
   // The list entry already carries the same seat numbers, so the row paints
   // settled on the first frame and the query only corrects it if they moved.
-  // A total is printed only when the organization enforces seats and actually
-  // bought some: `getOrganizationSeatUsage` answers `seat_count || 0`, so a
-  // legacy organization would read `3 / 0`, and the row would also change
-  // shape on the frame the seats read lands.
+  // The shared readout prints a total only when the seats read confirms the
+  // organization bought some, so the row does not change shape when it lands.
   const seatsInUse = seats.data?.usedSeats ?? org.seatCount.used;
   const seatsPurchased = seats.data?.totalSeats ?? org.seatCount.total;
-  const seatCountValue =
-    org.requireSeats && seatsPurchased > 0
-      ? formatSeatCount(seatsInUse, seatsPurchased)
-      : formatNumber(seatsInUse, i18n.language);
+  const seatCountValue = seatCountReadout({
+    seatsEnforced: org.requireSeats,
+    used: seatsInUse,
+    total: seatsPurchased,
+  });
 
   const autoTopUpReadout = autoTopUp.data ? getAutoTopUpReadout(autoTopUp.data) : null;
 
@@ -330,22 +320,12 @@ export function OrganizationBillingScreen() {
           </View>
         )}
 
-        <View className="gap-2">
-          <SectionLabel>{t('organization.billing.manageOnWeb')}</SectionLabel>
-          <View className="gap-3 rounded-lg bg-secondary p-3">
-            {changePlanOnBanner ? null : (
-              <ExternalBillingLink url={subscriptionsUrl} label={changePlanLabel} />
-            )}
-            <ExternalBillingLink
-              url={`${subscriptionsUrl}/seats`}
-              label={t('organization.billing.buySeats')}
-            />
-            <ExternalBillingLink
-              url={organizationBillingUrl(organizationId)}
-              label={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
-            />
-          </View>
-        </View>
+        <BillingWebSettings
+          subscriptionsUrl={subscriptionsUrl}
+          planLabel={changePlanOnBanner ? null : changePlanLabel}
+          autoTopUpUrl={organizationBillingUrl(organizationId)}
+          autoTopUpLabel={getAutoTopUpLinkLabel(autoTopUp.data?.enabled)}
+        />
       </TabScreenScrollView>
     </View>
   );

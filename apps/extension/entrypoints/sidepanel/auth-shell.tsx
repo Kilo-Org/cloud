@@ -25,6 +25,7 @@ import {
   shouldShowFirefoxUsageDataHint,
 } from './analytics-settings-logic';
 import { ErrorNotice } from './error-notice';
+import { LocalAgentsSettings } from './local-agents-settings';
 import { MemorySettings } from './memory-settings';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
 import { RemoteMcpSettings } from './remote-mcp-settings';
@@ -243,6 +244,7 @@ const HeaderActions = ({
             />
             <WebMcpSettings />
             <RemoteMcpSettings />
+            <LocalAgentsSettings />
             <AnalyticsSettingsRow userEmail={auth.userEmail} />
             <button
               className="type-label h-9 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"

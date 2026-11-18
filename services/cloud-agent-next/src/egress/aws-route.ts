@@ -10,6 +10,7 @@ import { cleanEgressHeaders } from '@kilocode/worker-utils/egress-http';
 import type { HonoContext } from '../hono-context.js';
 import type { Env } from '../types.js';
 import { isSafeSandboxId } from '../shared/control-plane-credential.js';
+import { logger } from '../logger.js';
 
 export async function handleAwsEgress(
   request: Request,
@@ -52,7 +53,10 @@ export async function handleAwsEgress(
             : {}),
         },
       });
-      if (!admission.ok)
+      if (!admission.ok) {
+        logger
+          .withFields({ sandboxId, code: admission.code, status: admission.status })
+          .warn('AWS SCM egress admission rejected');
         return Response.json(
           { code: admission.code },
           {
@@ -62,6 +66,7 @@ export async function handleAwsEgress(
               : {}),
           }
         );
+      }
       headers.set('host', new URL(target).host);
       const upstream = new Request(target, {
         method: request.method,
@@ -80,7 +85,15 @@ export async function handleAwsEgress(
       );
     }
     return new Response(null, { status: 405 });
-  } catch {
+  } catch (error) {
+    // Error messages can carry the target URL; log only the error class.
+    logger
+      .withFields({
+        sandboxId,
+        operation,
+        errorName: error instanceof Error ? error.name : 'unknown',
+      })
+      .warn('AWS egress request failed');
     return Response.json({ code: 'egress_unavailable' }, { status: 503 });
   }
 }

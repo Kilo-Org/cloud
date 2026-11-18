@@ -130,7 +130,7 @@ export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disable
         onPress={() => {
           void preferences.refetch();
         }}
-        accessibilityLabel={`${t('agentBriefing.title')}. ${t('common.retry')}`}
+        accessibilityLabel={[t('agentBriefing.title'), t('common.retry')].join('. ')}
         trailing={
           <Text variant="caption" className="text-destructive">
             {t('common.retry')}

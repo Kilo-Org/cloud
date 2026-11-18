@@ -266,11 +266,10 @@ describe('low balance alert sheet', () => {
 
   it('disables Save for a threshold too large to store, then re-enables it once corrected', async () => {
     const { renderer, unmount } = await mountSheet();
-    const toggle = renderer.root.find(node => String(node.type) === 'Switch');
-    await act(() => {
-      (toggle.props.onValueChange as (value: boolean) => void)(true);
-    });
-
+    // A stored threshold turns the alert on at the mount, so the field is on
+    // screen before any press; each later press reads the switch of the
+    // current render, because the row flips the value it last rendered.
+    const switchOf = () => renderer.root.find(node => String(node.type) === 'Switch');
     const threshold = thresholdFieldOf(renderer);
     const paste = '1'.repeat(300);
     await act(() => {
@@ -294,10 +293,10 @@ describe('low balance alert sheet', () => {
       (threshold.props.onChangeText as (value: string) => void)('1000000001');
     });
     await act(() => {
-      (toggle.props.onValueChange as (value: boolean) => void)(false);
+      (switchOf().props.onValueChange as (value: boolean) => void)(false);
     });
     await act(() => {
-      (toggle.props.onValueChange as (value: boolean) => void)(true);
+      (switchOf().props.onValueChange as (value: boolean) => void)(true);
     });
     expect(thresholdFieldOf(renderer).props.error).toBe(capSentence());
     expect(saveButtonOf(renderer).props.doneDisabled).toBe(true);

@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SectionHeader } from './section-header';
@@ -39,7 +39,7 @@ describe('SectionHeader gutter', () => {
       return classes;
     };
 
-    expect(await rowClasses(false)).not.toContain('px-4');
-    expect(await rowClasses(true)).toContain('px-4');
+    expect(rowClasses(false)).not.toContain('px-4');
+    expect(rowClasses(true)).toContain('px-4');
   });
 });

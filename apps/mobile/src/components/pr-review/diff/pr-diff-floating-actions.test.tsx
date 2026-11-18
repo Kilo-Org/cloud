@@ -12,7 +12,7 @@
 // make the "0 pending" case below FAIL.
 
 import * as React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
@@ -319,6 +319,6 @@ describe('PrDiffFloatingActions footer', () => {
     // edge. As an in-flow footer the list ends above it at every scroll
     // position.
     const props = footerElement().props as { className?: string };
-    expect(String(props.className ?? '').split(' ')).not.toContain('absolute');
+    expect((props.className ?? '').split(' ')).not.toContain('absolute');
   });
 });

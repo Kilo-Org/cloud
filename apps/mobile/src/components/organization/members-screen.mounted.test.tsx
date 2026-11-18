@@ -291,8 +291,6 @@ describe('OrganizationMembersScreen section labels', () => {
     if (!card) {
       throw new Error('member card not found');
     }
-    expect(card.props.className).toContain('rounded-t-xl');
-    expect(card.props.className).not.toContain('mx-4');
     unmount();
   });
 

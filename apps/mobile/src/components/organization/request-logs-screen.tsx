@@ -243,6 +243,8 @@ export function OrganizationRequestLogsScreen() {
       case 'retryable': {
         return (
           <QueryError
+            placement="top"
+            inset="gutter"
             variant={current.variant}
             message={t('organization.requestLogs.loadError')}
             onRetry={() => void logs.refetch()}
@@ -254,6 +256,8 @@ export function OrganizationRequestLogsScreen() {
       case 'refused': {
         return (
           <QueryError
+            placement="top"
+            inset="gutter"
             variant={current.variant}
             message={t('organization.requestLogs.loadError')}
             refreshControl={refreshControl}
@@ -263,6 +267,8 @@ export function OrganizationRequestLogsScreen() {
       case 'empty': {
         return (
           <EmptyState
+            placement="top"
+            inset="gutter"
             icon={DirectionalLogs}
             title={t('organization.requestLogs.emptyTitle')}
             refreshControl={refreshControl}

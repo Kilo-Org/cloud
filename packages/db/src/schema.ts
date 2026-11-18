@@ -6042,6 +6042,18 @@ export const blacklisted_domains = pgTable('blacklisted_domains', {
   domain: text().primaryKey(),
 });
 
+export const blacklisted_domains_settings = pgTable(
+  'blacklisted_domains_settings',
+  {
+    id: integer().primaryKey().default(1),
+    blocked_signup_tlds: text().array().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    updated_by: text(),
+    updated_by_email: text(),
+  },
+  table => [check('blacklisted_domains_settings_singleton', sql`${table.id} = 1`)]
+);
+
 export const ai_gateway_sync_providers_state = pgTable(
   'ai_gateway_sync_providers_state',
   {

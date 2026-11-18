@@ -120,34 +120,47 @@ describe('repairGeminiJsonSchema', () => {
     });
   });
 
-  it('repairs a nested anyOf branch that receives keys', () => {
+  it('restores a nullable boolean enum the CLI stringified', () => {
     expect(
-      repaired({
-        anyOf: [{ anyOf: [{ type: 'string' }, { type: 'number' }] }, { type: 'null' }],
-        title: 'T',
-      })
-    ).toEqual({
-      anyOf: [
-        {
-          anyOf: [
-            { type: 'string', title: 'T' },
-            { type: 'number', title: 'T' },
-          ],
-        },
-        { type: 'null', title: 'T' },
-      ],
-    });
+      repaired({ anyOf: [{ type: 'boolean' }], nullable: true, enum: ['true', 'false', 'null'] })
+    ).toEqual({ anyOf: [{ type: 'boolean', enum: [true, false] }, { type: 'null' }] });
   });
 
   it.each([
     [{ anyOf: [{ type: 'string' }], type: 'object' }],
-    [{ anyOf: [{ required: ['b'] }], type: 'object', required: ['a'] }],
+    [{ anyOf: [{ type: 'object', required: ['b'] }], required: ['a'] }],
     [{ anyOf: [{ type: 'string' }, { type: 'integer' }], const: true }],
-    [{ anyOf: [{ type: 'boolean' }], nullable: true, enum: ['true', 'false', 'null'] }],
   ])('leaves %p alone when merging would change what it accepts', property => {
     const expected = structuredClone(property);
 
     expect(repaired(property)).toEqual(expected);
+  });
+
+  it.each([
+    [
+      {
+        anyOf: [{ anyOf: [{ type: 'string' }, { type: 'number' }] }, { type: 'null' }],
+        title: 'T',
+      },
+    ],
+    [{ anyOf: [{ $ref: '#/$defs/a' }, { type: 'string' }], title: 'T' }],
+    [{ anyOf: [{ type: 'string' }, { type: 'string', minLength: 2 }], title: 'T' }],
+    [{ anyOf: [{ type: 'string' }, { type: 'integer' }], not: { const: 'x' } }],
+  ])('leaves %p alone when merging would copy a subschema into several branches', property => {
+    const expected = structuredClone(property);
+
+    expect(repaired(property)).toEqual(expected);
+  });
+
+  it('leaves a schema deeper than the budget untouched', () => {
+    const leaf = { anyOf: [{ type: 'string' }], nullable: true, enum: ['a', 'null'] };
+    let deep: Record<string, unknown> = leaf;
+    for (let i = 0; i < 70; i++) deep = { type: 'object', properties: { next: deep } };
+    const schema = { type: 'object', properties: { root: deep } };
+    const expected = structuredClone(schema);
+
+    expect(repairGeminiJsonSchema(schema)).toBe(0);
+    expect(schema).toEqual(expected);
   });
 
   it('leaves the root schema alone', () => {
@@ -168,19 +181,13 @@ describe('repairGeminiJsonSchema', () => {
     });
   });
 
-  it('copies keys into untyped branches and a default only into branches of its type', () => {
+  it('copies a default only into branches of its type', () => {
     expect(
-      repaired({
-        anyOf: [{ $ref: '#/$defs/a' }, { type: 'string' }, { type: 'integer' }, true],
-        default: 'x',
-        title: 'T',
-      })
+      repaired({ anyOf: [{ type: 'string' }, { type: 'integer' }], default: 'x', title: 'T' })
     ).toEqual({
       anyOf: [
-        { $ref: '#/$defs/a', default: 'x', title: 'T' },
         { type: 'string', default: 'x', title: 'T' },
         { type: 'integer', title: 'T' },
-        { default: 'x', title: 'T' },
       ],
     });
   });

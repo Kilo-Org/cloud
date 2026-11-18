@@ -86,15 +86,11 @@ function copyKeywordsForType(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
   keys: string[],
-  type: string | undefined
+  type: string
 ): boolean {
   for (const key of keys) {
     if (key in target) continue;
     const value = source[key];
-    if (type === undefined) {
-      target[key] = value;
-      continue;
-    }
     if (TYPED_KEYWORDS.has(key) && !TYPE_KEYWORDS[type]?.has(key)) continue;
     if ((key === 'enum' || key === 'examples') && Array.isArray(value)) {
       const values = value.filter(item => matchesType(type, item));
@@ -122,6 +118,24 @@ function hasCombinator(node: Record<string, unknown>) {
   return 'anyOf' in node || 'oneOf' in node || 'allOf' in node;
 }
 
+const DATA_KEYWORDS = new Set(['enum', 'const', 'default', 'examples']);
+
+/**
+ * Whether moving `keys` of `node` into branches of distinct types copies no
+ * subschema into more than one branch. Type-specific keywords go to their own
+ * type's branch and data values are narrowed per type, so only scalars such as
+ * `title` are repeated, and a repaired schema stays about the size of its input.
+ */
+function movesWithoutCopies(node: Record<string, unknown>, keys: string[]) {
+  return keys.every(
+    key =>
+      TYPED_KEYWORDS.has(key) ||
+      DATA_KEYWORDS.has(key) ||
+      typeof node[key] !== 'object' ||
+      node[key] === null
+  );
+}
+
 /**
  * A type array is accepted unless its enum or const values span more than one
  * non-null type, which Gemini rejects. Such a node becomes an `anyOf` with one
@@ -137,6 +151,7 @@ function lowerMixedTypeArray(node: Record<string, unknown>): boolean {
   ];
   if (values.length === 0) return false;
   const keys = Object.keys(node).filter(key => key !== 'type' && key !== 'description');
+  if (!movesWithoutCopies(node, keys)) return false;
   const branches: Record<string, unknown>[] = [];
   for (const type of new Set(types)) {
     if (type === 'null') continue;
@@ -158,23 +173,30 @@ function lowerMixedTypeArray(node: Record<string, unknown>): boolean {
  * Schema type arrays: `{ type: ["string", "null"], enum: ["a", null] }` arrives
  * as `{ anyOf: [{ type: "string" }], nullable: true, enum: ["a", "null"] }`.
  * The CLI stringified every enum value, so with `nullable` the string "null"
- * was a JSON null, and a numeric branch whose enum has only strings is the
- * CLI's integer-to-string enum conversion. Nullability becomes a null branch,
- * which every Gemini upstream accepts.
+ * was a JSON null, a numeric branch whose enum has only strings is the CLI's
+ * integer-to-string enum conversion, and "true" and "false" in a boolean
+ * branch were booleans. Nullability becomes a null branch, which every Gemini
+ * upstream accepts.
  *
- * A node is left alone when a branch sets one of the moved keys to another
- * value, or when no branch could match, since merging those would change what
- * the schema accepts.
+ * Only an `anyOf` whose branches each have a distinct `type` is rewritten, so
+ * that no subschema is copied into several branches. A node is also left
+ * alone when a branch sets one of the moved keys to another value, or when no
+ * branch could match, since merging those would change what the schema accepts.
  */
 function distributeAnyOfSiblings(node: Record<string, unknown>): boolean {
   if (!Array.isArray(node.anyOf)) return false;
   const keys = Object.keys(node).filter(key => !ANY_OF_KEYS.has(key));
   if (keys.length === 0) return false;
   const anyOf = node.anyOf as unknown[];
-  const conflicts = anyOf.some(
-    branch =>
-      isRecord(branch) &&
-      keys.some(key => key in branch && JSON.stringify(branch[key]) !== JSON.stringify(node[key]))
+  const types = anyOf.map(branch =>
+    isRecord(branch) && typeof branch.type === 'string' ? branch.type : undefined
+  );
+  if (types.some(type => type === undefined) || new Set(types).size !== types.length) {
+    return false;
+  }
+  if (!movesWithoutCopies(node, keys)) return false;
+  const conflicts = (anyOf as Record<string, unknown>[]).some(branch =>
+    keys.some(key => key in branch && JSON.stringify(branch[key]) !== JSON.stringify(node[key]))
   );
   if (conflicts) return false;
 
@@ -183,42 +205,65 @@ function distributeAnyOfSiblings(node: Record<string, unknown>): boolean {
   if (nullable && Array.isArray(source.enum)) {
     source.enum = source.enum.filter(value => value !== 'null');
   }
-  const stringEnum =
-    Array.isArray(source.enum) && source.enum.every(value => typeof value === 'string');
+  const enumValues = Array.isArray(source.enum) ? (source.enum as unknown[]) : undefined;
+  const stringEnum = enumValues?.every(value => typeof value === 'string') ?? false;
+  const booleanSource =
+    stringEnum && enumValues?.every(value => value === 'true' || value === 'false')
+      ? { ...source, enum: enumValues.map(value => value === 'true') }
+      : source;
 
-  const branches: unknown[] = [];
-  for (const branch of anyOf) {
-    if (!isRecord(branch) && branch !== true) {
-      branches.push(branch);
-      continue;
-    }
-    const out: Record<string, unknown> = isRecord(branch) ? { ...branch } : {};
-    let type = typeof out.type === 'string' ? out.type : undefined;
+  const branches: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+  for (const branch of anyOf as Record<string, unknown>[]) {
+    let type = branch.type as string;
+    const out: Record<string, unknown> = { ...branch };
     if (stringEnum && (type === 'integer' || type === 'number')) {
       type = 'string';
       out.type = type;
+      if (types.includes('string') || seen.has('string')) {
+        // The string branch gets the same enum, so a bare converted branch would repeat it.
+        if (Object.keys(branch).length > 1) return false;
+        continue;
+      }
     }
-    if (!copyKeywordsForType(out, source, keys, type)) continue;
-    distributeAnyOfSiblings(out);
+    if (!copyKeywordsForType(out, type === 'boolean' ? booleanSource : source, keys, type)) {
+      continue;
+    }
+    seen.add(type);
     branches.push(out);
   }
 
-  const onlyNull = nullable && Array.isArray(source.enum) && source.enum.length === 0;
+  const onlyNull = nullable && enumValues?.length === 0;
   if (branches.length === 0 && !onlyNull) return false;
-  const unique = [...new Map(branches.map(branch => [JSON.stringify(branch), branch])).values()];
-  if (nullable && !unique.some(branch => isRecord(branch) && branch.type === 'null')) {
-    unique.push({ type: 'null' });
+  if (nullable && !seen.has('null')) branches.push({ type: 'null' });
+  replaceContents(node, { anyOf: branches, ...descriptionOf(node) });
+  return true;
+}
+
+// Bounds the walk over a client-supplied schema, like sanitize-json-ref-tool-results.ts.
+const SCHEMA_NODE_BUDGET = 100_000;
+const SCHEMA_MAX_DEPTH = 64;
+
+function withinBudget(schema: unknown): boolean {
+  const pending: { node: unknown; depth: number }[] = [{ node: schema, depth: 0 }];
+  let visited = 0;
+  for (let frame = pending.pop(); frame !== undefined; frame = pending.pop()) {
+    if (!isRecord(frame.node)) continue;
+    if (++visited > SCHEMA_NODE_BUDGET || frame.depth > SCHEMA_MAX_DEPTH) return false;
+    const depth = frame.depth + 1;
+    forEachChildSchema(frame.node, child => pending.push({ node: child, depth }));
   }
-  replaceContents(node, { anyOf: unique, ...descriptionOf(node) });
   return true;
 }
 
 /**
  * Rewrites the schema nodes below the root that Gemini rejects. The root of a
- * tool schema stays an object schema. Mutates the schema in place and returns
- * the number of nodes rewritten.
+ * tool schema stays an object schema, and a schema over the node or depth
+ * budget is left untouched. Mutates the schema in place and returns the number
+ * of nodes rewritten.
  */
 export function repairGeminiJsonSchema(schema: unknown): number {
+  if (!isRecord(schema) || !withinBudget(schema)) return 0;
   let repaired = 0;
   const visit = (node: unknown) => {
     if (!isRecord(node)) return;
@@ -226,7 +271,7 @@ export function repairGeminiJsonSchema(schema: unknown): number {
     if (lowerMixedTypeArray(node)) repaired++;
     if (distributeAnyOfSiblings(node)) repaired++;
   };
-  if (isRecord(schema)) forEachChildSchema(schema, visit);
+  forEachChildSchema(schema, visit);
   return repaired;
 }
 

@@ -2876,6 +2876,41 @@ describe('scanRequestWithVerdictCache', () => {
         cached_characters: toolText(short).length + ranges.at(-2)!.end,
       });
     });
+
+    it('counts only the slice with a cached block as a cached unit when it decides the tool', async () => {
+      const long = tool('long', numbered('t', 250_000));
+      const keys = toolKeys(long);
+      expect(keys).toHaveLength(3);
+      const store = memoryStore();
+      await rememberRequestVerdict(
+        {
+          key: keys[1]!,
+          verdict: { action: 'block', detectors: ['injection_attack'] },
+          ttlSeconds: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+        },
+        store
+      );
+      const dependencies = deps(store);
+
+      const results = await scanRequestWithVerdictCache(
+        makeRequest([], {}, { tools: [long] }),
+        dependencies
+      );
+
+      expect(results[0]?.verdict).toEqual({
+        action: 'block',
+        message: guardrailBlockMessage(['injection_attack'], null),
+      });
+      expect(toolsReport(results)).toMatchObject({
+        tools_total: 1,
+        tools_cached: 1,
+        tools_scanned: 0,
+        total_units: keys.length,
+        cached_units: 1,
+        decision: 'blocked',
+      });
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+    });
   });
 
   describe('the tool definitions report', () => {

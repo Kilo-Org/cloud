@@ -230,11 +230,12 @@ function cachedBlock(units: LookedUpUnit[]): Exclude<CachedVerdict, 'allow'> | u
  * How much of a part the cache covers. The segments whose units all have a cached verdict count
  * whole, joined as in the part. Of a segment split into slices with some uncached, the body text
  * of its cached slices counts too, once where slices overlap. Units are counted as they appear, so
- * a repeated unit counts each time.
+ * a repeated unit counts each time. `totalCharacters` is the part's joined length.
  */
 function cachedCoverage(
   rendered: string[],
-  units: LookedUpUnit[]
+  units: LookedUpUnit[],
+  totalCharacters: number
 ): Pick<EnkryptScanCoverage, 'cachedCharacters' | 'cachedSegments' | 'totalUnits' | 'cachedUnits'> {
   const uncached = new Set(units.filter(unit => !unit.verdict).map(unit => unit.segment));
   const cached = rendered.filter((_, index) => !uncached.has(index));
@@ -251,10 +252,7 @@ function cachedCoverage(
     coveredEnd = Math.max(coveredEnd, bodyRange.end);
   }
   return {
-    cachedCharacters: Math.min(
-      joinSegments(cached).length + partial,
-      joinSegments(rendered).length
-    ),
+    cachedCharacters: Math.min(joinSegments(cached).length + partial, totalCharacters),
     cachedSegments: cached.length,
     totalUnits: units.length,
     cachedUnits: units.filter(unit => unit.verdict).length,
@@ -451,12 +449,13 @@ async function planSegmentsPart(
   const keyed = keyedUnits(request, part, segments, cache);
   const { status, verdicts } = await lookup(request.organizationId, keyed, cache);
   const units = withVerdicts(keyed, verdicts);
+  const totalCharacters = joinSegments(rendered).length;
   const coverage: EnkryptScanCoverage = {
     part,
     cache: status,
-    totalCharacters: joinSegments(rendered).length,
+    totalCharacters,
     totalSegments: segments.length,
-    ...cachedCoverage(rendered, units),
+    ...cachedCoverage(rendered, units, totalCharacters),
     omittedAttachments: segments.filter(segment => segment.body === null).length,
   };
   const block = cachedBlock(units);
@@ -610,7 +609,7 @@ function toolsReport(
 
 /**
  * A tool's cached verdict, or the calls that scan its uncached segments, with its unit counts. A
- * tool with a cached verdict counts all its units as cached, like its characters.
+ * tool decided by a cached block counts only the units with a cached verdict as cached.
  */
 type ToolPlan = {
   tool: RequestToolDefinition;
@@ -647,11 +646,12 @@ async function planTools(
   const plans = toolUnits.map(({ tool, rendered, units: keyed }): ToolPlan => {
     const characters = joinSegments(rendered).length;
     const units = withVerdicts(keyed, verdicts);
-    const totalUnits = units.length;
+    const cached = cachedCoverage(rendered, units, characters);
+    const unitCounts = { totalUnits: cached.totalUnits, cachedUnits: cached.cachedUnits };
     const block = cachedBlock(units);
-    if (block) return { tool, characters, totalUnits, cachedUnits: totalUnits, verdict: block };
+    if (block) return { tool, characters, ...unitCounts, verdict: block };
     if (units.every(unit => unit.verdict === 'allow')) {
-      return { tool, characters, totalUnits, cachedUnits: totalUnits, verdict: 'allow' };
+      return { tool, characters, ...unitCounts, verdict: 'allow' };
     }
     const calls = uncachedCalls(units);
     const coverage: EnkryptScanCoverage = {
@@ -659,14 +659,13 @@ async function planTools(
       cache: status,
       totalCharacters: characters,
       totalSegments: tool.segments.length,
-      ...cachedCoverage(rendered, units),
+      ...cached,
       omittedAttachments: 0,
     };
     return {
       tool,
       characters,
-      totalUnits: coverage.totalUnits,
-      cachedUnits: coverage.cachedUnits,
+      ...unitCounts,
       calls,
       scans: callScans(request, coverage, calls),
     };

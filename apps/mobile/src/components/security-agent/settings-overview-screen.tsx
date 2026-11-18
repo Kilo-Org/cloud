@@ -120,12 +120,12 @@ export function SettingsOverviewScreen({
     connectivity,
   } as const;
   const settledVariantRef = useRef<'offline' | 'server' | null>(null);
-  const settledVariant = configUnavailable || capability.isError
-    ? (settledVariantRef.current =
-        classifyReadFailureVariant(
+  const settledVariant =
+    configUnavailable || capability.isError
+      ? (settledVariantRef.current = classifyReadFailureVariant(
           configUnavailable || config.isError ? configFailure : capabilityFailure
         ) as 'offline' | 'server')
-    : settledVariantRef.current;
+      : settledVariantRef.current;
   const variant = settledVariant ?? 'server';
   if (configUnavailable || capabilityUnavailable) {
     return (

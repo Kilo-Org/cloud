@@ -945,11 +945,18 @@ export function createTurnManager(deps: TurnManagerDeps) {
     );
     try {
       const confirmed = await Promise.race([stopped, cancelled.promise]);
-      if (!autoCommit) return;
       if (!confirmed) {
-        emitWarning(sessionId, 'Auto-commit skipped: agent cancellation was not confirmed');
+        emitWarning(
+          sessionId,
+          autoCommit
+            ? 'Auto-commit skipped: agent cancellation was not confirmed'
+            : 'Agent cancellation was not confirmed'
+        );
+        const parked = turns.get(sessionId);
+        if (parked && parked !== turn) sendOutcome(parked, 'failed', 'prompt_failed');
         return;
       }
+      if (!autoCommit) return;
       abort.signal.throwIfAborted();
       const runtime = deps.runtimes.get(key);
       if (

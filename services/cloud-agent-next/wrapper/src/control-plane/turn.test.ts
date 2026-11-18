@@ -4752,7 +4752,7 @@ describe('native session outcome transitions', () => {
 });
 
 describe('completion ownership and transport bounds', () => {
-  it.each(['late cancellation', 'retry without auto-commit'] as const)(
+  it.each(['late cancellation', 'confirmed retry', 'unconfirmed retry'] as const)(
     'handles %s after quiet-drain expiry',
     async scenario => {
       const stopped = Promise.withResolvers<boolean>();
@@ -4787,9 +4787,26 @@ describe('completion ownership and transport bounds', () => {
         h.manager.submit(SESSION_ID, promptPayload('m2'));
         await settle();
         expect(client.prompts).toHaveLength(1);
-        stopped.resolve(true);
+        stopped.resolve(scenario === 'confirmed retry');
         await settle();
-        expect(client.prompts).toHaveLength(2);
+        if (scenario === 'confirmed retry') {
+          expect(client.prompts).toHaveLength(2);
+        } else {
+          expect(client.prompts).toHaveLength(1);
+          expect(outcomeFrames(h.frames)).toMatchObject([
+            { status: 'failed', reason: 'completion_quiet_drain', lastMessageId: 'm1' },
+            { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm2' },
+          ]);
+          expect(eventFrames(h.frames)).toContainEqual(
+            expect.objectContaining({
+              type: 'error',
+              properties: expect.objectContaining({
+                fatal: false,
+                error: 'Agent cancellation was not confirmed',
+              }),
+            })
+          );
+        }
       }
       h.manager.shutdown();
     }

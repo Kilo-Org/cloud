@@ -1153,8 +1153,9 @@ the legacy profile restrictions.
   branch rules. Condense does not run. This cleanup has a three-minute budget, keeps the heartbeat
   active, and does not consume the parked prompts' delivery deadline. Stop, session release, wrapper
   shutdown and worktree deletion cancel it.
-  Cancellation failure or a root that is still running skips cleanup with a warning; abrupt sandbox
-  loss cannot guarantee a commit or push. Cleanup never changes the failed outcome.
+  Unconfirmed cancellation warns and fails parked prompts without dispatching them. A root that is
+  still running skips auto-commit with a warning; abrupt sandbox loss cannot guarantee a commit or
+  push. Cleanup never changes the original failed outcome.
 
 ### Kilo supervision
 

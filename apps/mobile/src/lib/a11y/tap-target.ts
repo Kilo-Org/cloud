@@ -18,6 +18,13 @@ export const MIN_TAP_TARGET_DP = 28;
 export const TOUCH_TARGET_DP = 44;
 
 /**
+ * The floor a control renders on its own node at {@link TOUCH_TARGET_DP}.
+ * Explicit px, because NativeWind's rem is 14pt here — no scale step lands on
+ * 44pt (`min-h-12` measures 42).
+ */
+export const TOUCH_TARGET_CLASS = 'min-h-[44px]';
+
+/**
  * Android's minimum touch-target size (`<Button>` 48dp rule, the size the
  * control-size audit reports from the node's own view rect). `hitSlop` widens
  * the touch region but not the rect, so an icon-only control meets this only

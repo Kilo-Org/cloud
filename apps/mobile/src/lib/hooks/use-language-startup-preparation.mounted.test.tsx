@@ -123,6 +123,8 @@ describe('useLanguageStartupPreparation', () => {
     expect(mocks.registerNeedsInputCategories).toHaveBeenCalledTimes(1);
     expect(mocks.runLanguageStartupDirectionGuardedAsync).toHaveBeenCalledTimes(1);
     expect(mocks.activateLanguage).toHaveBeenCalledTimes(1);
+    expect(mocks.readLanguageReturnTarget).toHaveBeenCalledTimes(1);
     expect(mocks.setLanguageReady).toHaveBeenCalledTimes(1);
+    renderer.unmount();
   });
 });

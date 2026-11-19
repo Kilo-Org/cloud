@@ -5,6 +5,8 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -54,12 +56,19 @@ export function SettingsSection({
 /** A one-line switch inside a settings section: the label, its note, and the control. */
 export function SettingsSwitchRow({
   label,
+  note,
   description,
   value,
   onValueChange,
   disabled = false,
 }: Readonly<{
   label: string;
+  /**
+   * A secondary fact about the row (a retirement date, say). It renders on its
+   * own muted line under the description and joins the switch's spoken label,
+   * so the row keeps a single accessible name.
+   */
+  note?: string;
   description?: string;
   value: boolean;
   onValueChange: (next: boolean) => void;
@@ -68,6 +77,7 @@ export function SettingsSwitchRow({
   // One switch per row: the tap target around the copy is hidden from
   // accessibility, and the native control carries the switch role, label, and
   // state, so a tap runs one handler and a screen reader sees one target.
+  const spokenLabel = note ? formatList([label, note], i18n.language) : label;
   return (
     <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3')}>
       <Pressable
@@ -87,13 +97,14 @@ export function SettingsSwitchRow({
           {description ? (
             <Text className="text-xs text-muted-foreground">{description}</Text>
           ) : null}
+          {note ? <Text className="text-xs text-muted-foreground">{note}</Text> : null}
         </View>
       </Pressable>
       <Switch
         value={value}
         disabled={disabled}
         onValueChange={onValueChange}
-        accessibilityLabel={label}
+        accessibilityLabel={spokenLabel}
         accessibilityHint={description}
         accessibilityState={{ checked: value, disabled }}
       />

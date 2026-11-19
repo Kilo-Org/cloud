@@ -79,20 +79,20 @@ export function providerRows(params: {
 export type DenyListModel = Readonly<{ id: string; name: string; retiresOn?: string }>;
 
 /**
- * The row label with the localized retirement note the old composed English
- * suffix carried: `Retires Nov 20` after the name, worded in the app language
- * from `retires_on`, and absent when the entry carries no date.
+ * The row's localized retirement note — `Retires Nov 20` alone, worded in the
+ * app language from `retires_on` — and absent when the entry carries no date.
+ * It renders on its own line under the model name, never inside it.
  */
-export function denyListRowLabel(item: DenyListModel, t: TFunction): string {
+export function denyListRowNote(item: DenyListModel, t: TFunction): string | undefined {
   if (!item.retiresOn) {
-    return item.name;
+    return undefined;
   }
   const date = formatDate(new Date(`${item.retiresOn}T00:00:00Z`), i18n.language, {
     day: 'numeric',
     month: 'short',
     timeZone: 'UTC',
   });
-  return `${item.name} (${t('common.modelRetires', { date })})`;
+  return t('common.modelRetires', { date });
 }
 
 /**

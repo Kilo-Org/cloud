@@ -13,7 +13,7 @@ import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import {
   type DenyListModel,
-  denyListRowLabel,
+  denyListRowNote,
   matchesSearch,
   type ModelAccessDraft,
   setModelsAllowed,
@@ -180,7 +180,8 @@ export function ModelDenyList({
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<DenyListModel>) => (
       <SettingsSwitchRow
-        label={denyListRowLabel(item, t)}
+        label={item.name}
+        note={denyListRowNote(item, t)}
         description={item.id}
         value={!draft.modelDenyList.includes(item.id)}
         disabled={disabled}

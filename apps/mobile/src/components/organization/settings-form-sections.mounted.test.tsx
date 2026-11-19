@@ -26,6 +26,7 @@ function renderRow(props: {
   onValueChange: (next: boolean) => void;
   disabled?: boolean;
   description?: string;
+  note?: string;
 }) {
   act(() => {
     const element = createElement(SettingsSwitchRow, { label: 'openrouter', ...props });
@@ -74,6 +75,31 @@ describe('SettingsSwitchRow', () => {
     // The copy's own node carries the 48dp frame, so the tap target clears the
     // 44dp floor even when the copy is a single short line.
     expect(row.props.className).toContain('min-h-[48px]');
+  });
+
+  it('renders the note on its own muted line and speaks it with the label', () => {
+    const root = renderRow({
+      value: true,
+      onValueChange: vi.fn<(next: boolean) => void>(),
+      description: 'z-ai/glm',
+      note: 'Retires Nov 22',
+    });
+
+    // The label stays the model name alone, so the name keeps the row's
+    // primary hierarchy; the note is a separate line under the id.
+    const labels = root.findAllByType('Text').map(node => node.props.children);
+    expect(labels).toEqual(['openrouter', 'z-ai/glm', 'Retires Nov 22']);
+    const noteText = root.findAllByType('Text')[2];
+    expect(noteText?.props.className).toBe('text-xs text-muted-foreground');
+
+    const [control] = root.findAllByType('Switch');
+    if (!control) {
+      throw new Error('switch not found');
+    }
+    // One accessible name for the control: the note joins the label through
+    // the shared list formatter, and the id stays the hint.
+    expect(control.props.accessibilityLabel).toBe('openrouter and Retires Nov 22');
+    expect(control.props.accessibilityHint).toBe('z-ai/glm');
   });
 
   it('toggles once whether the copy or the switch is tapped', () => {

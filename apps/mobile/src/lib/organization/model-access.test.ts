@@ -6,7 +6,7 @@ import {
   type CatalogModel,
   catalogProviderSlugs,
   denyListModels,
-  denyListRowLabel,
+  denyListRowNote,
   draftsEqual,
   initialDraft,
   matchesSearch,
@@ -118,32 +118,32 @@ describe('denyListModels', () => {
   });
 });
 
-describe('denyListRowLabel', () => {
+describe('denyListRowNote', () => {
   const t = ((key: string, values?: { date?: string }) =>
     key === 'common.modelRetires'
       ? i18n.t('common.modelRetires', { date: values?.date })
       : key) as never as TFunction;
 
-  it('appends the English note with the UTC short date after the name', async () => {
+  it('states the English note alone, with the UTC short date', async () => {
     await i18n.changeLanguage('en');
     expect(
-      denyListRowLabel({ id: 'z-ai/glm', name: 'Z.ai: GLM', retiresOn: '2026-11-22' }, t)
-    ).toBe('Z.ai: GLM (Retires Nov 22)');
+      denyListRowNote({ id: 'z-ai/glm', name: 'Z.ai: GLM', retiresOn: '2026-11-22' }, t)
+    ).toBe('Retires Nov 22');
   });
 
   it('words the note in the catalog language, from the same date', async () => {
     await i18n.changeLanguage('hi');
     try {
       expect(
-        denyListRowLabel({ id: 'z-ai/glm', name: 'Z.ai: GLM', retiresOn: '2026-11-22' }, t)
-      ).toBe('Z.ai: GLM (22 नव॰ को बंद हो जाएगा)');
+        denyListRowNote({ id: 'z-ai/glm', name: 'Z.ai: GLM', retiresOn: '2026-11-22' }, t)
+      ).toBe('22 नव॰ को बंद हो जाएगा');
     } finally {
       await i18n.changeLanguage('en');
     }
   });
 
-  it('keeps the label bare when the entry carries no date', () => {
-    expect(denyListRowLabel({ id: 'openai/gpt', name: 'GPT' }, t)).toBe('GPT');
+  it('has no note when the entry carries no date', () => {
+    expect(denyListRowNote({ id: 'openai/gpt', name: 'GPT' }, t)).toBeUndefined();
   });
 });
 

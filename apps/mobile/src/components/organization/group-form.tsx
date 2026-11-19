@@ -49,6 +49,7 @@ const GROUPS_LIST_ROUTE_NAME = 'groups';
 /** The navigation object a screen of a Stack sees. */
 type StackNavigation = {
   getState: () => { index: number; routes: { key: string; name: string }[] };
+  isFocused: () => boolean;
 };
 
 type GroupFormProps = Readonly<{
@@ -116,6 +117,14 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
 
   const leaveToList = () => {
     guard.leaveWithoutAsking(() => {
+      // A save can settle after the reader left for another tab, which keeps
+      // this stack mounted but blurred. Leaving then would arm the global
+      // one-Back window the blurred tab never spends and dismiss a route that
+      // is not the app's focused scene, swallowing the reader's Back; the
+      // group already landed, so the settle needs no navigation.
+      if (!navigation.isFocused()) {
+        return;
+      }
       const state = navigation.getState();
       const exit = orgGroupFormExit({
         routes: state.routes,

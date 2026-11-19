@@ -29,6 +29,7 @@ const members = vi.hoisted(() => ({
 const nav = vi.hoisted(() => ({
   routes: [] as { key: string; name: string }[],
   index: 0,
+  isFocused: true,
 }));
 
 const router = vi.hoisted(() => ({
@@ -52,6 +53,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ dismissTo: router.dismissTo, canGoBack: router.canGoBack }),
   useNavigation: () => ({
     getState: () => ({ index: nav.index, routes: nav.routes }),
+    isFocused: () => nav.isFocused,
   }),
 }));
 vi.mock('@/lib/navigation/pop-once', () => ({ usePopOnce: () => popOnce }));
@@ -292,6 +294,7 @@ beforeEach(() => {
   members.isPending = false;
   members.isError = false;
   router.canGoBack.mockReturnValue(true);
+  nav.isFocused = true;
   listThenForm({ key: 'form-1', name: 'group-form' });
 });
 
@@ -367,6 +370,36 @@ describe('GroupForm leave after a members save', () => {
     expect(popOnce).not.toHaveBeenCalled();
     expect(stackSafeReplace.replace).not.toHaveBeenCalled();
 
+    unmountOnce();
+  });
+
+  it('stays put when the save settles after the reader left for another tab', async () => {
+    // The profile tab keeps its stack mounted but blurred while the reader
+    // reads another tab, so a save that lands then must not dismiss a route
+    // that is not the app's focused scene.
+    const { renderer, unmountOnce } = await mountForm(storedGroup());
+    members.data = {
+      members: [{ id: 'user-1', name: 'Amira', email: 'amira@example.com', status: 'active' }],
+    };
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    selectMember('user-1');
+    await pressSave(renderer.root);
+    nav.isFocused = false;
+    settleSave(mutations.updateDetails);
+    theLeave()();
+
+    // The leave is inert: nothing navigates, and no one-Back window is armed
+    // for the blurred tab, so the reader's Back still closes the screen they
+    // are reading.
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(popOnce).not.toHaveBeenCalled();
+    expect(stackSafeReplace.replace).not.toHaveBeenCalled();
+    expect(insideLeaveSettle()).toBe(false);
+
+    nav.isFocused = true;
     unmountOnce();
   });
 

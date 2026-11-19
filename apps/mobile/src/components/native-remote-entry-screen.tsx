@@ -24,12 +24,13 @@ import { Skeleton } from '@/components/ui/skeleton';
  * Development-only transcript fixtures, opened as
  * `native-remote?nativeRemoteFixture=reconnecting|gaps`.
  *
- * `reconnecting` publishes a connection that dropped before its first snapshot:
- * the screen must show progress, not a blank transcript. `gaps` publishes a
- * transcript with two missing parts, and its Retry republishes the same
- * transcript whole. Both go through `connectSession`'s listener, the same path
- * a live socket drives, so the run proves the fix end to end. A production
- * build never reaches this code: `__DEV__` refuses first.
+ * `reconnecting` publishes a loaded transcript whose connection dropped before
+ * the retry could land, the settled form of the reconnecting surface: `Not
+ * connected` in the status line, the transcript still rendered. `gaps`
+ * publishes a transcript with two missing parts, and its Retry republishes the
+ * same transcript whole. Both go through `connectSession`'s listener, the same
+ * path a live socket drives, so the run proves the fix end to end. A
+ * production build never reaches this code: `__DEV__` refuses first.
  */
 type NativeFixtureName = 'reconnecting' | 'gaps';
 
@@ -46,7 +47,23 @@ function fixtureState(name: NativeFixtureName): NativeSessionState {
     return {
       connection: 'disconnected',
       runnerConnected: false,
-      messages: [],
+      session: {
+        id: fixtureSummary.sessionID,
+        origin: { directory: '/fixture' },
+        time: { created: 1, updated: 3 },
+      },
+      snapshot: { position: 1, revision: 1 },
+      messages: [
+        {
+          seq: 1,
+          message: {
+            id: 'msg_fixture_dropped',
+            type: 'assistant',
+            time: { created: 1, completed: 2 },
+            content: [{ type: 'text', text: 'Fixture reply before the connection dropped.' }],
+          },
+        },
+      ],
       pending: emptyPending,
       events: [],
       commands: {},

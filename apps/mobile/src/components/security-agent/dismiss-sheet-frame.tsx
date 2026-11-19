@@ -10,9 +10,10 @@ import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-in
  * The chrome the dismiss sheet's form-less states share: the sheet's title and
  * its close button, over one of the body states the screen picks.
  *
- * A sheet state that is not the form must keep this same header: the sheet is
- * a formSheet route, so its edge owns the top clearance, and a second header
- * shape would move the title between states.
+ * The header is deliberately the close-only shape here and the cancel/commit
+ * shape on the form. That split predates this component: the form carries a
+ * commit action, and a state that cannot be submitted offers no Done to press.
+ * Both shapes take their top clearance from the route's own formSheet inset.
  */
 export function DismissSheetFrame({ children }: Readonly<{ children: ReactNode }>) {
   const router = useRouter();

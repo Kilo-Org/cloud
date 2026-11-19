@@ -2399,9 +2399,14 @@ describe('a headless session_live_update push', () => {
       completed = true;
     })();
 
-    await vi.waitFor(() => {
-      expect(sessionPush.applySessionLiveUpdate).toHaveBeenCalled();
-    });
+    await vi.waitFor(
+      () => {
+        expect(sessionPush.applySessionLiveUpdate).toHaveBeenCalled();
+      },
+      // The headless preparation reads the Live Activity switch through one
+      // null-retrying budget (250 + 500 + 1000 ms) before the push is applied.
+      { timeout: 5000 }
+    );
     expect(completed).toBe(false);
     expect(sessionPush.releaseAndroidSessionToken).not.toHaveBeenCalled();
     release.resolve(true);
@@ -2731,19 +2736,26 @@ describe('cold iOS background delivery', () => {
     const scope = await import('@/lib/glanceable/scope');
     scope._setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
     await import('@/lib/glanceable/delivery-registration');
-    const [notifications, registry, persist, sink, cleanup, blank, waitingAsk] = await Promise.all([
-      import('./notifications'),
-      import('@/lib/glanceable/sink-registry'),
-      import('@/lib/glanceable/persist'),
-      import('@/glanceable-ios/ios-sink'),
-      import('@/lib/auth/logout-cleanup'),
-      import('@/lib/glanceable/cleanup'),
-      import('@/lib/glanceable/waiting-ask'),
-    ]);
+    const [notifications, registry, persist, sink, cleanup, blank, waitingAsk, gated] =
+      await Promise.all([
+        import('./notifications'),
+        import('@/lib/glanceable/sink-registry'),
+        import('@/lib/glanceable/persist'),
+        import('@/glanceable-ios/ios-sink'),
+        import('@/lib/auth/logout-cleanup'),
+        import('@/lib/glanceable/cleanup'),
+        import('@/lib/glanceable/waiting-ask'),
+        import('@/lib/auth/secure-store-gated'),
+      ]);
     persist._setSecureStoreForTests(secureStoreMock);
     // The ask mirror lazy-`require`s the native store too, so the headless
     // hydration reads the same injected map the snapshot restore does.
     waitingAsk._setSecureStoreForTests(secureStoreMock);
+    // The Live Activity read proves an absent switch with a default-class
+    // canary write, and that path lazy-`require`s the native module Node
+    // cannot load. The same fake stands in, so the canary lands or refuses
+    // exactly as the case's `setItemAsync` says.
+    gated._setWidgetStoreDefaultClassForTests(secureStoreMock);
     for (const listener of mocks.startTokenListeners) {
       listener({ activityPushToStartToken: 'scope-token' });
     }
@@ -2954,7 +2966,16 @@ describe('cold iOS background delivery', () => {
     const { getLiveActivityEnabled, isLiveActivityPreferenceKnown } =
       await import('@/lib/glanceable/live-activity-switch');
 
-    expect(await background.deliverPrepared({})).toBe(0);
+    expect(
+      await (async () => {
+        // The switch read retries an absent (null) value on 250/500/1000 ms
+        // backoff before the canary write proves the absence; fake timers must
+        // fire that schedule while the delivery runs.
+        const pending = background.deliverPrepared({});
+        await vi.advanceTimersByTimeAsync(2000);
+        return pending;
+      })()
+    ).toBe(0);
     await vi.advanceTimersByTimeAsync(0);
 
     expect(isLiveActivityPreferenceKnown()).toBe(true);

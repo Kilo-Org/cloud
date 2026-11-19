@@ -126,19 +126,45 @@ export function widgetSecureStore(): GatedSecureStore {
   return withWidgetAccessibility(require('expo-secure-store') as NativeWidgetStore);
 }
 
+// The default-class store the canary writes to. `null` resolves the native
+// module at the call, which is the app's path. A pure suite injects a fake
+// here, because Node cannot load the native module and a suite's
+// `expo-secure-store` mock never reaches this module's lazy `require`.
+let defaultClassStoreForTests: GatedSecureStore | null = null;
+
+/** Test-only: replace the lazily required default-class store. */
+export function _setWidgetStoreDefaultClassForTests(store: GatedSecureStore | null): void {
+  defaultClassStoreForTests = store;
+}
+
 /**
  * The same keychain written with expo-secure-store's default `WHEN_UNLOCKED`
- * class. Only the upgrade's canary uses it: that class cannot be written while
- * the device is locked, which makes a successful write the proof that a `null`
- * from a not-yet-upgraded item is an absence rather than a locked read.
+ * class. The upgrade's canary and {@link keychainAnswersNow} use it: that class
+ * cannot be written while the device is locked, which makes a successful write
+ * the proof that a `null` from a not-yet-upgraded item is an absence rather
+ * than a locked read.
  */
 export function widgetStoreDefaultClass(): GatedSecureStore {
+  if (defaultClassStoreForTests !== null) {
+    return defaultClassStoreForTests;
+  }
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- headless-safe lazy native load: the pure suites that import this module must not load expo-modules-core
   return require('expo-secure-store') as GatedSecureStore;
 }
 
-/** `true` only when a default-class write lands right now, so the device is unlocked. */
-async function deviceIsUnlocked(resolveStore: () => GatedSecureStore): Promise<boolean> {
+/**
+ * `true` only when a default-class write lands right now, so the device is
+ * unlocked.
+ *
+ * A successful default-class write is the one positive answer to "may a `null`
+ * read be read as an absence?": expo-secure-store's default class cannot be
+ * written while the device is locked, so a landing write proves the keychain
+ * answers and an absent item is absent rather than withheld. A refused write
+ * answers `false`, and the caller keeps the value unknown.
+ */
+export async function keychainAnswersNow(
+  resolveStore: () => GatedSecureStore = widgetStoreDefaultClass
+): Promise<boolean> {
   try {
     await resolveStore().setItemAsync(
       WIDGET_STORE_UNLOCK_CANARY.key,
@@ -285,7 +311,7 @@ export function upgradeGatedValue(
       return false;
     }
     if (stored.value === null) {
-      return deviceIsUnlocked(resolveDefaultClassStore);
+      return keychainAnswersNow(resolveDefaultClassStore);
     }
     return setGatedValue(resolveStore, key, stored.value);
   });

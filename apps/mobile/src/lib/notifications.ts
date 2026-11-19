@@ -542,8 +542,9 @@ async function handleBackgroundNotificationTask(
  *
  * The switch read goes through `live-activity-preference-store`, so the
  * settings path and this path share one parse rule and one retry budget.
- * `null` there means the read threw (a locked or failing keychain); an absent
- * key is an answer, not this null.
+ * `null` there means there is no answer: the read threw, or it resolved `null`
+ * while the keychain could not prove it answers. An absent key on an answering
+ * keychain is a real answer, not this null.
  */
 async function prepareHeadlessGlanceableRun(): Promise<void> {
   // A killed process starts on the bundled English catalog, and nothing else on

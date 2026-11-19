@@ -723,15 +723,15 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
     'the job output publishes the mark step output'
   );
 
-  // The aggregator reads a plain result list for the shards, and the producer
-  // failure as one explicit input it counts by the detection flag.
+  // The aggregator reads the whole `needs` object. One scan counts each need's
+  // job result and, for the producer, its reported build failure.
   const aggregateStep = jobs['mobile-test-result'].steps.find(
     step => step.name === 'Check test results'
   );
   assert.equal(
     aggregateStep.env.RESULTS,
-    '${{ toJSON(needs.*.result) }}',
-    'the aggregator reads every needed job result as an array'
+    '${{ toJSON(needs) }}',
+    'the aggregator reads every needed job with its result and its outputs'
   );
   assert.equal(
     aggregateStep.env.MOBILE,
@@ -740,8 +740,8 @@ test('kilo-app CI builds the harness SDK once and every suite downloads it', () 
   );
   assert.equal(
     aggregateStep.env.SDK_FAILED,
-    '${{ needs.prepare-harness-sdk.outputs.failed }}',
-    'the aggregator reads the producer failure report'
+    undefined,
+    'the job result and the reported output are both read from needs'
   );
 });
 
@@ -756,46 +756,65 @@ test(
     const step = workflows['kilo-app-ci.yml'].jobs['mobile-test-result'].steps.find(
       step => step.name === 'Check test results'
     );
-    // `needs.*.result` expands to a JSON array of result strings; run the step
-    // with `RESULTS` holding that same array and `jq` reading it back.
-    const aggregate = (results, { mobile = 'true', sdkFailed = '' } = {}) =>
+    // `toJSON(needs)` expands to an object keyed by job name, holding each
+    // job's result and outputs; run the step with `RESULTS` holding that same
+    // object and `jq` reading it back.
+    const aggregate = (needs, { mobile = 'true' } = {}) =>
       spawnSync('bash', ['-c', step.run], {
         encoding: 'utf8',
         cwd: work,
         env: {
           ...process.env,
-          RESULTS: JSON.stringify(results),
+          RESULTS: JSON.stringify({
+            'mobile-changes': { result: 'success', outputs: { mobile } },
+            'prepare-harness-sdk': { result: 'success', outputs: {} },
+            'prepare-trpc': { result: 'success', outputs: {} },
+            'mobile-test': { result: 'success', outputs: {} },
+            'i18n-catalogs': { result: 'success', outputs: {} },
+            ...needs,
+          }),
           MOBILE: mobile,
-          SDK_FAILED: sdkFailed,
         },
       }).status;
 
-    const all = ['success', 'success', 'success', 'success', 'success'];
-    assert.equal(aggregate(all), 0, 'all shards pass');
+    assert.equal(aggregate({}), 0, 'all shards pass');
     assert.notEqual(
-      aggregate(['success', 'success', 'success', 'failure', 'success']),
+      aggregate({ 'mobile-test': { result: 'failure', outputs: {} } }),
       0,
       'a failed shard fails the check'
     );
     assert.notEqual(
-      aggregate(['success', 'success', 'success', 'cancelled', 'success']),
+      aggregate({ 'mobile-test': { result: 'cancelled', outputs: {} } }),
       0,
       'a cancelled shard fails the check'
     );
     assert.notEqual(
-      aggregate(all, { sdkFailed: 'true' }),
+      aggregate({ 'prepare-harness-sdk': { result: 'failure', outputs: {} } }),
+      0,
+      'a failed producer job fails the check when detection selected the suite'
+    );
+    assert.equal(
+      aggregate({ 'prepare-harness-sdk': { result: 'failure', outputs: {} } }, { mobile: 'false' }),
+      0,
+      'the producer failure escapes the check only when detection selected no suite'
+    );
+    assert.notEqual(
+      aggregate({ 'prepare-harness-sdk': { result: 'success', outputs: { failed: 'true' } } }),
       0,
       'a reported build failure fails the check when detection selected the suite'
     );
     assert.equal(
-      aggregate(['success', 'skipped', 'skipped', 'skipped', 'skipped'], { mobile: 'false' }),
+      aggregate({ 'prepare-harness-sdk': { result: 'success', outputs: { failed: 'true' } } }, {
+        mobile: 'false',
+      }),
       0,
-      'a run without a selected suite passes'
+      'a reported build failure without a selected suite passes'
     );
-    assert.equal(
-      aggregate(['success', 'skipped', 'skipped', 'skipped', 'skipped'], { mobile: 'false', sdkFailed: 'true' }),
+    assert.equal(aggregate({}, { mobile: 'false' }), 0, 'a run without a selected suite passes');
+    assert.notEqual(
+      aggregate({ 'prepare-trpc': { result: 'failure', outputs: {} } }, { mobile: 'false' }),
       0,
-      'a producer failure without a selected suite passes'
+      'only the harness producer is exempt, not the declaration producer'
     );
   }
 );

@@ -15,9 +15,12 @@ import { reportFirewallRateLimitIssue } from './firewall-rate-limit';
  * spend the provider calls that admission and identity verification make: the
  * exchange proceeds only on an answer that permits it. The account rule runs
  * once the account is known, before any device session or refresh token is
- * written; it reports a rule that is not configured and an answer the firewall
- * blocked, and still lets the exchange finish, because the provider calls it
- * covers have already happened by then.
+ * written, and takes no refusal decision of its own: it returns the limiter's
+ * answer unchanged and only adds the report, because the provider calls it
+ * covers have already happened by then. A rule that is not configured therefore
+ * leaves the answer `rateLimited: false` and the exchange finishes; an answer
+ * the firewall blocked arrives as `rateLimited: true` and the exchange is
+ * refused. Both answers are reported through the shared throttle.
  */
 const ADDRESS_RATE_LIMIT_ID = 'native-token-address';
 const USER_RATE_LIMIT_ID = 'native-token-user';

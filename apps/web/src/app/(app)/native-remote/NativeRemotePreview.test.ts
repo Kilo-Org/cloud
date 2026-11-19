@@ -350,8 +350,9 @@ it('feeds canonical live native messages into the existing Cloud transcript and 
       messages: populated.messages.map(item => ({ ...item, incomplete: true })),
     })
   );
-  expect(dom.document.body.textContent).toContain('Native transcript recovery is incomplete');
+  expect(mockTranscript.mock.lastCall?.[0].messages).toEqual([]);
   expect(dom.document.body.textContent).not.toContain('This session has no messages yet.');
+  expect(dom.document.body.textContent).not.toContain('msg_');
   for (const error of ['forbidden', 'session_deleted']) {
     act(() => listener({ ...base, session: undefined, connection: 'disconnected', error }));
     expect(dom.document.body.textContent).toContain(error);

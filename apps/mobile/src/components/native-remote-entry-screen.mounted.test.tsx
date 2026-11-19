@@ -17,11 +17,12 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(() => null),
   credential: vi.fn(),
   fixture: undefined as string | undefined,
+  param: undefined as string | undefined,
 }));
 vi.mock('@kilocode/cloud-agent-sdk', () => ({ NativeSyncClient: mocks.client }));
 vi.mock('expo-router', () => ({
   Redirect: mocks.redirect,
-  useLocalSearchParams: () => ({ nativeRemoteFixture: mocks.fixture }),
+  useLocalSearchParams: () => ({ nativeRemoteFixture: mocks.param }),
 }));
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('react-i18next', () => ({
@@ -45,6 +46,11 @@ vi.mock('@/lib/config', () => ({
   },
 }));
 vi.mock('@/lib/native-remote-credential', () => ({ nativeRemoteCredential: mocks.credential }));
+vi.mock('@/lib/native-remote-fixture', () => ({
+  nativeRemoteFixtureClient: vi.fn(() => ({})),
+  nativeRemoteFixtureSummary: { sessionID: 'ses-fixture', tenant: { type: 'user', id: 'fixture-owner' }, live: true, createdAt: 1 },
+  readNativeRemoteFixture: () => mocks.fixture as string | undefined,
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -56,6 +62,7 @@ beforeEach(() => {
   mocks.isLoaded = true;
   mocks.url = 'http://localhost:8817';
   mocks.fixture = undefined;
+  mocks.param = undefined;
 });
 afterEach(() => {
   vi.clearAllMocks();
@@ -151,9 +158,9 @@ describe('native remote entry', () => {
     });
   });
 
-  it('serves a transcript fixture through the device listener while development builds allow it', () => {
+  it('serves the link-selected transcript fixture without an account token', () => {
+    // The handler link (`+native-intent.tsx`) selected the fixture state.
     mocks.fixture = 'gaps';
-    // A fixture needs no account token: it publishes its own state.
     mocks.token = undefined;
     const renderer = mount();
     expect(mocks.redirect).not.toHaveBeenCalled();
@@ -162,16 +169,27 @@ describe('native remote entry', () => {
     act(() => {
       renderer.unmount();
     });
+    mocks.fixture = undefined;
   });
 
-  it('never serves a fixture in a production build', () => {
-    mocks.fixture = 'gaps';
+  it('serves the param-selected fixture the gate deep link carries', () => {
+    mocks.param = 'gaps';
     mocks.token = undefined;
-    vi.stubGlobal('__DEV__', false);
+    const renderer = mount();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.client).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByType('NativeRemoteTranscript')).toHaveLength(1);
+    act(() => {
+      renderer.unmount();
+    });
+    mocks.param = undefined;
+  });
+
+  it('finds no fixture when neither carrier selected one', () => {
+    mocks.token = undefined;
     const renderer = mount();
     expect(mocks.redirect).toHaveBeenCalled();
     expect(renderer.root.findAllByType('NativeRemoteTranscript')).toHaveLength(0);
-    expect(mocks.client).not.toHaveBeenCalled();
     act(() => {
       renderer.unmount();
     });

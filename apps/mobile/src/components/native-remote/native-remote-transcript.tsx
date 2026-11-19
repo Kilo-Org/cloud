@@ -55,7 +55,7 @@ export function NativeRemoteTranscript({
               displayCount: formatNumber(conversation.recoveryGaps, i18n.language),
             })}
           </Text>
-          <Button variant="outline" onPress={() => void remote.recover()}>
+          <Button variant="outline" disabled={!canControl} onPress={() => void remote.recover()}>
             <Text>{t('common.retry')}</Text>
           </Button>
         </View>

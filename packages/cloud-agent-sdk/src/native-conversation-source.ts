@@ -163,11 +163,12 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
   const last = state.messages.at(-1)?.message;
   let messages: SessionSnapshot['messages'] = [];
   let projectionError: string | undefined;
+  const unresolvedByProjection = new Set(unresolved.map(item => item.message.id));
   if (session) {
     try {
       messages = readKilo2Messages(
         session,
-        complete.filter(item => !unresolved.includes(item)).map(item => item.message),
+        complete.filter(item => !unresolvedByProjection.has(item.message.id)).map(item => item.message),
         { assetURLs: state.assetURLs }
       );
     } catch (error) {
@@ -178,6 +179,16 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
           incompleteMessageIDs.push(item.message.id);
     }
   }
+  // Retryable gap count: parts the recovery snapshot can still fill. A
+  // projection failure is a real error below, not more gaps to charge the
+  // banner with.
+  const recoveryGaps = projectionError
+    ? new Set([
+        ...state.messages.filter(item => item.incomplete).map(item => item.message.id),
+        ...(state.pendingSnapshotMessageIDs ?? []),
+        ...unresolvedByProjection,
+      ]).size
+    : incompleteMessageIDs.length;
   return {
     source: { version: 'v2' as const, runtime: 'native' as const },
     // Keep the exact canonical values available to details, usage and export consumers.
@@ -185,7 +196,7 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
     nativeMessages: state.messages,
     messages,
     incompleteMessageIDs,
-    recoveryGaps: incompleteMessageIDs.length,
+    recoveryGaps,
     pending: state.pending,
     // A disconnected pre-snapshot window still shows progress, not a blank screen.
     loading: !session && !state.snapshot && !state.error,

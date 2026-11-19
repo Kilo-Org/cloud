@@ -1818,30 +1818,36 @@ export const createBrowserRuntime = ({
       return undefined;
     }
 
+    // Every candidate is consulted: a tab whose page matches but which holds nothing for this item must not hide the
+    // Owner on another tab, or the file is neither stopped nor reported. This ledger is one session's, so two sessions
+    // Cannot both answer here; when two of the session's own tabs both own the file it is stopped either way and the
+    // Report names the most recent window, the call that started it, so nothing is dropped and nothing is guessed.
+    let chosen: (DownloadSighting & { readonly itemId: number }) | null = null;
+    let chosenSince = Number.NEGATIVE_INFINITY;
+
     for (const tabId of candidateTabs) {
       const record = findRecord(session, { at, tabId, url: downloadUrlOf(item) });
       const watch = watches.find(candidate => candidate.tabId === tabId);
       const owner =
         record ?? (watch !== undefined && startedSince(item, watch.since) ? watch : undefined);
 
-      if (owner === undefined) {
-        return undefined;
+      if (owner !== undefined && owner.since > chosenSince) {
+        chosenSince = owner.since;
+        chosen = {
+          attempt: owner.attempt,
+          // The record knows the name the browser announced; a watch only knows the item it just found.
+          filename: record === undefined ? fileNameOf(item) : record.filename,
+          guid: undefined,
+          itemId: item.id,
+          session,
+          step: owner.step,
+          tabId,
+          url: downloadUrlOf(item),
+        };
       }
-
-      return {
-        attempt: owner.attempt,
-        // The record knows the name the browser announced; a watch only knows the item it just found.
-        filename: record === undefined ? fileNameOf(item) : record.filename,
-        guid: undefined,
-        itemId: item.id,
-        session,
-        step: owner.step,
-        tabId,
-        url: downloadUrlOf(item),
-      };
     }
 
-    return undefined;
+    return chosen ?? undefined;
   };
 
   /** Stops a download a guard left behind and settles its one record: the report reads the true outcome later. */
@@ -1887,7 +1893,62 @@ export const createBrowserRuntime = ({
     return reports;
   };
 
-  /** Forgets reported records once their window is over: nothing can search for their items again, and they are memory. */
+  /**
+   * The truth about a stop that outlived its window: without the optional permission nothing can be deleted, so the
+   * file survives and is named; an item gone from the history left no file; anything else is cancelled once more.
+   */
+  const overdueOutcome = async (
+    api: BrowserDownloadsApi | undefined,
+    record: DownloadRecord,
+    itemId: number
+  ): Promise<DiscardOutcome> => {
+    if (api === undefined) {
+      return { filename: record.filename, kind: 'kept' };
+    }
+
+    const current = await readDownload(api, itemId);
+
+    if (current === undefined) {
+      // The item is gone from the history: no file survived it.
+      return { filename: record.filename, kind: 'removed' };
+    }
+
+    return discardDownload(api, current);
+  };
+
+  /**
+   * A stop that never settled is settled here rather than dropped: past its bound the item is read once more, and the
+   * record keeps the true outcome, so the report that follows names a file the human keeps instead of forgetting it.
+   */
+  const settleOverdueStops = async (session: string): Promise<void> => {
+    const records = downloadRecords.get(session);
+
+    if (records === undefined) {
+      return;
+    }
+
+    const api = downloadsApi?.();
+    const at = Date.now();
+
+    for (const record of records.values()) {
+      // A stopping record always carries the item it is stopping: one without it never stopped a file.
+      if (record.kind === 'stopping' && record.itemId !== undefined) {
+        const { itemId } = record;
+
+        if (record.since + DOWNLOAD_GUARD_LINGER_MS < at) {
+          try {
+            // eslint-disable-next-line no-await-in-loop -- one overdue stop at a time, each its own item
+            settleDownload(session, itemId, await overdueOutcome(api, record, itemId));
+          } catch {
+            // The read, cancel or delete above threw: as far as this runtime can tell the file is still there.
+            settleDownload(session, itemId, { filename: record.filename, kind: 'kept' });
+          }
+        }
+      }
+    }
+  };
+
+  /** Forgets reported records once their window is over: an unsettled stop still owes the model its outcome. */
   const pruneRecords = (session: string, at: number): void => {
     const records = downloadRecords.get(session);
 
@@ -1896,13 +1957,9 @@ export const createBrowserRuntime = ({
     }
 
     for (const [key, record] of records) {
-      // A stop that never settled is memory too: nothing will report it, so it may not grow the map.
-      const stale =
-        record.kind === 'reported' || record.kind === 'stopping'
-          ? record.since + DOWNLOAD_GUARD_LINGER_MS < at
-          : false;
-
-      if (stale) {
+      // Only a record that has already been reported is memory. Pruning a running stop would let its outcome land on
+      // Nothing — a file the browser kept would never be named — so it stays until the settlement above writes it.
+      if (record.kind === 'reported' && record.since + DOWNLOAD_GUARD_LINGER_MS < at) {
         records.delete(key);
       }
     }
@@ -1915,6 +1972,8 @@ export const createBrowserRuntime = ({
   /** Everything this session owes a report for: one search for the items a guard left behind, then the records. */
   const collectDownloadReports = async (session: string): Promise<readonly DownloadReport[]> => {
     await finishWatchedDownloads(session);
+    // A stop that outlived its window is settled before the drain reads the records: nothing is dropped.
+    await settleOverdueStops(session);
 
     return drainDownloadReports(session);
   };

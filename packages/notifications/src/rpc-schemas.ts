@@ -164,8 +164,8 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 function refineRefreshSessionSubset(
   data: {
     cliSessionIds: string[];
-    approvalChangedSessionIds?: string[];
-    cardFollowSessionIds?: string[];
+    approvalChangedSessionIds?: string[] | undefined;
+    cardFollowSessionIds?: string[] | undefined;
   },
   ctx: z.RefinementCtx
 ): void {

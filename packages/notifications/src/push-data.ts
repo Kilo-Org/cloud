@@ -16,10 +16,11 @@ export const cloudAgentSessionCategorySchema = z.enum(['attention', 'status']);
 export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategorySchema>;
 
 /**
- * The category a cloud-agent-session push carries, applying the schema default
- * ('status') at the enforcement read site. Both presentation consumers — the
- * push kind and the history category — read this one function, so an omitted
- * category cannot mean different things in the two places.
+ * The category a cloud-agent-session payload carries, applying the schema
+ * default ('status') at the enforcement read site. Every consumer of the
+ * category — the push kind, the history category, and the push worker's
+ * preference gate — reads this one function, so an omitted category cannot
+ * mean different things in different places.
  *
  * The parameter names the payload's discriminant beside `category` so a whole
  * `PushData` union passes unchanged: a bare `{ category }` is a weak type and
@@ -27,8 +28,8 @@ export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategory
  * is read.
  */
 export function classifyCloudAgentSessionPush(data: {
-  type?: string;
-  category?: CloudAgentSessionCategory;
+  type?: string | undefined;
+  category?: CloudAgentSessionCategory | undefined;
 }): CloudAgentSessionCategory {
   return data.category ?? 'status';
 }

@@ -3488,6 +3488,89 @@ describe('scanRequestWithVerdictCache', () => {
       expect(timeoutWarnings).toHaveLength(1);
     });
   });
+
+  describe('cache entries reported as calls finish', () => {
+    const short = tool('ls', 'Lists.');
+    const mediumSystem = [segment('system', 's'.repeat(1_000))];
+
+    function partsRequest() {
+      return makeRequest(conversation, {}, { tools: [short], system: mediumSystem });
+    }
+
+    it("reports each call's entry before the next call starts, as in the results", async () => {
+      const reported: EnkryptVerdictCacheEntry[] = [];
+      const reportedAtCall: number[] = [];
+      const dependencies = deps(memoryStore(), () => {
+        reportedAtCall.push(reported.length);
+        return enkryptResponse({ injection_attack: 0 });
+      });
+
+      const results = await scanRequestWithVerdictCache(partsRequest(), {
+        ...dependencies,
+        onCacheEntry: entry => reported.push(entry),
+      });
+
+      const calls = conversation.length + 2;
+      expect(reportedAtCall).toEqual([...Array(calls).keys()]);
+      expect(reported).toEqual([
+        ...allowed(keysFor(conversation).toReversed()),
+        ...allowed(keysFor(mediumSystem, {}, 'system')),
+        ...allowed([toolKey(short)]),
+      ]);
+      const inResults = results.flatMap(result => result.cacheEntries);
+      expect(inResults).toHaveLength(reported.length);
+      for (const entry of inResults) expect(reported).toContain(entry);
+    });
+
+    it('reports the block, and nothing for the calls it skipped', async () => {
+      const reported: EnkryptVerdictCacheEntry[] = [];
+      const blocked = renderSegment(conversation[3]);
+      const dependencies = deps(memoryStore(), text =>
+        enkryptResponse({ injection_attack: text === blocked ? 1 : 0 })
+      );
+
+      await scanRequestWithVerdictCache(partsRequest(), {
+        ...dependencies,
+        onCacheEntry: entry => reported.push(entry),
+      });
+
+      const keys = keysFor(conversation);
+      expect(reported).toEqual([
+        ...allowed([keys[4]!]),
+        {
+          key: keys[3],
+          verdict: { action: 'block', detectors: ['injection_attack'] },
+          ttlSeconds: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+        },
+      ]);
+    });
+
+    it('reports the calls a deadline cut off, and those never made, as allowed briefly', async () => {
+      const reported: EnkryptVerdictCacheEntry[] = [];
+      const dependencies = deps(memoryStore());
+      dependencies.timeoutMs = 50;
+      dependencies.fetch = hangingAfter(2);
+
+      await scanConversation(makeRequest(conversation), {
+        ...dependencies,
+        onCacheEntry: entry => reported.push(entry),
+      });
+
+      const newestFirst = keysFor(conversation).toReversed();
+      expect(reported).toEqual([
+        ...allowed(newestFirst.slice(0, 2)),
+        ...allowedBriefly(newestFirst.slice(2)),
+      ]);
+    });
+
+    it('reports nothing without a store', async () => {
+      const onCacheEntry = jest.fn();
+
+      await scanConversation(makeRequest(conversation), { ...deps(null), onCacheEntry });
+
+      expect(onCacheEntry).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('rememberRequestVerdict', () => {

@@ -5,7 +5,7 @@ import {
   sessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import { cloudMessagePartSchema } from './cloud-conversation-schemas';
-import { hasUnresolvedKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
+import { hasUndisplayableKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
 import type { Part } from './types';
 import { readToolDetailMarker } from './tool-detail-marker';
 
@@ -73,7 +73,7 @@ export function readToolPartDetail(wire: unknown, preview: Part): ToolPartDetail
     const message = kilo2MessageSchema.safeParse(detail.message);
     // An attachment without an authorized URL has no display: the preview
     // stays on screen instead, as the history page and live source do.
-    if (message.success && !hasUnresolvedKilo2Assets(message.data)) {
+    if (message.success && !hasUndisplayableKilo2Assets(message.data)) {
       try {
         part = readKilo2Messages(detail.source.session, [message.data])[0]?.parts.find(
           item => item.id === preview.id

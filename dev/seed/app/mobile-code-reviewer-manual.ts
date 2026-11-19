@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
+import { findSeedUserId } from '../lib/users';
 
 export const usage = '<fake-email>';
 
@@ -37,16 +38,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const db = getSeedDb();
-  const userId = `dev-seed:mobile-code-reviewer-manual:${email}`;
-
-  const [existing] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, email));
-  if (existing && existing.id !== userId) {
-    throw new Error('The requested email belongs to a different account; choose a new fake email.');
-  }
-
+  // A fake account that already signed in keeps its own row: the fixture joins
+  // it, so the seed runs before or after the device-code sign-in.
+  const userId = (await findSeedUserId(email)) ?? `dev-seed:mobile-code-reviewer-manual:${email}`;
   await db
     .insert(kilocode_users)
     .values({

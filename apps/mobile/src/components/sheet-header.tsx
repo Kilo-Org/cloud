@@ -1,10 +1,21 @@
-import { type ReactNode, type Ref } from 'react';
+import { type ReactNode, type Ref, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Platform, Pressable, type TextInstance, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  type TextInstance,
+  View,
+  type ViewInstance,
+} from 'react-native';
 
 import { Share, X } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { type SheetHeaderTopInset, useSheetHeaderTopClearance } from '@/lib/form-sheet';
+import {
+  type SheetHeaderTopInset,
+  useSettledSheetHeaderTopClearance,
+  useSheetHeaderTopClearance,
+} from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { useScreenInsets } from '@/lib/screen-insets';
@@ -125,15 +136,18 @@ export function SheetHeader({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const insets = useScreenInsets();
+  const surfaceRef = useRef<ViewInstance | null>(null);
   const closeOnly = variant === 'close';
   const resolvedDoneLabel = doneLabel ?? (closeOnly ? t('common.close') : t('common.done'));
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
   const doneUnavailable = disabled || doneDisabled || doneBusy;
-  // The top clearance comes from the same rule (and the same inputs) as the
-  // detent cap, so the header and the sheet edge cannot disagree about who
-  // clears the status bar. It is known before the first frame, so the header
-  // paints once, already settled, instead of moving by the inset.
-  const topInsetHeight = useSheetHeaderTopClearance(topInset);
+  // The first-frame clearance comes from the surface's mode, so a header the
+  // platform places below the status bar paints once, already settled. Where
+  // the platform places the sheet itself (Android), the header then covers
+  // whatever the window's top inset still overlaps: the sheet can present at
+  // the window top, or stop at the status bar inside a taller display cutout.
+  const clearance = useSheetHeaderTopClearance(topInset);
+  const topInsetHeight = useSettledSheetHeaderTopClearance({ topInset, clearance, surfaceRef });
   // Resolved at render so each platform reads its own pair, through the same
   // helper the sheets that draw their own title row use.
   const underHandlePadding = sheetUnderHandlePaddingClass('header');
@@ -180,6 +194,7 @@ export function SheetHeader({
     // view by finding the header at the screen content's subview index 0 — a
     // flattened header breaks that native pass and the list paints over it.
     <View
+      ref={surfaceRef}
       collapsable={false}
       className={cn(
         'border-b border-border px-4',

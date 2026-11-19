@@ -683,9 +683,10 @@ describe('SheetHeader', () => {
   });
 
   it('drops the top clearance for a bottom formSheet on Android when the window has one', async () => {
-    // The detent cap subtracts the window's top inset, so the sheet edge
-    // settles at the status bar on the first frame; padding the header would
-    // reserve a dead band and drop it once the sheet landed.
+    // The detent cap subtracts the window's top inset, so the surface settles
+    // at the status bar; the header only tops itself up once it can read where
+    // the platform laid its content out (`useSettledSheetHeaderTopClearance`),
+    // which reserves nothing from a first frame that has no measurement.
     rn.os = 'android';
     rn.statusHeight = 48;
     safeArea.top = 24;

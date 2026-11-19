@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  sheetHeaderSettledTopClearance,
   sheetHeaderTopClearance,
   type SheetHeaderTopInset,
   useFormSheetDetents,
@@ -202,6 +203,35 @@ describe('sheetHeaderTopClearance', () => {
 
     expect(clearance('never', 'android', android)).toBe(0);
     expect(clearance('ios-page-sheet', 'android', android)).toBe(0);
+  });
+});
+
+describe('sheetHeaderSettledTopClearance', () => {
+  it('covers the inset the surface edge leaves above the header', () => {
+    // The list settings sheet: the platform settled its header 24 dp from the
+    // window top inside a 51.81 dp inset (the status bar carries a display
+    // cutout here).
+    expect(
+      sheetHeaderSettledTopClearance({ clearance: 0, insetTop: 51.81, headerTop: 24 })
+    ).toBeCloseTo(27.81);
+  });
+
+  it('keeps the clearance the surface mode already reserved', () => {
+    expect(
+      sheetHeaderSettledTopClearance({ clearance: 51.81, insetTop: 51.81, headerTop: 0 })
+    ).toBe(51.81);
+  });
+
+  it('adds nothing when the sheet settled below the whole inset', () => {
+    expect(
+      sheetHeaderSettledTopClearance({ clearance: 0, insetTop: 51.81, headerTop: 457.14 })
+    ).toBe(0);
+  });
+
+  it('never reserves more than the inset the header overlaps', () => {
+    expect(
+      sheetHeaderSettledTopClearance({ clearance: 0, insetTop: 51.81, headerTop: -12 })
+    ).toBe(51.81);
   });
 });
 

@@ -1074,7 +1074,8 @@
       "discussionAccessibility_one": "{{title}}: 1 comentário",
       "discussionAccessibility": "{{title}}: {{displayCount}} comentários",
       "discussionAccessibility_other": "{{title}}: {{displayCount}} comentários",
-      "discussionAccessibility_many": "{{title}}: {{displayCount}} comentários"
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} comentários",
+      "discussionAccessibility_zero": "{{title}}: {{displayCount}} comentários"
     },
     "fileStatus": {
       "modified": "Modificado",

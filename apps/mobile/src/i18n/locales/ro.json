@@ -2504,7 +2504,8 @@
       "customModes": "Moduri personalizate"
     },
     "modeSelector": {
-      "accessibility": "Mod: {{label}}"
+      "accessibility": "Mod: {{label}}",
+      "customMode": "Mod personalizat"
     },
     "modeOptions": {
       "code": "Programare",
@@ -2821,7 +2822,7 @@
       "thinkingEffortAccessibility": "efort de raționament: {{label}}",
       "thinkingEffortSelected": "efort de raționament: {{label}}, selectat",
       "thinkingEffortWithModel": "{{model}}, efort de raționament: {{variant}}",
-      "lockedByAgent": ", Blocat de agentul „{{agent}}”",
+      "lockedByAgent": "Blocat de agentul „{{agent}}”",
       "addToFavorites": "Adaugă {{name}} la favorite",
       "removeFromFavorites": "Elimină {{name}} din favorite",
       "sessionModel": "Modelul sesiunii"

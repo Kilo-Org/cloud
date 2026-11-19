@@ -1905,7 +1905,8 @@
       "customModes": "Modalità personalizzate"
     },
     "modeSelector": {
-      "accessibility": "Modalità: {{label}}"
+      "accessibility": "Modalità: {{label}}",
+      "customMode": "Modalità personalizzata"
     },
     "modeOptions": {
       "code": "Programma",
@@ -2222,7 +2223,7 @@
       "thinkingEffortAccessibility": "Livello di ragionamento: {{label}}",
       "thinkingEffortSelected": "Livello di ragionamento: {{label}}, selezionato",
       "thinkingEffortWithModel": "{{model}}, livello di ragionamento: {{variant}}",
-      "lockedByAgent": ", Bloccato dall'agente \"{{agent}}\"",
+      "lockedByAgent": "Bloccato dall'agente \"{{agent}}\"",
       "addToFavorites": "Aggiungi {{name}} ai preferiti",
       "removeFromFavorites": "Rimuovi {{name}} dai preferiti",
       "sessionModel": "Modello della sessione"

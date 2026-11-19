@@ -2013,7 +2013,8 @@
       "customModes": "أوضاع مخصصة"
     },
     "modeSelector": {
-      "accessibility": "الوضع: {{label}}"
+      "accessibility": "الوضع: {{label}}",
+      "customMode": "وضع مخصص"
     },
     "modeOptions": {
       "code": "البرمجة",
@@ -2333,7 +2334,7 @@
       "thinkingEffortAccessibility": "جهد التفكير: {{label}}",
       "thinkingEffortSelected": "جهد التفكير: {{label}}، محدد",
       "thinkingEffortWithModel": "{{model}}، جهد التفكير: {{variant}}",
-      "lockedByAgent": "، مقفل بواسطة الوكيل \"{{agent}}\"",
+      "lockedByAgent": "مقفل بواسطة الوكيل \"{{agent}}\"",
       "addToFavorites": "إضافة {{name}} إلى المفضلة",
       "removeFromFavorites": "إزالة {{name}} من المفضلة",
       "sessionModel": "نموذج الجلسة"

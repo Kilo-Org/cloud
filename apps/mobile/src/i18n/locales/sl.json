@@ -2552,7 +2552,8 @@
       "customModes": "Načini po meri"
     },
     "modeSelector": {
-      "accessibility": "Način: {{label}}"
+      "accessibility": "Način: {{label}}",
+      "customMode": "Način po meri"
     },
     "modeOptions": {
       "code": "Programiraj",
@@ -2870,7 +2871,7 @@
       "thinkingEffortAccessibility": "stopnja razmišljanja: {{label}}",
       "thinkingEffortSelected": "stopnja razmišljanja: {{label}}, izbrano",
       "thinkingEffortWithModel": "{{model}}, stopnja razmišljanja: {{variant}}",
-      "lockedByAgent": ", Zaklenil agent »{{agent}}«",
+      "lockedByAgent": "Zaklenil agent »{{agent}}«",
       "addToFavorites": "Dodaj {{name}} med priljubljene",
       "removeFromFavorites": "Odstrani {{name}} s seznama priljubljenih",
       "sessionModel": "Model seje"

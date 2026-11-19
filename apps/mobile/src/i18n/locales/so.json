@@ -2456,7 +2456,8 @@
       "customModes": "Qaabab gaar ah"
     },
     "modeSelector": {
-      "accessibility": "Qaab: {{label}}"
+      "accessibility": "Qaab: {{label}}",
+      "customMode": "Qaab gaar ah"
     },
     "modeOptions": {
       "code": "Qor koodh",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "heerka fikirka: {{label}}",
       "thinkingEffortSelected": "heerka fikirka: {{label}}, la doortay",
       "thinkingEffortWithModel": "{{model}}, heerka fikirka: {{variant}}",
-      "lockedByAgent": ", Waxaa xiray wakiilka \"{{agent}}\"",
+      "lockedByAgent": "Waxaa xiray wakiilka \"{{agent}}\"",
       "addToFavorites": "Ku dar {{name}} kuwa la jecel yahay",
       "removeFromFavorites": "Ka saar {{name}} kuwa la jecel yahay",
       "sessionModel": "Moodeelka kalfadhiga"

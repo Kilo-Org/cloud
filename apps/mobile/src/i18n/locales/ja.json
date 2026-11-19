@@ -1913,7 +1913,8 @@
       "customModes": "カスタムモード"
     },
     "modeSelector": {
-      "accessibility": "モード：{{label}}"
+      "accessibility": "モード：{{label}}",
+      "customMode": "カスタムモード"
     },
     "modeOptions": {
       "code": "コード",
@@ -2229,7 +2230,7 @@
       "thinkingEffortAccessibility": "思考量：{{label}}",
       "thinkingEffortSelected": "思考量：{{label}}、選択済み",
       "thinkingEffortWithModel": "{{model}}、思考量：{{variant}}",
-      "lockedByAgent": "、エージェント「{{agent}}」によってロックされています",
+      "lockedByAgent": "エージェント「{{agent}}」によってロックされています",
       "addToFavorites": "{{name}}をお気に入りに追加",
       "removeFromFavorites": "{{name}}をお気に入りから削除",
       "sessionModel": "セッションのモデル"

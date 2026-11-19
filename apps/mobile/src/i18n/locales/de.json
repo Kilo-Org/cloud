@@ -1913,7 +1913,8 @@
       "customModes": "Benutzerdefinierte Modi"
     },
     "modeSelector": {
-      "accessibility": "Modus: {{label}}"
+      "accessibility": "Modus: {{label}}",
+      "customMode": "Benutzerdefinierter Modus"
     },
     "modeOptions": {
       "code": "Programmieren",
@@ -2229,7 +2230,7 @@
       "thinkingEffortAccessibility": "Denkaufwand: {{label}}",
       "thinkingEffortSelected": "Denkaufwand: {{label}}, ausgewählt",
       "thinkingEffortWithModel": "{{model}}, Denkaufwand: {{variant}}",
-      "lockedByAgent": ", Durch den Agenten „{{agent}}“ gesperrt",
+      "lockedByAgent": "Durch den Agenten „{{agent}}“ gesperrt",
       "addToFavorites": "{{name}} zu den Favoriten hinzufügen",
       "removeFromFavorites": "{{name}} aus den Favoriten entfernen",
       "sessionModel": "Sitzungsmodell"

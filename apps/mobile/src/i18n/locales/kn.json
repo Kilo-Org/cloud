@@ -2456,7 +2456,8 @@
       "customModes": "ಕಸ್ಟಮ್ ಮೋಡ್‌ಗಳು"
     },
     "modeSelector": {
-      "accessibility": "ಮೋಡ್: {{label}}"
+      "accessibility": "ಮೋಡ್: {{label}}",
+      "customMode": "ಕಸ್ಟಮ್ ಮೋಡ್"
     },
     "modeOptions": {
       "code": "ಕೋಡ್ ಬರೆಯಿರಿ",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "ಯೋಚನೆಯ ಮಟ್ಟ: {{label}}",
       "thinkingEffortSelected": "ಯೋಚನೆಯ ಮಟ್ಟ: {{label}}, ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
       "thinkingEffortWithModel": "{{model}}, ಯೋಚನೆಯ ಮಟ್ಟ: {{variant}}",
-      "lockedByAgent": ", \"{{agent}}\" ಏಜೆಂಟ್ ಬದಲಾವಣೆಗಳನ್ನು ನಿರ್ಬಂಧಿಸಿದೆ",
+      "lockedByAgent": "\"{{agent}}\" ಏಜೆಂಟ್ ಬದಲಾವಣೆಗಳನ್ನು ನಿರ್ಬಂಧಿಸಿದೆ",
       "addToFavorites": "{{name}} ಅನ್ನು ಮೆಚ್ಚಿನವುಗಳಿಗೆ ಸೇರಿಸಿ",
       "removeFromFavorites": "{{name}} ಅನ್ನು ಮೆಚ್ಚಿನವುಗಳಿಂದ ತೆಗೆದುಹಾಕಿ",
       "sessionModel": "ಸೆಶನ್ ಮಾದರಿ"

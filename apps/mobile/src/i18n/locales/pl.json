@@ -1963,7 +1963,8 @@
       "customModes": "Tryby niestandardowe"
     },
     "modeSelector": {
-      "accessibility": "Tryb: {{label}}"
+      "accessibility": "Tryb: {{label}}",
+      "customMode": "Tryb niestandardowy"
     },
     "modeOptions": {
       "code": "Programowanie",
@@ -2281,7 +2282,7 @@
       "thinkingEffortAccessibility": "Poziom rozumowania: {{label}}",
       "thinkingEffortSelected": "Poziom rozumowania: {{label}}, wybrany",
       "thinkingEffortWithModel": "{{model}}, poziom rozumowania: {{variant}}",
-      "lockedByAgent": ", Zablokowane przez agenta „{{agent}}”",
+      "lockedByAgent": "Zablokowane przez agenta „{{agent}}”",
       "addToFavorites": "Dodaj {{name}} do ulubionych",
       "removeFromFavorites": "Usuń {{name}} z ulubionych",
       "sessionModel": "Model sesji"

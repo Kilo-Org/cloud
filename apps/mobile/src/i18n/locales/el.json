@@ -2456,7 +2456,8 @@
       "customModes": "Προσαρμοσμένες λειτουργίες"
     },
     "modeSelector": {
-      "accessibility": "Λειτουργία: {{label}}"
+      "accessibility": "Λειτουργία: {{label}}",
+      "customMode": "Προσαρμοσμένη λειτουργία"
     },
     "modeOptions": {
       "code": "Κώδικας",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "ένταση σκέψης: {{label}}",
       "thinkingEffortSelected": "ένταση σκέψης: {{label}}, επιλεγμένη",
       "thinkingEffortWithModel": "{{model}}, ένταση σκέψης: {{variant}}",
-      "lockedByAgent": ", Κλειδωμένο από τον πράκτορα «{{agent}}»",
+      "lockedByAgent": "Κλειδωμένο από τον πράκτορα «{{agent}}»",
       "addToFavorites": "Προσθήκη του {{name}} στα αγαπημένα",
       "removeFromFavorites": "Αφαίρεση του {{name}} από τα αγαπημένα",
       "sessionModel": "Μοντέλο συνεδρίας"

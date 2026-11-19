@@ -1913,7 +1913,8 @@
       "customModes": "사용자 지정 모드"
     },
     "modeSelector": {
-      "accessibility": "모드: {{label}}"
+      "accessibility": "모드: {{label}}",
+      "customMode": "사용자 지정 모드"
     },
     "modeOptions": {
       "code": "코딩",
@@ -2229,7 +2230,7 @@
       "thinkingEffortAccessibility": "추론 강도: {{label}}",
       "thinkingEffortSelected": "추론 강도: {{label}}, 선택됨",
       "thinkingEffortWithModel": "{{model}}, 추론 강도: {{variant}}",
-      "lockedByAgent": ", 에이전트 \"{{agent}}\"에서 고정한 설정",
+      "lockedByAgent": "에이전트 \"{{agent}}\"에서 고정한 설정",
       "addToFavorites": "{{name}} 즐겨찾기에 추가",
       "removeFromFavorites": "{{name}} 즐겨찾기에서 제거",
       "sessionModel": "세션 모델"

@@ -2600,7 +2600,8 @@
       "customModes": "Móid saincheaptha"
     },
     "modeSelector": {
-      "accessibility": "Mód: {{label}}"
+      "accessibility": "Mód: {{label}}",
+      "customMode": "Mód saincheaptha"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2919,7 +2920,7 @@
       "thinkingEffortAccessibility": "leibhéal machnaimh: {{label}}",
       "thinkingEffortSelected": "leibhéal machnaimh: {{label}}, roghnaithe",
       "thinkingEffortWithModel": "{{model}}, leibhéal machnaimh: {{variant}}",
-      "lockedByAgent": ", Glasáilte ag an ngníomhaire \"{{agent}}\"",
+      "lockedByAgent": "Glasáilte ag an ngníomhaire \"{{agent}}\"",
       "addToFavorites": "Cuir {{name}} leis na cinn is fearr leat",
       "removeFromFavorites": "Bain {{name}} ó na cinn is fearr leat",
       "sessionModel": "Samhail an tseisiúin"

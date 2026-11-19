@@ -2456,7 +2456,8 @@
       "customModes": "सानुकूल मोड"
     },
     "modeSelector": {
-      "accessibility": "मोड: {{label}}"
+      "accessibility": "मोड: {{label}}",
+      "customMode": "सानुकूल मोड"
     },
     "modeOptions": {
       "code": "कोड",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "विचारांची पातळी: {{label}}",
       "thinkingEffortSelected": "विचारांची पातळी: {{label}}, निवडलेली",
       "thinkingEffortWithModel": "{{model}}, विचारांची पातळी: {{variant}}",
-      "lockedByAgent": ", \"{{agent}}\" या एजंटने लॉक केलेले",
+      "lockedByAgent": "\"{{agent}}\" या एजंटने लॉक केलेले",
       "addToFavorites": "{{name}} आवडत्या मॉडेलमध्ये जोडा",
       "removeFromFavorites": "{{name}} आवडत्या मॉडेलमधून काढा",
       "sessionModel": "सत्राचे मॉडेल"

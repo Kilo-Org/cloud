@@ -2456,7 +2456,8 @@
       "customModes": "ਕਸਟਮ ਮੋਡ"
     },
     "modeSelector": {
-      "accessibility": "ਮੋਡ: {{label}}"
+      "accessibility": "ਮੋਡ: {{label}}",
+      "customMode": "ਕਸਟਮ ਮੋਡ"
     },
     "modeOptions": {
       "code": "ਕੋਡ ਲਿਖੋ",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "ਸੋਚਣ ਦਾ ਪੱਧਰ: {{label}}",
       "thinkingEffortSelected": "ਸੋਚਣ ਦਾ ਪੱਧਰ: {{label}}, ਚੁਣਿਆ ਗਿਆ",
       "thinkingEffortWithModel": "{{model}}, ਸੋਚਣ ਦਾ ਪੱਧਰ: {{variant}}",
-      "lockedByAgent": ", ਏਜੰਟ \"{{agent}}\" ਦੁਆਰਾ ਲਾਕ ਕੀਤਾ ਗਿਆ",
+      "lockedByAgent": "ਏਜੰਟ \"{{agent}}\" ਦੁਆਰਾ ਲਾਕ ਕੀਤਾ ਗਿਆ",
       "addToFavorites": "{{name}} ਨੂੰ ਪਸੰਦੀਦਾ ਸੂਚੀ ਵਿੱਚ ਜੋੜੋ",
       "removeFromFavorites": "{{name}} ਨੂੰ ਪਸੰਦੀਦਾ ਸੂਚੀ ਤੋਂ ਹਟਾਓ",
       "sessionModel": "ਸੈਸ਼ਨ ਦਾ ਮਾਡਲ"

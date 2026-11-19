@@ -1913,7 +1913,8 @@
       "customModes": "Özel modlar"
     },
     "modeSelector": {
-      "accessibility": "Mod: {{label}}"
+      "accessibility": "Mod: {{label}}",
+      "customMode": "Özel mod"
     },
     "modeOptions": {
       "code": "Kod yaz",
@@ -2229,7 +2230,7 @@
       "thinkingEffortAccessibility": "{{label}} düşünme düzeyi",
       "thinkingEffortSelected": "{{label}} düşünme düzeyi, seçili",
       "thinkingEffortWithModel": "{{model}}, {{variant}} düşünme düzeyi",
-      "lockedByAgent": ", \"{{agent}}\" ajanı tarafından kilitlendi",
+      "lockedByAgent": "\"{{agent}}\" ajanı tarafından kilitlendi",
       "addToFavorites": "{{name}} modelini favorilere ekle",
       "removeFromFavorites": "{{name}} modelini favorilerden kaldır",
       "sessionModel": "Oturum modeli"

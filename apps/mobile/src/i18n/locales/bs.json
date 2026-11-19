@@ -2504,7 +2504,8 @@
       "customModes": "Prilagođeni načini rada"
     },
     "modeSelector": {
-      "accessibility": "Način rada: {{label}}"
+      "accessibility": "Način rada: {{label}}",
+      "customMode": "Prilagođeni način rada"
     },
     "modeOptions": {
       "code": "Kodiraj",
@@ -2821,7 +2822,7 @@
       "thinkingEffortAccessibility": "Intenzitet razmišljanja: {{label}}",
       "thinkingEffortSelected": "Intenzitet razmišljanja: {{label}}, odabrano",
       "thinkingEffortWithModel": "{{model}}, intenzitet razmišljanja: {{variant}}",
-      "lockedByAgent": ", Zaključao agent „{{agent}}“",
+      "lockedByAgent": "Zaključao agent „{{agent}}“",
       "addToFavorites": "Dodaj {{name}} u omiljene",
       "removeFromFavorites": "Ukloni {{name}} iz omiljenih",
       "sessionModel": "Model sesije"

@@ -1869,7 +1869,8 @@
       "customModes": "कस्टम मोड"
     },
     "modeSelector": {
-      "accessibility": "मोड: {{label}}"
+      "accessibility": "मोड: {{label}}",
+      "customMode": "कस्टम मोड"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2178,7 +2179,7 @@
       "thinkingEffortAccessibility": "सोचने का स्तर: {{label}}",
       "thinkingEffortSelected": "सोचने का स्तर: {{label}}, चयनित",
       "thinkingEffortWithModel": "{{model}}, सोचने का स्तर: {{variant}}",
-      "lockedByAgent": ", एजेंट \"{{agent}}\" द्वारा लॉक",
+      "lockedByAgent": "एजेंट \"{{agent}}\" द्वारा लॉक",
       "addToFavorites": "{{name}} को पसंदीदा में जोड़ें",
       "removeFromFavorites": "{{name}} को पसंदीदा से हटाएँ",
       "sessionModel": "सत्र का मॉडल"

@@ -1938,7 +1938,8 @@
       "customModes": "מצבים מותאמים אישית"
     },
     "modeSelector": {
-      "accessibility": "מצב: {{label}}"
+      "accessibility": "מצב: {{label}}",
+      "customMode": "מצב מותאם אישית"
     },
     "modelCost": {
       "lessThan": "מתחת ל-{{amount}}",
@@ -2255,7 +2256,7 @@
       "thinkingEffortAccessibility": "מאמץ חשיבה: {{label}}",
       "thinkingEffortSelected": "מאמץ חשיבה: {{label}}, נבחר",
       "thinkingEffortWithModel": "{{model}}, מאמץ חשיבה: {{variant}}",
-      "lockedByAgent": ", נעול על ידי הסוכן \"{{agent}}\"",
+      "lockedByAgent": "נעול על ידי הסוכן \"{{agent}}\"",
       "addToFavorites": "הוספת {{name}} למועדפים",
       "removeFromFavorites": "הסרת {{name}} מהמועדפים",
       "sessionModel": "המודל של הסשן"

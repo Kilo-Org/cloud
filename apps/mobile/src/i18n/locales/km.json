@@ -2456,7 +2456,8 @@
       "customModes": "របៀបផ្ទាល់ខ្លួន"
     },
     "modeSelector": {
-      "accessibility": "របៀប: {{label}}"
+      "accessibility": "របៀប: {{label}}",
+      "customMode": "របៀបផ្ទាល់ខ្លួន"
     },
     "modeOptions": {
       "code": "សរសេរកូដ",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "កម្រិតនៃការគិត {{label}}",
       "thinkingEffortSelected": "កម្រិតនៃការគិត {{label}}, បានជ្រើសរើស",
       "thinkingEffortWithModel": "{{model}}, កម្រិតនៃការគិត {{variant}}",
-      "lockedByAgent": ", បានចាក់សោដោយភ្នាក់ងារ \"{{agent}}\"",
+      "lockedByAgent": "បានចាក់សោដោយភ្នាក់ងារ \"{{agent}}\"",
       "addToFavorites": "បន្ថែម {{name}} ទៅចំណូលចិត្ត",
       "removeFromFavorites": "ដក {{name}} ចេញពីចំណូលចិត្ត",
       "sessionModel": "ម៉ូដែលរបស់វគ្គ"

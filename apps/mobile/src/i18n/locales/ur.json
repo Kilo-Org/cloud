@@ -2456,7 +2456,8 @@
       "customModes": "حسب ضرورت موڈز"
     },
     "modeSelector": {
-      "accessibility": "موڈ: {{label}}"
+      "accessibility": "موڈ: {{label}}",
+      "customMode": "حسب ضرورت موڈ"
     },
     "modeOptions": {
       "code": "کوڈ لکھیں",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "غور کی سطح: {{label}}",
       "thinkingEffortSelected": "غور کی سطح: {{label}}، منتخب شدہ",
       "thinkingEffortWithModel": "{{model}}، غور کی سطح: {{variant}}",
-      "lockedByAgent": "، ایجنٹ \"{{agent}}\" نے مقفل کیا ہے",
+      "lockedByAgent": "ایجنٹ \"{{agent}}\" نے مقفل کیا ہے",
       "addToFavorites": "{{name}} کو پسندیدہ میں شامل کریں",
       "removeFromFavorites": "{{name}} کو پسندیدہ سے ہٹائیں",
       "sessionModel": "سیشن کا ماڈل"

@@ -1845,7 +1845,8 @@
       "platformBitbucket": "Bitbucket"
     },
     "modeSelector": {
-      "accessibility": "Mode : {{label}}"
+      "accessibility": "Mode : {{label}}",
+      "customMode": "Mode personnalisé"
     },
     "modeOptions": {
       "code": "Coder",
@@ -2151,7 +2152,7 @@
       "thinkingEffortAccessibility": "niveau de réflexion : {{label}}",
       "thinkingEffortSelected": "niveau de réflexion : {{label}}, sélectionné",
       "thinkingEffortWithModel": "{{model}}, niveau de réflexion : {{variant}}",
-      "lockedByAgent": ", Verrouillé par l'agent « {{agent}} »",
+      "lockedByAgent": "Verrouillé par l'agent « {{agent}} »",
       "addToFavorites": "Ajouter {{name}} aux favoris",
       "removeFromFavorites": "Retirer {{name}} des favoris",
       "sessionModel": "Modèle de la session"

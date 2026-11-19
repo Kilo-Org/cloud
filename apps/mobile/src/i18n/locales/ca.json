@@ -2504,7 +2504,8 @@
       "customModes": "Modes personalitzats"
     },
     "modeSelector": {
-      "accessibility": "Mode actual: {{label}}"
+      "accessibility": "Mode actual: {{label}}",
+      "customMode": "Mode personalitzat"
     },
     "modeOptions": {
       "code": "Programa",
@@ -2821,7 +2822,7 @@
       "thinkingEffortAccessibility": "Esforç de raonament {{label}}",
       "thinkingEffortSelected": "Esforç de raonament {{label}}, seleccionat",
       "thinkingEffortWithModel": "{{model}}, esforç de raonament {{variant}}",
-      "lockedByAgent": ", Bloquejat per l'agent «{{agent}}»",
+      "lockedByAgent": "Bloquejat per l'agent «{{agent}}»",
       "addToFavorites": "Afegeix {{name}} als preferits",
       "removeFromFavorites": "Treu {{name}} dels preferits",
       "sessionModel": "Model de la sessió"

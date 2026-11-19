@@ -1913,7 +1913,8 @@
       "customModes": "Mode kustom"
     },
     "modeSelector": {
-      "accessibility": "Mode aktif: {{label}}"
+      "accessibility": "Mode aktif: {{label}}",
+      "customMode": "Mode kustom"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2229,7 +2230,7 @@
       "thinkingEffortAccessibility": "Tingkat penalaran {{label}}",
       "thinkingEffortSelected": "Tingkat penalaran {{label}}, dipilih",
       "thinkingEffortWithModel": "{{model}}, tingkat penalaran {{variant}}",
-      "lockedByAgent": ", Dikunci oleh agen \"{{agent}}\"",
+      "lockedByAgent": "Dikunci oleh agen \"{{agent}}\"",
       "addToFavorites": "Tambahkan {{name}} ke favorit",
       "removeFromFavorites": "Hapus {{name}} dari favorit",
       "sessionModel": "Model sesi"

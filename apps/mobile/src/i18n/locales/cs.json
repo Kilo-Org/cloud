@@ -2552,7 +2552,8 @@
       "customModes": "Vlastní režimy"
     },
     "modeSelector": {
-      "accessibility": "Režim: {{label}}"
+      "accessibility": "Režim: {{label}}",
+      "customMode": "Vlastní režim"
     },
     "modeOptions": {
       "code": "Programovat",
@@ -2870,7 +2871,7 @@
       "thinkingEffortAccessibility": "Úroveň uvažování: {{label}}",
       "thinkingEffortSelected": "Úroveň uvažování: {{label}}, vybráno",
       "thinkingEffortWithModel": "{{model}}, úroveň uvažování: {{variant}}",
-      "lockedByAgent": ", Uzamčeno agentem „{{agent}}“",
+      "lockedByAgent": "Uzamčeno agentem „{{agent}}“",
       "addToFavorites": "Přidat {{name}} do oblíbených",
       "removeFromFavorites": "Odebrat {{name}} z oblíbených",
       "sessionModel": "Model relace"

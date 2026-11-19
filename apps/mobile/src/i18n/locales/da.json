@@ -2456,7 +2456,8 @@
       "customModes": "Brugerdefinerede tilstande"
     },
     "modeSelector": {
-      "accessibility": "Tilstand: {{label}}"
+      "accessibility": "Tilstand: {{label}}",
+      "customMode": "Brugerdefineret tilstand"
     },
     "modeOptions": {
       "code": "Skriv kode",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "Ræsonnementsniveau: {{label}}",
       "thinkingEffortSelected": "Ræsonnementsniveau: {{label}}, valgt",
       "thinkingEffortWithModel": "{{model}}, ræsonnementsniveau: {{variant}}",
-      "lockedByAgent": ", Låst af agenten \"{{agent}}\"",
+      "lockedByAgent": "Låst af agenten \"{{agent}}\"",
       "addToFavorites": "Tilføj {{name}} til favoritter",
       "removeFromFavorites": "Fjern {{name}} fra favoritter",
       "sessionModel": "Sessionsmodel"

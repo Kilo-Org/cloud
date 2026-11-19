@@ -2456,7 +2456,8 @@
       "customModes": "Maxsus rejimlar"
     },
     "modeSelector": {
-      "accessibility": "Rejim: {{label}}"
+      "accessibility": "Rejim: {{label}}",
+      "customMode": "Maxsus rejim"
     },
     "modeOptions": {
       "code": "Kod yozish",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "fikrlash darajasi: {{label}}",
       "thinkingEffortSelected": "fikrlash darajasi: {{label}}, tanlangan",
       "thinkingEffortWithModel": "{{model}}, fikrlash darajasi: {{variant}}",
-      "lockedByAgent": ", \"{{agent}}\" agenti tomonidan o'zgartirish cheklangan",
+      "lockedByAgent": "\"{{agent}}\" agenti tomonidan o'zgartirish cheklangan",
       "addToFavorites": "{{name}} modelini sevimlilarga qo'shish",
       "removeFromFavorites": "{{name}} modelini sevimlilardan olib tashlash",
       "sessionModel": "Sessiya modeli"

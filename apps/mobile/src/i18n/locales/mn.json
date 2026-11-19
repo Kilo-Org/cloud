@@ -2456,7 +2456,8 @@
       "customModes": "Өөрийн горимууд"
     },
     "modeSelector": {
-      "accessibility": "Горим: {{label}}"
+      "accessibility": "Горим: {{label}}",
+      "customMode": "Өөрийн горим"
     },
     "modeOptions": {
       "code": "Код бичих",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "Бодох түвшин: {{label}}",
       "thinkingEffortSelected": "Бодох түвшин: {{label}}, сонгогдсон",
       "thinkingEffortWithModel": "{{model}}, бодох түвшин: {{variant}}",
-      "lockedByAgent": ", «{{agent}}» агент түгжсэн",
+      "lockedByAgent": "«{{agent}}» агент түгжсэн",
       "addToFavorites": "{{name}} загварыг дуртай загваруудад нэмэх",
       "removeFromFavorites": "{{name}} загварыг дуртай загваруудаас хасах",
       "sessionModel": "Сессийн загвар"

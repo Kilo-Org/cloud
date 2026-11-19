@@ -2552,7 +2552,8 @@
       "customModes": "Pasirinktiniai režimai"
     },
     "modeSelector": {
-      "accessibility": "Režimas: {{label}}"
+      "accessibility": "Režimas: {{label}}",
+      "customMode": "Pasirinktinis režimas"
     },
     "modeOptions": {
       "code": "Programuoti",
@@ -2870,7 +2871,7 @@
       "thinkingEffortAccessibility": "mąstymo intensyvumas: {{label}}",
       "thinkingEffortSelected": "mąstymo intensyvumas: {{label}}, pasirinkta",
       "thinkingEffortWithModel": "{{model}}, mąstymo intensyvumas: {{variant}}",
-      "lockedByAgent": ", Užrakino agentas „{{agent}}“",
+      "lockedByAgent": "Užrakino agentas „{{agent}}“",
       "addToFavorites": "Įtraukti {{name}} į mėgstamiausius",
       "removeFromFavorites": "Pašalinti {{name}} iš mėgstamiausių",
       "sessionModel": "Sesijos modelis"

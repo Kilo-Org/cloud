@@ -2456,7 +2456,8 @@
       "customModes": "අභිරුචි ප්‍රකාර"
     },
     "modeSelector": {
-      "accessibility": "ප්‍රකාරය: {{label}}"
+      "accessibility": "ප්‍රකාරය: {{label}}",
+      "customMode": "අභිරුචි ප්‍රකාරය"
     },
     "modeOptions": {
       "code": "කේත ලියන්න",
@@ -2772,7 +2773,7 @@
       "thinkingEffortAccessibility": "සිතීමේ මට්ටම: {{label}}",
       "thinkingEffortSelected": "සිතීමේ මට්ටම: {{label}}, තෝරා ඇත",
       "thinkingEffortWithModel": "{{model}}, සිතීමේ මට්ටම: {{variant}}",
-      "lockedByAgent": ", \"{{agent}}\" නියෝජිතයා විසින් අගුළු දමා ඇත",
+      "lockedByAgent": "\"{{agent}}\" නියෝජිතයා විසින් අගුළු දමා ඇත",
       "addToFavorites": "ප්‍රියතමයන්ට {{name}} එක් කරන්න",
       "removeFromFavorites": "ප්‍රියතමයන්ගෙන් {{name}} ඉවත් කරන්න",
       "sessionModel": "සැසියේ මාදිලිය"

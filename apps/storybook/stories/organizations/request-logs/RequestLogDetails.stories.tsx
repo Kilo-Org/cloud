@@ -677,7 +677,20 @@ const enkryptBlockStoppedScanDetails: RequestLogDetails = {
 };
 
 export const EnkryptBlockStoppedScan: Story = {
-  args: { ...BlockedByEnkryptInputGuardrail.args, details: enkryptBlockStoppedScanDetails },
+  args: {
+    row: {
+      ...row,
+      provider: null,
+      is_user_byok: false,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_hit_tokens: 0,
+      has_error: true,
+      latency_ms: 1_660,
+      generation_time_ms: null,
+    },
+    details: enkryptBlockStoppedScanDetails,
+  },
 };
 
 const enkryptFailedOpenDetails: RequestLogDetails = {

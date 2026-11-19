@@ -22,13 +22,10 @@ import {
   isNotNull,
   like,
   sql,
-  type SQL,
 } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
-import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
 import { MAX_INGEST_ITEM_BYTES, CLONE_WINDOW_MAX_BYTES } from '../util/ingest-limits';
@@ -82,6 +79,7 @@ import { readSessionMetricsWindow } from './session-metrics-window';
 import { readStoredRunningAssistantCostUsd } from './running-cost-seed';
 import migrations from '../../drizzle/migrations';
 import { refreshGlanceableSessions } from '../remote-session-notifications';
+import { describeWorkerDbError } from '../util/worker-db-error';
 import {
   applySessionLiveSummaryStatus,
   decideLiveSummaryPersist,
@@ -101,12 +99,20 @@ import { precedesStatusTransition, resetAttentionStatusOnCliDisconnect } from '.
 import {
   BRIEFING_MAX_INLINE_BYTES,
   BRIEFING_MAX_EXCERPT_SOURCE_ROWS,
-  briefingExcerptUpdate,
+  briefingExcerptIsNewer,
   buildBriefingExcerpt,
   completedBriefingResponse,
   isFinalizedBriefingText,
   type BriefingExcerpt,
+  type BriefingExcerptIdentity,
 } from '../ingest/briefing-excerpt';
+import {
+  createLivePersistQueue,
+  mergeLivePersistRequests,
+  persistLiveSessionColumns,
+  type LivePersistRequest,
+  type LiveSessionColumns,
+} from './live-session-columns';
 import {
   SHARE_INFO_KEY_PREFIX,
   shareInfoKey,
@@ -226,8 +232,6 @@ function readLiveSummaryPersisted(db: DrizzleSqliteDODatabase): SessionLiveSumma
   return parsed.success ? parsed.data : null;
 }
 
-type BriefingExcerptIdentity = Pick<BriefingExcerpt, 'messageId' | 'completedAt'>;
-
 /** The excerpt identity the last live persist handed to Postgres, or null when none did. */
 function readBriefingExcerptPersisted(db: DrizzleSqliteDODatabase): BriefingExcerptIdentity | null {
   const raw = readIngestMetaValue(db, 'lastBriefingExcerptPersisted');
@@ -243,27 +247,6 @@ function readBriefingExcerptPersisted(db: DrizzleSqliteDODatabase): BriefingExce
   if (typeof messageId !== 'string' || messageId.length === 0) return null;
   if (typeof completedAt !== 'string') return null;
   return { messageId, completedAt };
-}
-
-/**
- * Mirrors the SQL ordering in `briefingExcerptUpdate`: a candidate is newer on a later
- * `completedAt`, or on an equal one and a greater `messageId`. Both times are canonical ISO
- * strings, so comparing them as text matches comparing them as timestamps. The SQL guard orders
- * the ids with `COLLATE "C"`, which is byte order, so the ids are compared as their UTF-8 bytes
- * rather than by UTF-16 code unit.
- */
-function briefingExcerptIsNewer(
-  next: BriefingExcerptIdentity,
-  last: BriefingExcerptIdentity | null
-): boolean {
-  if (last === null) return true;
-  if (next.completedAt !== last.completedAt) return next.completedAt > last.completedAt;
-  const left = new TextEncoder().encode(next.messageId);
-  const right = new TextEncoder().encode(last.messageId);
-  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
-    if (left[index] !== right[index]) return left[index] > right[index];
-  }
-  return left.length > right.length;
 }
 
 /** Records the excerpt the object is sending, so the next identical batch adds no column. */
@@ -358,81 +341,6 @@ function writeCloneVerification(
   writeCloneMeta(db, 'cloneVerifyCursor', JSON.stringify(progress.verifyCursor));
   writeCloneMeta(db, 'cloneVerifyChain', progress.verifyChain);
   writeCloneMeta(db, 'cloneVerifyRows', String(progress.verifyRows));
-}
-
-/**
- * Monotonic live-column write for cost, last_activity_at, and the session
- * card summary. Per-column CASE guards so concurrent waitUntil tasks commute.
- * Used by live ingest persists and the close-path emitSessionMetrics write.
- *
- * The summary has no order of its own, so it carries the activity time of
- * the batch that produced it (`atIso`) and is written only when that time is
- * not older than the stored activity. A slower in-flight write of an older
- * batch then leaves the newer summary in place, as the activity guard does.
- */
-export async function persistLiveSessionColumns(
-  connectionString: string,
-  kiloUserId: string,
-  sessionId: string,
-  columns: {
-    costMicrodollars?: number;
-    lastActivityAtIso?: string;
-    liveSummary?: { summary: SessionLiveSummary; atIso: string };
-    briefingExcerpt?: { excerpt: BriefingExcerpt; receivedAtIso: string };
-  }
-): Promise<void> {
-  const set: {
-    total_cost_microdollars?: SQL;
-    last_activity_at?: SQL;
-    live_summary?: SQL;
-    briefing_excerpt?: SQL;
-  } = {};
-
-  if (columns.costMicrodollars !== undefined) {
-    const cost = columns.costMicrodollars;
-    set.total_cost_microdollars = sql`CASE
-      WHEN ${cli_sessions_v2.total_cost_microdollars} IS NULL
-        OR ${cli_sessions_v2.total_cost_microdollars} < ${cost}
-      THEN ${cost}
-      ELSE ${cli_sessions_v2.total_cost_microdollars}
-    END`;
-  }
-
-  if (columns.lastActivityAtIso !== undefined) {
-    const activity = columns.lastActivityAtIso;
-    set.last_activity_at = sql`CASE
-      WHEN ${cli_sessions_v2.last_activity_at} IS NULL
-        OR ${cli_sessions_v2.last_activity_at} < ${activity}
-      THEN ${activity}
-      ELSE ${cli_sessions_v2.last_activity_at}
-    END`;
-  }
-
-  if (columns.liveSummary !== undefined) {
-    // Postgres reads every SET expression against the old row, so this guard
-    // compares with the stored activity, not the value set beside it.
-    const { summary, atIso } = columns.liveSummary;
-    set.live_summary = sql`CASE
-      WHEN ${cli_sessions_v2.last_activity_at} IS NULL
-        OR ${cli_sessions_v2.last_activity_at} <= ${atIso}
-      THEN ${JSON.stringify(summary)}::jsonb
-      ELSE ${cli_sessions_v2.live_summary}
-    END`;
-  }
-
-  if (columns.briefingExcerpt !== undefined) {
-    const { excerpt, receivedAtIso } = columns.briefingExcerpt;
-    set.briefing_excerpt = briefingExcerptUpdate(excerpt, receivedAtIso);
-  }
-
-  if (Object.keys(set).length === 0) return;
-
-  await getWorkerDb(connectionString)
-    .update(cli_sessions_v2)
-    .set(set)
-    .where(
-      and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    );
 }
 
 const INGEST_META_EXTRACTORS: Array<{
@@ -660,6 +568,26 @@ export class SessionIngestDO extends DurableObject<Env> {
   private cleanupOperation: Promise<void> | undefined;
   /** The excerpt a scheduled live persist carries, so an identical batch adds no column. */
   private briefingExcerptInFlight: BriefingExcerptIdentity | null = null;
+  private readonly liveColumns = createLivePersistQueue<LivePersistRequest>({
+    merge: mergeLivePersistRequests,
+    write: async request => {
+      if (this.isDeleted()) return;
+      await persistLiveSessionColumns(
+        this.env.HYPERDRIVE.connectionString,
+        request.kiloUserId,
+        request.sessionId,
+        request.columns
+      );
+    },
+    onWritten: request => this.recordLiveColumnsWritten(request),
+    onFailed: (request, error) => {
+      console.error('SessionIngestDO failed to persist live session columns', {
+        kiloUserId: request.kiloUserId,
+        sessionId: request.sessionId,
+        ...describeWorkerDbError(error),
+      });
+    },
+  });
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -1174,12 +1102,7 @@ export class SessionIngestDO extends DurableObject<Env> {
         (item.type === 'part' && isFinalizedBriefingText(item.data))
     );
     if (decision.persistActivity || decision.persistCost || briefingResponseChanged) {
-      const columns: {
-        costMicrodollars?: number;
-        lastActivityAtIso?: string;
-        liveSummary?: { summary: SessionLiveSummary; atIso: string };
-        briefingExcerpt?: { excerpt: BriefingExcerpt; receivedAtIso: string };
-      } = {};
+      const columns: LiveSessionColumns = {};
       if (decision.persistCost && currentCostMicrodollars !== null) {
         columns.costMicrodollars = currentCostMicrodollars;
       }
@@ -1195,9 +1118,6 @@ export class SessionIngestDO extends DurableObject<Env> {
           atIso: new Date(lastActivityValueMs).toISOString(),
         };
       }
-      const costToPersist = columns.costMicrodollars;
-      const activityValueMs = decision.persistActivity ? lastActivityValueMs : undefined;
-      const summaryToPersist = columns.liveSummary;
       // The excerpt gate runs before the write is scheduled: a batch that repeats a response the
       // object already persisted, or one a scheduled write still carries, adds no excerpt column.
       // The in-flight identity is memory, so it lapses with the instance and a write that never
@@ -1231,94 +1151,28 @@ export class SessionIngestDO extends DurableObject<Env> {
           });
         }
       }
-      const connectionString = this.env.HYPERDRIVE.connectionString;
-      this.ctx.waitUntil(
-        (async () => {
-          try {
-            if (this.isDeleted()) return;
-            await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
-            if (this.isDeleted()) return;
-            if (excerptInFlight !== undefined) {
-              // Max-merge, so a slower batch that carried an older excerpt cannot replace the
-              // identity of the newer one already recorded.
-              if (briefingExcerptIsNewer(excerptInFlight, readBriefingExcerptPersisted(this.db))) {
-                writeBriefingExcerptPersisted(this.db, excerptInFlight);
-              }
-              this.releaseBriefingExcerptInFlight(excerptInFlight);
-            }
-            if (summaryToPersist !== undefined) {
-              const prevSummaryAt = readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs');
-              if (prevSummaryAt === null || nowMsLive > prevSummaryAt) {
-                writeIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs', nowMsLive);
-                if (liveSummaryVisibleChanged) {
-                  writeIngestMetaValue(
-                    this.db,
-                    'lastLiveSummaryPersisted',
-                    JSON.stringify(summaryToPersist.summary)
-                  );
-                }
-              }
-            }
-            // Max-merge post-await so out-of-order concurrent ingests cannot regress throttle meta.
-            if (activityValueMs !== undefined) {
-              const prevAt = readIngestMetaNumber(this.db, 'lastActivityPersistedAtMs');
-              if (prevAt === null || nowMs > prevAt) {
-                writeIngestMetaNumber(this.db, 'lastActivityPersistedAtMs', nowMs);
-              }
-              const prevPersistedValue = readIngestMetaNumber(
-                this.db,
-                'lastActivityPersistedValueMs'
-              );
-              if (prevPersistedValue === null || activityValueMs > prevPersistedValue) {
-                writeIngestMetaNumber(this.db, 'lastActivityPersistedValueMs', activityValueMs);
-              }
-              const prevActivityValue = readIngestMetaNumber(this.db, 'lastActivityValueMs');
-              if (prevActivityValue === null || activityValueMs > prevActivityValue) {
-                writeIngestMetaNumber(this.db, 'lastActivityValueMs', activityValueMs);
-              }
-            }
-            if (costToPersist !== undefined) {
-              const prevCostAt = readIngestMetaNumber(this.db, 'lastCostPersistedAtMs');
-              if (prevCostAt === null || nowMs > prevCostAt) {
-                writeIngestMetaNumber(this.db, 'lastCostPersistedAtMs', nowMs);
-              }
-              const prevCost = readIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars');
-              if (prevCost === null || costToPersist > prevCost) {
-                writeIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars', costToPersist);
-              }
-            }
-            // The card reads the persisted row, so refresh only after the write
-            // landed and only when a card follows this session: the follow gate
-            // saves the whole snapshot build for a session nobody watches.
-            if (summaryToPersist !== undefined && liveSummaryVisibleChanged) {
-              try {
-                await refreshGlanceableSessions(this.env, {
-                  userId: kiloUserId,
-                  cliSessionIds: [sessionId],
-                  cardFollowSessionIds: [sessionId],
-                });
-              } catch (refreshError) {
-                console.error('SessionIngestDO failed to refresh the session card', {
-                  kiloUserId,
-                  sessionId,
-                  error:
-                    refreshError instanceof Error ? refreshError.message : String(refreshError),
-                });
-              }
-            }
-          } catch (error) {
-            // Nothing was recorded, because the record is written after the statement. The
-            // in-flight identity still has to go, or the next batch would skip the same excerpt.
-            if (excerptInFlight !== undefined) this.releaseBriefingExcerptInFlight(excerptInFlight);
-            console.error('SessionIngestDO failed to persist live session columns', {
-              kiloUserId,
-              sessionId,
-              error: error instanceof Error ? error.message : String(error),
-              stack: error instanceof Error ? error.stack : undefined,
-            });
-          }
-        })()
-      );
+      if (Object.keys(columns).length > 0) {
+        const request: LivePersistRequest = {
+          kiloUserId,
+          sessionId,
+          columns,
+          excerptsInFlight: excerptInFlight === undefined ? [] : [excerptInFlight],
+        };
+        if (decision.persistActivity) {
+          request.activity = { persistedAtMs: nowMs, valueMs: lastActivityValueMs };
+        }
+        if (columns.costMicrodollars !== undefined) {
+          request.cost = { persistedAtMs: nowMs, microdollars: columns.costMicrodollars };
+        }
+        if (columns.liveSummary !== undefined) {
+          request.liveSummary = {
+            persistedAtMs: nowMsLive,
+            visibleChanged: liveSummaryVisibleChanged,
+          };
+        }
+        const write = this.liveColumns.schedule(request);
+        if (write !== undefined) this.ctx.waitUntil(write);
+      }
     }
 
     const attentionSignals: AttentionSignal[] = [];
@@ -1420,6 +1274,84 @@ export class SessionIngestDO extends DurableObject<Env> {
    */
   async resetAttentionStatusOnCliDisconnect(kiloUserId: string, sessionId: string): Promise<void> {
     await resetAttentionStatusOnCliDisconnect(this.env, kiloUserId, sessionId, this.ctx);
+  }
+
+  /**
+   * Records a landed live-column write. Every value is max-merged, so a merged write or a write
+   * that lands after a newer one cannot regress the throttle state.
+   */
+  private recordLiveColumnsWritten(request: LivePersistRequest): void {
+    if (this.isDeleted()) return;
+    const { kiloUserId, sessionId, columns } = request;
+    const excerpt = columns.briefingExcerpt?.excerpt;
+    if (
+      excerpt !== undefined &&
+      briefingExcerptIsNewer(excerpt, readBriefingExcerptPersisted(this.db))
+    ) {
+      writeBriefingExcerptPersisted(this.db, excerpt);
+    }
+    for (const identity of request.excerptsInFlight) this.releaseBriefingExcerptInFlight(identity);
+    if (request.liveSummary !== undefined && columns.liveSummary !== undefined) {
+      const prevSummaryAt = readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs');
+      if (prevSummaryAt === null || request.liveSummary.persistedAtMs > prevSummaryAt) {
+        writeIngestMetaNumber(
+          this.db,
+          'lastLiveSummaryPersistedAtMs',
+          request.liveSummary.persistedAtMs
+        );
+        if (request.liveSummary.visibleChanged) {
+          writeIngestMetaValue(
+            this.db,
+            'lastLiveSummaryPersisted',
+            JSON.stringify(columns.liveSummary.summary)
+          );
+        }
+      }
+    }
+    if (request.activity !== undefined) {
+      const { persistedAtMs, valueMs } = request.activity;
+      const prevAt = readIngestMetaNumber(this.db, 'lastActivityPersistedAtMs');
+      if (prevAt === null || persistedAtMs > prevAt) {
+        writeIngestMetaNumber(this.db, 'lastActivityPersistedAtMs', persistedAtMs);
+      }
+      const prevPersistedValue = readIngestMetaNumber(this.db, 'lastActivityPersistedValueMs');
+      if (prevPersistedValue === null || valueMs > prevPersistedValue) {
+        writeIngestMetaNumber(this.db, 'lastActivityPersistedValueMs', valueMs);
+      }
+      const prevActivityValue = readIngestMetaNumber(this.db, 'lastActivityValueMs');
+      if (prevActivityValue === null || valueMs > prevActivityValue) {
+        writeIngestMetaNumber(this.db, 'lastActivityValueMs', valueMs);
+      }
+    }
+    if (request.cost !== undefined) {
+      const { persistedAtMs, microdollars } = request.cost;
+      const prevCostAt = readIngestMetaNumber(this.db, 'lastCostPersistedAtMs');
+      if (prevCostAt === null || persistedAtMs > prevCostAt) {
+        writeIngestMetaNumber(this.db, 'lastCostPersistedAtMs', persistedAtMs);
+      }
+      const prevCost = readIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars');
+      if (prevCost === null || microdollars > prevCost) {
+        writeIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars', microdollars);
+      }
+    }
+    // The card reads the persisted row, so refresh only after the write landed and only when a
+    // card follows this session: the follow gate saves the whole snapshot build for a session
+    // nobody watches. The refresh runs beside the next live write, not before it.
+    if (request.liveSummary?.visibleChanged === true && columns.liveSummary !== undefined) {
+      this.ctx.waitUntil(
+        refreshGlanceableSessions(this.env, {
+          userId: kiloUserId,
+          cliSessionIds: [sessionId],
+          cardFollowSessionIds: [sessionId],
+        }).catch((refreshError: unknown) => {
+          console.error('SessionIngestDO failed to refresh the session card', {
+            kiloUserId,
+            sessionId,
+            error: refreshError instanceof Error ? refreshError.message : String(refreshError),
+          });
+        })
+      );
+    }
   }
 
   /** Drops the in-flight identity, unless a later batch already replaced it. */
@@ -1970,23 +1902,24 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Best-effort persist the per-session total cost to Postgres so the session
     // list can surface it. Runs before the O11Y RPC so an analytics failure cannot
     // skip it. Failures are logged and swallowed — must never break metrics emission.
-    // Same helper + CASE guard as live cost persist (D20).
+    // Same queue + CASE guard as live cost persist (D20). The flush waits for a live write in
+    // flight, ignores its backoff, and also carries the live values still pending. It records no
+    // live throttle state for the close cost.
     try {
       if (Number.isFinite(metrics.totalCost)) {
         const totalCostMicrodollars = Math.max(0, Math.round(metrics.totalCost * 1_000_000));
-        await persistLiveSessionColumns(
-          this.env.HYPERDRIVE.connectionString,
+        await this.liveColumns.flush({
           kiloUserId,
           sessionId,
-          { costMicrodollars: totalCostMicrodollars }
-        );
+          columns: { costMicrodollars: totalCostMicrodollars },
+          excerptsInFlight: [],
+        });
       }
     } catch (error) {
       console.error('SessionIngestDO failed to persist session total cost', {
         sessionId,
         kiloUserId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        ...describeWorkerDbError(error),
       });
     }
 

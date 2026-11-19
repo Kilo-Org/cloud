@@ -42,6 +42,12 @@ import {
   SESSION_METRICS_WINDOW_MAX_ROWS,
 } from './session-metrics-window';
 
+/** A Worker DB whose transaction runs the callback against `update` and accepts `SET LOCAL`. */
+function workerDbWithUpdate(update: unknown) {
+  const tx = { execute: vi.fn(async () => undefined), update };
+  return { transaction: async (run: (transaction: typeof tx) => Promise<unknown>) => run(tx) };
+}
+
 describe('SessionIngestDO ingest ordering', () => {
   it('uses ingested_at with id only as a tie-breaker for cursor progression', () => {
     expect(ingestOrderCursor({ ingested_at: 100, id: 7 })).toEqual({ ingestedAt: 100, id: 7 });
@@ -623,7 +629,7 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     });
     const pgUpdate = vi.fn(() => ({ set: pgSet }));
     dbClientMocks.getWorkerDb.mockReset();
-    dbClientMocks.getWorkerDb.mockReturnValue({ update: pgUpdate });
+    dbClientMocks.getWorkerDb.mockReturnValue(workerDbWithUpdate(pgUpdate));
 
     const ingestSessionMetrics = vi.fn(async () => {
       operations.push('o11y:ingestSessionMetrics');
@@ -1166,7 +1172,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     });
     const pgUpdate = vi.fn(() => ({ set: pgSet }));
     dbClientMocks.getWorkerDb.mockReset();
-    dbClientMocks.getWorkerDb.mockReturnValue({ update: pgUpdate });
+    dbClientMocks.getWorkerDb.mockReturnValue(workerDbWithUpdate(pgUpdate));
 
     const ingestSessionMetrics = vi.fn(async () => undefined);
     const r2Get = vi.fn(async (key: string) => {
@@ -3000,8 +3006,9 @@ describe('SessionIngestDO live activity + cost persist', () => {
     }
   });
 
-  it('post-await throttle meta max-merges so older completion cannot regress newer (KB-6)', async () => {
-    // Two concurrent waitUntil tasks: newer cost meta is written first; older completion must not clobber.
+  it('keeps one live write in flight and merges later batches into the next write', async () => {
+    // While a write waits, for example on a locked row, a later batch must not open a second
+    // write. It merges into one pending write that starts when the first one ends.
     type Gate = { resolve: () => void; promise: Promise<void> };
     const makeGate = (): Gate => {
       let resolve!: () => void;
@@ -3011,9 +3018,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
       return { resolve, promise };
     };
 
-    const gateA = makeGate(); // older, lower cost — completes second
-    const gateB = makeGate(); // newer, higher cost — completes first
+    const gateA = makeGate();
+    const gateB = makeGate();
     let pgInvoke = 0;
+    const pgSets: Array<Record<string, unknown>> = [];
 
     const meta = new Map<string, string | null>();
     // Stored message rows in row-id order, with the column each one carries.
@@ -3171,9 +3179,16 @@ describe('SessionIngestDO live activity + cost persist', () => {
       };
     });
     dbClientMocks.getWorkerDb.mockReset();
-    dbClientMocks.getWorkerDb.mockReturnValue({
-      update: vi.fn(() => ({ set: vi.fn(() => ({ where: pgWhere })) })),
-    });
+    dbClientMocks.getWorkerDb.mockReturnValue(
+      workerDbWithUpdate(
+        vi.fn(() => ({
+          set: vi.fn((set: Record<string, unknown>) => {
+            pgSets.push(set);
+            return { where: pgWhere };
+          }),
+        }))
+      )
+    );
 
     const env = {
       SESSION_INGEST_R2: { delete: vi.fn() },
@@ -3182,24 +3197,75 @@ describe('SessionIngestDO live activity + cost persist', () => {
     } as never;
     const durableObject = new SessionIngestDO(state, env);
 
-    // Ingest A: cost 100000 — its PG write is held on gateA
+    // Ingest A: cost 100000 — its PG write is held on gateA.
     await durableObject.ingest([assistantItem('ma', 0.1)], 'usr_live', 'ses_live', 1, 10_000);
-    // Ingest B: cost 250000 — held on gateB
+    // Ingests B and C arrive while A waits. Running costs 350000 and 450000.
     await durableObject.ingest([assistantItem('mb', 0.25)], 'usr_live', 'ses_live', 1, 20_000);
+    await durableObject.ingest([assistantItem('mc', 0.1)], 'usr_live', 'ses_live', 1, 15_000);
 
-    expect(waitUntilPromises.length).toBe(2);
-
-    // B completes first (sum 0.1+0.25 → 350000), then A (0.1 → 100000).
-    // Without max-merge, A would regress meta to 100000.
-    gateB.resolve();
-    await waitUntilPromises[1];
-    expect(meta.get('lastCostPersistedMicrodollars')).toBe('350000');
+    expect(waitUntilPromises.length).toBe(1);
+    expect(pgInvoke).toBe(1);
 
     gateA.resolve();
+    await vi.waitFor(() => expect(pgInvoke).toBe(2));
+    expect(meta.get('lastCostPersistedMicrodollars')).toBe('100000');
+    // B and C share one write, with the larger cost and the later activity time.
+    expect(sqlFragmentText(pgSets[1].total_cost_microdollars)).toContain('450000');
+    expect(sqlFragmentText(pgSets[1].last_activity_at)).toContain(new Date(20_000).toISOString());
+    expect(sqlFragmentText(pgSets[1].last_activity_at)).not.toContain(
+      new Date(15_000).toISOString()
+    );
+
+    gateB.resolve();
     await waitUntilPromises[0];
-    expect(meta.get('lastCostPersistedMicrodollars')).toBe('350000');
-    // activity value also max-merged
+    expect(pgInvoke).toBe(2);
+    expect(meta.get('lastCostPersistedMicrodollars')).toBe('450000');
     expect(Number(meta.get('lastActivityPersistedValueMs'))).toBe(20_000);
+  });
+
+  it('backs off after a failed live write instead of writing on every batch', async () => {
+    let now = 1_700_000_000_000;
+    const dateNow = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    try {
+      const harness = makeLiveHarness({ persistError: new Error('lock timeout') });
+      await harness.durableObject.ingest(
+        [assistantItem('m1', 0.1)],
+        'usr_live',
+        'ses_live',
+        1,
+        now
+      );
+      await harness.settle();
+      expect(harness.pgCallCount).toBe(1);
+
+      // Every batch during the backoff merges into the pending write and opens no write.
+      for (let index = 2; index <= 4; index += 1) {
+        now += 4_000;
+        await harness.durableObject.ingest(
+          [assistantItem(`m${index}`, 0.1)],
+          'usr_live',
+          'ses_live',
+          1,
+          now
+        );
+        await harness.settle();
+      }
+      expect(harness.pgCallCount).toBe(1);
+
+      now += 4_000;
+      await harness.durableObject.ingest(
+        [assistantItem('m5', 0.1)],
+        'usr_live',
+        'ses_live',
+        1,
+        now
+      );
+      await harness.settle();
+      expect(harness.pgCallCount).toBe(2);
+      expect(sqlFragmentText(harness.lastPgSet?.total_cost_microdollars)).toContain('500000');
+    } finally {
+      dateNow.mockRestore();
+    }
   });
 });
 

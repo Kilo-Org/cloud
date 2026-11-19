@@ -5,6 +5,29 @@ import { agent_briefing_context_preferences, cli_sessions_v2 } from '@kilocode/d
 
 export type BriefingExcerpt = NonNullable<typeof cli_sessions_v2.$inferSelect.briefing_excerpt>;
 
+export type BriefingExcerptIdentity = Pick<BriefingExcerpt, 'messageId' | 'completedAt'>;
+
+/**
+ * Mirrors the SQL ordering in `briefingExcerptUpdate`: a candidate is newer on a later
+ * `completedAt`, or on an equal one and a greater `messageId`. Both times are canonical ISO
+ * strings, so comparing them as text matches comparing them as timestamps. The SQL guard orders
+ * the ids with `COLLATE "C"`, which is byte order, so the ids are compared as their UTF-8 bytes
+ * rather than by UTF-16 code unit.
+ */
+export function briefingExcerptIsNewer(
+  next: BriefingExcerptIdentity,
+  last: BriefingExcerptIdentity | null
+): boolean {
+  if (last === null) return true;
+  if (next.completedAt !== last.completedAt) return next.completedAt > last.completedAt;
+  const left = new TextEncoder().encode(next.messageId);
+  const right = new TextEncoder().encode(last.messageId);
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    if (left[index] !== right[index]) return left[index] > right[index];
+  }
+  return left.length > right.length;
+}
+
 export const BRIEFING_MAX_INLINE_BYTES = 8 * 1024;
 export const BRIEFING_MAX_EXCERPT_SOURCE_ROWS = 32;
 /** Excerpts whose client completion time runs further ahead of the server clock are rejected. */

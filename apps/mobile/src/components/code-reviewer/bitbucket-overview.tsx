@@ -96,18 +96,15 @@ export function BitbucketOverview({
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-          <View className="gap-3 rounded-lg bg-secondary p-4">
-            <Text className="text-sm font-medium">{capabilities.label}</Text>
+        <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+          <Card>
             {workspaceName?.displayName ? (
-              <Text variant="muted" className="text-xs">
-                {workspaceName.displayName}
-              </Text>
+              <Text className="text-sm font-medium">{workspaceName.displayName}</Text>
             ) : null}
-            <Text variant="muted" className="text-sm">
+            <Text variant="muted" className="text-xs">
               {t('codeReviewer.bitbucketConnect.managedOnWeb')}
             </Text>
-          </View>
+          </Card>
         </TabScreenScrollView>
       </View>
     );

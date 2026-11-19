@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Mukautetut ohjeet",
-      "deprecation": "Mukautetut ohjeet on tarkoitus poistaa käytöstä. Siirrä nämä ohjeet koodivarastosi REVIEW.md-tiedostoon.",
+      "deprecation": "Mukautetut ohjeet poistetaan. Siirrä nämä ohjeet koodivarastosi REVIEW.md-tiedostoon.",
       "placeholder": "esim. noudata virheenkäsittelykäytäntöjämme…",
       "clearTitle": "Poistetaanko mukautetut ohjeet?",
       "clearMessage": "Tyhjän kentän tallentaminen poistaa tälle koodikatselmoijalle tallennetut mukautetut ohjeet."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
       "description": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
       "descriptionReconnect": "Luo uusi työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
+      "descriptionOverview": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se seuraavalla näytöllä.",
       "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
       "tokenPlaceholder": "Työtilan käyttöoikeustunnus",
       "tokenRefused": "Bitbucket ei hyväksynyt tätä työtilan käyttöoikeustunnusta. Tarkista, että siinä on yllä olevat oikeudet, ja yritä sitten uudelleen."
@@ -1923,7 +1924,7 @@
       "githubAppSettings": "GitHub-sovelluksen asetukset",
       "manageAccess": "Hallinnoi GitHub-sovelluksen käyttöoikeuksia",
       "noRepositories": "Ei koodivarastoja",
-      "noRepositoriesDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin",
+      "noRepositoriesDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin.",
       "selectAtLeastOne": "Valitse vähintään yksi koodivarasto."
     },
     "scopeEntry": {
@@ -3186,6 +3187,8 @@
     "retryHint": "Yrittää hakea Kilo Passin tilan uudelleen.",
     "endedOn": "Päättynyt {{date}}",
     "notAvailableInApp": "Kilo Pass ei ole saatavilla sovelluksessa.",
+    "notAvailableTitle": "Kilo Pass ei ole sovelluksessa",
+    "noPassDescription": "Tällä tilillä ei ole Kilo Passia.",
     "statusActive": "Aktiivinen",
     "statusTrialing": "Kokeilujakso",
     "statusPastDue": "Maksu erääntynyt",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "Näytetään uusimmat laskut."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Ota saldohälytys käyttöön",
+      "subtitle": "Lähetä sähköpostivaroitus antamiisi osoitteisiin, kun tämän organisaation saldo laskee asettamasi summan alle.",
       "notifyEmailsLabel": "Vastaanottajien sähköpostiosoitteet",
       "permissionDenied": "Sinulla ei ole oikeutta hallita laskutushälytyksiä.",
       "separateEmailsHint": "Erota sähköpostiosoitteet pilkuilla.",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "Viimeistele tilin luominen valitsemalla ”$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Viimeistele tilin luominen valitsemalla ”$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Viimeistele tilin luominen valitsemalla ”$t(login.signInWithGoogle)”.",
-    "invalidCode": "Koodi on virheellinen. Yritä uudelleen.",
+    "signupStepUpBack": "Palaa takaisin ja viimeistele tilin luominen valitsemalla ”$t(login.moreSignInOptions)”.",
+    "invalidCode": "Koodi on virheellinen tai vanhentunut. Yritä uudelleen tai valitse ”$t(login.resendCode)”.",
     "codeInProgress": "Koodiasi käsitellään. Odota hetki ja yritä uudelleen.",
     "tooManyAttempts": "Liian monta yritystä. Pyydä uusi koodi.",
     "invalidToken": "Kirjautuminen epäonnistui. Yritä uudelleen.",
@@ -4537,6 +4541,7 @@
     "empty": "Ei toimintaa tässä katsausikkunassa",
     "emptyHint": "Pilvi- ja CLI-koodausistuntosi näkyvät täällä, kun ajastetussa katsauksessa on toimintaa.",
     "loadError": "Katsauksia ei voitu ladata",
+    "estimateLoadError": "Arviota ei voitu ladata.",
     "view": "Lue katsaus",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4942,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise-ominaisuus",
-    "enterpriseOnly": "Tämä ominaisuus on saatavilla vain Enterprise-tilauksessa.",
+    "enterpriseOnly": "Palveluntarjoajat ja mallit ovat saatavilla Enterprise-paketissa.",
     "readOnly": "Vain organisaation omistajat ja ylläpitäjät voivat muuttaa näitä asetuksia.",
     "loadError": "Palveluntarjoajia ja malleja ei voitu ladata",
     "tabModels": "Mallit",

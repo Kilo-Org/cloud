@@ -48,6 +48,7 @@ beforeAll(async () => {
       git_branch text,
       pr_url text,
       organization_id uuid,
+      live_summary jsonb,
       created_on_platform text NOT NULL DEFAULT 'cloud-agent-web',
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),

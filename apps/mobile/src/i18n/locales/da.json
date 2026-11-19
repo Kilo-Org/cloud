@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Brugerdefinerede instruktioner",
-      "deprecation": "Brugerdefinerede instruktioner er planlagt til udfasning. Flyt i stedet retningslinjerne til en REVIEW.md-fil i dit kodelager.",
+      "deprecation": "Brugerdefinerede instruktioner bliver fjernet. Flyt i stedet retningslinjerne til en REVIEW.md-fil i dit kodelager.",
       "placeholder": "f.eks. overhold vores regler for fejlhåndtering…",
       "clearTitle": "Fjern brugerdefinerede instruktioner?",
       "clearMessage": "Når du gemmer et tomt felt, slettes de brugerdefinerede instruktioner, der er gemt for denne anmelder."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",
       "description": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "descriptionReconnect": "Opret et nyt adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
+      "descriptionOverview": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det på næste skærm.",
       "scopes": "Konto: læse · Kodelagre: læse/skrive · Pull requests: læse · Webhooks: læse/skrive",
       "tokenPlaceholder": "Adgangstoken til arbejdsområdet",
       "tokenRefused": "Bitbucket accepterede ikke dette adgangstoken til arbejdsområdet. Kontroller, at det har tilladelserne ovenfor, og prøv derefter igen."
@@ -3186,6 +3187,8 @@
     "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
     "endedOn": "Afsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgængeligt i appen.",
+    "notAvailableTitle": "Kilo Pass findes ikke i appen",
+    "noPassDescription": "Denne konto har ikke Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Prøveperiode",
     "statusPastDue": "Betaling forfalden",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "Viser de seneste fakturaer."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktivér advarsel om lav saldo",
+      "subtitle": "Send en advarsel via e-mail til de adresser, du angiver, når organisationens saldo falder under det beløb, du har angivet.",
       "notifyEmailsLabel": "Modtagernes e-mailadresser",
       "permissionDenied": "Du har ikke tilladelse til at administrere advarsler om fakturering.",
       "separateEmailsHint": "Adskil e-mailadresser med kommaer.",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "Brug '$t(login.moreSignInOptions)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpApple": "Brug '$t(login.signInWithApple)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpGoogle": "Brug '$t(login.signInWithGoogle)' for at færdiggøre oprettelsen af din konto.",
-    "invalidCode": "Koden er forkert. Prøv igen.",
+    "signupStepUpBack": "Gå tilbage og brug '$t(login.moreSignInOptions)' for at færdiggøre oprettelsen af din konto.",
+    "invalidCode": "Koden er forkert eller udløbet. Prøv igen eller brug '$t(login.resendCode)'.",
     "codeInProgress": "Din kode behandles. Vent et øjeblik, og prøv igen.",
     "tooManyAttempts": "For mange forsøg. Bed om en ny kode.",
     "invalidToken": "Det lykkedes ikke at logge ind. Prøv igen.",
@@ -4537,6 +4541,7 @@
     "empty": "Ingen aktivitet i dette briefingvindue",
     "emptyHint": "Dine cloud- og CLI-kodesessioner vises her, når en planlagt briefing har aktivitet.",
     "loadError": "Kunne ikke indlæse briefinger",
+    "estimateLoadError": "Kunne ikke indlæse estimatet.",
     "view": "Læs briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4942,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise-funktion",
-    "enterpriseOnly": "Denne funktion er kun tilgængelig for Enterprise.",
+    "enterpriseOnly": "Udbydere og modeller er tilgængelige på Enterprise-planen.",
     "readOnly": "Kun organisationens ejere og administratorer kan ændre disse indstillinger.",
     "loadError": "Udbydere og modeller kunne ikke indlæses",
     "tabModels": "Modeller",

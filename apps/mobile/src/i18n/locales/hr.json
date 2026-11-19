@@ -1250,7 +1250,7 @@
     },
     "instructions": {
       "title": "Prilagođene upute",
-      "deprecation": "Planira se ukidanje prilagođenih uputa. Premjesti ove smjernice u datoteku REVIEW.md u svom repozitoriju.",
+      "deprecation": "Prilagođene upute bit će uklonjene. Premjesti ove smjernice u datoteku REVIEW.md u svom repozitoriju.",
       "placeholder": "npr. primjena naših pravila za obradu pogrešaka…",
       "clearTitle": "Ukloniti prilagođene upute?",
       "clearMessage": "Ako spremiš prazno polje, izbrisat će se prilagođene upute spremljene za ovog recenzenta."
@@ -1416,6 +1416,7 @@
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računala.",
       "description": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
       "descriptionReconnect": "Stvori novi token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
+      "descriptionOverview": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga na sljedećem zaslonu.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru",
       "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Provjeri ima li gore navedena dopuštenja, pa pokušaj ponovno."
@@ -3245,6 +3246,8 @@
     "retryHint": "Ponovno učitava stanje Kilo Passa.",
     "endedOn": "Završeno {{date}}",
     "notAvailableInApp": "Kilo Pass nije dostupan u aplikaciji.",
+    "notAvailableTitle": "Kilo Pass se ne nudi u aplikaciji",
+    "noPassDescription": "Ovaj račun nema Kilo Pass.",
     "statusActive": "Aktivno",
     "statusTrialing": "Probno razdoblje",
     "statusPastDue": "Dospjelo plaćanje",
@@ -3527,7 +3530,7 @@
       "retentionLimit": "Prikazuju se najnoviji računi."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Omogući upozorenje o niskom saldu",
+      "subtitle": "Pošalji upozorenje e-poštom na navedene adrese kada saldo ove organizacije padne ispod iznosa koji postaviš.",
       "notifyEmailsLabel": "Adrese e-pošte za obavijesti",
       "permissionDenied": "Nemaš dopuštenje za upravljanje upozorenjima o naplati.",
       "separateEmailsHint": "Odvoji adrese e-pošte zarezima.",
@@ -3711,7 +3714,8 @@
     "signupStepUp": "Za dovršetak izrade računa odaberi „$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Za dovršetak izrade računa odaberi „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Za dovršetak izrade računa odaberi „$t(login.signInWithGoogle)”.",
-    "invalidCode": "Kôd nije točan. Pokušaj ponovno.",
+    "signupStepUpBack": "Za dovršetak izrade računa vrati se natrag i odaberi „$t(login.moreSignInOptions)”.",
+    "invalidCode": "Kôd nije točan ili je istekao. Pokušaj ponovno ili odaberi „$t(login.resendCode)”.",
     "codeInProgress": "Tvoj se kôd obrađuje. Pričekaj trenutak i pokušaj ponovno.",
     "tooManyAttempts": "Previše pokušaja. Zatraži novi kôd.",
     "invalidToken": "Prijava nije uspjela. Pokušaj ponovno.",
@@ -4609,6 +4613,7 @@
     "empty": "Nema aktivnosti u ovom prozoru izvješća",
     "emptyHint": "Vaše sesije kodiranja u oblaku i CLI-ju pojavljuju se ovdje kad zakazano izvješće zabilježi aktivnost.",
     "loadError": "Učitavanje izvješća nije uspjelo",
+    "estimateLoadError": "Učitavanje procjene nije uspjelo.",
     "view": "Pročitaj izvješće",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5018,7 +5023,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Značajka za poduzeća",
-    "enterpriseOnly": "Ovo je značajka samo za poduzeća.",
+    "enterpriseOnly": "Pružatelji i modeli dostupni su na planu Enterprise.",
     "readOnly": "Samo vlasnici i administratori organizacije mogu mijenjati ove postavke.",
     "loadError": "Nije moguće učitati pružatelje i modele.",
     "tabModels": "Modeli",

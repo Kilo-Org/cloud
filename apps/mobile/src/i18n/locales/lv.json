@@ -1250,7 +1250,7 @@
     },
     "instructions": {
       "title": "Pielāgoti norādījumi",
-      "deprecation": "Pielāgoto norādījumu funkcijas atbalstu plānots pārtraukt. Tā vietā pārvieto šos norādījumus uz REVIEW.md failu savā repozitorijā.",
+      "deprecation": "Pielāgotie norādījumi tiks noņemti. Tā vietā pārvieto šos norādījumus uz REVIEW.md failu savā repozitorijā.",
       "placeholder": "piemēram, ievērot mūsu kļūdu apstrādes noteikumus…",
       "clearTitle": "Noņemt pielāgotos norādījumus?",
       "clearMessage": "Saglabājot tukšu lauku, tiks dzēsti šim recenzentam saglabātie pielāgotie norādījumi."
@@ -1416,6 +1416,7 @@
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "descriptionReconnect": "Izveido jaunu darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
+      "descriptionOverview": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to nākamajā ekrānā.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
       "tokenPlaceholder": "Darbvietas piekļuves pilnvara",
       "tokenRefused": "Bitbucket nepieņēma šo darbvietas piekļuves pilnvaru. Pārbaudi, vai tai ir iepriekš norādītās atļaujas, un pēc tam mēģini vēlreiz."
@@ -3245,6 +3246,8 @@
     "retryHint": "Atkārtoti ielādē Kilo Pass stāvokli.",
     "endedOn": "Beidzies {{date}}",
     "notAvailableInApp": "Kilo Pass lietotnē nav pieejams.",
+    "notAvailableTitle": "Kilo Pass lietotnē netiek piedāvāts",
+    "noPassDescription": "Šim kontam nav Kilo Pass.",
     "statusActive": "Aktīvs",
     "statusTrialing": "Izmēģinājuma periods",
     "statusPastDue": "Maksājums nokavēts",
@@ -3527,7 +3530,7 @@
       "retentionLimit": "Tiek rādīti jaunākie rēķini."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Iespējot brīdinājumu par mazu atlikumu",
+      "subtitle": "Sūti brīdinājumu pa e-pastu uz norādītajām adresēm, kad šīs organizācijas atlikums nokrītas zem iestatītās summas.",
       "notifyEmailsLabel": "Paziņojumu saņēmēju e-pasta adreses",
       "permissionDenied": "Tev nav atļaujas pārvaldīt norēķinu brīdinājumus.",
       "separateEmailsHint": "Atdali vairākas e-pasta adreses ar komatiem.",
@@ -3711,7 +3714,8 @@
     "signupStepUp": "Lai pabeigtu konta izveidi, izvēlies “$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithGoogle)”.",
-    "invalidCode": "Kods nav pareizs. Mēģini vēlreiz.",
+    "signupStepUpBack": "Lai pabeigtu konta izveidi, atgriezies iepriekšējā ekrānā un izvēlies “$t(login.moreSignInOptions)”.",
+    "invalidCode": "Kods ir nepareizs vai tam beidzies derīguma termiņš. Mēģini vēlreiz vai izvēlies “$t(login.resendCode)”.",
     "codeInProgress": "Tavs kods tiek apstrādāts. Uzgaidi mirkli un mēģini vēlreiz.",
     "tooManyAttempts": "Pārāk daudz mēģinājumu. Pieprasi jaunu kodu.",
     "invalidToken": "Pierakstīšanās neizdevās. Lūdzu, mēģini vēlreiz.",
@@ -4609,6 +4613,7 @@
     "empty": "Nav aktivitātes šajā atskaites periodā",
     "emptyHint": "Jūsu mākoņa un CLI kodēšanas sesijas parādīsies šeit, kad plānotajā atskaitē būs aktivitāte.",
     "loadError": "Neizdevās ielādēt atskaites",
+    "estimateLoadError": "Neizdevās ielādēt novērtējumu.",
     "view": "Lasīt atskaiti",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5018,7 +5023,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Uzņēmuma funkcija",
-    "enterpriseOnly": "Šī funkcija ir pieejama tikai uzņēmuma līmenī.",
+    "enterpriseOnly": "Nodrošinātāji un modeļi ir pieejami Enterprise plānā.",
     "readOnly": "Šos iestatījumus var mainīt tikai organizācijas īpašnieki un administratori.",
     "loadError": "Neizdevās ielādēt nodrošinātājus un modeļus",
     "tabModels": "Modeļi",

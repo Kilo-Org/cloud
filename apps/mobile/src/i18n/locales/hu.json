@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Egyéni utasítások",
-      "deprecation": "Az egyéni utasítások funkcióját a tervek szerint megszüntetjük. Helyezd át ezeket az irányelveket a kódtáradban lévő REVIEW.md fájlba.",
+      "deprecation": "Az egyéni utasítások funkcióját megszüntetjük. Helyezd át ezeket az irányelveket a kódtáradban lévő REVIEW.md fájlba.",
       "placeholder": "pl. a hibakezelési szabályaink betartása…",
       "clearTitle": "Eltávolítod az egyéni utasításokat?",
       "clearMessage": "Az üres mező mentése törli az ellenőrzőhöz tárolt egyéni utasításokat."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionReconnect": "Hozz létre egy új hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
+      "descriptionOverview": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, majd illeszd be a következő képernyőn.",
       "scopes": "Fiók: olvasás · Kódtárak: olvasás/írás · PR-ek: olvasás · Webhookok: olvasás/írás.",
       "tokenPlaceholder": "Munkaterület-hozzáférési token",
       "tokenRefused": "A Bitbucket nem fogadta el ezt a munkaterület-hozzáférési tokent. Ellenőrizd, hogy rendelkezik-e a fenti jogosultságokkal, majd próbáld újra."
@@ -3186,6 +3187,8 @@
     "retryHint": "Újra lekéri a Kilo Pass állapotát.",
     "endedOn": "Lejárt: {{date}}",
     "notAvailableInApp": "A Kilo Pass nem érhető el az alkalmazásban.",
+    "notAvailableTitle": "A Kilo Pass nem szerepel az alkalmazásban",
+    "noPassDescription": "Ehhez a fiókhoz nem tartozik Kilo Pass.",
     "statusActive": "Aktív",
     "statusTrialing": "Próbaidőszak",
     "statusPastDue": "Fizetési késedelem",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "A legutóbbi számlák láthatók."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Figyelmeztetés bekapcsolása alacsony egyenleg esetén",
+      "subtitle": "Küldj e-mailes értesítést a megadott címekre, amikor a szervezet egyenlege az általad beállított összeg alá csökken.",
       "notifyEmailsLabel": "Értesítési e-mail-címek",
       "permissionDenied": "Nincs jogosultságod a számlázási figyelmeztetések kezelésére.",
       "separateEmailsHint": "Ha több e-mail-címet adsz meg, vesszővel válaszd el őket.",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.signInWithGoogle)”.",
-    "invalidCode": "A kód helytelen. Próbáld újra.",
+    "signupStepUpBack": "A fiókod létrehozásának befejezéséhez lépj vissza, és válaszd ezt: „$t(login.moreSignInOptions)”.",
+    "invalidCode": "A kód helytelen vagy lejárt. Próbáld újra, vagy válaszd ezt: „$t(login.resendCode)”.",
     "codeInProgress": "A kód feldolgozása folyamatban van. Várj egy pillanatot, majd próbáld újra.",
     "tooManyAttempts": "Túl sok próbálkozás történt. Kérj új kódot.",
     "invalidToken": "Nem sikerült bejelentkezni. Próbáld újra.",
@@ -4537,6 +4541,7 @@
     "empty": "Nincs tevékenység ebben az időablakban",
     "emptyHint": "A felhőben és CLI-ben futó kódolási munkamenetek itt jelennek meg, amikor egy ütemezett jelentésben van tevékenység.",
     "loadError": "Nem sikerült betölteni a jelentéseket",
+    "estimateLoadError": "Nem sikerült betölteni a becslést.",
     "view": "Jelentés megnyitása",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4942,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Vállalati funkció",
-    "enterpriseOnly": "Ez egy csak vállalati csomagban elérhető funkció.",
+    "enterpriseOnly": "A szolgáltatók és modellek az Enterprise csomagban érhetők el.",
     "readOnly": "Csak a szervezet tulajdonosai és rendszergazdái módosíthatják ezeket a beállításokat.",
     "loadError": "A szolgáltatókat és modelleket nem sikerült betölteni",
     "tabModels": "Modellek",

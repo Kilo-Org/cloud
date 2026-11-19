@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "අභිරුචි උපදෙස්",
-      "deprecation": "අභිරුචි උපදෙස් පහසුකම ඉවත් කිරීමට සැලසුම් කර ඇත. ඒ වෙනුවට මෙම මාර්ගෝපදේශ ඔබේ ගබඩාවේ REVIEW.md ගොනුවකට ගෙන යන්න.",
+      "deprecation": "අභිරුචි උපදෙස් පහසුකම ඉවත් කරනු ලැබේ. ඒ වෙනුවට මෙම මාර්ගෝපදේශ ඔබේ ගබඩාවේ REVIEW.md ගොනුවකට ගෙන යන්න.",
       "placeholder": "උදා. අපගේ දෝෂ හැසිරවීමේ රීති අනුගමනය කරන බව තහවුරු කරන්න…",
       "clearTitle": "අභිරුචි උපදෙස් ඉවත් කරන්නද?",
       "clearMessage": "හිස් ක්ෂේත්‍රයක් සුරැකීමෙන් මෙම සමාලෝචකයා සඳහා ගබඩා කර ඇති අභිරුචි උපදෙස් මකා දැමේ."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
       "description": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "descriptionReconnect": "{{organization}} සඳහා නව වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
+      "descriptionOverview": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා ඊළඟ තිරයේ අලවන්න.",
       "scopes": "ගිණුම: කියවීම · ගබඩා: කියවීම/ලිවීම · PR: කියවීම · වෙබ්හුක්: කියවීම/ලිවීම",
       "tokenPlaceholder": "වැඩබිම් ප්‍රවේශ ටෝකනය",
       "tokenRefused": "Bitbucket මෙම වැඩබිම් ප්‍රවේශ ටෝකනය පිළිගත්තේ නැත. එහි ඉහත අවසර ඇත්දැයි පරීක්ෂා කර, නැවත උත්සාහ කරන්න."
@@ -3186,6 +3187,8 @@
     "retryHint": "Kilo Pass තත්ත්වය නැවත ලබාගැනීමට උත්සාහ කරයි.",
     "endedOn": "{{date}} දින අවසන් විය",
     "notAvailableInApp": "Kilo Pass යෙදුමේ ලබාගත නොහැක.",
+    "notAvailableTitle": "Kilo Pass යෙදුමේ නොමැත",
+    "noPassDescription": "මෙම ගිණුමට Kilo Pass එකක් නොමැත.",
     "statusActive": "සක්‍රීය",
     "statusTrialing": "අත්හදා බැලීමේ",
     "statusPastDue": "ගෙවීම කල් ඉකුත් වී ඇත",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "නවතම ඉන්වොයිසි පෙන්වයි."
     },
     "lowBalanceAlert": {
-      "enableA11y": "ශේෂය අඩු වූ විට දැනුම්දීම සක්‍රීය කරන්න",
+      "subtitle": "මෙම සංවිධානයේ ශේෂය ඔබ සකසන මුදලට වඩා අඩු වූ විට ඔබ ලැයිස්තුගත කරන ලිපිනවලට ඊමේල් මගින් දැනුම්දීමක් යවන්න.",
       "notifyEmailsLabel": "දැනුම්දීම් ලබන ඊමේල් ලිපින",
       "permissionDenied": "බිල්පත් දැනුම්දීම් කළමනාකරණය කිරීමට ඔබට අවසර නොමැත.",
       "separateEmailsHint": "ඊමේල් ලිපින කිහිපයක් ඇතුළත් කරන්නේ නම්, ඒවා කොමාවලින් වෙන් කරන්න.",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.moreSignInOptions)' භාවිත කරන්න.",
     "signupStepUpApple": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithApple)' භාවිත කරන්න.",
     "signupStepUpGoogle": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට '$t(login.signInWithGoogle)' භාවිත කරන්න.",
-    "invalidCode": "එම කේතය වැරදියි. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "signupStepUpBack": "ඔබේ ගිණුම සෑදීම සම්පූර්ණ කිරීමට ආපසු ගොස් '$t(login.moreSignInOptions)' භාවිත කරන්න.",
+    "invalidCode": "එම කේතය වැරදියි හෝ කල් ඉකුත් වී ඇත. කරුණාකර නැවත උත්සාහ කරන්න, නැතහොත් '$t(login.resendCode)' භාවිත කරන්න.",
     "codeInProgress": "ඔබේ කේතය සකසනු ලැබේ. මොහොතක් රැඳී සිට නැවත උත්සාහ කරන්න.",
     "tooManyAttempts": "උත්සාහ කළ වාර ගණන වැඩියි. කරුණාකර නව කේතයක් ඉල්ලන්න.",
     "invalidToken": "පිවිසීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -4537,6 +4541,7 @@
     "empty": "මෙම වාර්තා කාල පරාසය තුළ ක්‍රියාකාරකම් නැත.",
     "emptyHint": "කාලසටහන්ගත වාර්තාවක ක්‍රියාකාරකම් ඇති විට ඔබේ cloud සහ CLI කේතකරණ සැසි මෙහි දිස්වේ.",
     "loadError": "වාර්තා පූරණය කළ නොහැකි විය",
+    "estimateLoadError": "ඇස්තමේන්තුව පූරණය කළ නොහැකි විය.",
     "view": "වාර්තාව කියවන්න",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4942,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ව්‍යවසාය විශේෂාංගය",
-    "enterpriseOnly": "මෙය ව්‍යවසාය සඳහා පමණක් වන විශේෂාංගයකි.",
+    "enterpriseOnly": "සපයන්නන් සහ ආකෘති Enterprise සැලසුමේදී ලබා ගත හැක.",
     "readOnly": "මෙම සැකසුම් වෙනස් කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකයින්ට පමණයි.",
     "loadError": "සපයන්නන් සහ ආකෘති පූරණය කළ නොහැකි විය",
     "tabModels": "ආකෘති",

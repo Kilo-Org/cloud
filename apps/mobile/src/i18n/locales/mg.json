@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Toromarika manokana",
-      "deprecation": "Kasaina hatsahatra ny fampiasana torolalana manokana. Afindrao ao anaty rakitra REVIEW.md ao amin'ny tahirin-kaodinao ireo torolalana ireo.",
+      "deprecation": "Hesorina ny torolalana manokana. Afindrao ao anaty rakitra REVIEW.md ao amin'ny tahirin-kaodinao ireo torolalana ireo.",
       "placeholder": "ohatra: Fanarahana ny fitsipika momba ny fitantanana hadisoana…",
       "clearTitle": "Esory ny toromarika manokana?",
       "clearMessage": "Raha tahirizinao saha tsy misy votoaty, dia voafafa ny toromarika manokana voatahiry ho an'ity mpandinika ity."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "Ny fifandraisana Bitbucket amin'ny {{organization}} dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
       "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho eto ambany.",
       "descriptionReconnect": "Mamoròna mari-pidirana vaovao ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho eto ambany.",
+      "descriptionOverview": "Mamoròna mari-pidirana ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho amin'ny efijery manaraka.",
       "scopes": "Kaonty: mamaky · Tahirin-kaody: mamaky/manoratra · PR: mamaky · Rohy fampandrenesana: mamaky/manoratra",
       "tokenPlaceholder": "Mari-pidirana ho an'ny sehatra fiasana",
       "tokenRefused": "Tsy nanaiky io mari-pidirana ho an'ny sehatra fiasana io i Bitbucket. Hamarinio fa manana ny alalana etsy ambony izy, dia andramo indray."
@@ -3186,6 +3187,8 @@
     "retryHint": "Manandrana maka indray ny satan'ny Kilo Pass.",
     "endedOn": "Vita tamin'ny {{date}}",
     "notAvailableInApp": "Tsy azo ampiasaina ao amin'ny rindranasa ny Kilo Pass.",
+    "notAvailableTitle": "Tsy misy ao amin'ny rindranasa ny Kilo Pass",
+    "noPassDescription": "Tsy manana Kilo Pass ity kaonty ity.",
     "statusActive": "Mavitrika",
     "statusTrialing": "Fanandramana",
     "statusPastDue": "Tara ny fandoavam-bola",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "Aseho ny faktiora farany indrindra."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Alefaso ny fampandrenesana rehefa kely ny ambim-bola",
+      "subtitle": "Alefaso amin'ny mailaka ho an'ireo adiresy nampidirinao ny fampandrenesana rehefa latsaky ny vola voafaritrao ny ambim-bolan'ity fikambanana ity.",
       "notifyEmailsLabel": "Adiresy mailaka handraisana fampandrenesana",
       "permissionDenied": "Tsy manana alalana hitantana ny fampandrenesana faktiora ianao.",
       "separateEmailsHint": "Saraho amin'ny faingo ny adiresy mailaka maromaro.",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "Ampiasao ny '$t(login.moreSignInOptions)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpApple": "Ampiasao ny '$t(login.signInWithApple)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpGoogle": "Ampiasao ny '$t(login.signInWithGoogle)' hamitana ny famoronana ny kaontinao.",
-    "invalidCode": "Diso io kaody io. Andramo indray azafady.",
+    "signupStepUpBack": "Mba hamitana ny famoronana ny kaontinao, miverena any aoriana ary ampiasao ny '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Andramo indray na ampiasao ny '$t(login.resendCode)'.",
     "codeInProgress": "Mbola karakaraina ny kaodinao. Miandrasa kely ary andramo indray.",
     "tooManyAttempts": "Betsaka loatra ny andrana. Mangataha kaody vaovao azafady.",
     "invalidToken": "Tsy nahomby ny fidirana. Andramo indray azafady.",
@@ -4537,6 +4541,7 @@
     "empty": "Tsy nisy hetsika tao anatin'ity fe-potoana tatitra ity",
     "emptyHint": "Hiseho eto ny fivoriana kaody cloud sy CLI rehefa misy hetsika ny tatitra voalahatra.",
     "loadError": "Tsy nahavita naka ny tatitra",
+    "estimateLoadError": "Tsy nahavita naka ny vinavina.",
     "view": "Vakio ny tatitra",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4942,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Endri-javatra ho an'ny orinasa lehibe",
-    "enterpriseOnly": "Endri-javatra natokana ho an'ny orinasa lehibe ihany ity.",
+    "enterpriseOnly": "Misy amin'ny drafitra Enterprise ny mpamatsy sy ny modely.",
     "readOnly": "Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka manova ireo safidy ireo.",
     "loadError": "Tsy afaka nampiditra ny mpamatsy sy ny modely",
     "tabModels": "Modely",

@@ -1274,7 +1274,7 @@
     },
     "instructions": {
       "title": "Pasirinktinės instrukcijos",
-      "deprecation": "Pasirinktinių instrukcijų funkcijos planuojama atsisakyti. Perkelk šias gaires į saugyklos REVIEW.md failą.",
+      "deprecation": "Pasirinktinės instrukcijos bus pašalintos. Perkelk šias gaires į saugyklos REVIEW.md failą.",
       "placeholder": "pvz., tikrinti, ar laikomasi mūsų klaidų apdorojimo taisyklių…",
       "clearTitle": "Pašalinti pasirinktines instrukcijas?",
       "clearMessage": "Išsaugojus tuščią lauką bus ištrintos šiam tikrintuvui saugomos pasirinktinės instrukcijos."
@@ -1440,6 +1440,7 @@
       "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
       "description": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "descriptionReconnect": "Sukurk naują {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
+      "descriptionOverview": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį kitame ekrane.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
       "tokenPlaceholder": "Darbo srities prieigos raktas",
       "tokenRefused": "Bitbucket nepriėmė šio darbo srities prieigos rakto. Patikrink, ar jis turi aukščiau nurodytas teises, tada bandyk dar kartą."
@@ -2003,7 +2004,7 @@
       "githubAppSettings": "GitHub programėlės nustatymai",
       "manageAccess": "Tvarkyti GitHub programėlės prieigą",
       "noRepositories": "Nėra saugyklų",
-      "noRepositoriesDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų",
+      "noRepositoriesDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų.",
       "selectAtLeastOne": "Pasirink bent vieną saugyklą."
     },
     "scopeEntry": {
@@ -3304,6 +3305,8 @@
     "retryHint": "Bando iš naujo gauti Kilo Pass būseną.",
     "endedOn": "Baigėsi {{date}}",
     "notAvailableInApp": "Kilo Pass nepasiekiamas programėlėje.",
+    "notAvailableTitle": "Kilo Pass nėra programėlėje",
+    "noPassDescription": "Ši paskyra neturi Kilo Pass.",
     "statusActive": "Aktyvi",
     "statusTrialing": "Bandomoji",
     "statusPastDue": "Mokėjimas pradelstas",
@@ -3586,7 +3589,7 @@
       "retentionLimit": "Rodomos naujausios sąskaitos."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Įjungti pranešimą apie mažą likutį",
+      "subtitle": "Siųsk įspėjimą el. paštu nurodytais adresais, kai šios organizacijos likutis nukrenta žemiau tavo nustatytos sumos.",
       "notifyEmailsLabel": "Gavėjų el. pašto adresai",
       "permissionDenied": "Neturite leidimo valdyti atsiskaitymo pranešimų.",
       "separateEmailsHint": "El. pašto adresus atskirkite kableliais.",
@@ -3772,7 +3775,8 @@
     "signupStepUp": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithGoogle)“.",
-    "invalidCode": "Kodas neteisingas. Bandyk dar kartą.",
+    "signupStepUpBack": "Kad užbaigtum paskyros kūrimą, grįžk atgal ir pasirink „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Kodas neteisingas arba nebegalioja. Bandyk dar kartą arba pasirink „$t(login.resendCode)“.",
     "codeInProgress": "Tavo kodas apdorojamas. Palauk akimirką ir bandyk dar kartą.",
     "tooManyAttempts": "Per daug bandymų. Paprašyk naujo kodo.",
     "invalidToken": "Nepavyko prisijungti. Bandyk dar kartą.",
@@ -4681,6 +4685,7 @@
     "empty": "Šiuo suvestinės laikotarpiu veiklos nebuvo",
     "emptyHint": "Jūsų debesies ir CLI programavimo sesijos bus rodomos čia, kai suplanuotoje suvestinėje bus veiklos.",
     "loadError": "Nepavyko įkelti suvestinių",
+    "estimateLoadError": "Nepavyko įkelti apskaičiavimo.",
     "view": "Skaityti suvestinę",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5094,7 +5099,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Įmonės funkcija",
-    "enterpriseOnly": "Tai funkcija, skirta tik įmonėms.",
+    "enterpriseOnly": "Teikėjai ir modeliai prieinami „Enterprise“ plane.",
     "readOnly": "Tik organizacijos savininkai ir administratoriai gali keisti šiuos nustatymus.",
     "loadError": "Nepavyko įkelti teikėjų ir modelių",
     "tabModels": "Modeliai",

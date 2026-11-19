@@ -1274,7 +1274,7 @@
     },
     "instructions": {
       "title": "Navodila po meri",
-      "deprecation": "Navodila po meri bodo ukinjena. Te smernice raje premakni v datoteko REVIEW.md v svojem skladišču.",
+      "deprecation": "Navodila po meri bodo odstranjena. Te smernice raje premakni v datoteko REVIEW.md v svojem skladišču.",
       "placeholder": "npr. upoštevanje naših pravil za obravnavo napak…",
       "clearTitle": "Odstranim navodila po meri?",
       "clearMessage": "Če shraniš prazno polje, izbrišeš navodila po meri, shranjena za tega pregledovalca."
@@ -1440,6 +1440,7 @@
       "managedOnWeb": "Povezava Bitbucket za {{organization}} se upravlja v spletu z računalnika.",
       "description": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
       "descriptionReconnect": "Ustvari nov žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
+      "descriptionOverview": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi na naslednjem zaslonu.",
       "scopes": "Račun: branje · Skladišča: branje/pisanje · Zahteve za združitev: branje · Spletni povratni klici: branje/pisanje",
       "tokenPlaceholder": "Žeton za dostop do delovnega prostora",
       "tokenRefused": "Bitbucket ni sprejel tega žetona za dostop do delovnega prostora. Preveri, ali ima zgoraj navedena dovoljenja, nato poskusi znova."
@@ -3304,6 +3305,8 @@
     "retryHint": "Znova poskusi naložiti stanje naročnine Kilo Pass.",
     "endedOn": "Končano {{date}}",
     "notAvailableInApp": "Kilo Pass v aplikaciji ni na voljo.",
+    "notAvailableTitle": "Kilo Pass ni v aplikaciji",
+    "noPassDescription": "Ta račun nima naročnine Kilo Pass.",
     "statusActive": "Aktiven",
     "statusTrialing": "Preizkusno obdobje",
     "statusPastDue": "Plačilo v zamudi",
@@ -3586,7 +3589,7 @@
       "retentionLimit": "Prikazani so najnovejši računi."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Omogoči opozorilo o nizkem stanju",
+      "subtitle": "Pošlji opozorilo po e-pošti na navedene naslove, ko stanje te organizacije pade pod nastavljeni znesek.",
       "notifyEmailsLabel": "E-poštni naslovi za obvestila",
       "permissionDenied": "Nimaš dovoljenja za upravljanje obračunskih opozoril.",
       "separateEmailsHint": "Več e-poštnih naslovov loči z vejicami.",
@@ -3772,7 +3775,8 @@
     "signupStepUp": "Za dokončanje ustvarjanja računa izberi »$t(login.moreSignInOptions)«.",
     "signupStepUpApple": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithApple)«.",
     "signupStepUpGoogle": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithGoogle)«.",
-    "invalidCode": "Ta koda ni pravilna. Poskusi znova.",
+    "signupStepUpBack": "Za dokončanje ustvarjanja računa se vrni nazaj in izberi »$t(login.moreSignInOptions)«.",
+    "invalidCode": "Ta koda ni pravilna ali je potekla. Poskusi znova ali uporabi »$t(login.resendCode)«.",
     "codeInProgress": "Tvoja koda se obdeluje. Počakaj trenutek in poskusi znova.",
     "tooManyAttempts": "Preveč poskusov. Zahtevaj novo kodo.",
     "invalidToken": "Prijava ni uspela. Poskusi znova.",
@@ -4681,6 +4685,7 @@
     "empty": "Ni dejavnosti v tem časovnem obdobju poročila.",
     "emptyHint": "Vaše seje kodiranja v oblaku in CLI se prikažejo tukaj, ko ima načrtovano poročilo dejavnost.",
     "loadError": "Poročil ni bilo mogoče naložiti",
+    "estimateLoadError": "Ocene ni bilo mogoče naložiti.",
     "view": "Preberi poročilo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5094,7 +5099,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funkcija za podjetja",
-    "enterpriseOnly": "To je funkcija samo za podjetja.",
+    "enterpriseOnly": "Ponudniki in modeli so na voljo v paketu Enterprise.",
     "readOnly": "Samo lastniki in skrbniki organizacije lahko spremenijo te nastavitve.",
     "loadError": "Ponudnikov in modelov ni bilo mogoče naložiti",
     "tabModels": "Modeli",

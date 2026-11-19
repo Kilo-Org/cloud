@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Imiyalo oyibekayo",
-      "deprecation": "Kuhlelwe ukuthi imiyalo oyenzela wena iyekwe ukusekelwa. Faka le mihlahlandlela kufayela le-REVIEW.md enqolobaneni yakho yekhodi esikhundleni salokho.",
+      "deprecation": "Imiyalo oyenzela wena izosuswa. Faka le mihlahlandlela kufayela le-REVIEW.md enqolobaneni yakho yekhodi esikhundleni salokho.",
       "placeholder": "isb. Landela imithetho yethu yokusingatha amaphutha…",
       "clearTitle": "Ufuna ukususa imiyalo oyibekayo?",
       "clearMessage": "Ukugcina indawo engenalutho kususa imiyalo oyibekayo egcinelwe lo mhloli wekhodi."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "Uxhumano lwe-Bitbucket lwe-{{organization}} luphathwa kuwebhu ngekhompyutha.",
       "description": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "descriptionReconnect": "Dala ithokheni entsha yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
+      "descriptionOverview": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela esikrinini esilandelayo.",
       "scopes": "I-akhawunti: ukufunda · Izinqolobane zekhodi: ukufunda/ukubhala · Izicelo zokuhlanganisa ikhodi: ukufunda · Ama-webhook: ukufunda/ukubhala",
       "tokenPlaceholder": "Ithokheni yokufinyelela endaweni yokusebenza",
       "tokenRefused": "I-Bitbucket ayikwamukelanga le thokheni yokufinyelela endaweni yokusebenza. Hlola ukuthi inazo izimvume ezingenhla, bese uzama futhi."
@@ -3186,6 +3187,8 @@
     "retryHint": "Iphinda izame ukulayisha isimo se-Kilo Pass.",
     "endedOn": "Iphelile ngomhla ka-{{date}}",
     "notAvailableInApp": "I-Kilo Pass ayitholakali kuhlelo lokusebenza.",
+    "notAvailableTitle": "I-Kilo Pass ayikho kuhlelo lokusebenza",
+    "noPassDescription": "Le akhawunti ayinayo i-Kilo Pass.",
     "statusActive": "Iyasebenza",
     "statusTrialing": "Isesivivinyweni",
     "statusPastDue": "Inkokhelo idlulelwe yisikhathi",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "Kuboniswa ama-invoyisi akamuva."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Vula isaziso sebhalansi ephansi",
+      "subtitle": "Thumela isaziso nge-imeyili kumakheli owafakile lapho ibhalansi yale nhlangano yehla ngaphansi kwenani olibekile.",
       "notifyEmailsLabel": "Amakheli okuthumela izaziso",
       "permissionDenied": "Awunayo imvume yokuphatha izaziso zokukhokha.",
       "separateEmailsHint": "Hlukanisa amakheli e-imeyili ngamakhoma.",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "Ukuze uqedele ukudala i-akhawunti yakho, sebenzisa '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Ukuze uqedele ukudala i-akhawunti yakho, sebenzisa '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Ukuze uqedele ukudala i-akhawunti yakho, sebenzisa '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Leyo khodi ayilungile. Sicela uzame futhi.",
+    "signupStepUpBack": "Ukuze uqedele ukudala i-akhawunti yakho, buyela emuva bese usebenzisa '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Leyo khodi ayilungile noma isiphelelwe yisikhathi. Zama futhi noma usebenzise '$t(login.resendCode)'.",
     "codeInProgress": "Ikhodi yakho iyacubungulwa. Linda isikhashana bese uzama futhi.",
     "tooManyAttempts": "Imizamo eminingi kakhulu. Sicela ucele ikhodi entsha.",
     "invalidToken": "Ukungena kwehlulekile. Sicela uzame futhi.",
@@ -4537,6 +4541,7 @@
     "empty": "Awukho umsebenzi kulesi sikhathi sombiko.",
     "emptyHint": "Amaseshini akho okukhoda e-cloud nawe-CLI azovela lapha uma umbiko ohleliwe unomsebenzi.",
     "loadError": "Ayikwazanga ukulayisha imibiko",
+    "estimateLoadError": "Ayikwazanga ukulayisha isilinganiso.",
     "view": "Funda umbiko",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4942,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Isici sebhizinisi elikhulu",
-    "enterpriseOnly": "Lokhu kuyisici esitholakala kuphela emabhizinisini amakhulu.",
+    "enterpriseOnly": "Abahlinzeki namamodeli bayatholakala kuhlelo lwe-Enterprise.",
     "readOnly": "Abanikazi benhlangano nabaphathi kuphela abangashintsha lezi zilungiselelo.",
     "loadError": "Abahlinzeki namamodeli abakwazanga ukulayisha",
     "tabModels": "Amamodeli",

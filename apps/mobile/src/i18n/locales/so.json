@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "Tilmaamo gaar ah",
-      "deprecation": "Taageerada tilmaamaha gaarka ah waxaa la qorshaynayaa in la joojiyo. Tilmaamahan u rar faylka REVIEW.md ee kaydkaaga.",
+      "deprecation": "Tilmaamaha gaarka ah waa la saari doonaa. Tilmaamahan u rar faylka REVIEW.md ee kaydkaaga.",
       "placeholder": "tusaale: Raac habraacayaga maaraynta khaladaadka…",
       "clearTitle": "Ka saar tilmaamaha gaarka ah?",
       "clearMessage": "Kaydinta beer madhan waxay tirtiraysaa tilmaamaha gaarka ah ee lagu kaydiyay fiiriyahan."
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
       "description": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
       "descriptionReconnect": "Abuur summad gelitaan cusub oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
+      "descriptionOverview": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna ku dheji shaashadda xigta.",
       "scopes": "Akoonka: akhrin · Kaydadka: akhrin/qorid · Codsiyada isku darka: akhrin · Ogeysiisyada shabakadda: akhrin/qorid",
       "tokenPlaceholder": "Summadda gelitaanka goobta shaqada",
       "tokenRefused": "Bitbucket ma aqbalin summaddan gelitaanka goobta shaqada. Hubi inay leedahay oggolaanshaha sare, ka dibna isku day mar kale."
@@ -3186,6 +3187,8 @@
     "retryHint": "Wuxuu mar kale isku dayaa inuu soo dejiyo xaaladda Kilo Pass.",
     "endedOn": "Wuxuu dhammaaday {{date}}",
     "notAvailableInApp": "Kilo Pass lagama heli karo abka.",
+    "notAvailableTitle": "Kilo Pass kuma jiro abka",
+    "noPassDescription": "Akoonkan ma laha Kilo Pass.",
     "statusActive": "Firfircoon",
     "statusTrialing": "Tijaabo",
     "statusPastDue": "Lacag-bixin daahday",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "Waxaa la muujinayaa qaansheegyada ugu dambeeyay."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Daar digniinta hadhaaga yar",
+      "subtitle": "U dir digniin iimayl ah ciwaannada aad qorto marka hadhaaga ururkan uu ka hooseeyo qadarka aad dejisay.",
       "notifyEmailsLabel": "Iimayllada ogeysiiska loo dirayo",
       "permissionDenied": "Ma lihid oggolaansho aad ku maamusho digniinaha biilasha.",
       "separateEmailsHint": "Cinwaannada iimaylka ku kala saar hakadyo.",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Koodhku waa qalad. Fadlan mar kale isku day.",
+    "signupStepUpBack": "Si aad u dhammaystirto abuurista akoonkaaga, dib u noqo oo isticmaal '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Koodhkaasi waa qalad ama wakhtigiisii wuu dhacay. Mar kale isku day ama isticmaal '$t(login.resendCode)'.",
     "codeInProgress": "Koodhkaaga waa la habaynayaa. Wax yar sug oo mar kale isku day.",
     "tooManyAttempts": "Isku dayo aad u badan. Fadlan codso koodh cusub.",
     "invalidToken": "Soo geliddu way fashilantay. Fadlan mar kale isku day.",
@@ -4537,6 +4541,7 @@
     "empty": "Ma jiro dhaqdhaqaaq muddadan warbixinta",
     "emptyHint": "Fadhiyadaada koodhka ee cloud iyo CLI halkan ayay ka muuqdaan marka warbixin la jadwalay ay yeelato dhaqdhaqaaq.",
     "loadError": "Lama soo rari karin warbixinnada",
+    "estimateLoadError": "Lama soo rari karin qiimeynta.",
     "view": "Akhri warbixinta",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4942,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Astaanta ganacsi weyn",
-    "enterpriseOnly": "Kani waa astaanta ganacsiyada waaweyn oo kaliya.",
+    "enterpriseOnly": "Bixiyeyaasha iyo moodeellada waxay diyaar ku yihiin qorshaha Enterprise.",
     "readOnly": "Kaliya milkiilayaasha iyo maamulayaasha ururka ayaa beddeli kara dejintan.",
     "loadError": "Bixiyeyaasha iyo moodeellada lama soo dejisan karin",
     "tabModels": "Moodeellada",

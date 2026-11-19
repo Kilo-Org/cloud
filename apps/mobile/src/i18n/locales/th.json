@@ -1226,7 +1226,7 @@
     },
     "instructions": {
       "title": "คำแนะนำที่กำหนดเอง",
-      "deprecation": "คำแนะนำที่กำหนดเองจะเลิกใช้งานในอนาคต ย้ายคำแนะนำเหล่านี้ไปไว้ในไฟล์ REVIEW.md ในคลังโค้ดแทน",
+      "deprecation": "คำแนะนำที่กำหนดเองจะถูกนำออก ย้ายคำแนะนำเหล่านี้ไปไว้ในไฟล์ REVIEW.md ในคลังโค้ดแทน",
       "placeholder": "เช่น ตรวจให้เป็นไปตามแนวทางการจัดการข้อผิดพลาดของเรา…",
       "clearTitle": "ลบคำแนะนำที่กำหนดเองหรือไม่",
       "clearMessage": "การบันทึกช่องที่ว่างเปล่าจะลบคำแนะนำที่กำหนดเองที่จัดเก็บไว้สำหรับตัวตรวจสอบนี้ออก"
@@ -1392,6 +1392,7 @@
       "managedOnWeb": "การเชื่อมต่อ Bitbucket ของ {{organization}} ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
       "description": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานสำหรับ {{organization}} แล้ววางโทเค็นด้านล่าง",
       "descriptionReconnect": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานใหม่สำหรับ {{organization}} แล้ววางโทเค็นด้านล่าง",
+      "descriptionOverview": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานสำหรับ {{organization}} แล้ววางโทเค็นในหน้าจอถัดไป",
       "scopes": "บัญชี: อ่าน · คลังโค้ด: อ่าน/เขียน · PR: อ่าน · เว็บฮุก: อ่าน/เขียน",
       "tokenPlaceholder": "โทเค็นการเข้าถึงพื้นที่ทำงาน",
       "tokenRefused": "Bitbucket ไม่ยอมรับโทเค็นการเข้าถึงพื้นที่ทำงานนี้ ตรวจสอบว่ามีขอบเขตสิทธิ์ด้านบน แล้วลองอีกครั้ง"
@@ -3186,6 +3187,8 @@
     "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง",
     "endedOn": "สิ้นสุดวันที่ {{date}}",
     "notAvailableInApp": "Kilo Pass ไม่พร้อมใช้งานในแอป",
+    "notAvailableTitle": "ไม่มี Kilo Pass ในแอป",
+    "noPassDescription": "บัญชีนี้ไม่มี Kilo Pass",
     "statusActive": "ใช้งานอยู่",
     "statusTrialing": "ช่วงทดลองใช้",
     "statusPastDue": "การชำระเงินเกินกำหนด",
@@ -3468,7 +3471,7 @@
       "retentionLimit": "กำลังแสดงใบแจ้งหนี้ล่าสุด"
     },
     "lowBalanceAlert": {
-      "enableA11y": "เปิดใช้การแจ้งเตือนยอดคงเหลือต่ำ",
+      "subtitle": "ส่งการแจ้งเตือนทางอีเมลไปยังที่อยู่ที่คุณระบุเมื่อยอดคงเหลือขององค์กรนี้ต่ำกว่าจำนวนที่คุณตั้งไว้",
       "notifyEmailsLabel": "อีเมลสำหรับการแจ้งเตือน",
       "permissionDenied": "คุณไม่มีสิทธิ์จัดการการแจ้งเตือนการเรียกเก็บเงิน",
       "separateEmailsHint": "หากมีหลายอีเมล ให้คั่นด้วยเครื่องหมายจุลภาค",
@@ -3650,7 +3653,8 @@
     "signupStepUp": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ใช้ '$t(login.moreSignInOptions)'",
     "signupStepUpApple": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ใช้ '$t(login.signInWithApple)'",
     "signupStepUpGoogle": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ใช้ '$t(login.signInWithGoogle)'",
-    "invalidCode": "รหัสนั้นไม่ถูกต้อง โปรดลองอีกครั้ง",
+    "signupStepUpBack": "หากต้องการสร้างบัญชีให้เสร็จสมบูรณ์ ให้ย้อนกลับไปแล้วใช้ '$t(login.moreSignInOptions)'.",
+    "invalidCode": "รหัสนั้นไม่ถูกต้องหรือหมดอายุแล้ว โปรดลองอีกครั้งหรือใช้ '$t(login.resendCode)'.",
     "codeInProgress": "กำลังประมวลผลรหัสของคุณ รอสักครู่แล้วลองอีกครั้ง",
     "tooManyAttempts": "ลองหลายครั้งเกินไป โปรดขอรหัสใหม่",
     "invalidToken": "เข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้ง",
@@ -4537,6 +4541,7 @@
     "empty": "ไม่มีกิจกรรมในช่วงเวลาของรายงานนี้",
     "emptyHint": "เซสชันเขียนโค้ดบนคลาวด์และ CLI ของคุณจะแสดงที่นี่เมื่อรายงานตามกำหนดการมีกิจกรรม",
     "loadError": "ไม่สามารถโหลดรายงานได้",
+    "estimateLoadError": "ไม่สามารถโหลดประมาณการได้",
     "view": "อ่านรายงาน",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4942,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "คุณสมบัติระดับองค์กร",
-    "enterpriseOnly": "นี่เป็นคุณสมบัติเฉพาะระดับองค์กร",
+    "enterpriseOnly": "ผู้ให้บริการและโมเดลพร้อมใช้งานในแพ็กเกจ Enterprise",
     "readOnly": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่เปลี่ยนการตั้งค่าเหล่านี้ได้",
     "loadError": "ไม่สามารถโหลดผู้ให้บริการและโมเดลได้",
     "tabModels": "โมเดล",

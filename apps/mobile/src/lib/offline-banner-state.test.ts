@@ -51,7 +51,7 @@ describe('createOfflineBannerStore', () => {
     probe.mockImplementationOnce(() => {
       throw new Error('Probe could not start');
     });
-    source.emit({ isConnected: false, isInternetReachable: false });
+    source.emit(offlineState);
     timer.advanceBy(5000);
     expect(store.state()).toBe('offline');
     expect(changes).toEqual(['offline']);

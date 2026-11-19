@@ -1,4 +1,5 @@
 import type { ToolDisplayMode } from './tool-detail-marker';
+import type { AgentBoardState } from './agent-board';
 import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
@@ -576,6 +577,7 @@ type SessionManagerAtoms = {
   /** Every pending question, oldest first. `activeQuestion` is the head. */
   pendingQuestions: W<readonly StandaloneQuestion[]>;
   backgroundActivity: W<BackgroundActivityState>;
+  agentBoard: W<AgentBoardState>;
   /** Every pending permission, oldest first. `activePermission` is the head. */
   pendingPermissions: W<readonly StandalonePermission[]>;
   /**
@@ -1298,6 +1300,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const activePermissionAtom = atom<StandalonePermission | null>(null);
   const pendingQuestionsAtom = atom<readonly StandaloneQuestion[]>([]);
   const backgroundActivityAtom = atom<BackgroundActivityState>({ status: 'inactive' });
+  const agentBoardAtom = atom<AgentBoardState>({ status: 'inactive' });
   const pendingPermissionsAtom = atom<readonly StandalonePermission[]>([]);
   const unreadablePermissionsAtom = atom<readonly UnreadablePermissionState[]>([]);
   const suggestionAtom = atom<SuggestionState | null>(null);
@@ -1810,6 +1813,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activePermissionAtom, null);
     store.set(pendingQuestionsAtom, []);
     store.set(backgroundActivityAtom, { status: 'inactive' });
+    store.set(agentBoardAtom, { status: 'inactive' });
     store.set(pendingPermissionsAtom, []);
     store.set(unreadablePermissionsAtom, []);
     store.set(suggestionAtom, null);
@@ -3719,6 +3723,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           store.set(backgroundActivityAtom, event.state);
           return;
         }
+        if (event.type === 'agent-board.state') {
+          store.set(agentBoardAtom, event.state);
+          return;
+        }
         if (
           event.type === 'cloud.message.queued' ||
           event.type === 'cloud.message.sent' ||
@@ -4735,6 +4743,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activePermission: activePermissionAtom,
       pendingQuestions: pendingQuestionsAtom,
       backgroundActivity: backgroundActivityAtom,
+      agentBoard: agentBoardAtom,
       pendingPermissions: pendingPermissionsAtom,
       unreadablePermissions: unreadablePermissionsAtom,
       suggestion: suggestionAtom,

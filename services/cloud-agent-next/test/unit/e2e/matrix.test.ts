@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isTransientScenarioFailure,
   parseMatrixArgs,
   resolveParallelism,
   sandboxBudget,
@@ -183,5 +184,56 @@ describe('scopeFor', () => {
     const scope = scopeFor(job('x'.repeat(100)), 'ab12cd34');
     expect(scope).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
     expect(scope.endsWith('-ab12cd34')).toBe(true);
+  });
+});
+
+describe('isTransientScenarioFailure', () => {
+  it('classifies the database and network failures that fail a deployed start', () => {
+    expect(
+      isTransientScenarioFailure(
+        '❌ hot/echo:hi (15647ms): threw: tRPC start failed: 500 Internal Server Error — INTERNAL_SERVER_ERROR: Failed query: begin'
+      )
+    ).toBe(true);
+    expect(
+      isTransientScenarioFailure(
+        'tRPC start failed: 500 Internal Server Error — INTERNAL_SERVER_ERROR: Failed query: select "id" from "agent_environment_profiles"'
+      )
+    ).toBe(true);
+    expect(isTransientScenarioFailure('❌ chunked-streaming/slow:5:50: threw: fetch failed')).toBe(
+      true
+    );
+    expect(
+      isTransientScenarioFailure(
+        '❌ callback-completion/echo:done: threw: Stream did not connect for workspace_df479885'
+      )
+    ).toBe(true);
+    expect(
+      isTransientScenarioFailure(
+        'session stream connection failed Error: WebSocket was closed before the connection was established'
+      )
+    ).toBe(true);
+    expect(isTransientScenarioFailure('tRPC start failed: 503 Service Unavailable')).toBe(true);
+    expect(isTransientScenarioFailure('connect ETIMEDOUT 10.0.0.1:5432')).toBe(true);
+  });
+
+  it('leaves assertion and client errors as scenario failures', () => {
+    expect(
+      isTransientScenarioFailure('❌ cold/echo:hi: expected sameContainer=true, received false')
+    ).toBe(false);
+    expect(
+      isTransientScenarioFailure(
+        'tRPC start failed: 400 Bad Request — BAD_REQUEST: Selected model is not available for this cloud agent session'
+      )
+    ).toBe(false);
+    expect(
+      isTransientScenarioFailure(
+        'filled 9 before rejection: TOO_MANY_REQUESTS: Pending message queue is full (10)'
+      )
+    ).toBe(false);
+    expect(
+      isTransientScenarioFailure(
+        'tRPC start failed: 500 Internal Server Error — INTERNAL_SERVER_ERROR: boom'
+      )
+    ).toBe(false);
   });
 });

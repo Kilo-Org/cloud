@@ -868,6 +868,7 @@ exactly `auth-reject`. The end-of-run output is a machine-readable contract:
 
 ```
 unsupported: <name>
+retried: <name>
 Summary: <pass> passed, <fail> failed, <unsupported> unsupported
 Wall time: <seconds>s
 ```
@@ -878,6 +879,16 @@ scenarios are filtered before spawn, a non-zero child exit is a failure: exit `1
 if any scenario failed, else `0`. A child that exceeds its watchdog deadline (its
 scenario budget plus ten minutes) is killed and reported as a failure. When
 `GITHUB_STEP_SUMMARY` is set the runner appends its `Summary:` line to that file.
+
+A scenario whose failure output names a transient infrastructure fault
+(`Failed query:`, `fetch failed`, a connection reset or timeout, or a 502/503/504
+response) is retried once in a fresh child and fake-LLM scope after a 60 s
+delay, and listed on a `retried:` line. The delay lets a short database or
+network blip clear, because an immediate retry can race the same fault. The
+nightly depends on the production database and backend, so one blip must not be
+reported as several scenario regressions. The retry is bounded to one; a
+persistent defect still fails, and assertion, validation and 4xx failures are
+never retried.
 
 The `cloud-agent-e2e-tests` GitHub workflow
 (`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`

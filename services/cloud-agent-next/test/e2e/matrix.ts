@@ -29,9 +29,13 @@
  * `Wall time:`):
  *
  *   unsupported: <name>
+ *   retried: <name>
  *   disabled: <name> (<reason>)
  *   Summary: <pass> passed, <fail> failed, <unsupported> unsupported
  *   Wall time: <seconds>s
+ *
+ * A scenario that fails with a transient infrastructure signature is retried
+ * once, in a fresh child and fake-LLM scope, and listed on a `retried:` line.
  *
  * The runner asserts `pass + fail + unsupported` equals the scenarios it
  * selected and exits `2` otherwise. When `GITHUB_STEP_SUMMARY` is set it appends
@@ -117,7 +121,42 @@ type JobResult = {
   outcome: Outcome;
   exitCode: number;
   durationMs: number;
+  /** True when the failure looks like a transient infrastructure fault, not a scenario defect. */
+  transient: boolean;
 };
+
+/**
+ * Failure text that identifies a transient infrastructure fault. The nightly
+ * runs against production dependencies, so one database or network blip must
+ * not be reported as nine scenario regressions. A single retry keeps the
+ * signal: a persistent defect still fails, and the retry is logged.
+ */
+const TRANSIENT_FAILURE_MARKERS = [
+  'Failed query:',
+  'fetch failed',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EAI_AGAIN',
+  'ENOTFOUND',
+  'WebSocket was closed before the connection was established',
+  'Stream did not connect',
+] as const;
+
+/** Only gateway/unavailable statuses are transient; a 500 without a marker can be a real defect. */
+const TRANSIENT_HTTP_STATUS = /\b5(?:02|03|04)\b/;
+
+/**
+ * Wait before the one retry. A short database or network blip often lasts tens
+ * of seconds, so an immediate retry would race the same fault.
+ */
+const TRANSIENT_RETRY_DELAY_MS = 60_000;
+
+export function isTransientScenarioFailure(output: string): boolean {
+  return (
+    TRANSIENT_FAILURE_MARKERS.some(marker => output.includes(marker)) ||
+    TRANSIENT_HTTP_STATUS.test(output)
+  );
+}
 
 export type MatrixArgs = { profile?: string; parallel?: string; only?: string[] };
 
@@ -339,6 +378,16 @@ function runScenario(
     });
 
     const prefix = `[${job.label}] `;
+    // Keep a bounded tail of the child's output for failure classification. The
+    // scenario result line is printed last, so a tail is enough.
+    const OUTPUT_TAIL_LIMIT = 64 * 1024;
+    let outputTail = '';
+    const record = (text: string): void => {
+      outputTail += text;
+      if (outputTail.length > OUTPUT_TAIL_LIMIT) {
+        outputTail = outputTail.slice(outputTail.length - OUTPUT_TAIL_LIMIT);
+      }
+    };
     const forward = (stream: NodeJS.ReadableStream): void => {
       stream.setEncoding('utf8');
       let buffered = '';
@@ -346,10 +395,16 @@ function runScenario(
         buffered += chunk;
         const lines = buffered.split('\n');
         buffered = lines.pop() ?? '';
-        for (const line of lines) console.log(`${prefix}${line}`);
+        for (const line of lines) {
+          console.log(`${prefix}${line}`);
+          record(`${line}\n`);
+        }
       });
       stream.on('end', () => {
-        if (buffered.length > 0) console.log(`${prefix}${buffered}`);
+        if (buffered.length > 0) {
+          console.log(`${prefix}${buffered}`);
+          record(buffered);
+        }
       });
     };
     forward(child.stdout);
@@ -371,10 +426,11 @@ function runScenario(
       clearTimeout(watchdog);
       const durationMs = Date.now() - startedAt;
       const outcome: Outcome = exitCode === 0 ? 'pass' : 'failure';
+      const transient = outcome === 'failure' && isTransientScenarioFailure(outputTail);
       console.log(
         `--- ${job.label} ${outcome} (exit=${exitCode}, ${Math.round(durationMs / 1000)}s) ---`
       );
-      resolve({ job, outcome, exitCode, durationMs });
+      resolve({ job, outcome, exitCode, durationMs, transient });
     };
 
     child.on('error', error => {
@@ -469,6 +525,7 @@ async function main(): Promise<void> {
   const before = isLocal ? await runningSandboxIds() : undefined;
 
   const results: JobResult[] = [];
+  const retried = new Set<string>();
   let cursor = 0;
   const startedAt = Date.now();
   const worker = async (): Promise<void> => {
@@ -476,8 +533,31 @@ async function main(): Promise<void> {
       const index = cursor++;
       const job = jobs[index];
       if (job === undefined) return;
-      const scope = scopeFor(job, randomUUID().slice(0, 8));
-      results.push(await runScenario(job, profile, scope, jobs.length, index));
+      let result = await runScenario(
+        job,
+        profile,
+        scopeFor(job, randomUUID().slice(0, 8)),
+        jobs.length,
+        index
+      );
+      // One retry for a transient infrastructure fault. The retry uses a new
+      // fake-LLM scope; a scenario that created sessions on the first attempt
+      // cleans them up in its own `finally`.
+      if (result.outcome === 'failure' && result.transient && !retried.has(job.label)) {
+        retried.add(job.label);
+        console.log(
+          `--- ${job.label} transient failure; retrying once after ${TRANSIENT_RETRY_DELAY_MS / 1000}s (exit=${result.exitCode}, ${Math.round(result.durationMs / 1000)}s) ---`
+        );
+        await new Promise(resolve => setTimeout(resolve, TRANSIENT_RETRY_DELAY_MS));
+        result = await runScenario(
+          job,
+          profile,
+          scopeFor(job, randomUUID().slice(0, 8)),
+          jobs.length,
+          index
+        );
+      }
+      results.push(result);
     }
   };
   await Promise.all(Array.from({ length: parallelism.size }, worker));
@@ -512,6 +592,7 @@ async function main(): Promise<void> {
   }
 
   for (const name of unsupported) console.log(`unsupported: ${name}`);
+  for (const label of retried) console.log(`retried: ${label}`);
   for (const name of Object.keys(SHARED_SCENARIOS)) {
     const reason = SHARED_SCENARIOS[name]?.disabled;
     if (reason !== undefined && !selectedKeys.includes(name)) {

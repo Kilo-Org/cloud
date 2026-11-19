@@ -26,7 +26,8 @@ describe('anthropicUserProfileCreateParams', () => {
   it('normalizes the email before hashing it', () => {
     const hash = anthropicUserProfileEmailHash(' Person@Example.com ');
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(hash).toBe(anthropicUserProfileEmailHash('person@example.com'));
+    // Pinned: a different value means the pepper changed, which breaks matching at Anthropic.
+    expect(hash).toBe('e401be35f622916caf6786b83879cee35a39acbd7ca9166e74866fce59955a59');
     expect(hash).not.toBe(anthropicUserProfileEmailHash('other@example.com'));
   });
 

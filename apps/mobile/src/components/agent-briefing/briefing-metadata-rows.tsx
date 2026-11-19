@@ -1,14 +1,8 @@
+import { type BriefingSourceMetadata } from '@kilocode/app-shared/agent-briefing';
 import { type TFunction } from 'i18next';
 
 import { Text } from '@/components/ui/text';
 import { formatNumber } from '@/lib/format';
-
-/** Structured facts a briefing source carries instead of a prose excerpt. */
-export type BriefingSourceMetadata = {
-  plan?: { done: number; total: number; current: string | null };
-  changes?: { files: number; added: number; removed: number };
-  failure?: { kind: 'provider' | 'tool' | 'cancelled' | 'other' };
-};
 
 /** The failure wording of each payload kind. */
 const FAILURE_KIND_KEYS = {
@@ -63,7 +57,7 @@ export function briefingMetadataTexts(
   return texts;
 }
 
-/** One single-line, selectable text per present metadata member. */
+/** One selectable, wrapping text per present metadata member. */
 export function BriefingMetadataRows({
   metadata,
   t,
@@ -76,7 +70,7 @@ export function BriefingMetadataRows({
   return (
     <>
       {briefingMetadataTexts(metadata, t, language).map(text => (
-        <Text key={text} className="text-sm text-muted-foreground" selectable numberOfLines={1}>
+        <Text key={text} className="text-sm text-muted-foreground" selectable>
           {text}
         </Text>
       ))}

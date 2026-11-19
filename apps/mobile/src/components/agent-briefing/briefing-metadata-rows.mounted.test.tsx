@@ -1,13 +1,10 @@
+import { type BriefingSourceMetadata } from '@kilocode/app-shared/agent-briefing';
 import { type TFunction } from 'i18next';
 import { createElement, type ElementType } from 'react';
 import { expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
-import {
-  BriefingMetadataRows,
-  briefingMetadataTexts,
-  type BriefingSourceMetadata,
-} from './briefing-metadata-rows';
+import { BriefingMetadataRows, briefingMetadataTexts } from './briefing-metadata-rows';
 
 const t = ((key: string, values?: Readonly<Record<string, unknown>>) =>
   values ? [key, ...Object.values(values)].join(' ') : key) as unknown as TFunction;

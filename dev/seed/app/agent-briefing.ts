@@ -180,6 +180,21 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         failure: { kind: 'tool' },
       } satisfies SessionLiveSummary,
     },
+    {
+      // A title whose credential assignment screening cannot clear: the capture
+      // withholds the title, and the source row shows the localized kind label.
+      key: 'redacted',
+      title: 'Plan for client_' + 'secret: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"',
+      organizationId: null,
+      status: 'idle',
+      text: 'Rewrote the retry plan notes and cleared the old examples.',
+      liveSummary: {
+        step: null,
+        plan: { done: 2, total: 2, current: null },
+        changes: { files: 5, added: 60, removed: 12 },
+        failure: null,
+      } satisfies SessionLiveSummary,
+    },
     ...(options.organizationId
       ? [
           {

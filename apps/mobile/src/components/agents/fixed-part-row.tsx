@@ -9,6 +9,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useToolSummaryTranslation } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 import { useToolSummaryItemId } from './tool-summary-translation-scope';
 import { cn } from '@/lib/utils';
+import { PART_ROW_HIT_SLOP } from '@/lib/a11y/tap-target';
 
 import { useMessageLongPress } from './message-long-press-context';
 
@@ -134,62 +135,62 @@ export function FixedPartRow({
     : baseAccessibilityLabel;
 
   return (
-    <View
+    // One node is both the outline and the control: a shell that clipped the
+    // pressable would also clip its slop, and the row's `py-2` frame around one
+    // `text-sm` line measures 31.6 dp, so the slop is what reaches 44 dp.
+    <Pressable
       className={cn(
         // The default hairline is 7% white in dark, which all but vanishes on the
         // near-black page: a dashed outline then reads as no outline at all. The
         // dark page takes the neutral step the outlined control uses, so a row
         // keeps the separation it has in the light scheme.
-        'overflow-hidden rounded-lg border border-border dark:border-neutral-700',
+        'flex-row items-center gap-2 overflow-hidden rounded-lg border border-border px-3 py-2 active:bg-secondary dark:border-neutral-700',
         variant === 'dashed' && 'border-dashed'
       )}
+      hitSlop={PART_ROW_HIT_SLOP}
+      onPress={onPress}
+      onLongPress={messageLongPress ?? undefined}
+      disabled={!onPress}
+      accessibilityRole="button"
+      accessibilityLabel={shownAccessibilityLabel}
+      accessibilityHint={onPress ? t('agentChat.partDetail.showDetails') : undefined}
+      accessibilityState={{ disabled: !onPress }}
     >
-      <Pressable
-        className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"
-        onPress={onPress}
-        onLongPress={messageLongPress ?? undefined}
-        disabled={!onPress}
-        accessibilityRole="button"
-        accessibilityLabel={shownAccessibilityLabel}
-        accessibilityHint={onPress ? t('agentChat.partDetail.showDetails') : undefined}
-        accessibilityState={{ disabled: !onPress }}
-      >
-        {status === 'pending' || status === 'running' ? (
-          // RN's small spinner is 20x20 while the status icons are 16x16, so
-          // the row grew ~2.5dp while a tool ran and snapped back when it
-          // resolved (iOS and Android alike). Pin the spinner to the icon's
-          // square: the leading slot is then identical in every status and the
-          // label, not the spinner, sizes the row.
-          <View
-            className="items-center justify-center"
-            style={{ width: STATUS_ICON_SIZE_DP, height: STATUS_ICON_SIZE_DP }}
-          >
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-          </View>
-        ) : null}
-        {status === 'error' ? (
-          <XCircle size={STATUS_ICON_SIZE_DP} color={colors.destructive} />
-        ) : null}
-        {status === 'completed' && Icon ? (
-          <Icon size={STATUS_ICON_SIZE_DP} color={colors.mutedForeground} />
-        ) : null}
-
-        {/* Baseline, not center: the label is text-sm and the badge text-xs, so
-            centering the line boxes drops the badge below the label. */}
-        <View className="flex-1 flex-row items-baseline gap-1.5">
-          <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
-            {shownLabel}
-          </Text>
-          {badge ? (
-            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-              {badge}
-            </Text>
-          ) : null}
-          {failed ? <TranslationFailureIndicator iconOnly={failureIcon} /> : null}
+      {status === 'pending' || status === 'running' ? (
+        // RN's small spinner is 20x20 while the status icons are 16x16, so
+        // the row grew ~2.5dp while a tool ran and snapped back when it
+        // resolved (iOS and Android alike). Pin the spinner to the icon's
+        // square: the leading slot is then identical in every status and the
+        // label, not the spinner, sizes the row.
+        <View
+          className="items-center justify-center"
+          style={{ width: STATUS_ICON_SIZE_DP, height: STATUS_ICON_SIZE_DP }}
+        >
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
         </View>
+      ) : null}
+      {status === 'error' ? (
+        <XCircle size={STATUS_ICON_SIZE_DP} color={colors.destructive} />
+      ) : null}
+      {status === 'completed' && Icon ? (
+        <Icon size={STATUS_ICON_SIZE_DP} color={colors.mutedForeground} />
+      ) : null}
 
-        {onPress ? <RowChevron /> : null}
-      </Pressable>
-    </View>
+      {/* Baseline, not center: the label is text-sm and the badge text-xs, so
+          centering the line boxes drops the badge below the label. */}
+      <View className="flex-1 flex-row items-baseline gap-1.5">
+        <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
+          {shownLabel}
+        </Text>
+        {badge ? (
+          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+            {badge}
+          </Text>
+        ) : null}
+        {failed ? <TranslationFailureIndicator iconOnly={failureIcon} /> : null}
+      </View>
+
+      {onPress ? <RowChevron /> : null}
+    </Pressable>
   );
 }

@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { COMPACT_CONTROL_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -87,7 +88,9 @@ export function PrDiffFileListHeader({
           accessibilityLabel={t('prReview.fileList.openNavigator')}
           testID="pr-files-summary"
           className="min-h-9 flex-row items-center gap-1.5 rounded-md px-2 active:opacity-70"
-          hitSlop={6}
+          // `min-h-9` measures 31.2 dp at NativeWind's 14pt rem: a 6 dp slop
+          // stopped at 43.2 dp, the compact control's slop reaches 47 dp.
+          hitSlop={COMPACT_CONTROL_HIT_SLOP}
         >
           <Rows3 size={14} color={colors.mutedForeground} />
           <Text className="text-xs font-medium text-foreground">

@@ -2183,27 +2183,32 @@ function checkValuePlaceholders({
   const actualSet = placeholderTokens(value);
   const dropped = expectedSet.filter(name => !actualSet.includes(name));
   const added = actualSet.some(name => !expectedSet.includes(name));
-  // A visible count this form must show and does not: the count reads as an
-  // age only when the language spells the number out, so the form needs the
-  // reviewed worded form that names its key, category and locale.
-  for (const name of new Set(dropped)) {
-    if (requiredCounts.has(name) && !countsMayBeWorded) {
-      problems.push(
-        `${label}: "${key}" drops {{${name}}} without a reviewed worded form (WORDED_COUNTS)`
-      );
-    }
+  // A visible count the form must show and does not. `requiredCounts` comes
+  // from the whole family, not from the reference, because a reference may
+  // spell its own numeral out ("1 live session") while a sibling carries the
+  // placeholder. The count reads as an age only when the language spells the
+  // number out, so a form that drops it needs the reviewed worded form that
+  // names its key, category and locale. A form that also uses a token the
+  // family never uses is the mismatch below instead: its signature names both.
+  const missingCounts =
+    countsMayBeWorded || added ? [] : [...requiredCounts].filter(name => !actualSet.includes(name));
+  for (const name of missingCounts) {
+    problems.push(
+      `${label}: "${key}" drops {{${name}}} without a reviewed worded form (WORDED_COUNTS)`
+    );
   }
   // The set differs from the reference unless the difference is one the rules
   // already explain: a family token the form adds, a count it words under an
-  // exemption, or a required count the loop above has named. One defect keeps
-  // one line. An English-keyed key passes no required count, so any drop is
-  // still this message.
+  // exemption, or a missing count the loop above has named. One defect keeps
+  // one line, and the specific count line wins. An English-keyed key passes no
+  // required count, so any drop is still this message.
   const explained =
-    dropped.length > 0 &&
-    !added &&
-    dropped.every(name =>
-      countsMayBeWorded ? COUNT_PLACEHOLDERS.has(name) : requiredCounts.has(name)
-    );
+    missingCounts.length > 0 ||
+    (dropped.length > 0 &&
+      !added &&
+      dropped.every(name =>
+        countsMayBeWorded ? COUNT_PLACEHOLDERS.has(name) : requiredCounts.has(name)
+      ));
   if (
     actual !== expected &&
     !addsFamilyPlaceholderOnly(english, key, actual, expected) &&

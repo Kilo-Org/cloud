@@ -2781,3 +2781,37 @@ test('does not owe a push registry entry to an unsupported catalog file', () => 
   assert.doesNotMatch(text, /catalog "de\.json" has no import in/);
   assert.doesNotMatch(text, /catalog "de\.json" has no push locale registry entry/);
 });
+
+// The count a form must show comes from the whole family, not from the one
+// English reference the form is read against: English's `_one` may spell its
+// numeral out while `_other` carries the placeholder, and a form that answers
+// to the reference with no numeral must still show the count.
+test('rejects an added form that drops the family count its reference lacks', () => {
+  const found = run({
+    language: 'ru',
+    english: {
+      agents: {
+        title: 'Agents',
+        items_one: 'one item',
+        items_other: '{{displayCount}} items',
+      },
+    },
+    translated: {
+      agents: {
+        title: 'Локальные агенты',
+        items_one: 'один элемент',
+        items_few: 'несколько элементов',
+        items_many: '{{displayCount}} элементов',
+        items_other: '{{displayCount}} элементов',
+      },
+    },
+    source: "t('agents.title');\nt('agents.items', { count: 2 });",
+  });
+  const text = found.join('\n');
+  assert.match(
+    text,
+    /^mobile\/ru: "agents\.items_few" drops \{\{displayCount\}\} without a reviewed worded form \(WORDED_COUNTS\)$/m
+  );
+  // One line for the value: the specific count message replaces the general one.
+  assert.doesNotMatch(text, /"agents\.items_few" placeholders differ from English/);
+});

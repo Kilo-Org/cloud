@@ -116,6 +116,8 @@ export function ModelAccessForm({
   organizationId,
   canEdit,
   planEnded,
+  planMessage,
+  planAction,
   models,
   catalog,
   catalogUnavailable,
@@ -136,6 +138,14 @@ export function ModelAccessForm({
    * and the plan-ended sentence replaces the read-only role sentence.
    */
   planEnded: boolean;
+  /**
+   * The lapsed-plan refusal's sentence and step, resolved by the screen from
+   * the reader's role and the storefront rule — the same pair the hub paints.
+   * The form owns neither: a sentence that offers a next step needs the step
+   * beside it, and only the screen reads the role and the billing link.
+   */
+  planMessage: string;
+  planAction?: { label: string; onPress: () => void };
   models: readonly AvailableModel[];
   /** The gateway's whole catalog; empty while it is unavailable. */
   catalog: readonly CatalogModel[];
@@ -316,46 +326,52 @@ export function ModelAccessForm({
         {/* The lapsed plan blocks every edit on this screen, so the block under
             the segments names that state, its cause and who can end it: the
             shared organization plan refusal, as the hub, the billing screen and
-            the new-session form paint it. */}
-        {planEnded ? (
-          <OrganizationPlanRefusal message={t('common.organizationTrialEnded')} />
-        ) : null}
+            the new-session form paint it. The sentence says "then try again",
+            so the step the screen resolved rides under it. */}
+        {planEnded ? <OrganizationPlanRefusal message={planMessage} action={planAction} /> : null}
         {!canEdit && !planEnded ? (
           <Text className="text-xs text-muted-foreground">
             {t('organizationModelAccess.readOnly')}
           </Text>
         ) : null}
         {/* The buttons keep their place while the draft is clean, so a save
-            that settles never moves the list below them. */}
-        <View className="flex-row items-center gap-2">
-          <View className="min-h-5 flex-1 justify-center">
-            <AccessibleStatus
-              message={statusMessage}
-              tone={feedback.status === 'failed' ? 'error' : 'status'}
-              className="text-sm"
-            />
+            that settles never moves the list below them. A lapsed plan with a
+            clean draft has no action left to offer — the gate has Save and
+            Cancel is `!dirty` — so the row leaves instead of holding two dead
+            controls under the sentence that already states the blocker. A
+            dirty draft keeps it, because Cancel is then the only way to
+            discard what the gate trapped. */}
+        {planEnded && !dirty ? null : (
+          <View className="flex-row items-center gap-2">
+            <View className="min-h-5 flex-1 justify-center">
+              <AccessibleStatus
+                message={statusMessage}
+                tone={feedback.status === 'failed' ? 'error' : 'status'}
+                className="text-sm"
+              />
+            </View>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!dirty || saving}
+              onPress={() => {
+                clearWhere(() => true);
+                setForm(previous => ({ ...previous, draft: previous.baseline }));
+              }}
+            >
+              <Text>{t('common.cancel')}</Text>
+            </Button>
+            <Button
+              variant={planEnded ? 'outline' : 'default'}
+              size="sm"
+              loading={saving}
+              disabled={cannotSave}
+              onPress={() => void onSave()}
+            >
+              <Text>{t('common.save')}</Text>
+            </Button>
           </View>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!dirty || saving}
-            onPress={() => {
-              clearWhere(() => true);
-              setForm(previous => ({ ...previous, draft: previous.baseline }));
-            }}
-          >
-            <Text>{t('common.cancel')}</Text>
-          </Button>
-          <Button
-            variant={planEnded ? 'outline' : 'default'}
-            size="sm"
-            loading={saving}
-            disabled={cannotSave}
-            onPress={() => void onSave()}
-          >
-            <Text>{t('common.save')}</Text>
-          </Button>
-        </View>
+        )}
       </View>
 
       {activeTab === 'models' ? (

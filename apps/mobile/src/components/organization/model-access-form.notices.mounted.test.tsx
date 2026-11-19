@@ -1,10 +1,8 @@
 // What the providers-and-models form offers and says, which the save contract
 // does not cover: the Gateways segment exists only while the settings read
 // reports gateways available, like the web page's Advanced policies tab, so an
-// unavailable organization loses the tab instead of landing on an empty one;
-// and a lapsed plan names itself once, through the shared organization plan
-// refusal, instead of the role rule. The sibling suite owns the save contract
-// and keeps this harness small.
+// unavailable organization loses the tab instead of landing on an empty one.
+// The sibling suite owns the save contract and keeps this harness small.
 
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -71,11 +69,17 @@ type FormOverrides = {
   canEdit?: boolean;
 };
 
+/** The sentence and step the screen resolved, as this harness hands them in. */
+const PLAN_MESSAGE = 'The plan lapsed for this organization.';
+const planAction = { label: 'Manage billing', onPress: () => undefined };
+const planProps = { planMessage: PLAN_MESSAGE, planAction };
+
 function element(overrides: FormOverrides = {}) {
   return createElement(ModelAccessForm, {
     organizationId: 'org-1',
     canEdit: overrides.canEdit ?? true,
     planEnded: overrides.planEnded ?? false,
+    ...planProps,
     models: [],
     catalog: [],
     catalogUnavailable: false,
@@ -148,15 +152,20 @@ function gatewaySections(root: ReactTestInstance) {
   return root.findAllByType('GatewaySettingsSection' as never);
 }
 
-/** The control whose single label `Text` reads `label`, as the rendered pressable. */
-function labelledControl(root: ReactTestInstance, label: string): ReactTestInstance {
-  const found = root
+/** The rendered pressables whose single label `Text` reads `label`. */
+function controls(root: ReactTestInstance, label: string): ReactTestInstance[] {
+  return root
     .findAll(node => Object.is(node.type, 'Pressable'))
-    .find(
+    .filter(
       node =>
         node.findAll(child => Object.is(child.type, 'Text') && child.props.children === label)
           .length === 1
     );
+}
+
+/** The control whose single label `Text` reads `label`, as the rendered pressable. */
+function labelledControl(root: ReactTestInstance, label: string): ReactTestInstance {
+  const [found] = controls(root, label);
   if (!found) {
     throw new Error(`the ${label} control is missing`);
   }
@@ -280,7 +289,7 @@ describe('ModelAccessForm read-only notice', () => {
 });
 
 describe('ModelAccessForm lapsed-plan controls', () => {
-  it('hands the shared refusal the plan-ended sentence once, under the segments', () => {
+  it('hands the shared refusal the plan-ended sentence and step once, under the segments', () => {
     const root = render({ canEdit: true, planEnded: true });
     const found = refusals(root);
 
@@ -289,7 +298,10 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     if (!refusal) {
       throw new Error('the plan refusal is missing');
     }
-    expect(refusal.props.message).toBe(appI18n.t('common.organizationTrialEnded'));
+    // The form paints the sentence and the step the screen resolved: it owns
+    // neither, so the exact values it was handed are what must arrive.
+    expect(refusal.props.message).toBe(PLAN_MESSAGE);
+    expect(refusal.props.action).toBe(planAction);
 
     // The block sits directly under the segments, above the role caption slot
     // the plan state replaces.
@@ -297,8 +309,9 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     const siblings = refusal.parent?.children ?? [];
     expect(siblings.indexOf(control)).toBeLessThan(siblings.indexOf(refusal));
 
-    // The plan state is the refusal's sentence, not a save failure.
-    expect(root.findByType('AccessibleStatus' as never).props.message).toBeNull();
+    // The plan state is the refusal's sentence, not a save failure, and a
+    // clean draft leaves no status line behind it either.
+    expect(root.findAllByType('AccessibleStatus' as never)).toHaveLength(0);
   });
 
   it('keeps the role caption and no refusal for a member on an active plan', () => {
@@ -344,18 +357,25 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     expect(labelledControl(next, appI18n.t('common.save')).props.disabled).toBe(false);
   });
 
-  it('paints save and cancel as the dimmed outline while the plan lapsed', () => {
-    // A clean draft holds both controls disabled for a reason of its own: Save
-    // through the plan gate, Cancel through `!dirty`. Each is the same dimmed
-    // outline the switches and the bulk-action chips paint, not a filled plate.
+  it('leaves the actions row out for a clean draft while the plan lapsed', () => {
+    // A clean draft already disables Save through `!dirty` and Cancel through
+    // the same rule, so a lapsed plan with nothing to discard has no action
+    // left: the row leaves rather than holding two dead controls under the
+    // sentence that states the blocker.
     const root = render({ canEdit: true, planEnded: true });
 
-    for (const label of [appI18n.t('common.save'), appI18n.t('common.cancel')]) {
-      const control = String(labelledControl(root, label).props.className ?? '');
+    expect(controls(root, appI18n.t('common.save'))).toHaveLength(0);
+    expect(controls(root, appI18n.t('common.cancel'))).toHaveLength(0);
+  });
 
-      expect(control).toContain('opacity-50');
-      expect(control).not.toContain('bg-primary');
-    }
+  it('keeps the actions row with Cancel live and Save gated for a trapped draft', () => {
+    // A draft the plan lapsed under can only be discarded through Cancel, which
+    // reaches no server state, so the row stays and only Save takes the gate.
+    const root = render({ canEdit: true, planEnded: true });
+    changeDraft(root, draft => ({ ...draft, modelDenyList: ['anthropic/claude'] }));
+
+    expect(labelledControl(root, appI18n.t('common.save')).props.disabled).toBe(true);
+    expect(labelledControl(root, appI18n.t('common.cancel')).props.disabled).toBe(false);
   });
 
   it('keeps cancel usable to discard a draft the plan gate trapped', () => {

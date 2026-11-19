@@ -82,6 +82,8 @@ function element(providerAllowList: readonly string[] | undefined, overrides: Ov
     organizationId: 'org-1',
     canEdit: true,
     planEnded: overrides.planEnded ?? false,
+    planMessage: 'The plan lapsed for this organization.',
+    planAction: { label: 'Manage billing', onPress: () => undefined },
     models: [],
     catalog: overrides.catalogUnavailable === true ? [] : (overrides.catalog ?? CATALOG),
     catalogUnavailable: overrides.catalogUnavailable === true,

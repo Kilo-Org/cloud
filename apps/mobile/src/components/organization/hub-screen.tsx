@@ -61,6 +61,7 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { organizationPlanRefusalFor } from '@/lib/organization/plan-refusal-copy';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
@@ -223,14 +224,16 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     org.plan === 'enterprise'
       ? t('organization.hub.planEnterprise')
       : t('organization.hub.planTeams');
-  const planBillingUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
-  // A role that gets the billing action below the block needs only the state,
-  // because the action is the next step. A role that cannot change the plan
-  // gets the sentence the rest of the app shows with the same explanation, so
-  // the member still learns who can end the state.
-  const planMessage = showMoney
-    ? t('organization.hub.planEnded')
-    : t('common.organizationTrialEnded');
+  // The sentence and the step the lapsed-plan block paints: the role picks the
+  // copy, and the storefront rule decides whether the web billing page may be
+  // linked under it. Shared with the providers-and-models form, which states
+  // the same state.
+  const planRefusal = organizationPlanRefusalFor({
+    role,
+    canLinkBilling,
+    billingUrl: `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`,
+    t,
+  });
 
   // The rename control's two states. `organizations.update` runs on the
   // organization billing mutation procedure, which refuses every mutation once
@@ -302,21 +305,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             the card below states the tier and its status, so this block adds
             neither. */}
         {planEnded ? (
-          <OrganizationPlanRefusal
-            message={planMessage}
-            action={
-              showMoney && canLinkBilling
-                ? {
-                    label: t('organization.hub.manageBilling'),
-                    onPress: () => {
-                      void openExternalUrl(planBillingUrl, {
-                        label: t('organization.hub.manageBilling'),
-                      });
-                    },
-                  }
-                : undefined
-            }
-          />
+          <OrganizationPlanRefusal message={planRefusal.message} action={planRefusal.action} />
         ) : null}
         <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
           {showMoney && (

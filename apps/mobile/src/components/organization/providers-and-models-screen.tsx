@@ -9,12 +9,15 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Lock } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
+import { WEB_BASE_URL } from '@/lib/config';
 import {
   useOrgAvailableModels,
   useOrgGatewaySettings,
   useOrgModelCatalog,
 } from '@/lib/hooks/use-org-settings-queries';
 import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
+import { organizationPlanRefusalFor } from '@/lib/organization/plan-refusal-copy';
 
 const TITLE_KEY = 'organization.settingsOnWeb.providersAndModels';
 
@@ -32,6 +35,10 @@ export function OrganizationProvidersAndModelsScreen() {
   const models = useOrgAvailableModels(organizationId, enterprise);
   const catalog = useOrgModelCatalog(enterprise);
   const gateway = useOrgGatewaySettings(organizationId, enterprise);
+  // The storefront rule that decides whether the lapsed-plan refusal may link
+  // the web billing page. Read with the other hooks, before the boundary's
+  // early return, so the form receives the same step the hub offers.
+  const canLinkBilling = useCanLinkExternalPurchase();
 
   if (isResolving || organizationId == null || org == null) {
     return <OrganizationBoundary title={t(TITLE_KEY)} />;
@@ -109,6 +116,12 @@ export function OrganizationProvidersAndModelsScreen() {
   // do not need: the organization's own models and both saved lists come from
   // the membership and available-models payloads. When it fails, the form still
   // opens on what the phone already has and offers a retry for the rest.
+  const planRefusal = organizationPlanRefusalFor({
+    role,
+    canLinkBilling,
+    billingUrl: `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`,
+    t,
+  });
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t(TITLE_KEY)} />
@@ -116,6 +129,8 @@ export function OrganizationProvidersAndModelsScreen() {
         organizationId={organizationId}
         canEdit={canManageOrganization(role)}
         planEnded={org.isTrialExpiredForEnforcement}
+        planMessage={planRefusal.message}
+        planAction={planRefusal.action}
         models={models.data.data}
         catalog={catalog.data ?? []}
         catalogUnavailable={catalog.data == null && catalog.isError}

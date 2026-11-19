@@ -51,6 +51,21 @@ wrong-purpose/sandbox envelopes and credentials invalidated by signing-key rotat
 `shutdown` and prompt closure on a short-lived Worker-local socket, without DO lookup. A temporarily
 unavailable signing secret returns 503, so ordinary bounded-backoff reconnect remains possible.
 
+### Sandbox provider owners
+
+| Concern | Owner |
+|---|---|
+| Feature support | `SANDBOX_PROVIDER_CAPABILITIES` in `packages/worker-utils/src/sandbox-provider-capabilities.ts`, read with `providerSupports` |
+| Each unsupported feature and its class (`gap`, `intentional`, `retired`) | `src/sandbox-control/provider-gaps.test.ts` |
+| Provider facts that are not features: label, reserved ports, launch env, customer credential, unique allocation name, credential transport, retired | `PROVIDER_DESCRIPTORS` in `src/shared/sandbox-provider.ts` |
+| Adapter construction | `createProviderAdapter` in `src/control-plane/sandbox/provider-adapters.ts` |
+| Shared adapter behavior | `src/sandbox-control/provider-contract.test.ts` |
+
+Code gates a feature with `providerSupports`, not with a provider-name comparison. A new provider
+adds a table row, a descriptor, a `case` in `createProviderAdapter` and a contract harness. The type
+checker rejects the change until all four exist. The Sandbox DO calls snapshot methods only through
+the adapter's optional members, because a stub adapter has none.
+
 ## 3. Topology and identities
 
 - One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`.
@@ -1834,37 +1849,79 @@ per-socket record of sent configuration, so hibernation does not change the resu
 workspace runtime keys remain isolated.
 The runtime still rejects profile MCP drift on legacy preparation paths.
 
-The built-in `kilo-cloud-agent` MCP server uses workspace authority. The worktree UUID identifies
-the canonical workspace parent, the original root chat that remains the authorization anchor for
-the existing child-session API. Every grant renewal checks that root's authorization and its owner,
-organization and worktree. Deleting or revoking the root disables new grants; another sibling never
-becomes the anchor. Children and callbacks belong to that workspace, not necessarily the chat
-invoking MCP. The MCP transport does not send the invoking chat's identity, so a completion callback
-either opens a new sibling chat in the root's workspace (`workspace:new-chat`) or notifies one
-existing chat in that workspace (`workspace:<session-id>`). The new-chat form uses the child result
-as the new chat's first message and derives its operation and session identity from the persisted
-callback message ID. The session form checks that the target is a root or sibling chat with the
-same owner, organization and workspace, and that it is still accessible; the invoking chat learns
-its own session id from the `cloud-agent-context` line in its turns. Built-in credential
-refresh rotates the workspace MCP credential; it is not profile MCP drift and does not reconfigure
-the workspace's MCP set.
+#### Workspace Cloud Agent authority
+
+The built-in `kilo-cloud-agent` MCP server, child launches, child management and child callbacks
+use the workspace's own authority, not the authorization of any chat. One
+`CloudAgentWorkspace` Durable Object per workspace (`CLOUD_AGENT_WORKSPACE`, named
+`ownerId:workspace_<uuid>`) owns that authority. The canonical workspace ID is `workspace_<uuid>`,
+where `worktree_<uuid>` is the worktree; a session without a worktree is its own workspace. The ID
+names the workspace for its whole life, including after the chat with the same UUID is deleted.
+Credentials keep the `CloudAgentAuthority` v1 claim: `parentSessionId` is the canonical workspace ID
+and `authorizationId` is the workspace's current authorization.
+
+The workspace record binds the canonical workspace ID, worktree, owner and organization, and stores
+its own runtime delegation (at most 24 hours), revocation state, origin and network policy. It is
+adopted once from the chat that created the workspace, only when that chat may launch children and
+does not use a legacy shared sandbox. Adoption copies the stored authorization as it is, including
+an expired or revoked state, and imports that chat's legacy child registry. A sibling chat is never
+an adoption source. Deleting the creating chat first completes adoption, so the authority and the
+registry survive; deleting a session without a worktree, or starting worktree deletion, permanently
+ends the workspace authority with a tombstone that adoption cannot overwrite.
+
+Every issuance, launch, management call and delegation checks the stored record and then renews it,
+which rechecks the owner, organization membership, credential pepper and admitting device session in
+the database. A failed binding persists `revoked`. A transient database failure is unavailable, not
+revoked. The record must be unchanged after the check.
+
+The MCP credential expires with the workspace delegation. An expired authority is restored only when
+the owner sends a message with a user credential in any chat of the workspace: that send mints a new
+workspace delegation with live owner, organization and device-session checks, and the workspace
+accepts it only if its current authorization is the expired one it reported. A revoked or deleted
+workspace, a sibling chat's authorization, a Cloud Agent or delegated token, an automation
+admission, a sandbox restart and a stale credential never restore authority. MCP is optional, so a
+failed renewal never fails the send. Before a prompt, the Sandbox DO offers a newer workspace MCP
+credential when the one it last sent is missing or due, so a renewed authority reaches a running
+runtime without a restart; a preparation after a restart receives it in `session.prepare`. Built-in
+credential refresh is not profile MCP drift and does not reconfigure the workspace's MCP set.
+
+The MCP transport does not identify the invoking chat. A completion callback either opens a new
+chat in the launching workspace (`workspace:new-chat`) or notifies one existing chat in it
+(`workspace:<session-id>`). The new-chat form derives its operation and session identity from the
+persisted callback message ID and delegates the workspace authority to the new chat, so it needs an
+active authority. The session form needs a workspace that is not deleted or revoked; an expired
+authority can still notify an existing chat, which runs on that chat's own authorization. The target
+must be a chat of the same worktree, owner and organization without spawn lineage, and still
+accessible. A deleted target fails the callback; it is never redirected to another chat. The
+invoking chat learns its own session id from the `cloud-agent-context` line in its turns.
 
 The scoped connection can create children, list direct children, inspect a child, read an exact
 message result, interrupt a child, and send a prompt follow-up. The personal and organization
 procedures are `prepareSession`, `listChildSessions`, `getSession`, `getMessageResult`,
-`interruptSession`, and `sendMessage`. Management revalidates the canonical parent's current
-authorization and the target's persisted spawn lineage, owner and organization; the parent itself,
-sibling chats and unrelated sessions are not valid targets. Follow-ups require a stable message ID
-and cannot change callbacks, runtime configuration or delegation lifetime. Interrupt stops work;
-it does not delete the child workspace.
+`interruptSession`, and `sendMessage`. Folder assignment and stacking on a child reach the same
+management checks through `getSession` and `listChildSessions`. Management revalidates the workspace
+authority and the target's persisted spawn lineage (`parentCloudAgentSessionId` equals the canonical
+workspace ID), owner and organization; the workspace itself, its chats and unrelated sessions are not
+valid targets, so a child cannot be managed from another workspace or organization. A child cannot
+launch children, so there are no grandchildren. Follow-ups require a
+stable message ID and cannot change callbacks, runtime configuration or delegation lifetime.
+Interrupt stops work; it does not delete the child workspace. Launch idempotency stays in the
+operation ledger by `operationKey`.
 
-The parent Session DO durably indexes newly created children for bounded, cursor-paginated listing.
+The workspace durably indexes newly created children for bounded, cursor-paginated listing.
 Registry entries are discovery hints: every returned child is reauthorized, and database or DO
 outages fail the query rather than reporting an empty list. An empty page can still have a
-`nextCursor` when its entries no longer authorize. Children created before this index was introduced
-are not backfilled; explicit management by ID still checks their lineage and remains supported.
+`nextCursor` when its entries no longer authorize. Children created before the original index was
+introduced are not backfilled; explicit management by ID still checks their lineage.
 Message-result queries preserve terminal assistant output and safe failure details. Prefer completion
 callbacks; bounded status checks are supported, but busy polling is not needed.
+
+Rollout: existing workspaces adopt their creating chat's authorization on first use, with the same
+authorization ID, so MCP credentials issued before the rollout stay valid until their own expiry.
+Existing child records keep their lineage, because their `parentCloudAgentSessionId` already is the
+canonical workspace ID. Queued callbacks keep their payload and resolve the workspace through the
+child's lineage. A workspace whose creating chat was deleted before rollout has no adoption source
+and stays without MCP. Deploy the Worker with the `v16` migration; no other service changes.
 
 Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`, `heartbeat_ack`,
 `session.prepare`, `session.progress`, `session.ready`, `session.failed`, `workspace.capture` and

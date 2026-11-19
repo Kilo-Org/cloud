@@ -13,6 +13,7 @@ const REASON_KEYS = {
     apple_intelligence_disabled: 'modelChat.localModels.reasons.appleIntelligenceDisabled',
     device_not_eligible: 'modelChat.localModels.reasons.deviceNotEligible',
     model_not_ready: 'modelChat.localModels.reasons.modelNotReady',
+    check_failed: 'modelChat.localModels.reasons.checkFailed',
     unsupported_os: 'modelChat.localModels.reasons.unsupportedOs',
   },
   android: {
@@ -20,6 +21,7 @@ const REASON_KEYS = {
     model_unavailable: 'modelChat.localModels.reasons.androidModelUnavailable',
     aicore_incompatible: 'modelChat.localModels.reasons.aicoreUpdateRequired',
     system_update_required: 'modelChat.localModels.reasons.aicoreUpdateRequired',
+    check_failed: 'modelChat.localModels.reasons.checkFailed',
   },
 } as const satisfies Record<LocalModelStatus['provider'], Record<string, string>>;
 

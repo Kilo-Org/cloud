@@ -5,7 +5,7 @@ import {
   ORGANIZATION_MODEL_AUDIENCES,
   type OrganizationModelAudience,
 } from '@kilocode/app-shared/organizations';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { addCustomRouterModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
@@ -32,6 +32,16 @@ export async function loadAvailableModelsForOrganization(params: {
 }): Promise<OpenRouterModelsResponse> {
   const { userId, organizationId, audience, headersList, fromDb } = params;
 
+  const routersPromise = listUsableCustomRouters({
+    userId,
+    organizationId,
+  }).catch(error => {
+    captureException(error, {
+      tags: { endpoint: 'organizations/models' },
+      extra: { action: 'listing_custom_routers', organizationId },
+    });
+    return [];
+  });
   const result = await getAvailableModelsForOrganization(
     organizationId,
     {
@@ -54,16 +64,7 @@ export async function loadAvailableModelsForOrganization(params: {
       message: 'Organization not found',
     });
   }
-  const routers = await listUsableCustomRouters({
-    userId,
-    organizationId,
-  }).catch(error => {
-    captureException(error, {
-      tags: { endpoint: 'organizations/models' },
-      extra: { action: 'listing_custom_routers', organizationId },
-    });
-    return [];
-  });
+  const routers = await routersPromise;
   return {
     ...result,
     data: addCustomRouterModels(

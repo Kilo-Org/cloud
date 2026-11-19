@@ -10,6 +10,7 @@ import { EmailOtpForm } from '@/components/login/email-otp-form';
 import { PendingLinkAuth } from '@/components/login/pending-link-auth';
 import { ProviderButtons } from '@/components/login/provider-buttons';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import {
@@ -337,11 +338,10 @@ export function IdleAuth({
   }
 
   const ssoBlock = ssoRecovery && (
-    <View className="gap-2 rounded-md border border-border bg-card p-3">
+    <Card>
       <Text>{t('login.organizationUsesSso')}</Text>
       <Button
         size="lg"
-        className="flex-row gap-2"
         disabled={authBusy}
         loading={browserAuthStarting}
         onPress={() => void startSsoAuth(ssoRecovery.email)}
@@ -359,7 +359,7 @@ export function IdleAuth({
       >
         <Text>{t('login.useDifferentEmail')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 
   const providerHandlers = {
@@ -486,17 +486,12 @@ export function IdleAuth({
       >
         <Button
           size="lg"
-          className="flex-row gap-2"
           disabled={authBusy}
           loading={busy === 'otp-send'}
           onPress={() => void handleSendCode(emailRef.current)}
           accessibilityLabel={t('login.continueWithEmail')}
         >
-          {/* The primary action's label takes the provider rows' 17pt label size;
-              at the button variant's 14pt the filled Continue read weaker than
-              the two outlined ways in below it. The variant keeps the weight
-              (`font-semibold`) and the brand fill. */}
-          <Text className="text-[17px]">{t('common.continue')}</Text>
+          <Text>{t('common.continue')}</Text>
         </Button>
       </View>
       {/* The sentence is one accessible element: Android's screen reader does

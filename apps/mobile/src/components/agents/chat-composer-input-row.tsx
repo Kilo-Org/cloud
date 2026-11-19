@@ -17,6 +17,7 @@ import { type Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { InputFrame } from '@/components/ui/input-frame';
 import { Text } from '@/components/ui/text';
 import { VoiceInputButton } from '@/components/voice-input-control';
 import { useMotionPolicy } from '@/lib/a11y/motion';
@@ -191,11 +192,8 @@ export function ChatComposerInputRow({
   const sendHitSlop = composerFacingHitSlop(COMPOSER_CONTROL_HIT_SLOP_DP, 'start');
 
   const inputField = (
-    <View
-      className={cn(
-        'overflow-hidden rounded-[20px] border border-border bg-card',
-        !inputEditable && 'opacity-50'
-      )}
+    <InputFrame
+      className={cn('overflow-hidden', !inputEditable && 'opacity-50')}
       onLayout={onInputLayout}
     >
       {/* The placeholder is a single-line overlay, not the input's own hint:
@@ -249,7 +247,7 @@ export function ChatComposerInputRow({
         autoCapitalize="sentences"
         autoCorrect
       />
-    </View>
+    </InputFrame>
   );
 
   return (

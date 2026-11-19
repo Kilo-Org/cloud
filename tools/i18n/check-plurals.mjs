@@ -211,9 +211,10 @@ function countedCall(node, text) {
 }
 
 /**
- * One traversal of the source tree: every counted call, and every file the
- * parser refused. It is the one traversal the accessors below project from, so
- * an audit that asks several questions of the same tree scans it once.
+ * One traversal of the source tree: every counted call, and every file the walk
+ * could not read or the parser refused. It is the one traversal the accessors
+ * below project from, so an audit that asks several questions of the same tree
+ * scans it once.
  */
 export function auditCountedCalls(rootDir = SOURCE_DIR) {
   const calls = [];
@@ -268,10 +269,11 @@ export function collectDynamicCountedCalls(scan) {
 }
 
 /**
- * Every source file the parser refused, as one problem line per error. The
- * tree of such a file is empty, so its counted messages are invisible; saying
- * so keeps a syntax error from passing as a clean audit. It projects a scan the
- * caller made once with `auditCountedCalls`.
+ * Every problem the tree scan made, as one line each: a file the parser refused
+ * or a file the walk could not read. A refused file's tree is empty, so its
+ * counted messages are invisible; an unreadable one was never read at all.
+ * Saying so keeps either failure from passing as a clean audit. It projects a
+ * scan the caller made once with `auditCountedCalls`.
  */
 export function findUnparsedFiles(scan) {
   return scan.problems;
@@ -474,6 +476,11 @@ function declaredKeys(entry, declaration) {
  * diagnostics name it by, the syntax tree its declarations are read from, the
  * lines that say the parser refused it, and the keys read from each declaration
  * so far — the two `McpStatusKey` entries share one read.
+ *
+ * A refused read is worded exactly as the tree walk words it. The module sits
+ * below the source root, so both reads reach it; one wording means the caller's
+ * `reported` set drops the line the scan already owns instead of printing the
+ * same failure twice.
  */
 function readDeclarationModule(rootDir, source) {
   const file = join(rootDir, source);
@@ -486,7 +493,7 @@ function readDeclarationModule(rootDir, source) {
       path: source,
       entry: null,
       declarations: new Map(),
-      problems: [`${source}: cannot read the module that declares its keys: ${message}`],
+      problems: [`${source}: cannot read: ${message}`],
     };
   }
   const entry = parseSourceEntry(rootDir, rootDir, file, text);
@@ -501,9 +508,9 @@ function readDeclarationModule(rootDir, source) {
  * naming the key, the expression, the declaration and the module that owns it.
  * Empty on a healthy tree. It reads the declaration modules only, so an audit
  * can check them without walking the source tree first. A caller that also
- * scanned the tree passes the parse problems that scan already printed as
- * `reported`: the declaration modules live below the source root, so the same
- * `cannot parse` line reaches both reads, and the tree's own scan owns it.
+ * scanned the tree passes the problems that scan already printed as `reported`:
+ * the declaration modules live below the source root, so the same `cannot read`
+ * or `cannot parse` line reaches both reads, and the tree's own scan owns it.
  */
 export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set()) {
   const problems = [];
@@ -555,9 +562,28 @@ export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set
   return problems;
 }
 
-/** The English catalog, flattened. */
+/**
+ * One catalog, flattened by tag. The English read and the per-locale loop both
+ * decode through here, so a change to how a catalog is read has one place to
+ * land; each caller keeps its own handling of a refused or malformed file.
+ */
+function readCatalog(tag, localesDir = LOCALES_DIR) {
+  return flattenCatalog(JSON.parse(readFileSync(join(localesDir, `${tag}.json`), 'utf8')));
+}
+
+/**
+ * The English catalog, flattened. A caller that cannot read English gets one
+ * problem line and skips only the checks that need English: a read the
+ * filesystem refuses, or a file JSON.parse rejects, leaves the rest of the
+ * audit reporting instead of a stack trace.
+ */
 export function readEnglishCatalog(localesDir = LOCALES_DIR) {
-  return flattenCatalog(JSON.parse(readFileSync(join(localesDir, 'en.json'), 'utf8')));
+  try {
+    return { catalog: readCatalog('en', localesDir), problems: [] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { catalog: null, problems: [`en: cannot audit catalog: ${message}`] };
+  }
 }
 
 /**
@@ -593,9 +619,14 @@ export function findUnlistedDynamicCalls(scan) {
  * are neither a plural family in English nor a reviewed `NO_AGREEMENT` entry.
  * Empty on a healthy tree; every entry is a message whose count cannot select
  * a form. It projects a scan the caller made once with `auditCountedCalls` and
- * checks it against the `english` catalog the caller read once.
+ * checks it against the `english` catalog the caller read once. Without an
+ * English catalog there is no family to judge against, so every key would look
+ * countless; the caller's one problem line already names the cause instead.
  */
 export function findCountlessFamilies(scan, english) {
+  if (english === null) {
+    return [];
+  }
   return auditKeys(scan).filter(
     key => !NO_AGREEMENT.has(key) && !declaresPluralFamily(english, key)
   );
@@ -606,7 +637,9 @@ function run() {
   const problems = [];
   const report = [];
   const scan = auditCountedCalls(SOURCE_DIR);
-  const english = readEnglishCatalog();
+  const englishRead = readEnglishCatalog();
+  const english = englishRead.catalog;
+  problems.push(...englishRead.problems);
   // The scan already read every file below the source root, the declaration
   // modules included, so it owns their parse diagnostics; the declaration check
   // skips the lines this scan already reported.
@@ -633,7 +666,9 @@ function run() {
     );
   }
 
-  if (!sourceOnly) {
+  // A missing English catalog still lets the scan, declaration and
+  // variable-key problems print; only the locale comparison needs English.
+  if (!sourceOnly && english !== null) {
     let totalKeys = 0;
     for (const tag of catalogTags(LOCALES_DIR)) {
       if (tag === 'en') {
@@ -642,9 +677,7 @@ function run() {
       let catalog;
       let missing;
       try {
-        catalog = flattenCatalog(
-          JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8'))
-        );
+        catalog = readCatalog(tag);
         missing = missingPluralCategories(english, catalog, tag);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

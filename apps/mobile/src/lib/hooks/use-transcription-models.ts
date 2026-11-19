@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
+import { i18n } from '@/i18n';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
 import {
   type ModelOption,
   OpenRouterModelsResponseSchema,
+  sortModelOptions,
   toModelOptions,
 } from '@/lib/hooks/use-available-models';
 import { TELEMETRY_DESCRIPTION_KEY, type TelemetryDescription } from '@/lib/telemetry/error-sink';
@@ -122,7 +125,7 @@ export async function fetchTranscriptionModels(organizationId?: string): Promise
       );
     }
 
-    return toModelOptions(parsed.data);
+    return toModelOptions(parsed.data, i18n.language);
   } catch (error) {
     // A typed failure is the more specific outcome, even when the deadline
     // fired while it was thrown: an abort rejects with a raw error, never with
@@ -156,6 +159,12 @@ export async function fetchTranscriptionModels(organizationId?: string): Promise
  * narrow to the caller, and the picker renders that as its empty state.
  */
 export function useTranscriptionModels(organizationId?: string) {
+  // `fetchTranscriptionModels` orders the rows with the active language's
+  // collator, so the memo follows the language as well as the payload: the
+  // LTR language switch applies in place (no remount) and leaves the cached
+  // `data` identity unchanged.
+  const { i18n: translation } = useTranslation();
+  const language = translation.language;
   const { data, isLoading, isError, isFetching, error, refetch } = useQuery({
     queryKey: ['transcription-models', organizationId] as const,
     queryFn: fetchTranscriptionModels.bind(null, organizationId),
@@ -163,7 +172,10 @@ export function useTranscriptionModels(organizationId?: string) {
     enabled: true,
   });
 
-  const models = useMemo(() => data ?? [], [data]);
+  // The cached `data` was collated for the language that fetched it, and a
+  // change does not refetch; the sort re-runs here so an in-place LTR switch
+  // re-sorts the mounted picker with the new locale.
+  const models = useMemo(() => sortModelOptions(data ?? [], language), [data, language]);
 
   return { models, isLoading, isError, isFetching, error, refetch };
 }

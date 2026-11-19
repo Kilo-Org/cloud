@@ -5,10 +5,15 @@ import { act, type ReactTestRenderer } from '@/test/renderer';
 import { hosts, mount } from './pr-merge-sheet.test-support';
 
 function methodChips(renderer: ReactTestRenderer) {
-  return hosts(renderer, 'Pressable').map(chip => ({
-    announced: chip.props.accessibilityLabel,
-    visible: chip.findAll(node => (node.type as string) === 'Text')[0]?.props.children,
-  }));
+  // Every method chip announces the merge it performs. The delete-branch row is
+  // a pressable group item with no label of its own, so the label keeps this
+  // helper on the chips.
+  return hosts(renderer, 'Pressable')
+    .filter(chip => chip.props.accessibilityLabel !== undefined)
+    .map(chip => ({
+      announced: chip.props.accessibilityLabel,
+      visible: chip.findAll(node => (node.type as string) === 'Text')[0]?.props.children,
+    }));
 }
 
 afterEach(async () => {

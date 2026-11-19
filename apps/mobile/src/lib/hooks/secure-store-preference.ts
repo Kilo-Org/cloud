@@ -47,10 +47,11 @@ export function createSecureStorePreference<T>(options: {
    */
   let inFlight: T | undefined = undefined;
   /**
-   * The target of the persist-then-apply write while it is on disk's way,
-   * visible only to `hasPendingWrite`: readers of `getRequested()` must keep
-   * seeing the last durable value, so a caller like the push-token locale
-   * registration is not told about a language the write may still reject.
+   * The target of the persist-then-apply write while it is on disk's way.
+   * `getRequested()` must keep seeing the last durable value while the write
+   * runs, so a caller like the push-token locale registration is not told about
+   * a language the write may still reject; `hasPendingWrite` and
+   * `getPendingWriteTarget` read it.
    */
   let asyncWriteTarget: T | undefined = undefined;
   let writing = false;

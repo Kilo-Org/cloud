@@ -6,6 +6,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   getRenderRecoveryFault,
   RENDER_RECOVERY_PAYLOAD_MARKER,
@@ -41,7 +42,7 @@ export function RenderRecoveryFixture() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Render recovery fixture" />
-      <ScrollView contentContainerClassName="gap-3 px-4 pt-4">
+      <ScrollView contentContainerClassName={SCREEN_BODY_CLASS}>
         <Text className="text-sm text-muted-foreground">Organization</Text>
         <Text className="text-base text-foreground">
           {organizationName.length > 0 ? organizationName : 'None'}

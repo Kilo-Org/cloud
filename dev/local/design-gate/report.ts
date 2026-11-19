@@ -183,6 +183,14 @@ export function skippedRules(cells: readonly CellRun[], out: string) {
           rule: 'safe-area',
           reason: 'snapshot has no system-bar inset evidence',
         });
+        // The page edge a gutter is measured from is the side safe-area inset,
+        // so a snapshot that cannot report it cannot measure the gutter either.
+        entries.push({
+          cell: cell.id,
+          target: screen.target,
+          rule: 'gutter',
+          reason: 'snapshot has no system-bar inset evidence',
+        });
       }
       // A screen that shows a natively presented dialog or sheet loses its
       // safe-area check: the probe reports those frames from the surface's own

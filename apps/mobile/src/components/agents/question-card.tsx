@@ -14,6 +14,7 @@ import { impactHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Check } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
@@ -264,24 +265,22 @@ export function QuestionCard({
   ) : null;
 
   return (
-    <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
-      <View className="border-b border-border bg-secondary px-4 py-3">
-        <Text ref={titleRef} accessible accessibilityLabel={title} className="text-sm font-medium">
+    <Card className="mx-4 my-2 shrink">
+      <View className="gap-1">
+        <Text ref={titleRef} accessible accessibilityLabel={title} variant="heading">
           {title}
         </Text>
-        <Text className="mt-1 text-xs text-muted-foreground">
-          {presentation.protocolExplanation}
-        </Text>
+        <Text variant="caption">{presentation.protocolExplanation}</Text>
       </View>
 
       {presentation.errorMessage ? (
-        <View className="border-b border-border bg-danger-tile-bg px-4 py-2">
-          <Text className="text-xs text-destructive">{presentation.errorMessage}</Text>
-        </View>
+        <Text variant="caption" className="text-destructive">
+          {presentation.errorMessage}
+        </Text>
       ) : null}
 
       <ScrollView className="max-h-96 shrink" keyboardShouldPersistTaps="handled">
-        <View className="gap-4 p-4">
+        <View className="gap-3">
           {questions.map((question, qIndex) => {
             const answer = answerOf(question, qIndex);
             const isCustomActive = isCustomSelected(answer);
@@ -389,7 +388,7 @@ export function QuestionCard({
                           'flex-row items-center justify-between rounded-md border px-3',
                           isCustomActive
                             ? 'border-primary bg-primary'
-                            : 'border-border bg-background dark:border-neutral-700 dark:bg-secondary',
+                            : 'border-border bg-background dark:border-neutral-700 dark:bg-muted',
                           interactionDisabled && 'opacity-50'
                         )}
                       >
@@ -434,7 +433,7 @@ export function QuestionCard({
                           'rounded-md border pl-3 pr-3 text-sm shadow-sm shadow-[#0000000D]',
                           isCustomActive
                             ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-border bg-background text-foreground dark:border-neutral-700 dark:bg-secondary',
+                            : 'border-border bg-background text-foreground dark:border-neutral-700 dark:bg-muted',
                           interactionDisabled && 'opacity-50'
                         )}
                       />
@@ -448,12 +447,9 @@ export function QuestionCard({
       </ScrollView>
 
       {presentation.hasPrimaryCta || presentation.hasRetryCta || presentation.hasRejectCta ? (
-        <View className="flex-col gap-2 border-t border-border p-3">
+        <View className="flex-col gap-2 border-t-[0.5px] border-hair-soft pt-3">
           {questions.length > 1 ? (
-            <Text
-              accessibilityLiveRegion="polite"
-              className="text-center text-xs text-muted-foreground"
-            >
+            <Text accessibilityLiveRegion="polite" variant="caption" className="text-center">
               {t('agentChat.questionCard.answerProgress', {
                 answered: answeredCount,
                 total: questions.length,
@@ -497,6 +493,6 @@ export function QuestionCard({
         </View>
       ) : null}
       {dialog}
-    </View>
+    </Card>
   );
 }

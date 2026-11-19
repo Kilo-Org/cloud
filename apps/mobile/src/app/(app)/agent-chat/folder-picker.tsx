@@ -6,17 +6,17 @@ import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
-import { Button } from '@/components/ui/button';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { FolderOpen } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { FolderOpen, RotateCcw } from '@/components/ui/icons';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DirectoryEntry, useListDirectories } from '@/lib/hooks/use-list-directories';
 import { folderPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { cn } from '@/lib/utils';
 
 const SKELETON_ROW_COUNT = 5;
 
@@ -129,9 +129,7 @@ export default function FolderPickerScreen() {
     empty = (
       <>
         {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
-          <View key={i} className="px-4 py-3">
-            <Skeleton className="h-6 w-2/3 rounded-md" />
-          </View>
+          <RowSkeleton key={i} />
         ))}
       </>
     );
@@ -142,16 +140,13 @@ export default function FolderPickerScreen() {
         title={t('agentChat.folderPicker.retryableTitle')}
         description={t('agentChat.folderPicker.retryableDescription')}
         action={
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
+          <StateAction
+            label={t('common.retry')}
+            icon={RotateCcw}
             onPress={() => {
               list(currentState.path);
             }}
-            accessibilityLabel={t('common.retry')}
-          >
-            <Text>{t('common.retry')}</Text>
-          </Button>
+          />
         }
       />
     );
@@ -213,7 +208,10 @@ export default function FolderPickerScreen() {
             // picker carries the same guard for the same reason).
             item ? (
               <Pressable
-                className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
+                className={cn(
+                  ROW_TARGET_CLASS,
+                  'flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3 active:bg-secondary'
+                )}
                 onPress={() => {
                   openChild(item);
                 }}
@@ -221,8 +219,8 @@ export default function FolderPickerScreen() {
                 accessibilityLabel={item.name}
                 accessibilityHint={t('agentChat.folderPicker.tapToListHint')}
               >
-                <View className="flex-1">
-                  <Text className="text-base text-foreground" numberOfLines={1}>
+                <View className="min-w-0 flex-1">
+                  <Text className="text-sm font-medium" numberOfLines={1}>
                     {item.name}
                   </Text>
                 </View>
@@ -231,7 +229,7 @@ export default function FolderPickerScreen() {
                   accessibilityElementsHidden
                   importantForAccessibility="no-hide-descendants"
                 >
-                  <DirectionalChevronRight size={14} color={colors.mutedForeground} />
+                  <RowChevron />
                 </View>
               </Pressable>
             ) : null

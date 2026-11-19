@@ -2,9 +2,9 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import '@/i18n';
 
 import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
+import { i18n } from '@/i18n';
 import { type KiloPassSubscription } from '@/lib/kilo-pass/state';
 
 const mockRouter = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
@@ -65,13 +65,23 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({ Crown: 'Crown' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The row primitives notify a selection through the haptic bridge, which loads
+// the expo runtime; the suite asserts structure, not feedback.
+vi.mock('@/lib/haptics', () => ({
+  impactHaptic: () => undefined,
+  notificationHaptic: () => undefined,
+  selectionHaptic: () => undefined,
+}));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 // The body's blocks have their own suites. The screen owns which state it
 // shows and when it prints the page, so they render as hosts here.
 vi.mock('@/components/kilo-pass/kilo-pass-management', () => ({
@@ -189,7 +199,8 @@ describe('KiloPassSubscriptionScreen', () => {
     const renderer = await renderScreen();
     const emptyState = nodesOfType(renderer, 'EmptyState');
     expect(emptyState).toHaveLength(1);
-    expect(emptyState[0]?.props.title).toBe("Kilo Pass isn't available in the app.");
+    expect(emptyState[0]?.props.title).toBe(i18n.t('organization.kiloPass.notSubscribed'));
+    expect(emptyState[0]?.props.description).toBe(i18n.t('kiloPass.notAvailableInApp'));
     // A finished message with no action: the app sells nothing here.
     expect(emptyState[0]?.props.action).toBeUndefined();
     renderer.unmount();
@@ -284,7 +295,6 @@ describe('KiloPassSubscriptionScreen', () => {
       ["This month's usage", '$12.50 / $58.80'],
       ['Available free bonus', '$9.80'],
     ]);
-    expect(rows.at(-1)?.props.last).toBe(true);
 
     // No button exists on the details surface: managing, cancelling, and
     // buying a pass are web-only.

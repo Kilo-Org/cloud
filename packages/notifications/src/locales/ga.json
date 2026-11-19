@@ -3,7 +3,7 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Tá nuashonrú ar do sheisiún ghníomhaire",
-      "lowBalance": "Teastaíonn aird ar do chothromas",
+      "lowBalance": "Teastaíonn aird ar d'iarmhéid",
       "spendAlert": "Teastaíonn aird ar do chaiteachas",
       "securityFinding": "Teastaíonn aird ar thátal slándála",
       "securityUpdate": "Tá nuashonrú ar sheiceáil slándála",
@@ -17,8 +17,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Foláireamh chothromas íseal",
-      "body": "Thit cothromas {{organizationName}} faoi ${{minimumBalanceUsd}}"
+      "title": "Foláireamh iarmhéid ísil",
+      "body": "Thit iarmhéid {{organizationName}} faoi ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Foláireamh caiteachais",

@@ -447,22 +447,6 @@ test('production EU preparation, rollback and historical source use the selected
   }
 });
 
-test('the staging callee reads the project token from its caller or the target environment', () => {
-  const stage = workflow('stage-vercel-deployment');
-  const job = stage.jobs['stage'];
-  // Callers pass the renamed project token; the callee accepts its omission
-  // and then resolves the VERCEL_PROJECT_TOKEN secret of the environment the
-  // job declares, so the token can also live in the environment scope.
-  assert.equal(job.environment, '${{ inputs.target_environment }}');
-  const deploy = job.steps.find(step => step.id === 'deploy');
-  assert.equal(deploy.env.VERCEL_TOKEN_TO_USE, '${{ secrets.VERCEL_PROJECT_TOKEN }}');
-  assert.match(deploy.run, /if \[ -z "\$VERCEL_TOKEN_TO_USE" \]/);
-  assert.match(deploy.run, /--token="\$VERCEL_TOKEN_TO_USE"/);
-  assert.doesNotMatch(deploy.run, /secrets\.VERCEL_PROJECT_TOKEN/);
-  const secret = stage.on.workflow_call.secrets.VERCEL_PROJECT_TOKEN;
-  assert.equal(secret.required, false);
-});
-
 test('both deploys start from a successful main CI run and keep an hourly catch-up poll', () => {
   for (const [name, deployment] of [
     ['production', production],

@@ -113,6 +113,7 @@ function fixtureConnection(
       return Promise.resolve();
     },
     clear: () => undefined,
+    refresh: () => undefined,
     close: () => undefined,
   };
 }

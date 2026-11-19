@@ -1,7 +1,7 @@
 import { mount, press, text } from './native-remote-test-utils';
 import { expect, it, vi } from 'vitest';
 import { act } from '@/test/renderer';
-import { nativeRemoteFixture, readySession } from './native-remote-test-helpers';
+import { nativeRemoteFixture, readySession } from './native-remote.test-helpers';
 
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
@@ -99,7 +99,7 @@ it('keeps the retry out of reach while the session cannot run recovery', async (
   expect(
     renderer.root
       .findAllByType('Button')
-      .filter((node: { props: Record<string, unknown> }) => text(node as never) === 'common.retry')[0]
+      .find((node: { props: Record<string, unknown> }) => text(node as never) === 'common.retry')
       ?.props.disabled
   ).toBe(false);
 });

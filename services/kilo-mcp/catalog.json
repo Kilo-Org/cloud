@@ -39112,6 +39112,10 @@
           "type": "number",
           "minimum": 1,
           "maximum": 100
+        },
+        "includeLegacySessionIds": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "required": [
@@ -39123,9 +39127,10 @@
       "listrequests",
       "triggerid",
       "organizationid",
-      "limit"
+      "limit",
+      "includelegacysessionids"
     ],
-    "searchBlob": "webhookTriggers.listRequests List recent captured inbound requests for a specific webhook trigger, with an option to limit the number returned and enriched session identifiers. webhooktriggers listrequests triggerid organizationid limit triggerId organizationId limit"
+    "searchBlob": "webhookTriggers.listRequests List recent captured inbound requests for a specific webhook trigger, with an option to limit the number returned and enriched session identifiers. webhooktriggers listrequests triggerid organizationid limit includelegacysessionids triggerId organizationId limit includeLegacySessionIds"
   },
   "webhookTriggers.update": {
     "path": "webhookTriggers.update",

@@ -53,7 +53,6 @@ export const REVIEW_REACTION_CONTENTS: readonly ReviewReactionContent[] = [
 // Derive the wire (DTO) shapes from the tRPC `listReviewThreads` output so a
 // backend contract change (fields, nullability) is type-checked here rather
 // than silently drifting from a hand-copied shape (apps/mobile/AGENTS.md).
-// `reactions[].content` is typed as a plain `string` by tRPC; we narrow it to
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type ReviewThreadsPage = RouterOutputs['githubPrReview']['listReviewThreads'];
 export type ReviewThread = ReviewThreadsPage['threads'][number];
@@ -61,8 +60,6 @@ export type ReviewComment = ReviewThread['comments'][number];
 /** Conversation (issue) comments share the review-comment DTO shape. */
 export type ConversationComment = ReviewThreadsPage['conversation'][number];
 
-// The shape of a single page in the cached `InfiniteData<ReviewThreadsPage>`
-// produced by `useInfiniteQuery(trpc.githubPrReview.listReviewThreads…)`.
 export type ReviewThreadsInfiniteData = {
   readonly pages: readonly ReviewThreadsPage[];
   readonly pageParams: readonly unknown[];

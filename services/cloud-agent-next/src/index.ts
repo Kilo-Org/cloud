@@ -1,6 +1,7 @@
 import { instrumentCloudAgentDurableObject } from './sentry.js';
 import { SandboxControlV2 } from './control-plane/sandbox/sandbox-do.js';
 import { SandboxSessionV2 } from './control-plane/session/session-do.js';
+import { CloudAgentWorkspaceDO } from './control-plane/workspace/workspace-do.js';
 import { SandboxContainers as SandboxContainersBase } from './sandbox-containers/SandboxContainers.js';
 import { StreamTicketNonceDO as StreamTicketNonceDOBase } from './persistence/StreamTicketNonceDO.js';
 import { UserKiloFacade as UserKiloFacadeBase } from './kilo-facade/user-kilo-facade.js';
@@ -20,6 +21,11 @@ export const SandboxControl = instrumentCloudAgentDurableObject(
 export type SandboxControl = SandboxControlV2;
 export const SandboxSession = instrumentCloudAgentDurableObject(SandboxSessionV2, 'session');
 export type SandboxSession = SandboxSessionV2;
+export const CloudAgentWorkspace = instrumentCloudAgentDurableObject(
+  CloudAgentWorkspaceDO,
+  'workspace'
+);
+export type CloudAgentWorkspace = CloudAgentWorkspaceDO;
 export const SandboxContainers = instrumentCloudAgentDurableObject(
   SandboxContainersBase,
   'sandbox-container'

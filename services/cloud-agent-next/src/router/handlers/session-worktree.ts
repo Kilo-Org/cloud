@@ -58,6 +58,7 @@ import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
+import { runtimeAuthorizationLifetime } from '../../session/runtime-authorization-lifetime.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
@@ -667,6 +668,7 @@ async function createDestinationRuntimeAuthorization(
       resourceKind: 'cloud-agent-next',
       resourceId: progress.cloudAgentSessionId,
       environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      ...runtimeAuthorizationLifetime(ctx.env),
       onAdmissionRejected: reason =>
         logRuntimeAuthorizationDiagnostic(progress.cloudAgentSessionId, 'admission', reason),
       ...(organizationId ? { organizationId } : {}),

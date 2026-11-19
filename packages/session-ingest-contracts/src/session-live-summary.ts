@@ -40,9 +40,7 @@ export type SessionLiveFailureKind = (typeof SESSION_LIVE_FAILURE_KINDS)[number]
 
 /** The longest step target (a file basename or a short tool target). */
 export const SESSION_LIVE_TARGET_LIMIT = 40;
-/** The longest plan step name. */
 export const SESSION_LIVE_PLAN_STEP_LIMIT = 40;
-/** The longest permission command. */
 export const SESSION_LIVE_COMMAND_LIMIT = 60;
 
 export const sessionLiveStepSchema = z.object({

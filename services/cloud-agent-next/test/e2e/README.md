@@ -479,6 +479,32 @@ when the matrix includes worktree scenarios. The local dev container caps in
 The matrix starts with `cold-hot`, which pays one cold sandbox boot and then
 runs several hot same-session turns.
 
+### Workspace MCP authority check
+
+`workspace-mcp-authority-local.ts` follows the built-in `kilo-cloud-agent` MCP
+connection of a two-chat workspace through expiry, renewal, a sandbox restart,
+deletion of the first chat and a pepper revocation. It sends real MCP
+`tools/list` and `tools/call` requests to the local kilo-mcp. Runtime
+delegations normally last 24 hours, so add a development-only override to the
+local `services/cloud-agent-next/.dev.vars` and restart `cloud-agent-next`:
+
+```sh
+RUNTIME_AUTHORIZATION_LIFETIME_MS=480000
+```
+
+The Worker reads it only when `ENVIRONMENT=development`; never add it to
+`wrangler.jsonc`. Select steps with `WORKSPACE_MCP_STEPS` (default
+`expiry,restart`; also `delete-root` and `revoke`):
+
+```sh
+WORKSPACE_MCP_STEPS=expiry,restart,delete-root,revoke \
+  WORKER_URL=http://localhost:8794 KILO_MCP_URL=http://localhost:8815/mcp \
+  pnpm exec tsx services/cloud-agent-next/test/e2e/workspace-mcp-authority-local.ts
+```
+
+The script prints one JSON observation per step and does not assert. The run
+takes about 15 minutes because it waits for real expiry.
+
 ### Teardown
 
 The shared gate (`runSharedScenario`) owns teardown for every profile, so

@@ -1381,8 +1381,8 @@ jobs:
           cp ../web/.env .env
           cp ../web/.env.test .env.production.local
 
-      - name: Check ai-gateway usage queue targets
-        run: pnpm --filter ai-gateway run test:usage-queue
+      - name: Check ai-gateway Vercel config
+        run: pnpm --filter ai-gateway run test:vercel-config
 
       - name: Build ai-gateway
         env:

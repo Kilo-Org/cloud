@@ -4,7 +4,6 @@ import { partSettledAt } from '../part-utils';
 import { isPreviewOfStoredTool } from '../tool-detail-marker';
 import type { SessionSubscriptionKey } from './types';
 
-/** Sort key of a message id: the id is its own key. */
 function messageIdKey(value: string): string {
   return value;
 }

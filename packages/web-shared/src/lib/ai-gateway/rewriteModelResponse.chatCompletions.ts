@@ -98,15 +98,18 @@ export async function rewriteModelResponse_ChatCompletions({
   const capturedChunks: string[] | null = capture ? [] : null;
   let keepAlive: FirstByteKeepAlive | null = null;
   const stream = new ReadableStream<string>({
-    async start(controller) {
+    async start(streamController) {
       const reader = response.body?.getReader();
       if (!reader) {
-        controller.close();
+        streamController.close();
         capture?.setBody('');
         return;
       }
-      keepAlive =
-        keepAliveUntilFirstByte && response.ok ? startFirstByteKeepAlive(controller) : null;
+      keepAlive = startFirstByteKeepAlive(streamController, {
+        enabled: keepAliveUntilFirstByte,
+        response,
+      });
+      const controller = keepAlive?.output ?? streamController;
 
       let doneReceived = false;
       let terminalEventReceived = false;

@@ -4,8 +4,6 @@ import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { CenteredState } from '@/components/centered-state';
-import { BitbucketSetupRecovery } from '@/components/code-reviewer/bitbucket-setup-recovery';
 import { repositoryEmptyCopy } from '@/components/code-reviewer/repository-empty-copy';
 import { RepositoryModelOverrides } from '@/components/code-reviewer/repository-model-overrides';
 import { RepositoryRowsList } from '@/components/code-reviewer/repository-rows-list';
@@ -20,10 +18,10 @@ import {
 } from '@/components/code-reviewer/repository-selection-mode';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
-import { Text } from '@/components/ui/text';
 import { TAB_SCREEN_TRAILING_GAP, useTabScreenFrame } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { classifyBitbucketConnection, isWebManagedConnection } from '@/lib/code-reviewer-bitbucket';
+import { BitbucketRepositoriesState } from '@/components/code-reviewer/bitbucket-repositories-state';
+import { classifyBitbucketConnection } from '@/lib/code-reviewer-bitbucket';
 import { repositoryModelOverrideHandlers } from '@/lib/code-reviewer-repo-models';
 import {
   isPersonal,
@@ -95,9 +93,19 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     },
   };
   const { query: reposQuery, rows: repoRows, syncedAt } = reposByPlatform[platform];
-  const reposLoading = reposQuery.isLoading;
+  // The readiness read covers workspace tokens only, so the status read beside
+  // it is what names an OAuth connection. Until that read answers, the recovery
+  // card's token form is not the truth — an OAuth organization would be given a
+  // form the server refuses — so the body waits or retries exactly as it does
+  // for its own read.
+  const bitbucketConnection =
+    platform === 'bitbucket'
+      ? classifyBitbucketConnection({ readiness: bitbucketReadiness, status: bitbucketStatus })
+      : null;
+  const statusFailure = bitbucketConnection?.kind === 'error' ? bitbucketConnection : null;
+  const reposLoading = reposQuery.isLoading || bitbucketConnection?.kind === 'loading';
   const reposError = reposQuery.isError;
-  const reposFetching = reposQuery.isFetching;
+  const reposFetching = reposQuery.isFetching || statusFailure?.isRetrying === true;
   const refetchRepos = () => void reposQuery.refetch();
 
   const selectedIds = data?.selectedRepositoryIds ?? [];
@@ -109,13 +117,6 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   const allModeBody = allMode && !configDisabled;
   const bitbucketNotReady =
     platform === 'bitbucket' && bitbucketReadiness.data?.repositoryCache.status !== 'available';
-  // A Bitbucket OAuth connection has no token integration to repair, so the
-  // notice naming the web page replaces the recovery card's Connect button.
-  const bitbucketManagedOnWeb =
-    platform === 'bitbucket' &&
-    isWebManagedConnection(
-      classifyBitbucketConnection({ readiness: bitbucketReadiness, status: bitbucketStatus })
-    );
   // The rows body is the only body with rows to narrow; in all mode the summary
   // stands where they would, so a field there would filter nothing.
   const rowsBody = !capabilities.selectionModePicker || mode === 'selected';
@@ -186,31 +187,18 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         isRetrying={reposFetching}
       />
     );
-  } else if (!reposLoading && bitbucketManagedOnWeb) {
-    // An OAuth connection has no token to repair here: the notice names the
-    // web page instead of offering a Connect the server would refuse.
+  } else if (!reposLoading && bitbucketNotReady && bitbucketConnection !== null) {
+    // Both reads decide the body when the snapshot is not readable: an OAuth
+    // connection has no token to repair, a failed status read retries it, and
+    // only a token workspace offers the recovery card.
     repoState = (
-      <CenteredState contentContainerClassName="px-4">
-        <Text variant="muted" className="text-center text-xs">
-          {t('codeReviewer.bitbucketConnect.managedOnWeb')}
-        </Text>
-      </CenteredState>
-    );
-  } else if (!reposLoading && bitbucketNotReady) {
-    repoState = (
-      <CenteredState contentContainerClassName="px-4">
-        {bitbucketReadiness.data ? (
-          <BitbucketSetupRecovery
-            scope={scope}
-            readiness={bitbucketReadiness.data}
-            message={t('common.couldNotLoadRepositories')}
-          />
-        ) : (
-          <Text variant="muted" className="text-center text-xs">
-            {t('common.couldNotLoadRepositories')}
-          </Text>
-        )}
-      </CenteredState>
+      <BitbucketRepositoriesState
+        scope={scope}
+        connection={bitbucketConnection}
+        onRetry={() => {
+          void reposQuery.refetch();
+        }}
+      />
     );
   } else if (confirmedEmpty) {
     repoState = (

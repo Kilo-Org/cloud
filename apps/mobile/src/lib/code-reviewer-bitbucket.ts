@@ -329,7 +329,12 @@ export function classifyBitbucketConnection(input: {
  * token the app can replace and no form the server would accept, so every
  * surface states that fact instead of offering an action.
  */
-export function isWebManagedConnection(connection: BitbucketConnection): boolean {
+export function isWebManagedConnection(
+  connection: BitbucketConnection
+): connection is Extract<
+  BitbucketConnection,
+  { kind: 'oauth-connected' } | { kind: 'oauth-attention' }
+> {
   return connection.kind === 'oauth-connected' || connection.kind === 'oauth-attention';
 }
 

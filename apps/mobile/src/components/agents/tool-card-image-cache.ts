@@ -73,6 +73,20 @@ export function extensionForImageMime(mime: string): string {
   return extensionForMime(mime);
 }
 
+/** Decoded byte count of a base64 payload, from its length and padding.
+ *  `apps/mobile/src/lib/artifacts/artifact-crawl.ts` carries the same
+ *  arithmetic; duplicated locally because importing that module would pull an
+ *  unrelated heavy dependency into this import graph. */
+function base64DecodedByteLength(payload: string): number {
+  let padding = 0;
+  if (payload.endsWith('==')) {
+    padding = 2;
+  } else if (payload.endsWith('=')) {
+    padding = 1;
+  }
+  return Math.floor((payload.length * 3) / 4) - padding;
+}
+
 /**
  * Strip the `data:<mime>;base64,` prefix from a data URL. Returns undefined
  * when the payload is not a base64 data URL for the given mime.
@@ -146,8 +160,10 @@ function tempFilenameFor(finalName: string): string {
  *
  * The body is written to a `<final>.tmp-<n>` sibling and moved onto the final
  * name only after the write resolves, so a partial or interrupted write never
- * leaves a file under the final name and the synchronous exists-reuse check can
- * only observe a fully written payload. A failed attempt latches the part id:
+ * leaves a file under the final name. A file under the final name is reused
+ * only when its size equals the decoded payload size: a truncated file from an
+ * interrupted or legacy write (an older version wrote straight at the final
+ * name) is rewritten rather than served. A failed attempt latches the part id:
  * no further writes run for it until `clearToolCardImageCache` (sign-out) or a
  * test reset, so a corrupt environment does not turn a long transcript into a
  * retry storm. The URI is recorded when the move resolves.
@@ -185,10 +201,13 @@ export function cacheToolAttachment(
     const finalName = cacheFilenameForAttachment(partId, mime, filename);
     try {
       const directory = ensureCacheDirectory();
-      // Fully reuse a file that survived earlier runs: only a fully written and
-      // moved file can exist under the final name.
+      // A file counts as cached only when its body is the whole payload: an
+      // interrupted legacy write, or a file left by an older version that wrote
+      // straight at the final name, is truncated and must be rewritten instead
+      // of published.
+      const expectedBytes = base64DecodedByteLength(payload);
       const file = new File(directory, finalName);
-      if (!file.exists) {
+      if (!file.exists || file.size !== expectedBytes) {
         tempFile = new File(directory, tempFilenameFor(finalName));
         await tempFile.write(payload, { encoding: 'base64' });
         if (generation !== cacheGeneration) {

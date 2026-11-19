@@ -18,6 +18,7 @@ import {
 
 type FileInstance = {
   exists: boolean;
+  size: number;
   uri: string;
   written?: { content: string; encoding?: string };
   write: (content: string, options?: { encoding?: string }) => Promise<void>;
@@ -46,6 +47,7 @@ const expoFileSystemMock = vi.hoisted(() => {
   ): FileInstance {
     const instance: FileInstance = {
       exists: false,
+      size: 0,
       uri: `file:///cache/tool-card-images/${filename}`,
       write: (content: string, options?: { encoding?: string }) => {
         instance.written = { content, encoding: options?.encoding };
@@ -224,6 +226,7 @@ describe('cacheToolCardImage', () => {
     ) {
       const instance = {
         exists: true,
+        size: 2,
         uri: `file:///cache/tool-card-images/${filename}`,
         write,
         move: vi.fn(() => Promise.resolve()),
@@ -591,6 +594,75 @@ describe('cacheToolAttachment write lifetime', () => {
     expect(temp).toBeDefined();
     expect(temp?.delete).toHaveBeenCalledTimes(1);
     expect(temp?.filename).toMatch(/^part-cleanup\.png\.tmp-\d+$/);
+  });
+
+  it('rewrites a truncated file that exists under the final name', async () => {
+    // 'QUJDRA==' decodes to the 4 bytes 'ABCD'; the seeded instance holds only
+    // 2 bytes, as an interrupted legacy write would leave. The write path runs:
+    // a temp sibling carries the payload and moves onto the truncated file.
+    const defaultFactory = expoFileSystemMock.File.getMockImplementation();
+    expoFileSystemMock.File.mockImplementationOnce(function FileTruncated(
+      directory: { name?: string },
+      filename: string
+    ) {
+      // Mutate the recorded instance so the array copy matches what the cache
+      // observed; a spread copy would leave `fileInstances` describing an
+      // absent zero-byte file.
+      const instance = defaultFactory?.(directory, filename) as FileInstance;
+      instance.exists = true;
+      instance.size = 2;
+      return instance;
+    });
+
+    cacheToolAttachment('part-truncated', {
+      mime: 'image/png',
+      dataUrl: 'data:image/png;base64,QUJDRA==',
+    });
+
+    await vi.waitFor(() => {
+      expect(getToolCardImageUri('part-truncated')).toBe(
+        'file:///cache/tool-card-images/part-truncated.png'
+      );
+    });
+
+    // The write path ran against a fresh temp sibling and moved it over the
+    // truncated file instead of publishing the truncated body.
+    const temp = tempInstanceFor('part-truncated.png');
+    expect(temp).toBeDefined();
+    expect(temp?.written).toEqual({ content: 'QUJDRA==', encoding: 'base64' });
+    expect(temp?.move).toHaveBeenCalledTimes(1);
+    expect(finalInstanceFor('part-truncated.png')?.move).not.toHaveBeenCalled();
+    expect(finalInstances()).toHaveLength(1);
+    expect(isToolCardImagePending('part-truncated')).toBe(false);
+  });
+
+  it('does not rewrite a file whose size already matches the decoded payload', async () => {
+    // 'QUJDRA==' decodes to 4 bytes; the seeded instance holds exactly that.
+    const defaultFactory = expoFileSystemMock.File.getMockImplementation();
+    expoFileSystemMock.File.mockImplementationOnce(function FileComplete(
+      directory: { name?: string },
+      filename: string
+    ) {
+      // Mutate the recorded instance, matching what the cache observed.
+      const instance = defaultFactory?.(directory, filename) as FileInstance;
+      instance.exists = true;
+      instance.size = 4;
+      return instance;
+    });
+
+    cacheToolAttachment('part-complete', {
+      mime: 'image/png',
+      dataUrl: 'data:image/png;base64,QUJDRA==',
+    });
+    await drainCacheWrites();
+
+    expect(getToolCardImageUri('part-complete')).toBe(
+      'file:///cache/tool-card-images/part-complete.png'
+    );
+    expect(tempInstanceFor('part-complete.png')).toBeUndefined();
+    expect(finalInstanceFor('part-complete.png')?.move).not.toHaveBeenCalled();
+    expect(finalInstances()).toHaveLength(1);
+    expect(isToolCardImagePending('part-complete')).toBe(false);
   });
 });
 

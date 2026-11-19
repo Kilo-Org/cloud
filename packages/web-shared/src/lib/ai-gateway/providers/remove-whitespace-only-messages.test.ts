@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import type Anthropic from '@anthropic-ai/sdk';
-import { removeWhitespaceOnlyMessages } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
+import {
+  preserveCacheControl,
+  removeWhitespaceOnlyMessages,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 function makeBody(messages: Anthropic.MessageParam[]): GatewayMessagesRequest {
@@ -25,6 +28,13 @@ const thinking: Anthropic.ThinkingBlockParam = {
   thinking: 'Considering the request.',
   signature: 'sig-1',
 };
+
+const image: Anthropic.ImageBlockParam = {
+  type: 'image',
+  source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0KGgo=' },
+};
+
+const ephemeral: Anthropic.CacheControlEphemeral = { type: 'ephemeral' };
 
 describe('removeWhitespaceOnlyMessages', () => {
   afterEach(() => {
@@ -347,5 +357,58 @@ describe('removeWhitespaceOnlyMessages', () => {
 
     expect(body.messages).toBe(messages);
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('preserveCacheControl', () => {
+  it('moves a breakpoint from a removed message onto the last cacheable block', () => {
+    const previousMessage: Anthropic.MessageParam = { role: 'assistant', content: [toolUse] };
+    const removedMessage: Anthropic.MessageParam = {
+      role: 'user',
+      content: [{ type: 'text', text: 'x', cache_control: ephemeral }, image],
+    };
+
+    const result = preserveCacheControl(previousMessage, removedMessage);
+
+    expect(result).toEqual({
+      role: 'assistant',
+      content: [{ ...toolUse, cache_control: ephemeral }],
+    });
+  });
+
+  it('reads a breakpoint that sits on a non-text cacheable block of the removed message', () => {
+    // The old text-only read missed a breakpoint on a tool_result block; the shared
+    // isCacheableMessagesContentBlock predicate finds it and the write re-applies it.
+    const previousMessage: Anthropic.MessageParam = { role: 'assistant', content: [toolUse] };
+    const removedMessage: Anthropic.MessageParam = {
+      role: 'user',
+      content: [{ ...toolResult, cache_control: ephemeral }, image],
+    };
+
+    const result = preserveCacheControl(previousMessage, removedMessage);
+
+    expect(result).toEqual({
+      role: 'assistant',
+      content: [{ ...toolUse, cache_control: ephemeral }],
+    });
+  });
+
+  it('keeps a preceding message whose cacheable block already has a breakpoint', () => {
+    const previousMessage: Anthropic.MessageParam = {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Hi', cache_control: { ...ephemeral, ttl: '1h' } }],
+    };
+    const removedMessage: Anthropic.MessageParam = {
+      role: 'user',
+      content: [{ ...toolResult, cache_control: ephemeral }],
+    };
+
+    const result = preserveCacheControl(previousMessage, removedMessage);
+
+    expect(result).toBe(previousMessage);
+    expect(result).toEqual({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Hi', cache_control: { type: 'ephemeral', ttl: '1h' } }],
+    });
   });
 });

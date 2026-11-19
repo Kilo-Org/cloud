@@ -558,10 +558,15 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // Route and probe text can reveal stale navigation, but neither proves native paint.
   // Keep this bounded navigation retry separate from screenshot capture: a genuine
   // blank screenshot must survive as evidence rather than be retried until it disappears.
+  // A link to the screen navigation resets to (Home) changes nothing on glass;
+  // it opened when the settled screen is the one the link names. A URL drops
+  // groups, so the route alone cannot tell, but the probe's screen keeps them.
+  const linkScreen = linkRoute?.slice(1);
   const opened = (dump: ProbeDump) =>
     screenTexts(dump) !== beforeTexts ||
     (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
-    (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
+    (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute) ||
+    (linkScreen !== undefined && linkScreen !== '' && dump.env.screen === linkScreen);
   await ctx.probe.openLink(target.link);
   // A cold screen paints its own loading placeholder and holds it still, so a
   // settle loop would measure the placeholder. Wait for it to clear first, and

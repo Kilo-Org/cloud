@@ -604,6 +604,19 @@ test('runMatrix retries a link that leaves the screen unchanged and reports last
   );
 });
 
+test('a link to the screen navigation resets to counts as opened when that screen settles', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  state.screen = '(app)/(tabs)/(0_home)';
+  const home = 'kiloapp:///(app)/(tabs)/(0_home)';
+  const ctx = context(fakeDevice(calls, state, { routes: { [home]: '/' } }), fakeProbe(state));
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [
+    { id: 'home', link: home },
+  ]);
+  assert.equal(calls.filter(call => call === `open:${home}`).length, 1);
+  assert.deepEqual(outcome.findings, []);
+});
+
 test('runMatrix re-sends a link the router routed without painting the screen', async () => {
   const calls: string[] = [];
   const state = probeState();

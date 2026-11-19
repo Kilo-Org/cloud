@@ -110,9 +110,9 @@ describe('SessionListRefreshStatus pull progress', () => {
     const progressRow = mounted.root.findByProps({ accessibilityRole: 'progressbar' });
     expect(progressRow.props.accessible).toBe(true);
     expect(progressRow.props.accessibilityState).toEqual({ busy: true });
-    expect(progressRow.findByProps({ children: i18n.t('common.loading') }).props.className).toContain(
-      'absolute size-px overflow-hidden'
-    );
+    expect(
+      progressRow.findByProps({ children: i18n.t('common.loading') }).props.className
+    ).toContain('absolute size-px overflow-hidden');
     // No indicator mounted means no progressbar node: the pull's settled state
     // must not leave a stale busy node behind (RN never clears the busy tag on
     // a kept view — see the component note).

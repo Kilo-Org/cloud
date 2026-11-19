@@ -169,9 +169,7 @@ describe('motion primitives', () => {
     // the flight (RN never clears the tag on a kept view). Scope to the
     // RefreshProgress band: the RefreshControl stub can host a progressbar
     // too.
-    const staticProgress = refreshSlot.find(
-      node => node.props.accessibilityRole === 'progressbar'
-    );
+    const staticProgress = refreshSlot.find(node => node.props.accessibilityRole === 'progressbar');
     expect(staticProgress.props.accessible).toBe(true);
     expect(staticProgress.props.accessibilityState).toEqual({ busy: true });
     expect(staticProgress.props.className).toBe('absolute inset-0 items-center justify-center');

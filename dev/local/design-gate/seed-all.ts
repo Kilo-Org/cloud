@@ -161,11 +161,14 @@ export function seedAll(options: {
     const result = options.run(entry.topic, entry.args(options.email));
     try {
       if (result.status !== 0) {
-        const reason = result.stderr
+        // The runner prints `Seed runner failed: <Error>: <message>` first; a
+        // Drizzle error then dumps an object whose last lines are braces.
+        const lines = result.stderr
           .split('\n')
           .map(line => line.trim())
           .filter(line => line !== '' && !line.startsWith('at '));
-        throw new Error(`exit ${result.status}: ${reason.slice(-2).join(' | ')}`);
+        const reason = lines.find(line => /error/i.test(line)) ?? lines[0] ?? 'no stderr';
+        throw new Error(`exit ${result.status}: ${reason}`);
       }
       const values = parseSeedJson(result.stdout);
       steps[entry.step] = { topic: entry.topic, ok: true, values };

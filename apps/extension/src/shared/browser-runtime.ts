@@ -282,17 +282,6 @@ const STEP_TAB_TTL_MS = 2 * 60_000;
 const STEP_TAB_LIMIT = 32;
 
 /**
- * How long an approved call's downloads are its own — the guard's late window, since that is how long a file it
- * Started could still land — and how many such windows a session keeps.
- */
-const APPROVED_DOWNLOAD_WINDOW_MS = DOWNLOAD_GUARD_LINGER_MS;
-/** How far before an approved call an item may have started and still be its file: a click's request races. */
-const APPROVED_WINDOW_SLACK_MS = 50;
-/** How long a finished window is remembered, and how many are kept: a search can arrive just after it ends. */
-const APPROVED_WINDOW_KEEP_MS = 60_000;
-const APPROVED_WINDOW_LIMIT = 8;
-
-/**
  * How long the guard waits for a download it stopped to reach `complete` or
  * `interrupted`. `cancel` resolves on an item that already finished, so the
  * only proof that no file exists is the item's own terminal state.
@@ -1034,9 +1023,11 @@ const armDownloadGuard = (
     readonly attempt: string;
     readonly ledger: DownloadLedger;
     readonly linger: LingerSink | undefined;
+    /** The one file an approval bought: the approved call keeps it, so no stop of that call cancels it. */
+    readonly exempt?: ((item: BrowserDownloadItem) => boolean) | undefined;
   }
 ): DownloadGuard => {
-  const { ledger, linger } = hooks;
+  const { exempt, ledger, linger } = hooks;
   const { attempt } = hooks;
   const { navigation, step, tab, tabIds } = attribution;
   const session = step?.session ?? '';
@@ -1115,6 +1106,11 @@ const armDownloadGuard = (
   };
 
   const stop = (item: BrowserDownloadItem): void => {
+    // The file the human approved is the approved call's: it is the only download of that call left alone.
+    if (exempt !== undefined && exempt(item)) {
+      return;
+    }
+
     if (stops.has(item.id)) {
       return;
     }
@@ -1386,31 +1382,59 @@ export const createBrowserRuntime = ({
   /** Names one guard attempt; a record is counted by the attempt that opened it and by no other. */
   let attempts = 0;
   /**
-   * The windows in which a call ran with its downloads approved, per session: a file a human approved is that
-   * call's, so no later search may stop it however closely it matches an older record for the same url.
+   * The one file an approval buys, per session: the refused step's tab and the url its download had. The approval
+   * covers that file alone — a second download during the approved call, on another tab or another url, is
+   * Guarded as usual — so the need is bound to the first item the browser creates for that tab and url.
    */
-  const approvedWindows = new Map<string, { readonly from: number; readonly to: number }[]>();
-  /** When each session last ran a call with its downloads approved: a later item of the same url is that call's. */
-  const lastApprovedAt = new Map<string, number>();
+  const approvedNeeds = new Map<
+    string,
+    { itemId: number | undefined; readonly tabId: number; readonly url: string }
+  >();
 
-  /** Notes that this session's call runs with its downloads approved, and forgets windows that are over. */
-  const noteApprovedWindow = (session: string, from: number): void => {
-    const kept = (approvedWindows.get(session) ?? []).filter(
-      window => window.to >= from - APPROVED_WINDOW_KEEP_MS
-    );
-
-    kept.push({ from, to: from + APPROVED_DOWNLOAD_WINDOW_MS });
-
-    approvedWindows.set(session, kept.slice(-APPROVED_WINDOW_LIMIT));
-    lastApprovedAt.set(session, from);
+  /** Notes the file an approval is for: the download the refused step's own call started. */
+  const noteApprovedNeed = (
+    session: string,
+    need: { readonly tabId: number; readonly url: string }
+  ): void => {
+    approvedNeeds.set(session, { itemId: undefined, tabId: need.tabId, url: need.url });
   };
 
-  /** Whether the browser created this item while an approved call was running: then it is that call's file. */
-  const startedByApprovedCall = (session: string, item: BrowserDownloadItem): boolean => {
-    const at = itemStartOf(item);
+  /** Whether this item is the one file the session's approval bought; the first item for its tab and url is it. */
+  const approvedItem = (
+    session: string,
+    item: { readonly id: number; readonly tabId?: number | undefined; readonly url?: string }
+  ): boolean => {
+    const need = approvedNeeds.get(session);
 
-    return (approvedWindows.get(session) ?? []).some(
-      window => window.from - APPROVED_WINDOW_SLACK_MS <= at && at <= window.to
+    if (need === undefined) {
+      return false;
+    }
+
+    if (need.itemId !== undefined) {
+      return need.itemId === item.id;
+    }
+
+    if ((item.tabId !== undefined && item.tabId !== need.tabId) || item.url !== need.url) {
+      return false;
+    }
+
+    need.itemId = item.id;
+
+    return true;
+  };
+
+  /**
+   * When each session last bought an approval: a reported record may still link the file it announced, but not one
+   * The browser started after an approval, which is that approved call's own.
+   */
+  const lastApprovedAt = new Map<string, number>();
+
+  /** Whether a url and tab name the approval's file before the browser has named its item. */
+  const approvedUrl = (session: string, url: string, tabId: number): boolean => {
+    const need = approvedNeeds.get(session);
+
+    return (
+      need !== undefined && need.itemId === undefined && need.url === url && need.tabId === tabId
     );
   };
 
@@ -1507,7 +1531,7 @@ export const createBrowserRuntime = ({
   /** A session that ends owes no approval, and its stopped files stay unreported: there is no model left to tell. */
   const closeSessionRecords = (session: string): void => {
     downloadRecords.delete(session);
-    approvedWindows.delete(session);
+    approvedNeeds.delete(session);
     lastApprovedAt.delete(session);
 
     // The session's steps are over with it: no later call may resolve one of their tabs.
@@ -1581,6 +1605,12 @@ export const createBrowserRuntime = ({
     // An item already linked is another download of the same url: only an unlinked announcement is this one, and
     // A repeated url answers with the newest of them, which is the announcement this item belongs to.
     const at = input.at ?? Date.now();
+
+    // The file this session's approval bought is nobody's record: no record of an earlier step may adopt it, or the
+    // Stop that follows would cancel the file the human approved.
+    if (approvedUrl(session, input.url, input.tabId)) {
+      return undefined;
+    }
 
     return [...records.values()]
       .filter(
@@ -1813,7 +1843,7 @@ export const createBrowserRuntime = ({
 
     for (const item of found) {
       const owner =
-        startedSince(item, since) && !startedByApprovedCall(session, item)
+        startedSince(item, since) && !approvedItem(session, item)
           ? ownerOf({ item, pageByTab, records, session, watches })
           : undefined;
 
@@ -2336,11 +2366,16 @@ export const createBrowserRuntime = ({
    * a grant or revoke is seen. `undefined` when the optional permission is
    * missing — the caller then refuses the call rather than run it unguarded.
    */
-  const armGuard = (api: BrowserDownloadsApi, attribution: DownloadAttribution): DownloadGuard => {
+  const armGuard = (
+    api: BrowserDownloadsApi,
+    attribution: DownloadAttribution,
+    options: { readonly exempt?: (item: BrowserDownloadItem) => boolean } = {}
+  ): DownloadGuard => {
     const attempt = `attempt-${String((attempts += 1))}`;
 
     return armDownloadGuard(api, attribution, {
       attempt,
+      ...(options.exempt === undefined ? {} : { exempt: options.exempt }),
       ledger,
       linger: {
         armed: ({ end, since }) => {
@@ -2701,6 +2736,23 @@ export const createBrowserRuntime = ({
               )
             : false;
 
+        // The approval buys exactly one file: the one the refused step started, the same tab and url. Any other
+        // Download during this call — another url, another tab — is guarded as usual and reported with its own token.
+        if (downloadApproved) {
+          const refused = [...(downloadRecords.get(sessionKey)?.values() ?? [])].find(
+            record =>
+              record.step?.session === sessionKey &&
+              record.step.argumentHash === stepHash &&
+              record.url !== undefined
+          );
+
+          lastApprovedAt.set(sessionKey, Date.now());
+
+          if (refused !== undefined && refused.url !== undefined) {
+            noteApprovedNeed(sessionKey, { tabId: refused.tabId, url: refused.url });
+          }
+        }
+
         // A call that can start a download owns the tab's downloads: an earlier call's linger and window end before
         // It runs, so neither cancels a file this call starts — an approved repeat, or the panel's own click, above
         // All. A read never starts one, so it leaves the earlier guard on duty and consumes no report: a file that
@@ -2987,12 +3039,6 @@ export const createBrowserRuntime = ({
 
         const callStartedAt = Date.now();
 
-        // A file an approved call starts belongs to that approval: no later search may stop it, however closely it
-        // Matches an older record for the same url.
-        if (downloadApproved) {
-          noteApprovedWindow(sessionKey, callStartedAt);
-        }
-
         let result: EvalTabResult | null = null;
         let settlement: GuardSettlement = { kept: [], stopped: 0 };
 
@@ -3063,6 +3109,70 @@ export const createBrowserRuntime = ({
         // A taken-over call drops its late result: the page belongs to the panel now.
         if (taken) {
           return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
+        }
+
+        const approvedApi =
+          downloadApproved && approvedNeeds.get(sessionKey) !== undefined ? guardApi : undefined;
+        const approvedSearch = approvedApi?.search;
+
+        // An approval buys one file: a second download the approved call starts is guarded as usual — stopped and
+        // Reported with its own step token — while the approved file is the only one that call leaves alone.
+        if (approvedApi !== undefined && approvedSearch !== undefined) {
+          const findItems = approvedSearch;
+          const origin = preflight?.ok ? preflight.origin : '';
+          const approvedNames: string[] = [];
+          const others: BrowserDownloadItem[] = [];
+          const started: readonly BrowserDownloadItem[] =
+            (await Promise.resolve(
+              findItems({ startedAfter: new Date(callStartedAt).toISOString() })
+            ).catch(() => [])) ?? [];
+          const owned = new Set(
+            [...(downloadRecords.get(sessionKey)?.values() ?? [])]
+              .map(record => record.itemId)
+              .filter((itemId): itemId is number => itemId !== undefined)
+          );
+          // An item this session already stopped is not the approval's file: it is the download the human refused.
+          const verdicts = started
+            .filter(item => !owned.has(item.id))
+            .map(item => ({ approved: approvedItem(sessionKey, item), item }));
+
+          approvedNames.push(
+            ...verdicts.filter(verdict => verdict.approved).map(verdict => fileNameOf(verdict.item))
+          );
+          others.push(
+            ...verdicts.filter(verdict => !verdict.approved).map(verdict => verdict.item)
+          );
+
+          if (others.length > 0) {
+            const outcomes = await Promise.all(
+              others.map(item => discardDownload(approvedApi, item))
+            );
+
+            return needsPermissionOutcome(
+              [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
+              {
+                afterAction: true,
+                keptFiles: [
+                  ...approvedNames,
+                  ...outcomes
+                    .filter(outcome => outcome.kind === 'kept')
+                    .map(outcome => outcome.filename),
+                ],
+                ...(downloadStep === undefined
+                  ? {}
+                  : {
+                      step: {
+                        argumentsHash: downloadStep.argumentHash,
+                        tool: downloadStep.toolName,
+                      },
+                    }),
+                stepToken: issueSensitiveToken(
+                  { origin, reason: SENSITIVE_REASON.download },
+                  runTabId
+                ),
+              }
+            );
+          }
         }
 
         const settled = result ?? { error: 'The browser tool returned no result.', ok: false };

@@ -779,6 +779,54 @@ describe('agent browser calls', () => {
     expect(cancelled).toStrictEqual([41]);
   });
 
+  it('keeps only the approved file when the approved call starts a second download', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let commands = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        const click = Math.floor(commands / 2);
+
+        commands += 1;
+
+        if (commands % 2 === 0) {
+          if (click === 0) {
+            downloads.emit({ id: 41, tabId: TAB_ID, url: `${MAIN_ORIGIN}/invoice.pdf` });
+          } else if (click === 1) {
+            downloads.emit({ id: 42, tabId: TAB_ID, url: `${MAIN_ORIGIN}/invoice.pdf` });
+            downloads.emit({ id: 43, tabId: TAB_ID, url: `${MAIN_ORIGIN}/other.pdf` });
+          }
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const refused = await click([]);
+
+    expect(refused.kind).toBe('needs_permission');
+    expect(downloads.cancelled).toStrictEqual([41]);
+
+    const approved = await click([expectStepToken(refused)]);
+
+    expect(approved).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+    });
+    expect(expectStepToken(approved)).toBeDefined();
+    expect([downloads.cancelled, downloads.removed]).toStrictEqual([[41, 43], []]);
+  });
+
   it('refuses a download-capable call when the optional permission is missing', async () => {
     // No downloads API: the guard cannot see a blob download, so the click must not run.
     const { cdp, runtime } = await createHarness({ downloadsGranted: false });

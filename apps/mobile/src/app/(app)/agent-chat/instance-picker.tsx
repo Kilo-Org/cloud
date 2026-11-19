@@ -20,7 +20,11 @@ import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import {
+  useDetailScreenBottomPadding,
+  useSideInsetMarginStyle,
+  useSideInsetStyle,
+} from '@/lib/screen-insets';
 import { resolveLiveInstance } from '@/lib/resolve-live-instance';
 import {
   type InstancePickerListItem,
@@ -51,6 +55,8 @@ export default function InstancePickerScreen() {
   // that report a zero bottom inset still keep the bottom action visible and
   // tappable.
   const bottomClearance = useDetailScreenBottomPadding();
+  const sideInsetStyle = useSideInsetStyle();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const [bridge, setBridge] = useState(() => instancePickerSlot.get(UNFENCED_ROUTE_KEY));
   const bridgeRef = useRef(bridge);
   useRouteRegistry(UNFENCED_ROUTE_KEY);
@@ -245,7 +251,10 @@ export default function InstancePickerScreen() {
         onCancel={closePicker}
         scrollable={false}
       >
-        <View className="bg-background" style={{ paddingBottom: bottomClearance }}>
+        <View
+          className="bg-background"
+          style={{ paddingBottom: bottomClearance, ...sideInsetStyle }}
+        >
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
             <RowSkeleton key={i} subtitle />
           ))}
@@ -302,7 +311,7 @@ export default function InstancePickerScreen() {
           group name live on the FlashList container instead of a wrapper. */}
       <FlashList<InstancePickerListItem>
         nestedScrollEnabled
-        style={[listStyle, { backgroundColor: colors.background }]}
+        style={[listStyle, { backgroundColor: colors.background }, sideInsetMarginStyle]}
         accessibilityRole="radiogroup"
         accessibilityLabel={t('agentChat.instancePicker.runOn')}
         data={listItems}

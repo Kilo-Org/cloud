@@ -1319,6 +1319,29 @@ describe('an answer the person stops', () => {
     ]);
     expect(asMessages(snapshotOf(opened)).at(-1)?.info.id).toBe(`${opened}:answering`);
   });
+
+  it('keeps the words that had arrived when the stream fails, with the failure and a Retry', async () => {
+    storedHistory = [];
+    await say(opened, { text: 'tell a story', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    emitEvent?.({ kind: 'delta', text: ' once upon a time' });
+    await settled();
+
+    crash?.();
+    await settled();
+
+    const held = snapshotOf(opened);
+    expect(held.status).toBe('idle');
+    expect(held.failureKey).not.toBeNull();
+    expect(held.asked).toBe('tell a story');
+    expect(said(opened)).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'ok once upon a time'],
+    ]);
+    const written = await askedIn(opened);
+    expect(written?.answer).toBe('ok once upon a time');
+    expect(written?.failureKey).toBe(held.failureKey);
+  });
 });
 
 describe('a question with images', () => {

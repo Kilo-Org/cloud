@@ -252,7 +252,7 @@ describe('selectMessageFailure', () => {
       expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
     });
 
-    it('states a chat answer the person stopped under its words, with the Retry the chat offers', () => {
+    it('states a chat answer the person stopped under its words, with the Retry and Copy the chat offers', () => {
       const deliveryState = { status: 'failed', error: '', reason: 'interrupted' } as const;
       const result = selectMessageFailure({ info: assistantInfoWithoutError(), deliveryState });
       expect(result?.side).toBe('assistant');
@@ -260,7 +260,7 @@ describe('selectMessageFailure', () => {
       expect(result?.titleKey).toBe('agentChat.messageFailure.assistantStopped');
       expect(result?.detail).toBeNull();
       expect(result?.canRetry).toBe(true);
-      expect(result?.canCopy).toBe(false);
+      expect(result?.canCopy).toBe(true);
       expect(
         selectMessageFailure({
           info: assistantInfoWithoutError(),

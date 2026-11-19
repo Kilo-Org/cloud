@@ -3865,7 +3865,7 @@
       "protocol": "Kawa whakatau",
       "chatCompletions": "Chat Completions",
       "responses": "Responses",
-      "messages": "Ngā karere",
+      "messages": "Messages",
       "apiKey": "Kī API (kōwhiringa)",
       "headersHelp": "Ka tiakina haumaru ngā pane ritenga, ā, ka whakakapi i ngā pane motuhēhēnga taunoa. Kāore e whakaaetia ngā pane Kilo, ngā pane e whakahaerehia ana e te pūnaha kawe, me ngā whakataki anō.",
       "models": "Ngā tauira o te pūnaha tuarā",

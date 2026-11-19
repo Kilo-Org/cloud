@@ -92,10 +92,6 @@ describe('Māori brand mark label', () => {
 });
 
 describe('Māori model chat copy', () => {
-  it('translates the model-backends message label', () => {
-    expect(i18n.t('modelChat.backends.messages')).toBe('Ngā karere');
-  });
-
   it('describes the download size instead of commanding a download', () => {
     expect(i18n.t('modelChat.catalog.quantDetail', { size: '2.1 GB', memory: '4 GB' })).toBe(
       '2.1 GB te tikiake · tata ki te 4 GB o te mahara'

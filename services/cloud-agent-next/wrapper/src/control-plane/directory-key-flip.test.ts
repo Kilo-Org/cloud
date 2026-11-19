@@ -563,6 +563,55 @@ describe('directory-key flip (production dispatcher)', () => {
     }
   });
 
+  it('serves a re-prepared binding after settling the turn of the previous one', async () => {
+    const h = createHarness();
+    try {
+      const first = routeSpec('ses_a', 'ses_kilo_a');
+      h.dispatcher({
+        type: 'session.prepare',
+        spec: first,
+        credentials: credentialsFor('ses_a', proxyHandle(EXP_NOW)),
+      });
+      await waitFor(() => h.frames.filter(frame => frame.type === 'session.ready').length === 1);
+
+      const runtime = h.runtimes.get(DIRECTORY)!;
+      const prompts: string[] = [];
+      runtime.client.submit = async opts => {
+        prompts.push(opts.sessionId);
+        h.turns.observeKiloEvent({
+          type: 'session.turn.open',
+          properties: { sessionID: opts.sessionId },
+          nativeRuntimeId: runtime.nativeRuntimeId!,
+        });
+      };
+      h.dispatcher({ type: 'session.prompt', sessionId: 'ses_a', payload: promptPayload('m1') });
+      await waitFor(() => prompts.length === 1);
+
+      // A re-prepare that names another native session settles the live turn
+      // through the promotion seam, before the previous runtime is released.
+      h.dispatcher({
+        type: 'session.prepare',
+        spec: { ...first, kiloSessionId: 'ses_kilo_b' },
+        credentials: credentialsFor('ses_a', proxyHandle(EXP_NOW)),
+      });
+      await waitFor(() =>
+        h.frames.some(
+          frame =>
+            frame.type === 'session.outcome' &&
+            frame.status === 'failed' &&
+            frame.reason === 'agent_restarted'
+        )
+      );
+      expect(
+        h.frames.filter(
+          frame => frame.type === 'session.outcome' && frame.reason === 'agent_unavailable'
+        )
+      ).toEqual([]);
+    } finally {
+      await h.runtimes.shutdown();
+    }
+  });
+
   it('releases a sibling during a restart without throwing and still forgets its terminal', async () => {
     const h = createHarness();
     try {

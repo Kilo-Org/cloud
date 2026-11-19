@@ -2642,8 +2642,7 @@ describe('createPreparationManager', () => {
     expect(harness.releaseCalls).toEqual([prepared.runtimeKey]);
     expect(harness.manager.preparedRoute(spec.sessionId)?.runtimeKey).toBe(spec.sessionId);
     expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
-    // The superseded runtime key is released only after the new binding reported
-    // ready, so a live turn never observes its runtime missing mid-change.
+    // The binding change is logged with every identity component it compares.
     expect(harness.logs.some(line => line.includes('re-prepare binding changed'))).toBe(true);
   });
 

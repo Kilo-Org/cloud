@@ -1695,20 +1695,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     /**
-     * Settle the work attached to a binding that a re-prepare is replacing, before
-     * its runtime is released.
+     * Settle the work attached to a binding that a re-prepare is replacing. The
+     * prepare manager calls this only after it has established that the incoming
+     * spec names another binding, and before it releases the superseded runtime.
      */
     releaseSupersededRoute(spec: ControlPlaneRouteSpec): void {
-      const route = routes.get(spec.sessionId);
-      if (route === undefined) return;
-      if (
-        route.kiloSessionId === spec.kiloSessionId &&
-        route.directory === spec.directory &&
-        route.runtimeKey === runtimeKey(spec) &&
-        route.createdOnPlatform === spec.createdOnPlatform &&
-        sameReviewTarget(route.githubReviewTarget, spec.githubReviewTarget)
-      )
-        return;
       log(`turn: route binding changed session=${spec.sessionId}`);
       settleSupersededRoute(spec.sessionId);
     },

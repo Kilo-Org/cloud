@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "AI kaitsepiirangud",
-    "permissionDenied": "AI kaitsepiiranguid saavad hallata ainult organisatsiooni omanikud ja administraatorid.",
+    "permissionDenied": "AI kaitsepiiranguid saavad hallata ainult organisatsiooni omanikud ja administraatorid. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI kaitsepiirangud pole lubatud",
     "unavailable": "Kilo lubab organisatsioonile AI kaitsepiirangud soovi korral. Võta ühendust aadressil {{supportEmail}} ja Kilo meeskond lülitab need teie organisatsiooni jaoks sisse.",
     "contactSupport": "Võta ühendust toega",

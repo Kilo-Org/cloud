@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "Süni intellekt qoruyucu qaydaları",
-    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və adminlər idarə edə bilər.",
+    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və adminlər idarə edə bilər. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Süni intellekt qoruyucu qaydaları aktivləşdirilməyib",
     "unavailable": "Kilo təşkilat üçün Süni intellekt qoruyucu qaydalarını sorğu əsasında aktivləşdirir. {{supportEmail}} ilə əlaqə saxlayın və Kilo komandası onu təşkilatınız üçün aktivləşdirir.",
     "contactSupport": "Dəstək xidməti ilə əlaqə saxla",

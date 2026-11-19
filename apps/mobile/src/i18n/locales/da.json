@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-sikkerhedsgrænser",
-    "permissionDenied": "Kun organisationens ejere og administratorer kan administrere AI-sikkerhedsgrænser.",
+    "permissionDenied": "Kun organisationens ejere og administratorer kan administrere AI-sikkerhedsgrænser. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI-sikkerhedsgrænser er ikke aktiveret",
     "unavailable": "Kilo aktiverer AI-sikkerhedsgrænser for en organisation efter anmodning. Kontakt {{supportEmail}}, og Kilo-teamet slår dem til for din organisation.",
     "contactSupport": "Kontakt support",

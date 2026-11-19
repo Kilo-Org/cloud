@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "Shingayen Tsaro na Basirar Wucin Gadi",
-    "permissionDenied": "Masu mallakar ƙungiya da masu gudanarwa ne kawai za su iya sarrafa Shingayen Tsaro na Basirar Wucin Gadi.",
+    "permissionDenied": "Masu mallakar ƙungiya da masu gudanarwa ne kawai za su iya sarrafa Shingayen Tsaro na Basirar Wucin Gadi. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Ba a kunna Shingayen Tsaro na Basirar Wucin Gadi ba",
     "unavailable": "Kilo na kunna Shingayen Tsaro na Basirar Wucin Gadi ga ƙungiya bisa buƙata. Tuntuɓi {{supportEmail}}, sannan ƙungiyar Kilo za ta kunna ta ga kungiyarka.",
     "contactSupport": "Tuntuɓi masu tallafi",

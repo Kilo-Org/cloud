@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "AIガードレール",
-    "permissionDenied": "AIガードレールを管理できるのは組織の所有者と管理者のみです。",
+    "permissionDenied": "AIガードレールを管理できるのは組織の所有者と管理者のみです。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AIガードレールは有効になっていません",
     "unavailable": "Kiloは、リクエストに応じて組織のAIガードレールを有効にします。{{supportEmail}} までお問い合わせください。Kiloチームがお使いの組織に対して有効にします。",
     "contactSupport": "サポートに連絡",

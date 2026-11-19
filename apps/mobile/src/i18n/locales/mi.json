@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "Ara Tiaki Atamai",
-    "permissionDenied": "Ka taea e ngā kaipupuri me ngā kaiwhakahaere o te whakahaere anake te whakahaere i ngā Ara Tiaki Atamai.",
+    "permissionDenied": "Ka taea e ngā kaipupuri me ngā kaiwhakahaere o te whakahaere anake te whakahaere i ngā Ara Tiaki Atamai. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Kāore anō ngā Ara Tiaki Atamai kia whakahohea",
     "unavailable": "Ka taea e Kilo te whakahohe i ngā Ara Tiaki Atamai mō tētahi whakahaere ina tonohia. Whakapā atu ki {{supportEmail}}, ā, mā te rōpū Kilo e whakakā ana mō tō whakahaere.",
     "contactSupport": "Whakapā ki te rōpū tautoko",

@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-suojakaiteet",
-    "permissionDenied": "Vain organisaation omistajat ja ylläpitäjät voivat hallita AI-suojakaiteita.",
+    "permissionDenied": "Vain organisaation omistajat ja ylläpitäjät voivat hallita AI-suojakaiteita. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI-suojakaiteet eivät ole käytössä",
     "unavailable": "Kilo ottaa AI-suojakaiteet käyttöön organisaatiolle pyynnöstä. Ota yhteyttä osoitteeseen {{supportEmail}}, ja Kilo-tiimi ottaa ne käyttöön organisaatiollesi.",
     "contactSupport": "Ota yhteyttä tukeen",

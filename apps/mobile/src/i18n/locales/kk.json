@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "ЖИ қорғаныс шектеулері",
-    "permissionDenied": "ЖИ қорғаныс шектеулерін тек ұйым иелері мен әкімшілері басқара алады.",
+    "permissionDenied": "ЖИ қорғаныс шектеулерін тек ұйым иелері мен әкімшілері басқара алады. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ЖИ қорғаныс шектеулері қосылмаған",
     "unavailable": "Kilo сұраныс бойынша ұйым үшін ЖИ қорғаныс шектеулерін қосады. {{supportEmail}} мекенжайына хабарласыңыз, Kilo командасы оны ұйымыңыз үшін қосады.",
     "contactSupport": "Қолдау қызметіне хабарласу",

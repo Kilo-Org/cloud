@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "Yapay Zeka Korkulukları",
-    "permissionDenied": "Yapay Zeka Korkuluklarını yalnızca kuruluş sahipleri ve yöneticileri yönetebilir.",
+    "permissionDenied": "Yapay Zeka Korkuluklarını yalnızca kuruluş sahipleri ve yöneticileri yönetebilir. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Yapay Zeka Korkulukları etkin değil",
     "unavailable": "Kilo, talep üzerine bir kuruluş için Yapay Zeka Korkuluklarını etkinleştirir. {{supportEmail}} ile iletişime geçin; Kilo ekibi bunları kuruluşunuz için açar.",
     "contactSupport": "Destekle iletişime geç",

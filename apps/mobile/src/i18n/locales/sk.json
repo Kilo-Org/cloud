@@ -4956,7 +4956,7 @@
   },
   "organizationGuardrails": {
     "title": "AI ochranné mechanizmy",
-    "permissionDenied": "AI ochranné mechanizmy môžu spravovať iba vlastníci organizácie a správcovia.",
+    "permissionDenied": "AI ochranné mechanizmy môžu spravovať iba vlastníci organizácie a správcovia. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI ochranné mechanizmy nie sú zapnuté",
     "unavailable": "Kilo zapína AI ochranné mechanizmy pre organizáciu na požiadanie. Kontaktujte {{supportEmail}} a tím Kilo ich zapne pre vašu organizáciu.",
     "contactSupport": "Kontaktovať podporu",

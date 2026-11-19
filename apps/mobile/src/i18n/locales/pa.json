@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "ਏਆਈ ਗਾਰਡਰੇਲ",
-    "permissionDenied": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦੇ ਮਾਲਕ ਅਤੇ ਪ੍ਰਬੰਧਕ ਹੀ ਏਆਈ ਗਾਰਡਰੇਲ ਦਾ ਪ੍ਰਬੰਧ ਕਰ ਸਕਦੇ ਹਨ।",
+    "permissionDenied": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦੇ ਮਾਲਕ ਅਤੇ ਪ੍ਰਬੰਧਕ ਹੀ ਏਆਈ ਗਾਰਡਰੇਲ ਦਾ ਪ੍ਰਬੰਧ ਕਰ ਸਕਦੇ ਹਨ। $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ਏਆਈ ਗਾਰਡਰੇਲ ਸਮਰੱਥ ਨਹੀਂ ਹੈ",
     "unavailable": "ਕੀਲੋ ਬੇਨਤੀ 'ਤੇ ਕਿਸੇ ਸੰਗਠਨ ਲਈ ਏਆਈ ਗਾਰਡਰੇਲ ਸਮਰੱਥ ਕਰਦਾ ਹੈ। {{supportEmail}} ਨਾਲ ਸੰਪਰਕ ਕਰੋ, ਅਤੇ Kilo ਟੀਮ ਤੁਹਾਡੀ ਸੰਸਥਾ ਲਈ ਇਸਨੂੰ ਚਾਲੂ ਕਰੇਗੀ।",
     "contactSupport": "ਸਹਾਇਤਾ ਟੀਮ ਨਾਲ ਸੰਪਰਕ ਕਰੋ",

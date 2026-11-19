@@ -4956,7 +4956,7 @@
   },
   "organizationGuardrails": {
     "title": "Ограничители ИИ",
-    "permissionDenied": "Управлять ограничителями ИИ могут только владельцы и администраторы организации.",
+    "permissionDenied": "Управлять ограничителями ИИ могут только владельцы и администраторы организации. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Ограничители ИИ не включены",
     "unavailable": "Kilo включает ограничители ИИ для организации по запросу. Свяжитесь с {{supportEmail}}, и команда Kilo включает их для вашей организации.",
     "contactSupport": "Связаться с поддержкой",

@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "KI-Guardrails",
-    "permissionDenied": "Nur Inhaber und Admins der Organisation können KI-Guardrails verwalten.",
+    "permissionDenied": "Nur Inhaber und Admins der Organisation können KI-Guardrails verwalten. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "KI-Guardrails sind nicht aktiviert",
     "unavailable": "Kilo aktiviert KI-Guardrails für eine Organisation auf Anfrage. Kontaktiere {{supportEmail}}, und das Kilo-Team schaltet sie für deine Organisation ein.",
     "contactSupport": "Support kontaktieren",

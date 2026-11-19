@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "Ilaalada AI",
-    "permissionDenied": "Kaliya milkiilayaasha iyo maamulayaasha ururka ayaa maamuli kara Ilaalada AI.",
+    "permissionDenied": "Kaliya milkiilayaasha iyo maamulayaasha ururka ayaa maamuli kara Ilaalada AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Ilaalada AI lama daarmin",
     "unavailable": "Kilo wuxuu Ilaalada AI u daaraa urur marka la codsado. La xiriir {{supportEmail}}, kooxda Kilo ayay u daari doontaa ururkaaga.",
     "contactSupport": "La xiriir taageerada",

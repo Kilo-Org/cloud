@@ -4880,7 +4880,7 @@
   },
   "organizationGuardrails": {
     "title": "Salvaguardes d'IA",
-    "permissionDenied": "Només els propietaris i els administradors de l'organització poden gestionar les salvaguardes d'IA.",
+    "permissionDenied": "Només els propietaris i els administradors de l'organització poden gestionar les salvaguardes d'IA. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Les salvaguardes d'IA no estan activades",
     "unavailable": "Kilo activa les salvaguardes d'IA per a una organització a petició. Contacta amb {{supportEmail}} i l'equip de Kilo les activa per a la teva organització.",
     "contactSupport": "Contacta amb l'equip de suport",

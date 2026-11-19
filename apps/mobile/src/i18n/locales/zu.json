@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "Izivikelo ze-AI",
-    "permissionDenied": "Abanikazi benhlangano nabaphathi kuphela abangaphatha izivikelo ze-AI.",
+    "permissionDenied": "Abanikazi benhlangano nabaphathi kuphela abangaphatha izivikelo ze-AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Izivikelo ze-AI azivuliwe",
     "unavailable": "I-Kilo ivula Izivikelo ze-AI zenhlangano uma ziceliwe. Xhumana ne-{{supportEmail}}, futhi iqembu le-Kilo lizizula kuzilungiselelo zenhlangano yakho.",
     "contactSupport": "Xhumana nethimba losizo",

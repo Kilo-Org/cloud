@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "ଏଆଇ ଗାର୍ଡରେଲ୍ସ",
-    "permissionDenied": "କେବଳ ସଂସ୍ଥାର ମାଲିକ ଏବଂ ପ୍ରଶାସକ ଏଆଇ ଗାର୍ଡରେଲ୍ସ ପରିଚାଲନା କରିପାରିବେ।",
+    "permissionDenied": "କେବଳ ସଂସ୍ଥାର ମାଲିକ ଏବଂ ପ୍ରଶାସକ ଏଆଇ ଗାର୍ଡରେଲ୍ସ ପରିଚାଲନା କରିପାରିବେ। $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ଏଆଇ ଗାର୍ଡରେଲ୍ସ ସକ୍ଷମ ହୋଇନାହିଁ",
     "unavailable": "କିଲୋ ଅନୁରୋଧ କ୍ରମେ ଏକ ସଂସ୍ଥା ପାଇଁ ଏଆଇ ଗାର୍ଡରେଲ୍ସ ସକ୍ଷମ କରେ। {{supportEmail}} ସହିତ ଯୋଗାଯୋଗ କରନ୍ତୁ, ଏବଂ Kilo ଟିମ୍ ଆପଣଙ୍କ ସଂସ୍ଥା ପାଇଁ ଏହାକୁ ଚାଲୁ କରିବେ।",
     "contactSupport": "ସହାୟତା ଦଳ ସହ ଯୋଗାଯୋଗ କରନ୍ତୁ",

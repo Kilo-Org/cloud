@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-skyddsräcken",
-    "permissionDenied": "Endast organisationsägare och administratörer kan hantera AI-skyddsräcken.",
+    "permissionDenied": "Endast organisationsägare och administratörer kan hantera AI-skyddsräcken. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI-skyddsräcken är inte aktiverade",
     "unavailable": "Kilo aktiverar AI-skyddsräcken för en organisation på begäran. Kontakta {{supportEmail}}, och Kilo-teamet slår på dem för din organisation.",
     "contactSupport": "Kontakta supporten",

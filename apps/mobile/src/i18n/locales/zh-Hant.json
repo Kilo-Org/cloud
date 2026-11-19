@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "AI 護欄",
-    "permissionDenied": "只有組織擁有者與管理員可以管理 AI 護欄。",
+    "permissionDenied": "只有組織擁有者與管理員可以管理 AI 護欄。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "未啟用 AI 護欄",
     "unavailable": "Kilo 可依請求為組織啟用 AI 護欄。請聯絡 {{supportEmail}}，Kilo 團隊會為你的組織開啟。",
     "contactSupport": "聯絡客服",

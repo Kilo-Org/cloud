@@ -5108,7 +5108,7 @@
   },
   "organizationGuardrails": {
     "title": "ضوابط حماية الذكاء الاصطناعي",
-    "permissionDenied": "يمكن لمالكي المؤسسة ومسؤوليها فقط إدارة ضوابط حماية الذكاء الاصطناعي.",
+    "permissionDenied": "يمكن لمالكي المؤسسة ومسؤوليها فقط إدارة ضوابط حماية الذكاء الاصطناعي. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ضوابط حماية الذكاء الاصطناعي غير مفعّلة",
     "unavailable": "تُمكّن Kilo ضوابط حماية الذكاء الاصطناعي لمؤسسة عند الطلب. تواصل مع {{supportEmail}}، وفريق Kilo يفعّلها لمؤسستك.",
     "contactSupport": "التواصل مع الدعم",

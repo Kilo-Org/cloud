@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "KI-veiligheidsreëls",
-    "permissionDenied": "Slegs organisasie-eienaars en -administrateurs kan KI-veiligheidsreëls bestuur.",
+    "permissionDenied": "Slegs organisasie-eienaars en -administrateurs kan KI-veiligheidsreëls bestuur. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "KI-veiligheidsreëls is nie geaktiveer nie",
     "unavailable": "Kilo aktiveer KI-veiligheidsreëls vir 'n organisasie op versoek. Kontak {{supportEmail}}, en die Kilo-span skakel dit vir jou organisasie aan.",
     "contactSupport": "Kontak ondersteuning",

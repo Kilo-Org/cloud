@@ -4956,7 +4956,7 @@
   },
   "organizationGuardrails": {
     "title": "AI varovala",
-    "permissionDenied": "Samo lastniki in skrbniki organizacije lahko upravljajo AI varovala.",
+    "permissionDenied": "Samo lastniki in skrbniki organizacije lahko upravljajo AI varovala. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI varovala niso omogočena",
     "unavailable": "Kilo na zahtevo omogoči AI varovala za organizacijo. Obrnite se na {{supportEmail}}, skupaj Kilo jih vklopi za vašo organizacijo.",
     "contactSupport": "Obrni se na podporo",

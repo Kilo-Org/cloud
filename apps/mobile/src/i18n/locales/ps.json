@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "د مصنوعي ځیرکتیا ساتونکي",
-    "permissionDenied": "یوازې د سازمان مالکین او مدیران کولی شي د مصنوعي ځیرکتیا ساتونکي مدیریت کړي.",
+    "permissionDenied": "یوازې د سازمان مالکین او مدیران کولی شي د مصنوعي ځیرکتیا ساتونکي مدیریت کړي. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "د مصنوعي ځیرکتیا ساتونکي فعال نه دي",
     "unavailable": "Kilo د غوښتنې پر بنسټ یو سازمان لپاره د مصنوعي ځیرکتیا ساتونکي فعالوي. له {{supportEmail}} سره اړیکه ونیسئ، او د Kilo ټیم به یې ستاسو د سازمان لپاره فعال کړي.",
     "contactSupport": "له ملاتړ سره اړیکه ونیسئ",

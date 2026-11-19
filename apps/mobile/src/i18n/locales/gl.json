@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "Barreiras de seguridade da IA",
-    "permissionDenied": "Só os propietarios e administradores da organización poden xestionar as barreiras de seguridade da IA.",
+    "permissionDenied": "Só os propietarios e administradores da organización poden xestionar as barreiras de seguridade da IA. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "As barreiras de seguridade da IA non están activadas",
     "unavailable": "Kilo activa as barreiras de seguridade da IA para unha organización a petición. Contacta con {{supportEmail}} e o equipo de Kilo actívaas para a túa organización.",
     "contactSupport": "Contactar coa asistencia",

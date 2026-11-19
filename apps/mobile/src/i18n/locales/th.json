@@ -4804,7 +4804,7 @@
   },
   "organizationGuardrails": {
     "title": "แนวป้องกัน AI",
-    "permissionDenied": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่จัดการแนวป้องกัน AI ได้",
+    "permissionDenied": "เฉพาะเจ้าขององค์กรและผู้ดูแลระบบเท่านั้นที่จัดการแนวป้องกัน AI ได้ $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "แนวป้องกัน AI ยังไม่ได้เปิดใช้งาน",
     "unavailable": "Kilo เปิดใช้งานแนวป้องกัน AI ให้กับองค์กรตามคำขอ ติดต่อ {{supportEmail}} และทีม Kilo จะเปิดให้สำหรับองค์กรของคุณ",
     "contactSupport": "ติดต่อฝ่ายสนับสนุน",

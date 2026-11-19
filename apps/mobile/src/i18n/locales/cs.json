@@ -4956,7 +4956,7 @@
   },
   "organizationGuardrails": {
     "title": "Ochranná pravidla AI",
-    "permissionDenied": "Ochranná pravidla AI mohou spravovat jen vlastníci a správci organizace.",
+    "permissionDenied": "Ochranná pravidla AI mohou spravovat jen vlastníci a správci organizace. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Ochranná pravidla AI nejsou povolena",
     "unavailable": "Kilo povoluje ochranná pravidla AI pro organizaci na vyžádání. Kontaktujte {{supportEmail}} a tým Kilo je zapne pro vaši organizaci.",
     "contactSupport": "Kontaktovat podporu",

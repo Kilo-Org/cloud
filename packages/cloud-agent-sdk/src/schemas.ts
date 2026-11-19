@@ -386,6 +386,10 @@ export const PREPARATION_MAX_STEPS = 100;
  * `RETAINED_MESSAGE_WINDOW` (session-manager.ts) so a commit card of a visible
  * turn keeps its record, with headroom for a turn that commits more than one
  * repository.
+ *
+ * This bounds the retained rows only. The seen-identity set keeps one short
+ * identity per commit for the life of the session: dropping an identity would
+ * let a replayed, already-trimmed commit re-enter the list at its tail.
  */
 export const SESSION_MAX_COMMITS = 256;
 

@@ -11,7 +11,7 @@ import { act, TestRenderer } from '@/test/renderer';
 
 import { ChatComposerInputRow } from './chat-composer-input-row';
 
-export type RenderProps = {
+type RenderProps = {
   canSend?: boolean;
   hasSendableContent?: boolean;
   inputEditable: boolean;
@@ -23,7 +23,7 @@ export type RenderProps = {
   sendDisabledReason?: string | null;
 };
 
-export function makeProps(overrides: Partial<RenderProps> = {}) {
+function makeProps(overrides: Partial<RenderProps> = {}) {
   return {
     attachmentsEnabled: false,
     canSend: false,

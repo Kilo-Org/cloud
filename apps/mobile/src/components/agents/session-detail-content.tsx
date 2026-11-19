@@ -244,7 +244,8 @@ import {
   type AgentStackState,
   openComposerWithOutcome,
 } from '@/components/agents/new-session-navigation-outcome';
-import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
+import { useBackToAgentsSessions } from '@/lib/navigation/back-to-agents-sessions';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -349,6 +350,9 @@ export function SessionDetailContent({
   // A Back that lands while one of the composer's pickers is still opening is
   // delivered to this screen by the native stack; it closes the picker instead.
   usePickerAboveLeaveGuard();
+  // The terminal card's way back: it truncates the stack to the sessions list,
+  // and takes this route's place when it is the stack's only route.
+  const handleBackToSessions = useBackToAgentsSessions();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,
@@ -1912,13 +1916,6 @@ export function SessionDetailContent({
       toast.error(t('agentChat.session.failedToStopExecution'));
     }
   }, [manager, t]);
-
-  const handleBackToSessions = useCallback(() => {
-    // POP_TO reuses the `(tabs)` route under this screen and truncates every
-    // `agent-chat` route above it, so a composer still on the stack under a
-    // missing session is gone with it.
-    router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
-  }, [router]);
 
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {

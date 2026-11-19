@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -6,7 +5,7 @@ import { StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { RotateCcw } from '@/components/ui/icons';
-import { AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
+import { useBackToAgentsSessions } from '@/lib/navigation/back-to-agents-sessions';
 
 import { RestoredRouteFallback } from './restored-route-fallback';
 
@@ -45,17 +44,13 @@ export function SessionPermanentError({
   isRetrying,
   restoredRouteOpen,
 }: Readonly<SessionPermanentErrorProps>) {
-  const router = useRouter();
+  const goBackToSessions = useBackToAgentsSessions();
   const { t } = useTranslation();
   const backToSessions = (
     <StateAction
       label={t('agentChat.session.backToSessions')}
       icon={DirectionalArrowLeft}
-      onPress={() => {
-        // POP_TO reuses the `(tabs)` route under this screen and truncates
-        // every `agent-chat` route above it.
-        router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
-      }}
+      onPress={goBackToSessions}
     />
   );
   return (

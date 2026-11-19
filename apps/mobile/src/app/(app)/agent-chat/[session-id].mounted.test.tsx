@@ -191,6 +191,16 @@ vi.mock('@/components/agents/chat-markdown-text', () => ({
 vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
+  // The stack the route is rendered in: the exit rule reads its index to tell
+  // a dismissal from the only-route case.
+  useNavigation: () => ({
+    getState: () => ({
+      index: navigationRoutes.length - 1,
+      routes: navigationRoutes.map((name, index) => ({ name, key: `route-${index}` })),
+    }),
+    // The stack-safe replacement listens for its push's transition end.
+    addListener: () => () => undefined,
+  }),
   useRouter: useRouterMock,
   // The session route's Back listener runs while the route is focused, which
   // for these tests is its mount lifetime.

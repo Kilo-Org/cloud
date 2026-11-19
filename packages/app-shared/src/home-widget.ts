@@ -300,9 +300,6 @@ export function buildHomeWidgetPresentation(
 ): HomeWidgetPresentation {
   const { snapshot, details } = data;
   const { terminal, primaryKind, checkedAt, staleAt } = staleness(data);
-  // A title is drawn only beside the kind it describes. A payload stored or
-  // pushed before details carried the kind omits it, which reads as unknown and
-  // keeps the title, so that payload renders as it did.
   const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
   const status = presentationStatus(snapshot, terminal, primaryKind);

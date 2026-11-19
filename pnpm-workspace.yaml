@@ -16,7 +16,7 @@ catalog:
   # Workers-compatible JSON Schema validator for the kilo-mcp call tool.
   # AJV cannot run on Workerd: it compiles schemas with `new Function`, which
   # the Workers runtime forbids. Pinned exactly.
-  '@cfworker/json-schema': 4.1.1
+  '@cfworker/json-schema': 4.1.6
   '@octokit/auth-app': 8.2.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
@@ -39,7 +39,7 @@ catalog:
   drizzle-kit: 0.31.11
   drizzle-orm: 0.45.4
   hono: 4.13.16
-  jose: 6.2.12
+  jose: 6.2.17
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
   # apps/web builds its CSS with this and the workspace override below forces one
@@ -395,8 +395,6 @@ patchedDependencies:
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
   stripe@23.0.0: patches/stripe@23.0.0.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
-  # Keep lease renewal errors categorical; neither runtime may log receipt handles.
-  '@vercel/queue@0.8.0': patches/@vercel+queue@0.8.0.patch
   # Give the Apple @ExpoModule class scan 60 s instead of the hard-coded 5 s.
   # Slow macOS CI runners exceed 5 s; the configure phase then leaves modules
   # out of the modules provider and the iOS build fails. Keep src/ and build/

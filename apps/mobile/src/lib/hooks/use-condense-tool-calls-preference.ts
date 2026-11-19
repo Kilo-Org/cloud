@@ -4,10 +4,11 @@ import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference
 import { CONDENSE_TOOL_CALLS_KEY } from '@/lib/storage-keys';
 
 /**
- * On unless the stored string is exactly `false`. A transcript that collapses
- * consecutive tool calls by default is the readable one on a phone, so the
- * preference only records the reader who turned it off; a missing value (a
- * fresh install, or a session stored before the preference existed) reads as on.
+ * On for a missing value (`null`) or the stored string `true`; any other stored
+ * string reads as off. A transcript that collapses consecutive tool calls by
+ * default is the readable one on a phone, so the preference only records the
+ * reader who turned it off; a missing value (a fresh install, or a session
+ * stored before the preference existed) reads as on.
  */
 export function parseCondenseToolCalls(raw: string | null): boolean {
   return raw === null ? true : raw === 'true';

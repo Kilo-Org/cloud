@@ -53,6 +53,8 @@ type CliLiveTransportConfig = {
    * so the transport never overwrites older messages already loaded via
    * `loadOlderMessages`. The first page that applies additionally fires
    * `onInitialPageLoaded` so the manager can record the cursor.
+   *
+   * `null` represents an access-not-found outcome (worker returns 404).
    */
   fetchSnapshotPage?: (
     kiloSessionId: KiloSessionId,

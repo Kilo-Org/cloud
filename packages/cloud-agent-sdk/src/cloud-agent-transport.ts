@@ -93,6 +93,8 @@ type CloudAgentTransportConfig = {
    * its initial bounded read (newest 50) instead of `fetchSnapshot`, and for
    * any reconnect snapshot replays. The transport calls `onInitialPageLoaded`
    * after a successful initial read so the manager can record the cursor.
+   *
+   * `null` represents an access-not-found outcome (worker returns 404).
    */
   fetchSnapshotPage?: (
     kiloSessionId: KiloSessionId,

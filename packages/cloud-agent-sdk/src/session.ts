@@ -188,6 +188,8 @@ type CloudAgentSessionTransport = {
    * manager can record the cursor and `omittedItemCount`; later replays do NOT
    * fire that callback so the user's already-advanced older-messages cursor
    * isn't reset to the latest 50.
+   *
+   * `null` represents an access-not-found outcome (worker returns 404).
    */
   fetchSnapshotPage?:
     | ((

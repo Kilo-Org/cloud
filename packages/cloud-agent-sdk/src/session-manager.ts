@@ -367,6 +367,8 @@ type SessionManagerConfig = {
    * legacy `fetchSnapshot`-only path keeps working for callers that haven't
    * migrated to the paginated endpoint yet (e.g. server-side, tests). The
    * mobile adapter is the canonical provider.
+   *
+   * `null` represents an access-not-found outcome (worker returns 404).
    */
   fetchSnapshotPage?: (
     kiloSessionId: KiloSessionId,

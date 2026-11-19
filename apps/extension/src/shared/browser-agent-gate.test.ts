@@ -557,19 +557,36 @@ describe('origin grants', () => {
 });
 
 describe('origin changed after redirects', () => {
-  it('reports the origin a navigation landed on', async () => {
-    const approved = 'https://other.example.com';
+  const approved = 'https://other.example.com';
+  const landed = 'https://accounts.example.org';
+  const redirected = () => createSession({ mainUrl: `${landed}/login` });
 
+  it('reports the origin a navigation landed on', async () => {
     await expect(
-      postAgentNavigate(createSession({ mainUrl: approved }), approved)
+      postAgentNavigate(createSession({ mainUrl: approved }), approved, [])
     ).resolves.toBeUndefined();
-    await expect(
-      postAgentNavigate(createSession({ mainUrl: 'https://accounts.example.org/login' }), approved)
-    ).resolves.toStrictEqual({
+    await expect(postAgentNavigate(redirected(), approved, [])).resolves.toStrictEqual({
       from: approved,
       kind: 'origin_changed',
-      to: 'https://accounts.example.org',
+      to: landed,
     });
+  });
+
+  it('lets a redirect land on an origin the call may already open or read', async () => {
+    await expect(
+      postAgentNavigate(redirected(), approved, [{ class: 'navigate', origin: landed }])
+    ).resolves.toBeUndefined();
+    await expect(
+      postAgentNavigate(redirected(), approved, [
+        { class: 'read', origin: 'https://*.example.org' },
+      ])
+    ).resolves.toBeUndefined();
+  });
+
+  it('still reports a redirect whose landing origin is granted only to act on', async () => {
+    await expect(
+      postAgentNavigate(redirected(), approved, [{ class: 'act', origin: landed }])
+    ).resolves.toStrictEqual({ from: approved, kind: 'origin_changed', to: landed });
   });
 });
 

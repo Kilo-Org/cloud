@@ -37,7 +37,12 @@ export const CONSENT_OUTCOME_ACTIONS = ['accepted', 'optional_changed', 'revoked
 export const NOTIFICATION_PERMISSION_OUTCOMES = ['granted', 'denied'] as const;
 export const NOTIFICATION_TOKEN_ACTIONS = ['registered', 'unregistered'] as const;
 
-/** App cold-start outcome values (mirrors apps/mobile/src/lib/startup-timing.ts). */
+/**
+ * Single authority for the app cold-start outcome vocabulary. The mobile
+ * producer (apps/mobile/src/lib/startup-timing.ts) imports `StartupOutcome`
+ * from this tuple via a type-only import, so adding a value here extends the
+ * producer's allowed set.
+ */
 export const STARTUP_OUTCOMES = [
   'app',
   'login',
@@ -46,7 +51,10 @@ export const STARTUP_OUTCOMES = [
   'user-error',
   'consent-error',
   'language-error',
+  'restore-error',
 ] as const;
+
+export type StartupOutcome = (typeof STARTUP_OUTCOMES)[number];
 
 export const SESSION_CREATE_FAILURE_STAGES = [
   'report',
@@ -207,8 +215,6 @@ export const ANALYTICS_EVENT_SCHEMAS = {
   [KILO_PASS_PURCHASE_STARTED_EVENT]: z.object({}).strict(),
   [KILO_PASS_PURCHASE_COMPLETED_EVENT]: z.object({}).strict(),
   [KILO_PASS_PURCHASE_FAILED_EVENT]: z.object({}).strict(),
-  // Strict at runtime, but the map type stays a record so the mobile
-  // `takeStartupTimings()` payload compiles unchanged.
   [APP_STARTUP_EVENT]: z
     .object({
       outcome: z.enum(STARTUP_OUTCOMES),
@@ -219,7 +225,7 @@ export const ANALYTICS_EVENT_SCHEMAS = {
       consent_ready: metric.optional(),
       splash_hidden: metric.optional(),
     })
-    .strict() as z.ZodType<Record<string, string | number>>,
+    .strict(),
 
   [CLAW_WEATHER_LOCATION_SELECTED_EVENT]: z.object({}).strict(),
   [CLAW_WEATHER_LOCATION_SKIPPED_EVENT]: z.object({}).strict(),

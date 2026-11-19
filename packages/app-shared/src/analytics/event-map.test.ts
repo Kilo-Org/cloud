@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { z } from 'zod';
 
 import { SECURITY_COMMAND_TYPES } from '@kilocode/app-shared/security-agent';
@@ -33,8 +33,10 @@ import {
   SESSION_CREATED_EVENT,
   SESSION_CREATE_SETTLED_EVENT,
   SESSION_VIEWED_EVENT,
+  STARTUP_OUTCOMES,
   TERMINAL_PHASE_EVENTS,
   type AcceptedPhaseEventName,
+  type AnalyticsEventMap,
   type TerminalOutcomeEventName,
 } from './event-map';
 import { isProhibitedPropertyKey, redactProhibitedProperties } from './privacy';
@@ -321,6 +323,41 @@ describe('app_startup validation', () => {
     expect(startupSchema.safeParse({ outcome: 'language-error', splash_hidden: 90 }).success).toBe(
       true
     );
+    // Mobile emits `restore-error` from the restore-failure bootstrap path.
+    expect(startupSchema.safeParse({ outcome: 'restore-error', splash_hidden: 90 }).success).toBe(
+      true
+    );
+  });
+
+  it('accepts every value in STARTUP_OUTCOMES as an outcome', () => {
+    for (const outcome of STARTUP_OUTCOMES) {
+      expect(startupSchema.safeParse({ outcome }).success, outcome).toBe(true);
+    }
+  });
+
+  it('keeps the producer payload type identical to the catalog schema type', () => {
+    // A payload the mobile producer returns (marks only for gates it observed)
+    // must be assignable to the cataloged app_startup type.
+    const producerPayload = {
+      outcome: 'restore-error',
+      auth_ready: 0,
+      splash_hidden: 90,
+    } satisfies AnalyticsEventMap['app_startup'];
+    expectTypeOf(producerPayload).toExtend<AnalyticsEventMap['app_startup']>();
+
+    // Built the way takeStartupTimings() builds it: a typed partial written
+    // field by field. The return type must be exactly the cataloged type.
+    const buildProducerPayload = (): AnalyticsEventMap['app_startup'] => {
+      const payload: AnalyticsEventMap['app_startup'] = { outcome: 'restore-error' };
+      payload.splash_hidden = 90;
+      return payload;
+    };
+    expectTypeOf(buildProducerPayload()).toEqualTypeOf<AnalyticsEventMap['app_startup']>();
+
+    // The closed schema type rejects a key the catalog does not define.
+    // @ts-expect-error `unknown_key` is not part of the strict app_startup schema
+    const withUnknownKey: AnalyticsEventMap['app_startup'] = { outcome: 'restore-error', unknown_key: 1 };
+    expect(withUnknownKey).toBeDefined();
   });
 
   it('rejects an invalid startup outcome', () => {

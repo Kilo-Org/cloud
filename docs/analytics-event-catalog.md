@@ -14,8 +14,9 @@ the recorded exclusions.
   (`apps/mobile/src/lib/analytics/posthog.ts`) and durable-outbox validation
   (`packages/db/src/operation-ledger.ts`, Wave 2).
 - Every object schema is `.strict()`; values are restricted to stable enum
-  strings, integer counts, `duration_ms` integers, and booleans. The single
-  exception is `app_startup`, a bounded record of numeric timing marks.
+  strings, integer counts, `duration_ms` integers, and booleans. The
+  `app_startup` payloads are typed by their strict catalog schema; its metric
+  keys are still checked against the deny-list at runtime capture.
 - New event names are snake_case. Existing names are grandfathered verbatim in
   `LEGACY_EVENT_NAMES` (frozen, no additions) — the kebab-case KiloClaw
   onboarding names are locked to AppsFlyer dashboards.
@@ -48,7 +49,7 @@ Two enforcement layers:
 
 - Compile time: the strict object schemas cannot carry a prohibited key.
 - Runtime: the uncataloged `captureEvent` overload (mobile AppsFlyer mirror
-  only) and the `app_startup` record redact prohibited keys before capture.
+  only) and the `app_startup` payload redact prohibited keys before capture.
 
 ## Delivery model
 
@@ -98,7 +99,7 @@ helper, such as `apps/web/src/lib/kilo-pass/posthog-tracking.ts`.
 | `kilo_pass_purchase_started` | Mobile app | How often do purchase flows start? | Client: purchase request issued | None (`{}`) | Best-effort (SDK) |
 | `kilo_pass_purchase_completed` | Web + mobile | Purchase completion precedent (see Exclusions) | Post-commit acceptance boundary, untouched | None (`{}`) | Best-effort (server, existing call sites) |
 | `kilo_pass_purchase_failed` | Mobile app | How often do purchase flows fail? | Client: purchase error | None (`{}`) | Best-effort (SDK) |
-| `app_startup` | Mobile app | How long does cold start take per gate? | Client: first launch drain | Record of numeric marks + `outcome` enum; keys runtime-checked against the deny-list | Best-effort (SDK) |
+| `app_startup` | Mobile app | How long does cold start take per gate? | Client: first launch drain | Typed by the strict catalog schema (`outcome` enum + numeric marks); keys runtime-checked against the deny-list | Best-effort (SDK) |
 
 ### KiloClaw onboarding events (legacy kebab-case, AppsFlyer-locked)
 
@@ -164,9 +165,9 @@ receipt.
   creation is future work.
 - `session_created` fires after `prepareSession` returns; it is accepted-phase
   metadata, never a terminal outcome, and is not moved or renamed.
-- `app_startup` payload stays a bounded record of numeric timing marks (the
-  single record-schema exception); its keys are checked against the deny-list
-  at runtime capture.
+- `app_startup` payloads are typed by the strict catalog schema (`outcome`
+  enum + numeric timing marks); its keys are checked against the deny-list at
+  runtime capture.
 - The uncataloged mobile `captureEvent` overload is sanctioned for the
   AppsFlyer mirror path only. `appsflyer.ts` `trackEvent` forwards the locked
   funnel names through consent, generation, and privacy checks.

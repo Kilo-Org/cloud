@@ -59,13 +59,16 @@ export function isProhibitedPropertyKey(key: string): boolean {
 }
 
 /**
- * Returns a copy of `properties` with every prohibited key removed. Used at
- * runtime capture for record-shaped payloads whose keys a strict object
- * schema cannot enumerate (`app_startup`) and for uncataloged dynamic-name
- * events (the AppsFlyer mirror path).
+ * Returns a partial copy of `properties` with every prohibited key removed.
+ * Callers must narrow before reading any key of the result. Used at runtime
+ * capture for record-shaped payloads whose keys a strict object schema cannot
+ * enumerate (`app_startup`) and for uncataloged dynamic-name events (the
+ * AppsFlyer mirror path).
  */
-export function redactProhibitedProperties<T extends Record<string, unknown>>(properties: T): T {
+export function redactProhibitedProperties<T extends Record<string, unknown>>(
+  properties: T
+): Partial<T> {
   return Object.fromEntries(
     Object.entries(properties).filter(([key]) => !isProhibitedPropertyKey(key))
-  ) as T;
+  ) as Partial<T>;
 }

@@ -345,7 +345,7 @@ function addedLatency(report: EnkryptGuardrailReport | EnkryptOutputGuardrailRep
   if (!logOnly) return { label: 'Added latency', value };
   return {
     label: 'Log-only scan time',
-    hint: 'Log-only detectors add no latency. How long their scan ran after the point where a blocking scan would wait. Older reports show none.',
+    hint: 'Log-only detectors add no latency. How long their scan ran after the point where a blocking scan would wait. Older reports show the actual wait instead: about 0 ms, or none.',
     value,
   };
 }

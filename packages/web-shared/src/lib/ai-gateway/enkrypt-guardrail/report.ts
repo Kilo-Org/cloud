@@ -99,9 +99,10 @@ const scanOutcomeShape = {
   /**
    * Calls of an input part not made because an earlier call of the request's blocking scan, or a
    * cached block, possibly of this part, blocked the request. Their units are neither scanned nor
-   * cached. A part all of
-   * whose calls were skipped reports `allowed`, with no attempt. Absent from reports written before
-   * scans stopped at a block, and from per-call and output scan reports.
+   * cached. A part decided by its own cached block reports `blocked`; a part all of whose calls
+   * were skipped because another part blocked the request reports `allowed`, with no attempt.
+   * Absent from reports written before scans stopped at a block, and from per-call and output scan
+   * reports.
    */
   calls_skipped: z.number().optional(),
   /**

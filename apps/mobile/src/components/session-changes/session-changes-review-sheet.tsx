@@ -91,6 +91,10 @@ export function SessionChangesReviewSheet({
         title={t('agentChat.sessionChanges.reviewTitle', { count: draft.comments.length })}
         onDone={onClose}
         doneLabel={t('common.close')}
+        // The sheet sizes to its content and never reaches the window top, so
+        // the header reserves no status-bar clearance — the half-detent rule
+        // the environment and reaction pickers follow.
+        topInset="never"
         underHandle
       />
       <View className="px-4 pb-6">

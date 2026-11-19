@@ -1,3 +1,6 @@
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+import { z } from 'zod';
 import { createKiloClient } from '@kilocode/sdk';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
 import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
@@ -34,6 +37,21 @@ export type KiloHarnessOptions = {
   log?: (message: string) => void;
 };
 
+/**
+ * The fields a session read returns that a reuse decision depends on: its
+ * identity and the directory it is recorded under.
+ */
+const sessionProbeSchema = z.object({ id: z.string(), directory: z.string() });
+
+/** The native server stores realpath-canonical paths; compare in the same form. */
+async function canonicalDirectory(directory: string): Promise<string> {
+  try {
+    return await fsp.realpath(directory);
+  } catch {
+    return path.resolve(directory);
+  }
+}
+
 async function sessionExists(
   client: WrapperKiloClient,
   sessionId: string,
@@ -45,11 +63,18 @@ async function sessionExists(
   const response = await fetchKiloServer(client.server, url, { signal });
   if (response.status === 404) return false;
   if (!response.ok) throw new Error('Kilo session probe failed');
-  const data: unknown = await response.json();
-  if (typeof data !== 'object' || data === null || !('id' in data) || data.id !== sessionId) {
+  const parsed = sessionProbeSchema.safeParse(await response.json());
+  if (!parsed.success || parsed.data.id !== sessionId) {
     throw new Error('Kilo session probe returned an invalid session');
   }
-  return true;
+  // Reuse requires the session to be recorded under this route's directory.
+  // Otherwise it is treated as absent, so the caller restores or creates its
+  // own session, as the v2 opener does.
+  const [sessionDirectory, routeDirectory] = await Promise.all([
+    canonicalDirectory(parsed.data.directory),
+    canonicalDirectory(directory),
+  ]);
+  return sessionDirectory === routeDirectory;
 }
 
 export function createKiloHarness(options: KiloHarnessOptions): Harness {

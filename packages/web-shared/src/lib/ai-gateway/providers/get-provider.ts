@@ -420,7 +420,6 @@ async function resolvePartnerRoute(
     provider: {
       ...buildDirectProvider('partner', getCustomLlmApiKinds(definition), definition, auth),
       inferenceProviderId: definition.partner.inference_provider,
-      catalogModelId: partner.public_id,
     },
     userByok: null,
     isFree: isFreeModel(input.requestedModel),

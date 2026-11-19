@@ -72,7 +72,6 @@ import {
   OPENROUTER,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { createUserVercelAiGatewayProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
-import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -2547,7 +2546,7 @@ describe('logMicrodollarUsage', () => {
     expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
   });
 
-  test('bills partner usage at the partner pricing and records the requested model', async () => {
+  test('bills partner usage at the partner pricing and keeps the upstream model', async () => {
     const user = await insertTestUser({
       id: 'test-partner-priced-user',
       microdollars_used: 1000,
@@ -2589,41 +2588,11 @@ describe('logMicrodollarUsage', () => {
     });
     expect(usageRecord).toMatchObject({
       provider: 'partner',
-      model: 'moonshotai/kimi-k2.6',
+      model: 'partner-upstream-model',
       requested_model: 'moonshotai/kimi-k2.6',
       cost: pricedCost,
     });
     expect((await findUserById(user.id))?.microdollars_used).toBe(1000 + pricedCost);
-  });
-
-  test('records the catalog model a partner served for a latest alias request', async () => {
-    const user = await insertTestUser({
-      id: 'test-partner-alias-user',
-      microdollars_used: 0,
-      google_user_email: 'partner-alias@example.com',
-    });
-
-    const result = await processTokenData(
-      { ...BASE_USAGE_STATS, model: 'partner-upstream-model', messageId: null, cost_mUsd: 300 },
-      {
-        ...createBaseUsageContext(user),
-        provider: 'partner',
-        requested_model: '~moonshotai/kimi-latest',
-        is_free: false,
-        custom_llm_pricing: null,
-      },
-      { catalogModelId: 'moonshotai/kimi-k2.6' } as Provider
-    );
-
-    assert(result);
-    const usageRecord = await db.query.microdollar_usage.findFirst({
-      where: eq(microdollar_usage.id, result.usageId),
-    });
-    expect(usageRecord).toMatchObject({
-      provider: 'partner',
-      model: 'moonshotai/kimi-k2.6',
-      requested_model: '~moonshotai/kimi-latest',
-    });
   });
 
   test.each([

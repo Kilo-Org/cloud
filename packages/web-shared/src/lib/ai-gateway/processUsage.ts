@@ -1771,9 +1771,7 @@ export async function processTokenData(
     );
   }
 
-  if (usageContext.provider === 'partner') {
-    usageStats.model = servingProvider?.catalogModelId ?? usageContext.requested_model;
-  } else if (
+  if (
     !usageStats.model || // fallback for failure cases
     usageContext.provider === 'custom' ||
     usageContext.provider === 'custom-public' // custom LLMs do not reveal their upstream model

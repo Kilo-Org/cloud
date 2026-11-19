@@ -501,7 +501,7 @@ describe('getProvider skips the partner', () => {
 
     expect(result.routes).toHaveLength(2);
     const partnerRoute = await result.routes[0]();
-    expect(partnerRoute.provider).toMatchObject({ type: 'partner', catalogModelId: MODEL });
+    expect(partnerRoute.provider.type).toBe('partner');
     expect(partnerRoute.customLlmPricing).toEqual(pricing);
     expect(decision.steps.at(-1)).toMatchObject({
       step: 'kilo',

@@ -8,7 +8,10 @@ import { eq } from 'drizzle-orm';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { MetadataDb } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
-import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import {
+  isLatestAliasId,
+  type GatewayModelMap,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 /**
  * How old a new target must be before an alias that already has a stored target switches to it, so
@@ -78,7 +81,7 @@ export function updateLatestAliasTargets(params: {
   const entries: LatestAliasTarget[] = [];
   for (const [alias, model] of Object.entries(models)) {
     const liveTarget = model.alias_target?.slug;
-    if (!alias.startsWith('~') || liveTarget === undefined) continue;
+    if (!isLatestAliasId(alias) || liveTarget === undefined) continue;
     const stored = previous.get(alias);
     if (!Object.hasOwn(models, liveTarget)) {
       if (stored) entries.push(stored);

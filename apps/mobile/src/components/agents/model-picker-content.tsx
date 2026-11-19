@@ -55,9 +55,19 @@ export function ModelPickerContent() {
   const selectedModelRef = useRef(selectedModel);
   const selectedVariantRef = useRef(selectedVariant);
   const selectionChangedRef = useRef(false);
+  // Set only by the closes that keep the pick: Done, and the pick's own close
+  // (a single-effort model, or an effort chip). Every other way out — Cancel,
+  // Android Back, an iOS swipe-down — leaves it unset, so the focus cleanup
+  // drops a pick still waiting for its effort and the caller keeps its model.
+  const commitOnCloseRef = useRef(false);
   const closePickerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const closePicker = useCallback(() => {
+    commitOnCloseRef.current = true;
+    router.back();
+  }, [router]);
+
+  const cancelPicker = useCallback(() => {
     router.back();
   }, [router]);
 
@@ -76,6 +86,7 @@ export function ModelPickerContent() {
       selectedModelRef.current = nextModel;
       selectedVariantRef.current = nextVariant;
       selectionChangedRef.current = false;
+      commitOnCloseRef.current = false;
       setBridge(nextBridge);
       setSelectedModel(nextModel);
       setSelectedVariant(nextVariant);
@@ -89,7 +100,7 @@ export function ModelPickerContent() {
         }
 
         const activeBridge = bridgeRef.current;
-        if (activeBridge && selectionChangedRef.current) {
+        if (activeBridge && selectionChangedRef.current && commitOnCloseRef.current) {
           commitModelPickerSelection(
             activeBridge,
             selectedModelRef.current,
@@ -225,6 +236,7 @@ export function ModelPickerContent() {
       <PickerSheet
         title={t('agentChat.modelPicker.title')}
         onDone={closePicker}
+        onCancel={cancelPicker}
         scrollable={false}
         expired
       />
@@ -235,6 +247,7 @@ export function ModelPickerContent() {
     <PickerSheet
       title={t('agentChat.modelPicker.title')}
       onDone={closePicker}
+      onCancel={cancelPicker}
       scrollable={false}
       headerContent={
         <View>

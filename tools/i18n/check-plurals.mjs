@@ -51,7 +51,7 @@ import {
   missingPluralCategories,
 } from '../lib/catalogs.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
-import { isTestArtifact, parseSourceEntry, parseSourceTree } from '../lib/source-files.mjs';
+import { isTestArtifact, parseSourceTree, readSourceEntry } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SOURCE_DIR = join(ROOT, 'apps/mobile/src');
@@ -477,26 +477,14 @@ function declaredKeys(entry, declaration) {
  * lines that say the parser refused it, and the keys read from each declaration
  * so far — the two `McpStatusKey` entries share one read.
  *
- * A refused read is worded exactly as the tree walk words it. The module sits
- * below the source root, so both reads reach it; one wording means the caller's
- * `reported` set drops the line the scan already owns instead of printing the
- * same failure twice.
+ * The read is the tree walk's own step, `readSourceEntry`, so a refused read
+ * yields that step's single line instead of a copy of its wording. The module
+ * sits below the source root, so both reads reach it; one wording means the
+ * caller's `reported` set drops the line the scan already owns instead of
+ * printing the same failure twice.
  */
 function readDeclarationModule(rootDir, source) {
-  const file = join(rootDir, source);
-  let text;
-  try {
-    text = readFileSync(file, 'utf8');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      path: source,
-      entry: null,
-      declarations: new Map(),
-      problems: [`${source}: cannot read: ${message}`],
-    };
-  }
-  const entry = parseSourceEntry(rootDir, rootDir, file, text);
+  const entry = readSourceEntry(rootDir, rootDir, join(rootDir, source));
   return { path: entry.path, entry, declarations: new Map(), problems: entry.problems };
 }
 
@@ -563,12 +551,27 @@ export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set
 }
 
 /**
- * One catalog, flattened by tag. The English read and the per-locale loop both
+ * One catalog, flattened by tag. The audited read and the per-locale loop both
  * decode through here, so a change to how a catalog is read has one place to
- * land; each caller keeps its own handling of a refused or malformed file.
+ * land. The read-and-report step is `readAuditedCatalog`; the plural-rule
+ * failure is reported by its caller with the same line.
  */
 function readCatalog(tag, localesDir = LOCALES_DIR) {
   return flattenCatalog(JSON.parse(readFileSync(join(localesDir, `${tag}.json`), 'utf8')));
+}
+
+/**
+ * One catalog read and reported: the flattened catalog and the problem lines a
+ * caller must print, or a `null` catalog and one line naming the cause when the
+ * filesystem refuses the file or `JSON.parse` rejects it.
+ */
+export function readAuditedCatalog(tag, localesDir = LOCALES_DIR) {
+  try {
+    return { catalog: readCatalog(tag, localesDir), problems: [] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { catalog: null, problems: [`${tag}: cannot audit catalog: ${message}`] };
+  }
 }
 
 /**
@@ -578,12 +581,7 @@ function readCatalog(tag, localesDir = LOCALES_DIR) {
  * audit reporting instead of a stack trace.
  */
 export function readEnglishCatalog(localesDir = LOCALES_DIR) {
-  try {
-    return { catalog: readCatalog('en', localesDir), problems: [] };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { catalog: null, problems: [`en: cannot audit catalog: ${message}`] };
-  }
+  return readAuditedCatalog('en', localesDir);
 }
 
 /**
@@ -674,11 +672,14 @@ function run() {
       if (tag === 'en') {
         continue;
       }
-      let catalog;
+      const read = readAuditedCatalog(tag);
+      problems.push(...read.problems);
+      if (read.catalog === null) {
+        continue;
+      }
       let missing;
       try {
-        catalog = readCatalog(tag);
-        missing = missingPluralCategories(english, catalog, tag);
+        missing = missingPluralCategories(english, read.catalog, tag);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         problems.push(`${tag}: cannot audit catalog: ${message}`);

@@ -107,6 +107,7 @@ import {
   isFinalizedBriefingText,
   type BriefingExcerpt,
 } from '../ingest/briefing-excerpt';
+import { laterLastActivityAt } from '../ingest/last-activity';
 import {
   SHARE_INFO_KEY_PREFIX,
   shareInfoKey,
@@ -399,13 +400,7 @@ export async function persistLiveSessionColumns(
   }
 
   if (columns.lastActivityAtIso !== undefined) {
-    const activity = columns.lastActivityAtIso;
-    set.last_activity_at = sql`CASE
-      WHEN ${cli_sessions_v2.last_activity_at} IS NULL
-        OR ${cli_sessions_v2.last_activity_at} < ${activity}
-      THEN ${activity}
-      ELSE ${cli_sessions_v2.last_activity_at}
-    END`;
+    set.last_activity_at = laterLastActivityAt(columns.lastActivityAtIso);
   }
 
   if (columns.liveSummary !== undefined) {

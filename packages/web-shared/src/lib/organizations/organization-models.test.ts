@@ -39,7 +39,7 @@ const mockEvaluatePolicy = jest.fn(
 );
 const ALLOWED_MODEL_ROUTES: ReadonlySet<string> = new Set(['groq']);
 const DENIAL_SOURCES: Record<string, string> = {
-  'provider/blocked': 'group_model',
+  'provider/blocked': 'no_grant',
   'provider/ceiling-inference': 'organization_provider',
   'provider/ceiling-catalog': 'organization_provider',
   'provider/ceiling-gateway': 'organization_provider',

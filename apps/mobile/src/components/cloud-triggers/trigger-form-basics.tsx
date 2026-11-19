@@ -58,7 +58,7 @@ export function TriggerFormBasics({
   const { markTouched, shownProblem } = useTouchedProblems(problems);
   const repositoryError = triggerProblemText(shownProblem('repository'));
   const repositoryValue =
-    draft.repository.length === 0 ? t('cloudAgent.triggers.notSelected') : draft.repository;
+    draft.repository.length === 0 ? t('common.notSelected') : draft.repository;
   const activate = (activation: TriggerActivation) => {
     // A prompt still on the other activation's default follows the choice, so a
     // scheduled trigger does not start out describing a webhook body.

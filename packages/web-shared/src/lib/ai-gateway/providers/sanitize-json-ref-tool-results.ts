@@ -1,15 +1,19 @@
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+import { CACHE_CONTROL_NODE_BUDGET } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 /**
- * Same order as `CACHE_CONTROL_NODE_BUDGET` in the OpenRouter request helpers: tool payloads
- * are client-supplied, so a traversal of one needs a fixed bound. A payload over either
+ * Tool payloads are client-supplied, so a traversal of one needs a fixed bound: the same node
+ * budget as the cache-control traversal in the OpenRouter request helpers. A payload over either
  * budget is left unchanged rather than partially rewritten.
  */
-const JSON_REF_NODE_BUDGET = 100_000;
+export const JSON_REF_NODE_BUDGET = CACHE_CONTROL_NODE_BUDGET;
 
-/** Same value as `PROMPT_WALK_MAX_DEPTH` in `packages/auto-routing-contracts/src/normalize.ts`. */
-const JSON_REF_MAX_DEPTH = 64;
+/**
+ * The depth bound every walk over client content uses; asserted equal to
+ * `PROMPT_WALK_MAX_DEPTH`.
+ */
+export const JSON_REF_MAX_DEPTH = 64;
 
 /**
  * Renames `$ref` properties to `_ref` in place and reports whether anything would change.

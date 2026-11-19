@@ -61,6 +61,12 @@ const openPicker = vi.hoisted(() => vi.fn());
 
 const councilUi = vi.hoisted(() => ({ allowed: false }));
 
+// The header's scope subtitle reads the membership list; this suite tests the
+// overview body, so the subtitle is a fixed name for each kind of scope.
+vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
+  useReviewerScopeTitle: (scope: string) => (scope === 'personal' ? 'Personal' : 'Drain Labs'),
+}));
+
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },

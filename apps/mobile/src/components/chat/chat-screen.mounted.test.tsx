@@ -1076,7 +1076,7 @@ describe('message actions', () => {
     }
   });
 
-  it('puts Retry and Copy to composer on the failed question, and states why under the transcript', async () => {
+  it('puts Retry, Copy to composer and the cause on the failed question, and nothing above the composer', async () => {
     state.status = 'idle';
     state.asked = 'what is a monad';
     state.failureKey = 'modelChat.backends.deletedBackend';
@@ -1089,12 +1089,16 @@ describe('message actions', () => {
     const tree = await mount();
     const failed = bubbleFor(tree, 's1:asked');
 
-    expect(failed.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(failed.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
+    });
     expect(bubbleFor(tree, 's1:waiting:0').onRetryMessage).toBeUndefined();
     expect(bubbleFor(tree, 't1').deliveryState).toBeUndefined();
-    expect(tree.root.find(node => (node.type as string) === 'AccessibleStatus').props.message).toBe(
-      'This chat backend was deleted. Choose another backend to continue.'
-    );
+    // The bubble states the failure once; the row above the composer does not repeat it.
+    expect(count(tree, 'AccessibleStatus')).toBe(0);
     // The message carries the one Retry.
     expect(count(tree, 'Button')).toBe(0);
 
@@ -1144,7 +1148,12 @@ describe('message actions', () => {
     const kept = bubbleFor(tree, 's1:displaced:k1');
 
     // It keeps the footer and the recovery it had in the slot.
-    expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(kept.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
+    });
     expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual(kept.deliveryState);
 
     act(() => {
@@ -1199,7 +1208,8 @@ describe('message actions', () => {
     expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual({
       status: 'failed',
       error: '',
-      reason: 'execution',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
     });
   });
 
@@ -1268,7 +1278,12 @@ describe('message actions', () => {
     const bubble = bubbleFor(tree, 's1:asked');
 
     // The transcript drew the slot's own bubble, so the recovery is on it.
-    expect(bubble.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubble.deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'chat-response',
+      detailKey: 'modelChat.backends.deletedBackend',
+    });
     expect(bubble.onRetryMessage).toBeDefined();
   });
 

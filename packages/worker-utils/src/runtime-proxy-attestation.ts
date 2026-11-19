@@ -8,6 +8,8 @@ export const RUNTIME_PROXY_ATTESTATION_ISSUER = 'kilocode-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_TYPE = 'cloud-agent-next-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_VERSION = 1;
 export const RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS = 30;
+/** Sanity bound on the untrusted header value in characters, checked before any JWT parsing runs. */
+export const RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH = 4096;
 
 export const RuntimeProxyAttestationAudienceSchema = z.enum([
   'kilo-api',
@@ -93,7 +95,7 @@ export async function issueRuntimeProxyAttestation(
 export async function verifyRuntimeProxyAttestation(
   input: RuntimeProxyAttestationSubject & { value: string | null | undefined }
 ): Promise<boolean> {
-  if (!input.value || input.value.length > 4096) return false;
+  if (!input.value || input.value.length > RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH) return false;
   try {
     const { payload } = await verifyKiloTokenSignature(input.value, input.secret, {
       issuer: RUNTIME_PROXY_ATTESTATION_ISSUER,

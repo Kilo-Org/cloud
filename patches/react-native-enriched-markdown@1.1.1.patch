@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
-index 7bb48f44c5415f7c6b914934db90705825bfea13..0492125a61245e4494b517d32216db0eec901598 100644
+index 7bb48f4..0492125 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/MeasurementStore.kt
 @@ -50,6 +50,42 @@ import kotlin.math.ceil
@@ -349,10 +349,23 @@ index 7bb48f44c5415f7c6b914934db90705825bfea13..0492125a61245e4494b517d32216db0e
  
      return size to layout
 diff --git a/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt b/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt
-index 423ab10f53d43295fd52363cb87348e3e3410007..34c4954a037e9a3d7ee48982ca9d6fc32e960b6d 100644
+index 423ab10..76cc60d 100644
 --- a/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt
 +++ b/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt
-@@ -447,7 +447,7 @@ class MarkdownAccessibilityHelper(
+@@ -326,6 +326,12 @@ class MarkdownAccessibilityHelper(
+     if (items.isNotEmpty()) {
+       host.isScreenReaderFocusable = false
+       host.isFocusable = false
++      // The TextView is clickable for link taps. Links are virtual children with their own
++      // click action, so the host without text must not be a clickable node.
++      host.isClickable = false
++      host.isLongClickable = false
++      host.removeAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK)
++      host.removeAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK)
+       // Prevent TalkBack from reading the full text when swiping onto the host.
+       // Without this, the host node retains the TextView's text and TalkBack
+       // announces it as a single element before entering the virtual children.
+@@ -447,7 +453,7 @@ class MarkdownAccessibilityHelper(
        return singleLineBounds(vs, ve, startLine)
      }
  
@@ -361,7 +374,7 @@ index 423ab10f53d43295fd52363cb87348e3e3410007..34c4954a037e9a3d7ee48982ca9d6fc3
    }
  
    private fun singleLineBounds(
-@@ -456,9 +456,22 @@ class MarkdownAccessibilityHelper(
+@@ -456,9 +462,22 @@ class MarkdownAccessibilityHelper(
      line: Int,
    ): Rect {
      val layout = textView.layout
@@ -387,7 +400,7 @@ index 423ab10f53d43295fd52363cb87348e3e3410007..34c4954a037e9a3d7ee48982ca9d6fc3
  
      return Rect(
        left,
-@@ -469,25 +482,24 @@ class MarkdownAccessibilityHelper(
+@@ -469,25 +488,24 @@ class MarkdownAccessibilityHelper(
    }
  
    private fun multiLineBounds(

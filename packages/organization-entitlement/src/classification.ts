@@ -5,6 +5,7 @@ import {
 } from './trial';
 import {
   isPaidOrganizationSeatSubscriptionStatus,
+  toOrganizationSeatPurchaseSubscriptionStatus,
   type OrganizationEntitlementBypassReason,
   type OrganizationEntitlementClassification,
   type OrganizationEntitlementInput,
@@ -12,7 +13,7 @@ import {
 
 export function classifyOrganizationEntitlement({
   organization,
-  latestSeatPurchaseStatus,
+  latestSeatPurchaseStatus: storedSeatPurchaseStatus,
   now,
 }: OrganizationEntitlementInput): OrganizationEntitlementClassification {
   const measuredDaysRemaining = getDaysRemainingInTrial(
@@ -29,6 +30,13 @@ export function classifyOrganizationEntitlement({
       ? Math.min(measuredDaysRemaining, -ORGANIZATION_TRIAL_SOFT_EXPIRY_GRACE_DAYS - 1)
       : measuredDaysRemaining;
   const trialStatus = getOrgTrialStatusFromDays(daysRemaining);
+  // The stored status is the provider's open set, so it is narrowed exactly once
+  // here: every read below sees the closed union, and a status the union does not
+  // name becomes the non-paying `unrecognized` member.
+  const latestSeatPurchaseStatus =
+    storedSeatPurchaseStatus === null
+      ? null
+      : toOrganizationSeatPurchaseSubscriptionStatus(storedSeatPurchaseStatus);
   const hasPaidSeatEntitlement =
     latestSeatPurchaseStatus != null &&
     isPaidOrganizationSeatSubscriptionStatus(latestSeatPurchaseStatus);

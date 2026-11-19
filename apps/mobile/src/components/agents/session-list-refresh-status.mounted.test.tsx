@@ -113,9 +113,9 @@ describe('SessionListRefreshStatus pull progress', () => {
     expect(
       progressRow.findByProps({ children: i18n.t('common.loading') }).props.className
     ).toContain('absolute size-px overflow-hidden');
-    // No indicator mounted means no progressbar node: the pull's settled state
-    // must not leave a stale busy node behind (RN never clears the busy tag on
-    // a kept view — see the component note).
+    // Exactly one progressbar node exists while the pull is in flight: the
+    // band draws no second indicator beside the body's own (the settled
+    // contract lives in the case below).
     const showsIndicator = mounted.root.findAllByProps({ accessibilityRole: 'progressbar' });
     expect(showsIndicator.length).toBe(1);
   });

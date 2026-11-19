@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import { kilocode_users, security_findings } from '@kilocode/db/schema';
+import { kilocode_users, organization_memberships, security_findings } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import type { SeedResult } from '../index';
 
-export const usage = '<email>';
+export const usage = '<email> [--empty | --denied <organization-id>]';
 
 const SOURCE_IDS = ['seed-redos-1', 'seed-left-pad-1'] as const;
 
@@ -19,9 +19,21 @@ function printUsage(): void {
   console.log('with the wrapped lines GitHub returns, so the finding detail screen is reachable');
   console.log('with real provider-shaped copy.');
   console.log('');
+  console.log('Variants:');
+  console.log(
+    '  --empty            removes this topic\u2019s two findings, so the personal finding'
+  );
+  console.log('                     list is empty; the audit report has no recorded event either.');
+  console.log('  --denied <org-id>  writes nothing and returns the links for an organization the');
+  console.log('                     account is a plain member of: the audit report answers the');
+  console.log('                     billing-role refusal and the settings screen is read-only.');
+  console.log('                     Seed that membership first with app:mobile-org-states.');
+  console.log('');
   console.log('Usage:');
   console.log('  pnpm dev:seed app:create-user "Security Fixture" sec@example.com');
   console.log('  pnpm dev:seed app:security-agent-findings sec@example.com');
+  console.log('  pnpm dev:seed app:security-agent-findings sec@example.com --empty');
+  console.log('  pnpm dev:seed app:security-agent-findings sec@example.com --denied <org-id>');
   console.log('');
   console.log('Open a finding with:');
   console.log('  adb shell "am start -a android.intent.action.VIEW \\');
@@ -43,13 +55,18 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const [email, ...rest] = args;
-  if (!email) {
+  if (!email || email.startsWith('-')) {
     printUsage();
     throw new Error('email is required');
   }
-  if (rest.length > 0) {
-    throw new Error(`unexpected arguments: ${rest.join(' ')}`);
+  const emptyVariant = rest.length === 1 && rest[0] === '--empty';
+  const deniedVariant = rest.length === 2 && rest[0] === '--denied' && rest[1].length > 0;
+  if (rest.length > 0 && !emptyVariant && !deniedVariant) {
+    throw new Error(
+      `unexpected arguments: ${rest.join(' ')}; pass --empty or --denied <organization-id>`
+    );
   }
+  const deniedOrganizationId = deniedVariant ? rest[1] : null;
 
   assertLocalSeedDatabase('app:security-agent-findings');
   const db = getSeedDb();
@@ -67,15 +84,75 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   // Idempotent rerun: the two fixtures are the only rows this topic owns, so it
-  // deletes them by their stable source ids before inserting fresh copies.
-  await db
+  // deletes them by their stable source ids before inserting fresh copies. The
+  // returned rows are the ones `--empty` reports it removed.
+  const removedFindings = await db
     .delete(security_findings)
     .where(
       and(
         eq(security_findings.owned_by_user_id, user.id),
         inArray(security_findings.source_id, [...SOURCE_IDS])
       )
-    );
+    )
+    .returning({ id: security_findings.id });
+
+  if (deniedOrganizationId !== null) {
+    // The denial is the server's role refusal, not a row: the audit-report
+    // procedure is owner-or-billing-only, so a plain member's read is refused.
+    // Check the membership here so a wrong id fails at the seed, not as a
+    // silently different screen later.
+    const [membership] = await db
+      .select({ role: organization_memberships.role })
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, deniedOrganizationId),
+          eq(organization_memberships.kilo_user_id, user.id)
+        )
+      )
+      .limit(1);
+    if (!membership) {
+      throw new Error(
+        `${email} is not a member of ${deniedOrganizationId}; seed app:mobile-org-states first`
+      );
+    }
+    if (membership.role !== 'member') {
+      throw new Error(
+        `${email} is ${membership.role} of ${deniedOrganizationId}; the denial needs a plain member`
+      );
+    }
+
+    console.log('This fixture represents:');
+    console.log('  An organization scope where the account is a plain member, so the audit');
+    console.log('  report answers the billing-role refusal and the settings screen is read-only.');
+    console.log('Suggested next step: open a returned deep link in the signed-in mobile app.');
+
+    return {
+      userId: user.id,
+      email: email.trim(),
+      organizationId: deniedOrganizationId,
+      role: membership.role,
+      auditReportPath: `/(app)/security-agent/${deniedOrganizationId}/audit-report`,
+      auditReportDeepLink: `kiloapp:///(app)/security-agent/${deniedOrganizationId}/audit-report`,
+      settingsDeepLink: `kiloapp:///(app)/security-agent/${deniedOrganizationId}/settings`,
+    };
+  }
+
+  if (emptyVariant) {
+    console.log('This fixture represents:');
+    console.log('  The personal Security Agent as a fresh account sees it: no finding row, and');
+    console.log('  no recorded audit event, so the finding list and the audit report both paint');
+    console.log('  their empty states.');
+    console.log('Suggested next step: open a returned deep link in the signed-in mobile app.');
+
+    return {
+      userId: user.id,
+      email: email.trim(),
+      removedFindingCount: removedFindings.length,
+      findingsDeepLink: 'kiloapp:///(app)/security-agent/personal/findings',
+      auditReportDeepLink: 'kiloapp:///(app)/security-agent/personal/audit-report',
+    };
+  }
 
   const dismissedFindingId = randomUUID();
   const openFindingId = randomUUID();

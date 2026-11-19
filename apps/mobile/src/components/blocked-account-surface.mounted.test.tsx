@@ -30,6 +30,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 const RETRY_LABEL = 'Retry loading account';
 const CONTACT_SUPPORT_LABEL = 'Contact support';
 const SIGN_OUT_LABEL = 'Sign out';
+const CONTINUE_LABEL = 'Continue';
 
 type SurfaceProps = {
   canRetry: boolean;
@@ -182,7 +183,7 @@ describe('BlockedAccountSurface', () => {
     renderer.unmount();
   });
 
-  it('drops Retry when no session is left and keeps Contact support then Sign out', async () => {
+  it('drops Retry when no session is left and labels the exit for what it does', async () => {
     const onContactSupport = vi.fn<() => void>();
     const onSignOut = vi.fn<() => void>();
     const renderer = await mountSurface({
@@ -193,12 +194,14 @@ describe('BlockedAccountSurface', () => {
       onSignOut,
     });
 
-    expect(pressableLabels(renderer.root)).toEqual([CONTACT_SUPPORT_LABEL, SIGN_OUT_LABEL]);
+    // Nothing is left to sign out of, so the exit reveals the login screen
+    // under a label that says so.
+    expect(pressableLabels(renderer.root)).toEqual([CONTACT_SUPPORT_LABEL, CONTINUE_LABEL]);
 
     press(renderer.root, CONTACT_SUPPORT_LABEL);
     expect(onContactSupport).toHaveBeenCalledTimes(1);
 
-    press(renderer.root, SIGN_OUT_LABEL);
+    press(renderer.root, CONTINUE_LABEL);
     expect(onSignOut).toHaveBeenCalledTimes(1);
 
     renderer.unmount();

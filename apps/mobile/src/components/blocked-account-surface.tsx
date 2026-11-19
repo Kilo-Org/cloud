@@ -5,8 +5,10 @@ import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 /**
  * The blocked-account explanation. Retry re-reads the account while the
  * session that was refused still exists, so a block lifted server-side
- * dismisses the surface without a sign-out; with no session left (the refresh
- * route's refusal) Contact support is the next step and Sign out the exit.
+ * dismisses the surface without a sign-out. With no session left (the refresh
+ * route's refusal) Contact support is the next step, and the exit only reveals
+ * the screen the app has already settled on — the login screen — so it is
+ * labelled for that reveal instead of for a sign-out that already happened.
  */
 export function BlockedAccountSurface({
   canRetry,
@@ -24,14 +26,17 @@ export function BlockedAccountSurface({
   onSignOut: () => void;
 }>) {
   const { t } = useTranslation();
+  // Without a session the exit cannot sign out: it clears the explanation and
+  // reveals the login screen, so it says what it does.
+  const exitLabel = canRetry ? t('common.signOut') : t('common.continue');
   const copy = {
     title: t('accountBlocked.title'),
     description: t('accountBlocked.description'),
     secondaryLabel: t('accountBlocked.contactSupport'),
     secondaryAccessibilityLabel: t('accountBlocked.contactSupport'),
     onSecondaryPress: onContactSupport,
-    tertiaryLabel: t('common.signOut'),
-    tertiaryAccessibilityLabel: t('common.signOut'),
+    tertiaryLabel: exitLabel,
+    tertiaryAccessibilityLabel: exitLabel,
     onTertiaryPress: onSignOut,
   };
   if (!canRetry) {

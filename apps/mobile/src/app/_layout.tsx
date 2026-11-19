@@ -327,11 +327,20 @@ function RootLayoutNav({
     // Every query refused while the account was blocked holds a cached
     // failure, so the reveal would show stale error cards until each surface
     // is retried by hand. Refetch the tree instead: a lifted block makes those
-    // reads answer. The stored organization choice is not a query — its
-    // provider keeps the failed restore in its own state — so it is retried
-    // through the same call its own Retry makes.
+    // reads answer. The identity read is the exception — it is the read that
+    // just answered, so invalidating it would only refetch it. The stored
+    // organization choice is not a query — its provider keeps the failed
+    // restore in its own state — so it is retried through the same call its
+    // own Retry makes.
     onAnswered: () => {
-      void queryClient.invalidateQueries();
+      const identityPath = trpc.user.getMe.pathKey().flat().join('.');
+      void queryClient.invalidateQueries({
+        predicate: query => {
+          // tRPC stores the procedure path as the key's first element.
+          const path = query.queryKey[0];
+          return !(Array.isArray(path) && path.join('.') === identityPath);
+        },
+      });
       retryOrganization();
     },
   });
@@ -1128,12 +1137,13 @@ function RootLayoutNav({
   // refused, so the session is still there — the overlay's Retry re-reads the
   // account, and an attempt that reaches it clears the explanation (a block
   // lifted server-side needs no sign-out). The refresh route's raise has no
-  // session behind it, so no read can answer for it: Sign out is then the only
-  // exit, and it clears the explanation and reveals whatever the tree has
-  // settled on (login when signed out). Contact support sits beside Sign out
-  // as the next step the copy names; it opens a mail to the support address
-  // and leaves the explanation up. A new sign-in clears it too, since that is
-  // the one event that proves the block no longer applies.
+  // session behind it, so no read can answer for it: the exit is then the only
+  // way out, it clears the explanation and reveals whatever the tree has
+  // settled on (login when signed out), and it is labelled Continue rather
+  // than Sign out — there is nothing left to sign out of. Contact support sits
+  // beside it as the next step the copy names; it opens a mail to the support
+  // address and leaves the explanation up. A new sign-in clears it too, since
+  // that is the one event that proves the block no longer applies.
   const showBlockedAccountError = blockedAccountActive && bootstrapErrorOwnsScreen;
 
   // The wait surface (or the held restore or blocked surface) covers the tree:

@@ -29,6 +29,7 @@ import {
   getOrganizationByokProviderIds,
   getStoredByokKeys,
   getUserByokProviderIds,
+  parseByokSettings,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -268,11 +269,23 @@ describe('byokOwner', () => {
 
 describe('servesCatalogModels', () => {
   test('is true only for stored settings that enable catalog mode', () => {
-    expect(servesCatalogModels({ serve_catalog_models: true })).toBe(true);
-    expect(servesCatalogModels({ serve_catalog_models: false })).toBe(false);
-    expect(servesCatalogModels({})).toBe(false);
-    expect(servesCatalogModels(null)).toBe(false);
-    expect(servesCatalogModels({ serve_catalog_models: 'true' })).toBe(false);
+    expect(servesCatalogModels(parseByokSettings({ serve_catalog_models: true }))).toBe(true);
+    expect(servesCatalogModels(parseByokSettings({ serve_catalog_models: false }))).toBe(false);
+    expect(servesCatalogModels(parseByokSettings({}))).toBe(false);
+    expect(servesCatalogModels(parseByokSettings(null))).toBe(false);
+    expect(servesCatalogModels(parseByokSettings({ serve_catalog_models: 'true' }))).toBe(false);
+  });
+});
+
+describe('parseByokSettings', () => {
+  test('reads invalid or missing settings as empty', () => {
+    expect(parseByokSettings({})).toEqual({});
+    expect(parseByokSettings({ priority: 'x' })).toEqual({});
+    expect(parseByokSettings(null)).toEqual({});
+    expect(parseByokSettings({ serve_catalog_models: true, priority: 2 })).toEqual({
+      serve_catalog_models: true,
+      priority: 2,
+    });
   });
 });
 
@@ -358,12 +371,12 @@ describe('getByokCredentials', () => {
       'anthropic',
       '2026-01-01T00:00:00.000Z',
       {
-        settings: { serve_catalog_models: true },
+        settings: { serve_catalog_models: true, priority: 2 },
       }
     );
 
     await expect(getBYOKforUser(db, user.id, ['anthropic'])).resolves.toEqual([
-      { decryptedAPIKey: expect.any(String), providerId: 'anthropic' },
+      { decryptedAPIKey: expect.any(String), providerId: 'anthropic', priority: 2 },
     ]);
   });
 });

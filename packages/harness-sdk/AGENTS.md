@@ -1637,21 +1637,18 @@ instead of the provider would be a change to what the provider sealed.
 .delta`, so both are read. Two providers relayed through the chat shape name it
 `reasoning` and `reasoning_content`, so both are read there.
 
-A turn holds as many reasoning parts as the model produced, and an encrypted
-block closes the one open at the time. What still merges is two signed blocks
-with nothing between them: a signature does not close a block here, so both
-land in one part with the second signature. A model produces those between tool
-calls, which this package does not have. Split on the signature when it does.
+A turn holds as many reasoning parts as the model produced. The words and the
+signature arrive on separate events, so both land on the block still open, and
+a signature closes it: the next thinking event opens a new part. An encrypted
+block closes the one open at the time. A model produces two signed blocks in a
+row between tool calls, and merging them would hand the provider one block
+under the other's seal.
 
 Measured with `pnpm test:e2e:probe responses anthropic/claude-sonnet-4.5` on
 2026-09-04: one reasoning item and one message in a turn, 43
 `response.reasoning.delta` frames and a single `response.output_item.done`
-carrying the reasoning. So the merge loses nothing today, and the probe is how
-to check that again.
-
-A thinking block is closed by its seal, not by the next event. A model produces
-two signed blocks in a row between tool calls, and merging them would hand the
-provider one block under the other's seal.
+carrying the reasoning. So a turn holds one sealed block today, and the probe
+is how to check that again.
 
 The gateway then ends a block with a reasoning event carrying no words and no
 signature, after the signature has already arrived. That event opens no block:

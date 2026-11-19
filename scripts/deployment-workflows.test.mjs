@@ -640,7 +640,9 @@ test('web promotion waits for a completed or deliberately skipped gateway rollou
       'stage-ai-gateway': stage,
       'promote-ai-gateway': promotion,
     };
-    const needs = Object.fromEntries(job.needs.map(name => [name, { result: results[name] }]));
+    const needs = Object.fromEntries(
+      job.needs.map(name => [name, { result: results[name] ?? 'success' }])
+    );
     assert.equal(
       runInNewContext(expression, {
         needs,
@@ -1326,10 +1328,11 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
 
   const ingest = workers.jobs['deploy-session-ingest'];
   assert.equal(ingest.needs, 'verify-main');
-  assert.equal(
-    ingest.if,
-    "github.repository == 'Kilo-Org/cloud' && inputs.deploy_cloud_agent_after_session_ingest == 'true'"
-  );
+  // Selected only by the detection call's flag, behind the same repo and
+  // ref-check guard every secret-reading deploy job names.
+  assert.match(ingest.if, /github\.repository == 'Kilo-Org\/cloud'/);
+  assert.match(ingest.if, /needs\.verify-main\.result == 'success'/);
+  assert.match(ingest.if, /inputs\.deploy_cloud_agent_after_session_ingest == 'true'/);
   assert.equal(ingest.environment, '${{ inputs.target_environment }}');
   assert.equal(ingest['timeout-minutes'], 25);
 
@@ -1490,4 +1493,108 @@ test('a Pages pin move deploys the output shell beside Pages', t => {
   git('checkout', '-q', '-b', 'docs', base);
   commit({ 'services/pages/README.md': 'Pages, again' }, 'docs');
   assert.deepEqual(detected('docs'), ['services/pages'], 'another Pages change leaves the shell');
+});
+
+// A job that holds an environment or reads a credential needs the ref check
+// itself, not an unrelated chained result: GitHub skips a job whose `needs`
+// failed, but a condition that never names verify-main still runs the moment
+// some other dependency succeeds on a ref that must not deploy. The predicate
+// covers the three job-level shapes and any secret read anywhere in the job
+// (a step env, a token mint, a service container), because a step-level secret
+// is as privileged as one the job maps.
+const SECRET_JOB = job => {
+  const source = JSON.stringify(job);
+  return (
+    job.environment !== undefined ||
+    job.secrets !== undefined ||
+    (job.env !== undefined &&
+      Object.values(job.env).some(value => String(value).includes('secrets.'))) ||
+    source.includes('secrets.') ||
+    source.includes('github.token')
+  );
+};
+
+test('every job that reads a secret requires the ref check explicitly', () => {
+  const deployments = {
+    'deploy-production': production,
+    'deploy-staging': staging,
+    'deploy-workers': workers,
+    'kilo-app-changelog-history': workflow('kilo-app-changelog-history'),
+  };
+  // What check-changes and detect-workers publish, so a condition that reads an
+  // output gets the value a healthy run provides.
+  const outputs = {
+    should_deploy: 'true',
+    target_sha: 'x',
+    base_sha: 'y',
+    deployment_url: 'https://example.test',
+    matrix: '[]',
+    'deploy-cloud-agent-after-session-ingest': 'false',
+  };
+  const asExpression = source =>
+    String(source)
+      .trim()
+      .replace(/^\$\{\{/, '')
+      .replace(/\}\}$/, '')
+      .replace(/needs\.([\w-]+)\./g, 'needs["$1"].')
+      .trim();
+
+  for (const [name, deployment] of Object.entries(deployments)) {
+    // The workflow's declared defaults, plus every selection input engaged: a
+    // job skipped because its own input is empty would make the guard
+    // unobservable, so the inputs a caller sets when the job is meant to run
+    // are set here.
+    const inputs = { worker: 'services/session-ingest' };
+    for (const declared of [
+      deployment.on?.workflow_dispatch?.inputs,
+      deployment.on?.workflow_call?.inputs,
+    ]) {
+      for (const [input, spec] of Object.entries(declared ?? {})) {
+        inputs[input] = spec?.default ?? '';
+      }
+    }
+    inputs.worker = 'services/session-ingest';
+    inputs.worker_matrix = '["services/session-ingest"]';
+    inputs.base_sha = 'x';
+    inputs.deploy_cloud_agent_after_session_ingest = 'true';
+
+    const runs = (job, result) => {
+      const needs = Object.fromEntries(
+        ['verify-main', ...[job.needs ?? []].flat()].map(dependency => [
+          dependency,
+          { result: dependency === 'verify-main' ? result : 'success', outputs },
+        ])
+      );
+      return runInNewContext(asExpression(job.if), {
+        needs,
+        github: {
+          repository: 'Kilo-Org/cloud',
+          event_name: 'workflow_dispatch',
+          ref: 'refs/heads/main',
+        },
+        inputs,
+        vars: {},
+        secrets: {},
+        cancelled: () => false,
+      });
+    };
+
+    const guarded = Object.entries(deployment.jobs).filter(([, job]) => SECRET_JOB(job));
+    assert.ok(guarded.length > 0, `${name} must still deploy something that reads a secret`);
+    for (const [id, job] of guarded) {
+      const needsVerifyMain = [job.needs ?? []].flat().includes('verify-main');
+      assert.equal(needsVerifyMain, true, `${name} ${id} reads a secret and must need verify-main`);
+      assert.match(
+        String(job.if),
+        /needs\.verify-main\.result == 'success'/,
+        `${name} ${id} must name the ref check result`
+      );
+      assert.equal(runs(job, 'success'), true, `${name} ${id} runs when the ref check passed`);
+      assert.equal(
+        runs(job, 'failure'),
+        false,
+        `${name} ${id} must not run when verify-main failed`
+      );
+    }
+  }
 });

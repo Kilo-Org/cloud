@@ -50,8 +50,13 @@ jobs:
     needs: verify-main
     # The mint below uses a repository secret; only the canonical repo may run
     # this job, and the sibling jobs of the release workflow that consume the
-    # same credential all run on main, so this one requires it too.
-    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
+    # same credential all run on main, so this one requires it too. The ref
+    # check's result is named explicitly, so a failed verify-main blocks the
+    # mint instead of relying on the ref alone.
+    if: >-
+      github.repository == 'Kilo-Org/cloud' &&
+      needs.verify-main.result == 'success' &&
+      github.ref == 'refs/heads/main'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:

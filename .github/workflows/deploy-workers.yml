@@ -98,7 +98,12 @@ jobs:
     # (Also called as a reusable workflow from deploy-staging.yml, whose
     # caller job is itself guarded — deploy-manual does not run on calls
     # because `worker` is empty.)
-    if: inputs.worker != '' && github.repository == 'Kilo-Org/cloud'
+    # The ref check is named here: this job deploys with repo secrets, so a
+    # failed verify-main must block it.
+    if: >-
+      inputs.worker != '' &&
+      github.repository == 'Kilo-Org/cloud' &&
+      needs.verify-main.result == 'success'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ inputs.worker == 'services/cloud-agent-next' && 75 || inputs.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     name: Deploy ${{ inputs.worker }}
@@ -450,8 +455,14 @@ jobs:
   deploy-changed:
     needs: verify-main
     # A deploy call reaches this job only through a caller that already gates
-    # the call on main (deploy-production.yml / deploy-staging.yml).
-    if: inputs.worker_matrix != '[]' && inputs.worker_matrix != '' && github.repository == 'Kilo-Org/cloud'
+    # the call on main (deploy-production.yml / deploy-staging.yml). The ref
+    # check is named here as well: this job deploys with repo secrets, so a
+    # failed verify-main must block it even if a caller stops gating.
+    if: >-
+      inputs.worker_matrix != '[]' &&
+      inputs.worker_matrix != '' &&
+      github.repository == 'Kilo-Org/cloud' &&
+      needs.verify-main.result == 'success'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ matrix.worker == 'services/cloud-agent-next' && 75 || matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     environment: ${{ inputs.target_environment }}
@@ -599,8 +610,12 @@ jobs:
     # Guard: this reusable workflow can be invoked from a fork, and the job
     # deploys to the target environment with inherited repo secrets. Only the
     # canonical repo may run it. The ordered path comes from the detection call,
-    # because a deploy call does not run detection.
-    if: github.repository == 'Kilo-Org/cloud' && inputs.deploy_cloud_agent_after_session_ingest == 'true'
+    # because a deploy call does not run detection. The ref check is named here
+    # too: this job deploys with repo secrets.
+    if: >-
+      github.repository == 'Kilo-Org/cloud' &&
+      needs.verify-main.result == 'success' &&
+      inputs.deploy_cloud_agent_after_session_ingest == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25
     environment: ${{ inputs.target_environment }}
@@ -655,9 +670,11 @@ jobs:
   deploy-cloud-agent-after-session-ingest:
     needs: [verify-main, deploy-session-ingest]
     # GitHub skips a dependent job when a needed job fails: cloud-agent-next never
-    # deploys after an unsuccessful session-ingest deployment.
+    # deploys after an unsuccessful session-ingest deployment. The ref check is
+    # named here too: this job deploys with repo secrets.
     if: >-
       github.repository == 'Kilo-Org/cloud' &&
+      needs.verify-main.result == 'success' &&
       inputs.deploy_cloud_agent_after_session_ingest == 'true' &&
       needs.deploy-session-ingest.result == 'success'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

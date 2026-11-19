@@ -61,8 +61,14 @@ jobs:
     needs: [verify-main, check-changes]
     # Guard: this workflow_dispatch is reachable from a fork, and it deploys
     # the web app to staging using repo secrets. Only the canonical repo may
-    # run it.
-    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # run it. The ref check is named here: this job holds the staging
+    # environment and those secrets, so a failed verify-main must block it.
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        needs.verify-main.result == 'success' &&
+        needs.check-changes.outputs.should_deploy == 'true'
+      }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: staging
@@ -115,7 +121,14 @@ jobs:
   deploy-app:
     needs: [verify-main, check-changes]
     # Guard: privileged workflow — only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # The ref check is named here: this job maps a repo secret into the reusable
+    # workflow, so a failed verify-main must not let it start.
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        needs.verify-main.result == 'success' &&
+        needs.check-changes.outputs.should_deploy == 'true'
+      }}
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
@@ -127,7 +140,14 @@ jobs:
   deploy-ai-gateway:
     needs: [verify-main, check-changes]
     # Guard: privileged workflow — only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # The ref check is named here: this job maps a repo secret into the reusable
+    # workflow, so a failed verify-main must not let it start.
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        needs.verify-main.result == 'success' &&
+        needs.check-changes.outputs.should_deploy == 'true'
+      }}
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
@@ -155,8 +175,14 @@ jobs:
   deploy-workers:
     needs: [verify-main, check-changes, db-gate, detect-workers]
     # Guard: this workflow_dispatch is reachable from a fork, and the reusable
-    # workflow inherits repo secrets. Only the canonical repo may run it.
-    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    # workflow inherits repo secrets. Only the canonical repo may run it, and
+    # only when the ref check passed.
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        needs.verify-main.result == 'success' &&
+        needs.check-changes.outputs.should_deploy == 'true'
+      }}
     uses: ./.github/workflows/deploy-workers.yml
     with:
       target_environment: staging
@@ -171,6 +197,7 @@ jobs:
       ${{
         github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
+        needs.verify-main.result == 'success' &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.db-gate.result == 'success' &&
         needs.deploy-app.result == 'success' &&

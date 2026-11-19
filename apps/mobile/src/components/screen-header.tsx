@@ -449,9 +449,8 @@ export function ScreenHeader({
   // Which of the heading's lines the header paints, which decides whether the
   // leading control has a line above the title to reach into (see
   // `backControlOverhang`).
-  const hasEyebrowLine = Boolean(eyebrow) || Boolean(reserveEyebrow);
-  const hasSubtitleLine =
-    Boolean(subtitle) || Boolean(reserveSubtitle) || Boolean(subtitlePlaceholder);
+  const hasEyebrowLine = Boolean(eyebrow) || reserveEyebrow;
+  const hasSubtitleLine = Boolean(subtitle) || reserveSubtitle || Boolean(subtitlePlaceholder);
   const stackedTitleLines = hasEyebrowLine || hasSubtitleLine;
   // A centered title shares its row with the leading and trailing controls.
   // A spacer opposite the back control keeps the title centered on the full

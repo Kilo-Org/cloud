@@ -120,6 +120,7 @@ vi.mock('@/components/ui/icons', () => ({
   SlidersHorizontal: 'SlidersHorizontal',
   Trash2: 'Trash2',
   Unlock: 'Unlock',
+  X: 'X',
 }));
 
 const GITHUB_REPO: TestRepoOption = { platform: 'github', fullName: 'acme/api', private: true };

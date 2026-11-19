@@ -91,6 +91,8 @@ const flashListMock = vi.hoisted(
 vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => undefined },
+  Pressable: 'Pressable',
+  Text: 'Text',
   View: 'View',
   TextInput: 'TextInput',
   I18nManager: { isRTL: false },
@@ -107,7 +109,12 @@ vi.mock('@/components/empty-state', () => ({
 }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ Mic: 'Mic', Search: 'Search', SearchX: 'SearchX' }));
+vi.mock('@/components/ui/icons', () => ({
+  Mic: 'Mic',
+  Search: 'Search',
+  SearchX: 'SearchX',
+  X: 'X',
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

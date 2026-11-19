@@ -251,6 +251,13 @@ const TAB_COMMIT_POLL_MS = 50;
  */
 const DOWNLOAD_GUARD_LINGER_MS = 2000;
 
+/**
+ * How many calls may find an overdue stop still unknowable — the optional permission gone, or a search that throws —
+ * before its record names the file as kept: a browser that cannot answer must not leave the record waiting forever,
+ * and a file nobody could look for is reported, never passed off as stopped.
+ */
+const OVERDUE_STOP_ATTEMPTS = 3;
+
 /** How long an approved navigate waits for the browser to name the file it kept. */
 const KEPT_DOWNLOAD_POLLS = 60;
 const KEPT_DOWNLOAD_POLL_MS = 50;
@@ -533,6 +540,31 @@ const readDownload = async (
 };
 
 /**
+ * What one look for a download's own item found. `unknown` is not "nothing there": a browser with no search, or a
+ * search that threw, has said nothing about the file, and a record may not claim that file is gone on that answer.
+ */
+type DownloadLookup =
+  | { readonly item: BrowserDownloadItem; readonly kind: 'found' }
+  | { readonly kind: 'missing' }
+  | { readonly kind: 'unknown' };
+
+/** One search for a download's own item, keeping a failed or missing search apart from an empty one. */
+const lookUpDownload = async (api: BrowserDownloadsApi, id: number): Promise<DownloadLookup> => {
+  if (api.search === undefined) {
+    return { kind: 'unknown' };
+  }
+
+  try {
+    const found = (await api.search({ id })) ?? [];
+    const item = found.find(candidate => candidate.id === id);
+
+    return item === undefined ? { kind: 'missing' } : { item, kind: 'found' };
+  } catch {
+    return { kind: 'unknown' };
+  }
+};
+
+/**
  * Deletes the file of a download the call could not settle, after the call has
  * answered: the browser may need a moment to finish writing it, and the tab
  * must not wait for a file the model does not read.
@@ -758,6 +790,11 @@ interface DownloadRecord {
    * told the model, so no later call may report it again.
    */
   readonly kind: 'announced' | 'stopping' | 'stopped' | 'kept' | 'reported';
+  /**
+   * How many calls found this stop overdue and still unknowable — the browser would not search, or the search threw.
+   * Bounded by the runtime: once the attempts are spent the report names the file as kept instead of waiting on it.
+   */
+  readonly attempts?: number;
 }
 
 /** One download as a later call reports it: the file it was, whether it survived, and the step that started it. */
@@ -1819,35 +1856,65 @@ export const createBrowserRuntime = ({
     }
 
     // Every candidate is consulted: a tab whose page matches but which holds nothing for this item must not hide the
-    // Owner on another tab, or the file is neither stopped nor reported. This ledger is one session's, so two sessions
-    // Cannot both answer here; when two of the session's own tabs both own the file it is stopped either way and the
-    // Report names the most recent window, the call that started it, so nothing is dropped and nothing is guessed.
-    let chosen: (DownloadSighting & { readonly itemId: number }) | null = null;
-    let chosenSince = Number.NEGATIVE_INFINITY;
+    // Owner on another tab, or the file is neither stopped nor reported.
+    // A record matched to this item's own url is the call that announced it, and a watch only knows when its call
+    // Started: the two times are not comparable, so a record always wins and a watch is consulted only when no record
+    // Owns the item. Within one kind the most recent window wins, because the call that started the file is the one the
+    // Report has to ask the model to repeat. This ledger is one session's, so two sessions cannot both answer here.
+    let bestRecord: { readonly record: DownloadRecord; readonly tabId: number } | null = null;
+    let bestWatch: {
+      readonly since: number;
+      readonly tabId: number;
+      readonly watch: OpenWatch;
+    } | null = null;
 
     for (const tabId of candidateTabs) {
       const record = findRecord(session, { at, tabId, url: downloadUrlOf(item) });
-      const watch = watches.find(candidate => candidate.tabId === tabId);
-      const owner =
-        record ?? (watch !== undefined && startedSince(item, watch.since) ? watch : undefined);
 
-      if (owner !== undefined && owner.since > chosenSince) {
-        chosenSince = owner.since;
-        chosen = {
-          attempt: owner.attempt,
-          // The record knows the name the browser announced; a watch only knows the item it just found.
-          filename: record === undefined ? fileNameOf(item) : record.filename,
-          guid: undefined,
-          itemId: item.id,
-          session,
-          step: owner.step,
-          tabId,
-          url: downloadUrlOf(item),
-        };
+      if (record === undefined) {
+        const watch = watches.find(candidate => candidate.tabId === tabId);
+
+        if (
+          watch !== undefined &&
+          startedSince(item, watch.since) &&
+          (bestWatch === null || watch.since > bestWatch.since)
+        ) {
+          bestWatch = { since: watch.since, tabId, watch };
+        }
+      } else if (bestRecord === null || record.since > bestRecord.record.since) {
+        bestRecord = { record, tabId };
       }
     }
 
-    return chosen ?? undefined;
+    if (bestRecord !== null) {
+      const { record, tabId } = bestRecord;
+
+      return {
+        attempt: record.attempt,
+        // The record knows the name the browser announced.
+        filename: record.filename,
+        guid: undefined,
+        itemId: item.id,
+        session,
+        step: record.step,
+        tabId,
+        url: downloadUrlOf(item),
+      };
+    }
+
+    return bestWatch === null
+      ? undefined
+      : {
+          attempt: bestWatch.watch.attempt,
+          // A watch only knows the item it just found.
+          filename: fileNameOf(item),
+          guid: undefined,
+          itemId: item.id,
+          session,
+          step: bestWatch.watch.step,
+          tabId: bestWatch.tabId,
+          url: downloadUrlOf(item),
+        };
   };
 
   /** Stops a download a guard left behind and settles its one record: the report reads the true outcome later. */
@@ -1894,31 +1961,49 @@ export const createBrowserRuntime = ({
   };
 
   /**
-   * The truth about a stop that outlived its window: without the optional permission nothing can be deleted, so the
-   * file survives and is named; an item gone from the history left no file; anything else is cancelled once more.
+   * One last attempt at a stop that outlived its window. `undefined` means the browser could not say whether the item
+   * still exists — no search at all, or one that threw — so the record keeps waiting instead of claiming that a file it
+   * never looked for is gone. Only a search that answers counts, and an item missing from the history still has its
+   * file deleted once more by id before the record may say the file is removed.
    */
   const overdueOutcome = async (
     api: BrowserDownloadsApi | undefined,
     record: DownloadRecord,
     itemId: number
-  ): Promise<DiscardOutcome> => {
+  ): Promise<DiscardOutcome | undefined> => {
     if (api === undefined) {
+      // Without the optional permission nothing can be searched or deleted: the file is unaccounted for, not stopped.
+      return undefined;
+    }
+
+    const listed = await lookUpDownload(api, itemId);
+
+    if (listed.kind === 'unknown') {
+      return undefined;
+    }
+
+    if (listed.kind === 'found') {
+      return discardDownload(api, listed.item);
+    }
+
+    // The item left the history, and that alone does not prove its file went with it: delete it once more by id.
+    if (api.removeFile === undefined) {
       return { filename: record.filename, kind: 'kept' };
     }
 
-    const current = await readDownload(api, itemId);
+    try {
+      await api.removeFile(itemId);
+      await api.erase?.({ id: itemId });
 
-    if (current === undefined) {
-      // The item is gone from the history: no file survived it.
       return { filename: record.filename, kind: 'removed' };
+    } catch {
+      return { filename: record.filename, kind: 'kept' };
     }
-
-    return discardDownload(api, current);
   };
 
   /**
-   * A stop that never settled is settled here rather than dropped: past its bound the item is read once more, and the
-   * record keeps the true outcome, so the report that follows names a file the human keeps instead of forgetting it.
+   * A stop that never settled is settled here rather than dropped: past its bound the item is looked up once more, and
+   * the record keeps the true outcome, so the report that follows names a file the human keeps instead of forgetting it.
    */
   const settleOverdueStops = async (session: string): Promise<void> => {
     const records = downloadRecords.get(session);
@@ -1930,20 +2015,44 @@ export const createBrowserRuntime = ({
     const api = downloadsApi?.();
     const at = Date.now();
 
-    for (const record of records.values()) {
-      // A stopping record always carries the item it is stopping: one without it never stopped a file.
-      if (record.kind === 'stopping' && record.itemId !== undefined) {
-        const { itemId } = record;
+    /** One overdue stop: the true outcome when the browser can say it, else one more attempt on a later call. */
+    const settleOne = async (key: string, record: DownloadRecord): Promise<void> => {
+      const { itemId } = record;
 
-        if (record.since + DOWNLOAD_GUARD_LINGER_MS < at) {
-          try {
-            // eslint-disable-next-line no-await-in-loop -- one overdue stop at a time, each its own item
-            settleDownload(session, itemId, await overdueOutcome(api, record, itemId));
-          } catch {
-            // The read, cancel or delete above threw: as far as this runtime can tell the file is still there.
-            settleDownload(session, itemId, { filename: record.filename, kind: 'kept' });
-          }
+      // A stopping record always carries the item it is stopping: one without it never stopped a file.
+      if (itemId === undefined) {
+        return;
+      }
+
+      try {
+        const outcome = await overdueOutcome(api, record, itemId);
+
+        if (outcome !== undefined) {
+          settleDownload(session, itemId, outcome);
+
+          return;
         }
+
+        const tries = (record.attempts ?? 0) + 1;
+
+        if (tries >= OVERDUE_STOP_ATTEMPTS) {
+          // The browser never answered: the file the record names is reported as kept, never as stopped.
+          settleDownload(session, itemId, { filename: record.filename, kind: 'kept' });
+
+          return;
+        }
+
+        records.set(key, { ...record, attempts: tries });
+      } catch {
+        // The lookup, cancel or delete above threw: as far as this runtime can tell the file is still there.
+        settleDownload(session, itemId, { filename: record.filename, kind: 'kept' });
+      }
+    };
+
+    for (const [key, record] of records) {
+      if (record.kind === 'stopping' && record.since + DOWNLOAD_GUARD_LINGER_MS < at) {
+        // eslint-disable-next-line no-await-in-loop -- one overdue stop at a time, each its own item
+        await settleOne(key, record);
       }
     }
   };

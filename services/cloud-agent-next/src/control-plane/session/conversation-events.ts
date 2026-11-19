@@ -34,7 +34,7 @@ export function persistConversationEvent(input: {
   const { event, queries, sessionId } = input;
   const timestamp = Date.now();
   let entityId: string;
-  const liveProperties = publicEventProperties(event);
+  let liveProperties = publicEventProperties(event);
   let properties: Record<string, unknown> = liveProperties;
   let type = event.type;
   const stored = (id: number): StoredEvent => ({
@@ -67,6 +67,13 @@ export function persistConversationEvent(input: {
           ? prior.properties.parentID
           : undefined;
       properties = { ...parsed.data, parentID: parentID || undefined };
+      if (
+        parentID &&
+        parsed.data.message.type === 'assistant' &&
+        prior?.properties.message.type === 'assistant'
+      ) {
+        liveProperties = { ...liveProperties, parentID };
+      }
     }
   } else if (type === 'conversation.event') {
     const parsed = kilo2ConversationEventSchema.safeParse(properties);

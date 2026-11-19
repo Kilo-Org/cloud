@@ -44,6 +44,9 @@ cloud-agent-next refactor.
    Next.js. A real-model session (`kilo-auto/efficient`, etc.) uses the same
    Worker URL and does not need a restart.
 
+If a Kilo Cloud sandbox image build fails with a certificate error while
+downloading `glab`, see [Docker build TLS trust](../../../../.kilo/skills/cloud-agent-sandbox/SKILL.md#docker-build-tls-trust).
+
 ## Kilo v2 drain checks
 
 Drain completion applies only to Kilo v2 (`0.0.0-v2-85` or newer), not the default v1 runtime.

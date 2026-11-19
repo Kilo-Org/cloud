@@ -17,8 +17,10 @@ import {
   PrReviewChecksStatusRow,
 } from '@/components/pr-review/pr-review-checks-status-row';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import { PrReviewSectionLabel } from '@/components/pr-review/pr-review-section-label';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -246,32 +248,29 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
       // checks endpoint access (rare; usually means the app isn't
       // installed on the head repo). No retry — just the message.
       return (
-        <View className="gap-2">
-          <PrReviewSectionLabel label={t('prReview.checks.title')} />
-          <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
+        <Section label={t('prReview.checks.title')}>
+          <Card key={CONTENT_CARD_KEY} className="gap-2">
             <Text className="text-sm text-muted-foreground">
               {t('prReview.checks.notAvailable')}
             </Text>
-          </View>
-        </View>
+          </Card>
+        </Section>
       );
     }
     if (state.kind === 'permission') {
       return (
-        <View className="gap-2">
-          <PrReviewSectionLabel label={t('prReview.checks.title')} />
-          <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
+        <Section label={t('prReview.checks.title')}>
+          <Card key={CONTENT_CARD_KEY} className="gap-2">
             <Text className="text-sm text-muted-foreground">{t('prReview.checks.noAccess')}</Text>
-          </View>
-        </View>
+          </Card>
+        </Section>
       );
     }
     if (state.kind === 'reconnect') {
       return (
-        <View className="gap-2">
-          <PrReviewSectionLabel label={t('prReview.checks.title')} />
+        <Section label={t('prReview.checks.title')}>
           <PrReviewReconnectNotice />
-        </View>
+        </Section>
       );
     }
 
@@ -279,9 +278,8 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
     // button. A BAD_GATEWAY names its own cause; every other failure keeps
     // the generic could-not-load copy.
     return (
-      <View className="gap-2">
-        <PrReviewSectionLabel label={t('prReview.checks.title')} />
-        <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
+      <Section label={t('prReview.checks.title')}>
+        <Card key={CONTENT_CARD_KEY} className="gap-3">
           <Text className="text-sm text-muted-foreground">
             {state.kind === 'service-unavailable'
               ? t('prReview.reviewServiceUnavailableDescription')
@@ -297,8 +295,8 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
           >
             <Text>{t('common.retry')}</Text>
           </Button>
-        </View>
-      </View>
+        </Card>
+      </Section>
     );
   }
 
@@ -317,9 +315,8 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
 
   if (runList.length === 0) {
     return (
-      <View className="gap-2">
-        <PrReviewSectionLabel label={t('prReview.checks.title')} />
-        <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
+      <Section label={t('prReview.checks.title')}>
+        <Card key={CONTENT_CARD_KEY} className="gap-3">
           <Text className="text-sm text-muted-foreground">
             {t('prReview.checks.noChecksReported')}
           </Text>
@@ -337,8 +334,8 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
               </View>
             </Button>
           ) : null}
-        </View>
-      </View>
+        </Card>
+      </Section>
     );
   }
 
@@ -355,11 +352,10 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
   // plural fallback that must carry the `other` copy, so the family is one key
   // with a plural stem, not two keys for one string.
   return (
-    <View className="gap-2">
-      <PrReviewSectionLabel label={t('prReview.checks.title')} />
-      <View key={CONTENT_CARD_KEY} className="overflow-hidden rounded-lg bg-secondary">
+    <Section label={t('prReview.checks.title')}>
+      <RowGroup key={CONTENT_CARD_KEY}>
         {showTotal ? (
-          <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
+          <View className="px-4 py-2">
             <Text variant="muted" className="text-xs">
               {t('prReview.checks.checksCount', {
                 count: runList.length,
@@ -368,12 +364,11 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
             </Text>
           </View>
         ) : null}
-        {groups.map((group, groupIndex) => (
+        {groups.map(group => (
           <PrReviewChecksStatusRow
             key={group.status}
             status={group.status}
             count={group.runs.length}
-            showSeparator={groupIndex < groups.length - 1}
           >
             {group.runs.map((run, runIndex) => (
               <View key={`${run.name}-${runIndex}`}>
@@ -385,7 +380,7 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
             ))}
           </PrReviewChecksStatusRow>
         ))}
-      </View>
-    </View>
+      </RowGroup>
+    </Section>
   );
 }

@@ -33,7 +33,7 @@ export function ProfileManageSlot({
     return null;
   }
   return (
-    <View className="items-center px-2">
+    <View className="items-center">
       <Text variant="muted" className="text-center">
         {t('profiles.organizationRoleRequired')}
       </Text>

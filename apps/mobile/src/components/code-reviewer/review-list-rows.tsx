@@ -3,7 +3,8 @@ import { Pressable, View } from 'react-native';
 
 import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/code-review';
 import { QueryError } from '@/components/query-error';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { type ReviewListItem } from '@/lib/hooks/use-code-reviews';
@@ -44,6 +45,10 @@ export function statusMeta(status: string) {
 /**
  * One recent review. Split from the screen so the list screen keeps the read
  * surface rather than the row layout.
+ *
+ * The row is the flat list row of the layout contract: full-bleed, its content
+ * from the page gutter, a hairline between rows, and the trailing chevron that
+ * says the press opens a detail.
  */
 export function ReviewRow({
   review,
@@ -60,27 +65,33 @@ export function ReviewRow({
   return (
     <Pressable
       accessibilityRole="button"
-      className={cn('py-3 active:opacity-70', !last && 'border-b-[0.5px] border-hair-soft')}
+      className={cn(
+        'flex-row items-center gap-3 px-4 py-3 active:opacity-70',
+        !last && 'border-b-[0.5px] border-hair-soft'
+      )}
       onPress={() => {
         onOpen(review);
       }}
     >
-      <Text className="text-sm font-medium" numberOfLines={1}>
-        {review.pr_title}
-      </Text>
-      <Text variant="muted" className="mt-0.5 text-xs">
-        {review.repo_full_name} #{review.pr_number}
-      </Text>
-      <View className="mt-1 flex-row items-center gap-2">
-        <Text className={cn('text-xs', meta.className)}>{meta.label}</Text>
-        <Text variant="muted" className="text-xs">
-          {timeAgo(
-            parseTimestamp(review.completed_at ?? review.started_at ?? review.created_at),
-            undefined,
-            now
-          )}
+      <View className="min-w-0 flex-1">
+        <Text className="text-sm font-medium" numberOfLines={1}>
+          {review.pr_title}
         </Text>
+        <Text variant="muted" className="mt-0.5 text-xs">
+          {review.repo_full_name} #{review.pr_number}
+        </Text>
+        <View className="mt-1 flex-row items-center gap-2">
+          <Text className={cn('text-xs', meta.className)}>{meta.label}</Text>
+          <Text variant="muted" className="text-xs">
+            {timeAgo(
+              parseTimestamp(review.completed_at ?? review.started_at ?? review.created_at),
+              undefined,
+              now
+            )}
+          </Text>
+        </View>
       </View>
+      <RowChevron />
     </Pressable>
   );
 }
@@ -92,12 +103,15 @@ export function ReviewListFooter({
 }: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
   const { t } = useTranslation();
   if (loading) {
-    return <Skeleton className="h-20 w-full rounded-lg" />;
+    // The next page lands as another row of the list, so its pending body holds
+    // one row's three-line frame instead of a shorter grouped row.
+    return <RowSkeleton lines={3} last />;
   }
   if (error) {
     return (
       <QueryError
         placement="top"
+        inset="gutter"
         message={t('codeReviewer.reviewList.couldNotLoad')}
         onRetry={onRetry}
       />

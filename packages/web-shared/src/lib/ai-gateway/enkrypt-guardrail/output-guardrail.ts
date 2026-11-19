@@ -114,6 +114,8 @@ function wholeResponseCoverage(text: string): EnkryptScanCoverage {
     totalSegments: text.length > 0 ? 1 : 0,
     cachedCharacters: 0,
     cachedSegments: 0,
+    totalUnits: text.length > 0 ? 1 : 0,
+    cachedUnits: 0,
     omittedAttachments: 0,
   };
 }
@@ -374,13 +376,18 @@ export async function guardEnkryptOutput({
       const scanned = (async () => {
         try {
           const copied = await readBody(copy);
+          // Where a blocking scan would start to hold the response back.
+          const waitStartedAt = performance.now();
           report.upstream_read_failed = copied.readError !== null;
           if (copied.overLimit) return notScannedBecause('held_output_too_large');
           const text = extractResponseText(kind, format, bodyText(copied));
           report.output_characters = text.length;
           if (isTooLargeToScan(text)) return notScannedBecause('output_too_large');
           const result = await scanOutput(logOnly, text);
-          return outputUsageRecords([], result.usageRecords, 0);
+          // A guardrail that only logs adds no latency, so it records its log-only scan time.
+          const scanTimeMs = Math.round(performance.now() - waitStartedAt);
+          report.added_latency_ms = scanTimeMs;
+          return outputUsageRecords([], result.usageRecords, scanTimeMs);
         } catch (error) {
           console.error('[enkrypt-guardrail] log-only output scan failed unexpectedly', {
             ...logFields,

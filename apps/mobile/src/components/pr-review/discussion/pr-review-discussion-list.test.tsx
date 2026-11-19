@@ -56,7 +56,10 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
   MessageSquarePlus: 'MessageSquarePlus',

@@ -172,6 +172,39 @@ describe('buildDirectProvider model field', () => {
   });
 });
 
+describe('buildDirectProvider remove_from_body', () => {
+  it('removes top-level and nested fields by path', async () => {
+    const request = {
+      kind: 'chat_completions',
+      body: {
+        model: 'public-model',
+        usage: { include: true },
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'hi', cache_control: { type: 'ephemeral' } }],
+          },
+          { role: 'assistant', content: 'plain' },
+        ],
+        tools: [{ type: 'function', function: { name: 'f', strict: true } }],
+      },
+    } as unknown as GatewayRequest;
+
+    await transformRequest(request, {
+      remove_from_body: ['usage', 'messages.*.content.*.cache_control', 'tools.*.function.strict'],
+    });
+
+    expect(request.body).toEqual({
+      model: 'upstream-model',
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+        { role: 'assistant', content: 'plain' },
+      ],
+      tools: [{ type: 'function', function: { name: 'f' } }],
+    });
+  });
+});
+
 describe('buildDirectProvider Mt-User-Id header', () => {
   const provider = buildDirectProvider(
     'custom',

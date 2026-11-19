@@ -23,7 +23,6 @@ import { type RemoteMcpToolView } from './remote-mcp-state';
  * stored list and never mints a credential.
  */
 
-/** What a view is drawn and driven from: the server, its deps, its tools. */
 export type RemoteMcpViewSource = {
   readonly server: RemoteMcpServer;
   readonly deps: RemoteMcpClientDeps;
@@ -38,9 +37,9 @@ export type RemoteMcpViewDocument =
 
 /**
  * The document the view is drawn from, held to the policy the resource
- * declared. It is read off the same server the tool came from, under the same
- * deadline and credential rules as a call, so a server that refuses this
- * session is reported the way a refused call is.
+ * declared. It is read off the same server the tool came from, on the view-read
+ * deadline rather than one call's, and a read that fails is not reported the
+ * way a refused call is: the row's own Retry is where a failed read surfaces.
  */
 export async function readViewDocument(
   source: RemoteMcpViewSource,

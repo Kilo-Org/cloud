@@ -23,6 +23,7 @@ import { useRefetchSessionMessagesOnTerminal } from '@/components/code-reviewer/
 import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { Text } from '@/components/ui/text';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useTRPC } from '@/lib/trpc';
 
 const renderSpectatorRow: ListRenderItem<SpectatorRow> = ({ item }) => (
@@ -41,7 +42,7 @@ const renderSpectatorRow: ListRenderItem<SpectatorRow> = ({ item }) => (
 
 function SpectatorCopy({ message }: Readonly<{ message: string }>) {
   return (
-    <CenteredState contentContainerClassName="px-6">
+    <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
       <Text variant="muted" className="text-center text-xs">
         {message}
       </Text>

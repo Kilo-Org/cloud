@@ -10,6 +10,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   applyMistralModelSettings,
+  applyMistralThinkingRequestTransform,
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
@@ -72,6 +73,7 @@ import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gatew
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
 import { repairGeminiToolSchemas } from '@kilocode/web-shared/lib/ai-gateway/providers/repair-gemini-tool-schemas';
+import { moveInvalidToolPropertyKeys } from '@kilocode/web-shared/lib/ai-gateway/providers/move-invalid-tool-property-keys';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import { removeWhitespaceOnlyMessages } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 import {
@@ -101,11 +103,16 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
     delete message.reasoning;
 
     const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
+    const toolCallsById = new Map<string, Record<string, unknown>>();
     for (const toolCall of toolCalls) {
       const legacySignature = toolCall.thoughtSignature;
       delete toolCall.thoughtSignature;
       if (typeof legacySignature === 'string') {
         setGeminiThoughtSignature(toolCall, legacySignature);
+      }
+      // First write wins, so a duplicate id keeps the earliest tool call.
+      if (typeof toolCall.id === 'string' && !toolCallsById.has(toolCall.id)) {
+        toolCallsById.set(toolCall.id, toolCall);
       }
     }
 
@@ -125,10 +132,7 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
         continue;
       }
 
-      const toolCall =
-        typeof detail.id === 'string'
-          ? toolCalls.find(candidate => candidate.id === detail.id)
-          : undefined;
+      const toolCall = typeof detail.id === 'string' ? toolCallsById.get(detail.id) : undefined;
       setGeminiThoughtSignature(toolCall ?? message, detail.data);
     }
   }
@@ -306,6 +310,9 @@ export function applyReasoningDetailsTransform(
       replaceReasoningObjectWithReasoningEffort(requestToMutate);
       mapReasoningDetailsToReasoning(requestToMutate.body);
       break;
+    case ReasoningDetailsTransform.MistralThinking:
+      applyMistralThinkingRequestTransform(requestToMutate);
+      break;
     case null:
       break;
   }
@@ -353,6 +360,8 @@ export async function applyProviderSpecificLogic(
   if (isClaudeModel(requestedModel)) {
     // Anthropic rejects tools with "input_schema does not support oneOf, allOf, or anyOf at the top level"
     removeTopLevelToolSchemaCombinators(requestToMutate);
+    // Anthropic rejects tools with "input_schema.properties: Property keys should match pattern '^[a-zA-Z0-9_.-]{1,64}$'"
+    moveInvalidToolPropertyKeys(requestToMutate);
   }
 
   if (isKimiModel(requestedModel)) {

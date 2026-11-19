@@ -37,6 +37,14 @@ const account = vi.hoisted(() => ({
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ org: route.org }),
+  usePathname: () => '/organization/usage',
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), dismissTo: vi.fn(), back: vi.fn() }),
+  useNavigation: () => ({
+    getState: () => ({ routes: [{ key: 'usage', name: 'usage' }], index: 0 }),
+    addListener: () => () => undefined,
+    reset: vi.fn(),
+    isFocused: () => true,
+  }),
 }));
 
 vi.mock('@/lib/hooks/use-leave-stale-organization-scope', () => ({

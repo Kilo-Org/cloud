@@ -929,12 +929,22 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     </VStack>
   );
   const sectionLabel = (label: string) => text(label, 12, palette.muted, 'semibold');
-  // The scheduled line under the label: the next wake, Awaiting update, or the title.
+  // The scheduled line under the label: Awaiting update inside the retry
+  // window, the clock time the wake was due after it, the next wake, or the
+  // title. A past wake keeps the line rather than leaving the slot empty.
   const scheduledLine = (size: number, color: string) => {
     if (awaitingUpdate) {
       return text(COPY.awaitingUpdate ?? 'Awaiting update', size, palette.muted);
     }
     if (scheduledAt !== null) {
+      if (scheduledAt.getTime() <= today.getTime()) {
+        return (
+          <HStack spacing={3}>
+            {text(COPY.wasDue ?? 'Was due', size, palette.muted)}
+            {when(scheduledAt, size, palette.muted, 'short')}
+          </HStack>
+        );
+      }
       return (
         <HStack spacing={3}>
           {text(COPY.nextRun ?? 'Next run', size, color)}

@@ -14,6 +14,9 @@ export const MAGIC_LINK_EMAIL_ERRORS = {
   NO_PLUS: 'EMAIL-CANNOT-CONTAIN-PLUS',
 } as const;
 
+export type MagicLinkEmailError =
+  (typeof MAGIC_LINK_EMAIL_ERRORS)[keyof typeof MAGIC_LINK_EMAIL_ERRORS];
+
 /**
  * Domain that is allowed to use + in email addresses for internal testing.
  */
@@ -52,7 +55,7 @@ const hasAllowedPlus = (email: string): boolean => !email.includes('+') || isKil
  */
 export function validateMagicLinkSignupEmail(email: string): {
   valid: boolean;
-  error: string | null;
+  error: MagicLinkEmailError | null;
 } {
   if (!isSyntacticallyValid(email)) {
     return { valid: false, error: MAGIC_LINK_EMAIL_ERRORS.INVALID_FORMAT };

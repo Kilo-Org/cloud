@@ -97,15 +97,18 @@ const MODEL_OPTIONS: SessionModelOption[] = [
  * below.
  */
 function reportedModelOptions(): SessionModelOption[] {
-  const gatewayModels = toModelOptions({
-    data: [
-      {
-        id: 'deepseek/deepseek-v4.1-flash',
-        name: CATALOGUE_MODEL_NAME,
-        opencode: { variants: { low: {}, medium: {} } },
-      },
-    ],
-  });
+  const gatewayModels = toModelOptions(
+    {
+      data: [
+        {
+          id: 'deepseek/deepseek-v4.1-flash',
+          name: CATALOGUE_MODEL_NAME,
+          opencode: { variants: { low: {}, medium: {} } },
+        },
+      ],
+    },
+    'en'
+  );
   return buildSessionModelOptions({
     activeSessionType: null,
     remoteModelState: { ownerConnectionId: null, protocol: 'unknown', refresh: 'idle' },
@@ -163,9 +166,10 @@ function cliCatalogModelOptions(): SessionModelOption[] {
 const REPORTED_RAW_MODEL_ID = 'deepseek/deepseek-v4.1-flash-1017';
 
 function reportedRemoteOptions(): SessionModelOption[] {
-  const gatewayModels = toModelOptions({
-    data: [{ id: REPORTED_RAW_MODEL_ID, name: 'DeepSeek: DeepSeek V4.1 Flash 1017' }],
-  });
+  const gatewayModels = toModelOptions(
+    { data: [{ id: REPORTED_RAW_MODEL_ID, name: 'DeepSeek: DeepSeek V4.1 Flash 1017' }] },
+    'en'
+  );
   return buildSessionModelOptions({
     activeSessionType: 'remote',
     remoteModelState: { ownerConnectionId: 'cli-owner', protocol: 'unknown', refresh: 'idle' },
@@ -243,7 +247,11 @@ describe('ChatToolbar chip for a model the CLI catalogue cannot name', () => {
     const options = reportedRemoteOptions();
     const renderer = renderToolbar('remote-unavailable-model', options);
 
-    const modelChip = findPressable(renderer, label => label === 'DeepSeek V4.1 Flash 1017');
+    // The chip names the catalogue's model and states that it is unavailable;
+    // what matters here is that the raw reference never appears.
+    const modelChip = findPressable(renderer, label =>
+      label.startsWith('DeepSeek V4.1 Flash 1017')
+    );
     expect(modelChip).toBeDefined();
 
     const rawReference = renderer.root.findAll(

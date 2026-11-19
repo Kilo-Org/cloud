@@ -17,6 +17,8 @@ import {
   type SandboxAllocation,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import { PROVIDER_DESCRIPTORS } from './shared/sandbox-provider.js';
 import { getDefaultSandboxDestination, isOrgInList } from './sandbox-id.js';
 import { containersBillingIdentity } from './container-usage-context.js';
 import type { Env } from './types.js';
@@ -57,10 +59,12 @@ export function sandboxAllocationProviderCapabilityReason(
   capability: SandboxAllocationCapability | undefined
 ): string | undefined {
   if (capability === undefined) return undefined;
-  if (getSandboxAllocationProvider(allocation) !== 'vercel') return undefined;
+  const provider = getSandboxAllocationProvider(allocation);
+  if (providerSupports(provider, 'scmCliTools')) return undefined;
+  const { label } = PROVIDER_DESCRIPTORS[provider];
   return capability === 'review'
-    ? 'Vercel sandboxes do not include the code-review publishing tools'
-    : 'Vercel sandboxes do not include the security-remediation command-line tools';
+    ? `${label} sandboxes do not include the code-review publishing tools`
+    : `${label} sandboxes do not include the security-remediation command-line tools`;
 }
 
 export function sandboxAllocationUnavailableReason(

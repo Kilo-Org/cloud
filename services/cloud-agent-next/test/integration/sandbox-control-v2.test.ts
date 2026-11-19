@@ -20,10 +20,8 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type ContainerUsageRpcMethods } from '@kilocode/container-usage';
-import type {
-  SandboxControlV2,
-  StoredProviderPin,
-} from '../../src/control-plane/sandbox/sandbox-do.js';
+import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import type { StoredProviderPin } from '../../src/control-plane/sandbox/provider-adapters.js';
 import {
   allocation as allocationTable,
   routes as routesTable,
@@ -3065,6 +3063,23 @@ describe('SandboxControlV2 allocation egress policy', () => {
     const pin = await readProviderPin(stub);
     await expect(
       startAllocation(provider, { sandboxId, provider: 'cloudflare-containers', ...policy })
+    ).rejects.toThrow('Sandbox configuration is invalid or unsupported');
+    expect(await readState(stub)).toEqual(before);
+    expect(await readProviderPin(stub)).toBe(pin);
+    expect(provider.createCalls).toBe(0);
+  });
+
+  it('rejects an unknown ensure provider as an invalid configuration without pinning it', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    const before = await readState(stub);
+    const pin = await readProviderPin(stub);
+    await expect(
+      startAllocation(provider, {
+        sandboxId,
+        // A provider id that a newer deployment knows.
+        provider: 'newer-provider' as StoredProviderPin['provider'],
+      })
     ).rejects.toThrow('Sandbox configuration is invalid or unsupported');
     expect(await readState(stub)).toEqual(before);
     expect(await readProviderPin(stub)).toBe(pin);

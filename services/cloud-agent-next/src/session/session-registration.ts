@@ -140,6 +140,7 @@ import {
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
 import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   RUNTIME_BUILTIN_AGENT_SLUGS,
   type RuntimeBuiltinAgents,
@@ -202,7 +203,7 @@ function assertEgressPolicyAllocation(
   allocation: Pick<SessionRegistrationResult, 'sandboxProvider'>
 ): void {
   if (input.runtime?.egressMode !== 'allowlist' && input.runtime?.egressAudit !== true) return;
-  if (allocation.sandboxProvider !== 'cloudflare-containers') {
+  if (!providerSupports(allocation.sandboxProvider, 'egressPolicy')) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',

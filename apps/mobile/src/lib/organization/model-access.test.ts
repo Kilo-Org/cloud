@@ -126,9 +126,9 @@ describe('denyListRowNote', () => {
 
   it('states the English note alone, with the UTC short date', async () => {
     await i18n.changeLanguage('en');
-    expect(
-      denyListRowNote({ id: 'z-ai/glm', name: 'Z.ai: GLM', retiresOn: '2026-11-22' }, t)
-    ).toBe('Retires Nov 22');
+    expect(denyListRowNote({ id: 'z-ai/glm', name: 'Z.ai: GLM', retiresOn: '2026-11-22' }, t)).toBe(
+      'Retires Nov 22'
+    );
   });
 
   it('words the note in the catalog language, from the same date', async () => {

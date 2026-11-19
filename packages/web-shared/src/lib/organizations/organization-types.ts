@@ -321,7 +321,6 @@ export type UsageDetails = {
 export const TimePeriodSchema = z.enum(['week', 'month', 'year', 'all']);
 export type TimePeriod = z.infer<typeof TimePeriodSchema>;
 
-
 export const OrganizationSSODomainSchema = z.string().transform((input, ctx) => {
   const normalized = normalizeSsoDomain(input);
   if (normalized === null) {

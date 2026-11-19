@@ -87,9 +87,6 @@ export function useMetadataLeaveGuard({
   const pendingLeaveRef = useRef<(() => void) | null>(null);
   const replayRef = useRef<(() => void) | null>(null);
   const [leaveCount, setLeaveCount] = useState(0);
-  // Set while a caller-driven leave, whose draft is already cleared, is being
-  // dispatched; see `leaveWithoutAsking`.
-  const forcedLeaveRef = useRef(false);
 
   const state = leavePhase({ dirty, saving, leaveAllowed });
   const stateRef = useRef<MetadataLeaveState>({ kind: 'idle' });
@@ -99,6 +96,11 @@ export function useMetadataLeaveGuard({
   stateRef.current = state;
 
   const handleDirtyChange = useCallback((next: boolean) => {
+    // A route that stayed mounted after a caller-driven leave — a save whose pop
+    // the navigator dropped, or a blurred tab — must guard the next draft again.
+    if (next) {
+      setLeaveAllowed(false);
+    }
     setDirty(next);
   }, []);
 
@@ -111,6 +113,7 @@ export function useMetadataLeaveGuard({
   );
   const leaveWithoutAsking = useCallback((leave: () => void) => {
     setDirty(false);
+    setLeaveAllowed(true);
     // The leave waits one task for the render that disarms the guard. Clearing
     // the edit flag and leaving in one turn asks the native stack to change this
     // route's `preventRemove` option and start its pop transition together: the
@@ -118,16 +121,13 @@ export function useMetadataLeaveGuard({
     // re-mounts the screen header, and Fabric throws `addViewAt … The specified
     // child already has a parent` (Sentry KILO-APP-25). Nothing else on the
     // screen moves between the two, so one task is enough for the disarm to
-    // reach the native side first — and the pop is then a plain pop.
+    // reach the native side first — and the pop is then a plain pop. The guard is
+    // already disarmed in this commit, so the native stack sees a plain pop
+    // instead of a prevented removal it would have to replay.
     clearTimeout(leaveTimerRef.current);
-    forcedLeaveRef.current = true;
     leaveTimerRef.current = setTimeout(() => {
       leaveTimerRef.current = undefined;
       leave();
-      // The navigator consults the guard synchronously inside `leave()`, so the
-      // mark is spent by now: a removal that never reached an armed guard (one
-      // this form's write already disarmed) must not swallow a later Back.
-      forcedLeaveRef.current = false;
     }, 0);
   }, []);
 
@@ -140,13 +140,6 @@ export function useMetadataLeaveGuard({
         setLeaveCount(count => count + 1);
       };
       const current = stateRef.current;
-      // A caller-driven leave whose draft is already cleared stands aside even
-      // while the write that produced it still reports pending, so the save's own
-      // pop is never mistaken for a Back press.
-      if (forcedLeaveRef.current) {
-        leave();
-        return;
-      }
       // A write this form started owns the route until it settles: a Back press
       // is dropped without asking, because Discard would pop a screen whose
       // request still lands and nothing on the screen can call that request back.

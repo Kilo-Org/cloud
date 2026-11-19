@@ -16,6 +16,8 @@ const h = vi.hoisted(() => ({
   repeat: vi.fn(),
   /** The guard flag the replay saw, so a replay before the disarm is visible. */
   repeatSawEnabled: [] as boolean[],
+  /** The guard flag the success path's own pop found, per pop. */
+  enabledAtPop: [] as boolean[],
   guard: {
     enabled: false as boolean,
     handler: undefined as
@@ -77,11 +79,17 @@ vi.mock('@/lib/hooks/use-org-modes-queries', () => ({
   useOrgModeMutations: () => h.mutations,
 }));
 // The real `usePopOnce` dismisses the route through the navigator, which
-// dispatches a POP removal the guard sees: the stub does the same so a suite can
-// tell a leave the guard replayed from one it dropped.
+// dispatches a POP removal. The navigator only consults the guard while its
+// `preventRemove` listener is registered, so the stub does the same: it records
+// the flag the pop found and hands the removal to the handler only when the
+// guard was on, which is exactly what "a plain pop" means here.
 vi.mock('@/lib/navigation/pop-once', () => ({
   usePopOnce: () => () => {
+    h.enabledAtPop.push(h.guard.enabled);
     h.pop();
+    if (!h.guard.enabled) {
+      return;
+    }
     h.guard.handler?.({
       data: { action: { type: 'POP' } },
       repeat: () => {
@@ -225,6 +233,7 @@ beforeEach(() => {
   h.mutations.update.isPending = false;
   h.mutations.remove.isPending = false;
   h.repeatSawEnabled = [];
+  h.enabledAtPop = [];
   h.guard.enabled = false;
   h.guard.handler = undefined;
 });
@@ -330,14 +339,19 @@ describe('ModeForm leave guard while a write is in flight', () => {
 
     expect(h.confirm).not.toHaveBeenCalled();
     expect(h.replace).not.toHaveBeenCalled();
+    expect(h.repeat).not.toHaveBeenCalled();
+    // The success disarmed the guard before it popped, so the navigator saw no
+    // listener to prevent: a plain pop, not a dropped removal to replay.
+    expect(h.enabledAtPop).toEqual([false]);
     expect(h.guard.enabled).toBe(false);
 
     unmount();
   });
 
-  // The success path's own pop is not a Back press: it must land even while the
-  // create still reports pending, or a successful save leaves the form open on
-  // the record it just created.
+  // The success path's own pop is not a Back press, and a write still reporting
+  // pending must not turn it into one. On the code before the fix none of the
+  // write was visible to the guard, so this case never failed; it pins the
+  // disarm-before-pop contract that replaced the forced-leave workaround.
   it('pops after a successful create that still reports pending', async () => {
     h.mutations.create.isPending = true;
     h.mutations.create.mutate.mockImplementation(
@@ -355,10 +369,10 @@ describe('ModeForm leave guard while a write is in flight', () => {
 
     expect(h.pop).toHaveBeenCalledOnce();
     expect(h.confirm).not.toHaveBeenCalled();
-    // The pop the success dispatched is a removal the armed guard saw: it has to
-    // replay it, or the route stays on the record the form just created.
-    await waitFor(() => h.repeat.mock.calls.length > 0);
-    expect(h.repeat).toHaveBeenCalledOnce();
+    // The guard was already off when the pop reached the navigator, so nothing
+    // intercepted it and nothing replayed it.
+    expect(h.enabledAtPop).toEqual([false]);
+    expect(h.repeat).not.toHaveBeenCalled();
 
     // The success cleared the draft, so once the create settles the guard is off.
     box.setCreatePending(false);

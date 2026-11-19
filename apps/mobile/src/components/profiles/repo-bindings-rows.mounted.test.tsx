@@ -12,6 +12,7 @@ import {
   COMPACT_CONTROL_HIT_SLOP_DP,
   COMPACT_CONTROL_ROW_END_CLASS,
   ICON_TARGET_BOX_CLASS,
+  ROW_TARGET_CLASS,
 } from '@/lib/a11y/tap-target';
 import { type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -105,13 +106,13 @@ describe('RepoBindingRow', () => {
 
     const row = renderer.root
       .findAll(node => String(node.type) === 'View')
-      .find(node => String(node.props.className ?? '').includes('min-h-14'));
+      .find(node => String(node.props.className ?? '').includes(ROW_TARGET_CLASS));
     if (!row) {
       throw new Error('The binding row did not render');
     }
-    // The row pads 16 dp on both sides: the same inset the leading icon and
-    // the trash glyph end at.
-    expect(String(row.props.className)).toContain('px-[16px]');
+    // The row pads 16 dp on both sides — the gutter the leading icon and the
+    // trash glyph end at — and nothing narrower.
+    expect(String(row.props.className)).toContain('px-4');
     expect(String(row.props.className)).not.toContain('px-3 ');
 
     const remove = renderer.root

@@ -6,7 +6,7 @@
 import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type ReactTestInstance } from '@/test/renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
@@ -35,8 +35,19 @@ const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline'
 const screenHeaders = vi.hoisted(() => ({
   rendered: [] as {
     title?: string;
+    subtitle?: string;
     eyebrow?: string;
     reserveEyebrow?: boolean;
+  }[],
+}));
+
+const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+
+const emptyStates = vi.hoisted(() => ({
+  rendered: [] as {
+    title?: string;
+    placement?: string;
+    action?: unknown;
   }[],
 }));
 
@@ -85,16 +96,25 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { title: string; placement?: string }) =>
-    createElement('EmptyState', props, `EMPTY_STATE:${props.title}`),
+  EmptyState: (props: { title: string; placement?: string; action?: unknown }) => {
+    emptyStates.rendered.push(props);
+    return createElement('EmptyState', props, `EMPTY_STATE:${props.title}`);
+  },
 }));
+
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: navigation.push }) }));
 
 vi.mock('@/components/query-error', () => ({
   QueryError: () => null,
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string; reserveEyebrow?: boolean }) => {
+  ScreenHeader: (props: {
+    title?: string;
+    subtitle?: string;
+    eyebrow?: string;
+    reserveEyebrow?: boolean;
+  }) => {
     screenHeaders.rendered.push(props);
     return null;
   },
@@ -152,6 +172,8 @@ beforeEach(() => {
   pageHook.isRetentionLimited = false;
   connectivity.value = 'online';
   screenHeaders.rendered = [];
+  emptyStates.rendered = [];
+  navigation.push.mockClear();
 });
 
 describe('PersonalInvoicesScreen header', () => {
@@ -160,11 +182,45 @@ describe('PersonalInvoicesScreen header', () => {
     pageHook.entries = [INVOICE];
 
     await renderWithProviders(createElement(PersonalInvoicesScreen));
-
     expect(screenHeaders.rendered).toHaveLength(1);
     expect(screenHeaders.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
     expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
     expect(screenHeaders.rendered[0]?.reserveEyebrow).toBeUndefined();
+  });
+
+  it("labels the header with the list's fixed one-year window", async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [INVOICE];
+
+    await renderWithProviders(createElement(PersonalInvoicesScreen));
+
+    expect(screenHeaders.rendered).toHaveLength(1);
+    expect(screenHeaders.rendered[0]?.subtitle).toBe(i18n.t('invoices.personalPeriod'));
+  });
+
+  it("routes the empty state's action to the credit history screen", async () => {
+    // No pages: the read settled with zero invoices, so the empty state with
+    // its action renders in the centered branch.
+    pageQuery.data = { pages: [] };
+    pageHook.entries = [];
+
+    await renderWithProviders(createElement(PersonalInvoicesScreen));
+
+    expect(emptyStates.rendered).toHaveLength(1);
+    // The action is the screen's own outline Button element: its Text child
+    // reads the credit-history screen's name, and its press pushes the route.
+    const action = emptyStates.rendered[0]?.action as {
+      props?: { onPress?: () => void; children?: { props?: { children?: string } } };
+    };
+    expect(action).toBeDefined();
+    expect(action.props?.children?.props?.children).toBe(i18n.t('common.creditHistory'));
+
+    const onPress = action.props?.onPress;
+    expect(onPress).toBeDefined();
+    await act(() => {
+      onPress?.();
+    });
+    expect(navigation.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/credit-history');
   });
 });
 

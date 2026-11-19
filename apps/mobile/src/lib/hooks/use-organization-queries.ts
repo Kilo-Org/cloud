@@ -267,7 +267,6 @@ export function buildOrgInvoicesPageQueryOptions(
           lastPage.hasMore && hasRetentionBudget(pages.length)
             ? (lastPage.nextCursor ?? undefined)
             : undefined,
-        // A paused first page leaves the skeleton rows with no exit.
         ...SETTLE_WHILE_OFFLINE,
       }
     )

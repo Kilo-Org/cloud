@@ -32,7 +32,7 @@ export async function OrganizationByPageLayout({
     organization: Organization;
     isGlobalAdmin: boolean;
   }) => JSX.Element;
-  roles?: OrganizationRole[];
+  roles?: readonly OrganizationRole[];
   /**
    * The organization dashboard is an allowlisted support read surface; other
    * pages require membership.

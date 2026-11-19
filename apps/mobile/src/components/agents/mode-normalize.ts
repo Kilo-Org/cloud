@@ -28,7 +28,12 @@ export type AgentMode = BuiltinAgentMode | (string & {});
 /** One row in the mode picker. */
 export type ModeOption = {
   value: AgentMode;
+  /**
+   * Display name. Empty means no loaded option names this mode, so the chip and
+   * the picker substitute the generic translated mode label.
+   */
   label: string;
+  /** Free text; empty means the mode has no description to show. */
   description: string;
 };
 
@@ -125,6 +130,10 @@ export function dedupeCustomModeOptions(custom: ModeOption[]): ModeOption[] {
 /**
  * Append the selected slug once when it is neither a built-in nor already in
  * the custom list, so a prefill or inherited custom slug stays visible.
+ *
+ * The appended option carries the slug only as identity: no loaded option names
+ * that mode, so its label is empty and the chip and picker substitute the
+ * generic translated mode label.
  */
 export function ensureSelectedCustomOption(
   custom: ModeOption[],
@@ -133,7 +142,7 @@ export function ensureSelectedCustomOption(
   if (isBuiltinAgentMode(selected) || custom.some(o => o.value === selected)) {
     return custom;
   }
-  return [...custom, { value: selected, label: selected, description: '' }];
+  return [...custom, { value: selected, label: '', description: '' }];
 }
 
 /** Trim a possibly-null model/variant to `undefined` when empty. */

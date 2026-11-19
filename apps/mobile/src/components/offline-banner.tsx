@@ -65,11 +65,13 @@ export function OfflineBanner() {
         accessible
         accessibilityRole="alert"
         accessibilityLabel={t('offline.noInternet')}
-        className="flex-row items-center justify-center gap-2 bg-warn px-4"
+        className="flex-row items-center justify-center gap-2 bg-warn-solid px-4"
         style={{ height: OFFLINE_BANNER_HEIGHT }}
       >
-        <WifiOff size={14} color={colors.warnForeground} />
-        <Text className="text-sm font-medium text-warn-foreground">{t('offline.noInternet')}</Text>
+        <WifiOff size={14} color={colors.warnSolidForeground} />
+        <Text className="text-sm font-medium text-warn-solid-foreground">
+          {t('offline.noInternet')}
+        </Text>
       </Animated.View>
     </View>
   );

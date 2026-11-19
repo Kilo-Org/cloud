@@ -49,6 +49,13 @@ const VERDICT_CACHE_VERSION = 6;
 
 export const ENKRYPT_VERDICT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
+/**
+ * How long content whose scan Enkrypt failed is cached as allowed. Deliberately short: long enough
+ * that the following steps of a conversation do not resend the same content to an Enkrypt that is
+ * already failing, short enough that the content is rescanned soon, once Enkrypt has recovered.
+ */
+export const ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS = 5 * 60;
+
 const cachedBlockVerdictSchema = z
   .object({
     action: z.literal('block'),
@@ -59,6 +66,7 @@ const cachedBlockVerdictSchema = z
 export type EnkryptVerdictCacheEntry = {
   key: string;
   verdict: 'allow' | z.infer<typeof cachedBlockVerdictSchema>;
+  ttlSeconds: number;
 };
 
 export type EnkryptVerdictCacheStore = {
@@ -218,14 +226,37 @@ function cachedBlock(units: LookedUpUnit[]): Exclude<CachedVerdict, 'allow'> | u
   return undefined;
 }
 
-/** The segments whose units all have a cached verdict, and their length joined as in the part. */
+/**
+ * How much of a part the cache covers. The segments whose units all have a cached verdict count
+ * whole, joined as in the part. Of a segment split into slices with some uncached, the body text
+ * of its cached slices counts too, once where slices overlap. Units are counted as they appear, so
+ * a repeated unit counts each time. `totalCharacters` is the part's joined length.
+ */
 function cachedCoverage(
   rendered: string[],
-  units: LookedUpUnit[]
-): Pick<EnkryptScanCoverage, 'cachedCharacters' | 'cachedSegments'> {
+  units: LookedUpUnit[],
+  totalCharacters: number
+): Pick<EnkryptScanCoverage, 'cachedCharacters' | 'cachedSegments' | 'totalUnits' | 'cachedUnits'> {
   const uncached = new Set(units.filter(unit => !unit.verdict).map(unit => unit.segment));
   const cached = rendered.filter((_, index) => !uncached.has(index));
-  return { cachedCharacters: joinSegments(cached).length, cachedSegments: cached.length };
+  let partial = 0;
+  let coveredEnd = 0;
+  let coveredSegment = -1;
+  for (const { segment, verdict, bodyRange } of units) {
+    if (!verdict || !bodyRange || !uncached.has(segment)) continue;
+    if (segment !== coveredSegment) {
+      coveredSegment = segment;
+      coveredEnd = 0;
+    }
+    partial += Math.max(0, bodyRange.end - Math.max(bodyRange.start, coveredEnd));
+    coveredEnd = Math.max(coveredEnd, bodyRange.end);
+  }
+  return {
+    cachedCharacters: Math.min(joinSegments(cached).length + partial, totalCharacters),
+    cachedSegments: cached.length,
+    totalUnits: units.length,
+    cachedUnits: units.filter(unit => unit.verdict).length,
+  };
 }
 
 /**
@@ -245,43 +276,55 @@ function uncachedCalls(units: LookedUpUnit[]): KeyedUnit[][] {
 }
 
 /**
- * A log-only scan gates nothing, so its result is cached even when it fails, unless the client
- * disconnected or the scan ran out of time before any call. Otherwise a failure that recurs, such
- * as a timeout, a detector error, or a request too large to scan, would rescan, log, and possibly be
- * charged for the same text on every later request of the conversation. A scan that never got a
- * call slot in time was not charged, and the next request scans it.
+ * A scan that let its content through without a clean result: a blocking scan that failed open, or
+ * a failed log-only scan, other than for a client disconnect. Its content is cached as allowed, but
+ * only for `ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS`. This is a deliberate tradeoff: without a cached
+ * verdict, every later step of the conversation would resend the same content to an Enkrypt that is
+ * already failing, and with the usual TTL it would stay unscanned for days. With the short TTL it is
+ * rescanned soon anyway.
  */
-function isCacheableAllow({ verdict, report, usageRecords }: EnkryptGuardrailScanResult): boolean {
-  if (verdict.action !== 'allow') return false;
-  if (report.scan === 'log_only') {
-    return (
-      report.decision !== 'client_aborted' && !(report.error === 'timeout' && report.attempts === 0)
-    );
-  }
-  return usageRecords.at(-1)?.decision === 'allowed';
+function isFailedAllow({ verdict, report }: EnkryptGuardrailScanResult): boolean {
+  if (verdict.action === 'fail_open') return true;
+  return (
+    verdict.action === 'allow' &&
+    report.scan === 'log_only' &&
+    report.error !== null &&
+    report.decision !== 'client_aborted'
+  );
 }
 
-/** What to cache for a scan whose content had no cached verdict: an allow, a genuine block, or nothing. */
+/**
+ * What to cache for a scan whose content had no cached verdict, and for how long: an allow, a
+ * genuine block, or nothing.
+ */
 function cacheableVerdict(
   result: EnkryptGuardrailScanResult,
   config: ReadyConfig
-): EnkryptVerdictCacheEntry['verdict'] | null {
-  if (isCacheableAllow(result)) return 'allow';
+): Omit<EnkryptVerdictCacheEntry, 'key'> | null {
+  if (isFailedAllow(result)) {
+    return { verdict: 'allow', ttlSeconds: ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS };
+  }
+  const decision = result.usageRecords.at(-1)?.decision;
+  if (result.verdict.action === 'allow' && decision === 'allowed') {
+    return { verdict: 'allow', ttlSeconds: ENKRYPT_VERDICT_CACHE_TTL_SECONDS };
+  }
   const blockingDetectors = result.report.detectors_fired.filter(detector =>
     config.blockingDetectors.includes(detector)
   );
-  return result.verdict.action === 'block' &&
-    result.usageRecords.at(-1)?.decision === 'blocked' &&
-    blockingDetectors.length > 0
-    ? { action: 'block', detectors: blockingDetectors }
+  return result.verdict.action === 'block' && decision === 'blocked' && blockingDetectors.length > 0
+    ? {
+        verdict: { action: 'block', detectors: blockingDetectors },
+        ttlSeconds: ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+      }
     : null;
 }
 
 /**
- * What to cache for the calls of a part: an allowed call caches an allow for each of its units, so
- * after another call fails or runs out of time, the next request rescans only that call's units.
- * Writes are deferred and auto-pipelined, and an allow is never overwritten. Enkrypt does not say
- * which unit of a packed call fired, so a genuine block is cached only for a call of one unit.
+ * What to cache for the calls of a part: an allowed call caches an allow for each of its units, and
+ * a failed call a short-lived allow, so the next request rescans only the units of a failed call,
+ * and only once their allow expired. Writes are deferred and auto-pipelined, and an allow is never
+ * overwritten. Enkrypt does not say which unit of a packed call fired, so a genuine block is cached
+ * only for a call of one unit.
  */
 function callCacheEntries(
   calls: KeyedUnit[][],
@@ -290,18 +333,28 @@ function callCacheEntries(
 ): EnkryptVerdictCacheEntry[] {
   if (!cache) return [];
   return calls.flatMap((call, index): EnkryptVerdictCacheEntry[] => {
-    const verdict = cacheableVerdict(required(results[index]), cache.config);
-    if (verdict === 'allow') {
-      return call.flatMap(({ key }) => (key ? [{ key, verdict }] : []));
+    const cacheable = cacheableVerdict(required(results[index]), cache.config);
+    if (cacheable?.verdict === 'allow') {
+      return call.flatMap(({ key }) => (key ? [{ key, ...cacheable }] : []));
     }
     const [only] = call;
-    return verdict && call.length === 1 && only?.key ? [{ key: only.key, verdict }] : [];
+    return cacheable && call.length === 1 && only?.key ? [{ key: only.key, ...cacheable }] : [];
   });
+}
+
+/** Calls that failed but whose units are cached as allowed briefly anyway; see `isFailedAllow`. */
+function failedCallsCached(
+  results: EnkryptGuardrailScanResult[],
+  cache: VerdictCache | null
+): number {
+  if (!cache) return 0;
+  return results.filter(isFailedAllow).length;
 }
 
 const DECISION_SEVERITY: readonly EnkryptScanReport['decision'][] = [
   'blocked',
   'error_fail_closed',
+  'error_fail_open',
   'error_logged',
   'client_aborted',
   'allowed',
@@ -327,8 +380,8 @@ function sum(values: number[]): number {
 }
 
 /**
- * The result of a part scanned in chunks: it blocks when any chunk blocks, and is otherwise
- * unavailable when any chunk's scan is, so a chunk that fails never lets the part through.
+ * The result of a part scanned in chunks: it blocks when any chunk blocks, is otherwise unavailable
+ * when any chunk's scan is, and otherwise fails open when any chunk's scan does.
  */
 function combineChunks(results: EnkryptGuardrailScanResult[]): EnkryptGuardrailScanResult {
   const first = required(results[0]);
@@ -384,8 +437,7 @@ function callScans(
  * Plans the system prompt or the conversation. Each segment, or each slice of a segment too long
  * for one Enkrypt call, has its verdict cached on its own; only the units without one are scanned,
  * packed into as few calls as fit. A cached block of any unit rejects the request. A cache failure
- * scans the part in full, so it never lets unscanned content through. A failed blocking scan is
- * never cached; see `isCacheableAllow` for log-only scans.
+ * scans the part in full. A failed scan is cached as allowed only briefly; see `isFailedAllow`.
  */
 async function planSegmentsPart(
   part: EnkryptSegmentsPart,
@@ -397,12 +449,13 @@ async function planSegmentsPart(
   const keyed = keyedUnits(request, part, segments, cache);
   const { status, verdicts } = await lookup(request.organizationId, keyed, cache);
   const units = withVerdicts(keyed, verdicts);
+  const totalCharacters = joinSegments(rendered).length;
   const coverage: EnkryptScanCoverage = {
     part,
     cache: status,
-    totalCharacters: joinSegments(rendered).length,
+    totalCharacters,
     totalSegments: segments.length,
-    ...cachedCoverage(rendered, units),
+    ...cachedCoverage(rendered, units, totalCharacters),
     omittedAttachments: segments.filter(segment => segment.body === null).length,
   };
   const block = cachedBlock(units);
@@ -419,6 +472,7 @@ async function planSegmentsPart(
       credits_cost: null,
       latency_ms: 0,
       chunks: 0,
+      failed_calls_cached: 0,
     };
     console.debug('[enkrypt-guardrail] decision', { ...scanLogFields(request), ...report });
     return {
@@ -440,7 +494,12 @@ async function planSegmentsPart(
       const result = combineChunks(results);
       return {
         ...result,
-        report: { ...result.report, part, chunks: calls.length },
+        report: {
+          ...result.report,
+          part,
+          chunks: calls.length,
+          failed_calls_cached: failedCallsCached(results, cache),
+        },
         cacheEntries: callCacheEntries(calls, results, cache),
       };
     },
@@ -452,11 +511,12 @@ function required<T>(value: T | undefined): T {
   return value;
 }
 
-/** A verdict acts on its most severe source: a block, then an unavailable scan. */
+/** A verdict acts on its most severe source: a block, then an unavailable scan, then a failed one. */
 export function mostSevereVerdict(verdicts: EnkryptGuardrailVerdict[]): EnkryptGuardrailVerdict {
   return (
     verdicts.find(verdict => verdict.action === 'block') ??
     verdicts.find(verdict => verdict.action === 'unavailable') ??
+    verdicts.find(verdict => verdict.action === 'fail_open') ??
     verdicts.find(verdict => verdict.action === 'allow') ?? { action: 'skip' }
   );
 }
@@ -465,12 +525,15 @@ export function mostSevereVerdict(verdicts: EnkryptGuardrailVerdict[]): EnkryptG
 type ToolOutcome = {
   tool: RequestToolDefinition;
   characters: number;
+  totalUnits: number;
+  cachedUnits: number;
   outcome:
     | { kind: 'cached'; verdict: EnkryptVerdictCacheEntry['verdict'] }
     | {
         kind: 'scanned';
         result: EnkryptGuardrailScanResult;
         cacheEntries: EnkryptVerdictCacheEntry[];
+        failedCallsCached: number;
       };
 };
 
@@ -518,6 +581,11 @@ function toolsReport(
     cached_characters:
       sum(cached.map(each => each.characters)) +
       sum(reports.map(report => report.cached_characters)),
+    total_units: sum(outcomes.map(each => each.totalUnits)),
+    cached_units: sum(outcomes.map(each => each.cachedUnits)),
+    failed_calls_cached: sum(
+      outcomes.map(({ outcome }) => (outcome.kind === 'scanned' ? outcome.failedCallsCached : 0))
+    ),
     scanned_characters: sum(reports.map(report => report.scanned_characters)),
     decision: mostSevereDecision([
       ...reports.map(report => report.decision),
@@ -539,11 +607,16 @@ function toolsReport(
   };
 }
 
-/** A tool's cached verdict, or the calls that scan its uncached segments. */
-type ToolPlan = { tool: RequestToolDefinition; characters: number } & (
-  | { verdict: CachedVerdict }
-  | { calls: KeyedUnit[][]; scans: EnkryptGuardrailScan[] }
-);
+/**
+ * A tool's cached verdict, or the calls that scan its uncached segments, with its unit counts. A
+ * tool decided by a cached block counts only the units with a cached verdict as cached.
+ */
+type ToolPlan = {
+  tool: RequestToolDefinition;
+  characters: number;
+  totalUnits: number;
+  cachedUnits: number;
+} & ({ verdict: CachedVerdict } | { calls: KeyedUnit[][]; scans: EnkryptGuardrailScan[] });
 
 /**
  * Plans the tool definitions and response formats. Each segment of each is cached on its own, as
@@ -552,7 +625,7 @@ type ToolPlan = { tool: RequestToolDefinition; characters: number } & (
  * tool that fired it. Each call pays Enkrypt's per-call minimum, so an uncached tool set costs more
  * than one combined call would; verdicts are shared across the organization, so that is paid once
  * per tool and detector set. The results are aggregated into one result for the part: it blocks
- * when any tool blocks, and is otherwise unavailable when any tool's scan is.
+ * when any tool blocks, and is otherwise unavailable or fails open when any tool's scan is or does.
  */
 async function planTools(
   tools: RequestToolDefinition[],
@@ -573,10 +646,14 @@ async function planTools(
   const plans = toolUnits.map(({ tool, rendered, units: keyed }): ToolPlan => {
     const characters = joinSegments(rendered).length;
     const units = withVerdicts(keyed, verdicts);
+    const unitCounts = {
+      totalUnits: units.length,
+      cachedUnits: units.filter(unit => unit.verdict).length,
+    };
     const block = cachedBlock(units);
-    if (block) return { tool, characters, verdict: block };
+    if (block) return { tool, characters, ...unitCounts, verdict: block };
     if (units.every(unit => unit.verdict === 'allow')) {
-      return { tool, characters, verdict: 'allow' };
+      return { tool, characters, ...unitCounts, verdict: 'allow' };
     }
     const calls = uncachedCalls(units);
     const coverage: EnkryptScanCoverage = {
@@ -584,27 +661,42 @@ async function planTools(
       cache: status,
       totalCharacters: characters,
       totalSegments: tool.segments.length,
-      ...cachedCoverage(rendered, units),
+      ...cachedCoverage(rendered, units, characters),
       omittedAttachments: 0,
     };
-    return { tool, characters, calls, scans: callScans(request, coverage, calls) };
+    return {
+      tool,
+      characters,
+      ...unitCounts,
+      calls,
+      scans: callScans(request, coverage, calls),
+    };
   });
   return {
     scans: plans.flatMap(plan => ('scans' in plan ? plan.scans : [])),
     finish(resultOf) {
       const outcomes = plans.map((plan): ToolOutcome => {
-        const { tool, characters } = plan;
+        const { tool, characters, totalUnits, cachedUnits } = plan;
         if ('verdict' in plan) {
-          return { tool, characters, outcome: { kind: 'cached', verdict: plan.verdict } };
+          return {
+            tool,
+            characters,
+            totalUnits,
+            cachedUnits,
+            outcome: { kind: 'cached', verdict: plan.verdict },
+          };
         }
         const results = plan.scans.map(resultOf);
         return {
           tool,
           characters,
+          totalUnits,
+          cachedUnits,
           outcome: {
             kind: 'scanned',
             result: combineChunks(results),
             cacheEntries: callCacheEntries(plan.calls, results, cache),
+            failedCallsCached: failedCallsCached(results, cache),
           },
         };
       });
@@ -676,16 +768,14 @@ export async function scanRequestWithVerdictCache(
 }
 
 export async function rememberRequestVerdict(
-  { key, verdict }: EnkryptVerdictCacheEntry,
+  { key, verdict, ttlSeconds }: EnkryptVerdictCacheEntry,
   store: EnkryptVerdictCacheStore
 ): Promise<EnkryptGuardrailReport['scans'][number]['verdict_cache_write']> {
   try {
     const result = await store.set(
       key,
       verdict,
-      verdict === 'allow'
-        ? { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS, nx: true }
-        : { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS }
+      verdict === 'allow' ? { ex: ttlSeconds, nx: true } : { ex: ttlSeconds }
     );
     return result === null ? 'skipped' : 'written';
   } catch (error) {

@@ -4,16 +4,20 @@ import { type ComponentProps, useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { StoredSessionRow } from '@/components/agents/session-row';
+import { SessionRow } from '@/components/ui/session-row';
 import { i18n } from '@/i18n';
 
 // Open the development session-row-fixture deep link to inspect history-row
-// accessibility in one language. `lang` picks the catalog (Hindi by default) and
-// `rows=repo` adds the repository-origin row that speaks its platform last.
+// accessibility in one language. `lang` picks the catalog (Hindi by default),
+// `rows=repo` adds the repository-origin row that speaks its platform last,
+// and `rows=states` adds the idle and live state-word rows so the two states'
+// pinned eyebrow tints are capturable beside each other.
 export function SessionRowFixture() {
   const params = useLocalSearchParams<{ lang?: string; rows?: string }>();
   const requestedLanguage = params.lang ?? '';
   const lang = requestedLanguage === '' ? 'hi' : requestedLanguage;
-  const repoRow = params.rows === 'repo';
+  const repoRow = params.rows === 'repo' || params.rows === 'states';
+  const stateRows = params.rows === 'states';
   const [ready, setReady] = useState(false);
   const [timestamp] = useState(() => new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
   useEffect(() => {
@@ -45,6 +49,15 @@ export function SessionRowFixture() {
             setReady(false);
           }}
         />
+      ) : null}
+      {stateRows ? (
+        // The tray words. Note: no production surface derives the `idle` key
+        // yet, so this renders a latent pin (`stateTint`), not a row the tray
+        // can show today; LIVE is the tray's real state-word row.
+        <>
+          <SessionRow agentLabel="IDLE" agentState="idle" title="Idle state fixture" />
+          <SessionRow agentLabel="LIVE" agentState="live" title="Live state fixture" live />
+        </>
       ) : null}
     </View>
   );

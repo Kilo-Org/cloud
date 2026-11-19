@@ -29,8 +29,9 @@ const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>([
  * - Falls back to {@link AGENT_ATTACHMENT_FALLBACK_EXTENSION} when the
  *   filename has no extension or the extension does not match
  *   {@link AGENT_ATTACHMENT_EXTENSION_REGEX}.
- * - Never throws; the result is always a known key in
- *   {@link AGENT_ATTACHMENT_MIME_BY_EXTENSION}.
+ * - Never throws; an extension the regex admits but the table does not
+ *   know resolves through {@link mimeForExtension}'s `application/octet-stream`
+ *   fallback.
  */
 export function normalizeAttachmentExtension(name: string): AgentAttachmentExtension {
   const dot = name.lastIndexOf('.');

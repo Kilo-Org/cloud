@@ -1,5 +1,9 @@
 import { custom_llm2 } from '@kilocode/db/schema';
-import type { CustomLlmDefinition, EncryptedData } from '@kilocode/db/schema-types';
+import type {
+  CustomLlmDefinition,
+  CustomPricingTiers,
+  EncryptedData,
+} from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { eq } from 'drizzle-orm';
@@ -31,6 +35,32 @@ export function publicCustomLlmDefinition(
     ...baseDefinition,
     display_name: 'Public custom LLM',
     public: { inference_providers: inferenceProviders, description: 'A public custom LLM' },
+    ...overrides,
+  };
+}
+
+const partnerPricing: CustomPricingTiers = [
+  {
+    start_context_length: 0,
+    pricing: {
+      prompt_per_million: 1,
+      completion_per_million: 2,
+      input_cache_read_per_million: null,
+      input_cache_write_per_million: null,
+    },
+  },
+];
+
+/** A partner that serves the catalog model with the same public id as `inferenceProvider`. */
+export function partnerCustomLlmDefinition(
+  inferenceProvider: string,
+  overrides: Partial<CustomLlmDefinition> = {}
+): CustomLlmDefinition {
+  return {
+    ...baseDefinition,
+    display_name: 'Partner custom LLM',
+    partner: { inference_provider: inferenceProvider },
+    pricing: partnerPricing,
     ...overrides,
   };
 }

@@ -27,7 +27,9 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
       ) : null}
       {report.summary.model ? (
         <Text className="text-xs text-muted-foreground">
-          {t('common.model')}: {resolveCatalogModelName(report.summary.model, catalog.models)}
+          {t('agentBriefing.summaryModel', {
+            model: resolveCatalogModelName(report.summary.model, catalog.models),
+          })}
         </Text>
       ) : null}
       {report.summary.costMicrodollars > 0 ||

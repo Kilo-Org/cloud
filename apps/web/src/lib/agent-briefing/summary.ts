@@ -49,7 +49,6 @@ import {
   briefingSummaryErrorSchema,
   redactBriefingExcerpt,
   redactBriefingExcerptOrDrop,
-  redactBriefingTitle,
   type BriefingEstimate,
 } from '@kilocode/app-shared/agent-briefing';
 import {
@@ -212,12 +211,11 @@ export function briefingPrompt(
     omittedFromSummary: 0,
     sessions: facts.sessions.map(session => ({
       ...session,
-      title: redactBriefingTitle(session.title),
       sources: session.sources.map(({ excerpt, ...source }) => {
         const safeExcerpt = excerpt ? redactBriefingExcerptOrDrop(excerpt) : undefined;
         return {
+          // Capture-time screening already applied; keep the stored value verbatim.
           ...source,
-          title: redactBriefingTitle(source.title),
           ...(safeExcerpt ? { excerpt: safeExcerpt } : {}),
         };
       }),

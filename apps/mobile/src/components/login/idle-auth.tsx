@@ -115,7 +115,7 @@ export function IdleAuth({
   // rest of the app uses for it, so the sentence and the screen it opens carry
   // one name.
   const legalSentence =
-    `${t('login.termsPrefix')}${t('prReview.discussion.termsTitle')}${t('login.termsConnector')}` +
+    `${t('login.termsPrefix')}${t('common.termsOfService')}${t('login.termsConnector')}` +
     `${t('common.privacyPolicy')}${t('login.termsSuffix')}`;
   const [view, setView] = useState<'main' | 'otp'>('main');
   const [verifyError, setVerifyError] = useState<string | undefined>(undefined);
@@ -551,14 +551,12 @@ export function IdleAuth({
           className={INLINE_LINK_BOX_CLASS}
           hitSlop={inlineLinkHitSlop('start')}
           accessibilityRole="link"
-          accessibilityLabel={t('prReview.discussion.termsTitle')}
+          accessibilityLabel={t('common.termsOfService')}
           onPress={() => {
             openLegalDocument('terms');
           }}
         >
-          <Text className="text-sm text-primary underline">
-            {t('prReview.discussion.termsTitle')}
-          </Text>
+          <Text className="text-sm text-primary underline">{t('common.termsOfService')}</Text>
         </Pressable>
         <Text
           importantForAccessibility="no-hide-descendants"

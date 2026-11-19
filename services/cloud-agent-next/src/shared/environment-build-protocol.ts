@@ -88,6 +88,23 @@ export const environmentBuildPinGroupSchema = z
   .strict();
 export type EnvironmentBuildPinGroup = z.infer<typeof environmentBuildPinGroupSchema>;
 
+const environmentBuildIdentityFields = {
+  environmentId: z.string().uuid(),
+  buildId: z.string().uuid(),
+  allocationId: z.string().uuid(),
+};
+const environmentBuildRunFields = {
+  commands: z.array(z.string().min(1).max(16_000)).max(20),
+  env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
+  /** Names of the secret entries in `env`, so the builder redacts their values. */
+  secretKeys: z.array(z.string().min(1).max(128)).max(50),
+  filesystemArchive: z
+    .object({ baseImage: z.string().min(1).max(8192) })
+    .strict()
+    .optional(),
+  deadlineAt: z.number().int().positive(),
+};
+
 /**
  * What the builder fetches once it starts. Secrets are decrypted only into this
  * reply. A V1 build serves the `git` shape at the isolated directory. A V2 build
@@ -97,38 +114,27 @@ export type EnvironmentBuildPinGroup = z.infer<typeof environmentBuildPinGroupSc
 export const environmentBuildInputSchema = z.union([
   z
     .object({
-      environmentId: z.string().uuid(),
-      buildId: z.string().uuid(),
-      allocationId: z.string().uuid(),
+      ...environmentBuildIdentityFields,
       git: environmentBuildGitSchema,
       members: z.undefined().optional(),
       directory: z.literal(ENVIRONMENT_BUILD_WORKSPACE),
-      commands: z.array(z.string().min(1).max(16_000)).max(20),
-      env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
-      /** Names of the secret entries in `env`, so the builder redacts their values. */
-      secretKeys: z.array(z.string().min(1).max(128)).max(50),
-      deadlineAt: z.number().int().positive(),
+      ...environmentBuildRunFields,
     })
     .strict(),
   z
     .object({
-      environmentId: z.string().uuid(),
-      buildId: z.string().uuid(),
-      allocationId: z.string().uuid(),
+      ...environmentBuildIdentityFields,
       members: z.array(environmentBuildMemberSchema).min(1),
       git: z.undefined().optional(),
       directory: z.string().regex(/^\/workspace(\/[^/]+)?$/),
-      commands: z.array(z.string().min(1).max(16_000)).max(20),
-      env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
-      secretKeys: z.array(z.string().min(1).max(128)).max(50),
-      deadlineAt: z.number().int().positive(),
+      ...environmentBuildRunFields,
     })
     .strict(),
 ]);
 export type EnvironmentBuildInput = z.infer<typeof environmentBuildInputSchema>;
 
 /** Steps the builder reports; the coordinator's own states wrap them. */
-export const ENVIRONMENT_BUILD_RUNNER_STEPS = ['clone', 'setup', 'cleanup'] as const;
+export const ENVIRONMENT_BUILD_RUNNER_STEPS = ['clone', 'setup', 'cleanup', 'archive'] as const;
 export type EnvironmentBuildRunnerStep = (typeof ENVIRONMENT_BUILD_RUNNER_STEPS)[number];
 
 export const environmentBuildEventsSchema = z
@@ -158,6 +164,7 @@ export const ENVIRONMENT_BUILD_RUNNER_FAILURES = [
   'setup_failed',
   'setup_timeout',
   'cleanup_failed',
+  'archive_failed',
   'canceled',
 ] as const;
 export type EnvironmentBuildRunnerFailure = (typeof ENVIRONMENT_BUILD_RUNNER_FAILURES)[number];

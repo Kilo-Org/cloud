@@ -125,7 +125,7 @@ const capabilitySchema = cachedCapabilitySchema(hasCurrentCapabilityPrefix);
 const legacyKiloCapabilitySchema = cachedCapabilitySchema(credential =>
   credential.startsWith(LEGACY_CAPABILITY_PREFIX.kilo)
 );
-const repositorySchema = z.discriminatedUnion('type', [
+export const repositorySchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('github'),
@@ -160,7 +160,7 @@ const repositorySchema = z.discriminatedUnion('type', [
     })
     .strict(),
 ]);
-const scmSchema = z
+export const scmSchema = z
   .object({
     purpose: z.enum(['github', 'gitlab', 'bitbucket']),
     alias: tokenSchema.optional(),
@@ -755,9 +755,9 @@ function isCapabilityCurrent(
   );
 }
 
-async function refreshScmCapability(
-  env: CredentialEnv,
-  grant: SessionCredentialGrant,
+export async function refreshScmCapability(
+  env: Partial<Pick<Env, 'GIT_TOKEN_SERVICE'>>,
+  grant: { userId: string; orgId?: string; sandboxId: string },
   repository: CredentialRepository,
   outboundContainerId: string,
   now: number,

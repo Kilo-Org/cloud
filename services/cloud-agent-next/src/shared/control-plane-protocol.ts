@@ -197,6 +197,8 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'runtime_artifact_invalid',
   'runtime_cli_probe_failed',
   'runtime_supervisor_missing',
+  'environment_restore_failed',
+  'environment_restore_unavailable',
   'connection_lost',
   'sandbox_lost',
   'agent_restarted',

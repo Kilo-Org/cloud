@@ -9,6 +9,10 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   runtime_artifact_invalid: 'Runtime artifact verification failed',
   runtime_cli_probe_failed: 'Runtime CLI validation failed',
   runtime_supervisor_missing: 'Runtime supervisor is missing',
+  environment_restore_failed:
+    'Prepared environment restoration failed. Rebuild the environment and try again.',
+  environment_restore_unavailable:
+    'Prepared environment restoration was interrupted. Send a new message to retry. If the failure continues, contact Kilo.',
   preparation_timeout: 'Environment preparation timed out',
   preparation_cancelled: 'Environment preparation was stopped',
   workspace_setup_failed: 'Workspace setup failed',

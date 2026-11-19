@@ -66,9 +66,11 @@ type NoticeCopyProps = {
 
 /**
  * One earlier purchase may still complete, so a second charge needs the person's
- * explicit consent. The retry is a store query: it names no pack and needs no
- * price, because it never starts a purchase — a retired or unidentifiable
- * earlier SKU must still reach it.
+ * explicit consent. The other action is a store query: it names no pack and
+ * needs no price, because it never starts a purchase — a retired or
+ * unidentifiable earlier SKU must still reach it. It reads "Check purchase",
+ * not "Try again": beside a warning that buying again may charge again, a retry
+ * label read as the second purchase.
  */
 function NoticeCopy({
   warning,
@@ -86,15 +88,15 @@ function NoticeCopy({
   const reconcile = (
     <Button
       key="reconcile"
-      accessibilityLabel={[t('common.tryAgain'), ...packCopy].join(', ')}
+      accessibilityLabel={[t('credits.checkPurchase'), ...packCopy].join(', ')}
       accessibilityState={{ disabled: actionsDisabled }}
       disabled={actionsDisabled}
       onPress={onReconcile}
       size="action"
-      testID="credit-unresolved-try-again"
+      testID="credit-unresolved-check-purchase"
       variant={buyAgainFirst ? 'outline' : 'default'}
     >
-      <Text>{t('common.tryAgain')}</Text>
+      <Text>{t('credits.checkPurchase')}</Text>
     </Button>
   );
   const buyAgain = (

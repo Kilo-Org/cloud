@@ -170,6 +170,7 @@
     "generating": "Generando…",
     "working": "Trabajando",
     "yourOwnRepositories": "Tus propios repositorios",
+    "organizationRepositories": "Repositorios de la organización",
     "dismissed": "Descartado",
     "agent": "Agente",
     "durationMinuteShort": "min",
@@ -3476,8 +3477,7 @@
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Por debajo de {{amount}}",
-      "organizationSeats": "Licencias de la organización",
-      "plan": "Plan de la organización",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Finalizado",
@@ -4485,6 +4485,7 @@
     "pickPackToBuyAgain": "Elige un paquete de arriba para iniciar una nueva compra.",
     "purchasePending": "La tienda aún está procesando este pago. Tus créditos llegarán en cuanto apruebe el cargo.",
     "buyAgain": "Volver a comprar",
+    "checkPurchase": "Comprobar la compra",
     "purchaseOwnedByAnotherAccount": "El crédito de esta cuenta de Apple pertenece a una cuenta de Kilo diferente. Inicia sesión en esa cuenta de Kilo para usarlo.",
     "purchaseOwnedByAnotherAccountPlay": "El crédito de esta cuenta de Google Play pertenece a una cuenta de Kilo diferente. Inicia sesión en esa cuenta de Kilo para usarlo."
   },

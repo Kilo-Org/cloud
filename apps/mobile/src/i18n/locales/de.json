@@ -170,6 +170,7 @@
     "generating": "Wird generiert…",
     "working": "In Bearbeitung",
     "yourOwnRepositories": "Deine eigenen Code-Repositories",
+    "organizationRepositories": "Code-Repositories der Organisation",
     "dismissed": "Verworfen",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -3418,8 +3419,7 @@
     "hub": {
       "balance": "Guthaben",
       "lowBalanceBelow": "Unter {{amount}}",
-      "organizationSeats": "Nutzerplätze der Organisation",
-      "plan": "Organisationsplan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Beendet",
@@ -4418,6 +4418,7 @@
     "pickPackToBuyAgain": "Wähle oben ein Paket aus, um einen neuen Kauf zu starten.",
     "purchasePending": "Der Store verarbeitet diese Zahlung noch. Deine Credits werden gutgeschrieben, sobald er die Belastung genehmigt.",
     "buyAgain": "Erneut kaufen",
+    "checkPurchase": "Kauf prüfen",
     "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
     "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."
   },

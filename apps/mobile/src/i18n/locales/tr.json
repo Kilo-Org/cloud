@@ -170,6 +170,7 @@
     "generating": "Oluşturuluyor…",
     "working": "Çalışıyor",
     "yourOwnRepositories": "Kendi depoların",
+    "organizationRepositories": "Kuruluşun depoları",
     "dismissed": "Yok sayıldı",
     "agent": "Ajan",
     "durationMinuteShort": "dk",
@@ -3418,8 +3419,7 @@
     "hub": {
       "balance": "Bakiye",
       "lowBalanceBelow": "{{amount}} altı",
-      "organizationSeats": "Kuruluş lisansları",
-      "plan": "Kuruluş planı",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Sona erdi",
@@ -4418,6 +4418,7 @@
     "pickPackToBuyAgain": "Yeni bir satın alma başlatmak için yukarıdan bir paket seçin.",
     "purchasePending": "Mağaza bu ödemeyi hâlâ işliyor. Kredileriniz, mağaza ödemeyi onayladığında hesabınıza yüklenir.",
     "buyAgain": "Yeniden satın al",
+    "checkPurchase": "Satın almayı kontrol et",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account üzerindeki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum aç.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındaki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum açın."
   },

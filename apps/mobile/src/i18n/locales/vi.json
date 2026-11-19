@@ -170,6 +170,7 @@
     "generating": "Đang tạo…",
     "working": "Đang xử lý",
     "yourOwnRepositories": "Kho mã nguồn của riêng bạn",
+    "organizationRepositories": "Kho mã nguồn của tổ chức",
     "dismissed": "Đã bỏ qua",
     "agent": "Đại lý",
     "durationMinuteShort": "phút",
@@ -3418,8 +3419,7 @@
     "hub": {
       "balance": "Số dư",
       "lowBalanceBelow": "Dưới {{amount}}",
-      "organizationSeats": "Số suất sử dụng của tổ chức",
-      "plan": "Gói tổ chức",
+      "plan": "Gói",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Đã kết thúc",
@@ -4418,6 +4418,7 @@
     "pickPackToBuyAgain": "Chọn một gói ở trên để bắt đầu giao dịch mua mới.",
     "purchasePending": "Cửa hàng vẫn đang xử lý khoản thanh toán này. Tín dụng của bạn sẽ được cộng ngay khi cửa hàng phê duyệt khoản phí.",
     "buyAgain": "Mua lần nữa",
+    "checkPurchase": "Kiểm tra giao dịch mua",
     "purchaseOwnedByAnotherAccount": "Tín dụng trên Apple Account này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng.",
     "purchaseOwnedByAnotherAccountPlay": "Tín dụng trên Tài khoản Google Play này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng."
   },

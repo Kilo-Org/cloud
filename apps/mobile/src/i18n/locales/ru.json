@@ -170,6 +170,7 @@
     "generating": "Генерация…",
     "working": "В работе",
     "yourOwnRepositories": "Личные репозитории",
+    "organizationRepositories": "Репозитории организации",
     "dismissed": "Отклонено",
     "agent": "Агент",
     "durationMinuteShort": "мин",
@@ -3534,8 +3535,7 @@
     "hub": {
       "balance": "Баланс",
       "lowBalanceBelow": "Ниже {{amount}}",
-      "organizationSeats": "Места в организации",
-      "plan": "План организации",
+      "plan": "План",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Закончился",
@@ -4552,6 +4552,7 @@
     "pickPackToBuyAgain": "Выберите пакет выше, чтобы начать новую покупку.",
     "purchasePending": "Магазин всё ещё обрабатывает этот платёж. Кредиты поступят, как только он одобрит списание.",
     "buyAgain": "Купить ещё раз",
+    "checkPurchase": "Проверить покупку",
     "purchaseOwnedByAnotherAccount": "Кредиты в этом Apple Account связаны с другим аккаунтом Kilo. Войдите в тот аккаунт Kilo, чтобы их использовать.",
     "purchaseOwnedByAnotherAccountPlay": "Кредиты на этом Google Play аккаунте принадлежат другому аккаунту Kilo. Войдите в тот аккаунт Kilo, чтобы их использовать."
   },

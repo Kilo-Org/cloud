@@ -170,6 +170,7 @@
     "generating": "正在產生…",
     "working": "處理中",
     "yourOwnRepositories": "你自己的存放庫",
+    "organizationRepositories": "組織的存放庫",
     "dismissed": "已忽略",
     "agent": "代理人",
     "durationMinuteShort": "min",
@@ -3418,8 +3419,7 @@
     "hub": {
       "balance": "餘額",
       "lowBalanceBelow": "低於 {{amount}}",
-      "organizationSeats": "組織席次",
-      "plan": "組織套餐",
+      "plan": "套餐",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 已結束",
@@ -4418,6 +4418,7 @@
     "pickPackToBuyAgain": "請在上方選擇一個方案以開始新的購買。",
     "purchasePending": "商店仍在處理這筆付款。商店核准扣款後，你的點數就會入帳。",
     "buyAgain": "再次購買",
+    "checkPurchase": "檢查購買",
     "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
   },

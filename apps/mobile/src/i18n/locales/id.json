@@ -170,6 +170,7 @@
     "generating": "Membuat…",
     "working": "Bekerja",
     "yourOwnRepositories": "Repositori milikmu",
+    "organizationRepositories": "Repositori organisasi",
     "dismissed": "Diabaikan",
     "agent": "Agen",
     "durationMinuteShort": "min",
@@ -3418,8 +3419,7 @@
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Di bawah {{amount}}",
-      "organizationSeats": "Lisensi pengguna organisasi",
-      "plan": "Paket organisasi",
+      "plan": "Paket",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Berakhir",
@@ -4418,6 +4418,7 @@
     "pickPackToBuyAgain": "Pilih paket di atas untuk memulai pembelian baru.",
     "purchasePending": "Toko masih memproses pembayaran ini. Kredit Anda akan masuk setelah toko menyetujui tagihannya.",
     "buyAgain": "Beli lagi",
+    "checkPurchase": "Periksa pembelian",
     "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."
   },

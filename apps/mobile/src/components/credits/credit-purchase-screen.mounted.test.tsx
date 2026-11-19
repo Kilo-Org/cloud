@@ -1772,7 +1772,9 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
 
     const actions = card.findAll(node => String(node.type) === 'Button');
     expect(actions).toHaveLength(2);
-    await press(actions.find(node => labelOf(node).startsWith('Try again')));
+    // The store query is named for what it does: "Try again" beside a warning
+    // about a second charge read as "buy again".
+    await press(actions.find(node => labelOf(node).startsWith('Check purchase')));
     expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
     await press(actions.find(node => labelOf(node).startsWith('Buy again')));
     expect(owner.buyAgain).toHaveBeenCalledTimes(1);

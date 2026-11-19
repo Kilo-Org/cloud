@@ -170,6 +170,7 @@
     "generating": "生成中…",
     "working": "作業中",
     "yourOwnRepositories": "自分のリポジトリ",
+    "organizationRepositories": "組織のリポジトリ",
     "dismissed": "却下済み",
     "agent": "エージェント",
     "durationMinuteShort": "min",
@@ -3418,8 +3419,7 @@
     "hub": {
       "balance": "残高",
       "lowBalanceBelow": "{{amount}}未満",
-      "organizationSeats": "組織のシート数",
-      "plan": "組織のプラン",
+      "plan": "プラン",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 終了",
@@ -4418,6 +4418,7 @@
     "pickPackToBuyAgain": "新しい購入を開始するには、上のパックを選択してください。",
     "purchasePending": "ストアでこのお支払いを処理中です。請求が承認されると、クレジットが付与されます。",
     "buyAgain": "もう一度購入",
+    "checkPurchase": "購入を確認",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
   },

@@ -362,7 +362,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               />
             )}
             <KvRow
-              label={t('organization.hub.organizationSeats')}
+              // The hub is the organization's own screen, so the label does not
+              // repeat "Organization"; it is the Seats label Billing uses.
+              label={t('organization.billing.seats')}
               // `requireSeats` is the enforcement switch; total is the raw
               // purchased capacity and can legitimately be zero, so the shared
               // readout prints the used count alone until seats were bought.

@@ -170,6 +170,7 @@
     "generating": "יוצר…",
     "working": "בפעולה",
     "yourOwnRepositories": "המאגרים שלך",
+    "organizationRepositories": "מאגרי הארגון",
     "dismissed": "סומן להתעלמות",
     "agent": "סוֹכֵן",
     "durationMinuteShort": "min",
@@ -3476,8 +3477,7 @@
     "hub": {
       "balance": "יתרה",
       "lowBalanceBelow": "מתחת ל-{{amount}}",
-      "organizationSeats": "רישיונות הארגון",
-      "plan": "תוכנית הארגון",
+      "plan": "תוכנית",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · הסתיים",
@@ -4485,6 +4485,7 @@
     "pickPackToBuyAgain": "בחרו חבילה למעלה כדי להתחיל רכישה חדשה.",
     "purchasePending": "החנות עדיין מעבדת את התשלום הזה. הקרדיטים שלך יגיעו ברגע שהיא תאשר את החיוב.",
     "buyAgain": "לקנות שוב",
+    "checkPurchase": "בדיקת הרכישה",
     "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
     "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
   },

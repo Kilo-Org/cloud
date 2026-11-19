@@ -206,9 +206,20 @@ async function processMessage(
     outcome.kind === 'unavailable' && outcome.reason === 'http_error' && outcome.status === 429
       ? outcome.admissionReason
       : undefined;
+  // Only a validated tagged message whose writer explicitly marked the rejection class-only
+  // opts into the slower early window; a class-limit marker must never change LLM retries.
+  const nonLlmClassOnly =
+    (parsed.kind === 'enkrypt_usage' || parsed.kind === 'exa_usage') &&
+    classOnly === true &&
+    admissionReason === 'queue_limit';
   const retryDelaySeconds = acknowledged
     ? undefined
-    : usageRetryDelaySeconds(message.attempts, admissionReason !== undefined);
+    : usageRetryDelaySeconds(
+        message.attempts,
+        admissionReason !== undefined,
+        Math.random,
+        nonLlmClassOnly
+      );
   const level = acknowledged ? 'info' : 'warn';
   logSafely(level, () => ({
     event: 'usage_ingest_processing',

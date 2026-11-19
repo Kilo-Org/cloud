@@ -1157,10 +1157,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
    * through a session that is already tracked. `createdParentId` is the parent
    * the announcement reports; a child of an unknown parent is not adopted.
    */
-  function emittingRoute(
-    key: string | undefined,
-    createdParentId: string
-  ): TurnRoute | undefined {
+  function emittingRoute(key: string | undefined, createdParentId: string): TurnRoute | undefined {
     if (key === undefined) return undefined;
     const direct = routes.get(key);
     if (direct !== undefined) return direct;
@@ -1455,19 +1452,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
    * carry over on the shared sets, and the review publication is rebuilt with the
    * turn.
    */
-  function adoptRegisteredRoute(
-    previous: TurnRoute | undefined,
-    route: TurnRoute
-  ): void {
+  function adoptRegisteredRoute(previous: TurnRoute | undefined, route: TurnRoute): void {
     if (previous === undefined || sameRegisteredBinding(previous, route)) return;
     log(
       `turn: route binding changed session=${route.sessionId} nativeSession=${
         previous.kiloSessionId
       }->${route.kiloSessionId}`
     );
-    interruptedFinalizations
-      .get(route.sessionId)
-      ?.abort.abort(new Error('route binding changed'));
+    interruptedFinalizations.get(route.sessionId)?.abort.abort(new Error('route binding changed'));
     const turn = turns.get(route.sessionId);
     if (turn !== undefined) {
       // Finalization re-checks the live turn only after its steps return, so a

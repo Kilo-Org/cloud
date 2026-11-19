@@ -4442,7 +4442,9 @@ describe('turn route identity', () => {
     // settles and the next prompt uses the registration that is current.
     h.registerRoute({ ...first, kiloSessionId: 'ses_replaced' });
     await settle();
-    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'agent_restarted' }]);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'agent_restarted' },
+    ]);
 
     h.manager.submit(SESSION_ID, promptPayload('m2'));
     await settle();
@@ -4459,7 +4461,9 @@ describe('turn route identity', () => {
     const replaced = { ...first, directory: '/workspace/moved' };
     h.registerRoute(replaced);
     await settle();
-    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'agent_restarted' }]);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'agent_restarted' },
+    ]);
 
     h.manager.submit(SESSION_ID, promptPayload('m2'));
     await settle();
@@ -4487,7 +4491,9 @@ describe('turn route identity', () => {
     if (target === undefined) throw new Error('Missing review target');
     h.registerRoute({ ...first, githubReviewTarget: { ...target, pullRequestNumber: 43 } });
     await settle();
-    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'agent_restarted' }]);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'agent_restarted' },
+    ]);
   });
 
   it('keeps a live turn through a re-registration of the same binding', async () => {
@@ -4520,9 +4526,7 @@ describe('turn route identity', () => {
     // No longer a code-review route, so its question reaches the person instead
     // of being rejected by the previous route's policy.
     expect(h.client(first).questionRejections).toHaveLength(0);
-    expect(
-      eventFrames(h.frames).filter(event => event.type === 'question.asked')
-    ).toHaveLength(1);
+    expect(eventFrames(h.frames).filter(event => event.type === 'question.asked')).toHaveLength(1);
   });
 
   it('stops a running finalization step when the binding moves', async () => {
@@ -4558,7 +4562,9 @@ describe('turn route identity', () => {
     await aborted.promise;
     await settle();
 
-    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'agent_restarted' }]);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'agent_restarted' },
+    ]);
     release.resolve();
     await settle();
     // Nothing more was dispatched into the previous native session.

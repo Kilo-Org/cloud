@@ -11372,19 +11372,20 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     }
   });
 
-  it('reports a page that throws while being applied without advancing the older cursor', async () => {
+  it('keeps a page whose row the replay skips and stores the rest', async () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const fetchSnapshotPage = createPageFetchMock(async (_id, options) =>
         options.cursor
           ? {
-              ...makePage({ kiloSessionId: 'ses-1', nextCursor: null }),
-              // Readable enough for the replay, but the apply itself throws: a
-              // row with no info passes the replay loop and fails when the page
-              // is applied, after the replay already accepted the other row.
+              ...makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-B' }),
+              // A row with no info is one the replay deliberately skips. It
+              // must not abort the page, and it must not be named in the
+              // retained-history entry either.
               messages: [
-                makePageMessage('msg-good', 'ses-1', 'good row'),
+                makePageMessage('msg-good-1', 'ses-1', 'good row one'),
                 { parts: [] } as unknown as SessionSnapshotPage['messages'][number],
+                makePageMessage('msg-good-2', 'ses-1', 'good row two'),
               ],
             }
           : makePage({
@@ -11399,20 +11400,22 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await expect(mgr.loadOlderMessages()).resolves.toBeUndefined();
 
       expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      // The page was applied: both readable rows are stored and no error is
+      // reported for the row the transcript cannot describe.
       expect(
         atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
-      ).toEqual({ kind: 'retryable' });
-      // The page was not applied, so its cursor must not be consumed: a retry
-      // has to fetch this same page again rather than the next older one.
+      ).toBeNull();
+      expect(
+        atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+      ).toEqual(['msg-good-1', 'msg-good-2', 'msg-initial']);
+      // The page was applied, so its cursor is consumed and the next load
+      // continues past it instead of retrying it.
       expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
       expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
 
-      await expect(mgr.loadOlderMessages()).resolves.toBeUndefined();
-      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to apply an older page'),
-        expect.any(Error)
-      );
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-B' });
+      expect(errorSpy).not.toHaveBeenCalled();
     } finally {
       errorSpy.mockRestore();
     }

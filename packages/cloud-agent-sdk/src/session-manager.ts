@@ -1939,7 +1939,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     storage: SessionStorage,
     messages: SessionSnapshot['messages'],
     updateCursor?: number
-  ): void {
+  ): string[] {
     const chatProcessor = createChatProcessor(storage, {
       onToolAttachment: config.onToolAttachment,
       onFilePart: config.onFilePart,
@@ -1951,7 +1951,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // Same boundary as the live sink in `session.ts`: a stored page reaches the
     // processor unvalidated, so one row it cannot apply must not take the rows
     // after it. Report the row and keep replaying the rest of the page.
-    replayStoredMessages(
+    return replayStoredMessages(
       messages,
       event => {
         try {
@@ -2539,9 +2539,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     outcome: SessionSnapshotPageOutcome,
     expectedGeneration: number,
     initialPage = false
-  ): boolean {
-    if (expectedGeneration !== loadOlderGeneration) return false;
-    if (outcome.kind !== 'success') return false;
+  ): string[] | null {
+    if (expectedGeneration !== loadOlderGeneration) return null;
+    if (outcome.kind !== 'success') return null;
 
     // Defense-in-depth: a stale or mismatched page must not overwrite the
     // active session's messages or cursor. This catches races where a
@@ -2551,12 +2551,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activeSessionId === null ||
       outcome.info.id !== (activeCloudSessionId ? store.get(rootSessionIdAtom) : activeSessionId)
     )
-      return false;
+      return null;
 
     const storage = store.get(sessionStorageAtom);
-    if (!storage) return false;
+    if (!storage) return null;
 
-    replayMessagesIntoStorage(storage, outcome.messages, outcome.updateCursor);
+    const storedMessageIds = replayMessagesIntoStorage(
+      storage,
+      outcome.messages,
+      outcome.updateCursor
+    );
 
     if (activeCloudSessionId && outcome.totalCostMicrodollars !== undefined) {
       const data = store.get(fetchedSessionDataAtom);
@@ -2580,7 +2584,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       initialPageOmittedItemCount = outcome.omittedItemCount;
     }
     store.set(olderMessagesErrorAtom, null);
-    return true;
+    return storedMessageIds;
   }
 
   async function loadOlderMessages(): Promise<void> {
@@ -2660,9 +2664,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // when this was the last one. Both the ids and the apply run under
           // this catch, so a throw here leaves the cursor where it was.
           try {
-            const messageIds = outcome.messages.map(m => m.info.id);
-            if (applyPage(outcome, expectedGeneration)) {
-              retainedHistoryStack.push({ cursorBefore: cursor, messageIds });
+            // The ids of the rows the apply actually stored: a row the replay
+            // skipped must not be named here, or a page the transcript cannot
+            // describe would abort the whole load on every retry.
+            const storedMessageIds = applyPage(outcome, expectedGeneration);
+            if (storedMessageIds) {
+              retainedHistoryStack.push({ cursorBefore: cursor, messageIds: storedMessageIds });
             }
           } catch (error) {
             if (expectedGeneration !== loadOlderGeneration) return;
@@ -3293,7 +3300,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (!cachedPage || !open.acceptCachedPage || open.expectedGeneration !== switchGeneration) {
         return;
       }
-      if (!applyPage({ ...cachedPage, kind: 'success' }, open.initialPageGeneration, true)) return;
+      if (applyPage({ ...cachedPage, kind: 'success' }, open.initialPageGeneration, true) === null)
+        return;
       store.set(cachedTranscriptSessionIdAtom, open.kiloSessionId);
       transcriptRows.restore(cachedPage);
       // Settings are cached only for Cloud Agent sessions, so the composer can show
@@ -3358,7 +3366,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
               if (read.kind !== 'page' || !open.acceptCachedPage) return;
               if (open.initialPageGeneration !== loadOlderGeneration) return;
               store.set(rootSessionIdAtom, read.page.info.id);
-              if (!applyPage({ ...read.page, kind: 'success' }, open.initialPageGeneration, true))
+              if (
+                applyPage({ ...read.page, kind: 'success' }, open.initialPageGeneration, true) ===
+                null
+              )
                 return;
               open.initialPageApplied = read.page;
               store.set(cachedTranscriptSessionIdAtom, open.kiloSessionId);
@@ -3963,7 +3974,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         return;
       }
       if (activeCloudSessionId) store.set(rootSessionIdAtom, page.info.id);
-      if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
+      if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true) !== null) {
         // The stream replays these rows later; show them with the page's messages.
         transcriptRows.restore(page);
         // A bounded page can lag the stream; omissions are not deletion evidence.

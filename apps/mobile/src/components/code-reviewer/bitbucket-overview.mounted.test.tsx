@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite for the overview's surfaces: the config body, the rows and the not-connected state share one mock harness */
 // The Bitbucket reviewer overview must paint one surface for its config read:
 // rows from cache, an error with retry, or a loading state. A pending read that
 // nothing is fetching (the state a cancelled first fetch reverts to) used to
@@ -142,7 +143,7 @@ vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
 }));
 const orgBoundaryCalls = vi.hoisted(() => [] as (string | undefined)[]);
-const orgBoundary = vi.hoisted(() => ({ resolved: true }));
+const orgBoundary = vi.hoisted(() => ({ resolved: true, resolving: false }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: (organizationIdOverride?: string) => {
     orgBoundaryCalls.push(organizationIdOverride);
@@ -150,7 +151,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       org: orgBoundary.resolved
         ? { organizationId: 'org_1', organizationName: 'Acme Robotics', role: 'owner' }
         : undefined,
-      isResolving: false,
+      isResolving: orgBoundary.resolving,
     };
   },
 }));
@@ -208,6 +209,7 @@ beforeEach(() => {
   readiness.fetchStatus = 'idle';
   orgBoundaryCalls.length = 0;
   orgBoundary.resolved = true;
+  orgBoundary.resolving = false;
   connectivity.known = true;
   queryError.variants = [];
   queryError.retries = [];
@@ -352,6 +354,21 @@ describe('BitbucketOverview not-connected state', () => {
     const text = JSON.stringify(root.toJSON());
 
     expect(text).toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(connectActions(root)).toHaveLength(0);
+  });
+
+  it('keeps the skeleton while the organization list resolves', async () => {
+    readiness.connected = false;
+    readiness.integrationId = null;
+    orgBoundary.resolved = false;
+    orgBoundary.resolving = true;
+
+    const root = await renderScreen();
+    const text = JSON.stringify(root.toJSON());
+
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(text).not.toContain('{{');
     expect(connectActions(root)).toHaveLength(0);
   });
 });

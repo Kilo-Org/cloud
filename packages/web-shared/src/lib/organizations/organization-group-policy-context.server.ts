@@ -9,11 +9,13 @@ import {
   type Organization,
 } from '@kilocode/db/schema';
 import { type OrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
-import { parseOrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
+import {
+  parseOrganizationGroupPolicies,
+  canonicalSettingsFrom,
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
 import { and, eq, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { canonicalSettingsFrom } from './organization-groups';
 
 export type OrganizationPolicySubject =
   | {

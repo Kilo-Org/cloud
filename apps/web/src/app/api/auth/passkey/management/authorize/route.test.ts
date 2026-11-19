@@ -155,7 +155,10 @@ async function refuseManagementGrantInserts() {
       await db
         .execute(sql.raw(`DROP TRIGGER IF EXISTS ${name} ON passkey_management_authorizations`))
         .catch(() => undefined);
-      await db.execute(sql.raw(`DROP FUNCTION IF EXISTS ${name}()`)).catch(() => undefined);
+      // CASCADE so the drop still succeeds if the trigger somehow survived the
+      // statement above: a stranded function would refuse every later grant
+      // insert in this worker database.
+      await db.execute(sql.raw(`DROP FUNCTION IF EXISTS ${name}() CASCADE`)).catch(() => undefined);
     },
   };
 }

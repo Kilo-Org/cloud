@@ -288,22 +288,52 @@ describe('device-sessions', () => {
     });
 
     test('a claim that settles runs inside the transaction and the session commits', async () => {
-      let claimCalls = 0;
+      // The claim must receive the session's transaction: if it were handed the
+      // pool, its write would commit even when the session rolled back. Prove it
+      // by reading the just-inserted session through the executor the claim got.
+      let sawOwnRow = false;
       const sessionId = await createDeviceSession({
         userId: testUserId,
-        claim: async () => {
-          claimCalls += 1;
+        claim: async (tx: DrizzleTransaction) => {
+          const [row] = await tx
+            .select({ id: device_sessions.id })
+            .from(device_sessions)
+            .where(eq(device_sessions.kilo_user_id, testUserId));
+          sawOwnRow = row !== undefined;
           return true;
         },
       });
 
-      expect(claimCalls).toBe(1);
+      expect(sawOwnRow).toBe(true);
       expect(sessionId).not.toBeNull();
       const [row] = await db
         .select({ revoked_at: device_sessions.revoked_at })
         .from(device_sessions)
         .where(eq(device_sessions.id, sessionId!));
       expect(row?.revoked_at).toBeNull();
+    });
+
+    test('a claim write through the transaction is rolled back with a lost claim', async () => {
+      // A claim that writes through its executor must leave nothing behind when
+      // it loses. This only holds when the executor is the session transaction.
+      const marker = `claim-marker-${Date.now()}`;
+      const lost = await createDeviceSession({
+        userId: testUserId,
+        claim: async (tx: DrizzleTransaction) => {
+          await tx
+            .update(device_sessions)
+            .set({ user_agent: marker })
+            .where(eq(device_sessions.kilo_user_id, testUserId));
+          return false;
+        },
+      });
+
+      expect(lost).toBeNull();
+      const rows = await db
+        .select({ user_agent: device_sessions.user_agent })
+        .from(device_sessions)
+        .where(eq(device_sessions.user_agent, marker));
+      expect(rows).toHaveLength(0);
     });
 
     test('a claim that throws rejects instead of reporting a lost claim', async () => {

@@ -9,6 +9,17 @@ import {
   type SeedValue,
 } from './batch-manifest';
 
+/** `mobile-profile-caps` prints `<stem>AtCapProfileId` and `<stem>BelowCapProfileId` per list. */
+const PROFILE_CAP_STEMS = [
+  'instructions',
+  'skills',
+  'variables',
+  'commands',
+  'agents',
+  'mcpServers',
+  'slashCommands',
+];
+
 /**
  * Every seed topic the batch manifest needs, in the order they must run, keyed
  * by the step name a `{{seed:<step>.<key>}}` link template names. Each topic
@@ -27,6 +38,8 @@ export const SEED_STEPS: readonly Readonly<{
   step: string;
   topic: string;
   args: (email: string) => string[];
+  /** The keys a link may template; `batches seed` fails the step when one is missing. */
+  outputs: readonly string[];
   screens?: readonly string[];
   needs?: readonly string[];
 }>[] = [
@@ -34,12 +47,14 @@ export const SEED_STEPS: readonly Readonly<{
     step: 'org-pair',
     topic: 'app:mobile-org-account-pair',
     args: email => [email],
+    outputs: ['ownerOrganizationId', 'memberOrganizationId'],
     screens: ['(app)/(tabs)/(3_profile)/organization'],
   },
   {
     step: 'reviewer-analytics',
     topic: 'app:mobile-reviewer-analytics',
     args: email => [email],
+    outputs: [],
     screens: ['(app)/code-reviewer/[scope]/analytics'],
     needs: ['org-pair'],
   },
@@ -47,33 +62,75 @@ export const SEED_STEPS: readonly Readonly<{
     step: 'profile-caps',
     topic: 'app:mobile-profile-caps',
     args: email => ['--email', email],
+    outputs: PROFILE_CAP_STEMS.flatMap(stem => [
+      `${stem}AtCapProfileId`,
+      `${stem}BelowCapProfileId`,
+    ]),
     screens: ['(app)/profile-management', '(app)/(tabs)/(3_profile)/profiles'],
   },
   {
     step: 'security-findings',
     topic: 'app:security-agent-findings',
     args: email => [email],
+    outputs: ['openFindingId', 'dismissedFindingId'],
     screens: ['(app)/security-agent/[scope]/findings'],
   },
   {
     step: 'security-org-scopes',
     topic: 'app:mobile-security-agent-notification-scopes',
     args: email => [email],
+    outputs: ['organizationId'],
   },
   {
     step: 'review-list',
     topic: 'code-reviews:review-list',
     args: email => ['--email', email, '--count', '60'],
+    outputs: ['newestReviewId'],
     screens: ['(app)/code-reviewer/[scope]/reviews'],
   },
   {
     step: 'sessions',
     topic: 'app:mobile-sheet-fixtures',
     args: email => [email, '--child-performance'],
+    outputs: [
+      'rootSessionId',
+      'childSessionId',
+      'unsupportedSessionId',
+      'emptySessionId',
+      'performanceRootSessionId',
+    ],
   },
-  { step: 'paged-history', topic: 'app:paged-history', args: email => [email] },
-  { step: 'session-diff', topic: 'app:mobile-session-diff-fixture', args: email => [email] },
+  {
+    step: 'paged-history',
+    topic: 'app:paged-history',
+    args: email => [email],
+    outputs: ['sessionId'],
+  },
+  {
+    step: 'session-diff',
+    topic: 'app:mobile-session-diff-fixture',
+    args: email => [email],
+    outputs: ['sessionId'],
+  },
 ];
+
+/**
+ * Every `{{seed:<step>.<key>}}` in the rows whose step or key is not declared
+ * above: a misspelled key fails here, statically, instead of as an unresolved
+ * link on every device.
+ */
+export function templateProblems(rows: readonly ManifestRow[]): string[] {
+  return rows.flatMap(row =>
+    templateReferences(row.link).flatMap(reference => {
+      const [, step = '', key = ''] = /^seed:([a-z0-9-]+)\.([A-Za-z0-9]+)$/.exec(reference) ?? [];
+      const entry = SEED_STEPS.find(candidate => candidate.step === step);
+      if (entry === undefined) return [`line ${row.line}: {{${reference}}} names no seed step`];
+      return entry.outputs.includes(key)
+        ? []
+        : [`line ${row.line}: {{${reference}}}: ${step} declares no ${key}`];
+    })
+  );
+}
 
 export type SeedRunner = (
   topic: string,
@@ -171,6 +228,8 @@ export function seedAll(options: {
         throw new Error(`exit ${result.status}: ${reason}`);
       }
       const values = parseSeedJson(result.stdout);
+      const missing = entry.outputs.filter(key => values[key] === undefined);
+      if (missing.length > 0) throw new Error(`printed no ${missing.join(', ')}`);
       steps[entry.step] = { topic: entry.topic, ok: true, values };
       options.log(
         `seed-all: ${entry.step} (${entry.topic}) ok: ${Object.keys(values).length} values`

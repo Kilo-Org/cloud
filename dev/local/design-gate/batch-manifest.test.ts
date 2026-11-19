@@ -13,7 +13,7 @@ import {
   type RouteFile,
   type SeedMap,
 } from './batch-manifest';
-import { SEED_STEPS, stepsFor } from './seed-all';
+import { SEED_STEPS, seedAll, stepsFor, templateProblems } from './seed-all';
 
 const route = (file: string): RouteFile => ({
   file,
@@ -134,4 +134,47 @@ test('seed steps follow link templates, provided screens and their needs', () =>
     stepsFor(readManifest()),
     SEED_STEPS.map(entry => entry.step)
   );
+});
+
+test('a template key its seed step does not declare fails statically', () => {
+  assert.deepEqual(templateProblems(readManifest()), []);
+  const rows = parseManifest(
+    [
+      MANIFEST_COLUMNS.join('\t'),
+      'T1-G07c\tT1\tsigned-in\tstandard\tandroid\tlong-content\t-\tkiloapp:///(app)/profile-management/{{seed:profile-caps.mcpAtCapProfileId}}/mcp\tscreen\t(app)/profile-management/[profileId]/mcp',
+      'T1-G07c\tT1\tsigned-in\tstandard\tandroid\thappy\t-\tkiloapp:///x/{{seed:nope.id}}\tclean\t-',
+    ].join('\n')
+  );
+  assert.deepEqual(templateProblems(rows), [
+    'line 2: {{seed:profile-caps.mcpAtCapProfileId}}: profile-caps declares no mcpAtCapProfileId',
+    'line 3: {{seed:nope.id}} names no seed step',
+  ]);
+});
+
+test('a failed seed step keeps its error line, and a missing declared key fails the step', () => {
+  const map = seedAll({
+    email: 'kilo-e2e@example.com',
+    steps: ['security-findings', 'security-org-scopes'],
+    run: topic =>
+      topic === 'app:security-agent-findings'
+        ? {
+            status: 1,
+            stdout: '',
+            stderr: [
+              'Seed runner failed: Error: Failed query: insert into "security_findings"',
+              '    at PgPreparedQuery.queryWithCache (node_modules/drizzle-orm/pg-core/session.js:41:15)',
+              '  {',
+              "    query: 'insert into …',",
+              '  }',
+              '}',
+            ].join('\n'),
+          }
+        : { status: 0, stdout: '{"userId":"u"}\n', stderr: '' },
+    log: () => undefined,
+  });
+  assert.equal(
+    map.steps['security-findings']?.error,
+    'exit 1: Seed runner failed: Error: Failed query: insert into "security_findings"'
+  );
+  assert.equal(map.steps['security-org-scopes']?.error, 'printed no organizationId');
 });

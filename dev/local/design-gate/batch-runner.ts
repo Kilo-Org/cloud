@@ -51,6 +51,7 @@ import {
   SEED_STEPS,
   seedAll,
   stepsFor,
+  templateProblems,
   writeSeedMap,
 } from './seed-all';
 
@@ -661,13 +662,19 @@ export async function batchesMain(argv: readonly string[], deps: BatchesDeps): P
             `line ${row.line}: ${row.batch} ${row.link} -> ${row.kind} ${row.screen || '-'}`
           );
         }
+        // A template key the seed step does not print fails every device at
+        // run time; name it here instead. `--write` cannot repair it.
+        const templates = templateProblems(rows);
+        for (const problem of templates) deps.warn(`expect: ${problem}`);
         if (values.write === true) {
           fs.writeFileSync(manifestFile, formatManifest(updated));
           deps.log(`expect: wrote ${manifestFile} (${changed.length} changed)`);
-          return 0;
+          return templates.length > 0 ? 1 : 0;
         }
-        deps.log(`expect: ${changed.length} row(s) differ from the route files`);
-        return changed.length > 0 ? 1 : 0;
+        deps.log(
+          `expect: ${changed.length} row(s) differ from the route files, ${templates.length} undeclared seed key(s)`
+        );
+        return changed.length > 0 || templates.length > 0 ? 1 : 0;
       }
       case 'coverage': {
         const coverageFile = values.coverage ?? DEFAULT_COVERAGE;

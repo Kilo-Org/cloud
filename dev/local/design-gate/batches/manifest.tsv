@@ -38,7 +38,7 @@ T1-G07b	T1	signed-in	standard	android,ios	long-content	-	kiloapp:///(app)/profil
 T1-G07b	T1	signed-in	standard	android,ios	long-content	-	kiloapp:///(app)/profile-management/{{seed:profile-caps.variablesAtCapProfileId}}/variables	screen	(app)/profile-management/[profileId]/variables
 T1-G07b	T1	signed-in	standard	android,ios	long-content	-	kiloapp:///(app)/profile-management/{{seed:profile-caps.commandsAtCapProfileId}}/commands	screen	(app)/profile-management/[profileId]/commands
 T1-G07b	T1	signed-in	standard	android,ios	long-content	-	kiloapp:///(app)/profile-management/{{seed:profile-caps.agentsAtCapProfileId}}/agents	screen	(app)/profile-management/[profileId]/agents
-T1-G07c	T1	signed-in	standard	android,ios	long-content	-	kiloapp:///(app)/profile-management/{{seed:profile-caps.mcpAtCapProfileId}}/mcp	screen	(app)/profile-management/[profileId]/mcp
+T1-G07c	T1	signed-in	standard	android,ios	long-content	-	kiloapp:///(app)/profile-management/{{seed:profile-caps.mcpServersAtCapProfileId}}/mcp	screen	(app)/profile-management/[profileId]/mcp
 T1-G07c	T1	signed-in	standard	android,ios	long-content	-	kiloapp:///(app)/profile-management/{{seed:profile-caps.slashCommandsAtCapProfileId}}/slash-commands	screen	(app)/profile-management/[profileId]/slash-commands
 T1-G08a	T1	signed-in	standard	android,ios	happy	-	kiloapp:///(app)/agent-chat/new	screen	(app)/agent-chat/new
 T1-G08a	T1	signed-in	standard	android,ios	happy	-	kiloapp:///dev/agent-chat-fixture	screen	(app)/agent-chat-fixture

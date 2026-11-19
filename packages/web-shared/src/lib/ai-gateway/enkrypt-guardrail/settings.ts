@@ -86,7 +86,6 @@ export function readStoredEnkryptOutputDetectors(
   return readStored(EnkryptOutputDetectorsSchema, 'output', organizationId, detectors);
 }
 
-/** The settings section that holds each direction's guardrail. */
 const GUARDRAIL_SETTINGS_KEYS = {
   input: 'input_guardrail',
   output: 'output_guardrail',

@@ -1,3 +1,4 @@
+import { type Href } from 'expo-router';
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -40,16 +41,18 @@ vi.mock('expo-router', () => ({
 const HUB = 'index';
 const GUARDRAILS = 'guardrails';
 const SELF = '/(app)/(tabs)/(3_profile)/organization/guardrails';
+const MODE_FORM = 'mode-form';
+const MODE_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/mode-form';
 
-function Harness() {
-  useRepairOrganizationRouteStack({ self: SELF });
+function Harness({ self }: Readonly<{ self: Href }>) {
+  useRepairOrganizationRouteStack({ self });
   return null;
 }
 
-function mount() {
+function mount(self: Href = SELF) {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(Harness));
+    ref.current = TestRenderer.create(createElement(Harness, { self }));
   });
   if (!ref.current) {
     throw new Error('harness did not render');
@@ -103,6 +106,19 @@ describe('useRepairOrganizationRouteStack', () => {
     expect(pushMock.mock.calls.map(call => call[0])).toEqual([
       '/(app)/(tabs)/(3_profile)/organization?stackRebuilt=1',
       `${SELF}?stackRebuilt=1`,
+    ]);
+  });
+
+  it('keeps the opened record on the rebuilt push', () => {
+    const self: Href = `${MODE_FORM_PATH}?modeId=mode-1`;
+    setStack([r('tabs', '(tabs)'), r('m', MODE_FORM)], 1);
+    nav.pathname = '/organization/mode-form';
+
+    mount(self);
+
+    expect(pushMock.mock.calls.map(call => call[0])).toEqual([
+      '/(app)/(tabs)/(3_profile)/organization?stackRebuilt=1',
+      `${MODE_FORM_PATH}?modeId=mode-1&stackRebuilt=1`,
     ]);
   });
 

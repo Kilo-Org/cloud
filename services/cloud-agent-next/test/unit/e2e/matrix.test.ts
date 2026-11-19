@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  isTransientScenarioFailure,
   parseMatrixArgs,
   resolveParallelism,
+  runScenario,
   sandboxBudget,
   scopeFor,
   selectJobs,
@@ -10,6 +15,11 @@ import {
 import { resolveProfile } from '../../e2e/run.js';
 import type { ScenarioEnvironment } from '../../e2e/scenario-capabilities.js';
 import { SHARED_SCENARIOS } from '../../e2e/scenarios-shared.js';
+
+vi.mock(import('node:child_process'), async importOriginal => ({
+  ...(await importOriginal()),
+  spawn: vi.fn(),
+}));
 
 const GIB = 1024 ** 3;
 
@@ -184,4 +194,91 @@ describe('scopeFor', () => {
     expect(scope).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
     expect(scope.endsWith('-ab12cd34')).toBe(true);
   });
+});
+
+describe('isTransientScenarioFailure', () => {
+  it.each([
+    '❌ hot/echo:hi (15647ms): threw: tRPC start failed: 500 Internal Server Error — INTERNAL_SERVER_ERROR: Failed query: begin',
+    '❌ chunked-streaming/slow:5:50 (43571ms): start session: tRPC start failed: 500 Internal Server Error — INTERNAL_SERVER_ERROR: Failed query: begin',
+    '❌ queue-rapid-fire-no-gate/_ (15409ms): threw: tRPC start failed: 500 Internal Server Error — INTERNAL_SERVER_ERROR: Failed query: select "id" from "agent_environment_profiles"',
+    '❌ callback-completion/echo:done (71649ms): threw: Stream did not connect for workspace_df479885',
+    '❌ hot/echo:hi (12ms): threw: fetch failed',
+    '❌ hot/echo:hi (12ms): threw: tRPC start failed: 503 Service Unavailable',
+    '❌ hot/echo:hi (12ms): threw: connect ETIMEDOUT 10.0.0.1:5432',
+  ])('recognizes an infrastructure failure: %s', line => {
+    expect(isTransientScenarioFailure(line)).toBe(true);
+  });
+
+  it.each([
+    '❌ hot/echo:hi (12ms): threw: tRPC start failed: 400 Bad Request — BAD_REQUEST: Selected model is not available for this cloud agent session',
+    '❌ hot/echo:hi (12ms): threw: tRPC start failed: 400 Bad Request — BAD_REQUEST: fetch failed',
+    '❌ queue-full/_ (12ms): filled 9 before rejection: TOO_MANY_REQUESTS: Pending message queue is full (10)',
+    '❌ hot/echo:hi (12ms): threw: tRPC start failed: 500 Internal Server Error — INTERNAL_SERVER_ERROR: boom',
+    '❌ preview-http/_ (28ms): preview-http: closed-port GET / status=500 was not 502',
+    '❌ preview-http/_ (28ms): preview-http: unexpected body; closedPort=8080:502(12ms)',
+    '❌ preview-http/_ (28ms): preview-http: GET / status=503 was not 200',
+    '❌ preview-http/_ (28ms): preview-http: body={"status":503}',
+    '❌ hot/echo:hi (504ms): expected sameContainer=true, received false',
+    '❌ hot/echo:hi (12ms): assertion failed after 504 ms',
+  ])('does not retry assertion failures, 4xx or a 500 without a marker: %s', line => {
+    expect(isTransientScenarioFailure(line)).toBe(false);
+  });
+});
+
+describe('runScenario retry eligibility', () => {
+  function startChild() {
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      pid: 1234,
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(spawn).mockReturnValueOnce(child as ReturnType<typeof spawn>);
+    const result = runScenario(
+      { name: 'hot', label: 'hot', conversation: 'echo:hi', api: 'unified', timeoutMs: 1 },
+      'deployed',
+      'hot-test',
+      1,
+      0
+    );
+    return { child, result };
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('ignores recovered errors on both streams before an assertion failure', async () => {
+    const { child, result } = startChild();
+    child.stdout.write('warning: fetch failed; reconnecting\n');
+    child.stderr.write('session stream connection failed Error: ECONNRESET\n');
+    child.stdout.write('❌ hot/echo:hi (12ms): expected sameContainer=true, received false\n');
+    child.stdout.write('   events (0): (none)\n');
+    child.emit('close', 1);
+    await expect(result).resolves.toMatchObject({ outcome: 'failure', transient: false });
+  });
+
+  it('keeps the result line eligible despite the event summary', async () => {
+    const { child, result } = startChild();
+    child.stdout.write('❌ hot/echo:hi (12ms): threw: fetch failed\n');
+    child.stdout.write('   events (0): (none)\n');
+    child.emit('close', 1);
+    await expect(result).resolves.toMatchObject({ outcome: 'failure', transient: true });
+  });
+
+  it.each([null, 1])(
+    'does not retry a watchdog kill even with a transient result (exit=%s)',
+    async code => {
+      vi.useFakeTimers();
+      const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
+      const { child, result } = startChild();
+      child.stdout.write('❌ hot/echo:hi (12ms): threw: fetch failed\n');
+      await vi.advanceTimersByTimeAsync(10 * 60_000 + 1);
+      expect(kill).toHaveBeenCalledWith(-1234, 'SIGKILL');
+      child.emit('close', code);
+      await expect(result).resolves.toMatchObject({ outcome: 'failure', transient: false });
+    }
+  );
 });

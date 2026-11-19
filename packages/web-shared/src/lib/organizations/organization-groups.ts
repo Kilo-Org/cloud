@@ -31,6 +31,9 @@ import { normalizeRegisteredOrganizationGroupPolicy } from '@kilocode/web-shared
 import {
   DEFAULT_ORGANIZATION_GROUP_POLICIES,
   parseOrganizationGroupPolicies,
+  canonicalSettingsFrom,
+  type CanonicalOrganizationGroupPolicySettings,
+  type OrganizationGroupPolicySettingsRow,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
 
 type OrganizationGroupActor = {
@@ -39,10 +42,7 @@ type OrganizationGroupActor = {
   name: string;
 };
 
-export type CanonicalOrganizationGroupPolicySettings = {
-  defaultPolicies: OrganizationGroupPolicies;
-  policyRevision: number;
-};
+export type { CanonicalOrganizationGroupPolicySettings } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
 
 export type OrganizationGroupWithMembers = OrganizationGroup & {
   policies: OrganizationGroupPolicies;
@@ -95,8 +95,6 @@ export async function lockOrganizationGroupPolicy(tx: DrizzleTransaction, organi
     )
   `);
 }
-
-type OrganizationGroupPolicySettingsRow = typeof organization_group_policy_settings.$inferSelect;
 
 async function getSettingsRow(
   organizationId: string,
@@ -151,31 +149,6 @@ export async function bumpOrganizationGroupPolicyRevision(
   await lockOrganizationGroupPolicy(tx, organizationId);
   const existing = await getSettingsRow(organizationId, tx);
   return await writeOrganizationGroupPolicyRevision(tx, organizationId, actorUserId, existing);
-}
-
-/**
- * The canonical view of an organization's group-policy settings: the stored
- * row, or the defaults at revision 0 when the organization has none yet. The
- * read path and the mutation wrapper share it so they cannot disagree about
- * the defaults or the parse options.
- */
-function canonicalSettingsFrom(
-  settings: OrganizationGroupPolicySettingsRow | undefined,
-  organizationId: string
-): CanonicalOrganizationGroupPolicySettings {
-  if (!settings) {
-    return {
-      defaultPolicies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
-      policyRevision: 0,
-    };
-  }
-  return {
-    defaultPolicies: parseOrganizationGroupPolicies(settings.default_policies, {
-      organizationId,
-      source: 'default',
-    }),
-    policyRevision: settings.policy_revision,
-  };
 }
 
 export async function getOrganizationGroupPolicySettings(

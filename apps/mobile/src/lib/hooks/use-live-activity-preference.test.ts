@@ -90,6 +90,26 @@ describe('live-activity preference store', () => {
     expect(sink.getLiveActivityEnabled()).toBe(false);
   });
 
+  it('keeps the sink unknown until the disk read lands', async () => {
+    // Hold the read open: the store answers its default on until then.
+    const read = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValue(read.promise);
+    const sink = await import('@/lib/glanceable/live-activity-switch');
+    await import('./use-live-activity-preference');
+
+    // The store's default on is not a stored answer: the push-to-start token
+    // stays refused while the read is pending.
+    expect(sink.isLiveActivityPreferenceKnown()).toBe(false);
+    expect(sink.getLiveActivityEnabled()).toBe(true);
+    expect(sink.canRegisterActivityTokenKind('ios_push_to_start')).toBe(false);
+
+    read.resolve('false');
+    await flushMicrotasks();
+
+    expect(sink.isLiveActivityPreferenceKnown()).toBe(true);
+    expect(sink.getLiveActivityEnabled()).toBe(false);
+  });
+
   it('clears back to the default and deletes the key', async () => {
     getItemAsync.mockResolvedValue('false');
     const { clearLiveActivityPreference, getLiveActivityEnabled } =

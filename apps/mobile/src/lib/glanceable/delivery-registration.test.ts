@@ -168,6 +168,8 @@ describe('delivery registerTokens', () => {
     _resetLiveActivitySwitchForTests();
     setSignOutTeardownActive(false);
     setActiveToken('access-1', null);
+    // A stored switch value, as a signed-in process reads it before any token.
+    setLiveActivityEnabledValue(true);
     setNotificationPermissionGrantedValue(true);
   });
 
@@ -1039,6 +1041,55 @@ describe('delivery registerTokens', () => {
     setNotificationPermissionGrantedValue(true);
     getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
     await flushRegistration();
+    expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
+  });
+
+  it('registers the cached push-to-start token when the stored switch value arrives', async () => {
+    // A process whose stored switch value has not been read yet: the cached
+    // token waits, because an unresolved preference never counts as consent.
+    _resetLiveActivitySwitchForTests();
+    setNotificationPermissionGrantedValue(true);
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
+    await flushRegistration();
+    expect(trpcMock.registerActivityToken.mutate).not.toHaveBeenCalled();
+
+    // The read lands with the switch on. The same cached token registers with
+    // no new native token event and no scope refresh.
+    setLiveActivityEnabledValue(true);
+    await flushRegistration();
+
+    expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
+  });
+
+  it('keeps the cached push-to-start token off the server when the stored switch is off', async () => {
+    _resetLiveActivitySwitchForTests();
+    setNotificationPermissionGrantedValue(true);
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
+    await flushRegistration();
+
+    // The read lands with the switch off, so the retry stays refused.
+    setLiveActivityEnabledValue(false);
+    await flushRegistration();
+
+    expect(trpcMock.registerActivityToken.mutate).not.toHaveBeenCalled();
+    expect(rows.size).toBe(0);
+  });
+
+  it('registers a cached push-to-start token when the permission is granted later', async () => {
+    setNotificationPermissionGrantedValue(false);
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
+    await flushRegistration();
+    expect(rows.size).toBe(0);
+
+    setNotificationPermissionGrantedValue(true);
+    await flushRegistration();
+
     expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
   });
 

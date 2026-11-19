@@ -28,10 +28,22 @@ const store = createSecureStorePreference<boolean>({
 // Mirror the persisted value into the React-Native-free holder the sink reads.
 // Subscribing also starts the disk read, so the mirror is correct from the
 // first emit rather than from the first render of the settings screen.
+//
+// `store.get()` is the default on until the read lands, and the holder must not
+// take that default for consent: the iOS push-to-start token stays refused
+// until a stored answer arrives. `setLiveActivityEnabledValue` is therefore the
+// only signal, and it runs only once the read has an answer. A load that reads
+// the default on marks the preference known without a value change, so no
+// running activity ends.
 store.subscribe(() => {
+  if (!store.getHasLoaded()) {
+    return;
+  }
   setLiveActivityEnabledValue(store.get());
 });
-setLiveActivityEnabledValue(store.get());
+if (store.getHasLoaded()) {
+  setLiveActivityEnabledValue(store.get());
+}
 
 export function clearLiveActivityPreference() {
   store.clear();

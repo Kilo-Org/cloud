@@ -5,9 +5,11 @@ import {
   canRegisterActivityTokenKind,
   getLiveActivityEnabled,
   getNotificationPermissionGranted,
+  isLiveActivityPreferenceKnown,
   setLiveActivityEnabledValue,
   setNotificationPermissionGrantedValue,
   subscribeLiveActivityEnabled,
+  subscribeLiveActivityPreferenceKnown,
   subscribeNotificationPermissionGranted,
 } from './live-activity-switch';
 
@@ -45,6 +47,79 @@ describe('live activity switch', () => {
     // Live Activity prompt before the user asked for notifications.
     expect(getLiveActivityEnabled()).toBe(true);
     expect(canRegisterActivityTokenKind('ios_push_to_start')).toBe(false);
+  });
+
+  it('refuses push-to-start until a stored switch value has been read', () => {
+    // The permission is granted, but the stored switch has no answer yet: the
+    // default on is not consent, so the token must not reach the server.
+    setNotificationPermissionGrantedValue(true);
+
+    expect(isLiveActivityPreferenceKnown()).toBe(false);
+    expect(getLiveActivityEnabled()).toBe(true);
+    expect(canRegisterActivityTokenKind('ios_push_to_start')).toBe(false);
+  });
+
+  it('allows push-to-start once the stored value resolves on', () => {
+    setNotificationPermissionGrantedValue(true);
+    setLiveActivityEnabledValue(true);
+
+    expect(isLiveActivityPreferenceKnown()).toBe(true);
+    expect(canRegisterActivityTokenKind('ios_push_to_start')).toBe(true);
+  });
+
+  it('tells known listeners once per unknown-to-known transition', () => {
+    const listener = vi.fn<() => void>();
+    subscribeLiveActivityPreferenceKnown(listener);
+
+    setLiveActivityEnabledValue(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    // Later values are not transitions, so nothing fires.
+    setLiveActivityEnabledValue(true);
+    setLiveActivityEnabledValue(false);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    _resetLiveActivitySwitchForTests();
+    const afterReset = vi.fn<() => void>();
+    subscribeLiveActivityPreferenceKnown(afterReset);
+    setLiveActivityEnabledValue(true);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(afterReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops telling an unsubscribed known listener', () => {
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeLiveActivityPreferenceKnown(listener);
+    unsubscribe();
+    setLiveActivityEnabledValue(true);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('tells no value listener when only the known state resolves on', () => {
+    // A first read that resolves to the default on must not end a running
+    // activity: the resolved value never changed.
+    const listener = vi.fn<() => void>();
+    subscribeLiveActivityEnabled(listener);
+
+    setLiveActivityEnabledValue(true);
+
+    expect(getLiveActivityEnabled()).toBe(true);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('tells value listeners before known listeners when a first read resolves off', () => {
+    const order: string[] = [];
+    subscribeLiveActivityEnabled(() => {
+      order.push('value');
+    });
+    subscribeLiveActivityPreferenceKnown(() => {
+      order.push('known');
+    });
+
+    setLiveActivityEnabledValue(false);
+
+    expect(order).toEqual(['value', 'known']);
   });
 
   it('refuses push-to-start while the switch is off, even when the permission is granted', () => {

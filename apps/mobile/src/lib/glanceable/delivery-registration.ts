@@ -45,12 +45,18 @@ import {
   readUnregisterAuthToken,
   unionTokens,
 } from './unregister-session';
-import { canRegisterActivityTokenKind } from './live-activity-switch';
+import {
+  canRegisterActivityTokenKind,
+  subscribeLiveActivityPreferenceKnown,
+  subscribeNotificationPermissionGranted,
+} from './live-activity-switch';
 import { type GlanceableDelivery, setGlanceableDelivery } from './sink-registry';
 
 let pushToStartToken: string | null = null;
 let scopeRegistration: Registration | null = null;
 let startSubscription: ReturnType<typeof addPushToStartTokenListener> | null = null;
+// The unsubscribe handles of the gate listeners below, so a re-arm can drop them.
+let gateSubscriptions: (() => void)[] = [];
 // Keep every attempted token until its delete succeeds, including tokens rotated away by native.
 const scopeTokens = new Set<string>();
 const activityTokens = new Set<string>();
@@ -122,7 +128,28 @@ async function registerToken(target: Registration, token: string): Promise<void>
   }
 }
 
+/**
+ * A push-to-start token the native listener cached while the switch or the
+ * permission was still unknown never reached the server: `registerToken`
+ * refuses it, and nothing retried once an answer landed. Each answer signal
+ * runs this guarded retry, so the token registers as soon as both allow it and
+ * a gate that is still unknown or off stays a no-op.
+ */
+function retryCachedPushToStartToken(): void {
+  if (scopeRegistration !== null && pushToStartToken !== null) {
+    void registerToken(scopeRegistration, pushToStartToken);
+  }
+}
+
+/** The two answers an iOS push-to-start token waits for. */
+const gateSignals = [subscribeLiveActivityPreferenceKnown, subscribeNotificationPermissionGranted];
+
 function observePushToStart(target: Registration | null): void {
+  // Replace the gate listeners, so a reset never leaves a stale pair behind.
+  for (const unsubscribe of gateSubscriptions) {
+    unsubscribe();
+  }
+  gateSubscriptions = gateSignals.map(subscribe => subscribe(retryCachedPushToStartToken));
   startSubscription?.remove();
   const epoch = registerEpoch;
   startSubscription = addPushToStartTokenListener(({ activityPushToStartToken }) => {

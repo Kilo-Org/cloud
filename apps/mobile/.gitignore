@@ -1,8 +1,8 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# Repo-wide rules (node_modules, .expo, .DS_Store, *.pem, *.tsbuildinfo,
-# .superpowers) live in the root .gitignore, which applies at every depth. Keep
-# only patterns that are specific to this app here.
+# Repo-wide rules (node_modules, .expo, .DS_Store, *.pem, .env*.local,
+# *.tsbuildinfo, .superpowers) live in the root .gitignore, which applies at
+# every depth. Keep only patterns that are specific to this app here.
 
 # Expo
 dist/
@@ -23,9 +23,6 @@ expo-env.d.ts
 
 # debug
 npm-debug.*
-
-# local env files
-.env*.local
 
 app-example
 

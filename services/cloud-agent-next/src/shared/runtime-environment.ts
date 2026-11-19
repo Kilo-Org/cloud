@@ -107,10 +107,10 @@ export function findReservedEnvVarName(names: Iterable<string>): string | undefi
 export const MAX_PROFILE_ENV_VARS = 50;
 
 /**
- * Credential and runtime names a prepared attach env adds beside the profile
- * env: every `ISSUED_CREDENTIAL_ENV_KEYS` entry that is not reserved. Mirrored
- * here for the same reason as `MAX_PROFILE_ENV_VARS`; the same test holds the
- * two equal.
+ * Credential names a prepared attach env adds beside the profile env: every
+ * `ISSUED_CREDENTIAL_ENV_KEYS` entry that is not reserved. Mirrored here for
+ * the same reason as `MAX_PROFILE_ENV_VARS`; the same test holds this count at
+ * least as large as that list.
  */
 const PLATFORM_ATTACH_ENV_KEY_COUNT = 13;
 

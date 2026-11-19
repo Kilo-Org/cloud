@@ -35,8 +35,10 @@
  * takes no writes: the reset queries and forced failures never reach it, and
  * the snapshot from before the first mode is what the next launch restores.
  *
- * The only entry point is `+native-intent.tsx`, behind `__DEV__`; every other
- * reader checks `__DEV__` first, so a release build never reaches this module.
+ * The only entry point is `+native-intent.tsx`, behind `__DEV__`, and every
+ * other reader checks `__DEV__` first. The module guards itself as well: in a
+ * release build a link applies nothing, so no mode can hold, and the fetch
+ * wrapper is the plain fetch.
  */
 import { type Query, type QueryClient } from '@tanstack/react-query';
 
@@ -136,7 +138,7 @@ export function getForcedMode(): ForceStateMode | null {
 
 /** True when a forced mode answers this procedure instead of the backend. */
 export function isForcedProcedure(path: string): boolean {
-  return state.kind === 'forced' && !BOOTSTRAP_PROCEDURES.has(path);
+  return __DEV__ && state.kind === 'forced' && !BOOTSTRAP_PROCEDURES.has(path);
 }
 
 /** True from the first forced mode until the app restarts. */
@@ -213,6 +215,9 @@ const BATCH_QUERY = /[?&]batch=1(?:&|$)/;
  * forced and live calls), so a batched URL reaches the backend unchanged.
  */
 export function withForceState(fetchImpl: typeof fetch): typeof fetch {
+  if (!__DEV__) {
+    return fetchImpl;
+  }
   return (input, init) => {
     const url = requestUrlString(input);
     const procedure = trpcProcedureText(url);
@@ -279,6 +284,9 @@ function isResettableQuery(query: Query): boolean {
  * the app link to open next, or null to stay on the current screen.
  */
 export function applyForceStatePath(path: string, client: QueryClient): string | null | undefined {
+  if (!__DEV__) {
+    return undefined;
+  }
   const match = FORCE_STATE_PATH.exec(path);
   if (!match) {
     return undefined;

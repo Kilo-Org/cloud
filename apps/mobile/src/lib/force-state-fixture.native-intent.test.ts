@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { redirectSystemPath } from '@/app/+native-intent';
-import { getForcedMode, resetForceStateForTests } from '@/lib/force-state-fixture';
+import { QueryClient } from '@tanstack/react-query';
+
+import {
+  applyForceStatePath,
+  getForcedMode,
+  isForcedProcedure,
+  resetForceStateForTests,
+  withForceState,
+} from '@/lib/force-state-fixture';
 
 const mapWebPath = vi.hoisted(() => vi.fn((_link: { path: string; initial: boolean }) => 'mapped'));
 
@@ -61,5 +69,15 @@ describe('force-state intent entry', () => {
 
     expect(getForcedMode()).toBeNull();
     expect(mapWebPath).toHaveBeenCalledExactlyOnceWith({ path: LINK, initial: true });
+  });
+
+  it('guards itself in a release build, whatever the caller checks', () => {
+    vi.stubGlobal('__DEV__', false);
+    const plainFetch: typeof fetch = vi.fn<typeof fetch>();
+
+    expect(applyForceStatePath(LINK, new QueryClient())).toBeUndefined();
+    expect(getForcedMode()).toBeNull();
+    expect(isForcedProcedure('codeReviews.listForUser')).toBe(false);
+    expect(withForceState(plainFetch)).toBe(plainFetch);
   });
 });

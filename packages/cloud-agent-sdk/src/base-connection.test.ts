@@ -524,6 +524,10 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       releaseFirstRefresh();
       await Promise.resolve();
       await Promise.resolve();
+      // Freeze the backoff jitter so the reconnect timer is guaranteed to fire
+      // inside the advance below; otherwise this test could pass without the
+      // timer ever running.
+      jest.spyOn(Math, 'random').mockReturnValue(0);
       closeSocket(0);
       jest.advanceTimersByTime(500);
       expect(sockets).toHaveLength(1);

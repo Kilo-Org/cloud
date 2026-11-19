@@ -55,6 +55,8 @@ type ResolvedComposerSendDisabledReason = {
  * Status codes whose line is a progress phase, not a failure, so the reason
  * beside send stays in the neutral status tone. Every other code (connection
  * lost, delivery failed, commit failed, failed to stop) is a failure.
+ * `agent-connection-reconnecting` names a drop the transport recovers from on
+ * its own, so a send paused mid-drop keeps the status tone.
  */
 const NEUTRAL_STATUS_CODES = new Set<SdkStatusMessageCode>([
   'setting-up-environment',
@@ -62,6 +64,7 @@ const NEUTRAL_STATUS_CODES = new Set<SdkStatusMessageCode>([
   'committing',
   'committed',
   'session-stopped',
+  'agent-connection-reconnecting',
 ]);
 
 /**

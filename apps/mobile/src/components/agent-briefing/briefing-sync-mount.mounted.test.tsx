@@ -4,6 +4,7 @@ import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BriefingSyncMount } from './briefing-sync-mount';
+import { purgeInaccessibleBriefingCache } from '@/lib/agent-briefing-cache';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 // The dismissal journal drains one post at a time and backs off on failure. A
@@ -22,6 +23,7 @@ const state = vi.hoisted(() => ({
   dismiss: vi.fn<(input: { reportId: string }) => Promise<unknown>>(),
   saveJournal: vi.fn<(entries: JournalEntry[]) => Promise<unknown>>(),
   journalFails: 0,
+  authEpoch: 1,
   toastError: vi.fn(),
 }));
 
@@ -31,14 +33,14 @@ vi.mock('@/lib/agent-briefing', () => ({
   useBriefingInvalidation: () => undefined,
   useBriefingDismissals: () => ({
     data: state.dismissals,
-    save: { mutateAsync: state.saveJournal, isPending: false },
+    save: { mutateAsync: state.saveJournal, mutate: state.saveJournal, isPending: false },
   }),
 }));
 vi.mock('@/lib/agent-briefing-cache', () => ({
-  purgeInaccessibleBriefingCache: () => Promise.resolve(),
+  purgeInaccessibleBriefingCache: vi.fn<() => Promise<void>>(),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: () => ({ authEpoch: 1, isSigningOut: false }),
+  useAuth: () => ({ authEpoch: state.authEpoch, isSigningOut: false }),
 }));
 vi.mock('@/lib/auth/auth-epoch', () => ({ isCurrentAuthEpoch: () => true }));
 vi.mock('@/lib/hooks/use-app-lifecycle', () => ({
@@ -46,7 +48,10 @@ vi.mock('@/lib/hooks/use-app-lifecycle', () => ({
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({ useOfflineBannerState: () => false }));
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
-  useOrganizationsList: () => ({ isSuccess: false, data: [] }),
+  useOrganizationsList: () => ({
+    isSuccess: true,
+    data: [{ organizationId: 'org-1', role: 'admin' }],
+  }),
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
@@ -81,6 +86,7 @@ describe('BriefingSyncMount dismissal drain', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     state.journalFails = 0;
+    state.authEpoch = 1;
     state.dismiss.mockReset();
     state.saveJournal.mockReset();
     const entry: JournalEntry = {
@@ -114,25 +120,110 @@ describe('BriefingSyncMount dismissal drain', () => {
     vi.useRealTimers();
   });
 
-  it('walks the finite ladder after repeated server rejections and toasts once per step', async () => {
+  it('walks the finite ladder after repeated server rejections', async () => {
+    state.dismiss.mockRejectedValue(new Error('upstream unavailable'));
+
+    await advance(0);
+    expect(state.dismiss).toHaveBeenCalledTimes(1);
+    expect(state.toastError).toHaveBeenCalledTimes(1);
+    // The mount uses the app's real i18n instance (no `@/i18n` mock here), so
+    // the toast reads back through the English catalog.
+    expect(state.toastError).toHaveBeenCalledWith(
+      'Couldn’t dismiss this brief yet. It retries in the background.'
+    );
+
+    await advance(2000);
+    expect(state.dismiss).toHaveBeenCalledTimes(2);
+
+    await advance(8000);
+    expect(state.dismiss).toHaveBeenCalledTimes(3);
+
+    // The ladder is exhausted: no fourth request, however long the app waits.
+    await advance(60_000);
+    expect(state.dismiss).toHaveBeenCalledTimes(3);
+  });
+
+  it('announces each hidden report once, then stays silent for it', async () => {
+    const entry = state.dismissals[0];
+    if (!entry) {
+      throw new Error('Journal entry went missing');
+    }
+    const second: JournalEntry = { ...entry, reportId: 'report-2' };
+    state.dismissals = [entry, second];
+    state.client?.setQueryData(DISMISSALS_KEY, [entry, second]);
+    // Report-1 exhausts two retries before posting; report-2 then fails.
+    state.dismiss
+      .mockRejectedValueOnce(new Error('upstream unavailable'))
+      .mockRejectedValueOnce(new Error('upstream unavailable'))
+      .mockResolvedValueOnce({ kind: 'accepted' })
+      .mockRejectedValue(new Error('upstream unavailable'));
+
+    await advance(2000);
+    expect(state.dismiss).toHaveBeenCalledTimes(2);
+    expect(state.toastError).toHaveBeenCalledTimes(1);
+    expect(state.toastError).toHaveBeenCalledWith(
+      'Couldn’t dismiss this brief yet. It retries in the background.'
+    );
+
+    await advance(8000);
+    // Report-1 posted on the third step; the settled journal reveals
+    // report-2, whose drain runs on the next ladder step.
+    expect(state.dismiss).toHaveBeenCalledTimes(3);
+    await advance(0);
+    await advance(2000);
+    expect(state.dismiss).toHaveBeenCalledTimes(4);
+    expect(state.toastError).toHaveBeenCalledTimes(2);
+
+    await advance(8000);
+    // Report-2 already had its announcement: the retries stay quiet.
+    expect(state.toastError).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      unmount();
+    });
+    unmount = () => undefined;
+  });
+
+  it('announces the same report again after the account changes', async () => {
     state.dismiss.mockRejectedValue(new Error('upstream unavailable'));
 
     await advance(0);
     expect(state.dismiss).toHaveBeenCalledTimes(1);
     expect(state.toastError).toHaveBeenCalledTimes(1);
 
+    // A new sign-in epoch clears the announcement memory with the ladder's
+    // own reset, so the still-pending report announces once more for the new
+    // account, and its ladder restarts from the first step.
+    state.authEpoch = 2;
+    await advance(0);
     await advance(2000);
-    expect(state.dismiss).toHaveBeenCalledTimes(2);
     expect(state.toastError).toHaveBeenCalledTimes(2);
+    expect(state.toastError).toHaveBeenLastCalledWith(
+      'Couldn’t dismiss this brief yet. It retries in the background.'
+    );
 
-    await advance(8000);
-    expect(state.dismiss).toHaveBeenCalledTimes(3);
-    expect(state.toastError).toHaveBeenCalledTimes(3);
+    act(() => {
+      unmount();
+    });
+    unmount = () => undefined;
+  });
 
-    // The ladder is exhausted: no fourth request, however long the app waits.
+  it('stays silent when the inaccessible-context purge fails', async () => {
+    vi.mocked(purgeInaccessibleBriefingCache).mockRejectedValueOnce(
+      new Error('cache write failed')
+    );
+    state.dismiss.mockResolvedValue({ kind: 'accepted' });
+
+    const mountResult = await renderWithProviders(createElement(BriefingSyncMount));
+    unmount = mountResult.unmount;
+    await advance(0);
     await advance(60_000);
-    expect(state.dismiss).toHaveBeenCalledTimes(3);
-    expect(state.toastError).toHaveBeenCalledTimes(3);
+    expect(state.toastError).not.toHaveBeenCalled();
+
+    act(() => {
+      unmount();
+    });
+    unmount = () => undefined;
   });
 
   it('re-arms the retry after a journal write failure with no other dependency change', async () => {

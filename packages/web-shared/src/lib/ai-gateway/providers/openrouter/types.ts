@@ -112,6 +112,9 @@ export type GatewayMessagesRequest = SharedGatewayRequestProperties &
   Anthropic.MessageCreateParams & {
     user?: string;
     session_id?: string;
+    // Sampling parameters that clients still send but SDK 1.x dropped from `MessageCreateParams`.
+    temperature?: number;
+    top_p?: number;
     thinking?: Anthropic.ThinkingConfigParam & { block_binding?: ThinkingBlockBinding };
   };
 

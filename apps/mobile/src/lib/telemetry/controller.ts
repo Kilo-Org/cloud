@@ -91,9 +91,11 @@ export function currentAccountId(): string | undefined {
   return decision?.accountId;
 }
 
-/** Reset every module-level variable. For tests only. */
+/** Reset every module-level variable and drop every subscriber. For tests only.
+ *  Subscribers are dropped without being notified. */
 export function resetTelemetryControllerForTests(): void {
   decision = undefined;
   generation = 0;
   epoch = 0;
+  generationListeners.clear();
 }

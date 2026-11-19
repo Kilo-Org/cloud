@@ -92,8 +92,8 @@ export type NeedsInputSessionManager = {
     activeQuestion: Atom<PendingRequest | null>;
     /**
      * The session's activity. `connecting` means no snapshot has landed yet,
-     * so an empty raise atom proves nothing; any other value means the
-     * transport resolved and its connect was processed.
+     * so an empty raise atom proves nothing; activity alone never proves the
+     * connect ran — see `liveSnapshotLanded` for the evidence that does.
      */
     activity: Atom<SessionActivity>;
     /**

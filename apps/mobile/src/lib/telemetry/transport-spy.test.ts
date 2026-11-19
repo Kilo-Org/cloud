@@ -4,96 +4,85 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SENTRY_NATIVE_OPTIONS } from '@/lib/sentry-dsn';
 import { type SentryInitExtras } from '@/lib/sentry-init';
 
-const hoisted = vi.hoisted(() => {
-  const usHost = 'https://us.i.posthog.com';
+// The helper's vi.hoisted object merges into file scope (usHost, fetch, the
+// custom transport-routing client, and the Sentry doubles stay file-local):
+// this file's PostHog client keeps its own shape, so it shadows-only the
+// client key and lets the mock factory return the local one.
+import { postHogPersistedProperty, posthogTestDouble } from '../analytics/posthog-test-double';
 
-  const fetch = vi.fn();
-  const flush = vi.fn().mockResolvedValue(undefined);
+const usHost = 'https://us.i.posthog.com';
 
-  // The PostHog client double: `capture` routes through the client's own
-  // `fetch` (not the global fetch), mirroring the real SDK, so a fetch wrap
-  // registered by `wrapPostHogFetchForTests` observes the transport.
-  const client = {
-    register: vi.fn(),
-    setPersonPropertiesForFlags: vi.fn(),
-    onFeatureFlags: vi.fn(),
-    setPersistedProperty: vi.fn(),
-    optOut: vi.fn().mockResolvedValue(undefined),
-    fetch,
-    flush,
-    capture: vi.fn(function capture(this: { fetch: typeof fetch }, name: string) {
-      this.fetch(`${usHost}/batch/`, {
-        method: 'POST',
-        body: JSON.stringify({ event: name }),
-      });
-    }),
-  };
+const device = { deviceType: null as number | null };
 
-  const holder: { options?: Record<string, unknown> } = {};
+const fetch = vi.fn();
+const flush = vi.fn().mockResolvedValue(undefined);
 
-  const device = { deviceType: null as number | null };
+// The PostHog client double: `capture` routes through the client's own
+// `fetch` (not the global fetch), mirroring the real SDK, so a fetch wrap
+// registered by `wrapPostHogFetchForTests` observes the transport.
+const client = {
+  register: vi.fn(),
+  setPersonPropertiesForFlags: vi.fn(),
+  onFeatureFlags: vi.fn(),
+  setPersistedProperty: vi.fn(),
+  optOut: vi.fn().mockResolvedValue(undefined),
+  fetch,
+  flush,
+  capture: vi.fn(function capture(this: { fetch: typeof fetch }, name: string) {
+    this.fetch(`${usHost}/batch/`, {
+      method: 'POST',
+      body: JSON.stringify({ event: name }),
+    });
+  }),
+};
 
-  const appsFlyer = {
-    init: vi.fn(),
-    registerSessionReadyListener: vi.fn(),
-    isSessionReady: vi.fn(),
-    start: vi.fn(),
-    logEvent: vi.fn(),
-    stop: vi.fn(),
-    setConsentData: vi.fn(),
-    create: vi.fn().mockResolvedValue(undefined),
-    startObservingTransactions: vi.fn(),
-    stopObservingTransactions: vi.fn(),
-  };
+const appsFlyer = {
+  init: vi.fn(),
+  registerSessionReadyListener: vi.fn(),
+  isSessionReady: vi.fn(),
+  start: vi.fn(),
+  logEvent: vi.fn(),
+  stop: vi.fn(),
+  setConsentData: vi.fn(),
+  create: vi.fn().mockResolvedValue(undefined),
+  startObservingTransactions: vi.fn(),
+  stopObservingTransactions: vi.fn(),
+};
 
-  const platform: { OS: string; Version: number | string } = { OS: 'ios', Version: 0 };
+const platform: { OS: string; Version: number | string } = { OS: 'ios', Version: 0 };
 
-  const sentryHolder: { initOptions?: Record<string, unknown> } = { initOptions: undefined };
-  const mobileReplayIntegration = vi.fn();
-  const deeplinkIntegration = vi.fn();
-  // Mirrors the real factory's return shape: `{ name: 'HermesProfiling' }` —
-  // so tests can prove sentry-init renames the instance per consented init.
-  const hermesProfilingIntegration = vi.fn(() => ({ name: 'HermesProfiling' }));
-  const expoRouterIntegration = vi.fn(() => ({ name: 'expo-router-integration' }));
-  const extraErrorDataIntegration = vi.fn(() => ({ name: 'ExtraErrorData' }));
+const sentryHolder: { initOptions?: Record<string, unknown> } = { initOptions: undefined };
+const mobileReplayIntegration = vi.fn();
+const deeplinkIntegration = vi.fn();
+// Mirrors the real factory's return shape: `{ name: 'HermesProfiling' }` —
+// so tests can prove sentry-init renames the instance per consented init.
+const hermesProfilingIntegration = vi.fn(() => ({ name: 'HermesProfiling' }));
+const expoRouterIntegration = vi.fn(() => ({ name: 'expo-router-integration' }));
+const extraErrorDataIntegration = vi.fn(() => ({ name: 'ExtraErrorData' }));
 
-  const storage = {
-    sealPostHogStorage: vi.fn(),
-    unsealPostHogStorage: vi.fn(),
-    purgePostHogPersistence: vi.fn(),
-    // oxlint-disable-next-line consistent-type-assertions -- mock must match PostHogCustomStorage interface
-    posthogCustomStorage: {} as Record<string, unknown>,
-  };
-
-  return {
-    client,
-    fetch,
-    flush,
-    usHost,
-    holder,
-    device,
-    appsFlyer,
-    platform,
-    sentryHolder,
-    mobileReplayIntegration,
-    deeplinkIntegration,
-    hermesProfilingIntegration,
-    expoRouterIntegration,
-    extraErrorDataIntegration,
-    storage,
-  };
-});
+// This file's own transport-routing client shadows the shared one; the other
+// file-local doubles join it in one merge, so every `hoisted.<name>.*`
+// reference keeps working and the shared double stays unmodified.
+const hoisted = {
+  ...posthogTestDouble,
+  client,
+  device,
+  appsFlyer,
+  platform,
+  sentryHolder,
+  mobileReplayIntegration,
+  deeplinkIntegration,
+  hermesProfilingIntegration,
+  expoRouterIntegration,
+  extraErrorDataIntegration,
+};
 
 vi.mock('posthog-react-native', () => ({
   default: vi.fn(function PostHogMock(_key: string, options: Record<string, unknown>) {
     hoisted.holder.options = options;
     return hoisted.client;
   }),
-  PostHogPersistedProperty: {
-    Queue: 'queue',
-    LogsQueue: 'logs_queue',
-    AiQueue: 'ai_queue',
-  },
+  PostHogPersistedProperty: postHogPersistedProperty,
 }));
 
 vi.mock('expo-application', () => ({

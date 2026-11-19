@@ -535,6 +535,56 @@ test('rejects an empty sentence joiner in the markless Thai catalog', () => {
   assert.match(found.join('\n'), /mobile\/th: "common\.sentenceJoiner" is empty/);
 });
 
+test('rejects a locale value that is a serialized JSON object', () => {
+  // A translation store once shipped an action label wrapped in a JSON
+  // object; the reader would see the braces and quotes instead of the words.
+  const found = run({
+    translated: { agents: { ...TRANSLATED.agents, title: '{"value": "Localized agents"}' } },
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.title" is serialized JSON/);
+});
+
+test('rejects scalar JSON copied into a catalog', () => {
+  const found = run({
+    english: { agents: { ...ENGLISH.agents } },
+    translated: {
+      agents: {
+        ...TRANSLATED.agents,
+        title: '9',
+        liveCount_one: 'true',
+        liveCount_other: 'null',
+      },
+    },
+    source: SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.title" is serialized JSON/);
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.liveCount_one" is serialized JSON/);
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.liveCount_other" is serialized JSON/);
+});
+
+test('accepts prose copy that only starts with a bracket', () => {
+  // A bracket that opens prose copy does not make it a serialized object:
+  // `[{{provider}}] агенты` never parses as JSON. English keeps the same
+  // placeholder, so the two catalogs agree on it.
+  const found = run({
+    english: { agents: { title: '[{{provider}}] agents' } },
+    translated: { agents: { title: '[{{provider}}] агенты' } },
+    source: "t('agents.title');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects an English value that is a serialized JSON object', () => {
+  const found = run({
+    english: { agents: { ...ENGLISH.agents, title: '{"value": "Agents"}' } },
+    source: "t('agents.title');\nt('agents.liveCount', { count: 2 });",
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/en: "agents\.title" is serialized JSON/);
+});
+
 test('rejects a trailing space that English does not carry', () => {
   const found = run({
     translated: { agents: { ...TRANSLATED.agents, title: 'Localized agents ' } },
@@ -1906,6 +1956,159 @@ test('still rejects that push value in a language the exceptions do not list', (
   assert.match(
     found.join('\n'),
     /notifications\/ru: "internal\.securityFindingNew\.body" is English; translate it/
+  );
+});
+
+// Two non-English catalogs let a case leave one of them in English while the
+// other translates the same key. The every-locale rule then stays silent (the
+// value is not identical everywhere), so only the per-catalog rule can see the
+// catalog that never translated.
+const PER_CATALOG_LANGUAGES = "export const SUPPORTED_LANGUAGES = ['en', 'fr', 'ru'];";
+const PER_CATALOG_PUSH_REGISTRY = [
+  "import en from './locales/en.json';",
+  "import fr from './locales/fr.json';",
+  "import ru from './locales/ru.json';",
+  "const pushCatalogs = { 'en': en, 'fr': fr, 'ru': ru };",
+].join('\n');
+const PER_CATALOG_FRENCH_PUSH = {
+  'packages/notifications/src/locales/fr.json': '{}',
+  'packages/notifications/src/i18n.ts': PER_CATALOG_PUSH_REGISTRY,
+};
+
+/** The audit over a tree whose French catalog may keep a value in English. */
+function runWithFrench({ english, french, russian, source }) {
+  return run({
+    english,
+    translated: russian,
+    source,
+    extraFiles: {
+      ...PER_CATALOG_FRENCH_PUSH,
+      'apps/mobile/src/i18n/languages.ts': PER_CATALOG_LANGUAGES,
+      'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(french),
+    },
+  });
+}
+
+test('rejects a mobile value one catalog left in English while another translated it', () => {
+  const found = runWithFrench({
+    english: { agents: { title: 'Your agents' } },
+    french: { agents: { title: 'Your agents' } },
+    russian: { agents: { title: 'Ваши агенты' } },
+    source: "t('agents.title');",
+  });
+  assert.ok(
+    found.includes(
+      'mobile/fr: "agents.title" is English; translate it, or list the value for "fr" in MOBILE_ENGLISH_COPY_EXCEPTIONS'
+    ),
+    found.join('\n')
+  );
+  assert.ok(!found.some(problem => problem.startsWith('mobile/ru:')), found.join('\n'));
+  assert.ok(
+    !found.some(problem => problem.includes('equals English in every locale')),
+    'the every-locale rule must stay silent when one catalog translated the key'
+  );
+});
+
+test('accepts that value translated in the catalog that kept it', () => {
+  const found = runWithFrench({
+    english: { agents: { title: 'Your agents' } },
+    french: { agents: { title: 'Vos agents' } },
+    russian: { agents: { title: 'Ваши агенты' } },
+    source: "t('agents.title');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts an allowlisted proper noun left in English in one catalog', () => {
+  // `agentChat.toolCard.toolBash` is allowlisted and its value is a bare
+  // lowercase word, so this case proves the allowlist skip rather than the
+  // prose skip. `profile.providerApple` is the brief's own example; its value
+  // carries no prose, so it passes whichever skip runs first.
+  const found = runWithFrench({
+    english: {
+      agentChat: { toolCard: { toolBash: 'bash' } },
+      profile: { providerApple: 'Apple' },
+    },
+    french: {
+      agentChat: { toolCard: { toolBash: 'bash' } },
+      profile: { providerApple: 'Apple' },
+    },
+    russian: {
+      agentChat: { toolCard: { toolBash: 'терминал' } },
+      profile: { providerApple: 'Эппл' },
+    },
+    source: "t('agentChat.toolCard.toolBash');\nt('profile.providerApple');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a placeholder-only and a capitalised product name left in English', () => {
+  const found = runWithFrench({
+    english: { agents: { tokenOnly: '{{name}}', brand: 'Kilo Code' } },
+    french: { agents: { tokenOnly: '{{name}}', brand: 'Kilo Code' } },
+    russian: { agents: { tokenOnly: '{{name}} привет', brand: 'Кило Код' } },
+    source: "t('agents.tokenOnly');\nt('agents.brand');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a mobile value its catalog lists as English on purpose', () => {
+  const english = { prReview: { terms: { mergeRequest: 'Merge request' } } };
+  const russian = { prReview: { terms: { mergeRequest: 'Запрос на слияние' } } };
+  const source = "t('prReview.terms.mergeRequest');";
+  const problem =
+    'mobile/fr: "prReview.terms.mergeRequest" is English; translate it, or list the value for "fr" in MOBILE_ENGLISH_COPY_EXCEPTIONS';
+
+  // With the shipped, empty map the value is reported, so the case below proves
+  // the exception entry is what accepts it.
+  const reported = runWithFrench({ english, french: english, russian, source });
+  assert.ok(reported.includes(problem), reported.join('\n'));
+
+  // The shipped map already holds entries, so the case swaps the whole literal
+  // body for one that names only the value this fixture audits: the fixture's
+  // own assertion then proves the entry is what accepts the value.
+  const mapBody = /const MOBILE_ENGLISH_COPY_EXCEPTIONS = \{[\s\S]*?\n\};/.exec(
+    CHECKER_SOURCE
+  )?.[0];
+  assert.ok(mapBody, 'the shipped checker ships the exception map literal');
+  const withException = CHECKER_SOURCE.replace(
+    mapBody,
+    [
+      'const MOBILE_ENGLISH_COPY_EXCEPTIONS = {',
+      "  fr: { 'Merge request': 'the Git noun French keeps in English' },",
+      '};',
+    ].join('\n')
+  );
+  assert.notEqual(withException, CHECKER_SOURCE, 'the case must fill the exception map');
+  const root = cliFixture(
+    {
+      ...standardFiles({ english, translated: russian, source }),
+      ...PER_CATALOG_FRENCH_PUSH,
+      'apps/mobile/src/i18n/languages.ts': PER_CATALOG_LANGUAGES,
+      'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(english),
+    },
+    withException
+  );
+  const result = cli(root);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('still reports a mobile value left in English in every locale', () => {
+  const found = run({
+    english: { agents: { title: 'Your agents' } },
+    translated: { agents: { title: 'Your agents' } },
+    source: "t('agents.title');",
+  });
+  assert.ok(
+    found.includes('mobile: "agents.title" equals English in every locale'),
+    found.join('\n')
+  );
+  assert.ok(
+    found.includes(
+      'mobile/ru: "agents.title" is English; translate it, or list the value for "ru" in MOBILE_ENGLISH_COPY_EXCEPTIONS'
+    ),
+    found.join('\n')
   );
 });
 

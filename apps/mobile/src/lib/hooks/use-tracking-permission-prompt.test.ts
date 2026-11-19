@@ -107,7 +107,6 @@ describe('useTrackingPermissionPrompt', () => {
     vi.restoreAllMocks();
   });
 
-  // Gate false: no pre-prompt.
   it('does nothing when enabled is false', async () => {
     const renderer = mountHarness(false);
     // Flush any microtasks so async effects can settle.
@@ -119,7 +118,6 @@ describe('useTrackingPermissionPrompt', () => {
     renderer.unmount();
   });
 
-  // Status decided: no pre-prompt.
   it.each([
     { label: 'denied', status: 'denied' },
     { label: 'granted', status: 'granted' },
@@ -137,7 +135,6 @@ describe('useTrackingPermissionPrompt', () => {
     renderer.unmount();
   });
 
-  // Happy: Continue is tapped and the system dialog appears.
   it('shows the pre-prompt alert when status is undetermined and calls requestTrackingPermissionsAsync on Continue', async () => {
     getTrackingPermissionsAsync.mockResolvedValue({
       status: 'undetermined',
@@ -167,7 +164,6 @@ describe('useTrackingPermissionPrompt', () => {
     renderer.unmount();
   });
 
-  // Not now: proves no tracking system request is made.
   it('does not request tracking permission when Not now is tapped', async () => {
     getTrackingPermissionsAsync.mockResolvedValue({
       status: 'undetermined',
@@ -226,7 +222,6 @@ describe('useTrackingPermissionPrompt', () => {
     expect(requestTrackingPermissionsAsync).not.toHaveBeenCalled();
     // The hook skips the ATT read entirely once the dismissal is on disk.
     expect(getTrackingPermissionsAsync).not.toHaveBeenCalled();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- renderer assigned inside act
     (renderer as unknown as TestRenderer.ReactTestRenderer).unmount();
   });
 
@@ -259,7 +254,6 @@ describe('useTrackingPermissionPrompt', () => {
 
     expect(alertMock).not.toHaveBeenCalled();
     expect(requestTrackingPermissionsAsync).not.toHaveBeenCalled();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- renderer assigned inside act
     (renderer as unknown as TestRenderer.ReactTestRenderer).unmount();
   });
 

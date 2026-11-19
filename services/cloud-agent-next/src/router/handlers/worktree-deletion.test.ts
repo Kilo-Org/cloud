@@ -16,6 +16,11 @@ const mocks = vi.hoisted(() => ({
   getControl: vi.fn(),
   getDb: vi.fn(),
   diagnostic: vi.fn(),
+  markWorkspaceDeleted: vi.fn(),
+  getWorkspace: vi.fn(),
+}));
+vi.mock('../../control-plane/workspace/workspace-stub', () => ({
+  getWorkspaceStub: mocks.getWorkspace,
 }));
 vi.mock('../../sandbox-control/diagnostics', () => ({ logControlDiagnostic: mocks.diagnostic }));
 vi.mock('../../sandbox-session/session-stub', () => ({
@@ -163,9 +168,39 @@ function fixture(rootCount = 1, childCount = 0) {
   };
 }
 
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocks.markWorkspaceDeleted.mockResolvedValue(undefined);
+  mocks.getWorkspace.mockReturnValue({ markDeleted: mocks.markWorkspaceDeleted });
+});
 
 describe('deleteWorktree authorization and completion', () => {
+  it('ends the workspace Cloud Agent authority once deletion begins, before content deletion', async () => {
+    const f = fixture(1);
+    await f.caller.deleteWorktree({ worktreeId });
+    expect(mocks.getWorkspace).toHaveBeenCalledWith(
+      f.ctx.env,
+      f.ctx.userId,
+      worktreeId.replace('worktree_', 'workspace_')
+    );
+    expect(mocks.markWorkspaceDeleted).toHaveBeenCalledOnce();
+    expect(f.begin.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.markWorkspaceDeleted.mock.invocationCallOrder[0]
+    );
+    expect(mocks.markWorkspaceDeleted.mock.invocationCallOrder[0]).toBeLessThan(
+      f.deleteContent.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('keeps deletion retryable when the workspace authority cannot be ended', async () => {
+    const f = fixture(1);
+    mocks.markWorkspaceDeleted.mockRejectedValue(new Error('workspace unavailable'));
+    await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+    expect(f.deleteContent).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])(
     'reports aggregate phase timings and pending cleanup when runtime cleanup fails=%s',
     async fail => {

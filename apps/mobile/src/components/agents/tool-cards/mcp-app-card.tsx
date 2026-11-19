@@ -56,9 +56,9 @@ type ViewState =
   | { readonly kind: 'empty' }
   | { readonly kind: 'unavailable' };
 
-/** The page's call that puts a document in the sandbox, as a JS literal. */
-const mountCall = (html: string): string =>
-  `window.kiloMcpHost.mount(${JSON.stringify(html)});true;`;
+/** The page's call that puts a labeled document in the sandbox, as a JS literal. */
+const mountCall = (html: string, title: string): string =>
+  `window.kiloMcpHost.mount(${JSON.stringify(html)}, ${JSON.stringify(title)});true;`;
 
 /** The page's call that posts one bridge message into the sandbox. */
 const deliverCall = (text: string): string =>
@@ -163,7 +163,7 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
             webView.current?.injectJavaScript(deliverCall(text));
           },
         });
-        webView.current?.injectJavaScript(mountCall(html));
+        webView.current?.injectJavaScript(mountCall(html, t('modelChat.mcp.app.label')));
       } catch {
         // The handshake or the mount failed: the row says so and offers a retry.
         if (active) {
@@ -175,7 +175,7 @@ function McpAppView({ part, view }: Readonly<McpAppViewProps>) {
     return () => {
       active = false;
     };
-  }, [pageLoaded, documentState, dark, i18n.language, part, view]);
+  }, [pageLoaded, documentState, dark, t, i18n.language, part, view]);
 
   return (
     <View style={{ height }} className="overflow-hidden rounded-lg bg-secondary">

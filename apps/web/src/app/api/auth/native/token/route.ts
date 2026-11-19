@@ -289,9 +289,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   }
 
   // ── Step 1: Admission gate ───────────────────────────────────────────────
-  // Credentials are issued only to an attested device. A missing or malformed
-  // proof is refused before any provider call, OTP reservation, ticket
-  // consumption, or user settlement, so no side effect precedes the gate.
   const admissionPayload = requireAdmissionPayload(body);
   if (!admissionPayload) {
     countAdmissionCondition('native_admission_missing');

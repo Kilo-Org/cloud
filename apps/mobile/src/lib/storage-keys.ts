@@ -90,8 +90,6 @@ export const REMOTE_MCP_OAUTH_KEY = 'remote-mcp-oauth';
 export const CHAT_BACKENDS_KEY = 'chat-backends';
 /** Provider platforms whose new-session "Connect <provider>" CTA the user collapsed. */
 export const COLLAPSED_CONNECT_CTAS_KEY = 'collapsed-connect-ctas';
-/** Master switch for the glanceable Active Agents surfaces (widgets, Live Activity,
- * Android ongoing). Off blanks every surface and unregisters its push tokens. */
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';
 /**

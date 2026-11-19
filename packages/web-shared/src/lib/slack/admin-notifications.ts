@@ -57,16 +57,11 @@ export async function sendAdminSlackNotification(
       body: JSON.stringify(notification),
       signal: AbortSignal.timeout(SLACK_WEBHOOK_TIMEOUT_MS),
     });
-  } catch {
-    // Do not retain the original error: fetch errors can contain the secret URL.
-    throw new AdminSlackNotificationError('network');
-  }
-
-  try {
     // Slack normally responds with a short plain-text "ok" body. Consuming it
     // allows the underlying connection to be reused.
     await response.text();
   } catch {
+    // Do not retain the original error: fetch errors can contain the secret URL.
     throw new AdminSlackNotificationError('network');
   }
 

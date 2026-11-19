@@ -7,7 +7,13 @@ import {
 } from './part-utils';
 import type { ChatEvent } from './normalizer';
 import type { SessionStorage } from './storage/types';
-import { MAX_REMOVAL_VERSIONS, storageVersions } from './storage/versions';
+import {
+  MAX_REMOVAL_VERSIONS,
+  storageVersions,
+  evictOldestRemoval,
+  messageVersionKey,
+  rowVersionKey,
+} from './storage/versions';
 import type { UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
 
 type ChatProcessor = {
@@ -35,8 +41,8 @@ function acceptVersion(sessionStorage: SessionStorage, event: ChatEvent): boolea
     info?.sessionID ?? part?.sessionID ?? ('sessionId' in event ? event.sessionId : '');
   const messageId = info?.id ?? part?.messageID ?? ('messageId' in event ? event.messageId : '');
   const partId = part?.id ?? ('partId' in event ? event.partId : undefined);
-  const messageKey = `${sessionId}\u0000${messageId}`;
-  const key = partId === undefined ? messageKey : `${messageKey}\u0000${partId}`;
+  const messageKey = messageVersionKey(sessionId, messageId);
+  const key = rowVersionKey(messageKey, partId);
   let versions = storageVersions.get(sessionStorage);
   if (!versions && !event.version) return true;
   if (!versions) {
@@ -103,31 +109,7 @@ function acceptVersion(sessionStorage: SessionStorage, event: ChatEvent): boolea
   versions.removals.delete(key);
   if (row.removed) {
     versions.removals.set(key, row);
-    if (versions.removals.size > MAX_REMOVAL_VERSIONS) {
-      const oldest = versions.removals.entries().next().value;
-      if (oldest) {
-        const [oldKey, oldRow] = oldest;
-        versions.removals.delete(oldKey);
-        versions.rows.delete(oldKey);
-        const oldMessageKey = `${oldRow.sessionId}\u0000${oldRow.messageId}`;
-        if (
-          ![...versions.rows.keys()].some(
-            rowKey => rowKey === oldMessageKey || rowKey.startsWith(`${oldMessageKey}\u0000`)
-          )
-        ) {
-          versions.messages.delete(oldMessageKey);
-        }
-        let sourceFloors = versions.removalFloors.get(oldRow.sessionId);
-        if (!sourceFloors) {
-          sourceFloors = new Map();
-          versions.removalFloors.set(oldRow.sessionId, sourceFloors);
-        }
-        sourceFloors.set(
-          oldRow.version.sourceId,
-          Math.max(sourceFloors.get(oldRow.version.sourceId) ?? 0, oldRow.version.cursor)
-        );
-      }
-    }
+    if (versions.removals.size > MAX_REMOVAL_VERSIONS) evictOldestRemoval(versions);
   }
   const latest = versions.messages.get(messageKey);
   if (!latest || latest.sourceId !== version.sourceId || latest.cursor < version.cursor) {
@@ -165,8 +147,10 @@ type ChatProcessorOptions = {
     | undefined;
 };
 
-function hasTextField(part: { text?: string } | unknown): part is { text: string } {
-  return typeof part === 'object' && part !== null && 'text' in part;
+function hasTextField(part: unknown): part is { text: string } {
+  return (
+    typeof part === 'object' && part !== null && 'text' in part && typeof part.text === 'string'
+  );
 }
 
 function isSyntheticPart(part: unknown): boolean {

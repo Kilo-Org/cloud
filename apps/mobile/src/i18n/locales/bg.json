@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Обзор",
       "files": "Файлове",
-      "discussion": "Дискусия"
+      "discussion": "Дискусия",
+      "discussionAccessibility_one": "{{title}}: 1 коментар",
+      "discussionAccessibility": "{{title}}: {{displayCount}} коментара",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} коментара"
     },
     "fileStatus": {
       "modified": "Променен",

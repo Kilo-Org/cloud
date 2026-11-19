@@ -1091,7 +1091,13 @@
     "tabs": {
       "overview": "Forléargas",
       "files": "Comhaid",
-      "discussion": "Plé"
+      "discussion": "Plé",
+      "discussionAccessibility_one": "{{title}}: 1 trácht",
+      "discussionAccessibility": "{{title}}: {{displayCount}} trácht",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} trácht",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} thrácht",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} thrácht",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} dtrácht"
     },
     "fileStatus": {
       "modified": "Modhnaithe",

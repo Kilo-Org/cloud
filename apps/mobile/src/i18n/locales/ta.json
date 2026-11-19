@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "மேலோட்டம்",
       "files": "கோப்புகள்",
-      "discussion": "விவாதம்"
+      "discussion": "விவாதம்",
+      "discussionAccessibility_one": "{{title}}: 1 கருத்து",
+      "discussionAccessibility": "{{title}}: {{displayCount}} கருத்துகள்",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} கருத்துகள்"
     },
     "fileStatus": {
       "modified": "மாற்றப்பட்டது",

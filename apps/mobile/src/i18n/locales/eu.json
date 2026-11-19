@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Ikuspegi orokorra",
       "files": "Fitxategiak",
-      "discussion": "Eztabaida"
+      "discussion": "Eztabaida",
+      "discussionAccessibility_one": "{{title}}: 1 iruzkin",
+      "discussionAccessibility": "{{title}}: {{displayCount}} iruzkin",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} iruzkin"
     },
     "fileStatus": {
       "modified": "Aldatuta",

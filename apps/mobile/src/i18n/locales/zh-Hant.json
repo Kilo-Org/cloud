@@ -3230,6 +3230,9 @@
     },
     "tabs": {
       "discussion": "討論",
+      "discussionAccessibility": "{{title}}：{{displayCount}} 則留言",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}} 則留言",
+      "discussionAccessibility_one": "{{title}}：1 則留言",
       "files": "檔案",
       "overview": "總覽"
     },

@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "مرور کلی",
       "files": "فایل‌ها",
-      "discussion": "گفت‌وگو"
+      "discussion": "گفت‌وگو",
+      "discussionAccessibility_one": "{{title}}: ۱ نظر",
+      "discussionAccessibility": "{{title}}: {{displayCount}} نظر",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} نظر"
     },
     "fileStatus": {
       "modified": "تغییریافته",

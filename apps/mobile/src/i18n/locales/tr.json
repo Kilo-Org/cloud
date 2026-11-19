@@ -3230,6 +3230,9 @@
     },
     "tabs": {
       "discussion": "Tartışma",
+      "discussionAccessibility": "{{title}}: {{displayCount}} yorum",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} yorum",
+      "discussionAccessibility_one": "{{title}}: 1 yorum",
       "files": "Dosyalar",
       "overview": "Genel bakış"
     },

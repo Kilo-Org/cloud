@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "አጠቃላይ እይታ",
       "files": "ፋይሎች",
-      "discussion": "ውይይት"
+      "discussion": "ውይይት",
+      "discussionAccessibility_one": "{{title}}: 1 አስተያየት",
+      "discussionAccessibility": "{{title}}: {{displayCount}} አስተያየቶች",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} አስተያየቶች"
     },
     "fileStatus": {
       "modified": "ተቀይሯል",

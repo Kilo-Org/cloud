@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Yfirlit",
       "files": "Skrár",
-      "discussion": "Umræða"
+      "discussion": "Umræða",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} athugasemd",
+      "discussionAccessibility": "{{title}}: {{displayCount}} athugasemdir",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} athugasemdir"
     },
     "fileStatus": {
       "modified": "Breytt",

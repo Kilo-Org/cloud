@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "خلاصہ",
       "files": "فائلیں",
-      "discussion": "گفتگو"
+      "discussion": "گفتگو",
+      "discussionAccessibility_one": "{{title}}: 1 تبصرہ",
+      "discussionAccessibility": "{{title}}: {{displayCount}} تبصرے",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} تبصرے"
     },
     "fileStatus": {
       "modified": "ترمیم شدہ",

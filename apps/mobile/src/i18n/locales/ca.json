@@ -1047,7 +1047,11 @@
     "tabs": {
       "overview": "Visió general",
       "files": "Fitxers",
-      "discussion": "Discussió"
+      "discussion": "Discussió",
+      "discussionAccessibility_one": "{{title}}: 1 comentari",
+      "discussionAccessibility": "{{title}}: {{displayCount}} comentaris",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} comentaris",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} comentaris"
     },
     "fileStatus": {
       "modified": "Modificat",

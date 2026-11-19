@@ -3230,6 +3230,9 @@
     },
     "tabs": {
       "discussion": "Thảo luận",
+      "discussionAccessibility": "{{title}}: {{displayCount}} bình luận",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} bình luận",
+      "discussionAccessibility_one": "{{title}}: 1 bình luận",
       "files": "Tệp",
       "overview": "Tổng quan"
     },

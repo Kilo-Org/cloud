@@ -3230,6 +3230,9 @@
     },
     "tabs": {
       "discussion": "चर्चा",
+      "discussionAccessibility": "{{title}}: {{displayCount}} टिप्पणियाँ",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} टिप्पणियाँ",
+      "discussionAccessibility_one": "{{title}}: 1 टिप्पणी",
       "files": "फ़ाइलें",
       "overview": "अवलोकन"
     },

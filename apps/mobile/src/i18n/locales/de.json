@@ -3230,6 +3230,9 @@
     },
     "tabs": {
       "discussion": "Diskussion",
+      "discussionAccessibility": "{{title}}: {{displayCount}} Kommentare",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} Kommentare",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
       "files": "Dateien",
       "overview": "Übersicht"
     },

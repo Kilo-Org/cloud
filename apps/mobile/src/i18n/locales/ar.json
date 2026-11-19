@@ -3458,6 +3458,13 @@
     },
     "tabs": {
       "discussion": "المناقشة",
+      "discussionAccessibility": "{{title}}: التعليقات: {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: التعليقات: {{displayCount}}",
+      "discussionAccessibility_one": "{{title}}: تعليق واحد",
+      "discussionAccessibility_zero": "{{title}}: عدد التعليقات: {{displayCount}}",
+      "discussionAccessibility_two": "{{title}}: تعليقان",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} تعليقات",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} تعليقًا",
       "files": "الملفات",
       "overview": "نظرة عامة"
     },

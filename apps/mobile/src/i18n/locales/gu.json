@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "ઝાંખી",
       "files": "ફાઇલો",
-      "discussion": "ચર્ચા"
+      "discussion": "ચર્ચા",
+      "discussionAccessibility_one": "{{title}}: 1 ટિપ્પણી",
+      "discussionAccessibility": "{{title}}: {{displayCount}} ટિપ્પણીઓ",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} ટિપ્પણીઓ"
     },
     "fileStatus": {
       "modified": "ફેરફાર કરેલી",

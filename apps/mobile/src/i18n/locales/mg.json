@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Topimaso",
       "files": "Rakitra",
-      "discussion": "Resaka"
+      "discussion": "Resaka",
+      "discussionAccessibility_one": "{{title}}: hevitra 1",
+      "discussionAccessibility": "{{title}}: fanehoan-kevitra {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: fanehoan-kevitra {{displayCount}}"
     },
     "fileStatus": {
       "modified": "Novaina",

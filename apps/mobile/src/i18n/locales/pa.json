@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "ਸੰਖੇਪ",
       "files": "ਫਾਈਲਾਂ",
-      "discussion": "ਚਰਚਾ"
+      "discussion": "ਚਰਚਾ",
+      "discussionAccessibility_one": "{{title}}: 1 ਟਿੱਪਣੀ",
+      "discussionAccessibility": "{{title}}: {{displayCount}} ਟਿੱਪਣੀਆਂ",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} ਟਿੱਪਣੀਆਂ"
     },
     "fileStatus": {
       "modified": "ਸੋਧੀ ਗਈ",

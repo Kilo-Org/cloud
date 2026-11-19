@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Yleiskatsaus",
       "files": "Tiedostot",
-      "discussion": "Keskustelu"
+      "discussion": "Keskustelu",
+      "discussionAccessibility_one": "{{title}}: 1 kommentti",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommenttia",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommenttia"
     },
     "fileStatus": {
       "modified": "Muokattu",

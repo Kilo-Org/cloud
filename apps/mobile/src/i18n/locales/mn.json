@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Тойм",
       "files": "Файлууд",
-      "discussion": "Хэлэлцүүлэг"
+      "discussion": "Хэлэлцүүлэг",
+      "discussionAccessibility_one": "{{title}}: 1 сэтгэгдэл",
+      "discussionAccessibility": "{{title}}: {{displayCount}} сэтгэгдэл",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} сэтгэгдэл"
     },
     "fileStatus": {
       "modified": "Өөрчилсөн",

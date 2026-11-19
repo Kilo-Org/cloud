@@ -1069,7 +1069,12 @@
     "tabs": {
       "overview": "Apžvalga",
       "files": "Failai",
-      "discussion": "Diskusija"
+      "discussion": "Diskusija",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentaras",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentarų",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentarų",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentarai",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentaro"
     },
     "fileStatus": {
       "modified": "Modifikuota",

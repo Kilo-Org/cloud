@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Apèsi",
       "files": "Fichye",
-      "discussion": "Diskisyon"
+      "discussion": "Diskisyon",
+      "discussionAccessibility_one": "{{title}}: 1 kòmantè",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kòmantè",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kòmantè"
     },
     "fileStatus": {
       "modified": "Modifye",

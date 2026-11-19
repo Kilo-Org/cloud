@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Ülevaade",
       "files": "Failid",
-      "discussion": "Arutelu"
+      "discussion": "Arutelu",
+      "discussionAccessibility_one": "{{title}}: 1 kommentaar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentaari",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentaari"
     },
     "fileStatus": {
       "modified": "Muudetud",

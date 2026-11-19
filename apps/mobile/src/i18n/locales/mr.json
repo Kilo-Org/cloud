@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "आढावा",
       "files": "फाइल्स",
-      "discussion": "चर्चा"
+      "discussion": "चर्चा",
+      "discussionAccessibility_one": "{{title}}: 1 टिप्पणी",
+      "discussionAccessibility": "{{title}}: {{displayCount}} टिप्पण्या",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} टिप्पण्या"
     },
     "fileStatus": {
       "modified": "बदल केलेली",

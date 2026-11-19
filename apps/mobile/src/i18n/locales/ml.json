@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "ഒറ്റനോട്ടം",
       "files": "ഫയലുകൾ",
-      "discussion": "ചർച്ച"
+      "discussion": "ചർച്ച",
+      "discussionAccessibility_one": "{{title}}: 1 അഭിപ്രായം",
+      "discussionAccessibility": "{{title}}: {{displayCount}} അഭിപ്രായങ്ങൾ",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} അഭിപ്രായങ്ങൾ"
     },
     "fileStatus": {
       "modified": "പരിഷ്കരിച്ചു",

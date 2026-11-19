@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Vista xeral",
       "files": "Ficheiros",
-      "discussion": "Conversa"
+      "discussion": "Conversa",
+      "discussionAccessibility_one": "{{title}}: 1 comentario",
+      "discussionAccessibility": "{{title}}: {{displayCount}} comentarios",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} comentarios"
     },
     "fileStatus": {
       "modified": "Modificado",

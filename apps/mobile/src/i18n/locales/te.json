@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "అవలోకనం",
       "files": "ఫైళ్లు",
-      "discussion": "చర్చ"
+      "discussion": "చర్చ",
+      "discussionAccessibility_one": "{{title}}: 1 వ్యాఖ్య",
+      "discussionAccessibility": "{{title}}: {{displayCount}} వ్యాఖ్యలు",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} వ్యాఖ్యలు"
     },
     "fileStatus": {
       "modified": "సవరించబడింది",

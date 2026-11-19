@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Översikt",
       "files": "Filer",
-      "discussion": "Diskussion"
+      "discussion": "Diskussion",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentarer",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentarer"
     },
     "fileStatus": {
       "modified": "Ändrad",

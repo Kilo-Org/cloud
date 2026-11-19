@@ -3230,6 +3230,9 @@
     },
     "tabs": {
       "discussion": "讨论",
+      "discussionAccessibility": "{{title}}：{{displayCount}} 条评论",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}} 条评论",
+      "discussionAccessibility_one": "{{title}}：1 条评论",
       "files": "文件",
       "overview": "概览"
     },

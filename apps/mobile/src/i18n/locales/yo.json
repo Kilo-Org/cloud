@@ -1025,7 +1025,10 @@
     "tabs": {
       "overview": "Àkópọ̀",
       "files": "Àwọn fáìlì",
-      "discussion": "Ìjíròrò"
+      "discussion": "Ìjíròrò",
+      "discussionAccessibility_one": "{{title}}: àsọyé 1",
+      "discussionAccessibility": "{{title}}: àsọyé {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: àsọyé {{displayCount}}"
     },
     "fileStatus": {
       "modified": "A ti yí padà",

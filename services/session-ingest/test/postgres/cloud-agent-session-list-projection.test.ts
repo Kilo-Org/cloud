@@ -153,9 +153,22 @@ describe('Cloud Agent list projection from the Session DO', () => {
     expect(await storedRow()).toMatchObject({ status: 'idle', title: 'Newer rename' });
   });
 
+  it('applies a native rename on a publication newer than the stored status', async () => {
+    await publish({ transitionId: firstTransitionId });
+    expect((await storedRow()).title).toBe('Generated from the first prompt');
+    await publish({
+      status: 'idle',
+      occurredAt: '2026-01-01T00:06:00.000Z',
+      transitionId: laterTransitionId,
+      rename: { title: 'Renamed by the agent', transitionId: laterTransitionId },
+    });
+    expect(await storedRow()).toMatchObject({ status: 'idle', title: 'Renamed by the agent' });
+  });
+
   it('keeps a user rename when a newer publication repeats an applied native rename', async () => {
     const rename = { title: 'Renamed by the agent', transitionId: firstTransitionId };
     await publish({ rename });
+    expect((await storedRow()).title).toBe('Renamed by the agent');
     await client.db.update(cli_sessions_v2).set({ title: 'Renamed by the user' });
     await publish({
       status: 'idle',

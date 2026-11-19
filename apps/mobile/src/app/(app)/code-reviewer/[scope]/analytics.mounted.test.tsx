@@ -513,7 +513,9 @@ describe('CodeReviewerAnalytics empty state', () => {
     expect(offEmpty?.props.description).toBe(
       'Organization billing roles can turn analytics on in the settings on the web to record completed reviews.'
     );
-    expect(findByType(offRenderer.root, 'TextMock')).toHaveLength(0);
+    // Only the platform and range pickers' two section labels render as text
+    // beside the state.
+    expect(findByType(offRenderer.root, 'TextMock')).toHaveLength(2);
     expect(findByType(offRenderer.root, 'ConfigureRowMock')).toHaveLength(0);
 
     act(() => {

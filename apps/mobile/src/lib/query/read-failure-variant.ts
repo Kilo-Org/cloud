@@ -45,8 +45,8 @@ export function classifyReadFailureVariant({
  * reachability probe settles; a pause there is not a connection failure yet,
  * and naming one flashes a false error on every cold deep link. Main's shared
  * classifier settles the same way — `classifyConfigBody` and
- * `listBodyState` both gate their paused-error state on a known connection and
- * keep loading while it is unsettled.
+ * `classifyListBody` both gate their paused-error state on a known connection
+ * and keep loading while it is unsettled.
  */
 export function isReadPausedBeforeData(read: {
   isPending: boolean;

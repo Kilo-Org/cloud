@@ -1,9 +1,10 @@
-import { Alert } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { type BriefingEstimate } from '@kilocode/app-shared/agent-briefing';
 
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { type SurfaceAttempt } from '@/lib/surface-feedback';
 import { briefingEstimateUnavailableKey } from '@/lib/agent-briefing-state';
@@ -34,13 +35,17 @@ export type BriefingEnableFlowInput = {
 /**
  * One confirm-and-enable flow per card, behind the surface-feedback admission
  * guard. Every exit settles the attempt itself: a toast outcome with
- * `abandon()` before the dialog, and — because `Alert.alert` is not awaited
- * and the dialog outlives this async function — the cancel/back path and the
- * confirmed enable settle it inside their own handlers. The paid enable only
- * runs after `owns()` says this attempt still owns the card, so a slow refetch
- * whose card unmounted (the store's `invalidateAll` on unmount) or a
- * superseded attempt cannot present a dialog or fire the paid write. Nothing
- * persists on the surface, so no outcome writes a failure here.
+ * `abandon()` before the dialog, an Android dismissal through the dialog's
+ * `onDismiss`, and — because `Alert.alert` is not awaited and the dialog
+ * outlives this async function — the cancel path and the confirmed enable
+ * settle it inside their own handlers. The flow refuses to present while the
+ * app is not in front, because an alert dropped for want of an activity runs no
+ * callback at all and would leave the card busy for the life of the mount. The
+ * paid enable only runs after `owns()` and the auth epoch say this attempt
+ * still owns the card, so a slow refetch whose card unmounted (the store's
+ * `invalidateAll` on unmount), a superseded attempt, or a changed account
+ * cannot present a dialog or fire the paid write. Nothing persists on the
+ * surface, so no outcome writes a failure here.
  */
 export function useBriefingEnableFlow() {
   const { t, i18n } = useTranslation();
@@ -52,6 +57,7 @@ export function useBriefingEnableFlow() {
 
   const run = async (
     attempt: SurfaceAttempt<EnableSurfaceFailure>,
+    epoch: number,
     input: BriefingEnableFlowInput
   ): Promise<void> => {
     if (!input.valid) {
@@ -60,9 +66,17 @@ export function useBriefingEnableFlow() {
       return;
     }
     const result = await input.refetch();
-    // The refetch was slow and the card went away (or a newer attempt owns
-    // the flow): the dialog and the paid enable must not outlive the attempt.
-    if (!attempt.owns()) {
+    // The refetch was slow and the card went away, a newer attempt owns the
+    // flow, or the account changed: the dialog and the paid enable must not
+    // outlive the attempt that was admitted.
+    if (!attempt.owns() || !isCurrentAuthEpoch(epoch)) {
+      return;
+    }
+    // React Native drops an alert presented while no activity is attached, and
+    // no callback runs, so the attempt would stay pending with no way out. The
+    // person can tap again once the app is in front.
+    if (AppState.currentState !== 'active') {
+      attempt.abandon();
       return;
     }
     const confirmed = result.data;
@@ -86,7 +100,9 @@ export function useBriefingEnableFlow() {
         {
           text: t('common.cancel'),
           style: 'cancel',
-          // Android back dismisses, which equals Cancel: nothing is enabled.
+          // Back, or an outside tap, dismisses the dialog and equals Cancel:
+          // nothing is enabled. That dismissal runs no button handler, so the
+          // dialog options below settle it.
           onPress: () => {
             attempt.abandon();
           },
@@ -94,10 +110,10 @@ export function useBriefingEnableFlow() {
         {
           text: t('agentBriefing.enable'),
           onPress: () => {
-            // The dialog outlived the flow's own frames, so the press
-            // re-checks ownership before the paid write can fire for a card
-            // that is gone or superseded.
-            if (!attempt.owns()) {
+            // The dialog outlived the flow's own frames, so the press re-checks
+            // ownership and the account before the paid write can fire for a
+            // card that is gone, superseded, or now belongs to another account.
+            if (!attempt.owns() || !isCurrentAuthEpoch(epoch)) {
               return;
             }
             input.confirm(confirmed.estimateToken);
@@ -105,7 +121,15 @@ export function useBriefingEnableFlow() {
           },
         },
       ],
-      { cancelable: true }
+      {
+        cancelable: true,
+        // Android back or an outside tap dismisses the dialog without running a
+        // button handler, so the dismissal settles the attempt here; `abandon`
+        // is idempotent, so a button press that already settled is unaffected.
+        onDismiss: () => {
+          attempt.abandon();
+        },
+      }
     );
   };
 
@@ -117,7 +141,7 @@ export function useBriefingEnableFlow() {
     if (attempt === null) {
       return;
     }
-    void run(attempt, input);
+    void run(attempt, currentAuthEpoch(), input);
   };
 
   return { pending, start };

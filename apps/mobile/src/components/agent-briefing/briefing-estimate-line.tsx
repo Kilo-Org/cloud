@@ -13,9 +13,9 @@ import { briefingMoney } from '@/lib/agent-briefing-format';
  * payload is the estimate wire type, so a screen passes its query's `data`
  * straight in; the phase narrows what each branch may read.
  *
- * `offline` and `failed` exist because a disabled read (offline) and a settled
- * failure with no cached quote never produce data: rendering `estimating` for
- * either would hold a "loading" claim forever next to nothing in flight.
+ * `offline` and `failed` exist only when nothing is cached, because a disabled
+ * (offline) or failed read produces no data of its own; a cached quote always
+ * renders, whatever the read is doing.
  */
 export type BriefingEstimateLineQuote =
   | { readonly kind: 'invalid' }
@@ -32,9 +32,8 @@ type UnavailableEstimate = Omit<BriefingEstimate, 'canGenerate'> & { readonly ca
 type EstimateReadState = {
   /** Confirmed offline, so the query is disabled and will not start. */
   readonly offline: boolean;
+  /** The read settled as an error. */
   readonly isError: boolean;
-  /** True while the query is actually in flight (`fetchStatus === 'fetching'`). */
-  readonly isFetching: boolean;
 };
 
 /**
@@ -48,9 +47,9 @@ export function parseBriefingEstimateLineQuote(
   if (!valid) {
     return { kind: 'invalid' };
   }
-  if (read.offline) {
-    return { kind: 'offline' };
-  }
+  // A cached quote outlives the read that produced it: going offline disables
+  // the query but keeps its data, and a failed refetch keeps the last quote.
+  // Data first, so the line never hides a quote the card still holds.
   if (estimate !== undefined) {
     if (estimate.canGenerate) {
       return { kind: 'quoted', quote: estimate };
@@ -60,24 +59,27 @@ export function parseBriefingEstimateLineQuote(
     // is re-asserted into the phase's payload shape.
     return { kind: 'unavailable', quote: { ...estimate, canGenerate: false } };
   }
+  // Nothing cached: a disabled read (offline) will not start, and a settled
+  // failure has nothing to describe. Neither settles on its own, so neither may
+  // claim the placeholder's wait.
+  if (read.offline) {
+    return { kind: 'offline' };
+  }
   if (read.isError) {
     return { kind: 'failed' };
   }
-  if (read.isFetching) {
-    return { kind: 'estimating' };
-  }
-  // Not offline, not failed, no data, and nothing in flight: the read has not
-  // started yet, which is the same wait the placeholder describes.
+  // No quote, not offline, no failure: the first read has not settled yet.
   return { kind: 'estimating' };
 }
 
 /**
  * Exactly one line per quote phase, so no flag pair can render two lines or the
- * wrong one. An unparsable field disables the query, so the last estimate cannot
- * speak for the current limits and `invalid` owns the line. With no quote yet
- * the line is `estimating`: a paused (offline) or failed read has produced
- * nothing to describe, and the retry button beside it owns recovery, so
- * "cannot quote" copy never claims a quote that does not exist.
+ * wrong one. A cached quote renders whatever the read is doing: going offline
+ * disables the query but keeps its data, and a failed refetch keeps the last
+ * quote. `invalid` owns the line for unparsable fields, because the disabled
+ * query cannot speak for the current limits. `offline` and `failed` render only
+ * with no quote cached, each beside the recovery the card offers: connectivity
+ * for the offline phase, and the card's Retry for the failed one.
  */
 export function BriefingEstimateLine({ quote }: { readonly quote: BriefingEstimateLineQuote }) {
   const { t, i18n } = useTranslation();
@@ -109,8 +111,13 @@ export function BriefingEstimateLine({ quote }: { readonly quote: BriefingEstima
     }
     case 'failed': {
       // The read settled as an error with no cached quote; the retry button
-      // beside the line owns recovery, so the line only names the miss.
-      return <Text className="text-xs text-muted-foreground">{t('agentBriefing.loadError')}</Text>;
+      // beside the line owns recovery, so the line only names the miss. The
+      // copy names the estimate, not the briefs the card beside it lists.
+      return (
+        <Text className="text-xs text-muted-foreground">
+          {t('agentBriefing.estimateLoadError')}
+        </Text>
+      );
     }
     case 'unavailable': {
       return (

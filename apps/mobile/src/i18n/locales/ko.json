@@ -4514,6 +4514,7 @@
     "empty": "이 브리핑 기간 동안 활동 없음",
     "emptyHint": "예약된 브리핑에 활동이 있으면 클라우드 및 CLI 코딩 세션이 여기에 표시됩니다.",
     "loadError": "브리핑을 불러올 수 없습니다",
+    "estimateLoadError": "예상 비용을 불러올 수 없습니다.",
     "view": "브리핑 읽기",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

@@ -4514,6 +4514,7 @@
     "empty": "ამ ანგარიშის ინტერვალში აქტივობა არ არის",
     "emptyHint": "თქვენი ღრუბლოვანი და CLI კოდირების სესიები აქ გამოჩნდება, როცა დაგეგმილ ანგარიშს აქტივობა ექნება.",
     "loadError": "ანგარიშების ჩატვირთვა ვერ მოხერხდა",
+    "estimateLoadError": "შეფასების ჩატვირთვა ვერ მოხერხდა.",
     "view": "ანგარიშის წაკითხვა",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

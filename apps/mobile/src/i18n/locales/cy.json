@@ -4798,6 +4798,7 @@
     "empty": "Dim gweithgarwch yn y cyfnod briff hwn",
     "emptyHint": "Bydd eich sesiynau codio cwmwl a CLI yn ymddangos yma pan fydd briff a drefnwyd yn cynnwys gweithgarwch.",
     "loadError": "Methu llwytho briffiau",
+    "estimateLoadError": "Methu llwytho'r amcangyfrif.",
     "view": "Darllen y briff",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

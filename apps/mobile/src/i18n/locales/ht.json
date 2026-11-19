@@ -4514,6 +4514,7 @@
     "empty": "Pa gen aktivite nan fenèt rapò sa a",
     "emptyHint": "Sesyon kodaj cloud ak CLI ou yo parèt isit la lè yon rapò pwograme gen aktivite.",
     "loadError": "Nou pa t kapab chaje rapò yo",
+    "estimateLoadError": "Nou pa t kapab chaje estime a.",
     "view": "Li rapò a",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

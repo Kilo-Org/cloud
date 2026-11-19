@@ -4514,6 +4514,7 @@
     "empty": "Нема активност во овој период на извештајот",
     "emptyHint": "Вашите сесии за кодирање во облак и CLI ќе се појават тука кога закажан извештај има активност.",
     "loadError": "Извештаите не можеа да се вчитаат",
+    "estimateLoadError": "Проценката не можеше да се вчита.",
     "view": "Прочитај извештај",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

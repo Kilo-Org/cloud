@@ -4585,6 +4585,7 @@
     "empty": "Nema aktivnosti u ovom periodu izveštaja",
     "emptyHint": "Vaše cloud i CLI sesije kodiranja pojavljuju se ovde kada u zakazanom izveštaju ima aktivnosti.",
     "loadError": "Učitavanje izveštaja nije uspelo",
+    "estimateLoadError": "Učitavanje procene nije uspelo.",
     "view": "Pročitaj izveštaj",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

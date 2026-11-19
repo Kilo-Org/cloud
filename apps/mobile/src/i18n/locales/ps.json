@@ -4514,6 +4514,7 @@
     "empty": "د دې راپور په مهال کې هېڅ فعالیت نشته",
     "emptyHint": "کله چې یو مهالویش شوی راپور فعالیت ولري، ستاسو د کلاوډ او CLI د کوډ کولو ناستې به دلته ښکاره شي.",
     "loadError": "راپورونه پورته نه شول",
+    "estimateLoadError": "اټکل پورته نه شو.",
     "view": "راپور ولولئ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}، $t(agentBriefing.snapshotPullRequests) {{pullRequests}}، $t(agentBriefing.snapshotBlockers) {{blockers}}",

@@ -4514,6 +4514,7 @@
     "empty": "ไม่มีกิจกรรมในช่วงเวลาของรายงานนี้",
     "emptyHint": "เซสชันเขียนโค้ดบนคลาวด์และ CLI ของคุณจะแสดงที่นี่เมื่อรายงานตามกำหนดการมีกิจกรรม",
     "loadError": "ไม่สามารถโหลดรายงานได้",
+    "estimateLoadError": "ไม่สามารถโหลดประมาณการได้",
     "view": "อ่านรายงาน",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

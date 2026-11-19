@@ -4514,6 +4514,7 @@
     "empty": "Engin virkni í þessum yfirlitsglugga",
     "emptyHint": "Forritunarlotur þínar í skýinu og CLI birtast hér þegar áætlað yfirlit hefur virkni.",
     "loadError": "Ekki tókst að hlaða yfirlitum",
+    "estimateLoadError": "Ekki tókst að hlaða áætluninni.",
     "view": "Lesa yfirlit",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

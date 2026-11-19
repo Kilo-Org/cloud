@@ -4585,6 +4585,7 @@
     "empty": "Nema aktivnosti u ovom periodu izvještaja",
     "emptyHint": "Vaše cloud i CLI sesije kodiranja pojavljuju se ovdje kada zakazani izvještaj ima aktivnost.",
     "loadError": "Nije moguće učitati izvještaje",
+    "estimateLoadError": "Nije moguće učitati procjenu.",
     "view": "Pročitaj izvještaj",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

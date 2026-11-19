@@ -4514,6 +4514,7 @@
     "empty": "اس بریفنگ کی مدت میں کوئی سرگرمی نہیں",
     "emptyHint": "جب کسی شیڈول شدہ بریفنگ میں سرگرمی ہو تو آپ کے کلاؤڈ اور CLI کوڈنگ سیشنز یہاں ظاہر ہوں گے۔",
     "loadError": "بریفنگز لوڈ نہیں ہو سکیں",
+    "estimateLoadError": "تخمینہ لوڈ نہیں ہو سکا۔",
     "view": "بریفنگ پڑھیں",
     "viewWithPreview": "$t(agentBriefing.view)۔ {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}، $t(agentBriefing.snapshotPullRequests) {{pullRequests}}، $t(agentBriefing.snapshotBlockers) {{blockers}}",

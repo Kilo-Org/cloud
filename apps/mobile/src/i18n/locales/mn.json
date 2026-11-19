@@ -4514,6 +4514,7 @@
     "empty": "Энэ тоймын хугацаанд үйл ажиллагаа алга",
     "emptyHint": "Товлосон тоймд үйл ажиллагаа байгаа үед таны үүлэн болон CLI кодчиллын сешнүүд энд харагдана.",
     "loadError": "Тоймуудыг ачаалж чадсангүй",
+    "estimateLoadError": "Тооцоог ачаалж чадсангүй.",
     "view": "Тойм унших",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

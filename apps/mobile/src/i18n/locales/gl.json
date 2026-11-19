@@ -4514,6 +4514,7 @@
     "empty": "Sen actividade nesta xanela do informe",
     "emptyHint": "As túas sesións de programación na nube e na CLI aparecerán aquí cando un informe programado teña actividade.",
     "loadError": "Non se puideron cargar os informes",
+    "estimateLoadError": "Non se puido cargar a estimación.",
     "view": "Ler informe",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

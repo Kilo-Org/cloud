@@ -4514,6 +4514,7 @@
     "empty": "ಈ ವರದಿ ಅವಧಿಯಲ್ಲಿ ಚಟುವಟಿಕೆ ಇಲ್ಲ",
     "emptyHint": "ನಿಗದಿತ ವರದಿಯಲ್ಲಿ ಚಟುವಟಿಕೆ ಇದ್ದಾಗ ನಿಮ್ಮ ಕ್ಲೌಡ್ ಮತ್ತು CLI ಕೋಡಿಂಗ್ ಸೆಷನ್‌ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
     "loadError": "ವರದಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+    "estimateLoadError": "ಅಂದಾಜನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.",
     "view": "ವರದಿ ಓದಿ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

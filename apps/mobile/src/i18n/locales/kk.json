@@ -4514,6 +4514,7 @@
     "empty": "Бұл шолу терезесінде белсенділік жоқ",
     "emptyHint": "Бұлттық және CLI кодтау сеанстарыңыз жоспарланған шолуда белсенділік болғанда осында көрсетіледі.",
     "loadError": "Шолуларды жүктеу мүмкін болмады",
+    "estimateLoadError": "Бағалауды жүктеу мүмкін болмады.",
     "view": "Шолуды оқу",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

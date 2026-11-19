@@ -4514,6 +4514,7 @@
     "empty": "Geen activiteit in dit briefingvenster",
     "emptyHint": "Je cloud- en CLI-codeersessies verschijnen hier wanneer een geplande briefing activiteit heeft.",
     "loadError": "Briefings konden niet worden geladen",
+    "estimateLoadError": "De schatting kon niet worden geladen.",
     "view": "Briefing lezen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

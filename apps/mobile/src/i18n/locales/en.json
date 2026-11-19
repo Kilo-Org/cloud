@@ -8,6 +8,7 @@
     "empty": "No activity in this brief window",
     "emptyHint": "Your cloud and CLI coding sessions appear here when a scheduled brief has activity.",
     "loadError": "Could not load briefs",
+    "estimateLoadError": "Couldn't load the estimate.",
     "view": "Read brief",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

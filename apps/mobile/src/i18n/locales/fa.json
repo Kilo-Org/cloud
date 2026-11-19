@@ -4514,6 +4514,7 @@
     "empty": "هیچ فعالیتی در این بازه گزارش وجود ندارد",
     "emptyHint": "جلسه‌های کدنویسی ابری و CLI شما وقتی یک گزارش زمان‌بندی‌شده فعالیتی داشته باشد، اینجا نمایش داده می‌شوند.",
     "loadError": "بارگیری گزارش‌ها ممکن نشد",
+    "estimateLoadError": "بارگیری تخمین ممکن نشد.",
     "view": "خواندن گزارش",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}، $t(agentBriefing.snapshotPullRequests) {{pullRequests}}، $t(agentBriefing.snapshotBlockers) {{blockers}}",

@@ -4656,6 +4656,7 @@
     "empty": "Žádná aktivita v tomto období přehledu",
     "emptyHint": "Vaše cloudové a CLI relace programování se zde zobrazí, když naplánovaný přehled zaznamená aktivitu.",
     "loadError": "Přehledy se nepodařilo načíst",
+    "estimateLoadError": "Odhad se nepodařilo načíst.",
     "view": "Číst přehled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

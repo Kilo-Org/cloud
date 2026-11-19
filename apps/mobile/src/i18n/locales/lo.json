@@ -4514,6 +4514,7 @@
     "empty": "ບໍ່ມີກິດຈະກຳໃນຊ່ວງເວລາຂອງລາຍງານນີ້",
     "emptyHint": "ເຊສຊັນຂຽນໂຄດໃນຄລາວ ແລະ CLI ຂອງທ່ານຈະສະແດງຢູ່ນີ້ເມື່ອລາຍງານທີ່ກຳນົດໄວ້ມີກິດຈະກຳ.",
     "loadError": "ບໍ່ສາມາດໂຫຼດລາຍງານໄດ້",
+    "estimateLoadError": "ບໍ່ສາມາດໂຫຼດການປະເມີນໄດ້.",
     "view": "ອ່ານລາຍງານ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

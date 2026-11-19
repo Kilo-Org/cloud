@@ -4514,6 +4514,7 @@
     "empty": "Καμία δραστηριότητα σε αυτό το διάστημα αναφοράς",
     "emptyHint": "Οι συνεδρίες κώδικα στο cloud και στο CLI εμφανίζονται εδώ όταν υπάρχει δραστηριότητα σε μια προγραμματισμένη αναφορά.",
     "loadError": "Δεν ήταν δυνατή η φόρτωση των αναφορών",
+    "estimateLoadError": "Δεν ήταν δυνατή η φόρτωση της εκτίμησης.",
     "view": "Ανάγνωση αναφοράς",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

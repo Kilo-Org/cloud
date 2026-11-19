@@ -4514,6 +4514,7 @@
     "empty": "ဤအစီရင်ခံစာ အချိန်ကာလအတွင်း လုပ်ဆောင်ချက် မရှိပါ",
     "emptyHint": "အချိန်စီစဉ်ထားသော အစီရင်ခံစာတွင် လှုပ်ရှားမှုရှိသောအခါ သင်၏ cloud နှင့် CLI coding session များ ဤနေရာတွင် ပေါ်လာပါမည်။",
     "loadError": "အစီရင်ခံစာများ ဖွင့်၍မရပါ",
+    "estimateLoadError": "ခန့်မှန်းခြေကို ဖွင့်၍မရပါ။",
     "view": "အစီရင်ခံစာ ဖတ်ပါ",
     "viewWithPreview": "$t(agentBriefing.view)။ {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}၊ $t(agentBriefing.snapshotPullRequests) {{pullRequests}}၊ $t(agentBriefing.snapshotBlockers) {{blockers}}",

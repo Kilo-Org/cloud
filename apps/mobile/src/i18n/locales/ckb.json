@@ -4514,6 +4514,7 @@
     "empty": "هیچ چالاکییەک لەم ماوەی ڕاپۆرتەدا نییە",
     "emptyHint": "دانیشتنەکانی کۆدنووسینی هەور و CLI لێرە دەردەکەون کاتێک ڕاپۆرتێکی خشتەکراو چالاکی هەبێت.",
     "loadError": "نەتوانرا ڕاپۆرتەکان باربکرێن",
+    "estimateLoadError": "نەتوانرا خەملێنراوەکە باربکرێت.",
     "view": "خوێندنەوەی ڕاپۆرت",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

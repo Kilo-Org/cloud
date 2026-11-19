@@ -4585,6 +4585,7 @@
     "empty": "Cap activitat en aquesta finestra de l'informe",
     "emptyHint": "Les teves sessions de programació al núvol i a la CLI apareixen aquí quan un informe programat té activitat.",
     "loadError": "No s'han pogut carregar els informes",
+    "estimateLoadError": "No s'ha pogut carregar l'estimació.",
     "view": "Llegeix l'informe",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

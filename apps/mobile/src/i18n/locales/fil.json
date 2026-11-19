@@ -4514,6 +4514,7 @@
     "empty": "Walang aktibidad sa window ng briefing na ito",
     "emptyHint": "Lalabas dito ang iyong mga cloud at CLI coding session kapag may aktibidad ang isang naka-iskedyul na briefing.",
     "loadError": "Hindi ma-load ang mga briefing",
+    "estimateLoadError": "Hindi ma-load ang tantiya.",
     "view": "Basahin ang briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

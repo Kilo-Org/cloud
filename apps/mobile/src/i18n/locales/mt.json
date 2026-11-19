@@ -4727,6 +4727,7 @@
     "empty": "L-ebda attività f'dan il-perjodu tal-briefing",
     "emptyHint": "Is-sessjonijiet tal-ikkowdjar tiegħek fil-cloud u CLI jidhru hawn meta briefing skedat ikollu attività.",
     "loadError": "Ma setgħux jitgħabbew il-briefings",
+    "estimateLoadError": "Ma setgħetx tiġi mgħobbija l-istima.",
     "view": "Aqra l-briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

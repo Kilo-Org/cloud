@@ -4514,6 +4514,7 @@
     "empty": "Tsy nisy hetsika tao anatin'ity fe-potoana tatitra ity",
     "emptyHint": "Hiseho eto ny fivoriana kaody cloud sy CLI rehefa misy hetsika ny tatitra voalahatra.",
     "loadError": "Tsy nahavita naka ny tatitra",
+    "estimateLoadError": "Tsy nahavita naka ny vinavina.",
     "view": "Vakio ny tatitra",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

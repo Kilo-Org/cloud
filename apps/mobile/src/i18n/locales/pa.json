@@ -4514,6 +4514,7 @@
     "empty": "ਇਸ ਬ੍ਰੀਫਿੰਗ ਦੀ ਮਿਆਦ ਵਿੱਚ ਕੋਈ ਗਤੀਵਿਧੀ ਨਹੀਂ",
     "emptyHint": "ਤੁਹਾਡੇ ਕਲਾਊਡ ਅਤੇ CLI ਕੋਡਿੰਗ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ ਜਦੋਂ ਕਿਸੇ ਨਿਰਧਾਰਿਤ ਬ੍ਰੀਫਿੰਗ ਵਿੱਚ ਗਤੀਵਿਧੀ ਹੋਵੇ।",
     "loadError": "ਬ੍ਰੀਫਿੰਗਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ",
+    "estimateLoadError": "ਅਨੁਮਾਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "view": "ਬ੍ਰੀਫਿੰਗ ਪੜ੍ਹੋ",
     "viewWithPreview": "$t(agentBriefing.view)। {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

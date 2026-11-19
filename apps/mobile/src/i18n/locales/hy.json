@@ -4514,6 +4514,7 @@
     "empty": "Այս հաշվետվության պատուհանում ակտիվություն չկա",
     "emptyHint": "Ձեր ամպային և CLI ծրագրավորման նստաշրջանները կհայտնվեն այստեղ, երբ պլանավորված հաշվետվությունն ակտիվություն ունենա։",
     "loadError": "Չհաջողվեց բեռնել հաշվետվությունները",
+    "estimateLoadError": "Չհաջողվեց բեռնել գնահատումը։",
     "view": "Կարդալ հաշվետվությունը",
     "viewWithPreview": "$t(agentBriefing.view)։ {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view)՝ $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

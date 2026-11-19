@@ -4514,6 +4514,7 @@
     "empty": "Tidak ada aktivitas dalam periode laporan ini",
     "emptyHint": "Sesi coding cloud dan CLI Anda muncul di sini saat laporan terjadwal memiliki aktivitas.",
     "loadError": "Tidak dapat memuat laporan",
+    "estimateLoadError": "Tidak dapat memuat estimasi.",
     "view": "Baca laporan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

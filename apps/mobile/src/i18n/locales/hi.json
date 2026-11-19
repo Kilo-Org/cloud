@@ -4514,6 +4514,7 @@
     "empty": "इस ब्रीफ़िंग विंडो में कोई गतिविधि नहीं",
     "emptyHint": "जब किसी निर्धारित ब्रीफ़िंग में गतिविधि होती है, तो आपके क्लाउड और CLI कोडिंग सत्र यहाँ दिखाई देते हैं।",
     "loadError": "ब्रीफ़िंग लोड नहीं हो सकीं",
+    "estimateLoadError": "अनुमान लोड नहीं हो सका।",
     "view": "ब्रीफ़िंग पढ़ें",
     "viewWithPreview": "$t(agentBriefing.view)। {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

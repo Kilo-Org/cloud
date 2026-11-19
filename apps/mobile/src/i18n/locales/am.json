@@ -4514,6 +4514,7 @@
     "empty": "በዚህ የሪፖርት ጊዜ ውስጥ እንቅስቃሴ የለም",
     "emptyHint": "የክላውድ እና CLI ኮዲንግ ክፍለ ጊዜዎችዎ የመርሃ ግብር ሪፖርት እንቅስቃሴ ሲኖረው እዚህ ይታያሉ።",
     "loadError": "ሪፖርቶችን መጫን አልተቻለም",
+    "estimateLoadError": "ግምቱን መጫን አልተቻለም።",
     "view": "ሪፖርቱን አንብብ",
     "viewWithPreview": "$t(agentBriefing.view)። {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}፣ $t(agentBriefing.snapshotPullRequests) {{pullRequests}}፣ $t(agentBriefing.snapshotBlockers) {{blockers}}",

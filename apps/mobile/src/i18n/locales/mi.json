@@ -4514,6 +4514,7 @@
     "empty": "Kāore he mahi i tēnei wā pūrongo",
     "emptyHint": "Ka puta mai ō wātū waehere kapua, CLI hoki ki konei ina whai mahi tētahi pūrongo kua hōtaka.",
     "loadError": "Kāore i taea te uta i ngā pūrongo",
+    "estimateLoadError": "Kāore i taea te uta i te whakatau tata.",
     "view": "Pānui pūrongo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

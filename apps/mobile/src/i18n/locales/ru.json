@@ -4656,6 +4656,7 @@
     "empty": "Нет активности в этом окне сводки",
     "emptyHint": "Ваши облачные и CLI-сессии появятся здесь, когда в запланированной сводке будет активность.",
     "loadError": "Не удалось загрузить сводки",
+    "estimateLoadError": "Не удалось загрузить оценку.",
     "view": "Читать сводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

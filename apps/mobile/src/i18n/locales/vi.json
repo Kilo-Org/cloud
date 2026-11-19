@@ -4514,6 +4514,7 @@
     "empty": "Không có hoạt động trong khung thời gian bản tin này.",
     "emptyHint": "Các phiên lập trình trên đám mây và CLI của bạn sẽ hiển thị tại đây khi một bản tin theo lịch có hoạt động.",
     "loadError": "Không thể tải bản tin",
+    "estimateLoadError": "Không thể tải ước tính.",
     "view": "Đọc bản tin",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

@@ -4656,6 +4656,7 @@
     "empty": "Šiuo suvestinės laikotarpiu veiklos nebuvo",
     "emptyHint": "Jūsų debesies ir CLI programavimo sesijos bus rodomos čia, kai suplanuotoje suvestinėje bus veiklos.",
     "loadError": "Nepavyko įkelti suvestinių",
+    "estimateLoadError": "Nepavyko įkelti apskaičiavimo.",
     "view": "Skaityti suvestinę",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

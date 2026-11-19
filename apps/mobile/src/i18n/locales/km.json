@@ -4514,6 +4514,7 @@
     "empty": "គ្មានសកម្មភាពនៅក្នុងរយៈពេលរបាយការណ៍នេះ",
     "emptyHint": "វគ្គសរសេរកូដលើ cloud និង CLI របស់អ្នកនឹងបង្ហាញនៅទីនេះ នៅពេលរបាយការណ៍តាមកាលវិភាគមានសកម្មភាព។",
     "loadError": "មិនអាចផ្ទុករបាយការណ៍បានទេ",
+    "estimateLoadError": "មិនអាចផ្ទុកការប្រមាណបានទេ។",
     "view": "អានរបាយការណ៍",
     "viewWithPreview": "$t(agentBriefing.view)។ {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

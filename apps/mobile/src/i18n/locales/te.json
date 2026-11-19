@@ -4514,6 +4514,7 @@
     "empty": "ఈ బ్రీఫింగ్ కాలవ్యవధిలో కార్యాచరణ ఏదీ లేదు",
     "emptyHint": "షెడ్యూల్ చేసిన బ్రీఫింగ్‌లో కార్యాచరణ ఉన్నప్పుడు మీ క్లౌడ్ మరియు CLI కోడింగ్ సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
     "loadError": "బ్రీఫింగ్‌లను లోడ్ చేయడం సాధ్యపడలేదు",
+    "estimateLoadError": "అంచనాను లోడ్ చేయడం సాధ్యపడలేదు.",
     "view": "బ్రీఫింగ్ చదవండి",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

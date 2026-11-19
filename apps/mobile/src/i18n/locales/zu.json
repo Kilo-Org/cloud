@@ -4514,6 +4514,7 @@
     "empty": "Awukho umsebenzi kulesi sikhathi sombiko.",
     "emptyHint": "Amaseshini akho okukhoda e-cloud nawe-CLI azovela lapha uma umbiko ohleliwe unomsebenzi.",
     "loadError": "Ayikwazanga ukulayisha imibiko",
+    "estimateLoadError": "Ayikwazanga ukulayisha isilinganiso.",
     "view": "Funda umbiko",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

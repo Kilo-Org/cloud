@@ -4514,6 +4514,7 @@
     "empty": "Enweghị ọrụ n'oge akụkọ a",
     "emptyHint": "Nnọkọ koodu gị nke cloud na CLI na-apụta ebe a mgbe akụkọ a haziri oge ya nwere ọrụ.",
     "loadError": "Enweghị ike ibunye akụkọ",
+    "estimateLoadError": "Enweghị ike ibunye atụmatụ.",
     "view": "Gụọ akụkọ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

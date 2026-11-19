@@ -4514,6 +4514,7 @@
     "empty": "Sochiin yeroo gabaasaa kana keessatti hin jiru.",
     "emptyHint": "Taa'umsawwan koodii cloud fi CLI kee yeroo gabaasni sagantaa sochii qabaatu asitti ni mul'atu.",
     "loadError": "Gabaasota fe'uun hin danda'amne",
+    "estimateLoadError": "Tilmaama fe'uun hin danda'amne.",
     "view": "Gabaasa dubbisi",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

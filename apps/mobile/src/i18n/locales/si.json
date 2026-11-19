@@ -4514,6 +4514,7 @@
     "empty": "මෙම වාර්තා කාල පරාසය තුළ ක්‍රියාකාරකම් නැත.",
     "emptyHint": "කාලසටහන්ගත වාර්තාවක ක්‍රියාකාරකම් ඇති විට ඔබේ cloud සහ CLI කේතකරණ සැසි මෙහි දිස්වේ.",
     "loadError": "වාර්තා පූරණය කළ නොහැකි විය",
+    "estimateLoadError": "ඇස්තමේන්තුව පූරණය කළ නොහැකි විය.",
     "view": "වාර්තාව කියවන්න",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

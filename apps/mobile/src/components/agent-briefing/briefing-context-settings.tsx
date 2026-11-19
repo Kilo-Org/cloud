@@ -80,17 +80,13 @@ export function BriefingContextSettings({
   // One phase per state of the quote line, so no flag pair can render two lines
   // or the wrong one. An unparsable field disables the query, so the last
   // estimate cannot speak for the current limits and `invalid` owns the line.
-  // With no quote yet the line is `estimating`: a paused (offline) or failed
-  // read has produced nothing to describe, and the retry button below owns
-  // recovery, so "cannot quote" copy never claims a quote that does not exist.
+  // A cached quote renders whatever the read is doing; only with nothing cached
+  // does the line name the read itself (offline, failed), and the Retry below
+  // belongs to the failed phase alone.
   const quote = estimate.data;
   const limitQuote: BriefingEstimateLineQuote = parseBriefingEstimateLineQuote(
     valid,
-    {
-      offline,
-      isError: estimate.isError,
-      isFetching: estimate.isFetching,
-    },
+    { offline, isError: estimate.isError },
     quote
   );
   const update = useMutation(
@@ -165,9 +161,10 @@ export function BriefingContextSettings({
     });
   };
   // The estimate's first load is a wait this card owns: the primary action shows
-  // A disabled (offline) or failed read never produces a quote, so only a real
-  // in-flight fetch is a wait this button can name; `estimate.isPending` alone
-  // would hold the spinner forever for the disabled read.
+  // the same spinner the switch does while the quote is on its way. A disabled
+  // (offline) or failed read never produces a quote, so only a real in-flight
+  // fetch is a wait this button can name; `estimate.isPending` alone would hold
+  // the spinner forever for the disabled read.
   const estimateLoading = estimate.data === undefined && estimate.isFetching;
   /** Exactly one line per quote phase, rendered by the line's own component. */
   return (
@@ -259,7 +256,7 @@ export function BriefingContextSettings({
         </Text>
       </View>
       <BriefingEstimateLine quote={limitQuote} />
-      {estimate.isError ? (
+      {limitQuote.kind === 'failed' ? (
         <Button
           variant="ghost"
           size="sm"

@@ -4514,6 +4514,7 @@
     "empty": "Bu rapor aralığında etkinlik yok",
     "emptyHint": "Bulut ve CLI kodlama oturumlarınız, planlanmış bir raporda etkinlik olduğunda burada görünür.",
     "loadError": "Raporlar yüklenemedi",
+    "estimateLoadError": "Tahmin yüklenemedi.",
     "view": "Raporu oku",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

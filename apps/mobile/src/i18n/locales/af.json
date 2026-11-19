@@ -4514,6 +4514,7 @@
     "empty": "Geen aktiwiteit in hierdie verslagvenster nie",
     "emptyHint": "Jou wolk- en CLI-koderingsessies verskyn hier wanneer 'n geskeduleerde verslag aktiwiteit het.",
     "loadError": "Kon nie verslae laai nie",
+    "estimateLoadError": "Kon nie die skatting laai nie.",
     "view": "Lees verslag",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

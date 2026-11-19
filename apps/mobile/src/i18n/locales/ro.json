@@ -4585,6 +4585,7 @@
     "empty": "Nicio activitate în acest interval de raport",
     "emptyHint": "Sesiunile tale de programare din cloud și CLI apar aici când un raport programat are activitate.",
     "loadError": "Rapoartele nu au putut fi încărcate",
+    "estimateLoadError": "Estimarea nu a putut fi încărcată.",
     "view": "Citește raportul",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

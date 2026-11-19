@@ -4514,6 +4514,7 @@
     "empty": "Bu brifing davrida faoliyat yo‘q",
     "emptyHint": "Bulut va CLI kodlash seanslaringiz rejalashtirilgan brifingda faoliyat bo‘lganda shu yerda ko‘rinadi.",
     "loadError": "Brifinglarni yuklab bo‘lmadi",
+    "estimateLoadError": "Taxminiy hisobni yuklab bo‘lmadi.",
     "view": "Brifingni o‘qish",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

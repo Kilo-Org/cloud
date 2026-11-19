@@ -4514,6 +4514,7 @@
     "empty": "এই ব্রিফিং উইন্ডোতে কোনো কার্যকলাপ নেই",
     "emptyHint": "নির্ধারিত ব্রিফিংয়ে কার্যকলাপ থাকলে আপনার ক্লাউড ও CLI কোডিং সেশন এখানে দেখা যাবে।",
     "loadError": "ব্রিফিং লোড করা যায়নি",
+    "estimateLoadError": "আনুমানিকটি লোড করা যায়নি।",
     "view": "ব্রিফিং পড়ুন",
     "viewWithPreview": "$t(agentBriefing.view)। {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

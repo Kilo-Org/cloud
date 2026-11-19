@@ -1,6 +1,8 @@
+/* eslint-disable max-lines -- one mock harness pins the quote line's phases and both enable-flow exits; a second file would duplicate the react-native and tRPC mocks */
 import { createElement } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { act, TestRenderer } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 
@@ -17,6 +19,7 @@ const COPY: Readonly<Record<string, string>> = {
   'agentBriefing.spendLimit': 'Spend limit (USD)',
   'agentBriefing.snapshotSafeguards': 'Per-summary limits.',
   'agentBriefing.invalidSafeguards': 'Invalid limits',
+  'agentBriefing.estimateLoadError': "Couldn't load the estimate.",
   'agentBriefing.enablePaid': 'Enable paid summaries',
   'common.retry': 'Retry',
 };
@@ -27,11 +30,13 @@ const paid = vi.hoisted(() => ({
   alert: vi.fn(),
   estimate: { value: undefined as unknown },
   read: { offline: false, isError: false, isFetching: false },
+  appState: { currentState: 'active' },
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   paid.read = { offline: false, isError: false, isFetching: false };
+  paid.appState.currentState = 'active';
   paid.refetch.mockResolvedValue({
     data: {
       canGenerate: true,
@@ -45,6 +50,11 @@ beforeEach(() => {
 
 vi.mock('react-native', () => ({
   Alert: { alert: paid.alert },
+  AppState: {
+    get currentState() {
+      return paid.appState.currentState;
+    },
+  },
   Platform: { OS: 'android' },
   useColorScheme: () => 'light',
   Switch: 'Switch',
@@ -243,9 +253,157 @@ it('names the failed read instead of a wait when the quote errors with no cache'
   const mounted = mount(true);
 
   const tree = JSON.stringify(mounted.toJSON());
-  expect(tree).toContain('agentBriefing.loadError');
+  expect(tree).toContain("Couldn't load the estimate.");
   expect(tree).not.toContain('common.loading');
 
+  act(() => {
+    mounted.unmount();
+  });
+});
+
+it('keeps a cached quote when connectivity drops', () => {
+  // A disabled query keeps the data of its last successful read, so the card
+  // still holds a quote the line must show instead of the offline note.
+  paid.estimate.value = {
+    canGenerate: true,
+    estimatedCostMicrodollars: 1000,
+    maximumCostMicrodollars: 2_000_000,
+    maxDurationSeconds: 600,
+    estimateToken: 'cached-quote',
+  };
+  paid.read = { offline: true, isError: false, isFetching: false };
+  const mounted = mount(true);
+
+  const tree = JSON.stringify(mounted.toJSON());
+  expect(tree).toContain('agentBriefing.estimate');
+  expect(tree).not.toContain('offline.noInternet');
+
+  act(() => {
+    mounted.unmount();
+  });
+});
+
+it('names the estimate read failure, not the briefs copy, when nothing is cached', () => {
+  paid.estimate.value = undefined;
+  paid.read = { offline: false, isError: true, isFetching: false };
+  const mounted = mount(true);
+
+  const tree = JSON.stringify(mounted.toJSON());
+  expect(tree).toContain("Couldn't load the estimate.");
+  expect(tree).not.toContain('agentBriefing.loadError');
+
+  act(() => {
+    mounted.unmount();
+  });
+});
+
+it('offers Retry only while the failed estimate is the line it shows', () => {
+  paid.estimate.value = undefined;
+  paid.read = { offline: false, isError: true, isFetching: false };
+  const mounted = mount(true);
+  expect(JSON.stringify(mounted.toJSON())).toContain('Retry');
+
+  const [durationField] = mounted.root.findAll(node => (node.type as string) === 'FormField');
+  if (!durationField) {
+    throw new Error('missing duration field');
+  }
+  // An unparsable field disables the query, so the line reads `Invalid limits`
+  // and the Retry beside it would refetch a query that cannot run.
+  act(() => {
+    (durationField.props.onChangeText as (value: string) => void)('not a duration');
+  });
+  const invalidTree = JSON.stringify(mounted.toJSON());
+  expect(invalidTree).toContain('Invalid limits');
+  expect(invalidTree).not.toContain('Retry');
+  act(() => {
+    mounted.unmount();
+  });
+
+  paid.read = { offline: true, isError: true, isFetching: false };
+  const offline = mount(true);
+  const offlineTree = JSON.stringify(offline.toJSON());
+  expect(offlineTree).toContain('offline.noInternet');
+  expect(offlineTree).not.toContain('Retry');
+  act(() => {
+    offline.unmount();
+  });
+});
+
+it('settles the confirm flow when the dialog is dismissed', async () => {
+  const mounted = mount(false);
+  const tap = (): void => {
+    const node = mounted.root.find(item => (item.type as string) === 'Switch');
+    (node.props.onValueChange as (next: boolean) => void)(true);
+  };
+  act(tap);
+  await waitFor(() => paid.alert.mock.calls.length === 1);
+
+  // Android back or an outside tap dismisses the dialog without running a
+  // button handler, so the dismissal alone must return the card to idle.
+  const options = paid.alert.mock.calls[0]?.[3] as { onDismiss?: () => void } | undefined;
+  act(() => {
+    options?.onDismiss?.();
+  });
+  const settled = mounted.root.find(item => (item.type as string) === 'Switch');
+  const settledState = settled.props as { accessibilityState?: { busy?: boolean } };
+  expect(settledState.accessibilityState?.busy).toBe(false);
+
+  act(tap);
+  await waitFor(() => paid.alert.mock.calls.length === 2);
+  act(() => {
+    mounted.unmount();
+  });
+});
+
+it('refuses to present the paid confirm while the app is not in front', async () => {
+  paid.appState.currentState = 'background';
+  const mounted = mount(false);
+  const switchNode = mounted.root.find(node => (node.type as string) === 'Switch');
+  const { onValueChange } = switchNode.props as { onValueChange: (next: boolean) => void };
+  act(() => {
+    onValueChange(true);
+  });
+  await waitFor(() => paid.refetch.mock.calls.length === 1);
+  // Presenting the alert here would run no callback at all, so the attempt is
+  // abandoned and the card returns to idle for the next tap.
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(paid.alert).not.toHaveBeenCalled();
+  const idle = mounted.root.find(node => (node.type as string) === 'Switch');
+  const idleState = idle.props as { accessibilityState?: { busy?: boolean } };
+  expect(idleState.accessibilityState?.busy).toBe(false);
+
+  paid.appState.currentState = 'active';
+  const active = mounted.root.find(node => (node.type as string) === 'Switch');
+  const { onValueChange: onOpen } = active.props as { onValueChange: (next: boolean) => void };
+  act(() => {
+    onOpen(true);
+  });
+  await waitFor(() => paid.alert.mock.calls.length === 1);
+  act(() => {
+    mounted.unmount();
+  });
+});
+
+it('declines a confirm press after the account changed', async () => {
+  const mounted = mount(false);
+  const switchNode = mounted.root.find(node => (node.type as string) === 'Switch');
+  const { onValueChange } = switchNode.props as { onValueChange: (next: boolean) => void };
+  act(() => {
+    onValueChange(true);
+  });
+  await waitFor(() => paid.alert.mock.calls.length === 1);
+  // The dialog outlived the account it was opened for, so its Enable press must
+  // not fire the paid write for a different account's card.
+  act(() => {
+    bumpAuthEpoch();
+  });
+  const buttons = paid.alert.mock.calls[0]?.[2] as { onPress?: () => void }[];
+  act(() => {
+    buttons[1]?.onPress?.();
+  });
+  expect(paid.mutate).not.toHaveBeenCalled();
   act(() => {
     mounted.unmount();
   });

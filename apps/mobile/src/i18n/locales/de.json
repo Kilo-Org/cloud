@@ -4514,6 +4514,7 @@
     "empty": "Keine Aktivität in diesem Briefing-Zeitraum.",
     "emptyHint": "Deine Cloud- und CLI-Coding-Sitzungen erscheinen hier, wenn ein geplantes Briefing Aktivität hat.",
     "loadError": "Briefings konnten nicht geladen werden",
+    "estimateLoadError": "Die Schätzung konnte nicht geladen werden.",
     "view": "Briefing lesen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

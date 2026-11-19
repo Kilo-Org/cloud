@@ -4798,6 +4798,7 @@
     "empty": "لا يوجد نشاط في نافذة هذا التقرير",
     "emptyHint": "ستظهر هنا جلسات البرمجة السحابية وجلسات CLI عندما يحتوي تقرير مجدول على نشاط.",
     "loadError": "تعذّر تحميل التقارير",
+    "estimateLoadError": "تعذّر تحميل التقدير.",
     "view": "قراءة التقرير",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}، $t(agentBriefing.snapshotPullRequests) {{pullRequests}}، $t(agentBriefing.snapshotBlockers) {{blockers}}",

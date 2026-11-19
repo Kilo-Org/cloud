@@ -4514,6 +4514,7 @@
     "empty": "Bu hesabat pəncərəsində fəaliyyət yoxdur.",
     "emptyHint": "Bulud və CLI kodlaşdırma sessiyalarınız planlaşdırılmış hesabatda fəaliyyət olduqda burada görünəcək.",
     "loadError": "Hesabatları yükləmək mümkün olmadı",
+    "estimateLoadError": "Təxmini yükləmək mümkün olmadı.",
     "view": "Hesabatı oxu",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

@@ -4727,6 +4727,7 @@
     "empty": "Gan aon ghníomhaíocht san fhuinneog tuarascála seo",
     "emptyHint": "Taispeánfar do sheisiúin chódála scamaill agus CLI anseo nuair a bhíonn gníomhaíocht i dtuarascáil sceidealaithe.",
     "loadError": "Níorbh fhéidir tuarascálacha a lódáil",
+    "estimateLoadError": "Níorbh fhéidir an meastachán a lódáil.",
     "view": "Léigh an tuarascáil",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

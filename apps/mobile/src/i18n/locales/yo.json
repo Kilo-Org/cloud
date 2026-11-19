@@ -4514,6 +4514,7 @@
     "empty": "Kò sí ìṣe nínú àkókò ìròyìn yìí",
     "emptyHint": "Àwọn ìgbà kóòdù cloud àti CLI rẹ yóò hàn níbí nígbà tí ìròyìn tí a ṣètò bá ní ìṣe.",
     "loadError": "Kò ṣeé ṣe láti gbé àwọn ìròyìn wọlé",
+    "estimateLoadError": "Kò ṣeé ṣe láti gbé ìsirò náà wọlé.",
     "view": "Ka ìròyìn",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

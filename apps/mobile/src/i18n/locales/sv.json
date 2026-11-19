@@ -4514,6 +4514,7 @@
     "empty": "Ingen aktivitet under den här rapportperioden",
     "emptyHint": "Dina kodningssessioner i molnet och CLI visas här när en schemalagd rapport har aktivitet.",
     "loadError": "Det gick inte att läsa in rapporter",
+    "estimateLoadError": "Det gick inte att läsa in uppskattningen.",
     "view": "Läs rapport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

@@ -4514,6 +4514,7 @@
     "empty": "Няма активност в този период на брифинга",
     "emptyHint": "Вашите облачни и CLI сесии за програмиране се появяват тук, когато планиран брифинг има активност.",
     "loadError": "Брифингите не могат да се заредят",
+    "estimateLoadError": "Прогнозата не можа да се зареди.",
     "view": "Прочети брифинга",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

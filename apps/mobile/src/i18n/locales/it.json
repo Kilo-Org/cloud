@@ -4585,6 +4585,7 @@
     "empty": "Nessuna attività in questa finestra di briefing",
     "emptyHint": "Le tue sessioni di coding cloud e CLI appaiono qui quando un briefing programmato ha attività.",
     "loadError": "Impossibile caricare i briefing",
+    "estimateLoadError": "Impossibile caricare la stima.",
     "view": "Leggi briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

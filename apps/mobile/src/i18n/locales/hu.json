@@ -4514,6 +4514,7 @@
     "empty": "Nincs tevékenység ebben az időablakban",
     "emptyHint": "A felhőben és CLI-ben futó kódolási munkamenetek itt jelennek meg, amikor egy ütemezett jelentésben van tevékenység.",
     "loadError": "Nem sikerült betölteni a jelentéseket",
+    "estimateLoadError": "Nem sikerült betölteni a becslést.",
     "view": "Jelentés megnyitása",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

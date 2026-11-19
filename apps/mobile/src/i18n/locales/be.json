@@ -4656,6 +4656,7 @@
     "empty": "Няма актыўнасці ў гэтым акне зводкі",
     "emptyHint": "Вашы воблачныя і CLI-сеансы кадавання з'явяцца тут, калі ў запланаванай зводцы ёсць актыўнасць.",
     "loadError": "Не ўдалося загрузіць зводкі",
+    "estimateLoadError": "Не ўдалося загрузіць ацэнку.",
     "view": "Чытаць зводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

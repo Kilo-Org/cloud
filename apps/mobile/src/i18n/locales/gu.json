@@ -4514,6 +4514,7 @@
     "empty": "આ રિપોર્ટ વિન્ડોમાં કોઈ પ્રવૃત્તિ નથી",
     "emptyHint": "તમારા ક્લાઉડ અને CLI કોડિંગ સત્રો અહીં ત્યારે દેખાશે જ્યારે શેડ્યૂલ કરેલા રિપોર્ટમાં પ્રવૃત્તિ હોય.",
     "loadError": "રિપોર્ટ લોડ થઈ શક્યા નહીં",
+    "estimateLoadError": "અંદાજ લોડ થઈ શક્યો નહીં.",
     "view": "રિપોર્ટ વાંચો",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

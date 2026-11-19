@@ -322,6 +322,35 @@ function messageLine(renderer: ReactTestRenderer) {
     );
 }
 
+/** Whether `node` sits inside one of these host elements. */
+function hasAncestorIn(node: ReactTestInstance, tags: readonly string[]): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    const tag: unknown = parent.type;
+    if (typeof tag === 'string' && tags.includes(tag)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The title line: the flex row that holds the disclosure slot and the event name. */
+function titleRowOf(title: ReactTestInstance): ReactTestInstance {
+  for (let node = title.parent; node; node = node.parent) {
+    const tag: unknown = node.type;
+    if (tag === 'View' || tag === 'Pressable') {
+      return node;
+    }
+  }
+  throw new Error('the title row was not found');
+}
+
+/** Which child of `row` holds `node`; the disclosure slot occupies the first. */
+function childColumnOf(row: ReactTestInstance, node: ReactTestInstance): number {
+  return row.children.findIndex(
+    child => typeof child !== 'string' && child.findAll(member => member === node).length > 0
+  );
+}
+
 /** The row's disclosure state; the renderer's props carry no type. */
 function disclosureState(node: ReactTestInstance): boolean | undefined {
   const state = node.props.accessibilityState as { expanded?: boolean } | undefined;
@@ -602,6 +631,48 @@ describe('OrganizationAuditLogScreen', () => {
     // renders the event name, actor, and time only.
     expect(messages).not.toContain('Changed role for ada@example.com from member to admin');
     expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
+    unmount();
+  });
+
+  it('gives a row without details the same title inset as a row with them', async () => {
+    // Two rows of the same action: the plain one has no details, the long one
+    // has them and leads with its disclosure. The only visual difference
+    // between their titles must be the slot ahead of the event name, never the
+    // event name's start column.
+    pageHook.entries = [...entries(1), longEntry()];
+    const { renderer, unmount } = await mount();
+
+    const titles = renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.children === 'Settings changed');
+    expect(titles).toHaveLength(2);
+    const plainTitle = titles.find(node => !hasAncestorIn(node, ['Pressable']));
+    const disclosedTitle = titles.find(node => hasAncestorIn(node, ['Pressable']));
+    expect(plainTitle).toBeDefined();
+    expect(disclosedTitle).toBeDefined();
+    if (!plainTitle || !disclosedTitle) {
+      throw new Error('both rows must render an event name');
+    }
+
+    const plainRow = titleRowOf(plainTitle);
+    const disclosedRow = titleRowOf(disclosedTitle);
+    // The shared title row holds the slot and then the event name in both
+    // kinds of row, so the two titles share one inset down the list.
+    expect(plainRow.children).toHaveLength(2);
+    expect(childColumnOf(plainRow, plainTitle)).toBe(1);
+    expect(childColumnOf(disclosedRow, disclosedTitle)).toBe(1);
+
+    // The plain row reserves the disclosure's width with an empty box; the
+    // disclosure row fills the same first column with a chevron of that size.
+    const [plainSlot] = plainRow.children;
+    expect(typeof plainSlot === 'string' ? null : plainSlot?.type).toBe('View');
+    expect(typeof plainSlot === 'string' ? null : plainSlot?.props.style).toEqual({
+      width: 16,
+      height: 16,
+    });
+    const [chevron] = disclosedRow.children;
+    expect(typeof chevron === 'string' ? null : chevron?.type).toBe('ChevronDown');
+    expect(typeof chevron === 'string' ? null : chevron?.props.size).toBe(16);
     unmount();
   });
 

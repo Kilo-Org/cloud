@@ -37,6 +37,10 @@ const TEAMS_ORGANIZATION_ID = 'a4f1c2d3-0000-4000-8000-9a1b2c3d4e02';
 
 const SEAT_PURCHASE_ID = 'a4f1c2d3-0000-4000-8000-9a1b2c3d4e10';
 
+// An address long enough that the audit row's localized role-change sentence
+// wraps past its two-line clamp and keeps the disclosure in the fixture.
+const LONG_MEMBER_EMAIL = 'alexandra-kowalski-quarterly-close-reviewer@example.com';
+
 function daysFromNow(days: number): string {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
 }
@@ -199,9 +203,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const auditRows = [
     {
       action: 'organization.settings.change' as const,
-      message: 'Organization settings updated',
+      message: 'Updated data collection setting: denied',
       actor_email: ownerEmail,
       actor_name: 'Org admin lab owner',
+      details: {
+        kind: 'data_collection_changed' as const,
+        value: 'denied' as const,
+      },
     },
     {
       action: 'organization.user.send_invite' as const,
@@ -226,13 +234,20 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         toRole: 'admin' as const,
       },
     },
-    // A message that runs past the audit row's two clamped lines, so the
-    // mobile screen's disclosure has a row that actually needs it.
+    // A detail sentence that runs past the audit row's two clamped lines, so
+    // the mobile screen's disclosure has a row that actually needs it. The
+    // length comes from the address, since the sentence around it is fixed.
     {
       action: 'organization.member.change_role' as const,
-      message: `${adminEmail} was made a billing manager for the quarterly close; the invite that followed adds them to the seats purchase that renews next month`,
+      message: `${LONG_MEMBER_EMAIL} was made a billing manager for the quarterly close`,
       actor_email: ownerEmail,
       actor_name: 'Org admin lab owner',
+      details: {
+        kind: 'member_role_changed' as const,
+        email: LONG_MEMBER_EMAIL,
+        fromRole: 'member' as const,
+        toRole: 'admin' as const,
+      },
     },
   ];
   for (const [index, row] of auditRows.entries()) {
@@ -246,7 +261,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         actor_name: row.actor_name,
         action: row.action,
         message: row.message,
-        ...(row.details !== undefined && { details: row.details }),
+        details: row.details,
       })
       .onConflictDoNothing();
   }

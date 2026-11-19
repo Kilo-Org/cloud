@@ -42,6 +42,14 @@ const listContentContainerStyle = { paddingHorizontal: 21, paddingTop: 14 } sati
 
 const AUDIT_DATE = { year: 'numeric', month: 'short', day: 'numeric' } as const;
 
+// Every row's title starts at the same inset. A row with a disclosure leads
+// with the chevron; a row without one keeps an empty box of the same size
+// instead of pulling its title to the card edge, which would put the two kinds
+// of row in different columns down the list. The size is spelled in pixels
+// because it must equal the icon's own size, which no rem-based class gives.
+const CHEVRON_SIZE = 16;
+const CHEVRON_BOX_STYLE = { width: CHEVRON_SIZE, height: CHEVRON_SIZE } satisfies ViewStyle;
+
 const RowSeparator = () => <View className="h-3" />;
 
 function RowSkeleton() {
@@ -76,6 +84,21 @@ function collapsedClampFor(
     return measured.lines;
   }
   return 2;
+}
+
+/**
+ * The element that leads a row's title: the disclosure chevron, or an empty box
+ * of the same size where the row has no detail to disclose. Both share the
+ * first column, so every title starts at the same inset down the list.
+ */
+function titleSlot(hasDetail: boolean, expanded: boolean, color: string): ReactNode {
+  if (!hasDetail) {
+    return <View style={CHEVRON_BOX_STYLE} />;
+  }
+  if (expanded) {
+    return <ChevronUp size={CHEVRON_SIZE} color={color} />;
+  }
+  return <ChevronDown size={CHEVRON_SIZE} color={color} />;
 }
 
 const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAuditLogEntry }>) {
@@ -171,10 +194,23 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
         ) : null}
       </View>
     ) : null;
+  // The slot ahead of the event name: the disclosure chevron when the row has
+  // a detail to disclose, otherwise the empty box that reserves the chevron's
+  // width. Both occupy the same first column, so every title keeps one inset
+  // down the list.
+  const disclosure = titleSlot(showsDetail, expanded, colors.mutedForeground);
+  // The title row is the same element in both kinds of row: the slot, then the
+  // event name.
+  const titleRow = (
+    <View className="flex-row items-center gap-2">
+      {disclosure}
+      <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
+    </View>
+  );
   if (!showsDetail) {
     return (
       <View className="gap-1 rounded-lg bg-secondary p-3">
-        <Text className="text-sm font-medium text-foreground">{eventName}</Text>
+        {titleRow}
         {metaLine}
       </View>
     );
@@ -202,14 +238,7 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       accessibilityState={{ expanded }}
       className="gap-1 rounded-lg bg-secondary p-3 active:opacity-70"
     >
-      <View className="flex-row items-center gap-2">
-        {expanded ? (
-          <ChevronUp size={16} color={colors.mutedForeground} />
-        ) : (
-          <ChevronDown size={16} color={colors.mutedForeground} />
-        )}
-        <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
-      </View>
+      {titleRow}
       <Text
         className="text-xs text-muted-foreground"
         numberOfLines={clamp}

@@ -12,6 +12,7 @@ import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 
 import { i18n as appI18n } from '@/i18n';
 import { type OrgGatewaySettings } from '@/lib/hooks/use-org-settings-queries';
+import { type ModelAccessDraft } from '@/lib/organization/model-access';
 import { ModelAccessForm } from './model-access-form';
 
 const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise<void>>() }));
@@ -117,6 +118,16 @@ function renderedCopy(root: ReactTestInstance): string[] {
     .findAllByType('Text' as never)
     .map(node => node.props.children)
     .filter((value): value is string => typeof value === 'string');
+}
+
+/** Apply a draft edit through the list, as toggling a row would. */
+function changeDraft(root: ReactTestInstance, edit: (draft: ModelAccessDraft) => ModelAccessDraft) {
+  const list = root.findByType('ModelDenyList' as never);
+  act(() => {
+    (list.props.onChange as (next: ModelAccessDraft) => void)(
+      edit(list.props.draft as ModelAccessDraft)
+    );
+  });
 }
 
 function selectTab(root: ReactTestInstance, tab: 'models' | 'providers' | 'gateways') {
@@ -231,20 +242,39 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     expect(root.findByType('AccessibleStatus' as never).props.message).toBeNull();
   });
 
-  it('disables the save button while the plan lapsed, even with edits', () => {
-    const root = render({ canEdit: true, planEnded: true });
+  it('disables save and the lists while the plan lapsed, even with edits', () => {
+    // A clean draft already disables Save through `!dirty`, so the plan gate is
+    // only observable after an edit dirties the draft: the same denial must
+    // leave Save and both lists enabled on an active plan, and disabled under a
+    // lapsed one.
+    const deny = (draft: ModelAccessDraft): ModelAccessDraft => ({
+      ...draft,
+      modelDenyList: ['anthropic/claude'],
+    });
 
-    const buttons = root.findAllByType('Button' as never);
-    const save = buttons.at(-1);
-    expect(save?.props.disabled).toBe(true);
+    const active = render({ canEdit: true, planEnded: false });
+    changeDraft(active, deny);
+    expect(active.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
+    expect(active.findByType('ModelDenyList' as never).props.disabled).toBe(false);
+    selectTab(active, 'providers');
+    expect(active.findByType('ProviderAllowList' as never).props.disabled).toBe(false);
+    act(() => renderer?.unmount());
+
+    const lapsed = render({ canEdit: true, planEnded: true });
+    changeDraft(lapsed, deny);
+    expect(lapsed.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(true);
+    expect(lapsed.findByType('ModelDenyList' as never).props.disabled).toBe(true);
+    selectTab(lapsed, 'providers');
+    expect(lapsed.findByType('ProviderAllowList' as never).props.disabled).toBe(true);
   });
 
-  it('releases the status line once the plan gate clears', () => {
-    render({ canEdit: true, planEnded: true });
+  it('releases the save when the plan gate clears', () => {
+    const lapsed = render({ canEdit: true, planEnded: true });
+    changeDraft(lapsed, draft => ({ ...draft, modelDenyList: ['anthropic/claude'] }));
+    expect(lapsed.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(true);
+
     const next = rerender({ canEdit: true, planEnded: false });
 
-    expect(next.findByType('AccessibleStatus' as never).props.message).toBeNull();
-    const buttons = next.findAllByType('Button' as never);
-    expect(buttons.at(-1)?.props.disabled).toBe(true);
+    expect(next.findAllByType('Button' as never).at(-1)?.props.disabled).toBe(false);
   });
 });

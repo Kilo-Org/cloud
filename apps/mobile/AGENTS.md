@@ -16,15 +16,16 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-
 
 ## Commands
 
-Run from `apps/mobile/`: `pnpm typecheck`, `pnpm lint`, `pnpm format` (or `format:check`), `pnpm check:unused`, `pnpm test`.
+Run from `apps/mobile/`: `pnpm typecheck`, `pnpm lint`, `pnpm format` (or `format:check`), `pnpm check:unused`, `pnpm assert:config`, `pnpm test`.
 
 Before pushing:
 
 ```bash
-pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused
+pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused && pnpm assert:config
 git diff --check
 ```
 
+- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `pnpm test` runs it too.
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.

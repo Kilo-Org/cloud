@@ -129,6 +129,8 @@ const storedIds = z.array(z.string()).default([]);
  * Opt-outs never get a profile or the header, and win over opt-ins.
  */
 export const AnthropicUserProfilesSettingsSchema = z.object({
+  /** Incremented on every save, so a save from a stale form can be rejected. */
+  revision: z.number().int().min(0).default(0),
   enabled: z.boolean().default(false),
   start_at: z.string().nullable().default(null),
   opted_in_user_ids: storedIds,
@@ -165,6 +167,8 @@ function overlap(a: string[], b: string[]): string[] {
 /** Schema for the admin Anthropic user profile settings mutation input. */
 export const AnthropicUserProfilesSettingsInputSchema = z
   .object({
+    /** The revision the form was loaded with. */
+    revision: z.number().int().min(0),
     enabled: z.boolean(),
     start_at: z.iso.datetime({ offset: true }).nullable(),
     opted_in_user_ids: userIdsInput,

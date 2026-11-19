@@ -71,6 +71,7 @@ describe('decideAnthropicUserProfile', () => {
 
 describe('AnthropicUserProfilesSettingsInputSchema', () => {
   const input = {
+    revision: 0,
     enabled: true,
     start_at: null,
     opted_in_user_ids: ['a'],

@@ -106,8 +106,9 @@ function toStartAtInput(startAt: string): string | null {
   return Number.isNaN(date.getTime()) ? startAt : date.toISOString();
 }
 
-function toInput(values: FormValues) {
+function toInput(values: FormValues, revision: number) {
   return {
+    revision,
     enabled: values.enabled,
     start_at: toStartAtInput(values.startAt),
     opted_in_user_ids: parseIds(values.optedInUserIds),
@@ -117,7 +118,13 @@ function toInput(values: FormValues) {
   };
 }
 
-function DeletedProfilesCard() {
+function formatAttempts(attemptCount: number, lastAttemptAt: string | null): string {
+  if (attemptCount === 0 || !lastAttemptAt) return 'Not attempted yet';
+  const attempts = `${attemptCount} ${attemptCount === 1 ? 'attempt' : 'attempts'}`;
+  return `${attempts}, last ${formatDate(lastAttemptAt)}`;
+}
+
+function ProfileDeletionsCard() {
   const trpc = useTRPC();
   const { data, isLoading, error, refetch } = useQuery(
     trpc.admin.gatewayConfig.listAnthropicUserProfileDeletions.queryOptions()
@@ -126,10 +133,12 @@ function DeletedProfilesCard() {
   return (
     <Card className="min-w-0">
       <CardHeader>
-        <CardTitle>Deleted profiles (last 7 days)</CardTitle>
+        <CardTitle>Profile deletions</CardTitle>
         <CardDescription>
           The daily cleanup deletes profiles that no user or organization uses anymore, and profiles
-          of users who have been blocked for at least seven days.
+          of users who have been blocked for at least seven days. Profiles are detached first and
+          then deleted at Anthropic; the cleanup retries pending deletions. Shows pending deletions
+          and those completed in the last 7 days.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -139,13 +148,15 @@ function DeletedProfilesCard() {
           </p>
         ) : error ? (
           <div className="flex flex-col items-start gap-2 text-sm" role="alert">
-            <p className="text-destructive">Could not load deleted profiles: {error.message}</p>
+            <p className="text-destructive">Could not load profile deletions: {error.message}</p>
             <Button variant="outline" size="sm" onClick={() => void refetch()}>
               Try again
             </Button>
           </div>
         ) : !data || data.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No profiles were deleted recently.</p>
+          <p className="text-muted-foreground text-sm">
+            No profile deletions are pending or were completed recently.
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -161,7 +172,18 @@ function DeletedProfilesCard() {
             <TableBody>
               {data.map(row => (
                 <TableRow key={row.id}>
-                  <TableCell className="whitespace-nowrap">{formatDate(row.deleted_at)}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {row.deleted_at ? (
+                      formatDate(row.deleted_at)
+                    ) : (
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge variant="warning">Pending</Badge>
+                        <span className="text-muted-foreground text-xs">
+                          {formatAttempts(row.attempt_count, row.last_attempt_at)}
+                        </span>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{row.user_profile_id}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">{row.reason}</Badge>
@@ -205,11 +227,13 @@ export function AnthropicUserProfilesContent() {
   const [values, setValues] = useState<FormValues | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [conflictError, setConflictError] = useState<string | null>(null);
 
   useEffect(() => {
     if (data) {
       setValues(toFormValues(data));
       setHasChanges(false);
+      setConflictError(null);
     }
   }, [data]);
 
@@ -223,6 +247,10 @@ export function AnthropicUserProfilesContent() {
         toast.success('Anthropic user profile settings updated');
       },
       onError: error => {
+        if (error.data?.code === 'CONFLICT') {
+          setConflictError(error.message);
+          return;
+        }
         toast.error(formatZodError(error));
       },
     })
@@ -249,17 +277,21 @@ export function AnthropicUserProfilesContent() {
     if (!values) return;
     setValues({ ...values, ...change });
     setValidationError(null);
+    setConflictError(null);
     setHasChanges(true);
   }
 
   function handleSave() {
-    if (!values) return;
-    const parsed = AnthropicUserProfilesSettingsInputSchema.safeParse(toInput(values));
+    if (!values || !data) return;
+    const parsed = AnthropicUserProfilesSettingsInputSchema.safeParse(
+      toInput(values, data.revision)
+    );
     if (!parsed.success) {
       setValidationError(formatZodError(parsed.error));
       return;
     }
     setValidationError(null);
+    setConflictError(null);
     mutation.mutate(parsed.data);
   }
 
@@ -347,6 +379,18 @@ export function AnthropicUserProfilesContent() {
             </pre>
           )}
 
+          {conflictError && (
+            <div
+              className="bg-destructive/10 text-destructive flex flex-col items-start gap-2 rounded-md p-3 text-sm"
+              role="alert"
+            >
+              <p>{conflictError}</p>
+              <Button variant="outline" size="sm" onClick={() => void refetch()}>
+                Discard my edits and reload
+              </Button>
+            </div>
+          )}
+
           <div>
             <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
               {mutation.isPending ? 'Saving...' : 'Save'}
@@ -354,7 +398,7 @@ export function AnthropicUserProfilesContent() {
           </div>
         </CardContent>
       </Card>
-      <DeletedProfilesCard />
+      <ProfileDeletionsCard />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import {
   DEFAULT_GATEWAY_CONFIG,
   OrganizationFeaturesInputSchema,
   AnthropicUserProfilesSettingsInputSchema,
+  GatewayAnthropicUserProfilesConfigSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import type {
   AnthropicUserProfilesSettings,
@@ -19,7 +20,8 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { desc, eq, inArray, sql } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import { desc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 
 async function readConfig(): Promise<GatewayConfig> {
   try {
@@ -104,8 +106,34 @@ export const adminGatewayConfigRouter = createTRPCRouter({
   setAnthropicUserProfiles: adminProcedure
     .input(AnthropicUserProfilesSettingsInputSchema)
     .mutation(async ({ input }) => {
-      const anthropic_user_profiles: AnthropicUserProfilesSettings = input;
-      await mergeIntoConfig({ anthropic_user_profiles });
+      const anthropic_user_profiles: AnthropicUserProfilesSettings = {
+        ...input,
+        revision: input.revision + 1,
+      };
+      await db.transaction(async tx => {
+        await tx.insert(ai_gateway_config).values({ id: 1 }).onConflictDoNothing();
+        const [row] = await tx
+          .select({ config: ai_gateway_config.config })
+          .from(ai_gateway_config)
+          .where(eq(ai_gateway_config.id, 1))
+          .for('update');
+        const current = GatewayAnthropicUserProfilesConfigSchema.parse(
+          row?.config ?? {}
+        ).anthropic_user_profiles;
+        if (current.revision !== input.revision) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message:
+              'The settings changed since you loaded them. Reload and apply your change again.',
+          });
+        }
+        await tx
+          .update(ai_gateway_config)
+          .set({
+            config: sql`${ai_gateway_config.config} || ${JSON.stringify({ anthropic_user_profiles })}::jsonb`,
+          })
+          .where(eq(ai_gateway_config.id, 1));
+      });
       return anthropic_user_profiles;
     }),
 
@@ -113,7 +141,16 @@ export const adminGatewayConfigRouter = createTRPCRouter({
     return db
       .select()
       .from(anthropic_user_profile_deletions)
-      .orderBy(desc(anthropic_user_profile_deletions.deleted_at))
+      .where(
+        or(
+          isNull(anthropic_user_profile_deletions.deleted_at),
+          gte(anthropic_user_profile_deletions.deleted_at, sql`now() - interval '7 days'`)
+        )
+      )
+      .orderBy(
+        sql`${anthropic_user_profile_deletions.deleted_at} desc nulls first`,
+        desc(anthropic_user_profile_deletions.queued_at)
+      )
       .limit(500);
   }),
 });

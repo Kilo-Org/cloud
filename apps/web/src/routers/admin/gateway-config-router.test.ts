@@ -275,6 +275,7 @@ describe('adminGatewayConfigRouter', () => {
   describe('Anthropic user profiles', () => {
     const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
     const settings = {
+      revision: 0,
       enabled: true,
       start_at: '2026-12-01T09:30:00.000Z',
       opted_in_user_ids: ['user-1', 'user-1', 'user-2'],
@@ -284,6 +285,7 @@ describe('adminGatewayConfigRouter', () => {
     };
     const normalizedSettings = {
       ...settings,
+      revision: 1,
       opted_in_user_ids: ['user-1', 'user-2'],
       opted_in_organization_ids: [organizationId],
     };
@@ -292,6 +294,7 @@ describe('adminGatewayConfigRouter', () => {
       const caller = await createCallerForUser(admin.id);
 
       await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toEqual({
+        revision: 0,
         enabled: false,
         start_at: null,
         opted_in_user_ids: [],
@@ -317,6 +320,7 @@ describe('adminGatewayConfigRouter', () => {
 
       await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
       await caller.admin.gatewayConfig.setAnthropicUserProfiles({
+        revision: 1,
         enabled: false,
         start_at: null,
         opted_in_user_ids: [],
@@ -326,9 +330,70 @@ describe('adminGatewayConfigRouter', () => {
       });
 
       await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toMatchObject({
+        revision: 2,
         enabled: false,
         start_at: null,
         opted_in_user_ids: [],
+      });
+    });
+
+    it('rejects a save from a stale revision and leaves the stored settings unchanged', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({
+          ...settings,
+          enabled: false,
+          opted_out_user_ids: [],
+        })
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toEqual(
+        normalizedSettings
+      );
+    });
+
+    it('rejects a revision ahead of the stored one', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({ ...settings, revision: 1 })
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toMatchObject({
+        revision: 0,
+        enabled: false,
+      });
+    });
+
+    it('accepts a save with the current revision and increments it each time', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const first = await caller.admin.gatewayConfig.setAnthropicUserProfiles(settings);
+      const second = await caller.admin.gatewayConfig.setAnthropicUserProfiles({
+        ...settings,
+        revision: first.revision,
+        opted_out_user_ids: ['user-3', 'user-4'],
+      });
+
+      expect([first.revision, second.revision]).toEqual([1, 2]);
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toMatchObject({
+        revision: 2,
+        opted_out_user_ids: ['user-3', 'user-4'],
+      });
+    });
+
+    it('lets only one of two concurrent saves from the same revision win', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const results = await Promise.allSettled([
+        caller.admin.gatewayConfig.setAnthropicUserProfiles(settings),
+        caller.admin.gatewayConfig.setAnthropicUserProfiles({ ...settings, enabled: false }),
+      ]);
+
+      expect(results.map(result => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+      await expect(caller.admin.gatewayConfig.getAnthropicUserProfiles()).resolves.toMatchObject({
+        revision: 1,
       });
     });
 
@@ -402,31 +467,55 @@ describe('adminGatewayConfigRouter', () => {
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
 
-    it('lists deleted profiles newest first', async () => {
+    it('lists pending deletions first, then deletions of the last 7 days newest first', async () => {
       const caller = await createCallerForUser(admin.id);
+      const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
       await db.insert(anthropic_user_profile_deletions).values([
         {
-          user_profile_id: 'uprof_old',
+          user_profile_id: 'uprof_expired',
           reason: 'unlinked',
-          deleted_at: '2026-11-10T00:00:00.000Z',
+          queued_at: daysAgo(10),
+          deleted_at: daysAgo(8),
         },
         {
           user_profile_id: 'uprof_new',
           reason: 'user_blocked',
           kilo_user_id: admin.id,
-          deleted_at: '2026-11-18T00:00:00.000Z',
+          queued_at: daysAgo(1),
+          deleted_at: daysAgo(0.5),
         },
         {
           user_profile_id: 'uprof_mid',
           reason: 'unlinked',
-          deleted_at: '2026-11-15T00:00:00.000Z',
+          queued_at: daysAgo(4),
+          deleted_at: daysAgo(3),
+        },
+        {
+          user_profile_id: 'uprof_pending_old',
+          reason: 'unlinked',
+          queued_at: daysAgo(20),
+          attempt_count: 5,
+          last_attempt_at: daysAgo(1),
+          deleted_at: null,
+        },
+        {
+          user_profile_id: 'uprof_pending_new',
+          reason: 'unlinked',
+          queued_at: daysAgo(0.1),
+          deleted_at: null,
         },
       ]);
 
       const rows = await caller.admin.gatewayConfig.listAnthropicUserProfileDeletions();
 
-      expect(rows.map(row => row.user_profile_id)).toEqual(['uprof_new', 'uprof_mid', 'uprof_old']);
-      expect(rows[0]).toMatchObject({ reason: 'user_blocked', kilo_user_id: admin.id });
+      expect(rows.map(row => row.user_profile_id)).toEqual([
+        'uprof_pending_new',
+        'uprof_pending_old',
+        'uprof_new',
+        'uprof_mid',
+      ]);
+      expect(rows[1]).toMatchObject({ attempt_count: 5, deleted_at: null });
+      expect(rows[2]).toMatchObject({ reason: 'user_blocked', kilo_user_id: admin.id });
     });
   });
 });

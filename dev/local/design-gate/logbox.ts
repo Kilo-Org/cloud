@@ -46,7 +46,9 @@ export function logBoxDisableExpression(): string {
     registry !== null && registry !== undefined && typeof registry.getModules === 'function'
       ? registry.getModules()
       : null;
-  if (modules === null) return { exposing: disabled.size, disabled: disabled.size };
+  // The ids carried from an earlier pass were disabled then; this pass inspected
+  // no module, so it exposes no module either.
+  if (modules === null) return { exposing: 0, disabled: disabled.size };
   const exposing = new Map();
   for (const [id, entry] of modules.entries()) {
     const exported = entry && entry.publicModule && entry.publicModule.exports;

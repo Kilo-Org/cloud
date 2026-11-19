@@ -86,6 +86,16 @@ test('a runtime with no registry or no exposing module reports none', () => {
   assert.deepEqual(unrelated.disable(), { exposing: 0, disabled: 0 });
 });
 
+test('a pass with no registry claims no module exposed the switch', () => {
+  const runtime = appRuntime({ '6': { setDisabled: store().setDisabled } });
+  assert.deepEqual(runtime.disable(), { exposing: 1, disabled: 1 });
+
+  // The ids a previous pass disabled stay disabled; this pass cannot inspect the
+  // bundle, so the run log must not read them back as modules that exposed it.
+  delete runtime.globalThis.__r;
+  assert.deepEqual(runtime.disable(), { exposing: 0, disabled: 1 });
+});
+
 test('the disable pass leaves the console chain alone', () => {
   const forwarded: unknown[][] = [];
   const error = function error(...args: unknown[]) {

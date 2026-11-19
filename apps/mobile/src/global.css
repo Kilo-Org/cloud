@@ -106,6 +106,12 @@
   --good-tile-border: #24784a33;
   --warn: #956011;
   --warn-foreground: #ffffff;
+  /* Solid warn fill of the app-wide offline banner. Light mode paints the same
+   * brown as `--warn`, so the banner's pixels do not move. The pair still
+   * exists because a solid fill and an ink token must not be conflated: the
+   * dark block paints a different fill from its amber ink. */
+  --warn-solid: #956011;
+  --warn-solid-foreground: #ffffff;
   --warn-tile-bg: #9560111a;
   --warn-tile-border: #95601133;
   --danger-tile-bg: #b0483a1a;
@@ -269,6 +275,12 @@
     --good-tile-border: #5fcb8e33;
     --warn: #f2b05f;
     --warn-foreground: #1a1a10;
+    /* Solid warn fill of the app-wide offline banner. The `--warn` above is the
+     * pale amber ink, which glares as a full-width fill, so the banner takes
+     * this deeper brown of the same hue: 3.1:1 off `--background` and 2.9:1 off
+     * `--card`, with white ink at 6.1:1 on it. */
+    --warn-solid: #8a5614;
+    --warn-solid-foreground: #ffffff;
     --warn-tile-bg: #f2b05f1a;
     --warn-tile-border: #f2b05f33;
     --danger-tile-bg: #f28b7a1a;
@@ -370,6 +382,8 @@
   --color-good-tile-border: var(--good-tile-border);
   --color-warn: var(--warn);
   --color-warn-foreground: var(--warn-foreground);
+  --color-warn-solid: var(--warn-solid);
+  --color-warn-solid-foreground: var(--warn-solid-foreground);
   --color-warn-tile-bg: var(--warn-tile-bg);
   --color-warn-tile-border: var(--warn-tile-border);
   --color-danger-tile-bg: var(--danger-tile-bg);

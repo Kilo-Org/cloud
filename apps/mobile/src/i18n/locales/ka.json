@@ -2468,7 +2468,8 @@
       "customModes": "მორგებული რეჟიმები"
     },
     "modeSelector": {
-      "accessibility": "რეჟიმი: {{label}}"
+      "accessibility": "რეჟიმი: {{label}}",
+      "customMode": "მორგებული რეჟიმი"
     },
     "modeOptions": {
       "code": "კოდის წერა",
@@ -2784,7 +2785,7 @@
       "thinkingEffortAccessibility": "მსჯელობის ინტენსივობა: {{label}}",
       "thinkingEffortSelected": "მსჯელობის ინტენსივობა: {{label}}, არჩეულია",
       "thinkingEffortWithModel": "{{model}}, მსჯელობის ინტენსივობა: {{variant}}",
-      "lockedByAgent": ", ჩაკეტილია აგენტის „{{agent}}“ მიერ",
+      "lockedByAgent": "ჩაკეტილია აგენტის „{{agent}}“ მიერ",
       "addToFavorites": "{{name}}-ის რჩეულებში დამატება",
       "removeFromFavorites": "{{name}}-ის რჩეულებიდან ამოღება",
       "sessionModel": "სესიის მოდელი"
@@ -3064,6 +3065,7 @@
   "queryError": {
     "neutralDescription": "სცადე ხელახლა.",
     "offlineTitle": "ჩატვირთვა ვერ მოხერხდა.",
+    "offlineDescription": "სერვერთან დაკავშირება ვერ მოხერხდა.",
     "permissionDescription": "ამის ნახვის უფლება არ გაქვს.",
     "notFoundDescription": "შესაძლოა, ეს ელემენტი წაიშალა ან აღარ არის ხელმისაწვდომი.",
     "serverTitle": "ჩატვირთვა ვერ მოხერხდა.",
@@ -3707,6 +3709,7 @@
     "lastKnown": "ბოლო ცნობილი",
     "awaitingUpdate": "განახლებას ელის",
     "nextRun": "შემდეგი გაშვება",
+    "wasDue": "მოსალოდნელი იყო",
     "waitingForYou": "გელოდებათ",
     "nextScheduled": "შემდეგი დაგეგმილი",
     "answerNeeded": "პასუხს ელის",
@@ -4512,8 +4515,12 @@
     "loadError": "ანგარიშების ჩატვირთვა ვერ მოხერხდა",
     "view": "ანგარიშის წაკითხვა",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "ფილტრი კონტექსტის მიხედვით",
+    "contextAll": "ყველა კონტექსტი",
     "dismiss": "ანგარიშის უგულებელყოფა",
+    "dismissFailed": "ამ ანგარიშის უგულებელყოფა ჯერ ვერ მოხერხდა. ხელახლა ცდა ფონურად გაგრძელდება.",
     "offline": "ოფლაინ · შენახული ანგარიში",
     "cached": "შენახული ანგარიში · განახლება მიუწვდომელია",
     "summary": "AI შეჯამება",
@@ -4521,6 +4528,7 @@
     "summaryUnavailable": "AI შეჯამება მიუწვდომელია. სტრუქტურირებული ანგარიში კვლავ ხელმისაწვდომია.",
     "summaryCharge": "AI-მ ჩამოჭრა {{cost}}",
     "summaryChargePending": "AI გადასახადი შეჯერებას ელოდება",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "მტკიცებულებები და არტეფაქტები",
     "timezone": "ანგარიშის სასაათო სარტყელი",
     "deviceTimezone": "მოწყობილობის სასაათო სარტყლის გამოყენება",
@@ -4532,22 +4540,22 @@
     "timeHint": "მთავარი ბარათი მიმდინარე სტატუსს აღადგენს ანგარიშის ინტერვალის დასრულებისას, ოფლაინშიც კი.",
     "invalidSchedule": "აირჩიეთ სწორი სასაათო სარტყელი და არაცარიელი ანგარიშის ინტერვალი.",
     "notificationsHint": "ერთი ზოგადი შეტყობინება ყოველ დაგეგმილ ანგარიშზე. ფასიანი AI შეჯამებებისგან დამოუკიდებელია.",
-    "notificationPermission": "ანგარიშის მისაღებად ჩართეთ მოწყობილობის შეტყობინებები აქ: $t(common.notifications).",
+    "notificationPermission": "ანგარიშის მისაღებად ჩართეთ push შეტყობინებები.",
     "defaultModel": "Kilo-ს ნაგულისხმევი მოდელის გამოყენება",
     "duration": "დროის ლიმიტი (წუთი)",
     "spendLimit": "ხარჯის ლიმიტი (USD)",
     "invalidSafeguards": "შეიყვანეთ დადებითი, სასრული დროისა და ხარჯის ლიმიტები.",
     "estimate": "შეფასება {{estimate}} · მაქსიმუმ {{maximum}}",
-    "estimateUnavailable": "ამ პარამეტრებისთვის ფასიანი შეჯამება ხელმისაწვდომი არ არის.",
+    "estimateUnavailable": "ამ პარამეტრებისთვის ფასიანი შეჯამება ხელმისაწვდომი არ არის. შეცვალეთ მოდელი ან ლიმიტები, ან სცადეთ ხელახლა მოგვიანებით.",
     "confirmPaid": "ჩაირთოს ფასიანი შეჯამებები: {{context}}?",
     "paidDisclosure": "სავარაუდოდ {{estimate}}, მაქსიმუმ {{maximum}}, {{minutes}}-წუთიანი ლიმიტით. გადასახადი ჩამოიჭრება შექმნის წარუმატებლობის შემთხვევაშიც.",
     "enable": "ფასიანი შეჯამებების ჩართვა",
     "allContexts": "პირადი და ორგანიზაციის ანგარიშები ცალ-ცალკე ინახება.",
     "emptyHistory": "შენახული ანგარიშები არ არის",
-    "estimatePermissionUnavailable": "ამ კონტექსტის ბალანსის გამოყენების უფლება არ გაქვთ.",
-    "estimatePricingUnavailable": "ამ მოდელის ფასები ხელმისაწვდომი არ არის.",
-    "estimateBalanceUnavailable": "ბალანსი არ არის საკმარისი ფასიანი შეჯამებისთვის.",
-    "estimateModelNotAllowed": "ეს მოდელი აქ ნებადართული არ არის.",
+    "estimatePermissionUnavailable": "ამ კონტექსტის ბალანსის გამოყენების უფლება არ გაქვთ. სთხოვეთ ორგანიზაციის მფლობელს ამის ჩართვა.",
+    "estimatePricingUnavailable": "ამ მოდელის ფასები ხელმისაწვდომი არ არის. აირჩიეთ სხვა მოდელი.",
+    "estimateBalanceUnavailable": "ბალანსი არ არის საკმარისი ფასიანი შეჯამებისთვის. დაამატეთ თანხა ამ კონტექსტის ბალანსს.",
+    "estimateModelNotAllowed": "ეს მოდელი ამ კონტექსტში ნებადართული არ არის. აირჩიეთ სხვა მოდელი.",
     "estimateSpendLimitTooLow": "გაზარდეთ ხარჯვის ლიმიტი ამ შეჯამების დასაშვებად.",
     "saved": "ანგარიშის პარამეტრები შენახულია",
     "selectedSessions": "შერჩეული სესიები",
@@ -4561,11 +4569,30 @@
     "scheduledContextSettings": "დაგეგმილი ანგარიშები · {{context}}",
     "scheduledContextHint": "ჩართეთ მდგომარეობის დაგეგმილი დაფიქსირება და ფასიანი AI შეჯამებები მხოლოდ ამ კონტექსტისთვის. შერჩეული, კონფიდენციალური მონაცემებისგან გასუფთავებული ფრაგმენტები და სტრუქტურირებული ფაქტები იგზავნება თქვენს მოდელთან. შეჯამებებისთვის გამოიყენება აპის ენა, რომელიც შენახულია ანგარიშის პარამეტრების განახლების დროს. გადასახადი ამ კონტექსტის ბალანსიდან ჩამოიჭრება. ანგარიშები, რომლებშიც აქტივობა არ შერჩეულა, AI-ს არ იყენებს.",
     "snapshotSafeguards": "თითო შეჯამების დროისა და ხარჯის ლიმიტები ვრცელდება თითოეულ დაგეგმილ ანგარიშზე და არა დღიურ ბიუჯეტზე.",
-    "snapshotEstimateInputTooLarge": "ამ ანგარიშში არჩეული მოდელისთვის მეტისმეტად ბევრი მასალაა.",
+    "snapshotEstimateInputTooLarge": "ამ ანგარიშში არჩეული მოდელისთვის მეტისმეტად ბევრი მასალაა. აირჩიეთ მოდელი უფრო დიდი შეყვანის ფანჯრით.",
     "quietSnapshot": "ამ ანგარიშისთვის სესიის აქტივობა არ შერჩეულა. AI შეჯამება არ მოთხოვნილა და საფასური არ ჩამოჭრილა.",
     "noEnabledContexts": "დაგეგმილი ანგარიშებისთვის არცერთი კონტექსტი არ არის ჩართული",
     "sourceBlocker": "სესია ყურადღებას საჭიროებს",
-    "sourceMetadata": "დაფიქსირებული სესიის მეტამონაცემები"
+    "sourceMetadata": "დაფიქსირებული სესიის მეტამონაცემები",
+    "metadataPlan_one": "გეგმა: {{displayDone}} / {{displayTotal}} ნაბიჯი შესრულებულია",
+    "metadataPlan_other": "გეგმა: {{displayDone}} / {{displayTotal}} ნაბიჯი შესრულებულია",
+    "metadataPlan": "გეგმა: {{displayDone}} / {{displayTotal}} ნაბიჯი შესრულებულია",
+    "metadataFiles_one": "{{displayCount}} ფაილი შეიცვალა",
+    "metadataFiles_other": "{{displayCount}} ფაილი შეიცვალა",
+    "metadataFiles": "{{displayCount}} ფაილი შეიცვალა",
+    "metadataLinesAdded_one": "{{displayCount}} ხაზი დაემატა",
+    "metadataLinesAdded_other": "{{displayCount}} ხაზი დაემატა",
+    "metadataLinesAdded": "{{displayCount}} ხაზი დაემატა",
+    "metadataLinesRemoved_one": "{{displayCount}} ხაზი წაიშალა",
+    "metadataLinesRemoved_other": "{{displayCount}} ხაზი წაიშალა",
+    "metadataLinesRemoved": "{{displayCount}} ხაზი წაიშალა",
+    "metadataPlanCurrent": "მიმდინარე ნაბიჯი: {{current}}",
+    "metadataFailure": "ბოლო ცდა ვერ შესრულდა: {{kind}}",
+    "sourceActivity": "უსათაურო აქტივობა",
+    "metadataFailureProvider": "პროვაიდერის შეცდომა",
+    "metadataFailureTool": "ინსტრუმენტის შეცდომა",
+    "metadataFailureCancelled": "გაუქმებულია",
+    "metadataFailureOther": "გაურკვეველი შეცდომა"
   },
   "systemSearch": {
     "couldNotOpenResult": "ამ ძიების შედეგის გახსნა ვერ მოხერხდა"
@@ -4604,7 +4631,8 @@
     "connectFailed": "დაკავშირების გვერდის გახსნა ვერ მოხერხდა"
   },
   "invoices": {
-    "personalEmptyDescription": "თქვენი პირადი შენაძენების ინვოისები აქ გამოჩნდება, როგორც კი თანხა ჩამოგეჭრებათ."
+    "personalEmptyDescription": "თქვენი პირადი შენაძენების ინვოისები აქ გამოჩნდება, როგორც კი თანხა ჩამოგეჭრებათ. ქვითრები App Store-იდან და Google Play-დან კრედიტების ისტორიაშია.",
+    "personalPeriod": "ბოლო 12 თვე"
   },
   "cloudAgent": {
     "compute": {

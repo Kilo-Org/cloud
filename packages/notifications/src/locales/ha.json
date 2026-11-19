@@ -3,7 +3,7 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Zaman wakilin naka yana da sabuntawa",
-      "lowBalance": "Ma'auninka yana buƙatar kulawa",
+      "lowBalance": "Ragowar kuɗinka tana buƙatar kulawa",
       "spendAlert": "Kashewar ku na buƙatar kulawa",
       "securityFinding": "Wani binciken tsaro yana buƙatar kulawa",
       "securityUpdate": "Wani duban tsaro yana da sabuntawa",
@@ -17,8 +17,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Faɗakarwar ƙarancin ma'auni",
-      "body": "Ma'aunin {{organizationName}} ya faɗi ƙasa da ${{minimumBalanceUsd}}"
+      "title": "Faɗakarwar ƙarancin kuɗi",
+      "body": "Ragowar kuɗin {{organizationName}} ta faɗi ƙasa da ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Faɗakarwar kashewa",

@@ -77,7 +77,9 @@ export default function ModePickerScreen() {
     const Icon = getModeIcon(item.value);
     const selected = item.value === currentValue;
     const isBuiltin = 'labelKey' in item;
-    const label = isBuiltin ? t(getBuiltinModeLabelKey(item.value) ?? '') : item.label;
+    const label = isBuiltin
+      ? t(getBuiltinModeLabelKey(item.value) ?? '')
+      : item.label || t('agentChat.modeSelector.customMode');
     const description = isBuiltin
       ? t(getBuiltinModeDescriptionKey(item.value) ?? '')
       : item.description;
@@ -89,16 +91,19 @@ export default function ModePickerScreen() {
           handleSelect(item.value);
         }}
         accessibilityRole="button"
-        accessibilityLabel={t('agentChat.modePicker.modeLabel', {
-          label,
-          description,
-        })}
+        accessibilityLabel={
+          description !== ''
+            ? t('agentChat.modePicker.modeLabel', { label, description })
+            : t('agentChat.modeSelector.accessibility', { label })
+        }
         accessibilityState={{ selected }}
       >
         <Icon size={20} color={colors.foreground} />
         <View className="flex-1">
           <Text className="text-base font-medium text-foreground">{label}</Text>
-          <Text className="text-sm text-muted-foreground">{description}</Text>
+          {description !== '' && (
+            <Text className="text-sm text-muted-foreground">{description}</Text>
+          )}
         </View>
         {selected && <Check size={18} color={selectionCheckColor(colors)} />}
       </Pressable>

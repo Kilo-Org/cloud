@@ -66,7 +66,7 @@
     "discardChangesMessage": "ການປ່ຽນແປງຂອງທ່ານຈະສູນໄປ.",
     "discardChangesTitle": "ຖິ້ມການປ່ຽນແປງບໍ?",
     "findings": "ບັນຫາທີ່ກວດພົບ",
-    "mergeRequest": "merge request",
+    "mergeRequest": "ຄຳຂໍຮວມ",
     "notConnected": "ຍັງບໍ່ເຊື່ອມຕໍ່",
     "notifications": "ການແຈ້ງເຕືອນ",
     "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
@@ -209,7 +209,7 @@
     "signInWithGoogle": "ເຂົ້າສູ່ລະບົບດ້ວຍ Google",
     "signInWithPasskey": "ເຂົ້າສູ່ລະບົບດ້ວຍກະແຈເຂົ້າ",
     "emailAddress": "ທີ່ຢູ່ອີເມວ",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "ເຈົ້າ@example.com",
     "continueWithEmail": "ສືບຕໍ່ດ້ວຍອີເມວ",
     "enterCodeSentTo": "ໃສ່ລະຫັດທີ່ສົ່ງໄປຫາ {{email}}.",
     "codeArrivalHint": "ຖ້າອີເມວນີ້ມີສິດໃຊ້ງານ, ລະຫັດຈະມາເຖິງພາຍໃນໜຶ່ງນາທີ.",
@@ -685,7 +685,7 @@
       },
       "terminal": {
         "closed": "ປິດຄຳຂໍລວມໂຄດນີ້ແລ້ວ",
-        "closedMergeRequest": "ປິດ merge request ນີ້ແລ້ວ"
+        "closedMergeRequest": "ປິດຄຳຂໍຮວມນີ້ແລ້ວ"
       },
       "partialSuccessBanner": {
         "body": "ບໍ່ສາມາດລຶບສາຂາໄດ້: {{reason}}.",
@@ -863,11 +863,11 @@
       "removeFromRecentsTitle": "ເອົາອອກຈາກລາຍການທີ່ເປີດຫຼ້າສຸດບໍ?",
       "removeFromRecentsMessage": "ການກວດທານນີ້ຈະຖືກລຶບອອກຈາກລາຍການຫຼ້າສຸດຂອງທ່ານ",
       "removeRecentAccessibility": "ເອົາ {{repo}} ອອກຈາກລາຍການທີ່ເປີດຫຼ້າສຸດ",
-      "urlAccessibility": "ປ້ອນ URL ຂອງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
-      "urlPlaceholder": "URL ຂອງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
-      "openAccessibility": "ເປີດຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
+      "urlAccessibility": "ປ້ອນ URL ຂອງຄຳຂໍລວມໂຄ້ດ ຫຼື ຄຳຂໍຮວມ",
+      "urlPlaceholder": "URL ຂອງຄຳຂໍລວມໂຄ້ດ ຫຼື ຄຳຂໍຮວມ",
+      "openAccessibility": "ເປີດຄຳຂໍລວມໂຄ້ດ ຫຼື ຄຳຂໍຮວມ",
       "clearLink": "ລ້າງລິ້ງ",
-      "pasteLink": "ວາງລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
+      "pasteLink": "ວາງລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື ຄຳຂໍຮວມ",
       "open": "ເປີດ"
     },
     "checks": {
@@ -936,9 +936,9 @@
       "reconnectTitleGitLab": "ເຊື່ອມຕໍ່ GitLab ໃໝ່",
       "reconnectTitleBitbucket": "ເຊື່ອມຕໍ່ Bitbucket ໃໝ່",
       "reconnectDescription": "ສິດການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານຖືກຖອນແລ້ວ.",
-      "gitlabDescription": "ກວດສອບ merge request ໃນມືຖື",
+      "gitlabDescription": "ກວດສອບຄຳຂໍຮວມໃນມືຖື",
       "gitlabInstanceMismatchTitle": "ການເຊື່ອມຕໍ່ GitLab ແມ່ນສຳລັບ instance ອື່ນ",
-      "gitlabInstanceMismatchDescription": "ການເຊື່ອມຕໍ່ GitLab ຂອງທ່ານແມ່ນສຳລັບ {{connected}}, ແຕ່ merge request ນີ້ຢູ່ໃນ {{requested}}. ເຊື່ອມຕໍ່ GitLab ໃນ instance ນັ້ນເພື່ອກວດສອບມັນ.",
+      "gitlabInstanceMismatchDescription": "ການເຊື່ອມຕໍ່ GitLab ຂອງທ່ານແມ່ນສຳລັບ {{connected}}, ແຕ່ຄຳຂໍຮວມນີ້ຢູ່ໃນ {{requested}}. ເຊື່ອມຕໍ່ GitLab ໃນ instance ນັ້ນເພື່ອກວດສອບມັນ.",
       "checkActiveConnection": "ການເຊື່ອມຕໍ່ເຮັດວຽກຢູ່, ແຕ່ລາຍການນີ້ຍັງບໍ່ສາມາດໂຫຼດໄດ້.",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
@@ -1046,7 +1046,7 @@
     },
     "linkPasteClipboardEmpty": "ຄລິບບອດວ່າງເປົ່າ.",
     "linkPasteDenied": "ການເຂົ້າເຖິງການວາງສົ່ງໄດ້ຖືກປະຕິເສດ. ອະນຸຍາດໃຫ້ວາງສົ່ງ ແລະ ລອງໃໝ່ອີກຄັ້ງ.",
-    "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
+    "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື ຄຳຂໍຮວມ",
     "announce": {
       "commentPosted": "ໂພດຄຳເຫັນແລ້ວ",
       "commentUpdated": "ອັບເດດຄຳເຫັນແລ້ວ",
@@ -1079,18 +1079,18 @@
     },
     "terms": {
       "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "ແບ່ງປັນ merge request",
+      "mergeRequest": "ຄຳຂໍຮວມ",
+      "mergeRequestNumber": "ຄຳຂໍຮວມ !{{number}}",
+      "shareMergeRequest": "ແບ່ງປັນຄຳຂໍຮວມ",
       "viewOnProvider": "ເບິ່ງເທິງ {{provider}}",
-      "mergeRequestUnavailable": "ບໍ່ສາມາດເປີດ merge request",
+      "mergeRequestUnavailable": "ບໍ່ສາມາດເປີດຄຳຂໍຮວມ",
       "unavailableDescription": "ການເຊື່ອມຕໍ່ອາດຈະລົ້ມເຫຼວ, ຫຼື ລາຍການອາດຈະຖືກລຶບ ຫຼື ເຂົ້າເຖິງບໍ່ໄດ້.",
-      "accessDeniedMergeRequest": "ທ່ານບໍ່ມີສິດເບິ່ງ merge request ນີ້.",
-      "couldNotLoadMergeRequest": "ບໍ່ສາມາດໂຫຼດ merge request ໄດ້.",
-      "discussionAccessDenied": "ທ່ານບໍ່ມີສິດເບິ່ງການສົນທະນາຂອງ merge request ນີ້.",
-      "discussionUnavailableMessage": "ການເຊື່ອມຕໍ່ອາດຈະລົ້ມເຫຼວ, ຫຼື Merge request ນີ້ອາດຈະຖືກລຶບໄປແລ້ວ.",
-      "noDiscussionDescription": "merge request ນີ້ຍັງບໍ່ມີເທຣດການກວດທານ ຫຼື ຄຳເຫັນການສົນທະນາ.",
-      "noFilesChangedDescription": "merge request ນີ້ບໍ່ມີການປ່ຽນແປງເຟົ້ມ."
+      "accessDeniedMergeRequest": "ທ່ານບໍ່ມີສິດເບິ່ງຄຳຂໍຮວມນີ້.",
+      "couldNotLoadMergeRequest": "ບໍ່ສາມາດໂຫຼດຄຳຂໍຮວມໄດ້.",
+      "discussionAccessDenied": "ທ່ານບໍ່ມີສິດເບິ່ງການສົນທະນາຂອງຄຳຂໍຮວມນີ້.",
+      "discussionUnavailableMessage": "ການເຊື່ອມຕໍ່ອາດຈະລົ້ມເຫຼວ, ຫຼື ຄຳຂໍຮວມນີ້ອາດຈະຖືກລຶບໄປແລ້ວ.",
+      "noDiscussionDescription": "ຄຳຂໍຮວມນີ້ຍັງບໍ່ມີເທຣດການກວດທານ ຫຼື ຄຳເຫັນການສົນທະນາ.",
+      "noFilesChangedDescription": "ຄຳຂໍຮວມນີ້ບໍ່ມີການປ່ຽນແປງໄຟລ໌."
     }
   },
   "notifications": {
@@ -1350,8 +1350,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "ໃສ່ URL ຂອງ merge request ທີ່ຖືກຕ້ອງ.",
-      "mergeRequestUrl": "URL ຂອງ merge request",
+      "invalidMergeRequestUrl": "ໃສ່ URL ຂອງຄຳຂໍຮວມທີ່ຖືກຕ້ອງ.",
+      "mergeRequestUrl": "URL ຂອງຄຳຂໍຮວມ",
       "instructionsAtLimit": "ຄຳແນະນຳຈຳກັດບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
       "title": "ການກວດສອບທີ່ເລີ່ມເອງ",
       "invalidUrl": "ໃສ່ URL ຂອງຄຳຂໍລວມໂຄ້ດທີ່ຖືກຕ້ອງ.",
@@ -2468,7 +2468,8 @@
       "customModes": "ໂໝດທີ່ກຳນົດເອງ"
     },
     "modeSelector": {
-      "accessibility": "ໂໝດ: {{label}}"
+      "accessibility": "ໂໝດ: {{label}}",
+      "customMode": "ໂໝດທີ່ກຳນົດເອງ"
     },
     "modeOptions": {
       "code": "ຂຽນໂຄດ",
@@ -2784,7 +2785,7 @@
       "thinkingEffortAccessibility": "ລະດັບການຄິດ {{label}}",
       "thinkingEffortSelected": "ລະດັບການຄິດ {{label}}, ເລືອກແລ້ວ",
       "thinkingEffortWithModel": "{{model}}, ລະດັບການຄິດ {{variant}}",
-      "lockedByAgent": ", ລັອກໂດຍເອເຈນ \"{{agent}}\"",
+      "lockedByAgent": "ລັອກໂດຍເອເຈນ \"{{agent}}\"",
       "addToFavorites": "ເພີ່ມ {{name}} ໃສ່ລາຍການທີ່ມັກ",
       "removeFromFavorites": "ເອົາ {{name}} ອອກຈາກລາຍການທີ່ມັກ",
       "sessionModel": "ໂມເດວຂອງເຊດຊັນ"
@@ -3064,6 +3065,7 @@
   "queryError": {
     "neutralDescription": "ກະລຸນາລອງອີກຄັ້ງ.",
     "offlineTitle": "ໂຫຼດບໍ່ສຳເລັດ.",
+    "offlineDescription": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບເຊີບເວີໄດ້.",
     "permissionDescription": "ທ່ານບໍ່ມີສິດເບິ່ງລາຍການນີ້.",
     "notFoundDescription": "ລາຍການນີ້ອາດຖືກລຶບ ຫຼື ບໍ່ມີອີກແລ້ວ.",
     "serverTitle": "ບໍ່ສາມາດໂຫຼດໄດ້.",
@@ -3707,6 +3709,7 @@
     "lastKnown": "ສະຖານະຫຼ້າສຸດທີ່ຮູ້",
     "awaitingUpdate": "ລໍການອັບເດດ",
     "nextRun": "ເຮັດວຽກຄັ້ງຕໍ່ໄປ",
+    "wasDue": "ຄາດໄວ້",
     "waitingForYou": "ລໍທ່ານ",
     "nextScheduled": "ກຳນົດເວລາຖັດໄປ",
     "answerNeeded": "ລໍຄຳຕອບ",
@@ -4512,8 +4515,12 @@
     "loadError": "ບໍ່ສາມາດໂຫຼດລາຍງານໄດ້",
     "view": "ອ່ານລາຍງານ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "ກັ່ນຕອງຕາມບໍລິບົດ",
+    "contextAll": "ບໍລິບົດທັງໝົດ",
     "dismiss": "ລະເວັ້ນລາຍງານ",
+    "dismissFailed": "ຍັງບໍ່ສາມາດລະເວັ້ນລາຍງານນີ້ໄດ້. ລະບົບຈະລອງໃໝ່ໃນພື້ນຫຼັງ.",
     "offline": "ອອບລາຍ · ລາຍງານທີ່ບັນທຶກໄວ້",
     "cached": "ລາຍງານທີ່ບັນທຶກໄວ້ · ບໍ່ສາມາດໂຫຼດຄືນໃໝ່",
     "summary": "ສະຫຼຸບໂດຍ AI",
@@ -4521,6 +4528,7 @@
     "summaryUnavailable": "ສະຫຼຸບ AI ບໍ່ພ້ອມໃຊ້. ລາຍງານແບບມີໂຄງສ້າງຂອງທ່ານຍັງໃຊ້ໄດ້.",
     "summaryCharge": "AI ຄິດຄ່າ {{cost}}",
     "summaryChargePending": "ຄ່າ AI ລໍຖ້າການກວດສອບ",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "ຫຼັກຖານ ແລະ ຜົນງານ",
     "timezone": "ເຂດເວລາຂອງລາຍງານ",
     "deviceTimezone": "ໃຊ້ເຂດເວລາຂອງອຸປະກອນ",
@@ -4532,22 +4540,22 @@
     "timeHint": "ບັດໜ້າຫຼັກຈະກັບມາສະແດງສະຖານະປັດຈຸບັນເມື່ອຊ່ວງເວລາຂອງລາຍງານສິ້ນສຸດ, ເຖິງແມ່ນອອບລາຍ.",
     "invalidSchedule": "ເລືອກເຂດເວລາທີ່ຖືກຕ້ອງ ແລະ ຊ່ວງເວລາຂອງລາຍງານທີ່ບໍ່ຫວ່າງ.",
     "notificationsHint": "ການແຈ້ງເຕືອນທົ່ວໄປໜຶ່ງຄັ້ງຕໍ່ລາຍງານທີ່ກຳນົດໄວ້. ບໍ່ຂຶ້ນກັບສະຫຼຸບ AI ແບບເສຍເງິນ.",
-    "notificationPermission": "ເປີດການແຈ້ງເຕືອນອຸປະກອນໃນ $t(common.notifications) ເພື່ອຮັບລາຍງານຂອງທ່ານ.",
+    "notificationPermission": "ເປີດການແຈ້ງເຕືອນແບບດັນ ເພື່ອຮັບລາຍງານຂອງທ່ານ.",
     "defaultModel": "ໃຊ້ໂມເດລເລີ່ມຕົ້ນຂອງ Kilo",
     "duration": "ຂີດຈຳກັດເວລາ (ນາທີ)",
     "spendLimit": "ຂີດຈຳກັດຄ່າໃຊ້ຈ່າຍ (USD)",
     "invalidSafeguards": "ປ້ອນຂີດຈຳກັດເວລາ ແລະ ຄ່າໃຊ້ຈ່າຍທີ່ເປັນບວກ ແລະ ມີຂອບເຂດ.",
     "estimate": "ປະເມີນ {{estimate}} · ສູງສຸດ {{maximum}}",
-    "estimateUnavailable": "ບໍ່ມີບົດສະຫຼຸບແບບຈ່າຍຄ່າສຳລັບການຕັ້ງຄ່າເຫຼົ່ານີ້.",
+    "estimateUnavailable": "ບໍ່ມີບົດສະຫຼຸບແບບຈ່າຍຄ່າສຳລັບການຕັ້ງຄ່າເຫຼົ່ານີ້. ປ່ຽນໂມເດລ ຫຼື ຂອບເຂດ, ຫຼື ລອງອີກຄັ້ງພາຍຫຼັງ.",
     "confirmPaid": "ເປີດສະຫຼຸບແບບເສຍເງິນສຳລັບ {{context}} ບໍ?",
     "paidDisclosure": "ປະມານ {{estimate}}, ສູງສຸດ {{maximum}}, ຈຳກັດເວລາ {{minutes}} ນາທີ. ຈະມີຄ່າໃຊ້ຈ່າຍເຖິງແມ່ນການສ້າງລົ້ມເຫຼວ.",
     "enable": "ເປີດສະຫຼຸບແບບເສຍເງິນ",
     "allContexts": "ລາຍງານສ່ວນຕົວ ແລະ ຂອງອົງກອນຖືກແຍກອອກຈາກກັນ.",
     "emptyHistory": "ບໍ່ມີລາຍງານທີ່ບັນທຶກໄວ້",
-    "estimatePermissionUnavailable": "ທ່ານບໍ່ມີສິດໃຊ້ຍອດເງິນຄົງເຫຼືອຂອງບໍລິບົດນີ້.",
-    "estimatePricingUnavailable": "ບໍ່ມີຂໍ້ມູນລາຄາສຳລັບໂມເດນີ້.",
-    "estimateBalanceUnavailable": "ຍອດເງິນບໍ່ພຽງພໍສຳລັບບົດສະຫຼຸບແບບຈ່າຍຄ່າ.",
-    "estimateModelNotAllowed": "ໂມເດນີ້ບໍ່ອະນຸຍາດໃຫ້ໃຊ້ຢູ່ນີ້.",
+    "estimatePermissionUnavailable": "ທ່ານບໍ່ມີສິດໃຊ້ຍອດເງິນຄົງເຫຼືອຂອງບໍລິບົດນີ້. ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງອົງກອນເປີດການໃຊ້.",
+    "estimatePricingUnavailable": "ບໍ່ມີຂໍ້ມູນລາຄາສຳລັບໂມເດນີ້. ເລືອກໂມເດລອື່ນ.",
+    "estimateBalanceUnavailable": "ຍອດເງິນບໍ່ພຽງພໍສຳລັບບົດສະຫຼຸບແບບຈ່າຍຄ່າ. ເພີ່ມເຄຣດິດໃສ່ຍອດເງິນຂອງບໍລິບົດນີ້.",
+    "estimateModelNotAllowed": "ໂມເດນີ້ບໍ່ອະນຸຍາດໃຫ້ໃຊ້ໃນບໍລິບົດນີ້. ເລືອກໂມເດລອື່ນ.",
     "estimateSpendLimitTooLow": "ເພີ່ມຂີດຈຳກັດການໃຊ້ຈ່າຍເພື່ອອະນຸຍາດບົດສະຫຼຸບນີ້.",
     "saved": "ການຕັ້ງຄ່າລາຍງານຖືກບັນທຶກແລ້ວ.",
     "selectedSessions": "ເຊສຊັນທີ່ເລືອກ",
@@ -4556,16 +4564,35 @@
     "capturedAt": "ບັນທຶກເມື່ອ {{time}}",
     "snapshotHint": "ບັນທຶກສະຖານະລ່າສຸດຂອງເຊສຊັນເທົ່າທີ່ເກັບໄດ້ ໃນເວລາຕອນເຊົ້າທີ່ກຳນົດໄວ້. ຈຳນວນທີ່ສະແດງແມ່ນຂອງເຊສຊັນທີ່ເລືອກ, ບໍ່ແມ່ນກິດຈະກຳທັງໝົດໃນຄືນນັ້ນ.",
     "snapshotTruncated": "ບາງເຊສຊັນ ຫຼື ຫຼັກຖານບໍ່ໄດ້ຖືກລວມໄວ້ ເພື່ອຈຳກັດຂະໜາດຂອງບັນທຶກສະຖານະນີ້.",
-    "snapshotSummaryFailed": "ສະຫຼຸບ AI ລົ້ມເຫຼວ. ບັນທຶກສະຖານະແບບມີໂຄງສ້າງຂອງທ່ານຍັງໃຊ້ໄດ້.",
+    "snapshotSummaryFailed": "ສະຫຼຸບ AI ລົ້ມເຫຼວ. ລາຍງານແບບມີໂຄງສ້າງຂອງທ່ານຍັງໃຊ້ໄດ້.",
     "scheduledContextEnabled": "ລາຍງານທີ່ກຳນົດໄວ້",
     "scheduledContextSettings": "ລາຍງານທີ່ກຳນົດໄວ້ · {{context}}",
     "scheduledContextHint": "ເປີດການບັນທຶກສະຖານະຕາມກຳນົດ ແລະ ສະຫຼຸບ AI ແບບເສຍເງິນ ສະເພາະບໍລິບົດນີ້. ຂໍ້ຄວາມທີ່ເລືອກ ແລະ ປິດບັງຂໍ້ມູນລັບແລ້ວ ພ້ອມຂໍ້ເທັດຈິງແບບມີໂຄງສ້າງ ຈະຖືກສົ່ງໄປຫາໂມເດລຂອງທ່ານ. ສະຫຼຸບຈະໃຊ້ພາສາຂອງແອັບທີ່ບັນທຶກໄວ້ເມື່ອທ່ານປັບປ່ຽນການຕັ້ງຄ່າລາຍງານ. ຄ່າໃຊ້ຈ່າຍຈະຫັກຈາກຍອດເງິນຂອງບໍລິບົດນີ້. ບັນທຶກສະຖານະທີ່ບໍ່ມີກິດຈະກຳຈະບໍ່ໃຊ້ AI.",
     "snapshotSafeguards": "ຂີດຈຳກັດເວລາ ແລະ ຄ່າໃຊ້ຈ່າຍຕໍ່ການສະຫຼຸບ ໃຊ້ກັບບັນທຶກສະຖານະຕາມກຳນົດແຕ່ລະຄັ້ງ, ບໍ່ແມ່ນງົບປະມານລາຍວັນ.",
-    "snapshotEstimateInputTooLarge": "ບັນທຶກສະຖານະນີ້ມີຫຼັກຖານຫຼາຍເກີນໄປສຳລັບໂມເດລທີ່ເລືອກ.",
+    "snapshotEstimateInputTooLarge": "ບັນທຶກສະຖານະນີ້ມີຫຼັກຖານຫຼາຍເກີນໄປສຳລັບໂມເດລທີ່ເລືອກ. ເລືອກໂມເດລທີ່ມີປ່ອງຮັບຂໍ້ມູນຂາເຂົ້າທີ່ໃຫຍ່ກວ່າ.",
     "quietSnapshot": "ບໍ່ມີກິດຈະກຳຂອງເຊສຊັນໃດທີ່ຖືກເລືອກສຳລັບບັນທຶກສະຖານະນີ້. ບໍ່ມີການຮ້ອງຂໍ ຫຼື ຄິດຄ່າໃຊ້ຈ່າຍສຳລັບສະຫຼຸບ AI.",
     "noEnabledContexts": "ບໍ່ມີບໍລິບົດທີ່ເປີດໃຊ້ລາຍງານທີ່ກຳນົດໄວ້",
     "sourceBlocker": "ເຊສຊັນຕ້ອງການການເອົາໃຈໃສ່",
-    "sourceMetadata": "ຂໍ້ມູນເມຕາຂອງເຊສຊັນທີ່ບັນທຶກໄວ້"
+    "sourceMetadata": "ຂໍ້ມູນເມຕາຂອງເຊສຊັນທີ່ບັນທຶກໄວ້",
+    "metadataPlan_other": "ແຜນ: ສຳເລັດ {{displayDone}} ຈາກ {{displayTotal}} ຂັ້ນຕອນ",
+    "metadataPlan": "ແຜນ: ສຳເລັດ {{displayDone}} ຈາກ {{displayTotal}} ຂັ້ນຕອນ",
+    "metadataFiles_other": "{{displayCount}} ໄຟລ໌ທີ່ປ່ຽນແປງ",
+    "metadataFiles": "{{displayCount}} ໄຟລ໌ທີ່ປ່ຽນແປງ",
+    "metadataLinesAdded_other": "ເພີ່ມ {{displayCount}} ແຖວ",
+    "metadataLinesAdded": "ເພີ່ມ {{displayCount}} ແຖວ",
+    "metadataLinesRemoved_other": "ລຶບ {{displayCount}} ແຖວ",
+    "metadataLinesRemoved": "ລຶບ {{displayCount}} ແຖວ",
+    "metadataPlanCurrent": "ຂັ້ນຕອນປັດຈຸບັນ: {{current}}",
+    "metadataFailure": "ຄັ້ງຫຼ້າລົ້ມເຫຼວ: {{kind}}",
+    "sourceActivity": "ກິດຈະກຳບໍ່ມີຊື່",
+    "metadataFailureProvider": "ຂໍ້ຜິດພາດຈາກຜູ້ໃຫ້ບໍລິການ",
+    "metadataFailureTool": "ຂໍ້ຜິດພາດຈາກເຄື່ອງມື",
+    "metadataFailureCancelled": "ຍົກເລີກແລ້ວ",
+    "metadataFailureOther": "ຂໍ້ຜິດພາດທີ່ບໍ່ລະບຸ",
+    "metadataPlan_one": "ແຜນ: ສຳເລັດ {{displayDone}} ຈາກ {{displayTotal}} ຂັ້ນຕອນ",
+    "metadataFiles_one": "{{displayCount}} ໄຟລ໌ທີ່ປ່ຽນແປງ",
+    "metadataLinesAdded_one": "ເພີ່ມ {{displayCount}} ແຖວ",
+    "metadataLinesRemoved_one": "ລຶບ {{displayCount}} ແຖວ"
   },
   "systemSearch": {
     "couldNotOpenResult": "ບໍ່ສາມາດເປີດຜົນການຄົ້ນຫານີ້ໄດ້"
@@ -4604,7 +4631,8 @@
     "connectFailed": "ບໍ່ສາມາດເປີດໜ້າການເຊື່ອມຕໍ່ໄດ້"
   },
   "invoices": {
-    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງຈະສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ."
+    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ. ໃບຮັບເງິນຈາກ App Store ແລະ Google Play ຢູ່ໃນປະຫວັດເຄຣດິດ.",
+    "personalPeriod": "12 ເດືອນຜ່ານມາ"
   },
   "cloudAgent": {
     "compute": {

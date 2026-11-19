@@ -2468,7 +2468,8 @@
       "customModes": "Mod tersuai"
     },
     "modeSelector": {
-      "accessibility": "Mod: {{label}}"
+      "accessibility": "Mod: {{label}}",
+      "customMode": "Mod tersuai"
     },
     "modeOptions": {
       "code": "Tulis kod",
@@ -2784,7 +2785,7 @@
       "thinkingEffortAccessibility": "Tahap pemikiran {{label}}",
       "thinkingEffortSelected": "Tahap pemikiran {{label}}, dipilih",
       "thinkingEffortWithModel": "{{model}}, tahap pemikiran {{variant}}",
-      "lockedByAgent": ", Dikunci oleh ejen \"{{agent}}\"",
+      "lockedByAgent": "Dikunci oleh ejen \"{{agent}}\"",
       "addToFavorites": "Tambah {{name}} ke kegemaran",
       "removeFromFavorites": "Buang {{name}} daripada kegemaran",
       "sessionModel": "Model sesi"
@@ -2989,7 +2990,7 @@
     "toolRun": {
       "sheetTitle": "Panggilan alat",
       "condensedLabel": "{{itemCount}} item; {{last}}",
-      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elemen; {{last}}",
       "condensedLabel_other": "{{itemCount}} item; {{last}}"
     }
   },
@@ -3064,6 +3065,7 @@
   "queryError": {
     "neutralDescription": "Sila cuba lagi.",
     "offlineTitle": "Gagal memuatkan data.",
+    "offlineDescription": "Tidak dapat menghubungi pelayan.",
     "permissionDescription": "Anda tidak mempunyai kebenaran untuk melihat ini.",
     "notFoundDescription": "Item ini mungkin telah dibuang atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat memuatkan data.",
@@ -3707,6 +3709,7 @@
     "lastKnown": "Terakhir diketahui",
     "awaitingUpdate": "Menunggu kemas kini",
     "nextRun": "Pelaksanaan seterusnya",
+    "wasDue": "Sepatutnya",
     "waitingForYou": "Menunggu anda",
     "nextScheduled": "Jadual seterusnya",
     "answerNeeded": "Perlu jawapan",
@@ -4512,8 +4515,12 @@
     "loadError": "Tidak dapat memuatkan laporan",
     "view": "Baca laporan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Tapis mengikut konteks",
+    "contextAll": "Semua konteks",
     "dismiss": "Ketepikan laporan",
+    "dismissFailed": "Laporan ini masih belum dapat diketepikan. Ia akan dicuba semula di latar belakang.",
     "offline": "Luar talian · laporan disimpan",
     "cached": "Laporan disimpan · muat semula tidak tersedia",
     "summary": "Ringkasan AI",
@@ -4521,6 +4528,7 @@
     "summaryUnavailable": "Ringkasan AI tidak tersedia. Laporan berstruktur anda masih tersedia.",
     "summaryCharge": "Caj AI {{cost}}",
     "summaryChargePending": "Caj AI menunggu penyelarasan",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Bukti dan artifak",
     "timezone": "Zon waktu laporan",
     "deviceTimezone": "Guna zon waktu peranti",
@@ -4532,22 +4540,22 @@
     "timeHint": "Kad Utama memulihkan status langsung apabila tempoh laporan tamat, walaupun luar talian.",
     "invalidSchedule": "Pilih zon waktu yang sah dan tempoh laporan yang tidak kosong.",
     "notificationsHint": "Satu pemberitahuan umum setiap laporan berjadual. Bebas daripada ringkasan AI berbayar.",
-    "notificationPermission": "Dayakan pemberitahuan peranti dalam $t(common.notifications) untuk menerima laporan anda.",
+    "notificationPermission": "Hidupkan pemberitahuan push untuk menerima laporan anda.",
     "defaultModel": "Guna model lalai Kilo",
     "duration": "Had masa (minit)",
     "spendLimit": "Had perbelanjaan (USD)",
     "invalidSafeguards": "Masukkan had masa dan perbelanjaan yang positif dan terhingga.",
     "estimate": "Anggaran {{estimate}} · maksimum {{maximum}}",
-    "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk tetapan ini.",
+    "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk tetapan ini. Tukar model atau had, atau cuba lagi nanti.",
     "confirmPaid": "Dayakan ringkasan berbayar untuk {{context}}?",
     "paidDisclosure": "Anggaran {{estimate}}, sehingga {{maximum}}, dengan had {{minutes}} minit. Caj dikenakan walaupun penjanaan gagal.",
     "enable": "Dayakan ringkasan berbayar",
     "allContexts": "Laporan peribadi dan organisasi kekal berasingan.",
     "emptyHistory": "Tiada laporan tersimpan",
-    "estimatePermissionUnavailable": "Anda tidak mempunyai kebenaran untuk menggunakan baki konteks ini.",
-    "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia.",
-    "estimateBalanceUnavailable": "Baki tidak mencukupi untuk ringkasan berbayar.",
-    "estimateModelNotAllowed": "Model ini tidak dibenarkan di sini.",
+    "estimatePermissionUnavailable": "Anda tidak mempunyai kebenaran untuk menggunakan baki konteks ini. Minta pemilik organisasi untuk mendayakannya.",
+    "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia. Pilih model lain.",
+    "estimateBalanceUnavailable": "Baki tidak mencukupi untuk ringgisan berbayar. Tambah kredit pada baki konteks ini.",
+    "estimateModelNotAllowed": "Model ini tidak dibenarkan dalam konteks ini. Pilih model lain.",
     "estimateSpendLimitTooLow": "Naikkan had perbelanjaan untuk membenarkan ringkasan ini.",
     "saved": "Tetapan laporan disimpan",
     "selectedSessions": "Sesi terpilih",
@@ -4556,16 +4564,35 @@
     "capturedAt": "Dirakam {{time}}",
     "snapshotHint": "Syot kilat keadaan sesi terkini yang tersedia, dirakam sebaik mungkin pada waktu pagi yang dijadualkan. Bilangan merujuk kepada sesi terpilih, bukan keseluruhan aktiviti semalaman.",
     "snapshotTruncated": "Sesetengah sesi atau bukti tidak disertakan untuk mengehadkan saiz syot kilat ini.",
-    "snapshotSummaryFailed": "Ringkasan AI gagal. Syot kilat berstruktur anda masih tersedia.",
+    "snapshotSummaryFailed": "Ringkasan AI gagal. Laporan berstruktur anda masih tersedia.",
     "scheduledContextEnabled": "Laporan berjadual",
     "scheduledContextSettings": "Laporan berjadual · {{context}}",
     "scheduledContextHint": "Dayakan rakaman berjadual dan ringkasan AI berbayar untuk konteks ini sahaja. Petikan terpilih yang disunting untuk menyembunyikan maklumat sensitif dan fakta berstruktur dihantar ke model anda. Ringkasan menggunakan bahasa aplikasi yang disimpan apabila anda mengemas kini tetapan laporan. Caj menggunakan baki konteks ini. Syot kilat tanpa aktiviti tidak menggunakan AI.",
     "snapshotSafeguards": "Had masa dan perbelanjaan bagi setiap ringkasan dikenakan pada setiap syot kilat berjadual, bukan sebagai bajet harian.",
-    "snapshotEstimateInputTooLarge": "Syot kilat ini mempunyai terlalu banyak bukti untuk model yang dipilih.",
+    "snapshotEstimateInputTooLarge": "Syot kilat ini mempunyai terlalu banyak bukti untuk model yang dipilih. Pilih model dengan tetingkap input yang lebih besar.",
     "quietSnapshot": "Tiada aktiviti sesi dipilih untuk syot kilat ini. Tiada ringkasan AI diminta atau caj dikenakan.",
     "noEnabledContexts": "Tiada konteks didayakan untuk laporan berjadual",
     "sourceBlocker": "Sesi memerlukan perhatian",
-    "sourceMetadata": "Metadata sesi yang dirakam"
+    "sourceMetadata": "Metadata sesi yang dirakam",
+    "metadataPlan_other": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
+    "metadataPlan": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
+    "metadataFiles_other": "{{displayCount}} fail diubah",
+    "metadataFiles": "{{displayCount}} fail diubah",
+    "metadataLinesAdded_other": "{{displayCount}} baris ditambah",
+    "metadataLinesAdded": "{{displayCount}} baris ditambah",
+    "metadataLinesRemoved_other": "{{displayCount}} baris dibuang",
+    "metadataLinesRemoved": "{{displayCount}} baris dibuang",
+    "metadataPlanCurrent": "Langkah semasa: {{current}}",
+    "metadataFailure": "Pusingan terakhir gagal: {{kind}}",
+    "sourceActivity": "Aktiviti tanpa tajuk",
+    "metadataFailureProvider": "ralat pembekal",
+    "metadataFailureTool": "ralat alat",
+    "metadataFailureCancelled": "Dibatalkan",
+    "metadataFailureOther": "ralat tidak dinyatakan",
+    "metadataPlan_one": "Pelan: {{displayDone}} daripada {{displayTotal}} langkah selesai",
+    "metadataFiles_one": "{{displayCount}} fail diubah",
+    "metadataLinesAdded_one": "{{displayCount}} baris ditambah",
+    "metadataLinesRemoved_one": "{{displayCount}} baris dibuang"
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
@@ -4604,7 +4631,8 @@
     "connectFailed": "Tidak dapat membuka halaman sambungan"
   },
   "invoices": {
-    "personalEmptyDescription": "Invois untuk pembelian anda sendiri akan dipaparkan di sini setelah anda dibilkan."
+    "personalEmptyDescription": "Invois untuk pembelian anda sendiri dipaparkan di sini setelah anda dibilkan. Resit daripada App Store dan Google Play terdapat dalam Sejarah kredit.",
+    "personalPeriod": "12 Bulan Terakhir"
   },
   "cloudAgent": {
     "compute": {

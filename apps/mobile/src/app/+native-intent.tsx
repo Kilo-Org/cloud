@@ -184,6 +184,15 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/organization-invoices-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/(tabs)/(3_profile)/organization/invoices-fixture';
     }
+    // Dev-only personal invoices screen against fixed Stripe answers
+    // (`dev/personal-invoices-fixture/<listed|empty|error>`): the personal list
+    // is a Stripe read a local stack cannot serve, so every capture state routes
+    // here.
+    const personalInvoicesFixture =
+      /(?:^|\/)dev\/personal-invoices-fixture\/(listed|empty|error)\/?$/.exec(path);
+    if (personalInvoicesFixture) {
+      return `/(app)/(tabs)/(3_profile)/personal-invoices-fixture?state=${personalInvoicesFixture[1]}`;
+    }
     // Dev-only invite sheet: it navigates itself, so this returns falsy.
     if (handleOrganizationInviteMemberFixturePath(path)) {
       return null;

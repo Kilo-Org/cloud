@@ -6,8 +6,10 @@ import { isCompactionPart, type StoredMessage } from '../types';
 import {
   groupAssistantParts,
   groupConsecutiveAssistantMessages,
+  readKiloV1BackgroundTaskResult,
 } from '../shared-transcript-presentation';
 import { getVisibleAssistantParts } from '../message-presentation';
+import { BackgroundResultCard } from '../BackgroundResultCard';
 import { CloudMessage } from './CloudMessage';
 import { CloudMessagePartByIndex } from './CloudMessageParts';
 import { CloudReadOnlyThread } from './CloudThread';
@@ -16,12 +18,18 @@ import { AgentWorkGroup } from './AgentWorkGroup';
 
 function SharedMessage() {
   const presentation = useCloudMessagePresentation();
-  if (
-    presentation.sources[0]?.info.role === 'user' ||
-    presentation.parts.some(part => isCompactionPart(part.source))
-  )
-    return <CloudMessage />;
   const parts = presentation.parts.map(part => part.source);
+  if (presentation.sources[0]?.info.role === 'user') {
+    const [part] = parts;
+    const result = parts.length === 1 && part ? readKiloV1BackgroundTaskResult(part) : undefined;
+    if (!part || !result) return <CloudMessage />;
+    return (
+      <MessagePrimitive.Root className="py-2" data-message-id={presentation.id}>
+        <BackgroundResultCard part={part} result={result} />
+      </MessagePrimitive.Root>
+    );
+  }
+  if (parts.some(isCompactionPart)) return <CloudMessage />;
   const indices = new Map(getVisibleAssistantParts(parts).map((part, index) => [part, index]));
   const segments = groupAssistantParts(parts);
   if (segments.length === 0) return null;

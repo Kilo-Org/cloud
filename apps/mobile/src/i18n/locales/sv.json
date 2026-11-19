@@ -2468,7 +2468,8 @@
       "customModes": "Anpassade lägen"
     },
     "modeSelector": {
-      "accessibility": "Läge: {{label}}"
+      "accessibility": "Läge: {{label}}",
+      "customMode": "Anpassat läge"
     },
     "modeOptions": {
       "code": "Kod",
@@ -2784,7 +2785,7 @@
       "thinkingEffortAccessibility": "Resonemangsnivå: {{label}}",
       "thinkingEffortSelected": "Resonemangsnivå: {{label}}, vald",
       "thinkingEffortWithModel": "{{model}}, resonemangsnivå: {{variant}}",
-      "lockedByAgent": ", Låst av agenten ”{{agent}}”",
+      "lockedByAgent": "Låst av agenten ”{{agent}}”",
       "addToFavorites": "Lägg till {{name}} i favoriter",
       "removeFromFavorites": "Ta bort {{name}} från favoriter",
       "sessionModel": "Sessionmodell"
@@ -3064,6 +3065,7 @@
   "queryError": {
     "neutralDescription": "Försök igen.",
     "offlineTitle": "Kunde inte läsa in",
+    "offlineDescription": "Kunde inte nå servern.",
     "permissionDescription": "Du har inte behörighet att se det här.",
     "notFoundDescription": "Det här objektet kan ha tagits bort eller är inte längre tillgängligt.",
     "serverTitle": "Kunde inte läsa in innehållet.",
@@ -3707,6 +3709,7 @@
     "lastKnown": "Senast kända",
     "awaitingUpdate": "Väntar på uppdatering",
     "nextRun": "Nästa körning",
+    "wasDue": "Förväntades",
     "waitingForYou": "Väntar på dig",
     "nextScheduled": "Nästa schemalagda",
     "answerNeeded": "Väntar på svar",
@@ -4512,8 +4515,12 @@
     "loadError": "Det gick inte att läsa in rapporter",
     "view": "Läs rapport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Filtrera efter kontext",
+    "contextAll": "Alla kontexter",
     "dismiss": "Avskriv rapport",
+    "dismissFailed": "Det gick inte att avfärda den här rapporten ännu. Den försöker igen i bakgrunden.",
     "offline": "Offline · sparad rapport",
     "cached": "Sparad rapport · kan inte uppdateras",
     "summary": "AI-sammanfattning",
@@ -4521,6 +4528,7 @@
     "summaryUnavailable": "AI-sammanfattningen är inte tillgänglig. Din strukturerade rapport finns fortfarande.",
     "summaryCharge": "AI debiterade {{cost}}",
     "summaryChargePending": "AI-avgiften väntar på avstämning",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Underlag och artefakter",
     "timezone": "Tidszon för rapport",
     "deviceTimezone": "Använd enhetens tidszon",
@@ -4532,22 +4540,22 @@
     "timeHint": "Hem-kortet återgår till livestatus när rapportperioden slutar, även offline.",
     "invalidSchedule": "Välj en giltig tidszon och en rapportperiod som inte är tom.",
     "notificationsHint": "En allmän avisering per schemalagd rapport. Oberoende av betalda AI-sammanfattningar.",
-    "notificationPermission": "Aktivera enhetsaviseringar i $t(common.notifications) för att få din rapport.",
+    "notificationPermission": "Aktivera push-notiser för att få din rapport.",
     "defaultModel": "Använd Kilos standardmodell",
     "duration": "Tidsgräns (minuter)",
     "spendLimit": "Kostnadsgräns (USD)",
     "invalidSafeguards": "Ange positiva, ändliga tids- och kostnadsgränser.",
     "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
-    "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar.",
+    "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar. Ändra modellen eller gränserna, eller försök igen senare.",
     "confirmPaid": "Aktivera betalda sammanfattningar för {{context}}?",
     "paidDisclosure": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
     "enable": "Aktivera betalda sammanfattningar",
     "allContexts": "Personliga rapporter och organisationsrapporter hålls åtskilda.",
     "emptyHistory": "Inga sparade rapporter",
-    "estimatePermissionUnavailable": "Du har inte behörighet att använda saldot för den här kontexten.",
-    "estimatePricingUnavailable": "Prissättning för denna modell är inte tillgänglig.",
-    "estimateBalanceUnavailable": "Inte tillräckligt saldo för en betald sammanfattning.",
-    "estimateModelNotAllowed": "Denna modell är inte tillåten här.",
+    "estimatePermissionUnavailable": "Du har inte behörighet att använda saldot för den här kontexten. Be en organisationsägare att aktivera det.",
+    "estimatePricingUnavailable": "Prissättning för denna modell är inte tillgänglig. Välj en annan modell.",
+    "estimateBalanceUnavailable": "Inte tillräckligt saldo för en betald sammanfattning. Lägg till krediter på saldot för den här kontexten.",
+    "estimateModelNotAllowed": "Denna modell är inte tillåten i den här kontexten. Välj en annan modell.",
     "estimateSpendLimitTooLow": "Höj utgiftsskyddet för att tillåta denna sammanfattning.",
     "saved": "Inställningar för rapport sparade.",
     "selectedSessions": "Utvalda sessioner",
@@ -4556,16 +4564,35 @@
     "capturedAt": "Tagen {{time}}",
     "snapshotHint": "Ögonblicksbild av sessionernas senast tillgängliga tillstånd vid den schemalagda morgontiden. Underlaget kan vara ofullständigt. Antalen gäller utvalda sessioner, inte all aktivitet under natten.",
     "snapshotTruncated": "Vissa sessioner eller underlag utelämnades för att begränsa ögonblicksbildens omfattning.",
-    "snapshotSummaryFailed": "AI-sammanfattningen misslyckades. Din strukturerade ögonblicksbild finns fortfarande tillgänglig.",
+    "snapshotSummaryFailed": "AI-sammanfattningen misslyckades. Din strukturerade rapport finns fortfarande.",
     "scheduledContextEnabled": "Schemalagda rapporter",
     "scheduledContextSettings": "Schemalagda rapporter · {{context}}",
     "scheduledContextHint": "Aktivera schemalagda ögonblicksbilder och betalda AI-sammanfattningar endast för den här kontexten. Utvalda, maskerade utdrag och strukturerade fakta skickas till din modell. Sammanfattningarna använder det appspråk som sparas när du ändrar rapportinställningarna. Avgifter dras från den här kontextens saldo. Ögonblicksbilder utan utvald aktivitet använder inte AI.",
     "snapshotSafeguards": "Tids- och kostnadsgränser per sammanfattning gäller för varje schemalagd ögonblicksbild, inte som en daglig budget.",
-    "snapshotEstimateInputTooLarge": "Den här ögonblicksbilden innehåller för mycket underlag för den valda modellen.",
+    "snapshotEstimateInputTooLarge": "Den här ögonblicksbilden innehåller för mycket underlag för den valda modellen. Välj en modell med ett större inmatningsfönster.",
     "quietSnapshot": "Ingen sessionsaktivitet valdes ut för den här ögonblicksbilden. Ingen AI-sammanfattning begärdes och ingen avgift togs ut.",
     "noEnabledContexts": "Inga kontexter är aktiverade för schemalagda rapporter",
     "sourceBlocker": "Sessionen behöver uppmärksamhet",
-    "sourceMetadata": "Insamlad sessionsmetadata"
+    "sourceMetadata": "Insamlad sessionsmetadata",
+    "metadataPlan_one": "Plan: {{displayDone}} av {{displayTotal}} steg klart",
+    "metadataPlan_other": "Plan: {{displayDone}} av {{displayTotal}} steg klara",
+    "metadataPlan": "Plan: {{displayDone}} av {{displayTotal}} steg klara",
+    "metadataFiles_one": "{{displayCount}} fil ändrad",
+    "metadataFiles_other": "{{displayCount}} filer ändrade",
+    "metadataFiles": "{{displayCount}} filer ändrade",
+    "metadataLinesAdded_one": "{{displayCount}} rad tillagd",
+    "metadataLinesAdded_other": "{{displayCount}} rader tillagda",
+    "metadataLinesAdded": "{{displayCount}} rader tillagda",
+    "metadataLinesRemoved_one": "{{displayCount}} rad borttagen",
+    "metadataLinesRemoved_other": "{{displayCount}} rader borttagna",
+    "metadataLinesRemoved": "{{displayCount}} rader borttagna",
+    "metadataPlanCurrent": "Aktuellt steg: {{current}}",
+    "metadataFailure": "Förra omgången misslyckades: {{kind}}",
+    "sourceActivity": "Namnlös aktivitet",
+    "metadataFailureProvider": "leverantörsfel",
+    "metadataFailureTool": "verktygsfel",
+    "metadataFailureCancelled": "Avbruten",
+    "metadataFailureOther": "ospecificerat fel"
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunde inte öppna det här sökresultatet"
@@ -4604,7 +4631,8 @@
     "connectFailed": "Det gick inte att öppna anslutningssidan"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakturor för dina egna köp visas här när du har fakturerats."
+    "personalEmptyDescription": "Fakturor för dina egna köp visas här när du har fakturerats. Kvitton från App Store och Google Play finns i Kredithistorik.",
+    "personalPeriod": "Senaste 12 månaderna"
   },
   "cloudAgent": {
     "compute": {

@@ -2468,7 +2468,8 @@
       "customModes": "Hali maalum"
     },
     "modeSelector": {
-      "accessibility": "Hali: {{label}}"
+      "accessibility": "Hali: {{label}}",
+      "customMode": "Hali maalum"
     },
     "modeOptions": {
       "code": "Andika msimbo",
@@ -2784,7 +2785,7 @@
       "thinkingEffortAccessibility": "juhudi za kufikiri: {{label}}",
       "thinkingEffortSelected": "juhudi za kufikiri: {{label}}, zimechaguliwa",
       "thinkingEffortWithModel": "{{model}}, juhudi za kufikiri: {{variant}}",
-      "lockedByAgent": ", Imefungwa na wakala \"{{agent}}\"",
+      "lockedByAgent": "Imefungwa na wakala \"{{agent}}\"",
       "addToFavorites": "Ongeza {{name}} kwenye vipendwa",
       "removeFromFavorites": "Ondoa {{name}} kwenye vipendwa",
       "sessionModel": "Modeli ya kikao"
@@ -3064,6 +3065,7 @@
   "queryError": {
     "neutralDescription": "Tafadhali jaribu tena.",
     "offlineTitle": "Imeshindikana kupakia.",
+    "offlineDescription": "Imeshindikana kufikia seva.",
     "permissionDescription": "Huna ruhusa ya kuona maudhui haya.",
     "notFoundDescription": "Kipengele hiki huenda kiliondolewa au hakipatikani tena.",
     "serverTitle": "Imeshindikana kupakia.",
@@ -3707,6 +3709,7 @@
     "lastKnown": "Hali ya mwisho iliyojulikana",
     "awaitingUpdate": "Inasubiri sasisho",
     "nextRun": "Utekelezaji unaofuata",
+    "wasDue": "Ilitarajiwa",
     "waitingForYou": "Inakusubiri",
     "nextScheduled": "Zilizopangwa zinazofuata",
     "answerNeeded": "Inasubiri jibu",
@@ -4512,8 +4515,12 @@
     "loadError": "Imeshindwa kupakia ripoti",
     "view": "Soma ripoti",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Chuja kwa muktadha",
+    "contextAll": "Miktadha yote",
     "dismiss": "Puuza ripoti",
+    "dismissFailed": "Ripoti hii bado haiwezi kupuuzwa. Inajaribu tena katika usuli.",
     "offline": "Nje ya mtandao · ripoti iliyohifadhiwa",
     "cached": "Ripoti iliyohifadhiwa · haiwezi kuonyeshwa upya",
     "summary": "Muhtasari wa AI",
@@ -4521,6 +4528,7 @@
     "summaryUnavailable": "Muhtasari wa AI haupatikani. Ripoti yako iliyopangwa bado inapatikana.",
     "summaryCharge": "AI imetoza {{cost}}",
     "summaryChargePending": "Malipo ya AI yanasubiri uhakiki",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Ushahidi na vielelezo",
     "timezone": "Saa za eneo za ripoti",
     "deviceTimezone": "Tumia saa za eneo za kifaa",
@@ -4532,22 +4540,22 @@
     "timeHint": "Kadi ya Mwanzo hurejesha hali ya sasa wakati kipindi cha ripoti kinapoisha, hata nje ya mtandao.",
     "invalidSchedule": "Chagua saa za eneo sahihi na kipindi cha ripoti kisichokuwa tupu.",
     "notificationsHint": "Arifa moja ya jumla kwa kila ripoti iliyoratibiwa. Haitegemei muhtasari wa AI wa kulipia.",
-    "notificationPermission": "Washa arifa za kifaa katika $t(common.notifications) ili kupokea ripoti yako.",
+    "notificationPermission": "Washa arifa za push ili kupokea ripoti yako.",
     "defaultModel": "Tumia modeli chaguomsingi ya Kilo",
     "duration": "Kikomo cha muda (dakika)",
     "spendLimit": "Kikomo cha matumizi (USD)",
     "invalidSafeguards": "Weka vikomo vya muda na matumizi vyenye thamani chanya na zenye ukomo.",
     "estimate": "Makadirio {{estimate}} · kiwango cha juu {{maximum}}",
-    "estimateUnavailable": "Muhtasari wenye malipo haupatikani kwa mipangilio hii.",
+    "estimateUnavailable": "Muhtasari wenye malipo haupatikani kwa mipangilio hii. Badilisha modeli au mipaka, au ujaribu tena baadaye.",
     "confirmPaid": "Washa muhtasari wa kulipia kwa {{context}}?",
     "paidDisclosure": "Makadirio {{estimate}}, hadi {{maximum}}, na kikomo cha dakika {{minutes}}. Malipo yanatozwa hata utengenezaji ukishindwa.",
     "enable": "Washa muhtasari wa kulipia",
     "allContexts": "Ripoti za binafsi na za shirika hubaki tofauti.",
     "emptyHistory": "Hakuna ripoti zilizohifadhiwa",
-    "estimatePermissionUnavailable": "Huna ruhusa ya kutumia salio la muktadha huu.",
-    "estimatePricingUnavailable": "Bei ya modeli hii haipatikani.",
-    "estimateBalanceUnavailable": "Salio halitoshi kwa muhtasari wenye malipo.",
-    "estimateModelNotAllowed": "Modeli hii hairuhusiwa hapa.",
+    "estimatePermissionUnavailable": "Huna ruhusa ya kutumia salio la muktadha huu. Omba mmiliki wa shirika kuiwezesha.",
+    "estimatePricingUnavailable": "Bei ya modeli hii haipatikani. Chagua modeli nyingine.",
+    "estimateBalanceUnavailable": "Salio halitoshi kwa muhtasari wenye malipo. Ongeza mkopo kwenye salio la muktadha huu.",
+    "estimateModelNotAllowed": "Modeli hii hairuhusiwi katika muktadha huu. Chagua modeli nyingine.",
     "estimateSpendLimitTooLow": "Ongeza kikomo cha matumizi ili kuruhusu muhtasari huu.",
     "saved": "Mipangilio ya ripoti imehifadhika",
     "selectedSessions": "Vipindi vilivyochaguliwa",
@@ -4556,16 +4564,35 @@
     "capturedAt": "Ilihifadhiwa {{time}}",
     "snapshotHint": "Rekodi ya hali ya hivi karibuni ya vipindi inayopatikana, iliyohifadhiwa kadiri inavyowezekana asubuhi iliyoratibiwa. Idadi zinahusu vipindi vilivyochaguliwa, si shughuli zote za usiku.",
     "snapshotTruncated": "Baadhi ya vipindi au ushahidi havikujumuishwa ili rekodi hii ya hali isizidi vikomo.",
-    "snapshotSummaryFailed": "Muhtasari wa AI umeshindwa. Rekodi yako ya hali yenye taarifa zilizopangwa bado inapatikana.",
+    "snapshotSummaryFailed": "Muhtasari wa AI umeshindwa. Ripoti yako iliyopangwa bado inapatikana.",
     "scheduledContextEnabled": "Ripoti zilizoratibiwa",
     "scheduledContextSettings": "Ripoti zilizoratibiwa · {{context}}",
     "scheduledContextHint": "Washa uhifadhi wa hali kwa ratiba na mihtasari ya AI ya kulipia kwa muktadha huu tu. Dondoo zilizochaguliwa, ambazo taarifa nyeti zimefichwa, pamoja na taarifa zilizopangwa hutumwa kwa modeli yako. Mihtasari hutumia lugha ya programu iliyohifadhiwa unapobadilisha mipangilio ya ripoti. Malipo hutumia salio la muktadha huu. Rekodi za hali zisizo na shughuli hazitumii AI.",
     "snapshotSafeguards": "Vikomo vya muda na matumizi kwa kila muhtasari hutumika kwa kila rekodi ya hali iliyoratibiwa, si bajeti ya kila siku.",
-    "snapshotEstimateInputTooLarge": "Rekodi hii ya hali ina ushahidi mwingi mno kwa modeli iliyochaguliwa.",
+    "snapshotEstimateInputTooLarge": "Rekodi hii ya hali ina ushahidi mwingi mno kwa modeli iliyochaguliwa. Chagua modeli yenye dirisha kikubwa zaidi la ingizo.",
     "quietSnapshot": "Hakuna shughuli za vipindi zilizochaguliwa kwa rekodi hii ya hali. Hakuna muhtasari wa AI ulioombwa wala malipo yaliyotozwa.",
     "noEnabledContexts": "Hakuna miktadha iliyowezeshwa kwa ripoti zilizoratibiwa",
     "sourceBlocker": "Kipindi kinahitaji kushughulikiwa",
-    "sourceMetadata": "Metadata za kipindi zilizohifadhiwa"
+    "sourceMetadata": "Metadata za kipindi zilizohifadhiwa",
+    "metadataPlan_one": "Mpango: hatua {{displayDone}} kati ya {{displayTotal}} imekamilika",
+    "metadataPlan_other": "Mpango: hatua {{displayDone}} kati ya {{displayTotal}} zimekamilika",
+    "metadataPlan": "Mpango: hatua {{displayDone}} kati ya {{displayTotal}} zimekamilika",
+    "metadataFiles_one": "Faili {{displayCount}} limebadilika",
+    "metadataFiles_other": "Faili {{displayCount}} zimebadilika",
+    "metadataFiles": "Faili {{displayCount}} zimebadilika",
+    "metadataLinesAdded_one": "Mstari {{displayCount}} umeongezwa",
+    "metadataLinesAdded_other": "Mistari {{displayCount}} imeongezwa",
+    "metadataLinesAdded": "Mistari {{displayCount}} imeongezwa",
+    "metadataLinesRemoved_one": "Mstari {{displayCount}} umeondolewa",
+    "metadataLinesRemoved_other": "Mistari {{displayCount}} imeondolewa",
+    "metadataLinesRemoved": "Mistari {{displayCount}} imeondolewa",
+    "metadataPlanCurrent": "Hatua ya sasa: {{current}}",
+    "metadataFailure": "Zamu ya mwisho ilishindikana: {{kind}}",
+    "sourceActivity": "Shughuli isiyo na jina",
+    "metadataFailureProvider": "hitilafu ya mtoa huduma",
+    "metadataFailureTool": "hitilafu ya zana",
+    "metadataFailureCancelled": "Imeghairiwa",
+    "metadataFailureOther": "hitilafu isiyojulikana"
   },
   "systemSearch": {
     "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"
@@ -4604,7 +4631,8 @@
     "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha"
   },
   "invoices": {
-    "personalEmptyDescription": "Ankara za ununuzi wako binafsi zitaonekana hapa baada ya kutozwa."
+    "personalEmptyDescription": "Ankara za ununuzi wako binafsi zinaonekana hapa baada ya kutozwa. Risiti kutoka App Store na Google Play ziko katika Historia ya salio.",
+    "personalPeriod": "Miezi 12 iliyopita"
   },
   "cloudAgent": {
     "compute": {

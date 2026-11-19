@@ -2468,7 +2468,8 @@
       "customModes": "Àwọn ipò àkànṣe"
     },
     "modeSelector": {
-      "accessibility": "Ipò: {{label}}"
+      "accessibility": "Ipò: {{label}}",
+      "customMode": "Ipò àkànṣe"
     },
     "modeOptions": {
       "code": "Kọ kóòdù",
@@ -2784,7 +2785,7 @@
       "thinkingEffortAccessibility": "ìwọ̀n ìrònú {{label}}",
       "thinkingEffortSelected": "ìwọ̀n ìrònú {{label}}, a ti yàn án",
       "thinkingEffortWithModel": "{{model}}, ìwọ̀n ìrònú {{variant}}",
-      "lockedByAgent": ", Aṣojú \"{{agent}}\" ti tì í pa",
+      "lockedByAgent": "Aṣojú \"{{agent}}\" ti tì í pa",
       "addToFavorites": "Fi {{name}} kún àwọn àyànfẹ́",
       "removeFromFavorites": "Yọ {{name}} kúrò nínú àwọn àyànfẹ́",
       "sessionModel": "Àwòṣe ìgbà iṣẹ́"
@@ -3064,6 +3065,7 @@
   "queryError": {
     "neutralDescription": "Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
     "offlineTitle": "A kò lè gbé dátà wọlé.",
+    "offlineDescription": "A kò lè dé olupin.",
     "permissionDescription": "O kò ní àṣẹ láti wo èyí.",
     "notFoundDescription": "Ó ṣeé ṣe kí a ti yọ ohun yìí kúrò tàbí kí ó má sí mọ́.",
     "serverTitle": "A kò lè gbé dátà wọlé.",
@@ -3707,6 +3709,7 @@
     "lastKnown": "Tí a mọ̀ kẹ́yìn",
     "awaitingUpdate": "Ń dúró de ìmúdójúìwọ̀n",
     "nextRun": "Ìṣiṣẹ́ tó kàn",
+    "wasDue": "A retí",
     "waitingForYou": "Ń dúró dè ọ́",
     "nextScheduled": "Àwọn ètò tó kàn",
     "answerNeeded": "Nílò èsì",
@@ -4512,8 +4515,12 @@
     "loadError": "Kò ṣeé ṣe láti gbé àwọn ìròyìn wọlé",
     "view": "Ka ìròyìn",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Àṣàyàn nípa àyíká",
+    "contextAll": "Gbogbo àyíká",
     "dismiss": "Yọ ìròyìn kúrò",
+    "dismissFailed": "Kì í ṣeé yọ ìròyìn yìí kúrò ṣẹ́ṣẹ́. Ọ́ máa tún gbìyànjú fúnra rẹ̀.",
     "offline": "Kò sí lórí ayélujára · ìròyìn tí a fipamọ́",
     "cached": "Ìròyìn tí a fipamọ́ · kò ṣeé sọ di tuntun",
     "summary": "Àkópọ̀ AI",
@@ -4521,6 +4528,7 @@
     "summaryUnavailable": "Àkópọ̀ AI kò sí. Ìròyìn onílànà rẹ ṣì wà.",
     "summaryCharge": "AI gba {{cost}}",
     "summaryChargePending": "Owó AI ń dúró de ìṣirò",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Ẹ̀rí àti àwọn ohun èlò",
     "timezone": "Àgbègbè àkókò ìròyìn",
     "deviceTimezone": "Lo àgbègbè àkókò ẹ̀rọ",
@@ -4532,22 +4540,22 @@
     "timeHint": "Káàdì Ilé yóò dá ipò lọ́wọ́lọ́wọ́ padà nígbà tí àkókò ìròyìn bá parí, kódà láìsí ayélujára.",
     "invalidSchedule": "Yan àgbègbè àkókò tó tọ́ àti àkókò ìròyìn tí kò ṣófo.",
     "notificationsHint": "Ìfitónilétí gbogbogbò kan ṣoṣo fún ìròyìn kọ̀ọ̀kan tí a ṣètò. Kò sinmi lórí àkópọ̀ AI olówó.",
-    "notificationPermission": "Mú ìfitónilétí ẹ̀rọ ṣiṣẹ́ nínú $t(common.notifications) láti gba ìròyìn rẹ.",
+    "notificationPermission": "Mú ìfitónilétí ẹ̀rọ ṣiṣẹ́ láti gba ìròyìn rẹ.",
     "defaultModel": "Lo àwòṣe àìyípadà Kilo",
     "duration": "Ààbò àkókò (ìṣẹ́jú)",
     "spendLimit": "Ààbò ìnáwó (USD)",
     "invalidSafeguards": "Tẹ òpin àkókò àti ìnáwó tó jẹ́ rere, tó sì ní òpin.",
     "estimate": "Ìsirò {{estimate}} · ti ó pọ̀jù {{maximum}}",
-    "estimateUnavailable": "Àkópọ̀ tí a sanwó fún kò sí fún àwọn ètò yìí.",
+    "estimateUnavailable": "Àkópọ̀ tí a sanwó fún kò sí fún àwọn ètò yìí. Yí àwòṣe dà tàbí àwọn ààlà dà, tàbí gbìyànjú mọ̀ ní àmọ̀jú.",
     "confirmPaid": "Mú àkópọ̀ olówó ṣiṣẹ́ fún {{context}}?",
     "paidDisclosure": "Ìdíyelé {{estimate}}, títí dé {{maximum}}, pẹ̀lú òpin ìṣẹ́jú {{minutes}}. A ó gba owó kódà tí ìṣẹ̀dá bá kùnà.",
     "enable": "Mú àkópọ̀ olówó ṣiṣẹ́",
     "allContexts": "Àwọn ìròyìn ti ara ẹni àti ti àjọ wà lọ́tọ̀ọ̀tọ̀.",
     "emptyHistory": "Kò sí ìròyìn tí a fi pamọ́",
-    "estimatePermissionUnavailable": "O kò ní àṣẹ láti lo owó tó ṣẹ́ kù nínú àyíká yìí.",
-    "estimatePricingUnavailable": "Owó tí a ń gbà fún àwòṣe yìí kò hàn.",
-    "estimateBalanceUnavailable": "Owó inú àkántì kò tó fún àkópọ̀ tí a sanwó fún.",
-    "estimateModelNotAllowed": "A kò jẹ́ kí a lo àwòṣe yìí níbí.",
+    "estimatePermissionUnavailable": "O kò ní àṣẹ láti lo owó tó ṣẹ́ kù nínú àyíká yìí. Jọ̀wọ́ bẹ́ olùdárí àjọ láti tán ọ́ sílẹ̀.",
+    "estimatePricingUnavailable": "Owó tí a ń gbà fún àwòṣe yìí kò hàn. Yan àwòṣe mìíràn.",
+    "estimateBalanceUnavailable": "Owó inú àkántì kò tó fún àkópọ̀ tí a sanwó fún. Fi owó kún owó inú àyíká yìí.",
+    "estimateModelNotAllowed": "A kò fàyè gba láti lo àwòṣe yìí nínú àyíká yìí. Yan àwòṣe mìíràn.",
     "estimateSpendLimitTooLow": "Gbé òpin ààbò ìnáwó sókè láti jẹ́ kí àkópọ̀ yìí ṣeé ṣe.",
     "saved": "A ti fi Ètò ìròyìn pamọ́.",
     "selectedSessions": "Àwọn ìgbà iṣẹ́ tí a yàn",
@@ -4556,16 +4564,35 @@
     "capturedAt": "A gba a sílẹ̀ {{time}}",
     "snapshotHint": "Àkọsílẹ̀ ipò ìgbà iṣẹ́ tuntun jùlọ tó wà, tí a gbà ní àárọ̀ tí a ṣètò, bí ẹ̀rí tó wà ṣe gbà. Àwọn iye náà jẹ́ ti ìgbà iṣẹ́ tí a yàn, kì í ṣe gbogbo ìṣe òru.",
     "snapshotTruncated": "A fi àwọn ìgbà iṣẹ́ tàbí ẹ̀rí kan sílẹ̀ kí àkọsílẹ̀ ipò yìí má kọjá òpin.",
-    "snapshotSummaryFailed": "Àkópọ̀ AI kùnà. Àkọsílẹ̀ ipò onílànà rẹ ṣì wà.",
+    "snapshotSummaryFailed": "Àkópọ̀ AI kùnà. Ìròyìn onílànà rẹ ṣì wà.",
     "scheduledContextEnabled": "Àwọn ìròyìn tí a ṣètò",
     "scheduledContextSettings": "Àwọn ìròyìn tí a ṣètò · {{context}}",
     "scheduledContextHint": "Mú gbígba àkọsílẹ̀ ipò ní àkókò tí a ṣètò àti àkópọ̀ AI olówó ṣiṣẹ́ fún àyíká yìí nìkan. A ń fi àwọn àyọkà tí a yàn, tí a sì ti yọ ìsọfúnni àṣírí kúrò nínú wọn, àti òtítọ́ onílànà ránṣẹ́ sí àwòṣe rẹ. Àwọn àkópọ̀ ń lo èdè app tí a fi pamọ́ nígbà tí o bá yí ètò ìròyìn padà fúnra rẹ. Owó ń wá láti inú ìyókù àyíká yìí. Àwọn àkọsílẹ̀ ipò tí kò ní ìṣe kì í lo AI.",
     "snapshotSafeguards": "Òpin àkókò àti ìnáwó fún àkópọ̀ kọ̀ọ̀kan kan àkọsílẹ̀ ipò kọ̀ọ̀kan tí a ṣètò, kì í ṣe ìnáwó ojoojúmọ́.",
-    "snapshotEstimateInputTooLarge": "Ẹ̀rí nínú àkọsílẹ̀ ipò yìí pọ̀ ju ohun tí àwòṣe tí a yàn lè lò lọ.",
+    "snapshotEstimateInputTooLarge": "Ẹ̀rí nínú àkọsílẹ̀ ipò yìí pọ̀ ju ohun tí àwòṣe tí a yàn lè lò lọ. Yan àwòṣe tí fèrèsé ìfọ̀kàntẹ́ rẹ tóbì jù.",
     "quietSnapshot": "Kò sí ìṣe ìgbà iṣẹ́ tí a yàn fún àkọsílẹ̀ ipò yìí. A kò béèrè fún àkópọ̀ AI, a kò sì gba owó.",
     "noEnabledContexts": "Kò sí àyíká tí a ti mú ṣiṣẹ́ fún àwọn ìròyìn tí a ṣètò",
     "sourceBlocker": "Ìgbà iṣẹ́ nílò àfiyèsí",
-    "sourceMetadata": "Ìsọfúnni àpèjúwe ìgbà iṣẹ́ tí a gbà sílẹ̀"
+    "sourceMetadata": "Ìsọfúnni àpèjúwe ìgbà iṣẹ́ tí a gbà sílẹ̀",
+    "metadataPlan_other": "Ètò: {{displayDone}} nínú {{displayTotal}} ìgbésẹ̀ ti parí",
+    "metadataPlan": "Ètò: {{displayDone}} nínú {{displayTotal}} ìgbésẹ̀ ti parí",
+    "metadataFiles_other": "{{displayCount}} fáìlì ti yí padà",
+    "metadataFiles": "{{displayCount}} fáìlì ti yí padà",
+    "metadataLinesAdded_other": "{{displayCount}} ìlà tí a fi kún",
+    "metadataLinesAdded": "{{displayCount}} ìlà tí a fi kún",
+    "metadataLinesRemoved_other": "{{displayCount}} ìlà tí a yọ kúrò",
+    "metadataLinesRemoved": "{{displayCount}} ìlà tí a yọ kúrò",
+    "metadataPlanCurrent": "Ìgbésẹ̀ lọ́wọ́lọ́wọ́: {{current}}",
+    "metadataFailure": "Ìyí tó kẹ́yìn kùnà: {{kind}}",
+    "sourceActivity": "Ìgbéṣe tí kò ní àkọlé",
+    "metadataFailureProvider": "àṣìṣe olùpèsè",
+    "metadataFailureTool": "àṣìṣe irinṣẹ́",
+    "metadataFailureCancelled": "A ti fagilé",
+    "metadataFailureOther": "àṣìṣe àìmọ̀",
+    "metadataPlan_one": "Ètò: {{displayDone}} nínú {{displayTotal}} ìgbésẹ̀ ti parí",
+    "metadataFiles_one": "{{displayCount}} fáìlì ti yí padà",
+    "metadataLinesAdded_one": "{{displayCount}} ìlà tí a fi kún",
+    "metadataLinesRemoved_one": "{{displayCount}} ìlà tí a yọ kúrò"
   },
   "systemSearch": {
     "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"
@@ -4604,7 +4631,8 @@
     "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀"
   },
   "invoices": {
-    "personalEmptyDescription": "Àwọn ìwé owó fún àwọn ìrajà tìrẹ yóò hàn níbí nígbà tí a bá ti gba owó lọ́wọ́ rẹ."
+    "personalEmptyDescription": "Àwọn ìwé owó fún àwọn ìrajà tìrẹ yóò hàn níbí nígbà tí a bá ti gba owó lọ́wọ́ rẹ. Ìwé ẹ̀rí ìsanwó láti App Store àti ìwé ẹ̀rí ìsanwó láti Google Play wà nínú Ìtàn kírẹ́dítì.",
+    "personalPeriod": "Oṣù 12 tó kọjá"
   },
   "cloudAgent": {
     "compute": {

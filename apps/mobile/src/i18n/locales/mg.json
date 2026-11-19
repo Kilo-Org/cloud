@@ -2468,7 +2468,8 @@
       "customModes": "Fomba fiasa manokana"
     },
     "modeSelector": {
-      "accessibility": "Fomba fiasa: {{label}}"
+      "accessibility": "Fomba fiasa: {{label}}",
+      "customMode": "Fomba fiasa manokana"
     },
     "modeOptions": {
       "code": "Manorata kaody",
@@ -2784,7 +2785,7 @@
       "thinkingEffortAccessibility": "ezaka amin'ny fisainana: {{label}}",
       "thinkingEffortSelected": "ezaka amin'ny fisainana: {{label}}, voafidy",
       "thinkingEffortWithModel": "{{model}}, ezaka amin'ny fisainana: {{variant}}",
-      "lockedByAgent": ", Nohidin'ny mpanampy \"{{agent}}\"",
+      "lockedByAgent": "Nohidin'ny mpanampy \"{{agent}}\"",
       "addToFavorites": "Ampio ao amin'ny ankafizinao ny {{name}}",
       "removeFromFavorites": "Esory ao amin'ny ankafizinao ny {{name}}",
       "sessionModel": "Modelin'ny fotoam-piasana"
@@ -3064,6 +3065,7 @@
   "queryError": {
     "neutralDescription": "Andramo indray azafady.",
     "offlineTitle": "Tsy nahomby ny fampidirana.",
+    "offlineDescription": "Tsy tafita nifandray tamin'ny mpizara.",
     "permissionDescription": "Tsy manana alalana hijery an'ity ianao.",
     "notFoundDescription": "Mety nesorina ity zavatra ity na tsy misy intsony.",
     "serverTitle": "Tsy nety nampidirina ny angona.",
@@ -3707,6 +3709,7 @@
     "lastKnown": "Fantatra farany",
     "awaitingUpdate": "Miandry fanavaozana",
     "nextRun": "Fampandehanana manaraka",
+    "wasDue": "Nokasaina",
     "waitingForYou": "Miandry anao",
     "nextScheduled": "Voalahatra manaraka",
     "answerNeeded": "Mila valiny",
@@ -4512,8 +4515,12 @@
     "loadError": "Tsy nahavita naka ny tatitra",
     "view": "Vakio ny tatitra",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Sivana araka ny sehatra",
+    "contextAll": "Sehatra rehetra",
     "dismiss": "Esory ny tatitra",
+    "dismissFailed": "Mbola tsy azo esorina ity tatitra ity. Haverina any ambadika izany.",
     "offline": "Tsy misy tambajotra · tatitra voatahiry",
     "cached": "Tatitra voatahiry · tsy azo havaozina",
     "summary": "Famintinana AI",
@@ -4521,6 +4528,7 @@
     "summaryUnavailable": "Tsy misy ny famintinana AI. Mbola azo jerena ny tatitra voalamina.",
     "summaryCharge": "Sarany AI {{cost}}",
     "summaryChargePending": "Sarany AI miandry fanamarinana",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Porofo sy vokatra",
     "timezone": "Faritra ora amin'ny tatitra",
     "deviceTimezone": "Ampiasao ny faritra ora amin'ny fitaovana",
@@ -4532,22 +4540,22 @@
     "timeHint": "Averin'ny karatra Fandraisana ny sata ankehitriny rehefa tapitra ny fe-potoana tatitra, na tsy misy tambajotra aza.",
     "invalidSchedule": "Misafidiana faritra ora marina sy fe-potoana tatitra tsy foana.",
     "notificationsHint": "Fampandrenesana tsotra iray isaky ny tatitra voalahatra. Tsy miankina amin'ny famintinana AI andoavana.",
-    "notificationPermission": "Alefaso ny fampandrenesana amin'ny fitaovana ao amin'ny $t(common.notifications) mba handraisana ny tatitra.",
+    "notificationPermission": "Alefaso ny fampandrenesana push mba handraisana ny tatitrao.",
     "defaultModel": "Ampiasao ny modely default an'i Kilo",
     "duration": "Fetra fotoana (minitra)",
     "spendLimit": "Fetra fandaniana (USD)",
     "invalidSafeguards": "Ampidiro fetra fotoana sy fandaniana lehibe noho ny aotra sady voafetra.",
     "estimate": "Vinavina {{estimate}} · ambony indrindra {{maximum}}",
-    "estimateUnavailable": "Tsy misy famintinana andoavam-bola ho an'ireto fandrindrana ireto.",
+    "estimateUnavailable": "Tsy misy famintinana andoavam-bola ho an'ireto fandrindrana ireto. Ovay ny maodely na ny fetra, na andramo indray any aoriana.",
     "confirmPaid": "Alefa ve ny famintinana andoavana ho an'i {{context}}?",
     "paidDisclosure": "Tombana {{estimate}}, hatramin'ny {{maximum}}, miaraka amin'ny fetra {{minutes}} minitra. Misy sarany na dia tsy mahomby aza ny famoronana.",
     "enable": "Alefaso ny famintinana andoavana",
     "allContexts": "Misaraka ny tatitra manokana sy ny an'ny fikambanana.",
     "emptyHistory": "Tsy misy tatitra voatahiry",
-    "estimatePermissionUnavailable": "Tsy manana alalana hampiasa ny vola tavela amin'ity sehatra ity ianao.",
-    "estimatePricingUnavailable": "Tsy misy ny vidin'ity modely ity.",
-    "estimateBalanceUnavailable": "Tsy ampy ny vola tavela ho an'ny famintinana andoavam-bola.",
-    "estimateModelNotAllowed": "Tsy azo ekena ity modely ity eto.",
+    "estimatePermissionUnavailable": "Tsy manana alalana hampiasa ny vola tavela amin'ity sehatra ity ianao. Angataho ny tompon'ny fikambanana hampandehana izany.",
+    "estimatePricingUnavailable": "Tsy misy ny vidin'ity maodely ity. Misafidiana maodely hafa.",
+    "estimateBalanceUnavailable": "Tsy ampy ny vola tavela ho an'ny famintinana andoavam-bola. Ampio credit ao amin'ny vola tavela amin'ity sehatra ity.",
+    "estimateModelNotAllowed": "Tsy azo ekena ity maodely ity amin'ity sehatra ity. Misafidiana maodely hafa.",
     "estimateSpendLimitTooLow": "Ampitomboy ny fetra fandaniana mba hahafahana mamorona ity famintinana ity.",
     "saved": "Voatahiry ny fikirakirana tatitra",
     "selectedSessions": "Fotoam-piasana voafantina",
@@ -4556,16 +4564,35 @@
     "capturedAt": "Noraketina {{time}}",
     "snapshotHint": "Tatitra raikitra momba ny sata farany misy amin'ny fotoam-piasana, voarakitra araka izay azo atao amin'ny maraina voalahatra. Ny isa dia momba ny fotoam-piasana voafantina, fa tsy ny hetsika rehetra nandritra ny alina.",
     "snapshotTruncated": "Nisy fotoam-piasana na porofo tsy nampidirina mba hamerana ny haben'ity tatitra raikitra ity.",
-    "snapshotSummaryFailed": "Tsy nahomby ny famintinana AI. Mbola azo jerena ny tatitra voalamina voarakitrao.",
+    "snapshotSummaryFailed": "Tsy nahomby ny famintinana AI. Mbola azo jerena ny tatitra voalamina.",
     "scheduledContextEnabled": "Tatitra voalahatra",
     "scheduledContextSettings": "Tatitra voalahatra · {{context}}",
     "scheduledContextHint": "Alefaso ny fandraketana voalahatra sy ny famintinana AI andoavana ho an'ity toe-javatra ity ihany. Sombiny voafantina sy nanafenana ny angona saro-pady ary zava-misy voalamina no alefa any amin'ny modelinao. Ny famintinana dia mampiasa ny fitenin'ny rindranasa voatahiry rehefa manova ny fikirakirana tatitra ianao. Avy amin'ny vola ao amin'ity toe-javatra ity ny sarany. Tsy mampiasa AI ny tatitra tsy misy hetsika.",
     "snapshotSafeguards": "Mihatra amin'ny tatitra raikitra voalahatra tsirairay ny fetra fotoana sy fandaniana isaky ny famintinana, fa tsy teti-bola isan'andro.",
-    "snapshotEstimateInputTooLarge": "Be loatra ny porofo ao amin'ity tatitra raikitra ity ho an'ny maodely voafantina.",
+    "snapshotEstimateInputTooLarge": "Be loatra ny porofo ao amin'ity tatitra raikitra ity ho an'ny maodely voafantina. Misafidiana maodely misy fenitra fampidirana miitatra kokoa.",
     "quietSnapshot": "Tsy nisy hetsika tao amin'ny fotoam-piasana voafantina ho an'ity tatitra raikitra ity. Tsy nisy famintinana AI nangatahana ary tsy nisy sarany nalaina.",
     "noEnabledContexts": "Tsy misy toe-javatra nandefasana tatitra voalahatra",
     "sourceBlocker": "Mila fikarakarana ny fotoam-piasana",
-    "sourceMetadata": "Metadata momba ny fotoam-piasana voarakitra"
+    "sourceMetadata": "Metadata momba ny fotoam-piasana voarakitra",
+    "metadataPlan_one": "Drafitra: {{displayDone}} amin'ny {{displayTotal}} dingana vita",
+    "metadataPlan_other": "Drafitra: {{displayDone}} amin'ny {{displayTotal}} dingana vita",
+    "metadataPlan": "Drafitra: {{displayDone}} amin'ny {{displayTotal}} dingana vita",
+    "metadataFiles_one": "{{displayCount}} rakitra no novaina",
+    "metadataFiles_other": "{{displayCount}} rakitra no novaina",
+    "metadataFiles": "{{displayCount}} rakitra no novaina",
+    "metadataLinesAdded_one": "{{displayCount}} andalana nampidirina",
+    "metadataLinesAdded_other": "{{displayCount}} andalana nampidirina",
+    "metadataLinesAdded": "{{displayCount}} andalana nampidirina",
+    "metadataLinesRemoved_one": "{{displayCount}} andalana nesorina",
+    "metadataLinesRemoved_other": "{{displayCount}} andalana nesorina",
+    "metadataLinesRemoved": "{{displayCount}} andalana nesorina",
+    "metadataPlanCurrent": "Dingana ankehitriny: {{current}}",
+    "metadataFailure": "Tsy nahomby ny fihodinana farany: {{kind}}",
+    "sourceActivity": "Hetsika tsy misy lohateny",
+    "metadataFailureProvider": "fahadisoan'ny mpanome tolotra",
+    "metadataFailureTool": "fahadisoan'ny fitaovana",
+    "metadataFailureCancelled": "Nofoanana",
+    "metadataFailureOther": "fahadisoana tsy voafaritra"
   },
   "systemSearch": {
     "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"
@@ -4604,7 +4631,8 @@
     "connectFailed": "Tsy afaka nanokatra ny pejy fampifandraisana"
   },
   "invoices": {
-    "personalEmptyDescription": "Hiseho eto ny faktioran'ny fividiananao manokana rehefa voaloa ianao."
+    "personalEmptyDescription": "Miseho eto ny faktioran'ny fividiananao manokana rehefa voaloa ianao. Ny rosia avy amin'ny App Store sy Google Play dia ao amin'ny Tantaran'ny kredita.",
+    "personalPeriod": "12 volana lasa izay"
   },
   "cloudAgent": {
     "compute": {

@@ -2468,7 +2468,8 @@
       "customModes": "Mënyrat e personalizuara"
     },
     "modeSelector": {
-      "accessibility": "Mënyra: {{label}}"
+      "accessibility": "Mënyra: {{label}}",
+      "customMode": "Mënyrë e personalizuar"
     },
     "modeOptions": {
       "code": "Shkruaj kod",
@@ -2784,7 +2785,7 @@
       "thinkingEffortAccessibility": "niveli i arsyetimit: {{label}}",
       "thinkingEffortSelected": "niveli i arsyetimit: {{label}}, i zgjedhur",
       "thinkingEffortWithModel": "{{model}}, niveli i arsyetimit: {{variant}}",
-      "lockedByAgent": ", I bllokuar nga agjenti «{{agent}}»",
+      "lockedByAgent": "I bllokuar nga agjenti «{{agent}}»",
       "addToFavorites": "Shto {{name}} te të preferuarat",
       "removeFromFavorites": "Hiq {{name}} nga të preferuarat",
       "sessionModel": "Modeli i seancës"
@@ -3064,6 +3065,7 @@
   "queryError": {
     "neutralDescription": "Provo përsëri.",
     "offlineTitle": "Ngarkimi dështoi.",
+    "offlineDescription": "Nuk mund të arrihet serveri.",
     "permissionDescription": "Nuk ke leje për ta parë këtë.",
     "notFoundDescription": "Ky element mund të jetë hequr ose të mos jetë më i disponueshëm.",
     "serverTitle": "Nuk u krye ngarkimi.",
@@ -3707,6 +3709,7 @@
     "lastKnown": "Gjendja e fundit e njohur",
     "awaitingUpdate": "Në pritje të përditësimit",
     "nextRun": "Ekzekutimi i radhës",
+    "wasDue": "Ishte planifikuar",
     "waitingForYou": "Pret ty",
     "nextScheduled": "Të planifikuara në vijim",
     "answerNeeded": "Pret përgjigje",
@@ -4512,8 +4515,12 @@
     "loadError": "Raportet nuk u ngarkuan",
     "view": "Lexo raportin",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Filtro sipas kontekstit",
+    "contextAll": "Të gjithë kontekstet",
     "dismiss": "Hidh poshtë raportin",
+    "dismissFailed": "Raporti nuk u hodh dot poshtë akoma. Provon përsëri në sfond.",
     "offline": "Jashtë linje · raport i ruajtur",
     "cached": "Raport i ruajtur · rifreskimi i padisponueshëm",
     "summary": "Përmbledhje AI",
@@ -4521,6 +4528,7 @@
     "summaryUnavailable": "Përmbledhja AI nuk është e disponueshme. Raporti i strukturuar mbetet i disponueshëm.",
     "summaryCharge": "AI tarifoi {{cost}}",
     "summaryChargePending": "Tarifa AI në pritje të rakordimit",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Prova dhe artefakte",
     "timezone": "Zona kohore e raportit",
     "deviceTimezone": "Përdor zonën kohore të pajisjes",
@@ -4532,22 +4540,22 @@
     "timeHint": "Karta Kreu rikthen statusin live kur mbaron dritarja kohore e raportit, edhe jashtë linje.",
     "invalidSchedule": "Zgjidh një zonë kohore të vlefshme dhe një dritare kohore jo boshe për raportin.",
     "notificationsHint": "Një njoftim i përgjithshëm për çdo raport të planifikuar. I pavarur nga përmbledhjet AI me pagesë.",
-    "notificationPermission": "Aktivizo njoftimet e pajisjes te $t(common.notifications) për të marrë raportin.",
+    "notificationPermission": "Aktivizo njoftimet push për të marrë raportin.",
     "defaultModel": "Përdor modelin e parazgjedhur të Kilo",
     "duration": "Kufiri i kohës (minuta)",
     "spendLimit": "Kufiri i shpenzimit (USD)",
     "invalidSafeguards": "Fut kufij kohe dhe shpenzimi pozitivë dhe të fundëm.",
     "estimate": "Vlerësimi {{estimate}} · maksimumi {{maximum}}",
-    "estimateUnavailable": "Një përmbledhje me pagesë nuk është e disponueshme për këto rregullime.",
+    "estimateUnavailable": "Një përmbledhje me pagesë nuk është e disponueshme për këto rregullime. Ndrysho modelin ose kufijtë, ose provo përsëri më vonë.",
     "confirmPaid": "Të aktivizohen përmbledhjet me pagesë për {{context}}?",
     "paidDisclosure": "{{estimate}} e vlerësuar, deri në {{maximum}}, me kufi {{minutes}} min. Tarifat zbatohen edhe nëse gjenerimi dështon.",
     "enable": "Aktivizo përmbledhjet me pagesë",
     "allContexts": "Raportet personale dhe të organizatës mbahen të ndara.",
     "emptyHistory": "Nuk ka raporte të ruajtura",
-    "estimatePermissionUnavailable": "Nuk ke leje të përdorësh gjendjen e llogarisë së këtij konteksti.",
-    "estimatePricingUnavailable": "Çmimi për këtë model nuk është i disponueshëm.",
-    "estimateBalanceUnavailable": "Balanca nuk mjafton për një përmbledhje me pagesë.",
-    "estimateModelNotAllowed": "Ky model nuk lejohet këtu.",
+    "estimatePermissionUnavailable": "Nuk ke leje të përdorësh balancën e këtij konteksti. Kërko një pronar organizate ta aktivizojë.",
+    "estimatePricingUnavailable": "Çmimi për këtë model nuk është i disponueshëm. Zgjidh një model tjetër.",
+    "estimateBalanceUnavailable": "Balanca nuk mjafton për një përmbledhje me pagesë. Shto kredi në balancën e këtij konteksti.",
+    "estimateModelNotAllowed": "Ky model nuk lejohet në këtë kontekst. Zgjidh një model tjetër.",
     "estimateSpendLimitTooLow": "Rrite kufirin e shpenzimit për ta lejuar këtë përmbledhje.",
     "saved": "Cilësimet e raportit u ruajtën",
     "selectedSessions": "Seancat e zgjedhura",
@@ -4556,16 +4564,35 @@
     "capturedAt": "Regjistruar {{time}}",
     "snapshotHint": "Pamje e çastit e gjendjes më të fundit të disponueshme të seancave, me aq të dhëna sa mund të mblidhen në orarin e planifikuar të mëngjesit. Numrat përshkruajnë seancat e zgjedhura, jo të gjithë aktivitetin gjatë natës.",
     "snapshotTruncated": "Disa seanca ose prova u lanë jashtë për të kufizuar madhësinë e kësaj pamjeje të çastit.",
-    "snapshotSummaryFailed": "Përmbledhja AI dështoi. Pamja jote e strukturuar e çastit mbetet e disponueshme.",
+    "snapshotSummaryFailed": "Përmbledhja AI dështoi. Raporti i strukturuar mbetet i disponueshëm.",
     "scheduledContextEnabled": "Raporte të planifikuara",
     "scheduledContextSettings": "Raporte të planifikuara · {{context}}",
     "scheduledContextHint": "Aktivizo regjistrimin e planifikuar dhe përmbledhjet AI me pagesë vetëm për këtë kontekst. Fragmente të zgjedhura me të dhënat e ndjeshme të fshehura dhe fakte të strukturuara dërgohen te modeli yt. Përmbledhjet përdorin gjuhën e aplikacionit që ruhet kur përditëson cilësimet e raportit. Tarifat përdorin balancën e këtij konteksti. Pamjet e çastit pa aktivitet nuk përdorin AI.",
     "snapshotSafeguards": "Kufijtë e kohës dhe shpenzimit për përmbledhje zbatohen për çdo pamje të planifikuar të çastit, jo si buxhet ditor.",
-    "snapshotEstimateInputTooLarge": "Kjo pamje e çastit përmban tepër prova për modelin e zgjedhur.",
+    "snapshotEstimateInputTooLarge": "Kjo pamje e çastit përmban tepër prova për modelin e zgjedhur. Zgjidh një model me dritare hyrjeje më të madhe.",
     "quietSnapshot": "Nuk u zgjodh asnjë aktivitet seance për këtë pamje të çastit. Nuk u kërkua përmbledhje AI dhe nuk u aplikua asnjë tarifë.",
     "noEnabledContexts": "Asnjë kontekst i aktivizuar për raportet e planifikuara",
     "sourceBlocker": "Seanca kërkon vëmendje",
-    "sourceMetadata": "Metatëdhënat e regjistruara të seancës"
+    "sourceMetadata": "Metatëdhënat e regjistruara të seancës",
+    "metadataPlan_one": "Plani: {{displayDone}} nga {{displayTotal}} hap i kryer",
+    "metadataPlan_other": "Plani: {{displayDone}} nga {{displayTotal}} hapa të kryer",
+    "metadataPlan": "Plani: {{displayDone}} nga {{displayTotal}} hapa të kryer",
+    "metadataFiles_one": "{{displayCount}} skedar i ndryshuar",
+    "metadataFiles_other": "{{displayCount}} skedarë të ndryshuar",
+    "metadataFiles": "{{displayCount}} skedarë të ndryshuar",
+    "metadataLinesAdded_one": "{{displayCount}} rresht i shtuar",
+    "metadataLinesAdded_other": "{{displayCount}} rreshta të shtuar",
+    "metadataLinesAdded": "{{displayCount}} rreshta të shtuar",
+    "metadataLinesRemoved_one": "{{displayCount}} rresht i hequr",
+    "metadataLinesRemoved_other": "{{displayCount}} rreshta të hequr",
+    "metadataLinesRemoved": "{{displayCount}} rreshta të hequr",
+    "metadataPlanCurrent": "Hapi aktual: {{current}}",
+    "metadataFailure": "Raundi i fundit dështoi: {{kind}}",
+    "sourceActivity": "Aktivitet pa titull",
+    "metadataFailureProvider": "gabim i ofruesit",
+    "metadataFailureTool": "gabim i mjetit",
+    "metadataFailureCancelled": "Anuluar",
+    "metadataFailureOther": "gabim i paspecifikuar"
   },
   "systemSearch": {
     "couldNotOpenResult": "Nuk u hap dot ky rezultat kërkimi"
@@ -4604,7 +4631,8 @@
     "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {
-    "personalEmptyDescription": "Faturat për blerjet e tua personale do të shfaqen këtu pasi të faturohesh."
+    "personalEmptyDescription": "Faturat për blerjet e tua personale shfaqen këtu pasi të faturohesh. Dëftesat nga App Store dhe Google Play janë në Historikun e kredive.",
+    "personalPeriod": "12 muajt e fundit"
   },
   "cloudAgent": {
     "compute": {

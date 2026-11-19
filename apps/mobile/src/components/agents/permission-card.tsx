@@ -129,15 +129,14 @@ export function PermissionCard({
   // or machine payloads and must not reach the card as raw key/value rows.
   const parsedCommand = commandSchema.safeParse(metadata?.command);
   const command = parsedCommand.success ? parsedCommand.data : null;
-  // The card lists the rule patterns, which name the scope a stored rule
-  // covers. It lists them unless every pattern is the same text as the
-  // command, after trimming and collapsing whitespace. When it lists both, the
-  // command stays as the explanatory line.
-  const normalizedCommand = command?.replaceAll(/\s+/g, ' ').trim() ?? null;
-  const showPatterns =
-    patterns.length > 0 &&
-    (!normalizedCommand ||
-      patterns.some(pattern => pattern.replaceAll(/\s+/g, ' ').trim() !== normalizedCommand));
+  // The patterns name the scope a stored rule covers. With a command visible,
+  // only the patterns that differ from the command after trimming and
+  // collapsing whitespace need a scope caption, and the command stays visible.
+  const normalized = (value: string) => value.replaceAll(/\s+/g, ' ').trim();
+  const scopePatterns =
+    command === null
+      ? patterns
+      : patterns.filter(pattern => normalized(pattern) !== normalized(command));
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
@@ -162,14 +161,15 @@ export function PermissionCard({
             {t('agentChat.permissionCard.allowQuestion', { permission: permissionDisplay })}
           </Text>
 
-          {showPatterns ? (
+          {command === null && patterns.length > 0 ? (
             <View className="gap-1 rounded-lg bg-muted p-2">
               <Text className="text-xs font-medium text-muted-foreground">
                 {t('agentChat.permissionCard.appliesTo')}
               </Text>
               {patterns.map((pattern, index) => (
                 <Text key={index} className="text-xs text-muted-foreground">
-                  • {isolateLtrBidiText(displaySafeText(pattern))}
+                  {patterns.length > 1 ? '• ' : null}
+                  {isolateLtrBidiText(displaySafeText(pattern))}
                 </Text>
               ))}
             </View>
@@ -183,6 +183,12 @@ export function PermissionCard({
               <Text className="text-xs text-muted-foreground">
                 {isolateLtrBidiText(displaySafeText(command))}
               </Text>
+              {scopePatterns.length > 0 ? (
+                <Text className="text-xs text-muted-foreground">
+                  {t('agentChat.permissionCard.appliesTo')}{' '}
+                  {isolateLtrBidiText(displaySafeText(scopePatterns.join(', ')))}
+                </Text>
+              ) : null}
             </View>
           ) : null}
         </View>

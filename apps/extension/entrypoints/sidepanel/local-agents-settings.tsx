@@ -2,7 +2,6 @@
 import { browser, storage } from '#imports';
 import type { JSX } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { LOCAL_AGENTS_COMMAND_MESSAGE } from '@/src/shared/local-agents/commands';
 import {
   LOCAL_AGENT_CONTROLLERS_STORAGE_KEY,
   loadLocalAgentConnectedAgents,
@@ -24,6 +23,9 @@ import {
 import type { LocalAgentEndpointStatus } from '@/src/shared/local-agents/status';
 import { createSerialAsyncChain } from '@/src/shared/serial-async-chain';
 import { setLocalAgentsEnabled } from './local-agent-toggle';
+import { LOCAL_AGENTS_COMMAND_ERRORS, sendLocalAgentCommand } from './local-agents-commands';
+import type { LocalAgentsCommand } from './local-agents-commands';
+import { LocalAgentsPairedClis } from './local-agents-paired-clis';
 import { deriveLocalAgentsSettingsView } from './local-agents-settings-state';
 import { SettingsToggle } from './workflow-settings';
 
@@ -77,19 +79,17 @@ const requestLocalAgentPermissions = async (): Promise<void> => {
   }
 };
 
-const sendLocalAgentCommand = async (
-  command: { kind: 'stop_all' } | { controllerId: string; kind: 'disconnect' }
-): Promise<void> => {
-  await browser.runtime.sendMessage({ ...command, type: LOCAL_AGENTS_COMMAND_MESSAGE });
-};
-
 export const LocalAgentsSettings = (): JSX.Element => {
   const [enabled, setEnabled] = useState<boolean | undefined>();
   const [agents, setAgents] = useState<LocalAgentConnectedAgent[]>([]);
   const [status, setStatus] = useState<LocalAgentEndpointStatus[]>([]);
+  /* When the status was read: a paired CLI's reachability is judged against it, not against render time. */
+  const [statusReadAt, setStatusReadAt] = useState(0);
   const [pairingNotice, setPairingNotice] = useState<LocalAgentPairingNotice | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  /* Not tied to the rows: the background clears them before the step that can fail, so the error outlives them. */
+  const [commandError, setCommandError] = useState<LocalAgentsCommand['kind'] | null>(null);
   const saveChainRef = useRef(createSerialAsyncChain());
 
   const refresh = useCallback(async () => {
@@ -104,6 +104,7 @@ export const LocalAgentsSettings = (): JSX.Element => {
       setEnabled(settings.enabled);
       setAgents(nextAgents);
       setStatus(nextStatus);
+      setStatusReadAt(Date.now());
       setPairingNotice(nextNotice);
       setLoadError(false);
     } catch {
@@ -143,6 +144,7 @@ export const LocalAgentsSettings = (): JSX.Element => {
     const next = !enabled;
     setEnabled(next);
     setSaveError(false);
+    setCommandError(null);
 
     // Rapid toggles each write the whole record; one chain keeps the last click authoritative.
     void saveChainRef.current.enqueue(async () => {
@@ -159,21 +161,16 @@ export const LocalAgentsSettings = (): JSX.Element => {
     });
   }, [enabled]);
 
-  const onCommand = useCallback(
-    (command: { kind: 'stop_all' } | { controllerId: string; kind: 'disconnect' }) => {
-      setSaveError(false);
-      void (async (): Promise<void> => {
-        try {
-          await sendLocalAgentCommand(command);
-        } catch {
-          setSaveError(true);
-        }
-      })();
-    },
-    []
-  );
+  const onCommand = useCallback((command: LocalAgentsCommand) => {
+    setCommandError(null);
+    void (async (): Promise<void> => {
+      if (!(await sendLocalAgentCommand(command))) {
+        setCommandError(command.kind);
+      }
+    })();
+  }, []);
 
-  const view = deriveLocalAgentsSettingsView({ agents, enabled, status });
+  const view = deriveLocalAgentsSettingsView({ agents, enabled, now: statusReadAt, status });
 
   return (
     <section
@@ -202,6 +199,8 @@ export const LocalAgentsSettings = (): JSX.Element => {
           {PAIRING_NOTICE_HINTS[pairingNotice]}
         </p>
       )}
+
+      <LocalAgentsPairedClis endpoints={view.loopbackEndpoints} />
 
       {view.emptyState === 'host_missing_not_installed' ? (
         <p className="type-body mt-2 text-foreground-muted">{HOST_MISSING_HINT}</p>
@@ -274,6 +273,12 @@ export const LocalAgentsSettings = (): JSX.Element => {
             ))}
           </ul>
         </>
+      ) : null}
+
+      {enabled === true && commandError !== null ? (
+        <p className="type-body mt-2 text-status-red-400">
+          {LOCAL_AGENTS_COMMAND_ERRORS[commandError]}
+        </p>
       ) : null}
     </section>
   );

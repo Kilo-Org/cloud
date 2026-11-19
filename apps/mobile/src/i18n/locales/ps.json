@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "عمومي کتنه",
       "files": "فایلونه",
-      "discussion": "بحث"
+      "discussion": "بحث",
+      "discussionAccessibility_one": "{{title}}: ۱ تبصره",
+      "discussionAccessibility": "{{title}}: {{displayCount}} تبصرې",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} تبصرې"
     },
     "fileStatus": {
       "modified": "بدل شوی",

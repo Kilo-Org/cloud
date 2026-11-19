@@ -264,14 +264,17 @@ describe('FixedPartRow mounted', () => {
       accessibilityLabel: 'Thought',
     });
 
-    const outerView = findHost(renderer.root, 'View').find(
+    // The outline and the control are one Pressable node, so its slop is not
+    // clipped by a shell around it.
+    const outerView = findHost(renderer.root, 'Pressable').find(
       node =>
         typeof node.props.className === 'string' && node.props.className.includes('border-dashed')
     );
     expect(outerView).toBeDefined();
     if (!outerView) {
-      throw new Error('dashed outer view not found');
+      throw new Error('dashed outer pressable not found');
     }
+    expect(outerView.props.hitSlop).toEqual({ top: 7, bottom: 7 });
     const className = outerView.props.className as string;
     expect(className).toContain('overflow-hidden');
     expect(className).toContain('rounded-lg');

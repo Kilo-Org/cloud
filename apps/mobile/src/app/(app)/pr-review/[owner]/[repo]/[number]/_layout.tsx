@@ -1,4 +1,5 @@
 import { type Href, Stack, useLocalSearchParams } from 'expo-router';
+import { Platform } from 'react-native';
 import { appScreenLayout } from '@/components/app-screen-layout';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -10,6 +11,7 @@ import {
   pendingReviewDraftKey,
   PendingReviewProvider,
 } from '@/lib/pr-review/pending-review-provider';
+import { prMergeSheetOptions } from '@/lib/pr-review/merge/merge-sheet-options';
 import { githubPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
@@ -41,6 +43,7 @@ export default function PrReviewNumberLayout() {
   const repo = parseParam(params.repo);
   const number = parsePositiveIntParam(params.number);
   const sheetOptions = { ...useFormSheetScreenOptions(), sheetInitialDetentIndex: 'last' as const };
+  const mergeSheetOptions = prMergeSheetOptions(sheetOptions, Platform.OS);
   const { userId } = useCurrentUserId();
   useRouteForegroundRefresh([[['githubPrReview']]]);
 
@@ -75,7 +78,7 @@ export default function PrReviewNumberLayout() {
             <Stack.Screen name="conversation-comment" options={sheetOptions} />
             <Stack.Screen name="comment-edit" options={sheetOptions} />
             <Stack.Screen name="review-submit" options={sheetOptions} />
-            <Stack.Screen name="merge" options={sheetOptions} />
+            <Stack.Screen name="merge" options={mergeSheetOptions} />
             <Stack.Screen name="file-navigator" options={sheetOptions} />
           </Stack>
         </PendingReviewProvider>

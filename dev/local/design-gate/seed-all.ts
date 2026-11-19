@@ -29,10 +29,8 @@ const PROFILE_CAP_STEMS = [
  * selects the step), and `needs` the steps it builds on.
  * Order matters: the reviewer analytics topic seeds the organizations the
  * account-pair topic created, and every topic needs the signed-in account.
- * `sessions` also needs the account's GitHub integration on the fixture
- * installation (`app:github-integration`, which validates against GitHub with
- * the app credentials); without it that step fails and only its links go
- * unresolved.
+ * `sessions` gives an account with no GitHub integration a fake one that lists
+ * its root session's repository, so a fresh fake account needs no GitHub App.
  */
 export const SEED_STEPS: readonly Readonly<{
   step: string;

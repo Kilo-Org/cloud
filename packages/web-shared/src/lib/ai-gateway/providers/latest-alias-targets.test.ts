@@ -158,6 +158,64 @@ describe('updateLatestAliasTargets', () => {
       })
     ).toEqual([]);
   });
+
+  it('keeps the stored entry while a refresh reports no live target', () => {
+    const entry = {
+      alias: ALIAS,
+      target: 'vendor/old',
+      pending: { target: 'vendor/new', effective_at: new Date(NOW + HOUR).toISOString() },
+    };
+    expect(
+      updateLatestAliasTargets({
+        previous: stored(entry),
+        models: Object.fromEntries([
+          [ALIAS, model(ALIAS)],
+          ['vendor/old', model('vendor/old')],
+        ]),
+        createdAtMs: new Map(),
+        nowMs: NOW,
+      })
+    ).toEqual([entry]);
+  });
+
+  it('keeps the switch gate when the target reappears after a refresh without one', () => {
+    const first = updateLatestAliasTargets({
+      previous: stored({ alias: ALIAS, target: 'vendor/old' }),
+      models: models('vendor/new', 'vendor/old', 'vendor/new'),
+      createdAtMs: new Map(),
+      nowMs: NOW,
+    });
+    expect(first).toEqual([
+      {
+        alias: ALIAS,
+        target: 'vendor/old',
+        pending: {
+          target: 'vendor/new',
+          effective_at: new Date(NOW + LATEST_ALIAS_TARGET_MIN_AGE_MS).toISOString(),
+        },
+      },
+    ]);
+
+    const second = updateLatestAliasTargets({
+      previous: stored(...first),
+      models: Object.fromEntries([
+        [ALIAS, model(ALIAS)],
+        ['vendor/old', model('vendor/old')],
+      ]),
+      createdAtMs: new Map(),
+      nowMs: NOW + HOUR,
+    });
+    expect(second).toEqual(first);
+
+    expect(
+      updateLatestAliasTargets({
+        previous: stored(...second),
+        models: models('vendor/new', 'vendor/old', 'vendor/new'),
+        createdAtMs: new Map(),
+        nowMs: NOW + HOUR,
+      })
+    ).toEqual(first);
+  });
 });
 
 describe('applyLatestAliasTargets', () => {

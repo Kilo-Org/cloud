@@ -996,3 +996,84 @@ describe('handleNeedsInputNotificationResponse — one interaction per tap', () 
     expect(mocks.runNeedsInputInteraction).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('handleNeedsInputNotificationResponse — finished report', () => {
+  const approveKey = `needs-input:ses_1:${NEEDS_INPUT_ACTION_IDS.approve}`;
+
+  it('reports the response finished once the answer and its result notification are done', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    const finishHandlingResponse = vi.fn<(key: string) => void>();
+
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      finishHandlingResponse,
+    });
+
+    expect(finishHandlingResponse).toHaveBeenCalledExactlyOnceWith(approveKey);
+    // iOS may suspend the app as soon as the report arrives, so the result
+    // notification must already be posted.
+    expect(mocks.scheduleNotificationAsync.mock.invocationCallOrder[0]).toBeLessThan(
+      finishHandlingResponse.mock.invocationCallOrder[0] ?? 0
+    );
+  });
+
+  it('reports the response finished after a failed interaction', async () => {
+    mocks.runNeedsInputInteraction.mockRejectedValue(new Error('network down'));
+    const finishHandlingResponse = vi.fn<(key: string) => void>();
+
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      finishHandlingResponse,
+    });
+
+    expect(finishHandlingResponse).toHaveBeenCalledExactlyOnceWith(approveKey);
+  });
+
+  it('reports the response finished when the dispatch itself throws', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    const finishHandlingResponse = vi.fn<(key: string) => void>();
+
+    await expect(
+      handleNeedsInputNotificationResponse(raiseResponse(), {
+        runInteraction: mocks.runNeedsInputInteraction,
+        readPreviews: () => {
+          throw new Error('preferences unreadable');
+        },
+        finishHandlingResponse,
+      })
+    ).rejects.toThrow('preferences unreadable');
+
+    expect(finishHandlingResponse).toHaveBeenCalledExactlyOnceWith(approveKey);
+  });
+
+  it('reports a response delivered twice once', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    const finishHandlingResponse = vi.fn<(key: string) => void>();
+
+    await Promise.all([
+      handleNeedsInputNotificationResponse(raiseResponse(), {
+        runInteraction: mocks.runNeedsInputInteraction,
+        finishHandlingResponse,
+      }),
+      handleNeedsInputNotificationResponse(raiseResponse(), {
+        runInteraction: mocks.runNeedsInputInteraction,
+        finishHandlingResponse,
+      }),
+    ]);
+
+    expect(finishHandlingResponse).toHaveBeenCalledExactlyOnceWith(approveKey);
+  });
+
+  it('reports a body tap finished under the mapped default action id', async () => {
+    const finishHandlingResponse = vi.fn<(key: string) => void>();
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({ actionIdentifier: 'expo.modules.notifications.actions.DEFAULT' }),
+      { finishHandlingResponse }
+    );
+
+    expect(finishHandlingResponse).toHaveBeenCalledExactlyOnceWith(
+      'needs-input:ses_1:expo.modules.notifications.actions.DEFAULT'
+    );
+  });
+});

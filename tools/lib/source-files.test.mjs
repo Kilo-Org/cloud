@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -89,37 +89,50 @@ test('keeps a .ts file behind a symlink to a real file', context => {
 });
 
 test('reports an unreadable file as one problem and keeps walking', context => {
-  if (process.getuid?.() === 0) {
-    context.skip('root reads any file, so chmod 000 leaves it readable');
-    return;
-  }
   const root = mkdtempSync(join(tmpdir(), 'source-files-'));
-  const locked = join(root, 'locked.ts');
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+
+  const refusing = join(root, 'cannot.ts');
   writeFileSync(join(root, 'a-first.ts'), 'export const a = 1;\n');
-  writeFileSync(locked, 'export const b = 2;\n');
+  writeFileSync(refusing, 'export const b = 2;\n');
   writeFileSync(join(root, 'z-last.ts'), 'export const z = 3;\n');
-  chmodSync(locked, 0o000);
-  // Restore the mode before the tree is removed, so cleanup cannot trip on it.
-  context.after(() => {
-    chmodSync(locked, 0o644);
-    rmSync(root, { recursive: true, force: true });
-  });
+  // The reader fails one path and defers to the filesystem for the others, so
+  // the walk meets exactly one refused read on every machine. A chmod fixture
+  // cannot say that: root reads a mode-000 file, so the test skipped as root.
+  const refusal = 'the injected reader refused this file';
+  const read = (file, encoding) => {
+    if (file === refusing) {
+      throw new Error(refusal);
+    }
+    return readFileSync(file, encoding);
+  };
 
-  const entries = [...parseSourceTree(root, root, isTestArtifact)];
+  const entries = [...parseSourceTree(root, root, isTestArtifact, read)];
 
+  // A refusal must not drop the entry or end the walk, so the refused file and
+  // both neighbours are still named, in name order.
   assert.deepEqual(
     entries.map(entry => entry.path),
-    ['a-first.ts', 'locked.ts', 'z-last.ts']
+    ['a-first.ts', 'cannot.ts', 'z-last.ts']
   );
-  const lockedEntry = entries[1];
-  // The read the filesystem refuses is one problem line named after the path,
-  // so the audit reports it instead of ending on a stack trace.
-  assert.equal(lockedEntry.problems.length, 1);
-  assert.match(lockedEntry.problems[0], /^locked\.ts: cannot read: /);
-  assert.equal(lockedEntry.text, '');
-  assert.deepEqual(lockedEntry.program.body, []);
+  const refusedEntry = entries[1];
+  // The refused read is one problem line named after the path, so the audit
+  // reports it instead of ending on a stack trace — the same line whichever
+  // reader refused.
+  assert.equal(refusedEntry.problems.length, 1);
+  assert.match(refusedEntry.problems[0], new RegExp(`^cannot\\.ts: cannot read: ${refusal}$`));
+  // The entry still has the shared shape, so a caller reads its own findings as
+  // none rather than tripping over a missing field.
+  assert.equal(refusedEntry.text, '');
+  assert.deepEqual(refusedEntry.program.body, []);
   // The readable files still come through clean: the refusal costs one entry's
   // findings, not the walk.
   assert.deepEqual(entries[0].problems, []);
   assert.deepEqual(entries[2].problems, []);
+  // The last entry's text is the file's own, so the reader was consulted for
+  // the reads and the walk continued past the refused file.
+  assert.equal(entries[2].text, 'export const z = 3;\n');
+  // The filesystem can read what the reader refused, so the throw came from the
+  // injected reader and not from an unreadable file.
+  assert.equal(readFileSync(join(root, 'cannot.ts'), 'utf8'), 'export const b = 2;\n');
 });

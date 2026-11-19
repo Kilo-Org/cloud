@@ -132,7 +132,7 @@ export function ComposerFooter({
 }: {
   isEdit: boolean;
   isSubmitting: boolean;
-  /** Only the in-flight write locks Cancel; the pre-submit Terms gate does not. */
+  /** Only the in-flight write locks Discard; the pre-submit Terms gate does not. */
   dismissalLocked: boolean;
   primaryDisabled: boolean;
   onSave: () => void;
@@ -143,8 +143,9 @@ export function ComposerFooter({
   const { t } = useTranslation();
   return (
     // Lives inside the formSheet ScrollView (not a sticky sibling).
-    // Half detent stays a drag-down; keep Cancel above the closed-sheet
-    // limit (~874) without scrolling.
+    // Half detent stays a drag-down; keep Discard above the closed-sheet
+    // limit (~874) without scrolling. The header close keeps the durable
+    // draft; Discard is the explicit way to clear it.
     <PrFormSheetFooter>
       {isEdit ? (
         <Button onPress={onSave} disabled={primaryDisabled} accessibilityLabel={t('common.save')}>
@@ -176,9 +177,9 @@ export function ComposerFooter({
         onPress={onCancel}
         disabled={dismissalLocked}
         className="mt-2"
-        accessibilityLabel={t('common.cancel')}
+        accessibilityLabel={t('common.discard')}
       >
-        <Text>{t('common.cancel')}</Text>
+        <Text>{t('common.discard')}</Text>
       </Button>
     </PrFormSheetFooter>
   );

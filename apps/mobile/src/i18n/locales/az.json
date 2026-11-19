@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Xülasə",
       "files": "Fayllar",
-      "discussion": "Müzakirə"
+      "discussion": "Müzakirə",
+      "discussionAccessibility_one": "{{title}}: 1 şərh",
+      "discussionAccessibility": "{{title}}: {{displayCount}} şərh",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} şərh"
     },
     "fileStatus": {
       "modified": "Dəyişdirilib",

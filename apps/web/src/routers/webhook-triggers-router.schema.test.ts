@@ -10,6 +10,14 @@ import type { adminWebhookTriggersRouter as AdminWebhookTriggersRouter } from '.
 import type { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import { webhookTriggerModeSchema } from '@/lib/webhook-trigger-validation';
 import type {
+  generateCloudAgentWorkflowToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
+import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import type { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import type { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import jwt from 'jsonwebtoken';
+import type {
   createWorkerTrigger as createWorkerTriggerType,
   getWorkerTrigger as getWorkerTriggerType,
   updateWorkerTrigger as updateWorkerTriggerType,
@@ -43,7 +51,11 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 }));
 
 jest.mock('@kilocode/web-shared/lib/tokens', () => ({
-  generateCloudAgentToken: () => 'test-cloud-agent-token',
+  generateCloudAgentWorkflowToken: jest.fn(() => 'test-cloud-agent-token'),
+  TOKEN_EXPIRY: { oneHour: 3600 },
+}));
+jest.mock('@/lib/auth/cloud-agent-workflow-user', () => ({
+  prepareCloudAgentWorkflowUser: (user: User) => Promise.resolve(user),
 }));
 
 const mockCreateWorkerTrigger = jest.fn<typeof createWorkerTriggerType>();
@@ -1009,6 +1021,81 @@ describe('webhook trigger variant inputs', () => {
       code: 'UNAUTHORIZED',
     });
     expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+  });
+
+  it('mints a bounded workflow credential for the Worker capability read', async () => {
+    const { generateCloudAgentWorkflowToken } = jest.requireMock(
+      '@kilocode/web-shared/lib/tokens'
+    ) as { generateCloudAgentWorkflowToken: jest.Mock };
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: true, options: [] });
+
+    await expect(createCaller({ user }).capabilities({ organizationId })).resolves.toEqual({
+      canSetSandboxAllocation: true,
+      sandboxSelection: { enabled: true, options: [] },
+    });
+    expect(generateCloudAgentWorkflowToken).toHaveBeenCalledWith(
+      user,
+      expect.objectContaining({ tokenSource: 'webhook-trigger', expiresIn: 3600 })
+    );
+  });
+
+  it('issues a credential that verifies under the Worker audience policy', async () => {
+    // requireActual bypasses the module mock so the real issuer mints the token
+    // this case then pins against the Worker-side policy validator.
+    const tokens = jest.requireActual('@kilocode/web-shared/lib/tokens') as {
+      generateCloudAgentWorkflowToken: typeof generateCloudAgentWorkflowToken;
+      TOKEN_EXPIRY: typeof TOKEN_EXPIRY;
+    };
+    const { verifyKiloTokenForResource: verifyForResource } = jest.requireActual(
+      '@kilocode/worker-utils/kilo-token-policy'
+    ) as { verifyKiloTokenForResource: typeof verifyKiloTokenForResource };
+    const { NEXTAUTH_SECRET: secret } = jest.requireActual(
+      '@kilocode/web-shared/lib/config.server'
+    ) as { NEXTAUTH_SECRET: typeof NEXTAUTH_SECRET };
+
+    const saved = new Map(
+      ['SHARED_RESOURCE_TOKENS_ENABLED', 'CLOUD_AGENT_RESOURCE_TOKENS_ENABLED'].map(key => [
+        key,
+        process.env[key],
+      ])
+    );
+    process.env.SHARED_RESOURCE_TOKENS_ENABLED = 'true';
+    process.env.CLOUD_AGENT_RESOURCE_TOKENS_ENABLED = 'true';
+    try {
+      const pepperedUser = { ...user, api_token_pepper: 'webhook-trigger-pepper' } as User;
+      const token = tokens.generateCloudAgentWorkflowToken(pepperedUser, {
+        tokenSource: 'webhook-trigger',
+        expiresIn: tokens.TOKEN_EXPIRY.oneHour,
+      });
+      await expect(
+        verifyForResource(token, secret, {
+          audience: CLOUD_AGENT_NEXT_AUDIENCE,
+          mode: 'allow-legacy',
+        })
+      ).resolves.toMatchObject({
+        kiloUserId: user.id,
+        tokenSource: 'webhook-trigger',
+        runtimeAdmission: { source: 'automation' },
+      });
+      const claims = jwt.decode(token) as unknown as {
+        aud: string;
+        tokenPurpose: string;
+        credentialExchange: boolean;
+        iat: number;
+        exp: number;
+      };
+      expect(claims.aud).toBe(CLOUD_AGENT_NEXT_AUDIENCE);
+      expect(claims.tokenPurpose).toBe('internal-service');
+      expect(claims.credentialExchange).toBe(false);
+      expect(claims.exp - claims.iat).toBe(3600);
+    } finally {
+      for (const [key, value] of saved) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 
   it.each(['webhook', 'scheduled'] as const)(

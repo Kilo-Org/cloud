@@ -170,6 +170,7 @@ const config: ExpoConfig = {
   // Asserted in scripts/assert-expo-config.mjs.
   platforms: ['ios', 'android'],
   // Per-locale native strings; the plugin options below stay as the base Info.plist value.
+  // `withAppIntentLocalizations` writes the same bundle's `Localizable.strings`.
   locales: nativeLocales,
   ios: {
     // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the

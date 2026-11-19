@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import { isBlockedAccountActive, setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { isAccountBlockedTrpcError } from '@/lib/trpc-error';
 
 /** What the latest current-user read attempt says about the account. */
@@ -81,6 +82,17 @@ export function useBlockedAccountFromAccountRead(input: BlockedAccountFromAccoun
   onAnswered.current = input.onAnswered;
   const verdict = accountReadVerdict(input.error, input.userId);
   useEffect(() => {
+    // The sign-out fence owns both publishes while the session is being torn
+    // down. `signOut` closes it synchronously before its first await, so an
+    // attempt already in flight when the surface's Sign out was tapped
+    // (Retry, a focus refetch, a reconnect) cannot raise the explanation back
+    // over the login route after the flag was cleared, and cannot refetch the
+    // tree with a dying token. The fence reopens only at a sign-in's
+    // credential publication, which also clears the explanation — the next
+    // sign-in's first settled read then starts from a fresh state.
+    if (isSignOutActive()) {
+      return;
+    }
     if (!input.enabled) {
       // No session: a cached refusal from the session that ended must neither
       // raise nor clear anything.

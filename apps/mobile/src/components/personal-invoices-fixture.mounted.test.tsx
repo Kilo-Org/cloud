@@ -71,6 +71,8 @@ vi.mock('@/components/empty-state', () => ({
     emptyStates.rendered.push(props);
     return null;
   },
+  // The retryable state's action; the suite asserts the captured state, not it.
+  StateAction: () => null,
 }));
 
 vi.mock('@/components/screen-header', () => ({

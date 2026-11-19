@@ -3,6 +3,7 @@ import {
   getProvider,
   type GetProviderProviderResult,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
 import {
   expectProviderResult,
@@ -60,7 +61,6 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
   const actual = jest.requireActual<typeof directByokModule>(
@@ -100,9 +100,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(),
   shouldRouteToVercel: jest.fn(),
-}));
-jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
-  isClaudePlatformOAuthEnabled: jest.fn(async () => false),
 }));
 
 const MODEL = 'moonshotai/kimi-k2.6';
@@ -241,7 +238,7 @@ afterEach(() => {
 });
 
 describe('getProvider routing decision', () => {
-  test('never falls back from a connected personal Claude payer for an ineligible requester', async () => {
+  test('never falls back from a connected personal Claude payer that cannot bill', async () => {
     const user = await insertTestUser({ google_user_email: 'requester-personal@example.com' });
     await db.insert(claude_billing_connections).values({
       kilo_user_id: user.id,
@@ -253,7 +250,6 @@ describe('getProvider routing decision', () => {
     });
     await insertKeys(user, [{ providerId: 'anthropic' }], undefined);
     jest.mocked(getStoredByokKeys).mockClear();
-    jest.mocked(isClaudePlatformOAuthEnabled).mockClear();
     const model = 'anthropic/claude-sonnet-4.6';
     const result = await getProvider(
       getProviderInput({
@@ -267,13 +263,12 @@ describe('getProvider routing decision', () => {
       })
     );
     expect(result).toMatchObject({ kind: 'claude-billing-unavailable' });
-    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(user.google_user_email);
     expect(getStoredByokKeys).not.toHaveBeenCalled();
     expect(decryptApiKey).not.toHaveBeenCalled();
     expect(checkOpenAiChatGptByok).not.toHaveBeenCalled();
   });
 
-  test('never falls back from the organization Claude connection for an ineligible connector', async () => {
+  test('never falls back from the organization Claude connection that cannot bill', async () => {
     const requester = await insertTestUser({
       google_user_email: 'requester-org@example.com',
     });
@@ -290,7 +285,6 @@ describe('getProvider routing decision', () => {
     });
     await insertKeys(requester, [{ providerId: 'anthropic' }], org.id);
     jest.mocked(getStoredByokKeys).mockClear();
-    jest.mocked(isClaudePlatformOAuthEnabled).mockClear();
     const model = 'anthropic/claude-sonnet-4.6';
     const result = await getProvider(
       getProviderInput({
@@ -304,8 +298,6 @@ describe('getProvider routing decision', () => {
       })
     );
     expect(result).toMatchObject({ kind: 'claude-billing-unavailable' });
-    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(connector.google_user_email);
-    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalledWith(requester.google_user_email);
     expect(getStoredByokKeys).not.toHaveBeenCalled();
     expect(decryptApiKey).not.toHaveBeenCalled();
     expect(checkOpenAiChatGptByok).not.toHaveBeenCalled();
@@ -335,7 +327,6 @@ describe('getProvider routing decision', () => {
         blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
       })
       .where(eq(kilocode_users.id, connector.id));
-    jest.mocked(isClaudePlatformOAuthEnabled).mockClear();
     const model = 'anthropic/claude-sonnet-4.6';
 
     const result = await getProvider(
@@ -349,14 +340,12 @@ describe('getProvider routing decision', () => {
     );
 
     expect(result).toMatchObject({ kind: 'claude-billing-reconnect' });
-    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
     expect(getStoredByokKeys).not.toHaveBeenCalled();
   });
 
-  test('keeps normal routing for a Claude request without a connection and does not evaluate the gate', async () => {
+  test('keeps normal routing for a Claude request without a connection', async () => {
     const user = await insertTestUser();
     const model = 'anthropic/claude-sonnet-4.6';
-    jest.mocked(isClaudePlatformOAuthEnabled).mockClear();
     const result = await getProvider(
       getProviderInput({
         user,
@@ -368,7 +357,6 @@ describe('getProvider routing decision', () => {
         },
       })
     );
-    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
     expect((await onlyRoute(result)).provider.type).not.toBe('claude-billing');
   });
 
@@ -671,6 +659,27 @@ describe('getProvider routing decision', () => {
     );
   });
 
+  test('tells the Vercel routing decision that OpenRouter is disabled', async () => {
+    const user = await insertTestUser();
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+
+    const decision = await routeAndRecord({
+      requestedModel: MODEL,
+      request: request('chat_completions'),
+      user,
+      organizationId: undefined,
+      openRouterDisabled: true,
+    });
+
+    expect(decision.steps).toContainEqual(
+      expect.objectContaining({ step: 'kilo', outcome: 'selected', gateway: 'vercel' })
+    );
+    expect(shouldRouteToVercel).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: MODEL, openRouterDisabled: true }),
+      expect.any(Function)
+    );
+  });
+
   test('records provider keys the organization policy excludes', async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization(
@@ -782,6 +791,33 @@ describe('getProvider routing decision', () => {
       payer: 'owner-byok-key',
       is_free: false,
     });
+  });
+
+  test('never reports a provider model id its own key pays for as free', async () => {
+    const user = await insertTestUser();
+    await insertKeys(user, [{ providerId: 'zai-coding' }]);
+    const { provider, model } = catalogModel('zai-coding', ['chat_completions']);
+    jest.mocked(getDirectByokModel).mockResolvedValueOnce({
+      provider,
+      model: { ...model, id: 'kimi-k2.6-free' },
+    });
+    const requestedModel = 'zai-coding/kimi-k2.6-free';
+    expect(isFreeModel(requestedModel)).toBe(true);
+    const decisions: ProviderRoutingDecision[] = [];
+
+    const result = await getProvider(
+      getProviderInput({
+        requestedModel,
+        request: request('chat_completions'),
+        user,
+        organizationId: undefined,
+        onDecision: decision => decisions.push(decision),
+      })
+    );
+
+    expect(await onlyRoute(result)).toMatchObject({ isFree: false });
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].result).toMatchObject({ route: 'direct-byok-model', is_free: false });
   });
 
   test('records a provider model id without a key before the later steps', async () => {

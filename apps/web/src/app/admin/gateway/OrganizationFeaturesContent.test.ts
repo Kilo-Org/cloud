@@ -164,7 +164,7 @@ describe('OrganizationFeaturesContent', () => {
     expect(sections.map(section => section.querySelector('h3')?.textContent)).toEqual([
       'Direct Amazon Bedrock and Google Vertex AI BYOK (2)',
       'Enkrypt output guardrails (1)',
-      'Gateway settings (2)',
+      'Advanced policies (2)',
     ]);
     expect(Array.from(sections[2].querySelectorAll('a')).map(link => link.textContent)).toEqual([
       'Deleted organization',

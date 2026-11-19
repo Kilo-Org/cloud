@@ -5,7 +5,6 @@ import type { EncryptedData } from '@kilocode/db/schema-types';
 /**
  * Encrypts a string using AES-256-GCM with the provided key
  *
- * @param plaintext - The string to encrypt
  * @param keyBase64 - Base64-encoded 32-byte encryption key
  * @returns EncryptedData object containing IV, encrypted data, and auth tag
  */
@@ -36,9 +35,7 @@ export function encryptApiKey(plaintext: string, keyBase64: string): EncryptedDa
 /**
  * Decrypts data that was encrypted with encryptApiKey
  *
- * @param encrypted - The EncryptedData object to decrypt
  * @param keyBase64 - Base64-encoded 32-byte encryption key
- * @returns The decrypted plaintext string
  */
 export function decryptApiKey(encrypted: EncryptedData, keyBase64: string): string {
   const key = Buffer.from(keyBase64, 'base64');
@@ -60,12 +57,6 @@ export function decryptApiKey(encrypted: EncryptedData, keyBase64: string): stri
   return decrypted;
 }
 
-/**
- * Generates a random 32-byte (256-bit) encryption key encoded as base64
- * This is a utility function for generating new keys
- *
- * @returns Base64-encoded 32-byte key
- */
 export function generateEncryptionKey(): string {
   return randomBytes(32).toString('base64');
 }

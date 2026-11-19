@@ -16,6 +16,78 @@ export const cloudAgentSessionCategorySchema = z.enum(['attention', 'status']);
 export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategorySchema>;
 
 /**
+ * The category a cloud-agent-session payload carries, applying the schema
+ * default ('status') at the enforcement read site. Every consumer of the
+ * category — the push kind, the history category, and the push worker's
+ * preference gate — reads this one function, so an omitted category cannot
+ * mean different things in different places.
+ *
+ * The parameter names the payload's discriminant beside `category` so a whole
+ * `PushData` union passes unchanged: a bare `{ category }` is a weak type and
+ * TypeScript rejects a union that shares no property with it. Only `category`
+ * is read.
+ */
+export function classifyCloudAgentSessionPush(data: {
+  type?: string | undefined;
+  category?: CloudAgentSessionCategory | undefined;
+}): CloudAgentSessionCategory {
+  return data.category ?? 'status';
+}
+
+// The needs-input raise fields every cloud-agent-session contract carries,
+// whatever envelope transports it: the visible push in this module and the
+// send request in `./rpc-schemas`. Declared once so a field cannot be added
+// to one path and silently dropped by the other.
+export const cloudAgentSessionRaiseShape = {
+  category: cloudAgentSessionCategorySchema.optional(),
+  // Needs-input raise detail: which answer the waiting agent wants, and the
+  // PR that can be opened from the notification. Absent on status pushes.
+  attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
+  prUrl: nonEmptyStringSchema.optional(),
+};
+
+// One followed session's Android ongoing notification
+// (`.specs/mobile-session-live-activity.md` "Android"). A high-priority
+// data-only message to the device that follows the session; the app
+// renders, updates, or cancels the notification from `content`. Only a
+// device that registered an `android_session_ongoing` row receives it, and
+// `schemaVersion` gates a later shape: a client that does not know the
+// version ignores the message.
+const sessionLiveUpdateShape = {
+  type: z.literal('session_live_update'),
+  schemaVersion: z.literal(1),
+  event: z.enum(['update', 'end']),
+  content: sessionLiveActivityContentStateSchema,
+  /**
+   * Only on an end: how long a finished notification stays in the shade.
+   * 0 removes it at once (the session is gone or out of scope).
+   */
+  dismissAfterMs: z.number().int().min(0).optional(),
+};
+
+/** The shape's own type, so the refinement below reads the event vocabulary from the enum. */
+const sessionLiveUpdateSchema = z.object(sessionLiveUpdateShape);
+
+/**
+ * Only an end carries `dismissAfterMs`. An update keeps the ongoing
+ * notification, so a duration on one has nothing to act on; a value there
+ * means a producer built the wrong event and the client would silently drop
+ * the field.
+ */
+function refineSessionLiveUpdate(
+  data: z.infer<typeof sessionLiveUpdateSchema>,
+  ctx: z.RefinementCtx
+): void {
+  if (data.dismissAfterMs !== undefined && data.event !== 'end') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['dismissAfterMs'],
+      message: 'only an end carries dismissAfterMs',
+    });
+  }
+}
+
+/**
  * Schema for the `data` blob attached to Expo push notifications.
  * This crosses the OS boundary as untyped JSON, so it MUST be
  * Zod-parsed by the mobile notification handler before use.
@@ -24,10 +96,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('cloud_agent_session'),
     cliSessionId: nonEmptyStringSchema,
-    category: cloudAgentSessionCategorySchema.optional(),
-    // Needs-input raise detail: which answer the waiting agent wants, and the
-    // PR that can be opened from the notification. Absent on status pushes.
-    attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
+    ...cloudAgentSessionRaiseShape,
     /**
      * The one raise this attention push presents: the waiting session's own
      * status time (`cli_sessions_v2.status_updated_at`), in the payload's ISO
@@ -38,7 +107,6 @@ export const pushDataSchema = z.discriminatedUnion('type', [
      * existed — the app then keeps its previous behaviour.
      */
     raiseId: nonEmptyStringSchema.optional(),
-    prUrl: nonEmptyStringSchema.optional(),
     // The session's organization, so a tap can land the app in the context
     // the session belongs to. Optional so a push from an older producer in a
     // rolling deploy still validates; absent means Personal.
@@ -88,24 +156,9 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     type: z.literal('active_agents_glanceable'),
     homeWidgetDetails: homeWidgetDetailsSchema.optional(),
   }),
-  // One followed session's Android ongoing notification
-  // (`.specs/mobile-session-live-activity.md` "Android"). A high-priority
-  // data-only message to the device that follows the session; the app
-  // renders, updates, or cancels the notification from `content`. Only a
-  // device that registered an `android_session_ongoing` row receives it, and
-  // `schemaVersion` gates a later shape: a client that does not know the
-  // version ignores the message.
-  z.object({
-    type: z.literal('session_live_update'),
-    schemaVersion: z.literal(1),
-    event: z.enum(['update', 'end']),
-    content: sessionLiveActivityContentStateSchema,
-    /**
-     * Only on an end: how long a finished notification stays in the shade.
-     * 0 removes it at once (the session is gone or out of scope).
-     */
-    dismissAfterMs: z.number().int().min(0).optional(),
-  }),
+  // One followed session's Android ongoing notification; see
+  // `sessionLiveUpdateShape` above.
+  z.object(sessionLiveUpdateShape).superRefine(refineSessionLiveUpdate),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;
@@ -130,15 +183,3 @@ export type GlanceableLiveActivityContentState = Pick<
   | 'scheduled'
   | 'scheduledAt'
 >;
-
-/**
- * Relevance per spec "Presentation order": iOS shows the highest score in the
- * Dynamic Island and orders the Lock Screen by it. Both producers use this.
- */
-export const LIVE_ACTIVITY_RELEVANCE = {
-  sessionNeedsInput: 100,
-  aggregateNeedsInput: 80,
-  sessionActive: 60,
-  aggregate: 40,
-  sessionIdle: 20,
-} as const;

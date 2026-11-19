@@ -3,6 +3,7 @@ import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
+  RuntimeModelContextLimitsSchema,
   RuntimeKiloCommandsSchema,
   RuntimeInstructionsSchema,
 } from './runtime-profile.js';
@@ -12,6 +13,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import { webSearchProviderSchema } from './web-search-provider.js';
 import { customerBillingFailureSchema } from './cloud-agent-billing.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { RUNTIME_HARNESSES } from './control-plane-runtime-contract.js';
@@ -202,6 +204,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'no_progress',
   'no_outcome',
   'completion_unconfirmed',
+  'completion_quiet_drain',
   'prompt_failed',
   'sandbox_stopped',
   'execution_limit',
@@ -483,6 +486,9 @@ const routeSpecObjectSchema = z
     runtimeInstructions: RuntimeInstructionsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
+    modelContextLimits: RuntimeModelContextLimitsSchema.optional(),
+    webSearchDisabled: z.literal(true).optional(),
+    webSearchProvider: webSearchProviderSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
     /**
      * Preserves the runtime key and HOME of existing allocations. The Sandbox
@@ -539,6 +545,9 @@ export const workspaceConfigSchema = routeSpecObjectSchema
     runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
+    modelContextLimits: true,
+    webSearchDisabled: true,
+    webSearchProvider: true,
     kiloCommands: true,
   })
   .strict();
@@ -556,6 +565,9 @@ export const attachmentSpecSchema = routeSpecObjectSchema
     runtimeInstructions: true,
     runtimeAgents: true,
     builtinAgents: true,
+    modelContextLimits: true,
+    webSearchDisabled: true,
+    webSearchProvider: true,
     kiloCommands: true,
   })
   .strict()
@@ -973,6 +985,10 @@ export const controlPlaneSessionRefPayloadSchema = z
   .object({ sessionId: z.string().min(1) })
   .strict();
 
+export const controlPlaneReleasePayloadSchema = controlPlaneSessionRefPayloadSchema.extend({
+  reason: z.literal('standalone_session_deleted').optional(),
+});
+
 /**
  * Workspace Stop during environment preparation. One sandbox serves one
  * workspace, so the Sandbox DO retires every route on it. `requestedAt` is when
@@ -1139,6 +1155,17 @@ const controlPlaneHelloFrameSchema = z
      */
     startCommands: z.literal(true).optional(),
     worktreeGit: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper renews short-lived sandbox transfer
+     * grants over this connection with `transfer.grant`. A wrapper that did not
+     * advertise it keeps the launch-time grant.
+     */
+    transferGrants: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper opens the preview tunnel when it gets a
+     * `preview.tunnel` frame. A wrapper without it has no preview.
+     */
+    previewTunnel: z.literal(true).optional(),
   })
   .strict();
 
@@ -1207,6 +1234,24 @@ const controlPlaneSessionReadyFrameSchema = z
       .array(controlPlaneCommandFailureSchema)
       .max(CONTROL_PLANE_COMMAND_FAILURES_MAX)
       .optional(),
+  })
+  .strict();
+
+const restoreDurationSchema = z.number().int().nonnegative().max(86_400_000);
+const controlPlaneSessionRestoreFrameSchema = z
+  .object({
+    type: z.literal('session.restore_attempt'),
+    sessionId: z.string().min(1).max(128),
+    attempt: z.number().int().min(1).max(2),
+    durationMs: restoreDurationSchema,
+    downloadMs: restoreDurationSchema.optional(),
+    importMs: restoreDurationSchema.optional(),
+    diffsMs: restoreDurationSchema.optional(),
+    outcome: z.enum(['restored', 'partial', 'fallback', 'failed', 'cancelled']),
+    reason: z
+      .enum(['download', 'import', 'diffs', 'not_found', 'empty', 'restore_error'])
+      .optional(),
+    willRetry: z.boolean(),
   })
   .strict();
 
@@ -1591,6 +1636,42 @@ const controlPlanePreviewListFrameSchema = z
   })
   .strict();
 
+const controlPlaneTransferGrantFrameSchema = z
+  .object({
+    type: z.literal('transfer.grant'),
+    requestId: z.string().min(1).max(128),
+  })
+  .strict();
+
+const controlPlaneTransferGrantResultFrameSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      type: z.literal('transfer.grant.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(true),
+      grant: z.string().min(1).max(4096),
+      expiresAt: z.number().int().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('transfer.grant.result'),
+      requestId: z.string().min(1).max(128),
+      ok: z.literal(false),
+      error: controlPlaneRequestErrorSchema,
+    })
+    .strict(),
+]);
+
+/**
+ * Sandbox DO -> wrapper: open the preview tunnel now. The frame carries no
+ * address or secret; the wrapper derives the tunnel URL from its control URL
+ * and authenticates with its launch credential.
+ */
+const controlPlanePreviewTunnelFrameSchema = z
+  .object({ type: z.literal('preview.tunnel') })
+  .strict();
+
 const controlPlanePreviewResultFrameSchema = z.discriminatedUnion('ok', [
   z
     .object({
@@ -1670,6 +1751,7 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneSessionPrepareFrameSchema,
   controlPlaneSessionAttachFrameSchema,
   controlPlaneSessionProgressFrameSchema,
+  controlPlaneSessionRestoreFrameSchema,
   controlPlaneSessionReadyFrameSchema,
   controlPlaneWorkspaceCaptureFrameSchema,
   controlPlaneWorkspaceCapturedFrameSchema,
@@ -1697,6 +1779,9 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneKiloResultFrameSchema,
   controlPlanePreviewListFrameSchema,
   controlPlanePreviewResultFrameSchema,
+  controlPlaneTransferGrantFrameSchema,
+  controlPlaneTransferGrantResultFrameSchema,
+  controlPlanePreviewTunnelFrameSchema,
   controlPlaneHistoryPageFrameSchema,
   controlPlaneHistoryRecentFrameSchema,
   controlPlaneHistoryResultFrameSchema,
@@ -1715,6 +1800,7 @@ export type ControlPlaneOutcome = z.infer<typeof controlPlaneOutcomeSchema>;
 export type ControlPlaneDeliverPayload = z.infer<typeof controlPlaneDeliverPayloadSchema>;
 export type ControlPlaneDeliverResult = z.infer<typeof controlPlaneDeliverResultSchema>;
 export type ControlPlaneSessionRefPayload = z.infer<typeof controlPlaneSessionRefPayloadSchema>;
+export type ControlPlaneReleasePayload = z.infer<typeof controlPlaneReleasePayloadSchema>;
 export type ControlPlaneAnswerReply = z.infer<typeof controlPlaneAnswerReplySchema>;
 export type ControlPlaneAnswerPayload = z.infer<typeof controlPlaneAnswerPayloadSchema>;
 export type ControlPlaneDispatchResult = z.infer<typeof controlPlaneDispatchResultSchema>;
@@ -1803,7 +1889,12 @@ export type ControlPlaneKiloRequestInput = z.infer<typeof controlPlaneKiloReques
 export type ControlPlaneKiloRequestFrame = z.infer<typeof controlPlaneKiloRequestFrameSchema>;
 export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultFrameSchema>;
 export type ControlPlanePreviewListFrame = z.infer<typeof controlPlanePreviewListFrameSchema>;
+export type ControlPlanePreviewTunnelFrame = z.infer<typeof controlPlanePreviewTunnelFrameSchema>;
 export type ControlPlanePreviewResultFrame = z.infer<typeof controlPlanePreviewResultFrameSchema>;
+export type ControlPlaneTransferGrantFrame = z.infer<typeof controlPlaneTransferGrantFrameSchema>;
+export type ControlPlaneTransferGrantResultFrame = z.infer<
+  typeof controlPlaneTransferGrantResultFrameSchema
+>;
 export type ControlPlaneHistoryPageFrame = z.infer<typeof controlPlaneHistoryPageFrameSchema>;
 export type ControlPlaneHistoryRecentFrame = z.infer<typeof controlPlaneHistoryRecentFrameSchema>;
 export type ControlPlaneHistoryResultFrame = z.infer<typeof controlPlaneHistoryResultFrameSchema>;

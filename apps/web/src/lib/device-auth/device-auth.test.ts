@@ -24,12 +24,12 @@ import {
   DeviceAuthPendingLimitError,
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
   DEVICE_AUTH_PENDING_LOCK_WAIT_MS,
+  DEVICE_AUTH_CODE_LIFETIME_SECONDS,
   DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
   DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
   getDeviceAuthPendingLink,
 } from './device-auth';
-import { createPendingLink } from '@/lib/auth/pending-link';
-import { issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { createPendingLink, hashPendingLinkSecret } from '@/lib/auth/pending-link';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 
 // Capture real implementations for pass-through default behaviour.
@@ -37,20 +37,7 @@ import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 // const/let initializers, but var is hoisted with an undefined initial value
 // that is safe to assign to.
 // eslint-disable-next-line no-var
-var _realIssueSessionCredentials: ((...args: any[]) => any) | undefined;
-// eslint-disable-next-line no-var
 var _realGenerateApiToken: ((...args: any[]) => any) | undefined;
-
-jest.mock('@/lib/auth/device-sessions', () => {
-  const actual = jest.requireActual('@/lib/auth/device-sessions') as any;
-  _realIssueSessionCredentials = actual.issueSessionCredentials;
-  return {
-    ...actual,
-    issueSessionCredentials: jest.fn((...args: any[]) =>
-      (_realIssueSessionCredentials as any)(...args)
-    ),
-  };
-});
 
 jest.mock('@kilocode/web-shared/lib/tokens', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/tokens') as any;
@@ -61,8 +48,14 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => {
   };
 });
 
-const mockedIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockedGenerateApiToken = jest.mocked(generateApiToken);
+
+/**
+ * Remaining life of the oldest pending row in the retry-advisory test. Well
+ * inside the code lifetime, so the advisory it produces is distinguishable from
+ * both the full-lifetime default and every later row's expiry.
+ */
+const OLDEST_ROW_REMAINING_MS = 120_000;
 
 describe('Device Auth', () => {
   const testUserId = 'test-user-' + Date.now();
@@ -81,9 +74,6 @@ describe('Device Auth', () => {
 
   afterEach(async () => {
     // Reset mocks to pass-through defaults.
-    mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-      (_realIssueSessionCredentials as any)(...args)
-    );
     mockedGenerateApiToken.mockImplementation((...args: any[]) =>
       (_realGenerateApiToken as any)(...args)
     );
@@ -258,25 +248,117 @@ describe('Device Auth', () => {
       expect(result.code).toBeDefined();
       expect(result.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
     });
-    test('rejects the sixth live pending request from the same IP', async () => {
+    test('rejects the sixth live pending request from the same IP with the oldest row as the retry advisory', async () => {
       const ipAddress = `192.168.1.${(Date.now() * 11) % 254}`;
 
       // Clean up any leftover rows.
       await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
 
-      // Create 5 live pending requests.
-      for (let i = 0; i < 5; i++) {
-        await createDeviceAuthRequest({ ipAddress });
+      // Create 5 live pending requests, staggered so the OLDEST row is
+      // distinguishable: the first request expires first, the rest later.
+      const firstUserCode = await (async () => {
+        const { userCode } = await createDeviceAuthRequest({ ipAddress });
+        return userCode;
+      })();
+      // The oldest row is pulled well inside the code lifetime, so its remaining
+      // life differs from both the full lifetime and every other row: a read of
+      // this row cannot be confused with the default fallback, and a read of the
+      // newest row instead of the oldest would report a much larger wait.
+      await db
+        .update(device_auth_requests)
+        .set({ expires_at: new Date(Date.now() + OLDEST_ROW_REMAINING_MS).toISOString() })
+        .where(eq(device_auth_requests.user_code, firstUserCode));
+      for (let i = 0; i < 4; i++) {
+        const { userCode } = await createDeviceAuthRequest({ ipAddress });
+        // Push each later row past the first one's expiry in the same live state.
+        await db
+          .update(device_auth_requests)
+          .set({ expires_at: new Date(Date.now() + (600_000 + (i + 1) * 60_000)).toISOString() })
+          .where(eq(device_auth_requests.user_code, userCode));
       }
+      // The first row keeps the shortest remaining life of the five live rows.
+      const [oldest] = await db
+        .select({ expires_at: device_auth_requests.expires_at })
+        .from(device_auth_requests)
+        .where(eq(device_auth_requests.user_code, firstUserCode));
+      expect(oldest).toBeDefined();
+      const oldestRemainingMs = new Date(oldest!.expires_at).getTime() - Date.now();
 
-      // The 6th request must be rejected.
-      await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
-        DeviceAuthPendingLimitError
-      );
+      // The 6th request must be rejected with an advisory derived from that row.
+      let refusal: DeviceAuthPendingLimitError | undefined;
+      try {
+        await createDeviceAuthRequest({ ipAddress });
+      } catch (error) {
+        if (error instanceof DeviceAuthPendingLimitError) refusal = error;
+      }
+      expect(refusal).toBeInstanceOf(DeviceAuthPendingLimitError);
+      const retryAfterSeconds = refusal!.retryAfterSeconds;
+      // The advisory tracks the oldest row's remaining life (within a small
+      // tolerance for elapsed time between the read and the throw) and never
+      // promises a longer or shorter wait than the block allows.
+      expect(retryAfterSeconds).toBeGreaterThanOrEqual(Math.floor(oldestRemainingMs / 1000) - 5);
+      expect(retryAfterSeconds).toBeLessThanOrEqual(Math.ceil(oldestRemainingMs / 1000) + 5);
+      // It is a read of a row, not the default that applies when no row can be
+      // read, and not a read of a later row: both would report a longer wait.
+      expect(retryAfterSeconds).not.toBe(DEVICE_AUTH_CODE_LIFETIME_SECONDS);
+      expect(retryAfterSeconds).toBeLessThan(DEVICE_AUTH_CODE_LIFETIME_SECONDS);
       await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
         DEVICE_AUTH_PENDING_LIMIT_MESSAGE
       );
     });
+
+    test('does not count rows that expired while the request waited for the address lock', async () => {
+      const ipAddress = `192.168.1.${(Date.now() * 37) % 254}`;
+      await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
+
+      // Five live rows sharing one deadline captured before the loop, so the
+      // guard does not depend on how fast the loop runs: every row is still
+      // live when the waiting request starts. Their remaining life is far
+      // shorter than the lock hold, so by the time the request that waited for
+      // the lock reads its clock every row is past its deadline. The previous
+      // code read that clock before the wait and still counted them.
+      const rowsDeadline = new Date(Date.now() + 2_000).toISOString();
+      for (let i = 0; i < 5; i++) {
+        const { userCode } = await createDeviceAuthRequest({ ipAddress });
+        await db
+          .update(device_auth_requests)
+          .set({ status: 'pending', expires_at: rowsDeadline })
+          .where(eq(device_auth_requests.user_code, userCode));
+      }
+
+      // Hold the address's advisory lock (same namespace literal as
+      // PENDING_LIMIT_LOCK_NAMESPACE) so the next request must wait for it.
+      const lockHeld = Promise.withResolvers<void>();
+      const releaseLock = Promise.withResolvers<void>();
+      const lockHolder = db.transaction(async tx => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext('device_auth_request_pending'), hashtext(${ipAddress}))`
+        );
+        lockHeld.resolve();
+        // A real wait, deliberate: the rows expire against Postgres's own
+        // clock, which jest fake timers cannot advance. Hold the lock past the
+        // rows' 2 s deadline, so the waiting request reads its clock after
+        // every row is past its deadline.
+        await new Promise(resolve => setTimeout(resolve, 2_700));
+        await releaseLock.promise;
+      });
+      await lockHeld.promise;
+
+      try {
+        // Start the request while the lock is held: it blocks on the lock for
+        // the holder's whole 2.7 s hold, and its clock is read only once the
+        // lock is acquired — after every row is past its deadline — so the
+        // five expired rows do not count and the request is admitted.
+        const waiting = createDeviceAuthRequest({ ipAddress });
+        releaseLock.resolve();
+        const result = await waiting;
+        expect(result.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+      } finally {
+        releaseLock.resolve();
+        await lockHolder.catch(() => {});
+        await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
+      }
+    }, 30_000);
 
     test('keeps the live pending rows of one address within the limit under concurrent requests', async () => {
       const ipAddress = `10.${(Date.now() * 13) % 254}.${(Date.now() * 17) % 254}.7`;
@@ -348,8 +430,11 @@ describe('Device Auth', () => {
         expect(other.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
         expect(Date.now() - otherStartedAt).toBeLessThan(1_000);
 
-        // The wait ends at the bound with the pending-limit refusal.
-        expect(await waitingOutcome).toBeInstanceOf(DeviceAuthPendingLimitError);
+        // The wait ends at the bound with the pending-limit refusal, carrying
+        // the default full code lifetime as its retry advisory.
+        const waitingError = (await waitingOutcome) as DeviceAuthPendingLimitError;
+        expect(waitingError).toBeInstanceOf(DeviceAuthPendingLimitError);
+        expect(waitingError.retryAfterSeconds).toBe(DEVICE_AUTH_CODE_LIFETIME_SECONDS);
         const waitedMs = Date.now() - waitingStartedAt;
         expect(waitedMs).toBeGreaterThanOrEqual(DEVICE_AUTH_PENDING_LOCK_WAIT_MS - 250);
         expect(waitedMs).toBeLessThan(DEVICE_AUTH_PENDING_LOCK_WAIT_MS + 10_000);
@@ -808,12 +893,14 @@ describe('Device Auth', () => {
     });
 
     test('failed issuance after consume restores row and removes orphan session (supportsRefresh)', async () => {
-      mockedIssueSessionCredentials.mockRejectedValue(new Error('issuance failed'));
+      mockedGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('issuance failed');
+      });
 
       const { userCode, deviceCode } = await createDeviceAuthRequest({});
       await approveDeviceAuthRequest(userCode, testUserId);
 
-      // First consume fails because issueSessionCredentials throws.
+      // First consume fails while minting the pair, inside the transaction.
       await expect(
         consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true })
       ).rejects.toThrow('issuance failed');
@@ -823,17 +910,12 @@ describe('Device Auth', () => {
       expect(request?.status).toBe('approved');
       expect(request?.consumed_at).toBeNull();
 
-      // No device session was left behind.
+      // No device session was left behind: the failed mint rolled it back.
       const sessions = await db
         .select()
         .from(device_sessions)
         .where(eq(device_sessions.device_auth_request_id, request!.id));
       expect(sessions).toHaveLength(0);
-
-      // Reset mock to pass-through for the re-consume.
-      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-        (_realIssueSessionCredentials as any)(...args)
-      );
 
       // A later consume succeeds.
       const retry = await consumeDeviceAuthByDeviceCode(deviceCode);
@@ -893,7 +975,9 @@ describe('Device Auth', () => {
       });
       await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: true });
 
-      mockedIssueSessionCredentials.mockRejectedValueOnce(new Error('issuance failed'));
+      mockedGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('issuance failed');
+      });
       await expect(
         consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true })
       ).rejects.toThrow('issuance failed');
@@ -904,9 +988,6 @@ describe('Device Auth', () => {
         .where(eq(pending_auth_links.id, pendingLink.id));
       expect(pendingRow.consumed_at).toBeNull();
 
-      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-        (_realIssueSessionCredentials as any)(...args)
-      );
       const retry = await consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true });
       expect(retry.status).toBe('approved');
       expect(retry.pendingLink).toEqual({ status: 'linked', provider: 'github' });
@@ -948,13 +1029,15 @@ describe('Device Auth', () => {
       expect(result2.token).toBeDefined();
 
       // Now make the first request's issuance fail.
-      mockedIssueSessionCredentials.mockRejectedValue(new Error('issuance failed'));
+      mockedGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('issuance failed');
+      });
 
       await expect(
         consumeDeviceAuthByDeviceCode(deviceCode1, { supportsRefresh: true })
       ).rejects.toThrow('issuance failed');
 
-      // The first request's session was cleaned up.
+      // The first request's session was rolled back with the failed mint.
       const request1 = await getDeviceAuthRequest(userCode1);
       const sessions1 = await db
         .select()
@@ -969,11 +1052,6 @@ describe('Device Auth', () => {
         .from(device_sessions)
         .where(eq(device_sessions.device_auth_request_id, request2!.id));
       expect(sessions2).toHaveLength(1);
-
-      // Reset mock.
-      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
-        (_realIssueSessionCredentials as any)(...args)
-      );
     });
   });
 
@@ -1162,29 +1240,141 @@ describe('Device Auth', () => {
     });
   });
 
-  describe('isDeviceAuthRequestExpired', () => {
-    test('returns true for expired request', () => {
-      const request = {
-        expires_at: new Date(Date.now() - 1000).toISOString(),
-        status: 'pending',
-      };
-      expect(isDeviceAuthRequestExpired(request)).toBe(true);
+  describe('expiry boundary', () => {
+    const deadline = '2026-03-01T00:00:00.000Z';
+    const createdCodes: string[] = [];
+
+    beforeEach(() => {
+      // Fake only the clock, so equality with the deadline is exact and the
+      // database driver keeps its real timers.
+      jest.useFakeTimers({
+        now: new Date(deadline),
+        doNotFake: [
+          'setTimeout',
+          'setInterval',
+          'setImmediate',
+          'clearTimeout',
+          'clearInterval',
+          'clearImmediate',
+          'queueMicrotask',
+          'nextTick',
+          'hrtime',
+          'performance',
+        ],
+      });
     });
 
-    test('returns false for valid request', () => {
-      const request = {
-        expires_at: new Date(Date.now() + 60000).toISOString(),
-        status: 'pending',
-      };
-      expect(isDeviceAuthRequestExpired(request)).toBe(false);
+    afterEach(async () => {
+      jest.useRealTimers();
+      for (const code of createdCodes.splice(0)) {
+        await db.delete(device_auth_requests).where(eq(device_auth_requests.code, code));
+      }
     });
 
-    test('returns true for request with expired status', () => {
-      const request = {
-        expires_at: new Date(Date.now() + 60000).toISOString(),
+    async function createRequest(params: { pendingLinkToken?: string } = {}) {
+      const created = await createDeviceAuthRequest(params);
+      createdCodes.push(created.code);
+      return created;
+    }
+
+    async function setDeadline(code: string, expiresAt: string) {
+      await db
+        .update(device_auth_requests)
+        .set({ expires_at: expiresAt })
+        .where(eq(device_auth_requests.code, code));
+    }
+
+    test('a request expires at its deadline, not after it', () => {
+      expect(isDeviceAuthRequestExpired({ expires_at: deadline, status: 'pending' })).toBe(true);
+      expect(
+        isDeviceAuthRequestExpired({
+          expires_at: '2026-03-01T00:00:01.000Z',
+          status: 'pending',
+        })
+      ).toBe(false);
+      expect(
+        isDeviceAuthRequestExpired({
+          expires_at: '2026-03-01T00:00:01.000Z',
+          status: 'expired',
+        })
+      ).toBe(true);
+    });
+
+    test('the approval page and the approval action agree at the deadline', async () => {
+      const { secret } = await createPendingLink({
+        kiloUserId: testUserId,
+        kind: 'existing_account',
+        identity: {
+          google_user_email: testUserEmail,
+          google_user_name: 'Test User',
+          google_user_image_url: '',
+          hosted_domain: '@@github@@',
+          provider: 'github',
+          provider_account_id: 'github-device-boundary',
+          display_name: 'octocat',
+        },
+        emailCodeAllowed: true,
+      });
+      // Pin the link's deadline in real time: createPendingLink derives it from
+      // the frozen clock, and a parallel test file's cleanup drops expired rows.
+      await db
+        .update(pending_auth_links)
+        .set({ expires_at: sql`NOW() + interval '15 minutes'` })
+        .where(eq(pending_auth_links.secret_hash, hashPendingLinkSecret(secret)));
+
+      const { code, userCode } = await createRequest({ pendingLinkToken: secret });
+
+      // The approval page shows the live link while the request is live.
+      await expect(getDeviceAuthPendingLink(userCode)).resolves.toEqual({
+        provider: 'github',
+        email: testUserEmail,
+        displayName: 'octocat',
+      });
+
+      await setDeadline(code, deadline);
+
+      // The row is still pending and the link is still live, so only the
+      // request deadline hides it.
+      await expect(getDeviceAuthPendingLink(userCode)).resolves.toBeNull();
+
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
+        'Device authorization request has expired'
+      );
+      const request = await getDeviceAuthRequest(userCode);
+      expect(request?.status).toBe('expired');
+    });
+
+    test('both redeemers report a request past its deadline as expired', async () => {
+      const device = await createRequest();
+      await approveDeviceAuthRequest(device.userCode, testUserId);
+      await setDeadline(device.code, deadline);
+
+      await expect(consumeDeviceAuthByDeviceCode(device.deviceCode)).resolves.toEqual({
         status: 'expired',
-      };
-      expect(isDeviceAuthRequestExpired(request)).toBe(true);
+      });
+      const deviceRequest = await getDeviceAuthRequest(device.userCode);
+      expect(deviceRequest?.status).toBe('expired');
+
+      const legacy = await createRequest();
+      await approveDeviceAuthRequest(legacy.userCode, testUserId);
+      await setDeadline(legacy.code, deadline);
+
+      await expect(pollDeviceAuthRequest(legacy.code)).resolves.toEqual({ status: 'expired' });
+      const legacyRequest = await getDeviceAuthRequest(legacy.userCode);
+      expect(legacyRequest?.status).toBe('expired');
+    });
+
+    test('cleanup deletes the request that expires at the deadline and keeps the later one', async () => {
+      const expired = await createRequest();
+      await setDeadline(expired.code, deadline);
+      const live = await createRequest();
+      await setDeadline(live.code, '2026-03-01T00:01:00.000Z');
+
+      const deletedCount = await cleanupExpiredDeviceAuthRequests();
+      expect(deletedCount).toBeGreaterThanOrEqual(1);
+
+      await expect(getDeviceAuthRequest(expired.userCode)).resolves.toBeUndefined();
+      await expect(getDeviceAuthRequest(live.userCode)).resolves.toBeDefined();
     });
   });
 

@@ -420,6 +420,11 @@ export function resetSelectedBranchOverrides(): void {
 export type BranchSectionState =
   /** Bitbucket is organization-only: a personal row never queries branches. */
   | { kind: 'bitbucket-organizations-only' }
+  /**
+   * The row can serve nothing yet: no repository is selected and no request
+   * runs.
+   */
+  | { kind: 'inactive' }
   /** The request is still in flight (bounded by the hook's settle bound). */
   | { kind: 'loading' }
   /** A refusal a retry cannot fix (no access, repository gone). */
@@ -457,7 +462,10 @@ export function resolveBranchSectionState(input: BranchSectionInput): BranchSect
   if (!input.isEnabled && input.platform === 'bitbucket') {
     return { kind: 'bitbucket-organizations-only' };
   }
-  if (input.isLoading || !input.isEnabled) {
+  if (!input.isEnabled) {
+    return { kind: 'inactive' };
+  }
+  if (input.isLoading) {
     return { kind: 'loading' };
   }
   if (input.isPermanentError) {

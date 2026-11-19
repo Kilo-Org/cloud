@@ -1,11 +1,11 @@
-import { afterEach, describe, expect, it } from '@jest/globals';
+import { afterAll, afterEach, describe, expect, it } from '@jest/globals';
 import { createRequire } from 'node:module';
 import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { BYOKApiKeyResponse } from '@/lib/byok/types';
-import { VERCEL_BYOK_PROVIDER_NAMES } from '@/lib/byok/provider-names';
+import { getByokProviderDisplayName, VERCEL_BYOK_PROVIDER_NAMES } from '@/lib/byok/provider-names';
 import { BYOKKeysManager, getStructuredCredentialKind } from './BYOKKeysManager';
 
 type ListInput = { organizationId?: string };
@@ -13,6 +13,10 @@ type ReorderInput = ListInput & { keyIds: string[] };
 
 const listKey = (input: ListInput) => ['byok', 'list', input];
 let mockKeys: BYOKApiKeyResponse[] = [];
+/** The options the screen registered for the stored-key test, so a test can run its handlers. */
+let mockTestApiKeyOptions:
+  | { onSuccess?: (result: unknown, variables: { id: string }) => void }
+  | undefined;
 const mockReorder = jest.fn(async ({ keyIds }: ReorderInput) => {
   mockKeys = keyIds.map(id => {
     const key = mockKeys.find(key => key.id === id);
@@ -54,7 +58,12 @@ jest.mock('@/lib/trpc/utils', () => ({
         reorder: {
           mutationOptions: (options: object) => ({ ...options, mutationFn: mockReorder }),
         },
-        testApiKey: mutation,
+        testApiKey: {
+          mutationOptions: (options: object) => {
+            mockTestApiKeyOptions = options as typeof mockTestApiKeyOptions;
+            return { ...options, mutationFn: jest.fn() };
+          },
+        },
       },
     };
   },
@@ -64,6 +73,20 @@ jest.mock('@/components/ui/confirm', () => ({ useConfirm: () => jest.fn() }));
 jest.mock('@/components/ui/switch', () => ({ Switch: () => null }));
 jest.mock('./BYOKRoutingPreview', () => ({ BYOKRoutingPreview: () => null }));
 jest.mock('sonner', () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
+
+/**
+ * How to put each installed DOM global back. React attributes an update with a
+ * timer that reads `window`, and that timer can still be queued when a test
+ * ends, so the DOM globals outlive every test of this file and are restored
+ * once, after the last one.
+ */
+const domRestores: (() => void)[] = [];
+
+afterAll(() => {
+  for (const restore of domRestores.splice(0).reverse()) {
+    restore();
+  }
+});
 
 function installDom() {
   const requireFromHere = createRequire(__filename);
@@ -90,12 +113,10 @@ function installDom() {
     previous.set(name, globals[name]);
     globals[name] = value;
   }
+  domRestores.push(() => previous.forEach((value, name) => (globals[name] = value)));
   const container = document.getElementById('root');
   if (!container) throw new Error('React root missing');
-  return {
-    container,
-    cleanup: () => previous.forEach((value, name) => (globals[name] = value)),
-  };
+  return { container };
 }
 
 // The personal BYOK page renders the "Sign in with ChatGPT" connection card
@@ -143,15 +164,12 @@ describe('getStructuredCredentialKind', () => {
 describe('BYOK key priorities', () => {
   let root: Root | undefined;
   let queryClient: QueryClient | undefined;
-  let cleanup: (() => void) | undefined;
 
   afterEach(async () => {
     await act(async () => root?.unmount());
     root = undefined;
     queryClient?.clear();
     queryClient = undefined;
-    cleanup?.();
-    cleanup = undefined;
     mockReorder.mockClear();
     jest.mocked(toast.error).mockClear();
   });
@@ -174,7 +192,6 @@ describe('BYOK key priorities', () => {
     queryClient = client;
     client.setQueryData(listKey(organizationId ? { organizationId } : {}), mockKeys);
     const dom = installDom();
-    cleanup = dom.cleanup;
     root = createRoot(dom.container);
     await act(async () => {
       root?.render(
@@ -248,5 +265,162 @@ describe('BYOK key priorities', () => {
       previousKeys
     );
     expect(toast.error).toHaveBeenCalledWith('Failed to save key priority: Permission denied');
+  });
+});
+
+describe('BYOK stored-key test toasts', () => {
+  let root: Root | undefined;
+  let queryClient: QueryClient | undefined;
+
+  afterEach(async () => {
+    await act(async () => root?.unmount());
+    root = undefined;
+    queryClient?.clear();
+    queryClient = undefined;
+    mockTestApiKeyOptions = undefined;
+    jest.mocked(toast.error).mockClear();
+    jest.mocked(toast.success).mockClear();
+  });
+
+  async function mount(providerId = 'anthropic') {
+    mockKeys = [
+      {
+        id: 'anthropic-key',
+        provider_id: providerId,
+        provider_name: getByokProviderDisplayName(providerId),
+        management_source: 'user',
+        is_enabled: true,
+        serve_catalog_models: false,
+        supports_catalog_mode: false,
+        can_change_catalog_mode: false,
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        created_by: 'test-user',
+      },
+    ];
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient = client;
+    client.setQueryData(listKey({}), mockKeys);
+    const dom = installDom();
+    root = createRoot(dom.container);
+    await act(async () => {
+      root?.render(
+        createElement(QueryClientProvider, { client }, createElement(BYOKKeysManager, {}))
+      );
+    });
+    if (!mockTestApiKeyOptions?.onSuccess) throw new Error('Test mutation was never created');
+    return mockTestApiKeyOptions.onSuccess;
+  }
+
+  it('names the stored provider that rejected the key', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        { outcome: 'rejected', success: false, message: 'legacy sentence' },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'API key test failed: Anthropic rejected this API key. Check that the key is correct and has not been revoked.'
+    );
+  });
+
+  it('reports a rejected key without naming a provider when the key is not in the list', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        { outcome: 'rejected', success: false, message: 'legacy sentence' },
+        { id: 'gone-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'API key test failed: the provider rejected this API key. Check that the key is correct and has not been revoked.'
+    );
+  });
+
+  it('names the stored provider of a deprecated key', async () => {
+    const onSuccess = await mount('codestral');
+
+    await act(async () => {
+      onSuccess(
+        { outcome: 'deprecated-provider', success: false, message: 'legacy sentence' },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'Legacy Codestral-only key is deprecated and its API key can no longer be tested.'
+    );
+  });
+
+  it('keeps the provider sentence for a failure that has no other reason', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        { outcome: 'failed', detail: 'upstream said 401', success: false, message: 'legacy' },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('API key test failed: upstream said 401');
+  });
+
+  it('drops the terminal colour codes a provider SDK puts in its sentence', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        {
+          outcome: 'failed',
+          detail: '\u001b[1m\u001b[31mUnauthenticated request.\u001b[0m Check the key.',
+          success: false,
+          message: 'legacy',
+        },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'API key test failed: Unauthenticated request. Check the key.'
+    );
+  });
+
+  it('names the provider that is still listed when its id is gone from the catalog', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        { outcome: 'unsupported-provider', success: false, message: 'legacy' },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Provider anthropic is no longer supported.');
+  });
+
+  it('reports a successful test with the provider and model the server chose', async () => {
+    const onSuccess = await mount();
+
+    await act(async () => {
+      onSuccess(
+        {
+          outcome: 'ok',
+          provider: 'Anthropic',
+          model: 'claude-sonnet-4',
+          success: true,
+          message: 'legacy',
+        },
+        { id: 'anthropic-key' }
+      );
+    });
+
+    expect(toast.success).toHaveBeenCalledWith(
+      'API key test success. Provider: Anthropic. Model: claude-sonnet-4.'
+    );
   });
 });

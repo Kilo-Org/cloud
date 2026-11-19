@@ -2,24 +2,23 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Sesyon ajant ou gen yon aktyalizasyon",
-      "lowBalance": "Saldo ou bezwen atansyon",
+      "cloudAgentSession": "Sesyon ajan ou gen yon aktyalizasyon",
+      "lowBalance": "Balans ou bezwen atansyon",
       "spendAlert": "Depans ou bezwen atansyon",
       "securityFinding": "Yon rezilta sekirite bezwen atansyon",
       "securityUpdate": "Yon chèk sekirite gen yon aktyalizasyon",
-      "activeAgentsGlanceable": "Ajans aktif yo gen yon aktyalizasyon"
+      "activeAgentsGlanceable": "Ajan aktif yo gen yon aktyalizasyon"
     }
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Alèt saldo ba",
-      "body": "{{organizationName}} saldo tonbe anba ${{minimumBalanceUsd}}"
+      "title": "Alèt balans ba",
+      "body": "{{organizationName}} balans tonbe anba ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Alèt depans",
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Vyolasyon SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Yon chèk sekirite gen yon aktyalizasyon"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Sesyon Kilo ou pare pou kontwole soti nan telefòn ou"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

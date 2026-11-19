@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
@@ -12,15 +12,14 @@ import {
 } from '@/components/profiles/repo-bindings-model';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
-import { Check, GitBranch, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { Eyebrow } from '@/components/ui/eyebrow';
+import { GitBranch, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
-import { selectionCheckColor } from '@/lib/selection-check-color';
-import { cn } from '@/lib/utils';
 
 type RepoPickerSheetProps = Readonly<{
   repositories: readonly RepoOption[];
@@ -35,9 +34,9 @@ type RepoPickerSheetProps = Readonly<{
 /** Content-shaped rows in the same slot and height as a loaded repo row. */
 function RepoPickerSkeleton() {
   return (
-    <View className="gap-1 px-4">
+    <View className="gap-1">
       {[0, 1, 2, 3].map(index => (
-        <Skeleton key={index} className={cn(ROW_TARGET_CLASS, 'w-full rounded-md bg-muted-soft')} />
+        <RowSkeleton key={index} />
       ))}
     </View>
   );
@@ -57,34 +56,31 @@ function RepoOptionRow({
   const { t } = useTranslation();
   const colors = useThemeColors();
   return (
-    <Pressable
-      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 px-4 active:opacity-70')}
-      accessibilityRole="button"
-      accessibilityLabel={
+    <ChoiceRow
+      accessibleName={
         repo.private ? t('common.privateRepositoryA11y', { name: repo.fullName }) : repo.fullName
       }
-      accessibilityState={{ selected: isSelected }}
+      selected={isSelected}
       onPress={onSelect}
     >
-      <View
-        className="shrink-0"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      >
-        {repo.private ? (
-          <Lock size={14} color={colors.mutedForeground} />
-        ) : (
-          <Unlock size={14} color={colors.mutedForeground} />
-        )}
+      <View className="min-w-0 flex-1 flex-row items-center gap-2">
+        <View
+          className="shrink-0"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {repo.private ? (
+            <Lock size={14} color={colors.mutedForeground} />
+          ) : (
+            <Unlock size={14} color={colors.mutedForeground} />
+          )}
+        </View>
+        <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
+          {repo.fullName}
+        </Text>
+        <Eyebrow>{repo.platform === 'gitlab' ? 'GL' : 'GH'}</Eyebrow>
       </View>
-      <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
-        {repo.fullName}
-      </Text>
-      <Text className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {repo.platform === 'gitlab' ? 'GL' : 'GH'}
-      </Text>
-      {isSelected ? <Check size={16} color={selectionCheckColor(colors)} /> : null}
-    </Pressable>
+    </ChoiceRow>
   );
 }
 
@@ -128,6 +124,7 @@ export function RepoPickerSheet({
       <QueryError
         variant="server"
         placement="top"
+        inset="gutter"
         title={t('profiles.loadFailed')}
         onRetry={onRetry}
       />
@@ -135,6 +132,9 @@ export function RepoPickerSheet({
   } else if (visible.length === 0) {
     body = (
       <EmptyState
+        placement="top"
+        compact
+        inset="gutter"
         icon={isSearching ? SearchX : GitBranch}
         title={
           isSearching ? t('common.noRepositoriesFound') : t('agentChat.repoPicker.noRepositories')

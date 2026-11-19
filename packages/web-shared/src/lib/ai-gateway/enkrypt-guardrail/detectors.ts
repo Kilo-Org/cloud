@@ -125,7 +125,6 @@ export function enabledEnkryptDetectorIds(detectors: EnkryptInputDetectors): Enk
   return ENKRYPT_DETECTOR_IDS.filter(id => detectors[id].enabled);
 }
 
-/** Enabled configurable detectors whose detection blocks the request. */
 export function blockingEnkryptDetectorIds(detectors: EnkryptInputDetectors): EnkryptDetectorId[] {
   return ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.filter(id => {
     const detector = detectors[id];
@@ -158,7 +157,6 @@ export function enabledEnkryptOutputDetectorIds(
   return ENKRYPT_OUTPUT_DETECTOR_IDS.filter(id => detectors[id].enabled);
 }
 
-/** Enabled output detectors whose detection blocks the response. */
 export function blockingEnkryptOutputDetectorIds(
   detectors: EnkryptOutputDetectors
 ): EnkryptOutputDetectorId[] {

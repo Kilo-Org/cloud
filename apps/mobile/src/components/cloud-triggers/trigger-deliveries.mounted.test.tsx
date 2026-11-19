@@ -16,7 +16,11 @@ import { TriggerDeliveries } from './trigger-deliveries';
 
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  // `textActionTargetClass` reads the platform to pick the shared frame.
+  Platform: { OS: 'android', select: (options: Record<string, unknown>) => options.android },
+}));
 vi.mock('expo-router', () => ({ useRouter: () => router }));
 vi.mock('@/lib/cloud-triggers/use-cloud-triggers', () => ({
   useTriggerDeliveries: () => ({
@@ -37,7 +41,10 @@ vi.mock('@/lib/cloud-triggers/use-cloud-triggers', () => ({
     refetch: vi.fn(),
   }),
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({ Workflow: 'Workflow' }));

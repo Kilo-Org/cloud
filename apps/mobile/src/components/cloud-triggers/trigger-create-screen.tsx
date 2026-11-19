@@ -8,13 +8,13 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   buildCreateInput,
@@ -27,6 +27,7 @@ import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy
 import { triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { deviceTimeZone } from '@/lib/intl-cache';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
@@ -39,7 +40,11 @@ type TriggerCreateScreenProps = Readonly<{
 export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps) {
   const { t } = useTranslation();
   const trpc = useTRPC();
-  const router = useRouter();
+  // The post-create hand-off swaps the create screen for the detail screen in
+  // one commit; a literal `router.replace` crashes Android Fabric there (the
+  // session-route crash class, KILO-APP-25), so it goes through the
+  // push-then-retire hook instead.
+  const router = useStackSafeReplace();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<TriggerDraft>(() => createTriggerDraft(deviceTimeZone()));
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<TriggerFormFailure>();
@@ -64,7 +69,7 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
         return;
       }
       announcingToast.success(t('cloudAgent.triggers.created'));
-      router.replace(triggerDetailHref(created.triggerId, organizationId) as Href);
+      router.replace(triggerDetailHref(created.triggerId, organizationId));
     } catch (error) {
       const message = readTrpcErrorField(error, 'message') ?? t('common.somethingWentWrong');
       attempt.fail({ kind: isRetryableTrpcError(error) ? 'retryable' : 'rejected', message });
@@ -76,7 +81,7 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
       <ScreenHeader title={t('cloudAgent.triggers.new')} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -92,7 +97,7 @@ export function TriggerCreateScreen({ organizationId }: TriggerCreateScreenProps
           }}
           authConfigured={false}
           submitting={submitting}
-          submitLabel={t('cloudAgent.triggers.new')}
+          submitLabel={t('cloudAgent.triggers.create')}
           canSubmit={!hasTriggerDraftProblems(problems) && !submitting}
           onSubmit={() => {
             void submit();

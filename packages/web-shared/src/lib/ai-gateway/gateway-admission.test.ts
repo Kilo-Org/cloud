@@ -7,16 +7,20 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
+  dataCollectionPolicyRejection,
   freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   gatewayUsageContextBase,
-  managedGatewayRejection,
-  organizationGatewayPolicy,
+  gatewaySettingsRejection,
   organizationProviderPreferences,
   paidUsageRejection,
   readGatewayBalance,
   resolveGatewayCaller,
+  resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { isDeniedByProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -32,6 +36,18 @@ import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
 
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/is-free-model'
+  ),
+  isDeniedByProviderPrivacy: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
+  ),
+  isCustomLlm: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
@@ -272,6 +288,46 @@ describe('organizationProviderPreferences', () => {
     });
   });
 
+  it('keeps the request provider options while the organization limits the routes', () => {
+    expect(
+      organizationProviderPreferences({
+        decision: {
+          allowed: true,
+          eligibleProviderRoutes: new Set(['openai', 'azure', 'virtual']),
+        },
+        settings: { data_collection: 'deny' },
+        requestProvider: {
+          only: ['openai', 'anthropic'],
+          ignore: ['azure'],
+          order: ['openai', 'azure'],
+          zdr: true,
+        },
+      })
+    ).toEqual({
+      kind: 'allowed',
+      provider: {
+        only: ['openai'],
+        ignore: ['azure'],
+        order: ['openai', 'azure'],
+        zdr: true,
+        data_collection: 'deny',
+      },
+    });
+  });
+
+  it('rejects a request whose providers the organization routes exclude', () => {
+    const preferences = organizationProviderPreferences({
+      decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
+      settings: { data_collection: 'allow' },
+      requestProvider: { only: ['anthropic'], zdr: true },
+    });
+
+    expect(preferences.kind).toBe('rejected');
+    if (preferences.kind === 'rejected') {
+      expect(preferences.response.status).toBe(404);
+    }
+  });
+
   it.each([
     { organization: 'allow', request: 'deny' },
     { organization: 'deny', request: 'allow' },
@@ -288,6 +344,56 @@ describe('organizationProviderPreferences', () => {
       ).toEqual({ kind: 'allowed', provider: { data_collection: 'deny' } });
     }
   );
+});
+
+describe('dataCollectionPolicyRejection', () => {
+  const model = 'vendor/model';
+
+  beforeEach(() => {
+    jest.mocked(isCustomLlm).mockResolvedValue(false);
+  });
+
+  it.each<OpenRouterProviderConfig>([
+    { data_collection: 'deny' },
+    { zdr: true },
+    { data_collection: 'allow', zdr: true },
+  ])('rejects a model the provider privacy rules out under %j', async provider => {
+    jest.mocked(isDeniedByProviderPrivacy).mockResolvedValue(true);
+
+    const response = await dataCollectionPolicyRejection(model, provider);
+
+    expect(isDeniedByProviderPrivacy).toHaveBeenCalledWith(model, provider);
+    expect(response?.status).toBe(400);
+    await expect(response?.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.data_collection_required,
+      error: expect.stringContaining('Data collection is required'),
+    });
+  });
+
+  it('rejects a custom LLM under zdr as unavailable for zero data retention', async () => {
+    jest.mocked(isCustomLlm).mockResolvedValue(true);
+    jest.mocked(isDeniedByProviderPrivacy).mockResolvedValue(true);
+
+    const response = await dataCollectionPolicyRejection(model, { zdr: true });
+
+    expect(response?.status).toBe(400);
+    await expect(response?.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.data_collection_required,
+      error: expect.stringContaining('Zero data retention is not available'),
+    });
+  });
+
+  it.each<OpenRouterProviderConfig | undefined>([
+    undefined,
+    {},
+    { data_collection: 'allow' },
+    { zdr: false },
+    { data_collection: 'deny' },
+  ])('admits a model the provider privacy does not rule out under %j', async provider => {
+    jest.mocked(isDeniedByProviderPrivacy).mockResolvedValue(false);
+
+    await expect(dataCollectionPolicyRejection(model, provider)).resolves.toBeNull();
+  });
 });
 
 describe('gatewayUsageContextBase', () => {
@@ -464,17 +570,20 @@ describe('freeModelRateLimitRejection', () => {
   });
 });
 
-describe('managedGatewayRejection', () => {
+describe('gatewaySettingsRejection', () => {
   const openRouterDisabled: OrganizationGatewaySettings = {
-    disabledGateways: new Set(['openrouter']),
+    openRouterDisabled: true,
     dataRegion: null,
   };
+  const euRegion: OrganizationGatewaySettings = { openRouterDisabled: true, dataRegion: 'eu' };
+  const vercel = { type: 'vercel', apiUrl: 'https://ai-gateway.vercel.sh/v1' } as const;
+  const userByok = [{ decryptedAPIKey: 'sk-user', providerId: 'openrouter' }] as const;
 
   it.each([
     { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' },
     { type: 'custom', apiUrl: 'https://openrouter.ai/api/v1' },
-  ] as const)('rejects a $type provider at $apiUrl', async ({ type, apiUrl }) => {
-    const response = managedGatewayRejection(openRouterDisabled, type, apiUrl);
+  ] as const)('rejects a $type provider at $apiUrl when OpenRouter is disabled', async provider => {
+    const response = gatewaySettingsRejection(openRouterDisabled, { provider, userByok: null });
 
     expect(response?.status).toBe(403);
     await expect(response?.json()).resolves.toMatchObject({
@@ -485,21 +594,49 @@ describe('managedGatewayRejection', () => {
   });
 
   it.each([
-    { settings: openRouterDisabled, type: 'vercel', apiUrl: 'https://ai-gateway.vercel.sh/v1' },
-    { settings: openRouterDisabled, type: 'custom', apiUrl: 'https://notopenrouter.ai/v1' },
+    { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' },
+    { type: 'custom', apiUrl: 'https://llm.example.com/v1' },
+  ] as const)('rejects a $type provider under an inference region', async provider => {
+    const response = gatewaySettingsRejection(euRegion, { provider, userByok: null });
+
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toMatchObject({
+      error:
+        'Your organization requires inference in the European Union region, which this request cannot use.',
+      error_type: ProxyErrorType.provider_not_allowed,
+    });
+  });
+
+  it.each([
+    { settings: openRouterDisabled, provider: vercel, userByok: null },
+    { settings: euRegion, provider: vercel, userByok: null },
+    {
+      settings: openRouterDisabled,
+      provider: { type: 'custom', apiUrl: 'https://notopenrouter.ai/v1' },
+      userByok: null,
+    },
     {
       settings: NO_ORGANIZATION_GATEWAY_SETTINGS,
-      type: 'openrouter',
-      apiUrl: 'https://openrouter.ai/api/v1',
+      provider: { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' },
+      userByok: null,
     },
-  ] as const)('admits a $type provider at $apiUrl', ({ settings, type, apiUrl }) => {
-    expect(managedGatewayRejection(settings, type, apiUrl)).toBeNull();
+    {
+      settings: euRegion,
+      provider: { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' },
+      userByok,
+    },
+    {
+      settings: euRegion,
+      provider: { type: 'direct-byok', apiUrl: 'https://api.openai.com/v1' },
+      userByok: [{ decryptedAPIKey: 'sk-user', providerId: 'openai' }],
+    },
+  ] as const)('admits a $provider.type route', ({ settings, provider, userByok }) => {
+    expect(gatewaySettingsRejection(settings, { provider, userByok })).toBeNull();
   });
 });
 
-describe('organizationGatewayPolicy', () => {
-  const openRouter = { type: 'openrouter', apiUrl: 'https://openrouter.ai/api/v1' } as const;
-  const vercel = { type: 'vercel', apiUrl: 'https://ai-gateway.vercel.sh/v1' } as const;
+describe('resolveOrganizationGatewaySettings', () => {
+  const settings = { disable_openrouter: true, data_region: 'eu' } as const;
 
   beforeEach(() => {
     jest
@@ -508,37 +645,45 @@ describe('organizationGatewayPolicy', () => {
       .mockResolvedValue({ ...DEFAULT_ORGANIZATION_FEATURES, gateway_settings: ['org-1'] });
   });
 
-  it('rejects a route through a gateway the organization disabled', async () => {
-    const policy = await organizationGatewayPolicy({
-      organizationId: 'org-1',
-      settings: { disable_openrouter: true, data_region: 'eu' },
-      provider: openRouter,
-    });
-
-    expect(policy.kind).toBe('rejected');
-    if (policy.kind === 'rejected') expect(policy.response.status).toBe(403);
-  });
-
-  it('returns the data region for an allowed route', async () => {
+  it('returns the settings of an enterprise organization with the organization feature', async () => {
     await expect(
-      organizationGatewayPolicy({
+      resolveOrganizationGatewaySettings({
         organizationId: 'org-1',
-        settings: { disable_openrouter: true, data_region: 'eu' },
-        provider: vercel,
+        plan: 'enterprise',
+        settings,
       })
-    ).resolves.toEqual({ kind: 'allowed', dataRegion: 'eu' });
+    ).resolves.toEqual({ openRouterDisabled: true, dataRegion: 'eu' });
   });
 
   it.each([
-    { organizationId: 'org-2', settings: { disable_openrouter: true, data_region: 'eu' } },
-    { organizationId: undefined, settings: { disable_openrouter: true, data_region: 'eu' } },
-    { organizationId: 'org-1', settings: undefined },
-  ] as const)(
-    'ignores the settings of $organizationId without the organization feature or settings',
-    async ({ organizationId, settings }) => {
-      await expect(
-        organizationGatewayPolicy({ organizationId, settings, provider: openRouter })
-      ).resolves.toEqual({ kind: 'allowed', dataRegion: null });
-    }
-  );
+    { name: 'a teams plan', organizationId: 'org-1', plan: 'teams', settings },
+    { name: 'an unknown plan', organizationId: 'org-1', plan: undefined, settings },
+    {
+      name: 'an organization outside the feature',
+      organizationId: 'org-2',
+      plan: 'enterprise',
+      settings,
+    },
+    { name: 'no organization', organizationId: undefined, plan: 'enterprise', settings },
+    { name: 'no settings', organizationId: 'org-1', plan: 'enterprise', settings: undefined },
+  ] as const)('applies no settings for $name', async ({ organizationId, plan, settings }) => {
+    await expect(
+      resolveOrganizationGatewaySettings({ organizationId, plan, settings })
+    ).resolves.toEqual(NO_ORGANIZATION_GATEWAY_SETTINGS);
+  });
+
+  it('skips the feature lookup without an organization or settings', async () => {
+    await resolveOrganizationGatewaySettings({
+      organizationId: undefined,
+      plan: 'enterprise',
+      settings,
+    });
+    await resolveOrganizationGatewaySettings({
+      organizationId: 'org-1',
+      plan: 'enterprise',
+      settings: undefined,
+    });
+
+    expect(getRuntimeOrganizationFeatures).not.toHaveBeenCalled();
+  });
 });

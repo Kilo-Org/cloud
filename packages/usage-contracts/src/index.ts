@@ -1,12 +1,23 @@
-import { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
+import {
+  ABUSE_CLASSIFICATION,
+  GatewayApiKindSchema,
+  KiloOrganizationIdSchema,
+} from './schema-types';
 import { z } from 'zod';
 import type { EnkryptUsageQueueMessage } from './enkrypt';
 import type { ExaUsageQueueMessage } from './exa';
 
-export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
-export type { AbuseClassification, GatewayApiKind } from './schema-types';
+export const USAGE_CLASS_LIMIT_HEADER = 'x-usage-class-limit';
+
+export {
+  ABUSE_CLASSIFICATION,
+  GatewayApiKindSchema,
+  KiloOrganizationIdSchema,
+} from './schema-types';
+export type { AbuseClassification, GatewayApiKind, KiloOrganizationId } from './schema-types';
 export {
   EXA_ALLOWED_PATHS,
+  EXA_MAX_COST_MICRODOLLARS_PER_CALL,
   EXA_USAGE_FEATURE_ID_MAX_LENGTH,
   EXA_USAGE_TYPE_MAX_LENGTH,
   EXA_USAGE_WRITE_PATH,
@@ -39,21 +50,23 @@ export type {
 const bigintAsNumber = z.number().int().safe();
 
 const CoreUsageSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   kilo_user_id: z.string(),
   cost: bigintAsNumber,
   input_tokens: bigintAsNumber,
   output_tokens: bigintAsNumber,
   cache_write_tokens: bigintAsNumber,
   cache_hit_tokens: bigintAsNumber,
-  created_at: z.string().datetime(),
+  created_at: z.iso.datetime(),
   provider: z.string().nullable(),
   model: z.string().nullable(),
   requested_model: z.string().nullable(),
   cache_discount: bigintAsNumber.nullable(),
   has_error: z.boolean(),
-  abuse_classification: z.nativeEnum(ABUSE_CLASSIFICATION),
-  organization_id: z.string().uuid().nullable(),
+  abuse_classification: z.enum(ABUSE_CLASSIFICATION),
+  // The `organizations.id` column contract: any stored id passes, so a stricter
+  // check here would reject a legitimate payer. See `KiloOrganizationIdSchema`.
+  organization_id: KiloOrganizationIdSchema.nullable(),
   inference_provider: z.string().nullable(),
   project_id: z.string().nullable(),
 });
@@ -61,7 +74,7 @@ const CoreUsageSchema = z.object({
 const UsageMetadataSchema = z.object({
   id: z.string(),
   message_id: z.string(),
-  created_at: z.string().datetime(),
+  created_at: z.iso.datetime(),
   http_x_forwarded_for: z.string().nullable(),
   http_x_vercel_ip_city: z.string().nullable(),
   http_x_vercel_ip_country: z.string().nullable(),
@@ -191,7 +204,12 @@ export const UsageRecordResponseSchema = z.object({
   status: z.enum(['recorded', 'duplicate', 'not_recorded']),
   result: z
     .object({
-      usageId: z.string(),
+      // The writer echoes the inserted `microdollar_usage.id`, which is the
+      // request's `core.id` (validated as a UUID above) or a generated UUID.
+      usageId: z.uuid(),
+      // Stays a plain string: this is read back out of PostgreSQL, so the
+      // strict-ISO rule for `created_at` above does not apply. See
+      // packages/db/AGENTS.md "Timestamp boundaries".
       createdAt: z.string(),
       newMicrodollarsUsed: z.number().nullable(),
     })

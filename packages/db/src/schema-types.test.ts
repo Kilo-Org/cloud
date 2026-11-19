@@ -1,12 +1,17 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   CodeReviewCouncilConfigSchema,
+  CustomLlmApiConfigSchema,
+  CustomLlmDefinitionSchema,
   EnkryptInputGuardrailSettingsSchema,
   ModelsSchema,
   VercelModelsSchema,
   OpenRouterPricing,
   OpenRouterProvider,
+  ReasoningDetailsTransformSchema,
+  OrganizationBrowserAllowedOriginSchema,
   OrganizationSettingsSchema,
+  normalizeOrganizationBrowserOrigin,
 } from './schema-types';
 import type { GatewayModel } from './schema-types';
 
@@ -288,5 +293,178 @@ describe('OpenRouterPricing', () => {
     });
 
     expect(pricing.discount).toBe(0.5);
+  });
+});
+
+describe('OrganizationBrowserAllowedOriginSchema', () => {
+  it.each([
+    'https://example.com',
+    'https://example.com/',
+    'http://example.com',
+    'http://localhost:3000',
+    'https://app.example.com:8443',
+  ])('accepts the origin %s', origin => {
+    expect(OrganizationBrowserAllowedOriginSchema.safeParse(origin).success).toBe(true);
+  });
+
+  it.each([
+    'example.com',
+    'https://example.com/path',
+    'https://example.com?query=1',
+    'https://example.com#section',
+    'https://user:password@example.com',
+    'ftp://example.com',
+    'https://',
+    '',
+  ])('rejects %s', origin => {
+    expect(OrganizationBrowserAllowedOriginSchema.safeParse(origin).success).toBe(false);
+  });
+
+  it('normalizes a trailing slash to the bare origin', () => {
+    expect(normalizeOrganizationBrowserOrigin('https://Example.com:443/')).toBe(
+      'https://example.com'
+    );
+    expect(normalizeOrganizationBrowserOrigin('https://example.com/path')).toBeNull();
+  });
+});
+
+describe('OrganizationSettingsSchema browser control', () => {
+  it('keeps the browser control policy', () => {
+    const parsed = OrganizationSettingsSchema.parse({
+      browserControl: 'playwright_only',
+      browserAllowedOrigins: ['https://example.com', 'http://localhost:3000'],
+    });
+
+    expect(parsed.browserControl).toBe('playwright_only');
+    expect(parsed.browserAllowedOrigins).toEqual(['https://example.com', 'http://localhost:3000']);
+  });
+
+  it('rejects an unknown browser control mode', () => {
+    const parsed = OrganizationSettingsSchema.safeParse({ browserControl: 'ask' });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects an allowed origin with a path', () => {
+    const parsed = OrganizationSettingsSchema.safeParse({
+      browserAllowedOrigins: ['https://example.com/checkout'],
+    });
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('CustomLlmDefinitionSchema partner', () => {
+  const baseDefinition = {
+    internal_id: 'upstream-model',
+    display_name: 'Partner model',
+    context_length: 128_000,
+    max_completion_tokens: 4096,
+    base_url: 'https://partner.example.com/v1',
+  };
+  const pricing = [
+    {
+      start_context_length: 0,
+      pricing: {
+        prompt_per_million: 1,
+        completion_per_million: 2,
+        input_cache_read_per_million: null,
+        input_cache_write_per_million: null,
+      },
+    },
+  ];
+  const partner = { inference_provider: 'acme-ai' };
+  const uuid = '00000000-0000-4000-8000-000000000123';
+
+  function issuePaths(definition: Record<string, unknown>) {
+    const result = CustomLlmDefinitionSchema.safeParse({ ...baseDefinition, ...definition });
+    return result.success ? null : result.error.issues.map(issue => issue.path.join('.'));
+  }
+
+  it('parses a partner definition with pricing', () => {
+    const result = CustomLlmDefinitionSchema.safeParse({ ...baseDefinition, partner, pricing });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.partner).toEqual(partner);
+  });
+
+  it('parses a partner definition with a reasoning details transform', () => {
+    const result = CustomLlmDefinitionSchema.safeParse({
+      ...baseDefinition,
+      partner,
+      pricing,
+      may_train_on_prompts: false,
+      reasoning_details_transform: 'mistral-thinking',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('requires pricing', () => {
+    expect(issuePaths({ partner })).toEqual(['pricing']);
+  });
+
+  it.each([
+    ['public', { public: { inference_providers: ['acme-ai'], description: 'A public model' } }],
+    ['organization_ids', { organization_ids: [uuid] }],
+    ['organization_ids', { organization_ids: [] }],
+    ['group_ids', { group_ids: [uuid] }],
+    ['country_deny_list', { country_deny_list: ['CU'] }],
+    ['country_deny_list', { country_deny_list: [] }],
+  ])('rejects %s', (key, extra) => {
+    expect(issuePaths({ partner, pricing, ...extra })).toEqual([key]);
+  });
+
+  it('rejects an inference provider that is not a lowercase slug', () => {
+    expect(issuePaths({ partner: { inference_provider: 'Acme AI' }, pricing })).toEqual([
+      'partner.inference_provider',
+    ]);
+  });
+
+  it('keeps accepting a definition without a partner or pricing', () => {
+    expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(true);
+  });
+});
+
+describe('ReasoningDetailsTransformSchema', () => {
+  it('accepts mistral-thinking', () => {
+    expect(ReasoningDetailsTransformSchema.parse('mistral-thinking')).toBe('mistral-thinking');
+  });
+});
+
+describe('CustomLlmApiConfigSchema remove_from_body', () => {
+  const parse = (remove_from_body: string[]) =>
+    CustomLlmApiConfigSchema.safeParse({
+      base_url: 'https://llm.example.com/v1',
+      remove_from_body,
+    });
+
+  it.each([
+    ['usage'],
+    ['tools.*.function.strict'],
+    ['messages.*.content.*.cache_control'],
+    ['a.*.*.b'],
+  ])('accepts %s', path => {
+    expect(parse([path]).success).toBe(true);
+  });
+
+  it('accepts an empty list', () => {
+    expect(parse([]).success).toBe(true);
+  });
+
+  it.each([
+    [''],
+    ['.'],
+    ['a..b'],
+    ['.a'],
+    ['a.'],
+    ['*'],
+    ['a.*'],
+    ['__proto__'],
+    ['a.__proto__.b'],
+    ['constructor.prototype.x'],
+    ['messages.*.prototype'],
+  ])('rejects %j', path => {
+    const result = parse(['usage', path]);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map(issue => issue.path)).toEqual([['remove_from_body', 1]]);
   });
 });

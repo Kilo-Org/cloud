@@ -13,13 +13,14 @@ import { View } from 'react-native';
 
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
+import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
 import {
   type TriggerDraft,
   type TriggerDraftProblems,
   withRunAsCreator,
 } from '@/lib/cloud-triggers/trigger-draft';
+import { useTouchedProblems } from '@/lib/cloud-triggers/use-touched-problems';
 
 import { TriggerSwitchRow } from './trigger-form-rows';
 
@@ -35,6 +36,26 @@ type TriggerFormBehaviourProps = Readonly<{
   onDraftChange: (next: TriggerDraft) => void;
 }>;
 
+/**
+ * The guidance under the secret field, for what the trigger can do with it
+ * today: a creator run needs its own 16-character secret, a stored secret only
+ * changes when a new one is typed, and otherwise no secret exists yet and the
+ * field must be filled in.
+ */
+function secretHelpKeyFor(
+  state: Readonly<{ authConfigured: boolean; runAsCreator: boolean }>
+):
+  | 'cloudAgent.triggers.authSecretCreator'
+  | 'cloudAgent.triggers.authSecretKeep'
+  | 'cloudAgent.triggers.authSecretSet' {
+  if (state.runAsCreator) {
+    return 'cloudAgent.triggers.authSecretCreator';
+  }
+  return state.authConfigured
+    ? 'cloudAgent.triggers.authSecretKeep'
+    : 'cloudAgent.triggers.authSecretSet';
+}
+
 export function TriggerFormBehaviour({
   mode,
   organizationId,
@@ -46,6 +67,8 @@ export function TriggerFormBehaviour({
 }: TriggerFormBehaviourProps) {
   const { t } = useTranslation();
   const isScheduled = draft.activation === 'scheduled';
+  const { markTouched, shownProblem } = useTouchedProblems(problems);
+  const secretHelpKey = secretHelpKeyFor({ authConfigured, runAsCreator: draft.runAsCreator });
   return (
     <View className="gap-4">
       <FormField
@@ -60,8 +83,11 @@ export function TriggerFormBehaviour({
         onChangeText={prompt => {
           onDraftChange({ ...draft, prompt });
         }}
-        error={problems.prompt === undefined ? undefined : triggerProblemMessage(problems.prompt)}
-        className="min-h-[120px] leading-[1.25rem]"
+        error={triggerProblemText(shownProblem('prompt'))}
+        onBlur={() => {
+          markTouched('prompt');
+        }}
+        className="min-h-32"
         textAlignVertical="top"
       />
 
@@ -74,21 +100,18 @@ export function TriggerFormBehaviour({
             onChangeText={bodySchemaJson => {
               onDraftChange({ ...draft, bodySchemaJson });
             }}
-            error={
-              problems.bodySchema === undefined
-                ? undefined
-                : triggerProblemMessage(problems.bodySchema)
-            }
+            error={triggerProblemText(shownProblem('bodySchema'))}
+            onBlur={() => {
+              markTouched('bodySchema');
+            }}
             placeholder={TRIGGER_FIELD_EXAMPLES.bodySchema}
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
-            className="min-h-[120px] font-mono text-xs leading-[1.25rem]"
+            className="min-h-32 font-mono text-xs"
             textAlignVertical="top"
           />
-          <Text variant="muted" className="text-xs">
-            {t('cloudAgent.triggers.bodySchemaHelp')}
-          </Text>
+          <Text variant="caption">{t('cloudAgent.triggers.bodySchemaHelp')}</Text>
 
           <View className="gap-1">
             <TriggerSwitchRow
@@ -114,11 +137,10 @@ export function TriggerFormBehaviour({
                   onChangeText={authHeader => {
                     onDraftChange({ ...draft, authHeader });
                   }}
-                  error={
-                    problems.authHeader === undefined
-                      ? undefined
-                      : triggerProblemMessage(problems.authHeader)
-                  }
+                  error={triggerProblemText(shownProblem('authHeader'))}
+                  onBlur={() => {
+                    markTouched('authHeader');
+                  }}
                   autoCapitalize="none"
                   autoCorrect={false}
                   spellCheck={false}
@@ -132,11 +154,10 @@ export function TriggerFormBehaviour({
                   onChangeText={authSecret => {
                     onDraftChange({ ...draft, authSecret });
                   }}
-                  error={
-                    problems.authSecret === undefined
-                      ? undefined
-                      : triggerProblemMessage(problems.authSecret)
-                  }
+                  error={triggerProblemText(shownProblem('authSecret'))}
+                  onBlur={() => {
+                    markTouched('authSecret');
+                  }}
                   secureTextEntry
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -147,11 +168,7 @@ export function TriggerFormBehaviour({
                       : t('cloudAgent.triggers.authSecretLabel')
                   }
                 />
-                <Text variant="muted" className="text-xs">
-                  {draft.runAsCreator
-                    ? t('cloudAgent.triggers.authSecretCreator')
-                    : t('cloudAgent.triggers.authSecretKeep')}
-                </Text>
+                <Text variant="caption">{t(secretHelpKey)}</Text>
               </View>
             )}
           </View>

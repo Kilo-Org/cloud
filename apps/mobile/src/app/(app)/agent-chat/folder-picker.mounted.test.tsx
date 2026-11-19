@@ -19,6 +19,10 @@ const bridge = vi.hoisted(() => ({
   currentPath: '',
   onSelect: vi.fn(),
 }));
+// Reads through the live bridge object so a test can take it away (the slot
+// is gone) without touching the shared mock's other callers. A test that
+// flips the flag restores it, because nothing else resets it between tests.
+const bridgeGone = vi.hoisted(() => ({ gone: false }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const router = vi.hoisted(() => ({ back: vi.fn() }));
 // Live BackHandler harness: every armed listener registers here so a test can
@@ -94,13 +98,20 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
-vi.mock('@/components/ui/icons', () => ({ FolderOpen: 'FolderOpen' }));
+vi.mock('@/components/ui/icons', () => ({
+  FolderOpen: 'FolderOpen',
+  Info: 'Info',
+  RotateCcw: 'RotateCcw',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -108,7 +119,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/route-registry', () => ({
   folderPickerSlot: {
-    get: () => bridge,
+    get: () => (bridgeGone.gone ? undefined : bridge),
     clear: folderPickerSlotClear,
   },
   UNFENCED_ROUTE_KEY: 'unscoped',
@@ -277,6 +288,34 @@ describe('FolderPickerScreen body', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+
+  it('dismisses the expired shell from the header Cancel without reporting a pick', async () => {
+    bridgeGone.gone = true;
+    const renderer = await mount();
+
+    const [expiredHeader] = renderer.root.findAll(
+      node =>
+        String(node.type) === 'SheetHeader' &&
+        typeof node.props.onCancel === 'function' &&
+        node.props.cancelLabel === undefined
+    );
+    if (!expiredHeader) {
+      throw new Error('The expired picker shell did not mount');
+    }
+    const cancel = expiredHeader.props.onCancel as () => void;
+
+    act(() => {
+      cancel();
+    });
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(bridge.onSelect).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+    bridgeGone.gone = false;
   });
 });
 // Hardware Back behavior lives in folder-picker.back.mounted.test.tsx.

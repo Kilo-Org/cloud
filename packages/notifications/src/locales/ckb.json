@@ -2,24 +2,23 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "دانیشتنی ئەجێنتەکەت نوێکراوەتەوە",
-      "lowBalance": "تەوازنەکەت پێویستی بە سەرنجە",
+      "cloudAgentSession": "دانیشتنی بریکارەکەت نوێکراوەتەوە",
+      "lowBalance": "باڵانسەکەت پێویستی بە سەرنجە",
       "spendAlert": "خەرجەکەت پێویستی بە سەرنجە",
       "securityFinding": "دۆزینەوەیەکی ئاسایش پێویستی بە سەرنجە",
       "securityUpdate": "پشکنینێکی ئاسایش نوێکارییەکی هەیە",
-      "activeAgentsGlanceable": "ئەجێنتە چالاکەکان نوێکارییەکیان هەیە"
+      "activeAgentsGlanceable": "بریکارە چالاکەکان نوێکارییەکیان هەیە"
     }
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "ئاگادارکردنەوەی تەوازنی نزم",
-      "body": "تەوازنی {{organizationName}} لە ${{minimumBalanceUsd}} خوارتر کەوت"
+      "title": "ئاگادارکردنەوەی کەمی باڵانس",
+      "body": "باڵانسی {{organizationName}} لە ${{minimumBalanceUsd}} خوارتر کەوت"
     },
     "spendAlert": {
       "title": "ئاگادارکردنەوەی خەرج",
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "پێشێلکردنی SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "پشکنینێکی ئاسایش نوێکارییەکی هەیە"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "دانیشتنی Kiloـی تۆ ئامادەیە بۆ کۆنترۆڵکردن لە مۆبایلەکەتەوە"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

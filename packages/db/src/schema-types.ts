@@ -1572,6 +1572,53 @@ export type OrganizationMcpConnectTarget =
 export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
+// How Kilo clients may drive a browser for this organization's members: anything the
+// member configured, the bundled Playwright browser only, or no browser tools at all.
+export const ORGANIZATION_BROWSER_CONTROL_MODES = ['allow', 'playwright_only', 'off'] as const;
+export const OrganizationBrowserControlSchema = z.enum(ORGANIZATION_BROWSER_CONTROL_MODES);
+export type OrganizationBrowserControl = z.infer<typeof OrganizationBrowserControlSchema>;
+
+export const MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS = 200;
+export const MAX_ORGANIZATION_BROWSER_ORIGIN_LENGTH = 2048;
+
+function parseHttpOrigin(value: string): URL | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return null;
+  }
+  if (url.username !== '' || url.password !== '' || url.search !== '' || url.hash !== '') {
+    return null;
+  }
+  if (url.pathname !== '/') {
+    return null;
+  }
+  return url;
+}
+
+/**
+ * The canonical origin for an allow-list entry, or null when the value is not a
+ * bare http(s) origin. Clients grant `<class>:<origin>`, so a path or query in a
+ * stored value would silently grant nothing usable.
+ */
+export function normalizeOrganizationBrowserOrigin(value: string): string | null {
+  return parseHttpOrigin(value.trim())?.origin ?? null;
+}
+
+export const OrganizationBrowserAllowedOriginSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_ORGANIZATION_BROWSER_ORIGIN_LENGTH)
+  .refine(
+    value => normalizeOrganizationBrowserOrigin(value) !== null,
+    'Expected an http or https origin such as https://example.com'
+  );
+
 const OrganizationSettingsSchema = z.object({
   // The default model and provider access for organization members. Group
   // policies set the access of their own members. Organization admins manage
@@ -1620,8 +1667,17 @@ const OrganizationSettingsSchema = z.object({
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
   guardrails: OrganizationGuardrailsSettingsSchema.optional(),
-  // These apply only while the `gateway_settings` organization feature is enabled in the gateway
-  // configuration. A null or absent data_region routes Vercel AI Gateway requests globally.
+  // Browser automation policy. Absent means `allow`, which leaves the choice of
+  // backend and origins to each member's client.
+  browserControl: OrganizationBrowserControlSchema.optional(),
+  // Origins every member's client treats as granted for browser read, act, and navigate.
+  browserAllowedOrigins: z
+    .array(OrganizationBrowserAllowedOriginSchema)
+    .max(MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS)
+    .optional(),
+  // Advanced policies. These apply only to an enterprise organization while the `gateway_settings`
+  // organization feature is enabled in the gateway configuration. A null or absent data_region
+  // routes Vercel AI Gateway requests globally; a set one also disables OpenRouter.
   disable_openrouter: z.boolean().optional(),
   data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
@@ -2528,11 +2584,36 @@ export type SecurityFindingAnalysis = {
 
 // --- OpenRouter types ---
 
+/**
+ * Time-of-day prices. OpenRouter lists the prices of each UTC window in `overrides`; Vercel AI
+ * Gateway multiplies its token prices by `peak_pricing.multiplier` during peak windows.
+ *
+ * An `overrides` entry with `min_prompt_tokens` is not a time-of-day window: it applies to requests
+ * whose prompt exceeds that many tokens (a long-context surcharge). Vercel's long-context prices
+ * are `EndpointPricingSchema`'s `*_tiers`; the base price fields are their first (short-context)
+ * tier.
+ */
+export const PriceOverrideSchema = z.looseObject({
+  min_prompt_tokens: z.number().optional().catch(undefined),
+  prompt: z.string().optional().catch(undefined),
+  completion: z.string().optional().catch(undefined),
+  input_cache_read: z.string().optional().catch(undefined),
+  input_cache_write: z.string().optional().catch(undefined),
+});
+
+export const PeakPricingSchema = z.looseObject({ multiplier: z.number() });
+
+const TimeOfDayPricingFields = {
+  overrides: z.array(PriceOverrideSchema).optional().catch(undefined),
+  peak_pricing: PeakPricingSchema.optional().catch(undefined),
+};
+
 export type OpenRouterPricing = z.infer<typeof OpenRouterPricing>;
 export const OpenRouterPricing = z.object({
   prompt: z.string(),
   completion: z.string(),
   discount: z.number().optional(),
+  ...TimeOfDayPricingFields,
 });
 
 export type OpenRouterBaseModel = z.infer<typeof OpenRouterBaseModel>;
@@ -2882,6 +2963,8 @@ export const ReasoningDetailsTransform = {
   ReasoningContent: 'reasoning-content',
   /** The upstream sends reasoning as a plain `reasoning` string, without `reasoning_details`. */
   Reasoning: 'reasoning',
+  /** The upstream is Mistral's Chat Completions API, which sends reasoning as `thinking` content chunks. */
+  MistralThinking: 'mistral-thinking',
 } as const;
 
 export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform);
@@ -2906,6 +2989,33 @@ export function getCustomLlmClientApiKind(
   }
 }
 
+/** Segments `remove_from_body` paths never traverse: they reach prototypes, not request data. */
+export const REMOVE_FROM_BODY_BLOCKED_SEGMENTS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
+/**
+ * A dotted path into the request body, where `*` stands for every element of an array or every
+ * value of an object, for example `usage`, `tools.*.function.strict` or
+ * `messages.*.content.*.cache_control`. The last segment names the field to delete.
+ */
+const CustomLlmRemoveFromBodyPathSchema = z.string().superRefine((path, ctx) => {
+  const segments = path.split('.');
+  if (segments.some(segment => segment === '')) {
+    ctx.addIssue({ code: 'custom', message: 'Path segments must not be empty' });
+    return;
+  }
+  if (segments[segments.length - 1] === '*') {
+    ctx.addIssue({ code: 'custom', message: 'The last path segment must name a field, not *' });
+  }
+  const blocked = segments.find(segment => REMOVE_FROM_BODY_BLOCKED_SEGMENTS.has(segment));
+  if (blocked !== undefined) {
+    ctx.addIssue({ code: 'custom', message: `Path segment ${blocked} is not allowed` });
+  }
+});
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
   /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
@@ -2917,7 +3027,7 @@ export const CustomLlmApiConfigSchema = z.object({
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
-  remove_from_body: z.array(z.string()).optional(),
+  remove_from_body: z.array(CustomLlmRemoveFromBodyPathSchema).optional(),
   reasoning_details_transform: ReasoningDetailsTransformSchema.optional(),
 });
 
@@ -3037,6 +3147,22 @@ export const CustomLlmPublicSchema = z.object({
 
 export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
 
+/**
+ * Makes a custom LLM a partner route for the gateway catalog model with the same
+ * public id. It does not own the id: Kilo-paid requests for the model try the
+ * partner first and fall back to the regular route when it answers with an
+ * unsuccessful status. User BYOK keys and other user-paid routes are unaffected. When the
+ * definition declares `opencode_settings.reasoning_options`, a request for a reasoning effort
+ * outside them skips the partner up front.
+ */
+export const CustomLlmPartnerSchema = z.object({
+  /** The provider slug the partner serves the model as. Organization provider allow
+   * lists and request provider settings decide whether the partner may serve. */
+  inference_provider: CustomLlmInferenceProviderSlugSchema,
+});
+
+export type CustomLlmPartner = z.infer<typeof CustomLlmPartnerSchema>;
+
 /** An ISO 3166-1 alpha-2 code as sent in Vercel's `x-vercel-ip-country` header. */
 export const VercelCountryCodeSchema = z
   .string()
@@ -3088,6 +3214,8 @@ export const CustomLlmDefinitionSchema = z
     organization_ids: z.array(z.uuid()).optional(),
     group_ids: z.array(z.uuid()).optional(),
     public: CustomLlmPublicSchema.optional(),
+    /** Requires pricing, and excludes public, organization_ids, group_ids, and country_deny_list. */
+    partner: CustomLlmPartnerSchema.optional(),
     /** Hidden from model lists and refused by the gateway for requests from these countries.
      * A request without a known country is not restricted. */
     country_deny_list: z.array(VercelCountryCodeSchema).optional(),
@@ -3096,7 +3224,8 @@ export const CustomLlmDefinitionSchema = z
     pricing: CustomPricingTiersSchema.optional(),
     /** Whether the upstream may train on prompts. Only allowed with pricing; without it,
      * or when unset, the model is assumed to train on prompts. Set it to false only for
-     * an upstream with zero data retention. */
+     * an upstream that does not train on prompts. It never makes a custom LLM eligible
+     * for zero data retention (`provider.zdr`), which excludes every custom LLM. */
     may_train_on_prompts: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
@@ -3114,6 +3243,24 @@ export const CustomLlmDefinitionSchema = z
         path: ['may_train_on_prompts'],
         message: 'may_train_on_prompts must not be set without pricing',
       });
+    }
+    if (definition.partner) {
+      if (!definition.pricing) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['pricing'],
+          message: 'pricing must be set when partner is set',
+        });
+      }
+      for (const key of ['public', 'organization_ids', 'group_ids', 'country_deny_list'] as const) {
+        if (definition[key] !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: `${key} must not be set when partner is set`,
+          });
+        }
+      }
     }
     if (!definition.public) return;
     for (const key of ['organization_ids', 'group_ids'] as const) {
@@ -3206,6 +3353,38 @@ export const VercelModelIdOverridesConfigSchema = z.object({
 });
 
 export type VercelModelIdOverridesConfig = z.infer<typeof VercelModelIdOverridesConfigSchema>;
+
+export const LatestAliasTargetSchema = z.object({
+  alias: z.string().startsWith('~'),
+  target: z.string().min(1),
+  /** A newer target the alias switches to once `effective_at` passes. */
+  pending: z
+    .object({
+      target: z.string().min(1),
+      effective_at: z.iso.datetime(),
+    })
+    .optional(),
+});
+
+export type LatestAliasTarget = z.infer<typeof LatestAliasTargetSchema>;
+
+export const LatestAliasTargetsConfigSchema = z.object({
+  aliases: z.array(LatestAliasTargetSchema).superRefine((aliases, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, { alias }] of aliases.entries()) {
+      if (seen.has(alias)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate alias "${alias}"`,
+          path: [index, 'alias'],
+        });
+      }
+      seen.add(alias);
+    }
+  }),
+});
+
+export type LatestAliasTargetsConfig = z.infer<typeof LatestAliasTargetsConfigSchema>;
 
 export const PREFERRED_PROVIDER_ORDER_MAX_RULES = 200;
 export const PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS = 20;
@@ -3300,6 +3479,14 @@ export const CustomPricingConfigSchema = z.object({
           ctx.addIssue({
             code: 'custom',
             message: `Duplicate model "${model}"`,
+            path: [index, 'model'],
+          });
+        }
+        // A latest alias is billed at the custom pricing of the model it resolves to.
+        if (model.startsWith('~')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `"${model}" is a latest alias. Aliases are billed at their target model's custom pricing, so add an entry for the target model instead.`,
             path: [index, 'model'],
           });
         }
@@ -3403,6 +3590,15 @@ export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 
 export const VercelModelsSchema = z.object({ data: z.array(VercelModelSchema) });
 
+/**
+ * Vercel AI Gateway's context-length price tiers of one token price: the price per token for
+ * prompts of `min` up to `max` tokens. The first tier equals the base price field.
+ */
+export const PriceTiersSchema = z
+  .array(z.looseObject({ cost: z.string() }))
+  .optional()
+  .catch(undefined);
+
 export const EndpointPricingSchema = z.object({
   prompt: z.string(),
   completion: z.string(),
@@ -3413,6 +3609,11 @@ export const EndpointPricingSchema = z.object({
   web_search: z.string().optional(),
   internal_reasoning: z.string().optional(),
   discount: z.number().optional(),
+  prompt_tiers: PriceTiersSchema,
+  completion_tiers: PriceTiersSchema,
+  input_cache_read_tiers: PriceTiersSchema,
+  input_cache_write_tiers: PriceTiersSchema,
+  ...TimeOfDayPricingFields,
 });
 
 export const EndpointInferenceRegionSchema = z.object({

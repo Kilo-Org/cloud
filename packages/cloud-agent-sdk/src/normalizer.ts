@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 import type { BackgroundActivityState } from './background-activity';
+import type { SessionSnapshotFailure } from './snapshot-page';
 import type { Part, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
@@ -16,6 +17,7 @@ import type {
 } from './types';
 import {
   cloudWorktreeChangesReadyDataSchema,
+  cloudWorkspaceArtifactsChangedDataSchema,
   isValidCloudAgentEvent,
   projectSessionGoal,
   kilocodePayloadSchema,
@@ -148,7 +150,16 @@ export type ServiceEvent =
   | {
       type: 'stopped';
       reason: 'complete' | 'interrupted' | 'disconnected' | 'transport-disconnected' | 'error';
+      /** The transport spent its reconnect budget; only `transport-disconnected` sets it. */
+      exhausted?: boolean | undefined;
       branch?: string | undefined;
+      /**
+       * The typed transcript-read failure this stop ends, when the transport
+       * reports one. `service-state` forwards it to the same `onError` channel
+       * the read used, so the terminal-vs-retryable decision keeps the machine
+       * kind instead of degrading to the generic stop message.
+       */
+      failure?: SessionSnapshotFailure | undefined;
     }
   | { type: 'warning' }
   | {
@@ -220,6 +231,7 @@ export type ServiceEvent =
       catalogStatus?: SlashCommandCatalogStatus | undefined;
     }
   | { type: 'worktree.changes.ready'; cloudSessionId: string; revision: number }
+  | { type: 'workspace.artifacts.changed'; cloudSessionId: string; revision: number }
   | {
       type: 'cloud.message.queued';
       messageId: string;
@@ -262,16 +274,21 @@ export type ServiceEvent =
 
 export type NormalizedEvent = ChatEvent | ServiceEvent;
 
-const CHAT_EVENT_TYPES = new Set([
-  'message.updated',
-  'message.part.updated',
-  'message.part.delta',
-  'message.part.removed',
-  'message.removed',
-]);
+/**
+ * Every `ChatEvent` variant, declared once. `satisfies` makes a renamed, added or
+ * typo'd variant a compile error here, so this table cannot drift from the union
+ * that `isChatEvent` narrows to.
+ */
+const CHAT_EVENT_TYPES = {
+  'message.updated': true,
+  'message.part.updated': true,
+  'message.part.delta': true,
+  'message.part.removed': true,
+  'message.removed': true,
+} as const satisfies Record<ChatEvent['type'], true>;
 
 export function isChatEvent(event: NormalizedEvent): event is ChatEvent {
-  return CHAT_EVENT_TYPES.has(event.type);
+  return Object.hasOwn(CHAT_EVENT_TYPES, event.type);
 }
 
 /** Best-effort error message extraction from a loosely-typed error field. */
@@ -728,6 +745,16 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
     if (!r.success) return null;
     return {
       type: 'worktree.changes.ready',
+      cloudSessionId: raw.sessionId,
+      revision: r.data.revision,
+    };
+  }
+
+  if (raw.streamEventType === 'cloud.workspace.artifacts.changed') {
+    const r = cloudWorkspaceArtifactsChangedDataSchema.safeParse(raw.data);
+    if (!r.success) return null;
+    return {
+      type: 'workspace.artifacts.changed',
       cloudSessionId: raw.sessionId,
       revision: r.data.revision,
     };

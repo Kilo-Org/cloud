@@ -17,11 +17,14 @@ import {
 } from '@/components/agents/mode-options';
 import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
+import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import { triggerProblemMessage } from '@/lib/cloud-triggers/trigger-problem-copy';
+import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
+import { useTouchedProblems } from '@/lib/cloud-triggers/use-touched-problems';
 import {
   useTriggerEnvironments,
   useTriggerProfiles,
@@ -59,6 +62,15 @@ export function TriggerFormAgent({
   // Loaded up front so a saved profile's name shows before the sheet is opened.
   const profiles = useTriggerProfiles(draft.runAsCreator ? undefined : organizationId, true);
   const isCustomAgent = !BUILTIN_AGENT_MODES.some(mode => mode === draft.agent);
+  const { markTouched, shownProblem } = useTouchedProblems(problems);
+  // TanStack Query v5 resets a no-data query to `pending` when it refetches,
+  // clearing `error`, so `isError` alone would unmount the failure row (and its
+  // retry) the moment the retry is pressed. Keeping the failed state through
+  // the refetch leaves the row in place and lets the retry show its busy state
+  // until the request settles. Same contract as the tool-summary settings
+  // screen and `use-current-user-id`.
+  const catalogueFailed =
+    (models.isError || (models.isLoading && models.isFetched)) && models.models.length === 0;
 
   const agentOptions: TriggerChoice[] = [
     ...BUILTIN_AGENT_MODES.map(mode => ({
@@ -75,17 +87,22 @@ export function TriggerFormAgent({
     environment => environment.id === draft.environmentId
   );
   const selectedProfile = profiles.profiles.find(profile => profile.id === draft.profileId);
+  const modelProblemText = triggerProblemText(shownProblem('model'));
 
   return (
     <View className="gap-4">
-      <TriggerSelectRow
-        label={t('common.agent')}
-        value={draft.agent.length === 0 ? t('cloudAgent.triggers.customAgent') : agentValue}
-        onPress={() => {
-          onOpenSheetChange('agent');
-        }}
-        error={problems.agent === undefined ? undefined : triggerProblemMessage(problems.agent)}
-      />
+      <View className="gap-1">
+        <TriggerSelectRow
+          label={t('common.agent')}
+          value={draft.agent.length === 0 ? t('cloudAgent.triggers.customAgent') : agentValue}
+          onPress={() => {
+            markTouched('agent');
+            onOpenSheetChange('agent');
+          }}
+          error={triggerProblemText(shownProblem('agent'))}
+        />
+        <Text variant="caption">{t('cloudAgent.triggers.agentHelp')}</Text>
+      </View>
       {isCustomAgent && (
         <FormField
           label={t('profiles.agents.slug')}
@@ -101,30 +118,35 @@ export function TriggerFormAgent({
           maxLength={50}
         />
       )}
-      <Text variant="muted" className="text-xs">
-        {t('cloudAgent.triggers.agentHelp')}
-      </Text>
 
       <View className="gap-2">
-        <View className="flex-row items-center gap-2">
-          <ModelSelector
-            value={draft.model}
-            variant={draft.variant}
-            options={models.models}
-            acceptsVariant
-            onSelect={(model, variant) => {
-              onDraftChange({ ...draft, model, variant });
-            }}
-            isLoading={models.isLoading}
+        <ModelSelector
+          value={draft.model}
+          variant={draft.variant}
+          options={models.models}
+          acceptsVariant
+          presentation="field"
+          onSelect={(model, variant) => {
+            onDraftChange({ ...draft, model, variant });
+          }}
+          onOpen={() => {
+            markTouched('model');
+          }}
+          isLoading={models.isLoading}
+          disabled={catalogueFailed}
+        />
+        {catalogueFailed ? (
+          <QueryError
+            placement="top"
+            compact
+            variant="server"
+            title={t('common.couldNotLoadModels')}
+            onRetry={() => void models.refetch()}
+            isRetrying={models.isFetching}
           />
-          {models.isError ? (
-            <Text className="min-w-0 flex-1 text-xs text-destructive">
-              {t('common.couldNotLoadModels')}
-            </Text>
-          ) : null}
-        </View>
-        {problems.model === undefined ? null : (
-          <Text className="text-xs text-destructive">{triggerProblemMessage(problems.model)}</Text>
+        ) : null}
+        {modelProblemText === undefined ? null : (
+          <AccessibleStatus message={modelProblemText} className="text-sm" />
         )}
       </View>
 
@@ -136,16 +158,16 @@ export function TriggerFormAgent({
           onOpenSheetChange('environment');
         }}
       />
-      <TriggerSelectRow
-        label={t('common.profile')}
-        value={selectedProfile?.name ?? t('cloudAgent.triggers.profileDefaults')}
-        onPress={() => {
-          onOpenSheetChange('profile');
-        }}
-      />
-      <Text variant="muted" className="text-xs">
-        {t('cloudAgent.triggers.profileHelp')}
-      </Text>
+      <View className="gap-1">
+        <TriggerSelectRow
+          label={t('common.profile')}
+          value={selectedProfile?.name ?? t('cloudAgent.triggers.profileDefaults')}
+          onPress={() => {
+            onOpenSheetChange('profile');
+          }}
+        />
+        <Text variant="caption">{t('cloudAgent.triggers.profileHelp')}</Text>
+      </View>
 
       <TriggerChoiceSheet
         visible={openSheet === 'agent'}

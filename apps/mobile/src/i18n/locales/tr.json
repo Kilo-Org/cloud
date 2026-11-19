@@ -26,6 +26,7 @@
     "creditHistory": "Kredi geçmişi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "İptal",
     "done": "Bitti",
     "retry": "Tekrar dene",
@@ -157,7 +158,7 @@
     "retryLoadingMore": "Daha fazlasını yüklemeyi tekrar dene",
     "reviewPr": "PR'yi incele",
     "role": "Rol",
-    "searchModels": "Model adı...",
+    "searchModels": "Model adı…",
     "selectedRepositories": "Seçilen depolar",
     "selectRepositories": "Depoları seç",
     "sendMessage": "Mesaj gönder",
@@ -175,7 +176,9 @@
     "durationHourShort": "sa",
     "changes": "Değişiklikler",
     "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir.",
-    "privateRepositoryA11y": "{{name}}, özel depo"
+    "privateRepositoryA11y": "{{name}}, özel depo",
+    "legalDocumentEnglishOnly": "Bu belge yalnızca İngilizce olarak mevcuttur.",
+    "organizationTrialEndedBilling": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Faturalandırmayı güncelleyip ardından tekrar deneyebilirsin."
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -198,7 +201,7 @@
     "openSignInPageInBrowser": "Oturum açma sayfasını tarayıcıda aç",
     "copySignInLink": "Oturum açma bağlantısını kopyala",
     "cancelSignIn": "Oturum açmayı iptal et",
-    "startingSignIn": "Oturum açma başlatılıyor...",
+    "startingSignIn": "Oturum açma başlatılıyor…",
     "organizationUsesSso": "Kuruluşun tek oturum açma kullanıyor.",
     "continueWithSso": "SSO ile devam et",
     "useDifferentEmail": "Farklı bir e-posta adresi kullan",
@@ -308,9 +311,9 @@
     "passkeyVerifyDescription": "Güvenliğiniz için geçiş anahtarlarınızı değiştirmeden önce kimliğinizi doğrulayın.",
     "passkeyVerifyWithPasskey": "Geçiş anahtarıyla doğrula",
     "passkeyVerifySendCode": "Bana e-postayla kod gönder",
-    "passkeyVerifySendingCode": "Kod gönderiliyor...",
+    "passkeyVerifySendingCode": "Kod gönderiliyor…",
     "passkeyVerifyPasskeyPrompt": "Devam etmek için geçiş anahtarınızla onaylayın.",
-    "passkeyVerifyChecking": "Kodunuz kontrol ediliyor...",
+    "passkeyVerifyChecking": "Kodunuz kontrol ediliyor…",
     "passkeyVerifyCodeSent": "{{email}} adresine gönderilen kodu gir.",
     "passkeyVerifyCodeRejected": "Kod eşleşmedi. Tekrar deneyin.",
     "passkeyVerifyPasskeyFailed": "Bu geçiş anahtarıyla doğrulama yapılamadı. Tekrar deneyin.",
@@ -318,8 +321,8 @@
     "passkeyVerifyInProgress": "Bu kod zaten kontrol ediliyor. Biraz sonra tekrar deneyin.",
     "passkeyVerifyTooManyAttempts": "Çok fazla deneme yapıldı. Yeni bir kod gönderin.",
     "passkeyVerifySsoRequired": "Kuruluşunuz tek oturum açmayı zorunlu kılıyor. Bu değişikliği tarayıcıda onaylayın, ardından buraya dönün.",
-    "passkeyVerifySsoStarting": "Onay işlemi başlatılıyor...",
-    "passkeyVerifySsoWaiting": "Onay bekleniyor...",
+    "passkeyVerifySsoStarting": "Onay işlemi başlatılıyor…",
+    "passkeyVerifySsoWaiting": "Onay bekleniyor…",
     "passkeyVerifySsoOpen": "Onay sayfasını aç",
     "passkeyVerifySsoExpired": "Onayın süresi doldu veya onay iptal edildi. Tekrar deneyin.",
     "passkeyVerifySsoUnavailable": "Tek oturum açma onayı şu anda kullanılamıyor. Tekrar deneyin.",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Kayıtlı değer gösterilemez. Değiştirmek için yeni bir değer gir.",
       "editKeyMappingsWarning": "Anahtarı değiştirmek kayıtlı model eşlemelerini de değiştirir: hâlâ ihtiyaç duyduğun her eşlemeyi yeniden gir.",
       "saveFailed": "Anahtar kaydedilemedi.",
-      "invalidCredentials": "Kimlik bilgilerini kontrol edip tekrar dene.",
       "fieldRequired": "{{field}} gerekli.",
+      "keyIncomplete": "Anahtarda gerekli bir değer eksik.",
       "incompleteMapping": "Eşleme {{number}} için hem bir gateway model slug'ı hem de bir dağıtım adı gerekli.",
       "apiKeyLabel": "API anahtarı",
       "apiKeyPlaceholder": "Anahtarı yapıştır",
       "apiKeyRequired": "Anahtarı gir.",
+      "keyAlreadyExists": "Bu sağlayıcı için zaten bir anahtarın var. Başka bir tane eklemeden önce onu kaldır.",
+      "keyStoreFailed": "Anahtar kaydedilemedi.",
+      "invalidCredentials": "Bu anahtar bu sağlayıcının beklediği biçimde değil. Kontrol edip tekrar dene.",
+      "testSucceeded": "Anahtar çalışıyor. Sağlayıcı: {{provider}}. Model: {{model}}.",
+      "testRejected": "Sağlayıcı bu anahtarı reddetti. Anahtarın doğru olduğunu ve iptal edilmediğini kontrol et.",
+      "testIncomplete": "Sağlayıcı testi bitmeden sonlandırdı. Tekrar dene.",
+      "testUnsupportedProvider": "Bu sağlayıcı artık desteklenmiyor. Anahtarı kaldır.",
+      "testUnreadableKey": "Kayıtlı anahtar okunamadı. Daha sonra tekrar dene.",
+      "testDeprecatedProvider": "Bu sağlayıcı kullanımdan kaldırıldı, bu yüzden anahtarı test edilemez.",
+      "keyManagedByCodingPlan": "Bu sağlayıcının anahtarını bir kodlama planı yönetir ve anahtar salt okunurdur. Kendi anahtarını eklemek için kodlama planını iptal et.",
+      "providerUnavailable": "Bu sağlayıcı henüz kullanıma açık olmadığı için ona anahtar ekleyemezsin.",
+      "testFailed": "Anahtar testi başarısız oldu. Tekrar dene.",
       "authMethod": "Kimlik doğrulama yöntemi",
       "authMethodAccessKeys": "Erişim anahtarları",
       "resourceName": "Azure kaynak adı",
@@ -489,7 +504,14 @@
       "capped": "En son raporlarınız gösteriliyor."
     },
     "changelog": "Yenilikler",
-    "changelogVersionPending": "Bu sürümün notları sonraki uygulama güncellemesiyle gelir."
+    "changelogVersionPending": "{{version}} sürümünün notları sonraki uygulama güncellemesiyle gelir.",
+    "changelogGroupNew": "Yeni",
+    "changelogFixesIn": "Şu alanlarda düzeltmeler ve iyileştirmeler: {{areas}}.",
+    "changelogFixesPolish": "Uygulama genelinde düzeltmeler ve iyileştirmeler.",
+    "changelogAreas": {
+      "signIn": "Oturum açma",
+      "profileOrganizations": "Profil ve kuruluşlar"
+    }
   },
   "preferences": {
     "general": "Genel",
@@ -681,10 +703,12 @@
       "notConnectedReadOnly": "Bitbucket bağlı değil. Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bu kuruluşun Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
-      "description": "Gerekli izinlere sahip bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
+      "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
+      "description": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
+      "descriptionReconnect": "{{organization}} için yeni bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",
-      "tokenPlaceholder": "Çalışma alanı erişim belirteci"
+      "tokenPlaceholder": "Çalışma alanı erişim belirteci",
+      "tokenRefused": "Bitbucket bu çalışma alanı erişim belirtecini kabul etmedi. Yukarıdaki izinlere sahip olduğunu kontrol et ve yeniden dene."
     },
     "followReviewMd": "REVIEW.md yönergelerine uy",
     "followReviewMdSubtitle": "Her deponun REVIEW.md dosyasındaki talimatlara uy",
@@ -766,7 +790,7 @@
       "transcriptRetry": "İnceleme dökümü yüklenemedi.",
       "transcriptLive": "Canlı",
       "agentIdle": "Ajan boşta",
-      "agentWorking": "Ajan çalışıyor...",
+      "agentWorking": "Ajan çalışıyor…",
       "anErrorOccurred": "Bir hata oluştu",
       "errorWithMessage": "Hata: {{message}}.",
       "executionStarted": "Yürütme başladı",
@@ -785,6 +809,7 @@
     },
     "reviewList": {
       "configureProvider": "Sağlayıcıyı yapılandır",
+      "connectOwnerOnly": "Sağlayıcıyı bağlaması için bir kuruluş sahibi veya yöneticiden istekte bulunun.",
       "couldNotLoad": "İncelemeler yüklenemedi.",
       "noReviews": "Henüz inceleme yok",
       "noReviewsDescription": "Kod inceleyici bir çekme isteğini inceledikten sonra sonuçlar burada görünür.",
@@ -929,13 +954,25 @@
       "repositoryLine": "İncelemeler: {{reviews}} · Bulgular: {{findings}}",
       "empty": "Henüz istatistiği olan inceleme yok",
       "emptyDescription": "İstatistikler, kuruluş için etkin olduğu sürece tamamlanan incelemeleri kaydeder.",
-      "off": "Bu kuruluş için istatistikler kapalı.",
-      "couldNotLoad": "İstatistikler yüklenemedi"
+      "offTitle": "{{platform}} için istatistikler kapalı",
+      "offDescription": "Kuruluşun faturalama rollerine sahip kişiler (sahipler, yöneticiler ve faturalama yöneticileri), tamamlanan incelemeleri kaydetmek için istatistikleri web'deki kuruluş ayarlarından açabilir.",
+      "couldNotLoad": "İstatistikler yüklenemedi",
+      "trackedReviewsCaption": "Bu dönemde istatistikler açıkken tamamlanan incelemeler. Devam eden ve başarısız olan incelemeler hiçbir zaman sayılmaz.",
+      "trackedReviewsUncounted": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi.",
+      "trackedReviewsUncounted_one": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi.",
+      "trackedReviewsUncounted_other": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi."
     },
     "council": {
       "title": "Konsey incelemesi",
       "subtitle": "Birkaç uzman her çekme isteğini inceler ve oyları tek bir kararda birleşir.",
-      "unavailable": "Konsey incelemesi bu kuruluş için kullanılamıyor.",
+      "unavailablePersonallyTitle": "Enterprise kuruluşu gerekli",
+      "unavailablePersonally": "Konsey incelemesi kişisel hesabın bir parçası değildir.",
+      "unavailablePersonallyAction": "Kuruluş oluştur",
+      "unavailablePersonallySwitchAction": "Kuruluş değiştir",
+      "unavailableOrganizationTitle": "Konsey incelemesi şu anda mevcut değil",
+      "unavailableForOrganization": "Konsey incelemesi, etkin bir abonelik veya deneme süresi olan Enterprise planını gerektirir. Bu kuruluşta şu anda mevcut değil.",
+      "unavailableForOrganizationNeutral": "Konsey incelemesi şu anda bu kuruluş için mevcut değil. Daha sonra tekrar deneyin.",
+      "unavailableOnBitbucket": "Konsey incelemesi Bitbucket depoları için kullanılamıyor.",
       "noRepositories": "Henüz depo seçilmedi. Önce depo ayarlarından depo seç.",
       "specialists": "Uzmanlar",
       "labels": "Konsey incelemesini tetikleyen etiketler",
@@ -1577,6 +1614,8 @@
       "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
+      "historyTooLarge": "Bu oturumun dökümü yüklenemeyecek kadar büyük.",
+      "historyUnavailable": "Bu oturumun dökümü okunamıyor.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar dene.",
       "notEnoughCredits": "Bu istek için yeterli kredi yok. Kredi ekleyip tekrar dene.",
       "previousTaskFinishing": "Önceki görev henüz tamamlanmadı. Biraz bekle.",
@@ -1653,6 +1692,7 @@
       "branchDefault": "Varsayılan",
       "branchAccessibility": "Dal: {{label}}",
       "branchLoading": "Dallar yükleniyor",
+      "branchInactive": "Dallarının yüklenmesi için bir depo seç.",
       "branchLoadError": "Dallar yüklenemedi",
       "branchUnavailable": "Bu depo için dal kullanılamıyor. Sağlayıcıdaki erişimini kontrol et, ardından başka bir depo seç.",
       "branchEmpty": "Kullanılabilir dal yok",
@@ -1885,7 +1925,8 @@
       "customModes": "Özel modlar"
     },
     "modeSelector": {
-      "accessibility": "Mod: {{label}}"
+      "accessibility": "Mod: {{label}}",
+      "customMode": "Özel mod"
     },
     "modeOptions": {
       "code": "Kod yaz",
@@ -1906,7 +1947,7 @@
       "noMatches": "Eşleşme yok",
       "noRepositories": "Kullanılabilir depo yok",
       "noRepositoriesDescription": "Hesabına bağlı depo yok.",
-      "loading": "Yükleniyor...",
+      "loading": "Yükleniyor…",
       "accessibility": "Depo: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2201,7 +2242,7 @@
       "thinkingEffortAccessibility": "{{label}} düşünme düzeyi",
       "thinkingEffortSelected": "{{label}} düşünme düzeyi, seçili",
       "thinkingEffortWithModel": "{{model}}, {{variant}} düşünme düzeyi",
-      "lockedByAgent": ", \"{{agent}}\" ajanı tarafından kilitlendi",
+      "lockedByAgent": "\"{{agent}}\" ajanı tarafından kilitlendi",
       "addToFavorites": "{{name}} modelini favorilere ekle",
       "removeFromFavorites": "{{name}} modelini favorilerden kaldır",
       "sessionModel": "Oturum modeli"
@@ -2237,8 +2278,8 @@
       "pasteFromClipboard": "Panodan yapıştır",
       "stopGenerating": "Oluşturmayı durdur",
       "selectModelBeforeSending": "Göndermeden önce bir model seç.",
-      "preparingPlaceholder": "Ortam hazırlanıyor...",
-      "finalizingPlaceholder": "Tamamlanıyor...",
+      "preparingPlaceholder": "Ortam hazırlanıyor…",
+      "finalizingPlaceholder": "Tamamlanıyor…",
       "sessionLoadFailed": "Oturum yüklenemedi. Önce yeniden deneyin.",
       "cannotReceiveFiles": "Bu oturum dosya alamıyor. Mesajını göndermek için ekleri kaldır.",
       "couldNotAttachFiles": "Dosyalar eklenemedi. Tekrar denemek için gönder düğmesine dokun.",
@@ -2439,6 +2480,7 @@
     "signOutThisDevice": "Bu cihazın oturumunu kapat",
     "signOutSessionLabel": "{{device}} cihazındaki oturumu kapat, giriş: {{signedIn}}, son görülme: {{lastSeen}}",
     "sessionSignedOut": "Oturum kapatıldı.",
+    "sessionSignOutFailed": "Bu oturum kapatılamadı. Tekrar deneyin.",
     "signOutThisDeviceTitle": "Bu cihazın oturumu kapatılsın mı?",
     "signOutThisSessionTitle": "Bu oturum kapatılsın mı?",
     "signOutThisSessionMessage": "{{device}} cihazındaki oturum kapatılacak. Son görülme: {{lastSeen}}. Cihazın API erişimi bir saat daha devam edebilir.",
@@ -2453,7 +2495,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Oturumlar yüklenemedi.",
-    "couldNotLoadActiveSessions": "Etkin oturumlar yüklenemedi.",
     "agentSessions": "Şu anda etkin",
     "newCodingTask": "Yeni kodlama görevi",
     "newTaskFromPicture": "Resimden yeni görev",
@@ -2480,6 +2521,7 @@
   "queryError": {
     "neutralDescription": "Lütfen tekrar dene.",
     "offlineTitle": "Yüklenemedi.",
+    "offlineDescription": "Sunucuya ulaşılamadı.",
     "permissionDescription": "Bunu görüntüleme iznin yok.",
     "notFoundDescription": "Bu öğe kaldırılmış veya artık kullanılamıyor olabilir.",
     "serverTitle": "Yüklenemedi.",
@@ -2500,7 +2542,7 @@
     "scheduled": "ZAMANLANDI"
   },
   "voiceInput": {
-    "listening": "Dinleniyor...",
+    "listening": "Dinleniyor…",
     "allow": "İzin ver",
     "onlineMessage": "Bu cihaz, sesi çevrimdışı olarak metne dönüştüremiyor. Kaydın, metne dönüştürülmesi için {{provider}} hizmetine gönderilir. Kilo ses kaydını saklamaz.",
     "onlineTitle": "Konuşma çevrimiçi işleniyor",
@@ -2522,7 +2564,7 @@
     "useOnlineTranscription": "Çevrimiçi transkripsiyona izin ver",
     "offlineModelDownloadScheduled": "Çevrimdışı konuşma dosyaları arka planda indirilecek. Sesli girişi daha sonra tekrar dene.",
     "listeningStopped": "Dinleme durdu.",
-    "transcribing": "Metne dönüştürülüyor...",
+    "transcribing": "Metne dönüştürülüyor…",
     "gatewayUnreachable": "Kilo Gateway'e ulaşılamadı. Bağlantını kontrol et ve tekrar dene.",
     "gatewayTimeout": "Metne dönüştürme çok uzun sürdü. Tekrar dene.",
     "gatewayModelUnavailable": "Bu metne dönüştürme modeli kullanılamıyor. Tercihler'den başkasını seç.",
@@ -2561,12 +2603,14 @@
     "manage": {
       "billingHistory": "Fatura geçmişi",
       "billingHistoryEmpty": "Henüz fatura geçmişi yok.",
+      "billingHistoryError": "Fatura geçmişi yüklenemedi",
       "cancel": "Aboneliği iptal et",
       "cancelDescription": "Kilo Pass'ınız fatura döneminin sonuna kadar etkin kalır ve yenilenmez.",
       "cancelScheduled": "{{date}} tarihinde iptal edilecek",
       "cancelScheduledChange": "Planlanan değişikliği iptal et",
       "cancelled": "Abonelik iptal edildi",
       "creditHistoryEmpty": "Henüz Kilo Pass kredisi yok.",
+      "creditHistoryError": "Kredi geçmişi yüklenemedi",
       "resume": "Aboneliği sürdür",
       "resumeCancelledDescription": "Kilo Pass'ınız yeniden otomatik olarak yenilenmeye başlar.",
       "resumePausedDescription": "Kilo Pass'ınız planlanan devam tarihini beklemeden şimdi devam eder.",
@@ -2583,7 +2627,6 @@
     "completingPurchase": "Satın alma tamamlanıyor",
     "subscriptionLoading": "Kilo Pass aboneliği yükleniyor",
     "retryHint": "Kilo Pass durumunu almayı tekrar dener.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "{{date}} tarihinde sona erdi",
     "notAvailableInApp": "Kilo Pass uygulamada kullanılamıyor.",
     "statusActive": "Aktif",
@@ -2768,7 +2811,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hesabın henüz bir kuruluşu yok. Bitbucket çekme isteklerini, bir kuruluş oluşturduktan ya da birine katıldıktan sonra gözden geçirebilirsin.",
       "gitlabReconnectAdminOnlyDescription": "Yeniden bağlaması için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "bitbucketNotConnectedTitle": "Bitbucket bağlı değil",
-      "bitbucketAdminOnlyDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
+      "adminOnlyConnectDescription": "Yalnızca kuruluş sahipleri, yöneticiler ve faturalandırma yöneticileri bağlayabilir.",
       "contextLine": "{{organization}} için",
       "contextLinePersonal": "Kişisel hesabınız için"
     },
@@ -2865,7 +2908,19 @@
         "fileComment": "Dosya yorumu",
         "outdatedOnPathLines": "{{path}} · {{lines}} · Güncel değil",
         "outdatedOnLines": "{{lines}} · Güncel değil",
-        "outdatedOnPath": "{{path}} · Güncel değil"
+        "outdatedOnPath": "{{path}} · Güncel değil",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} · L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} · {{lineRange}} ({{side}})",
+        "sideLeft": "Sol taraf",
+        "sideRight": "Sağ taraf",
+        "outdatedOnLinesSide": "{{lines}} ({{side}}) · Güncel değil",
+        "outdatedOnPathLinesSide": "{{path}} · {{lines}} ({{side}}) · Güncel değil",
+        "outdatedSide": "Güncel değil ({{side}})",
+        "outdatedOnPathSide": "{{path}} üzerinde güncel değil ({{side}})"
       },
       "deletedUser": "silinen kullanıcı",
       "replyForbiddenTerm": "Bu {{term}}ne yanıt verme iznin yok.",
@@ -3321,6 +3376,7 @@
       "manageOnWeb": "Web'deki faturalandırma ayarları",
       "changePlan": "Planı değiştir",
       "buySeats": "Lisans satın al",
+      "managedOnWeb": "Plan, lisanslar ve otomatik yükleme web'de yönetilir.",
       "setupAutoTopUp": "Otomatik yüklemeyi ayarla",
       "manageAutoTopUp": "Otomatik yüklemeyi yönet",
       "opensOnWeb": "Web'de açılır"
@@ -3332,13 +3388,13 @@
       "loadErrorTitle": "Kuruluşların yüklenemedi.",
       "membershipLostNotice": "Bu kuruluşa artık erişimin yok. {{target}}'e geçildi.",
       "noOrganization": "Kuruluş yok",
-      "noOrganizationDescription": "Bu hesap bir kuruluşa bağlı değil. Üye davetleri ve düşük bakiye uyarıları gibi kuruluş özelliklerini kullanmak için bir kuruluş oluşturun ya da davet edildiğiniz bir kuruluşa katılmak için web'i açın.",
+      "noOrganizationDescription": "Bu hesap bir kuruluşa bağlı değil. Üye davetleri ve düşük bakiye uyarıları gibi kuruluş özelliklerini kullanmak için bir kuruluş oluşturun ya da bir kuruluşun size gönderdiği e-postadaki daveti kabul edin.",
       "organizationUnavailable": "Kuruluş kullanılamıyor.",
       "selectDescriptionWithOrganizations": "Bir veya daha fazla kuruluşa aitsin. Bu ekranın kullanması gereken hesabı seç.",
       "selectOrganization": "Bir kuruluş seç",
       "unavailableDescription": "Bu kuruluş artık kullanılamıyor. Devam etmek için profilinden başka bir kuruluş seç.",
       "unavailableSessionsDescription": "Bu kuruluş artık kullanılamıyor. Oturumları yüklenemiyor.",
-      "accessDeniedDescription": "Bu kuruluşa erişimin yok."
+      "accessDeniedDescription": "Bir kuruluş sahibinden ya da yöneticiden sana erişim vermesini iste."
     },
     "create": {
       "title": "Kuruluş oluştur",
@@ -3364,7 +3420,8 @@
         "accounting_adjustment": "Muhasebe düzeltmesi",
         "credits_expired": "Kredilerin süresi doldu"
       },
-      "truncated": "Daha eski kredi hareketleri mevcut."
+      "truncated": "Daha eski kredi hareketleri mevcut.",
+      "retentionLimit": "En son kredi hareketleri gösteriliyor."
     },
     "hub": {
       "balance": "Bakiye",
@@ -3387,6 +3444,7 @@
       "sendInvite": "Davet gönder",
       "title": "Üye davet et",
       "alreadyInvited": "Bu kişi zaten davet edilmiş veya zaten üye.",
+      "organizationUnavailable": "Bu kuruluş artık kullanılamıyor.",
       "sendError": "Davet gönderilemedi.",
       "pendingInvitation": "Bu e-posta adresinin zaten bekleyen bir daveti var.",
       "alreadyMember": "Bu kişi zaten bu kuruluşun bir üyesi.",
@@ -3408,7 +3466,8 @@
         "void": "İptal edildi",
         "uncollectible": "Tahsil edilemez"
       },
-      "truncated": "Daha eski faturalar mevcut."
+      "truncated": "Daha eski faturalar mevcut.",
+      "retentionLimit": "En son faturalar gösteriliyor."
     },
     "lowBalanceAlert": {
       "enableA11y": "Düşük bakiye uyarısını etkinleştir",
@@ -3471,16 +3530,26 @@
     },
     "settingsOnWeb": {
       "title": "Web'deki kuruluş ayarları",
-      "integrations": "Web'deki entegrasyonlar",
       "usageDetails": "Kullanım ayrıntıları",
       "providersAndModels": "Sağlayıcılar ve modeller",
       "groups": "Gruplar",
       "guardrails": "Koruma kuralları",
       "byok": "Kendi anahtarınızı kullanın",
+      "ssoAndDomain": "SSO ve alan adı",
+      "dataCollection": "Veri toplama",
       "auditLogs": "Denetim günlükleri",
-      "requestLogs": "İstek günlükleri",
-      "subOrganizations": "Alt kuruluşlar",
-      "distributeFunds": "Fonları dağıt"
+      "requestLogs": "İstek günlükleri"
+    },
+    "requestLogs": {
+      "older": "Önceki saat",
+      "newer": "Sonraki saat",
+      "truncated": "Bu saatte listede gösterilenden daha fazla istek var.",
+      "emptyTitle": "Bu saatte istek yok",
+      "emptyDescription": "Daha önceki istekleri görmek için Önceki saat'i kullanın.",
+      "loadError": "İstek günlükleri yüklenemedi.",
+      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "tokens": "{{input}} giriş · {{output}} çıkış",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",
@@ -3627,8 +3696,7 @@
     "imagesSectionEmpty": "Güvenilen görsel sunucusu yok",
     "revoke": "{{host}} sunucusuna verilen güveni kaldır",
     "revokeMessage": "Bu sunucuya verilen bağlantılar yeniden onay isteyecek.",
-    "revokeImageMessage": "Bu sunucudaki görseller yeniden onay isteyecek.",
-    "backToPreferences": "Tercihlere dön"
+    "revokeImageMessage": "Bu sunucudaki görseller yeniden onay isteyecek."
   },
   "glanceable": {
     "waiting": "Ajanlar güncelleniyor",
@@ -3642,7 +3710,7 @@
     "newestSession": "En yeni: {{title}}",
     "noneWaiting": "Bekleyen ajan yok",
     "newAgent": "Yeni ajan",
-    "approving": "Onaylanıyor...",
+    "approving": "Onaylanıyor…",
     "couldNotApprove": "Onaylanamadı",
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
@@ -3654,6 +3722,7 @@
     "lastKnown": "Son bilinen",
     "awaitingUpdate": "Güncelleme bekleniyor",
     "nextRun": "Sonraki çalışma",
+    "wasDue": "Bekleniyordu",
     "waitingForYou": "Sizi bekliyor",
     "nextScheduled": "Sıradaki zamanlananlar",
     "answerNeeded": "Yanıt bekliyor",
@@ -3763,6 +3832,8 @@
       "fieldName": "Görünen ad",
       "fieldUrl": "Sunucu URL'si",
       "fieldUrlInvalid": "Geçerli bir sunucu URL'si girin.",
+      "duplicateUrl": "Bu URL zaten kayıtlı.",
+      "serverNotFound": "Bu sunucu artık kayıtlı değil.",
       "enableServer": "Bu sunucuyu etkinleştir: {{name}}",
       "editServer": "Sunucuyu düzenle",
       "deleteServer": "Sunucuyu sil",
@@ -3872,6 +3943,8 @@
       "downloading": "İndiriliyor: {{written}} / {{total}}",
       "downloadingUnknown": "İndiriliyor: {{written}}",
       "paused": "Duraklatıldı: {{written}} / {{total}}",
+      "retrying": "Yeniden deneniyor: {{written}} / {{total}}",
+      "retryingUnknown": "Yeniden deneniyor: {{written}}",
       "verifying": "İndirilen dosya denetleniyor…",
       "downloaded": "İndirildi · {{size}}",
       "url": "Doğrudan indirme bağlantısı",
@@ -3962,7 +4035,9 @@
         "androidModelUnavailable": "Bu cihaz Gemini Nano'yu desteklemiyor veya AICore sistem uygulaması hâlâ kuruluyor. Daha sonra yeniden deneyin.",
         "aicoreUpdateRequired": "Bu modeli kullanmak için AICore uygulamasını ve sistem yazılımınızı güncelleyin.",
         "downloadable": "Bu modeli kullanabilmek için bir kereliğine indirmeniz gerekiyor.",
-        "downloading": "Model indiriliyor. İndirme tamamlandığında kullanıma hazır olacak."
+        "downloading": "Model indiriliyor. İndirme tamamlandığında kullanıma hazır olacak.",
+        "batteryQuota": "Cihazdaki model şimdilik kendisine ayrılan pil kotasını kullandı. Daha sonra yeniden deneyin.",
+        "checkFailed": "Uygulama bu modeli denetleyemedi. Yeniden deneyin."
       },
       "unavailable": "Cihazdaki model şu anda kullanılamıyor. Durumunu $t(modelChat.backends.title) bölümünden denetleyin.",
       "busy": "Cihazdaki model başka bir yanıtla meşgul. Tamamlandığında yeniden deneyin.",
@@ -4091,6 +4166,7 @@
     "commandAtLimit": "Komut {{max}} karakterle sınırlıdır",
     "commandsEmpty": "Henüz kurulum komutu yok",
     "commandsSaveFailed": "Kurulum komutları kaydedilemedi",
+    "commandLimitReached": "Bir profil en fazla {{max}} kurulum komutu barındırabilir. Bir tane daha eklemek için birini silin.",
     "moveCommandUp": "{{position}}. komutu yukarı taşı",
     "moveCommandDown": "{{position}}. komutu aşağı taşı",
     "skillsTitle": "Yetenekler",
@@ -4177,6 +4253,7 @@
       "deleteMessage": "Bu profili kullanan yeni oturumlar artık bu sunucunun araçlarına erişemez. Bu işlem geri alınamaz.",
       "deleteConfirm": "MCP sunucusunu sil",
       "saveFailed": "MCP sunucusu kaydedilemedi",
+      "limitReached": "Bir profil en fazla {{max}} MCP sunucusu barındırabilir. Bir tane daha eklemek için birini silin.",
       "deleteFailed": "MCP sunucusu silinemedi",
       "updateFailed": "MCP sunucusu güncellenemedi"
     },
@@ -4198,7 +4275,7 @@
       "topPPlaceholder": "örn. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Temsilcim",
-      "promptPlaceholder": "Sen bir...",
+      "promptPlaceholder": "Sen bir…",
       "tools": "Aletler",
       "wholeToolRule": "Bu ajan tüm aletlere aynı anda tek bir kural uygular: {{rule}}. Bu anahtarlar salt okunur.",
       "visibility": "Görünürlük",
@@ -4209,6 +4286,7 @@
       "modeSubagent": "Yalnızca alt temsilci",
       "modeAll": "Tüm modlar",
       "saveFailed": "Temsilci kaydedilemedi",
+      "limitReached": "Bir profil en fazla {{max}} aracı barındırabilir. Bir tane daha eklemek için birini silin.",
       "deleteFailed": "Temsilci silinemedi",
       "nameRequired": "Bir temsilci adı girin",
       "slugRequired": "Bir temsilci slug girin",
@@ -4239,6 +4317,7 @@
       "moveUp": "{{name}} eğik çizgi komutunu yukarı taşı",
       "moveDown": "{{name}} eğik çizgi komutunu aşağı taşı",
       "saveFailed": "Komut kaydedilemedi",
+      "limitReached": "Bir profil en fazla {{max}} eğik çizgi komutu barındırabilir. Bir tane daha eklemek için birini silin.",
       "deleteFailed": "Komut silinemedi",
       "nameRequired": "Bir komut adı girin",
       "nameInvalid": "Ad küçük harfle başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
@@ -4271,8 +4350,7 @@
       "repoValue": "Depo: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Bu profil artık kullanılamıyor. Başka bir profil seçin.",
-      "pickerEmptyDescriptionOrganization": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir kuruluş profili oluşturun.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Kuruluş sahibi veya yöneticisi bir kuruluş profili oluşturabilir."
+      "pickerEmptyDescriptionOrganization": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir kuruluş profili oluşturun."
     },
     "variablesDeleteFailed": "Değişken silinemedi",
     "deleteVariable": "{{key}} değişkenini sil",
@@ -4319,8 +4397,9 @@
       },
       "purchaseFallback": "Kredi satın alımı",
       "receipt": "Makbuz",
-      "receiptA11y": "{{description}} için makbuzu aç",
-      "receiptUnavailable": "Bu satın alım için makbuz mevcut değil."
+      "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
+      "receiptUnavailable": "Bu satın alım için makbuz mevcut değil.",
+      "retentionLimit": "En son kredi geçmişi gösteriliyor."
     },
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
@@ -4454,16 +4533,20 @@
     "loadError": "Raporlar yüklenemedi",
     "view": "Raporu oku",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Bağlama göre filtrele",
+    "contextAll": "Tüm bağlamlar",
     "dismiss": "Raporu yok say",
+    "dismissFailed": "Bu rapor henüz yok sayılamadı. Arka planda yeniden denenecek.",
     "offline": "Çevrimdışı · kayıtlı rapor",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
-    "window": "{{start}} – {{end}}",
     "summary": "AI özeti",
     "summaryPending": "AI özeti hazırlanıyor. Hazır olduğunda buraya eklenecek.",
     "summaryUnavailable": "AI özeti kullanılamıyor. Yapılandırılmış raporunuz hâlâ mevcut.",
     "summaryCharge": "AI ücreti: {{cost}}",
     "summaryChargePending": "AI ücreti mutabakat bekliyor",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Kanıtlar ve çıktılar",
     "timezone": "Rapor saat dilimi",
     "deviceTimezone": "Cihaz saat dilimini kullan",
@@ -4475,22 +4558,22 @@
     "timeHint": "Ana sayfa kartı, rapor aralığı bittiğinde çevrimdışı olsa bile canlı duruma döner.",
     "invalidSchedule": "Geçerli bir saat dilimi ve boş olmayan bir rapor aralığı seçin.",
     "notificationsHint": "Planlanmış her rapor için tek bir genel bildirim. Ücretli AI özetlerinden bağımsızdır.",
-    "notificationPermission": "Raporunuzu almak için $t(common.notifications) bölümünde cihaz bildirimlerini etkinleştirin.",
+    "notificationPermission": "Raporunuzu almak için anlık bildirimleri açın.",
     "defaultModel": "Kilo’nun varsayılan modelini kullan",
     "duration": "Süre sınırı (dakika)",
     "spendLimit": "Harcama sınırı (USD)",
     "invalidSafeguards": "Pozitif ve sonlu süre ve harcama sınırları girin.",
     "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
-    "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil.",
+    "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil. Modeli veya sınırları değiştirin ya da daha sonra tekrar deneyin.",
     "confirmPaid": "{{context}} için ücretli özetler etkinleştirilsin mi?",
     "paidDisclosure": "Tahmini {{estimate}}, en fazla {{maximum}}, {{minutes}} dakika sınırıyla. Oluşturma başarısız olsa bile ücret alınır.",
     "enable": "Ücretli özetleri etkinleştir",
     "allContexts": "Kişisel ve kuruluş raporları ayrı tutulur.",
     "emptyHistory": "Kayıtlı rapor yok",
-    "estimatePermissionUnavailable": "Bu bağlamın bakiyesini kullanma izniniz yok.",
-    "estimatePricingUnavailable": "Bu model için fiyatlandırma mevcut değil.",
-    "estimateBalanceUnavailable": "Ücretli özet için bakiye yetersiz.",
-    "estimateModelNotAllowed": "Bu model burada kullanılamaz.",
+    "estimatePermissionUnavailable": "Bu bağlamın bakiyesini kullanma izniniz yok. Bir kuruluş sahibinden bunu etkinleştirmesini isteyin.",
+    "estimatePricingUnavailable": "Bu model için fiyatlandırma mevcut değil. Başka bir model seçin.",
+    "estimateBalanceUnavailable": "Ücretli özet için bakiye yetersiz. Bu bağlamın bakiyesine kredi ekleyin.",
+    "estimateModelNotAllowed": "Bu modele bu bağlamda izin verilmiyor. Başka bir model seçin.",
     "estimateSpendLimitTooLow": "Bu özete izin vermek için harcama limitini yükseltin.",
     "saved": "Rapor ayarları kaydedildi",
     "selectedSessions": "Seçilen oturumlar",
@@ -4499,16 +4582,35 @@
     "capturedAt": "Kaydedilme: {{time}}",
     "snapshotHint": "Planlanan sabah saatinde, mevcut veriler elverdiğince kaydedilen en son oturum durumunun anlık görüntüsü. Sayılar, gece boyunca tüm etkinlikleri değil, seçilen oturumları yansıtır.",
     "snapshotTruncated": "Bu anlık görüntünün kapsamını sınırlı tutmak için bazı oturumlar veya kanıtlar dahil edilmedi.",
-    "snapshotSummaryFailed": "AI özeti başarısız oldu. Yapılandırılmış anlık görüntünüz hâlâ mevcut.",
+    "snapshotSummaryFailed": "AI özeti başarısız oldu. Yapılandırılmış raporunuz hâlâ mevcut.",
     "scheduledContextEnabled": "Planlanmış raporlar",
     "scheduledContextSettings": "Planlanmış raporlar · {{context}}",
     "scheduledContextHint": "Yalnızca bu bağlam için planlanmış kayıtları ve ücretli AI özetlerini etkinleştirin. Seçilmiş, hassas bilgileri gizlenmiş alıntılar ve yapılandırılmış bilgiler modelinize gönderilir. Özetler, rapor ayarlarını güncellediğinizde kaydedilen uygulama dilini kullanır. Ücretler bu bağlamın bakiyesinden düşülür. Etkinlik olmayan anlık görüntülerde AI kullanılmaz.",
     "snapshotSafeguards": "Özet başına süre ve harcama sınırları, planlanmış her anlık görüntü için ayrı ayrı geçerlidir; günlük bütçe değildir.",
-    "snapshotEstimateInputTooLarge": "Bu anlık görüntüde seçilen modelin işleyebileceğinden fazla kanıt var.",
+    "snapshotEstimateInputTooLarge": "Bu anlık görüntüde seçilen model için çok fazla kanıt var. Daha büyük bir giriş penceresine sahip bir model seçin.",
     "quietSnapshot": "Bu anlık görüntü için hiçbir oturum etkinliği seçilmedi. AI özeti istenmedi ve ücret alınmadı.",
     "noEnabledContexts": "Planlanmış raporlar için etkinleştirilmiş bağlam yok",
     "sourceBlocker": "Oturumla ilgilenilmesi gerekiyor",
-    "sourceMetadata": "Kaydedilen oturum meta verileri"
+    "sourceMetadata": "Kaydedilen oturum meta verileri",
+    "metadataPlan_one": "Plan: {{displayTotal}} adımdan {{displayDone}} tanesi tamamlandı",
+    "metadataPlan_other": "Plan: {{displayTotal}} adımdan {{displayDone}} tanesi tamamlandı",
+    "metadataPlan": "Plan: {{displayTotal}} adımdan {{displayDone}} tanesi tamamlandı",
+    "metadataFiles_one": "{{displayCount}} dosya değişti",
+    "metadataFiles_other": "{{displayCount}} dosya değişti",
+    "metadataFiles": "{{displayCount}} dosya değişti",
+    "metadataLinesAdded_one": "{{displayCount}} satır eklendi",
+    "metadataLinesAdded_other": "{{displayCount}} satır eklendi",
+    "metadataLinesAdded": "{{displayCount}} satır eklendi",
+    "metadataLinesRemoved_one": "{{displayCount}} satır silindi",
+    "metadataLinesRemoved_other": "{{displayCount}} satır silindi",
+    "metadataLinesRemoved": "{{displayCount}} satır silindi",
+    "metadataPlanCurrent": "Mevcut adım: {{current}}",
+    "metadataFailure": "Son tur başarısız: {{kind}}",
+    "sourceActivity": "Adsız etkinlik",
+    "metadataFailureProvider": "sağlayıcı hatası",
+    "metadataFailureTool": "araç hatası",
+    "metadataFailureCancelled": "İptal edildi",
+    "metadataFailureOther": "belirtilmemiş hata"
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu arama sonucu açılamadı"
@@ -4525,6 +4627,8 @@
     "topModels": "En çok kullanılan modeller",
     "topFeatures": "En çok kullanılan özellikler",
     "emptyTitle": "Bu dönemde kullanım yok",
+    "unavailableTitle": "Kullanım kullanılamıyor",
+    "unavailableDescription": "Bu çalışma alanı kullanım bildirmiyor. Yeniden denemek işe yaramaz.",
     "orgSelfNotice": "Bu organizasyondaki kendi kullanımınızı görüyorsunuz.",
     "viewDetails": "Kullanım ayrıntılarını görüntüle"
   },
@@ -4542,10 +4646,14 @@
     "couldNotLoad": "Entegrasyonlar yüklenemedi",
     "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
     "managedByOwner": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibine başvurun.",
+    "managedByOwnerOrAdmin": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi veya yöneticiye başvurun.",
+    "managedByOwnerOrBilling": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi veya faturalandırma yöneticisine başvurun.",
+    "managedByOwnerAdminOrBilling": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibi, yönetici veya faturalandırma yöneticisine başvurun.",
     "connectFailed": "Bağlantı sayfası açılamadı"
   },
   "invoices": {
-    "personalEmptyDescription": "Kendi satın alımlarınıza ait faturalar, faturalandırıldığınızda burada görünecek."
+    "personalEmptyDescription": "Kendi satın alımlarınıza ait faturalar, faturalandırıldığınızda burada görünür. Makbuz App Store'da ve Makbuz Google Play'de ise Kredi geçmişi'nde bulunur.",
+    "personalPeriod": "Son 12 Ay"
   },
   "cloudAgent": {
     "compute": {
@@ -4575,8 +4683,9 @@
       "title": "Tetikleyiciler ve web kancaları",
       "subtitle": "Cloud Agent çalıştırmalarını web kancası çağrısıyla veya zamanlamayla otomatikleştirin.",
       "new": "Yeni tetikleyici",
+      "create": "Tetikleyici oluştur",
       "emptyTitle": "Henüz tetikleyici yok",
-      "emptyDescription": "Bir web kancası çağrısıyla veya bir zamanlamayla Cloud Agent çalıştırması başlatmak için bir tetikleyici oluşturun.",
+      "emptyDescription": "İlk tetikleyicinizi oluşturun.",
       "loadFailedTitle": "Tetikleyiciler yüklenemedi",
       "loadFailedDescription": "Bağlantınız olduğunda tekrar deneyin.",
       "detailLoadFailedTitle": "Bu tetikleyici yüklenemedi",
@@ -4596,7 +4705,7 @@
       "fieldCron": "Cron ifadesi",
       "fieldCronHelp": "Beş alan: dakika, saat, gün, ay ve haftanın günü. En kısa aralık bir dakikadır.",
       "fieldTimezone": "Saat dilimi",
-      "nameLocked": "Ad, web kancası URL'sinin bir parçasıdır ve değiştirilemez.",
+      "nameLocked": "Tetikleyici oluşturulduktan sonra ad değiştirilemez.",
       "repositoryLocked": "Tetikleyici oluşturulduktan sonra depo değiştirilemez.",
       "environmentAutomatic": "Depoya göre otomatik",
       "notSelected": "Seçilmedi",
@@ -4611,6 +4720,7 @@
       "authHeaderLabel": "Başlık adı",
       "authSecretLabel": "Paylaşılan gizli anahtar",
       "authSecretKeep": "Kaydedilmiş gizli anahtarı korumak için boş bırakın.",
+      "authSecretSet": "Zorunlu. Güçlü rastgele bir dize seçin.",
       "authSecretCreator": "Tetikleyici oluşturucusu olarak çalıştığında en az 16 karakter kullanın.",
       "autoCommit": "Çalıştırma bittiğinde değişiklikleri işle",
       "condenseOnComplete": "Çalıştırma bittiğinde bağlamı sıkıştır",
@@ -4621,11 +4731,14 @@
       "saveFailedTitle": "Tetikleyici kaydedilemedi",
       "deleteTitle": "Bu tetikleyici silinsin mi?",
       "deleteMessage": "{{name}} adresine yapılan çağrılar başarısız olur. Bu işlem geri alınamaz.",
+      "deleteMessageScheduled": "{{name}} tetikleyicisinin zamanlanmış çalıştırmaları durur. Bu işlem geri alınamaz.",
       "runNow": "Şimdi çalıştır",
       "runStarted": "Çalıştırma başladı",
       "created": "Tetikleyici oluşturuldu",
       "saved": "Tetikleyici kaydedildi",
       "statusArrived": "Ulaştı",
+      "defaultPromptWebhook": "Bu web kancası isteğinin gövdesini açıklayın:\n\n{{body}}",
+      "defaultPromptScheduled": "Zamanlanmış görevi çalıştırın. {{scheduledTime}} zamanında tetiklendi.",
       "problems": {
         "nameRequired": "Bir ad girin.",
         "nameTooShort": "En az 8 karakter kullanın.",
@@ -4660,8 +4773,9 @@
     "create": "Bağlantı oluştur",
     "createFailed": "Bağlantı oluşturulamadı.",
     "existingTitle": "Mevcut bağlantı",
-    "existingDescription": "Bu oturumun zaten bir paylaşım bağlantısı var. Yeni bir bağlantı oluşturursanız mevcut bağlantının yerini alır ve eski bağlantı çalışmaz hâle gelir.",
+    "existingDescription": "Bu oturumun zaten bir paylaşım bağlantısı var. Bu ayarlarla yeni bir bağlantı oluşturursanız mevcut bağlantının yerini alır ve eski bağlantı çalışmaz hâle gelir.",
     "rotate": "Yeni bağlantı oluştur",
+    "replacementSettings": "Bu ayarlar yeni bağlantı için geçerlidir.",
     "revoke": "Bağlantıyı kaldır",
     "revokeTitle": "Bağlantı kaldırılsın mı?",
     "revokeMessage": "Mevcut bağlantı hemen çalışmayı durdurur.",
@@ -4673,6 +4787,7 @@
     "superseded": "Bu bağlantı başka bir cihazdan yenisiyle değiştirildiği için artık çalışmıyor."
   },
   "sharedSession": {
+    "startedAt": "{{time}}'de başladı",
     "title": "Paylaşılan oturum",
     "someone": "Biri",
     "sharedBy": "Paylaşan: {{owner}}",
@@ -4680,5 +4795,179 @@
     "unavailableDescription": "Bu paylaşım bağlantısının süresi dolmuş veya bağlantı iptal edilmiş.",
     "transcriptUnavailableTitle": "Bu döküm yüklenemedi",
     "transcriptUnavailableDescription": "Bağlantı hâlâ çalışıyor. Birazdan tekrar deneyin."
+  },
+  "organizationGuardrails": {
+    "title": "Yapay Zeka Korkulukları",
+    "permissionDenied": "Yapay Zeka Korkuluklarını yalnızca kuruluş sahipleri ve yöneticileri yönetebilir.",
+    "unavailableTitle": "Yapay Zeka Korkulukları etkin değil",
+    "unavailable": "Kilo, talep üzerine bir kuruluş için Yapay Zeka Korkuluklarını etkinleştirir. {{supportEmail}} ile iletişime geçin; Kilo ekibi bunları kuruluşunuz için açar.",
+    "contactSupport": "Destekle iletişime geç",
+    "loadError": "Yapay Zeka Korkulukları yüklenemedi",
+    "statusSaving": "Kaydediliyor…",
+    "statusSaved": "Kaydedildi",
+    "statusFailed": "Kaydedilemedi.",
+    "inputTitle": "Girdi korkulukları",
+    "inputDescription": "Araç sonuçları dahil her girdiyi Enkrypt AI ile tarar. Enkrypt kullanılamadığında istekler reddedilmek yerine taranmadan gönderilir.",
+    "outputTitle": "Çıktı korkulukları",
+    "outputDescription": "Yanıtları, üyeler almadan önce Enkrypt AI ile tarar. Siz açmadıkça kapalıdır.",
+    "detectorsHint": "Engelle, işaretlenen isteği reddeder. Yalnızca günlüğe kaydet seçeneği ise isteği geciktirmeden kaydeder.",
+    "detectorsHintOutput": "Engelle, işaretlenen yanıtı başarısız kılar. Yalnızca günlüğe kaydet seçeneği ise yanıtı geciktirmeden kaydeder.",
+    "choiceLog": "Yalnızca günlüğe kaydet",
+    "applyTo": "Şunlara uygula",
+    "applyToAllMembers": "Tüm üyeler",
+    "applyKiloDefault": "Kilo Varsayılanını Uygula",
+    "invalidSavedTitle": "Kaydedilen girdi algılayıcı ayarları okunamıyor",
+    "invalidSavedBody": "Girdi algılayıcıları yeniden kaydedilene kadar istekler engellenir. Aşağıdaki algılayıcılar Kilo Varsayılanından başlar.",
+    "invalidSavedOutputTitle": "Kaydedilen çıktı algılayıcı ayarları okunamıyor",
+    "invalidSavedOutputBody": "Yanıtlar, çıktı algılayıcıları yeniden kaydedilene kadar alıkonur. Aşağıdan çıktı algılayıcılarını seçin.",
+    "blockingOutputNote": "Engelleyici bir çıktı algılayıcısı, Enkrypt tamamını denetleyene kadar yanıtı bekletir. Gecikmeden kaçınmak için Yalnızca günlüğe kaydet seçeneğini kullanın.",
+    "inputDetectorRequired": "En az bir girdi algılayıcısını açın.",
+    "outputDetectorRequired": "En az bir çıktı algılayıcısını açın.",
+    "rulesTooMany": "En fazla {{max}} kural ekleyin.",
+    "ruleIdRequired": "Bir kural kimliği girin.",
+    "ruleIdInvalid": "Bir kural kimliği yalnızca harf, rakam, nokta, tire ve alt çizgi kullanabilir.",
+    "ruleTextRequired": "Kuralın neyi yasakladığını veya gerektirdiğini açıklayın.",
+    "keywordTooLong": "Her anahtar sözcük en fazla {{max}} karakter olabilir.",
+    "topicTooLong": "Her konu en fazla {{max}} karakter olabilir.",
+    "keywordsTooMany": "En fazla {{max}} anahtar sözcük ekleyin.",
+    "topicsTooMany": "En fazla {{max}} konu ekleyin.",
+    "piiEntityRequired": "Algılanacak en az bir veri türü seçin.",
+    "keywordRequired": "En az bir anahtar sözcük ekleyin.",
+    "topicRequired": "En az bir konu ekleyin.",
+    "policyTextRequired": "İlke metnini girin.",
+    "ruleRequired": "En az bir kural ekleyin.",
+    "ruleIdDuplicate": "Her kuralın kendi ID'si olmalıdır.",
+    "piiEntities": "Algılanacak veriler",
+    "keywordsLabel": "Anahtar sözcükler",
+    "keywordsHint": "Her satıra bir anahtar sözcük.",
+    "topicsHint": "Her satıra bir konu.",
+    "policyFormat": "İlke biçimi",
+    "policyFormatRules": "Yapılandırılmış kurallar",
+    "policyFormatRulesDescription": "Her gereksinim için bir kural; kategori ve önem derecesiyle birlikte. Önerilir.",
+    "policyFormatText": "İlke metni",
+    "policyFormatTextDescription": "Mevcut bir ilkeyi düz metin olarak yapıştırın.",
+    "rulesEmpty": "Henüz kural yok. Her kural, girdilerin içermemesi veya talep etmemesi gereken tek bir şeyi açıklar.",
+    "addRule": "Kural ekle",
+    "ruleNumber": "Kural {{number}}",
+    "ruleRemove": "{{number}} numaralı kuralı kaldır",
+    "ruleIdLabel": "Kural kimliği",
+    "ruleNameLabel": "Ad (isteğe bağlı)",
+    "ruleTextLabel": "Kural",
+    "ruleRiskCategory": "Risk kategorisi",
+    "ruleApplicability": "Kapsam",
+    "ruleFrameworks": "Çerçeveler",
+    "detector": {
+      "promptInjection": {
+        "label": "İstem enjeksiyonu",
+        "description": "Talimatları geçersiz kılma veya modelin kısıtlamalarını aşma girişimlerini algılar."
+      },
+      "policyViolation": {
+        "label": "İlke ihlali",
+        "description": "Metin veya kural olarak yazılmış kuruluş ilkenizi ihlal eden girdileri işaretler.",
+        "descriptionOutput": "Metin veya kural olarak yazılmış kuruluş ilkenizi ihlal eden yanıtları işaretler."
+      },
+      "pii": {
+        "label": "PII ve gizli bilgiler",
+        "description": "Kişisel verileri, kimlik bilgilerini, IP adreslerini ve URL'leri algılar."
+      },
+      "keywords": {
+        "label": "Yasaklı anahtar sözcükler",
+        "descriptionOutput": "Listelediğiniz anahtar sözcüklerden herhangi birini içeren yanıtları algılar."
+      },
+      "topics": {
+        "label": "Konular",
+        "descriptionOutput": "Listelediğiniz konulardan herhangi biri hakkındaki yanıtları işaretler."
+      },
+      "toxicity": {
+        "label": "Toksiklik",
+        "description": "Toksik, aşağılayıcı, tehdit edici veya nefret içeren dili algılar."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Cinsel veya başka açılardan iş ortamında uygun olmayan içerikleri algılar."
+      },
+      "bias": {
+        "label": "Önyargı",
+        "description": "Önyargılı veya ayrımcı dili algılar."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Kişisel veriler",
+        "description": "Adlar, e-posta adresleri, telefon numaraları."
+      },
+      "secrets": {
+        "label": "Gizli bilgiler",
+        "description": "API anahtarları, belirteçler, parolalar."
+      },
+      "ipAddress": {
+        "label": "IP adresleri",
+        "description": "IPv4 ve IPv6 adresleri."
+      },
+      "url": {
+        "label": "URL'ler",
+        "description": "Web adresleri."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Güvenlik ve dolandırıcılık",
+      "safetyHarm": "Emniyet ve zarar",
+      "privacyDataProtection": "Gizlilik ve veri koruma",
+      "brandReputationTrust": "Marka ve itibar",
+      "biasFairnessEthical": "Önyargı ve hakkaniyet",
+      "legalIpLiability": "Hukuki ve fikri mülkiyet sorumluluğu",
+      "productMisuse": "Ürünün kötüye kullanımı",
+      "performanceQuality": "Performans ve kalite"
+    },
+    "applicability": {
+      "user": "Kullanıcı girdisi",
+      "userAssistant": "Kullanıcı girdisi ve yanıtlar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM İlk 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "AB Yapay Zeka Yasası",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Kurumsal özellik",
+    "enterpriseOnly": "Bu yalnızca kurumsal bir özelliktir.",
+    "readOnly": "Bu ayarları yalnızca kuruluş sahipleri ve yöneticileri değiştirebilir.",
+    "loadError": "Sağlayıcılar ve modeller yüklenemedi",
+    "tabModels": "Modeller",
+    "tabProviders": "Sağlayıcılar",
+    "tabGateways": "Ağ geçitleri",
+    "modelsDescription": "Bir modeli her üye için engellemek üzere kapatın. İzin verilen sağlayıcılardan gelen modeller açık başlar.",
+    "modelsDeniedOnly": "Yalnızca engellenenler",
+    "modelsEmpty": "Bu aramayla eşleşen model yok.",
+    "modelsDeniedEmpty": "Engellenen model yok.",
+    "modelsDeniedSearchEmpty": "Bu aramayla eşleşen engellenen model yok.",
+    "providersDescription": "Kilo'nun bu kuruluş için o sağlayıcıya yönlendirme yapmasını durdurmak üzere bir sağlayıcıyı kapatın.",
+    "providersNeedCatalog": "Tam model kataloğu yüklenene kadar sağlayıcı anahtarları salt okunur kalır. Bunları düzenlemek için yukarıdaki Tekrar dene düğmesine dokunun.",
+    "providersEmpty": "Bu aramayla eşleşen sağlayıcı yok.",
+    "allowAllShown": "Gösterilenlerin tümüne izin ver",
+    "denyAllShown": "Gösterilenlerin tümünü reddet",
+    "gatewaysDescription": "Kilo, model isteklerini Vercel AI Gateway veya OpenRouter üzerinden yönlendirir. Devre dışı bırakılan bir ağ geçidi bu istekleri başarısız kılar.",
+    "emptyProviderList": "En az bir sağlayıcıya izin verin. Boş bir liste tüm Kilo model yönlendirmelerini engeller.",
+    "gatewaysUnavailable": "Ağ geçidi ayarları bu kuruluş için kullanılamıyor.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter istekleri bir bölgeye sabitlenmez.",
+    "inferenceRegion": "Çıkarım bölgesi",
+    "inferenceRegionDescription": "Vercel AI Gateway isteklerini bu bölgeye sabitler. Orada kullanılamayan bir model başarısız olur.",
+    "disableOpenrouterNote": "OpenRouter'ı devre dışı bırakmak, istekleri onun üzerinden yönlendiren BYOK anahtarlarını da engeller.",
+    "emptyModelList": "En az bir modeli açık bırakın. Tüm modelleri reddetmek, üyelere kullanacak hiçbir şey bırakmaz.",
+    "catalogUnavailable": "Tam model kataloğu yüklenemedi, bu yüzden yalnızca kayıtlı listeleriniz gösteriliyor. Tüm modelleri yüklemek için yeniden deneyin.",
+    "region": {
+      "global": "Küresel",
+      "us": "Amerika Birleşik Devletleri",
+      "eu": "Avrupa Birliği",
+      "au": "Avustralya",
+      "jp": "Japonya"
+    }
   }
 }

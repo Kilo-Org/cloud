@@ -63,6 +63,7 @@ import {
   getByokProviderDisplayName,
 } from '@/lib/byok/provider-names';
 import { cn } from '@/lib/utils';
+import type { BYOKKeyTestResult } from '@/lib/byok/types';
 import * as z from 'zod';
 
 export {
@@ -275,6 +276,52 @@ function updateBYOKDialogState(state: BYOKDialogState, update: Partial<BYOKDialo
   return { ...state, ...update };
 }
 
+/**
+ * Provider SDKs colour their error text for a terminal. A toast shows those
+ * escape sequences as characters, so they are removed before the sentence is
+ * rendered.
+ */
+function stripAnsi(text: string): string {
+  // eslint-disable-next-line no-control-regex -- the escape byte is the target
+  return text.replace(/\u001b\[[0-9;]*m/g, '');
+}
+
+/**
+ * The stored-key test reports an outcome rather than a message, so this copy
+ * lives here. `rejected` names the credential problem itself and drops the
+ * provider's own error text, which is SDK setup for a different audience.
+ * `failed` keeps the provider's own sentence, which is where its reason lives,
+ * with any terminal colour codes removed: a toast renders them as characters.
+ * The outcome is generic, so a sentence that names the provider takes that name
+ * from the stored key, and stays neutral when the key is not known yet.
+ */
+function byokKeyTestMessage(result: BYOKKeyTestResult, providerId: string | undefined): string {
+  switch (result.outcome) {
+    case 'ok':
+      return `API key test success. Provider: ${result.provider}. Model: ${result.model}.`;
+    case 'incomplete':
+      return 'API key test failed: the provider ended the test before it finished.';
+    case 'unsupported-provider':
+      return providerId
+        ? `Provider ${providerId} is no longer supported.`
+        : 'This provider is no longer supported.';
+    case 'unreadable-key':
+      return 'API key test failed: the stored key could not be read. Try again later.';
+    case 'deprecated-provider':
+      return providerId
+        ? `${getByokProviderDisplayName(providerId)} is deprecated and its API key can no longer be tested.`
+        : 'This provider is deprecated and its API key can no longer be tested.';
+    case 'rejected':
+      return providerId
+        ? `API key test failed: ${getByokProviderDisplayName(providerId)} rejected this API key. Check that the key is correct and has not been revoked.`
+        : 'API key test failed: the provider rejected this API key. Check that the key is correct and has not been revoked.';
+    case 'failed':
+      return result.detail
+        ? `API key test failed: ${stripAnsi(result.detail)}`
+        : 'API key test failed. Check the credential and try again.';
+  }
+}
+
 export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const [dialogState, updateDialogState] = useReducer(
     updateBYOKDialogState,
@@ -419,11 +466,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
   const testMutation = useMutation(
     trpc.byok.testApiKey.mutationOptions({
-      onSuccess: result => {
-        if (result.success) {
-          toast.success(result.message);
+      onSuccess: (result, variables) => {
+        const providerId = keys?.find(key => key.id === variables.id)?.provider_id;
+        const message = byokKeyTestMessage(result, providerId);
+        if (result.outcome === 'ok') {
+          toast.success(message);
         } else {
-          toast.error(result.message);
+          toast.error(message);
         }
       },
       onError: (error: { message: string }) => {
@@ -1217,13 +1266,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         <AlertDescription>
                           <p>
                             Once saved, this key is used for the supported models above that none of
-                            your provider keys cover. If you add both a Vercel AI Gateway key and an
-                            OpenRouter key, the Vercel AI Gateway key is used for models it serves.
+                            your provider keys cover, including embedding and System One models. If
+                            you add both a Vercel AI Gateway key and an OpenRouter key, the Vercel
+                            AI Gateway key is used for models it serves.
+                            {selectedProvider === 'openrouter'
+                              ? ' Transcription requests use only an OpenRouter key.'
+                              : ''}
                           </p>
                           {organizationId ? (
                             <p className="mt-2">
                               Organization model and provider restrictions apply to requests that
-                              use this key.
+                              use this key. The organization&apos;s Advanced policies, such as an
+                              inference region, do not.
                             </p>
                           ) : null}
                         </AlertDescription>
@@ -1236,13 +1290,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       <AlertDescription>
                         <p>
                           Once saved, your key will automatically be used whenever your client
-                          requests one of the supported models above. If several of your keys can
-                          serve the same model, the one highest in your key list is used.
+                          requests one of the supported models above, including embedding and System
+                          One models served through the Vercel AI Gateway. If several of your keys
+                          can serve the same model, the one highest in your key list is used.
                         </p>
                         {organizationId ? (
                           <p className="mt-2">
                             Organization-configured model and provider restrictions apply. The key
-                            is not used when the provider allow-list excludes this provider.
+                            is not used when the provider allow-list excludes this provider. The
+                            organization&apos;s Advanced policies, such as an inference region, do
+                            not apply to requests that use the key.
                           </p>
                         ) : null}
                       </AlertDescription>

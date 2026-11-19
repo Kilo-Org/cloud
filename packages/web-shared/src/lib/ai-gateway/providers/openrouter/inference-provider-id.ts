@@ -78,6 +78,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'streamlake',
   'tencent',
   'together',
+  'typesafe',
   'upstage',
   'venice',
   'wafer',
@@ -189,7 +190,6 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum.edenai]: 'openai/gpt-5.6-luna',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
   [DirectUserByokInferenceProviderIdSchema.enum['inceptron-byok']]: 'moonshotai/Kimi-K2.6',
-  [DirectUserByokInferenceProviderIdSchema.enum.martian]: 'google/gemini-3.5-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['morph-byok']]: 'morph-qwen35-397b',
   [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum['nvidia-byok']]:
@@ -239,6 +239,7 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'stepfun',
   'streamlake',
   'togetherai',
+  'typesafe-ai',
   'vertexAnthropic',
   'voyage',
   'wafer',
@@ -269,6 +270,8 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelUserByokInferenceProviderIdSchema.enum.zai,
   [OpenRouterInferenceProviderIdSchema.enum.together]:
     VercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
+  [OpenRouterInferenceProviderIdSchema.enum.typesafe]:
+    VercelNonUserByokInferenceProviderIdSchema.enum['typesafe-ai'],
 } as Record<string, VercelInferenceProviderId | undefined>;
 
 export function normalizeInferenceProviderId(providerId: string): string;

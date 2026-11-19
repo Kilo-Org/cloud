@@ -56,9 +56,11 @@ const native = vi.hoisted(() => {
 vi.mock('@/components/centered-state-surface', () => ({ useStateSurface: () => native.surface }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value * 2) / 2 },
   // Portrait by default, so the short-band flag the scroller publishes stays
   // false and a state inside it keeps its full stack.
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ ...native.window, fontScale: 1 }),
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
@@ -72,13 +74,16 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: () => null,
   AlertCircle: () => null,
   Lock: () => null,
+  RotateCcw: () => null,
   SearchX: () => null,
   ServerCrash: () => null,
   WifiOff: () => null,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#777777',
   useThemeColors: () => ({ mutedForeground: '#777777' }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -128,6 +133,7 @@ async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>>
   return {
     ...mounted,
     content,
+    contentNode,
     scroll,
     rerender: () => {
       act(() => {
@@ -552,5 +558,105 @@ describe('CenteredState first-frame paint', () => {
     });
     expect(mounted.scroll().style).toBeUndefined();
     mounted.unmount();
+  });
+
+  it('holds the state until a pending native surface reports, then paints it placed', async () => {
+    // A pushed stack screen paints its surface insets 0/0 while the native
+    // geometry probe is still arriving; the probe's safe-area bottom then
+    // raises the band bottom and a state painted from the estimate jumped up
+    // half the band change after it first appeared (explorer:android
+    // layout-jump, Recent Reviews). A pending native surface is a band the
+    // estimate cannot place, so the state waits for the surface's frame — and
+    // its first painted placement already carries the reported insets.
+    native.surface.frame = null;
+    native.surface.bounds = null;
+    native.surface.source = 'pending';
+    native.surface.topInset = 0;
+    native.surface.bottomInset = 0;
+    const held = await mount();
+    // No content box while the surface is pending: the scroller stays empty
+    // rather than painting a position the measurement would correct.
+    expect(held.contentNode()).toBeUndefined();
+    expect(held.scroll().contentContainerStyle).toBeUndefined();
+
+    // The probe reports with the device's insets. The scroller's own frame
+    // reaches the window bottom, so the reported bottom inset moves the band:
+    // the first painted placement must carry it, or the state would move again
+    // once the content height landed (the defect this test pins).
+    native.surface.source = 'native';
+    native.surface.frame = { top: 0, bottom: 900 };
+    native.surface.bounds = { top: 0, bottom: 900 };
+    native.surface.safeAreaBottom = 24;
+    native.surface.topInset = 52;
+    native.surface.bottomInset = 24;
+    held.rerender();
+    held.settle(80, 900 - 80);
+    expectPainted(held);
+    // First paint: the band style built from the reported insets. The band
+    // bottom sits one bottom inset above the window bottom while the scroller
+    // runs to the window bottom itself, so the scroller's bottom padding
+    // carries that inset; a placement built from zero insets would paint a
+    // smaller padding and move when it corrected.
+    expect(held.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 900 - 80,
+      justifyContent: 'center',
+      paddingTop: 16,
+      paddingBottom: 24 + 16,
+    });
+    // The measured layout centers the content in the same band: band top is
+    // the scroller's top (the top inset sits above it) and band bottom is the
+    // window bottom minus the bottom inset, so a content box of 188 centers
+    // 12 higher than the zero-inset placement would place it. Asserting the
+    // inset-carrying value is what proves the first paint is the final one.
+    const layout188: Partial<LayoutChangeEvent> = {
+      nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 188 } },
+    };
+    act(() => {
+      held.contentNode()?.props.onLayout?.(layout188 as LayoutChangeEvent);
+    });
+    const placed = held.scroll().contentContainerStyle as {
+      paddingTop: number;
+    };
+    // Band: top 80, bottom 900 - 24 = 876; (796 - 188) / 2 = 304 below the top.
+    expect(placed.paddingTop).toBeCloseTo(304, 5);
+    held.unmount();
+
+    // The scroller can also measure before the probe reports (the surface's
+    // capture installs on focus). The measured path must hold too: with a
+    // measured viewport but a pending surface, no content box paints — a
+    // placement built from the scroller frame alone would move when the
+    // probe's insets landed.
+    native.surface.frame = null;
+    native.surface.bounds = null;
+    native.surface.source = 'pending';
+    native.surface.topInset = 0;
+    native.surface.bottomInset = 0;
+    const heldLate = await mount();
+    heldLate.settle(80, 900 - 80);
+    expect(heldLate.contentNode()).toBeUndefined();
+    expect(heldLate.scroll().contentContainerStyle).toBeUndefined();
+
+    // The probe reports while the scroller stays measured: the first painted
+    // placement carries the insets immediately.
+    native.surface.source = 'native';
+    native.surface.frame = { top: 0, bottom: 900 };
+    native.surface.bounds = { top: 0, bottom: 900 };
+    native.surface.safeAreaBottom = 24;
+    native.surface.topInset = 52;
+    native.surface.bottomInset = 24;
+    heldLate.rerender();
+    heldLate.settle(80, 900 - 80);
+    const layoutLate: Partial<LayoutChangeEvent> = {
+      nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 188 } },
+    };
+    act(() => {
+      heldLate.contentNode()?.props.onLayout?.(layoutLate as LayoutChangeEvent);
+    });
+    const placedLate = heldLate.scroll().contentContainerStyle as {
+      paddingTop: number;
+    };
+    expect(placedLate.paddingTop).toBeCloseTo(304, 5);
+    heldLate.unmount();
   });
 });

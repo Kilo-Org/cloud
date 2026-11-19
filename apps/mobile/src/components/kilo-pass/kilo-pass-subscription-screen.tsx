@@ -16,8 +16,12 @@ import {
 } from '@/components/kilo-pass/kilo-pass-management';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Crown } from '@/components/ui/icons';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
@@ -29,9 +33,9 @@ import {
 } from '@/lib/hooks/use-kilo-pass-history';
 import { isStoreManagedPass, type KiloPassSubscriptionState } from '@/lib/kilo-pass/management';
 import { getKiloPassDetailState, type KiloPassDetail } from '@/lib/kilo-pass/state';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
-import { cn } from '@/lib/utils';
 
 /**
  * The screen's frame: one header for every state, above the body it owns. The
@@ -52,6 +56,8 @@ function KiloPassFrame({ children }: { children: ReactNode }) {
         <ScreenHeader
           title={t('kiloPass.title')}
           modal
+          centerTitle={false}
+          backIcon="back"
           safeAreaTop={!surfaceOwnsWindowTop}
           className={surfaceOwnsWindowTop ? 'pt-2' : undefined}
         />
@@ -64,28 +70,39 @@ function KiloPassFrame({ children }: { children: ReactNode }) {
 function KiloPassLoadingScreen() {
   return (
     <KiloPassFrame>
-      <View className="flex-1 px-5">
-        {/* The scroller applies the landscape side insets, so a cutout window
-            cannot paint the reserved blocks under the sensor area. */}
-        <DetailScreenScrollView
-          className="-mx-1 flex-1"
-          contentContainerClassName="grow gap-5 px-1 py-4"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* The page prints once, at its final height: every block the pass
-              state introduces is held until it has one answer, so this
-              skeleton stands in for a page that would otherwise grow under
-              the reader and push the ledgers down. */}
-          <View className="gap-1">
-            <Skeleton className="h-5 w-40 rounded" />
-            <Skeleton className="h-4 w-24 rounded" />
+      <DetailScreenScrollView
+        className="flex-1"
+        contentContainerClassName={SCREEN_BODY_CLASS}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* The page prints once, at its final height: every block the pass
+            state introduces is held until it has one answer, so this skeleton
+            stands in for a page that would otherwise grow under the reader and
+            push the ledgers down. Each block is the primitive it stands for. */}
+        <View className="gap-1">
+          <Skeleton className="h-5 w-40 rounded" />
+          <Skeleton className="h-4 w-24 rounded" />
+        </View>
+        <RowGroup>
+          <RowSkeleton />
+          <RowSkeleton />
+          <RowSkeleton />
+        </RowGroup>
+        <Card>
+          <Skeleton className="h-24 w-full rounded-lg" />
+        </Card>
+        {/* Both ledgers: a labelled section over its own row group, each row a
+            KvRow (title and value on one line). */}
+        {[0, 1].map(section => (
+          <View key={section} className="gap-3">
+            <SectionHeaderSkeleton />
+            <RowGroup>
+              <RowSkeleton />
+              <RowSkeleton />
+            </RowGroup>
           </View>
-          <Skeleton className="h-[132px] w-full rounded-lg" />
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-[104px] w-full rounded-lg" />
-          <Skeleton className="h-[104px] w-full rounded-lg" />
-        </DetailScreenScrollView>
-      </View>
+        ))}
+      </DetailScreenScrollView>
     </KiloPassFrame>
   );
 }
@@ -95,11 +112,11 @@ function KiloPassErrorScreen({ onRetry }: { onRetry: () => void }) {
   return (
     <KiloPassFrame>
       <CenteredState>
-        <View className="items-center gap-3 px-6">
+        <View className="items-center gap-3 px-4">
           <Text className="text-center font-semibold text-foreground">
             {t('kiloPass.unavailable')}
           </Text>
-          <Text className="text-center text-sm text-muted-foreground">
+          <Text variant="muted" className="text-center text-sm">
             {t('kiloPass.couldNotLoad')}
           </Text>
           <Button
@@ -134,31 +151,28 @@ function KiloPassDetailBody({
 }>) {
   return (
     <KiloPassFrame>
-      <DetailScreenScrollView contentContainerClassName="grow gap-5 px-5 pb-8">
+      <DetailScreenScrollView contentContainerClassName={SCREEN_BODY_CLASS}>
         <View className="gap-1">
-          <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
+          <Text variant="large">{detail.planLabel}</Text>
           <Text
-            className={cn(
-              'text-sm',
-              detail.statusTone === 'danger' ? 'text-destructive' : 'text-muted-foreground'
-            )}
+            variant="muted"
+            className={detail.statusTone === 'danger' ? 'text-destructive' : undefined}
           >
             {detail.statusLabel}
           </Text>
         </View>
         {detail.rows.length > 0 ? (
-          <View className="rounded-lg bg-secondary px-3">
-            {detail.rows.map((row, index) => (
+          <RowGroup>
+            {detail.rows.map(row => (
               <KvRow
                 key={row.id}
                 label={row.label}
                 value={row.value}
-                last={index === detail.rows.length - 1}
                 valueFace={row.id === 'renewal' ? 'text' : 'numeric'}
                 valueDirection={row.id === 'renewal' ? undefined : 'ltr'}
               />
             ))}
-          </View>
+          </RowGroup>
         ) : null}
         <KiloPassManagementSections subscription={subscription} scheduledChange={scheduledChange} />
         <KiloPassCreditHistorySection history={creditHistory} />
@@ -171,25 +185,51 @@ function KiloPassDetailBody({
   );
 }
 
-function KiloPassMessageBody({ message }: { message: string }) {
+function KiloPassMessageBody({ title, description }: { title: string; description: string }) {
   return (
     <KiloPassFrame>
       <View className="flex-1 justify-center">
-        <EmptyState placement="static" icon={Crown} title={message} />
+        <EmptyState
+          placement="static"
+          inset="gutter"
+          icon={Crown}
+          title={title}
+          description={description}
+        />
       </View>
     </KiloPassFrame>
   );
 }
 
 /**
- * A lapsed pass is one of the screen's centered states — crown, the plan it
- * was, the day it stopped — so the reader sees where their pass stands instead
- * of a bare line floating in an otherwise empty body.
+ * A lapsed pass keeps the receipts: the plan it was, the day it stopped, and
+ * both ledgers the account already paid for. It offers no action, because the
+ * app sells nothing here and the pass can no longer change.
  */
-function KiloPassEndedBody({ detail }: { detail: Extract<KiloPassDetail, { kind: 'ended' }> }) {
+function KiloPassEndedBody({
+  subscription,
+  detail,
+  creditHistory,
+  billingHistory,
+}: Readonly<{
+  subscription: KiloPassSubscriptionState;
+  detail: Extract<KiloPassDetail, { kind: 'ended' }>;
+  creditHistory: KiloPassCreditHistory;
+  billingHistory: KiloPassBillingHistory;
+}>) {
   return (
     <KiloPassFrame>
-      <EmptyState icon={Crown} title={detail.planLabel} description={detail.endedLabel} />
+      <DetailScreenScrollView contentContainerClassName={SCREEN_BODY_CLASS}>
+        <View className="gap-1">
+          <Text variant="large">{detail.planLabel}</Text>
+          <Text variant="muted">{detail.endedLabel}</Text>
+        </View>
+        <KiloPassCreditHistorySection history={creditHistory} />
+        {/* A store-sold pass has no Stripe invoices, and the read rejects one. */}
+        {!isStoreManagedPass(subscription) && (
+          <KiloPassBillingHistorySection history={billingHistory} />
+        )}
+      </DetailScreenScrollView>
     </KiloPassFrame>
   );
 }
@@ -206,27 +246,29 @@ export function KiloPassSubscriptionScreen() {
   const { t } = useTranslation();
 
   // The pass state introduces three more reads, and each one adds or removes
-  // height below the state rows. Hold the page until all three answer so its
-  // first frame is its last: a ledger or a scheduled plan change that landed
-  // afterwards would push the blocks under it.
-  const isDetail = detail.kind === 'active' && subscription != null;
+  // height below the state rows. Hold the page until every read the state shows
+  // has answered: a ledger or a scheduled plan change that landed afterwards
+  // would push the blocks under it. An ended page waits on its own ledgers the
+  // same way, so its last row does not move once it prints.
+  const hasDetail = (detail.kind === 'active' || detail.kind === 'ended') && subscription != null;
+  const activeDetail = detail.kind === 'active' && subscription != null;
   const storeManaged = subscription != null && isStoreManagedPass(subscription);
-  const creditHistory = useKiloPassCreditHistory(isDetail);
-  const billingHistory = useKiloPassBillingHistory(isDetail && !storeManaged);
+  const creditHistory = useKiloPassCreditHistory(hasDetail);
+  const billingHistory = useKiloPassBillingHistory(hasDetail && !storeManaged);
   // The page waits on this read before it prints, so it must settle even while
   // the online manager reports offline: a paused query never errors and never
   // answers, and the screen would hold its loading state with no retry.
   const scheduledChangeQuery = useQuery({
     ...trpc.kiloPass.getScheduledChange.queryOptions(),
-    enabled: isDetail && !storeManaged,
+    enabled: activeDetail && !storeManaged,
     ...SETTLE_WHILE_OFFLINE,
   });
   // A store-managed pass has neither a Stripe schedule nor invoices, so those
   // two stay disabled and their pending status says nothing.
   const blocksPending =
-    isDetail &&
-    (creditHistory.query.isPending ||
-      (!storeManaged && (billingHistory.query.isPending || scheduledChangeQuery.isPending)));
+    (hasDetail &&
+      (creditHistory.query.isPending || (!storeManaged && billingHistory.query.isPending))) ||
+    (activeDetail && !storeManaged && scheduledChangeQuery.isPending);
 
   if (detail.kind === 'loading' || blocksPending) {
     return <KiloPassLoadingScreen />;
@@ -241,15 +283,33 @@ export function KiloPassSubscriptionScreen() {
     );
   }
   if (detail.kind === 'none') {
-    return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
-  }
-  if (detail.kind === 'ended') {
-    return <KiloPassEndedBody detail={detail} />;
+    return (
+      <KiloPassMessageBody
+        title={t('organization.kiloPass.notSubscribed')}
+        description={t('kiloPass.notAvailableInApp')}
+      />
+    );
   }
   if (subscription == null) {
-    // An active detail is derived from a subscription, so this only narrows the
-    // type; the message keeps the screen total rather than throwing on it.
-    return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
+    // A detail — active or ended — is derived from a subscription, so this only
+    // narrows the type; the message keeps the screen total rather than throwing
+    // on it.
+    return (
+      <KiloPassMessageBody
+        title={t('organization.kiloPass.notSubscribed')}
+        description={t('kiloPass.notAvailableInApp')}
+      />
+    );
+  }
+  if (detail.kind === 'ended') {
+    return (
+      <KiloPassEndedBody
+        subscription={subscription}
+        detail={detail}
+        creditHistory={creditHistory}
+        billingHistory={billingHistory}
+      />
+    );
   }
   return (
     <KiloPassDetailBody

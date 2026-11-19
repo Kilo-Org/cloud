@@ -4,7 +4,7 @@ import {
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { canRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,

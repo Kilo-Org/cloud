@@ -151,25 +151,27 @@ describe('bitbucketRepair', () => {
 });
 
 describe('bitbucketConnectionFailure', () => {
-  it('reads a refused token as a token problem', () => {
+  it('reads a refused first connect as a bad token, not an expired connection', () => {
     expect(
       bitbucketConnectionFailure(
         {
           data: { code: 'UNAUTHORIZED', message: 'Bitbucket rejected the Workspace Access Token' },
         },
-        translate
+        translate,
+        'first-connect'
       )
     ).toEqual({
       kind: 'token-refused',
-      message: 'prReview.reconnectNotice.bitbucketTitle',
+      message: 'codeReviewer.bitbucketConnect.tokenRefused',
     });
   });
 
-  it('reads the shaped envelope a cache refresh rejects with', () => {
+  it('reads a refused stored-token call as the connection expiring', () => {
     expect(
       bitbucketConnectionFailure(
         { shape: { data: { code: 'UNAUTHORIZED', message: 'The saved token expired' } } },
-        translate
+        translate,
+        'replace-token'
       )
     ).toEqual({
       kind: 'token-refused',
@@ -177,46 +179,62 @@ describe('bitbucketConnectionFailure', () => {
     });
   });
 
-  it('reads every refusal sentence for a lost billing role as a role problem', () => {
-    for (const message of [
-      'You do not have the required organizational role to access this feature',
-      'You do not have access to this organization',
-      'The current user cannot manage this organization integration',
-    ]) {
-      expect(
-        bitbucketConnectionFailure({ data: { code: 'UNAUTHORIZED', message } }, translate)
-      ).toEqual({
-        kind: 'role-refused',
-        message: 'prReview.connect.bitbucketAdminOnlyDescription',
-      });
+  it('reads every role refusal sentence as a role problem on either surface', () => {
+    for (const tokenRefusal of ['first-connect', 'replace-token'] as const) {
+      for (const message of [
+        'You do not have the required organizational role to access this feature',
+        'You do not have access to this organization',
+        'The current user cannot manage this organization integration',
+      ]) {
+        expect(
+          bitbucketConnectionFailure(
+            { data: { code: 'UNAUTHORIZED', message } },
+            translate,
+            tokenRefusal
+          )
+        ).toEqual({
+          kind: 'role-refused',
+          message: 'prReview.connect.adminOnlyConnectDescription',
+        });
+      }
     }
   });
 
-  it('reads an unprocessable token as a token problem', () => {
-    for (const code of ['BAD_REQUEST', 'FORBIDDEN', 'UNPROCESSABLE_CONTENT']) {
-      expect(bitbucketConnectionFailure({ data: { code } }, translate).kind).toBe('token-refused');
+  it('reads an unprocessable token as a token problem on either surface', () => {
+    for (const tokenRefusal of ['first-connect', 'replace-token'] as const) {
+      for (const code of ['BAD_REQUEST', 'FORBIDDEN', 'UNPROCESSABLE_CONTENT']) {
+        expect(bitbucketConnectionFailure({ data: { code } }, translate, tokenRefusal).kind).toBe(
+          'token-refused'
+        );
+      }
     }
   });
 
-  it('reads a changed connection as one the sheet must reopen', () => {
-    for (const code of ['CONFLICT', 'NOT_FOUND']) {
-      expect(bitbucketConnectionFailure({ data: { code } }, translate).kind).toBe(
-        'connection-changed'
-      );
+  it('reads a changed connection as one the sheet must reopen on either surface', () => {
+    for (const tokenRefusal of ['first-connect', 'replace-token'] as const) {
+      for (const code of ['CONFLICT', 'NOT_FOUND']) {
+        expect(bitbucketConnectionFailure({ data: { code } }, translate, tokenRefusal).kind).toBe(
+          'connection-changed'
+        );
+      }
     }
   });
 
-  it('reads a rate limit, a timeout, an outage or a lost connection as retryable', () => {
-    for (const error of [
-      { data: { code: 'TOO_MANY_REQUESTS' } },
-      { data: { code: 'TIMEOUT' } },
-      { data: { code: 'INTERNAL_SERVER_ERROR' } },
-      new Error('Network request failed'),
-    ]) {
-      expect(bitbucketConnectionFailure(error, translate)).toEqual({
-        kind: 'retryable',
-        message: 'prReview.connect.providerCheckFailedMessage',
-      });
+  it('reads transport failures as retryable on either surface', () => {
+    // Rate limits, timeouts, an outage and a lost connection keep their one
+    // truthful sentence; only the refusal axis picks between two sentences.
+    for (const tokenRefusal of ['first-connect', 'replace-token'] as const) {
+      for (const error of [
+        { data: { code: 'TOO_MANY_REQUESTS' } },
+        { data: { code: 'TIMEOUT' } },
+        { data: { code: 'INTERNAL_SERVER_ERROR' } },
+        new Error('Network request failed'),
+      ]) {
+        expect(bitbucketConnectionFailure(error, translate, tokenRefusal)).toEqual({
+          kind: 'retryable',
+          message: 'prReview.connect.providerCheckFailedMessage',
+        });
+      }
     }
   });
 });

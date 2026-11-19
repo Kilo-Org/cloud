@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { renderProfileRowBody } from '@/components/agents/new-session-profile-row';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { ChevronDown } from '@/components/ui/icons';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { cn } from '@/lib/utils';
@@ -22,20 +23,12 @@ export type NewSessionProfileRowProps = {
 };
 
 /**
- * The card every Environment row state renders inside. The chrome lives on the
- * card rather than on the tappable branch, so loading, failure and every
- * settled profile occupy the same box.
- */
-const ENVIRONMENT_ROW_CARD = cn(
-  ROW_TARGET_CLASS,
-  'flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5'
-);
-
-/**
  * The new-session Environment row: a tappable summary of the effective profile.
- * Loading, failure and every settled profile occupy the same card and reserve
- * the same two-line summary slot, so the row never changes height as the query
- * settles or as the counts change length.
+ * Loading, failure and every settled profile occupy the same card, and the card
+ * is only as tall as what it shows: the default environment is its title line,
+ * centred against the chevron with the card's own padding, and a configured
+ * profile adds its summary line. The card grows once, when that summary
+ * arrives; a one-line summary keeps one line instead of reserving a second.
  */
 export function NewSessionProfileRow({
   profile,
@@ -70,42 +63,44 @@ export function NewSessionProfileRow({
   ) : null;
 
   return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.environment')}
-      </Text>
+    <View className="gap-2">
+      <FormFieldLabel label={t('agentChat.newSession.environment')} />
       {isProfileLoading || isProfileError ? (
-        <View className={cn(ENVIRONMENT_ROW_CARD, 'justify-between')}>
-          <View className="min-w-0 flex-1 gap-1">
-            {attention}
-            {renderProfileRowBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })}
+        <View className={FIELD_TRIGGER_FRAME_CLASS}>
+          <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+            <View className="min-w-0 flex-1 gap-1">
+              {attention}
+              {renderProfileRowBody({
+                t,
+                profile,
+                isProfileLoading,
+                isProfileError,
+                onRetryProfile,
+              })}
+            </View>
           </View>
         </View>
       ) : (
         <Pressable
-          className={cn(ENVIRONMENT_ROW_CARD, 'justify-between active:opacity-70')}
+          className={cn(FIELD_TRIGGER_FRAME_CLASS, 'active:opacity-70')}
           onPress={onOpenProfilePicker}
           accessibilityRole="button"
           accessibilityLabel={accessibilityLabel}
         >
-          <View className="min-w-0 flex-1 gap-1">
-            {attention}
-            <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
-              {profile?.name ?? t('agentChat.newSession.defaultEnvironment')}
-            </Text>
-            <View
-              accessibilityElementsHidden={!hasSummary}
-              importantForAccessibility={hasSummary ? 'auto' : 'no-hide-descendants'}
-            >
-              {/* A one-line summary still fills both matching lines through
-                  `min-h-10`, and an unconfigured profile keeps the two-line
-                  placeholder, so the card never shrinks as counts load. */}
-              <Text className="min-h-10 text-sm text-muted-foreground" numberOfLines={2}>
-                {hasSummary ? profileSummary : '\u00A0\n\u00A0'}
+          <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+            <View className="min-w-0 flex-1 gap-1">
+              {attention}
+              <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
+                {profile?.name ?? t('agentChat.newSession.defaultEnvironment')}
               </Text>
+              {hasSummary ? (
+                <Text className="text-sm text-muted-foreground" numberOfLines={2}>
+                  {profileSummary}
+                </Text>
+              ) : null}
             </View>
+            <ChevronDown size={18} color={colors.mutedForeground} />
           </View>
-          <ChevronDown size={18} color={colors.mutedForeground} />
         </Pressable>
       )}
     </View>

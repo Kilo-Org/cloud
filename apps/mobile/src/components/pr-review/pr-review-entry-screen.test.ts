@@ -350,10 +350,12 @@ describe('provider-neutral URL field', () => {
     const clear = find(after, 'Pressable', p => p.accessibilityLabel === 'Clear link');
     expect(clear).toBeTruthy();
     // Icon-only like the paste control, so its own box carries Android's 48dp
-    // minimum instead of a smaller frame plus hit slop.
-    expect(String(clear.props?.className)).toContain(
-      'h-[48px] w-[48px] items-center justify-center'
-    );
+    // minimum instead of a smaller frame plus hit slop. The field's clear box
+    // adds a negative vertical margin so the 48dp box fits the frame; the
+    // literal is used for the same reason as the paste control's below.
+    const clearClasses = String(clear.props?.className);
+    expect(clearClasses).toContain('h-[48px] w-[48px]');
+    expect(clearClasses).toContain('items-center justify-center');
     expect(clear.props?.hitSlop).toBeUndefined();
   });
 

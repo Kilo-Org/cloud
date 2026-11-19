@@ -1,8 +1,10 @@
 import { sandboxControlWebSocketUrl } from './control-url.js';
 import { getSentryConfig } from '../shared/sentry.js';
-import { mintControlLogUploadGrant } from './log-upload-grant.js';
+import { mintControlLogUploadGrant, mintSandboxTransferGrant } from './sandbox-transfer-grant.js';
+import { sandboxTransferScopes } from '../shared/control-diagnostics.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
+  PROVIDER_DESCRIPTORS,
   type AgentSandboxProvider,
 } from '../shared/sandbox-provider.js';
 
@@ -24,7 +26,7 @@ export function buildControlWrapperLaunchEnv(
 ): Record<string, string> {
   const workerUrl = input.workerUrl?.replace(/\/$/, '') ?? '';
   const sentry = getSentryConfig(input.sentry ?? {});
-  let diagnosticEnv: Record<string, string> = {};
+  let transferEnv: Record<string, string> = {};
   if (input.diagnostics?.signingSecret && workerUrl) {
     try {
       const base = new URL(workerUrl);
@@ -35,35 +37,37 @@ export function buildControlWrapperLaunchEnv(
         base.search ||
         base.hash
       ) {
-        throw new Error('Invalid diagnostic upload origin');
+        throw new Error('Invalid transfer upload origin');
       }
       const identity = {
         sandboxId: input.sandboxId,
         allocationId: input.diagnostics.allocationId,
         wrapperInstanceId: crypto.randomUUID(),
       };
-      const grant = mintControlLogUploadGrant(identity, input.diagnostics.signingSecret);
+      const transfer = mintSandboxTransferGrant(
+        identity,
+        sandboxTransferScopes,
+        input.diagnostics.signingSecret
+      );
+      const legacyGrant = mintControlLogUploadGrant(identity, input.diagnostics.signingSecret);
       const path = [identity.sandboxId, identity.allocationId, identity.wrapperInstanceId]
         .map(encodeURIComponent)
         .join('/');
-      diagnosticEnv = {
+      transferEnv = {
+        SANDBOX_TRANSFER_URL: `${workerUrl}/sandbox-transfer/${path}`,
+        SANDBOX_TRANSFER_GRANT: transfer.grant,
         CONTROL_LOG_UPLOAD_URL: `${workerUrl}/sandbox-logs/${path}`,
-        CONTROL_LOG_UPLOAD_GRANT: grant,
+        CONTROL_LOG_UPLOAD_GRANT: legacyGrant,
         CONTROL_WRAPPER_INSTANCE_ID: identity.wrapperInstanceId,
       };
     } catch {
-      diagnosticEnv = {};
+      transferEnv = {};
     }
   }
   return {
-    ...diagnosticEnv,
-    // The Vercel node24 snapshot installs Bun and global CLIs in /usr/local/bin.
-    // Supply the runtime path directly instead of reading a snapshot's login profile.
-    ...(input.provider === 'vercel'
-      ? {
-          PATH: '/usr/local/bin:/vercel/runtimes/node24/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin',
-        }
-      : {}),
+    ...transferEnv,
+    // Provider launch facts, such as the Vercel runtime PATH.
+    ...PROVIDER_DESCRIPTORS[input.provider].launchEnv,
     ...(sentry
       ? {
           CLOUD_AGENT_SENTRY_DSN: sentry.dsn,

@@ -24,12 +24,14 @@ import {
   type SessionStatusIndicator,
   type SlashCommandCatalogStatus,
   type SlashCommandInfo,
+  type SnapshotHistoryFailure,
   type StandalonePermission,
   type StandaloneQuestion,
   type StandaloneSuggestion,
   type StoredMessage,
   type SuggestionState,
   type UnreadablePermissionState,
+  type WorkspaceArtifactsRefresh,
   type WorktreeChangesRefresh,
 } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
@@ -38,22 +40,16 @@ import { type SessionStatus } from '@kilocode/cloud-agent-sdk/schemas';
 import { cloudAgentId } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 import { AGENT_CHAT_FIXTURE_SESSION_ID } from './agent-chat-fixture-session';
-import { BLOCKED_BASH_COMMAND, PENDING_BASH_ASK } from './agent-chat-fixture-states';
+import { BLOCKED_BASH_COMMAND, EMOJI_ANSWER, PENDING_BASH_ASK } from './agent-chat-fixture-states';
 
 /**
  * The agent chat screen — transcript and composer — against one fixed
  * transcript, for a design-gate cell. The transcript keeps a refused message as
- * an undelivered bubble with Retry and leaves the composer empty.
- *
- * Nothing here talks to a transport. Every atom holds one still layout and every
- * method is inert, so a cell can bracket the screen and compare two revisions of
- * it without a live session that keeps moving behind it.
- *
- * The sibling state — the same text restored in the composer, with the cause
- * stated above it — is not reproduced here: the screen reads its draft from the
- * durable store under the signed-in account, so a fixture cannot seed it without
- * writing into that account's drafts. That state is proven by device captures
- * and the component suites instead.
+ * an undelivered bubble with Retry and leaves the composer empty. Nothing here
+ * talks to a transport; every atom holds one still layout, so a cell can
+ * bracket the screen without a live session moving behind it. The composer-draft
+ * state is not reproduced here: the screen reads its draft from the durable
+ * store, so a fixture cannot seed it without writing into the account's drafts.
  */
 
 /** The prompt the refused message carries. */
@@ -81,7 +77,7 @@ const answer: StoredMessage = {
       sessionID: AGENT_CHAT_FIXTURE_SESSION_ID,
       messageID: 'msg_designGateAnswer',
       type: 'text',
-      text: 'Staging runs the previous build. The deploy is queued behind the migration.',
+      text: 'Staging runs the previous build. The deploy is queued behind the migration.\n\nHere is a much longer wrapped paragraph so the markdown measurement path has to lay out several lines inside the transcript bubble: the deploy pipeline pushes the bundle to the staging environment, waits for the database migration to finish, runs the smoke suite, and only then flips the traffic switch, so a regression that slips through shows up on staging first and the rollback stays one command away for every service that reads the shared configuration blob.',
     },
   ],
 };
@@ -101,7 +97,7 @@ const opening: StoredMessage = {
       sessionID: AGENT_CHAT_FIXTURE_SESSION_ID,
       messageID: 'msg_designGateOpening',
       type: 'text',
-      text: 'Where does the staging deploy stand?',
+      text: 'Where does the staging deploy stand? Give me the full picture for the staging environment, including the deploy pipeline state, the database migration queue, the smoke suite result, and the rollback path for every service that reads the shared configuration blob. ✅',
     },
   ],
 };
@@ -201,8 +197,12 @@ function fixed<T>(value: T) {
  * a bash ask, so the row that reports the agent's activity can be compared
  * while the agent waits for the answer; `running` holds the same blocked
  * transcript with the ask answered, which is the row the wait returns to.
+ * `permission-failed` holds the pending-permission screen too, but the first
+ * answer to the bash ask fails like a transient transport error, so the card
+ * shows its retryable failure branch, and a later answer — the Retry tap —
+ * succeeds.
  */
-export type AgentChatFixtureState = 'idle' | 'pending-permission' | 'running';
+export type AgentChatFixtureState = 'idle' | 'pending-permission' | 'permission-failed' | 'running';
 
 /**
  * The session manager the real screen mounts against, typed as the product's own
@@ -211,11 +211,16 @@ export type AgentChatFixtureState = 'idle' | 'pending-permission' | 'running';
 export function createAgentChatFixtureManager(
   state: AgentChatFixtureState = 'idle'
 ): SessionManager {
-  const waitingForPermission = state === 'pending-permission';
+  const waitingForPermission = state === 'pending-permission' || state === 'permission-failed';
+  // The first answer to the ask must fail like a transient transport error, and
+  // a later answer — the Retry tap — succeed, so the counter closes over the
+  // manager and every other fixture state shares the idle no-op below.
+  let failedAnswerAttempts = 0;
+  const failOnceThenAllow = state === 'permission-failed';
   const streaming = state !== 'idle';
   const messages: StoredMessage[] = streaming
-    ? [opening, answer, BLOCKED_BASH_COMMAND]
-    : [opening, answer, refused];
+    ? [opening, answer, EMOJI_ANSWER, BLOCKED_BASH_COMMAND]
+    : [opening, answer, EMOJI_ANSWER, refused];
   const pending = streaming
     ? new Map<string, MessageDeliveryState>()
     : new Map<string, MessageDeliveryState>([[refused.info.id, undeliveredEntry]]);
@@ -241,7 +246,15 @@ export function createAgentChatFixtureManager(
     clearTranscript: () => undefined,
     answerQuestion: idle,
     rejectQuestion: idle,
-    respondToPermission: idle,
+    respondToPermission: failOnceThenAllow
+      ? async () => {
+          failedAnswerAttempts += 1;
+          if (failedAnswerAttempts > 1) {
+            return;
+          }
+          throw new Error('The answer could not be delivered');
+        }
+      : idle,
     acceptSuggestion: idle,
     dismissSuggestion: idle,
     clearFailedMessage: () => undefined,
@@ -276,6 +289,7 @@ export function createAgentChatFixtureManager(
       canInterrupt: fixed(false),
       statusIndicator: fixed<SessionStatusIndicator | null>(null),
       error: fixed<string | null>(null),
+      failedHistoryKind: fixed<SnapshotHistoryFailure | null>(null),
       question: fixed<QuestionState | null>(null),
       sessionInfo: fixed<SessionInfo | null>({ id: AGENT_CHAT_FIXTURE_SESSION_ID }),
       sessionId: fixed<CloudAgentSessionId | null>(cloudAgentId('cag_designGateAgentChat')),
@@ -310,6 +324,7 @@ export function createAgentChatFixtureManager(
       availableCommands: fixed<SlashCommandInfo[]>([]),
       availableCommandsCatalogStatus: fixed<SlashCommandCatalogStatus | null>(null),
       worktreeChangesRefresh: fixed(noWorktreeRefresh),
+      workspaceArtifactsRefresh: fixed<WorkspaceArtifactsRefresh | null>(null),
       messagesList: atom(messages),
       staticMessages: atom(messages),
       dynamicMessages: atom<StoredMessage[]>([]),

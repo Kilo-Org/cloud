@@ -10,6 +10,14 @@ import type { adminWebhookTriggersRouter as AdminWebhookTriggersRouter } from '.
 import type { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import { webhookTriggerModeSchema } from '@/lib/webhook-trigger-validation';
 import type {
+  generateCloudAgentWorkflowToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
+import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import type { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import type { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import jwt from 'jsonwebtoken';
+import type {
   createWorkerTrigger as createWorkerTriggerType,
   getWorkerTrigger as getWorkerTriggerType,
   updateWorkerTrigger as updateWorkerTriggerType,
@@ -43,7 +51,11 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 }));
 
 jest.mock('@kilocode/web-shared/lib/tokens', () => ({
-  generateCloudAgentToken: () => 'test-cloud-agent-token',
+  generateCloudAgentWorkflowToken: jest.fn(() => 'test-cloud-agent-token'),
+  TOKEN_EXPIRY: { oneHour: 3600 },
+}));
+jest.mock('@/lib/auth/cloud-agent-workflow-user', () => ({
+  prepareCloudAgentWorkflowUser: (user: User) => Promise.resolve(user),
 }));
 
 const mockCreateWorkerTrigger = jest.fn<typeof createWorkerTriggerType>();
@@ -56,41 +68,58 @@ const mockDbUpdate = jest.fn();
 const mockDbDelete = jest.fn();
 const mockFindAdmin = jest.fn<() => Promise<Partial<User> | undefined>>();
 const mockSelectWhere = jest.fn<(condition?: SQL) => Promise<Array<Record<string, unknown>>>>();
+const mockSelectV1Sessions = jest.fn<() => Promise<Array<Record<string, unknown>>>>(() =>
+  Promise.resolve([])
+);
+const mockSelectV2Sessions = jest.fn<() => Promise<Array<Record<string, unknown>>>>(() =>
+  Promise.resolve([])
+);
+const mockSelectChat = jest.fn<() => Promise<Array<Record<string, unknown>>>>();
 
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: {
-    query: { kilocode_users: { findFirst: mockFindAdmin } },
-    select: () => ({
-      from: () => ({
-        where: (condition?: SQL) => {
-          const result = mockSelectWhere(condition);
-          return {
-            limit: () => result,
-            orderBy: () => result,
-            then: result.then.bind(result),
-          };
-        },
+jest.mock('@kilocode/web-shared/lib/drizzle', () => {
+  const { cliSessions, cli_sessions_v2 } = jest.requireActual('@kilocode/db/schema') as {
+    cliSessions: unknown;
+    cli_sessions_v2: unknown;
+  };
+  return {
+    db: {
+      query: { kilocode_users: { findFirst: mockFindAdmin } },
+      select: () => ({
+        from: (table: unknown) => ({
+          leftJoin: () => ({ where: () => ({ limit: mockSelectChat }) }),
+          where: (condition?: SQL) => {
+            let result: Promise<Array<Record<string, unknown>>>;
+            if (table === cliSessions) result = mockSelectV1Sessions();
+            else if (table === cli_sessions_v2) result = mockSelectV2Sessions();
+            else result = mockSelectWhere(condition);
+            return {
+              limit: () => result,
+              orderBy: () => result,
+              then: result.then.bind(result),
+            };
+          },
+        }),
       }),
-    }),
-    insert: mockDbInsert.mockImplementation(() => ({
-      values: () => ({
-        returning: () =>
-          Promise.resolve([
-            {
-              id: '00000000-0000-4000-8000-000000000002',
-              created_at: '2026-01-01T00:00:00.000Z',
-            },
-          ]),
-      }),
-    })),
-    update: mockDbUpdate.mockImplementation(() => ({
-      set: () => ({ where: () => Promise.resolve() }),
-    })),
-    delete: mockDbDelete.mockImplementation(() => ({
-      where: () => Promise.resolve(),
-    })),
-  },
-}));
+      insert: mockDbInsert.mockImplementation(() => ({
+        values: () => ({
+          returning: () =>
+            Promise.resolve([
+              {
+                id: '00000000-0000-4000-8000-000000000002',
+                created_at: '2026-01-01T00:00:00.000Z',
+              },
+            ]),
+        }),
+      })),
+      update: mockDbUpdate.mockImplementation(() => ({
+        set: () => ({ where: () => Promise.resolve() }),
+      })),
+      delete: mockDbDelete.mockImplementation(() => ({
+        where: () => Promise.resolve(),
+      })),
+    },
+  };
+});
 
 jest.mock('@/lib/webhook-agent/webhook-agent-client', () => ({
   buildInboundUrl: jest.fn(() => 'https://inbound'),
@@ -147,6 +176,116 @@ beforeAll(async () => {
   WebhookTriggerUpdateInput = router.WebhookTriggerUpdateInput;
   const adminRouter = await import('./admin-webhook-triggers-router');
   createAdminCaller = createCallerFactory(adminRouter.adminWebhookTriggersRouter);
+});
+
+describe('existing Cloud Agent chat targets', () => {
+  const chatId = 'workspace_00000000-0000-4000-8000-000000000003';
+  const input = {
+    triggerId: 'trigger-id',
+    targetType: 'cloud_agent_chat',
+    cloudAgentSessionId: chatId,
+    mode: 'code',
+    model: 'model',
+    promptTemplate: 'Run task',
+  } as const;
+  const chat = {
+    userId: user.id,
+    organizationId: null,
+    worktreeId: 'worktree-1',
+    workspaceOwner: user.id,
+    workspaceOrganization: null,
+    deletionStartedAt: null,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateWorkerTrigger.mockResolvedValue({ success: true, inboundUrl: 'https://inbound' });
+    mockSelectWhere.mockResolvedValue([
+      {
+        id: 'registry-id',
+        target_type: input.targetType,
+        cloud_agent_session_id: chatId,
+        activation_mode: 'webhook',
+      },
+    ]);
+  });
+
+  it.each([
+    ['missing chat', []],
+    ['different owner', [{ ...chat, userId: 'other-user' }]],
+    ['different scope', [{ ...chat, organizationId: 'different-scope' }]],
+    ['missing workspace', [{ ...chat, worktreeId: null }]],
+    ['workspace deletion in progress', [{ ...chat, deletionStartedAt: new Date().toISOString() }]],
+  ])('rejects an invalid target without disclosing the reason: %s', async (_label, rows) => {
+    mockSelectChat.mockResolvedValue(rows);
+    const caller = createCaller({ user });
+    const error = {
+      code: 'NOT_FOUND',
+      message: 'Cloud Agent chat not found or not accessible',
+    };
+    await expect(caller.create(input)).rejects.toMatchObject(error);
+    await expect(
+      caller.update({ triggerId: input.triggerId, model: 'other-model' })
+    ).rejects.toMatchObject(error);
+    expect(mockCreateWorkerTrigger).not.toHaveBeenCalled();
+    expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
+  });
+
+  it('creates a trigger without workspace settings', async () => {
+    mockSelectChat.mockResolvedValue([chat]);
+    await createCaller({ user }).create(input);
+    expect(mockCreateWorkerTrigger).toHaveBeenCalledWith(
+      user.id,
+      undefined,
+      input.triggerId,
+      expect.objectContaining({
+        targetType: input.targetType,
+        cloudAgentSessionId: chatId,
+        githubRepo: undefined,
+        profileId: undefined,
+      })
+    );
+  });
+
+  it('can disable a trigger without checking its missing target chat', async () => {
+    mockSelectChat.mockResolvedValue([]);
+    mockUpdateWorkerTrigger.mockResolvedValue({ success: true, config: triggerConfig });
+
+    await createCaller({ user }).update({ triggerId: input.triggerId, isActive: false });
+
+    expect(mockSelectChat).not.toHaveBeenCalled();
+    expect(mockUpdateWorkerTrigger).toHaveBeenCalledWith(
+      user.id,
+      undefined,
+      input.triggerId,
+      expect.objectContaining({ isActive: false })
+    );
+    expect(mockDbUpdate).toHaveBeenCalled();
+  });
+
+  it.each([{ isActive: true }, { isActive: false, variant: null }])(
+    'still validates the target for update %j',
+    async patch => {
+      mockSelectChat.mockResolvedValue([]);
+      await expect(
+        createCaller({ user }).update({ triggerId: input.triggerId, ...patch })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects bot-run organization triggers and workspace settings', () => {
+    expect(
+      WebhookTriggerCreateInput.safeParse({
+        ...input,
+        organizationId: '00000000-0000-4000-8000-000000000004',
+      }).error?.issues
+    ).toEqual(expect.arrayContaining([expect.objectContaining({ path: ['runAsCreator'] })]));
+    expect(
+      WebhookTriggerCreateInput.safeParse({ ...input, githubRepo: 'owner/repo' }).success
+    ).toBe(false);
+  });
 });
 
 describe('webhook trigger variant inputs', () => {
@@ -884,6 +1023,81 @@ describe('webhook trigger variant inputs', () => {
     expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
   });
 
+  it('mints a bounded workflow credential for the Worker capability read', async () => {
+    const { generateCloudAgentWorkflowToken } = jest.requireMock(
+      '@kilocode/web-shared/lib/tokens'
+    ) as { generateCloudAgentWorkflowToken: jest.Mock };
+    const organizationId = '00000000-0000-4000-8000-000000000003';
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: true, options: [] });
+
+    await expect(createCaller({ user }).capabilities({ organizationId })).resolves.toEqual({
+      canSetSandboxAllocation: true,
+      sandboxSelection: { enabled: true, options: [] },
+    });
+    expect(generateCloudAgentWorkflowToken).toHaveBeenCalledWith(
+      user,
+      expect.objectContaining({ tokenSource: 'webhook-trigger', expiresIn: 3600 })
+    );
+  });
+
+  it('issues a credential that verifies under the Worker audience policy', async () => {
+    // requireActual bypasses the module mock so the real issuer mints the token
+    // this case then pins against the Worker-side policy validator.
+    const tokens = jest.requireActual('@kilocode/web-shared/lib/tokens') as {
+      generateCloudAgentWorkflowToken: typeof generateCloudAgentWorkflowToken;
+      TOKEN_EXPIRY: typeof TOKEN_EXPIRY;
+    };
+    const { verifyKiloTokenForResource: verifyForResource } = jest.requireActual(
+      '@kilocode/worker-utils/kilo-token-policy'
+    ) as { verifyKiloTokenForResource: typeof verifyKiloTokenForResource };
+    const { NEXTAUTH_SECRET: secret } = jest.requireActual(
+      '@kilocode/web-shared/lib/config.server'
+    ) as { NEXTAUTH_SECRET: typeof NEXTAUTH_SECRET };
+
+    const saved = new Map(
+      ['SHARED_RESOURCE_TOKENS_ENABLED', 'CLOUD_AGENT_RESOURCE_TOKENS_ENABLED'].map(key => [
+        key,
+        process.env[key],
+      ])
+    );
+    process.env.SHARED_RESOURCE_TOKENS_ENABLED = 'true';
+    process.env.CLOUD_AGENT_RESOURCE_TOKENS_ENABLED = 'true';
+    try {
+      const pepperedUser = { ...user, api_token_pepper: 'webhook-trigger-pepper' } as User;
+      const token = tokens.generateCloudAgentWorkflowToken(pepperedUser, {
+        tokenSource: 'webhook-trigger',
+        expiresIn: tokens.TOKEN_EXPIRY.oneHour,
+      });
+      await expect(
+        verifyForResource(token, secret, {
+          audience: CLOUD_AGENT_NEXT_AUDIENCE,
+          mode: 'allow-legacy',
+        })
+      ).resolves.toMatchObject({
+        kiloUserId: user.id,
+        tokenSource: 'webhook-trigger',
+        runtimeAdmission: { source: 'automation' },
+      });
+      const claims = jwt.decode(token) as unknown as {
+        aud: string;
+        tokenPurpose: string;
+        credentialExchange: boolean;
+        iat: number;
+        exp: number;
+      };
+      expect(claims.aud).toBe(CLOUD_AGENT_NEXT_AUDIENCE);
+      expect(claims.tokenPurpose).toBe('internal-service');
+      expect(claims.credentialExchange).toBe(false);
+      expect(claims.exp - claims.iat).toBe(3600);
+    } finally {
+      for (const [key, value] of saved) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
   it.each(['webhook', 'scheduled'] as const)(
     'rejects the retired isolated-standard allocation on %s triggers without a picker option',
     async activationMode => {
@@ -1611,6 +1825,10 @@ describe('scheduled trigger invocation', () => {
 describe('webhook trigger request listing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSelectV1Sessions.mockReset();
+    mockSelectV1Sessions.mockResolvedValue([]);
+    mockSelectV2Sessions.mockReset();
+    mockSelectV2Sessions.mockResolvedValue([]);
     mockSelectWhere.mockResolvedValue([
       {
         id: '00000000-0000-4000-8000-000000000002',
@@ -1645,6 +1863,73 @@ describe('webhook trigger request listing', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
     expect(mockDbDelete).not.toHaveBeenCalled();
+  });
+
+  const capturedRequest = (cloudAgentSessionId: string) => ({
+    id: crypto.randomUUID(),
+    timestamp: '2026-01-01T00:00:00.000Z',
+    method: 'POST',
+    path: '/',
+    queryString: null,
+    headers: {},
+    body: '',
+    contentType: null,
+    sourceIp: null,
+    startedAt: null,
+    completedAt: null,
+    processStatus: 'success' as const,
+    cloudAgentSessionId,
+    errorMessage: null,
+    triggerSource: 'webhook' as const,
+  });
+
+  it('resolves session ids from cli_sessions_v2 only by default', async () => {
+    const bothId = crypto.randomUUID();
+    const v1OnlyId = crypto.randomUUID();
+    const v2SessionId = 'ses_2f0aa1c1c1c1c1c1c1c1c1c1c1';
+    mockListWorkerRequests.mockResolvedValueOnce({
+      success: true,
+      requests: [capturedRequest(bothId), capturedRequest(v1OnlyId)],
+    });
+    mockSelectV2Sessions.mockResolvedValueOnce([
+      { cloudAgentSessionId: bothId, sessionId: v2SessionId },
+    ]);
+    mockSelectV1Sessions.mockResolvedValueOnce([
+      { cloudAgentSessionId: bothId, sessionId: crypto.randomUUID() },
+      { cloudAgentSessionId: v1OnlyId, sessionId: crypto.randomUUID() },
+    ]);
+
+    const requests = await createCaller({ user }).listRequests({ triggerId: 'trigger-id' });
+
+    expect(requests.map(r => r.kiloSessionId)).toEqual([v2SessionId, null]);
+    expect(mockSelectV2Sessions).toHaveBeenCalledTimes(1);
+    expect(mockSelectV1Sessions).not.toHaveBeenCalled();
+  });
+
+  it('resolves legacy v1 session ids when includeLegacySessionIds is set', async () => {
+    const bothId = crypto.randomUUID();
+    const v1OnlyId = crypto.randomUUID();
+    const unresolvedId = crypto.randomUUID();
+    const v1SessionIdForBoth = crypto.randomUUID();
+    const v1SessionIdOnly = crypto.randomUUID();
+    mockListWorkerRequests.mockResolvedValueOnce({
+      success: true,
+      requests: [capturedRequest(bothId), capturedRequest(v1OnlyId), capturedRequest(unresolvedId)],
+    });
+    mockSelectV1Sessions.mockResolvedValueOnce([
+      { cloudAgentSessionId: bothId, sessionId: v1SessionIdForBoth },
+      { cloudAgentSessionId: v1OnlyId, sessionId: v1SessionIdOnly },
+    ]);
+    mockSelectV2Sessions.mockResolvedValueOnce([]);
+
+    const requests = await createCaller({ user }).listRequests({
+      triggerId: 'trigger-id',
+      includeLegacySessionIds: true,
+    });
+
+    expect(requests.map(r => r.kiloSessionId)).toEqual([v1SessionIdForBoth, v1SessionIdOnly, null]);
+    expect(mockSelectV1Sessions).toHaveBeenCalledTimes(1);
+    expect(mockSelectV2Sessions).toHaveBeenCalledTimes(1);
   });
 });
 

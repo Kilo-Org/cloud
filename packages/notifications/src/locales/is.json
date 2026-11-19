@@ -3,23 +3,22 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Umboðslotan þín hefur uppfærslu",
-      "lowBalance": "Staðan þín þarfnast athygli",
+      "lowBalance": "Inneignin þín þarfnast athygli",
       "spendAlert": "Útgjöldin þín þarfnast athygli",
       "securityFinding": "Öryggisfundur þarfnast athygli",
       "securityUpdate": "Öryggisathugun hefur uppfærslu",
-      "activeAgentsGlanceable": "Virk umboð hafa uppfærslu"
+      "activeAgentsGlanceable": "Virkir umboðsmenn hafa uppfærslu"
     }
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Viðvörun um lága stöðu",
-      "body": "Staða {{organizationName}} fór niður fyrir ${{minimumBalanceUsd}}"
+      "title": "Viðvörun um lága inneign",
+      "body": "Inneign {{organizationName}} fór niður fyrir ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Viðvörun um útgjöld",
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-brot"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Öryggisathugun hefur uppfærslu"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Kilo-lotan þín er tilbúin til stjórnunar úr símanum þínum"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

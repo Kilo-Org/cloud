@@ -8,6 +8,7 @@ import { ProfileKiloCommandsScreen } from '@/components/profiles/profile-kilo-co
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 
@@ -56,6 +57,7 @@ vi.mock('react-native', async () => {
   } = await import('react');
   return {
     Platform: { OS: 'ios' },
+    useColorScheme: () => 'light',
     View: 'View',
     Pressable: 'Pressable',
     Switch: 'Switch',
@@ -95,6 +97,7 @@ vi.mock('@/components/empty-state', async () => {
   // helpers must be loaded inside the factory.
   const { createElement: createMockElement } = await import('react');
   return {
+    StateAction: 'StateAction',
     // The real state renders its `action` below the title, so the manage slot's
     // sentence or the manager's CTA reaches the tree the way the screen hands it over.
     EmptyState: (props: { action?: ReactNode }) =>
@@ -112,6 +115,7 @@ vi.mock('@/components/ui/icons', () => ({
   Pencil: 'Pencil',
   Terminal: 'Terminal',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 type TestCommand = {
@@ -608,7 +612,12 @@ describe('ProfileKiloCommandsScreen row controls', () => {
     );
     expect(actions.map(node => node.props.accessibilityLabel)).toEqual(labels);
     for (const action of actions) {
-      expect(action.props.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+      expect(action.props.hitSlop).toEqual({
+        top: COMPACT_CONTROL_HIT_SLOP_DP,
+        bottom: COMPACT_CONTROL_HIT_SLOP_DP,
+        left: COMPACT_CONTROL_HIT_SLOP_DP,
+        right: COMPACT_CONTROL_HIT_SLOP_DP,
+      });
     }
 
     unmount();
@@ -818,6 +827,93 @@ describe('ProfileKiloCommandsScreen delete confirmation', () => {
       profileId: 'profile-1',
       commandId: 'cmd-1',
     });
+
+    unmount();
+  });
+});
+
+/** The translated cap line, as the footer and the sheet render it. */
+function capMessage(): string {
+  return i18n.t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS });
+}
+
+/** True for the rendered `Text` that carries the cap line. */
+function isCapLine(node: ReactTestInstance): boolean {
+  return node.props.children === capMessage();
+}
+
+/** `length` distinct commands, so the list holds exactly the count the server caps. */
+function commandsAt(length: number): TestCommand[] {
+  return Array.from({ length }, (_, index) =>
+    testCommand({ id: `cmd-${index}`, name: `command-${index}`, description: null })
+  );
+}
+
+describe('ProfileKiloCommandsScreen command cap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    permissionState.permission = 'allowed';
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('states the cap above the Add action and disables it at the cap', async () => {
+    h.query.data = commandsAt(MAX_PROFILE_KILO_COMMANDS);
+    const { renderer, unmount } = await mountScreen();
+
+    // One pre-order walk, so the indexes compare the footer's own order.
+    const ordered = renderer.root.findAll(
+      node => String(node.type) === 'Text' || String(node.type) === 'Button'
+    );
+    const noticeIndex = ordered.findIndex(node => isCapLine(node));
+    const addIndex = ordered.findIndex(node => String(node.type) === 'Button');
+
+    expect(noticeIndex).toBeGreaterThan(-1);
+    expect(addIndex).toBeGreaterThan(-1);
+    expect(noticeIndex).toBeLessThan(addIndex);
+    expect(ordered[noticeIndex]?.props.className).toContain('text-warn');
+    expect(findOne(renderer.root, 'Button').props.disabled).toBe(true);
+
+    unmount();
+  });
+
+  it('offers the Add action without a notice one command below the cap', async () => {
+    h.query.data = commandsAt(MAX_PROFILE_KILO_COMMANDS - 1);
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Text').some(node => isCapLine(node))).toBe(false);
+    expect(findOne(renderer.root, 'Button').props.disabled).toBe(false);
+
+    unmount();
+  });
+
+  it('reports a create the cap refuses as the cap line, not a generic failure', async () => {
+    h.query.data = [testCommand()];
+    h.mutations.createKiloCommand.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Profiles are limited to 50 custom commands'), {
+        data: { code: 'PRECONDITION_FAILED' },
+      })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressAddButton(renderer.root);
+    changeText(renderer.root, 'Command name', 'deploy');
+    changeText(renderer.root, 'Template', 'Do it');
+    pressSheetDone(renderer.root);
+
+    await waitFor(() => findAll(renderer.root, 'Text').some(node => isCapLine(node)));
+    const status = findAll(renderer.root, 'Text').find(node => isCapLine(node));
+    expect(status?.props.className).toContain('text-warn');
+    expect(
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+      )
+    ).toBe(false);
 
     unmount();
   });

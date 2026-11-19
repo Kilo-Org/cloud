@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
+import { StateAction } from '@/components/empty-state';
+import { ArrowLeft, RotateCcw } from '@/components/ui/icons';
 import { type OrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
@@ -14,9 +14,10 @@ import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
  * own first-run or empty state, so a lost membership never reads as "nothing is
  * set up yet" and never offers a setup the reader cannot complete.
  *
- * Retry re-resolves the membership: an owner who restores access gets the
- * organization back in place. Back to profile leaves the stale selection behind,
- * exactly like the shared organization boundary's absent-override state.
+ * Leaving leads: Back to profile drops the stale selection, exactly like the
+ * shared organization boundary's absent-override state, so the reader lands on
+ * a scope they can open. Retry only re-resolves the membership, for an owner
+ * who restores access while the reader waits.
  */
 export function ScopeAccessDeniedScreen({
   title,
@@ -53,18 +54,22 @@ export function ScopeAccessDeniedScreen({
       )}
       action={
         <View className="gap-3">
-          <Button onPress={onRetry} loading={isRetrying} accessibilityLabel={t('common.retry')}>
-            <Text>{t('common.retry')}</Text>
-          </Button>
-          <Button
-            variant="outline"
-            accessibilityLabel={t('organization.boundary.backToProfile')}
+          {/* Leaving is the recovery this surface leads with, so it holds the
+              one filled control. Retry only re-resolves the membership, and
+              the state slot has one action shape for both. */}
+          <StateAction
+            label={t('organization.boundary.backToProfile')}
+            icon={ArrowLeft}
             onPress={() => {
               router.replace(PROFILE_TAB_HREF);
             }}
-          >
-            <Text>{t('organization.boundary.backToProfile')}</Text>
-          </Button>
+          />
+          <StateAction
+            label={t('common.retry')}
+            icon={RotateCcw}
+            loading={isRetrying}
+            onPress={onRetry}
+          />
         </View>
       }
     />

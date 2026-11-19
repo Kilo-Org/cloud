@@ -13,16 +13,17 @@ import {
   pressAddButton,
   pressEmptyAction,
   pressPressable,
+  pressRowContentPress,
   pressSheetCancel,
   pressSheetDone,
   rerenderScreen,
-  type TestConfirmMock,
   testProfile,
   testServer,
 } from '@/components/profiles/profile-mcp-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
+import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 
 const h = vi.hoisted(() => ({
@@ -82,6 +83,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   // The screen hands its action to the manage slot, so the stub renders what it
   // is given: the read-only sentence replaces the button in the same subtree.
   EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
@@ -97,6 +99,7 @@ vi.mock('@/components/ui/icons', () => ({
   Pencil: 'Pencil',
   Server: 'Server',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 /** The props a mocked Switch host element exposes, which the renderer keeps untyped. */
@@ -177,11 +180,29 @@ describe('ProfileMcpScreen', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
-    expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
+    // The row content is the edit action, so without the manage role it renders
+    // no labelled control at all.
+    expect(
+      findAll(renderer.root, 'Pressable')
+        .map(node => node.props.accessibilityLabel)
+        .filter((label): label is string => typeof label === 'string')
+    ).toEqual([]);
     expect(findAll(renderer.root, 'Button')).toHaveLength(0);
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
       i18n.t('profiles.organizationRoleRequired')
     );
+
+    // With nothing to open the row renders static, so the count and the command
+    // it paints stay text stops instead of being hidden for a press that does
+    // not exist.
+    const factLines = findAll(renderer.root, 'Text').filter(
+      node => node.props.children === 1 || node.props.children === 'npx @example/mcp'
+    );
+    expect(factLines).toHaveLength(2);
+    for (const line of factLines) {
+      expect(line.props.accessible).toBeUndefined();
+      expect(line.props.importantForAccessibility).toBeUndefined();
+    }
 
     unmount();
   });
@@ -202,7 +223,15 @@ describe('ProfileMcpScreen', () => {
   });
 
   it('happy: a row shows name, type and summary; the switch toggles the server', async () => {
-    h.query.data = testProfile([testServer()]);
+    h.query.data = testProfile([
+      testServer(),
+      testServer({
+        id: 'mcp-2',
+        name: 'remote-docs',
+        type: 'remote',
+        config: { url: 'https://mcp.example.com/docs' },
+      }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -226,13 +255,27 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
+  it('leaves the type out when every server has the same one', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain('docs');
+    expect(texts).toContain('npx @example/mcp');
+    expect(texts).not.toContain('Local');
+
+    unmount();
+  });
+
   it('happy: the edit control opens the sheet seeded with the server', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressRowContentPress(renderer.root, 'Edit MCP server docs');
 
     expect(findField(renderer.root, 'Server name').props.defaultValue).toBe('docs');
     expect(findField(renderer.root, 'Command line').props.defaultValue).toBe('npx @example/mcp');
@@ -266,7 +309,7 @@ describe('ProfileMcpScreen', () => {
     h.query.isPending = false;
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressRowContentPress(renderer.root, 'Edit MCP server docs');
     expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
     pressSheetDone(renderer.root);
     await waitFor(() => h.mutations.updateMcp.mutateAsync.mock.calls.length > 0);
@@ -402,7 +445,7 @@ describe('ProfileMcpScreen', () => {
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressRowContentPress(renderer.root, 'Edit MCP server docs');
     expect(findField(renderer.root, 'Server name').props.error).toBeUndefined();
 
     changeText(renderer.root, 'Server name', 'search');
@@ -444,7 +487,7 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
-  it('a11y: the switch is the row element named after the server, and the count names itself', async () => {
+  it('a11y: the switch is the row element named after the server, and the press names the count', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;
 
@@ -460,13 +503,16 @@ describe('ProfileMcpScreen', () => {
       accessible: false,
       importantForAccessibility: 'no',
     });
-    // The counted glyphs stay decorative; the count line carries their meaning.
+    // The counted glyphs stay decorative; the content press carries their meaning.
     expect(findOne(renderer.root, 'Lock').parent?.props.accessibilityLabel).toBeUndefined();
+    expect(
+      findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)
+    ).toContain('Edit MCP server docs, 1 secret, npx @example/mcp');
 
     unmount();
   });
 
-  it('a11y: the count names itself in the plural form', async () => {
+  it('a11y: the press names the count in the plural form', async () => {
     h.query.data = testProfile([
       testServer({
         type: 'remote',
@@ -482,7 +528,9 @@ describe('ProfileMcpScreen', () => {
 
     const counts = findAll(renderer.root, 'Text').filter(node => node.props.children === 3);
     expect(counts).toHaveLength(1);
-    expect(counts[0]?.props.accessibilityLabel).toBe('3 secrets');
+    expect(
+      findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)
+    ).toContain('Edit MCP server docs, 3 secrets, https://example.com/mcp');
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
 
     unmount();
@@ -614,13 +662,11 @@ describe('ProfileMcpScreen', () => {
     pressSheetDone(renderer.root);
     expect(h.mutations.createMcp.mutateAsync).toHaveBeenCalledTimes(1);
 
-    // Dismiss that attempt and open a different form: the refusal of the first
-    // save belongs to the first form and must not appear under the second.
+    // The save is still in flight, so the guard closes without asking; the
+    // refusal of the first save belongs to the first form and must not appear
+    // under the second.
     pressSheetCancel(renderer.root);
-    await act(async () => {
-      confirmRequest(h.confirm as TestConfirmMock);
-      await Promise.resolve();
-    });
+    expect(h.confirm).not.toHaveBeenCalled();
     pressEmptyAction(renderer);
 
     await act(async () => {
@@ -641,12 +687,12 @@ describe('ProfileMcpScreen', () => {
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressRowContentPress(renderer.root, 'Edit MCP server docs');
     pressSheetDone(renderer.root);
     await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
 
     pressPressable(renderer.root, 'Delete MCP server docs');
-    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressRowContentPress(renderer.root, 'Edit MCP server docs');
     // The test renderer exposes host props untyped; the screen passes this handler.
     const toggleProps = findOne(renderer.root, 'Switch').props as ToggleProps;
     act(() => {
@@ -751,6 +797,117 @@ describe('ProfileMcpScreen delete confirmation', () => {
       profileId: 'profile-1',
       mcpServerId: 'mcp-1',
     });
+
+    unmount();
+  });
+});
+
+/** The translated cap line, as the footer and the sheet render it. */
+function capMessage(): string {
+  return i18n.t('profiles.mcp.limitReached', { max: MAX_PROFILE_MCP_SERVERS });
+}
+
+/** `length` distinct servers, so the list holds exactly the count the server caps. */
+function serversAt(length: number) {
+  return Array.from({ length }, (_, index) =>
+    testServer({ id: `mcp-${index}`, name: `server-${index}` })
+  );
+}
+
+describe('ProfileMcpScreen server cap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
+    Object.assign(h.query, { isError: false, isPending: false, isRefetching: false });
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('states the cap above the Add action and disables it at the cap', async () => {
+    h.query.data = testProfile(serversAt(MAX_PROFILE_MCP_SERVERS));
+    const { renderer, unmount } = await mountScreen();
+
+    // One pre-order walk, so the indexes compare the footer's own order.
+    const ordered = renderer.root.findAll(
+      node => String(node.type) === 'Text' || String(node.type) === 'Button'
+    );
+    const noticeIndex = ordered.findIndex(node => node.props.children === capMessage());
+    const addIndex = ordered.findIndex(node => String(node.type) === 'Button');
+
+    expect(noticeIndex).toBeGreaterThan(-1);
+    expect(addIndex).toBeGreaterThan(-1);
+    expect(noticeIndex).toBeLessThan(addIndex);
+    expect(ordered[noticeIndex]?.props.className).toContain('text-warn');
+    expect(findOne(renderer.root, 'Button').props.disabled).toBe(true);
+
+    unmount();
+  });
+
+  it('offers the Add action without a notice one server below the cap', async () => {
+    h.query.data = testProfile(serversAt(MAX_PROFILE_MCP_SERVERS - 1));
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === capMessage())).toBe(
+      false
+    );
+    expect(findOne(renderer.root, 'Button').props.disabled).toBe(false);
+
+    unmount();
+  });
+
+  it('reports a create the cap refuses as the cap line, not a generic failure', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.mutations.createMcp.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Profiles are limited to 20 MCP servers'), {
+        data: { code: 'PRECONDITION_FAILED' },
+      })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressAddButton(renderer);
+    changeText(renderer.root, 'Server name', 'new-server');
+    changeText(renderer.root, 'Command line', 'npx some-mcp');
+    pressSheetDone(renderer.root);
+
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(node => node.props.children === capMessage())
+    );
+    const status = findAll(renderer.root, 'Text').find(
+      node => node.props.children === capMessage()
+    );
+    expect(status?.props.className).toContain('text-warn');
+    expect(
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.mcp.saveFailed')
+      )
+    ).toBe(false);
+
+    unmount();
+  });
+
+  it('reports any other refused create as a generic failure', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.mutations.createMcp.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Internal server error'), { data: { code: 'INTERNAL_SERVER_ERROR' } })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressAddButton(renderer);
+    changeText(renderer.root, 'Server name', 'new-server');
+    changeText(renderer.root, 'Command line', 'npx some-mcp');
+    pressSheetDone(renderer.root);
+
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.mcp.saveFailed')
+      )
+    );
+    const status = findAll(renderer.root, 'Text').find(
+      node => node.props.children === i18n.t('profiles.mcp.saveFailed')
+    );
+    expect(status?.props.className).toContain('text-destructive');
 
     unmount();
   });

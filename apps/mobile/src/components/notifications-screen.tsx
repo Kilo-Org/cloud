@@ -9,12 +9,13 @@ import {
   Bot,
   KeyRound,
   ListTodo,
+  MessageSquare,
   RefreshCw,
   ShieldAlert,
   Smartphone,
   Wallet,
 } from '@/components/ui/icons';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -22,16 +23,23 @@ import { toast } from 'sonner-native';
 
 import { deriveMasterGateLeadingPresentation } from '@/components/notifications-master-gate';
 import { BriefingNotificationCategoryRow } from '@/components/agent-briefing/briefing-notification-toggle';
-import { IconTile } from '@/components/ui/icon-tile';
-import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ConfigureRow } from '@/components/ui/configure-row';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowFrame } from '@/components/ui/row-frame';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
+import { Section } from '@/components/ui/section';
 import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
 import { createSubmitLock } from '@/lib/submit-lock';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { useAuth } from '@/lib/auth/auth-context';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   applyAgentPushOptimistic,
@@ -65,6 +73,23 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 const permissionQueryKey = ['notificationPermission'] as const;
+
+/**
+ * The master gate's bell, by its settled presentation. The neutral state reads
+ * nothing yet, so it keeps the tile's frame with a loading mark instead of one
+ * of these.
+ */
+const MASTER_GATE_ICON = { on: Bell, off: BellOff } as const;
+
+/**
+ * The master row's subtitle, by its settled presentation: the neutral state
+ * says nothing yet, so it has no key.
+ */
+const MASTER_GATE_SUBTITLE_KEYS = {
+  neutral: undefined,
+  on: 'notifications.onDescription',
+  off: 'notifications.offDescription',
+} as const;
 
 /**
  * The glanceable row's subtitle: what it promises while the OS allows it, and
@@ -220,7 +245,6 @@ function CategoryRow({
   isPending,
   onChange,
 }: CategoryRowProps) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const Icon = meta.icon;
   // Display the optimistic value while a mutation is in flight; otherwise
@@ -258,35 +282,25 @@ function CategoryRow({
   const accessibilityLabel =
     'accessibilityLabelKey' in meta ? t(meta.accessibilityLabelKey) : t(meta.titleKey);
   return (
-    <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-      <IconTile icon={Icon} tint={NEUTRAL_TINT} />
-      <View className="flex-1">
-        {/* Disabled cue is the muted title, not row opacity: blanket opacity
-            drops every label below the 4.5:1 text minimum. The switch carries
-            the other half: a disabled `Switch` paints the palette's muted pair
-            on Android, where the platform draws none, so an unavailable row
-            never shows a full-strength accent beside it. */}
-        <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
-          {title}
-        </Text>
-        <Text variant="muted" className="mt-0.5 text-xs">
-          {subtitle}
-        </Text>
-      </View>
-      {isPending && <ActivityIndicator size="small" color={colors.mutedForeground} />}
-      <Switch
-        value={displayedValue}
-        disabled={isDisabled}
-        accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ disabled: isDisabled, busy: isPending }}
-        onValueChange={value => {
-          if (isDisabled) {
-            return;
-          }
-          onChange(value);
-        }}
-      />
-    </View>
+    <PreferenceRow
+      icon={Icon}
+      title={title}
+      subtitle={subtitle}
+      value={displayedValue}
+      disabled={isDisabled}
+      busy={isPending}
+      resolveValue={() => readAgentPushPreference(queryClient, queryKey, meta.key)}
+      // The switch cell is the one the LIVE UPDATES and PUSH rows use, so the
+      // three sections share one switch column instead of the category rows
+      // landing a few points nearer the screen edge.
+      accessibilityLabel={accessibilityLabel}
+      onValueChange={value => {
+        if (isDisabled) {
+          return;
+        }
+        onChange(value);
+      }}
+    />
   );
 }
 
@@ -645,158 +659,138 @@ export function NotificationsScreen() {
   const previewTerminal = previewErrorCode === 'UNAUTHORIZED';
   const previewDisabled = !notificationsEnabled || isPreviewPending || previewTerminal;
 
+  const masterSubtitleKey = MASTER_GATE_SUBTITLE_KEYS[masterLeading];
+  const masterSubtitle = masterSubtitleKey === undefined ? undefined : t(masterSubtitleKey);
+
+  // Master trailing slot — first match wins: a settling permission read or a
+  // token query still in flight shows its skeleton, a permission read that
+  // failed offers the retry, and only a settled gate draws the real switch.
+  let masterTrailing: ReactNode = null;
+  if (permissionLoading) {
+    masterTrailing = <Skeleton className="h-8 w-14 rounded-full" />;
+  } else if (permissionError) {
+    masterTrailing = (
+      <InlineRetry
+        label={t('notifications.retryPermission')}
+        color={colors.destructive}
+        onPress={() => void refetchPermission()}
+      />
+    );
+  } else if (!gateSettled) {
+    masterTrailing = <Skeleton className="h-8 w-14 rounded-full" />;
+  } else {
+    // The switch and the Enable notice below are one control, not two: while
+    // push cannot work, the notice carries the action, and the switch appears
+    // only once it does. Painting a dead switch beside the card offered the
+    // same state twice (`h-11` greys, 2026-11-18).
+    masterTrailing = notificationsEnabled ? (
+      <View className="flex-row items-center gap-2">
+        {isMasterBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+        {renderRowTrailing({
+          kind: 'switch',
+          value: notificationsEnabled,
+          disabled: isMasterBusy,
+          accessibilityLabel: t('notifications.deviceTitle'),
+          accessibilityState: { disabled: isMasterBusy, busy: isMasterBusy },
+          onValueChange: value => {
+            if (value) {
+              void handleEnableNotifications();
+            } else {
+              handleDisableNotifications();
+            }
+          },
+        })}
+      </View>
+    ) : null;
+  }
+  // While the gate is settled and off, the row and the Enable card say the same
+  // state twice, so the section renders one notice instead: the row's title,
+  // subtitle and dead switch collapse into the card that owns the action.
+  const showEnableNotice = showEnableCta && gateSettled && !permissionLoading && !permissionError;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.notifications')} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 gap-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         {/* The glanceable surface. First on the screen because it is what the
             user sees without opening the app, and it must not sit below eight
             category rows. Each platform names it the way its own OS does:
             a Live Activity on iOS, a Live Update on Android. */}
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {isIos ? t('notifications.liveActivities') : t('notifications.liveUpdates')}
-          </Text>
-          <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            <IconTile icon={Smartphone} tint={NEUTRAL_TINT} />
-            <View className="flex-1">
-              {/* Disabled cue is the muted title, not row opacity — the same
-                  pattern as CategoryRow below. */}
-              <Text
-                className={cn(
-                  'text-sm font-medium',
-                  liveActivityRowDisabled && 'text-muted-foreground'
-                )}
-              >
-                {t('glanceable.channelName')}
-              </Text>
-              <Text variant="muted" className="mt-0.5 text-xs">
-                {t(glanceableSubtitleKey(systemAllowsGlanceable, isIos))}
-              </Text>
-            </View>
-            <Switch
+        <Section label={isIos ? t('notifications.liveActivities') : t('notifications.liveUpdates')}>
+          <RowGroup>
+            <PreferenceRow
+              icon={Smartphone}
+              title={t('glanceable.channelName')}
+              subtitle={t(glanceableSubtitleKey(systemAllowsGlanceable, isIos))}
               value={systemAllowsGlanceable && liveActivityEnabled}
               disabled={liveActivityRowDisabled}
-              accessibilityLabel={t('glanceable.channelName')}
-              accessibilityState={{ disabled: liveActivityRowDisabled }}
               onValueChange={setLiveActivityEnabled}
             />
-          </View>
+          </RowGroup>
           {/* Our switch cannot turn ActivityKit's back on, so the row offers
               the only thing that can instead of pretending otherwise. Android
               needs no button here: the master gate below already enables the
               same permission. */}
           {isIos && !systemAllowsLiveActivities && (
-            <Pressable
-              onPress={() => void Linking.openSettings()}
-              accessibilityRole="button"
+            <Button
+              variant="outline"
+              className="w-full"
               accessibilityLabel={t('common.openSettings')}
-              className="items-center rounded-lg bg-primary py-2.5 active:opacity-80"
+              onPress={() => void Linking.openSettings()}
             >
-              <Text className="text-sm font-semibold text-primary-foreground">
-                {t('common.openSettings')}
-              </Text>
-            </Pressable>
+              <Text>{t('common.openSettings')}</Text>
+            </Button>
           )}
-        </View>
+        </Section>
 
         {/* Master gate */}
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('notifications.push')}
-          </Text>
-          <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            {/* The leading cell keeps the tile's 30 dp frame in all three
-                states, so the title never moves when the permission settles
-                into "on" or "off". */}
-            {masterLeading === 'neutral' ? (
-              <IconTile tint={NEUTRAL_TINT} content={<Skeleton className="h-4 w-4 rounded" />} />
-            ) : (
-              <IconTile icon={masterLeading === 'on' ? Bell : BellOff} tint={NEUTRAL_TINT} />
-            )}
-            <View className="flex-1">
-              <Text className="text-sm font-medium">{t('notifications.deviceTitle')}</Text>
-              {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}
-              {masterLeading === 'on' && (
-                <Text variant="muted" className="mt-0.5 text-xs">
-                  {t('notifications.onDescription')}
-                </Text>
-              )}
-              {masterLeading === 'off' && (
-                <Text variant="muted" className="mt-0.5 text-xs">
-                  {t('notifications.offDescription')}
-                </Text>
-              )}
-            </View>
-            {/* Master trailing slot — first match wins:
-                1. permissionLoading → skeleton
-                2. permissionError → InlineRetry
-                3. !gateSettled → skeleton (token queries still settling)
-                4. else → real Switch (+ optional isMasterBusy spinner) */}
-            {permissionLoading && <Skeleton className="h-[31px] w-[51px] rounded-full" />}
-            {!permissionLoading && permissionError && (
-              <InlineRetry
-                label={t('notifications.retryPermission')}
-                color={colors.destructive}
-                onPress={() => void refetchPermission()}
+        <Section label={t('notifications.push')}>
+          {/* While the gate reads, fails or is on, the row carries that state.
+              Once it has settled off, the row and the card below would describe
+              one state twice, so the card alone stands as the notice. */}
+          {showEnableNotice ? null : (
+            <RowGroup>
+              <RowFrame
+                // The leading tile keeps its 30 dp frame in all three states, so
+                // the title never moves when the permission settles into "on" or
+                // "off". While it is unsettled the tile holds a neutral mark
+                // instead of the off bell: painting "off" before the answer would
+                // assert a state nobody has read yet.
+                icon={masterLeading === 'neutral' ? undefined : MASTER_GATE_ICON[masterLeading]}
+                iconContent={
+                  masterLeading === 'neutral' ? <Skeleton className="h-4 w-4 rounded" /> : undefined
+                }
+                title={t('notifications.deviceTitle')}
+                subtitle={masterSubtitle === undefined ? undefined : { text: masterSubtitle }}
+                subtitlePlaceholder={
+                  masterLeading === 'neutral' ? <Skeleton className="mt-0.5 h-4 w-52" /> : undefined
+                }
+                trailing={{ kind: 'node', node: masterTrailing }}
               />
-            )}
-            {!permissionLoading && !permissionError && !gateSettled && (
-              <Skeleton className="h-[31px] w-[51px] rounded-full" />
-            )}
-            {!permissionLoading && !permissionError && gateSettled && (
-              <>
-                {isMasterBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
-                <Switch
-                  value={notificationsEnabled}
-                  disabled={isMasterBusy}
-                  accessibilityLabel={t('notifications.deviceTitle')}
-                  accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
-                  onValueChange={value => {
-                    if (value) {
-                      void handleEnableNotifications();
-                    } else {
-                      handleDisableNotifications();
-                    }
-                  }}
-                />
-              </>
-            )}
-          </View>
-
-          {/* Empty-state CTA: only shown when the master gate is closed and the
-              gate has settled (avoids a transient flash while token queries
-              resolve for an already-registered user). The retryable unhappy
-              path (a category mutation rejection) is handled by the toggle
-              itself — there is no terminal failure mode for these preferences,
-              so a non-retryable CTA is structurally absent. */}
-          {!permissionLoading && !permissionError && gateSettled && showEnableCta && (
-            <View className="rounded-lg border border-border bg-card p-4">
-              <Text variant="muted" className="text-xs">
-                {t('notifications.enableDescription')}
-              </Text>
-              <Pressable
-                onPress={() => void handleEnableNotifications()}
-                disabled={isMasterBusy}
-                accessibilityRole="button"
-                accessibilityLabel={t('notifications.enable')}
-                className="mt-3 items-center rounded-lg bg-primary py-2.5 active:opacity-80"
-              >
-                {isMasterBusy ? (
-                  <ActivityIndicator size="small" color={colors.primaryForeground} />
-                ) : (
-                  <Text className="text-sm font-semibold text-primary-foreground">
-                    {t('notifications.enable')}
-                  </Text>
-                )}
-              </Pressable>
-            </View>
+            </RowGroup>
           )}
-        </View>
+
+          {/* The one push notice while the gate is off: what the switch would
+              turn on, and the action that turns it on. It replaces the row that
+              used to repeat the same state above it. */}
+          {showEnableNotice && (
+            <Card>
+              <Text variant="caption">{t('notifications.enableDescription')}</Text>
+              <Button
+                className="w-full"
+                loading={isMasterBusy}
+                accessibilityLabel={t('notifications.enable')}
+                onPress={() => void handleEnableNotifications()}
+              >
+                <Text>{t('notifications.enable')}</Text>
+              </Button>
+            </Card>
+          )}
+        </Section>
 
         {/* Everything below waits for the master gate. The gate's settled
             height is only known once it settles: the Push row grows by its
@@ -808,41 +802,25 @@ export function NotificationsScreen() {
         {gateSettled && (
           <>
             {/* Categories */}
-            <View className="gap-3">
-              <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                {t('notifications.categories')}
-              </Text>
+            <Section label={t('notifications.categories')}>
               {preferencesLoading && (
-                <>
+                <RowGroup leadingTile>
                   {CATEGORY_META.map(meta => (
-                    <View
-                      key={meta.key}
-                      className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
-                    >
-                      {/* The leading cell reserves the loaded CategoryRow's
-                          30 dp tile frame, so the rows do not move when the
-                          preferences arrive. */}
-                      <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
-                      <View className="flex-1">
-                        <Skeleton className="h-5 w-24" />
-                        <Skeleton className="mt-0.5 h-4 w-40" />
-                      </View>
-                      <Skeleton className="h-[31px] w-[51px] rounded-full" />
-                    </View>
+                    <RowSkeleton key={meta.key} tile subtitle />
                   ))}
-                </>
+                </RowGroup>
               )}
               {preferencesError && (
-                <View className="rounded-lg bg-secondary p-3">
+                <Card>
                   <InlineRetry
                     label={t('notifications.retryCategories')}
                     color={colors.destructive}
                     onPress={() => void refetchPreferences()}
                   />
-                </View>
+                </Card>
               )}
-              {preferences && (
-                <>
+              {preferences ? (
+                <RowGroup leadingTile>
                   {CATEGORY_META.map(meta => (
                     <CategoryRow
                       key={meta.key}
@@ -867,84 +845,85 @@ export function NotificationsScreen() {
                       }}
                     />
                   ))}
-                </>
+                  <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
+                </RowGroup>
+              ) : (
+                <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
               )}
-              <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
-            </View>
+            </Section>
 
             {/* Message previews */}
-            <View className="gap-3">
-              <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                {t('notifications.messagePreviews')}
-              </Text>
+            <Section label={t('notifications.messagePreviews')}>
               {preferencesLoading && (
-                <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-                  <View className="flex-1">
-                    <Skeleton className="h-5 w-24" />
-                    <Skeleton className="mt-0.5 h-4 w-40" />
-                  </View>
-                  <Skeleton className="h-[31px] w-[51px] rounded-full" />
-                </View>
+                <RowGroup leadingTile>
+                  <RowSkeleton tile subtitle />
+                </RowGroup>
               )}
               {preferencesError && (
-                <View className="rounded-lg bg-secondary p-3">
+                <Card>
                   <InlineRetry
                     label={t('notifications.retryPreviews')}
                     color={colors.destructive}
                     onPress={() => void refetchPreferences()}
                   />
-                </View>
+                </Card>
               )}
               {preferences && (
-                <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-                  <View className="flex-1">
-                    <Text
-                      className={cn(
-                        'text-sm font-medium',
-                        previewDisabled && 'text-muted-foreground'
-                      )}
-                    >
-                      {previewIsFull
+                <RowGroup>
+                  <ConfigureRow
+                    icon={MessageSquare}
+                    title={
+                      previewIsFull
                         ? t('notifications.previewAlways')
-                        : t('notifications.previewWhenUnlocked')}
-                    </Text>
-                    <Text variant="muted" className="mt-0.5 text-xs">
-                      {previewIsFull
+                        : t('notifications.previewWhenUnlocked')
+                    }
+                    subtitle={
+                      previewIsFull
                         ? t('notifications.previewFullDescription')
-                        : t('notifications.previewGenericDescription')}
-                    </Text>
-                  </View>
-                  {isPreviewPending && (
-                    <ActivityIndicator size="small" color={colors.mutedForeground} />
-                  )}
-                  {previewErrorCode !== undefined && !previewTerminal && (
-                    <InlineRetry
-                      label={t('notifications.retrySavingPreviews')}
-                      color={colors.destructive}
-                      onPress={() => {
-                        handlePreviewChange(previewIntent);
-                      }}
-                    />
-                  )}
-                  <Switch
-                    value={previewIsFull}
+                        : t('notifications.previewGenericDescription')
+                    }
+                    variant="action"
                     disabled={previewDisabled}
-                    accessibilityLabel={t('notifications.showFullPreviews')}
-                    accessibilityState={{ disabled: previewDisabled, busy: isPreviewPending }}
-                    onValueChange={value => {
-                      if (previewDisabled) {
-                        return;
-                      }
-                      handlePreviewChange(value ? 'full' : 'generic');
-                    }}
+                    trailing={
+                      <View className="flex-row items-center gap-2">
+                        {isPreviewPending && (
+                          <ActivityIndicator size="small" color={colors.mutedForeground} />
+                        )}
+                        {previewErrorCode !== undefined && !previewTerminal && (
+                          <InlineRetry
+                            label={t('notifications.retrySavingPreviews')}
+                            color={colors.destructive}
+                            onPress={() => {
+                              handlePreviewChange(previewIntent);
+                            }}
+                          />
+                        )}
+                        {renderRowTrailing({
+                          kind: 'switch',
+                          value: previewIsFull,
+                          disabled: previewDisabled,
+                          accessibilityLabel: t('notifications.showFullPreviews'),
+                          accessibilityState: {
+                            disabled: previewDisabled,
+                            busy: isPreviewPending,
+                          },
+                          onValueChange: value => {
+                            if (previewDisabled) {
+                              return;
+                            }
+                            handlePreviewChange(value ? 'full' : 'generic');
+                          },
+                        })}
+                      </View>
+                    }
                   />
-                </View>
+                </RowGroup>
               )}
-            </View>
+            </Section>
 
             {/* Device-token / pushTokens error retry block */}
             {(deviceTokenError || pushTokensError) && !permissionError && (
-              <View className="rounded-lg bg-secondary p-3">
+              <Card>
                 <InlineRetry
                   label={t('notifications.retryDeviceRegistration')}
                   color={colors.destructive}
@@ -953,7 +932,7 @@ export function NotificationsScreen() {
                     void refetchPushTokens();
                   }}
                 />
-              </View>
+              </Card>
             )}
           </>
         )}

@@ -12,13 +12,12 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Lågbalansvarning",
+      "title": "Varning för lågt saldo",
       "body": "{{organizationName}}s saldo föll under ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-brott"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "En säkerhetskontroll har en uppdatering"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Din Kilo-session är redo att styras från din telefon"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

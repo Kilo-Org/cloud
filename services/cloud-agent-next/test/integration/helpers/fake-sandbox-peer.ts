@@ -1,5 +1,5 @@
 import type { ControlPlaneSandboxPeer } from '../../../src/control-plane/session/session-do.js';
-import type { ControlRuntimeCredentialProxyFence } from '../../../src/control-plane/sandbox/sandbox-do.js';
+import type { ControlRuntimeCredentialProxyFenceScope } from '../../../src/control-plane/sandbox/sandbox-do.js';
 import type {
   PreviewSandboxScope,
   PreviewTargetResult,
@@ -50,7 +50,7 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   statusError: Error | null = null;
   readonly statusCalls: string[] = [];
   /** Optional fence returned by `getRuntimeCredentialProxyFence` (H4 tests). */
-  runtimeCredentialProxyFence: ControlRuntimeCredentialProxyFence | null = null;
+  runtimeCredentialProxyFence: ControlRuntimeCredentialProxyFenceScope | null = null;
   /** The snapshot returned by `getStatusSnapshot` (B10 badge tests). */
   statusSnapshot: SandboxStatusSnapshot = {
     status: 'sleeping',
@@ -134,7 +134,7 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
     };
   }
 
-  async getRuntimeCredentialProxyFence(): Promise<ControlRuntimeCredentialProxyFence | null> {
+  async getRuntimeCredentialProxyFence(): Promise<ControlRuntimeCredentialProxyFenceScope | null> {
     return this.runtimeCredentialProxyFence;
   }
 
@@ -175,6 +175,7 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   previewTargetResult: PreviewTargetResult = {
     status: 'ok',
     coordinates: {
+      transport: 'durable-object',
       provider: 'cloudflare-containers',
       logicalSandboxId: 'sbx',
       allocationRef: 'sbx',

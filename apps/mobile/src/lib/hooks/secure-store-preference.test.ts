@@ -1,4 +1,4 @@
-/* oxlint-disable max-lines -- one suite for the SecureStore-backed preference store: the initial read, the write drain, and what a failed read reports all drive the same mocked keychain */
+/* eslint-disable max-lines -- one store, one harness: the write-pending suites stay beside the write suites they mirror */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createSecureStorePreference } from './secure-store-preference';
@@ -195,6 +195,91 @@ describe('createSecureStorePreference', () => {
     expect(setItemAsync).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the last durable value visible while a setAsync write runs', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    // The seed write lands at once; the gated one is the pick's write.
+    setItemAsync.mockResolvedValueOnce(undefined).mockImplementation(async () => {
+      await writeGate.promise;
+    });
+    const store = createSecureStorePreference<string>({
+      key: 'k',
+      defaultValue: 'en',
+      parse: raw => raw ?? 'en',
+      serialize: value => value,
+    });
+
+    store.set('en');
+    await store.whenPersisted();
+    expect(store.get()).toBe('en');
+
+    // A pick that must not change memory until the disk takes it. The write is
+    // pending for the language follow, but getRequested() keeps reporting the
+    // last durable value: the pick may still be rejected by the disk.
+    const applying = store.setAsync('es');
+    expect(store.hasPendingWrite()).toBe(true);
+    expect(store.getRequested()).toBe('en');
+
+    writeGate.resolve(undefined);
+    await expect(applying).resolves.toBe(true);
+
+    expect(store.getRequested()).toBe('es');
+    expect(store.hasPendingWrite()).toBe(false);
+  });
+
+  it('surfaces the setAsync pick as the pending write target', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const writeGate = Promise.withResolvers<undefined>();
+    // The seed write lands at once; the gated one is the pick's write.
+    setItemAsync.mockResolvedValueOnce(undefined).mockImplementation(async () => {
+      await writeGate.promise;
+    });
+    const store = createSecureStorePreference<string>({
+      key: 'k',
+      defaultValue: 'en',
+      parse: raw => raw ?? 'en',
+      serialize: value => value,
+    });
+
+    store.set('en');
+    await store.whenPersisted();
+    expect(store.getPendingWriteTarget()).toBeUndefined();
+
+    // The restore of the language follow reads this: the durable value keeps
+    // reading `en` while the write runs, so the pick lives only here.
+    const applying = store.setAsync('es');
+    expect(store.getPendingWriteTarget()).toBe('es');
+    expect(store.getRequested()).toBe('en');
+
+    writeGate.resolve(undefined);
+    await expect(applying).resolves.toBe(true);
+
+    expect(store.getPendingWriteTarget()).toBeUndefined();
+    expect(store.getRequested()).toBe('es');
+  });
+
+  it('keeps the durable value in getRequested after a failed setAsync write', async () => {
+    getItemAsync.mockResolvedValue(null);
+    setItemAsync.mockResolvedValueOnce(undefined).mockRejectedValue(new Error('disk refused'));
+    const store = createSecureStorePreference<string>({
+      key: 'k',
+      defaultValue: 'en',
+      parse: raw => raw ?? 'en',
+      serialize: value => value,
+    });
+
+    store.set('en');
+    await store.whenPersisted();
+
+    await expect(store.setAsync('es')).resolves.toBe(false);
+
+    // The caller rolls its own apply back; memory keeps the durable choice.
+    expect(store.getRequested()).toBe('en');
+    expect(store.getPendingWriteTarget()).toBeUndefined();
+    expect(store.hasPendingWrite()).toBe(false);
+    expect(store.get()).toBe('en');
+  });
+
   it('writes the newest choice, not every choice, when several land during one write', async () => {
     getItemAsync.mockResolvedValue(null);
     const firstWriteGate = Promise.withResolvers<undefined>();
@@ -382,6 +467,97 @@ describe('createSecureStorePreference', () => {
     expect(deleteItemAsync).toHaveBeenCalled();
     expect(store.get()).toBe(false);
     unsubscribe();
+  });
+
+  it('keeps a pre-clear read out of the store when a set() follows the clear', async () => {
+    const pendingRead = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValueOnce(pendingRead.promise);
+    const store = createSecureStorePreference<string[]>({
+      key: 'k',
+      defaultValue: [],
+      parse: raw => (raw ? (JSON.parse(raw) as string[]) : []),
+      serialize: value => JSON.stringify(value),
+      mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
+    });
+
+    // The read starts, then the clear resets the store and a new choice
+    // follows it. The snapshot the read returns describes the state the clear
+    // removed, so it must not reach the value or the disk.
+    store.preload();
+    store.clear();
+    store.set(['new']);
+    pendingRead.resolve('["old"]');
+    await store.whenLoaded();
+    await store.whenPersisted();
+
+    expect(store.get()).toEqual(['new']);
+    expect(store.getRequested()).toEqual(['new']);
+    const written = setItemAsync.mock.calls.map(call => call[1] as string);
+    expect(written.some(value => value.includes('old'))).toBe(false);
+    expect(setItemAsync).toHaveBeenLastCalledWith('k', '["new"]');
+  });
+
+  it('reads no disk value when the delete a clear() queued failed', async () => {
+    deleteItemAsync.mockRejectedValue(new Error('keychain refused'));
+    getItemAsync.mockResolvedValue('true');
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    /* The clear runs before any read starts and its delete spends the whole
+       retry budget without landing, so the disk still holds the snapshot the
+       clear removed. A read of that snapshot would bring the removed value
+       back, so the store must not start one. */
+    vi.useFakeTimers();
+    try {
+      store.clear();
+      const unsubscribe = store.subscribe(noopListener);
+      const loading = store.whenLoaded();
+      await vi.runAllTimersAsync();
+      await loading;
+
+      expect(deleteItemAsync).toHaveBeenCalledTimes(4);
+      expect(getItemAsync).not.toHaveBeenCalled();
+      expect(store.get()).toBe(false);
+      expect(store.getRequested()).not.toBe(true);
+      unsubscribe();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries a refused delete so a clear converges on disk', async () => {
+    deleteItemAsync
+      .mockRejectedValueOnce(new Error('keychain refused'))
+      .mockResolvedValue(undefined);
+    getItemAsync.mockResolvedValue(null);
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    /* One transient refusal must not pin the removed value: the retry lands
+       the delete, so the read that follows may start and the store reads the
+       default. */
+    vi.useFakeTimers();
+    try {
+      store.clear();
+      store.subscribe(noopListener);
+      const loading = store.whenLoaded();
+      await vi.runAllTimersAsync();
+      await loading;
+
+      expect(deleteItemAsync).toHaveBeenCalledTimes(2);
+      expect(getItemAsync).toHaveBeenCalled();
+      expect(store.get()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('preload() starts the disk read once and a following subscribe() does not start a second read', async () => {

@@ -12,6 +12,7 @@
 import { createElement, type ElementType, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { createTriggerDraft, defaultPrompt } from '@/lib/cloud-triggers/trigger-draft';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -19,13 +20,22 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { TriggerFormBasics } from './trigger-form-basics';
 import { TriggerFormBehaviour } from './trigger-form-behaviour';
 
+// The scheduled fields' base direction comes from `ltrValueTextStyle`, which
+// reads the interface direction; hoisted so a test can flip it per render.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+
 vi.mock('react-native', () => ({
+  I18nManager: i18nManager,
   Pressable: 'Pressable',
   Switch: 'Switch',
   TextInput: 'TextInput',
   View: 'View',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#6f6a61' }),
+}));
 vi.mock('@/components/ui/form-field', async () => {
   // `vi.mock` factories hoist above this file's imports, so the factory loads
   // React itself instead of closing over the top-level import.
@@ -71,6 +81,18 @@ vi.mock('@/components/profiles/repo-picker-sheet', () => ({ RepoPickerSheet: 'Re
 vi.mock('@/lib/cloud-triggers/use-trigger-options', () => ({
   useTriggerRepositories: () => ({
     repositories: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useTriggerEnvironments: () => ({
+    environments: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useTriggerProfiles: () => ({
+    profiles: [],
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -141,9 +163,24 @@ function typePrompt(root: ReactTestRenderer['root'], value: string): void {
   });
 }
 
+/** The one field a scheduled form labels with `key`. */
+function scheduledField(root: ReactTestRenderer['root'], key: string) {
+  const found = root.findAll(
+    node => Object.is(node.type, FIELD) && node.props.label === i18n.t(key)
+  );
+  const [only] = found;
+  if (!only || found.length !== 1) {
+    throw new Error(`expected one ${key} field, found ${found.length}`);
+  }
+  return only;
+}
+
 afterEach(() => {
-  act(() => renderer?.unmount());
+  act(() => {
+    renderer?.unmount();
+  });
   renderer = undefined;
+  i18nManager.isRTL = false;
 });
 
 describe('trigger create form prompt', () => {
@@ -163,5 +200,33 @@ describe('trigger create form prompt', () => {
     pressActivation(root, 'scheduled');
 
     expect(promptField(root).props.shownValue).toBe('Summarise the payload for me.');
+  });
+});
+
+describe('trigger create form cron direction', () => {
+  it('pins the cron field left to right in a left-to-right interface', async () => {
+    const root = await mount();
+    pressActivation(root, 'scheduled');
+
+    expect(scheduledField(root, 'cloudAgent.triggers.fieldCron').props.style).toEqual({
+      direction: 'ltr',
+      writingDirection: 'ltr',
+    });
+  });
+
+  it('keeps it left to right with the interface alignment in a right-to-left interface', async () => {
+    i18nManager.isRTL = true;
+    try {
+      const root = await mount();
+      pressActivation(root, 'scheduled');
+
+      expect(scheduledField(root, 'cloudAgent.triggers.fieldCron').props.style).toEqual({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+        textAlign: 'right',
+      });
+    } finally {
+      i18nManager.isRTL = false;
+    }
   });
 });

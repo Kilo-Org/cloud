@@ -26,6 +26,7 @@
     "creditHistory": "Kreditthistorikk",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Avbryt",
     "done": "Ferdig",
     "retry": "Prøv igjen",
@@ -65,7 +66,7 @@
     "discardChangesMessage": "Endringene dine vil gå tapt.",
     "discardChangesTitle": "Forkast endringer?",
     "findings": "Funn",
-    "mergeRequest": "merge request",
+    "mergeRequest": "fletteforespørsel",
     "notConnected": "Ikke tilkoblet",
     "notifications": "Varsler",
     "pullRequest": "PR",
@@ -157,7 +158,7 @@
     "retryLoadingMore": "Prøv igjen å laste inn flere",
     "reviewPr": "Gjennomgå PR",
     "role": "Rolle",
-    "searchModels": "Søk etter modeller...",
+    "searchModels": "Søk etter modeller…",
     "selectedRepositories": "Valgte kodelagre",
     "selectRepositories": "Velg kodelagre",
     "sendMessage": "Send melding",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "Endringer",
     "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
-    "privateRepositoryA11y": "{{name}}, privat repository"
+    "privateRepositoryA11y": "{{name}}, privat repository",
+    "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk.",
+    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen."
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -308,9 +311,9 @@
     "passkeyVerifyDescription": "Av sikkerhetshensyn må du bekrefte at det er deg før du endrer passnøklene dine.",
     "passkeyVerifyWithPasskey": "Bekreft med passnøkkel",
     "passkeyVerifySendCode": "Send meg en kode på e-post",
-    "passkeyVerifySendingCode": "Sender kode...",
+    "passkeyVerifySendingCode": "Sender kode…",
     "passkeyVerifyPasskeyPrompt": "Bekreft med passnøkkelen din for å fortsette.",
-    "passkeyVerifyChecking": "Sjekker koden din...",
+    "passkeyVerifyChecking": "Sjekker koden din…",
     "passkeyVerifyCodeSent": "Skriv inn koden som ble sendt til {{email}}.",
     "passkeyVerifyCodeRejected": "Koden stemte ikke. Prøv igjen.",
     "passkeyVerifyPasskeyFailed": "Passnøkkelen ble ikke bekreftet. Prøv igjen.",
@@ -318,8 +321,8 @@
     "passkeyVerifyInProgress": "Koden sjekkes allerede. Prøv igjen om et øyeblikk.",
     "passkeyVerifyTooManyAttempts": "For mange forsøk. Send en ny kode.",
     "passkeyVerifySsoRequired": "Organisasjonen din krever enkel pålogging. Godkjenn denne endringen i nettleseren og kom tilbake hit.",
-    "passkeyVerifySsoStarting": "Starter godkjenning...",
-    "passkeyVerifySsoWaiting": "Venter på godkjenning...",
+    "passkeyVerifySsoStarting": "Starter godkjenning…",
+    "passkeyVerifySsoWaiting": "Venter på godkjenning…",
     "passkeyVerifySsoOpen": "Åpne godkjenningssiden",
     "passkeyVerifySsoExpired": "Godkjenningen utløp eller ble avbrutt. Prøv igjen.",
     "passkeyVerifySsoUnavailable": "Godkjenning via enkel pålogging er ikke tilgjengelig akkurat nå. Prøv igjen.",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Den lagrede verdien kan ikke vises. Skriv inn en ny for å erstatte den.",
       "editKeyMappingsWarning": "Når du erstatter nøkkelen, erstattes også de lagrede modelltilordningene: skriv inn alle tilordningene du fortsatt trenger.",
       "saveFailed": "Kunne ikke lagre nøkkelen.",
-      "invalidCredentials": "Kontroller legitimasjonen og prøv igjen.",
       "fieldRequired": "{{field}} må fylles ut.",
+      "keyIncomplete": "Nøkkelen mangler en påkrevd verdi.",
       "incompleteMapping": "Tilordning {{number}} må ha både en slug for gateway-modell og et deployment-navn.",
       "apiKeyLabel": "API-nøkkel",
       "apiKeyPlaceholder": "Lim inn nøkkelen",
       "apiKeyRequired": "Skriv inn nøkkelen.",
+      "keyAlreadyExists": "Du har allerede en nøkkel for denne leverandøren. Fjern den før du legger til en ny.",
+      "keyStoreFailed": "Nøkkelen kunne ikke lagres.",
+      "invalidCredentials": "Denne nøkkelen er ikke i det formatet denne leverandøren forventer. Kontroller den og prøv igjen.",
+      "testSucceeded": "Nøkkelen fungerer. Leverandør: {{provider}}. Modell: {{model}}.",
+      "testRejected": "Leverandøren avviste denne nøkkelen. Kontroller at den er riktig og ikke er tilbakekalt.",
+      "testIncomplete": "Leverandøren avsluttet testen før den var ferdig. Prøv igjen.",
+      "testUnsupportedProvider": "Denne leverandøren støttes ikke lenger. Fjern nøkkelen.",
+      "testUnreadableKey": "Den lagrede nøkkelen kunne ikke leses. Prøv igjen senere.",
+      "testDeprecatedProvider": "Denne leverandøren er utdatert, så nøkkelen kan ikke testes.",
+      "keyManagedByCodingPlan": "Et kodeabonnement administrerer denne leverandørens nøkkel, og nøkkelen er skrivebeskyttet. Avbryt kodeabonnementet for å legge til din egen nøkkel.",
+      "providerUnavailable": "Denne leverandøren er ikke tilgjengelig ennå, så du kan ikke legge til en nøkkel for den.",
+      "testFailed": "Nøkkeltesten mislyktes. Prøv igjen.",
       "authMethod": "Autentiseringsmetode",
       "authMethodAccessKeys": "Tilgangsnøkler",
       "resourceName": "Azure-ressursnavn",
@@ -489,7 +504,14 @@
       "capped": "Viser de nyeste rapportene dine."
     },
     "changelog": "Nyheter",
-    "changelogVersionPending": "Merknadene for denne versjonen kommer med neste appoppdatering."
+    "changelogVersionPending": "Merknadene for versjon {{version}} kommer med neste appoppdatering.",
+    "changelogGroupNew": "Nytt",
+    "changelogFixesIn": "Feilrettinger og forbedringer i {{areas}}.",
+    "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
+    "changelogAreas": {
+      "signIn": "Innlogging",
+      "profileOrganizations": "Profil og organisasjoner"
+    }
   },
   "preferences": {
     "general": "Generelt",
@@ -671,7 +693,7 @@
       },
       "terminal": {
         "closed": "Denne PR-en er lukket",
-        "closedMergeRequest": "Denne merge request-en er lukket"
+        "closedMergeRequest": "Denne fletteforespørselen er lukket"
       },
       "partialSuccessBanner": {
         "body": "Kunne ikke slette grenen: {{reason}}.",
@@ -806,7 +828,19 @@
         "fileComment": "Filkommentar",
         "outdatedOnPathLines": "Utdatert i {{path}}, {{lines}}",
         "outdatedOnLines": "Utdatert på {{lines}}",
-        "outdatedOnPath": "Utdatert i {{path}}"
+        "outdatedOnPath": "Utdatert i {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Venstre side",
+        "sideRight": "Høyre side",
+        "outdatedOnLinesSide": "Utdatert på {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Utdatert i {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Utdatert ({{side}})",
+        "outdatedOnPathSide": "Utdatert i {{path}} ({{side}})"
       },
       "deletedUser": "slettet bruker",
       "replyForbiddenTerm": "Du har ikke tillatelse til å svare på denne {{term}}.",
@@ -837,11 +871,11 @@
       "removeFromRecentsTitle": "Fjerne fra listen over nylige PR-er?",
       "removeFromRecentsMessage": "Denne gjennomgangen fjernes fra listen over nylige.",
       "removeRecentAccessibility": "Fjern {{repo}} fra listen over nylige PR-er",
-      "urlAccessibility": "Skriv inn en PR- eller merge request-URL",
-      "urlPlaceholder": "URL for PR eller merge request",
-      "openAccessibility": "Åpne PR eller merge request",
+      "urlAccessibility": "Skriv inn en PR- eller fletteforespørsel-URL",
+      "urlPlaceholder": "URL for PR eller fletteforespørsel",
+      "openAccessibility": "Åpne PR eller fletteforespørsel",
       "clearLink": "Fjern lenken",
-      "pasteLink": "Lim inn PR- eller merge request-lenke",
+      "pasteLink": "Lim inn PR- eller fletteforespørsel-lenke",
       "open": "Åpne"
     },
     "checks": {
@@ -910,15 +944,15 @@
       "reconnectTitleGitLab": "Koble til GitLab på nytt",
       "reconnectTitleBitbucket": "Koble til Bitbucket på nytt",
       "reconnectDescription": "Tilgangen til GitHub-kontoen din er trukket tilbake.",
-      "gitlabDescription": "Gå gjennom merge requests på mobilen",
+      "gitlabDescription": "Gå gjennom fletteforespørsler på mobilen",
       "gitlabInstanceMismatchTitle": "GitLab-tilkoblingen er for en annen instans",
-      "gitlabInstanceMismatchDescription": "GitLab-tilkoblingen din er for {{connected}}, men denne merge requesten er på {{requested}}. Koble til GitLab på den instansen for å gå gjennom den.",
+      "gitlabInstanceMismatchDescription": "GitLab-tilkoblingen din er for {{connected}}, men denne fletteforespørselen er på {{requested}}. Koble til GitLab på den instansen for å gå gjennom den.",
       "checkActiveConnection": "Tilkoblingen er aktiv, men dette elementet kan fortsatt ikke lastes inn.",
       "bitbucketOrgOnlyDescription": "Bytt kontoen over til en organisasjon for å gå gjennom dens PR-er på Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne kontoen har ingen organisasjoner ennå. Du kan gå gjennom PR-er på Bitbucket når du oppretter eller blir med i en organisasjon.",
       "gitlabReconnectAdminOnlyDescription": "Be en eier, administrator eller faktureringsansvarlig i organisasjonen om å koble den til på nytt.",
       "bitbucketNotConnectedTitle": "Bitbucket er ikke tilkoblet",
-      "bitbucketAdminOnlyDescription": "Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen.",
+      "adminOnlyConnectDescription": "Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For personlig konto"
     },
@@ -1020,7 +1054,7 @@
     },
     "linkPasteClipboardEmpty": "Utklippstavlen er tom.",
     "linkPasteDenied": "Tilgang til å lime inn ble avslått. Tillat innliming og prøv igjen.",
-    "linkPasteNotAPullRequest": "Dette er ikke en lenke til en PR eller merge request",
+    "linkPasteNotAPullRequest": "Dette er ikke en lenke til en PR eller fletteforespørsel",
     "announce": {
       "commentPosted": "Kommentar publisert",
       "commentUpdated": "Kommentar oppdatert",
@@ -1053,18 +1087,18 @@
     },
     "terms": {
       "pullRequest": "PR",
-      "mergeRequest": "Merge request",
-      "mergeRequestNumber": "Merge request !{{number}}",
-      "shareMergeRequest": "Del merge request",
+      "mergeRequest": "Fletteforespørsel",
+      "mergeRequestNumber": "Fletteforespørsel !{{number}}",
+      "shareMergeRequest": "Del fletteforespørsel",
       "viewOnProvider": "Vis på {{provider}}",
-      "mergeRequestUnavailable": "Merge request er utilgjengelig",
+      "mergeRequestUnavailable": "Fletteforespørsel er utilgjengelig",
       "unavailableDescription": "Tilkoblingen kan ha feilet, eller elementet kan være slettet eller utilgjengelig.",
-      "accessDeniedMergeRequest": "Du har ikke tilgang til å se denne merge request.",
-      "couldNotLoadMergeRequest": "Kunne ikke laste inn merge request.",
-      "discussionAccessDenied": "Du har ikke tilgang til diskusjonen om denne merge request.",
-      "discussionUnavailableMessage": "Tilkoblingen kan ha feilet, eller merge requesten kan ha blitt fjernet.",
-      "noDiscussionDescription": "Denne merge request har ingen diskusjonstråder fra kodegjennomganger eller andre kommentarer.",
-      "noFilesChangedDescription": "Denne merge request inneholder ingen filendringer."
+      "accessDeniedMergeRequest": "Du har ikke tilgang til å se denne fletteforespørselen.",
+      "couldNotLoadMergeRequest": "Kunne ikke laste inn fletteforespørselen.",
+      "discussionAccessDenied": "Du har ikke tilgang til diskusjonen om denne fletteforespørselen.",
+      "discussionUnavailableMessage": "Tilkoblingen kan ha feilet, eller fletteforespørselen kan ha blitt fjernet.",
+      "noDiscussionDescription": "Denne fletteforespørselen har ingen diskusjonstråder fra kodegjennomganger eller andre kommentarer.",
+      "noFilesChangedDescription": "Denne fletteforespørselen inneholder ingen filendringer."
     }
   },
   "notifications": {
@@ -1258,7 +1292,7 @@
       "transcriptRetry": "Kunne ikke laste inn loggen fra gjennomgangen.",
       "transcriptLive": "Sanntid",
       "agentIdle": "Agenten er inaktiv",
-      "agentWorking": "Agenten jobber...",
+      "agentWorking": "Agenten jobber…",
       "anErrorOccurred": "Det oppstod en feil",
       "errorWithMessage": "Feil: {{message}}.",
       "executionStarted": "Kjøringen startet",
@@ -1324,8 +1358,8 @@
       }
     },
     "manualReview": {
-      "invalidMergeRequestUrl": "Skriv inn en gyldig URL til en merge request.",
-      "mergeRequestUrl": "URL til merge request",
+      "invalidMergeRequestUrl": "Skriv inn en gyldig URL til en fletteforespørsel.",
+      "mergeRequestUrl": "URL til fletteforespørsel",
       "instructionsAtLimit": "Instruksjonene er begrenset til {{max}} tegn",
       "title": "Manuell gjennomgang",
       "invalidUrl": "Skriv inn en gyldig URL til en PR.",
@@ -1359,10 +1393,12 @@
       "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Organisasjonens Bitbucket-tilkobling administreres på nettet fra en datamaskin.",
-      "description": "Opprett et tilgangstoken for arbeidsområdet med de nødvendige tillatelsene, og lim det inn nedenfor.",
+      "managedOnWeb": "Bitbucket-tilkoblingen for {{organization}} administreres på nettet fra en datamaskin.",
+      "description": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
+      "descriptionReconnect": "Opprett et nytt tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
-      "tokenPlaceholder": "Tilgangstoken for arbeidsområdet"
+      "tokenPlaceholder": "Tilgangstoken for arbeidsområdet",
+      "tokenRefused": "Bitbucket godtok ikke dette tilgangstokenet for arbeidsområdet. Kontroller at det har tillatelsene ovenfor, og prøv deretter på nytt."
     },
     "scopeList": {
       "personalStillAvailable": "Personlige kodelagre er fortsatt tilgjengelige nedenfor.",
@@ -1374,7 +1410,8 @@
       "noReviews": "Ingen gjennomganger ennå",
       "noReviewsDescription": "Gjennomganger vises her når kodegranskeren har gjennomgått en PR.",
       "startManualReview": "Start en manuell gjennomgang",
-      "configureProvider": "Konfigurer leverandør"
+      "configureProvider": "Konfigurer leverandør",
+      "connectOwnerOnly": "Be en eier eller administrator i organisasjonen om å koble til en leverandør."
     },
     "platformList": {
       "checking": "Sjekker…",
@@ -1472,13 +1509,25 @@
       "repositoryLine": "Gjennomganger: {{reviews}} · Funn: {{findings}}",
       "empty": "Ingen gjennomganger med statistikk ennå",
       "emptyDescription": "Statistikken registrerer fullførte gjennomganger så lenge den er aktivert for organisasjonen.",
-      "off": "Statistikken er slått av for denne organisasjonen.",
-      "couldNotLoad": "Kunne ikke laste statistikken"
+      "offTitle": "Statistikken er slått av for {{platform}}",
+      "offDescription": "Organisasjonens faktureringsroller (eiere, administratorer og faktureringsansvarlige) kan slå på statistikken i organisasjonens innstillinger på nettet for å registrere fullførte gjennomganger.",
+      "couldNotLoad": "Kunne ikke laste statistikken",
+      "trackedReviewsCaption": "Fullførte gjennomganger som ble avsluttet i denne perioden med statistikken slått på. Gjennomganger som pågår eller feiler, telles aldri med.",
+      "trackedReviewsUncounted": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat.",
+      "trackedReviewsUncounted_one": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat.",
+      "trackedReviewsUncounted_other": "Ikke talt med: {{displayCount}} av de {{displayTotal}} fullførte gjennomgangene organisasjonen har, uten registrert resultat."
     },
     "council": {
       "title": "Panelvurdering",
       "subtitle": "Flere spesialister vurderer hver PR, og stemmene deres kombineres til én avgjørelse.",
-      "unavailable": "Panelvurdering er ikke tilgjengelig for denne organisasjonen.",
+      "unavailablePersonallyTitle": "Trenger en Enterprise-organisasjon",
+      "unavailablePersonally": "Panelvurdering er ikke en del av en personlig konto.",
+      "unavailablePersonallyAction": "Opprett organisasjon",
+      "unavailablePersonallySwitchAction": "Bytt organisasjon",
+      "unavailableOrganizationTitle": "Panelvurdering er ikke tilgjengelig",
+      "unavailableForOrganization": "Panelvurdering krever Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisasjonen har det ikke akkurat nå.",
+      "unavailableForOrganizationNeutral": "Panelvurdering er ikke tilgjengelig for denne organisasjonen akkurat nå. Prøv igjen senere.",
+      "unavailableOnBitbucket": "Panelvurdering er ikke tilgjengelig for Bitbucket-kodelagre.",
       "noRepositories": "Ingen kodelagre er valgt ennå. Velg kodelagre i kodelagerinnstillingene først.",
       "specialists": "Spesialister",
       "labels": "Etiketter som utløser panelvurdering",
@@ -2120,6 +2169,8 @@
       "renameAccessibility": "Gi økten nytt navn: {{title}}",
       "cloningSession": "Kloner økten",
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten.",
+      "historyTooLarge": "Øktens logg er for stor til å laste inn.",
+      "historyUnavailable": "Øktens logg kan ikke leses.",
       "cloneFailedRetry": "Kunne ikke klone denne økten. Prøv igjen.",
       "notEnoughCredits": "Du har ikke nok kreditter til denne forespørselen. Fyll på kreditter og prøv igjen.",
       "previousTaskFinishing": "Den forrige oppgaven er ikke helt avsluttet ennå. Vent et øyeblikk.",
@@ -2196,6 +2247,7 @@
       "branchDefault": "Standard",
       "branchAccessibility": "Gren: {{label}}",
       "branchLoading": "Laster inn grener",
+      "branchInactive": "Velg et kodelager for å laste inn grenene.",
       "branchLoadError": "Kunne ikke laste inn grener",
       "branchUnavailable": "Ingen grener er tilgjengelige for dette kodelageret. Sjekk tilgangen din hos leverandøren og velg et annet kodelager.",
       "branchEmpty": "Ingen tilgjengelige grener",
@@ -2428,7 +2480,8 @@
       "customModes": "Egendefinerte moduser"
     },
     "modeSelector": {
-      "accessibility": "Modus: {{label}}"
+      "accessibility": "Modus: {{label}}",
+      "customMode": "Egendefinert modus"
     },
     "modeOptions": {
       "code": "Kod",
@@ -2744,7 +2797,7 @@
       "thinkingEffortAccessibility": "Resonneringsinnsats: {{label}}",
       "thinkingEffortSelected": "Resonneringsinnsats: {{label}}, valgt",
       "thinkingEffortWithModel": "{{model}}, resonneringsinnsats: {{variant}}",
-      "lockedByAgent": ", Låst av agenten «{{agent}}»",
+      "lockedByAgent": "Låst av agenten «{{agent}}»",
       "addToFavorites": "Legg {{name}} til favoritter",
       "removeFromFavorites": "Fjern {{name}} fra favoritter",
       "sessionModel": "Øktmodell"
@@ -2981,6 +3034,7 @@
     "signOutThisDevice": "Logg ut denne enheten",
     "signOutSessionLabel": "Logg ut {{device}}, logget inn {{signedIn}}, sist sett {{lastSeen}}",
     "sessionSignedOut": "Økten er logget ut.",
+    "sessionSignOutFailed": "Kunne ikke logge ut denne økten. Prøv igjen.",
     "signOutThisDeviceTitle": "Logge ut denne enheten?",
     "signOutThisSessionTitle": "Logge ut denne økten?",
     "signOutThisSessionMessage": "{{device}} vil bli logget ut. Sist sett {{lastSeen}}. Den kan beholde API-tilgang i opptil en time.",
@@ -2996,7 +3050,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kunne ikke laste inn øktene.",
-    "couldNotLoadActiveSessions": "Kunne ikke laste inn aktive økter.",
     "agentSessions": "Pågår nå",
     "newCodingTask": "Ny kodeoppgave",
     "newTaskFromPicture": "Ny oppgave fra et bilde",
@@ -3023,6 +3076,7 @@
   "queryError": {
     "neutralDescription": "Prøv igjen.",
     "offlineTitle": "Kunne ikke laste inn innholdet.",
+    "offlineDescription": "Kunne ikke nå serveren.",
     "permissionDescription": "Du har ikke tillatelse til å se dette.",
     "notFoundDescription": "Dette elementet kan ha blitt fjernet eller er ikke lenger tilgjengelig.",
     "serverTitle": "Kunne ikke laste inn innholdet.",
@@ -3043,7 +3097,7 @@
     "scheduled": "PLANLAGT"
   },
   "voiceInput": {
-    "listening": "Lytter...",
+    "listening": "Lytter…",
     "onlineTitle": "Tale behandles på nettet",
     "onlineMessage": "Denne enheten kan ikke gjøre tale om til tekst uten nettilkobling. Opptaket ditt sendes til {{provider}} for å gjøres om til tekst. Kilo lagrer ikke lyden.",
     "allow": "Tillat",
@@ -3065,7 +3119,7 @@
     "useOnlineTranscription": "Tillat transkripsjon på nettet",
     "offlineModelDownloadScheduled": "De frakoblede talefilene lastes ned i bakgrunnen. Prøv diktering igjen senere.",
     "listeningStopped": "Dikteringen har stoppet.",
-    "transcribing": "Transkriberer...",
+    "transcribing": "Transkriberer…",
     "gatewayUnreachable": "Kunne ikke nå Kilo Gateway. Sjekk tilkoblingen og prøv igjen.",
     "gatewayTimeout": "Transkripsjonen tok for lang tid. Prøv igjen.",
     "gatewayModelUnavailable": "Denne transkripsjonsmodellen er ikke tilgjengelig. Velg en annen under Innstillinger.",
@@ -3104,12 +3158,14 @@
     "manage": {
       "billingHistory": "Faktureringshistorikk",
       "billingHistoryEmpty": "Ingen faktureringshistorikk ennå.",
+      "billingHistoryError": "Kunne ikke laste inn faktureringshistorikken",
       "cancel": "Si opp abonnement",
       "cancelDescription": "Kilo Pass forblir aktiv til slutten av faktureringsperioden og fornyes ikke.",
       "cancelScheduled": "Avsluttes {{date}}",
       "cancelScheduledChange": "Avbryt planlagt endring",
       "cancelled": "Abonnementet er sagt opp",
       "creditHistoryEmpty": "Ingen Kilo Pass-kreditter ennå.",
+      "creditHistoryError": "Kunne ikke laste inn kredithistorikken",
       "resume": "Gjenoppta abonnement",
       "resumeCancelledDescription": "Kilo Pass fornyes automatisk igjen.",
       "resumePausedDescription": "Kilo Pass gjenopptas nå, før den planlagte datoen for gjenopptakelse.",
@@ -3126,7 +3182,6 @@
     "completingPurchase": "Fullfører kjøp",
     "subscriptionLoading": "Laster inn Kilo Pass-abonnementet",
     "retryHint": "Prøver å hente statusen for Kilo Pass på nytt.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Avsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgjengelig i appen.",
     "statusActive": "Aktiv",
@@ -3329,6 +3384,7 @@
       "manageOnWeb": "Faktureringsinnstillinger på nettet",
       "changePlan": "Endre plan",
       "buySeats": "Kjøp brukerplasser",
+      "managedOnWeb": "Planen, brukerplassene og automatisk påfylling administreres på nettet.",
       "setupAutoTopUp": "Sett opp automatisk påfylling",
       "manageAutoTopUp": "Administrer automatisk påfylling",
       "opensOnWeb": "Åpnes på nettet"
@@ -3340,13 +3396,13 @@
       "loadErrorTitle": "Kunne ikke laste inn organisasjonene dine.",
       "membershipLostNotice": "Du har ikke lenger tilgang til denne organisasjonen. Byttet til {{target}}.",
       "noOrganization": "Ingen organisasjon",
-      "noOrganizationDescription": "Denne kontoen er ikke med i noen organisasjon. Opprett en for å bruke organisasjonsfunksjoner som invitasjoner av medlemmer og varsler om lav saldo, eller åpne nettsiden for å bli med i en du har blitt invitert til.",
+      "noOrganizationDescription": "Denne kontoen er ikke med i noen organisasjon. Opprett en for å bruke organisasjonsfunksjoner som invitasjoner av medlemmer og varsler om lav saldo, eller godta en invitasjon fra e-posten en organisasjon har sendt deg.",
       "organizationUnavailable": "Organisasjonen er ikke tilgjengelig.",
       "selectDescriptionWithOrganizations": "Du tilhører én eller flere organisasjoner. Velg kontoen som denne skjermen skal bruke.",
       "selectOrganization": "Velg en organisasjon",
       "unavailableDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Velg en fra profilen din for å fortsette.",
       "unavailableSessionsDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Øktene dens kan ikke lastes inn.",
-      "accessDeniedDescription": "Du har ikke tilgang til denne organisasjonen."
+      "accessDeniedDescription": "Be en eier eller administrator i en organisasjon om å gi deg tilgang."
     },
     "create": {
       "title": "Opprett organisasjon",
@@ -3372,7 +3428,8 @@
         "accounting_adjustment": "Regnskapsjustering",
         "credits_expired": "Kreditter utløpt"
       },
-      "truncated": "Eldre kredittbevegelser er tilgjengelige."
+      "truncated": "Eldre kredittbevegelser er tilgjengelige.",
+      "retentionLimit": "Viser de nyeste kredittbevegelsene."
     },
     "inviteMember": {
       "emailError": "Angi en gyldig e-postadresse.",
@@ -3382,6 +3439,7 @@
       "sendInvite": "Send invitasjon",
       "title": "Inviter medlem",
       "alreadyInvited": "Personen er allerede invitert eller allerede medlem.",
+      "organizationUnavailable": "Denne organisasjonen er ikke lenger tilgjengelig.",
       "sendError": "Kunne ikke sende invitasjonen.",
       "pendingInvitation": "Denne e-postadressen har allerede en ventende invitasjon.",
       "alreadyMember": "Denne personen er allerede medlem av denne organisasjonen.",
@@ -3403,7 +3461,8 @@
         "void": "Annullert",
         "uncollectible": "Uinnkrevbar"
       },
-      "truncated": "Tidligere fakturaer er tilgjengelige."
+      "truncated": "Tidligere fakturaer er tilgjengelige.",
+      "retentionLimit": "Viser de nyeste fakturaene."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktiver varsel om lav saldo",
@@ -3466,16 +3525,26 @@
     },
     "settingsOnWeb": {
       "title": "Organisasjonsinnstillinger på nettet",
-      "integrations": "Integrasjoner på nettet",
       "usageDetails": "Bruksdetaljer",
       "providersAndModels": "Leverandører og modeller",
       "groups": "Grupper",
       "guardrails": "Sikkerhetsrammer",
       "byok": "Bruk din egen nøkkel",
+      "ssoAndDomain": "SSO og domene",
+      "dataCollection": "Datainnsamling",
       "auditLogs": "Revisjonslogger",
-      "requestLogs": "Forespørselslogger",
-      "subOrganizations": "Underorganisasjoner",
-      "distributeFunds": "Fordel midler"
+      "requestLogs": "Forespørselslogger"
+    },
+    "requestLogs": {
+      "older": "Eldre time",
+      "newer": "Nyere time",
+      "truncated": "Denne timen har flere forespørsler enn listen viser.",
+      "emptyTitle": "Ingen forespørsler denne timen",
+      "emptyDescription": "Bruk «Eldre time» for å se tidligere forespørsler.",
+      "loadError": "Kunne ikke laste inn forespørselslogger.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene.",
+      "tokens": "{{input}} inn · {{output}} ut",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",
@@ -3627,8 +3696,7 @@
     "imagesSectionEmpty": "Ingen godkjente bildeverter",
     "revoke": "Trekk tilbake godkjenningen av {{host}}",
     "revokeMessage": "Lenker til denne verten vil igjen be om bekreftelse.",
-    "revokeImageMessage": "Bilder fra denne verten vil igjen be om bekreftelse.",
-    "backToPreferences": "Tilbake til innstillinger"
+    "revokeImageMessage": "Bilder fra denne verten vil igjen be om bekreftelse."
   },
   "glanceable": {
     "waiting": "Oppdaterer agenter",
@@ -3642,7 +3710,7 @@
     "newestSession": "Nyeste: {{title}}",
     "noneWaiting": "Ingen agenter venter",
     "newAgent": "Ny agent",
-    "approving": "Godkjenner...",
+    "approving": "Godkjenner…",
     "couldNotApprove": "Kunne ikke godkjenne",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
@@ -3654,6 +3722,7 @@
     "lastKnown": "Sist kjent",
     "awaitingUpdate": "Venter på oppdatering",
     "nextRun": "Neste kjøring",
+    "wasDue": "Forventet",
     "waitingForYou": "Venter på deg",
     "nextScheduled": "Neste planlagte",
     "answerNeeded": "Venter på svar",
@@ -3763,6 +3832,8 @@
       "fieldName": "Vist navn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Skriv inn en gyldig server-URL.",
+      "duplicateUrl": "Denne server-URL-en er allerede lagret.",
+      "serverNotFound": "Denne serveren er ikke lenger lagret.",
       "enableServer": "Aktiver denne serveren: {{name}}",
       "editServer": "Rediger server",
       "deleteServer": "Slett server",
@@ -3872,6 +3943,8 @@
       "downloading": "Laster ned: {{written}} av {{total}}",
       "downloadingUnknown": "Laster ned: {{written}}",
       "paused": "På pause: {{written}} av {{total}}",
+      "retrying": "Prøver på nytt: {{written}} av {{total}}",
+      "retryingUnknown": "Prøver på nytt: {{written}}",
       "verifying": "Sjekker den nedlastede filen …",
       "downloaded": "Lastet ned · {{size}}",
       "url": "Direkte nedlastingslenke",
@@ -3962,7 +4035,9 @@
         "androidModelUnavailable": "Denne enheten støtter ikke Gemini Nano, eller systemappen AICore klargjøres fortsatt. Prøv igjen senere.",
         "aicoreUpdateRequired": "Oppdater AICore-appen og systemprogramvaren for å bruke denne modellen.",
         "downloadable": "Denne modellen må lastes ned én gang før du kan bruke den.",
-        "downloading": "Modellen lastes ned. Den er klar når nedlastingen er fullført."
+        "downloading": "Modellen lastes ned. Den er klar når nedlastingen er fullført.",
+        "batteryQuota": "Modellen på enheten har brukt opp batterikvoten sin for nå. Prøv igjen senere.",
+        "checkFailed": "Appen kunne ikke sjekke denne modellen. Prøv igjen."
       },
       "unavailable": "Modellen på enheten er ikke tilgjengelig akkurat nå. Sjekk statusen i $t(modelChat.backends.title).",
       "busy": "Modellen på enheten er opptatt med et annet svar. Prøv igjen når den er ferdig.",
@@ -4091,6 +4166,7 @@
     "commandAtLimit": "Kommandoen er begrenset til {{max}} tegn",
     "commandsEmpty": "Ingen oppsettkommandoer ennå",
     "commandsSaveFailed": "Kunne ikke lagre oppsettkommandoer",
+    "commandLimitReached": "En profil kan ha opptil {{max}} oppsettkommandoer. Slett én for å legge til en ny.",
     "moveCommandUp": "Flytt kommando {{position}} opp",
     "moveCommandDown": "Flytt kommando {{position}} ned",
     "skillsTitle": "Ferdigheter",
@@ -4177,6 +4253,7 @@
       "deleteMessage": "Nye økter som bruker denne profilen når ikke lenger denne serverens verktøy. Dette kan ikke angres.",
       "deleteConfirm": "Slett MCP-server",
       "saveFailed": "Kunne ikke lagre MCP-serveren",
+      "limitReached": "En profil kan ha opptil {{max}} MCP-servere. Slett én for å legge til en ny.",
       "deleteFailed": "Kunne ikke slette MCP-serveren",
       "updateFailed": "Kunne ikke oppdatere MCP-serveren"
     },
@@ -4198,7 +4275,7 @@
       "topPPlaceholder": "f.eks. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Agenten min",
-      "promptPlaceholder": "Du er en...",
+      "promptPlaceholder": "Du er en…",
       "tools": "Verktøy",
       "wholeToolRule": "Denne agenten bruker én regel på alle verktøy samtidig: {{rule}}. Disse bryterne er skrivebeskyttede.",
       "visibility": "Synlighet",
@@ -4209,6 +4286,7 @@
       "modeSubagent": "Kun subagent",
       "modeAll": "Alle moduser",
       "saveFailed": "Kunne ikke lagre agenten",
+      "limitReached": "En profil kan ha opptil {{max}} agenter. Slett én for å legge til en ny.",
       "deleteFailed": "Kunne ikke slette agenten",
       "nameRequired": "Skriv inn et agentnavn",
       "slugRequired": "Skriv inn en agentslug",
@@ -4239,6 +4317,7 @@
       "moveUp": "Flytt slash-kommando {{name}} opp",
       "moveDown": "Flytt slash-kommando {{name}} ned",
       "saveFailed": "Kunne ikke lagre kommandoen",
+      "limitReached": "En profil kan ha opptil {{max}} slash-kommandoer. Slett én for å legge til en ny.",
       "deleteFailed": "Kunne ikke slette kommandoen",
       "nameRequired": "Skriv inn et kommandonavn",
       "nameInvalid": "Navnet må begynne med en liten bokstav og kun bruke små bokstaver, sifre og bindestreker",
@@ -4252,10 +4331,10 @@
       "add": "Legg til standard",
       "empty": "Ingen standardinnstillinger er konfigurert",
       "emptyDescription": "Legg til en standard for automatisk å bruke en profil når du starter økter for en repo.",
-      "repo": "Velg depot...",
+      "repo": "Velg depot…",
       "profile": "Velg profil",
       "removeForRepo": "Avbind «{{repo}}»",
-      "search": "Søk i depoter...",
+      "search": "Søk i depoter…",
       "addedToast": "Standard profil satt for «{{repo}}»",
       "addFailed": "Kunne ikke angi standardprofil",
       "removedToast": "Standardprofilen er fjernet for «{{repo}}»",
@@ -4271,8 +4350,7 @@
       "repoValue": "Depot: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Denne profilen er ikke lenger tilgjengelig. Velg en annen.",
-      "pickerEmptyDescriptionOrganization": "Opprett en organisasjonsprofil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "En organisasjonseier eller administrator kan opprette en organisasjonsprofil."
+      "pickerEmptyDescriptionOrganization": "Opprett en organisasjonsprofil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter."
     },
     "variablesDeleteFailed": "Kunne ikke slette variabelen",
     "deleteVariable": "Slett variabel {{key}}",
@@ -4319,8 +4397,9 @@
       },
       "purchaseFallback": "Kjøp av kreditter",
       "receipt": "Kvittering",
-      "receiptA11y": "Åpne kvitteringen for {{description}}",
-      "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet."
+      "receiptA11y": "Åpne kvitteringen for {{description}}, {{amount}}, fra {{date}}",
+      "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet.",
+      "retentionLimit": "Viser den nyeste kreditthistorikken."
     },
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
@@ -4454,16 +4533,20 @@
     "loadError": "Kunne ikke laste briefer",
     "view": "Les brief",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Filtrer etter kontekst",
+    "contextAll": "Alle kontekster",
     "dismiss": "Avvis brief",
+    "dismissFailed": "Klarte ikke å avvise denne briefen ennå. Forsøket gjentas i bakgrunnen.",
     "offline": "Frakoblet · lagret brief",
-    "cached": "Lagret rapport · kan ikke oppdateres",
-    "window": "{{start}} – {{end}}",
+    "cached": "Lagret brief · kan ikke oppdateres",
     "summary": "AI-sammendrag",
     "summaryPending": "AI-sammendraget lages. Det legges til her når det er klart.",
-    "summaryUnavailable": "AI-sammendrag er ikke tilgjengelig. Den strukturerte rapporten er fortsatt tilgjengelig.",
+    "summaryUnavailable": "AI-sammendrag er ikke tilgjengelig. Den strukturerte briefen er fortsatt tilgjengelig.",
     "summaryCharge": "AI belastet {{cost}}",
     "summaryChargePending": "AI-belastning venter på avstemming",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Bevis og artefakter",
     "timezone": "Tidssone for brief",
     "deviceTimezone": "Bruk enhetens tidssone",
@@ -4475,22 +4558,22 @@
     "timeHint": "Hjem-kortet viser live-status igjen når briefvinduet slutter, også frakoblet.",
     "invalidSchedule": "Velg en gyldig tidssone og et briefvindu som ikke er tomt.",
     "notificationsHint": "Ett generelt varsel per planlagt brief. Uavhengig av betalte AI-sammendrag.",
-    "notificationPermission": "Slå på enhetsvarsler i $t(common.notifications) for å motta briefen.",
+    "notificationPermission": "Slå på push-varsler for å motta briefen.",
     "defaultModel": "Bruk Kilos standardmodell",
     "duration": "Tidsgrense (minutter)",
     "spendLimit": "Forbruksgrense (USD)",
     "invalidSafeguards": "Angi positive, endelige grenser for tid og forbruk.",
     "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
-    "estimateUnavailable": "En betalt oppsummering er ikke tilgjengelig for disse innstillingene.",
+    "estimateUnavailable": "En betalt oppsummering er ikke tilgjengelig for disse innstillingene. Endre modellen eller grensene, eller prøv igjen senere.",
     "confirmPaid": "Slå på betalte sammendrag for {{context}}?",
     "paidDisclosure": "Anslått {{estimate}}, opptil {{maximum}}, med en grense på {{minutes}} min. Kostnader påløper selv om genereringen mislykkes.",
     "enable": "Slå på betalte sammendrag",
     "allContexts": "Personlige briefer og organisasjonsbriefer holdes atskilt.",
     "emptyHistory": "Ingen lagrede briefer",
-    "estimatePermissionUnavailable": "Du har ikke tillatelse til å bruke saldoen til denne konteksten.",
-    "estimatePricingUnavailable": "Prising for denne modellen er utilgjengelig.",
-    "estimateBalanceUnavailable": "Ikke nok saldo for en betalt oppsummering.",
-    "estimateModelNotAllowed": "Denne modellen er ikke tillatt her.",
+    "estimatePermissionUnavailable": "Du har ikke tillatelse til å bruke saldoen til denne konteksten. Be en organisasjonseier om å aktivere det.",
+    "estimatePricingUnavailable": "Prising for denne modellen er utilgjengelig. Velg en annen modell.",
+    "estimateBalanceUnavailable": "Ikke nok saldo for en betalt oppsummering. Legg til kreditt i saldoen til denne konteksten.",
+    "estimateModelNotAllowed": "Denne modellen er ikke tillatt i denne konteksten. Velg en annen modell.",
     "estimateSpendLimitTooLow": "Øk forbruksgrensen for å tillate denne oppsummeringen.",
     "saved": "Brief-innstillinger lagret",
     "selectedSessions": "Utvalgte økter",
@@ -4499,16 +4582,35 @@
     "capturedAt": "Lagret {{time}}",
     "snapshotHint": "Øyeblikksbilde av siste tilgjengelige øktstatus, lagret på det planlagte morgentidspunktet. Kan være ufullstendig. Tallene gjelder utvalgte økter, ikke all aktivitet gjennom natten.",
     "snapshotTruncated": "Noen økter eller noe kildemateriale ble utelatt for å begrense størrelsen på øyeblikksbildet.",
-    "snapshotSummaryFailed": "AI-sammendraget mislyktes. Det strukturerte øyeblikksbildet er fortsatt tilgjengelig.",
+    "snapshotSummaryFailed": "AI-sammendraget mislyktes. Den strukturerte briefen er fortsatt tilgjengelig.",
     "scheduledContextEnabled": "Planlagte briefer",
     "scheduledContextSettings": "Planlagte briefer · {{context}}",
     "scheduledContextHint": "Slå på planlagt lagring av øyeblikksbilder og betalte AI-sammendrag kun for denne konteksten. Utvalgte, sladdede utdrag og strukturerte fakta sendes til modellen din. Sammendrag bruker appens språk som lagres når du oppdaterer brief-innstillingene. Kostnader trekkes fra denne kontekstens saldo. Øyeblikksbilder uten aktivitet bruker ikke AI.",
     "snapshotSafeguards": "Tids- og forbruksgrensene per sammendrag gjelder for hvert planlagte øyeblikksbilde, ikke som et dagsbudsjett.",
-    "snapshotEstimateInputTooLarge": "Dette øyeblikksbildet har for mye kildemateriale for den valgte modellen.",
+    "snapshotEstimateInputTooLarge": "Dette øyeblikksbildet har for mye kildemateriale for den valgte modellen. Velg en modell med et større inngangsvindu.",
     "quietSnapshot": "Ingen øktaktivitet ble valgt ut til dette øyeblikksbildet. Ingen AI-sammendrag ble forespurt eller belastet.",
     "noEnabledContexts": "Ingen kontekster er aktivert for planlagte briefer",
     "sourceBlocker": "Økten krever oppmerksomhet",
-    "sourceMetadata": "Lagrede øktmetadata"
+    "sourceMetadata": "Lagrede øktmetadata",
+    "metadataPlan_one": "Plan: {{displayDone}} av {{displayTotal}} trinn fullført",
+    "metadataPlan_other": "Plan: {{displayDone}} av {{displayTotal}} trinn fullført",
+    "metadataPlan": "Plan: {{displayDone}} av {{displayTotal}} trinn fullført",
+    "metadataFiles_one": "{{displayCount}} fil endret",
+    "metadataFiles_other": "{{displayCount}} filer endret",
+    "metadataFiles": "{{displayCount}} filer endret",
+    "metadataLinesAdded_one": "{{displayCount}} linje lagt til",
+    "metadataLinesAdded_other": "{{displayCount}} linjer lagt til",
+    "metadataLinesAdded": "{{displayCount}} linjer lagt til",
+    "metadataLinesRemoved_one": "{{displayCount}} linje fjernet",
+    "metadataLinesRemoved_other": "{{displayCount}} linjer fjernet",
+    "metadataLinesRemoved": "{{displayCount}} linjer fjernet",
+    "metadataPlanCurrent": "Gjeldende trinn: {{current}}",
+    "metadataFailure": "Forrige kjøring mislyktes: {{kind}}",
+    "sourceActivity": "Aktivitet uten navn",
+    "metadataFailureProvider": "leverandørfeil",
+    "metadataFailureTool": "verktøyfeil",
+    "metadataFailureCancelled": "Avbrutt",
+    "metadataFailureOther": "uspesifisert feil"
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åpne dette søkeresultatet"
@@ -4525,6 +4627,8 @@
     "topModels": "Mest brukte modeller",
     "topFeatures": "Mest brukte funksjoner",
     "emptyTitle": "Ikke noe forbruk i denne perioden",
+    "unavailableTitle": "Forbruk er ikke tilgjengelig",
+    "unavailableDescription": "Dette arbeidsområdet rapporterer ikke forbruk. Det hjelper ikke å prøve igjen.",
     "orgSelfNotice": "Du ser ditt eget forbruk i denne organisasjonen.",
     "viewDetails": "Vis forbruksdetaljer"
   },
@@ -4542,10 +4646,14 @@
     "couldNotLoad": "Kunne ikke laste inn integrasjoner",
     "permissionDenied": "Du har ikke tillatelse til å administrere disse integrasjonene.",
     "managedByOwner": "Be en eier i organisasjonen om å endre en tilkobling du ikke kan endre.",
+    "managedByOwnerOrAdmin": "Be en eier eller administrator i organisasjonen om å endre en tilkobling du ikke kan endre.",
+    "managedByOwnerOrBilling": "Be en eier eller faktureringsansvarlig i organisasjonen om å endre en tilkobling du ikke kan endre.",
+    "managedByOwnerAdminOrBilling": "Be en eier, administrator eller faktureringsansvarlig i organisasjonen om å endre en tilkobling du ikke kan endre.",
     "connectFailed": "Kunne ikke åpne tilkoblingssiden"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakturaer for dine egne kjøp vises her når du har blitt fakturert."
+    "personalEmptyDescription": "Fakturaer for dine egne kjøp vises her når du har blitt fakturert. Kvitteringer fra App Store og Google Play finnes i Kreditthistorikk.",
+    "personalPeriod": "Siste 12 måneder"
   },
   "cloudAgent": {
     "compute": {
@@ -4575,8 +4683,9 @@
       "title": "Triggere og webhooker",
       "subtitle": "Automatiser Cloud Agent-kjøringer fra et webhook-kall eller en tidsplan.",
       "new": "Ny trigger",
+      "create": "Opprett trigger",
       "emptyTitle": "Ingen triggere ennå",
-      "emptyDescription": "Opprett en trigger for å starte en Cloud Agent-kjøring fra et webhook-kall eller etter en tidsplan.",
+      "emptyDescription": "Opprett din første trigger.",
       "loadFailedTitle": "Kunne ikke laste inn triggere",
       "loadFailedDescription": "Prøv igjen når du har forbindelse.",
       "detailLoadFailedTitle": "Kunne ikke laste inn denne triggeren",
@@ -4596,7 +4705,7 @@
       "fieldCron": "Cron-uttrykk",
       "fieldCronHelp": "Fem felt: minutt, time, dag, måned og ukedag. Det korteste intervallet er ett minutt.",
       "fieldTimezone": "Tidssone",
-      "nameLocked": "Navnet er en del av webhook-URL-en og kan ikke endres.",
+      "nameLocked": "Navnet kan ikke endres etter at triggeren er opprettet.",
       "repositoryLocked": "Repositoriet kan ikke endres etter at triggeren er opprettet.",
       "environmentAutomatic": "Automatisk basert på repositoriet",
       "notSelected": "Ikke valgt",
@@ -4611,6 +4720,7 @@
       "authHeaderLabel": "Headernavn",
       "authSecretLabel": "Delt hemmelighet",
       "authSecretKeep": "La det stå tomt for å beholde den lagrede hemmeligheten.",
+      "authSecretSet": "Påkrevd. Velg en sterk tilfeldig streng.",
       "authSecretCreator": "Bruk minst 16 tegn når triggeren kjøres som oppretteren.",
       "autoCommit": "Sjekk inn endringer når kjøringen er ferdig",
       "condenseOnComplete": "Komprimer konteksten når kjøringen er ferdig",
@@ -4621,11 +4731,14 @@
       "saveFailedTitle": "Kunne ikke lagre triggeren",
       "deleteTitle": "Slette denne triggeren?",
       "deleteMessage": "Kall til {{name}} vil mislykkes. Dette kan ikke angres.",
+      "deleteMessageScheduled": "Planlagte kjøringer av {{name}} stopper. Dette kan ikke angres.",
       "runNow": "Kjør nå",
       "runStarted": "Kjøring startet",
       "created": "Trigger opprettet",
       "saved": "Trigger lagret",
       "statusArrived": "Ankommet",
+      "defaultPromptWebhook": "Beskriv innholdet i webhook-forespørselen:\n\n{{body}}",
+      "defaultPromptScheduled": "Kjør den planlagte oppgaven. Utløst ved {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Skriv inn et navn.",
         "nameTooShort": "Bruk minst 8 tegn.",
@@ -4660,8 +4773,9 @@
     "create": "Opprett lenke",
     "createFailed": "Kunne ikke opprette lenken.",
     "existingTitle": "Eksisterende lenke",
-    "existingDescription": "Denne økten har allerede en delingslenke. Hvis du oppretter en ny, erstattes den, og den gamle lenken slutter å virke.",
+    "existingDescription": "Denne økten har allerede en delingslenke. Hvis du oppretter en ny lenke med disse innstillingene, erstattes den, og den gamle lenken slutter å virke.",
     "rotate": "Opprett en ny lenke",
+    "replacementSettings": "Disse innstillingene gjelder for den nye lenken.",
     "revoke": "Tilbakekall lenke",
     "revokeTitle": "Tilbakekalle lenken?",
     "revokeMessage": "Den nåværende lenken slutter å virke umiddelbart.",
@@ -4673,6 +4787,7 @@
     "superseded": "Denne lenken ble erstattet et annet sted, så den virker ikke lenger."
   },
   "sharedSession": {
+    "startedAt": "Startet kl. {{time}}",
     "title": "Delt økt",
     "someone": "Noen",
     "sharedBy": "Delt av {{owner}}",
@@ -4680,5 +4795,179 @@
     "unavailableDescription": "Denne delingslenken har utløpt eller blitt tilbakekalt.",
     "transcriptUnavailableTitle": "Kunne ikke laste inn denne transkripsjonen",
     "transcriptUnavailableDescription": "Lenken fungerer fortsatt. Prøv igjen om litt."
+  },
+  "organizationGuardrails": {
+    "title": "KI-vernetiltak",
+    "permissionDenied": "Bare organisasjonseiere og administratorer kan administrere KI-vernetiltak.",
+    "unavailableTitle": "KI-vernetiltak er ikke aktivert",
+    "unavailable": "Kilo aktiverer KI-vernetiltak for en organisasjon på forespørsel. Kontakt {{supportEmail}}, og Kilo-teamet slår dem på for organisasjonen din.",
+    "contactSupport": "Kontakt kundestøtte",
+    "loadError": "KI-vernetiltak kunne ikke lastes inn",
+    "statusSaving": "Lagrer…",
+    "statusSaved": "Lagret",
+    "statusFailed": "Kunne ikke lagre.",
+    "inputTitle": "Vernetiltak for inndata",
+    "inputDescription": "Skanner alle inndata med Enkrypt AI, inkludert verktøyresultater. Når Enkrypt ikke er tilgjengelig, sendes forespørsler uten skanning i stedet for å bli avvist.",
+    "outputTitle": "Vernetiltak for utdata",
+    "outputDescription": "Skanner svar med Enkrypt AI før medlemmer mottar dem. Av med mindre du slår det på.",
+    "detectorsHint": "Blokker avviser en forespørsel som er flagget. Bare logg registrerer den uten å forsinke forespørselen.",
+    "detectorsHintOutput": "Blokker får et flagget svar til å feile. Bare logg registrerer det uten å forsinke svaret.",
+    "choiceLog": "Bare logg",
+    "applyTo": "Bruk på",
+    "applyToAllMembers": "Alle medlemmer",
+    "applyKiloDefault": "Bruk Kilo-standard",
+    "invalidSavedTitle": "Lagrede innstillinger for inndatadetektorer kan ikke leses",
+    "invalidSavedBody": "Forespørsler blokkeres til inndatadetektorene er lagret på nytt. Detektorene nedenfor starter fra Kilo-standard.",
+    "invalidSavedOutputTitle": "Lagrede innstillinger for utdatadetektorer kan ikke leses",
+    "invalidSavedOutputBody": "Svar holdes tilbake til utdatadetektorene er lagret på nytt. Velg utdatadetektorer nedenfor.",
+    "blockingOutputNote": "En blokkerende utdatadetektor holder et svar tilbake til Enkrypt har kontrollert alt av det. Bruk Bare logg for å unngå forsinkelsen.",
+    "inputDetectorRequired": "Slå på minst én inndatadetektor.",
+    "outputDetectorRequired": "Slå på minst én utdatadetektor.",
+    "rulesTooMany": "Legg til opptil {{max}} regler.",
+    "ruleIdRequired": "Skriv inn en regel-ID.",
+    "ruleIdInvalid": "En regel-ID kan bare bruke bokstaver, tall, punktum, bindestreker og understreker.",
+    "ruleTextRequired": "Beskriv hva regelen forbyr eller krever.",
+    "keywordTooLong": "Hvert nøkkelord kan være opptil {{max}} tegn.",
+    "topicTooLong": "Hvert emne kan være opptil {{max}} tegn.",
+    "keywordsTooMany": "Legg til opptil {{max}} nøkkelord.",
+    "topicsTooMany": "Legg til opptil {{max}} emner.",
+    "piiEntityRequired": "Velg minst én type data som skal oppdages.",
+    "keywordRequired": "Legg til minst ett nøkkelord.",
+    "topicRequired": "Legg til minst ett emne.",
+    "policyTextRequired": "Skriv inn retningslinjeteksten.",
+    "ruleRequired": "Legg til minst én regel.",
+    "ruleIdDuplicate": "Hver regel trenger sin egen regel-ID.",
+    "piiEntities": "Data som skal oppdages",
+    "keywordsLabel": "Nøkkelord",
+    "keywordsHint": "Ett nøkkelord per linje.",
+    "topicsHint": "Ett emne per linje.",
+    "policyFormat": "Format for retningslinjer",
+    "policyFormatRules": "Strukturerte regler",
+    "policyFormatRulesDescription": "Én regel per krav, med kategori og alvorlighetsgrad. Anbefalt.",
+    "policyFormatText": "Retningslinjetekst",
+    "policyFormatTextDescription": "Lim inn en eksisterende retningslinje som ren tekst.",
+    "rulesEmpty": "Ingen regler ennå. Hver regel beskriver én ting inndata ikke må inneholde eller be om.",
+    "addRule": "Legg til regel",
+    "ruleNumber": "Regel {{number}}",
+    "ruleRemove": "Fjern regel {{number}}",
+    "ruleIdLabel": "Regel-ID",
+    "ruleNameLabel": "Navn (valgfritt)",
+    "ruleTextLabel": "Regel",
+    "ruleRiskCategory": "Risikokategori",
+    "ruleApplicability": "Omfang",
+    "ruleFrameworks": "Rammeverk",
+    "detector": {
+      "promptInjection": {
+        "label": "Ledetekstinjeksjon",
+        "description": "Oppdager forsøk på å overstyre instruksjoner eller omgå modellens sikkerhet."
+      },
+      "policyViolation": {
+        "label": "Brudd på retningslinjer",
+        "description": "Markerer inndata som bryter med organisasjonens retningslinjer, skrevet som tekst eller regler.",
+        "descriptionOutput": "Markerer svar som bryter med organisasjonens retningslinjer, skrevet som tekst eller regler."
+      },
+      "pii": {
+        "label": "PII og hemmeligheter",
+        "description": "Oppdager personopplysninger, påloggingsinformasjon, IP-adresser og URL-er."
+      },
+      "keywords": {
+        "label": "Forbudte nøkkelord",
+        "descriptionOutput": "Oppdager svar som inneholder noen av nøkkelordene du lister opp."
+      },
+      "topics": {
+        "label": "Emner",
+        "descriptionOutput": "Markerer svar om noen av emnene du lister opp."
+      },
+      "toxicity": {
+        "label": "Toksicitet",
+        "description": "Oppdager giftig, fornærmende, truende eller hatefull språkbruk."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Oppdager seksuelt innhold eller annet innhold som ikke er trygt for arbeid."
+      },
+      "bias": {
+        "label": "Skjevhet",
+        "description": "Oppdager partisk eller diskriminerende språkbruk."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personopplysninger",
+        "description": "Navn, e-postadresser, telefonnumre."
+      },
+      "secrets": {
+        "label": "Hemmeligheter",
+        "description": "API-nøkler, tokener, passord."
+      },
+      "ipAddress": {
+        "label": "IP-adresser",
+        "description": "IPv4- og IPv6-adresser."
+      },
+      "url": {
+        "label": "URL-er",
+        "description": "Nettadresser."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Sikkerhet og svindel",
+      "safetyHarm": "Trygghet og skade",
+      "privacyDataProtection": "Personvern og databeskyttelse",
+      "brandReputationTrust": "Merkevare og omdømme",
+      "biasFairnessEthical": "Skjevhet og rettferdighet",
+      "legalIpLiability": "Juridisk og IP-ansvar",
+      "productMisuse": "Misbruk av produkt",
+      "performanceQuality": "Ytelse og kvalitet"
+    },
+    "applicability": {
+      "user": "Brukerinndata",
+      "userAssistant": "Brukerinndata og svar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Topp 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EUs KI-forordning",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Bedriftsfunksjon",
+    "enterpriseOnly": "Dette er en funksjon kun for bedrifter.",
+    "readOnly": "Bare organisasjonseiere og administratorer kan endre disse innstillingene.",
+    "loadError": "Leverandører og modeller kunne ikke lastes inn",
+    "tabModels": "Modeller",
+    "tabProviders": "Leverandører",
+    "tabGateways": "Inngangsportaler",
+    "modelsDescription": "Slå av en modell for å blokkere den for alle medlemmer. Modeller fra tillatte leverandører er slått på som standard.",
+    "modelsDeniedOnly": "Kun nektet",
+    "modelsEmpty": "Ingen modeller samsvarer med dette søket.",
+    "modelsDeniedEmpty": "Ingen modell er nektet.",
+    "modelsDeniedSearchEmpty": "Ingen nektet modell samsvarer med dette søket.",
+    "providersDescription": "Slå av en leverandør for å hindre at Kilo ruter til den for denne organisasjonen.",
+    "providersNeedCatalog": "Leverandørbryterne er skrivebeskyttet til hele modellkatalogen er lastet inn. Trykk på Prøv igjen ovenfor for å endre dem.",
+    "providersEmpty": "Ingen leverandører samsvarer med dette søket.",
+    "allowAllShown": "Tillat alle viste",
+    "denyAllShown": "Nekt alle viste",
+    "gatewaysDescription": "Kilo ruter modellforespørsler gjennom Vercel AI Gateway eller OpenRouter. En deaktivert inngangsportal får disse forespørslene til å feile.",
+    "emptyProviderList": "Tillat minst én leverandør. En tom liste blokkerer alle Kilo-modellruter.",
+    "gatewaysUnavailable": "Innstillinger for inngangsportaler er ikke tilgjengelige for denne organisasjonen.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter-forespørsler er ikke låst til en region.",
+    "inferenceRegion": "Inferensregion",
+    "inferenceRegionDescription": "Låser Vercel AI Gateway-forespørsler til denne regionen. En modell som ikke er tilgjengelig der, feiler.",
+    "disableOpenrouterNote": "Deaktivering av OpenRouter blokkerer også BYOK-nøkler som ruter forespørsler gjennom den.",
+    "emptyModelList": "La minst én modell være på. Hvis du avviser alle modeller, har medlemmene ingenting å bruke.",
+    "catalogUnavailable": "Hele modellkatalogen ble ikke lastet inn, så bare de lagrede listene dine vises. Prøv på nytt for å laste inn alle modeller.",
+    "region": {
+      "global": "Global",
+      "us": "USA",
+      "eu": "Den europeiske union",
+      "au": "Australia",
+      "jp": "Japan"
+    }
   }
 }

@@ -118,6 +118,34 @@ afterEach(async () => {
 });
 
 describe('native event delivery', () => {
+  it('preserves the live and stored callback parent after eviction and a parentless v2 snapshot', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    const { message } = kilo2Events(kiloSessionId);
+    const initial = message([]);
+    await stub.onEvents({
+      events: [{ ...initial, properties: { ...initial.properties, parentID: 'msg_prompt' } }],
+    });
+    await evictAllDurableObjects();
+    const final = message([{ type: 'text', text: 'Final answer' }], 3);
+    await runInDurableObject(stub, async (instance, state) => {
+      const broadcast = vi.spyOn(instance, 'broadcast');
+      await instance.onEvents({ events: [final] });
+      expect(JSON.parse(broadcast.mock.calls[0][0].payload).properties).toMatchObject({
+        parentID: 'msg_prompt',
+        message: final.properties.message,
+      });
+      const { row } = storedMessage(state);
+      expect(JSON.parse(row?.payload ?? '{}').properties).toMatchObject({
+        parentID: 'msg_prompt',
+        message: final.properties.message,
+      });
+      const queries = createSessionEventQueries(drizzle(state.storage), state.storage);
+      expect(
+        queries.getAssistantAnswerForUserMessage(sessionId, kiloSessionId, 'msg_prompt')
+      ).toMatchObject({ text: 'Final answer' });
+    });
+  });
+
   it('broadcasts unslimmed live payloads while persisting slim replay rows', async () => {
     const { stub, part } = await fixture();
     await runInDurableObject(stub, async (instance, state) => {

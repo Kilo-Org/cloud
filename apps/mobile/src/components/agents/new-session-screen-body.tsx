@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { EnvironmentSheet } from '@/components/agents/environment-sheet';
@@ -95,6 +94,7 @@ import {
 import {
   resolveContinueStartDisabled,
   resolveNewSessionConnectProvider,
+  resolveNewSessionProfileGate,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
   resolveRemoteStartMissingContent,
@@ -127,7 +127,10 @@ import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { useTRPC } from '@/lib/trpc';
+import { useBillingAction, useCanManageBilling, useTrialRefusalAction } from '@/lib/trial-refusal';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
 /** The ingest rejection code for a fork cut missing from the cloud source. */
@@ -604,11 +607,21 @@ export function NewSessionScreenBody() {
   const {
     profile,
     profileId,
+    resolvedOverrideProfileId,
     isLoading: isProfileLoading,
     isError: isProfileError,
     overrideNeedsAttention: profileOverrideNeedsAttention,
     refetch: refetchProfile,
   } = useEffectiveAgentProfile(organizationId, overrideProfileId);
+
+  // One state for the profile read's share of the Start gate. Built once here:
+  // the Start gate and the blocked-reason helper read the same value, so an
+  // offer to retry is only made when Start actually waits on the read.
+  const profileGate = resolveNewSessionProfileGate({
+    isLoading: isProfileLoading,
+    isError: isProfileError,
+    hasOverride: overrideProfileId !== null,
+  });
 
   // The picker opens as the app's standard native formSheet. The bridge carries
   // the current pick; the sheet reports the new one back through `onSelect`.
@@ -1116,10 +1129,20 @@ export function NewSessionScreenBody() {
   // the footer therefore names no other blocker while it shows. A personal
   // start, an unsettled list, and a list without the organization stay allowed
   // — the app never blocks a start on a verdict it does not have.
+  const canManageBilling = useCanManageBilling(organizationId);
+  // The step a create the plan refuses offers, for the role that can take it.
+  // Read unconditionally here: the clone path reports its rejection from a
+  // callback, and a hook cannot run inside it.
+  const billingAction = useBillingAction(organizationId);
   const planRefusal = startPlanRefusal({
     organizationId,
     organizations: useOrganizationsList().data,
+    canManageBilling,
   });
+  // The plan's refusal is the only one whose reader can end it from here, and
+  // only a role the server would let change the plan is handed the step: the
+  // block keeps its copy alone for everyone else.
+  const planRefusalAction = useTrialRefusalAction(planRefusal !== null, organizationId);
   // The composer only takes focus on arrival when the form already has its
   // repository. Focusing raises the keyboard, which shrinks the scroll frame past
   // the repository picker, Changes, Environment and Advanced Configuration while
@@ -1208,7 +1231,7 @@ export function NewSessionScreenBody() {
       model: displayModel,
       selectedRepo,
       selectedRepositoryResolved: selectedRepository !== null,
-      isProfileLoading,
+      profileGate,
     });
   }
 
@@ -1265,7 +1288,7 @@ export function NewSessionScreenBody() {
             isRemoteTargetSelected,
             isSubmitting,
             model: displayModel,
-            isProfileLoading,
+            profileGate,
           },
         }
   );
@@ -1310,6 +1333,12 @@ export function NewSessionScreenBody() {
     // The Environment row already shows its busy state; the footer says why
     // Start waits on it, so a disabled control is never unexplained.
     startBlockedReason = t('agentChat.newSession.profileLoadingToStart');
+  } else if (startBlockedReasonKey === 'profile-error') {
+    // The Environment row's error state offers the same retry. The footer names
+    // the failure and carries the action because Start waits on the read the
+    // retry re-runs: the picked profile cannot be submitted until it resolves.
+    startBlockedReason = t('agentChat.newSession.couldNotLoadEnvironment');
+    startBlockedAction = { label: t('common.retry'), onPress: () => void refetchProfile() };
   } else if (startBlockedReasonKey === 'model-missing') {
     startBlockedReason = t('agentChat.newSession.modelMissingToStart');
   } else if (startBlockedReasonKey === 'stale-selection') {
@@ -1356,9 +1385,15 @@ export function NewSessionScreenBody() {
             // The cut message is not in the saved source yet: say so, Start stays enabled.
             message = i18n.t(FORK_CUT_NOT_SYNCED_KEY);
           } else if (!isCloudPrepareRetryableError(error)) {
-            message = cloudPrepareFailureMessage(error);
+            // A terminal prepare rejection reads the copy its reader gets: the
+            // organization trial refusal offers the plan step to a role that
+            // can take it and names the owner to everyone else.
+            message = cloudPrepareFailureMessage(error, canManageBilling);
           }
-          toast.error(message);
+          // One reporting path: the failed prepare is a consequential outcome,
+          // so it is announced as well as shown, and the trial refusal adds
+          // its step when the reader may change the plan.
+          announceTrialRefusal(message, billingAction, isTrialExpiredRefusal(error));
         } finally {
           setIsCreating(false);
         }
@@ -1393,6 +1428,8 @@ export function NewSessionScreenBody() {
     displayModel,
     displayVariant,
     mode,
+    canManageBilling,
+    billingAction,
     runCloudCreate,
     remoteSpawn,
     createSessionFromDraft,
@@ -1480,7 +1517,7 @@ export function NewSessionScreenBody() {
         profileOverrideNeedsAttention={profileOverrideNeedsAttention}
         onRetryProfile={() => void refetchProfile()}
         onOpenProfilePicker={handleOpenProfilePicker}
-        selectedProfileId={overrideProfileId}
+        selectedProfileId={resolvedOverrideProfileId}
         onSelectProfile={setOverrideProfileId}
         manualVars={manualVars}
         manualCommands={manualCommands}
@@ -1499,6 +1536,7 @@ export function NewSessionScreenBody() {
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
         planRefusal={planRefusal}
+        planRefusalAction={planRefusalAction}
         remoteSpawnFailure={remoteSpawn.remoteSpawnFailure}
         onRetryRemoteSpawn={handleStartSession}
       />

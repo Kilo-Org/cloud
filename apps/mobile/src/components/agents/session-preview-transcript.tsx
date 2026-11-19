@@ -8,6 +8,7 @@ import { MessageCircle } from '@/components/ui/icons';
 import { isTerminalTrpcCode, readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
 
 import { MessageBubble } from './message-bubble';
+import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { SessionMessageList } from './session-message-list';
 import { SessionSkeletonMessages } from './session-detail-skeleton';
 
@@ -34,7 +35,8 @@ export type SessionPreviewTranscriptState = {
  * The preview's transcript region: the four read states plus loading, each
  * rendered into the space the card already reserved so the swap cannot move
  * the card. There is no composer and no send/stop/queue handler — the card is
- * a viewer.
+ * a viewer. The part detail host supplies the rows' press handlers, so a tool
+ * row opens the read-only part detail sheet and no write path is added.
  */
 export function SessionPreviewTranscript({
   sessionId,
@@ -62,6 +64,7 @@ export function SessionPreviewTranscript({
       <QueryError
         variant={trpcErrorVariant(error)}
         placement="static"
+        inset="gutter"
         className="w-full"
         onRetry={retryable ? onRetry : undefined}
       />
@@ -73,21 +76,24 @@ export function SessionPreviewTranscript({
         icon={MessageCircle}
         title={t('agentChat.session.emptyTitle')}
         placement="static"
+        inset="gutter"
         className="w-full"
       />
     );
   }
   return (
-    <SessionMessageList<StoredMessage>
-      sessionId={sessionId}
-      items={messages}
-      keyExtractor={message => message.info.id}
-      hasOlderMessages={false}
-      isLoadingOlderMessages={false}
-      olderMessagesError={null}
-      olderMessagesOmittedItemCount={0}
-      onLoadOlderMessages={noopLoadOlderMessages}
-      renderItem={renderItem}
-    />
+    <PartDetailSheetHost messages={messages}>
+      <SessionMessageList<StoredMessage>
+        sessionId={sessionId}
+        items={messages}
+        keyExtractor={message => message.info.id}
+        hasOlderMessages={false}
+        isLoadingOlderMessages={false}
+        olderMessagesError={null}
+        olderMessagesOmittedItemCount={0}
+        onLoadOlderMessages={noopLoadOlderMessages}
+        renderItem={renderItem}
+      />
+    </PartDetailSheetHost>
   );
 }

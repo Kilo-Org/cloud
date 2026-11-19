@@ -1,137 +1,50 @@
 import { getSettingsDirtyState, isValidDayCount } from '@kilocode/app-shared/security-agent';
+import { Clock } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { SLA_ROWS, SlaDayRow, type SlaSeverity } from '@/components/security-agent/sla-day-row';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { i18n } from '@/i18n';
-import { formatNumber, parseLocalizedNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
-import { cn } from '@/lib/utils';
 
 function SlaSettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('securityAgent.sla.title')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
+      <ScreenHeader title={t('securityAgent.sla.title')} />
+      <View className={SCREEN_BODY_CLASS}>
+        <RowGroup leadingTile>
+          <RowSkeleton tile subtitle />
+        </RowGroup>
+        <RowGroup>
+          {SLA_ROWS.map(row => (
+            <RowSkeleton key={row.key} subtitle />
+          ))}
+        </RowGroup>
       </View>
-    </View>
-  );
-}
-
-type SlaSeverity = 'critical' | 'high' | 'medium' | 'low';
-
-const SLA_ROWS = [
-  {
-    key: 'critical',
-    labelKey: 'common.critical',
-    descriptionKey: 'securityAgent.sla.criticalDescription',
-  },
-  {
-    key: 'high',
-    labelKey: 'securityAgent.sla.high',
-    descriptionKey: 'securityAgent.sla.highDescription',
-  },
-  {
-    key: 'medium',
-    labelKey: 'securityAgent.sla.medium',
-    descriptionKey: 'securityAgent.sla.mediumDescription',
-  },
-  {
-    key: 'low',
-    labelKey: 'securityAgent.sla.low',
-    descriptionKey: 'securityAgent.sla.lowDescription',
-  },
-] as const satisfies readonly {
-  key: SlaSeverity;
-  labelKey: string;
-  descriptionKey: string;
-}[];
-
-// Uncontrolled numeric TextInput — never pass `value` back on iOS (see
-// apps/mobile/AGENTS.md). The ref holds the raw typed text; `days` holds
-// the parsed number (or NaN while invalid) purely to drive dirty/validity.
-function SlaDayRow({
-  label,
-  description,
-  initialValue,
-  disabled,
-  onChangeValue,
-}: Readonly<{
-  label: string;
-  description: string;
-  initialValue: number;
-  disabled: boolean;
-  onChangeValue: (value: number) => void;
-}>) {
-  const colors = useThemeColors();
-  const { t } = useTranslation();
-  const rawRef = useRef(formatNumber(initialValue, i18n.language, { useGrouping: false }));
-  const [days, setDays] = useState(initialValue);
-
-  return (
-    <View
-      className={cn(
-        'flex-row items-center justify-between rounded-lg bg-secondary p-4',
-        disabled && 'opacity-50'
-      )}
-    >
-      <View className="min-w-0 flex-1 pe-3">
-        <Text className="text-sm font-medium">{label}</Text>
-        <Text variant="muted" className="text-xs">
-          {description}
-        </Text>
-        {!isValidDayCount(days) && (
-          <Text className="mt-1 text-xs text-destructive">
-            {t('securityAgent.sla.invalidDayCount')}
-          </Text>
-        )}
-      </View>
-      <Input
-        accessibilityLabel={t('securityAgent.sla.remediationDeadlineA11y', { label })}
-        accessibilityHint={
-          isValidDayCount(days) ? undefined : t('securityAgent.sla.enterWholeNumber')
-        }
-        className="w-16 rounded-lg border border-input bg-background pl-2 pr-2 text-sm text-foreground"
-        textAlign="center"
-        editable={!disabled}
-        accessibilityState={{ disabled }}
-        keyboardType="number-pad"
-        defaultValue={rawRef.current}
-        placeholderTextColor={colors.mutedForeground}
-        onChangeText={text => {
-          rawRef.current = text;
-          const value = parseLocalizedNumber(text, i18n.language);
-          const parsed = value !== null && Number.isInteger(value) ? value : Number.NaN;
-          setDays(parsed);
-          onChangeValue(parsed);
-        }}
-      />
     </View>
   );
 }
@@ -143,6 +56,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
   const feedback = useSettingsSaveFeedback();
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
+  const connectivity = useCommittedConnectivityStatus();
 
   const [slaEnabled, setSlaEnabled] = useState(false);
   const [slaDays, setSlaDays] = useState<Record<SlaSeverity, number>>({
@@ -248,7 +162,11 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     return (
       <PlatformErrorScreen
         title={t('securityAgent.sla.title')}
-        variant="offline"
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
         message={t('securityAgent.sla.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
@@ -271,7 +189,6 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('securityAgent.sla.title')}
         onBack={onBack}
         headerRight={
@@ -291,39 +208,41 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
             {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
-        <ToggleRow
-          title={t('securityAgent.sla.enableTracking')}
-          subtitle={t('securityAgent.sla.enableTrackingSubtitle')}
-          value={slaEnabled}
-          disabled={!canManage}
-          onValueChange={setSlaEnabled}
-        />
+        <RowGroup leadingTile>
+          <PreferenceRow
+            icon={Clock}
+            title={t('securityAgent.sla.enableTracking')}
+            subtitle={t('securityAgent.sla.enableTrackingSubtitle')}
+            value={slaEnabled}
+            disabled={!canManage}
+            onValueChange={setSlaEnabled}
+          />
+        </RowGroup>
 
         {slaEnabled && (
-          <View className="gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('securityAgent.sla.deadlinesHeading')}
-            </Text>
-            {SLA_ROWS.map(row => (
-              <SlaDayRow
-                key={row.key}
-                label={t(row.labelKey)}
-                description={t(row.descriptionKey)}
-                initialValue={slaDays[row.key]}
-                disabled={!canManage}
-                onChangeValue={value => {
-                  setSlaDays(current => ({ ...current, [row.key]: value }));
-                }}
-              />
-            ))}
-          </View>
+          <Section label={t('securityAgent.sla.deadlinesHeading')}>
+            <RowGroup>
+              {SLA_ROWS.map(row => (
+                <SlaDayRow
+                  key={row.key}
+                  label={t(row.labelKey)}
+                  description={t(row.descriptionKey)}
+                  initialValue={slaDays[row.key]}
+                  disabled={!canManage}
+                  onChangeValue={value => {
+                    setSlaDays(current => ({ ...current, [row.key]: value }));
+                  }}
+                />
+              ))}
+            </RowGroup>
+          </Section>
         )}
       </TabScreenScrollView>
       {dialog}

@@ -55,6 +55,9 @@ vi.mock('@/lib/trpc', async () => {
   };
 });
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
+// The hand-off helper imports the browser launcher, which reaches a native
+// module no test project loads; this suite needs the mint, not the launch.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
@@ -76,6 +79,7 @@ vi.mock('@/components/ui/icons', () => ({
   Clock: 'Clock',
   Cpu: 'Cpu',
   FolderGit2: 'FolderGit2',
+  ShieldCheck: 'ShieldCheck',
   Zap: 'Zap',
 }));
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
@@ -114,6 +118,12 @@ function host(root: TestRenderer.ReactTestInstance, type: string) {
 }
 function procedureFor(input: RequestInfo | URL) {
   return new URL(input instanceof Request ? input.url : input).pathname.split('.').at(-1) ?? '';
+}
+/** The hand-off targets the screen asked the server to mint, in call order. */
+function mintTargets(): unknown[] {
+  return transport.mock.calls
+    .filter(([input]) => procedureFor(input) === 'mintHandoff')
+    .map(([, init]) => JSON.parse(init?.body as string));
 }
 async function advanceBy() {
   await act(async () => {
@@ -166,7 +176,7 @@ beforeEach(() => {
     if (configHold && procedureFor(input) === 'getConfig') {
       await configHold;
     }
-    if (mintFailed && procedureFor(input) === 'mintInstallState') {
+    if (mintFailed && procedureFor(input) === 'mintHandoff') {
       throw new Error('Setup failed');
     }
     if (heldProcedures.has(procedureFor(input))) {
@@ -212,7 +222,7 @@ beforeEach(() => {
       getConfig: configData,
       getRepositories: repositoriesData,
       list: roles,
-      mintInstallState: { token: 'install-state' },
+      mintHandoff: { path: '/app-shell/handoff?token=handoff-token' },
     };
     return Response.json({ result: { data: data[procedureFor(input)] } });
   });
@@ -233,15 +243,17 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
     const setup = host(root, 'SecurityAgentSetup')[0];
     const url = new URL(setup?.props.url as string);
     expect(url.origin).toBe('https://settings.test');
-    expect(url.pathname).toBe('/github-app');
-    expect(url.searchParams.get('installState')).toBe('install-state');
-    expect(url.searchParams.get('fromApp')).toBe('1');
-    expect(url.searchParams.get('organizationId')).toBe(scope === 'personal' ? null : scope);
+    expect(url.pathname).toBe('/app-shell/handoff');
+    expect(url.searchParams.get('token')).toBe('handoff-token');
     expect(setup?.props.buttonLabel).toBe(
       hasIntegration ? 'Re-authorize GitHub App' : 'Install GitHub App'
     );
     expect(host(root, 'Switch')).toHaveLength(0);
     expect(host(root, 'DashboardScreen')).toHaveLength(0);
+    // The screen hands off to the install page for its own owner and nobody else.
+    expect(mintTargets()).toEqual([
+      scope === 'personal' ? { page: 'github-app' } : { page: 'github-app', organizationId: scope },
+    ]);
   });
 
   it.each([false, true])(
@@ -260,7 +272,7 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
       const resolve = setup?.props.resolveUrl as (() => Promise<unknown>) | undefined;
       await expect(resolve?.()).resolves.toBeUndefined();
       expect(
-        transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+        transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintHandoff')
       ).toHaveLength(2);
     }
   );
@@ -276,10 +288,13 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
       mintFailed = false;
       const resolve = setup?.props.resolveUrl as (() => Promise<unknown>) | undefined;
       const resolved = new URL((await resolve?.()) as string);
-      expect(resolved.origin + resolved.pathname).toBe('https://settings.test/github-app');
-      expect(resolved.searchParams.get('installState')).toBe('install-state');
-      expect(resolved.searchParams.get('fromApp')).toBe('1');
-      expect(resolved.searchParams.get('organizationId')).toBe(scope === 'personal' ? null : scope);
+      expect(resolved.origin + resolved.pathname).toBe('https://settings.test/app-shell/handoff');
+      expect(resolved.searchParams.get('token')).toBe('handoff-token');
+      expect(mintTargets().at(-1)).toEqual(
+        scope === 'personal'
+          ? { page: 'github-app' }
+          : { page: 'github-app', organizationId: scope }
+      );
     }
   );
 
@@ -311,7 +326,7 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
     const root = await mount(scope);
     expect(host(root, 'SecurityAgentSetup')[0]?.props.url).toBe(permissionData.reauthorizeUrl);
     expect(host(root, 'Switch')).toHaveLength(0);
-    expect(transport.mock.calls.some(([input]) => procedureFor(input) === 'mintInstallState')).toBe(
+    expect(transport.mock.calls.some(([input]) => procedureFor(input) === 'mintHandoff')).toBe(
       false
     );
   });
@@ -324,15 +339,15 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
       expect(host(root, 'DashboardScreen')).toHaveLength(isEnabled ? 1 : 0);
       expect(host(root, 'Switch')).toHaveLength(isEnabled ? 0 : 1);
       expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
-      expect(
-        transport.mock.calls.some(([input]) => procedureFor(input) === 'mintInstallState')
-      ).toBe(false);
+      expect(transport.mock.calls.some(([input]) => procedureFor(input) === 'mintHandoff')).toBe(
+        false
+      );
     }
   );
 });
 
 describe('ScopeEntryScreen GitHub install capability', () => {
-  // `githubApps.mintInstallState` is the authority on who may start an
+  // `appShell.mintHandoff` is the authority on who may start an
   // organization installation: it resolves the caller through
   // `ensureOrganizationAccess`, which also elevates a Kilo admin and accepts a
   // parent-organization role. The entry therefore offers the press and lets the
@@ -343,7 +358,7 @@ describe('ScopeEntryScreen GitHub install capability', () => {
     async role => {
       roles = [{ organizationId: 'org_123', organizationName: 'Drain Labs', role }];
       permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
-      deniedProcedures = new Set(['mintInstallState']);
+      deniedProcedures = new Set(['mintHandoff']);
 
       const root = await mount('org_123');
       const setup = host(root, 'SecurityAgentSetup')[0];
@@ -366,7 +381,7 @@ describe('ScopeEntryScreen GitHub install capability', () => {
     const setup = host(root, 'SecurityAgentSetup')[0];
 
     expect(setup?.props.readOnlyNotice).toBeUndefined();
-    expect(new URL(setup?.props.url as string).pathname).toBe('/github-app');
+    expect(new URL(setup?.props.url as string).pathname).toBe('/app-shell/handoff');
   });
 
   it.each(['owner', 'admin'])('keeps the install press for an %s', async role => {
@@ -377,9 +392,9 @@ describe('ScopeEntryScreen GitHub install capability', () => {
     const setup = host(root, 'SecurityAgentSetup')[0];
 
     expect(setup?.props.readOnlyNotice).toBeUndefined();
-    expect(new URL(setup?.props.url as string).pathname).toBe('/github-app');
+    expect(new URL(setup?.props.url as string).pathname).toBe('/app-shell/handoff');
     expect(
-      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintHandoff')
     ).toHaveLength(1);
   });
 
@@ -387,7 +402,7 @@ describe('ScopeEntryScreen GitHub install capability', () => {
     // Only a refused role retires the action; a transport or server failure
     // leaves the press, which re-mints before opening.
     permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
-    failingProcedures = new Set(['mintInstallState']);
+    failingProcedures = new Set(['mintHandoff']);
 
     const root = await mount('org_123');
     const setup = host(root, 'SecurityAgentSetup')[0];
@@ -403,7 +418,7 @@ describe('ScopeEntryScreen GitHub install capability', () => {
       // The app signs out on it; retiring the press for the role notice would
       // claim an organization role decided it, which a personal scope lacks.
       permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
-      deniedProcedures = new Set(['mintInstallState']);
+      deniedProcedures = new Set(['mintHandoff']);
       sessionAuthRequired = true;
 
       const root = await mount(scope);
@@ -439,7 +454,7 @@ describe('ScopeEntryScreen GitHub install capability', () => {
 
     expect(setup?.props.readOnlyNotice).toBeUndefined();
     expect(
-      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintInstallState')
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'mintHandoff')
     ).toHaveLength(1);
   });
 });
@@ -606,8 +621,8 @@ describe('ScopeEntryScreen organization access', () => {
     expect(host(root, 'ScopeAccessDeniedScreen')[0]?.props.kind).toBe('denied');
     expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
     expect(host(root, 'DashboardScreen')).toHaveLength(0);
-    // No install-state token is minted for a scope the reader cannot use.
-    expect(transport.mock.calls.some(([input]) => procedureFor(input) === 'mintInstallState')).toBe(
+    // No hand-off token is minted for a scope the reader cannot use.
+    expect(transport.mock.calls.some(([input]) => procedureFor(input) === 'mintHandoff')).toBe(
       false
     );
   });

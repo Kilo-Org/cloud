@@ -63,7 +63,10 @@ export const oauthRefreshTokenHistory = sqliteTable(
     token_hash: text('token_hash').primaryKey(),
     user_id: text('user_id').notNull(),
     grant_id: text('grant_id').notNull(),
+    /** The token the provider currently accepts. */
     current: integer('current', { mode: 'boolean' }).notNull(),
+    /** The single token the provider also still accepts after a rotation. */
+    previous: integer('previous', { mode: 'boolean' }).notNull().default(false),
     expires_at: text('expires_at').notNull(),
   },
   table => [index('idx_oauth_refresh_token_grant').on(table.user_id, table.grant_id)]

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { KiloCommandFormSheet } from '@/components/profiles/kilo-command-form-sheet';
 import { KiloCommandRowView } from '@/components/profiles/kilo-command-row';
 import {
@@ -16,9 +16,11 @@ import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Terminal } from '@/components/ui/icons';
+import { Plus, Terminal } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { SlashCommandsSkeleton } from '@/components/profiles/slash-commands-skeleton';
 import { ADD_FORM_KEY, useCommandSavePhase } from '@/components/profiles/use-command-save-phase';
 import { Text } from '@/components/ui/text';
@@ -27,8 +29,9 @@ import {
   useAgentProfileKiloCommands,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
@@ -67,6 +70,9 @@ export function ProfileKiloCommandsScreen({
 
   const commands = profileQuery.data ?? NO_COMMANDS;
   const rows = kiloCommandRows(commands);
+  // The server counts every row this profile holds and the list returns every
+  // row unfiltered, so the loaded length is the count the cap compares.
+  const atCommandCap = commands.length >= MAX_PROFILE_KILO_COMMANDS;
   // The open form comes from the sibling screens' draft contract: it survives a
   // remount, and its generation is what proves a settling save still owns it.
   const draftScope = `profiles:slash-commands:${profileId}`;
@@ -169,86 +175,93 @@ export function ProfileKiloCommandsScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
-              <Text>{t('profiles.slashCommands.add')}</Text>
-            </Button>
+            <StateAction label={t('profiles.slashCommands.add')} icon={Plus} onPress={startAdd} />
           </ProfileManageSlot>
         }
       />
     );
   } else {
     content = (
-      <>
-        {rows.map((row, index) => {
-          const source = commands[index];
-          if (source === undefined) {
-            return null;
-          }
-          return (
-            <KiloCommandRowView
-              key={row.id}
-              name={row.name}
-              description={row.description}
-              template={row.template}
-              subtask={row.subtask}
-              agent={row.agent}
-              model={row.model}
-              enabled={row.enabled}
-              isFirst={index === 0}
-              isLast={index === rows.length - 1}
-              onToggle={
-                canManage
-                  ? guardRowPress(enabled => {
-                      setKiloCommandEnabled.mutate(
-                        { profileId, commandId: source.id, enabled },
-                        {
-                          onError: error => {
-                            if (!hasUsableMessage(error)) {
-                              toast.error(t('profiles.slashCommands.saveFailed'));
-                            }
-                          },
-                        }
-                      );
-                    })
-                  : undefined
-              }
-              onMoveUp={
-                canManage
-                  ? guardRowPress(() => {
-                      move(index, -1);
-                    })
-                  : undefined
-              }
-              onMoveDown={
-                canManage
-                  ? guardRowPress(() => {
-                      move(index, 1);
-                    })
-                  : undefined
-              }
-              onEdit={
-                canManage
-                  ? guardRowPress(() => {
-                      startEdit(source);
-                    })
-                  : undefined
-              }
-              onDelete={
-                canManage
-                  ? guardRowPress(() => {
-                      confirmDelete(source);
-                    })
-                  : undefined
-              }
-            />
-          );
-        })}
+      <View className="gap-3">
+        <RowGroup leadingTile>
+          {rows.map((row, index) => {
+            const source = commands[index];
+            if (source === undefined) {
+              return null;
+            }
+            return (
+              <KiloCommandRowView
+                key={row.id}
+                name={row.name}
+                description={row.description}
+                template={row.template}
+                subtask={row.subtask}
+                agent={row.agent}
+                model={row.model}
+                enabled={row.enabled}
+                isFirst={index === 0}
+                isLast={index === rows.length - 1}
+                onToggle={
+                  canManage
+                    ? guardRowPress(enabled => {
+                        setKiloCommandEnabled.mutate(
+                          { profileId, commandId: source.id, enabled },
+                          {
+                            onError: error => {
+                              if (!hasUsableMessage(error)) {
+                                toast.error(t('profiles.slashCommands.saveFailed'));
+                              }
+                            },
+                          }
+                        );
+                      })
+                    : undefined
+                }
+                onMoveUp={
+                  canManage
+                    ? guardRowPress(() => {
+                        move(index, -1);
+                      })
+                    : undefined
+                }
+                onMoveDown={
+                  canManage
+                    ? guardRowPress(() => {
+                        move(index, 1);
+                      })
+                    : undefined
+                }
+                onEdit={
+                  canManage
+                    ? guardRowPress(() => {
+                        startEdit(source);
+                      })
+                    : undefined
+                }
+                onDelete={
+                  canManage
+                    ? guardRowPress(() => {
+                        confirmDelete(source);
+                      })
+                    : undefined
+                }
+              />
+            );
+          })}
+        </RowGroup>
         <ProfileManageSlot permission={permission}>
-          <Button onPress={startAdd}>
+          {atCommandCap ? (
+            <AccessibleStatus
+              message={t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
+          <Button disabled={atCommandCap} onPress={startAdd}>
             <Text>{t('profiles.slashCommands.add')}</Text>
           </Button>
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -262,7 +275,7 @@ export function ProfileKiloCommandsScreen({
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

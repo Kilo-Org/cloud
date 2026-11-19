@@ -1,8 +1,9 @@
 // McpServerRowView regression coverage for the one-control-per-row rule: the
 // server's name is painted once, but the enabled switch is the row's only
 // element carrying it, so a screen reader meets the name as the toggle and not
-// again as a static text. The type and summary lines stay their own stops
-// because they say more than the name does.
+// again as a static text. The type, the count and the summary are painted under
+// that name, and the content press is one element, so they ride its spoken name
+// instead of becoming stops of their own.
 import { act, type ElementType, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -22,6 +23,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   Pencil: 'Pencil',
+  Server: 'Server',
   Trash2: 'Trash2',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -57,13 +59,14 @@ function renderRow(element: ReactElement) {
   return renderer.root;
 }
 
-function row(overrides: { readOnly?: boolean } = {}) {
+function row(overrides: { readOnly?: boolean; showType?: boolean } = {}) {
   const readOnly = overrides.readOnly === true;
   return (
     <McpServerRowView
       server={server}
       summary="https://mcp.example.com/docs"
       secretCount={2}
+      showType={overrides.showType ?? true}
       onToggle={readOnly ? undefined : () => undefined}
       onEdit={readOnly ? undefined : () => undefined}
       onDelete={readOnly ? undefined : () => undefined}
@@ -88,7 +91,7 @@ describe('<McpServerRowView>', () => {
     expect(switches[0]?.props.value).toBe(true);
   });
 
-  it('keeps the type, the summary and the two action labels as their own stops', () => {
+  it('names the content press with the type, the secret count and the summary', () => {
     const root = renderRow(row());
 
     const announced = root
@@ -96,11 +99,32 @@ describe('<McpServerRowView>', () => {
       .filter(node => node.props.accessible !== false)
       .map(node => node.props.children);
 
-    expect(announced).toContain('Remote');
-    expect(announced).toContain('https://mcp.example.com/docs');
+    // The painted lines are merged into the content press, so none of them is a
+    // stop of its own.
+    expect(announced).not.toContain('Remote');
+    expect(announced).not.toContain('https://mcp.example.com/docs');
+
+    // A URL is told apart by its tail, so the value ellipsizes in the middle.
+    const summary = root
+      .findAllByType(TEXT)
+      .find(node => node.props.children === 'https://mcp.example.com/docs');
+    expect(summary?.props.ellipsizeMode).toBe('middle');
 
     const buttons = root.findAllByType(PRESSABLE).map(node => node.props.accessibilityLabel);
-    expect(buttons).toEqual(['Edit MCP server docs-search', 'Delete MCP server docs-search']);
+    expect(buttons).toEqual([
+      'Edit MCP server docs-search, Remote, 2 secrets, https://mcp.example.com/docs',
+      'Delete MCP server docs-search',
+    ]);
+  });
+
+  it('leaves out the type the whole list shares, and keeps the count in the name', () => {
+    const root = renderRow(row({ showType: false }));
+
+    const buttons = root.findAllByType(PRESSABLE).map(node => node.props.accessibilityLabel);
+    expect(buttons).toEqual([
+      'Edit MCP server docs-search, 2 secrets, https://mcp.example.com/docs',
+      'Delete MCP server docs-search',
+    ]);
   });
 
   it('gives the name its own line and leaves the type and count to the line under it', () => {
@@ -124,6 +148,25 @@ describe('<McpServerRowView>', () => {
     ]);
   });
 
+  it('leaves the type out when the whole list is one kind, and keeps the key count', () => {
+    const root = renderRow(row({ showType: false }));
+
+    const nameLine = root.findAllByType(TEXT).find(node => node.props.children === server.name);
+    const body = nameLine?.parent ?? null;
+    if (nameLine === undefined || body === null) {
+      throw new Error('Missing the server name line');
+    }
+    const lines = body.children.filter(
+      (child): child is ReactTestInstance => typeof child !== 'string'
+    );
+
+    expect(lines.map(line => line.findAllByType(TEXT).map(node => node.props.children))).toEqual([
+      [server.name],
+      [2],
+      ['https://mcp.example.com/docs'],
+    ]);
+  });
+
   it('carries the enabled state and disables the switch when the profile is read-only', () => {
     let root = renderRow(row());
     expect(root.findAllByType(SWITCH)[0]?.props.disabled).toBe(false);
@@ -131,5 +174,25 @@ describe('<McpServerRowView>', () => {
 
     root = renderRow(row({ readOnly: true }));
     expect(root.findAllByType(SWITCH)[0]?.props.disabled).toBe(true);
+  });
+
+  it('renders a read-only row static, so the facts it paints stay text stops', () => {
+    const root = renderRow(row({ readOnly: true }));
+
+    // No edit handler means no content press to name, so the row is the frame's
+    // static row: nothing is hidden behind a control that does not exist.
+    expect(root.findAllByType(PRESSABLE)).toHaveLength(0);
+    const factLines = root
+      .findAllByType(TEXT)
+      .filter(
+        node =>
+          node.props.children === 'Remote' || node.props.children === 'https://mcp.example.com/docs'
+      );
+    expect(factLines).toHaveLength(2);
+    for (const line of factLines) {
+      expect(line.props.accessible).toBeUndefined();
+      expect(line.props.importantForAccessibility).toBeUndefined();
+    }
+    expect(root.findAllByType(SWITCH)[0]?.props.accessibilityLabel).toBe(server.name);
   });
 });

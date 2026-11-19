@@ -3,34 +3,32 @@ import {
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { FolderGit2 } from '@/components/ui/icons';
+import { ExternalLink, FolderGit2 } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { classifyListBody } from '@/lib/query/list-body-state';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import { OrphanedFindingsCard } from '@/components/security-agent/orphaned-findings-card';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup, RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
-import { trpcClient } from '@/lib/trpc';
+import { openAppShellHandoff } from '@/lib/app-shell-handoff';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -48,26 +46,26 @@ type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
 /** The repository rows the picker lists; derived from the hook so the row shape cannot drift. */
 type RepositoryRow = NonNullable<ReturnType<typeof useSecurityAgentRepositories>['data']>[number];
 
-// FlashList takes `contentContainerStyle`, not className, so the ScrollView's
-// `px-6 pt-4` content classes map to their pixel values. The tab-bar inset
-// rides on the content (the ScrollView used a frame `marginBottom`) so the
-// last row can still scroll clear of the bar.
+// FlashList takes `contentContainerStyle`, not className, so the body carries
+// only the tab-bar band and the safe-area side insets; the page gutter lives on
+// the rows and the header, whose row primitives draw their own `px-4`.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-
-// The gutter each row keeps inside the safe-area side insets: in landscape they
-// are what clear the sensor housing, and portrait insets are zero.
-const LIST_CONTENT_GUTTER = 24;
 
 function RepositorySettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('common.repositories')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
+      <ScreenHeader title={t('common.repositories')} />
+      <View className={SCREEN_BODY_CLASS}>
+        <RowGroup>
+          <RowSkeleton />
+          <RowSkeleton />
+        </RowGroup>
+        {/* The picker's rows are one grouped card, so the reserve is one. */}
+        <RowGroup>
+          <RowSkeleton />
+          <RowSkeleton />
+        </RowGroup>
       </View>
     </View>
   );
@@ -80,7 +78,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const repositories = useSecurityAgentRepositories(scope);
   const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
   const feedback = useSettingsSaveFeedback();
-  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const connectivity = useCommittedConnectivityStatus();
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -144,36 +142,54 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // not — starts at the same offset and a rotation re-derives it once.
   const listContentContainerStyle = useMemo(
     () => ({
-      paddingTop: 16,
-      paddingLeft: insets.left + LIST_CONTENT_GUTTER,
-      paddingRight: insets.right + LIST_CONTENT_GUTTER,
+      paddingTop: 12,
+      paddingLeft: insets.left,
+      paddingRight: insets.right,
       paddingBottom,
     }),
     [insets.left, insets.right, paddingBottom]
   );
 
+  // The rendered count decides each cell's rounded end, so it is read once and
+  // carried into the renderer rather than re-derived per cell.
+  const repositoryCount = repositories.data?.length ?? 0;
+
   // Hoisted so the FlashList keeps one renderer identity across toggles and
   // re-renders only the rows whose `selected` actually changed.
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<RepositoryRow>) => (
-      <RepoToggleRow
-        repo={item}
-        selected={selectedIdSet.has(item.id)}
-        disabled={!canManage}
-        className="border-b-[0.5px] border-hair-soft"
-        onPress={() => {
-          toggleRepo(item.id);
-        }}
-      />
+    ({ item, index }: ListRenderItemInfo<RepositoryRow>) => (
+      // The picker is one grouped card inside the full-bleed list, so each
+      // virtualized cell draws its own rounded end, surface and separator and
+      // the page gutter lives here rather than on the list.
+      <RowGroupItem
+        position={rowGroupPosition({
+          first: index === 0,
+          last: index === repositoryCount - 1,
+        })}
+        className="mx-4"
+      >
+        <RepoToggleRow
+          repo={item}
+          selected={selectedIdSet.has(item.id)}
+          disabled={!canManage}
+          onPress={() => {
+            toggleRepo(item.id);
+          }}
+        />
+      </RowGroupItem>
     ),
-    [selectedIdSet, canManage, toggleRepo]
+    [selectedIdSet, canManage, repositoryCount, toggleRepo]
   );
 
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
         title={t('common.repositories')}
-        variant="offline"
+        variant={classifyReadFailureVariant({
+          errors: [config.error],
+          isPaused: config.fetchStatus === 'paused',
+          connectivity,
+        })}
         message={t('securityAgent.repositories.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
@@ -184,18 +200,18 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   }
 
   const showRepositoryStates = mode === 'selected';
-  const hasRepositories = (repositories.data?.length ?? 0) > 0;
+  const hasRepositories = repositoryCount > 0;
   // A loading, failed, or not-yet-fetched repository query must not read as
   // zero repositories. Only a delivered read may claim the list is empty: a
   // read paused by lost connectivity delivered nothing and names the
   // connection with Retry instead.
   const repositoriesBody = classifyListBody({
-    rowCount: repositories.data?.length ?? 0,
+    rowCount: repositoryCount,
     hasDeliveredData: repositories.data !== undefined,
     isError: repositories.isError,
     isFetching: repositories.isFetching,
     fetchStatus: repositories.fetchStatus,
-    connectivityKnown,
+    connectivityKnown: connectivity !== 'unknown',
   });
   const repositoriesFailed =
     repositoriesBody.status === 'error' ||
@@ -211,45 +227,19 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const showRepositorySection = showRepositoryStates || repositoriesBody.status === 'empty';
 
   // The GitHub settings page is where installation access is widened on the
-  // web, and `openExternalUrl` resolves when that page closes — on both
-  // platforms it awaits the browser's own dismissal (a launch it could not open
-  // is toasted by that helper and still resolves). Reading the repository list
-  // again on that return edge is what makes a grant show up here: without it the
-  // cached empty answer stays fresh for the whole stale window, and the disabled
-  // agent's enable rule counts exactly these repositories.
-  //
-  // The mint is only the hand-off token. An organization's mint needs
-  // `ORGANIZATION_MANAGE_ROLES` (`owner`/`admin`), which is narrower than this
-  // screen's `canManage` (`canManageOrganizationBilling` admits
-  // `billing_manager`), and `ensureOrganizationAccess` refuses the role with
-  // `UNAUTHORIZED`; an organization whose installation cannot take a second one
-  // is refused with `FORBIDDEN`. Both are ordinary states here, and both are
-  // exactly the empty-grant case this screen exists for. The web page mints
-  // its own state for the signed-in user, so any organization refusal falls
-  // back to the plain settings URL instead of leaving the control inert — the
-  // same rule the Code Reviewer's GitHub recovery control applies. A personal
-  // mint failure has no such page-level fallback to reach, so it keeps the
-  // toast.
+  // web, and `openAppShellHandoff` resolves when that page closes — on both
+  // platforms it awaits the browser's own dismissal (a launch or mint it could
+  // not complete is toasted by that helper and still resolves). Reading the
+  // repository list again on that return edge is what makes a grant show up
+  // here: without it the cached empty answer stays fresh for the whole stale
+  // window, and the disabled agent's enable rule counts exactly these
+  // repositories.
   const manageAccess = async () => {
     const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
-    const open = async (url: string) => {
-      await openExternalUrl(url, {
-        label: t('securityAgent.repositories.githubAppSettings'),
-      });
-    };
-    try {
-      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-        organizationId: orgId ?? undefined,
-        returnTo: '/cloud/sessions',
-      });
-      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token));
-    } catch {
-      if (!orgId) {
-        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
-        return;
-      }
-      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId));
-    }
+    await openAppShellHandoff(
+      { page: 'github-app', ...(orgId ? { organizationId: orgId } : {}) },
+      { label: t('securityAgent.repositories.githubAppSettings') }
+    );
     await repositories.refetch();
   };
 
@@ -257,44 +247,40 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // mode — the loading / error / empty branches) rides on the list header so
   // the rendered order and paddings are unchanged from the ScrollView version.
   const listHeader: ReactNode = (
-    <>
+    <View className="gap-6 px-4 pt-3">
       {!canManage && (
-        <Text className="pb-4 text-center text-xs text-muted-foreground">
+        <Text className="text-center text-xs text-muted-foreground">
           {t('securityAgent.sla.permissionNote')}
         </Text>
       )}
       <OrphanedFindingsCard scope={scope} canManage={canManage} />
       <RadioGroup label={t('common.repositories')}>
-        {(['all', 'selected'] as const).map(option => (
-          <ChoiceRow
-            key={option}
-            label={
-              option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
-            }
-            selected={mode === option}
-            disabled={!canManage}
-            className="border-b-[0.5px] border-hair-soft"
-            onPress={() => {
-              setMode(option);
-            }}
-          />
-        ))}
+        <RowGroup>
+          {(['all', 'selected'] as const).map(option => (
+            <ChoiceRow
+              key={option}
+              label={
+                option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
+              }
+              selected={mode === option}
+              disabled={!canManage}
+              onPress={() => {
+                setMode(option);
+              }}
+            />
+          ))}
+        </RowGroup>
       </RadioGroup>
 
       {showRepositorySection && (
-        <View className="mt-6">
-          {/* The empty state's own title already says "No repositories", so a
-              section label above it only repeats the screen title. */}
-          {repositoriesBody.status === 'empty' ? null : (
-            <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-              {t('common.repositories')}
-            </Text>
-          )}
+        // The empty state's own title already says "No repositories", so a
+        // section label above it only repeats the screen title.
+        <Section label={repositoriesBody.status === 'empty' ? undefined : t('common.repositories')}>
           {repositoriesBody.status === 'loading' && (
-            <View className="gap-3 pt-2">
-              <Skeleton className="h-12 w-full rounded-lg" />
-              <Skeleton className="h-12 w-full rounded-lg" />
-            </View>
+            <RowGroup>
+              <RowSkeleton />
+              <RowSkeleton />
+            </RowGroup>
           )}
           {repositoriesFailed && (
             <QueryError
@@ -317,26 +303,19 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               description={t('securityAgent.repositories.noRepositoriesDescription')}
               iconContainerClassName="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card dark:border-input dark:bg-secondary"
               action={
-                <Button
-                  className={STATE_ACTION_CLASS}
-                  // Widening the grant is the only way out of this state, and
-                  // the header's Save is quiet while the screen has nothing to
-                  // save. The action therefore carries the filled primary
-                  // style instead of an outlined one that recedes into the
-                  // page beside it.
-                  variant="default"
+                <StateAction
+                  label={t('securityAgent.repositories.manageAccess')}
+                  icon={ExternalLink}
                   onPress={() => {
                     void manageAccess();
                   }}
-                >
-                  <Text>{t('securityAgent.repositories.manageAccess')}</Text>
-                </Button>
+                />
               }
             />
           ) : null}
-        </View>
+        </Section>
       )}
-    </>
+    </View>
   );
 
   const listFooter: ReactNode =
@@ -345,7 +324,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     !repositories.isError &&
     hasRepositories &&
     selectedIds.length === 0 ? (
-      <Text className="pt-2 text-xs text-destructive">
+      <Text className="px-4 pt-3 text-xs text-destructive">
         {t('securityAgent.repositories.selectAtLeastOne')}
       </Text>
     ) : null;
@@ -362,7 +341,6 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('common.repositories')}
         onBack={onBack}
         headerRight={

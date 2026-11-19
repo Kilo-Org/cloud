@@ -2,14 +2,15 @@ import * as z from 'zod';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import { OwnerTypeSchema, type OwnerType } from './owner';
 import { ClassifierSubtaskTypeSchema, ClassifierTaskTypeSchema } from './taxonomy';
+import { VariantSchema } from './reasoning';
 import { addDuplicateKeyIssues } from './duplicate-keys';
-import { isVirtualAutoModelId } from './virtual-auto-model';
+import { KILO_AUTO_MODEL_NAMESPACE_PREFIX, isVirtualAutoModelId } from './virtual-auto-model';
 
 // ADR 0005: docs/adr/0005-custom-auto-routers.md
 
-export const CUSTOM_ROUTER_MODEL_PREFIX = 'kilo-auto/custom/';
-export const ORG_CUSTOM_ROUTER_MODEL_PREFIX = 'kilo-auto/custom/org/';
 export const RESERVED_USER_CUSTOM_ROUTER_SLUG = 'org';
+export const CUSTOM_ROUTER_MODEL_PREFIX = `${KILO_AUTO_MODEL_NAMESPACE_PREFIX}custom/`;
+export const ORG_CUSTOM_ROUTER_MODEL_PREFIX = `${CUSTOM_ROUTER_MODEL_PREFIX}${RESERVED_USER_CUSTOM_ROUTER_SLUG}/`;
 export const MAX_CUSTOM_ROUTERS_PER_OWNER = 10;
 export const MAX_CUSTOM_ROUTER_ENTRIES = 20;
 export const MAX_CUSTOM_ROUTER_NAME_LENGTH = 100;
@@ -162,6 +163,23 @@ export function customRouterEntryKey(entry: CustomRouterEntryRef): string {
 // deny lists keyed by gateway model IDs never match a client entry.
 export function customRouterCandidateModel(entry: CustomRouterEntryRef): string {
   return entry.kind === 'gateway' ? entry.model : customRouterEntryKey(entry);
+}
+
+/**
+ * A decision's `model` must name the candidate its `entry` resolves to.
+ *
+ * Both decision schemas call this function, so a change to the condition, the
+ * issue path, or the message cannot leave one schema behind. `entry` is optional
+ * because the gateway decision schema still accepts a decision without one.
+ */
+export function refineEntryModelMatch(
+  decision: { model: string; entry?: CustomRouterEntryRef },
+  ctx: z.RefinementCtx
+): void {
+  if (decision.entry == null) return;
+  if (decision.model !== customRouterCandidateModel(decision.entry)) {
+    ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
+  }
 }
 
 export function parseCustomRouterCandidateModel(model: string): CustomRouterEntryRef | null {
@@ -400,7 +418,7 @@ export const CustomRouterDecisionSchema = z
   .object({
     entry: CustomRouterEntryRefSchema,
     model: z.string().min(1),
-    variant: z.string().trim().min(1).nullable(),
+    variant: VariantSchema,
     stale: z.boolean(),
     // True when no routing decision named a servable entry, so the default or first servable
     // entry was used. taskType and subtaskType still report the classification, if any.
@@ -411,9 +429,7 @@ export const CustomRouterDecisionSchema = z
     tableVersion: z.string().nullable(),
   })
   .superRefine((decision, ctx) => {
-    if (decision.model !== customRouterCandidateModel(decision.entry)) {
-      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
-    }
+    refineEntryModelMatch(decision, ctx);
   });
 export type CustomRouterDecision = z.infer<typeof CustomRouterDecisionSchema>;
 
@@ -536,7 +552,6 @@ export async function verifyAutoDecision(
 export const MAX_CLIENT_EVAL_OUTPUT_LENGTH = 1_000_000;
 
 const RouterIdSchema = z.uuid();
-const VariantSchema = z.string().trim().min(1).nullable();
 const CaseIdSchema = z.string().trim().min(1);
 const RepetitionSchema = z.number().int().nonnegative();
 

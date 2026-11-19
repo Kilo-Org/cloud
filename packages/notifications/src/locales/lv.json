@@ -2,8 +2,8 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Tavas aģenta sesijas ir atjauninājums",
-      "lowBalance": "Tava bilancei nepieciešama uzmanība",
+      "cloudAgentSession": "Tavai aģenta sesijai ir atjauninājums",
+      "lowBalance": "Tavai bilancei nepieciešama uzmanība",
       "spendAlert": "Taviem izdevumiem nepieciešama uzmanība",
       "securityFinding": "Drošības atradumam nepieciešama uzmanība",
       "securityUpdate": "Drošības pārbaudei ir atjauninājums",
@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA pārkāpums"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Drošības pārbaudei ir atjauninājums"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Tava Kilo sesija ir gatava vadīšanai no tālruņa"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

@@ -13,13 +13,24 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountLinkedSuccessHeader } from './AccountLinkedSuccessHeader';
 import { AuthProviderIdSchema, getProviderById } from '@/lib/auth/provider-metadata';
+import { CardLoadFailure } from '@/components/CardLoadFailure';
 import { DiscordGuildStatus } from './DiscordGuildStatus';
 
 type LoginMethodsWrapperProps = {
   primaryEmail: string;
+  /**
+   * Where a provider link round trip returns, and whether marketing links stay
+   * out of the page. The app shell passes its own page and sets `shell`.
+   */
+  callbackPath?: string;
+  shell?: boolean;
 };
 
-export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) {
+export function LoginMethodsWrapper({
+  primaryEmail,
+  callbackPath,
+  shell = false,
+}: LoginMethodsWrapperProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [linkedProviderName, setLinkedProviderName] = useState<string | null>(null);
@@ -29,6 +40,7 @@ export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) 
   const {
     data: providersData,
     isLoading: loading,
+    error: providersError,
     refetch: refetchProviders,
   } = useQuery(trpc.user.getAuthProviders.queryOptions());
 
@@ -53,6 +65,22 @@ export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) 
 
   const providers = providersData?.providers || [];
   const hasDiscordLinked = providers.some(p => p.provider === 'discord');
+
+  // A failed read must not render as an account with no sign-in methods: that
+  // is a different answer, and on a shell page it is the only thing on screen.
+  if (providersError && !providersData) {
+    return (
+      <CardLoadFailure
+        title="Could not load your sign-in methods"
+        description={
+          shell
+            ? 'The request did not complete. Try again, or close this window and reopen it from the Kilo App.'
+            : 'The request did not complete. Try again.'
+        }
+        onRetry={() => void refetchProviders()}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -168,16 +196,20 @@ export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) 
           primaryEmail={primaryEmail}
           providers={providers}
           onError={setErrorMessage}
+          callbackPath={callbackPath}
         />
         <ConnectedAccountsCard
           providers={providers}
           onRefetch={refetchProviders}
           onError={setErrorMessage}
         />
-        <PasskeysCard />
+        {/* Passkeys are managed by the app's own Passkeys screen. Enrolling one
+            needs the web session's step-up route, which the shell cookie cannot
+            present, and the app already lists, adds, renames and deletes them. */}
+        {shell ? null : <PasskeysCard />}
       </div>
 
-      <DiscordGuildStatus hasDiscordLinked={hasDiscordLinked} />
+      <DiscordGuildStatus hasDiscordLinked={hasDiscordLinked} shell={shell} />
     </div>
   );
 }

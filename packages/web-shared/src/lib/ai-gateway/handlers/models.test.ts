@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
 import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -179,10 +179,23 @@ describe('GET /api/openrouter/models', () => {
     expect(mockedGetEnhancedOpenRouterModels.mock.calls[0]?.[0]?.fromDb).toBe(readDb);
   });
 
+  test('labels an unexpected upstream catalog shape for the request country', async () => {
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({ error: 'upstream error' } as never);
+
+    const response = await handleModelsRequest(request({ 'x-vercel-ip-country': 'CU' }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, max-age=0, must-revalidate');
+    expect(response.headers.get('Vary')).toBe('x-vercel-ip-country');
+    await expect(response.json()).resolves.toEqual({ error: 'upstream error' });
+  });
+
   test('leaves BYOK availability undefined for unauthenticated requests', async () => {
     const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, max-age=0, must-revalidate');
+    expect(response.headers.get('Vary')).toBe('x-vercel-ip-country');
     await expect(response.json()).resolves.toEqual({ data: [makeModel('public/model')] });
     expect(mockedGetUserByokProviderIds).not.toHaveBeenCalled();
     expect(mockedAddUserByokAvailability).not.toHaveBeenCalled();
@@ -217,6 +230,8 @@ describe('GET /api/openrouter/models', () => {
     const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(response.headers.get('Vary')).toBeNull();
     await expect(response.json()).resolves.toEqual({
       data: [{ ...publicModel, hasUserByokAvailable: true, isFree: false }, directModel],
     });
@@ -350,6 +365,7 @@ describe('GET /api/openrouter/models', () => {
     const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     await expect(response.json()).resolves.toEqual({
       data: [
         {
@@ -421,5 +437,21 @@ describe('GET /api/openrouter/models', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ data: [publicModel] });
+  });
+
+  test('serves the organization catalog without custom routers when loading them fails', async () => {
+    const allowedModel = makeModel('openai/gpt-5.4-mini');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: 'org-1',
+      authFailedResponse: null,
+    } as never);
+    mockedGetAvailableModelsForOrganization.mockResolvedValue({ data: [allowedModel] } as never);
+    mockedListUsableCustomRouters.mockRejectedValue(new Error('database unavailable'));
+
+    const response = await handleModelsRequest(request());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ data: [allowedModel] });
   });
 });

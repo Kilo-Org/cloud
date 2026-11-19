@@ -88,7 +88,10 @@ while IFS= read -r pkg; do
 done <<< "$workspace_dirs"
 
 if [ ${#lint_dirs[@]} -gt 0 ]; then
-  oxlint --config .oxlintrc.json "${lint_dirs[@]}"
+  # The config loads the plugin, so the plugin source is linted by the same
+  # pass; the config's ignorePatterns allow exactly this file through the
+  # blanket **/*.js ignore.
+  oxlint --config .oxlintrc.json oxlint-plugin-drizzle.js "${lint_dirs[@]}"
 fi
 
 if [ ${#mobile_lint_dirs[@]} -gt 0 ]; then

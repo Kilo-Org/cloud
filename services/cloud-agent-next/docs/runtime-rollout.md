@@ -22,9 +22,12 @@ path and Bun version required by the bootstrap. `src/shared/runtime-toolchain.ts
 (`bun`, `rg`, `gh`, `glab`, `pnpm`) to a release archive or registry tarball whose SHA-256 sits
 next to `RUNTIME_DISTRIBUTION`. The Durable Object build installs `bun` and the base tools from those pins,
 checks the downloaded bytes before unpacking or installing, and re-checks the tools it installed by exact
-version and digest before the snapshot is created or accepted.
+version and digest before the snapshot is created or accepted. The bootstrap starts the supervisor, and so
+Kilo, with only `RUNTIME_PROCESS_PATH`, so the build links `npm`, `npx` and `pnpm` into `/usr/local/bin`.
+The same verification, including `BASE_REQUIRED_BINARIES` on that `PATH`, runs on the builder and again on
+the validator, which boots from the new snapshot.
 Downloaded startup installs the selected immutable CLI
-and control release as root. The base digest covers the ABI, Node major, Bun, and base setup commands;
+and control release as root. The base digest covers the ABI, Node major, Bun, base setup commands, and base verification;
 CLI and wrapper changes do not change that digest or require a new snapshot. Existing allocations keep
 their installed release until a new allocation starts. Base dependency changes still require a snapshot
 upgrade. BYOC base snapshots contain no CLI or wrapper. Native image selection does not affect Vercel
@@ -42,10 +45,20 @@ Vercel credential and invoke the deployed `VercelSnapshotBuild`; no new global t
 environment variable is needed.
 
 A stored runtime digest differing from the deployed identity sets `upgradeAvailable` in the settings
-status. It does not invalidate a ready connection or reject new sessions: provider selection checks
-setup readiness, and the BYOC runtime resolver uses the stored snapshot ID. During an upgrade, the
-old ready snapshot remains selected until the validated replacement is projected as ready. A failed
-upgrade retains the old ready snapshot. New allocations use the replacement after activation;
+status. It does not invalidate a ready connection or reject normal sessions: provider selection checks
+setup readiness, and the BYOC runtime resolver uses the stored snapshot ID. A session that needs the
+SCM CLI tools (`scmCliTools`) also needs the stored digest to equal the deployed one, because an older
+base can lack the tools. So after a base change, tool-dependent sessions use platform compute until the
+owner upgrades the runtime. The grouped start path (`startNewSession`) and the ledger path
+(`createSessionWithLedger`) resolve a saved choice, and a saved Vercel choice on an older base falls
+back to platform compute. An explicit Vercel choice fails at allocation with a reason that names
+**Upgrade runtime**. The security-remediation service uses the split prepare flow (`prepareSession`
+without `autoInitiate`, so `registerNewSession`), which does not read saved settings, so remediation
+still runs on platform compute. A build that is in flight across a base-changing deploy can record the
+new digest for a snapshot without the tools; the remedy is another runtime upgrade through the
+`upgradeRuntime` procedure, because the settings page hides **Upgrade runtime** while the digests match.
+During an upgrade, the old ready snapshot remains selected until the validated replacement is
+projected as ready. A failed upgrade retains the old ready snapshot. New allocations use the replacement after activation;
 already-running allocations are not restarted. This does not waive the fixed-Node-path requirement
 above when deliberately enabling downloaded startup on an older base.
 
@@ -66,16 +79,20 @@ is rejected, not a path back to preinstalled startup. The renderer emits only th
 
 ### Kilo v2 harness
 
-A downloaded target can also name `kilo2: { orgIds }`. Without it, new sandboxes select v1.
-The checked-in default uses `kilo2: { orgIds: "*" }` for all organizations and personal accounts.
+A downloaded target can also name `kilo2: { orgIds, allSessionOrgIds? }`. Without it, new sandboxes
+select v1. The checked-in default uses `kilo2: { orgIds: "*" }` for all organizations and personal
+accounts, plus `allSessionOrgIds: ["9d278969-5453-4ae3-a51f-a8d2274a7b56"]` for the Kilo
+organization.
 A sandbox's first allocation selects v2 only when every preparing route has the
 worker-owned `billingOrigin: cloud-agent-web`. Its downloaded start must also pass the organization
 rule for `kilo2.orgIds`: `"*"` admits every account; a UUID list requires one listed organization
-across all preparing routes. Native allocations must be isolated. Code reviews, desktop,
-Agent Manager and other origins stay on v1, including
-routes with a missing origin and sandboxes with mixed origins. This origin restriction applies only
-to v2 selection; downloaded v1 startup is available to every account. A client-supplied
-`createdOnPlatform` cannot select v2. Existing routes without a stored `billingOrigin` select v1.
+across all preparing routes. Native allocations must be isolated. Code reviews, desktop, Agent
+Manager and other origins stay on v1, including routes with a missing origin and sandboxes with mixed
+origins. `kilo2.allSessionOrgIds` admits every origin and native sandbox class for its own accounts,
+and each listed organization must also be inside `kilo2.orgIds` (`"*"` requires `orgIds: "*"`). This
+origin restriction applies only to v2 selection; downloaded v1 startup is available to every account.
+A client-supplied `createdOnPlatform` cannot select v2. Existing routes without a stored
+`billingOrigin` select v1.
 The Sandbox DO stores that harness, and every later allocation of the
 sandbox uses it, because native history does not move between v1 and v2. A sandbox that allocated
 before this record existed stays on v1. The harness is stored after startup preflight and capacity
@@ -88,9 +105,10 @@ Changing the organization scope only affects new sandbox harness selection.
 
 Each publication packages the pinned v1 and v2 CLIs (`PINNED_CLIS` in
 `scripts/runtime-cli-artifact.ts`) with the same control payload. It verifies both on the base and
-records the v2 descriptor in the exact-SHA handoff. Deployment renders `RUNTIME_KILO2_ORG_IDS` and
-`RUNTIME_RELEASE_DESCRIPTOR_KILO2` from the catalog and that handoff, and fails when a `kilo2` target
-has no v2 release. The release names its harness through its CLI executable (`package/bin/kilo2`).
+records the v2 descriptor in the exact-SHA handoff. Deployment renders `RUNTIME_KILO2_ORG_IDS`,
+`RUNTIME_KILO2_ALL_SESSION_ORG_IDS` and `RUNTIME_RELEASE_DESCRIPTOR_KILO2` from the catalog and that
+handoff, and fails when a `kilo2` target has no v2 release. The release names its harness through its
+CLI executable (`package/bin/kilo2`).
 A start whose release harness differs from the sandbox's stored harness fails as
 `invalid_configuration`. Session snapshots are keyed by the selected descriptor, and environment
 snapshots do not depend on the runtime release, so neither needs a harness namespace.

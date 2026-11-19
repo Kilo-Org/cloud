@@ -37,6 +37,9 @@ vi.mock('@/lib/trpc', async () => {
   };
 });
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
+// The hand-off helper imports the browser launcher, which reaches a native
+// module this project cannot load; these states never open it.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: () => ({}) },
@@ -70,6 +73,7 @@ vi.mock('@/components/ui/icons', () => ({
   Clock: 'Clock',
   Cpu: 'Cpu',
   FolderGit2: 'FolderGit2',
+  ShieldCheck: 'ShieldCheck',
   Zap: 'Zap',
 }));
 vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
@@ -151,7 +155,7 @@ beforeEach(() => {
       getConfig: configData,
       getRepositories: repositoriesData,
       list: roles,
-      mintInstallState: { token: 'install-state' },
+      mintHandoff: { path: '/app-shell/handoff?token=handoff-token' },
     };
     return Response.json({ result: { data: data[procedure] } });
   });

@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/empty-state';
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
 import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { MessageSquarePlus } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -199,10 +200,7 @@ export function PrReviewDiscussionList({
         if (item.kind === 'comment') {
           return (
             <View className="px-4 pb-3">
-              <View
-                style={CARD_TOP_PADDING}
-                className="gap-2.5 rounded-xl border border-border bg-card px-3.5 pb-3.5"
-              >
+              <Card style={CARD_TOP_PADDING} className="gap-2.5">
                 <CommentRow
                   comment={item.comment}
                   owner={owner}
@@ -230,7 +228,7 @@ export function PrReviewDiscussionList({
                   }
                   onToggleReaction={noopReactionToggle}
                 />
-              </View>
+              </Card>
             </View>
           );
         }
@@ -270,6 +268,7 @@ export function PrReviewDiscussionList({
         // existing empty copy — new copy belongs to the translation slice.
         <EmptyState
           placement="top"
+          inset="gutter"
           icon={MessageSquarePlus}
           title={t('prReview.discussion.noDiscussion')}
           description={

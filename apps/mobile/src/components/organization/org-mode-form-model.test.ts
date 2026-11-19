@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isOrgModeFormDirty,
-  modeSlugFromName,
   type OrgMode,
   orgModeConfigInput,
   orgModeFormSaveValues,
@@ -45,18 +44,6 @@ function storedMode(overrides: Partial<OrgMode['config']> = {}): OrgMode {
     },
   };
 }
-
-describe('modeSlugFromName', () => {
-  it('folds a name into lowercase words joined by one hyphen', () => {
-    expect(modeSlugFromName('Security Reviewer')).toBe('security-reviewer');
-    expect(modeSlugFromName('  Data   Analyst!  ')).toBe('data-analyst');
-  });
-
-  it('leaves no leading or trailing hyphen', () => {
-    expect(modeSlugFromName('-Docs-')).toBe('docs');
-    expect(modeSlugFromName('###')).toBe('');
-  });
-});
 
 describe('validateOrgModeForm', () => {
   const existing = [
@@ -127,17 +114,42 @@ describe('validateOrgModeForm', () => {
 describe('orgModeFormSaveValues', () => {
   it('derives an empty identifier from the name on create', () => {
     expect(
-      orgModeFormSaveValues(values({ slug: '', name: 'Security Reviewer' }), 'create').slug
+      orgModeFormSaveValues(values({ slug: '', name: 'Security Reviewer' }), 'create', []).slug
     ).toBe('security-reviewer');
   });
 
+  it('derives the fallback past the slugs the organization holds on create', () => {
+    expect(
+      orgModeFormSaveValues(values({ slug: '', name: 'وضع' }), 'create', ['mode', 'mode-2']).slug
+    ).toBe('mode-3');
+  });
+
+  it('derives the fallback for a fold-away name on create, empty slug or not', () => {
+    expect(orgModeFormSaveValues(values({ slug: '', name: '###' }), 'create', []).slug).toBe(
+      'mode'
+    );
+    expect(orgModeFormSaveValues(values({ slug: '', name: '###' }), 'create', ['mode']).slug).toBe(
+      'mode-2'
+    );
+  });
+
+  it('derives nothing from an empty name, so the save is refused as missing', () => {
+    const saved = orgModeFormSaveValues(values({ slug: '', name: '' }), 'create', []);
+    expect(saved.slug).toBe('');
+    expect(saved.name).toBe('');
+    expect(validateOrgModeForm(saved, [])).toEqual({
+      name: 'nameRequired',
+      slug: 'identifierRequired',
+    });
+  });
+
   it('keeps an identifier the person typed on create', () => {
-    expect(orgModeFormSaveValues(values({ slug: 'auditor' }), 'create').slug).toBe('auditor');
+    expect(orgModeFormSaveValues(values({ slug: 'auditor' }), 'create', []).slug).toBe('auditor');
   });
 
   it('never derives one on update, so a cleared identifier is reported missing', () => {
     const cleared = values({ slug: '' });
-    const saved = orgModeFormSaveValues(cleared, 'update');
+    const saved = orgModeFormSaveValues(cleared, 'update', []);
     expect(saved.slug).toBe('');
     expect(validateOrgModeForm(saved, [])).toEqual({ slug: 'identifierRequired' });
   });

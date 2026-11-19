@@ -31,10 +31,12 @@ export function ForceUpdateScreen() {
 
   return (
     <CenteredState>
-      <View className="items-center px-8">
+      <View className="items-center px-4">
         <Download size={48} color={colors.foreground} />
-        <Text className="mt-6 text-center text-2xl font-bold">{t('forceUpdate.title')}</Text>
-        <Text className="mt-3 text-center text-base text-muted-foreground">
+        <Text variant="large" className="mt-6 text-center">
+          {t('forceUpdate.title')}
+        </Text>
+        <Text variant="muted" className="mt-3 text-center">
           {t('forceUpdate.description')}
         </Text>
         <Button className="mt-8 w-full" size="lg" onPress={() => void openStore()}>

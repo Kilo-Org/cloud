@@ -5,7 +5,7 @@ import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import {
-  isInstallStateRefusal,
+  isHandoffRefusal,
   selectScopeEntryLoadFailure,
   selectScopeEntryView,
 } from '@/components/security-agent/scope-entry-render';
@@ -19,9 +19,10 @@ import {
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
 import { SettingsOverviewScreen } from '@/components/security-agent/settings-overview-screen';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
-import { trpcClient } from '@/lib/trpc';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -41,19 +42,21 @@ import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access
  * resolved config already points at a setup state; an unanswered config paints
  * the dashboard frame instead (`DashboardLoadingView`).
  *
- * Sizes are the loaded state's, in px: the `ShieldCheck` mark, the `text-base`
- * title line, two `text-sm` description lines, the `mt-3` the button carries,
- * and the button's `min-h-[44px]` default at the shared `rounded-md`.
+ * Frames come from the spacing scale, not hand-picked pixels: the `ShieldCheck`
+ * bubble, the title line, two description lines, and the state action's own
+ * box — `STATE_ACTION_CLASS`, the frame the loaded `StateAction` paints — at
+ * the shared control radius. A shorter bar sat 12dp above the action the swap
+ * then draws.
  */
 function ScopeEntryBodySkeleton() {
   return (
-    <View className="flex-1 items-center justify-center px-6">
-      <View className="w-full items-center gap-3">
-        <Skeleton className="size-[28px] rounded-full" />
-        <Skeleton className="h-[20px] w-40 rounded" />
-        <Skeleton className="h-[14px] w-full rounded" />
-        <Skeleton className="h-[14px] w-2/3 rounded" />
-        <Skeleton className="mt-3 h-[44px] w-full rounded-md" />
+    <View className={cn('flex-1 items-center justify-center', SCREEN_GUTTER_CLASS)}>
+      <View className="w-full items-center gap-4">
+        <Skeleton className="size-14 rounded-full" />
+        <Skeleton className="h-6 w-40 rounded" />
+        <Skeleton className="h-4 w-full rounded" />
+        <Skeleton className="h-4 w-2/3 rounded" />
+        <Skeleton className={cn(STATE_ACTION_CLASS, 'mt-3 w-36 rounded-md')} />
       </View>
     </View>
   );
@@ -64,7 +67,7 @@ function ScopeEntrySkeleton({ scope }: Readonly<{ scope: string }>) {
   const scopeTitle = useSecurityScopeTitle(scope);
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={scopeTitle} eyebrow={t('common.securityAgent')} />
+      <ScreenHeader title={scopeTitle} eyebrow={t('common.securityAgent')} />
       <ScopeEntryBodySkeleton />
     </View>
   );
@@ -121,23 +124,20 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     isEnabled,
   });
 
-  // Pre-mint a C1 install state token so the web /github-app page
-  // receives it and does not mint a second token.  The return path is
-  // /cloud/sessions — a claimed universal-link route that maps to the
-  // agents tab.
+  // Pre-mint the shell hand-off so the press opens a URL the screen already
+  // holds, and a mount-time failure never replaces the setup screen. Reading
+  // the return edge is what brings the outcome back to this screen.
   const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
   const [mintUrl, setMintUrl] = useState<string | null>(null);
   const [isMinting, setIsMinting] = useState(false);
   const cancelledRef = useRef(false);
   const mintUrlRef = useRef<string | null>(null);
-  // Starting a GitHub installation for an organization is an organization-manage
-  // role's action, and the server is the only authority on that role:
-  // `githubApps.mintInstallState` resolves the caller through
-  // `ensureOrganizationAccess`, which also elevates a Kilo admin and accepts a
-  // parent-organization role — neither is visible in the device's membership
-  // read. So the press is offered until the server answers, and its
-  // `UNAUTHORIZED` answer retires the press for the role notice.
-  const [installRefused, setInstallRefused] = useState(false);
+  // The hand-off mint resolves the caller's organization membership on the
+  // server, which is also where an elevated (Kilo admin) or inherited
+  // (parent-organization) membership is known — neither is visible in the
+  // device's membership read. So the press is offered until the server answers,
+  // and its `UNAUTHORIZED` answer retires the press for the owner notice.
+  const [handoffRefused, setHandoffRefused] = useState(false);
 
   // A failed mint must not replace the setup screen with an error-only page:
   // the setup state (with the audit-report action) stays usable and the press
@@ -152,25 +152,24 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
         setMintUrl(null);
         mintUrlRef.current = null;
         setIsMinting(true);
-        setInstallRefused(false);
+        setHandoffRefused(false);
       }
       try {
-        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-          organizationId: orgId ?? undefined,
-          returnTo: '/cloud/sessions',
+        const url = await appShellHandoffUrl({
+          page: 'github-app',
+          ...(orgId ? { organizationId: orgId } : {}),
         });
-        const url = getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token);
         mintUrlRef.current = url;
         if (!cancelledRef.current) {
           setMintUrl(url);
-          setInstallRefused(false);
+          setHandoffRefused(false);
         }
         return true;
       } catch (error) {
-        // A refused role is the answer this screen acts on; a transport or
+        // A refused membership is the answer this screen acts on; a transport or
         // server failure leaves the press in place to retry.
-        if (!cancelledRef.current && isInstallStateRefusal(error)) {
-          setInstallRefused(true);
+        if (!cancelledRef.current && isHandoffRefusal(error)) {
+          setHandoffRefused(true);
         }
         return false;
       } finally {
@@ -309,7 +308,6 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
-            className="px-6"
             title={scopeTitle}
             eyebrow={t('common.securityAgent')}
             headerRight={auditAction}
@@ -324,10 +322,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
               // The Code Reviewer's connect gate shows the same role rule, but
               // its sentence also restates that the provider is unconnected,
               // which this heading already says; the narrower notice leaves one
-              // message on the screen. It is a personal scope's mint that takes
-              // no organization role, so only the server's refusal sets it.
+              // message on the screen. It is a personal scope's mint that asks
+              // no organization for access, so only the server's refusal sets
+              // it.
               readOnlyNotice={
-                installRefused
+                handoffRefused
                   ? t('securityAgent.scopeEntry.connectOwnerOnly', { platform: t('common.github') })
                   : undefined
               }
@@ -349,7 +348,6 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
-            className="px-6"
             title={scopeTitle}
             eyebrow={t('common.securityAgent')}
             headerRight={auditAction}

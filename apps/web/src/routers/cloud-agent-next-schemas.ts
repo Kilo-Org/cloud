@@ -953,6 +953,12 @@ export const baseGetSessionNextOutputSchema = z.object({
   githubRepo: z.string().optional(),
   gitUrl: z.string().optional(),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
+  /** The GitHub connection this session's repository was prepared with. */
+  githubIntegrationId: z.string().optional(),
+  /** The Bitbucket workspace that owns this session's repository. */
+  bitbucketWorkspaceUuid: z.string().optional(),
+  /** The Bitbucket repository this session was prepared for. */
+  bitbucketRepositoryUuid: z.string().optional(),
 
   // Execution params
   prompt: z.string().optional(),
@@ -1001,6 +1007,12 @@ export const baseGetSessionNextOutputSchema = z.object({
   // Versioning
   timestamp: z.number(),
   version: z.number(),
+
+  /** Durability watermark: newest persisted event ID from the session event log. */
+  latestEventId: z.number().int().positive().nullable().optional(),
+
+  // `updateCursor` from the Worker's event log is deliberately NOT projected:
+  // no web consumer reads it, and it is an internal log offset.
 });
 
 // Schema for answering a question

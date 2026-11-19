@@ -44,6 +44,9 @@ cloud-agent-next refactor.
    Next.js. A real-model session (`kilo-auto/efficient`, etc.) uses the same
    Worker URL and does not need a restart.
 
+If a Kilo Cloud sandbox image build fails with a certificate error while
+downloading `glab`, see [Docker build TLS trust](../../../../.kilo/skills/cloud-agent-sandbox/SKILL.md#docker-build-tls-trust).
+
 ## Kilo v2 drain checks
 
 Drain completion applies only to Kilo v2 (`0.0.0-v2-85` or newer), not the default v1 runtime.
@@ -479,6 +482,32 @@ when the matrix includes worktree scenarios. The local dev container caps in
 The matrix starts with `cold-hot`, which pays one cold sandbox boot and then
 runs several hot same-session turns.
 
+### Workspace MCP authority check
+
+`workspace-mcp-authority-local.ts` follows the built-in `kilo-cloud-agent` MCP
+connection of a two-chat workspace through expiry, renewal, a sandbox restart,
+deletion of the first chat and a pepper revocation. It sends real MCP
+`tools/list` and `tools/call` requests to the local kilo-mcp. Runtime
+delegations normally last 24 hours, so add a development-only override to the
+local `services/cloud-agent-next/.dev.vars` and restart `cloud-agent-next`:
+
+```sh
+RUNTIME_AUTHORIZATION_LIFETIME_MS=480000
+```
+
+The Worker reads it only when `ENVIRONMENT=development`; never add it to
+`wrangler.jsonc`. Select steps with `WORKSPACE_MCP_STEPS` (default
+`expiry,restart`; also `delete-root` and `revoke`):
+
+```sh
+WORKSPACE_MCP_STEPS=expiry,restart,delete-root,revoke \
+  WORKER_URL=http://localhost:8794 KILO_MCP_URL=http://localhost:8815/mcp \
+  pnpm exec tsx services/cloud-agent-next/test/e2e/workspace-mcp-authority-local.ts
+```
+
+The script prints one JSON observation per step and does not assert. The run
+takes about 15 minutes because it waits for real expiry.
+
 ### Teardown
 
 The shared gate (`runSharedScenario`) owns teardown for every profile, so
@@ -674,8 +703,10 @@ Driver env: `E2E_PROFILE=deployed`, `WORKER_URL`,
 `E2E_BACKEND_URL=https://api.kilo.ai`, `FAKE_LLM_URL`, and a user token from
 either `E2E_USER_TOKEN` or `E2E_AUTH_FILE`; optional `E2E_MODEL` (default
 `kilo/fake-deterministic`) and `E2E_GIT_URL`. `E2E_USER_TOKEN`, when set and
-non-empty, is an ordinary personal Kilo API token presented verbatim; it needs
-no separate `userId` or `email`. Otherwise `E2E_AUTH_FILE` must name a mode-600
+non-empty, is an ordinary personal Kilo API token used as the source credential;
+it needs no separate `userId` or `email`. The driver exchanges it for
+short-lived control tokens and uses it directly for backend requests,
+including stream tickets. Otherwise `E2E_AUTH_FILE` must name a mode-600
 JSON file carrying the `token` field. When neither supplies a token the run fails
 and names both variables. An empty value counts as unset; a whitespace-padded
 value is present but rejected, never trimmed.
@@ -692,8 +723,9 @@ run, so `releaseGate`, `fetchFakeWaiters`, `fetchFakeRequests`,
 configuration; precedence is env then auth file. The deployed profile reads the
 auth file at most once and only when a source needs it: never when `E2E_USER_TOKEN`
 and `FAKE_LLM_ADMIN_TOKEN` are both set. The
-deployed profile never reads `.dev.vars`, root env files, or Postgres, and never
-mints valid authentication credentials or stream tickets.
+deployed profile never reads `.dev.vars`, root env files, or Postgres. It never
+mints JWTs itself: it exchanges the source token for short-lived control tokens
+and fetches stream tickets from the live backend.
 The `auth-reject` negative probe deliberately signs one **invalid** JWT
 (wrong secret); it is used only for that bad-signature probe and is never
 presented as a valid credential.
@@ -706,16 +738,22 @@ The auth file, named by the optional `E2E_AUTH_FILE`, is JSON
 identity and the fake-llm admin bearer as one alternative to `E2E_USER_TOKEN` and
 `FAKE_LLM_ADMIN_TOKEN`. The token must be an **ordinary
 personal Kilo API token** (the `generateApiToken` family), obtained from the
-user's personal API key or CLI token flow.
+user's personal API key or CLI token flow. The driver exchanges it for
+short-lived Cloud Agent control tokens (`POST /api/cloud-agent-next/token`) and
+presents those to the Worker; stream-ticket requests still use the source token.
 Session/control tokens, organization tokens, and delegated/runtime tokens are
-refused with a diagnostic: they take the runtime-authorization path, and
-admission then fails with `Model catalog authentication unavailable`. The token
-is never printed.
+refused as the **source** with a diagnostic. Neither token is printed. A
+`503 Service Unavailable` from the exchange means Cloud Agent token issuance is
+disabled on the backend (`CLOUD_AGENT_RESOURCE_TOKENS_ENABLED`).
 
 Exact run command, from `services/cloud-agent-next`:
 
 ```bash
-E2E_PROFILE=deployed pnpm exec tsx test/e2e/run.ts cold-hot echo:hi
+E2E_PROFILE=deployed \
+WORKER_URL=https://cloud-agent-e2e-test.engineering-e11.workers.dev \
+FAKE_LLM_URL=https://fake-llm.engineering-e11.workers.dev \
+E2E_BACKEND_URL=https://api.kilo.ai \
+pnpm exec tsx test/e2e/run.ts cold-hot echo:hi
 ```
 
 Every runnable scenario is a shared definition in `scenarios-shared*.ts`.
@@ -830,6 +868,12 @@ pnpm --filter cloud-agent-next exec tsx test/e2e/matrix.ts --profile local-http 
 pnpm --filter cloud-agent-next exec tsx test/e2e/matrix.ts --profile local --only cold,worktree-chat
 ```
 
+The local Docker profile mints a modern control token with a runtime admission.
+The `local-http` and `deployed` profiles exchange their source token for a
+short-lived control token; `local-http` therefore needs
+`SHARED_RESOURCE_TOKENS_ENABLED=true` and
+`CLOUD_AGENT_RESOURCE_TOKENS_ENABLED=true` on the local web app.
+
 `matrix.ts` runs every entry in `SHARED_SCENARIOS` under one concurrency pool,
 one scenario per child process (`run.ts`), passing each scenario's
 `defaultConversation` and `defaultTimeoutMs`. The profile is `--profile`, else
@@ -865,9 +909,11 @@ scenario budget plus ten minutes) is killed and reported as a failure. When
 `GITHUB_STEP_SUMMARY` is set the runner appends its `Summary:` line to that file.
 
 The `cloud-agent-e2e-tests` GitHub workflow
-(`.github/workflows/cloud-agent-e2e-tests.yml`) is `workflow_dispatch`-only and
-runs `e2e:parallel` as ONE job — no `plan`, matrix, or `aggregate` jobs — with
-`E2E_PARALLEL=4`, and uploads `e2e.log`. Job failure is the runner's exit code.
+(`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`
+and `workflow_call`. The `cloud-agent-e2e-nightly` workflow calls it after
+deploying the e2e stack at 03:37 UTC each day. It runs `e2e:parallel` as one
+job and uploads `e2e.log`. Its `parallel` input defaults to `4` and sets
+`E2E_PARALLEL`; `only` selects scenarios. Job failure is the runner's exit code.
 The workflow keeps its workflow-level `concurrency` only. Use `run.ts <name> _`
 for a focused single scenario.
 
@@ -877,6 +923,9 @@ not proof the container was destroyed — a returned teardown can leave the
 allocation `stopping`. Capability gaps are reported as `unsupported`, not
 failures: the deployed profile marks a Docker-only flow (`sandboxFaults`,
 `gates`) `unsupported` and does not spawn it.
+When the last root session requires workspace deletion, the gate reads its
+workspace and Kilo session ids, then calls `deleteWorktree` with a sole-session
+fence and a separate 90 s client budget.
 
 Cold boots contend on container provisioning, so `all` maximises the chance of a
 container cold-start timeout showing up as a false failure; the default trades

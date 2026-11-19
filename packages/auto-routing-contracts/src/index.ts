@@ -1,12 +1,17 @@
 import * as z from 'zod';
 import { NormalizedClassifierInputSchema } from './input';
 import { OwnerTypeSchema } from './owner';
-import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
+import {
+  ReasoningEffortSchema,
+  refineVariantExclusivity,
+  ReasoningComplexitySchema,
+  VariantSchema,
+} from './reasoning';
 import {
   CustomRouterClientEntryIdSchema,
   CustomRouterEntryRefSchema,
   CustomRouterReferenceSchema,
-  customRouterCandidateModel,
+  refineEntryModelMatch,
 } from './custom-router';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import {
@@ -93,7 +98,7 @@ export const ClassifierOutputSchema = z
     taskType: ClassifierTaskTypeSchema,
     subtaskType: ClassifierSubtaskTypeSchema,
     contextComplexity: z.enum(['small', 'medium', 'large']),
-    reasoningComplexity: z.enum(['low', 'medium', 'high']),
+    reasoningComplexity: ReasoningComplexitySchema,
     riskLevel: z.enum(['low', 'medium', 'high']),
     executionMode: z.enum([
       'answer_only',
@@ -128,7 +133,7 @@ export const AutoRoutingDecisionSchema = z
     source: z.literal('benchmark'),
     tableVersion: z.string().nullable(),
     // Canonical catalog variant key the chosen model was benchmarked with.
-    variant: z.string().trim().min(1).nullable().optional(),
+    variant: VariantSchema.optional(),
     // Legacy effort the chosen model was benchmarked with; retained for
     // rolling deploy reads. Prefer `variant` when present.
     reasoningEffort: ReasoningEffortSchema.nullable().optional(),
@@ -151,9 +156,7 @@ export const AutoRoutingDecisionSchema = z
   })
   .superRefine((decision, ctx) => {
     refineVariantExclusivity(decision, ctx, 'Decision');
-    if (decision.entry && decision.model !== customRouterCandidateModel(decision.entry)) {
-      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
-    }
+    refineEntryModelMatch(decision, ctx);
     if (
       decision.fallback !== true &&
       (decision.taskType === null ||

@@ -80,7 +80,7 @@ the tables and columns. Set `SET LOCAL lock_timeout` in each transaction, use
 snapshot and journal as generated. See `0317_drop_briefing_legacy_objects.sql`.
 
 Only intentional `UPDATE` or `INSERT` data backfills may be appended after the
-generated DDL, separated with the exact marker `-->  statement-breakpoint`.
+generated DDL, separated with the exact marker `--> statement-breakpoint`.
 Prefer one generated migration per unshipped feature branch.
 
 Load `database-migrations` for shared PostgreSQL migration work. Load

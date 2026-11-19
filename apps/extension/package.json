@@ -2,7 +2,7 @@
   "name": "kilo-extension",
   "description": "Side-panel AI chat agent. Use open-weight or frontier models.",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "scripts": {
     "dev": "wxt --port 3001",
@@ -50,7 +50,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@playwright/test": "1.58.2",
+    "@playwright/test": "1.65.0",
     "@tailwindcss/vite": "4.3.1",
     "@testing-library/dom": "10.4.1",
     "@testing-library/react": "16.3.2",
@@ -58,6 +58,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/selenium-webdriver": "^4.35.6",
+    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "catalog:vitest5",
     "@wxt-dev/module-react": "1.2.2",
     "geckodriver": "^6.1.0",
@@ -65,8 +66,10 @@
     "selenium-webdriver": "^4.45.0",
     "tailwindcss": "4.3.1",
     "typescript": "catalog:",
+    "vite": "8.1.7",
     "vitest": "catalog:vitest5",
     "web-ext": "10.4.0",
+    "ws": "8.21.0",
     "wxt": "0.20.26"
   }
 }

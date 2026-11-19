@@ -55,6 +55,9 @@
     },
   ],
   "vars": {
+    // Deployment environment shared with the token minters' `env` claim
+    // (`process.env.NODE_ENV` on the web app): admission refused on mismatch.
+    "ENVIRONMENT": "production",
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
     "GITHUB_APP_SLUG": "kiloconnect",
     "GITHUB_APP_BOT_USER_ID": "240665456",
@@ -64,6 +67,7 @@
     "CLI_TIMEOUT_SECONDS": "900",
     "REAPER_INTERVAL_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
+    "WORKSPACE_ARTIFACTS_BUCKET_NAME": "cloud-agent-workspace-artifacts",
     // The web origins that open /stream and /terminal. The staging web target
     // reaches this Worker too, because cloud-agent-next has no staging
     // deployment of its own.
@@ -172,6 +176,10 @@
       "binding": "R2_BUCKET",
       "bucket_name": "kilocode-sessions",
     },
+    {
+      "binding": "WORKSPACE_ARTIFACTS_BUCKET",
+      "bucket_name": "cloud-agent-workspace-artifacts",
+    },
   ],
   // Native Cloudflare Containers is the only sandbox runtime. The retired
   // SDK-backed sandbox classes keep no container or binding; their historical
@@ -209,6 +217,10 @@
         "name": "SANDBOX_SESSION",
       },
       {
+        "class_name": "CloudAgentWorkspace",
+        "name": "CLOUD_AGENT_WORKSPACE",
+      },
+      {
         "class_name": "SandboxContainers",
         "name": "SANDBOX_CONTAINERS",
       },
@@ -219,6 +231,10 @@
       {
         "class_name": "VercelSnapshotBuild",
         "name": "VERCEL_SNAPSHOT_BUILD",
+      },
+      {
+        "class_name": "PreviewTunnel",
+        "name": "PREVIEW_TUNNEL",
       },
     ],
   },
@@ -293,6 +309,15 @@
         "SandboxCodeReviewContainment",
       ],
     },
+    {
+      "new_sqlite_classes": ["CloudAgentWorkspace"],
+      "tag": "v16",
+    },
+    // Cloudflare refuses `wrangler rollback` to a version before this migration.
+    {
+      "new_sqlite_classes": ["PreviewTunnel"],
+      "tag": "v17",
+    },
   ],
   /**
    * Hyperdrive Bindings
@@ -356,6 +381,7 @@
         },
       ],
       "vars": {
+        "ENVIRONMENT": "development",
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
         "GITHUB_APP_SLUG": "kiloconnect-development",
@@ -367,6 +393,7 @@
         "CLI_TIMEOUT_SECONDS": "900",
         "REAPER_INTERVAL_MS": "300000",
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
+        "WORKSPACE_ARTIFACTS_BUCKET_NAME": "cloud-agent-workspace-artifacts-dev",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
@@ -413,6 +440,10 @@
           "bucket_name": "kilocode-sessions-dev",
         },
         {
+          "binding": "WORKSPACE_ARTIFACTS_BUCKET",
+          "bucket_name": "cloud-agent-workspace-artifacts-dev",
+        },
+        {
           "binding": "RUNTIME_RELEASE_BUCKET",
           "bucket_name": "cloud-agent-runtime-dev",
         },
@@ -448,6 +479,10 @@
             "name": "SANDBOX_SESSION",
           },
           {
+            "class_name": "CloudAgentWorkspace",
+            "name": "CLOUD_AGENT_WORKSPACE",
+          },
+          {
             "class_name": "SandboxContainers",
             "name": "SANDBOX_CONTAINERS",
           },
@@ -458,6 +493,10 @@
           {
             "class_name": "VercelSnapshotBuild",
             "name": "VERCEL_SNAPSHOT_BUILD",
+          },
+          {
+            "class_name": "PreviewTunnel",
+            "name": "PREVIEW_TUNNEL",
           },
         ],
       },

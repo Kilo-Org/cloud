@@ -233,9 +233,9 @@ function layout(node: TestRenderer.ReactTestInstance, y: number) {
 }
 
 /**
- * The panel root, or the block it renders while expanded, found by the class
- * token that identifies it inside the panel. Both are the views whose layout
- * the reveal depends on. Matched by token, not by the whole class list, so a
+ * The panel root, or the block it renders while expanded, found by the handle
+ * that identifies it inside the panel. Both are the views whose layout the
+ * reveal depends on. Matched by token, not by the whole class list, so a
  * styling change to either view does not have to be mirrored here.
  */
 function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
@@ -250,6 +250,11 @@ function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
     throw new Error(`no view with layout class ${token}`);
   }
   return found;
+}
+
+/** The panel root: the view whose own offset the reveal reports. */
+function panelRoot(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findByProps({ testID: 'advanced-config-panel' });
 }
 
 function byLabel(renderer: TestRenderer.ReactTestRenderer, label: string) {
@@ -276,14 +281,14 @@ function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
-/** The remaining-characters counter nodes, which carry the counted label. */
+/** The remaining-characters rows, which show the counted phrase as their text. */
 function counterTexts(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root
     .findAllByType('Text' as never)
     .filter(
       node =>
-        typeof node.props.accessibilityLabel === 'string' &&
-        node.props.accessibilityLabel.includes('characters remaining')
+        typeof node.props.children === 'string' &&
+        node.props.children.endsWith('characters remaining')
     );
 }
 
@@ -401,7 +406,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ onRequestReveal });
 
     // The collapsed panel already reports where it sits in the scroll content.
-    layout(layoutView(renderer, 'mt-5'), 812);
+    layout(panelRoot(renderer), 812);
     press(byLabel(renderer, 'Advanced Configuration'));
     // The reveal waits for the expanded block: a scroll issued at the tap would
     // clamp against the collapsed content height and move nothing.
@@ -422,7 +427,7 @@ describe('AdvancedConfigPanel', () => {
 
     // Re-expanding reveals against the offset the panel last reported.
     press(byLabel(renderer, 'Advanced Configuration'));
-    layout(layoutView(renderer, 'mt-5'), 640);
+    layout(panelRoot(renderer), 640);
     layout(layoutView(renderer, 'mt-3'), 690);
     expect(onRequestReveal).toHaveBeenCalledTimes(2);
     expect(onRequestReveal).toHaveBeenLastCalledWith(640);
@@ -574,7 +579,9 @@ describe('AdvancedConfigPanel', () => {
 
     press(buttonByText(renderer, 'Add command'));
     typeInto(renderer, 'Command 1', 'a'.repeat(470));
-    expect(counterTexts(renderer).map(node => node.props.children)).toEqual([30]);
+    expect(counterTexts(renderer).map(node => node.props.children)).toEqual([
+      '30 characters remaining',
+    ]);
     expect(texts(renderer)).not.toContain('The command is limited to 500 characters');
 
     // At the bound the sentence replaces the count, so only one line is present.

@@ -1,5 +1,6 @@
 import type { SessionId } from './types/ids.js';
 import type { EnvironmentBuild } from './environment-build/environment-build-do.js';
+import type { PreviewTunnel } from './preview-tunnel/preview-tunnel-do.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
@@ -11,6 +12,7 @@ import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-a
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
+import type { CloudAgentWorkspaceDO } from './control-plane/workspace/workspace-do.js';
 import type { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 import type { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
@@ -29,10 +31,7 @@ import type { SecretBinding } from './auth.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
 import { SESSION_ID_RE } from './shared/protocol.js';
-import {
-  CONTROL_RUNTIME_RESERVED_ENV_VARS,
-  PNPM_STORE_ENV_VAR,
-} from './shared/runtime-environment.js';
+import { findReservedEnvVarName, RESERVED_ENV_VARS_MESSAGE } from './shared/runtime-environment.js';
 
 export const sessionIdSchema = z.string().regex(SESSION_ID_RE, 'Invalid session ID format');
 
@@ -104,14 +103,6 @@ export function parseManagedBitbucketCloneUrl(
   return parseBitbucketCloudCloneUrl(repositoryUrl, true);
 }
 
-export const RESERVED_ENV_VARS = [
-  'HOME',
-  'SESSION_ID',
-  'SESSION_HOME',
-  PNPM_STORE_ENV_VAR,
-  ...CONTROL_RUNTIME_RESERVED_ENV_VARS,
-] as const;
-
 export const envVarsSchema = z
   .record(
     z.string().max(Limits.MAX_ENV_VAR_KEY_LENGTH),
@@ -120,15 +111,9 @@ export const envVarsSchema = z
   .refine(obj => Object.keys(obj).length <= Limits.MAX_ENV_VARS, {
     message: `Maximum ${Limits.MAX_ENV_VARS} environment variables allowed`,
   })
-  .refine(
-    obj => {
-      const keys = Object.keys(obj);
-      return !keys.some(key => (RESERVED_ENV_VARS as readonly string[]).includes(key));
-    },
-    {
-      message: `Cannot set reserved environment variables: ${RESERVED_ENV_VARS.join(', ')}. These are managed by the system.`,
-    }
-  );
+  .refine(obj => findReservedEnvVarName(Object.keys(obj)) === undefined, {
+    message: RESERVED_ENV_VARS_MESSAGE,
+  });
 
 /** Unique identifier for a sandbox (container). Covers hash-based prefixes, per-session IDs, and legacy `__`-delimited formats. */
 export type SandboxId =
@@ -470,6 +455,12 @@ export type GitTokenService = {
 
 export type Env = {
   AI?: Ai;
+  /**
+   * Deployment environment for runtime-token admission checks; the web app
+   * mints control tokens with the same value (`process.env.NODE_ENV`),
+   * production with the top-level config and development with `env.dev`.
+   */
+  ENVIRONMENT?: string;
   CLOUD_AGENT_SENTRY_DSN?: string;
   CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
   CF_VERSION_METADATA?: { id: string };
@@ -480,10 +471,14 @@ export type Env = {
   VERCEL_SNAPSHOT_BUILD?: DurableObjectNamespace<VercelSnapshotBuild>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
+  /** One Cloud Agent authority and child registry per workspace (`ownerId:workspace_<uuid>`). */
+  CLOUD_AGENT_WORKSPACE: DurableObjectNamespace<CloudAgentWorkspaceDO>;
   /** Durable Object namespace for DO-managed Cloudflare containers (control-plane only) */
   SANDBOX_CONTAINERS: DurableObjectNamespace<SandboxContainers>;
   /** One environment build coordinator per repository environment id. */
   ENVIRONMENT_BUILD: DurableObjectNamespace<EnvironmentBuild>;
+  /** One preview tunnel per sandbox allocation, named `<sandboxId>:<allocationId>`. */
+  PREVIEW_TUNNEL: DurableObjectNamespace<PreviewTunnel>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
@@ -498,6 +493,10 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
+  /** Private R2 bucket for workspace artifacts synchronized from `/artifacts`. */
+  WORKSPACE_ARTIFACTS_BUCKET: R2Bucket;
+  /** Bucket name used as the S3 bucket in presigned artifact download URLs. */
+  WORKSPACE_ARTIFACTS_BUCKET_NAME?: string;
   /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;
@@ -508,6 +507,8 @@ export type Env = {
   RUNTIME_RELEASE_DESCRIPTOR?: string;
   /** Comma-separated org UUIDs, or `*` for all accounts' new cloud-agent-web sandboxes. */
   RUNTIME_KILO2_ORG_IDS?: string;
+  /** Comma-separated org UUIDs, or `*`, that select Kilo v2 from every session origin. */
+  RUNTIME_KILO2_ALL_SESSION_ORG_IDS?: string;
   /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
   RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */

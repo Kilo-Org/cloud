@@ -10,6 +10,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   applyMistralModelSettings,
+  applyMistralThinkingRequestTransform,
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
@@ -20,7 +21,10 @@ import {
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
-import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import {
+  applyOpenAiModelSettings,
+  isOpenAiModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import {
   isGatewayUserByokProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -31,6 +35,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
 import { resolvePreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import {
   ReasoningDetailsTransform,
@@ -67,6 +72,8 @@ import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta'
 import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gateway/providers/add-missing-tool-schema-enum-types';
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
+import { repairGeminiToolSchemas } from '@kilocode/web-shared/lib/ai-gateway/providers/repair-gemini-tool-schemas';
+import { moveInvalidToolPropertyKeys } from '@kilocode/web-shared/lib/ai-gateway/providers/move-invalid-tool-property-keys';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import { removeWhitespaceOnlyMessages } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 import {
@@ -96,11 +103,16 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
     delete message.reasoning;
 
     const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
+    const toolCallsById = new Map<string, Record<string, unknown>>();
     for (const toolCall of toolCalls) {
       const legacySignature = toolCall.thoughtSignature;
       delete toolCall.thoughtSignature;
       if (typeof legacySignature === 'string') {
         setGeminiThoughtSignature(toolCall, legacySignature);
+      }
+      // First write wins, so a duplicate id keeps the earliest tool call.
+      if (typeof toolCall.id === 'string' && !toolCallsById.has(toolCall.id)) {
+        toolCallsById.set(toolCall.id, toolCall);
       }
     }
 
@@ -120,10 +132,7 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
         continue;
       }
 
-      const toolCall =
-        typeof detail.id === 'string'
-          ? toolCalls.find(candidate => candidate.id === detail.id)
-          : undefined;
+      const toolCall = typeof detail.id === 'string' ? toolCallsById.get(detail.id) : undefined;
       setGeminiThoughtSignature(toolCall ?? message, detail.data);
     }
   }
@@ -301,6 +310,9 @@ export function applyReasoningDetailsTransform(
       replaceReasoningObjectWithReasoningEffort(requestToMutate);
       mapReasoningDetailsToReasoning(requestToMutate.body);
       break;
+    case ReasoningDetailsTransform.MistralThinking:
+      applyMistralThinkingRequestTransform(requestToMutate);
+      break;
     case null:
       break;
   }
@@ -336,6 +348,8 @@ export async function applyProviderSpecificLogic(
 
   if (isGeminiModel(requestedModel)) {
     sanitizeJsonRefToolResults(requestToMutate);
+    // Gemini rejects tools with "schema specified other fields alongside any_of. When using any_of, it must be the only field set."
+    repairGeminiToolSchemas(requestToMutate);
   }
 
   if (isMuseModel(requestedModel)) {
@@ -346,6 +360,8 @@ export async function applyProviderSpecificLogic(
   if (isClaudeModel(requestedModel)) {
     // Anthropic rejects tools with "input_schema does not support oneOf, allOf, or anyOf at the top level"
     removeTopLevelToolSchemaCombinators(requestToMutate);
+    // Anthropic rejects tools with "input_schema.properties: Property keys should match pattern '^[a-zA-Z0-9_.-]{1,64}$'"
+    moveInvalidToolPropertyKeys(requestToMutate);
   }
 
   if (isKimiModel(requestedModel)) {
@@ -384,9 +400,18 @@ export async function applyProviderSpecificLogic(
   if (isAutoSmallFreeModel(requestedModel)) {
     requestToMutate.body.model = AUTO_SMALL_FREE_MODEL_UPSTREAM_ID;
   }
+  if (provider.type === 'openrouter' && requestedModel.startsWith('~')) {
+    // Kilo pins a latest alias to its stored target, so OpenRouter serves that target rather than
+    // the newest model it would pick.
+    requestToMutate.body.model = await resolveOpenRouterModelAlias(requestedModel);
+  }
 
   if (isClaudeModel(requestedModel)) {
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
+  }
+
+  if (isOpenAiModel(requestedModel)) {
+    applyOpenAiModelSettings(requestToMutate);
   }
 
   // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
@@ -418,11 +443,12 @@ export async function applyProviderSpecificLogic(
   if (provider.type === 'vercel') {
     // A user's own Vercel AI Gateway key is shaped like a managed request: the
     // user's account pays and the provider routing settings still apply.
+    // The inference region pins only a route Kilo pays for; a user's own key is exempt.
     await applyVercelSettings(
       requestedModel,
       requestToMutate,
       usesUserGatewayKey ? null : userByok,
-      dataRegion
+      userByok === null ? dataRegion : null
     );
   }
 

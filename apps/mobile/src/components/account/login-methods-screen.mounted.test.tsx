@@ -1,4 +1,4 @@
-import { createElement, type ElementType } from 'react';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -21,11 +21,17 @@ const state = vi.hoisted(() => ({
   confirm: vi.fn(),
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
-  openExternalUrl: vi.fn(),
+  openAppShellHandoff: vi.fn(),
   invalidateQueries: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  View: 'View',
+  useColorScheme: () => 'light',
+  useWindowDimensions: () => ({ width: 390, height: 844, scale: 2, fontScale: 1 }),
+}));
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
   // hooks the screen calls are replaced.
@@ -53,7 +59,9 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: state.confirm, dialog: null }),
 }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
+vi.mock('@/lib/app-shell-handoff', () => ({
+  openAppShellHandoff: state.openAppShellHandoff,
+}));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/trpc', () => ({
@@ -69,16 +77,17 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Plus: 'Plus' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 
-const BUTTON = 'Button' as ElementType;
 const LAST_METHOD = "You can't unlink your only sign-in method. Link another method first.";
 
 let renderer: ReactTestRenderer | undefined = undefined;
@@ -111,7 +120,13 @@ function rerender() {
 }
 
 function unlinkButtons(root: ReactTestRenderer['root']) {
-  return root.findAll(node => Object.is(node.type, BUTTON) && node.props.accessibilityLabel);
+  return root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      node.props.accessibilityRole === 'button' &&
+      typeof node.props.accessibilityLabel === 'string' &&
+      node.props.accessibilityLabel.startsWith('Unlink')
+  );
 }
 
 /** The row note that states the last-method rule under a blocked row. */
@@ -143,7 +158,7 @@ beforeEach(() => {
   state.mutations = [];
   state.mutate.mockClear();
   state.confirm.mockClear();
-  state.openExternalUrl.mockClear();
+  state.openAppShellHandoff.mockClear();
   state.invalidateQueries.mockClear();
 });
 
@@ -301,7 +316,9 @@ describe('LoginMethodsScreen', () => {
   it('opens the connected accounts page to link another provider', async () => {
     const root = await mount();
     const linkRow = root.findAll(
-      node => Object.is(node.type, 'ConfigureRow') && node.props.title === 'Link another provider'
+      node =>
+        Object.is(node.type, 'Pressable') &&
+        node.findAll(child => child.props.children === 'Link another provider').length > 0
     );
 
     const [firstRow] = linkRow;
@@ -312,8 +329,8 @@ describe('LoginMethodsScreen', () => {
       (firstRow.props.onPress as () => void)();
     });
 
-    expect(state.openExternalUrl).toHaveBeenCalledWith(
-      'https://app.example.test/connected-accounts',
+    expect(state.openAppShellHandoff).toHaveBeenCalledWith(
+      { page: 'connected-accounts' },
       expect.objectContaining({ retryOnError: true })
     );
   });

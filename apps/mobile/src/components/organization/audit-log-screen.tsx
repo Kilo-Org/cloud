@@ -1,7 +1,7 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { memo, type ReactNode, useCallback } from 'react';
+import { memo, type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewStyle } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { auditActionLabel } from '@/components/organization/audit-log-action-label';
@@ -12,21 +12,27 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { ScrollText } from '@/components/ui/icons';
+import { Card } from '@/components/ui/card';
+import { ChevronDown, ChevronUp, ScrollText } from '@/components/ui/icons';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatClockTime, formatDate } from '@/lib/format';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { type OrgAuditLogEntry, useOrgAuditLogPage } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { parseTimestamp } from '@/lib/utils';
 
-// FlashList takes `contentContainerStyle` (no className), so the `px-6 pt-4`
-// inset maps to its pixel values; the tab bar's own bottom padding rides on the
-// footer, which `gap` would not cover.
+// The cards carry the page gutter themselves. The tab bar's own bottom padding
+// rides on the footer, which `gap` would not cover, and the body's top pad sits
+// on a header component because a FlashList cannot take a class on its content
+// container.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
+
+const ListTopPad = () => <View className="pt-3" />;
 
 const AUDIT_DATE = { year: 'numeric', month: 'short', day: 'numeric' } as const;
 
@@ -34,10 +40,10 @@ const RowSeparator = () => <View className="h-3" />;
 
 function RowSkeleton() {
   return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
+    <Card className="mx-4">
       <Skeleton className="h-4 w-3/4 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-1/3 rounded bg-muted-soft" />
-    </View>
+    </Card>
   );
 }
 
@@ -53,30 +59,83 @@ function formatAuditTime(createdAt: string): string {
 
 const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAuditLogEntry }>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
+  const [expanded, setExpanded] = useState(false);
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);
-  const meta = actor ? `${actor} · ${time}` : time;
+  const eventName = auditActionLabel(t, entry.action);
   // The server's message for the creation action is "Organization <name>
   // created", which only restates the event name already shown above it. Every
   // row of this log belongs to this organization, so the row shows neither that
   // English sentence nor a name a later rename would change.
   const showsDetail = entry.action !== 'organization.created';
+  // The actor and the time render as two elements in one row, never one
+  // interpolated string: the row shrinks the actor, not the time, and each
+  // keeps its own reading order. One string put the localized date inside the
+  // left-to-right email run, so under Arabic its parts read out of order, and
+  // the single-line clamp put the ellipsis on the time — the part that tells
+  // the entries apart — while the repeated email stayed whole.
+  const metaLine =
+    actor || time ? (
+      <View className="flex-row items-center gap-2">
+        {actor ? (
+          // RN defaults `flexShrink` to 0; `min-w-0 shrink` lets the long
+          // repeated email give up width and truncate instead of pushing the
+          // time off the line.
+          <Text variant="caption" className="min-w-0 shrink" numberOfLines={1}>
+            {actor}
+          </Text>
+        ) : null}
+        {time ? (
+          <Text variant="caption" className="shrink-0" numberOfLines={1}>
+            {time}
+          </Text>
+        ) : null}
+      </View>
+    ) : null;
+  if (!showsDetail) {
+    return (
+      <Card className="mx-4">
+        <Text className="text-sm font-medium text-foreground">{eventName}</Text>
+        {metaLine}
+      </Card>
+    );
+  }
+  // The message runs past two lines for most events, and nothing else in the
+  // app carries it, so the row itself is the detail view: it starts clamped and
+  // a press shows the whole sentence. The row cannot know whether the message
+  // fits two lines without measuring it — a clamped text reports only the lines
+  // it drew — so every event row offers the disclosure, and the reader who
+  // needs nothing more loses nothing by ignoring it.
   return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium text-foreground">
-        {auditActionLabel(t, entry.action)}
-      </Text>
-      {showsDetail ? (
-        <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+    <Pressable
+      onPress={() => {
+        setExpanded(value => !value);
+      }}
+      accessibilityRole="button"
+      // The clamp is visual only: a reader hears the whole event whether or not
+      // the row is open.
+      accessibilityLabel={[eventName, entry.message, [actor, time].filter(Boolean).join(', ')]
+        .filter(Boolean)
+        .join('. ')}
+      accessibilityState={{ expanded }}
+      className="mx-4 active:opacity-70"
+    >
+      <Card>
+        <View className="flex-row items-center gap-2">
+          {expanded ? (
+            <ChevronUp size={16} color={colors.mutedForeground} />
+          ) : (
+            <ChevronDown size={16} color={colors.mutedForeground} />
+          )}
+          <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
+        </View>
+        <Text variant="caption" numberOfLines={expanded ? undefined : 2}>
           {entry.message}
         </Text>
-      ) : null}
-      {meta.length === 0 ? null : (
-        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-          {meta}
-        </Text>
-      )}
-    </View>
+        {metaLine}
+      </Card>
+    </Pressable>
   );
 });
 
@@ -94,6 +153,12 @@ export function OrganizationAuditLogScreen() {
   const allowed = org != null && canViewOrgAuditLog(role, org.plan);
   const { query, entries, hasMore } = useOrgAuditLogPage(organizationId, allowed);
   const paddingBottom = useTabBarBottomPadding();
+
+  // An audit entry can be written while this screen is open (another admin
+  // changes settings on the web), so the pull is the reader's way to ask for
+  // the new events without leaving the list.
+  const [refreshing, onRefresh] = useManualRefresh(query.refetch, t('common.couldNotRefresh'));
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
 
   // `AuditLogRow` is memoized at module scope, so one identity across data
   // updates keeps every unchanged row from re-rendering. The row reads `t`
@@ -120,7 +185,10 @@ export function OrganizationAuditLogScreen() {
           title={t('organization.auditLog.title')}
           backFallback={ORGANIZATION_HUB_PATH}
         />
-        <PermissionDenied description={t('organization.auditLog.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.auditLog.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }
@@ -134,7 +202,7 @@ export function OrganizationAuditLogScreen() {
   let body: ReactNode = null;
   if (query.isPending) {
     body = (
-      <View className="gap-3 px-6 pt-4">
+      <View className="gap-3 pt-3">
         <RowSkeleton />
         <RowSkeleton />
         <RowSkeleton />
@@ -148,14 +216,15 @@ export function OrganizationAuditLogScreen() {
         icon={ScrollText}
         title={t('organization.auditLog.emptyTitle')}
         description={t('organization.auditLog.emptyDescription')}
+        refreshControl={refreshControl}
       />
     );
   } else {
     const footer = (
       <View className="pt-3">
         {hasMore && !isLaterPageError ? (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('organization.auditLog.truncated')}
             </Text>
             <Button
@@ -170,8 +239,8 @@ export function OrganizationAuditLogScreen() {
           </View>
         ) : null}
         {isLaterPageError ? (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('common.couldnTLoadMore')}
             </Text>
             <Button
@@ -197,7 +266,8 @@ export function OrganizationAuditLogScreen() {
         renderItem={renderItem}
         getItemType={() => 'auditLog'}
         ItemSeparatorComponent={RowSeparator}
-        contentContainerStyle={listContentContainerStyle}
+        ListHeaderComponent={<ListTopPad />}
+        refreshControl={refreshControl}
         ListFooterComponent={footer}
       />
     );

@@ -348,9 +348,22 @@ function vercelHarness(): ContractHarness {
   };
 }
 
-const harnessFactories = [containersHarness, vercelHarness];
+/**
+ * One harness per provider that runs compute. To add a provider, write a
+ * harness over its real adapter and a fake backend (like `vercelHarness`) and
+ * add it here: this Record does not compile without it. Every shared case
+ * below then runs against the new adapter. The retired `cloudflare` provider
+ * starts no compute and has no harness.
+ */
+const harnessFactories: Record<
+  Exclude<AgentSandboxProvider, 'cloudflare'>,
+  () => ContractHarness
+> = {
+  'cloudflare-containers': () => containersHarness(),
+  vercel: vercelHarness,
+};
 
-describe.each(harnessFactories.map(factory => [factory().name, factory] as const))(
+describe.each(Object.values(harnessFactories).map(factory => [factory().name, factory] as const))(
   'provider adapter contract: %s',
   (_name, factory) => {
     it('projects owned runtime identity without querying the backend', async () => {

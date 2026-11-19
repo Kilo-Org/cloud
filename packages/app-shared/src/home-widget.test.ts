@@ -259,6 +259,27 @@ describe('Home-only widget policy', () => {
     expect(buildHomeWidgetDetails([]).primaryKind).toBeNull();
   });
 
+  it('drops an approval key the schema rejects, keeping a valid key and null unchanged', () => {
+    const malformed = ['', 'a'.repeat(63), 'A'.repeat(64), 'g'.repeat(64), 'a'.repeat(65)];
+    for (const approvalKey of malformed) {
+      const data = buildHomeWidgetData({
+        ...scope,
+        sessions: [{ status: 'permission', title: 'Approve', approvalKey }],
+      });
+      expect(data.details.approvalKey).toBeNull();
+      expect(homeWidgetDataSchema.safeParse(data).success).toBe(true);
+      expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+        canApprove: false,
+        approvalKey: null,
+      });
+    }
+    const valid = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve', approvalKey: 'a'.repeat(64) }],
+    });
+    expect(valid.details.approvalKey).toBe('a'.repeat(64));
+  });
+
   it('hides a title whose kind no longer matches the presented kind', () => {
     const data = buildHomeWidgetData({
       ...scope,

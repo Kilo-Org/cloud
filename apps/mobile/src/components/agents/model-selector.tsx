@@ -215,15 +215,16 @@ export function ModelSelector({
           variant: variantLabel,
         })
       : modelLabel;
-  const allUnavailable =
-    pickerOptions.length > 0 && pickerOptions.every(option => option.unavailable);
+  // The chip names one model, so it states that model's state. Every option
+  // being unavailable is therefore not what decides the announcement.
+  const selectedUnavailable = selectedModel?.unavailable === true;
   // An empty catalog has nothing to choose, so the chip stays disabled instead
-  // of opening a sheet with no rows; only an every-unavailable catalog keeps
-  // its press so the picker can explain each model.
+  // of opening a sheet with no rows; an unavailable catalog keeps its press so
+  // the picker can explain each model.
   const chipDisabled = disabled || pickerOptions.length === 0;
   const accessibilityLabel = [
     spokenModel,
-    allUnavailable ? t('agentChat.modelSelector.unavailable') : undefined,
+    selectedUnavailable ? t('agentChat.modelSelector.unavailable') : undefined,
     lockLabel && disabled
       ? t('agentChat.modelSelector.lockedByAgent', { agent: lockLabel })
       : undefined,

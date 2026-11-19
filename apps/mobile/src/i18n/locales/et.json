@@ -2773,7 +2773,7 @@
       "thinkingEffortAccessibility": "Mõtlemise põhjalikkus: {{label}}",
       "thinkingEffortSelected": "Mõtlemise põhjalikkus: {{label}}, valitud",
       "thinkingEffortWithModel": "{{model}}, mõtlemise põhjalikkus: {{variant}}",
-      "lockedByAgent": "lukustatud agendi „{{agent}}“ poolt",
+      "lockedByAgent": "Lukustatud agendi „{{agent}}“ poolt",
       "addToFavorites": "Lisa {{name}} lemmikutesse",
       "removeFromFavorites": "Eemalda {{name}} lemmikutest",
       "sessionModel": "Seansi mudel"

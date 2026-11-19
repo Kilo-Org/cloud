@@ -594,6 +594,24 @@ describe('ModelSelector chip availability disclosure', () => {
     expect(label).toBe(`${option.name}${i18n.t('common.sentenceJoiner')}${lockedSentence}`);
   });
 
+  it('states availability for the model the chip names, not for the whole catalog', () => {
+    const unavailable = cliCatalogOption({ id: 'remote-model-gone', unavailable: true });
+    const available = cliCatalogOption({ id: 'remote-model-here' });
+    const mixed = renderSelector({ value: available.id, options: [unavailable, available] });
+    expect(String(chip(mixed).props.accessibilityLabel)).not.toContain(
+      i18n.t('agentChat.modelSelector.unavailable')
+    );
+
+    const selectedGone = renderSelector({
+      value: unavailable.id,
+      options: [unavailable, available],
+    });
+    expect(String(chip(selectedGone).props.accessibilityLabel)).toContain(
+      i18n.t('agentChat.modelSelector.unavailable')
+    );
+    expect(chip(selectedGone).props.disabled).toBe(false);
+  });
+
   it('joins the model name and BYOK through the active locale list format', async () => {
     await i18n.changeLanguage('de');
     const option = cliCatalogOption({ hasUserByokAvailable: true });

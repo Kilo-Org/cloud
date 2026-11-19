@@ -9,6 +9,10 @@ import {
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 
+import { PendingPermissionUnreadableError } from './pending-permission-unreadable-error';
+
+export { PendingPermissionUnreadableError };
+
 /**
  * The one read of the cloud-agent pending interactions. The ids live only in the
  * control plane's pending-interaction projection and are sent on stream connect,
@@ -90,18 +94,6 @@ export class PendingPermissionTimeoutError extends Error {
   constructor() {
     super('Timed out reading the cloud-agent pending permission');
     this.name = 'PendingPermissionTimeoutError';
-  }
-}
-
-/**
- * The control plane's pending-interaction projection could not be read. The ask
- * may still be pending, so this failure is retryable. It is not the empty
- * projection, which reads as no pending request.
- */
-export class PendingPermissionUnreadableError extends Error {
-  constructor() {
-    super('The cloud-agent pending-interaction projection could not be read');
-    this.name = 'PendingPermissionUnreadableError';
   }
 }
 

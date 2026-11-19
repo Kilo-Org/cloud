@@ -1,6 +1,7 @@
 import { SignJWT } from 'jose';
 import { z } from 'zod';
 import { verifyKiloTokenSignature } from './kilo-token-verification';
+import { sha256Hex } from './sha256.js';
 
 export const RUNTIME_PROXY_ATTESTATION_HEADER = 'X-Kilo-Runtime-Proxy-Attestation';
 export const RUNTIME_PROXY_ATTESTATION_ISSUER = 'kilocode-runtime-proxy';
@@ -51,11 +52,6 @@ const runtimeProxyAttestationClaims = z
 
 export type RuntimeProxyAttestationClaims = z.infer<typeof runtimeProxyAttestationClaims>;
 
-async function bearerDigest(bearer: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(bearer));
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
 function signingKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
 }
@@ -81,7 +77,7 @@ export async function issueRuntimeProxyAttestation(input: {
     userId: input.userId,
     authorizationId: input.authorizationId,
     resourceId: input.resourceId,
-    bearerDigest: await bearerDigest(input.bearer),
+    bearerDigest: await sha256Hex(input.bearer),
     iat: issuedAt,
     exp: issuedAt + RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS,
   });
@@ -117,7 +113,7 @@ export async function verifyRuntimeProxyAttestation(input: {
       claims.userId === input.userId &&
       claims.authorizationId === input.authorizationId &&
       claims.resourceId === input.resourceId &&
-      claims.bearerDigest === (await bearerDigest(input.bearer))
+      claims.bearerDigest === (await sha256Hex(input.bearer))
     );
   } catch {
     return false;

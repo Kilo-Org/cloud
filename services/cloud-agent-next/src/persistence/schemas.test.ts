@@ -1225,8 +1225,7 @@ describe('prepareSession config caps', () => {
       timestamp: Date.now(),
       mcpServers,
     });
-    // A plain value is capped at 4096 characters, so this count fills the
-    // plaintext budget exactly and one more value exceeds it.
+    // Values stay within their per-item cap, so only the materialized budget decides.
     const perValue = 'x'.repeat(4096);
     const recordWith = (count: number): Record<string, MCPServerConfig> => ({
       local: {
@@ -1237,8 +1236,8 @@ describe('prepareSession config caps', () => {
         ),
       },
     });
-    const atCap = MAX_MCP_PLAINTEXT_BYTES / perValue.length;
-    expect(MetadataSchema.safeParse(metadataWith(recordWith(atCap))).success).toBe(true);
-    expect(MetadataSchema.safeParse(metadataWith(recordWith(atCap + 1))).success).toBe(false);
+    expect(perValue.length * 21).toBeGreaterThan(MAX_MCP_PLAINTEXT_BYTES);
+    expect(MetadataSchema.safeParse(metadataWith(recordWith(19))).success).toBe(true);
+    expect(MetadataSchema.safeParse(metadataWith(recordWith(21))).success).toBe(false);
   });
 });

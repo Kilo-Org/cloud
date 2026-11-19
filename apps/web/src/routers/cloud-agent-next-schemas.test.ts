@@ -1343,12 +1343,11 @@ describe('basePrepareSessionNextSchema config caps', () => {
   it('caps the MCP secret plaintext and the submitted size', () => {
     const envWith = (count: number, value: string) =>
       Object.fromEntries(Array.from({ length: count }, (_, index) => [`KEY_${index}`, value]));
-    // A plain value is capped at 4096 characters, so this count fills the
-    // plaintext budget exactly and one more value exceeds it.
+    // Values stay within their per-item cap, so only the materialized budget decides.
     const perValue = 'x'.repeat(4096);
-    const atCap = MAX_MCP_PLAINTEXT_BYTES / perValue.length;
-    expect(accepts(withLocalServer({ environment: envWith(atCap, perValue) }))).toBe(true);
-    expect(accepts(withLocalServer({ environment: envWith(atCap + 1, perValue) }))).toBe(false);
+    expect(perValue.length * 21).toBeGreaterThan(MAX_MCP_PLAINTEXT_BYTES);
+    expect(accepts(withLocalServer({ environment: envWith(19, perValue) }))).toBe(true);
+    expect(accepts(withLocalServer({ environment: envWith(21, perValue) }))).toBe(false);
   });
 
   it('caps encrypted envelope strings', () => {

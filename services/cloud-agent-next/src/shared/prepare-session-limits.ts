@@ -80,16 +80,6 @@ export const MAX_ENCRYPTED_DEK_LENGTH = 684;
  */
 export const MAX_MCP_PLAINTEXT_BYTES = 80 * 1024;
 
-/**
- * Submitted-size ceiling for one `mcpServers` record. An envelope is base64
- * ciphertext (four thirds of its plaintext) plus a 684-character wrapped key, so
- * a configuration inside the plaintext budget stays under about 840 KiB even
- * when every one of the 1,000 permitted secret slots is used. 1 MiB therefore
- * bounds the submitted payload without refusing anything the plaintext budget
- * accepts.
- */
-export const MAX_MCP_SUBMITTED_BYTES = 1024 * 1024;
-
 /** AES-256-GCM frames `encryptedData` with a 16-byte IV and a 16-byte tag. */
 const ENVELOPE_FRAMING_BYTES = 32;
 
@@ -97,26 +87,58 @@ const ENVELOPE_FRAMING_BYTES = 32;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** Plaintext byte count of a secret value, without decrypting it. */
+/**
+ * Plaintext byte count of a secret value, without decrypting it. A GCM
+ * ciphertext is exactly as long as its plaintext, and base64 is four thirds of
+ * the ciphertext, so the submitted length bounds the plaintext.
+ */
 const secretPlaintextBytes = (value: unknown): number => {
   if (typeof value === 'string') return new TextEncoder().encode(value).byteLength;
   if (!isRecord(value)) return 0;
   const data = value.encryptedData;
   if (typeof data !== 'string') return 0;
-  // GCM ciphertext is exactly as long as its plaintext, and base64 is four
-  // thirds of the ciphertext, so the submitted length bounds the plaintext.
   return Math.max(0, Math.ceil((data.length * 3) / 4) - ENVELOPE_FRAMING_BYTES);
 };
 
-/** Plaintext bytes of every secret under one server's `environment` or `headers`. */
-const serverSecretBytes = (server: unknown): number => {
-  if (!isRecord(server)) return 0;
-  let total = 0;
-  for (const [field, values] of Object.entries(server)) {
-    if (field !== 'environment' && field !== 'headers') continue;
-    if (!isRecord(values)) continue;
-    for (const value of Object.values(values)) {
-      total += secretPlaintextBytes(value);
+/**
+ * The configuration as the sandbox attach schema measures it: the record with
+ * every secret value replaced by an empty string, so its serialized size holds
+ * everything except the secret payload itself.
+ */
+const frameOf = (servers: Record<string, unknown>): unknown => {
+  const frame: Record<string, unknown> = {};
+  for (const [name, server] of Object.entries(servers)) {
+    if (!isRecord(server)) {
+      frame[name] = server;
+      continue;
+    }
+    const copy: Record<string, unknown> = { ...server };
+    for (const field of ['environment', 'headers']) {
+      const values = copy[field];
+      if (!isRecord(values)) continue;
+      copy[field] = Object.fromEntries(Object.keys(values).map(key => [key, '']));
+    }
+    frame[name] = copy;
+  }
+  return frame;
+};
+
+/**
+ * Bytes the materialized MCP configuration would occupy: the JSON frame around
+ * the secrets plus each secret's plaintext size. Envelope framing (the wrapped
+ * key and the algorithm fields) is excluded because the attach schema measures
+ * the plaintext, not the envelopes that carry it.
+ */
+const materializedBytes = (servers: Record<string, unknown>): number => {
+  let total = new TextEncoder().encode(JSON.stringify(frameOf(servers))).byteLength;
+  for (const server of Object.values(servers)) {
+    if (!isRecord(server)) continue;
+    for (const field of ['environment', 'headers']) {
+      const values = server[field];
+      if (!isRecord(values)) continue;
+      for (const value of Object.values(values)) {
+        total += secretPlaintextBytes(value);
+      }
     }
   }
   return total;
@@ -133,21 +155,9 @@ export function mcpServersRecordSchema<ServerSchema extends z.ZodType>(serverSch
     .refine(servers => Object.keys(servers).length <= MAX_MCP_SERVERS, {
       message: `A session can have at most ${MAX_MCP_SERVERS} MCP servers`,
     })
-    .refine(
-      servers =>
-        Object.values(servers).reduce((total, server) => total + serverSecretBytes(server), 0) <=
-        MAX_MCP_PLAINTEXT_BYTES,
-      {
-        message: `MCP secret values exceed the ${MAX_MCP_PLAINTEXT_BYTES}-byte plaintext budget`,
-      }
-    )
-    .refine(
-      servers =>
-        new TextEncoder().encode(JSON.stringify(servers)).byteLength <= MAX_MCP_SUBMITTED_BYTES,
-      {
-        message: `Serialized MCP configuration exceeds the ${MAX_MCP_SUBMITTED_BYTES}-byte input budget`,
-      }
-    );
+    .refine(servers => materializedBytes(servers) <= MAX_MCP_PLAINTEXT_BYTES, {
+      message: `MCP configuration would materialize more than ${MAX_MCP_PLAINTEXT_BYTES} bytes of plaintext`,
+    });
 }
 
 /**

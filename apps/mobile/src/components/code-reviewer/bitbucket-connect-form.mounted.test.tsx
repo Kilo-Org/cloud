@@ -57,13 +57,18 @@ function statusMessage(root: ReactTestRenderer['root']): string | null {
   return status ? (status.props.message as string | null) : null;
 }
 
-async function mount(integrationId: string | null, onConnected: () => void = vi.fn()) {
+async function mount(
+  integrationId: string | null,
+  onConnected: () => void = vi.fn(),
+  onDirtyChange?: (dirty: boolean) => void
+) {
   const view = await renderWithProviders(
     createElement(BitbucketConnectForm, {
       scope: 'org-1',
       integrationId,
       organizationName: 'Acme',
       onConnected,
+      onDirtyChange,
     })
   );
   return { root: view.renderer.root, onConnected };
@@ -214,6 +219,57 @@ describe('BitbucketConnectForm', () => {
     expect(mutations.connect).not.toHaveBeenCalled();
     expect(statusMessage(root)).toBe(i18n.t('prReview.reconnectNotice.bitbucketTitle'));
     expect(submitButton(root).props.disabled).toBe(false);
+  });
+
+  it('reports a draft until a submit takes it, and gives it back when the connect fails', async () => {
+    const landing = Promise.withResolvers<unknown>();
+    mutations.connect.mockImplementation(() => landing.promise);
+    const onDirtyChange = vi.fn<(dirty: boolean) => void>();
+    const { root } = await mount(null, vi.fn<() => void>(), onDirtyChange);
+
+    await edit(root, 'workspace-token');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+    // The submit already sent this token, so a Back while the connect runs
+    // drops nothing the person typed.
+    await act(async () => {
+      (submitButton(root).props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+    // A refused token is still in the field, so the sheet guards it again.
+    await act(async () => {
+      landing.reject({
+        data: { code: 'UNAUTHORIZED', message: 'Bitbucket rejected the Workspace Access Token' },
+      });
+      await Promise.resolve();
+    });
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+    // Whitespace is what a submit would not send, so it is not an edit either.
+    await edit(root, '   ');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('never reports a draft again once a connect accepted the token', async () => {
+    mutations.connect.mockResolvedValue({ integrationId: 'bitbucket-1' });
+    const onDirtyChange = vi.fn<(dirty: boolean) => void>();
+    const { root, onConnected } = await mount(null, vi.fn<() => void>(), onDirtyChange);
+
+    await edit(root, 'workspace-token');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+    await act(async () => {
+      (submitButton(root).props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    // The accepted token is not a draft any more. A later `true` here would
+    // re-arm the sheet's leave guard over the dismissal it just started.
+    expect(onConnected).toHaveBeenCalledTimes(1);
+    expect(onDirtyChange).not.toHaveBeenLastCalledWith(true);
+    expect(onDirtyChange.mock.calls.filter(([dirty]) => dirty)).toHaveLength(1);
   });
 
   it('holds the token field still while the submitted token is in flight', async () => {

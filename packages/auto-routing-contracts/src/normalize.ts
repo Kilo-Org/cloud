@@ -288,7 +288,9 @@ function firstAndLatestPromptPrefix(
   role: string
 ): { first: string | null; latest: string | null } {
   const first = firstPromptPrefix(messages, role);
-  const latest = first === null ? null : lastPromptPrefix(messages, role);
+  const latest = lastPromptPrefix(messages, role);
+  // A latest prefix equal to the first is reported as `null`: the state only
+  // carries a distinct later turn.
   return { first, latest: latest && latest !== first ? latest : null };
 }
 

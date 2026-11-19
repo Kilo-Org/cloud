@@ -520,10 +520,15 @@ test('both deploys start from a successful main CI run and keep an hourly catch-
     // detect-workers stays beside it: the called workflow's deploy jobs carry
     // the ref check inside deploy-workers.yml, and the detection call deploys
     // nothing.
-    for (const id of Object.keys(deployment.jobs).filter(id => id !== 'check-changes' && id !== 'verify-main')) {
+    for (const id of Object.keys(deployment.jobs).filter(
+      id => id !== 'check-changes' && id !== 'verify-main'
+    )) {
       assert.ok(reachesCheckChanges(id), `${id} must run only after the guarded lookup`);
       if (id !== 'detect-workers') {
-        assert.ok([deployment.jobs[id].needs].flat().includes('verify-main'), `${id} must run only after the ref check`);
+        assert.ok(
+          [deployment.jobs[id].needs].flat().includes('verify-main'),
+          `${id} must run only after the ref check`
+        );
       }
     }
     assert.doesNotMatch(
@@ -783,7 +788,11 @@ test('one database gate per deployment checks out, installs and migrates once', 
   // until the gate finishes, so they run beside it. The Worker deploy and the
   // release record below keep the gate, so a failed migration still stops them.
   for (const job of ['deploy-app', 'deploy-ai-gateway']) {
-    assert.deepEqual(staging.jobs[job].needs, ['verify-main', 'check-changes'], `${job} must start beside db-gate`);
+    assert.deepEqual(
+      staging.jobs[job].needs,
+      ['verify-main', 'check-changes'],
+      `${job} must start beside db-gate`
+    );
   }
   // Production names the gate result explicitly so a skipped gate cannot let the
   // Worker deploy run ahead of the migrations; staging relies on the default

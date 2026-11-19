@@ -3420,6 +3420,7 @@
       "sendInvite": "Gửi lời mời",
       "title": "Mời thành viên",
       "alreadyInvited": "Địa chỉ email này đã được mời hoặc đã là thành viên.",
+      "organizationUnavailable": "Tổ chức này không còn khả dụng nữa.",
       "sendError": "Không gửi được lời mời.",
       "pendingInvitation": "Email này đã có lời mời đang chờ xử lý.",
       "alreadyMember": "Người này đã là thành viên của tổ chức này.",

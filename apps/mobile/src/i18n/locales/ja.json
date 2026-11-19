@@ -3420,6 +3420,7 @@
       "sendInvite": "招待を送信",
       "title": "メンバーを招待",
       "alreadyInvited": "このメールアドレスは、すでに招待済みか、すでにメンバーに追加されています。",
+      "organizationUnavailable": "この組織はもう利用できません。",
       "sendError": "招待を送信できませんでした。",
       "pendingInvitation": "このメールアドレスには、すでに保留中の招待があります。",
       "alreadyMember": "このユーザーはすでにこの組織のメンバーです。",

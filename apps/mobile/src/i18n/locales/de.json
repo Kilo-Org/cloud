@@ -3420,6 +3420,7 @@
       "sendInvite": "Einladung senden",
       "title": "Mitglied einladen",
       "alreadyInvited": "Diese Person ist bereits eingeladen oder bereits Mitglied.",
+      "organizationUnavailable": "Diese Organisation ist nicht mehr verfügbar.",
       "sendError": "Die Einladung konnte nicht gesendet werden.",
       "pendingInvitation": "Für diese E-Mail-Adresse liegt bereits eine ausstehende Einladung vor.",
       "alreadyMember": "Diese Person ist bereits Mitglied dieser Organisation.",

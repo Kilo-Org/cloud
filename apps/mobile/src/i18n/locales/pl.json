@@ -3536,6 +3536,7 @@
       "sendInvite": "Wyślij zaproszenie",
       "title": "Zaproś członka",
       "alreadyInvited": "Ten adres e-mail ma już oczekujące zaproszenie lub należy już do członka tej organizacji.",
+      "organizationUnavailable": "Ta organizacja nie jest już dostępna.",
       "sendError": "Nie udało się wysłać zaproszenia.",
       "pendingInvitation": "Ten adres e-mail ma już oczekujące zaproszenie.",
       "alreadyMember": "Ta osoba jest już członkiem tej organizacji.",

@@ -1223,6 +1223,27 @@ describe('Organizations', () => {
   });
 
   describe('inviteUserToOrganization', () => {
+    test('rejects an invitation to a deleted organization with its own message', async () => {
+      const owner = await insertTestUser();
+      const organization = await createOrganization('Deleted Invite Target', owner.id);
+      await db
+        .update(organizations)
+        .set({ deleted_at: sql`now()` })
+        .where(eq(organizations.id, organization.id));
+
+      const error = await inviteUserToOrganization(
+        organization.id,
+        owner.id,
+        'missing-target@example.com',
+        'member'
+      ).then(
+        () => null,
+        (e: unknown) => (e instanceof Error ? e : null)
+      );
+
+      expect(error?.message).toBe('This organization is no longer available');
+    });
+
     test('should create invitation with correct details', async () => {
       const owner = await insertTestUser();
       const organization = await createOrganization('Test Org', owner.id);

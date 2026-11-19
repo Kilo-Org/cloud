@@ -3478,6 +3478,7 @@
       "sendInvite": "Invia l'invito",
       "title": "Invita un membro",
       "alreadyInvited": "Questo indirizzo ha già un invito in sospeso o appartiene già a un membro.",
+      "organizationUnavailable": "Questa organizzazione non è più disponibile.",
       "sendError": "Impossibile inviare l'invito.",
       "pendingInvitation": "Questo indirizzo email ha già un invito in sospeso.",
       "alreadyMember": "Questa persona è già un membro di questa organizzazione.",

@@ -3531,6 +3531,7 @@
       "sendInvite": "Odeslat pozvánku",
       "title": "Pozvat člena",
       "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
+      "organizationUnavailable": "Tato organizace již není k dispozici.",
       "sendError": "Pozvánku se nepodařilo odeslat.",
       "pendingInvitation": "Pro tento e-mail již existuje čekající pozvánka.",
       "alreadyMember": "Tato osoba je již členem této organizace.",

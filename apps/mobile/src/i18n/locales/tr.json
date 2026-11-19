@@ -3420,6 +3420,7 @@
       "sendInvite": "Davet gönder",
       "title": "Üye davet et",
       "alreadyInvited": "Bu kişi zaten davet edilmiş veya zaten üye.",
+      "organizationUnavailable": "Bu kuruluş artık kullanılamıyor.",
       "sendError": "Davet gönderilemedi.",
       "pendingInvitation": "Bu e-posta adresinin zaten bekleyen bir daveti var.",
       "alreadyMember": "Bu kişi zaten bu kuruluşun bir üyesi.",

@@ -3473,6 +3473,7 @@
       "sendInvite": "Pošalji pozivnicu",
       "title": "Pozovi člana",
       "alreadyInvited": "Korisnik je već pozvan ili je već član.",
+      "organizationUnavailable": "Ova organizacija više nije dostupna.",
       "sendError": "Pozivnicu nije moguće poslati.",
       "pendingInvitation": "Ova adresa e-pošte već ima pozivnicu na čekanju.",
       "alreadyMember": "Ova osoba je već član ove organizacije.",

@@ -3415,6 +3415,7 @@
       "sendInvite": "Send invitasjon",
       "title": "Inviter medlem",
       "alreadyInvited": "Personen er allerede invitert eller allerede medlem.",
+      "organizationUnavailable": "Denne organisasjonen er ikke lenger tilgjengelig.",
       "sendError": "Kunne ikke sende invitasjonen.",
       "pendingInvitation": "Denne e-postadressen har allerede en ventende invitasjon.",
       "alreadyMember": "Denne personen er allerede medlem av denne organisasjonen.",

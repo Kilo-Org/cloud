@@ -3415,6 +3415,7 @@
       "sendInvite": "Saada kutse",
       "title": "Kutsu liige",
       "alreadyInvited": "Ta on juba kutsutud või juba liige.",
+      "organizationUnavailable": "See organisatsioon ei ole enam saadaval.",
       "sendError": "Kutset ei õnnestunud saata.",
       "pendingInvitation": "Sellele e-posti aadressile on juba saadetud kutse, mis on ootel.",
       "alreadyMember": "See isik on juba selle organisatsiooni liige.",

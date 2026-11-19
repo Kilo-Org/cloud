@@ -3415,6 +3415,7 @@
       "sendInvite": "Senda boð",
       "title": "Bjóða meðlim að taka þátt",
       "alreadyInvited": "Tölvupóstfangið er þegar boðið eða meðlimurinn er þegar í félaginu.",
+      "organizationUnavailable": "Þetta fyrirtæki er ekki lengur í boði.",
       "sendError": "Ekki tókst að senda boðið.",
       "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
       "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki.",

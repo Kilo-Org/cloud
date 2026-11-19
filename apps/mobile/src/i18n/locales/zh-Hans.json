@@ -3420,6 +3420,7 @@
       "sendInvite": "发送邀请",
       "title": "邀请成员",
       "alreadyInvited": "该邮箱已被邀请或已是成员。",
+      "organizationUnavailable": "该组织已不可用。",
       "sendError": "无法发送邀请。",
       "pendingInvitation": "该邮箱已有待处理的邀请。",
       "alreadyMember": "此人已是该组织的成员。",

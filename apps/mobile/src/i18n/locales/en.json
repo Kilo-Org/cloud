@@ -3518,6 +3518,7 @@
       "sendInvite": "Send invite",
       "title": "Invite member",
       "alreadyInvited": "They're already invited or already a member.",
+      "organizationUnavailable": "This organization is no longer available.",
       "sendError": "Couldn't send the invite.",
       "pendingInvitation": "This email already has a pending invitation.",
       "alreadyMember": "This person is already a member of this organization.",

@@ -3415,6 +3415,7 @@
       "sendInvite": "Stuur uitnodiging",
       "title": "Nooi lid uit",
       "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
+      "organizationUnavailable": "Hierdie organisasie is nie meer beskikbaar nie.",
       "sendError": "Kon nie die uitnodiging stuur nie.",
       "pendingInvitation": "Hierdie e-posadres het reeds 'n hangende uitnodiging.",
       "alreadyMember": "Hierdie persoon is reeds 'n lid van hierdie organisasie.",

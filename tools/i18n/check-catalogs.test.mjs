@@ -923,6 +923,47 @@ test('still rejects a category that drops a placeholder English requires', () =>
   );
 });
 
+// A placeholder token may hold a comma: `{{a,b}}` is one token. The family
+// exemption has to read the tokens the text writes, or a category that adds a
+// family token whose name holds a comma looks like one that adds two tokens no
+// value of the family uses.
+const COMMA_TOKEN_ENGLISH = {
+  agents: {
+    title: 'Agents',
+    liveCount_one: '{{count}} live session',
+    liveCount_other: '{{count}} items {{a,b}}',
+  },
+};
+
+test('accepts a family token that spells a comma inside one placeholder', () => {
+  const found = run({
+    english: COMMA_TOKEN_ENGLISH,
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        liveCount_one: '{{count}} localized session {{a,b}}',
+        liveCount_few: '{{count}} localized sessions (few) {{a,b}}',
+        liveCount_many: '{{count}} localized sessions (many) {{a,b}}',
+        liveCount_other: '{{count}} localized items {{a,b}}',
+      },
+    },
+  });
+  assert.ok(!found.join('\n').includes('placeholders differ from English'), found.join('\n'));
+});
+
+test('still rejects a translation that repeats a placeholder token', () => {
+  const found = run({
+    translated: {
+      agents: { ...TRANSLATED.agents, liveCount_one: '{{count}} {{count}} localized session' },
+    },
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ru: "agents\.liveCount_one" placeholders differ from English \(count\)/
+  );
+});
+
 /**
  * A counted form may say its number in a word instead of the placeholder, but
  * only where the allowlist names that key, category and locale: Arabic names

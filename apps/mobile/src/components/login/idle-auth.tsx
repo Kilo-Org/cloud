@@ -111,11 +111,11 @@ export function IdleAuth({
   // with whatever separator the locale puts before the Terms link — a space
   // where words are space-separated, nothing in Chinese — `termsConnector`
   // carries the conjunction with its own spacing, and the suffix is the
-  // sentence's final punctuation. The link inside the sentence reads
-  // `termsInSentence`, the form the locale's consent verb governs, while
-  // `login.terms` is the noun phrase the link announces on its own.
+  // sentence's final punctuation. Both links name the document by the key the
+  // rest of the app uses for it, so the sentence and the screen it opens carry
+  // one name.
   const legalSentence =
-    `${t('login.termsPrefix')}${t('login.termsInSentence')}${t('login.termsConnector')}` +
+    `${t('login.termsPrefix')}${t('prReview.discussion.termsTitle')}${t('login.termsConnector')}` +
     `${t('common.privacyPolicy')}${t('login.termsSuffix')}`;
   const [view, setView] = useState<'main' | 'otp'>('main');
   const [verifyError, setVerifyError] = useState<string | undefined>(undefined);
@@ -551,12 +551,14 @@ export function IdleAuth({
           className={INLINE_LINK_BOX_CLASS}
           hitSlop={inlineLinkHitSlop('start')}
           accessibilityRole="link"
-          accessibilityLabel={t('login.termsInSentence')}
+          accessibilityLabel={t('prReview.discussion.termsTitle')}
           onPress={() => {
             openLegalDocument('terms');
           }}
         >
-          <Text className="text-sm text-primary underline">{t('login.termsInSentence')}</Text>
+          <Text className="text-sm text-primary underline">
+            {t('prReview.discussion.termsTitle')}
+          </Text>
         </Pressable>
         <Text
           importantForAccessibility="no-hide-descendants"

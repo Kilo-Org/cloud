@@ -211,7 +211,7 @@ function findLink(root: I, label: string): I {
 
 /** The sentence end a legal link's accessibility label sits at. */
 function linkEdge(label: string | undefined): 'start' | 'end' {
-  return label === 'Terms of Use' ? 'start' : 'end';
+  return label === 'Terms of Service' ? 'start' : 'end';
 }
 
 /**
@@ -782,7 +782,7 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    expect(texts(renderer.root)).toContain('Terms of Use');
+    expect(texts(renderer.root)).toContain('Terms of Service');
     expect(texts(renderer.root)).toContain('Privacy Policy');
   });
 
@@ -792,7 +792,7 @@ describe('IdleAuth email continue copy', () => {
 
     const links = linkPressables(renderer.root);
     expect(links.map(link => link.props.accessibilityLabel)).toEqual([
-      'Terms of Use',
+      'Terms of Service',
       'Privacy Policy',
     ]);
 
@@ -818,7 +818,7 @@ describe('IdleAuth email continue copy', () => {
     // The sentence's copy is unchanged: both links still render, with the
     // connector and suffix the sentence carried before.
     expect(texts(renderer.root)).toEqual(
-      expect.arrayContaining(['Terms of Use', 'Privacy Policy', ' and ', '.'])
+      expect.arrayContaining(['Terms of Service', 'Privacy Policy', ' and ', '.'])
     );
 
     act(() => {
@@ -856,7 +856,7 @@ describe('IdleAuth email continue copy', () => {
     mockedPush.mockClear();
     const renderer = await mountIdleAuth(start);
 
-    const terms = findLink(renderer.root, 'Terms of Use');
+    const terms = findLink(renderer.root, 'Terms of Service');
     act(() => {
       (terms.props.onPress as () => void)();
     });
@@ -892,7 +892,7 @@ describe('IdleAuth email continue copy', () => {
     );
     expect(wrapper.props.accessibilityRole).toBe('text');
     expect(wrapper.props.accessibilityLabel).toBe(
-      'By continuing you agree to our Terms of Use and Privacy Policy.'
+      'By continuing you agree to our Terms of Service and Privacy Policy.'
     );
     expect(wrapper.props.accessibilityActions).toEqual([
       { name: 'openTerms', label: 'Terms' },
@@ -1152,7 +1152,7 @@ describe('IdleAuth layout repairs', () => {
     // tight against "Privacy Policy". The links' own px-1 padding widened every
     // boundary it touched.
     expect(legalSentence(renderer.root)).toBe(
-      'By continuing you agree to our Terms of Use and Privacy Policy.'
+      'By continuing you agree to our Terms of Service and Privacy Policy.'
     );
     for (const link of linkPressables(renderer.root)) {
       expect(String(link.props.className)).not.toMatch(/(?:^|\s)px-/);
@@ -1168,16 +1168,20 @@ describe('IdleAuth layout repairs', () => {
   });
 
   it.each([
-    ['zh-Hans', '条款', '继续即表示你同意我们的条款和隐私政策。'],
-    ['zh-Hant', '條款', '繼續即表示你同意我們的條款和隱私權政策。'],
+    ['zh-Hans', '服务条款', '继续即表示你同意我们的服务条款和隐私政策。'],
+    ['zh-Hant', '服務條款', '繼續即表示你同意我們的服務條款和隱私權政策。'],
     ['ja', '利用規約', '続行すると、利用規約およびプライバシーポリシーに同意したことになります。'],
-    ['th', 'ข้อกำหนด', 'การดำเนินการต่อแสดงว่าคุณยอมรับข้อกำหนดและนโยบายความเป็นส่วนตัว.'],
-    ['lo', 'ຂໍ້ກຳນົດ', 'ການສືບຕໍ່ໝາຍຄວາມວ່າທ່ານຍອມຮັບຂໍ້ກຳນົດແລະນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ.'],
-    ['km', 'លក្ខខណ្ឌ', 'តាមរយៈការបន្ត អ្នកយល់ព្រមតាមលក្ខខណ្ឌនិងគោលការណ៍ឯកជនភាព។'],
+    [
+      'th',
+      'ข้อกำหนดในการให้บริการ',
+      'การดำเนินการต่อแสดงว่าคุณยอมรับข้อกำหนดในการให้บริการและนโยบายความเป็นส่วนตัว.',
+    ],
+    ['lo', 'ຂໍ້ກຳນົດການໃຊ້ງານ', 'ການສືບຕໍ່ໝາຍຄວາມວ່າທ່ານຍອມຮັບຂໍ້ກຳນົດການໃຊ້ງານແລະນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ.'],
+    ['km', 'លក្ខខណ្ឌនៃសេវាកម្ម', 'តាមរយៈការបន្ត អ្នកយល់ព្រមតាមលក្ខខណ្ឌនៃសេវាកម្មនិងគោលការណ៍ឯកជនភាព។'],
     [
       'my',
-      'စည်းကမ်းချက်များ',
-      'ဆက်လုပ်ခြင်းဖြင့် သင်သည် ကျွန်ုပ်တို့၏စည်းကမ်းချက်များနှင့်ကိုယ်ရေးအချက်အလက် မူဝါဒကို သဘောတူလက်ခံပါသည်။',
+      'ဝန်ဆောင်မှုစည်းမျဉ်းများ',
+      'ဆက်လုပ်ခြင်းဖြင့် သင်သည် ကျွန်ုပ်တို့၏ဝန်ဆောင်မှုစည်းမျဉ်းများနှင့်ကိုယ်ရေးအချက်အလက် မူဝါဒကို သဘောတူလက်ခံပါသည်။',
     ],
   ])(
     'abuts the %s legal sentence, the connector and the spoken label to the words',

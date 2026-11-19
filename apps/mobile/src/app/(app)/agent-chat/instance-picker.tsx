@@ -10,10 +10,10 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
-import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -346,9 +346,14 @@ export default function InstancePickerScreen() {
             inset="gutter"
             compact
             title={t('agentChat.instancePicker.noCliInstances')}
-            description={stripInlineCodeMarkers(
-              t('agentChat.instancePicker.noCliInstancesDescription')
-            )}
+            description={
+              <InlineCodeText
+                variant="muted"
+                className="text-center"
+                codeClassName="text-muted-foreground"
+                value={t('agentChat.instancePicker.noCliInstancesDescription')}
+              />
+            }
             action={
               <StateAction
                 label={t('common.refresh')}

@@ -17,7 +17,7 @@ import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-in
 import { planLegalInContentLink } from './legal-document-link';
 
 const TITLE_KEY = {
-  terms: 'login.termsInSentence',
+  terms: 'prReview.discussion.termsTitle',
   privacy: 'common.privacyPolicy',
 } as const satisfies Record<LegalDocument, string>;
 

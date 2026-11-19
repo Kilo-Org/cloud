@@ -1,5 +1,6 @@
-import { marked, type MarkedToken, type Token } from 'marked';
+import { type MarkedToken, type Token } from 'marked';
 
+import { lexMarkdown } from '@/components/agents/markdown-parse-cache';
 import { i18n } from '@/i18n';
 import { segmenter } from '@/lib/intl-cache';
 
@@ -26,9 +27,12 @@ const ELLIPSIS = '…';
  *
  * Line-level markers are handled by the same walk: a heading, list item, or
  * quote contributes the text of its children, never its own `#`, `-`, or `>`.
+ *
+ * The lexer is the transcript renderer's memoized one, so deriving a title for
+ * a message already on screen reuses the tokens that draw it.
  */
 function chatPlainText(text: string): string {
-  return markedTokensText(marked.lexer(text), ' ');
+  return markedTokensText(lexMarkdown(text), ' ');
 }
 
 /**
@@ -58,9 +62,15 @@ function markedTokenText(token: MarkedToken): string {
     }
     case 'hr':
     case 'def':
-    case 'checkbox':
-    case 'html': {
+    case 'checkbox': {
       return '';
+    }
+    // An html token's own tags are not text, but its body is what the reader
+    // sees: `<br>` separates the words around it and `<p>deploy failed</p>` is
+    // that paragraph. Tags become a space rather than nothing so neighbours do
+    // not run together; entities stay as the source spells them.
+    case 'html': {
+      return token.text.replaceAll(/<[^>]*>/gu, ' ');
     }
     case 'code':
     case 'codespan':
@@ -73,7 +83,7 @@ function markedTokenText(token: MarkedToken): string {
       return markedTokensText(token.tokens, ' ');
     }
     case 'list': {
-      return token.items.map(item => markedTokensText(item.tokens)).join(' ');
+      return token.items.map(item => markedTokenText(item)).join(' ');
     }
     case 'table': {
       return [

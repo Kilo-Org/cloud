@@ -143,4 +143,20 @@ describe('derivedChatText with inline markdown', () => {
   it('keeps table cells apart', () => {
     expect(derivedChatText('x | y\n--- | ---\n1 | 2')).toBe('x y 1 2');
   });
+
+  it('separates the words around an inline html break', () => {
+    expect(derivedChatText('one<br>two')).toBe('one two');
+  });
+
+  it('keeps the visible text of an html block', () => {
+    expect(derivedChatText('<p>deploy failed</p>')).toBe('deploy failed');
+  });
+
+  it('keeps only the text of a tag with an attribute', () => {
+    expect(derivedChatText('<span class="x">hi</span>')).toBe('hi');
+  });
+
+  it('keeps the items of a nested list apart', () => {
+    expect(derivedChatText('- parent\n  - child\n- second')).toBe('parent child second');
+  });
 });

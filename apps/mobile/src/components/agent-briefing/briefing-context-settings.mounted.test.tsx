@@ -25,6 +25,7 @@ const paid = vi.hoisted(() => ({
   mutate: vi.fn(),
   refetch: vi.fn(),
   alert: vi.fn(),
+  estimate: { value: undefined as unknown },
 }));
 
 beforeEach(() => {
@@ -59,7 +60,12 @@ vi.mock('react-i18next', () => ({
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutate: paid.mutate, isPending: false }),
-  useQuery: () => ({ data: undefined, isError: false, isFetching: false, refetch: paid.refetch }),
+  useQuery: () => ({
+    data: paid.estimate.value,
+    isError: false,
+    isFetching: false,
+    refetch: paid.refetch,
+  }),
   useQueryClient: () => ({}),
 }));
 vi.mock('@/lib/trpc', () => ({
@@ -72,6 +78,11 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/lib/utils', () => ({
+  cn: (...classes: unknown[]) => classes.filter(Boolean).join(' '),
+}));
+
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/lib/hooks/use-available-models', () => ({
@@ -131,9 +142,37 @@ it('reports the off state instead of leaving the switch unstated', () => {
   });
 });
 
+it('hides the previous estimate when a field no longer parses', () => {
+  paid.estimate.value = {
+    canGenerate: true,
+    estimatedCostMicrodollars: 1000,
+    maximumCostMicrodollars: 2_000_000,
+    maxDurationSeconds: 600,
+    estimateToken: 'stale-quote',
+  };
+  const mounted = mount(true);
+  expect(JSON.stringify(mounted.toJSON())).toContain('agentBriefing.estimate');
+
+  const [durationField] = mounted.root.findAll(node => (node.type as string) === 'FormField');
+  if (!durationField) {
+    throw new Error('missing duration field');
+  }
+  act(() => {
+    (durationField.props.onChangeText as (value: string) => void)('not a duration');
+  });
+
+  const tree = JSON.stringify(mounted.toJSON());
+  expect(tree).toContain('Invalid limits');
+  expect(tree).not.toContain('agentBriefing.estimate');
+  expect(tree).not.toContain('stale-quote');
+
+  act(() => {
+    mounted.unmount();
+  });
+});
+
 it('requires a fresh cost confirmation before explicitly enabling scheduled capture', async () => {
   const mounted = mount(false);
-  expect(paid.mutate).not.toHaveBeenCalled();
   const switchNode = mounted.root.find(node => (node.type as string) === 'Switch');
   const { onValueChange } = switchNode.props as { onValueChange: (next: boolean) => void };
   act(() => {

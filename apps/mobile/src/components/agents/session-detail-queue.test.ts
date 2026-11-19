@@ -184,6 +184,7 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ background: '#000', mutedForeground: '#999' }),
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
@@ -586,6 +587,7 @@ vi.mock('@/components/agents/part-renderer', () => ({
 }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
 }));
 vi.mock('@/components/query-error', () => ({
   QueryError: 'QueryError',
@@ -623,6 +625,7 @@ function makeManager() {
       isLoading: { value: false },
       isRefreshingCachedTranscript: { value: false },
       error: { value: null },
+      failedHistoryKind: { value: null },
       fetchedSessionData: {
         value: {
           associatedPr: null,

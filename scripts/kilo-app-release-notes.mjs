@@ -4,9 +4,20 @@
  *
  * The kilo-app Release workflow writes the section after a successful store
  * submission. `body` lists the merged pull requests that shipped between two
- * refs and links each one, `identity` reads the store build identity from the
+ * refs, keeps the ones a reader can see, and asks the Kilo gateway to rewrite
+ * them as user outcomes; `identity` reads the store build identity from the
  * built IPA, and `write` inserts the section above the newest one and (with
  * --land) pushes it onto a branch.
+ *
+ * The rewrite is optional. `KILO_CHANGELOG_API_KEY` carries the gateway
+ * credential (the release workflow mints a one-hour token for it from the
+ * existing `MCP_CATALOG_TOKEN_SECRET` shared secret), and without it - or when
+ * the call fails or its answer does not pass `validateCuratedNotes` - `body`
+ * prints the deterministic block and warns on stderr. A release never fails
+ * because its notes could not be rewritten.
+ * `KILO_CHANGELOG_BASE_URL` and `KILO_CHANGELOG_TIMEOUT_MS` exist for tests, as
+ * does `KILO_CHANGELOG_RETRY_BASE_MS`, which shortens the wait before a
+ * rate-limited call (HTTP 429/503) is retried up to three times.
  *
  * Usage:
  *   node scripts/kilo-app-release-notes.mjs body [--from <ref>] [--to <ref>]
@@ -16,6 +27,21 @@
  * `--changelog` is repository-relative (default apps/mobile/CHANGELOG.md).
  * `--config`, `--ipa`, `--build-json` and `--body-file` are relative to the
  * current directory.
+ *
+ * A `--land` verifies the branch before it writes onto it: a merge base with
+ * main must exist, and the branch's diff from that base must be the version
+ * line and the changelog only. An empty diff carries no version line, so it is
+ * refused too. A branch that fails the check receives nothing, the section is
+ * carried to the `--pending` branch so the finished build's line is not lost,
+ * and the run exits 1; every later run refuses the same branch until a human
+ * removes it. A branch that could not be read - a deleted ref, a failed fetch -
+ * is not a verdict on its shape: the attempt is retried, and when the retries
+ * run out the section is carried exactly as for a gone branch and the run stays
+ * green. A land that succeeds prints two lines after its `changelog: landed
+ * ...` line, which the release workflow parses:
+ *
+ *   changelog-head=<sha the section now sits on>
+ *   changelog-files=<the files that commit changes, comma separated>
  *
  * A `--land` whose branch is gone or cannot be pushed is not a failed build:
  * the composed section is carried to the `--pending` branch and the next build
@@ -33,8 +59,9 @@
  *       carried to the pending branch
  *   1 - the store build identity cannot be resolved (the IPA is unreadable, has
  *       no CFBundleVersion, or disagrees with the configured version; or a
- *       supplied --build-json names no Android build), or the section could be
- *       neither landed nor carried
+ *       supplied --build-json names no Android build), the version-bump branch
+ *       failed the land-time check, or the section could be neither landed nor
+ *       carried
  *   2 - usage error, or a --from ref that does not resolve
  */
 import { execFileSync } from 'node:child_process';
@@ -52,6 +79,20 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const CHANGELOG_DEFAULT = 'apps/mobile/CHANGELOG.md';
+
+// The product areas the reader-facing notes name, and the commit scopes that
+// map to them. One file, shared with the bundled screen
+// (`apps/mobile/src/components/changelog-sections.ts`), so a scope added here
+// reaches both the composed section and the sections that already shipped.
+const AREA_MAP_PATH = new URL(
+  '../apps/mobile/src/components/changelog-areas.json',
+  import.meta.url
+);
+const AREA_MAP = JSON.parse(readFileSync(AREA_MAP_PATH, 'utf8'));
+
+// How many features one section lists; the rest ship their note in the areas
+// line, which the screen and this composer cap identically.
+const NEW_SUBJECT_LIMIT = 6;
 
 // The repository the app commits ship in. A changelog line links its pull
 // request here, so a reader opens the pull request from the rendered file.
@@ -100,6 +141,59 @@ const BOT_NAME = 'github-actions[bot]';
 const BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 const MAX_LAND_RETRIES = 3;
 
+// Where a version's notes are rewritten. The app serves the OpenAI-compatible
+// chat completions shape under `/api/openrouter`, the same route and body the
+// agent briefing calls (`apps/web/src/lib/agent-briefing/summary.ts`); both
+// prefixes rewrite to the AI gateway's `/api/v1/chat/completions`
+// (`apps/web/ai-gateway-rewrites.mjs`).
+//
+// The model is the gateway alias the app already ships as the agent briefing's
+// default (`DEFAULT_BRIEFING_MODEL` in
+// apps/web/src/lib/agent-briefing/store.ts:25), so no model is introduced here
+// that production does not already serve.
+const NOTES_BASE_URL_DEFAULT = 'https://app.kilo.ai';
+const NOTES_PATH = '/api/openrouter/chat/completions';
+const NOTES_MODEL = '~deepseek/deepseek-flash-latest';
+
+// The completion budget. The alias resolves to a DeepSeek Flash build that
+// reasons by default (`deepseek/deepseek-v4.1-flash-1017`: reasoning enabled at
+// high effort), and the reasoning tokens are charged to this same cap before
+// the answer starts. The briefing grants a reasoning model 16k
+// (`REASONING_MAX_OUTPUT_TOKENS` in
+// apps/web/src/lib/agent-briefing/summary.ts); a smaller cap is spent on
+// thinking, and the empty or half-written content is not JSON.
+const NOTES_MAX_TOKENS = 16_384;
+
+// Notes are never worth a delayed release: a call that does not answer within
+// this window is abandoned and the deterministic block is written instead. The
+// model thinks before it answers, so the window covers a reasoning pass and the
+// answer, not one short generation.
+const NOTES_TIMEOUT_DEFAULT_MS = 60_000;
+
+// The gateway rate-limits a burst of rewrites (429, and 503 while it sheds
+// load). A version's notes are worth a few short waits: three more calls, each
+// after the gateway's own `Retry-After` (capped) or an exponential backoff, and
+// never more than the total budget below. Anything longer falls back to the
+// deterministic block as before.
+const NOTES_RETRY_LIMIT = 3;
+const NOTES_RETRY_BASE_DEFAULT_MS = 5_000;
+const NOTES_RETRY_AFTER_CAP_MS = 30_000;
+const NOTES_RETRY_BUDGET_MS = 60_000;
+
+// The history rewrite sends one call per shipped version; without a pause the
+// gateway sees the whole file at once and rate-limits it.
+const VERSION_PAUSE_DEFAULT_MS = 3_000;
+
+// The caps a validated answer has to meet, the same shape the deterministic
+// composer and the bundled screen write and read.
+const CURATED_NEW_LIMIT = NEW_SUBJECT_LIMIT;
+const CURATED_CHANGES_LIMIT = 6;
+const CURATED_AREA_LIMIT = 3;
+const CURATED_LINE_LIMIT = 160;
+
+// The areas the model may name, from the shared map: `chat`, `cloudAgent`, ...
+const CURATED_AREAS = Object.keys(AREA_MAP.areas);
+
 // The version-bump branch is deleted the moment a human merges its PR (auto
 // delete), which can happen while the section is still being composed. A land
 // that finds no branch is not a failed build: the composed section is pushed
@@ -139,6 +233,647 @@ export function linkPullRequest(subject) {
     PR_SUBJECT_RE,
     (_, number) => `([#${number}](${REPO_URL}/pull/${number}))`
   );
+}
+
+/** `fix(mobile)!: keep the composer` as its type, its scope and its body. */
+const CONVENTIONAL_SUBJECT = /^([a-z][a-z-]*)(?:\(([^)]*)\))?!?:\s+(.+)$/;
+
+/**
+ * The commit types whose work a reader cannot see in the app. The release
+ * workflow already keeps app-local files out of the notes, so this covers the
+ * types a shipped file can still carry.
+ */
+const INTERNAL_SUBJECT_TYPES = ['build', 'chore', 'ci', 'docs', 'refactor', 'style', 'test'];
+
+/**
+ * Subjects a reader cannot see a change in even though their commit type ships
+ * one: a demo behind a flag, the app's own transport plumbing, and the tweaks
+ * that only move a card's padding or drop a section label. The screen applies
+ * the same list to sections that already shipped
+ * (`apps/mobile/src/components/changelog-sections.ts`).
+ */
+const UNSEEN_WORK = [
+  /\bdemo\b/i,
+  /\bflag[- ]gated\b/i,
+  /\bnative sync\b/i,
+  /\bsocket generation\b/i,
+  /\btransport failures?\b/i,
+  /\bcard padding\b/i,
+  /\bsection label\b/i,
+  /^align .*\bpadding\b/i,
+];
+
+/**
+ * Shipped subjects that name no change in a sentence, dropped until the file
+ * they landed in is gone from the app's history.
+ */
+const UNREADABLE_SUBJECTS = ['answer the request a glanceable approval names'];
+
+// The NEW group policy both this composer and the bundled screen read
+// (`apps/mobile/src/components/changelog-sections.ts`): scopes that never reach
+// the phone app, subjects that name no phone change, and the leading verbs that
+// state a removal or a restriction rather than a feature.
+const DROP_SCOPES = new Set(AREA_MAP.newGroup.dropScopes.map(scope => scope.toLowerCase()));
+const DROP_SUBJECT_PATTERNS = AREA_MAP.newGroup.dropSubjectPatterns.map(
+  pattern => new RegExp(pattern, 'i')
+);
+const CHANGE_PREFIX = new RegExp(`^(?:${AREA_MAP.newGroup.changePrefixes.join('|')})\\b`, 'i');
+
+/** The area a commit scope names, or the map's generic tag when it names none. */
+export function areaOfScope(scope) {
+  const key = scope === undefined ? '' : scope.trim().toLowerCase();
+  return AREA_MAP.scopeToArea[key] ?? AREA_MAP.generic;
+}
+
+/** The areas of `AREAS`, in the map's own order so a section reads stably. */
+function orderedAreas(seen) {
+  return Object.keys(AREA_MAP.areas).filter(area => seen.has(area));
+}
+
+/**
+ * True for the two markers a build with nothing to show writes instead of
+ * notes. They are file text, not shipped subjects, and neither is news.
+ */
+export function isNoChangeMarker(text) {
+  return text === INITIAL_MARKER.slice(2) || text === NO_CHANGES_MARKER.slice(2);
+}
+
+/**
+ * One shipped subject as the notes carry it: its linked sentence and the block
+ * it belongs to, or null when a reader cannot see the change in it.
+ */
+export function readerFacingSubject(subject) {
+  if (isNoChangeMarker(subject)) {
+    return null;
+  }
+  const conventional = CONVENTIONAL_SUBJECT.exec(subject);
+  const type = conventional ? conventional[1] : null;
+  if (type !== null && INTERNAL_SUBJECT_TYPES.includes(type)) {
+    return null;
+  }
+  const scope = conventional ? conventional[2] : undefined;
+  if (scope !== undefined && DROP_SCOPES.has(scope.trim().toLowerCase())) {
+    return null;
+  }
+  const body = conventional ? conventional[3] : subject;
+  if (
+    UNSEEN_WORK.some(pattern => pattern.test(body)) ||
+    DROP_SUBJECT_PATTERNS.some(pattern => pattern.test(body))
+  ) {
+    return null;
+  }
+  const plain = body
+    .replace(/\(\s*\[?#\d+.*$/, '')
+    .trim()
+    .toLowerCase();
+  if (UNREADABLE_SUBJECTS.includes(plain)) {
+    return null;
+  }
+  // A removal or a restriction is a change the reader should see, but it is not
+  // a new feature: it joins the fixes the areas line counts.
+  const isFeature = (type === null || type === 'feat') && !CHANGE_PREFIX.test(body);
+  return {
+    kind: isFeature ? 'new' : 'fix',
+    text: linkPullRequest(subject),
+    scope,
+  };
+}
+
+/**
+ * The body lines a section carries: its newest six features under `### New`,
+ * then one `areas:` line naming the product areas its fixes touched. A section
+ * whose work is all internal carries neither block, and the caller writes the
+ * no-change marker instead.
+ */
+export function changelogBodyLines(subjects) {
+  const news = [];
+  const areas = new Set();
+  let hasFixes = false;
+  for (const subject of subjects) {
+    const note = readerFacingSubject(subject);
+    if (note === null) {
+      continue;
+    }
+    if (note.kind === 'new') {
+      news.push(note.text);
+      continue;
+    }
+    hasFixes = true;
+    areas.add(areaOfScope(note.scope));
+  }
+  const newest = news.slice(-NEW_SUBJECT_LIMIT).reverse();
+  const lines = [];
+  if (newest.length > 0) {
+    lines.push('### New', '', ...newest.map(note => `- ${note}`));
+  }
+  if (hasFixes) {
+    if (lines.length > 0) {
+      lines.push('');
+    }
+    const named = orderedAreas(areas);
+    lines.push(
+      '### Fixes',
+      '',
+      `- areas: ${named.length === 0 ? AREA_MAP.generic : named.join(', ')}`
+    );
+  }
+  return lines;
+}
+
+/** `subject` without the pull request reference a changelog line ends in. */
+export function plainSubject(subject) {
+  return subject
+    .replace(/\s*\(\[#\d+\]\([^)]*\)\)$/, '')
+    .replace(/\s*\(#\d+\)$/, '')
+    .trim();
+}
+
+/**
+ * One shipped subject as the rewrite sees it: the block the shared table puts
+ * it in, the area its scope names, and its plain sentence. This is the same
+ * filter the deterministic block applies, so the model never rewrites work the
+ * table already dropped.
+ */
+export function rewriteCandidates(subjects) {
+  const candidates = [];
+  for (const subject of subjects) {
+    const note = readerFacingSubject(subject);
+    if (note === null) {
+      continue;
+    }
+    candidates.push({
+      kind: note.kind,
+      area: note.scope === undefined ? AREA_MAP.generic : areaOfScope(note.scope),
+      text: plainSubject(subject),
+    });
+  }
+  return candidates;
+}
+
+const NOTES_PROMPT = [
+  'You write the release notes for the Kilo mobile app. The reader is a Kilo app user, not a developer.',
+  '',
+  'Reply with one JSON object and nothing else:',
+  '{"new":["..."],"changes":["..."],"areas":["..."]}',
+  '',
+  'new: at most 6 lines. Each line names one outcome the reader can now see or do,',
+  'in plain language, starting with a capital letter. Order newest first. Never',
+  'mention code, files, endpoints, pull requests, tests, refactors or backend',
+  'internals. Use [] when the build shipped nothing a reader can see.',
+  '',
+  'Describe only what a subject states. Never guess a behaviour, a time limit or',
+  'a screen the subject does not name; when a subject is unclear to a reader,',
+  'leave it out. Leave out diagnostics, error reporting, logging and monitoring:',
+  'the reader cannot see them.',
+  '',
+  'Name things the way the app shows them to the reader, not by their internal',
+  'name. Avoid developer terms such as "tool interface", "command-line agent",',
+  '"confirmed account" or "mode"; say what the reader does or sees instead.',
+  'Spell out abbreviations such as "PR". Lead with the subject the reader knows,',
+  'for example "Cloud Agent can now ...".',
+  '',
+  'changes: at most 6 lines for policy or behaviour changes the reader must know',
+  'about: a removed sale, expiring credits, a discontinued benefit or a new',
+  'restriction. Word each one neutrally, without praise or apology. Leave out',
+  'anything that cannot apply to a reader who already uses the app, such as how',
+  'new sign-ups are screened, and never describe abuse, fraud or risk screening.',
+  'Use [] when there are none.',
+  '',
+  `areas: at most 3 product areas the fixes touched, as exact keys from this list:`,
+  `${CURATED_AREAS.join(', ')}. Use [] when the build shipped no fixes, and leave`,
+  'out a fix whose area above reads "app": it belongs to no named area. When no',
+  'fix names one, the notes read "Bug fixes and polish.", so [] is correct then.',
+  '',
+  'No line may contain a URL, a pull request reference such as (#123), backticks,',
+  'an identifier (snake_case, camelCase or a file name), a commit type prefix such',
+  'as "fix(mobile):", or markdown.',
+].join('\n');
+
+/** The user message: every candidate, oldest first, as `kind | area | subject`. */
+export function notesPrompt(candidates) {
+  return [
+    'The next app build ships these changes, oldest first (kind | area | subject):',
+    '',
+    ...candidates.map(candidate => `${candidate.kind} | ${candidate.area} | ${candidate.text}`),
+  ].join('\n');
+}
+
+/**
+ * The answer shape, read by hand. This file imports nothing outside Node's
+ * built-ins: the release workflow test runs a copy of it from a scratch
+ * directory with no node_modules, and the release job must be able to run it
+ * from anywhere in the checkout.
+ */
+function readAnswer(payload) {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { error: 'it was not a JSON object' };
+  }
+  const fields = Object.keys(payload).sort();
+  if (fields.join(',') !== 'areas,changes,new') {
+    return { error: 'it did not carry exactly new, changes and areas' };
+  }
+  for (const field of ['new', 'changes', 'areas']) {
+    const value = payload[field];
+    if (!Array.isArray(value) || !value.every(line => typeof line === 'string')) {
+      return { error: `its ${field} was not a list of lines` };
+    }
+  }
+  for (const area of payload.areas) {
+    if (!CURATED_AREAS.includes(area)) {
+      return { error: `it named an unknown area: ${area}` };
+    }
+  }
+  return { answer: { new: payload.new, changes: payload.changes, areas: payload.areas } };
+}
+
+/**
+ * The first choice of a chat completion: its message content, and the details a
+ * failure diagnostic names. `null` when the body carries no first choice with a
+ * message at all.
+ *
+ * A reasoning model reports its thinking beside the answer, under `reasoning`,
+ * `reasoning_content` or `reasoning_details`; those are never the answer and are
+ * read only to say whether they were there.
+ */
+function readCompletion(payload) {
+  if (payload === null || typeof payload !== 'object') {
+    return null;
+  }
+  const choices = payload.choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return null;
+  }
+  const choice = choices[0];
+  if (choice === null || typeof choice !== 'object') {
+    return null;
+  }
+  const message = choice.message;
+  if (message === null || typeof message !== 'object') {
+    return null;
+  }
+  return {
+    content: typeof message.content === 'string' ? message.content : null,
+    finishReason: typeof choice.finish_reason === 'string' ? choice.finish_reason : null,
+    reasoning:
+      typeof message.reasoning === 'string' ||
+      typeof message.reasoning_content === 'string' ||
+      (Array.isArray(message.reasoning_details) && message.reasoning_details.length > 0),
+  };
+}
+
+/**
+ * The model's answer as the reader gets it, for a failure log: the finish reason,
+ * how much content arrived, whether a reasoning field was beside it, and the first
+ * 120 characters of that content, JSON-quoted so line breaks cannot split the log
+ * line. Model output only.
+ */
+function answerDiagnostic(completion) {
+  const content = completion.content ?? '';
+  return [
+    `finish_reason ${completion.finishReason ?? 'absent'}`,
+    `${content.length} content characters`,
+    completion.reasoning ? 'a reasoning field present' : 'no reasoning field',
+    `content starts ${JSON.stringify(content.slice(0, 120))}`,
+  ].join(', ');
+}
+
+// A line that names code rather than an outcome: a code span, snake_case,
+// camelCase (a two-letter lowercase run keeps iPhone and iPad out of it, and the
+// lowercase after the hump keeps macOS and watchOS out), a source file name, a
+// call, or a conventional-commit prefix.
+const CODE_IN_LINE = [
+  /`/,
+  /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/,
+  /\b[a-z]{2,}[A-Z][a-z]+[A-Za-z0-9]*\b/,
+  /\b[\w-]+\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|sql|ya?ml|toml)\b/i,
+  /\b\w+\(\)/,
+  /^(?:feat|fix|perf|chore|docs|test|build|ci|refactor|style|revert)(?:\([^)]*\))?!?:/i,
+];
+const URL_IN_LINE = /https?:\/\/|www\./i;
+// The reference shapes a commit subject carries: a linked `([#123](url))`, a
+// bare reference `(#123)`, `[#123]`, a `pull/123` path, and a `#123` that ends
+// the line or closes a parenthesis. A sentence that counts something ("ranked
+// #1 for speed") is not a pull request, so it is left alone.
+const PULL_REQUEST_IN_LINE = /\(#\d+\)|\[#\d+\]|\bpull\/\d+\b|(?:^|\s)#\d+(?=$|\))/;
+
+/** The reason `line` cannot be printed as a note, or null when it can. */
+export function noteLineProblem(line) {
+  if (line.length === 0) {
+    return 'an empty line';
+  }
+  if (line.length > CURATED_LINE_LIMIT) {
+    return `a line longer than ${CURATED_LINE_LIMIT} characters`;
+  }
+  if (URL_IN_LINE.test(line)) {
+    return 'a URL';
+  }
+  if (PULL_REQUEST_IN_LINE.test(line)) {
+    return 'a pull request reference';
+  }
+  if (CODE_IN_LINE.some(pattern => pattern.test(line))) {
+    return 'a code identifier';
+  }
+  return null;
+}
+
+/** One note line as the reader gets it: no list marker, one sentence, capitalised. */
+function cleanNoteLine(line) {
+  const text = line
+    .replace(/^\s*[-*•]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.charAt(0).toLocaleUpperCase('en') + text.slice(1);
+}
+
+/**
+ * Check one answer against the caps, the line rules and the fixes this build
+ * actually shipped. `{ notes }` when every line may be printed, `{ error }` when
+ * the answer has to be discarded for the deterministic block.
+ */
+export function validateCuratedNotes(payload, candidates) {
+  const read = readAnswer(payload);
+  if (read.error) {
+    return { error: `the answer did not have the expected shape: ${read.error}` };
+  }
+  const { new: news, changes, areas } = read.answer;
+  if (news.length > CURATED_NEW_LIMIT) {
+    return { error: `the answer named ${news.length} new lines, more than ${CURATED_NEW_LIMIT}` };
+  }
+  if (changes.length > CURATED_CHANGES_LIMIT) {
+    return {
+      error: `the answer named ${changes.length} changes, more than ${CURATED_CHANGES_LIMIT}`,
+    };
+  }
+  if (areas.length > CURATED_AREA_LIMIT) {
+    return { error: `the answer named ${areas.length} areas, more than ${CURATED_AREA_LIMIT}` };
+  }
+  const lines = [...news, ...changes].map(cleanNoteLine);
+  for (const line of lines) {
+    const problem = noteLineProblem(line);
+    if (problem !== null) {
+      return { error: `the answer contained ${problem}: ${line}` };
+    }
+  }
+  const hasFixes = candidates.some(candidate => candidate.kind === 'fix');
+  if (lines.length === 0 && areas.length === 0 && !hasFixes) {
+    return { error: 'the answer named no new line, no change and no area' };
+  }
+  // A build without fixes names no area: the fixes line is what the answer
+  // replaces, so an area there would tell the reader the release did something
+  // it did not. A build with fixes may name none — an unmapped fix belongs to
+  // no product area — and its line then reads as bug fixes and polish.
+  if (!hasFixes && areas.length > 0) {
+    return { error: 'the answer named an area for a build that shipped no fixes' };
+  }
+  return {
+    notes: {
+      new: news.map(cleanNoteLine),
+      changes: changes.map(cleanNoteLine),
+      areas: orderedAreas(new Set(areas)),
+      hasFixes,
+    },
+  };
+}
+
+/**
+ * The block a curated version writes: New, then Changes, then the fixes line.
+ * A build whose fixes name no product area writes the generic `app` tag, which
+ * the screen reads as "Bug fixes and polish.".
+ */
+export function curatedBodyLines(notes) {
+  const lines = [];
+  if (notes.new.length > 0) {
+    lines.push('### New', '', ...notes.new.map(note => `- ${note}`));
+  }
+  if (notes.changes.length > 0) {
+    if (lines.length > 0) {
+      lines.push('');
+    }
+    lines.push('### Changes', '', ...notes.changes.map(change => `- ${change}`));
+  }
+  if (notes.hasFixes) {
+    if (lines.length > 0) {
+      lines.push('');
+    }
+    const named = notes.areas.length === 0 ? AREA_MAP.generic : notes.areas.join(', ');
+    lines.push('### Fixes', '', `- areas: ${named}`);
+  }
+  return lines;
+}
+
+/**
+ * Every JSON object in a model answer, in the order it wrote them. Scans for
+ * balanced `{...}` rather than accepting only a bare body or a fenced block: a
+ * reasoning model may put a sentence, a heading or a fence in front of the
+ * object it was asked for, and trailing prose must not hide it either. It may
+ * also echo the prompt's placeholder shape before its real answer, so the
+ * caller checks each object until one passes. Only top-level objects count: a
+ * scan resumes after an object that parsed, so an object nested inside an
+ * answer is never collected as a later answer.
+ */
+function parseAnswers(content) {
+  const answers = [];
+  let start = content.indexOf('{');
+  while (start !== -1) {
+    let next = start + 1;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < content.length; index += 1) {
+      const character = content[index];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (character === '\\') {
+          escaped = true;
+        } else if (character === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (character === '"') {
+        inString = true;
+      } else if (character === '{') {
+        depth += 1;
+      } else if (character === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          try {
+            answers.push(JSON.parse(content.slice(start, index + 1)));
+            next = index + 1;
+          } catch {
+            // Not JSON here; a later `{` may open the object instead.
+          }
+          break;
+        }
+      }
+    }
+    start = content.indexOf('{', next);
+  }
+  return answers;
+}
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/** The gateway statuses another call may succeed against. */
+function isRetryableStatus(status) {
+  return status === 429 || status === 503;
+}
+
+/** `Retry-After` as the milliseconds to wait, or null when it is absent or unreadable. */
+function parseRetryAfterMs(value) {
+  if (value === null || value === undefined || value.trim() === '') {
+    return null;
+  }
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, Math.round(seconds * 1000));
+  }
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
+}
+
+/**
+ * The wait before retry `attempt` (1-based): the gateway's own `Retry-After`
+ * when it sent one - seconds or an HTTP date, capped so one header cannot stall
+ * a release - else the base doubled per attempt, with a little jitter so
+ * parallel jobs do not retry in step.
+ */
+export function notesRetryDelayMs(attempt, retryAfter, baseMs = NOTES_RETRY_BASE_DEFAULT_MS) {
+  const fromHeader = parseRetryAfterMs(retryAfter);
+  if (fromHeader !== null) {
+    return Math.min(fromHeader, NOTES_RETRY_AFTER_CAP_MS);
+  }
+  const backoff = baseMs * 2 ** (attempt - 1);
+  return backoff + Math.floor(Math.random() * (backoff / 4 + 1));
+}
+
+/** The backoff base; `KILO_CHANGELOG_RETRY_BASE_MS` overrides it (~1 in tests), and a blank or invalid value means the default. */
+export function notesRetryBaseMs(configured = process.env.KILO_CHANGELOG_RETRY_BASE_MS) {
+  const text = typeof configured === 'string' ? configured.trim() : configured;
+  const value = Number(text);
+  if (text === undefined || text === '' || !Number.isFinite(value) || value < 0) {
+    return NOTES_RETRY_BASE_DEFAULT_MS;
+  }
+  return value;
+}
+
+/** How long the history rewrite waits between two versions; `KILO_CHANGELOG_VERSION_PAUSE_MS` overrides it. */
+export function versionPauseMs(configured = process.env.KILO_CHANGELOG_VERSION_PAUSE_MS) {
+  const value = Number(configured);
+  if (configured === undefined || configured === '' || !Number.isFinite(value) || value < 0) {
+    return VERSION_PAUSE_DEFAULT_MS;
+  }
+  return value;
+}
+
+/**
+ * Ask the gateway to rewrite one version's candidates. `{ lines }` when the
+ * answer passed every check, `{ error }` otherwise: the caller writes the
+ * deterministic block and warns, so a model failure never fails a release.
+ *
+ * `KILO_CHANGELOG_API_KEY` carries the credential, `KILO_CHANGELOG_BASE_URL`
+ * points at another gateway (a local fake in tests), and
+ * `KILO_CHANGELOG_TIMEOUT_MS` shortens the wait.
+ * `KILO_CHANGELOG_RETRY_BASE_MS` shortens the backoff (tests set it to ~1).
+ * The key is read here and sent only as the bearer token; nothing logs it.
+ */
+export async function requestCuratedNotes(candidates, options = {}) {
+  const apiKey = options.apiKey ?? process.env.KILO_CHANGELOG_API_KEY;
+  if (!apiKey) {
+    return { error: 'KILO_CHANGELOG_API_KEY is not set' };
+  }
+  const baseUrl = (
+    options.baseUrl ??
+    process.env.KILO_CHANGELOG_BASE_URL ??
+    NOTES_BASE_URL_DEFAULT
+  ).replace(/\/+$/, '');
+  const configuredTimeout = Number(options.timeoutMs ?? process.env.KILO_CHANGELOG_TIMEOUT_MS);
+  const timeoutMs =
+    Number.isFinite(configuredTimeout) && configuredTimeout > 0
+      ? configuredTimeout
+      : NOTES_TIMEOUT_DEFAULT_MS;
+  const retryBaseMs = notesRetryBaseMs(options.retryBaseMs);
+  const fetchImpl = options.fetchImpl ?? fetch;
+
+  let waited = 0;
+  let response;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      response = await fetchImpl(`${baseUrl}${NOTES_PATH}`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: NOTES_MODEL,
+          // No temperature: the briefing's working call sends none, and a
+          // reasoning model's own sampling is not what fixes this answer's shape.
+          max_tokens: NOTES_MAX_TOKENS,
+          stream: false,
+          messages: [
+            { role: 'system', content: NOTES_PROMPT },
+            { role: 'user', content: notesPrompt(candidates) },
+          ],
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      if (error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+        return { error: `the notes model did not answer within ${timeoutMs}ms` };
+      }
+      return { error: `the notes model could not be reached (${reasonOf(error)})` };
+    }
+    if (response.ok) {
+      break;
+    }
+    const status = response.status;
+    const remaining = NOTES_RETRY_BUDGET_MS - waited;
+    if (!isRetryableStatus(status) || attempt > NOTES_RETRY_LIMIT || remaining <= 0) {
+      return { error: `the notes model answered HTTP ${status}` };
+    }
+    const wait = Math.min(
+      notesRetryDelayMs(attempt, response.headers.get('retry-after'), retryBaseMs),
+      remaining
+    );
+    waited += wait;
+    console.error(
+      `changelog: the notes model answered HTTP ${status}; retrying in ${wait}ms (retry ${attempt} of ${NOTES_RETRY_LIMIT})`
+    );
+    // Free the rate-limited response's socket before the next call.
+    await response.body?.cancel().catch(() => {});
+    await sleep(wait);
+  }
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    return { error: 'the notes model returned a body that is not JSON' };
+  }
+  const completion = readCompletion(payload);
+  if (completion === null || completion.content === null) {
+    return { error: 'the notes model returned no message content' };
+  }
+  const answers = parseAnswers(completion.content);
+  if (answers.length === 0) {
+    return {
+      error: `the notes model returned invalid JSON (${answerDiagnostic(completion)})`,
+    };
+  }
+  // The model may quote the prompt's placeholder object before it writes the
+  // real answer, so the first object that parses is not the answer to read: the
+  // first that passes is. When none passes, the last object's error is the one
+  // that describes the final answer the model wrote.
+  let invalid = null;
+  for (const answer of answers) {
+    const validated = validateCuratedNotes(answer, candidates);
+    if (!validated.error) {
+      return { lines: curatedBodyLines(validated.notes) };
+    }
+    invalid = validated;
+  }
+  return invalid;
 }
 
 /**
@@ -399,7 +1134,7 @@ function usage(message) {
   return 2;
 }
 
-function runBody(args) {
+async function runBody(args) {
   const options = {};
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -419,12 +1154,21 @@ function runBody(args) {
     return usage(`--from ref does not resolve: ${options.from}`);
   }
   const subjects = shippedSubjects(options.from, options.to ?? 'HEAD');
-  if (subjects.length === 0) {
+  const deterministic = changelogBodyLines(subjects);
+  if (deterministic.length === 0) {
     console.log(NO_CHANGES_MARKER);
     return 0;
   }
-  for (const subject of subjects) {
-    console.log(`- ${linkPullRequest(subject)}`);
+  // The rewrite is an improvement, never a gate: a missing key, a slow call or
+  // an answer that fails validation leaves the release on the deterministic
+  // block, with the reason on stderr for the run's log.
+  const curated = await requestCuratedNotes(rewriteCandidates(subjects));
+  const lines = curated.lines ?? deterministic;
+  if (curated.error) {
+    console.error(`changelog: ${curated.error}; writing the release notes without the model`);
+  }
+  for (const line of lines) {
+    console.log(line);
   }
   return 0;
 }
@@ -645,68 +1389,173 @@ function clearPending(remote, branch, expectedSha) {
   }
 }
 
-function landSection(options, heading, section) {
-  const separator = options.land.lastIndexOf(':');
-  const remote = options.land.slice(0, separator);
-  const branch = options.land.slice(separator + 1);
-  if (separator < 0 || !remote || !branch) {
-    return usage(`--land must be <remote>:<branch>, got ${options.land}`);
+// Only the shallow checkout the changelog job makes (`fetch-depth: 1`) uses this
+// ladder: it has to deepen before a common base with main is reachable. The
+// measured version-bump branch sat 434 commits behind its merge base with main,
+// and a --depth=200 fetch of both refs still produced no merge base, so the
+// ladder starts above that case. A complete clone already holds the objects, so
+// it gets one plain fetch (`0`) instead and its history is never truncated.
+const VERIFY_DEPTHS = [512, 2048, 8192, 0];
+
+/**
+ * Fetch one ref for the provenance check, and the tip it now names.
+ *
+ * The ref is fetched by plain name (`main`, the branch) rather than by the sha
+ * the run already knows, because GitHub does not serve an unadvertised sha. A
+ * missing ref is `{ error }` rather than a throw: the caller retries the land,
+ * so a git failure never hides behind an exception and never becomes a verdict
+ * on the branch's shape.
+ */
+function fetchForVerify(remote, ref, depth) {
+  const args = ['fetch', '--no-tags', '--quiet'];
+  try {
+    if (depth > 0) {
+      args.push(`--depth=${depth}`);
+    } else if (git(['rev-parse', '--is-shallow-repository']).trim() === 'true') {
+      args.push('--unshallow');
+    }
+    args.push(remote, ref);
+    git(args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    return { sha: git(['rev-parse', 'FETCH_HEAD']).trim() };
+  } catch (error) {
+    if (isMissingRef(error)) {
+      return { error: `${ref} does not exist on ${remote}` };
+    }
+    return { error: reasonOf(error) };
   }
+}
 
-  const message = `docs(kilo-app): changelog for ${options.version} (build ${options.iosBuild})`;
-  console.log(section.replace(/\n$/, ''));
+/** Every path `tip` changes relative to `base`. */
+function replacedFiles(base, tip) {
+  return git(['diff', '--name-only', base, tip])
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+}
 
-  // Sections an earlier build could not land ride along above their own, so a
-  // branch that was merged during that build never loses its changelog line.
-  // A pending branch that exists but cannot be read is not an empty one: the
-  // carry path below replaces the branch, and overwriting content that could
-  // not be read would drop the sections an earlier build carried there.
-  const pendingRead = readPending(remote, options.pending);
-  const pending = pendingRead.sections;
+/** The app.config.ts diff between `base` and `tip`, for the version-line rule. */
+function replacedConfigDiff(base, tip) {
+  return git(['diff', '-U0', base, tip, '--', 'apps/mobile/app.config.ts']);
+}
 
-  for (let attempt = 1; attempt <= MAX_LAND_RETRIES + 1; attempt += 1) {
-    try {
-      git(['fetch', remote, branch]);
-    } catch (error) {
-      console.log(`changelog: attempt ${attempt} rejected (${reasonOf(error)})`);
+/**
+ * The provenance of the version-bump branch, as `{ ok: true, base }`,
+ * `{ ok: false, retry: true, reason }` or `{ ok: false, reason }`.
+ *
+ * A merge base between main and the branch must exist: the branch must be the
+ * version bump this run built. Main's own tip need not be an ancestor, because
+ * main advances during the ~60-minute build window. The branch's diff from that
+ * base must be the version line and the changelog only, the same shape
+ * `isVersionBumpCommit` guards for the release detection.
+ *
+ * Only a branch that was actually read can be refused. A fetch that failed - a
+ * missing ref, a transient network error - says nothing about the branch's
+ * shape, so it is `retry`: the caller tries the land again and, when the
+ * attempts run out, carries the section to the pending branch. A determined
+ * refusal is reserved for a branch every rung fetched whose history has no
+ * merge base with main, whose diff touches a file outside the version-bump set,
+ * or whose apps/mobile/app.config.ts diff changes more than the version line.
+ *
+ * `tip` is the branch commit the section is about to be written onto. A branch
+ * that moved since the caller fetched it is reported as such, so the caller can
+ * retry instead of writing the section onto a commit nobody checked.
+ */
+function verifyBumpBranch(remote, branch, tip) {
+  let base;
+  let fetchFailure;
+  let mergeBaseChecked = false;
+  // A complete repository already has every object, and deepening it would turn
+  // a previous complete clone into a shallow one: one plain fetch is enough. The
+  // ladder only helps a shallow checkout reach the fork point.
+  const shallow = git(['rev-parse', '--is-shallow-repository']).trim() === 'true';
+  for (const depth of shallow ? VERIFY_DEPTHS : [0]) {
+    const main = fetchForVerify(remote, 'main', depth);
+    if (main.error) {
+      fetchFailure = main.error;
       continue;
     }
-    const parent = git(['rev-parse', 'FETCH_HEAD']).trim();
-    const content = treeFile(parent, options.changelog);
-    // A re-run of a build whose section was carried would otherwise write it
-    // twice: drop a carried section that names this build.
-    const carried = pending.filter(
-      item => headingOf(item) !== heading && !hasSectionHeading(content, headingOf(item))
-    );
-    const block = hasSectionHeading(content, heading)
-      ? carried.join('')
-      : section + carried.join('');
-    if (block === '') {
-      console.log(`changelog: landed ${heading} on ${branch} (already present)`);
-      if (pending.length > 0) {
-        clearPending(remote, options.pending, pendingRead.sha);
-      }
-      return 0;
+    const head = fetchForVerify(remote, branch, depth);
+    if (head.error) {
+      fetchFailure = head.error;
+      continue;
     }
-    const sha = commitOn(parent, options.changelog, insertSection(content, block), message);
+    if (head.sha !== tip) {
+      return {
+        ok: false,
+        moved: true,
+        reason: 'the branch moved while the changelog was being composed',
+      };
+    }
     try {
-      git(['push', remote, `${sha}:refs/heads/${branch}`]);
-      console.log(`changelog: landed ${heading} on ${branch} as ${sha}`);
-      if (pending.length > 0) {
-        clearPending(remote, options.pending, pendingRead.sha);
-      }
-      return 0;
-    } catch (error) {
-      console.log(`changelog: attempt ${attempt} rejected (${reasonOf(error)})`);
+      base = git(['merge-base', main.sha, head.sha]).trim();
+      mergeBaseChecked = true;
+      break;
+    } catch {
+      // A shallow history that does not reach the fork point has no base yet:
+      // the next rung fetches deeper.
+      mergeBaseChecked = true;
     }
   }
+  if (!base) {
+    // A branch that was not read cannot be judged, so it is retried: the caller
+    // carries the section when the retries run out. Only history every rung
+    // fetched, with no common commit with main, is a determined refusal.
+    if (fetchFailure) {
+      return {
+        ok: false,
+        retry: true,
+        reason: `it could not be read: ${fetchFailure}`,
+      };
+    }
+    if (!mergeBaseChecked) {
+      return {
+        ok: false,
+        retry: true,
+        reason: 'it could not be read: no rung fetched both refs',
+      };
+    }
+    return { ok: false, reason: 'it shares no history with main' };
+  }
 
-  // The branch was merged and deleted while the build ran. The submission
-  // already succeeded, so the run stays green: the section waits for the next
-  // build's section instead of being lost.
+  let files;
+  let configDiff;
+  try {
+    files = replacedFiles(base, tip);
+    configDiff = replacedConfigDiff(base, tip);
+  } catch (error) {
+    // A local git failure after a successful fetch is not a verdict on the
+    // branch's shape either.
+    return { ok: false, retry: true, reason: reasonOf(error) };
+  }
+  if (!isVersionBumpCommit(files, configDiff)) {
+    const offending = files.filter(file => !VERSION_BUMP_FILES.has(file));
+    if (offending.length > 0) {
+      return {
+        ok: false,
+        reason: `it changes files other than the version line and the changelog: ${offending.join(', ')}`,
+      };
+    }
+    return {
+      ok: false,
+      reason: files.includes('apps/mobile/app.config.ts')
+        ? 'its apps/mobile/app.config.ts diff changes more than the version line'
+        : 'it carries no apps/mobile/app.config.ts version line',
+    };
+  }
+  return { ok: true, base };
+}
+
+/**
+ * Carry the composed section to the pending branch, and return 0 or a failure
+ * status. `opener` is the leading phrase of a failure message, so the refusal
+ * and the exhausted-retry paths each say why they are carrying.
+ */
+function carryToPending(options, heading, section, pendingRead, opener) {
+  const separator = options.land.lastIndexOf(':');
+  const remote = options.land.slice(0, separator);
   if (pendingRead.error) {
     return fail(
-      `could not land ${heading} on ${branch}, and ${options.pending} could not be read (${pendingRead.error}); refusing to overwrite the sections it carries`
+      `${opener}, and ${options.pending} could not be read (${pendingRead.error}); refusing to overwrite the sections it carries`
     );
   }
 
@@ -739,8 +1588,103 @@ function landSection(options, heading, section) {
       snapshot = reread;
     }
   }
-  return fail(
-    `could not land ${heading} on ${branch} or carry it to ${options.pending} (${carryFailure})`
+  return fail(`${opener} or carry it to ${options.pending} (${carryFailure})`);
+}
+
+/**
+ * The two machine-readable lines the release workflow parses after a land: the
+ * verified head the section now sits on and the files it changed.
+ */
+function printVerifiedLand(sha, files) {
+  console.log(`changelog-head=${sha}`);
+  console.log(`changelog-files=${files.join(', ')}`);
+}
+
+function landSection(options, heading, section) {
+  const separator = options.land.lastIndexOf(':');
+  const remote = options.land.slice(0, separator);
+  const branch = options.land.slice(separator + 1);
+  if (separator < 0 || !remote || !branch) {
+    return usage(`--land must be <remote>:<branch>, got ${options.land}`);
+  }
+
+  const message = `docs(kilo-app): changelog for ${options.version} (build ${options.iosBuild})`;
+  console.log(section.replace(/\n$/, ''));
+
+  // Sections an earlier build could not land ride along above their own, so a
+  // branch that was merged during that build never loses its changelog line.
+  // A pending branch that exists but cannot be read is not an empty one: the
+  // carry path below replaces the branch, and overwriting content that could
+  // not be read would drop the sections an earlier build carried there.
+  const pendingRead = readPending(remote, options.pending);
+  const pending = pendingRead.sections;
+
+  for (let attempt = 1; attempt <= MAX_LAND_RETRIES + 1; attempt += 1) {
+    try {
+      git(['fetch', remote, branch]);
+    } catch (error) {
+      console.log(`changelog: attempt ${attempt} rejected (${reasonOf(error)})`);
+      continue;
+    }
+    const parent = git(['rev-parse', 'FETCH_HEAD']).trim();
+    // The land-time check requires the branch to carry only the version line
+    // and the changelog from its merge base with main. A branch that moved, or
+    // that could not be read, is retried; a branch that was read and does not
+    // have that shape receives the section neither now nor on a later run,
+    // until it is replaced.
+    const check = verifyBumpBranch(remote, branch, parent);
+    if (!check.ok) {
+      if (check.moved || check.retry) {
+        console.log(`changelog: attempt ${attempt} rejected (${check.reason})`);
+        continue;
+      }
+      const refusal = `refusing to land ${heading} on ${branch}: ${check.reason}`;
+      const carried = carryToPending(options, heading, section, pendingRead, refusal);
+      if (carried !== 0) {
+        return carried;
+      }
+      return fail(`${refusal}; the section was carried to ${options.pending}`);
+    }
+    const content = treeFile(parent, options.changelog);
+    // A re-run of a build whose section was carried would otherwise write it
+    // twice: drop a carried section that names this build.
+    const carried = pending.filter(
+      item => headingOf(item) !== heading && !hasSectionHeading(content, headingOf(item))
+    );
+    const block = hasSectionHeading(content, heading)
+      ? carried.join('')
+      : section + carried.join('');
+    if (block === '') {
+      console.log(`changelog: landed ${heading} on ${branch} (already present)`);
+      if (pending.length > 0) {
+        clearPending(remote, options.pending, pendingRead.sha);
+      }
+      printVerifiedLand(parent, replacedFiles(check.base, parent));
+      return 0;
+    }
+    const sha = commitOn(parent, options.changelog, insertSection(content, block), message);
+    try {
+      git(['push', remote, `${sha}:refs/heads/${branch}`]);
+      console.log(`changelog: landed ${heading} on ${branch} as ${sha}`);
+      if (pending.length > 0) {
+        clearPending(remote, options.pending, pendingRead.sha);
+      }
+      printVerifiedLand(sha, replacedFiles(check.base, sha));
+      return 0;
+    } catch (error) {
+      console.log(`changelog: attempt ${attempt} rejected (${reasonOf(error)})`);
+    }
+  }
+
+  // The branch was merged and deleted while the build ran. The submission
+  // already succeeded, so the run stays green: the section waits for the next
+  // build's section instead of being lost.
+  return carryToPending(
+    options,
+    heading,
+    section,
+    pendingRead,
+    `could not land ${heading} on ${branch}`
   );
 }
 
@@ -815,5 +1759,5 @@ function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exit(main());
+  process.exit(await main());
 }

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
-import { createElement, type ElementType, type ReactNode } from 'react';
+import { createElement, type ElementType, type ReactNode, useEffect } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -54,8 +54,21 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 const pushMock = vi.hoisted(() => vi.fn());
+// The picker opener registers its press-burst reset through `useFocusEffect`.
+// Collecting the registered effects lets one case prove the guard really holds
+// a second press back inside a burst and really releases it on a return.
+type FocusEffect = () => (() => void) | undefined;
+const focusEffects = vi.hoisted(() => [] as FocusEffect[]);
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: pushMock, back: vi.fn() }),
+  // The real hook runs the effect on focus; this one runs it on mount and on
+  // every new effect identity, like the hook the screen sees.
+  useFocusEffect: (effect: FocusEffect) => {
+    if (!focusEffects.includes(effect)) {
+      focusEffects.push(effect);
+    }
+    useEffect(() => effect(), [effect]);
+  },
 }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
@@ -154,11 +167,26 @@ function retry(ui: Mounted) {
   return ui.renderer.root.findByProps({ accessibilityLabel: 'Retry' });
 }
 
-async function press(node: ReactTestInstance) {
+/** Every registered effect runs again, as a press right after a return would. */
+async function regainFocus() {
+  await act(() => {
+    for (const effect of focusEffects) {
+      effect();
+    }
+  });
+}
+
+/** One press with no focus change first: both presses land in the same burst. */
+async function pressWithoutReturn(node: ReactTestInstance) {
   const onPress = node.props.onPress as () => void;
   await act(() => {
     onPress();
   });
+}
+
+async function press(node: ReactTestInstance) {
+  await regainFocus();
+  await pressWithoutReturn(node);
 }
 
 /** The bridge the press handed the picker route, once the route was pushed. */
@@ -206,6 +234,7 @@ beforeEach(() => {
   appearance.colors = { ...DARK_COLORS };
   contextPickerSlot.clearAll();
   pushMock.mockReset();
+  focusEffects.length = 0;
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (key: string, value: string) => {
@@ -281,6 +310,23 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
+
+  it('opens the picker once for two presses in one burst, and again after a return', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    // Two presses with no return between them are one burst: the second would
+    // stack a second identical picker, so the reader pays two Back presses.
+    await pressWithoutReturn(picker(ui));
+    expect(pushMock).toHaveBeenCalledTimes(1);
+    await pressWithoutReturn(picker(ui));
+    expect(pushMock).toHaveBeenCalledTimes(1);
+    expect(pushMock).toHaveBeenCalledWith('/(app)/context-picker');
+    // Returning to the screen ends the burst, so the next press navigates.
+    await regainFocus();
+    await pressWithoutReturn(picker(ui));
+    expect(pushMock).toHaveBeenCalledTimes(2);
+  });
 
   it('leaves the account unchanged when the picker is dismissed without a pick', async () => {
     storage.read.mockResolvedValue('org-missing');
@@ -631,16 +677,34 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     await waitFor(() => !picker(ui).props.disabled);
     const trigger = picker(ui).props.className as string;
     // The same bordered, full-width box `InstanceSelector` and `RepoSelector`
-    // render, so one label-value row on the form keeps one shape. The inline
-    // default is a bare row with no box.
+    // render, so one label-value column on the form keeps one shape. The frame
+    // carries the chrome and the body inside it the 48 dp height, so a value,
+    // a skeleton or a retry fills one box. The inline default is a bare row
+    // with no box.
     expect(trigger).toContain('border');
     expect(trigger).toContain('bg-secondary');
-    expect(trigger).toContain('justify-between');
+    expect(trigger).not.toContain('min-h-');
+    const body = picker(ui).find(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('min-h-[48px]')
+    );
+    expect(body.props.className).toContain('flex-1');
     const label = picker(ui).findByType(Text);
     expect(label.props.className).toContain('flex-1');
     expect(label.props.className).toContain('text-foreground');
+    // The column's chevrons all end on the body's trailing edge — the
+    // Repository and Branch triggers draw a bare 14 dp glyph — so this one must
+    // not sit in a fixed `size-5` box (17.52 dp at this app's 14 pt rem), which
+    // left the top chevron ~1.9 dp short of the ones below it.
+    const glyphBox = picker(ui).findByType('ChevronDown' as never).parent?.props
+      .className as string;
+    expect(glyphBox).not.toContain('size-5');
     const inline = await mount();
     const inlineTrigger = picker(inline).props.className as string;
     expect(inlineTrigger).not.toContain('bg-secondary');
+    // The inline row keeps its fixed glyph box, which holds the line height.
+    const inlineGlyphBox = picker(inline).findByType('ChevronDown' as never).parent?.props
+      .className as string;
+    expect(inlineGlyphBox).toContain('size-5');
   });
 });

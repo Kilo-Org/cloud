@@ -52,7 +52,22 @@ const confirmDialog = vi.hoisted(() => ({
 // The guard is under test end to end: this suite keeps the real
 // useSettingsBackGuard / useConfirmDialog and the real getSettingsDirtyState,
 // and stubs only the native surfaces they render through.
-vi.mock('react-native', () => ({ View: 'View', Alert: { alert: vi.fn() } }));
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Bell',
+  Check: 'Check',
+  Clock: 'Clock',
+  Clock3: 'Clock3',
+  ShieldCheck: 'ShieldCheck',
+}));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Alert: { alert: vi.fn() },
+  Platform: { OS: 'android' },
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useNavigation: () => navigation,
@@ -75,6 +90,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ mutedForeground: '#000000' }),
 }));
 vi.mock('@rn-primitives/dialog', () => ({
@@ -127,7 +143,7 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({ PillGroup: '
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: 'SettingsSaveButton',
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({ ToggleRow: 'ToggleRow' }));
+vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'ToggleRow' }));
 
 const mounted: TestRenderer.ReactTestRenderer[] = [];
 

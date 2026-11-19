@@ -1,21 +1,20 @@
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 import { createDrizzleClient, pg } from '@kilocode/db/client';
 import { computeDatabaseUrl } from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
-import assert from 'node:assert';
 import { attachDatabasePool } from '@vercel/functions';
 export const { Client, Pool } = pg;
-const {
-  POSTGRES_CONNECT_TIMEOUT,
-  POSTGRES_MAX_QUERY_TIME,
-  DEBUG_QUERY_LOGGING,
-  VERCEL_REGION,
-  NODE_ENV,
-} = process.env;
+const { DEBUG_QUERY_LOGGING, VERCEL_REGION, NODE_ENV } = process.env;
 
-// Environment validation
-if (!POSTGRES_CONNECT_TIMEOUT) throw new Error('POSTGRES_CONNECT_TIMEOUT not configured');
-if (!POSTGRES_MAX_QUERY_TIME) throw new Error('POSTGRES_MAX_QUERY_TIME not configured');
+// Environment validation. A missing variable fails at module load through requireEnv, so every
+// required-variable failure in this module has one throw type and one message shape.
+const POSTGRES_CONNECT_TIMEOUT = requireEnv(
+  'POSTGRES_CONNECT_TIMEOUT',
+  process.env.POSTGRES_CONNECT_TIMEOUT
+);
+// Not read by this module: the data export pool sizes its own timeout. The check stays because
+// it is part of the deployment's startup contract.
+requireEnv('POSTGRES_MAX_QUERY_TIME', process.env.POSTGRES_MAX_QUERY_TIME);
 
 // Base url + test worker suffix (shared). It selects POSTGRES_URL_PRODUCTION or
 // POSTGRES_URL for the current mode and throws when that variable is unset, so
@@ -26,20 +25,19 @@ const IS_SCRIPT = process.env.IS_SCRIPT === 'true';
 
 if (IS_SCRIPT) {
   // For scripts, we use a different connection string to avoid conflicts with the main app
-  assert(getEnvVariable('POSTGRES_SCRIPT_URL'), 'POSTGRES_SCRIPT_URL must be set for scripts');
-  postgresUrl = getEnvVariable('POSTGRES_SCRIPT_URL');
+  postgresUrl = requireEnv('POSTGRES_SCRIPT_URL', getEnvVariable('POSTGRES_SCRIPT_URL'));
 }
 
 const appName = IS_SCRIPT ? 'kilocode-script' : 'kilocode-web';
 
+/**
+ * Whether a region is on the US side. The root AGENTS.md section "Vercel Function Regions" is
+ * the source of truth: functions run only in `fra1` and `sfo1`, and any other observed region is
+ * a proxy or edge hop rather than the function, so only the SFO prefix can match.
+ */
 export function isUSRegion(region = VERCEL_REGION): boolean {
   if (!region) return false;
-  return (
-    region.startsWith('sfo') ||
-    region.startsWith('iad') ||
-    region.startsWith('pdx') ||
-    region.startsWith('cle')
-  );
+  return region.startsWith('sfo');
 }
 
 export function selectReplicaUrl({
@@ -166,9 +164,6 @@ pool.on('error', (err: Error) => {
 if (usesSeparateReplica) {
   replicaPool.on('error', (err: Error) => {
     console.error('Unexpected error on idle client (replica)', err);
-    if (shouldExitOnPoolError('replica')) {
-      process.exit(-1);
-    }
   });
 }
 
@@ -202,6 +197,20 @@ export const readDb = replica.db;
  * consider using `readDb` instead for better performance in US regions.
  */
 export const db = primaryDb;
+
+/**
+ * A database connection: `db`, or `readDb` when a separate replica is configured. Both come from
+ * the same client factory, so they share one type, and `DrizzleTransaction` is the narrower
+ * connection a transaction hands to its callback.
+ */
+export type DrizzleDatabase = typeof db;
+
+/**
+ * The connection a helper accepts: the primary database, or a transaction when
+ * the caller already holds one.
+ */
+export type DrizzleConnection = typeof db | DrizzleTransaction;
+
 export { sql } from 'drizzle-orm';
 
 // Helper for automatically updating the deleted_at column with database server time

@@ -1,5 +1,6 @@
 import { FileText } from '@/components/ui/icons';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { type Href } from 'expo-router';
 import { type ReactNode, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -11,9 +12,11 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { selectInvoiceErrorVariant } from '@/lib/organization-invoice-error-variant';
 
@@ -31,31 +34,30 @@ type InvoiceListQuery = {
   readonly isFetchingNextPage: boolean;
   readonly error: unknown;
   readonly data: { readonly pages: readonly unknown[] } | undefined;
-  readonly refetch: () => void;
+  /**
+   * The pull's read: it resolves with the settled result so the shared refresh
+   * hook can decide whether to report the failure.
+   */
+  readonly refetch: () => Promise<{ readonly isError: boolean }>;
   readonly fetchNextPage: () => void;
 };
 
-// FlashList takes `contentContainerStyle` (no className), so the FlatList's
-// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
-// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
-// `gap` references), so the 12px inter-row gap rides on the measured item
-// separator instead of `contentContainerStyle.gap`. The old container `gap` also
-// sat between the last row and the pagination footer; FlashList's separator only
-// spans items, so that boundary carries the same 12px as `pt-3` on the footer.
+// FlashList takes `contentContainerStyle` (no className). The rows own their
+// full-bleed geometry and their hairline, so the container only carries the
+// flex grow the empty state needs.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
-  paddingHorizontal: 24,
-  paddingTop: 16,
 } satisfies ViewStyle;
 
-const InvoiceRowSeparator = () => <View className="h-3" />;
+const SKELETON_ROW_COUNT = 3;
 
-function InvoiceRowSkeleton() {
+function InvoiceListSkeleton() {
   return (
-    <View className="gap-1.5 rounded-lg bg-secondary p-3">
-      <Skeleton className="h-4 w-40 rounded" />
-      <Skeleton className="h-3 w-24 rounded" />
+    <View>
+      {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+        <RowSkeleton key={index} subtitle />
+      ))}
     </View>
   );
 }
@@ -63,12 +65,42 @@ function InvoiceRowSkeleton() {
 type InvoiceListScreenProps = Readonly<{
   /** The screen's own title: the personal and organization lists differ. */
   title: string;
+  /**
+   * One muted context line under the title, the header's subtitle slot: what
+   * the list covers when the title alone does not say it (the personal list's
+   * fixed one-year window).
+   */
+  subtitle?: string;
+  /**
+   * The screen's own name when the title names a scope: the organization scope
+   * titles itself with the membership's name, so this list's name keeps the
+   * header's mono category line and a user-authored name never takes it.
+   */
+  eyebrow?: string;
+  /**
+   * Hold the eyebrow's line before a scope name resolves, so the header keeps
+   * one height while the membership read settles. A caller whose title is
+   * already this screen's name paints no eyebrow and leaves this off.
+   */
+  reserveEyebrow?: boolean;
+  /** Where the header's Back lands when the list opens with no history to pop. */
+  backFallback: Href;
   /** The scope's paged invoice read, flattened by its own hook. */
   query: InvoiceListQuery;
   entries: readonly Invoice[];
   hasMore: boolean;
+  /**
+   * The read paused at the cache's page bound with the server still offering
+   * more: the footer names that bound where "Load more" would otherwise sit.
+   */
+  isRetentionLimited: boolean;
   emptyTitle: string;
   emptyDescription: string;
+  /**
+   * The empty state's way out, rendered in the state's action slot: a scope
+   * whose empty copy points elsewhere passes the control that opens it.
+   */
+  emptyAction?: ReactNode;
 }>;
 
 /**
@@ -78,21 +110,33 @@ type InvoiceListScreenProps = Readonly<{
  */
 export function InvoiceListScreen({
   title,
+  subtitle,
+  eyebrow,
+  reserveEyebrow,
+  backFallback,
   query,
   entries,
   hasMore,
+  isRetentionLimited,
   emptyTitle,
   emptyDescription,
+  emptyAction,
 }: InvoiceListScreenProps) {
   const { t } = useTranslation();
   const paddingBottom = useTabBarBottomPadding();
   const committedConnectivity = useCommittedConnectivityStatus();
+  // An invoice can appear without a screen change (a renewal charging while the
+  // app is open), so both bodies offer the same pull over the read.
+  const [refreshing, onRefresh] = useManualRefresh(query.refetch, t('common.couldNotRefresh'));
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
 
   // `InvoiceRow` is memoized at module scope, so the renderer keeps one identity
   // across data updates and only the changed rows re-render.
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<Invoice>) => <InvoiceRow invoice={item} />,
-    []
+    ({ item, index }: ListRenderItemInfo<Invoice>) => (
+      <InvoiceRow invoice={item} last={index === entries.length - 1} />
+    ),
+    [entries.length]
   );
 
   const isLoading = query.isPending;
@@ -118,10 +162,8 @@ export function InvoiceListScreen({
   let body: ReactNode = null;
   if (isLoading) {
     body = (
-      <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-6 pt-4">
-        <InvoiceRowSkeleton />
-        <InvoiceRowSkeleton />
-        <InvoiceRowSkeleton />
+      <Animated.View exiting={FadeOut.duration(150)}>
+        <InvoiceListSkeleton />
       </Animated.View>
     );
   } else if (isFirstPageError) {
@@ -133,7 +175,7 @@ export function InvoiceListScreen({
             isPermanentError
               ? undefined
               : () => {
-                  query.refetch();
+                  void query.refetch();
                 }
           }
           isRetrying={query.isFetching}
@@ -141,14 +183,29 @@ export function InvoiceListScreen({
       </Animated.View>
     );
   } else if (entries.length === 0 && !hasMore && !isLaterPageError) {
-    body = <EmptyState icon={FileText} title={emptyTitle} description={emptyDescription} />;
+    body = (
+      <EmptyState
+        icon={FileText}
+        title={emptyTitle}
+        description={emptyDescription}
+        action={emptyAction}
+        refreshControl={refreshControl}
+      />
+    );
   } else {
     const footer = (
-      // The former container gap also separated the last row from this footer
-      // block, which the item separator does not cover.
+      // The paging block follows the rows: the last row draws no hairline, so
+      // the footer owns the gap above it.
       <View className="pt-3">
+        {isRetentionLimited && !isLaterPageError && !hasMore && (
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('organization.invoices.retentionLimit')}
+            </Text>
+          </View>
+        )}
         {hasMore && !isLaterPageError && (
-          <View className="items-center gap-3 px-6 py-4">
+          <View className="items-center gap-3 px-4 py-4">
             <Text variant="muted" className="text-center text-xs">
               {t('organization.invoices.truncated')}
             </Text>
@@ -166,7 +223,7 @@ export function InvoiceListScreen({
           </View>
         )}
         {isLaterPageError && (
-          <View className="items-center gap-3 px-6 py-4">
+          <View className="items-center gap-3 px-4 py-4">
             <Text variant="muted" className="text-center text-xs">
               {t('common.couldnTLoadMore')}
             </Text>
@@ -196,14 +253,16 @@ export function InvoiceListScreen({
           keyExtractor={item => item.id}
           renderItem={renderItem}
           getItemType={() => 'invoice'}
-          ItemSeparatorComponent={InvoiceRowSeparator}
           contentContainerStyle={listContentContainerStyle}
+          refreshControl={refreshControl}
           ListEmptyComponent={
             <EmptyState
               placement="top"
+              inset="gutter"
               icon={FileText}
               title={emptyTitle}
               description={emptyDescription}
+              action={emptyAction}
             />
           }
           ListFooterComponent={footer}
@@ -214,7 +273,13 @@ export function InvoiceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} />
+      <ScreenHeader
+        title={title}
+        subtitle={subtitle}
+        eyebrow={eyebrow}
+        reserveEyebrow={reserveEyebrow}
+        backFallback={backFallback}
+      />
       {body}
     </View>
   );

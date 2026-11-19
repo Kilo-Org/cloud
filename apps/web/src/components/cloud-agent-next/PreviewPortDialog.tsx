@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useState, type ComponentProps, type FormEvent } from 'react';
 import { ChevronRight, ExternalLink, Globe, LoaderCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,21 +12,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  PREVIEW_PORT_MAX,
-  PREVIEW_PORT_MIN,
-} from '../../../../../services/cloud-agent-next/src/shared/preview-port';
-import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
+import { PREVIEW_PORT_MAX, PREVIEW_PORT_MIN } from '@cloud-agent-shared/preview-port';
+import type { PreviewTarget } from '@cloud-agent-shared/preview-target';
 import { useOpenPreview, usePreviewServices } from './use-preview';
 
 export function PreviewPortDialog({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   target,
   organizationId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
   target: PreviewTarget;
   organizationId?: string;
 }) {
@@ -39,7 +38,11 @@ export function PreviewPortDialog({
         if (!isOpening) onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-lg" showCloseButton={!isOpening}>
+      <DialogContent
+        className="sm:max-w-lg"
+        showCloseButton={!isOpening}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle>Open preview</DialogTitle>
           <DialogDescription>

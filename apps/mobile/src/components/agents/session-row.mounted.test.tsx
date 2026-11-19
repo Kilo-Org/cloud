@@ -72,17 +72,16 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/icons/slack-icon', () => ({ SlackIcon: 'SlackIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'Chevron' }));
-vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
-vi.mock('@/components/destination-option-row', () => ({
-  DestinationOptionRow: 'DestinationOptionRow',
-}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
@@ -227,7 +226,7 @@ describe('StoredSessionRow live speech', () => {
       'Fix login bug, feature/live, pull request 42, CLI, and cost 12 cents, 5 minutes ago';
     expect(button?.props.accessibilityLabel).toBe(nonliveLabel);
     expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(0);
-    expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
+    expect(texts(renderer)).toContain('\u2066$0.12\u2069 · 5 MINUTES AGO');
 
     act(() => {
       renderer.update(wrapped(row({ ...props, live: true })));
@@ -239,7 +238,7 @@ describe('StoredSessionRow live speech', () => {
     expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
       { kind: 'running' },
     ]);
-    expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
+    expect(texts(renderer)).toContain('\u2066$0.12\u2069 · 5 MINUTES AGO');
     expect(texts(renderer)).toContain('feature/live · #42');
 
     act(() => {
@@ -304,7 +303,7 @@ describe('StoredSessionRow live speech', () => {
         { kind: 'needsInput' },
       ]);
       expect(texts(renderer)).toContain('NEEDS INPUT');
-      expect(texts(renderer)).not.toContain('$0.12 · 5 MINUTES AGO');
+      expect(texts(renderer)).not.toContain('\u2066$0.12\u2069 · 5 MINUTES AGO');
     }
   );
 
@@ -431,7 +430,6 @@ describe('StoredSessionRow live speech', () => {
             selectedId = selected.session_id;
           },
           onRetry: () => undefined,
-          onDismiss: () => undefined,
           instances: [],
           spawningConnectionId: null,
           instanceRowsDisabled: false,
@@ -442,7 +440,7 @@ describe('StoredSessionRow live speech', () => {
       expect(button.props.accessibilityLabel).toBe(
         'Fix login bug, LIVE, feature/live, CLI, and cost 12 cents, 5 minutes ago'
       );
-      expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
+      expect(texts(renderer)).toContain('\u2066$0.12\u2069 · 5 MINUTES AGO');
       expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
         { kind: 'running' },
       ]);
@@ -530,8 +528,8 @@ describe('StoredSessionRow section heading', () => {
 
   it('shows the clock time instead of restating the Yesterday heading, visibly and in speech', () => {
     const renderer = mount(row({ session: yesterdaySession, sectionTitle: 'Yesterday' }));
-    expect(texts(renderer)).toContain(`$0.12 · ${yesterdayMeta}`);
-    expect(texts(renderer)).not.toContain('$0.12 · YESTERDAY');
+    expect(texts(renderer)).toContain(`\u2066$0.12\u2069 · ${yesterdayMeta}`);
+    expect(texts(renderer)).not.toContain('\u2066$0.12\u2069 · YESTERDAY');
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
       `Fix login bug, feature/live, CLI, and cost 12 cents, ${yesterdayMeta}`
     );
@@ -539,12 +537,12 @@ describe('StoredSessionRow section heading', () => {
 
   it('keeps the relative label under a heading it does not repeat', () => {
     const renderer = mount(row({ session: yesterdaySession, sectionTitle: 'Today' }));
-    expect(texts(renderer)).toContain('$0.12 · YESTERDAY');
+    expect(texts(renderer)).toContain('\u2066$0.12\u2069 · YESTERDAY');
   });
 
   it('keeps the relative label when the caller supplies no section', () => {
     const renderer = mount(row({ session: yesterdaySession }));
-    expect(texts(renderer)).toContain('$0.12 · YESTERDAY');
+    expect(texts(renderer)).toContain('\u2066$0.12\u2069 · YESTERDAY');
   });
 });
 
@@ -591,8 +589,8 @@ describe('StoredSessionRow time follows the shared clock', () => {
       })
     );
 
-    expect(texts(renderer)).toContain(`$0.12 · ${yesterdayClock}`);
-    expect(texts(renderer)).not.toContain('$0.12 · 2 DAYS AGO');
+    expect(texts(renderer)).toContain(`\u2066$0.12\u2069 · ${yesterdayClock}`);
+    expect(texts(renderer)).not.toContain('\u2066$0.12\u2069 · 2 DAYS AGO');
   });
 
   it('speaks the same clock time the row draws', () => {
@@ -614,7 +612,7 @@ describe('StoredSessionRow time follows the shared clock', () => {
       row({ session: { ...session, created_at: minuteAgo, updated_at: minuteAgo } })
     );
 
-    expect(texts(renderer)).toContain('$0.12 · 59 MINUTES AGO');
+    expect(texts(renderer)).toContain('\u2066$0.12\u2069 · 59 MINUTES AGO');
   });
 });
 

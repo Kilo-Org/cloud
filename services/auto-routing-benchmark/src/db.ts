@@ -15,6 +15,7 @@ import type {
 import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
+import { POLICY_SETTINGS } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
 import {
   and,
@@ -180,22 +181,28 @@ const ROLLBACK_SAFE_LEGACY_LANE_BUDGETS = {
   user_max_concurrency: 40,
 };
 
+// The seven fixed policy columns are legacy: nothing in this worker reads them
+// back, but they are NOT NULL and the previously deployed worker still reads
+// them, so every save writes the canonical fixed policy value.
+const ROLLBACK_SAFE_LEGACY_FIXED_POLICY = {
+  frontier_min_accuracy_delta: POLICY_SETTINGS.frontierMinAccuracyDelta.fixed,
+  switch_cost_factor: POLICY_SETTINGS.switchCostFactor.fixed,
+  best_accuracy_switch_threshold: POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed,
+  low_confidence_threshold: POLICY_SETTINGS.lowConfidenceThreshold.fixed,
+  classifier_repetitions: POLICY_SETTINGS.classifierRepetitions.fixed,
+  decider_repetitions: POLICY_SETTINGS.deciderRepetitions.fixed,
+  classifier_max_p95_latency_ms: POLICY_SETTINGS.classifierMaxP95LatencyMs.fixed,
+};
+
 export async function replaceConfig(
   db: D1Database,
   config: {
     min_accuracy: number;
     accuracy_noise_band?: number;
-    frontier_min_accuracy_delta?: number;
-    switch_cost_factor: number;
-    best_accuracy_switch_threshold: number;
     production_token_profile?: ProductionTokenProfile | null;
     switch_horizon_turns?: number | null;
-    low_confidence_threshold?: number | null;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
-    classifier_repetitions: number;
-    decider_repetitions: number;
-    classifier_max_p95_latency_ms: number | null;
     policy_overrides?: PolicySettingOverrides | null;
     updated_at: string;
     updated_by: string | null;
@@ -212,11 +219,16 @@ export async function replaceConfig(
         id: router === 'efficient' ? 1 : 2,
         ...config,
         ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
+        ...ROLLBACK_SAFE_LEGACY_FIXED_POLICY,
         router,
       })
       .onConflictDoUpdate({
         target: benchmarkConfig.router,
-        set: { ...config, ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS },
+        set: {
+          ...config,
+          ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
+          ...ROLLBACK_SAFE_LEGACY_FIXED_POLICY,
+        },
       }),
     orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),
     orm.delete(configDeciderModels).where(eq(configDeciderModels.router, router)),

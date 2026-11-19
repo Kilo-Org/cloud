@@ -1,11 +1,12 @@
 /* eslint-disable max-lines -- the spend display and the action/role menus share the row's mounted harness. */
-import { act } from '@/test/renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { i18n } from '@/i18n';
 import { isolateLtrBidiText } from '@/lib/bidi';
-import { formatMoney } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 import { MemberRow } from './member-row';
 
 type Mounted = RenderWithProvidersResult;
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   updateMember: { mutate: vi.fn() },
   removeMember: { mutate: vi.fn() },
+  hookFactory: vi.fn(),
   menuProps: [] as Record<string, unknown>[],
 }));
 
@@ -36,6 +38,19 @@ vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: mocks.confirm, dialog: null }),
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The refusal block imports the icon barrel; the real lucide deep imports
+// cannot load in this project (see `vitest.setup.ts` for the same stubbing).
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ destructive: '#de0000' }),
+}));
+// The refusal block's message renders through AccessibleStatus; the studio
+// mock above drops the announcement channel but keeps the message visible so
+// the row's refusal copy stays assertable.
+vi.mock('@/components/ui/accessible-status', () => ({
+  AccessibleStatus: (props: Record<string, unknown>) =>
+    props.message == null ? null : createElement('Text', props, props.message as string),
+}));
 vi.mock('@/components/ui/menu-sheet', () => ({
   MenuSheet: (props: Record<string, unknown>) => {
     mocks.menuProps.push(props);
@@ -43,10 +58,7 @@ vi.mock('@/components/ui/menu-sheet', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-organization-mutations', () => ({
-  useOrganizationMutations: () => ({
-    updateMember: mocks.updateMember,
-    removeMember: mocks.removeMember,
-  }),
+  useOrganizationMutations: () => mocks.hookFactory(),
 }));
 
 const member = {
@@ -66,6 +78,7 @@ async function renderRow(overrides: Partial<Parameters<typeof MemberRow>[0]> = {
     <MemberRow
       member={member}
       canManage
+      canManageLimit
       callerRole="owner"
       enableUsageLimits
       isSalesDemo={false}
@@ -119,7 +132,19 @@ beforeEach(() => {
   mocks.confirm.mockReset();
   mocks.updateMember.mutate.mockReset();
   mocks.removeMember.mutate.mockReset();
+  mocks.hookFactory.mockReset();
+  // Healthy mutations by default: updateMember and removeMember ride their
+  // shared mutate mocks; every state read is false.
+  mocks.hookFactory.mockImplementation(() => ({
+    updateMember: { mutate: mocks.updateMember.mutate, isError: false, error: null },
+    removeMember: { mutate: mocks.removeMember.mutate, isError: false, error: null },
+  }));
 });
+
+// The row's rendered strings, whatever the block layout holds.
+function textsOf(renderer: ReactTestRenderer): unknown[] {
+  return renderer.root.findAllByType('Text').map(node => node.props.children as unknown);
+}
 
 afterEach(() => {
   for (const view of mounted.splice(0)) {
@@ -136,7 +161,7 @@ describe('MemberRow menu', () => {
 
     expect(actionsMenu().visible).toBe(false);
     expect(row.props.accessibilityLabel).toBe(
-      i18n.t('organization.members.manageA11y', { name: 'Member E2E' })
+      `${i18n.t('organization.members.manageA11y', { name: 'Member E2E' })}, member@example.com`
     );
 
     await act(() => {
@@ -154,6 +179,69 @@ describe('MemberRow menu', () => {
     ]);
     expect(menu.options[2]?.destructive).toBe(true);
     expect(menu.options[0]?.destructive).toBeUndefined();
+  });
+
+  it('names a row whose display name repeats another member by its email', async () => {
+    // Two members can carry the same display name; the email is the row's
+    // unique fact, so the accessible name carries it and the rows differ.
+    const duplicate = { ...member, name: 'Same Name' } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: duplicate });
+
+    expect(renderer.root.findByType('Pressable').props.accessibilityLabel).toBe(
+      `${i18n.t('organization.members.manageA11y', { name: 'Same Name' })}, member@example.com`
+    );
+  });
+
+  it('does not repeat the email for a member with no name', async () => {
+    // The nameless row already reads by its email; appending it again would
+    // say the address twice.
+    const nameless = { ...member, name: '' } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: nameless });
+
+    expect(renderer.root.findByType('Pressable').props.accessibilityLabel).toBe(
+      i18n.t('organization.members.manageA11y', { name: 'member@example.com' })
+    );
+  });
+
+  it('offers an admin the daily limit alone on an owner row', async () => {
+    const owner = { ...member, role: 'owner' } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: owner, canManage: false, canManageLimit: true });
+    await act(() => {
+      (renderer.root.findByType('Pressable').props.onPress as () => void)();
+    });
+
+    expect(actionsMenu().visible).toBe(true);
+    expect(actionsMenu().options.map(option => option.label)).toEqual([
+      i18n.t('organization.members.setDailyUsageLimit'),
+    ]);
+  });
+
+  it('offers a member-row manager every action in order', async () => {
+    const renderer = await renderRow({ canManage: true, canManageLimit: true });
+    await act(() => {
+      (renderer.root.findByType('Pressable').props.onPress as () => void)();
+    });
+
+    expect(actionsMenu().options.map(option => option.label)).toEqual([
+      i18n.t('organization.members.changeRole'),
+      i18n.t('organization.members.setDailyUsageLimit'),
+      i18n.t('organization.members.removeMember'),
+    ]);
+  });
+
+  it('renders no menu when the caller may run no action', async () => {
+    const renderer = await renderRow({ canManage: false, canManageLimit: false });
+
+    expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
+    expect(
+      renderer.root.findAllByType('Text').map(node => node.props.children as unknown)
+    ).toContain('Member E2E');
   });
 
   it('hides the daily-limit option when usage limits are off', async () => {
@@ -304,6 +392,159 @@ describe('MemberRow menu', () => {
     expect(mocks.updateMember.mutate).not.toHaveBeenCalled();
     expect(mocks.removeMember.mutate).not.toHaveBeenCalled();
   });
+
+  // The hook is mocked per test, so a refusal is driven by returning a failed
+  // mutation object for the hook call this render makes.
+  function hookMutations(overrides: {
+    updateMember?: Partial<{
+      isError: boolean;
+      error: unknown;
+      mutateAsync: unknown;
+      reset: () => void;
+    }>;
+    removeMember?: Partial<{
+      isError: boolean;
+      error: unknown;
+      mutateAsync: unknown;
+      reset: () => void;
+    }>;
+  }) {
+    return {
+      updateMember: { mutate: mocks.updateMember.mutate, ...overrides.updateMember },
+      removeMember: { mutate: mocks.removeMember.mutate, ...overrides.removeMember },
+    };
+  }
+
+  it('renders the mapped refusal on the row when the server refuses the role change', async () => {
+    mocks.hookFactory.mockImplementation(() =>
+      hookMutations({
+        updateMember: {
+          isError: true,
+          error: { data: { code: 'FORBIDDEN', message: 'Organization trial has expired.' } },
+        },
+      })
+    );
+    const view = await renderRow();
+
+    expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('states a refused removal carried by the screen, after the row remounted', async () => {
+    const view = await renderRow({
+      removalFailure: { kind: 'removal-refused', message: 'Organization trial has expired.' },
+    });
+
+    expect(textsOf(view)).toContain('Organization trial has expired.');
+  });
+
+  it('publishes the removal refusal to the screen attempt and abandons on success', async () => {
+    let settled: { kind: string; message: string } | undefined = undefined;
+    let abandoned = false;
+    const onRemovalStarted = vi.fn(() => ({
+      owns: () => true,
+      succeed: () => true,
+      fail: (failure: { kind: string; message: string }) => {
+        settled = failure;
+        return true;
+      },
+      abandon: () => {
+        abandoned = true;
+        return true;
+      },
+    }));
+    mocks.hookFactory.mockImplementation(
+      () =>
+        hookMutations({
+          removeMember: {
+            // A recognized server sentence must arrive mapped, not as the
+            // generic fallback: the fallback copy would also satisfy a bare
+            // restore, so this rejection tells the two paths apart.
+            mutateAsync: vi.fn().mockRejectedValueOnce({
+              data: { code: 'FORBIDDEN', message: 'Organization trial has expired.' },
+            }),
+          },
+        }) as never
+    );
+    mocks.confirm.mockImplementation((request: { title: string; onConfirm: () => void }) => {
+      request.onConfirm();
+    });
+    const view = await renderRow({ onRemovalStarted });
+    await act(() => {
+      (view.root.findByType('Pressable').props.onPress as () => void)();
+    });
+    // Remove member is the actions menu's third row; the confirm mock confirms
+    // in place, so the attempt starts when the confirm lands.
+    await act(() => {
+      actionsMenu().onSelect(2);
+    });
+    await act(() => {
+      actionsMenu().onDismiss();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onRemovalStarted).toHaveBeenCalledWith('membership-1');
+    // The mapped sentence for the recognized server message, not the generic
+    // fallback: this is what tells the mapping from a bare restore.
+    expect(settled).toEqual({
+      kind: 'removal-refused',
+      message: i18n.t('common.organizationTrialEnded'),
+    });
+    expect(abandoned).toBe(false);
+  });
+
+  it('renders no refusal block while the mutations are healthy', async () => {
+    mocks.hookFactory.mockImplementation(() => hookMutations({}));
+    const view = await renderRow();
+
+    expect(textsOf(view)).not.toContain(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('gives a newer removal the row the refused role change no longer describes', async () => {
+    let resetCalls = 0;
+    mocks.hookFactory.mockImplementation(() =>
+      hookMutations({
+        updateMember: {
+          isError: true,
+          error: { data: { code: 'FORBIDDEN', message: 'Organization trial has expired.' } },
+          // The row resets the sticky role-change error to retire the refusal
+          // its newer removal supersedes. The count reads the call, not the
+          // property: the reset must run when the removal supersedes the
+          // refusal, not when this mock is wired.
+          reset: () => {
+            resetCalls += 1;
+          },
+        },
+        removeMember: {
+          mutateAsync: vi.fn().mockReturnValue(new Promise(() => undefined)),
+        },
+      })
+    );
+    mocks.confirm.mockImplementation((request: { title: string; onConfirm: () => void }) => {
+      request.onConfirm();
+    });
+    const view = await renderRow({
+      onRemovalStarted: () => ({
+        owns: () => true,
+        succeed: () => true,
+        fail: () => true,
+        abandon: () => true,
+      }),
+    });
+    await act(() => {
+      (view.root.findByType('Pressable').props.onPress as () => void)();
+    });
+    await act(() => {
+      actionsMenu().onSelect(2);
+    });
+    await act(() => {
+      actionsMenu().onDismiss();
+    });
+
+    expect(textsOf(view)).toContain(i18n.t('common.organizationTrialEnded'));
+    expect(resetCalls).toBe(1);
+  });
 });
 
 describe('MemberRow daily spend', () => {
@@ -318,11 +559,11 @@ describe('MemberRow daily spend', () => {
   const texts = (renderer: Awaited<ReturnType<typeof renderRow>>) =>
     renderer.root.findAllByType('Text').map(node => node.props.children as unknown);
 
-  const pair = `${isolateLtrBidiText(formatMoney(2.4, i18n.language))} / ${isolateLtrBidiText(
-    formatMoney(10, i18n.language)
+  const pair = `${isolateLtrBidiText(formatPrefixedMoney(2.4, i18n.language))} / ${isolateLtrBidiText(
+    formatPrefixedMoney(10, i18n.language)
   )}`;
   const limitOnly = i18n.t('organization.members.limitPerDay', {
-    amount: isolateLtrBidiText(formatMoney(10, i18n.language)),
+    amount: isolateLtrBidiText(formatPrefixedMoney(10, i18n.language)),
   });
 
   it('pairs spend with the limit for a sales-demo organization', async () => {
@@ -354,7 +595,7 @@ describe('MemberRow daily spend', () => {
     expect(texts(renderer)).not.toContain(pair);
     expect(
       texts(renderer).some(
-        value => typeof value === 'string' && value.includes(formatMoney(10, i18n.language))
+        value => typeof value === 'string' && value.includes(formatPrefixedMoney(10, i18n.language))
       )
     ).toBe(false);
   });

@@ -12,6 +12,11 @@ import {
   setSelectedBranchOverride,
 } from './new-session-repository-state';
 import { type RepositoryBranchesState, useRepositoryBranches } from '@/lib/use-new-session-repos';
+import {
+  FIELD_TRIGGER_BODY_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 
 const router = vi.hoisted(() => ({ push: vi.fn() }));
@@ -20,6 +25,11 @@ const keyboard = vi.hoisted(() => ({ dismiss: vi.fn() }));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   // The selector only builds an href literal; Href stays a type.
+}));
+// The picker opener goes through the guarded push, which forwards to the same
+// router spy asserted below.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => router.push,
 }));
 vi.mock('react-native', async () => {
   const React = await import('react');
@@ -100,6 +110,44 @@ function pressableWithLabel(renderer: TestRenderer.ReactTestRenderer, label: str
   )[0];
 }
 
+/** The class list a node renders, split into single class names. */
+function classesOf(node: TestRenderer.ReactTestInstance | undefined): string[] {
+  const className: unknown = node?.props.className;
+  return typeof className === 'string' ? className.split(' ') : [];
+}
+
+/** Nodes whose class list holds `className` as one class, not as a substring. */
+function rowsWithClass(renderer: TestRenderer.ReactTestRenderer, className: string) {
+  return renderer.root.findAll(node => classesOf(node).includes(className));
+}
+
+/** The bordered frame every branch-row state draws, whatever it holds. */
+function rowFrame(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(
+    node =>
+      classesOf(node).includes('rounded-lg') &&
+      classesOf(node).includes('border') &&
+      classesOf(node).includes('px-3')
+  )[0];
+}
+
+/**
+ * The body inside {@link rowFrame}: the box the row's height comes from. It is
+ * borderless on every state, so its floor is its exact height and the frame's
+ * border is the only thing the states add around it.
+ */
+function rowBody(renderer: TestRenderer.ReactTestRenderer) {
+  return rowFrame(renderer)?.children[0] as TestRenderer.ReactTestInstance | undefined;
+}
+
+/** The class names of the shared trigger body, for a body that must render it. */
+const TRIGGER_BODY_CLASSES = FIELD_TRIGGER_BODY_CLASS.split(' ');
+
+/** Classes that pin a node's own height — none may sit on a row frame. */
+function heightClasses(node: TestRenderer.ReactTestInstance | undefined): string[] {
+  return classesOf(node).filter(name => /^-?(min-)?h-/.test(name));
+}
+
 function branchLabel(branch: string): string {
   return i18n.t('agentChat.newSession.branchAccessibility', { label: branch });
 }
@@ -157,6 +205,13 @@ describe('RepositoryBranchSelector', () => {
 
     expect(texts(renderer)).toContain(partialNote);
 
+    // The note sits under a live trigger, so it is helper text with no frame of
+    // its own: a second bordered `bg-secondary` box there read as another,
+    // broken picker sitting 8 dp below the real one. Exactly one node may draw
+    // the trigger frame and its 48 dp body.
+    expect(rowsWithClass(renderer, 'bg-secondary')).toHaveLength(1);
+    expect(rowsWithClass(renderer, 'min-h-[48px]')).toHaveLength(1);
+
     openPicker(renderer, 'main');
 
     expect(branchPickerSlot.get(UNFENCED_ROUTE_KEY)?.truncated).toBe(true);
@@ -201,27 +256,40 @@ describe('RepositoryBranchSelector', () => {
   });
 
   it('reserves the row height while branches load, so nothing jumps', () => {
+    // The shift this pins: the loading row was a bare 48 dp skeleton while the
+    // rows it became drew their own 1 dp border around the same content, so
+    // everything below the row moved by that border when branches arrived.
     const loading = mountSelector(githubRow, branchesState({ isLoading: true }));
-    const skeleton = loading.root.findAllByType('Skeleton' as never)[0];
 
-    expect(skeleton?.props.className).toContain('h-12');
+    expect(heightClasses(rowFrame(loading))).toHaveLength(0);
+    expect(classesOf(rowBody(loading))).toContain('min-h-[48px]');
     expect(
       loading.root.findAll(
         node => node.props.accessibilityLabel === i18n.t('agentChat.newSession.branchLoading')
       )
     ).not.toHaveLength(0);
 
+    // `--skeleton-fill` equals `--secondary` in the light palette, so a default
+    // bar on this row's own `bg-secondary` fill painted nothing and the loading
+    // state read as an empty field. The bar takes `bg-muted-soft`, and `w-1/3`
+    // sizes it as a branch name rather than a progress bar.
+    const bar = loading.root.findAllByType('Skeleton' as never)[0];
+    expect(classesOf(bar)).toEqual(expect.arrayContaining(['h-4', 'w-1/3', 'bg-muted-soft']));
+    expect(classesOf(bar)).not.toContain('bg-skeleton-fill');
+
     const loaded = mountSelector(githubRow);
-    expect(pressableWithLabel(loaded, branchLabel('main'))?.props.className).toContain('h-12');
+    expect(rowFrame(loaded)?.props.accessibilityLabel).toBe(branchLabel('main'));
+    expect(heightClasses(rowFrame(loaded))).toHaveLength(0);
+    expect(classesOf(rowBody(loaded))).toContain('min-h-[48px]');
   });
 
   // Spot check e4-branch-03/04: the screenshots showed a blue "refreshing"
   // overlay floating over the prompt card and over the screen header while
   // branches loaded. That overlay belonged to the old inline picker; the row
-  // is now an in-flow fixed-height row and the picker is its own opaque
-  // formSheet route. These two tests pin the replacement: the row never
+  // is now an in-flow row on the shared 48 px floor and the picker is its own
+  // opaque formSheet route. These two tests pin the replacement: the row never
   // carries an absolute-positioned node in any state (nothing can cover the
-  // card above or the header), and the three fixed states share one height.
+  // card above or the header), and the three fixed states share one floor.
   it('renders every branch-row state in-flow — no node overlays the form', () => {
     const states: RepositoryBranchesState[] = [
       branchesState({ isLoading: true }),
@@ -243,20 +311,46 @@ describe('RepositoryBranchSelector', () => {
     }
   });
 
-  it('keeps skeleton, trigger, and error row at the same fixed height', () => {
-    for (const state of [
+  it('keeps every state on one frame around the shared row target', () => {
+    const states: RepositoryBranchesState[] = [
       branchesState({ isLoading: true }),
       branchesState(),
       branchesState({ isRetryableError: true }),
-    ]) {
+    ];
+    for (const state of states) {
       const renderer = mountSelector(githubRow, state);
-      const row = renderer.root.findAll(node => {
-        const classes =
-          typeof node.props.className === 'string' ? node.props.className.split(' ') : [];
-        return classes.includes('h-12');
-      });
-      expect(row).toHaveLength(1);
+      // The frame never pins a height: a floor read against a border box makes
+      // the states whose content is already 48 dp tall taller than the rest.
+      expect(heightClasses(rowFrame(renderer))).toHaveLength(0);
+      expect(classesOf(rowBody(renderer))).toContain('min-h-[48px]');
+      expect(rowsWithClass(renderer, 'h-12')).toHaveLength(0);
     }
+  });
+
+  it('draws the loading, loaded and failed rows on the same frame chrome', () => {
+    // Same border and padding on every state, so the only difference between
+    // the three boxes is their background — and a background never moves a row.
+    const chrome = (state: RepositoryBranchesState) =>
+      classesOf(rowFrame(mountSelector(githubRow, state))).filter(name => !name.startsWith('bg-'));
+    const loading = chrome(branchesState({ isLoading: true }));
+
+    expect(chrome(branchesState())).toEqual(loading);
+    expect(chrome(branchesState({ isRetryableError: true }))).toEqual(loading);
+  });
+
+  it('gives the failed row a body tall enough for its retry action', () => {
+    // At this app's 14 pt rem a fixed `h-12` row rendered 42 pt — 6 pt shorter
+    // than the 48 dp retry action before the row's own 1 dp borders — so the
+    // row clipped the action. The action now sits inside the row's 48 dp body,
+    // and the row's border is the only thing the frame adds around it.
+    const renderer = mountSelector(githubRow, branchesState({ isRetryableError: true }));
+    const body = rowBody(renderer);
+
+    expect(classesOf(body)).toContain('min-h-[48px]');
+    expect(body?.findAllByType('Button' as never)).toHaveLength(1);
+
+    const [retryAction] = renderer.root.findAllByType('Button' as never);
+    expect(classesOf(retryAction)).toContain(STATE_ACTION_CLASS);
   });
 
   it('shows the branch name and chevron once a retry loads the branches', () => {
@@ -319,7 +413,7 @@ describe('RepositoryBranchSelector', () => {
       throw new Error('the permanent-failure note rendered without a row');
     }
     const classes = (row.props.className as string).split(' ');
-    expect(classes).toContain('min-h-12');
+    expect(classesOf(row)).toContain('min-h-[48px]');
     expect(classes).not.toContain('h-12');
   });
 
@@ -330,6 +424,18 @@ describe('RepositoryBranchSelector', () => {
     );
 
     expect(texts(renderer)).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
+  });
+
+  it('shows the quiet inactive note, not loading, for a disabled row', () => {
+    // en.json alone translates this key until the translation slice lands; the
+    // fallback then resolves the English copy in every catalog.
+    const note = i18n.t('agentChat.newSession.branchInactive');
+    const renderer = mountSelector(githubRow, branchesState({ isEnabled: false }));
+
+    expect(texts(renderer)).toContain(note);
+    expect(renderer.root.findAllByType('Skeleton' as never)).toHaveLength(0);
+    expect(texts(renderer)).not.toContain(i18n.t('agentChat.newSession.branchLoading'));
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
   });
 
@@ -374,6 +480,92 @@ describe('RepositoryBranchSelector', () => {
     press(trigger);
     expect(router.push).not.toHaveBeenCalled();
     expect(branchPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
+  });
+
+  it('renders every state in the same trigger frame as the pickers above it', () => {
+    // The finding this pins: the branch row measured ~50.3 dp while the
+    // Account, Run on and Repository triggers above it measured ~44.2 dp, so
+    // the last control in the column read as a differently sized field, and
+    // the failed and note states swapped the frame's fill for a card.
+    const states: RepositoryBranchesState[] = [
+      branchesState({ isLoading: true }),
+      branchesState(),
+      branchesState({ isRetryableError: true }),
+      branchesState({ isPermanentError: true }),
+      branchesState({ branches: [], defaultBranch: null }),
+      branchesState({ isEnabled: false }),
+    ];
+    const triggerFrame = FIELD_TRIGGER_FRAME_CLASS.split(' ').sort();
+    for (const state of states) {
+      const renderer = mountSelector(githubRow, state);
+      expect(classesOf(rowFrame(renderer)).sort()).toEqual(triggerFrame);
+      expect(classesOf(rowBody(renderer))).toEqual(expect.arrayContaining(TRIGGER_BODY_CLASSES));
+      // One fill for every state, and it is the shared trigger's own.
+      expect(classesOf(rowFrame(renderer)).filter(name => name.startsWith('bg-'))).toEqual([
+        'bg-secondary',
+      ]);
+    }
+  });
+
+  it("starts a note row at the frame's leading inset, like the failed message", () => {
+    // A note is a line of copy inside a field, so it reads from the leading
+    // edge: the shared body lays its row out at the start, and only the
+    // loading line fills the width (its skeleton does).
+    const renderer = mountSelector(githubRow, branchesState({ isPermanentError: true }));
+
+    expect(classesOf(rowBody(renderer))).toEqual(expect.arrayContaining(TRIGGER_BODY_CLASSES));
+    expect(classesOf(rowBody(renderer))).not.toContain('justify-center');
+    expect(classesOf(rowBody(renderer))).not.toContain('justify-between');
+  });
+
+  it('keeps a multi-line note off the frame border', () => {
+    // A note keeps the 48 dp floor, but its copy can outgrow it: the
+    // permanent-refusal message runs past two lines at phone width, and longer
+    // translations of the truncated-list note do too. At three `text-sm` lines
+    // `items-center` has no slack left, so without the body's own vertical
+    // padding the first and last line boxes would sit on the frame's 1 dp
+    // border — the inset would collapse exactly for the long copy the row
+    // exists to show.
+    const renderer = mountSelector(githubRow, branchesState({ isPermanentError: true }));
+
+    expect(classesOf(rowBody(renderer))).toContain('py-2');
+    // The floor stays, so a one-line note is still exactly one trigger tall.
+    expect(classesOf(rowBody(renderer))).toContain('min-h-[48px]');
+    // The trigger's body never carries it: the value line is centred in slack.
+    const loaded = mountSelector(githubRow);
+    expect(classesOf(rowBody(loaded))).not.toContain('py-2');
+  });
+
+  it('keeps a two-line retry message off the frame border without growing the row', () => {
+    // The message is two lines of `text-sm` that scales with the system font,
+    // so at large sizes it outgrows the 48 dp floor. The padding goes on the
+    // message: on the body it would add to the 48 dp retry and make the failed
+    // row taller than every other branch state.
+    const renderer = mountSelector(githubRow, branchesState({ isRetryableError: true }));
+
+    expect(classesOf(rowBody(renderer))).not.toContain('py-2');
+    const message = renderer.root.findAll(
+      node => node.props.numberOfLines === 2 && typeof node.props.className === 'string'
+    )[0];
+    expect(classesOf(message)).toContain('py-2');
+  });
+
+  it('draws the retry borderless, on the shared action floor, aligned to the message inset', () => {
+    // A box inside the frame drew its own border against the frame's (doubled
+    // edges, worst in dark) and sat 10.5 dp in from the trailing border. A
+    // borderless action fills the body instead, and its negative trailing
+    // margin cancels its own horizontal padding, so the label keeps the same
+    // 10.5 dp from the trailing border that the message keeps from the leading
+    // one in either direction.
+    const renderer = mountSelector(githubRow, branchesState({ isRetryableError: true }));
+    const retryAction = renderer.root.findAllByType('Button' as never)[0];
+    if (retryAction === undefined) {
+      throw new Error('the retry action did not render');
+    }
+
+    expect(retryAction.props.variant).toBe('ghost');
+    expect(classesOf(retryAction)).toContain(STATE_ACTION_CLASS);
+    expect(classesOf(retryAction)).toContain('-me-3');
   });
 });
 

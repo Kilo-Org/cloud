@@ -12,7 +12,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -24,13 +24,23 @@ import { OrganizationMembersScreen } from './members-screen';
 const withMembersQuery = vi.hoisted(() => ({
   data: undefined as unknown,
   isLoading: false,
+  isPending: false,
+  isPaused: false,
   isFetching: false,
   isError: false,
   error: null as unknown,
   refetch: vi.fn(),
 }));
 
+// The identity read's state; the self-row gates need a resolved acting id, so
+// the tests drive the settled-with-no-id shape through it.
+const currentIdentity = vi.hoisted(() => ({
+  userId: 'user-1' as string | undefined,
+  isLoading: false,
+}));
+
 const routerPush = vi.hoisted(() => vi.fn());
+const memberRowProps = vi.hoisted(() => [] as Record<string, unknown>[]);
 
 /** The smallest box the control-size audit accepts on a control's own node. */
 const MIN_BOX_DP = 28;
@@ -119,6 +129,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; placement?: string; action?: ReactNode }) =>
     createElement('EmptyState', props, `EMPTY_STATE:${props.title}`, props.action),
 }));
@@ -128,7 +139,10 @@ vi.mock('@/components/organization/invited-member-row', () => ({
 }));
 
 vi.mock('@/components/organization/member-row', () => ({
-  MemberRow: () => null,
+  MemberRow: (props: Record<string, unknown>) => {
+    memberRowProps.push(props);
+    return null;
+  },
 }));
 
 vi.mock('@/components/organization/organization-boundary', () => ({
@@ -162,7 +176,7 @@ vi.mock('@/components/tab-screen', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ userId: 'user-1' }),
+  useCurrentUserId: () => currentIdentity,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -202,14 +216,33 @@ async function renderScreen(): Promise<string[]> {
   return collectText(renderer.toJSON());
 }
 
+/** Every mount a test forgot to unmount, released in reverse order. */
+const mountedRenderers: { unmount: () => void }[] = [];
+function trackMount(mount: { unmount: () => void }): void {
+  mountedRenderers.push(mount);
+}
+afterEach(() => {
+  unmountAll();
+});
+function unmountAll(): void {
+  while (mountedRenderers.length > 0) {
+    mountedRenderers.pop()?.unmount();
+  }
+}
+
 beforeEach(() => {
   withMembersQuery.data = undefined;
   withMembersQuery.isLoading = false;
+  withMembersQuery.isPending = false;
+  withMembersQuery.isPaused = false;
   withMembersQuery.isFetching = false;
   withMembersQuery.isError = false;
   withMembersQuery.error = null;
   withMembersQuery.refetch.mockClear();
+  currentIdentity.userId = 'user-1';
+  currentIdentity.isLoading = false;
   routerPush.mockClear();
+  memberRowProps.length = 0;
 });
 
 describe('OrganizationMembersScreen empty-state precedence', () => {
@@ -253,8 +286,22 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
   });
 
   it('keeps the loading skeleton ahead of error and empty states', async () => {
+    // A fetch-in-flight read is pending: the mock replays the hook's shape,
+    // where isLoading implies isPending.
     withMembersQuery.isLoading = true;
+    withMembersQuery.isPending = true;
     withMembersQuery.isError = true;
+    const texts = await renderScreen();
+    expect(texts).not.toContain('QUERY_ERROR');
+    expect(texts).not.toContain('EMPTY_STATE:No members yet');
+  });
+
+  it('keeps a skeleton over a read with neither data nor an answer yet', async () => {
+    // Pending with no fetch in flight and no error: the screen renders no
+    // settled body — the list skeleton holds until the read answers.
+    withMembersQuery.isPending = true;
+    withMembersQuery.isLoading = false;
+    withMembersQuery.data = undefined;
     const texts = await renderScreen();
     expect(texts).not.toContain('QUERY_ERROR');
     expect(texts).not.toContain('EMPTY_STATE:No members yet');
@@ -279,15 +326,13 @@ describe('OrganizationMembersScreen section labels', () => {
 
     const cards = renderer.root.findAll(
       node =>
-        typeof node.props.className === 'string' &&
-        node.props.className.includes('mx-6 bg-secondary')
+        typeof node.props.className === 'string' && node.props.className.includes('bg-secondary')
     );
     expect(cards).toHaveLength(1);
     const card = cards[0];
     if (!card) {
       throw new Error('member card not found');
     }
-    expect(card.props.className).toContain('rounded-t-lg');
     unmount();
   });
 
@@ -394,5 +439,159 @@ describe('OrganizationMembersScreen invite header control', () => {
 
     expect(loadedControl.props.className).toBe(loadingClassName);
     loaded.unmount();
+  });
+});
+
+describe('OrganizationMembersScreen removal refusals', () => {
+  // The optimistic removal unmounts the row while its request runs, so the
+  // screen owns the failure and hands it back on the row's remount. The
+  // MemberRow mock records its props, so the channel under test is the last
+  // render's props.
+  const activeMember = { status: 'active', id: 'member-9', name: 'Ada', email: 'ada@example.com' };
+
+  function lastRowProps(): Record<string, unknown> {
+    const props = memberRowProps.at(-1);
+    if (!props) {
+      throw new Error('member row never rendered');
+    }
+    return props;
+  }
+
+  function removalStart(): (memberId: string) => {
+    fail: (failure: { kind: string; message: string }) => boolean;
+  } | null {
+    const start = lastRowProps().onRemovalStarted;
+    if (typeof start !== 'function') {
+      throw new TypeError('removal channel missing');
+    }
+    return start as never;
+  }
+
+  it('hands the channel to every row and reports no failure while healthy', async () => {
+    withMembersQuery.data = { settings: {}, members: [activeMember] };
+    const { unmount } = await renderWithProviders(createElement(OrganizationMembersScreen));
+
+    const props = lastRowProps();
+    expect(typeof props.onRemovalStarted).toBe('function');
+    expect(props.removalFailure).toBeNull();
+    unmount();
+  });
+
+  it('publishes a refused removal to the row that owns the member', async () => {
+    withMembersQuery.data = { settings: {}, members: [activeMember] };
+    const { unmount } = await renderWithProviders(createElement(OrganizationMembersScreen));
+    const start = removalStart();
+    const attempt = start('member-9');
+    if (!attempt) {
+      throw new Error('attempt not admitted');
+    }
+    act(() => {
+      attempt.fail({ kind: 'removal-refused', message: 'Organization trial has expired.' });
+    });
+
+    expect(lastRowProps().removalFailure).toEqual({
+      kind: 'removal-refused',
+      message: 'Organization trial has expired.',
+    });
+    unmount();
+  });
+
+  it('admits one attempt per member until it settles', async () => {
+    withMembersQuery.data = { settings: {}, members: [activeMember] };
+    const { unmount } = await renderWithProviders(createElement(OrganizationMembersScreen));
+    const start = removalStart();
+
+    expect(start('member-9')).not.toBeNull();
+    expect(start('member-9')).toBeNull();
+    unmount();
+  });
+
+  it('retires the refusal when the next attempt for the member begins', async () => {
+    withMembersQuery.data = { settings: {}, members: [activeMember] };
+    const { unmount } = await renderWithProviders(createElement(OrganizationMembersScreen));
+    const start = removalStart();
+    const first = start('member-9');
+    if (!first) {
+      throw new Error('first attempt not admitted');
+    }
+    act(() => {
+      first.fail({ kind: 'removal-refused', message: 'Organization trial has expired.' });
+    });
+    act(() => {
+      start('member-9');
+    });
+
+    expect(lastRowProps().removalFailure).toBeNull();
+    unmount();
+  });
+});
+
+describe('OrganizationMembersScreen self-row identity gate', () => {
+  const ownMember = { status: 'active', id: 'user-1', name: 'Owner', email: 'owner@example.com' };
+  const otherMember = { status: 'active', id: 'member-9', name: 'Ada', email: 'ada@example.com' };
+
+  function rowPropsFor(memberId: string): Record<string, unknown> {
+    const props = memberRowProps.findLast(row => (row.member as { id: string }).id === memberId);
+    if (!props) {
+      throw new Error(`member row for ${memberId} never rendered`);
+    }
+    return props;
+  }
+
+  it('keeps the caller row read-only while the identity has no id', async () => {
+    withMembersQuery.data = { settings: {}, members: [ownMember, otherMember] };
+    currentIdentity.userId = undefined;
+
+    trackMount(await renderWithProviders(createElement(OrganizationMembersScreen)));
+
+    expect(rowPropsFor('user-1').canManage).toBe(false);
+    expect(rowPropsFor('user-1').canManageLimit).toBe(false);
+    unmountAll();
+  });
+
+  it('gates the roster rows while the identity has no id', async () => {
+    withMembersQuery.data = { settings: {}, members: [ownMember, otherMember] };
+    currentIdentity.userId = undefined;
+
+    trackMount(await renderWithProviders(createElement(OrganizationMembersScreen)));
+
+    expect(rowPropsFor('member-9').canManage).toBe(false);
+    expect(rowPropsFor('member-9').canManageLimit).toBe(false);
+    expect(rowPropsFor('user-1').canManage).toBe(false);
+    unmountAll();
+  });
+
+  it('resolves the gates after the identity matches the acting account', async () => {
+    withMembersQuery.data = { settings: {}, members: [ownMember, otherMember] };
+    currentIdentity.userId = 'user-1';
+
+    trackMount(await renderWithProviders(createElement(OrganizationMembersScreen)));
+
+    // The caller's own row stays read-only on a resolved identity (the server
+    // owns self-management); the other member's row becomes manageable.
+    expect(rowPropsFor('user-1').canManage).toBe(false);
+    expect(rowPropsFor('user-1').canManageLimit).toBe(false);
+    expect(rowPropsFor('member-9').canManage).toBe(true);
+    unmountAll();
+  });
+});
+
+describe('OrganizationMembersScreen pending membership read', () => {
+  it('renders no settled state while the read is pending and unfetched', async () => {
+    withMembersQuery.isPending = true;
+    withMembersQuery.isLoading = false;
+    withMembersQuery.data = undefined;
+
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
+    );
+    const texts = collectText(renderer.toJSON());
+
+    expect(texts).not.toContain('EMPTY_STATE:No members yet');
+    expect(texts).not.toContain('QUERY_ERROR');
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+    unmount();
   });
 });

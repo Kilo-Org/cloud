@@ -21,8 +21,6 @@ import {
 } from '@/lib/glanceable/session-activity-tokens-android';
 
 import { buildSessionNotificationCard } from './session-notification-card';
-import { ensureAndroidNotificationChannels } from './ensure-notification-channels';
-import { readStoredContext } from './session-stored-context';
 import {
   dismissSessionCard,
   getStoredSessionCards,
@@ -200,22 +198,6 @@ export function restoreFollowedSessionCards(
   }
 }
 
-/**
- * Launch, foreground, and a headless push: rebuild the set from native truth
- * and the stored scope. Resolves false when the keychain could not be read:
- * nothing is cancelled then, and the caller must not read the empty set as
- * "not followed".
- */
-export async function restoreFollowedSessionCardsFromStorage(): Promise<boolean> {
-  await ensureAndroidNotificationChannels();
-  const ctx = await readStoredContext();
-  if (ctx === 'unavailable') {
-    return false;
-  }
-  restoreFollowedSessionCards(ctx);
-  return true;
-}
-
 /** Follow one session from the row the session screen shows. */
 export function followSession(
   row: SessionLiveActivityRow,
@@ -318,6 +300,13 @@ export function syncFollowedSessionCards(
         approvalKey: stored.approvalKey,
         updatedAt,
         statusSinceFallback: stored.content?.statusSince ?? updatedAt,
+        // The tray row is the `activeSessions.list` row: it has no step, plan,
+        // diff, permission command, failure, start time or `costMicrodollars`
+        // (its cost field is `totalCostMicrodollars`), and it omits last
+        // activity when the column is null. `previous` supplies the rest under
+        // the builder's absence rule; `outcome` is recomputed there and is
+        // never carried.
+        previous: stored.content ?? undefined,
       });
       if (isLiveKind(content.statusKind)) {
         render(content, stored.ctx);
@@ -403,6 +392,13 @@ export async function approveFollowedSession(
 // The aggregate card and its Approve read the followed sessions through this
 // source, so their test graphs never load the Android notification bridge.
 setFollowedSessionsSource({ ids: () => followed.keys(), counts: followedSessionCounts });
+
+/** Test-only: the content one followed session holds, or null when it holds none. */
+export function _peekFollowedContentForTests(
+  sessionId: string
+): SessionLiveActivityContentState | null {
+  return followed.get(sessionId)?.content ?? null;
+}
 
 /** Test-only: drop the followed set and the listeners. */
 export function _resetSessionFollowForTests(): void {

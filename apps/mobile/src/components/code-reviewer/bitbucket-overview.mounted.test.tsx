@@ -24,6 +24,7 @@ const config = vi.hoisted(() => ({
 const readiness = vi.hoisted(() => ({
   connected: true,
   ready: true as boolean | undefined,
+  integrationId: 'bitbucket-1' as string | null,
   workspaceSlug: 'ws' as string | undefined,
   fetchStatus: 'idle' as string,
 }));
@@ -60,10 +61,20 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useFocusEffect: () => undefined,
 }));
+// The overview's rows and cards draw shared icons, whose Lucide modules ship
+// untranspiled types the Node test transform cannot parse. The screen is
+// asserted through host elements, so any icon answer is enough.
+vi.mock('@/components/ui/icons', () => {
+  const icons: Record<string, string> = {};
+  return new Proxy(icons, {
+    get: (_target, name) => (typeof name === 'string' ? name : undefined),
+    has: () => true,
+  });
+});
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/agents/model-selector', () => ({ openModelPicker: vi.fn() }));
-vi.mock('@/components/code-reviewer/bitbucket-connect-form', () => ({
-  BitbucketConnectForm: () => null,
+vi.mock('@/components/code-reviewer/bitbucket-setup-recovery', () => ({
+  BitbucketSetupRecovery: () => null,
 }));
 vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
   buildOverviewRows: () => [],
@@ -96,7 +107,7 @@ vi.mock('@/components/ui/skeleton', () => ({
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
-vi.mock('@/lib/integration-urls', () => ({ getBitbucketIntegrationUrl: () => 'https://x.test' }));
+
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   classifyProviderState: () => ({ status: 'connected' }),
   useBitbucketReadiness: () => ({
@@ -107,7 +118,16 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     data: {
       connected: readiness.connected,
       ready: readiness.ready,
+      integrationId: readiness.integrationId,
       workspace: { slug: readiness.workspaceSlug },
+      missingRequiredScopes: [],
+      repositoryCache: {
+        status: readiness.ready ? 'available' : 'uninitialized',
+        repositories: [],
+        syncedAt: null,
+      },
+      canManage: true,
+      canTriggerManualReview: false,
     },
     refetch: vi.fn(),
   }),

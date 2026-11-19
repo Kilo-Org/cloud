@@ -5,19 +5,15 @@ import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { canOpenExternalBilling } from '@/lib/credits/external-billing-link';
-import { openExternalUrl } from '@/lib/external-link';
 import { formatDate } from '@/lib/format';
 import {
-  isAppStorePass,
   isStoreManagedPass,
   type KiloPassSubscriptionState,
-  kiloPassWebUrl,
   selectKiloPassManagementAction,
-  storeSubscriptionsUrl,
 } from '@/lib/kilo-pass/management';
 import { kiloPassPlanLabel } from '@/lib/kilo-pass/state';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
@@ -30,13 +26,12 @@ export type KiloPassScheduledChange = NonNullable<
 
 /**
  * What a subscriber can do to their pass from the phone: cancel it, undo a
- * pending cancellation, resume a paused pass, cancel a scheduled plan change,
- * and open the store that sold a store-managed pass.
+ * pending cancellation, resume a paused pass, and cancel a scheduled plan
+ * change — all through this app's own procedures.
  *
- * Paid plan changes stay on the web, so that row is a link on Android and plain
- * text on iOS. The web's cancellation flow uses a third-party portal; this
- * screen calls the subscription procedure directly after its own confirmation,
- * which is the same cancellation without leaving the app.
+ * A pass the App Store or Play sold has no controls here: Kilo Pass is no
+ * longer sold in either store, so the surface states the pass it has and offers
+ * no manage or change-plan destination at all.
  *
  * The scheduled change arrives as a prop, because the screen waits for its
  * answer before it prints the page: a card that appeared later would push the
@@ -108,24 +103,11 @@ export function KiloPassManagementSections({
     })
   );
 
+  // A pass the store sold keeps its details above and offers nothing to manage
+  // here: Kilo Pass is no longer sold in either store, so there is no store page
+  // to send the reader to and no paid plan change to offer.
   if (storeManaged) {
-    const storeName = isAppStorePass(subscription) ? t('common.appStore') : t('common.googlePlay');
-    const manageLabel = t('kiloPass.manage.manageInStore', { store: storeName });
-    return (
-      <View className="gap-3">
-        <Button
-          accessibilityLabel={manageLabel}
-          variant="outline"
-          onPress={() => {
-            void openExternalUrl(storeSubscriptionsUrl(subscription.paymentProvider), {
-              label: manageLabel,
-            });
-          }}
-        >
-          <Text>{manageLabel}</Text>
-        </Button>
-      </View>
-    );
+    return null;
   }
 
   const action = selectKiloPassManagementAction(subscription);
@@ -149,7 +131,9 @@ export function KiloPassManagementSections({
             resumeCancelled.mutate();
           },
         },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: nothing resumes.
+      { cancelable: true }
     );
   };
 
@@ -165,7 +149,9 @@ export function KiloPassManagementSections({
             cancelScheduledChange.mutate();
           },
         },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: no change is cancelled.
+      { cancelable: true }
     );
   };
 
@@ -196,11 +182,9 @@ export function KiloPassManagementSections({
       )}
 
       {scheduledChange != null && (
-        <View className="gap-2 rounded-lg bg-secondary p-3">
-          <Text className="text-sm font-medium text-foreground">
-            {t('kiloPass.manage.scheduledChange')}
-          </Text>
-          <Text className="text-xs text-muted-foreground">
+        <Card>
+          <Text variant="small">{t('kiloPass.manage.scheduledChange')}</Text>
+          <Text variant="caption">
             {t('kiloPass.manage.scheduledChangeSummary', {
               plan: kiloPassPlanLabel(scheduledChange.toTier, scheduledChange.toCadence),
               date: formatDate(parseTimestamp(scheduledChange.effectiveAt), i18n.language, {
@@ -213,30 +197,15 @@ export function KiloPassManagementSections({
           <Button
             variant="outline"
             size="sm"
+            className="self-start"
             loading={cancelScheduledChange.isPending}
             onPress={confirmCancelScheduledChange}
           >
             <Text>{t('kiloPass.manage.cancelScheduledChange')}</Text>
           </Button>
-        </View>
+        </Card>
       )}
 
-      {/* A paid plan change is a purchase, so iOS keeps plain text: the app may
-          not link an external page that sells one. */}
-      {canOpenExternalBilling() ? (
-        <Button
-          variant="outline"
-          onPress={() => {
-            void openExternalUrl(kiloPassWebUrl(), { label: t('kiloPass.manage.changePlan') });
-          }}
-        >
-          <Text>{t('kiloPass.manage.changePlan')}</Text>
-        </Button>
-      ) : (
-        <Text variant="muted" className="text-sm">
-          {t('kiloPass.manage.changePlanIosNote')}
-        </Text>
-      )}
       {dialog}
     </View>
   );

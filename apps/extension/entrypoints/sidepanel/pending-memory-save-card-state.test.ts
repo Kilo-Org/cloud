@@ -189,11 +189,6 @@ describe('save error classification', () => {
     expect(classifySaveError(new AgentMemoryStoreFullError())).toBe('full');
   });
 
-  it('classifies a store-full error instance as full', () => {
-    // The card maps the exact store-full outcome reason to its full-state view.
-    expect(classifySaveError(new AgentMemoryStoreFullError('Memory store is full.'))).toBe('full');
-  });
-
   it('classifies generic Error with full-error name as full', () => {
     const error = new Error('Memory store is full.');
     error.name = 'AgentMemoryStoreFullError';

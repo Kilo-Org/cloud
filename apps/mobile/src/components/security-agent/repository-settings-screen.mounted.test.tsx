@@ -1,6 +1,7 @@
 // Security Agent repository picker: the repositories mount through FlashList
 // (one virtualized scroller instead of every RepoToggleRow inside the screen's
-// ScrollView), selection is a Set lookup, the loading / error / empty /
+// ScrollView), each cell draws the grouped card's own rounded end and
+// separator, selection is a Set lookup, the loading / error / empty /
 // validation branches keep rendering where they did before, and the empty
 // branch's Manage access launch is one shared fixture.
 /* eslint-disable max-lines -- one native fixture for the picker's states; splitting it would duplicate the mocks */
@@ -9,6 +10,7 @@ import { createElement, Fragment, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { RowGroupItem } from '@/components/ui/row-group';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -36,8 +38,7 @@ const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const saveButton = vi.hoisted(() => ({ onSave: null as (() => Promise<void>) | null }));
 const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
 const manageAccess = vi.hoisted(() => ({
-  openExternalUrl: vi.fn<(url: string, options?: unknown) => Promise<void>>(),
-  mintInstallState: vi.fn<() => Promise<{ token: string }>>(),
+  openAppShellHandoff: vi.fn<(target: unknown, options?: unknown) => Promise<void>>(),
 }));
 
 vi.mock('react-native', () => ({
@@ -63,7 +64,7 @@ vi.mock('expo-router', () => ({
 vi.mock('@shopify/flash-list', () => ({
   FlashList: (props: {
     data?: readonly unknown[];
-    renderItem: (info: { item: unknown }) => ReactNode;
+    renderItem: (info: { item: unknown; index: number }) => ReactNode;
     keyExtractor?: (item: never) => string;
     getItemType?: (item: unknown) => string;
     style?: unknown;
@@ -83,7 +84,7 @@ vi.mock('@shopify/flash-list', () => ({
       },
       props.ListHeaderComponent,
       data.map((item, index) =>
-        createElement(Fragment, { key: index }, props.renderItem({ item }))
+        createElement(Fragment, { key: index }, props.renderItem({ item, index }))
       ),
       props.ListFooterComponent
     );
@@ -103,11 +104,9 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
     dialog: null,
   }),
 }));
-vi.mock('@/lib/trpc', () => ({
-  trpcClient: { githubApps: { mintInstallState: { mutate: manageAccess.mintInstallState } } },
+vi.mock('@/lib/app-shell-handoff', () => ({
+  openAppShellHandoff: manageAccess.openAppShellHandoff,
 }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: manageAccess.openExternalUrl }));
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => (connectivity.known ? 'online' : 'unknown'),
 }));
@@ -126,7 +125,10 @@ vi.mock('@/components/security-agent/orphaned-findings-card', () => ({
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: 'PlatformErrorScreen',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 // `headerRight` is a prop, not a child: the stub renders it so the Save button
 // (the screen's only save path) actually mounts.
@@ -134,11 +136,15 @@ vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: { headerRight?: ReactNode }) =>
     createElement(Fragment, null, props.headerRight),
 }));
-vi.mock('@/components/ui/icons', () => ({ FolderGit2: 'FolderGit2' }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
+vi.mock('@/components/ui/icons', () => ({
+  ExternalLink: 'ExternalLink',
+  FolderGit2: 'FolderGit2',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/radio-group', () => ({ RadioGroup: 'RadioGroup' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 const THREE_REPOS: readonly [RepoRow, RepoRow, RepoRow] = [
@@ -175,6 +181,20 @@ function repoRow(renderer: TestRenderer.ReactTestRenderer, index: number) {
   return row;
 }
 
+// The reserve the loading branch paints: one `RowSkeleton` per repository the
+// loaded list would show, at the same one-line frame.
+function placeholderRows(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(node => String(node.type) === 'RowSkeleton');
+}
+
+// The picker's cells are one grouped card drawn by the list, so each carries
+// its own rounded end: `first`/`middle`/`last` for a multi-row section.
+function cellPositions(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+  return renderer.root
+    .findAllByType(RowGroupItem)
+    .map(node => (node.props as { position?: unknown }).position);
+}
+
 function textContents(renderer: TestRenderer.ReactTestRenderer): unknown[] {
   return renderer.root
     .findAll(node => String(node.type) === 'Text')
@@ -202,18 +222,18 @@ function emptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
 }
 
 // With nothing to save in the header, the grant action is the one control the
-// state exists to offer, so its visual weight is part of this contract.
-function emptyStateActionVariant(renderer: TestRenderer.ReactTestRenderer): unknown {
+// state exists to offer, so its label is part of this contract.
+function emptyStateActionLabel(renderer: TestRenderer.ReactTestRenderer): unknown {
   const action: unknown = renderer.root.find(node => String(node.type) === 'EmptyState').props
     .action;
   if (typeof action !== 'object' || action === null || !('props' in action)) {
     throw new TypeError('EmptyState action is not an element');
   }
   const { props } = action;
-  if (typeof props !== 'object' || props === null || !('variant' in props)) {
+  if (typeof props !== 'object' || props === null || !('label' in props)) {
     return undefined;
   }
-  return props.variant;
+  return props.label;
 }
 
 // Presses the action and lets the mint → launch → refetch chain settle.
@@ -221,7 +241,7 @@ async function pressEmptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
   const onPress = emptyStateAction(renderer);
   act(onPress);
   await vi.waitFor(() => {
-    expect(manageAccess.mintInstallState).toHaveBeenCalled();
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalled();
   });
 }
 
@@ -245,10 +265,8 @@ beforeEach(() => {
   saveButton.onSave = null;
   repositories.refetch.mockReset();
   repositories.refetch.mockResolvedValue(undefined);
-  manageAccess.mintInstallState.mockReset();
-  manageAccess.mintInstallState.mockResolvedValue({ token: 'install-state' });
-  manageAccess.openExternalUrl.mockReset();
-  manageAccess.openExternalUrl.mockResolvedValue(undefined);
+  manageAccess.openAppShellHandoff.mockReset();
+  manageAccess.openAppShellHandoff.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -273,17 +291,20 @@ describe('RepositorySettingsScreen repository picker', () => {
     );
     const keyExtractor = (list.props as { keyExtractor: (item: RepoRow) => string }).keyExtractor;
     expect(keyExtractor(THREE_REPOS[0])).toBe('1');
-    // The old ScrollView content inset (`px-6 pt-4` plus the tab-bar band) is
-    // now the list's content container, so the last row still clears the bar.
+    // The page gutter now lives on the rows and the header, so the list's
+    // content container carries only the top pad, the tab-bar band and the
+    // safe-area side insets.
     expect(list.props as { contentContainerStyle: unknown }).toMatchObject({
       contentContainerStyle: {
-        paddingTop: 16,
+        paddingTop: 12,
         paddingBottom: 12,
-        paddingLeft: 24,
-        paddingRight: 24,
+        paddingLeft: 0,
+        paddingRight: 0,
       },
     });
     expect((list.props as { style: unknown }).style).toEqual({ flex: 1 });
+    // One grouped card: the first cell rounds the top, the last the bottom.
+    expect(cellPositions(renderer)).toEqual(['first', 'middle', 'last']);
   });
 
   it('keeps the picker rows inside the landscape side insets', async () => {
@@ -291,9 +312,9 @@ describe('RepositorySettingsScreen repository picker', () => {
     sideInsets.right = 59;
     const { renderer } = await mount();
     expect(listOf(renderer).props.contentContainerStyle).toEqual({
-      paddingTop: 16,
-      paddingLeft: 71,
-      paddingRight: 83,
+      paddingTop: 12,
+      paddingLeft: 47,
+      paddingRight: 59,
       paddingBottom: 12,
     });
   });
@@ -316,12 +337,17 @@ describe('RepositorySettingsScreen repository picker', () => {
     });
   });
 
-  it('keeps the loading skeletons in the header without mounting rows', async () => {
+  it('reserves the loading rows in the header without mounting rows', async () => {
     repositories.isLoading = true;
     repositories.data = undefined;
     const { renderer } = await mount();
 
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(2);
+    // The picker's rows are one-line rows inside one grouped card, so the
+    // reserve is two rows of one bar each — not a second line the loaded row
+    // never draws.
+    const placeholders = placeholderRows(renderer);
+    expect(placeholders).toHaveLength(2);
+    expect(placeholders.every(row => row.props.subtitle !== true)).toBe(true);
     expect(repoRows(renderer)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
   });
@@ -343,9 +369,9 @@ describe('RepositorySettingsScreen repository picker', () => {
     const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
     expect((empty.props as { placement: string }).placement).toBe('top');
     expect(empty.props as { action: unknown }).toHaveProperty('action');
-    // The grant is the only way out of this state and the header's Save is
-    // quiet here, so the action carries the filled primary style.
-    expect(emptyStateActionVariant(renderer)).toBe('default');
+    // The grant is the only way out of this state, so it is the state's one
+    // primary action, named by its own label.
+    expect(emptyStateActionLabel(renderer)).toBe(i18n.t('securityAgent.repositories.manageAccess'));
     expect(repoRows(renderer)).toHaveLength(0);
   });
 
@@ -367,7 +393,7 @@ describe('RepositorySettingsScreen repository picker', () => {
     repositories.data = undefined;
     repositories.isLoading = true;
     const loading = await mount();
-    expect(loading.renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+    expect(placeholderRows(loading.renderer)).toHaveLength(0);
     expect(loading.renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(
       0
     );
@@ -393,50 +419,27 @@ describe('RepositorySettingsScreen repository picker', () => {
 
     await pressEmptyStateAction(renderer);
 
-    expect(manageAccess.openExternalUrl).toHaveBeenCalledTimes(1);
-    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
-      'https://settings.test/github-app?installState=install-state&fromApp=1'
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalledTimes(1);
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalledWith(
+      { page: 'github-app' },
+      expect.any(Object)
     );
     await vi.waitFor(() => {
       expect(repositories.refetch).toHaveBeenCalledTimes(1);
     });
   });
 
-  it('does not read the repositories when no settings page was opened', async () => {
+  it('names the organization on the hand-off target', async () => {
     repositories.data = [];
-    manageAccess.mintInstallState.mockRejectedValueOnce(new Error('mint refused'));
-    const { renderer } = await mount();
+    const { renderer } = await mount('org_123');
 
     await pressEmptyStateAction(renderer);
 
-    expect(manageAccess.openExternalUrl).not.toHaveBeenCalled();
-    expect(repositories.refetch).not.toHaveBeenCalled();
+    expect(manageAccess.openAppShellHandoff).toHaveBeenCalledWith(
+      { page: 'github-app', organizationId: 'org_123' },
+      expect.any(Object)
+    );
   });
-
-  // An organization's mint is refused for a role that may edit these settings
-  // but not manage the installation (`UNAUTHORIZED`) and for an organization
-  // that already holds an installation and cannot take a second one
-  // (`FORBIDDEN`). The settings page mints its own state for the signed-in web
-  // user, so the control still opens it instead of going inert.
-  it.each(['UNAUTHORIZED', 'FORBIDDEN'])(
-    'opens the organization settings page without a minted state on %s',
-    async code => {
-      repositories.data = [];
-      manageAccess.mintInstallState.mockRejectedValueOnce(
-        Object.assign(new Error('mint refused'), { data: { code, httpStatus: 403 } })
-      );
-      const { renderer } = await mount('org_123');
-
-      await pressEmptyStateAction(renderer);
-
-      expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
-        'https://settings.test/github-app?organizationId=org_123'
-      );
-      await vi.waitFor(() => {
-        expect(repositories.refetch).toHaveBeenCalledTimes(1);
-      });
-    }
-  );
 
   it('keeps the EmptyState out while the repository query has no data yet', async () => {
     // TanStack Query reports this shape while an enabled query is paused (the
@@ -463,7 +466,7 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     const error = renderer.root.find(node => String(node.type) === 'QueryError');
     expect((error.props as { variant: string }).variant).toBe('offline');
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+    expect(placeholderRows(renderer)).toHaveLength(0);
   });
 
   it('keeps the skeleton for a paused read whose connectivity is unsettled', async () => {
@@ -476,7 +479,7 @@ describe('RepositorySettingsScreen repository picker', () => {
 
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(2);
+    expect(placeholderRows(renderer)).toHaveLength(2);
   });
 
   it('shows the selectAtLeastOne validation only with an empty selection', async () => {

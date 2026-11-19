@@ -15,6 +15,13 @@ beforeEach(() => {
   providersQueryFn.mockResolvedValue({ providers: [] });
 });
 
+// The demo entry pushes through the press-burst guard, and this assertion reads
+// the router mock, so the guarded push is that function.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => routerPush,
+}));
+
 describe('Profile native remote demo entry', () => {
   it('is absent in a release bundle', async () => {
     const { renderer, unmount } = await mountProfile();

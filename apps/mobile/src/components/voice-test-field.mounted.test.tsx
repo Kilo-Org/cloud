@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { VoiceTestField } from '@/components/voice-test-field';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { tapTargetReachDp, textActionTargetClass, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 
 type VoiceInputOptions = {
   disabled: boolean;
@@ -30,13 +31,20 @@ const applyVoiceDraftToInput = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
   // The field renders the shared Input, whose alignment helper reads
-  // `I18nManager.isRTL` on every render.
+  // `I18nManager.isRTL` on every render, and the Clear control's frame comes
+  // from the tap-target helper, which reads the platform.
   I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The shared button and card are the app's own primitives; their geometry and
+// press feedback are covered by their own mounted tests, so this harness keeps
+// the control reachable as a host element and asserts the props it is given.
+vi.mock('@/components/ui/button', () => ({ Button: 'Pressable' }));
+vi.mock('@/components/ui/card', () => ({ Card: 'View' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/voice-input-control', () => ({
   VoiceInputButton: 'VoiceInputButton',
@@ -137,7 +145,7 @@ describe('VoiceTestField', () => {
     if (!button) {
       throw new Error('VoiceInputButton not found');
     }
-    expect(button.props).toMatchObject({ size: 'md', status: 'idle', disabled: false });
+    expect(button.props).toMatchObject({ status: 'idle', disabled: false });
 
     act(() => {
       (button.props.onPress as () => void)();
@@ -186,15 +194,16 @@ describe('VoiceTestField', () => {
     const renderer = await mountVoiceTestField();
 
     const clear = findByLabel(renderer, 'Clear text');
-    const className = clear.props.className as string;
-    // DESIGN.md: touch surfaces keep at least a 44px target. An arbitrary px
-    // value, not the rem-scaled min-h-11/min-w-11: NativeWind's rem is ~14px
-    // on device, so those render ~38.5pt tall (e14, 2026-09-12).
-    expect(className).toContain('min-h-[44px]');
-    expect(className).toContain('min-w-[44px]');
-    expect(className).toContain('items-center');
-    expect(className).toContain('justify-center');
-    expect(className).toContain('disabled:opacity-50');
+    // The action keeps the platform's text-action frame — 44pt on iOS, 48dp on
+    // Android — rather than the compact `sm` height, so the control's own node
+    // reaches the touch-target floor without depending on hit slop.
+    expect(clear.props.size).toBe('sm');
+    expect(String(clear.props.className).split(' ')).toEqual(
+      expect.arrayContaining(textActionTargetClass().split(' '))
+    );
+    expect(String(clear.props.className).split(' ')).toContain('ml-auto');
+    expect(clear.props.disabled).toBe(true);
+    expect(tapTargetReachDp(TOUCH_TARGET_DP, 0)).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 
   it('renders a transient failure inline, where the accessibility tree can see it', async () => {
@@ -211,7 +220,7 @@ describe('VoiceTestField', () => {
       message: "Couldn't reach the Kilo gateway. Check your connection and try again.",
       tone: 'error',
     });
-    expect(textValues(renderer)).not.toContain('Listening...');
+    expect(textValues(renderer)).not.toContain('Listening…');
   });
 
   it('leaves alert-backed feedback to its own surface', async () => {

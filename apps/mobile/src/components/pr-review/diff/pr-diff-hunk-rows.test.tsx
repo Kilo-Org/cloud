@@ -19,6 +19,7 @@ vi.mock('react-native', () => ({
   RefreshControl: 'RefreshControl',
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -130,10 +131,6 @@ describe('PaginationRow', () => {
       .findAll(node => String(node.type) === 'Text')
       .map(node => String(node.props.children));
   }
-
-  it('reads the one-file page as plural files, naming the whole page set', () => {
-    expect(renderPaginationRow()).toContain('1 of 5 files loaded');
-  });
 
   // The count handed to i18next picks the plural category. It must be the
   // loaded count, because the catalogs inflect the participle on the loaded

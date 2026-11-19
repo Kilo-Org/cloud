@@ -6,7 +6,10 @@ import {
 import { getWorkerDb } from '@kilocode/db/client';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import { NotificationChannelDO, NotificationsService } from '../../../notifications/src/index';
-import { GLANCEABLE_DELIVERY_MIN_INTERVAL_MS } from '../../../notifications/src/lib/glanceable-refresh';
+import {
+  GLANCEABLE_APPROVAL_MIN_INTERVAL_MS,
+  GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+} from '../../../notifications/src/lib/glanceable-refresh';
 import {
   sendPushNotifications,
   type ExpoPushMessage,
@@ -186,15 +189,23 @@ async function flushAsync(): Promise<void> {
  * scope per `GLANCEABLE_DELIVERY_MIN_INTERVAL_MS`, deferring a change inside the
  * window to the Durable Object alarm. The glanceable cases below assert the
  * connection DO's own per-status-change trigger, so step the wall clock past
- * the window between heartbeats. The window itself is covered by
+ * the window between heartbeats. An approval-carrying refresh uses the shorter
+ * `GLANCEABLE_APPROVAL_MIN_INTERVAL_MS` floor instead, so `advance` steps the
+ * clock by an exact amount. The windows themselves are covered by
  * `services/notifications/src/lib/glanceable-refresh.test.ts`.
  */
-function useDeliveryWindowClock(): { tick: () => void } {
+function useDeliveryWindowClock(): {
+  tick: () => void;
+  advance: (ms: number) => void;
+} {
   let now = Date.now();
   vi.spyOn(Date, 'now').mockImplementation(() => now);
   return {
     tick: () => {
       now += GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 1_000;
+    },
+    advance: (ms: number) => {
+      now += ms;
     },
   };
 }
@@ -245,6 +256,25 @@ function setup(env: Partial<Env> = {}) {
   const ctx = mockCtx.build();
   const doInstance = new UserConnectionDO(ctx as never, env as Env);
   return { doInstance, ctx, mockCtx };
+}
+
+/** Route the `create_session` organization check to a member or a non-member. */
+function setupOrganizationMembership(isMember: boolean) {
+  vi.mocked(getWorkerDb).mockReturnValue(
+    drizzle(async (sql: string) => {
+      if (sql.includes('organization_memberships')) {
+        // The lookup selects the direct role and the inherited role from one row over
+        // the live organization; a non-member gets a row with no role.
+        return { rows: [[isMember ? 'owner' : null, null]] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    }) as never
+  );
+}
+
+/** Env whose Hyperdrive binding supplies a connection string for that check. */
+function databaseEnv(): Partial<Env> {
+  return { HYPERDRIVE: { connectionString: 'postgres://unused' } } as unknown as Partial<Env>;
 }
 
 function pendingGlanceableKey(userId: string, organizationId: string | null): string {
@@ -304,7 +334,7 @@ function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
       })
     );
   });
-  return { ...result, env, messages, channelStorage: storage };
+  return { ...result, env, messages, channel, channelStorage: storage };
 }
 
 function connectWebSocket(doInstance: UserConnectionDO, connectionId: string): MockWS {
@@ -1003,17 +1033,42 @@ describe('UserConnectionDO', () => {
       expect(messages.every(message => message.data?.organizationBound === false)).toBe(true);
     });
 
-    it('delivers a question -> permission move inside the delivery window', async () => {
-      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+    it('coalesces a permission move inside the short approval floor and delivers it past it', async () => {
+      const { doInstance, mockCtx, messages, channel, channelStorage } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
       const clock = useDeliveryWindowClock();
       clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
       await flushAsync();
       expect(messages).toHaveLength(1);
-      // No clock tick: still inside the delivery window. The Approve control
-      // gates nothing here except this window, so the move must not wait it out.
+
+      // No clock advance: inside the short approval floor. The move is
+      // coalesced into a pending record that keeps the approval flag, so its
+      // trailing delivery cannot be bounced by the floor it was deferred out of.
       sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'permission')]);
+      await flushAsync();
+      expect(messages).toHaveLength(1);
+      const pending = (await channelStorage.get(pendingGlanceableKey('usr_1', null))) as
+        | { dueAt: number; approvalChanged?: boolean }
+        | undefined;
+      expect(pending).toMatchObject({
+        userId: 'usr_1',
+        organizationId: null,
+        approvalChanged: true,
+      });
+      const delivery = (await channelStorage.get(
+        `glanceable:${JSON.stringify(['usr_1', null])}:delivery`
+      )) as { deliveredAt: number } | undefined;
+      if (!delivery) throw new Error('Expected a shipped delivery record');
+      // The floor is measured from the last delivery, so the Approve control
+      // can never lag the full 10 s window.
+      expect(pending?.dueAt).toBe(delivery.deliveredAt + GLANCEABLE_APPROVAL_MIN_INTERVAL_MS);
+      expect(channelStorage.setAlarm).toHaveBeenCalledWith(pending?.dueAt);
+
+      // Past the floor the pending record delivers on the alarm that was armed
+      // for it: both counts land without the full window elapsing.
+      clock.advance(GLANCEABLE_APPROVAL_MIN_INTERVAL_MS + 1);
+      await channel.alarm();
       await flushAsync();
       expect(messages.map(message => message.data)).toMatchObject([
         { needsInput: 1, needsApproval: 0 },
@@ -4021,6 +4076,226 @@ describe('UserConnectionDO', () => {
         id: 'cmd-1',
         result,
       });
+    });
+  });
+
+  describe('create_session organization scope', () => {
+    const ORG_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const OTHER_ORG_ID = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+
+    it('forwards a create_session for an organization the user belongs to', async () => {
+      setupOrganizationMembership(true);
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, []);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        connectionId: 'cli-1',
+        data: { orgId: ORG_ID, title: 'Org session' },
+      });
+
+      const cliCommands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'create_session',
+        data: { orgId: ORG_ID, title: 'Org session' },
+      });
+      expect(webWs.send).not.toHaveBeenCalled();
+    });
+
+    it('refuses a create_session for an organization the user does not belong to', async () => {
+      setupOrganizationMembership(false);
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, []);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        connectionId: 'cli-1',
+        data: { orgId: ORG_ID, title: 'Org session' },
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'ORGANIZATION_ACCESS_DENIED',
+          message: 'You do not have access to this organization',
+        },
+      });
+      expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(0);
+    });
+
+    it('refuses a create_session whose organization id is not a uuid', async () => {
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, []);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      vi.mocked(getWorkerDb).mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        connectionId: 'cli-1',
+        data: { orgId: 'not-a-uuid', title: 'Org session' },
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'ORGANIZATION_ACCESS_DENIED',
+          message: 'You do not have access to this organization',
+        },
+      });
+      expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(0);
+      expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    });
+
+    it('forwards a create_session without an organization id', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, []);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      vi.mocked(getWorkerDb).mockClear();
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        connectionId: 'cli-1',
+        data: { title: 'Personal session' },
+      });
+
+      const cliCommands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'create_session',
+        data: { title: 'Personal session' },
+      });
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    });
+
+    it('forwards a session-scoped create whose organization matches the session', async () => {
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      vi.mocked(getWorkerDb).mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce({
+        kiloSessionId: 's1',
+        organizationId: ORG_ID,
+        cloudAgentSessionScopeId: null,
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+
+      const cliCommands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'create_session',
+        sessionId: 's1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    });
+
+    it('refuses a session-scoped create for a different organization', async () => {
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce({
+        kiloSessionId: 's1',
+        organizationId: ORG_ID,
+        cloudAgentSessionScopeId: null,
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, orgId: OTHER_ORG_ID },
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'ORGANIZATION_ACCESS_DENIED',
+          message: 'You do not have access to this organization',
+        },
+      });
+      expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(0);
+    });
+
+    it('forwards a session-scoped create for a session reached through a parent organization', async () => {
+      setupOrganizationMembership(false);
+      const { doInstance, mockCtx } = setup(databaseEnv());
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+      vi.mocked(getWorkerDb).mockClear();
+      sessionAccessMocks.resolveAccessibleKiloSession.mockResolvedValueOnce({
+        kiloSessionId: 's1',
+        organizationId: ORG_ID,
+        cloudAgentSessionScopeId: null,
+      });
+
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'create_session',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+
+      const cliCommands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(cliCommands).toHaveLength(1);
+      expect(cliCommands[0]).toMatchObject({
+        type: 'command',
+        command: 'create_session',
+        sessionId: 's1',
+        data: { protocolVersion: 1, orgId: ORG_ID },
+      });
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
     });
   });
 

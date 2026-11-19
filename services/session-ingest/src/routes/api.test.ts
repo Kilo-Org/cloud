@@ -2318,6 +2318,138 @@ describe('api routes', () => {
     }
   });
 
+  it('answers a transient Durable Object read failure as retryable rather than as a defect', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const reset = Object.assign(
+      new Error("Durable Object's isolate exceeded its memory limit and was reset."),
+      { retryable: true }
+    );
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => {
+        throw reset;
+      }),
+    } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    warn.mockRestore();
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      history: { kind: 'retryable_failure', phase: 'message_scan' },
+      sessionMetadata: null,
+    });
+  });
+
+  it('answers an unreadable read outcome as retryable instead of claiming the history is gone', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    // An outcome this worker does not know (a newer version's failure kind, a
+    // lost body) is not a page and says nothing about the stored history.
+    const readKiloSdkMessages = vi.fn(async () => ({ kind: 'future_failure_kind' }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: { kind: 'retryable_failure', phase: 'message_scan' },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers a messages-only body as retryable instead of claiming the history is gone', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    // No `nextCursor`: this is not a page the contract rejected, so nothing
+    // here is evidence the stored page is unreadable.
+    const readKiloSdkMessages = vi.fn(async () => ({ messages: [] }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: { kind: 'retryable_failure', phase: 'message_scan' },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps invalid_data for a page the contract rejects on both reads', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    // Page-shaped but unreadable: the stored page itself, which a retry cannot
+    // fix, so the terminal kind survives.
+    const readKiloSdkMessages = vi.fn(async () => ({ messages: [], nextCursor: 42 }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, history: { kind: 'invalid_data' } });
+    expect(readKiloSdkMessages).toHaveBeenCalledTimes(2);
+  });
+
+  it('serves the page when the same read answers it on the confirming read', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    // Ingest rewrote the rows between the reads: the first read saw identities
+    // that did not line up, the second read answers the page.
+    const readKiloSdkMessages = vi
+      .fn()
+      .mockResolvedValueOnce({ messages: [], nextCursor: 42 })
+      .mockResolvedValueOnce({ messages: [], nextCursor: null, omittedItemCount: 0 });
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+    });
+  });
+
   describe('GET /session/:sessionId/messages read-outcome logging', () => {
     it('logs outcome ok for a page and invalid_data for a page the contract rejects, without changing the response', async () => {
       const { db, fns } = makeDbFakes();
@@ -3358,10 +3490,12 @@ describe('api routes', () => {
     );
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { share_token: string };
+    const body = (await res.json()) as { share_token: string; public_id: string };
     expect(body).toMatchObject({ success: true });
     expect(body).toHaveProperty('share_token', expect.any(String));
-    expect(body).not.toHaveProperty('public_id');
+    /* The capability it wrote, so the app can tell its own link from one a later
+       rotation made. */
+    expect(body.public_id).toBe(sharedPublicId);
     expect(sharedPublicId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
@@ -3472,7 +3606,7 @@ describe('api routes', () => {
     const json: unknown = await res.json();
     expect(json).toMatchObject({ success: true });
     expect(json).toHaveProperty('share_token', expect.any(String));
-    expect(json).not.toHaveProperty('public_id');
+    expect(json).toHaveProperty('public_id', expect.any(String));
     expect(ingestStub.captureShareInfo).toHaveBeenCalledTimes(1);
     expect(ingestStub.captureShareInfo).toHaveBeenCalledWith(
       expect.stringMatching(
@@ -3997,6 +4131,26 @@ describe('api routes', () => {
     expect(res.status).toBe(200);
     expect(mint).toHaveBeenCalledTimes(2);
     expect(env.CONNECTION_TICKET_DO.newUniqueId).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST /user/web-ticket answers 503 when the mint hop is transiently unavailable', async () => {
+    const overloaded = new Error('Durable Object is overloaded. Too much data queued.');
+    const mint = vi.fn().mockRejectedValue(overloaded);
+    const env = makeTestEnv();
+    env.CONNECTION_TICKET_DO.newUniqueId.mockReturnValue({ toString: () => 'c'.repeat(64) });
+    env.CONNECTION_TICKET_DO.get.mockReturnValue({ mint });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/user/web-ticket', { method: 'POST' }),
+      env
+    );
+    warn.mockRestore();
+
+    // Nothing was minted, so the caller can retry instead of receiving a 500
+    // it cannot classify.
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ success: false, error: 'ticket_mint_unavailable' });
   });
 
   describe('GET /instances/active', () => {

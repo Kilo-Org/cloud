@@ -2,8 +2,12 @@ import { organizations } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import { isValidDomain } from '@kilocode/web-shared/lib/organizations/company-domain';
+import {
+  db,
+  type DrizzleConnection,
+  type DrizzleTransaction,
+} from '@kilocode/web-shared/lib/drizzle';
+import { normalizeSsoDomain } from '@kilocode/web-shared/lib/organizations/company-domain';
 
 export type SsoPolicyMisconfigurationReason =
   | 'organization_not_found'
@@ -39,8 +43,6 @@ export type SsoDomainAuthority =
       domain: string;
       reason: 'invalid_domain' | 'ambiguous_domain' | 'conflicting_child_policy';
     };
-
-type DbOrTransaction = typeof db | DrizzleTransaction;
 
 type SsoAuthorityRow = {
   id: string;
@@ -87,27 +89,39 @@ function decideDomainAuthority(
   return { status: 'authoritative', sourceOrganizationId: match.id };
 }
 
-function normalizeSsoDomain(domain: string): string | null {
-  const normalized = domain.trim().toLowerCase();
-  return isValidDomain(normalized) ? normalized : null;
-}
+/**
+ * The live organizations that claim any of the given normalized domains. One
+ * domain can be claimed by several organizations, so the caller groups the rows
+ * by domain and lets `decideDomainAuthority` judge each group.
+ */
+async function loadLiveDomainAuthorities(
+  domains: readonly string[],
+  dbOrTx: DrizzleConnection
+): Promise<SsoAuthorityRow[]> {
+  if (domains.length === 0) {
+    return [];
+  }
 
-async function resolveAuthorityForNormalizedDomain(
-  domain: string,
-  dbOrTx: DbOrTransaction
-): Promise<SsoDomainAuthority> {
-  const matchingOrganizations = await dbOrTx
+  return dbOrTx
     .select({
       id: organizations.id,
+      ssoDomain: organizations.sso_domain,
       parentOrganizationId: organizations.parent_organization_id,
     })
     .from(organizations)
     .where(
-      and(sql`lower(${organizations.sso_domain}) = ${domain}`, isNull(organizations.deleted_at))
-    )
-    .limit(2);
+      and(
+        inArray(sql`lower(${organizations.sso_domain})`, [...domains]),
+        isNull(organizations.deleted_at)
+      )
+    );
+}
 
-  const match = decideDomainAuthority(matchingOrganizations);
+async function resolveAuthorityForNormalizedDomain(
+  domain: string,
+  dbOrTx: DrizzleConnection
+): Promise<SsoDomainAuthority> {
+  const match = decideDomainAuthority(await loadLiveDomainAuthorities([domain], dbOrTx));
 
   switch (match.status) {
     case 'unmatched':
@@ -187,23 +201,8 @@ export async function resolveEffectiveOrganizationSsoPolicies(
   }
 
   // The authority map is only consulted for organizations that carry a domain, so an empty set
-  // needs no lookup.
-  const authorityRows: SsoAuthorityRow[] =
-    normalizedDomains.size === 0
-      ? []
-      : await dbOrTx
-          .select({
-            id: organizations.id,
-            ssoDomain: organizations.sso_domain,
-            parentOrganizationId: organizations.parent_organization_id,
-          })
-          .from(organizations)
-          .where(
-            and(
-              inArray(sql`lower(${organizations.sso_domain})`, [...normalizedDomains]),
-              isNull(organizations.deleted_at)
-            )
-          );
+  // needs no lookup; the loader answers the empty case without a query.
+  const authorityRows = await loadLiveDomainAuthorities([...normalizedDomains], dbOrTx);
 
   const authoritiesByDomain = new Map<string, SsoAuthorityRow[]>();
   for (const authority of authorityRows) {

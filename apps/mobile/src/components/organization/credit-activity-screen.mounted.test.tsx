@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- cohesive mounted suite for the credit-activity screen state contract */
+/* eslint-disable max-lines -- cohesive mounted suite for the credit-activity screen state contract, including the retention-limit footer */
 
 // Credit-activity screen state contract: loading skeleton, first-page error
 // (retryable vs. permanent NOT_FOUND/FORBIDDEN/UNAUTHORIZED no-retry), the empty
@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { OrganizationCreditActivityScreen } from './credit-activity-screen';
 import CreditActivityRoute from '@/app/(app)/(tabs)/(3_profile)/organization/credit-activity';
 
@@ -32,6 +32,7 @@ const pageQuery = vi.hoisted(() => ({
 const pageHook = vi.hoisted(() => ({
   entries: [] as unknown[],
   hasMore: false,
+  isRetentionLimited: false,
 }));
 
 const queryErrors = vi.hoisted(() => ({
@@ -78,7 +79,12 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   },
   useOrgCreditTransactionsPage: (id: string | null) => {
     route.queryIds.push(id);
-    return { query: pageQuery, entries: pageHook.entries, hasMore: pageHook.hasMore };
+    return {
+      query: pageQuery,
+      entries: pageHook.entries,
+      hasMore: pageHook.hasMore,
+      isRetentionLimited: pageHook.isRetentionLimited,
+    };
   },
 }));
 
@@ -127,6 +133,7 @@ vi.mock('@/lib/organization-context', () => ({
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ org: route.org }),
+  usePathname: () => '/organization/credit-activity',
   useRouter: () => route,
   useNavigation: () => navigation,
 }));
@@ -148,6 +155,7 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; placement?: string }) =>
     createElement('EmptyState', props, `EMPTY_STATE:${props.title}`),
 }));
@@ -245,6 +253,12 @@ async function renderScreen(): Promise<string[]> {
   return collectText(renderer.toJSON());
 }
 
+// The zone marker carries a bidi isolate and the date a no-break space; these
+// assertions are about the sentence, not that carriage.
+function readable(text: string): string {
+  return text.replaceAll(/[\u2066\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
+}
+
 beforeEach(() => {
   pageQuery.isPending = false;
   pageQuery.isError = false;
@@ -257,6 +271,7 @@ beforeEach(() => {
   pageQuery.fetchNextPage.mockClear();
   pageHook.entries = [];
   pageHook.hasMore = false;
+  pageHook.isRetentionLimited = false;
   queryErrors.errors = [];
   buttons.rendered = [];
   account.reset();
@@ -361,10 +376,26 @@ describe('OrganizationCreditActivityScreen pagination', () => {
     ];
     pageQuery.data = { pages: [{ entries: pageHook.entries, nextCursor: null, hasMore: false }] };
     const texts = await renderScreen();
-    const expiryLabels = texts.filter(text => text.startsWith('Expires '));
+    const expiryLabels = texts
+      .map(text => readable(text))
+      .filter(text => text.startsWith('Expires '));
     expect(expiryLabels).toHaveLength(1);
     expect(expiryLabels[0]).toContain('2027');
     expect(expiryLabels[0]).toContain('(UTC)');
+  });
+
+  it('keeps the Arabic zone marker on the date line, in its own direction', async () => {
+    pageHook.entries = [{ ...TRANSACTION, expiry_date: '2027-10-15T00:00:00Z' }];
+    pageQuery.data = { pages: [{ entries: pageHook.entries, nextCursor: null, hasMore: false }] };
+    await i18n.changeLanguage('ar');
+    try {
+      const texts = await renderScreen();
+      const expiry = texts.find(text => text.includes('(UTC)'));
+      expect(expiry).toContain('\u00A0\u2068(UTC)\u2069');
+      expect(expiry).not.toContain(' (UTC)');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('keeps pagination available when a loaded page has no visible entries', async () => {
@@ -471,6 +502,47 @@ describe('OrganizationCreditActivityScreen pagination', () => {
     expect(texts).toContain('Older credit activity is available.');
     expect(texts).not.toContain("Couldn't load more");
     expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+});
+
+describe('OrganizationCreditActivityScreen retention-limit footer', () => {
+  it('names the retention bound with no Load more at the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [TRANSACTION];
+    pageHook.isRetentionLimited = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('Top-up');
+    expect(texts).toContain(i18n.t('organization.creditActivity.retentionLimit'));
+    expect(texts).not.toContain('Older credit activity is available.');
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(false);
+  });
+
+  it('keeps the truncated note and Load more below the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: 1, hasMore: true }] };
+    pageHook.entries = [TRANSACTION];
+    pageHook.hasMore = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('Older credit activity is available.');
+    expect(texts).not.toContain(i18n.t('organization.creditActivity.retentionLimit'));
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+
+  it('never renders the two notes together when the impossible flag pairing is forced', async () => {
+    // The hooks can never return the bound flag next to `hasMore: true`, so
+    // force the pairing from the mock side and hold the footer to one note.
+    pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: 1, hasMore: true }] };
+    pageHook.entries = [TRANSACTION];
+    pageHook.hasMore = true;
+    pageHook.isRetentionLimited = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).not.toContain(i18n.t('organization.creditActivity.retentionLimit'));
+    expect(texts).toContain('Older credit activity is available.');
   });
 });
 

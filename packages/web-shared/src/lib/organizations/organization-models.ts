@@ -1,7 +1,7 @@
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   buildAutoModelCatalogEntry,
   getEnhancedOpenRouterModels,
@@ -26,6 +26,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { tagClaudeBillingByokModels } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/byok-models';
 import {
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
@@ -71,15 +72,25 @@ export async function getAvailableModelsForOrganization(
     countryCode: string | null;
   }
 ): Promise<OpenRouterModelsResponse | null> {
-  const context = await getOrganizationGroupPolicyContext({ organizationId, subject, fromDb });
-  const organization = context.organization;
-  const policy = evaluateEffectiveModelAccessPolicy(context);
-
-  const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
+  // Everything that does not depend on the organization's policy starts with the
+  // policy read, so the catalog and BYOK reads overlap it instead of following it.
+  const policyPromise = getOrganizationGroupPolicyContext({ organizationId, subject, fromDb }).then(
+    context => ({ context, policy: evaluateEffectiveModelAccessPolicy(context) })
+  );
+  const [
+    { context, policy },
+    directByokCatalogModelIds,
+    responseData,
+    byokProviderIds,
+    directByokModels,
+  ] = await Promise.all([
+    policyPromise,
+    policyPromise.then(({ policy }) => getAllowedDirectByokCatalogModelIds(organizationId, policy)),
     getEnhancedOpenRouterModels({ countryCode, fromDb }),
     getOrganizationByokProviderIds(readDb, organizationId),
-    getAllowedDirectByokCatalogModelIds(organizationId, policy),
+    getDirectByokModelsForOrganization(organizationId),
   ]);
+  const organization = context.organization;
   const restrictionCandidates = [...responseData.data];
 
   const { filteredModels, allowedProvidersByModel } = await applyModelPolicyToCatalog(
@@ -104,15 +115,16 @@ export async function getAvailableModelsForOrganization(
     availableModels.push(buildAutoModelCatalogEntry(ORG_AUTO_MODEL));
   }
 
-  availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
+  availableModels.push(...directByokModels);
   availableModels.push(
     ...(await listAvailableCustomLlms(organizationId, context.groupIds, countryCode))
   );
 
-  const chatGptOwner = chatGptByokOwner(organizationId, subject, audience);
-  if (chatGptOwner) {
-    availableModels = await tagOpenAiChatGptByokModels(chatGptOwner, availableModels);
-  }
+  availableModels = await tagByokConnectionModels(
+    chatGptByokOwner(organizationId, subject, audience),
+    organizationId,
+    availableModels
+  );
 
   const snapshot = await getEnkryptBenchmarks({ fromDb });
   return {
@@ -122,6 +134,31 @@ export async function getAvailableModelsForOrganization(
       snapshot
     ),
   };
+}
+
+/**
+ * Marks the models a ChatGPT or Claude billing connection serves as BYOK-available.
+ * Each tagger reads its own connection, so they run concurrently and their results
+ * are merged by model id.
+ */
+async function tagByokConnectionModels(
+  chatGptOwner: OpenAiChatGptOwner | null,
+  organizationId: string,
+  models: OpenRouterModel[]
+): Promise<OpenRouterModel[]> {
+  const byokModelIds = (tagged: OpenRouterModel[]) =>
+    tagged.filter(model => model.hasUserByokAvailable === true).map(model => model.id);
+  const [chatGptTagged, claudeTagged] = await Promise.all([
+    chatGptOwner ? tagOpenAiChatGptByokModels(chatGptOwner, models) : models,
+    tagClaudeBillingByokModels({ kind: 'organization', organizationId }, models),
+  ]);
+  if (chatGptTagged === models && claudeTagged === models) return models;
+  const tagged = new Set([...byokModelIds(chatGptTagged), ...byokModelIds(claudeTagged)]);
+  return models.map(model =>
+    model.hasUserByokAvailable !== true && !tagged.has(model.id)
+      ? model
+      : { ...model, hasUserByokAvailable: true, isFree: false }
+  );
 }
 
 /**

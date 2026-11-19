@@ -1,9 +1,14 @@
-import { jwtVerify, SignJWT } from 'jose';
+import { SignJWT } from 'jose';
 import { z } from 'zod';
 import { KILO_API_AUDIENCE } from './internal-service-token-audiences';
 import { KILO_TOKEN_VERSION, kiloTokenPayload } from './kilo-token';
 import type { KiloTokenPayload } from './kilo-token';
 import { validateCloudAgentAuthorityClaims } from './cloud-agent-authority';
+import {
+  assertKiloTokenIssuedAt,
+  checkKiloTokenAuthorityClaims,
+  verifyKiloTokenSignature,
+} from './kilo-token-verification';
 
 const audienceName = z
   .string()
@@ -115,23 +120,25 @@ export function isKiloResourceAudienceAllowed(
     : parsed.data.includes(policy.audience);
 }
 
+function assertKiloTokenAudience(
+  audience: unknown,
+  audiencePolicy: KiloResourceAudiencePolicy
+): void {
+  if (!isKiloResourceAudienceAllowed(audience, audiencePolicy)) {
+    throw new Error('Unexpected token audience');
+  }
+}
+
 export async function verifyKiloTokenForResource(
   token: string,
   secret: string,
   audiencePolicy: KiloResourceAudiencePolicy
 ): Promise<KiloTokenPayload> {
-  const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
-    algorithms: ['HS256'],
-  });
-  if (!isKiloResourceAudienceAllowed(payload.aud, audiencePolicy)) {
-    throw new Error('Unexpected token audience');
-  }
-  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
-    validateCloudAgentAuthorityClaims(payload);
+  const { payload } = await verifyKiloTokenSignature(token, secret);
+  assertKiloTokenAudience(payload.aud, audiencePolicy);
+  if (checkKiloTokenAuthorityClaims(payload)) {
     policyClaims.parse(payload);
-    if (typeof payload.iat !== 'number' || payload.iat > Math.floor(Date.now() / 1000)) {
-      throw new Error('Token issued in the future');
-    }
+    assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
   }
   return kiloTokenPayload.parse(payload);
 }
@@ -172,18 +179,11 @@ export async function verifyKiloTokenForPolicy(
   audiencePolicy: KiloResourceAudiencePolicy
 ): Promise<VerifiedKiloBearerContext> {
   const currentDate = new Date();
-  const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
-    algorithms: ['HS256'],
-    currentDate,
-  });
+  const { payload } = await verifyKiloTokenSignature(token, secret, { currentDate });
   const claims = policyClaims.parse(payload);
-  if (Object.hasOwn(payload, 'cloudAgentAuthority')) validateCloudAgentAuthorityClaims(payload);
-  if (claims.iat > Math.floor(currentDate.getTime() / 1000)) {
-    throw new Error('Token issued in the future');
-  }
-  if (!isKiloResourceAudienceAllowed(claims.aud, audiencePolicy)) {
-    throw new Error('Unexpected token audience');
-  }
+  checkKiloTokenAuthorityClaims(payload);
+  assertKiloTokenIssuedAt(claims.iat, Math.floor(currentDate.getTime() / 1000));
+  assertKiloTokenAudience(claims.aud, audiencePolicy);
   freezeClaimValue(claims);
   const auth = Object.freeze({
     [verifiedAuth]: true,
@@ -239,7 +239,6 @@ function hasOnlyExchangeSafeClaims(claimNames: readonly string[]): boolean {
   return claimNames.every(name => exchangeSafeClaimNames.has(name));
 }
 
-/** `kilo-api` on its own, as a scalar audience or a single-element array. */
 function hasSoleKiloApiAudience(audience: unknown): boolean {
   if (typeof audience === 'string') return audience === KILO_API_AUDIENCE;
   return Array.isArray(audience) && audience.length === 1 && audience[0] === KILO_API_AUDIENCE;

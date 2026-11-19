@@ -45,6 +45,19 @@ describe('foldSessionLiveSummary', () => {
     ).toBe('reportfdp.exe');
   });
 
+  it('draws the step, command and plan step without C1 controls', () => {
+    const edited = run([part('edit', 'running', { filePath: 'src/a\u0085b.ts' })]);
+    expect(edited.step).toEqual({ verb: 'editing', target: 'a b.ts' });
+    const ran = run([part('bash', 'running', { command: 'ls\u0080a\u009bb' })]);
+    expect(ran.step).toEqual({ verb: 'running', target: 'ls a b' });
+    const planned = run([
+      part('todowrite', 'running', {
+        todos: [{ content: 'fix\u0085the\u009bcard', status: 'in_progress' }],
+      }),
+    ]);
+    expect(planned.plan?.current).toBe('fix the card');
+  });
+
   it('maps read to a reading step', () => {
     expect(run([part('read', 'running', { filePath: '/tmp/a/notes.txt' })]).step).toEqual({
       verb: 'reading',

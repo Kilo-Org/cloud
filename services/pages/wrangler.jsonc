@@ -10,6 +10,7 @@
   "main": "dist/worker/index.js",
   "no_bundle": true,
   "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["global_fetch_strictly_public"],
   "assets": {
     "directory": "dist/public",
     "binding": "ASSETS",
@@ -73,5 +74,6 @@
     "PAGES_KILO_APP_URL": "https://app.kilo.ai",
     "PAGES_KILO_AUDIENCE": "pages-dev",
     "NOTEBOOK_CLOUD_OIDC_FLOW": "server",
+    "PAGES_OAUTH_METADATA_EGRESS": "public-https",
   },
 }

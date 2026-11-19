@@ -1,19 +1,9 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useCallback, useRef, useState } from 'react';
-import {
-  type LayoutChangeEvent,
-  ScrollView,
-  type ScrollViewInstance,
-  View,
-  type ViewInstance,
-} from 'react-native';
-import {
-  KeyboardAvoidingView,
-  useKeyboardState,
-  useWindowDimensions,
-} from 'react-native-keyboard-controller';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { type LayoutChangeEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
+import { useKeyboardState, useWindowDimensions } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
@@ -30,15 +20,17 @@ import { NewSessionRepositorySection } from '@/components/agents/new-session-rep
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
+import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
-import { keyboardAvoidingViewProps } from '@/lib/keyboard-avoiding-view-props';
-import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
-import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
+import { useSideInsetStyle } from '@/lib/screen-insets';
+import { cn } from '@/lib/utils';
 
 /**
  * The profile override the new-session screen adds to the shared contract: the
@@ -172,13 +164,14 @@ export function NewSessionConfigureForm({
   cloudCreateError = null,
   onRetryCloudCreate,
   planRefusal = null,
+  planRefusalAction,
   remoteSpawnFailure = null,
   onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
-  // The footer reserves the platform inset. KeyboardAvoidingView lifts the
-  // scroll body and footer together; the prompt yields height to the viewport.
+  // The footer reserves the platform inset. The lift above moves the scroll
+  // body and footer together; the prompt yields height to the viewport.
   // The scroll view takes no keyboard inset of its own: iOS sized that inset
   // before the lift, so the frame was cleared twice and the content scrolled
   // the composer's mode and model row out of view once the keyboard settled.
@@ -187,23 +180,28 @@ export function NewSessionConfigureForm({
   // fixed at the sheet triggers: a formSheet anchors over the keyboard that is
   // up at its first layout and never re-anchors, so the keyboard must be
   // dismissed before the sheet opens.)
-  const bottomClearance = useDetailScreenBottomPadding();
   const { bottom } = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { height: keyboardHeight, isVisible: keyboardVisible } = useKeyboardState();
-  const [containerFrame, setContainerFrame] = useState({ y: 0, height: 0 });
-  const containerRef = useRef<ViewInstance | null>(null);
+  const [containerHeight, setContainerHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(0);
-  // `containerY` is the view's top as the window places it, the same space the
-  // library measures its keyboard lift in. A parent-relative top would claim the
-  // view ends at the window's bottom edge while it really ends above it — inside
-  // the Tour modal's sheet — so the fit would read room the lift takes away.
+  // The container's bottom edge is the window's on every entry this form
+  // mounts through — the pushed card and the Tour modal's sheet both reach it —
+  // so its top follows from its own measured height and the window. A second
+  // measurement of the top (`measureInWindow`) can report a stale zero on the
+  // pass that stores it, and the fit would then claim the band the keyboard
+  // takes as room of its own.
+  const containerY = Math.max(0, windowHeight - containerHeight);
+  // The fit reads the same space the keyboard occupies: the container's top as
+  // the window places it, and its height. Its offset is the reduction the lift
+  // applies, so the frame reserves exactly the band the lift takes and never
+  // more; the footer's own bottom padding covers the rest of the inset.
   const frame = {
-    containerY: containerFrame.y,
-    containerHeight: containerFrame.height,
+    containerY,
+    containerHeight,
     footerHeight,
     windowHeight,
-    keyboardVerticalOffset: keyboardInsetOffset(bottom),
+    keyboardVerticalOffset: -bottom,
   };
   // Fit against the keyboard's destination, not each intermediate viewport.
   // The prompt interpolates to that whole-line fit on the UI thread.
@@ -238,24 +236,8 @@ export function NewSessionConfigureForm({
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
 
   function handleContainerLayout(event: LayoutChangeEvent) {
-    const layout = event.nativeEvent.layout;
-    const container = containerRef.current;
-    // The lift pads against where the window puts this view, so the fit asks the
-    // same question. The view's rect inside its parent answers a different one:
-    // inside the Tour modal's sheet its top is the sheet's, not the window's.
-    if (container === null) {
-      setContainerFrame(current =>
-        current.y === layout.y && current.height === layout.height ? current : layout
-      );
-      return;
-    }
-    container.measureInWindow((_x, windowY) => {
-      setContainerFrame(current =>
-        current.y === windowY && current.height === layout.height
-          ? current
-          : { y: windowY, height: layout.height }
-      );
-    });
+    const height = event.nativeEvent.layout.height;
+    setContainerHeight(current => (current === height ? current : height));
   }
 
   // The composer's scroll body, so the advanced configuration can bring its
@@ -274,7 +256,7 @@ export function NewSessionConfigureForm({
     <ScrollView
       ref={scrollRef}
       className="flex-1"
-      contentContainerClassName="flex-grow px-4 pt-4 pb-4"
+      contentContainerClassName={cn('flex-grow', SCREEN_BODY_CLASS)}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
@@ -322,13 +304,15 @@ export function NewSessionConfigureForm({
       </View>
 
       {/* The block under the card: the Account section when the entry point
-          renders one, then the Run on row and its refresh control. */}
-      <View>
+          renders one, then the Run on row and its refresh control. The body's
+          own section gap spaces the block's children, so none of them carries a
+          margin of its own (a margin here doubled the gap). */}
+      <View className="gap-6">
         {/* The plan refusal is known before the press, so it sits in the scroll
             content under the composer rather than in the pinned footer: it
             never takes height from the fields, the launch folder included. */}
         {planRefusal !== null ? (
-          <OrganizationPlanRefusal message={planRefusal} className="mt-5" />
+          <OrganizationPlanRefusal message={planRefusal} action={planRefusalAction} />
         ) : null}
         {accountSection}
         <NewSessionRunTarget
@@ -353,13 +337,20 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      {isRemote ? (
-        <Text className="mt-2 text-sm text-muted-foreground">
+      {/* Under the folder field: only the computer target with no instance yet
+          carries the setup sentence, because that is the one state where it is
+          the instruction for connecting a computer. A bound instance already
+          runs Kilo, and the Run on row and Folder field above it already name
+          the computer, its project and its folder, so an empty slot repeats
+          nothing. A refused spawn resets the target and raises the
+          disconnected note, which owns that copy. */}
+      {isRemote && runOnInstance === null && !showInstanceDisconnectedNote ? (
+        <Text className="text-sm text-muted-foreground">
           {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
         </Text>
       ) : null}
 
-      {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
+      {runOnNote ? <Text className="text-sm text-muted-foreground">{runOnNote}</Text> : null}
 
       {!isRemote ? (
         <NewSessionRepositorySection
@@ -388,7 +379,7 @@ export function NewSessionConfigureForm({
         (and the rest of the form) down after it has settled.
       */}
       {!isRemote && !isCloneEntry && repositoryRegionSettled ? (
-        <View className="mt-5">
+        <View>
           <Text className="mb-2 text-sm font-medium text-muted-foreground">
             {t('common.changes')}
           </Text>
@@ -450,65 +441,55 @@ export function NewSessionConfigureForm({
   // which path selected it.
   const footer = (
     <View
-      className="bg-background px-4 pt-3"
-      style={{ paddingBottom: bottomClearance }}
       onLayout={event => {
         setFooterHeight(event.nativeEvent.layout.height);
       }}
     >
-      {cloudCreateError && !isRemote ? (
-        <NewSessionCloudCreateError
-          failure={cloudCreateError}
-          onRetry={onRetryCloudCreate}
-          isRetryDisabled={isStartDisabled}
-        />
-      ) : null}
+      <ScreenFooter keyboard="host">
+        {cloudCreateError && !isRemote ? (
+          <NewSessionCloudCreateError
+            failure={cloudCreateError}
+            onRetry={onRetryCloudCreate}
+            isRetryDisabled={isStartDisabled}
+          />
+        ) : null}
 
-      {isRemote && remoteSpawnFailure !== null ? (
-        <NewSessionRemoteSpawnFailure
-          failure={remoteSpawnFailure}
-          onRetry={onRetryRemoteSpawn}
-          isRetryDisabled={isStartDisabled}
-        />
-      ) : null}
+        {isRemote && remoteSpawnFailure !== null ? (
+          <NewSessionRemoteSpawnFailure
+            failure={remoteSpawnFailure}
+            onRetry={onRetryRemoteSpawn}
+            isRetryDisabled={isStartDisabled}
+          />
+        ) : null}
 
-      <NewSessionStartButton
-        isCloneEntry={isCloneEntry}
-        isRemote={isRemote}
-        isStartDisabled={isStartDisabled}
-        isStarting={isStarting}
-        startBlockedReason={startBlockedReason}
-        startBlockedAction={startBlockedAction}
-        onStartSession={onStartSession}
-      />
+        <NewSessionStartButton
+          isCloneEntry={isCloneEntry}
+          isRemote={isRemote}
+          isStartDisabled={isStartDisabled}
+          isStarting={isStarting}
+          startBlockedReason={startBlockedReason}
+          startBlockedAction={startBlockedAction}
+          onStartSession={onStartSession}
+        />
+      </ScreenFooter>
     </View>
   );
 
   // Shrink the scroll viewport with the keyboard; a footer-only lift grows
-  // below its full-height sibling and leaves Start behind the keyboard. This
-  // form also renders inside the Tour modal, above the window's own bottom
-  // edge, so the lift is measured where the window places the view; the
-  // Android navigation-bar correction stays the separate vertical offset the
-  // content's own bottom padding needs.
-  //
-  // The frame the prompt fits into is measured on the wrapper, not on the lift:
-  // the library's view keeps its keyboard props, and the wrapper's window
-  // position is where that identical frame sits.
+  // below its full-height sibling and leaves Start behind the keyboard. The
+  // padding is the keyboard's own measured height, less the bottom inset the
+  // footer already pads, so the button sits just above the keyboard instead of
+  // a navigation-bar height above it. It follows the keyboard and never
+  // depends on a frame the platform reported late.
   return (
-    <View
-      ref={containerRef}
-      className="flex-1"
-      style={sideInsetStyle}
-      onLayout={handleContainerLayout}
-    >
-      <KeyboardAvoidingView
+    <View className="flex-1" style={sideInsetStyle} onLayout={handleContainerLayout}>
+      <KeyboardLiftView
         className="flex-1 bg-background"
-        {...keyboardAvoidingViewProps()}
-        keyboardVerticalOffset={keyboardInsetOffset(bottom)}
+        height={Math.max(0, keyboardHeight - bottom)}
       >
         {body}
         {footer}
-      </KeyboardAvoidingView>
+      </KeyboardLiftView>
     </View>
   );
 }

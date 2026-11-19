@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -9,10 +9,17 @@ import { ChevronDown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import {
+  FIELD_TRIGGER_BODY_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
+  ROW_TARGET_CLASS,
+} from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { isContextPickerPresented } from '@/lib/picker-presentation';
+import { PR_PICKER } from '@/lib/picker-routes';
 import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -32,13 +39,17 @@ export type ContextDisplayScope = { organizationId: string | null; isResolved: b
  * that differs from the active one (for example an explicit route scope). It
  * drives the check mark and the no-op comparison; a pick still changes the
  * active account, which is what every other surface reads.
+ *
+ * The opener admits a single push of the shared sheet per press burst, and none
+ * at all while a presented copy of it exists, so neither a double tap nor a
+ * repeated open stacks copies that each need their own Done.
  */
 export function useContextPicker(
   orgs: OrgListEntry[] | undefined,
   onSelectionChange?: (organizationId: string | null) => void,
   shownOrganizationId?: string | null
 ) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const { setOrganizationId, organizationId } = useOrganization();
   const shownId = shownOrganizationId !== undefined ? shownOrganizationId : organizationId;
@@ -74,6 +85,14 @@ export function useContextPicker(
       if (!orgs) {
         return;
       }
+      // While a copy of the sheet is presented, a second open must not write the
+      // slot again or push another copy — one Done then returns to the screen
+      // underneath instead of walking a stack of copies. The presented route
+      // owns that mark, so it holds for every surface that opens this picker,
+      // whichever navigator hosts the control.
+      if (isContextPickerPresented()) {
+        return;
+      }
       // The route reads its rows and its pick from the registry, so the
       // memberships and the selection identity the control shows are the ones
       // the sheet renders.
@@ -82,18 +101,10 @@ export function useContextPicker(
         currentIndex,
         onSelect: select,
       });
-      router.push('/(app)/context-picker' as Href);
+      pushOnce(PR_PICKER);
     },
   };
 }
-
-/**
- * The trigger a stacked form gives its pickers: the same bordered full-width
- * box `InstanceSelector` and `RepoSelector` render, so one label-value relation
- * on a form keeps one shape.
- */
-const FIELD_TRIGGER_CLASS =
-  'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3';
 
 /**
  * An explicit `scope` is always read-only; explicit null never inherits global
@@ -219,6 +230,27 @@ export function ContextControl({
     </Text>
   );
 
+  // The trailing glyph's box. In the `field` shape the column's chevrons all
+  // end on the body's trailing edge — the Repository and Branch triggers draw a
+  // bare 14 dp chevron — so this one must not sit in a wider fixed box, or the
+  // top chevron stops ~1.9 dp short of the ones below it in what is meant to be
+  // one column. The inline row keeps its `size-5` box, which is what holds the
+  // row's line height steady there.
+  const trailingGlyphClass = field
+    ? 'shrink-0 items-center justify-center'
+    : 'size-5 shrink-0 items-center justify-center';
+
+  // The `field` shape puts its content in the shared 48 dp trigger body, so
+  // every stated height (value, skeleton, retry) fills the same box as the
+  // other pickers in the column. The inline shape is a single row and lays its
+  // content out directly.
+  const fieldBody = (children: ReactNode) =>
+    field ? (
+      <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>{children}</View>
+    ) : (
+      <>{children}</>
+    );
+
   // Two shapes of the same row: the retry form, for a surface whose body has no
   // recovery of its own for this query, and the picker form every other frame
   // shows. The read-only `scope` form only names the account.
@@ -230,14 +262,18 @@ export function ContextControl({
       disabled={retryBusy}
       onPress={retry}
       className={cn(
-        field ? FIELD_TRIGGER_CLASS : cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1'),
+        field ? FIELD_TRIGGER_FRAME_CLASS : cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1'),
         'active:opacity-70'
       )}
     >
-      {content}
-      <View className="size-5 shrink-0 items-center justify-center">
-        {retryBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
-      </View>
+      {fieldBody(
+        <>
+          {content}
+          <View className={trailingGlyphClass}>
+            {retryBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+          </View>
+        </>
+      )}
     </Pressable>
   );
   const pickerRow = (
@@ -249,19 +285,23 @@ export function ContextControl({
       disabled={disabled}
       onPress={openPicker}
       className={cn(
-        field ? FIELD_TRIGGER_CLASS : cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1'),
+        field ? FIELD_TRIGGER_FRAME_CLASS : cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1'),
         'active:opacity-70',
         field && disabled && 'opacity-50'
       )}
     >
-      {content}
-      <View className="size-5 shrink-0 items-center justify-center">
-        {pickerBusy ? (
-          <ActivityIndicator size="small" color={colors.mutedForeground} />
-        ) : (
-          <ChevronDown size={14} color={colors.mutedForeground} />
-        )}
-      </View>
+      {fieldBody(
+        <>
+          {content}
+          <View className={trailingGlyphClass}>
+            {pickerBusy ? (
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+            ) : (
+              <ChevronDown size={14} color={colors.mutedForeground} />
+            )}
+          </View>
+        </>
+      )}
     </Pressable>
   );
   let row = pickerRow;
@@ -272,9 +312,9 @@ export function ContextControl({
         accessibilityRole="text"
         accessibilityLabel={rowLabel}
         accessibilityState={{ busy: pending }}
-        className={field ? FIELD_TRIGGER_CLASS : cn(ROW_TARGET_CLASS, 'justify-center')}
+        className={field ? FIELD_TRIGGER_FRAME_CLASS : cn(ROW_TARGET_CLASS, 'justify-center')}
       >
-        {content}
+        {fieldBody(content)}
       </View>
     );
   } else if (rowIsRetry) {

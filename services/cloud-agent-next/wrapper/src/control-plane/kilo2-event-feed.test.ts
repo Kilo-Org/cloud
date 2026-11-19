@@ -1,8 +1,75 @@
 import { expect, it } from 'bun:test';
 import { createKilo2EventFeed, nativeTurnError } from './kilo2-event-feed.js';
 import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
+import { kilo2ConversationMessageSchema } from '../../../src/shared/kilo2-conversation.js';
+import { classifyCloudAgentFailure } from '@kilocode/worker-utils/cloud-agent-failure';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import type { HarnessActivityEvent } from './harness-activity.js';
+import { KILO_ACTIVITY_MESSAGE_LIMIT } from '../kilo-api.js';
+
+it('persists a native background notice before another model turn starts', async () => {
+  const events: KiloFeedEvent[] = [];
+  const received = Promise.withResolvers<void>();
+  const message = {
+    id: 'msg_notice',
+    type: 'synthetic',
+    time: { created: 3 },
+    description: 'Run tests',
+    metadata: { source: 'shell', shellID: 'sh_test', state: 'completed', exit: 7 },
+    text: '<shell id="sh_test" state="completed" command="pnpm test">\nTests failed\n</shell>',
+  };
+  const native = Bun.serve({
+    port: 0,
+    fetch(request) {
+      const path = new URL(request.url).pathname;
+      if (path === '/api/event')
+        return new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `data: ${JSON.stringify({ id: 'evt_notice', type: 'session.synthetic', created: 3, data: { sessionID: 'ses_root', text: message.text, description: message.description, metadata: message.metadata }, location: { directory: '/workspace' } })}\n\n`
+                )
+              );
+            },
+          }),
+          { headers: { 'content-type': 'text/event-stream' } }
+        );
+      if (path === '/api/session/ses_root/message/msg_notice')
+        return Response.json({ data: message });
+      return Response.json({
+        data: {
+          id: 'ses_root',
+          location: { directory: '/workspace' },
+          time: { created: 1, updated: 3 },
+        },
+      });
+    },
+  });
+  const feed = createKilo2EventFeed({
+    source: {
+      server: { url: native.url.origin },
+      directory: '/workspace',
+      nativeRuntimeId: 'rt_local',
+    },
+    signal: AbortSignal.timeout(5000),
+    onEvent(event) {
+      events.push(event);
+      if (event.type === 'conversation.message.updated') received.resolve();
+    },
+    onFailure() {},
+  });
+  try {
+    await feed.open();
+    await received.promise;
+    expect(
+      events.find(event => event.type === 'conversation.message.updated')?.properties
+    ).toMatchObject({ sessionID: 'ses_root', message });
+  } finally {
+    feed.close();
+    await native.stop(true);
+  }
+});
 
 it('translates native drain proof without session reads or conversation history', async () => {
   const events: KiloFeedEvent[] = [];
@@ -151,7 +218,17 @@ it('does not acknowledge a later prompt from an earlier interrupted execution sn
   }
 });
 
-it('closes the turn and keeps the feed open when a native read fails', async () => {
+it.each([
+  [undefined, undefined],
+  [{ type: 'provider.internal', message: 'internal' }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: null }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: 42 }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: false }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: {} }, 'provider_unavailable'],
+  [{ type: 'provider.internal', message: 'internal', name: [] }, 'provider_unavailable'],
+  [{ type: 'tool.execution', message: 'failed' }, 'unknown'],
+  [{ type: 'unknown', message: 'failed', name: 'ContextOverflowError' }, 'context_limit'],
+] as const)('preserves native error %j when a read fails', async (error, reason) => {
   const directory = '/workspace';
   const sessionID = 'ses_local';
   const events: KiloFeedEvent[] = [];
@@ -199,10 +276,32 @@ it('closes the turn and keeps the feed open when a native read fails', async () 
   }
   try {
     await feed.open();
-    controller?.enqueue(frame('session.execution.succeeded', { sessionID }));
+    const terminalType =
+      error === undefined ? 'session.execution.succeeded' : 'session.execution.failed';
+    controller?.enqueue(frame(terminalType, { sessionID, error }));
     controller?.enqueue(frame('session.renamed', { sessionID }));
     await until(() => events.some(event => event.type === 'session.updated'));
     expect(events.map(event => event.type)).toContain('session.turn.close');
+    expect(
+      events.find(event => event.type === 'conversation.event')?.properties.event
+    ).toMatchObject({
+      type: terminalType,
+      data: error === undefined ? {} : { error },
+    });
+    const turnClose = events.find(event => event.type === 'session.turn.close')?.properties;
+    expect(turnClose).toMatchObject({
+      sessionID,
+      reason: error === undefined ? 'completed' : 'error',
+    });
+    if (reason === undefined) expect(turnClose).not.toHaveProperty('error');
+    else expect(classifyAssistantFailure(turnClose?.error).reason).toBe(reason);
+    expect(
+      events
+        .filter(event =>
+          ['session.status', 'session.turn.close', 'session.idle'].includes(event.type)
+        )
+        .map(event => event.type)
+    ).toEqual(['session.status', 'session.turn.close', 'session.idle']);
     expect(logs.some(message => message.includes('phase=frame_failed'))).toBe(true);
     expect(failures).toBe(0);
   } finally {
@@ -211,9 +310,228 @@ it('closes the turn and keeps the feed open when a native read fails', async () 
   }
 });
 
+it.each([200, 503])(
+  'clears retry status when the next native step starts with reads returning %s',
+  async status => {
+    const directory = '/workspace';
+    const sessionID = 'ses_local';
+    const events: KiloFeedEvent[] = [];
+    let streamingStatus: KiloFeedEvent['properties'] | undefined;
+    const finished = Promise.withResolvers<void>();
+    const retry = {
+      sessionID,
+      assistantMessageID: 'msg_answer',
+      attempt: 1,
+      at: 20,
+      error: { type: 'provider.internal', message: 'Provider request failed with HTTP 520' },
+    };
+    const native = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        const pathname = new URL(request.url).pathname;
+        if (pathname === '/api/event')
+          return new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                for (const [type, data] of [
+                  ['server.connected', {}],
+                  ['session.execution.started', { sessionID }],
+                  ['session.retry.scheduled', retry],
+                  ['session.step.started', { sessionID, assistantMessageID: 'msg_answer' }],
+                  [
+                    'session.text.delta',
+                    { sessionID, assistantMessageID: 'msg_answer', ordinal: 0, delta: 'Recovered' },
+                  ],
+                  ['session.retry.scheduled', { ...retry, attempt: 2, at: 30 }],
+                  ['session.step.started', { sessionID, assistantMessageID: 'msg_answer' }],
+                  ['session.execution.succeeded', { sessionID }],
+                ] as const)
+                  controller.enqueue(
+                    new TextEncoder().encode(
+                      `data: ${JSON.stringify({ id: `evt_${type}`, type, data, created: 10, location: { directory } })}\n\n`
+                    )
+                  );
+              },
+            }),
+            { headers: { 'content-type': 'text/event-stream' } }
+          );
+        if (status !== 200) return new Response(null, { status });
+        if (pathname.endsWith('/message'))
+          return Response.json({ data: [], cursor: { next: null } });
+        return Response.json({
+          data: { id: sessionID, location: { directory }, time: { created: 0, updated: 20 } },
+        });
+      },
+    });
+    const signal = AbortSignal.timeout(5000);
+    const feed = createKilo2EventFeed({
+      source: { server: { url: native.url.origin }, directory, nativeRuntimeId: 'runtime_local' },
+      signal,
+      onEvent(event) {
+        events.push(event);
+        if (event.type === 'session.idle') finished.resolve();
+      },
+      onHarnessActivity(event) {
+        if (event.activity.type === 'delta')
+          streamingStatus = events
+            .filter(event => event.type === 'session.status')
+            .at(-1)?.properties;
+      },
+      onFailure: () => finished.reject(new Error('Native feed failed')),
+      log() {},
+    });
+    try {
+      await feed.open();
+      await finished.promise;
+      expect(
+        events.filter(event => event.type === 'session.status').map(event => event.properties)
+      ).toEqual([
+        { sessionID, status: { type: 'busy' } },
+        {
+          sessionID,
+          status: { type: 'retry', attempt: 1, next: 20, message: retry.error.message },
+        },
+        { sessionID, status: { type: 'busy' } },
+        {
+          sessionID,
+          status: { type: 'retry', attempt: 2, next: 30, message: retry.error.message },
+        },
+        { sessionID, status: { type: 'busy' } },
+        { sessionID, status: { type: 'idle' } },
+      ]);
+      expect(streamingStatus).toEqual({ sessionID, status: { type: 'busy' } });
+      expect(events.filter(event => event.type === 'session.turn.open')).toHaveLength(1);
+      expect(events.filter(event => event.type === 'session.turn.close')).toHaveLength(1);
+    } finally {
+      feed.close();
+      await native.stop(true);
+    }
+  }
+);
+
+it.each(['cached', 'http_error', 'history_exhausted'])(
+  'projects the final answer after the prompt leaves the window (%s)',
+  async scenario => {
+    const directory = '/workspace';
+    const sessionID = 'ses_child';
+    const prompt = { id: 'msg_prompt', type: 'user', text: 'Run the steps', time: { created: 1 } };
+    const previousPrompt = { ...prompt, id: 'msg_previous', time: { created: 0 } };
+    const steps = Array.from({ length: KILO_ACTIVITY_MESSAGE_LIMIT * 2 }, (_, index) => ({
+      id: `msg_step_${index}`,
+      type: 'assistant',
+      time: { created: index + 2 },
+      content: [{ type: 'text', text: `Step ${index + 1}` }],
+    }));
+    const answer = {
+      id: 'msg_answer',
+      type: 'assistant',
+      time: { created: steps.length + 2, completed: steps.length + 3 },
+      content: [{ type: 'text', text: 'Final answer' }],
+    };
+    const history = [answer, ...steps.toReversed(), prompt, previousPrompt];
+    const events: KiloFeedEvent[] = [];
+    const logs: string[] = [];
+    let olderReads = 0;
+    let recentReads = 0;
+    const finished = Promise.withResolvers<void>();
+    const native = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        const url = new URL(request.url);
+        if (url.pathname === '/api/event') {
+          const frames = [
+            { id: 'evt_connected', type: 'server.connected', data: {} },
+            { id: 'evt_step', type: 'session.step.ended', data: { sessionID } },
+            { id: 'evt_succeeded', type: 'session.execution.succeeded', data: { sessionID } },
+          ].map(event => `data: ${JSON.stringify(event)}\n\n`);
+          return new Response(frames.join(''), {
+            headers: { 'content-type': 'text/event-stream' },
+          });
+        }
+        if (url.pathname.endsWith('/message')) {
+          const cursor = url.searchParams.get('cursor');
+          const order = url.searchParams.get('order');
+          if (cursor === null ? order !== 'desc' : order !== null)
+            return new Response(null, { status: 400 });
+          if (cursor === null) recentReads += 1;
+          else {
+            olderReads += 1;
+            if (recentReads === 1 && scenario === 'http_error')
+              return new Response(null, { status: 500 });
+            if (scenario === 'history_exhausted')
+              return Response.json({ data: [], cursor: { next: null } });
+            if (scenario === 'cached' && olderReads > 2) return new Response(null, { status: 500 });
+          }
+          const start = cursor === null ? 0 : Number(cursor.slice('cursor '.length));
+          const end = start + Number(url.searchParams.get('limit'));
+          return Response.json({
+            data: history
+              .slice(start, end)
+              .map(message =>
+                message === answer && recentReads === 1
+                  ? { ...answer, time: { created: answer.time.created }, content: [] }
+                  : message
+              ),
+            cursor: { next: end < history.length ? `cursor ${end}` : null },
+          });
+        }
+        return Response.json({
+          data: { id: sessionID, location: { directory }, time: { created: 0, updated: 100 } },
+        });
+      },
+    });
+    const feed = createKilo2EventFeed({
+      source: { server: { url: native.url.origin }, directory, nativeRuntimeId: 'runtime_local' },
+      signal: AbortSignal.timeout(5000),
+      onEvent(event) {
+        events.push(event);
+        if (event.type === 'session.idle') finished.resolve();
+      },
+      onFailure: () => finished.reject(new Error('Native feed ended before session.idle')),
+      log: entry => logs.push(entry),
+    });
+    try {
+      await feed.open();
+      await finished.promise;
+      const updates = events
+        .filter(event => event.type === 'conversation.message.updated')
+        .map(event => kilo2ConversationMessageSchema.parse(event.properties));
+      if (scenario === 'history_exhausted') {
+        expect(updates.at(-1)).toMatchObject({ sessionID, message: answer });
+        expect(updates.at(-1)).not.toHaveProperty('parentID');
+        expect(updates).toHaveLength(KILO_ACTIVITY_MESSAGE_LIMIT + 1);
+        expect(olderReads).toBe(1);
+        expect(logs).toHaveLength(1);
+        expect(logs[0]).toContain('reason=history_exhausted');
+        return;
+      }
+      expect(updates.at(-1)).toMatchObject({ sessionID, parentID: prompt.id, message: answer });
+      if (scenario === 'cached') {
+        expect(updates).toHaveLength(KILO_ACTIVITY_MESSAGE_LIMIT + 1);
+        expect(olderReads).toBe(2);
+        expect(logs).toEqual([]);
+      } else {
+        expect(updates[0]).not.toHaveProperty('parentID');
+        expect(updates.slice(KILO_ACTIVITY_MESSAGE_LIMIT)).toHaveLength(
+          KILO_ACTIVITY_MESSAGE_LIMIT
+        );
+        expect(olderReads).toBe(3);
+        expect(logs).toHaveLength(1);
+        expect(logs[0]).toContain('phase=parent_lookup_failed');
+      }
+    } finally {
+      feed.close();
+      await native.stop(true);
+    }
+  }
+);
+
 it('forwards an unchanged assistant projection once', async () => {
   const directory = '/workspace';
   const sessionID = 'ses_local';
+  const error = { type: 'provider.quota', message: 'Request failed', status: 402 };
   const events: KiloFeedEvent[] = [];
   let text = 'first';
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
@@ -244,6 +562,7 @@ it('forwards an unchanged assistant projection once', async () => {
               type: 'assistant',
               time: { created: 2 },
               content: [{ type: 'text', text }],
+              error,
             },
           ],
           cursor: { next: null },
@@ -279,7 +598,18 @@ it('forwards an unchanged assistant projection once', async () => {
     text = 'second';
     controller?.enqueue(frame('session.step.ended', { sessionID }));
     await until(() => updates().length === 2);
-    expect(updates()[1].properties).toMatchObject({ parentID: '', message: { id: 'msg_answer' } });
+    expect(updates()[1].properties).toMatchObject({
+      message: { id: 'msg_answer', error },
+    });
+    expect(updates()[1].properties).not.toHaveProperty('parentID');
+    expect(activity[0].activity).toMatchObject({
+      type: 'message',
+      message: {
+        id: 'msg_answer',
+        sessionId: sessionID,
+        error: { name: 'APIError', data: { statusCode: 402 } },
+      },
+    });
     // Each changed read reports the message, then its parts under the delta identity.
     expect(
       activity.map(event =>
@@ -355,15 +685,108 @@ it('contains a throwing failure callback when the native stream ends', async () 
 });
 
 it.each([
-  [{ type: 'provider.quota', message: 'Request failed', status: 402 }, 'insufficient_credits'],
-  [{ type: 'provider.rate-limit', message: 'Request failed', status: 429 }, 'rate_limited'],
-  [{ type: 'provider.rate-limit', message: 'ThrottlingException' }, 'rate_limited'],
-  [{ type: 'provider.internal', message: 'Request failed', status: 503 }, 'provider_unavailable'],
-  [{ type: 'provider.auth', message: 'Request failed' }, 'provider_authentication'],
-  [{ type: 'unknown', message: 'Request failed' }, 'unknown'],
-] as const)('classifies a native execution error by its status and type', (error, reason) => {
-  expect(classifyAssistantFailure(nativeTurnError(error)).reason).toBe(reason);
+  ['provider.quota', 'insufficient_credits', 'user', 'insufficient_credits'],
+  ['provider.rate-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.free-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.budget-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.model-budget-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.go-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.chatgpt-limit', 'rate_limited', 'provider', 'rate_limited'],
+  ['provider.internal', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
+  ['provider.transport', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
+  ['provider.invalid-output', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
+  ['tool.result-missing', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
+  ['output-limit', 'output_limit', 'provider', 'assistant_output_limit'],
+  ['provider.unknown', 'provider_unavailable', 'provider', 'managed_provider_unavailable'],
+  ['provider.auth', 'provider_authentication', 'platform', 'managed_provider_authentication'],
+  ['provider.content-filter', 'content_filter', 'user', 'assistant_content_filter'],
+  ['provider.timeout', 'timeout', 'provider', 'request_timeout'],
+  ['provider.invalid-request', 'invalid_request', 'platform', 'assistant_invalid_request'],
+  ['provider.unsupported-operation', 'invalid_request', 'platform', 'assistant_invalid_request'],
+  ['provider.no-route', 'unknown', 'unknown', 'assistant_unknown'],
+  ['permission.rejected', 'unknown', 'unknown', 'assistant_unknown'],
+  ['tool.execution', 'unknown', 'unknown', 'assistant_unknown'],
+  ['compaction.failed', 'unknown', 'unknown', 'assistant_unknown'],
+  ['compaction.unavailable', 'unknown', 'unknown', 'assistant_unknown'],
+  ['compaction.interrupted', 'unknown', 'unknown', 'assistant_unknown'],
+  ['aborted', 'unknown', 'unknown', 'assistant_unknown'],
+  ['tool.input-json', 'unknown', 'unknown', 'assistant_unknown'],
+  ['tool.input-incomplete', 'unknown', 'unknown', 'assistant_unknown'],
+  ['unknown', 'unknown', 'unknown', 'assistant_unknown'],
+  ['provider.future-error', 'unknown', 'unknown', 'assistant_unknown'],
+  ['constructor', 'unknown', 'unknown', 'assistant_unknown'],
+] as const)(
+  'classifies native %s through the shared failure pipeline',
+  (type, assistantReason, responsibility, reason) => {
+    const failure = classifyAssistantFailure(
+      nativeTurnError({ type, message: 'Request failed' }),
+      'managed'
+    );
+    expect(failure.reason).toBe(assistantReason);
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: failure.reason,
+        providerOwnership: failure.providerOwnership,
+      })
+    ).toEqual({ responsibility, reason });
+  }
+);
+
+it.each([
+  [402, 'insufficient_credits'],
+  [429, 'rate_limited'],
+  [401, 'provider_authentication'],
+  [403, 'provider_authentication'],
+  [408, 'timeout'],
+  [504, 'timeout'],
+  [503, 'provider_unavailable'],
+  [400, 'invalid_request'],
+] as const)('preserves native HTTP %s ahead of type, name and message', (status, reason) => {
+  const translated = nativeTurnError({
+    type: 'provider.content-filter',
+    name: 'ContextOverflowError',
+    message: 'Rate limit reached',
+    status,
+  });
+  expect(translated).toMatchObject({ name: 'APIError', data: { statusCode: status } });
+  expect(classifyAssistantFailure(translated).reason).toBe(reason);
 });
+
+it.each(['Rate limit reached', 'Request timed out', 'insufficient credits'])(
+  'does not replace a native invalid-request identity with %s',
+  message => {
+    for (const status of [undefined, 400, 413]) {
+      for (const prefix of ['', '[BYOK] ']) {
+        const failure = classifyAssistantFailure(
+          nativeTurnError({
+            type: 'provider.invalid-request',
+            message: `${prefix}${message}`,
+            status,
+          }),
+          'managed'
+        );
+        expect(failure.reason).toBe('invalid_request');
+        expect(failure.terminalCode).toBeUndefined();
+        expect(failure.providerOwnership).toBe(prefix ? 'byok' : 'managed');
+        expect(
+          classifyCloudAgentFailure({
+            source: 'run',
+            stage: 'agent_activity',
+            code: 'assistant_error',
+            assistantReason: failure.reason,
+            providerOwnership: failure.providerOwnership,
+          })
+        ).toEqual({
+          responsibility: prefix ? 'user' : 'platform',
+          reason: 'assistant_invalid_request',
+        });
+      }
+    }
+  }
+);
 
 // Kilo v2 0.0.0-v2-77 reports every model catalog load failure with this text.
 const catalogFailure = (detail: string) =>
@@ -376,12 +799,24 @@ it.each([
     'model_catalog_unavailable',
   ],
   [catalogFailure('HTTP 503'), 'provider_unavailable'],
+  ['Model unavailable: kilo/nvidia/nemotron-3-ultra-550b-a55b:free', 'model_unavailable'],
+  [
+    'SessionRunnerModel.ModelUnavailableError: Model unavailable: kilo/example',
+    'model_unavailable',
+  ],
+  ['Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant', 'invalid_request'],
+  [
+    'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example: instant',
+    'invalid_request',
+  ],
+  ['Request failed: Model unavailable: kilo/example', 'unknown'],
   [catalogFailure('HTTP 401'), 'provider_authentication'],
   [catalogFailure('network'), 'unknown'],
   ['No model is selected', 'unknown'],
 ] as const)('classifies a native no-route failure %s as %s', (message, reason) => {
   const failure = classifyAssistantFailure(nativeTurnError({ type: 'provider.no-route', message }));
   expect(failure.reason).toBe(reason);
+  if (reason === 'model_unavailable') expect(failure.terminalCode).toBe('model_missing');
   if (reason === 'model_catalog_unavailable') {
     expect(failure.safeMessage).toBe('The Kilo model catalog could not be loaded');
     expect(failure.terminalCode).toBeUndefined();

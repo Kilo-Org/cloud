@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href, useLocalSearchParams } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -8,67 +8,32 @@ import { EmptyState } from '@/components/empty-state';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
+import {
+  AnalyticsSkeleton,
+  MetricCard,
+  PERIOD_OPTIONS,
+  PLATFORM_OPTIONS,
+} from '@/components/code-reviewer/analytics-chrome';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { FileText, GitPullRequest, LineChart, type LucideIcon } from '@/components/ui/icons';
+import { FileText, GitPullRequest, LineChart } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
-import { PERSONAL_SCOPE, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
+import { PERSONAL_SCOPE, reviewerPlatformLabel } from '@/lib/code-reviewer-config';
+import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
+import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
+import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
+import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
+import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import { useTRPC } from '@/lib/trpc';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
-
-const PERIOD_OPTIONS = [
-  { value: '7', label: '7' },
-  { value: '30', label: '30' },
-  { value: '90', label: '90' },
-] as const;
-
-type PeriodDays = 7 | 30 | 90;
-type AnalyticsPlatform = 'github' | 'gitlab';
-
-const PLATFORM_OPTIONS = (['github', 'gitlab'] as const).map(platform => ({
-  value: platform,
-  label: PLATFORM_CAPABILITIES[platform].label,
-}));
-
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-}: Readonly<{ icon: LucideIcon; label: string; value: string }>) {
-  return (
-    <View className="min-w-0 flex-1 justify-center gap-1 rounded-lg bg-secondary p-4">
-      <View className="flex-row items-center gap-2">
-        <Icon size={14} className="text-muted-foreground" />
-        <Text variant="muted" className="min-w-0 flex-1 text-xs" numberOfLines={2}>
-          {label}
-        </Text>
-      </View>
-      <Text className="text-lg font-semibold">{value}</Text>
-    </View>
-  );
-}
-
-function AnalyticsSkeleton() {
-  return (
-    <View className="gap-3 px-6 pt-4">
-      <Skeleton className="h-10 w-full rounded-lg" />
-      <View className="flex-row gap-3">
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-      </View>
-      <View className="flex-row gap-3">
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-      </View>
-      <Skeleton className="h-12 w-full rounded-lg" />
-      <Skeleton className="h-12 w-full rounded-lg" />
-    </View>
-  );
-}
 
 export default function CodeReviewerAnalyticsRoute() {
   const { scope } = useLocalSearchParams<{ scope: string }>();
@@ -81,8 +46,24 @@ export default function CodeReviewerAnalyticsRoute() {
 function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const trpc = useTRPC();
-  const [period, setPeriod] = useState<PeriodDays>(30);
-  const [platform, setPlatform] = useState<AnalyticsPlatform>('github');
+  const { platform, period, setPlatform, setPeriod } = useCodeReviewerAnalyticsFilters(scope);
+
+  // The organization's own name for the header, and the row a denial titles
+  // itself with. The route already rejected the personal scope, so this read
+  // always has an organization to look up.
+  const organizations = useQuery(trpc.organizations.list.queryOptions());
+  // The name this app last showed stands in once the reader loses the
+  // membership, so the denial below still names the organization it is about.
+  const knownScopeName = useReviewerScopeName(scope, organizations.data);
+  const scopeTitle = reviewerScopeTitle(
+    scope,
+    organizations.data,
+    {
+      personal: t('common.personal'),
+      organization: t('common.organization'),
+    },
+    knownScopeName
+  );
 
   const dashboard = useQuery(
     trpc.codeReviews.analytics.getDashboard.queryOptions({
@@ -92,28 +73,124 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
     })
   );
 
-  const number = (value: number) => formatNumber(value, i18n.language);
+  // A denial is not a failed read: the reader cannot see this organization's
+  // analytics at all, so the screen says so with the same surface the platform
+  // list renders, and Retry re-resolves the membership a restored one lands.
+  // Every other failure, and the cached data beside a failed refetch, keeps the
+  // dashboard's own error state below.
+  const access = classifyOrganizationScopeAccess({
+    isOrganizationScope: true,
+    errors: [dashboard.error],
+  });
 
-  let body: ReactNode = null;
-  if (dashboard.isPending) {
-    body = <AnalyticsSkeleton />;
-  } else if (dashboard.isError && !dashboard.data) {
-    body = (
-      <QueryError
-        variant={trpcErrorVariant(dashboard.error)}
-        title={t('codeReviewer.analytics.couldNotLoad')}
-        onRetry={isRetryableTrpcError(dashboard.error) ? () => void dashboard.refetch() : undefined}
-        isRetrying={dashboard.isFetching}
+  // The dashboard read classifies through the shared body state: a read the
+  // online manager pauses while the device is offline never reaches
+  // react-query's error branch, so the screen would keep its skeleton forever.
+  // The classifier names a confirmed pause as the offline state with Retry and
+  // keeps an unsettled probe inside loading.
+  const readState = useQueryBodyState({
+    data: dashboard.data,
+    isError: dashboard.isError,
+    isFetching: dashboard.isFetching,
+    fetchStatus: dashboard.fetchStatus,
+    refetch: () => {
+      void dashboard.refetch();
+    },
+  });
+  const failure = queryBodyFailure(readState, dashboard.isFetching);
+
+  const periodOptions = PERIOD_OPTIONS.map(option => ({
+    value: option.value,
+    label: t(option.labelKey),
+  }));
+
+  if (access !== 'granted') {
+    return (
+      <ScopeAccessDeniedScreen
+        title={scopeTitle}
+        // The denied header carries the granted header's identity: this
+        // screen's own name over the organization, so a lost membership still
+        // reads as the analytics screen the reader tried to open.
+        eyebrow={t('codeReviewer.analytics.title')}
+        backFallback={CODE_REVIEWER_HOME_PATH}
+        kind={access}
+        onRetry={() => {
+          void Promise.allSettled([organizations.refetch(), dashboard.refetch()]);
+        }}
+        isRetrying={organizations.isFetching || dashboard.isFetching}
       />
     );
-  } else {
-    const { summary, repositories, settings } = dashboard.data;
+  }
+
+  const number = (value: number) => formatNumber(value, i18n.language);
+
+  // Cached metrics with a refresh that cannot run: the notice carries the
+  // action that refreshes them, and it stays mounted while that retry runs, so
+  // stale figures never pose as current without a way out.
+  const stale = dashboard.data != null && (dashboard.isError || dashboard.fetchStatus === 'paused');
+  const stalePaused = !dashboard.isError && dashboard.fetchStatus === 'paused';
+
+  let body: ReactNode = null;
+  if (failure) {
+    // A paused read names itself offline; a failed one keeps its own tRPC
+    // variant and offers Retry only for a retryable code.
+    const failedVariant = stalePaused ? 'offline' : trpcErrorVariant(dashboard.error);
     body = (
-      <View className="gap-6 px-6 pt-4">
-        {!settings.enabled ? (
-          <Text variant="muted" className="text-xs">
-            {t('codeReviewer.analytics.off')}
-          </Text>
+      <QueryError
+        variant={failedVariant}
+        title={
+          failedVariant === 'offline'
+            ? t('queryError.offlineTitle')
+            : t('codeReviewer.analytics.couldNotLoad')
+        }
+        onRetry={
+          stalePaused || isRetryableTrpcError(dashboard.error)
+            ? () => void dashboard.refetch()
+            : undefined
+        }
+        isRetrying={failure.isRetrying}
+      />
+    );
+  } else if (readState.body.status === 'loading' || dashboard.data === undefined) {
+    body = <AnalyticsSkeleton />;
+  } else {
+    const { summary, repositories, settings, coverage } = dashboard.data;
+    // Tracked counts only captured results, so the amount the reader's review
+    // list shows but the dashboard does not count is every captured miss: the
+    // capture is missing, its result failed validation, or it was omitted.
+    const uncapturedReviews = coverage.missing + coverage.invalid + coverage.omitted;
+    body = !settings.enabled ? (
+      // Analytics is enabled per platform, so a disabled one is a state, not an
+      // empty dataset: the zero stat cards and the generic empty state would
+      // read as data the organization has none of. One EmptyState names the
+      // platform whose setting is off and says where to turn it on; the
+      // segment controls above stay so the reader can flip to the other
+      // platform without leaving the screen.
+      <EmptyState
+        placement="center"
+        // The scroll body already insets this state by the page gutter.
+        inset="none"
+        icon={LineChart}
+        title={t('codeReviewer.analytics.offTitle', {
+          platform: reviewerPlatformLabel(settings.platform),
+        })}
+        description={t('codeReviewer.analytics.offDescription')}
+      />
+    ) : (
+      <View className="gap-6">
+        {stale ? (
+          <QueryError
+            variant={stalePaused ? 'offline' : trpcErrorVariant(dashboard.error)}
+            placement="top"
+            className="px-0 pt-0"
+            title={stalePaused ? t('queryError.offlineTitle') : t('common.somethingWentWrong')}
+            onRetry={
+              stalePaused || isRetryableTrpcError(dashboard.error)
+                ? () => void dashboard.refetch()
+                : undefined
+            }
+            isRetrying={dashboard.isFetching}
+          />
         ) : null}
         <View className="gap-3">
           <View className="flex-row gap-3">
@@ -140,6 +217,19 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
               value={number(summary.estimatedImpactPoints)}
             />
           </View>
+          <Text variant="muted" className="text-xs">
+            {t('codeReviewer.analytics.trackedReviewsCaption')}
+          </Text>
+          {/* The line always renders, so a period or platform change never
+          moves the list below it; at zero the count names the problem none. */}
+          <Text variant="muted" className="text-xs">
+            {t('codeReviewer.analytics.trackedReviewsUncounted', {
+              count: uncapturedReviews,
+              displayCount: number(uncapturedReviews),
+              total: coverage.enrolledCompletedReviews,
+              displayTotal: number(coverage.enrolledCompletedReviews),
+            })}
+          </Text>
         </View>
 
         {repositories.length === 0 ? (
@@ -150,12 +240,9 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
             description={t('codeReviewer.analytics.emptyDescription')}
           />
         ) : (
-          <View className="gap-2">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('common.repositories')}
-            </Text>
-            <View>
-              {repositories.map((repository, index) => (
+          <Section label={t('common.repositories')}>
+            <RowGroup leadingTile>
+              {repositories.map(repository => (
                 <ConfigureRow
                   key={repository.repository}
                   icon={GitPullRequest}
@@ -168,11 +255,10 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
                         repository.suggestionFindings
                     ),
                   })}
-                  last={index === repositories.length - 1}
                 />
               ))}
-            </View>
-          </View>
+            </RowGroup>
+          </Section>
         )}
       </View>
     );
@@ -181,10 +267,15 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
-        title={t('codeReviewer.analytics.title')}
-        eyebrow={t('common.codeReviewer')}
+        title={scopeTitle}
+        // One line, like the review list this scope also opens: the name arrives
+        // with the membership read and a longer one tail-truncates inside the
+        // same line instead of growing the header. The eyebrow keeps the
+        // screen's own name there, since the organization name is user prose.
+        titleNumberOfLines={1}
+        eyebrow={t('codeReviewer.analytics.title')}
       />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="gap-4 px-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <View className="gap-2">
           <SegmentedControl
             options={PLATFORM_OPTIONS}
@@ -193,7 +284,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
             onChange={setPlatform}
           />
           <SegmentedControl
-            options={PERIOD_OPTIONS}
+            options={periodOptions}
             value={String(period)}
             accessibilityLabel={t('usage.rangePicker')}
             onChange={value => {

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AdvancedConfigPanel } from './advanced-config-panel';
+import { SaveProfileSheet } from './save-profile-sheet';
 import { type ProfileSelectorProfile } from './profile-selector-model';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -201,6 +202,21 @@ function mount(
   return renderer;
 }
 
+/**
+ * A captured callback prop. Renderer props are untyped, so the value enters as
+ * `unknown` and is narrowed once before the test calls through it.
+ */
+function isVoidHandler(value: unknown): value is () => void {
+  return typeof value === 'function';
+}
+
+function invokeHandler(handler: unknown): void {
+  if (!isVoidHandler(handler)) {
+    throw new TypeError('expected a handler prop');
+  }
+  act(handler);
+}
+
 function press(node: TestRenderer.ReactTestInstance | undefined) {
   act(() => {
     (node?.props.onPress as (() => void) | undefined)?.();
@@ -217,9 +233,9 @@ function layout(node: TestRenderer.ReactTestInstance, y: number) {
 }
 
 /**
- * The panel root, or the block it renders while expanded, found by the class
- * token that identifies it inside the panel. Both are the views whose layout
- * the reveal depends on. Matched by token, not by the whole class list, so a
+ * The panel root, or the block it renders while expanded, found by the handle
+ * that identifies it inside the panel. Both are the views whose layout the
+ * reveal depends on. Matched by token, not by the whole class list, so a
  * styling change to either view does not have to be mirrored here.
  */
 function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
@@ -234,6 +250,11 @@ function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
     throw new Error(`no view with layout class ${token}`);
   }
   return found;
+}
+
+/** The panel root: the view whose own offset the reveal reports. */
+function panelRoot(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findByProps({ testID: 'advanced-config-panel' });
 }
 
 function byLabel(renderer: TestRenderer.ReactTestRenderer, label: string) {
@@ -260,14 +281,14 @@ function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
-/** The remaining-characters counter nodes, which carry the counted label. */
+/** The remaining-characters rows, which show the counted phrase as their text. */
 function counterTexts(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root
     .findAllByType('Text' as never)
     .filter(
       node =>
-        typeof node.props.accessibilityLabel === 'string' &&
-        node.props.accessibilityLabel.includes('characters remaining')
+        typeof node.props.children === 'string' &&
+        node.props.children.endsWith('characters remaining')
     );
 }
 
@@ -385,7 +406,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ onRequestReveal });
 
     // The collapsed panel already reports where it sits in the scroll content.
-    layout(layoutView(renderer, 'mt-5'), 812);
+    layout(panelRoot(renderer), 812);
     press(byLabel(renderer, 'Advanced Configuration'));
     // The reveal waits for the expanded block: a scroll issued at the tap would
     // clamp against the collapsed content height and move nothing.
@@ -406,7 +427,7 @@ describe('AdvancedConfigPanel', () => {
 
     // Re-expanding reveals against the offset the panel last reported.
     press(byLabel(renderer, 'Advanced Configuration'));
-    layout(layoutView(renderer, 'mt-5'), 640);
+    layout(panelRoot(renderer), 640);
     layout(layoutView(renderer, 'mt-3'), 690);
     expect(onRequestReveal).toHaveBeenCalledTimes(2);
     expect(onRequestReveal).toHaveBeenLastCalledWith(640);
@@ -558,7 +579,9 @@ describe('AdvancedConfigPanel', () => {
 
     press(buttonByText(renderer, 'Add command'));
     typeInto(renderer, 'Command 1', 'a'.repeat(470));
-    expect(counterTexts(renderer).map(node => node.props.children)).toEqual([30]);
+    expect(counterTexts(renderer).map(node => node.props.children)).toEqual([
+      '30 characters remaining',
+    ]);
     expect(texts(renderer)).not.toContain('The command is limited to 500 characters');
 
     // At the bound the sentence replaces the count, so only one line is present.
@@ -663,5 +686,29 @@ describe('AdvancedConfigPanel', () => {
 
     expect(field(renderer, 'Profile name')).toBeTruthy();
     expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('a late onClose from a closed save sheet leaves the reopened sheet open', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+    addVariable(renderer, 'API_KEY', 'abc');
+
+    press(buttonByText(renderer, 'Save as Profile'));
+    const firstSheet = renderer.root.findAll(node => node.type === SaveProfileSheet)[0];
+    if (!firstSheet) {
+      throw new TypeError('the first sheet was not mounted');
+    }
+    const firstClose: unknown = firstSheet.props.onClose;
+
+    // The person dismisses it, then opens it again.
+    invokeHandler(firstClose);
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(0);
+    press(buttonByText(renderer, 'Save as Profile'));
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(1);
+
+    // A settlement from the closed sheet arrives late: it must not close the
+    // sheet that replaced it.
+    invokeHandler(firstClose);
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(1);
   });
 });

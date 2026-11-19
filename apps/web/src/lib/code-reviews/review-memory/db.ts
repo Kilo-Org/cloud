@@ -1,6 +1,5 @@
 import { createHash } from 'crypto';
 import { and, asc, count, desc, eq, gte, inArray, lt, or, type SQL } from 'drizzle-orm';
-import { TRPCError } from '@trpc/server';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -14,19 +13,26 @@ import type {
   ReviewMemoryPlatform,
   ReviewMemoryProposalStatus,
 } from '@kilocode/db/schema-types';
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 import { reviewMemoryRetentionCutoff } from './retention';
 
 export type ReviewMemoryOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
 export type ReviewMemoryDatabase = typeof db;
 
-const ACTIVE_PROPOSAL_STATUSES = [
+/**
+ * Statuses that still occupy the proposal's scope. A proposal in one of these
+ * statuses holds its scope and can still be superseded.
+ */
+export const ACTIVE_PROPOSAL_STATUSES = [
   'open',
   'edited',
   'opening_change_request',
   'change_request_failed',
 ] as const;
-const EDITABLE_PROPOSAL_STATUSES = ['open', 'edited', 'change_request_failed'] as const;
+/**
+ * Statuses that can still be edited or approved into a change request.
+ */
+export const EDITABLE_PROPOSAL_STATUSES = ['open', 'edited', 'change_request_failed'] as const;
 const TERMINAL_PRUNABLE_PROPOSAL_STATUSES = [
   'rejected',
   'change_request_opened',
@@ -46,6 +52,14 @@ export class ReviewMemoryProposalConflictError extends Error {
   constructor() {
     super(REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_conflict);
     this.name = 'ReviewMemoryProposalConflictError';
+  }
+}
+
+/** Raised for an undecodable cursor; the router maps it to a transport status. */
+export class ReviewMemoryInvalidCursorError extends Error {
+  constructor() {
+    super('Invalid Review Memory proposal cursor.');
+    this.name = 'ReviewMemoryInvalidCursorError';
   }
 }
 
@@ -355,10 +369,7 @@ export async function listProposalsPage(input: {
   if (input.cursor) {
     const cursor = decodeProposalCursor(input.cursor);
     if (!cursor) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'Invalid Review Memory proposal cursor.',
-      });
+      throw new ReviewMemoryInvalidCursorError();
     }
     const sameTimestamp = and(
       eq(code_review_memory_proposals.updated_at, cursor.updatedAt),
@@ -505,7 +516,7 @@ export async function markProposalSuperseded(input: {
 }): Promise<CodeReviewMemoryProposal | null> {
   return await markProposalStatus({
     proposalId: input.proposalId,
-    fromStatuses: ['open', 'edited', 'opening_change_request', 'change_request_failed'],
+    fromStatuses: [...ACTIVE_PROPOSAL_STATUSES],
     set: { status: 'superseded' },
     database: input.database,
   });

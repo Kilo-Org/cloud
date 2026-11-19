@@ -61,7 +61,7 @@
 // (max-lines extraction). Expansion settle bookkeeping stays here.
 
 import { type FlashListRef } from '@shopify/flash-list';
-import { MessageSquarePlus } from '@/components/ui/icons';
+import { FolderOpen, MessageSquarePlus } from '@/components/ui/icons';
 import { type Href, useIsFocused, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -75,11 +75,11 @@ import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-s
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { CenteredState } from '@/components/centered-state';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   type ConversationComment,
@@ -91,7 +91,6 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { mergeDiscussionListItemsBySortKey } from '@/lib/pr-review/discussion/merge-discussion-list-items';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   expandedForThread,
   expandThread,
@@ -101,12 +100,12 @@ import {
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
 import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-comment-crud-mutations';
-import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderPrPlatform, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
@@ -141,6 +140,18 @@ const CONVERSATION_COMMENT_PATH =
 // comment's body, so the sheet opens as the READ surface and Save is the
 // UPDATE surface.
 const COMMENT_EDIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-edit' as const;
+
+/**
+ * The not-found message names the object in the reader's own provider terms, so
+ * a merge request is never called a pull request or the reverse. GitHub keeps
+ * the terminal copy; the two provider scopes name the connection, because both
+ * fold a connection failure into the same NOT_FOUND a removed item produces.
+ */
+const DISCUSSION_UNAVAILABLE_MESSAGE = {
+  github: 'prReview.discussion.unavailableMessage',
+  gitlab: 'prReview.terms.discussionUnavailableMessage',
+  bitbucket: 'prReview.pullRequestDiscussionUnavailableMessage',
+} as const satisfies Record<ProviderPrPlatform, string>;
 
 export function PrReviewDiscussionTab({
   owner,
@@ -380,7 +391,7 @@ export function PrReviewDiscussionTab({
         // no failure feedback from a confirmed delete (ux2 spot check).
         // The row stays, nothing is pending, and the same row action
         // retries once the banner clears.
-        if (getCommittedConnectivityStatus() === 'offline') {
+        if (connectionRefusesWrites()) {
           announcingToast.error(t('prReview.discussion.commentDeleteFailed'));
           return;
         }
@@ -415,14 +426,11 @@ export function PrReviewDiscussionTab({
       }
       action={
         onRequestFiles ? (
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
+          <StateAction
+            label={t('prReview.discussion.reviewFiles')}
+            icon={FolderOpen}
             onPress={onRequestFiles}
-            accessibilityLabel={t('prReview.discussion.reviewFiles')}
-          >
-            <Text>{t('prReview.discussion.reviewFiles')}</Text>
-          </Button>
+          />
         ) : null
       }
     />
@@ -448,16 +456,13 @@ export function PrReviewDiscussionTab({
     // merge request produces, so provider scopes offer the read retry and the
     // connection check instead of a dead end (GitHub keeps the terminal copy).
     const isProviderScope = ref.platform !== 'github';
+    const unavailableMessage = t(DISCUSSION_UNAVAILABLE_MESSAGE[ref.platform]);
     return (
       <>
         <QueryError
           variant="not-found"
           title={t('prReview.discussion.unavailable')}
-          message={
-            isMergeRequest
-              ? t('prReview.terms.discussionUnavailableMessage')
-              : t('prReview.discussion.unavailableMessage')
-          }
+          message={unavailableMessage}
           action={
             isProviderScope ? (
               <PrReviewUnavailableActions
@@ -476,7 +481,7 @@ export function PrReviewDiscussionTab({
   if (view.kind === 'reconnect') {
     return (
       <>
-        <CenteredState contentContainerClassName="px-6">
+        <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
           <PrReviewReconnectNotice />
         </CenteredState>
         {dialog}
@@ -529,12 +534,12 @@ export function PrReviewDiscussionTab({
       >
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key -- skeleton placeholders have no stable id
-          <View key={index} className="gap-2 rounded-xl border border-border bg-card p-3.5">
+          <Card key={index} className="gap-2">
             <Skeleton className="h-3 w-1/2" />
             <Skeleton className="h-3 w-1/3" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-6 w-2/3" />
-          </View>
+          </Card>
         ))}
         {dialog}
       </View>

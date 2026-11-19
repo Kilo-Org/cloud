@@ -23,6 +23,7 @@ import {
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
 } from './predicates';
+import { getPostgresErrorCode, RETRYABLE_TRANSACTION_SQLSTATES } from '@/lib/db-errors';
 
 /**
  * Exact app-type scope. The writers below must not reach a row whose app type
@@ -559,11 +560,8 @@ export async function updateRepositoriesForIntegration(
         .where(eq(platform_integrations.id, integrationId));
     });
   } catch (error) {
-    const code =
-      error && typeof error === 'object' && 'cause' in error
-        ? (error.cause as { code?: string } | undefined)?.code
-        : (error as { code?: string } | undefined)?.code;
-    if (code === '40P01' || code === '55P03' || code === '57014') {
+    const code = getPostgresErrorCode(error);
+    if (code !== null && RETRYABLE_TRANSACTION_SQLSTATES.has(code)) {
       throw new Error('Repository refresh temporarily unavailable; retry', { cause: error });
     }
     throw error;
@@ -637,22 +635,13 @@ export async function suspendIntegration(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const conditions = ownerIntegrationScope(
+  await suspendIntegrationForOwner(
     { type: 'org', id: organizationId },
     platform,
+    suspendedBy,
     githubAppType,
     installationId
   );
-
-  await db
-    .update(platform_integrations)
-    .set({
-      integration_status: INTEGRATION_STATUS.SUSPENDED,
-      suspended_at: new Date().toISOString(),
-      suspended_by: suspendedBy,
-      updated_at: new Date().toISOString(),
-    })
-    .where(and(...conditions));
 }
 
 /**
@@ -669,22 +658,12 @@ export async function unsuspendIntegration(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const conditions = ownerIntegrationScope(
+  await unsuspendIntegrationForOwner(
     { type: 'org', id: organizationId },
     platform,
     githubAppType,
     installationId
   );
-
-  await db
-    .update(platform_integrations)
-    .set({
-      integration_status: INTEGRATION_STATUS.ACTIVE,
-      suspended_at: null,
-      suspended_by: null,
-      updated_at: new Date().toISOString(),
-    })
-    .where(and(...conditions));
 }
 
 /**
@@ -700,14 +679,12 @@ export async function deleteIntegration(
   githubAppType?: GitHubAppType,
   installationId?: string
 ) {
-  const conditions = ownerIntegrationScope(
+  await deleteIntegrationForOwner(
     { type: 'org', id: organizationId },
     platform,
     githubAppType,
     installationId
   );
-
-  await db.delete(platform_integrations).where(and(...conditions));
 }
 
 export async function deleteGitHubInstallationRecords(
@@ -1043,7 +1020,12 @@ export async function autoCompleteInstallation(
       )
       .limit(1);
     if (peer) return { ok: false, reason: 'installation_claimed' };
-    await tx
+    // The early read is only a fast path: a writer that does not hold this
+    // installation's advisory lock (an owner-scoped delete) can remove the
+    // pending row between the read and this update. Gate the outcome on the
+    // update itself so a vanished or already-resolved row is reported, not
+    // acknowledged as completed.
+    const [completedRow] = await tx
       .update(platform_integrations)
       .set({
         platform_installation_id: installationData.installation_id,
@@ -1066,7 +1048,9 @@ export async function autoCompleteInstallation(
           eq(platform_integrations.id, integrationId),
           eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING)
         )
-      );
+      )
+      .returning({ id: platform_integrations.id });
+    if (!completedRow) return { ok: false, reason: 'not_pending' };
     return { ok: true };
   };
   return await (transaction ? execute(transaction) : db.transaction(execute));

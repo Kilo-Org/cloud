@@ -3,10 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 
 /** The inline outcome of the copy action on a live share link. */
 export type ShareCopyState = 'idle' | 'copied' | 'failed';
+
+/** The one press-time action a link's sheet can be running. */
+export type ShareDistribution = 'copy' | 'share';
 
 export const DURATION_LABEL_KEYS = {
   '1h': 'sessionShare.duration1h',
@@ -28,6 +33,8 @@ export function ShareActiveLink({
   includeNewMessages,
   copyState,
   busy,
+  revoking,
+  distribution,
   onCopy,
   onShare,
   onRevoke,
@@ -38,6 +45,10 @@ export function ShareActiveLink({
   includeNewMessages: boolean;
   copyState: ShareCopyState;
   busy: boolean;
+  /** The revoke mutation itself, which is the only one this panel can run. */
+  revoking: boolean;
+  /** The press-time read or native hand-off currently running, if any. */
+  distribution: ShareDistribution | null;
   onCopy: () => void;
   onShare: () => void;
   onRevoke: () => void;
@@ -50,10 +61,8 @@ export function ShareActiveLink({
   return (
     <View className="gap-3">
       <View className="gap-1">
-        <Text variant="muted" className="text-xs">
-          {lifetimeLabel}
-        </Text>
-        <Text variant="muted" className="text-xs">
+        <Text variant="caption">{lifetimeLabel}</Text>
+        <Text variant="caption">
           {includeNewMessages
             ? t('sessionShare.includesNewMessages')
             : t('sessionShare.excludesNewMessages')}
@@ -61,20 +70,23 @@ export function ShareActiveLink({
       </View>
       <Pressable
         onPress={onCopy}
+        disabled={busy}
         accessibilityRole="button"
         accessibilityLabel={t('common.copyLink')}
-        className="min-h-[44px] justify-center rounded-md border border-border bg-secondary p-3 active:opacity-70"
+        accessibilityState={{ disabled: busy }}
+        className={`${ROW_TARGET_CLASS} active:opacity-70`}
         testID="session-share-url"
       >
-        <Text variant="mono" className="text-xs text-foreground">
-          {url}
-        </Text>
+        <Card>
+          <Text variant="mono" className="text-xs text-foreground">
+            {url}
+          </Text>
+        </Card>
       </Pressable>
       {copyState !== 'idle' ? (
         <Text
-          className={
-            copyState === 'failed' ? 'text-xs text-destructive' : 'text-xs text-foreground'
-          }
+          variant="caption"
+          className={copyState === 'failed' ? 'text-destructive' : 'text-foreground'}
           testID="session-share-copy-status"
         >
           {copyState === 'failed'
@@ -85,6 +97,7 @@ export function ShareActiveLink({
       <Button
         variant="outline"
         className="w-full"
+        loading={distribution === 'copy'}
         disabled={busy}
         onPress={onCopy}
         testID="session-share-copy"
@@ -94,6 +107,7 @@ export function ShareActiveLink({
       <Button
         variant="outline"
         className="w-full"
+        loading={distribution === 'share'}
         disabled={busy}
         onPress={onShare}
         testID="session-share-sheet"
@@ -103,7 +117,8 @@ export function ShareActiveLink({
       <Button
         variant="outline-destructive"
         className="w-full"
-        loading={busy}
+        loading={revoking}
+        disabled={busy}
         onPress={onRevoke}
         testID="session-share-revoke"
       >

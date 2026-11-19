@@ -22,6 +22,7 @@
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
+    "./sandbox-provider-capabilities": "./src/sandbox-provider-capabilities.ts",
     "./microdollars": "./src/microdollars.ts",
     "./compute-member": "./src/compute-member.ts",
     "./cloud-agent-compute": "./src/cloud-agent-compute.ts",
@@ -44,6 +45,7 @@
     "./cloud-agent-session-sync": "./src/cloud-agent-session-sync.ts",
     "./cloud-agent-worktree-changes": "./src/cloud-agent-worktree-changes.ts",
     "./cloud-agent-worktree-operations": "./src/cloud-agent-worktree-operations.ts",
+    "./cloud-agent-workspace-artifacts": "./src/cloud-agent-workspace-artifacts.ts",
     "./cloud-agent-commits": "./src/cloud-agent-commits.ts",
     "./kilo-model-id": "./src/kilo-model-id.ts",
     "./extract-bearer-token": "./src/extract-bearer-token.ts",
@@ -61,12 +63,17 @@
     "./r2-client": "./src/r2-client.ts",
     "./direct-byok-model": "./src/direct-byok-model.ts",
     "./user-id-encoding": "./src/user-id-encoding.ts",
+    "./github-task-grant": "./src/github-task-grant.ts",
+    "./github-task-archive": "./src/github-task-archive.ts",
+    "./github-task-lfs": "./src/github-task-lfs.ts",
     "./github-authorization": "./src/github-authorization.ts",
+    "./pr-observations": "./src/pr-observations.ts",
     "./bounded-stream-reader": "./src/bounded-stream-reader.ts",
     "./usage-writer-client": "./src/usage-writer-client.ts",
     "./vercel-execution-region": "./src/vercel-execution-region.ts",
     "./organization-membership": "./src/organization-membership.ts",
     "./webhook-body-validation": "./src/webhook-body-validation.ts",
+    "./webhook-trigger-target": "./src/webhook-trigger-target.ts",
     "./organization-usage": "./src/organization-usage.ts",
     "./organization-consumption": "./src/organization-consumption.ts",
     "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts"
@@ -74,8 +81,9 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src packages/worker-utils/test/postgres"
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",

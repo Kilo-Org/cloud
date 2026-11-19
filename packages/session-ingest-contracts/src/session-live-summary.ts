@@ -40,9 +40,7 @@ export type SessionLiveFailureKind = (typeof SESSION_LIVE_FAILURE_KINDS)[number]
 
 /** The longest step target (a file basename or a short tool target). */
 export const SESSION_LIVE_TARGET_LIMIT = 40;
-/** The longest plan step name. */
 export const SESSION_LIVE_PLAN_STEP_LIMIT = 40;
-/** The longest permission command. */
 export const SESSION_LIVE_COMMAND_LIMIT = 60;
 
 export const sessionLiveStepSchema = z.object({
@@ -110,11 +108,12 @@ function isFormatControl(code: number): boolean {
 }
 
 /**
- * Display text as one line of what it draws: control characters and line breaks
- * become spaces, layout format controls are left out, and the joiners that
- * shape adjacent characters are kept. Every display surface that shows stored
- * text reads it through this, so one string cannot read two ways. White space
- * is left as it is; `sessionLiveText` collapses and bounds it.
+ * Display text as one line of what it draws: control characters (the C0 range,
+ * delete, the C1 range) and line breaks become spaces, layout format controls
+ * are left out, and the joiners that shape adjacent characters are kept. Every
+ * display surface that shows stored text reads it through this, so one string
+ * cannot read two ways. White space is left as it is; `sessionLiveText`
+ * collapses and bounds it.
  */
 export function sessionDisplayLine(raw: string): string {
   // Iterating code points keeps a surrogate pair whole while the control set is
@@ -124,7 +123,9 @@ export function sessionDisplayLine(raw: string): string {
     .map(char => {
       const code = char.codePointAt(0) ?? 0;
       if (isFormatControl(code)) return '';
-      return code <= 0x1f || code === 0x7f || code === 0x2028 || code === 0x2029 ? ' ' : char;
+      return code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029
+        ? ' '
+        : char;
     })
     .join('');
 }
@@ -151,21 +152,28 @@ function characterSegmenter(): Intl.Segmenter | null {
 }
 
 /**
+ * The shared character reader for every cut in the workspace: display surfaces
+ * read it through `sessionLiveCut`, and byte-capped report fields read it
+ * directly after their own byte count.
+ *
  * The end of the character at or before `maxIndex`, as the index just past it:
  * the largest extended grapheme cluster boundary no greater than `maxIndex`.
  * A runtime without segmentation falls back to a code unit boundary that keeps
- * a surrogate pair whole.
+ * a surrogate pair whole. A cap past the end of the line reads as the line end,
+ * and a cap at or below zero reads as zero.
  */
-function characterCut(line: string, maxIndex: number): number {
+export function characterCut(line: string, maxIndex: number): number {
+  // Clamping once keeps the two runtime branches on one contract.
+  const cap = Math.min(Math.max(maxIndex, 0), line.length);
   const segmenter = characterSegmenter();
   if (segmenter === null) {
-    const last = line.charCodeAt(maxIndex - 1);
-    return maxIndex > 0 && last >= 0xd800 && last <= 0xdbff ? maxIndex - 1 : maxIndex;
+    const last = line.charCodeAt(cap - 1);
+    return cap > 0 && last >= 0xd800 && last <= 0xdbff ? cap - 1 : cap;
   }
   let end = 0;
-  for (const { index } of segmenter.segment(line)) {
-    if (index > maxIndex) break;
-    end = index;
+  for (const { index, segment } of segmenter.segment(line)) {
+    if (index + segment.length > cap) break;
+    end = index + segment.length;
   }
   return end;
 }

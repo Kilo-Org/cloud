@@ -48,9 +48,16 @@ vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
 
 /** The connect action's own label node, matched by the copy it renders. */
 function actionLabel(renderer: TestRenderer.ReactTestRenderer, copy: string) {
+  // The action label is the connect row's centre-aligned Text: the card headers
+  // carry their own title copy, so matching on that alignment pins the lookup to
+  // the action regardless of where it sits in the tree.
   const node = renderer.root
     .findAllByType('Text' as never)
-    .find(candidate => candidate.children.includes(copy));
+    .find(
+      candidate =>
+        candidate.children.includes(copy) &&
+        String(candidate.props.className).includes('text-center')
+    );
   if (!node) {
     throw new Error(`no action label for ${copy}`);
   }
@@ -65,22 +72,24 @@ function actionLabel(renderer: TestRenderer.ReactTestRenderer, copy: string) {
 // segmented control's options; a longer locale ellipsizes and the full copy
 // stays the control's accessible name.
 describe('NewSessionRepositorySection connect action labels', () => {
-  it.each(['openGithub', 'openGitlab', 'openBitbucket'] as const)(
-    'keeps the %s action label on one line',
-    key => {
-      const renderer = mountSection({
-        groups: [
-          group('github', 'connect'),
-          group('gitlab', 'connect'),
-          group('bitbucket', 'connect'),
-        ],
-      });
+  it.each([
+    ['github', 'agentChat.newSession.openGithub'],
+    ['gitlab', 'agentChat.newSession.openGitlab'],
+    // Bitbucket's action opens the app's own token sheet, so it reads the bare
+    // "Connect" verb instead of "Open Bitbucket"; the card header keeps the
+    // full "Connect Bitbucket" title.
+    ['bitbucket', 'common.connect'],
+  ] as const)('keeps the %s action label on one line', (_provider, copyKey) => {
+    const renderer = mountSection({
+      groups: [
+        group('github', 'connect'),
+        group('gitlab', 'connect'),
+        group('bitbucket', 'connect'),
+      ],
+    });
 
-      expect(actionLabel(renderer, i18n.t(`agentChat.newSession.${key}`)).props.numberOfLines).toBe(
-        1
-      );
-    }
-  );
+    expect(actionLabel(renderer, i18n.t(copyKey)).props.numberOfLines).toBe(1);
+  });
 
   it('keeps the selected-provider action label on one line', () => {
     const renderer = mountSection({

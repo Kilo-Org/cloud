@@ -22,6 +22,13 @@ import { getSecurityAgentPath } from '@/lib/security-agent';
 import { act } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 
+// Every row here opens its screen through the press-burst guard, and these
+// assertions read the router mock, so the guarded push is that function.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => routerPush,
+}));
+
 /**
  * The three rows under AGENTS in the Profile tab are the only way into the code
  * reviewer, the security agent and the agent profiles from that tab, and each

@@ -1,61 +1,31 @@
 /* oxlint-disable max-lines */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const hoisted = vi.hoisted(() => {
-  const client = {
-    register: vi.fn(),
-    setPersonPropertiesForFlags: vi.fn(),
-    onFeatureFlags: vi.fn(),
-    capture: vi.fn(),
-    screen: vi.fn(),
-    identify: vi.fn(),
-    reloadFeatureFlags: vi.fn(),
-    getFeatureFlag: vi.fn(),
-    reset: vi.fn(),
-    setPersistedProperty: vi.fn(),
-    optOut: vi.fn().mockResolvedValue(undefined),
-    shutdown: vi.fn(),
-    flush: vi.fn(),
-  };
-  const holder: { options?: Record<string, unknown> } = {};
-  const device = { deviceType: null as number | null };
-  const controller = {
-    allowsMandatory: vi.fn().mockReturnValue(true),
-    allowsOptional: vi.fn().mockReturnValue(true),
-    currentGeneration: vi.fn().mockReturnValue(0),
-  };
-  let sealedState = false;
-  const storage = {
-    sealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = true;
-    }),
-    unsealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = false;
-    }),
-    purgePostHogPersistence: vi.fn(),
-    isPostHogStorageSealed: vi.fn().mockImplementation(() => sealedState),
-    // oxlint-disable-next-line consistent-type-assertions -- mock must match PostHogCustomStorage interface
-    posthogCustomStorage: {} as Record<string, unknown>,
-  };
-  return { client, holder, device, controller, storage };
-});
+// The helper's vi.hoisted object merges into file scope at the same import
+// position the local hoisted block used, so the vi.mock factories below reach
+// it the same way they reached the local doubles.
+import {
+  posthogMockConstructor,
+  postHogPersistedProperty,
+  posthogTestDouble,
+} from './posthog-test-double';
+
+const device = { deviceType: null as number | null };
+
+// File-local `device` joins the shared double so every `hoisted.device.*`
+// reference (mock getters and tests) keeps working, while the merged object
+// keeps the full type without mutating the shared double.
+const hoisted = { ...posthogTestDouble, device };
 
 vi.mock('posthog-react-native', () => ({
-  default: vi.fn(function PostHogMock(_key: string, options: Record<string, unknown>) {
-    hoisted.holder.options = options;
-    return hoisted.client;
-  }),
-  PostHogPersistedProperty: {
-    Queue: 'queue',
-    LogsQueue: 'logs_queue',
-    AiQueue: 'ai_queue',
-  },
+  default: posthogMockConstructor,
+  PostHogPersistedProperty: postHogPersistedProperty,
 }));
 
 vi.mock('expo-device', () => ({
   DeviceType: { UNKNOWN: 0, PHONE: 1, TABLET: 2, DESKTOP: 3, TV: 4 },
   get deviceType() {
-    return hoisted.device.deviceType;
+    return device.deviceType;
   },
 }));
 
@@ -76,7 +46,6 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
   sealPostHogStorage: hoisted.storage.sealPostHogStorage,
   unsealPostHogStorage: hoisted.storage.unsealPostHogStorage,
   purgePostHogPersistence: hoisted.storage.purgePostHogPersistence,
-  isPostHogStorageSealed: hoisted.storage.isPostHogStorageSealed,
   posthogCustomStorage: hoisted.storage.posthogCustomStorage,
 }));
 
@@ -95,12 +64,6 @@ function readCustomAppProperties(): (
   const fn = hoisted.holder.options?.customAppProperties;
   expect(fn).toEqual(expect.any(Function));
   return fn as (properties: Record<string, unknown>) => Record<string, unknown>;
-}
-
-async function loadInitPostHog() {
-  vi.resetModules();
-  const module = await import('./posthog');
-  return module.initPostHog;
 }
 
 // oxlint-disable-next-line require-await -- async required by promise-function-async
@@ -129,7 +92,7 @@ describe('initPostHog device_form_factor', () => {
     'maps deviceType $deviceType to device_form_factor $expected',
     async ({ deviceType, expected }) => {
       hoisted.device.deviceType = deviceType;
-      const initPostHog = await loadInitPostHog();
+      const { initPostHog } = await loadModule();
       initPostHog();
 
       const customAppProperties = readCustomAppProperties();
@@ -142,7 +105,7 @@ describe('initPostHog device_form_factor', () => {
 
   it('registers platform: mobile once', async () => {
     hoisted.device.deviceType = 1;
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.client.register).toHaveBeenCalledTimes(1);
@@ -151,7 +114,7 @@ describe('initPostHog device_form_factor', () => {
 
   it('constructs PostHog only once when init is called twice', async () => {
     hoisted.device.deviceType = 1;
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     const posthogModule = await import('posthog-react-native');
     const PostHog = posthogModule.default;
 
@@ -162,7 +125,7 @@ describe('initPostHog device_form_factor', () => {
   });
 
   it('passes customStorage to PostHog', async () => {
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options?.customStorage).toBe(hoisted.storage.posthogCustomStorage);
@@ -180,7 +143,7 @@ describe('initPostHog gate', () => {
 
   it('returns early when no account decision exists', async () => {
     hoisted.controller.allowsMandatory.mockReturnValue(false);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
@@ -189,7 +152,7 @@ describe('initPostHog gate', () => {
 
   it('initializes when optional consent is true', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
@@ -201,7 +164,7 @@ describe('initPostHog gate', () => {
     // account, but every switch that would send analytics on its own is off and
     // the SDK starts opted out, so capture is dropped.
     hoisted.controller.allowsOptional.mockReturnValue(false);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     const posthogModule = await import('posthog-react-native');
@@ -219,7 +182,7 @@ describe('initPostHog gate', () => {
 
   it('keeps capture on when optional consent is given', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options).toMatchObject({
@@ -237,7 +200,7 @@ describe('initPostHog gate', () => {
     hoisted.controller.allowsOptional.mockReturnValue(true);
     vi.stubGlobal('__DEV__', true);
     try {
-      const initPostHog = await loadInitPostHog();
+      const { initPostHog } = await loadModule();
       initPostHog();
 
       const posthogModule = await import('posthog-react-native');
@@ -254,7 +217,7 @@ describe('initPostHog gate', () => {
     vi.stubGlobal('__DEV__', true);
     process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://10.0.2.2:8123';
     try {
-      const initPostHog = await loadInitPostHog();
+      const { initPostHog } = await loadModule();
       initPostHog();
 
       const posthogModule = await import('posthog-react-native');
@@ -613,7 +576,7 @@ describe('initPostHog constructor options', () => {
   });
 
   it('passes disableGeoip: true to the constructor', async () => {
-    const initPostHog = await loadInitPostHog();
+    const { initPostHog } = await loadModule();
     initPostHog();
 
     expect(hoisted.holder.options?.disableGeoip).toBe(true);
@@ -678,50 +641,50 @@ describe('resumePostHog', () => {
     vi.clearAllMocks();
     hoisted.controller.allowsOptional.mockReturnValue(true);
     hoisted.controller.currentGeneration.mockReturnValue(0);
+    vi.useFakeTimers();
   });
 
-  it('returns a Promise and unseals storage after the 110 ms debounce', async () => {
-    vi.useFakeTimers();
+  // Restore the clock on the failing path too: a leftover fake clock makes the
+  // later suites' real timer waits hang instead of reporting their own failure.
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('returns a Promise and unseals storage after the 110 ms debounce', async () => {
     const { resumePostHog } = await loadModule();
     const promise = resumePostHog();
     expect(promise).toBeInstanceOf(Promise);
     expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
     // advanceTimersByTimeAsync processes microtasks (the await discardChain
-    // continuation), then the 110 ms setTimeout, then the microtask from the
+    // continuation), then the 110 ms setTimeout, then the microtask from the
     // resolved setTimeout promise, so unsealPostHogStorage runs synchronously.
     await vi.advanceTimersByTimeAsync(110);
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
     await promise;
-    vi.useRealTimers();
   });
 
   it('awaits active discard before unsealing', async () => {
     const { initPostHog, discardPostHog, resumePostHog } = await loadModule();
     initPostHog();
 
-    let optOutResolve: (() => void) | undefined = undefined;
-    hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>(resolve => {
-        optOutResolve = resolve;
-      });
-    });
+    const optOut = Promise.withResolvers<undefined>();
+    hoisted.client.optOut.mockImplementationOnce(() => optOut.promise);
 
+    // The synchronous part of the discard (seal, clear queues, client = null)
+    // runs inside the call, before it awaits optOut.
     const discardPromise = discardPostHog();
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 0);
-    });
-
     const resumePromise = resumePostHog();
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 10);
-    });
 
-    // Unseal must not have been called — discard is still in flight.
+    // The discard is still unresolved, so resumePostHog cannot reach its
+    // 110 ms debounce. Moving past that window must not unseal: this fails
+    // when resumePostHog stops awaiting the discard chain.
+    await vi.advanceTimersByTimeAsync(110);
     expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    optOutResolve!();
+    optOut.resolve(undefined);
     await discardPromise;
+    await vi.advanceTimersByTimeAsync(110);
     await resumePromise;
 
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
@@ -733,6 +696,14 @@ describe('discard serialization', () => {
     vi.clearAllMocks();
     hoisted.controller.allowsOptional.mockReturnValue(true);
     hoisted.controller.currentGeneration.mockReturnValue(0);
+    vi.useFakeTimers();
+  });
+
+  // Restore the clock on the failing path too: a leftover fake clock makes the
+  // later suites' real timer waits hang instead of reporting their own failure.
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it('resumePostHog awaits a slow discard even when a later fast discard overwrites the tail', async () => {
@@ -740,39 +711,33 @@ describe('discard serialization', () => {
     initPostHog();
 
     // First discard: slow optOut.
-    let optOutResolve: (() => void) | undefined = undefined;
-    hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>(resolve => {
-        optOutResolve = resolve;
-      });
-    });
+    const optOut = Promise.withResolvers<undefined>();
+    hoisted.client.optOut.mockImplementationOnce(() => optOut.promise);
 
     const firstDiscard = discardPostHog();
 
-    // Let the synchronous part of the first discard run (seal, clear
-    // queues, client=null).
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 0);
-    });
-
-    // Second discard: client is already null, so the IIFE returns early.
+    // Second discard: client is already null, so the IIFE returns early. No
+    // timer flush is needed between the two — the first discard's synchronous
+    // part (seal, clear queues, client = null) runs inside its call, before it
+    // awaits optOut.
     const secondDiscard = discardPostHog();
 
     // resumePostHog captures the chain tail. The tail includes the second
     // discard. Since the second discard chains after the first, awaiting
     // the tail must await the first discard too.
     const resumePromise = resumePostHog();
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 10);
-    });
 
-    // Unseal must not have been called — the first discard is still in flight.
+    // The first discard is still unresolved, so the tail cannot settle and
+    // resumePostHog cannot reach its 110 ms debounce. Moving past that window
+    // must not unseal: this fails when resumePostHog stops awaiting the
+    // discard chain.
+    await vi.advanceTimersByTimeAsync(110);
     expect(hoisted.storage.unsealPostHogStorage).not.toHaveBeenCalled();
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    optOutResolve!();
+    optOut.resolve(undefined);
     await firstDiscard;
     await secondDiscard;
+    await vi.advanceTimersByTimeAsync(110);
     await resumePromise;
 
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
@@ -786,12 +751,8 @@ describe('discard serialization', () => {
     await discardPostHog();
 
     // Second discard: slow optOut, but starts after resumePostHog captures the tail.
-    let optOutResolve: (() => void) | undefined = undefined;
-    hoisted.client.optOut.mockImplementationOnce(async () => {
-      await new Promise<void>(resolve => {
-        optOutResolve = resolve;
-      });
-    });
+    const optOut = Promise.withResolvers<undefined>();
+    hoisted.client.optOut.mockImplementationOnce(() => optOut.promise);
     // Re-create a client so the second discard has something to opt out.
     const posthogModule = await import('posthog-react-native');
     (posthogModule.default as ReturnType<typeof vi.fn>).mockClear();
@@ -804,8 +765,9 @@ describe('discard serialization', () => {
     const secondDiscard = discardPostHog();
 
     // resumePostHog captured the tail before the second discard was
-    // appended. The tail should resolve when the first discard's
-    // completion resolves (already done).
+    // appended. The tail resolves when the first discard's completion
+    // resolves (already done), so only the 110 ms debounce is left.
+    await vi.advanceTimersByTimeAsync(110);
     await resumePromise;
 
     // The second discard is still in flight, but resumePostHog has
@@ -813,8 +775,7 @@ describe('discard serialization', () => {
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
 
     // Clean up: resolve the second discard.
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously
-    optOutResolve!();
+    optOut.resolve(undefined);
     await secondDiscard;
   });
 
@@ -825,8 +786,10 @@ describe('discard serialization', () => {
     // Off: discard the client.
     await discardPostHog();
 
-    // On: resume and re-init.
-    await resumePostHog();
+    // On: resume and re-init. resumePostHog waits out its 110 ms debounce.
+    const resumePromise = resumePostHog();
+    await vi.advanceTimersByTimeAsync(110);
+    await resumePromise;
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
 
     const posthogModule = await import('posthog-react-native');
@@ -841,9 +804,8 @@ describe('discard serialization', () => {
     captureEvent('recovery-test');
     expect(hoisted.client.capture).toHaveBeenCalledWith('recovery-test', undefined);
 
-    // The recovered client must not be opted out — optOut was called on the
-    // old client, not the new one. The new client's optOut has never been
-    // called.
+    // The mock factory returns one shared client for every construction, so
+    // toHaveBeenCalledTimes(1) pins the single optOut from the first discard.
     expect(hoisted.client.optOut).toHaveBeenCalledTimes(1);
   });
 });

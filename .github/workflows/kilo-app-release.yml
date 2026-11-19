@@ -146,9 +146,48 @@ jobs:
             echo "should_build=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # Mint the credential the notes rewrite uses. It is the same mint the MCP
+      # catalog job runs (`.github/workflows/kilo-mcp-catalog.yml`): the shared
+      # `MCP_CATALOG_TOKEN_SECRET` is exchanged for a one-hour token that belongs
+      # to the internal benchmarking bot account, never a maintainer's login.
+      # continue-on-error: notes are never worth a failed release. A mint that
+      # fails leaves the step's output empty, and the notes step then writes the
+      # deterministic block and warns.
+      - name: Mint changelog token
+        id: mint-notes
+        if: steps.check.outputs.should_build == 'true'
+        continue-on-error: true
+        env:
+          MCP_CATALOG_TOKEN_SECRET: ${{ secrets.MCP_CATALOG_TOKEN_SECRET }}
+          WEB_API_BASE_URL: https://app.kilo.ai
+        run: |
+          set -euo pipefail
+          # Capture the status so a failed mint names its cause instead of a
+          # bare "curl: (22)".
+          status="$(curl -sS -o /tmp/notes-mint.json -w '%{http_code}' \
+            -X POST "$WEB_API_BASE_URL/api/internal/mcp-catalog/token" \
+            -H "Authorization: Bearer $MCP_CATALOG_TOKEN_SECRET" \
+            -H 'content-type: application/json' \
+            -d '{}')"
+          if [ "$status" != "200" ]; then
+            echo "::error::The changelog token mint returned HTTP $status: $(cat /tmp/notes-mint.json)"
+            exit 1
+          fi
+          token="$(jq -r '.token' /tmp/notes-mint.json)"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "::error::The changelog token mint returned no token"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
       - name: Notes for the changelog
         id: notes
         if: steps.check.outputs.should_build == 'true'
+        env:
+          # The minted one-hour token. Empty when the mint failed: the script
+          # still runs, falls back to the deterministic block and warns.
+          KILO_CHANGELOG_API_KEY: ${{ steps.mint-notes.outputs.token }}
         run: |
           if [ -n "$LAST_TAG" ]; then
             NOTES=$(node scripts/kilo-app-release-notes.mjs body --from "$LAST_TAG" --to HEAD)
@@ -817,8 +856,19 @@ jobs:
             --land "origin:$BRANCH" \
             --pending "$PENDING")
           printf '%s\n' "$OUT"
+          # The land prints the head it verified and the files that commit
+          # changes; the PR body reports them instead of asserting a shape
+          # nobody checked.
+          HEAD=$(printf '%s\n' "$OUT" | sed -n 's/^changelog-head=//p')
+          FILES=$(printf '%s\n' "$OUT" | sed -n 's/^changelog-files=//p')
           if printf '%s\n' "$OUT" | grep -q '^changelog: landed '; then
             echo "landed=true" >> "$GITHUB_OUTPUT"
+            echo "head=$HEAD" >> "$GITHUB_OUTPUT"
+            echo "files=$FILES" >> "$GITHUB_OUTPUT"
+            if [ -z "$HEAD" ] || [ -z "$FILES" ]; then
+              echo "::error::The section landed without reporting the verified head and files"
+              exit 1
+            fi
           else
             echo "landed=false" >> "$GITHUB_OUTPUT"
             echo "::notice::The version-bump branch was already merged — this build's changelog section waits on $PENDING for the next build's section. The submission itself succeeded."
@@ -832,9 +882,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: ${{ needs.bump-version.outputs.branch }}
           OLD: ${{ needs.check-changes.outputs.version }}
+          HEAD_SHA: ${{ steps.land.outputs.head }}
+          FILES: ${{ steps.land.outputs.files }}
         run: |
           NEW="${BRANCH#kilo-app-version-bump-}"
           RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          # The files and the head come from the land-time check, so the body
+          # reports what was verified instead of asserting a shape nobody checked.
           cat > "$RUNNER_TEMP/kilo-app-bump-pr.md" <<EOF
           ## What
 
@@ -853,8 +907,8 @@ jobs:
           1. Required checks show as pending: PRs opened with the default GITHUB_TOKEN
              do not trigger workflow runs. Close and reopen this PR (or push an empty
              commit) to start CI.
-          2. Review and merge. Only the version line and the changelog section
-             changed; no product code.
+          2. Review and merge. Against main this branch changes only $FILES.
+             Verified head $HEAD_SHA. No product code.
           EOF
           # Only a PR opened from this repository is the version-bump PR.
           PR=$(gh pr list --head "$BRANCH" --state open --json number,isCrossRepository \

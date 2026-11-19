@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { PackageSearch } from '@/components/ui/icons';
@@ -21,7 +22,11 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { BackendProviderChoice, type ProviderSelection } from './backend-provider-choices';
 import { modelCapabilityKey } from './model-capability';
 
-const FAILURE_KEYS = {
+/**
+ * The catalog key of each GGUF failure. Exported because the local failure
+ * copy fixture renders the same four problems through the same row.
+ */
+export const GGUF_FAILURE_KEYS = {
   space: 'modelChat.gguf.errors.space',
   network: 'modelChat.gguf.errors.network',
   invalidFile: 'modelChat.gguf.errors.invalidFile',
@@ -36,6 +41,11 @@ function progressKey(download: GgufDownload): string {
   // and its row must not read "Downloading" beside a Resume button.
   if (download.phase === 'paused') {
     return 'modelChat.gguf.paused';
+  }
+  // A retried transfer explains the counter that went back to zero. The paused
+  // line above keeps the row's own state when the retried transfer is paused.
+  if (download.retrying) {
+    return download.total > 0 ? 'modelChat.gguf.retrying' : 'modelChat.gguf.retryingUnknown';
   }
   if (download.total <= 0) {
     return 'modelChat.gguf.downloadingUnknown';
@@ -129,12 +139,8 @@ export function GgufDownloadControls({
     <>
       {record !== undefined && (
         <>
-          <Text className="text-sm">
-            {t('modelChat.gguf.downloaded', { size: size(record.sizeBytes) })}
-          </Text>
-          <Text className="text-sm text-muted-foreground">
-            {t(modelCapabilityKey(record.tools, record.vision))}
-          </Text>
+          <Text>{t('modelChat.gguf.downloaded', { size: size(record.sizeBytes) })}</Text>
+          <Text variant="muted">{t(modelCapabilityKey(record.tools, record.vision))}</Text>
           <Button
             variant="ghost"
             accessibilityLabel={namedWithDetail(deleteText, detail)}
@@ -155,7 +161,7 @@ export function GgufDownloadControls({
       )}
       {download !== undefined && (
         <>
-          <Text className="text-sm" accessibilityLiveRegion="polite">
+          <Text accessibilityLiveRegion="polite">
             {t(progressKey(download), {
               written: size(download.written),
               total: size(download.total),
@@ -169,7 +175,7 @@ export function GgufDownloadControls({
       {record === undefined && download === undefined && onDownload !== undefined && (
         <Button
           variant="outline"
-          disabled={snapshot.download !== null}
+          disabled={snapshot.download !== null || snapshot.loadFailed}
           onPress={onDownload}
           accessibilityLabel={namedWithDetail(downloadText, detail)}
         >
@@ -177,8 +183,8 @@ export function GgufDownloadControls({
         </Button>
       )}
       {failure !== undefined && (
-        <Text accessibilityRole="alert" className="text-sm text-destructive">
-          {t(FAILURE_KEYS[failure.problem])}
+        <Text accessibilityRole="alert" className="text-destructive">
+          {t(GGUF_FAILURE_KEYS[failure.problem])}
         </Text>
       )}
       {dialog}
@@ -204,7 +210,7 @@ function DirectLinkForm({ snapshot }: Readonly<{ snapshot: GgufDownloadsSnapshot
     }
   };
   return (
-    <View className="gap-2">
+    <View className="gap-3">
       <FormField
         key={field}
         label={t('modelChat.gguf.url')}
@@ -217,10 +223,10 @@ function DirectLinkForm({ snapshot }: Readonly<{ snapshot: GgufDownloadsSnapshot
         }}
         {...(error === null ? {} : { error: t(error) })}
       />
-      <Text className="text-sm text-muted-foreground">{t('modelChat.gguf.urlHelp')}</Text>
+      <Text variant="muted">{t('modelChat.gguf.urlHelp')}</Text>
       <Button
         variant="outline"
-        disabled={snapshot.download !== null}
+        disabled={snapshot.download !== null || snapshot.loadFailed}
         onPress={() => {
           void start();
         }}
@@ -252,15 +258,28 @@ export function GgufModelSection({
       ? snapshot.failure
       : null;
   return (
-    <View className="gap-2">
-      <Text className="font-semibold">{t('modelChat.gguf.title')}</Text>
-      <Text className="text-sm text-muted-foreground">{t('modelChat.gguf.help')}</Text>
+    <View className="gap-3">
+      <Text variant="heading">{t('modelChat.gguf.title')}</Text>
+      <Text variant="muted">{t('modelChat.gguf.help')}</Text>
       <Button onPress={onBrowse}>
         <PackageSearch size={18} color={colors.primaryForeground} />
         <Text>{t('modelChat.catalog.browse')}</Text>
       </Button>
+      {snapshot.loadFailed && (
+        <Card>
+          <Text>{t('common.couldNotLoadModels')}</Text>
+          <Button
+            variant="outline"
+            onPress={() => {
+              ggufDownloadActions.retryLoad();
+            }}
+          >
+            <Text>{t('common.tryAgain')}</Text>
+          </Button>
+        </Card>
+      )}
       {rows.map(row => (
-        <View key={row.fileId} className="gap-2 rounded-xl border border-border p-4">
+        <Card key={row.fileId}>
           <BackendProviderChoice
             {...selection}
             name={row.name}
@@ -278,7 +297,7 @@ export function GgufModelSection({
             downloadDetail={row.name}
             onDownload={undefined}
           />
-        </View>
+        </Card>
       ))}
       <Button
         variant="ghost"
@@ -291,8 +310,8 @@ export function GgufModelSection({
       </Button>
       {advanced && <DirectLinkForm snapshot={snapshot} />}
       {otherFailure !== null && (
-        <Text accessibilityRole="alert" className="text-sm text-destructive">
-          {t(FAILURE_KEYS[otherFailure.problem])}
+        <Text accessibilityRole="alert" className="text-destructive">
+          {t(GGUF_FAILURE_KEYS[otherFailure.problem])}
         </Text>
       )}
     </View>

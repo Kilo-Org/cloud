@@ -4,9 +4,11 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { FIELD_CLEAR_BOX_CLASS, ICON_TARGET_DP } from '@/lib/a11y/tap-target';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModelPickerRow } from '@/lib/model-picker-rows';
 import { type ModelPickerBridge } from '@/lib/picker-bridge';
+import { compiledDimensions } from '@/test/native-dimensions';
 
 import { ModelPickerContent } from './model-picker-content';
 
@@ -132,6 +134,7 @@ vi.mock('@/components/picker-sheet', () => ({
 // empty state's clear CTA is reachable from the tree; `title` stays a prop for
 // the existing assertions.
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; action?: ReactNode }) =>
     createElement('EmptyState', { title: props.title }, props.action),
 }));
@@ -418,18 +421,18 @@ describe('ModelPickerContent deferred search', () => {
     // The "No matches" body offers exactly one clear CTA, carrying the same
     // copy the Agents search empty state uses, so both searches recover the
     // same way.
-    const clearActions = findByType(renderer.root, 'Button');
+    const clearActions = findByType(renderer.root, 'StateAction');
     expect(clearActions).toHaveLength(1);
     const clearAction = clearActions[0];
     if (!clearAction) {
       throw new Error('clear search action not found');
     }
-    const buttonProps = clearAction.props as unknown as {
-      children?: { props?: { children?: ReactNode } };
+    const actionProps = clearAction.props as unknown as {
+      label?: unknown;
       onPress?: unknown;
     };
-    expect(buttonProps.children?.props?.children).toBe('Clear search');
-    const onPress = buttonProps.onPress;
+    expect(actionProps.label).toBe('Clear search');
+    const onPress = actionProps.onPress;
     if (typeof onPress !== 'function') {
       throw new TypeError('clear search action is not pressable');
     }
@@ -457,7 +460,7 @@ describe('ModelPickerContent deferred search', () => {
     // The mock renders `action` as a child (as the real EmptyState does), so
     // assert on the rendered children: no action node reaches the empty state.
     expect(emptyState[0]?.children).toHaveLength(0);
-    expect(findByType(renderer.root, 'Button')).toHaveLength(0);
+    expect(findByType(renderer.root, 'StateAction')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();
@@ -489,6 +492,76 @@ describe('ModelPickerContent deferred search', () => {
     // Clearing drops the query the rows derive from and hides the affordance.
     expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
     expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('lays the clear control out as its own target frame inside the field', async () => {
+    const renderer = await mount();
+    // The rounded field row: its height comes from the input's own
+    // `min-h-[44px]`, so comparing the row's class list across states proves
+    // the control's reveal cannot move the field.
+    const emptyFieldRows = findByType(renderer.root, 'View').filter(node =>
+      String(node.props.className).includes('rounded-full')
+    );
+    expect(emptyFieldRows).toHaveLength(1);
+    const emptyFieldClass = String(emptyFieldRows[0]?.props.className);
+    expect(emptyFieldClass).toContain('rounded-full');
+
+    // Nothing typed: no control. The frame an audit measures is a node's own
+    // box, and `hitSlop` never grows it, so a typed query must render a control
+    // whose box is the target.
+    expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    await act(async () => {
+      typeSearch(renderer, FINAL_QUERY);
+      await Promise.resolve();
+    });
+
+    const clears = clearSearchButtons(renderer);
+    expect(clears).toHaveLength(1);
+    const [clear] = clears;
+    if (!clear) {
+      throw new Error('clear affordance not found');
+    }
+
+    // One box width/height pair only: compiling the class is what proves the
+    // real box, so a second, conflicting pair cannot hide behind the order
+    // Tailwind emits its rules in. The exported box carries the whole
+    // `h-[48px] w-[48px] -my-[7px] items-center justify-center` quartet, whose
+    // literal values are pinned in `tap-target.test.ts`.
+    expect(clear.props.className).toContain(FIELD_CLEAR_BOX_CLASS);
+    // No slop at all: the box itself is the target, and a reach across the
+    // row's `gap-2` toward the input would take the field's own taps.
+    expect(clear.props.hitSlop).toBeUndefined();
+
+    // The compiled box, not its class text, is what the control lays out.
+    const declarations = (await compiledDimensions(clear.props.className as string)) as {
+      height?: number;
+      width?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { height: number; width: number };
+    expect(box.height).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+
+    // Placement is the call site's logical trailing margin, not a physical one:
+    // `-me-3` is the pill's own `px-3` (10.5pt at the app's 14pt rem), so the
+    // box's trailing edge lands on the pill's edge and the whole box stays
+    // inside the pill's frame, and RTL mirrors it with the row instead of
+    // pushing the box onto the wrong side. `compiledDimensions` compiles only
+    // `h` / `w` / `min-h` / `min-w`, so the margin is a class check.
+    expect(clear.props.className).toContain('-me-3');
+    expect(clear.props.className).not.toMatch(/-m[rl]-/);
+
+    // Same field row in both states: revealing the control leaves the class
+    // list — and so the height the input's `min-h-[44px]` sets — untouched.
+    const typedFieldRows = findByType(renderer.root, 'View').filter(node =>
+      String(node.props.className).includes('rounded-full')
+    );
+    expect(typedFieldRows).toHaveLength(1);
+    expect(String(typedFieldRows[0]?.props.className)).toBe(emptyFieldClass);
 
     act(() => {
       renderer.unmount();

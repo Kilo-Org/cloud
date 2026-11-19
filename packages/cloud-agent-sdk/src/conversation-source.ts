@@ -5,8 +5,10 @@ import {
   kilo2PartId,
 } from '@kilocode/session-ingest-contracts';
 import { normalize, type ChatEvent, type NormalizedEvent } from './normalizer';
+import { setBounded } from './bounded-map';
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import {
+  hasUnresolvedKilo2Assets,
   readKilo2ContentLayout,
   readKilo2Messages,
   isCompactionSummaryPart,
@@ -16,15 +18,14 @@ import type { SessionSnapshot } from './types';
 
 const MAX_TRACKED_MESSAGES = 2048;
 
-/** Sets `key` as the newest entry, evicting the oldest past the bound. */
-function remember<V>(map: Map<string, V>, key: string, value: V) {
-  map.delete(key);
-  map.set(key, value);
-  if (map.size > MAX_TRACKED_MESSAGES) {
-    const oldest = map.keys().next().value;
-    if (oldest !== undefined) map.delete(oldest);
-  }
-}
+const conversationEnvelopeSchema = z.object({ type: z.string(), properties: z.unknown() });
+
+const conversationTextEventDataSchema = z.object({
+  assistantMessageID: z.string(),
+  ordinal: z.number().int().nonnegative(),
+  delta: z.string().optional(),
+  text: z.string().optional(),
+});
 
 export type ConversationSource = { version: 'v1' } | { version: 'v2' };
 
@@ -72,7 +73,7 @@ export function createConversationSourceReader() {
     const starts = reasoningStarts.get(messageId) ?? new Map<string, number>();
     for (const part of parts)
       if (part.type === 'reasoning' && !starts.has(part.id)) starts.set(part.id, part.time.start);
-    if (starts.size) remember(reasoningStarts, messageId, starts);
+    if (starts.size) setBounded(reasoningStarts, messageId, starts, MAX_TRACKED_MESSAGES);
   }
   function positionOf(messageId: string, kind: string, ordinal: number): number {
     const layout = layouts.get(messageId) ?? {
@@ -85,7 +86,7 @@ export function createConversationSourceReader() {
       position = layout.next++;
       layout.positions.set(`${kind}:${ordinal}`, position);
     }
-    remember(layouts, messageId, layout);
+    setBounded(layouts, messageId, layout, MAX_TRACKED_MESSAGES);
     return position;
   }
   function readV2(type: string, properties: unknown): NormalizedEvent[] {
@@ -95,13 +96,27 @@ export function createConversationSourceReader() {
       const { source, message, parentID } = parsed.data;
       if (message.time.completed !== undefined) {
         completed.add(message.id);
-        if (completed.size > 2048) {
+        if (completed.size > MAX_TRACKED_MESSAGES) {
           const oldest = completed.values().next().value;
           if (oldest) completed.delete(oldest);
         }
       }
-      remember(layouts, message.id, readKilo2ContentLayout(message));
-      const display = readKilo2Messages(source.session, [message])[0];
+      setBounded(layouts, message.id, readKilo2ContentLayout(message), MAX_TRACKED_MESSAGES);
+      // An attachment without an authorized URL has no display; omit only this
+      // message and keep the rest of the event batch, as history pages do.
+      if (hasUnresolvedKilo2Assets(message)) return [];
+      // A live event must never throw into the socket handler: degrade this
+      // message instead of losing the surrounding event batch.
+      let display: SessionSnapshot['messages'][number] | undefined;
+      try {
+        display = readKilo2Messages(source.session, [message])[0];
+      } catch (error) {
+        console.error(
+          `[ConversationSource] Native message ${message.id} projection failed:`,
+          error
+        );
+        display = undefined;
+      }
       if (!display) return [];
       observeReasoning(message.id, display.parts);
       if (display.info.role === 'assistant' && parentID !== undefined)
@@ -115,20 +130,19 @@ export function createConversationSourceReader() {
     const parsed = kilo2ConversationEventSchema.safeParse(properties);
     if (!parsed.success) return [];
     const event = parsed.data.event;
+    if (
+      /^session\.(shell\.|synthetic$|execution\.|tool\.(called|started|ended|success|failed)$)|^(form\.|permission\.)/.test(
+        event.type
+      )
+    )
+      return [{ type: 'background.invalidated' }];
     const kind = event.type.startsWith('session.text.')
       ? 'text'
       : event.type.startsWith('session.reasoning.')
         ? 'reasoning'
         : undefined;
     if (!kind) return [];
-    const data = z
-      .object({
-        assistantMessageID: z.string(),
-        ordinal: z.number().int().nonnegative(),
-        delta: z.string().optional(),
-        text: z.string().optional(),
-      })
-      .safeParse(event.data);
+    const data = conversationTextEventDataSchema.safeParse(event.data);
     if (!data.success || completed.has(data.data.assistantMessageID)) return [];
     const id = kilo2PartId(
       data.data.assistantMessageID,
@@ -150,7 +164,7 @@ export function createConversationSourceReader() {
       const starts = reasoningStarts.get(data.data.assistantMessageID) ?? new Map<string, number>();
       const start = starts.get(id) ?? event.created ?? 0;
       starts.set(id, start);
-      remember(reasoningStarts, data.data.assistantMessageID, starts);
+      setBounded(reasoningStarts, data.data.assistantMessageID, starts, MAX_TRACKED_MESSAGES);
       reasoningTime = {
         start,
         ...(event.type.endsWith('.ended') ? { end: event.created ?? start } : {}),
@@ -184,21 +198,19 @@ export function createConversationSourceReader() {
             if (!layout.positions.has(item)) layout.positions.set(item, position);
           layout.next = Math.max(layout.next, live.next);
         }
-        remember(layouts, message.info.id, layout);
+        setBounded(layouts, message.info.id, layout, MAX_TRACKED_MESSAGES);
       }
     },
     /** Select the native reader at the SDK boundary. Renderers receive display events. */
     read(raw: CloudAgentEvent): { source: ConversationSource; events: NormalizedEvent[] } {
-      const envelope = z.object({ type: z.string(), properties: z.unknown() }).safeParse(raw.data);
-      if (
-        raw.streamEventType === 'kilocode' &&
-        envelope.success &&
-        envelope.data.type.startsWith('conversation.')
-      )
-        return {
-          source: { version: 'v2' },
-          events: readV2(envelope.data.type, envelope.data.properties),
-        };
+      if (raw.streamEventType === 'kilocode') {
+        const envelope = conversationEnvelopeSchema.safeParse(raw.data);
+        if (envelope.success && envelope.data.type.startsWith('conversation.'))
+          return {
+            source: { version: 'v2' },
+            events: readV2(envelope.data.type, envelope.data.properties),
+          };
+      }
       const event = normalize(raw);
       return { source: { version: 'v1' }, events: event ? [event] : [] };
     },

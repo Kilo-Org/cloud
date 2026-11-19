@@ -3,72 +3,25 @@ import { describe, expect, it, vi } from 'vitest';
 // Static import of the mobile package manifest — no file-system walk.
 import pkg from '../../../package.json';
 
-const hoisted = vi.hoisted(() => {
-  const client = {
-    register: vi.fn(),
-    setPersonPropertiesForFlags: vi.fn(),
-    onFeatureFlags: vi.fn(),
-    capture: vi.fn(),
-    screen: vi.fn(),
-    identify: vi.fn(),
-    reloadFeatureFlags: vi.fn(),
-    getFeatureFlag: vi.fn(),
-    reset: vi.fn(),
-    setPersistedProperty: vi.fn(),
-    optOut: vi.fn().mockResolvedValue(undefined),
-  };
-
-  const appsFlyer = {
-    init: vi.fn(),
-    setConsentData: vi.fn(),
-    logEvent: vi.fn(),
-    stop: vi.fn(),
-    create: vi.fn(),
-    startObservingTransactions: vi.fn(),
-    stopObservingTransactions: vi.fn(),
-  };
-
-  const device = { deviceType: null as number | null };
-
-  let sealedState = false;
-  const storage = {
-    sealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = true;
-    }),
-    unsealPostHogStorage: vi.fn().mockImplementation(() => {
-      sealedState = false;
-    }),
-    purgePostHogPersistence: vi.fn(),
-    isPostHogStorageSealed: vi.fn().mockImplementation(() => sealedState),
-    // oxlint-disable-next-line consistent-type-assertions -- mock must match PostHogCustomStorage interface
-    posthogCustomStorage: {} as Record<string, unknown>,
-  };
-
-  // Fresh controller — no decision set.
-  const controller = {
-    allowsMandatory: vi.fn().mockReturnValue(false),
-    allowsOptional: vi.fn().mockReturnValue(false),
-    currentGeneration: vi.fn().mockReturnValue(0),
-  };
-
-  return { client, appsFlyer, device, storage, controller };
-});
+// The helper's vi.hoisted object merges into file scope. This suite closes
+// both controller gates to `false`, preserving its "no SDK before a decision"
+// default, while `device` and `appsFlyer` stay file-local doubles.
+import {
+  createControllerDouble,
+  posthogMockConstructor,
+  postHogPersistedProperty,
+  posthogTestDouble,
+} from '../analytics/posthog-test-double';
 
 vi.mock('posthog-react-native', () => ({
-  default: vi.fn(function PostHogMock() {
-    return hoisted.client;
-  }),
-  PostHogPersistedProperty: {
-    Queue: 'queue',
-    LogsQueue: 'logs_queue',
-    AiQueue: 'ai_queue',
-  },
+  default: posthogMockConstructor,
+  PostHogPersistedProperty: postHogPersistedProperty,
 }));
 
 vi.mock('expo-device', () => ({
   DeviceType: { UNKNOWN: 0, PHONE: 1, TABLET: 2, DESKTOP: 3, TV: 4 },
   get deviceType() {
-    return hoisted.device.deviceType;
+    return device.deviceType;
   },
 }));
 
@@ -98,11 +51,32 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
   sealPostHogStorage: hoisted.storage.sealPostHogStorage,
   unsealPostHogStorage: hoisted.storage.unsealPostHogStorage,
   purgePostHogPersistence: hoisted.storage.purgePostHogPersistence,
-  isPostHogStorageSealed: hoisted.storage.isPostHogStorageSealed,
   posthogCustomStorage: hoisted.storage.posthogCustomStorage,
 }));
 
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+
+const device = { deviceType: null as number | null };
+
+const appsFlyer = {
+  init: vi.fn(),
+  setConsentData: vi.fn(),
+  logEvent: vi.fn(),
+  stop: vi.fn(),
+  create: vi.fn(),
+  startObservingTransactions: vi.fn(),
+  stopObservingTransactions: vi.fn(),
+};
+
+// File-local doubles and the closed-gates controller join the shared double in
+// one merge, so every `hoisted.<name>.*` reference keeps working and the
+// shared double stays unmodified.
+const hoisted = {
+  ...posthogTestDouble,
+  device,
+  appsFlyer,
+  controller: createControllerDouble({ mandatory: false, optional: false }),
+};
 
 vi.mock('react-native-appsflyer', () => ({
   default: {

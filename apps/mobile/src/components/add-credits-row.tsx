@@ -8,7 +8,7 @@ import {
   LINE_ACTION_HIT_SLOP,
   STATE_ACTION_CLASS,
 } from '@/lib/a11y/tap-target';
-import { canOpenExternalBilling } from '@/lib/credits/external-billing-link';
+import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { openExternalUrl } from '@/lib/external-link';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
@@ -46,9 +46,8 @@ type AddCreditsButtonProps = Readonly<{
  * is the palette's own step above that surface, so the dark fill stands off the
  * card the way the light fill does.
  *
- * It is always an in-app CTA and therefore always safe to show on iOS. The
- * external billing-page variant lives in `AddCreditsRow`, which owns the App
- * Store gate.
+ * It is always an in-app CTA and therefore always safe to show. The external
+ * billing-page variant lives in `AddCreditsRow`, which owns the storefront rule.
  */
 export function AddCreditsButton({
   onPress,
@@ -71,7 +70,7 @@ export function AddCreditsButton({
         // A line action fills the box `AddCreditsRow` wraps around it: the frame
         // is the box's floor with no vertical margin, so the box alone cancels
         // the height and the caller's line stays one text line tall.
-        lineAction ? 'min-h-[28px]' : STATE_ACTION_CLASS
+        lineAction ? 'min-h-8' : STATE_ACTION_CLASS
       )}
       // Undefined keeps the shared `Button`'s own `sm` default; a line action
       // draws a smaller frame, so it carries the flush-to-44pt slop itself.
@@ -88,7 +87,10 @@ export function AddCreditsButton({
 }
 
 type AddCreditsRowProps = Readonly<{
-  /** External billing page to open. App Store review forbids this on iOS. */
+  /**
+   * External billing page to open. Only an iOS build in the US storefront may
+   * link to it; every other case prints the label as plain text.
+   */
   url?: string;
   /** In-app destination (the credit purchase screen); platform-agnostic. */
   onPress?: () => void;
@@ -108,10 +110,10 @@ type AddCreditsRowProps = Readonly<{
 /**
  * An "Add credits" button in its call site's block. With `onPress` the button
  * is an in-app CTA on every platform. With `url` it opens the external web
- * billing page, which only Android has: iOS has no in-app link to an external
- * purchase (App Store review forbids it), so the gate here keeps that variant
- * off iOS whichever call site renders it. That is the whole platform fork: the
- * button and its in-app CTA are identical on both.
+ * billing page, which only an iOS build in the US storefront may link to; every
+ * other case prints the label as plain text with no control to press, the rule
+ * `useCanLinkExternalPurchase` owns. That is the whole fork: the button and its
+ * in-app CTA are identical on both platforms.
  *
  * The button carries its own label, so the block needs no copy beside it; a
  * sentence restating it is the redundancy `apps/mobile/AGENTS.md` rules out.
@@ -135,12 +137,17 @@ export function AddCreditsRow({
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const narrow = isNarrowLayout(width);
-  // App Store review: iOS must not show an in-app CTA that opens an external
-  // purchase/billing page, so the external `url` variant stays Android-only —
-  // the shared gate keeps it here so no call site can surface it on iOS. An
-  // in-app `onPress` CTA is platform-agnostic and shows on both platforms.
-  if (!onPress && !canOpenExternalBilling()) {
-    return null;
+  const canLink = useCanLinkExternalPurchase();
+  // An in-app link to an external purchase is refused outside the US App Store
+  // storefront and on Play everywhere, so the external `url` variant is not a
+  // control there: it prints the same label as plain text. An in-app `onPress`
+  // CTA is a real store purchase and shows on both platforms.
+  if (!onPress && !canLink) {
+    return (
+      <Text className={cn('text-xs font-semibold text-muted-foreground', className)}>
+        {t('addCredits.cta')}
+      </Text>
+    );
   }
   const button = (
     <AddCreditsButton

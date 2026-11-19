@@ -2,6 +2,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { formatPercent } from '@/lib/format';
+
+import { formatSessionCostBadge } from './session-list-helpers';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -14,8 +17,9 @@ import {
   getContextSheetContent,
   getContextTone,
   getHeaderPillContent,
-  getIndeterminateArcFraction,
+  getHeaderPillWidth,
   getMetricsAccessibilityLabel,
+  getPillSlotSizers,
   getRemainingTokens,
   type HeaderPillContent,
 } from './context-usage-display';
@@ -48,7 +52,7 @@ function pill(args: {
 const trackOnly: HeaderPillContent = {
   primary: null,
   secondary: null,
-  costSlot: 'none',
+  costSlot: 'unreported',
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
@@ -90,10 +94,10 @@ describe('formatExactTokens', () => {
 
 describe('formatCost', () => {
   it('preserves the existing four-decimal dollar format', () => {
-    expect(formatCost(0)).toBe('$0.0000');
-    expect(formatCost(0.08)).toBe('$0.0800');
-    expect(formatCost(0.123_456)).toBe('$0.1235');
-    expect(formatCost(1.2)).toBe('$1.2000');
+    expect(formatCost(0)).toBe('\u2066$0.0000\u2069');
+    expect(formatCost(0.08)).toBe('\u2066$0.0800\u2069');
+    expect(formatCost(0.123_456)).toBe('\u2066$0.1235\u2069');
+    expect(formatCost(1.2)).toBe('\u2066$1.2000\u2069');
   });
 });
 
@@ -118,21 +122,12 @@ describe('getContextTone', () => {
 });
 
 describe('getArcFraction', () => {
-  it('maps known percentages and leaves unknown capacity indeterminate', () => {
+  it('maps known percentages and leaves unknown capacity undefined', () => {
     expect(getArcFraction(0)).toBe(0);
     expect(getArcFraction(50)).toBe(0.5);
     expect(getArcFraction(100)).toBe(1);
     expect(getArcFraction(125)).toBe(1);
     expect(getArcFraction(undefined)).toBeUndefined();
-  });
-});
-
-describe('getIndeterminateArcFraction', () => {
-  it('returns a stable non-empty neutral arc fraction', () => {
-    const fraction = getIndeterminateArcFraction();
-    expect(fraction).toBeGreaterThan(0);
-    expect(fraction).toBeLessThan(1);
-    expect(getIndeterminateArcFraction()).toBe(fraction);
   });
 });
 
@@ -179,7 +174,7 @@ describe('getHeaderPillContent', () => {
       hasMessages: true,
     });
     expect(result).toMatchObject({
-      secondary: '$0.08',
+      secondary: '\u2066$0.08\u2069',
       costSlot: 'label',
       tone: 'primary',
       arcFraction: 0.42,
@@ -191,7 +186,7 @@ describe('getHeaderPillContent', () => {
   it('omits secondary cost when cost is zero or null', () => {
     const base = {
       secondary: null,
-      costSlot: 'none',
+      costSlot: 'unreported',
       tone: 'primary' as const,
       arcFraction: 0.1,
       interactive: true,
@@ -212,7 +207,7 @@ describe('getHeaderPillContent', () => {
       hasMessages: true,
     });
     expect(result.tone).toBe('warning');
-    expect(result.secondary).toBe('$0.50');
+    expect(result.secondary).toBe('\u2066$0.50\u2069');
     expect(result.arcFraction).toBe(0.8);
     expect(result.interactive).toBe(true);
   });
@@ -236,7 +231,7 @@ describe('getHeaderPillContent', () => {
     });
     expect(result).toMatchObject({
       primary: null,
-      secondary: '$0.12',
+      secondary: '\u2066$0.12\u2069',
       costSlot: 'label',
       tone: 'neutral',
       arcFraction: undefined,
@@ -255,7 +250,7 @@ describe('getHeaderPillContent', () => {
     ).toMatchObject({
       primary: null,
       secondary: null,
-      costSlot: 'none',
+      costSlot: 'unreported',
       tone: 'neutral',
       arcFraction: undefined,
       interactive: true,
@@ -266,7 +261,7 @@ describe('getHeaderPillContent', () => {
   it('shows cost only, not interactive, arc 0 when transcript exists without context', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: true })).toEqual({
       primary: null,
-      secondary: '$0.08',
+      secondary: '\u2066$0.08\u2069',
       costSlot: 'label',
       tone: 'neutral',
       arcFraction: 0,
@@ -288,10 +283,92 @@ describe('getHeaderPillContent', () => {
   });
 });
 
+describe('getPillSlotSizers', () => {
+  // The slots are laid out at the widest reading they can paint, so a reading
+  // that arrives fills its slot instead of resizing the pill beside the title.
+  it('sizes both slots from the widest reading each one paints', () => {
+    const sizers = getPillSlotSizers();
+    // The percentage keeps at most one decimal, so a fractional reading is a
+    // glyph wider than the whole window. The slot holds whichever is longer.
+    const fractional = formatPercent(99.9, i18n.language);
+    const whole = formatPercent(100, i18n.language);
+    expect(sizers.percentage).toBe(fractional.length >= whole.length ? fractional : whole);
+    // The cost sizer holds both badge shapes: the four-decimal one below half a
+    // cent is the wider of the two, so it is the reserve.
+    expect(sizers.cost).toBe(formatSessionCostBadge(4_999));
+  });
+
+  // The percentage slot holds every reading the pill paints, in both shapes the
+  // formatter produces: a fractional reading and a whole window.
+  it('holds a painted percentage in both of its shapes', () => {
+    const { percentage } = getPillSlotSizers();
+    for (const painted of [0, 0.4, 5, 16.7, 42, 88.8, 99.9, 100].map(value =>
+      formatPercent(value, i18n.language)
+    )) {
+      expect(painted.length).toBeLessThanOrEqual(percentage.length);
+    }
+    // A fractional reading is longer than the whole-window one it shares the
+    // slot with, so the reserve cannot be the whole window alone.
+    expect(formatPercent(16.7, i18n.language).length).toBeGreaterThan(
+      formatPercent(100, i18n.language).length
+    );
+  });
+
+  // A badge the pill actually paints fits the width its slot reserved, in both
+  // of the shapes the formatter produces: four decimals below half a cent and
+  // two at or above it.
+  it('holds a painted badge in both of its shapes', () => {
+    const { cost } = getPillSlotSizers();
+    for (const painted of [
+      formatSessionCostBadge(500),
+      formatSessionCostBadge(20_000),
+      formatSessionCostBadge(150_000),
+      formatSessionCostBadge(980_000),
+      // The widest two-decimal badge without a grouping separator. The first
+      // grouped total is a glyph wider than the reserve and truncates inside
+      // its single line, the bound the sizer's own comment states.
+      formatSessionCostBadge(999_990_000),
+    ]) {
+      expect(painted).not.toBeNull();
+      expect((painted ?? '').length).toBeLessThanOrEqual(cost.length);
+    }
+  });
+
+  it('never returns an empty sizer', () => {
+    const sizers = getPillSlotSizers();
+    expect(sizers.percentage.length).toBeGreaterThan(0);
+    expect(sizers.cost.length).toBeGreaterThan(0);
+  });
+});
+
+describe('getHeaderPillWidth', () => {
+  // A header reserves this width beside the title, so the reserve has to be the
+  // width the pill paints: the rows grow with the font scale, the chrome does not.
+  it('grows by its text alone as the font scale rises', () => {
+    const atOne = getHeaderPillWidth(1);
+    const atTwo = getHeaderPillWidth(2);
+    expect(atTwo).toBeGreaterThan(atOne);
+    expect(atTwo).toBeLessThan(atOne * 2);
+  });
+
+  // Read off the pill's classes: the 42dp square ring button, its two border dp
+  // and the 8.75 leading padding hold 52.75 dp, and the reserved value row adds
+  // 72.5 at scale 1.
+  it('reserves the pill its chrome and its readings', () => {
+    expect(getHeaderPillWidth(1)).toBe(125.25);
+    expect(getHeaderPillWidth(2)).toBe(197.75);
+  });
+
+  it('reads a missing or unusable scale as the default', () => {
+    expect(getHeaderPillWidth(Number.NaN)).toBe(getHeaderPillWidth(1));
+    expect(getHeaderPillWidth(0)).toBe(getHeaderPillWidth(1));
+  });
+});
+
 describe('getContextSheetContent', () => {
   it('does not invent usage before the first completed model step', () => {
     expect(getContextSheetContent(undefined, null)).toMatchObject({
-      usedTokens: '-',
+      usedTokens: null,
       windowTokens: null,
       capacityKnown: false,
       percentage: null,
@@ -312,7 +389,7 @@ describe('getContextSheetContent', () => {
     expect(content.percentage).toBe('42%');
     expect(content.remainingTokens).toBe('116,000');
     expect(content.remainingPercentage).toBe('58%');
-    expect(content.cost).toBe('$0.08');
+    expect(content.cost).toBe('\u2066$0.08\u2069');
     expect(content.tone).toBe('primary');
   });
 
@@ -602,7 +679,7 @@ describe('pure integration fallback', () => {
     // The cost takes the cost slot, which holds the widest badge; the
     // percentage slot stays reserved and empty.
     expect(result.primary).toBeNull();
-    expect(result.secondary).toBe('$0.08');
+    expect(result.secondary).toBe('\u2066$0.08\u2069');
     expect(result.costSlot).toBe('label');
   });
 });

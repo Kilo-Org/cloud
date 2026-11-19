@@ -22,6 +22,7 @@ const stored: CodeReviewStoredConfig = {
     },
   ],
   disableReviewMd: true,
+  reviewGuidelineSourceRepositories: ['acme/guidelines'],
   manuallyAddedRepositories: [{ id: 9, name: 'manual', full_name: 'manual/repo', private: true }],
   council: {
     enabled: true,
@@ -41,6 +42,20 @@ const stored: CodeReviewStoredConfig = {
 };
 
 describe('applyCodeReviewConfigPatch', () => {
+  it('preserves omitted guideline sources and accepts replacing or clearing the allowlist', () => {
+    expect(
+      applyCodeReviewConfigPatch(stored, { reviewStyle: 'strict' })
+        .reviewGuidelineSourceRepositories
+    ).toEqual(['acme/guidelines']);
+    expect(
+      applyCodeReviewConfigPatch(stored, { reviewGuidelineSourceRepositories: ['acme/other'] })
+        .reviewGuidelineSourceRepositories
+    ).toEqual(['acme/other']);
+    expect(
+      applyCodeReviewConfigPatch(stored, { reviewGuidelineSourceRepositories: [] })
+        .reviewGuidelineSourceRepositories
+    ).toEqual([]);
+  });
   it('preserves every field of `stored` when the patch is empty', () => {
     const merged = applyCodeReviewConfigPatch(stored, {});
     expect(merged).toEqual(stored);
@@ -139,7 +154,6 @@ describe('applyCodeReviewConfigPatch', () => {
   it('ignores explicit `undefined` values in the patch (preserves stored)', () => {
     const merged = applyCodeReviewConfigPatch(stored, {
       reviewStyle: undefined,
-      // Cast to satisfy the partial type at the test call site.
       council: undefined,
     });
     expect(merged.reviewStyle).toBe(stored.reviewStyle);

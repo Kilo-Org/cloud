@@ -559,6 +559,10 @@ that takes its time over one of them holds the whole run there.
 `models` fails about one run in five on a single third-party model that answers
 one turn with nothing. It is the model, not the package: the same model passes
 on the next run, and the failure is an empty answer rather than a refused call.
+The run therefore holds the whole conversation once more before an empty answer
+counts, and only a second one fails it — the rule `live` and `time` already
+keep. A refused call is not retried: that fallback to `chat_completions` is
+already in `run`.
 
 `shapes` reads a ratio of zero about as often, and for the provider's own
 reason: the entry is not readable yet. `google/gemini-3.7-flash` on `messages`
@@ -623,8 +627,10 @@ minimum, 4096 tokens on Haiku 4.5, or nothing caches and the check fails for
 the wrong reason.
 
 About one run in five fails with a ratio of 0, because the provider has not
-made the entry readable yet. Re-run before looking for a bug — a real prefix
-regression fails every time, not one time in five.
+made the entry readable yet. `e2e/live.ts` asks a second time when the first
+call read nothing back, so a zero in its output is a provider that read nothing
+twice: look for a bug then. A real prefix regression fails every time, not one
+time in five.
 
 Measured on 2026-09-03, `anthropic/claude-haiku-4.5`, the Kilo organization:
 
@@ -1814,9 +1820,8 @@ the entry even with the key.
 
 `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
 against, and every import of either is a type. Nothing of either survives the
-build, so both are dev dependencies and a consumer installs neither: 21.5 MiB
-and 14.2 MiB unpacked at `openai` 7.36.0 and `@anthropic-ai/sdk` 0.137.0,
-against 4 runtime dependencies that are all used.
+build, so both are dev dependencies and a consumer installs neither: 22.9 MiB
+and 16.5 MiB unpacked at `openai` 7.55.0 and `@anthropic-ai/sdk` 1.8.0.
 
 That holds only while no published declaration names one. Exporting a type
 built out of one — `ContentBlock`, say, which two wires exported and neither
@@ -2030,8 +2035,8 @@ There are eleven entry points: `@kilocode/harness-sdk`, `/core`,
 `/plugins/remote-mcp`, `/plugins/tools`, `/plugins/store/node`, `/plugins/store/expo`
 and `/testing`.
 The two stores have
-subpaths of their own because each names a platform: exporting them from the
-root would pull `node:sqlite` or `expo-sqlite` into every bundle. `/plugins/fetch`
+subpaths of their own because each names a platform: exporting the Node store
+from the root would pull `node:sqlite` into every bundle. `/plugins/fetch`
 and `/testing` have theirs because an entry point is what a consumer bundles and
 neither runs in production — a caller with a `fetch` of their own should not
 carry this one, and the conformance checks belong to a plugin author's test

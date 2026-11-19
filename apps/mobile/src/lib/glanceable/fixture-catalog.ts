@@ -1,4 +1,4 @@
-import { type GlanceableAgentsSnapshotStatus } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type GlanceableSnapshotStatusOverride } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type SessionLiveOutcomeKind } from '@kilocode/notifications/schemas';
 
 import { APPROVAL_ROWS, combinationRows, many, mixedRows, roundWake } from './fixture-rows';
@@ -48,7 +48,7 @@ export type GlanceableFixtureRow = {
 export type GlanceableFixture = {
   description: string;
   /** Overrides the happy/empty derivation, exactly as the publisher does. */
-  status?: Exclude<GlanceableAgentsSnapshotStatus, 'happy' | 'empty'>;
+  status?: GlanceableSnapshotStatusOverride;
   /** Minutes since the last successful confirmation. */
   checkedAgo?: number;
   rows?: (now: number) => GlanceableFixtureRow[];
@@ -230,6 +230,23 @@ export const GLANCEABLE_FIXTURES = {
     rows: now => [
       { status: 'question', ago: 5, title: '' },
       { status: 'scheduled', ago: 8, title: '', scheduledAt: roundWake(now) },
+    ],
+  },
+  'placeholder-title': {
+    description:
+      'Sessions still on the backend creation title: the generic agent label, never the machine text.',
+    rows: now => [
+      {
+        status: 'question',
+        ago: 6,
+        title: `New session - ${new Date(now - 40 * MINUTE_MS).toISOString()}`,
+      },
+      {
+        status: 'scheduled',
+        ago: 9,
+        title: `Child session - ${new Date(now - 50 * MINUTE_MS).toISOString()}`,
+        scheduledAt: roundWake(now),
+      },
     ],
   },
   'stale-idle': {

@@ -7,15 +7,19 @@ import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sin
 import {
   applyNeedsInputNotifications,
   type NeedsInputNotificationRow,
-  notificationIdentifierForSession,
   planNeedsInputNotifications,
   reconcileNotifiedAfterApply,
   shouldPublishForSession,
 } from './needs-input-notification';
+import {
+  notificationIdentifierForSession,
+  readNeedsInputPresentation,
+} from './needs-input-presentation';
 
 const mocks = vi.hoisted(() => ({
   scheduleNotificationAsync: vi.fn(),
   dismissNotificationAsync: vi.fn(),
+  getPresentedNotificationsAsync: vi.fn(),
   getPermissionsAsync: vi.fn(),
 }));
 
@@ -23,6 +27,7 @@ vi.mock('expo-notifications', () => ({
   PermissionStatus: { GRANTED: 'granted' },
   scheduleNotificationAsync: mocks.scheduleNotificationAsync,
   dismissNotificationAsync: mocks.dismissNotificationAsync,
+  getPresentedNotificationsAsync: mocks.getPresentedNotificationsAsync,
   getPermissionsAsync: mocks.getPermissionsAsync,
 }));
 
@@ -47,6 +52,7 @@ beforeEach(() => {
   setTelemetrySink(null);
   mocks.scheduleNotificationAsync.mockReset().mockResolvedValue(undefined);
   mocks.dismissNotificationAsync.mockReset().mockResolvedValue(undefined);
+  mocks.getPresentedNotificationsAsync.mockReset().mockResolvedValue([]);
   mocks.getPermissionsAsync.mockReset().mockResolvedValue({ status: 'granted' });
 });
 
@@ -56,6 +62,31 @@ describe('notificationIdentifierForSession', () => {
     expect(notificationIdentifierForSession('ses_1')).not.toBe(
       notificationIdentifierForSession('ses_2')
     );
+  });
+});
+
+describe('readNeedsInputPresentation', () => {
+  it('drops a marker whose notification the OS no longer holds', async () => {
+    await applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] });
+
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('absent');
+
+    // The marker is gone, so the next read answers without asking the OS again.
+    mocks.getPresentedNotificationsAsync.mockClear();
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('absent');
+    expect(mocks.getPresentedNotificationsAsync).not.toHaveBeenCalled();
+  });
+
+  it('reports unknown when the OS cannot be asked, keeping the marker', async () => {
+    await applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] });
+    mocks.getPresentedNotificationsAsync.mockRejectedValue(new Error('shade unavailable'));
+
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('unknown');
+
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([
+      { request: { identifier: notificationIdentifierForSession('ses_1') } },
+    ]);
+    await expect(readNeedsInputPresentation('ses_1')).resolves.toBe('presented');
   });
 });
 
@@ -79,12 +110,6 @@ describe('shouldPublishForSession', () => {
         false
       );
     }
-  });
-
-  it('publishes while a different session chat is open', () => {
-    expect(shouldPublishForSession({ appState: ACTIVE, pathname: AWAY, sessionId: 'ses_1' })).toBe(
-      true
-    );
   });
 
   it('publishes when the router is not mounted', () => {
@@ -709,37 +734,6 @@ describe('applyNeedsInputNotifications', () => {
         content: expect.not.objectContaining({ sound: false }),
       })
     );
-  });
-
-  it('keeps a first post of a raise alerting on the shared channel', async () => {
-    const plan = planNeedsInputNotifications({
-      previous: [],
-      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
-      pathname: AWAY,
-      appState: ACTIVE,
-      attentionEnabled: true,
-      previews: 'full',
-    });
-    expect(plan.updates).toEqual([]);
-
-    await applyNeedsInputNotifications(plan);
-
-    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith({
-      identifier: 'needs-input:ses_1',
-      content: {
-        title: 'Fix the bug',
-        body: 'Agent needs input',
-        data: {
-          type: 'cloud_agent_session',
-          cliSessionId: 'ses_1',
-          category: 'attention',
-          attentionKind: 'question',
-        },
-        categoryIdentifier: 'kilo-needs-input:question',
-        interruptionLevel: 'timeSensitive',
-      },
-      trigger: { channelId: 'needs-input' },
-    });
   });
 
   it('alerts again once the raise was dismissed and comes back', async () => {

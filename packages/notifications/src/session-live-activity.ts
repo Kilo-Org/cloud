@@ -1,8 +1,11 @@
-import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { glanceableTitle } from '@kilocode/app-shared/home-widget';
+import {
+  glanceableStatusKind,
+  LIVE_ACTIVITY_MAX_LIFETIME_MS,
+  type GlanceableSessionRow,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { glanceableSessionTitle } from '@kilocode/app-shared/home-widget';
 import { timestampMs, timestampToIso } from '@kilocode/app-shared/utils';
 import {
-  isDefaultSessionTitle,
   SESSION_LIVE_COMMAND_LIMIT,
   SESSION_LIVE_PLAN_STEP_LIMIT,
   SESSION_LIVE_TARGET_LIMIT,
@@ -13,44 +16,50 @@ import {
   type SessionLiveStep,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
 
-import { LIVE_ACTIVITY_RELEVANCE, type SessionLiveActivityContentState } from './push-data';
+import { LIVE_ACTIVITY_RELEVANCE, LIVE_ACTIVITY_TIE_BREAK_LIMIT } from './push-presentation';
 import {
   isFinishedSessionCardStatus,
   SESSION_CARD_QUIET_AFTER_MS,
   type SessionCardStatusKind,
+  type SessionLiveActivityContentState,
   type SessionLiveOutcomeKind,
 } from './session-live-content';
 
 /**
- * The session card title (spec "Content" rule 2): the shared glanceable title
- * cut, so the card draws the same text the Home widget row would. This surface
- * adds only its own empty rule: an untitled session or the backend
- * `New session - <ISO>` placeholder gives null, so the card draws
+ * The session card title (spec "Content" rule 2): the card draws exactly what
+ * the Home widget row draws. An untitled session and the backend
+ * `New session - <ISO>` placeholder give null, so the card draws
  * `common.agent` instead.
  */
 export function sessionLiveActivityTitle(raw: string | null | undefined): string | null {
-  const title = glanceableTitle(raw);
-  if (title === '' || isDefaultSessionTitle(title)) return null;
-  return title;
+  return glanceableSessionTitle(raw);
 }
 
-/** The facts of one session row that the session card shows. */
-export type SessionLiveActivityRow = {
+/**
+ * The facts of one session row that the session card shows: the shared
+ * active-session row (`GlanceableSessionRow`, whose nullability policy this
+ * row follows) plus the identity and the card-only facts. Every fact the
+ * card carries forward from the previous build follows one absence policy: a
+ * row that does not carry the fact omits it, and the card then keeps the value
+ * it already shows, because a tray rebuild carries only what the tray knows.
+ * `failure` is the one such fact whose explicit `null` means something,
+ * because it reports that nothing failed. `title` is read only from the row,
+ * so it accepts `null` from producers that serialize an absent value and never
+ * falls back to the previous build.
+ */
+export type SessionLiveActivityRow = GlanceableSessionRow & {
   id: string;
   title?: string | null;
-  status: string;
-  statusUpdatedAt?: string | null;
-  scheduledAt?: string | null;
   /** The stored summary the ingest service derived, when the row carries it. */
-  currentStep?: SessionLiveStep | null;
-  plan?: SessionLivePlan | null;
-  changes?: SessionLiveChanges | null;
-  permissionCommand?: string | null;
-  lastActivityAt?: string | null;
-  costMicrodollars?: number | null;
-  outcome?: SessionLiveOutcomeKind | null;
+  currentStep?: SessionLiveStep;
+  plan?: SessionLivePlan;
+  changes?: SessionLiveChanges;
+  permissionCommand?: string;
+  lastActivityAt?: string;
+  costMicrodollars?: number;
+  outcome?: SessionLiveOutcomeKind;
   failure?: SessionLiveFailureKind | null;
-  startedAt?: string | null;
+  startedAt?: string;
   /** True when this session has an open pull request; set on a finished row. */
   prOpened?: boolean;
 };
@@ -73,13 +82,31 @@ function maxCost(
   return Math.max(previous, next);
 }
 
-/** How a finished session ended: the PR it opened, its diff, or nothing. */
+/**
+ * The keep-the-previous rule for a fact a row may not carry: an absent fact
+ * leaves what the card shows, and a carried one replaces it. `null` is not a
+ * row value for these facts; the `failure` fact below is the one exception —
+ * it reports "no failure" with `null`, so its caller passes the remembered
+ * kind as `previous` and an explicit `null` clears it while an absent key
+ * keeps it.
+ */
+function carried<T>(value: T | undefined, previous: T | null | undefined): T | null {
+  return value === undefined ? (previous ?? null) : value;
+}
+
+/**
+ * How a finished session ended: the PR it opened, its diff, or nothing. A row
+ * that states neither fact keeps the outcome the card already shows; an
+ * explicit `prOpened: false` is a stated fact, so it re-derives instead.
+ */
 function outcomeKind(
   row: SessionLiveActivityRow,
-  changes: SessionLiveChanges | null
+  changes: SessionLiveChanges | null,
+  previous: SessionLiveOutcomeKind | undefined
 ): SessionLiveOutcomeKind {
-  if (row.outcome !== null && row.outcome !== undefined) return row.outcome;
+  if (row.outcome !== undefined) return row.outcome;
   if (row.prOpened === true) return 'pr_opened';
+  if (row.prOpened === undefined && previous !== undefined) return previous;
   return changes === null ? 'none' : 'changes';
 }
 
@@ -92,14 +119,21 @@ function outcomeKind(
  *   `awaitingPermission` is true only when that key is present.
  * - `statusSinceFallback` is used when the row has no usable status time.
  * - `scheduledAt` is set only for the scheduled status kind.
- * - The richer facts keep the value the row carries, and fall back to the
- *   content the card already shows. A tray row carries no step, plan, diff or
- *   outcome, so a local update must not wipe the ones a push delivered.
- * - A finished row with a failure reads as the `failed` kind, which the layout
- *   draws as a stopped turn. A row that carries `failure: null` reports no
- *   failure and clears the remembered one; a row with no `failure` key at all
- *   cannot report it either way, so the remembered failure survives, which is
- *   what keeps a push-delivered `failed` card through a tray rebuild.
+ * - One absence policy covers every optional fact: a row that does not carry
+ *   a fact omits it, and the card keeps the value it already shows. A tray row
+ *   carries no step, plan, diff or outcome, so a local update must not wipe
+ *   the ones a push delivered. The outcome follows that order: the row's own
+ *   outcome first, then an opened pull request, then the remembered outcome,
+ *   and the diff derivation last.
+ * - `prOpened: false` is a stated fact, not an absent one: it reports that no
+ *   pull request is open, so it does not carry the remembered outcome forward.
+ *   Only a row that omits `prOpened` entirely keeps it.
+ * - `failure` is the one exception to that policy. A finished row with a
+ *   failure reads as the `failed` kind, which the layout draws as a stopped
+ *   turn. A row that carries `failure: null` reports no failure and clears the
+ *   remembered one; a row with no `failure` key at all cannot report it either
+ *   way, so the remembered failure survives, which is what keeps a
+ *   push-delivered `failed` card through a tray rebuild.
  * - Every text field is read through the shared display rule before it reaches
  *   the card, so a value from any producer draws as the line it stands for.
  */
@@ -109,14 +143,14 @@ export function buildSessionLiveActivityContentState(
 ): SessionLiveActivityContentState {
   const previous = options.previous;
   const base = glanceableStatusKind(row.status);
-  const failure = row.failure === undefined ? (previous?.failure?.kind ?? null) : row.failure;
+  const failure = carried(row.failure, previous?.failure?.kind ?? null);
   const statusKind: SessionCardStatusKind = base === 'idle' && failure !== null ? 'failed' : base;
   const approvalKey = row.status === 'permission' ? options.approvalKey : null;
-  const changes = row.changes ?? previous?.changes ?? null;
+  const changes = carried(row.changes, previous?.changes);
   const finished = isFinishedSessionCardStatus(statusKind);
-  const step = row.currentStep ?? previous?.currentStep ?? null;
-  const plan = row.plan ?? previous?.plan ?? null;
-  const command = row.permissionCommand ?? previous?.permissionCommand ?? null;
+  const step = carried(row.currentStep, previous?.currentStep);
+  const plan = carried(row.plan, previous?.plan);
+  const command = carried(row.permissionCommand, previous?.permissionCommand);
   return {
     sessionId: row.id,
     title: sessionLiveActivityTitle(row.title),
@@ -139,7 +173,7 @@ export function buildSessionLiveActivityContentState(
     changes,
     lastActivityAt: timestampToIso(row.lastActivityAt) ?? previous?.lastActivityAt ?? null,
     costMicrodollars: maxCost(previous?.costMicrodollars, row.costMicrodollars),
-    outcome: finished ? { kind: outcomeKind(row, changes) } : null,
+    outcome: finished ? { kind: outcomeKind(row, changes, previous?.outcome?.kind) } : null,
     failure: failure === null || statusKind !== 'failed' ? null : { kind: failure },
     startedAt: timestampToIso(row.startedAt) ?? previous?.startedAt ?? null,
   };
@@ -172,7 +206,7 @@ export function sessionCardStaleAtSeconds(
  * older than this can no longer reach a card, so the server ignores and drops
  * it, and its session counts as unfollowed again.
  */
-export const SESSION_LIVE_ACTIVITY_MAX_AGE_MS = 8 * 60 * 60_000;
+export const SESSION_LIVE_ACTIVITY_MAX_AGE_MS = LIVE_ACTIVITY_MAX_LIFETIME_MS;
 
 // The recency term counts from this fixed origin, so two scores computed at
 // different times compare correctly.
@@ -181,13 +215,17 @@ const RECENCY_HALF_MS = 365 * 24 * 60 * 60_000;
 
 /**
  * A tie-break inside one relevance band (spec "Presentation order" rule 3):
- * a newer change first, and a bounded term so no tie-break can leave its band.
+ * a newer change first, and a bounded term so no tie-break can leave its
+ * band — the bound is `LIVE_ACTIVITY_TIE_BREAK_LIMIT`, one below the smallest
+ * gap between adjacent `LIVE_ACTIVITY_RELEVANCE` bands, so the term and the
+ * table state that invariant together.
  */
 function recencyTerm(changedAt: string | null): number {
   const at = timestampMs(changedAt);
   if (at === null) return 0;
   const elapsed = Math.max(0, at - RECENCY_ORIGIN_MS);
-  return Math.min(19, (19 * elapsed) / (elapsed + RECENCY_HALF_MS));
+  const limit = LIVE_ACTIVITY_TIE_BREAK_LIMIT;
+  return Math.min(limit, (limit * elapsed) / (elapsed + RECENCY_HALF_MS));
 }
 
 /**

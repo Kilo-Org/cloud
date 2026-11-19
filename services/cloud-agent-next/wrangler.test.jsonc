@@ -5,6 +5,7 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
+    "ENVIRONMENT": "production",
     "CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED": "true",
     "WORKER_URL": "https://worker.example.com",
     "NEXTAUTH_SECRET": "cloud-agent-integration-test-secret",
@@ -29,6 +30,10 @@
         "name": "SANDBOX_SESSION",
       },
       {
+        "class_name": "CloudAgentWorkspaceDO",
+        "name": "CLOUD_AGENT_WORKSPACE",
+      },
+      {
         "class_name": "PreviewPortTestDO",
         "name": "PREVIEW_PORT_TEST",
       },
@@ -39,6 +44,19 @@
       {
         "class_name": "SandboxContainers",
         "name": "SANDBOX_CONTAINERS",
+      },
+      { "class_name": "SentrySessionProbe", "name": "SENTRY_SESSION_PROBE" },
+      { "class_name": "SentryLegacySessionProbe", "name": "SENTRY_LEGACY_SESSION_PROBE" },
+      { "class_name": "SentrySandboxControlProbe", "name": "SENTRY_SANDBOX_CONTROL_PROBE" },
+      { "class_name": "SentrySandboxContainerProbe", "name": "SENTRY_SANDBOX_CONTAINER_PROBE" },
+      {
+        "class_name": "SentryBillingAdmissionContainer",
+        "name": "SENTRY_BILLING_ADMISSION_CONTAINER",
+      },
+      { "class_name": "SentryDisabledProbe", "name": "SENTRY_DISABLED_PROBE" },
+      {
+        "class_name": "PreviewTunnel",
+        "name": "PREVIEW_TUNNEL",
       },
     ],
   },
@@ -60,6 +78,10 @@
       "tag": "v10",
     },
     {
+      "new_sqlite_classes": ["CloudAgentWorkspaceDO"],
+      "tag": "v10-workspace",
+    },
+    {
       "new_classes": ["PreviewPortTestDO"],
       "tag": "v11",
     },
@@ -71,9 +93,28 @@
       "new_sqlite_classes": ["SandboxContainers"],
       "tag": "v13",
     },
+    {
+      "new_sqlite_classes": [
+        "SentrySessionProbe",
+        "SentryLegacySessionProbe",
+        "SentrySandboxControlProbe",
+        "SentrySandboxContainerProbe",
+        "SentryBillingAdmissionContainer",
+        "SentryDisabledProbe",
+      ],
+      "tag": "sentry-probes",
+    },
+    {
+      "new_sqlite_classes": ["PreviewTunnel"],
+      "tag": "v14",
+    },
   ],
   "r2_buckets": [
     { "binding": "RUNTIME_RELEASE_BUCKET", "bucket_name": "cloud-agent-runtime-test" },
+    {
+      "binding": "WORKSPACE_ARTIFACTS_BUCKET",
+      "bucket_name": "cloud-agent-workspace-artifacts-test",
+    },
   ],
   "queues": {
     "producers": [

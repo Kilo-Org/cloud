@@ -8,12 +8,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_CLEAR_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -195,13 +195,7 @@ export function ModelPickerContent() {
         return null;
       }
       if (item.type === 'header') {
-        return (
-          <View className="bg-secondary px-4 py-2">
-            <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {item.title}
-            </Text>
-          </View>
-        );
+        return <SectionHeader inset label={item.title} />;
       }
 
       return (
@@ -280,15 +274,24 @@ export function ModelPickerContent() {
                 </View>
               ) : null}
             </View>
-            {/* In-field clear, on every platform: `clearButtonMode` is iOS
-                only, so Android rendered the query with no way to reset it. */}
+            {/* In-field clear, on every platform: the native clear affordance is not
+                available on the platform without one, so the field carries its
+                own control. The frame, not the 16pt glyph, is what a
+                control-size audit reads, so the control renders a box that
+                carries the whole target on its own node, and it adds no
+                `hitSlop`: the box already reaches past the target, and a reach
+                across `gap-2` would take taps the search field should get. The
+                box cancels its own extra height, so the field keeps its height.
+                `-me-3` (the field's own `px-3`) puts the box's trailing edge on
+                the field's edge, so the whole box stays inside the field's
+                frame; it is a logical margin, so it mirrors with the row in
+                right-to-left layouts. */}
             {search.length > 0 ? (
               <Pressable
                 onPress={handleClearSearch}
                 accessibilityLabel={t('common.clearSearch')}
                 accessibilityRole="button"
-                hitSlop={12}
-                className="active:opacity-70"
+                className={`${FIELD_CLEAR_BOX_CLASS} -me-3 active:opacity-70`}
               >
                 <X size={16} color={colors.mutedForeground} />
               </Pressable>
@@ -321,9 +324,7 @@ export function ModelPickerContent() {
             // same recovery the Agents search empty state does, so the only
             // exit from "No matches" is not backspacing the query away.
             deferredSearch.trim() ? (
-              <Button variant="outline" onPress={handleClearSearch} className={STATE_ACTION_CLASS}>
-                <Text>{t('common.clearSearch')}</Text>
-              </Button>
+              <StateAction label={t('common.clearSearch')} icon={X} onPress={handleClearSearch} />
             ) : undefined
           }
         />

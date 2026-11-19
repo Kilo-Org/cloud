@@ -8,15 +8,19 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { NewSessionButton } from '@/components/agents/new-session-button';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
+import { StateAction } from '@/components/empty-state';
+import { Plus, SlidersHorizontal, X } from '@/components/ui/icons';
 import {
   selectSessionListBodyModel,
   type SessionListClearAction,
 } from '@/components/agents/session-list-body-model';
 import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
-import { type SessionSection } from '@/components/agents/session-list-helpers';
+import {
+  type SessionSection,
+  sessionSectionAccessibilityLabel,
+} from '@/components/agents/session-list-helpers';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
 import {
   flattenSessionSections,
@@ -43,8 +47,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
-export const FAB_SIZE = 56;
-export const FAB_MARGIN = 16;
 const REFRESH_STATUS_BAND_HEIGHT = 20;
 
 type AgentSessionListContentProps = {
@@ -223,19 +225,15 @@ export function AgentSessionListContent({
     return (
       <View className="flex-row flex-wrap items-center justify-center gap-2">
         {actions.map(action => (
-          <Button
+          <StateAction
             key={action}
-            variant="outline"
+            label={action === 'clear-search' ? t('common.clearSearch') : t('common.clearFilters')}
+            icon={action === 'clear-search' ? X : SlidersHorizontal}
             testID={action === 'clear-search' ? 'session-clear-search' : 'session-clear-filters'}
             onPress={() => {
               onClearAction(action);
             }}
-            className={STATE_ACTION_CLASS}
-          >
-            <Text>
-              {action === 'clear-search' ? t('common.clearSearch') : t('common.clearFilters')}
-            </Text>
-          </Button>
+          />
         ))}
       </View>
     );
@@ -244,7 +242,9 @@ export function AgentSessionListContent({
   // The no-history body's next step. It opens the same composer the Agents
   // tab's "New session" action does, so an empty history never dead-ends at a
   // message.
-  const createSessionAction = <NewSessionButton onPress={onCreateSession} />;
+  const createSessionAction = (
+    <StateAction label={t('common.newSession')} icon={Plus} onPress={onCreateSession} />
+  );
 
   // Each row re-reads the ack store through its own `useSyncExternalStore`
   // subscription (`useSessionAttentionRevision`). The snapshot taken when the
@@ -349,7 +349,7 @@ export function AgentSessionListContent({
   let listFooter: ReactNode = null;
   if (isFetchNextPageError) {
     listFooter = (
-      <View className="items-center gap-3 px-6 py-4">
+      <View className="items-center gap-3 px-4 py-4">
         <Text variant="muted" className="text-center text-xs">
           {t('common.couldnTLoadMore')}
         </Text>
@@ -375,22 +375,24 @@ export function AgentSessionListContent({
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {
+      // The reserved cold-open slots are separate list items in the stored
+      // list's own shape — a date-header placeholder, then one cell per session
+      // placeholder — so each is measured at its real height and the rows swap
+      // into the reserved space without a jump.
+      if (item.kind === 'section-header-skeleton') {
+        return <SessionSectionHeaderSkeleton />;
+      }
       if (item.kind === 'skeleton') {
-        // Reserved cold-open slot in the stored list's own shape (a date header
-        // above the first row, then eyebrow and title rows), so the rows swap
-        // into the reserved space without a jump.
-        const row = <SessionRowSkeleton index={item.index} subtitle={false} />;
-        return item.index === 0 ? (
-          <View>
-            <SessionSectionHeaderSkeleton />
-            {row}
-          </View>
-        ) : (
-          row
-        );
+        return <SessionRowSkeleton />;
       }
       if (item.kind === 'section-header') {
-        return <SessionListSectionHeader title={item.title} count={item.count} />;
+        return (
+          <SessionListSectionHeader
+            title={item.title}
+            count={item.count}
+            accessibilityLabel={sessionSectionAccessibilityLabel(item.title, item.count)}
+          />
+        );
       }
       return (
         <StoredSessionRow

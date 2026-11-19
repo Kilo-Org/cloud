@@ -1,11 +1,12 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { DataExportScreen } from './data-export-screen';
+import { ExportRow } from './data-export-row';
 import type * as ReactQuery from '@tanstack/react-query';
 
 type Export = {
@@ -46,7 +47,12 @@ function record(kind: string) {
   };
 }
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
+  View: 'View',
+  useColorScheme: () => 'light',
+  useWindowDimensions: () => ({ width: 390, height: 844, scale: 2, fontScale: 1 }),
+}));
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
   // hooks the screen calls are replaced.
@@ -111,11 +117,22 @@ vi.mock('@/components/ui/icons', () => ({
   FileText: 'FileText',
   Share: 'Share',
 }));
+// The row primitives notify a selection through the haptic bridge, which loads
+// the expo runtime; the suite asserts structure, not feedback.
+vi.mock('@/lib/haptics', () => ({
+  impactHaptic: () => undefined,
+  notificationHaptic: () => undefined,
+  selectionHaptic: () => undefined,
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -202,6 +219,45 @@ describe('DataExportScreen', () => {
     expect(texts(root)).toEqual(expect.arrayContaining(['Preparing', 'Ready to download']));
   });
 
+  it('shows a rejected code request under the list while no challenge is open', async () => {
+    state.exports = readyExport();
+    const root = await mount();
+
+    act(() => {
+      (root.findByType(ExportRow).props.onRequestCode as () => void)();
+    });
+    expect(state.calls).toEqual([{ name: 'requestCode', input: { exportId: 'export-2' } }]);
+
+    act(() => {
+      (state.mutations.requestCode as { onError: (error: unknown) => void }).onError(
+        new Error('Too many codes requested.')
+      );
+    });
+
+    // The message renders where the request was raised, with no code field on
+    // screen: the old copy could only paint inside the open challenge.
+    expect(texts(root)).toContain('Too many codes requested.');
+    expect(root.findAll(node => Object.is(node.type, 'FormField'))).toHaveLength(0);
+  });
+
+  it('uses the generic retry line when the code request fails without a readable reason', async () => {
+    state.exports = readyExport();
+    const root = await mount();
+
+    act(() => {
+      (root.findByType(ExportRow).props.onRequestCode as () => void)();
+    });
+    act(() => {
+      (state.mutations.requestCode as { onError: (error: unknown) => void }).onError({
+        data: { code: 'BAD_REQUEST' },
+      });
+    });
+
+    // The entry-field copy would name a field that is not on screen yet.
+    expect(texts(root)).toContain(i18n.t('queryError.neutralDescription'));
+    expect(texts(root)).not.toContain(i18n.t('profile.dataExport.codeRequired'));
+  });
+
   it('surfaces the server reason for a failed export', async () => {
     state.exports = [
       {
@@ -222,7 +278,7 @@ describe('DataExportScreen', () => {
 
     expect(
       root.findAll(node => Object.is(node.type, 'EmptyState')).map(node => node.props.title)
-    ).toEqual(["Your data isn't available yet"]);
+    ).toEqual([i18n.t('profile.dataExport.unavailableTitle')]);
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
   });
 

@@ -52,21 +52,18 @@ import {
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
-  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
-  MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
-  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   cloudAgentWorktreeIdSchema,
   WORKSPACE_REQUIRES_ROOT_SESSION,
   isDefaultSessionTitle,
   sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
   projectKnownCloudAgentPath,
-  validateKiloSdkMessagesCursor,
+  getSessionMessagesPageInputSchema,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
-import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
+import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
@@ -125,70 +122,15 @@ import {
   watchPrMutationSchema,
   watchPrQuerySchema,
 } from '@/lib/cloud-agent/watch-pr';
-
-type SessionTrpcErrorData = {
-  code?: string;
-  httpStatus?: number;
-  clientError?: { retryable?: unknown };
-};
-
-function sessionTrpcErrorData(err: unknown): SessionTrpcErrorData | undefined {
-  if (!(err instanceof TRPCClientError)) return undefined;
-  const data = err.data as SessionTrpcErrorData | undefined;
-  const shapeData = (err.shape as { data?: SessionTrpcErrorData } | undefined)?.data;
-  if (data === undefined && shapeData === undefined) return undefined;
-  return {
-    code: data?.code ?? shapeData?.code,
-    httpStatus: data?.httpStatus ?? shapeData?.httpStatus,
-    clientError: data?.clientError ?? shapeData?.clientError,
-  };
-}
-
-function sessionTrpcErrorCode(err: unknown): string | undefined {
-  return sessionTrpcErrorData(err)?.code;
-}
+import { withControlPlaneReadBudget } from '@/lib/control-plane-read-budget';
+import {
+  isSessionNotFoundError,
+  isTransientRuntimeError,
+  sessionTrpcErrorCode,
+} from '@/lib/session-trpc-errors';
 
 function isSessionConflictError(err: unknown): boolean {
   return sessionTrpcErrorCode(err) === 'CONFLICT';
-}
-
-/**
- * Check if an error indicates the session was not found in the cloud-agent DO.
- * This is expected for legacy sessions created before the new DO-based system.
- */
-function isSessionNotFoundError(err: unknown): boolean {
-  const errorData = sessionTrpcErrorData(err);
-  return errorData?.code === 'NOT_FOUND' || errorData?.httpStatus === 404;
-}
-
-const TRANSIENT_TRPC_CODES = new Set(['SERVICE_UNAVAILABLE', 'TIMEOUT']);
-const TRANSIENT_HTTP_STATUSES = new Set([503, 504]);
-const TRANSPORT_ERROR_NAMES = new Set([
-  'HeadersTimeoutError',
-  'BodyTimeoutError',
-  'ConnectTimeoutError',
-  'AbortError',
-  'TimeoutError',
-]);
-
-function isTransportFailure(cause: unknown, depth = 0): boolean {
-  if (typeof cause !== 'object' || cause === null || depth > 3) return false;
-  const { name, message } = cause as { name?: unknown; message?: unknown };
-  if (typeof name === 'string' && TRANSPORT_ERROR_NAMES.has(name)) return true;
-  if (cause instanceof TypeError && message === 'fetch failed') return true;
-  return isTransportFailure((cause as { cause?: unknown }).cause, depth + 1);
-}
-
-/** Worker outages, timeouts, and network failures that a later retry may resolve. */
-function isTransientRuntimeError(err: unknown): boolean {
-  if (!(err instanceof TRPCClientError)) return false;
-  const errorData = sessionTrpcErrorData(err);
-  if (errorData === undefined) return isTransportFailure(err.cause);
-  if (errorData.code && TRANSIENT_TRPC_CODES.has(errorData.code)) return true;
-  if (errorData.httpStatus && TRANSIENT_HTTP_STATUSES.has(errorData.httpStatus)) return true;
-  const retryable = errorData.clientError?.retryable === true;
-  // Internal errors stay defects even when a Worker envelope marks them retryable.
-  return retryable && errorData.code !== undefined && errorData.code !== 'INTERNAL_SERVER_ERROR';
 }
 
 function isParentLookupUnavailableError(err: unknown): boolean {
@@ -589,35 +531,6 @@ function worktreeMembershipCondition(userId: string, organizationId: string | nu
 
 const sessionIdField = z.string().min(1);
 const cloudAgentSessionIdField = z.string().min(1).max(255);
-
-/**
- * Input for the paginated `getSessionMessagesPage` endpoint. Mirrors the
- * worker-bound contract in `@kilocode/session-ingest-contracts` so tRPC-level
- * input validation matches the worker's access-checked RPC and HTTP route.
- * The `limit` default is applied here so the procedure body always sees a
- * positive page size and the client receives a bounded request.
- */
-const GetSessionMessagesPageInputSchema = z
-  .object({
-    session_id: sessionIdField,
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
-      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    cursor: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
-  })
-  .superRefine((params, ctx) => {
-    if (params.cursor === undefined) return;
-    if (!validateKiloSdkMessagesCursor(params.cursor)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cursor'],
-        message: 'cursor is not a valid message cursor',
-      });
-    }
-  });
 
 /**
  * Verify the user owns the session and still has access to its organization.
@@ -2041,10 +1954,21 @@ export const cliSessionsV2Router = createTRPCRouter({
     // `(session_id, kilo_user_id)` — so the lookup cannot take the first row:
     // that could pick another account's row for the same id and deny the owner
     // their own session. Read the rows for the id and prefer the caller's.
-    const sessions = await db
-      .select({ ...getTableColumns(cli_sessions_v2), ...latestRunFields })
-      .from(cli_sessions_v2)
-      .where(eq(cli_sessions_v2.session_id, session_id));
+    //
+    // The read is one primary-key lookup plus the three latest-run subqueries,
+    // each of which walks its own `(cloud_agent_session_id, queued_at)` index,
+    // so a slow answer is the database, not the plan. It is bounded for the
+    // mobile client, whose procedure has a 10s budget the read must not
+    // consume.
+    const sessions = await withControlPlaneReadBudget({
+      clock: ctx,
+      message: 'Session details took too long to load. Try again.',
+      read: () =>
+        db
+          .select({ ...getTableColumns(cli_sessions_v2), ...latestRunFields })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.session_id, session_id)),
+    });
 
     const session = sessions.find(row => row.kilo_user_id === ctx.user.id);
 
@@ -2140,7 +2064,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    * retryable from non-retryable failures without inferring retry semantics.
    */
   getSessionMessagesPage: baseProcedure
-    .input(GetSessionMessagesPageInputSchema)
+    .input(getSessionMessagesPageInputSchema)
     .query(async ({ ctx, input }) => {
       const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
@@ -2643,6 +2567,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'No GitHub integration configured for this session',
+          cause: { reason: 'no_integration' },
         });
       }
 
@@ -2651,6 +2576,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'GitHub installation ID is malformed',
+          cause: { reason: 'malformed_installation' },
         });
       }
       const appType = integration.github_app_type ?? 'standard';
@@ -2673,6 +2599,10 @@ export const cliSessionsV2Router = createTRPCRouter({
               : refreshBudget.reason === 'rate_limited'
                 ? `GitHub rate limit reached; try again after ${refreshBudget.retryAt.toISOString()}`
                 : `PR refresh was already attempted; try again after ${refreshBudget.retryAt.toISOString()}`,
+          cause: {
+            reason: refreshBudget.reason,
+            retryAt: refreshBudget.retryAt.toISOString(),
+          },
         });
       }
       const signal = AbortSignal.timeout(45_000);
@@ -2703,6 +2633,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
             message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
+            cause: { reason: 'rate_limited', retryAt: rateLimit.resetAt.toISOString() },
           });
         }
         captureException(error, {
@@ -2715,6 +2646,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch pull request from GitHub',
+          cause: { reason: 'fetch_failed' },
         });
       }
 
@@ -2794,6 +2726,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
             message: `GitHub rate limit reached; try again after ${rateLimit.resetAt.toISOString()}`,
+            cause: { reason: 'rate_limited', retryAt: rateLimit.resetAt.toISOString() },
           });
         }
         observations = {
@@ -3056,8 +2989,19 @@ export const cliSessionsV2Router = createTRPCRouter({
     }
 
     // Delegate DB deletion (including child sessions) and ingest DO/cache cleanup
-    // to the session-ingest worker.
-    await deleteSessionIngest(session_id, ctx.user.id);
+    // to the session-ingest worker. The call is mapped like every other
+    // session-ingest call: a budget expiry is a retryable upstream answer, not
+    // an internal defect.
+    try {
+      await deleteSessionIngest(session_id, ctx.user.id);
+    } catch (err) {
+      // `deleteSession` raises its own `TRPCError` for the worker's workspace
+      // conflicts (409). The client reads that code and message to cascade into
+      // deleting the workspace, so forward it unchanged; only a transport
+      // failure is mapped.
+      if (err instanceof TRPCError) throw err;
+      throw sessionIngestTrpcError('Failed to delete session', err);
+    }
 
     return { success: true, session_id, cleanup };
   }),
@@ -3123,7 +3067,10 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     try {
       const result = await shareSessionIngest(session_id, ctx.user.id, shareOptions);
-      return { share_token: result.share_token };
+      /* Both the token and the capability: the app compares the capability it
+         created with the one a later read reports, so a client can tell its own
+         link from one made elsewhere. */
+      return { share_token: result.share_token, public_id: result.public_id };
     } catch (error) {
       if (error instanceof SessionShareTooLargeError) {
         throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message, cause: error });

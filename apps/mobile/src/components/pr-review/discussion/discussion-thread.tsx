@@ -7,7 +7,7 @@
 //   - EXPANDED: the root is a plain view. Only the header label row
 //     is pressable (collapse). The resolve toggle is its own nested
 //     pressable in both states.
-//   - The thread header shows the anchor label ("src/a.ts L10 (RIGHT)"
+//   - The thread header shows the anchor label ("src/a.ts L10 (Right side)"
 //     or "File comment on src/a.ts" or "Outdated on ..."). The anchor
 //     owns file-level and outdated metadata; the "Resolved" badge is
 //     the sole Resolved text indicator. The resolve control is an
@@ -35,6 +35,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
+import { Card } from '@/components/ui/card';
 import { ResolveToggle } from '@/components/pr-review/discussion/discussion-thread-resolve-toggle';
 import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
 import { ThreadDiffSnippet } from '@/components/pr-review/discussion/thread-diff-snippet';
@@ -149,10 +150,7 @@ export function DiscussionThread({
     }
   };
 
-  const cardClassName = cn(
-    'gap-3 rounded-xl border border-border bg-card p-3.5',
-    thread.isResolved && 'bg-secondary'
-  );
+  const cardClassName = 'gap-3';
   const headerCommonProps = {
     anchorLabel,
     resolved: thread.isResolved,
@@ -178,7 +176,7 @@ export function DiscussionThread({
           }
         : undefined;
     return (
-      <View
+      <Card
         accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
         className={cardClassName}
       >
@@ -189,7 +187,7 @@ export function DiscussionThread({
             <View
               key={comment.nodeId}
               style={index > 0 ? SEPARATED_COMMENT_PADDING : undefined}
-              className={cn(index > 0 && 'border-t border-border')}
+              className={cn(index > 0 && 'border-t-[0.5px] border-hair-soft')}
             >
               <CommentRow
                 comment={comment}
@@ -233,7 +231,7 @@ export function DiscussionThread({
             onInputFocus={onReplyFocus}
           />
         ) : null}
-      </View>
+      </Card>
     );
   }
 
@@ -243,9 +241,11 @@ export function DiscussionThread({
       accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
       accessibilityState={{ expanded: false }}
       onPress={onToggleExpand}
-      className={cn(cardClassName, 'active:opacity-70')}
+      className="active:opacity-70"
     >
-      <ThreadHeader {...headerCommonProps} />
+      <Card className={cardClassName}>
+        <ThreadHeader {...headerCommonProps} />
+      </Card>
     </Pressable>
   );
 }
@@ -305,7 +305,7 @@ function ThreadHeader({
           ) : (
             <ChevronDown size={16} color={colors.mutedForeground} />
           )}
-          <Text className="flex-1 font-mono-medium text-[12px] text-foreground" numberOfLines={1}>
+          <Text className="flex-1 font-mono-medium text-sm text-foreground" numberOfLines={1}>
             {anchorLabel}
           </Text>
         </LabelRow>
@@ -315,9 +315,12 @@ function ThreadHeader({
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">
         {resolved ? (
-          <View className="flex-row items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-good">
+          // A resolved mark sits on the thread's card, so it takes a tint of
+          // its own instead of the card's secondary fill (which the card now
+          // paints) — the tile pair is the palette's tinted-surface token.
+          <View className="flex-row items-center gap-1 rounded-full bg-good-tile-bg px-2 py-0.5">
             <CheckCheck size={10} color={colors.good} />
-            <Text className="text-[10px] font-medium uppercase tracking-wide">
+            <Text className="text-xs font-medium text-good">
               {t('prReview.discussion.resolved')}
             </Text>
           </View>

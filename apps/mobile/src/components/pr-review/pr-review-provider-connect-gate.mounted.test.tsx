@@ -98,6 +98,7 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#FFFFFF',
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
@@ -114,15 +115,36 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { description?: React.ReactNode; action?: React.ReactNode }) =>
-    React.createElement('EmptyState', props, props.description, props.action),
+  StateAction: ({
+    label,
+    icon: Icon,
+    onPress,
+    disabled,
+    loading,
+  }: {
+    label: string;
+    icon: React.ElementType;
+    onPress: () => void;
+    disabled?: boolean;
+    loading?: boolean;
+  }) =>
+    React.createElement(
+      'StateAction',
+      { label, onPress, disabled, loading },
+      loading === true ? React.createElement('ActivityIndicator') : React.createElement(Icon, {}),
+      React.createElement('Text', null, label)
+    ),
+  EmptyState: (props: {
+    title?: React.ReactNode;
+    description?: React.ReactNode;
+    action?: React.ReactNode;
+  }) => React.createElement('EmptyState', props, props.title, props.description, props.action),
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/pr-review/pr-review-context-line', () => ({
   PrReviewContextLine: 'PrReviewContextLine',
 }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 // The gate's pending body is the detail screen's frame: the real skeleton over a
@@ -237,7 +259,7 @@ describe('organization GitLab reconnect state', () => {
     // restate the expiry or claim the provider was never connected.
     expect(renderedText(renderer)).not.toContain("GitLab isn't connected");
     expect(renderedText(renderer)).not.toContain('Connect GitLab');
-    expect(renderer.root.findAllByType('Button')).toHaveLength(0);
+    expect(renderer.root.findAllByType('StateAction')).toHaveLength(0);
   });
 
   it('keeps the first-time connect copy for an organization with no connection', () => {
@@ -247,13 +269,22 @@ describe('organization GitLab reconnect state', () => {
     expect(renderedText(renderer)).not.toContain('GitLab connection expired');
   });
 
-  it('keeps the first-time connect action for a member', () => {
-    // The organization OAuth connect only requires a billing role when a
-    // connection already exists, so a member can complete a first connect.
+  it('names the roles that can connect instead of offering a member an action', () => {
+    // Every organization GitLab connect requires a billing role, a first
+    // connect included, so a member cannot complete the integration page's
+    // action and the gate names who can instead of offering it.
     queryState.status = { connected: false, reconnectRequired: false };
     const renderer = mount('gitlab', 'org-1');
-    expect(renderedText(renderer)).toContain('Connect GitLab');
-    expect(renderer.root.findAllByType('Button')).toHaveLength(1);
+    expect(renderedText(renderer)).toContain(
+      'Only organization owners, admins, and billing managers can connect it.'
+    );
+    // The title names the provider the state is about; the copy that explains
+    // why there is nothing to press is the description above.
+    expect(renderer.root.findByType('EmptyState').props.title).toBe('Connect GitLab');
+    // The reader never had a connection, so no line claims an expired one, and
+    // no control offers the action the role cannot complete.
+    expect(renderedText(renderer)).not.toContain('GitLab connection expired');
+    expect(renderer.root.findAllByType('StateAction')).toHaveLength(0);
   });
 
   it('waits for the restored selection instead of painting the personal scope', () => {
@@ -304,7 +335,7 @@ describe('organization GitLab reconnect state', () => {
     permissionState.value = permission;
     queryState.status = { connected: false, reconnectRequired: true };
     const renderer = mount('gitlab', 'org-1');
-    expect(renderer.root.findAllByType('Button')).toHaveLength(1);
+    expect(renderer.root.findAllByType('StateAction')).toHaveLength(1);
   });
 });
 
@@ -320,7 +351,7 @@ describe('organization Bitbucket connect state', () => {
     // The title states the absence, so the line below names only the roles and
     // never repeats it.
     expect(renderedText(renderer)).not.toContain("Bitbucket isn't connected");
-    expect(renderer.root.findAllByType('Button')).toHaveLength(0);
+    expect(renderer.root.findAllByType('StateAction')).toHaveLength(0);
   });
 
   it('keeps the Connect action for a billing role', () => {
@@ -328,7 +359,7 @@ describe('organization Bitbucket connect state', () => {
     queryState.status = { connected: false };
     const renderer = mount('bitbucket', 'org-1');
     expect(renderedText(renderer)).toContain('Connect Bitbucket');
-    expect(renderer.root.findAllByType('Button')).toHaveLength(1);
+    expect(renderer.root.findAllByType('StateAction')).toHaveLength(1);
   });
 });
 

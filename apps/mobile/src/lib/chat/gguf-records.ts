@@ -43,8 +43,10 @@ export type GgufDownload = {
   readonly pending: boolean;
   /** The model file and its projector together, so one bar covers both. */
   readonly written: number;
-  /** Zero until the server states a length. */
+  /** Zero only while no length is known — the published size or the server's report as transfers finish. */
   readonly total: number;
+  /** The current transfer was started from zero again after it stopped short. */
+  readonly retrying: boolean;
 };
 
 export type GgufDownloadProblem = 'space' | 'network' | 'invalidFile' | 'checksum';
@@ -53,6 +55,12 @@ export type GgufDownloadsSnapshot = {
   readonly models: readonly GgufModelRecord[];
   readonly download: GgufDownload | null;
   readonly failure: { readonly fileId: string; readonly problem: GgufDownloadProblem } | null;
+  /**
+   * The saved model list could not be read. Not an empty list: the picker must say
+   * so and offer the retry, because nothing else tells the person why the models
+   * they downloaded are missing.
+   */
+  readonly loadFailed: boolean;
 };
 
 /** The file a finished download wrote. Nothing here reads it; it only has to exist. */

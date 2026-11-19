@@ -9,6 +9,7 @@ import { roleLabel } from '@/components/organization/member-row';
 import { getInviteSuccessMessage } from '@/components/organization/invited-member-row-state';
 import {
   inviteEmailError,
+  inviteEmailErrorMessages,
   inviteErrorCopy,
 } from '@/components/organization/invite-member-validators';
 import {
@@ -17,12 +18,13 @@ import {
 } from '@/components/organization/organization-role-options';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { RefusalStatus } from '@/components/refusal-status';
 import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
@@ -35,6 +37,10 @@ import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations
 import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopOnce } from '@/lib/navigation/pop-once';
+import { selectionCheckColor } from '@/lib/selection-check-color';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
+import { useTrialRefusalAction } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 
@@ -67,8 +73,16 @@ export function InviteMemberSheet() {
   // A rejected invite is rendered in localized copy, never as the server wrote
   // it: a schema rejection is a JSON issue array (internal code, raw pattern,
   // English message), not a sentence. Correcting the address drops the
-  // rejection, so the field never sits under a stale one.
-  const inviteError = mutations.invite.isError ? inviteErrorCopy(mutations.invite.error) : null;
+  // rejection, so the field never sits under a stale one. The copy and the step
+  // are chosen for this reader's role: only the plan refusal offers a step, and
+  // only to a role the server would let take it.
+  const inviteFailure = mutations.invite.isError ? mutations.invite.error : null;
+  const inviteError =
+    inviteFailure == null ? null : inviteErrorCopy(inviteFailure, isMoneyRole(myRole));
+  const trialRefusalAction = useTrialRefusalAction(
+    isTrialExpiredRefusal(inviteFailure),
+    organizationId
+  );
   const clearInviteError = () => {
     if (mutations.invite.isError) {
       resetInvite();
@@ -137,7 +151,7 @@ export function InviteMemberSheet() {
 
   if (isResolving) {
     return (
-      <SheetScrollView className="flex-1 bg-card" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
+      <SheetScrollView className="flex-1 bg-card" contentContainerClassName={SCREEN_BODY_CLASS}>
         <Skeleton className="h-11 rounded-lg" />
         <Skeleton className="h-11 rounded-lg" />
       </SheetScrollView>
@@ -147,7 +161,22 @@ export function InviteMemberSheet() {
     return <OrganizationBoundary />;
   }
   if (!isMoneyRole(myRole)) {
-    return <PermissionDenied description={t('organization.inviteMember.permissionDenied')} />;
+    // The denial is the sheet's whole surface: the header stays, so the sheet
+    // keeps its title and its one way out, and the state carries no second Back.
+    return (
+      <View className="flex-1 bg-background">
+        <SheetHeader
+          title={t('organization.inviteMember.title')}
+          variant="close"
+          onDone={requestClose}
+          topInset={modalTopInset}
+        />
+        <PermissionDenied
+          description={t('organization.inviteMember.permissionDenied')}
+          showBack={false}
+        />
+      </View>
+    );
   }
 
   // Seat capacity is the rule the web dialog shows and the invite procedure
@@ -212,7 +241,7 @@ export function InviteMemberSheet() {
       />
       <SheetScrollView
         className="flex-1 bg-card"
-        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         // The design gate's proof readiness marker for this route.
         testID="organization-invite-sheet"
         automaticallyAdjustKeyboardInsets
@@ -222,6 +251,7 @@ export function InviteMemberSheet() {
           key={formEpoch}
           label={t('common.email')}
           required
+          validateWhileTyping
           placeholder={t('organization.inviteMember.emailPlaceholder')}
           keyboardType="email-address"
           autoCapitalize="none"
@@ -230,6 +260,8 @@ export function InviteMemberSheet() {
           textContentType="emailAddress"
           autoFocus
           validate={inviteEmailError}
+          alwaysReserve
+          reserveErrorMessages={inviteEmailErrorMessages()}
           error={visibleInviteError?.field === 'email' ? visibleInviteError.message : undefined}
           onChangeText={value => {
             emailRef.current = value;
@@ -240,10 +272,13 @@ export function InviteMemberSheet() {
 
         {/* The rejected invite sits under the field it names, above the
             software keyboard. The mutation has no toast (inline error pattern
-            P2), so AccessibleStatus is the single announcement owner here: one
-            announcement per platform, visuals preserved (tone error). */}
-        <AccessibleStatus
+            P2), so the status line is the single announcement owner here: one
+            announcement per platform, visuals preserved (tone error). A plan
+            refusal this reader can end carries the billing step under the
+            copy. */}
+        <RefusalStatus
           message={visibleInviteError?.field === 'form' ? visibleInviteError.message : null}
+          action={trialRefusalAction}
           className="text-sm"
         />
 
@@ -268,30 +303,30 @@ export function InviteMemberSheet() {
                 one form, so the role group does not wear the list-section
                 eyebrow the rest of the app uses for section headings. */}
             <FormFieldLabel label={t('common.role')} />
-            <RadioGroup
-              label={t('common.role')}
-              className="overflow-hidden rounded-lg bg-secondary"
-            >
-              {roles.map((value, index) => {
-                const selected = selectedRole === value;
-                return (
-                  <Pressable
-                    key={value}
-                    className={cn(
-                      ROW_TARGET_CLASS,
-                      'flex-row items-center justify-between px-4 py-3 active:opacity-70',
-                      index < roles.length - 1 && 'border-b border-border'
-                    )}
-                    onPress={() => {
-                      setRole(value);
-                    }}
-                    {...radioItemA11y({ label: roleLabel(value), checked: selected })}
-                  >
-                    <Text className="flex-1 text-sm">{roleLabel(value)}</Text>
-                    {selected && <Check size={16} color={colors.primary} />}
-                  </Pressable>
-                );
-              })}
+            <RadioGroup label={t('common.role')}>
+              <RowGroup>
+                {roles.map(value => {
+                  const selected = selectedRole === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      className={cn(
+                        ROW_TARGET_CLASS,
+                        'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
+                      )}
+                      onPress={() => {
+                        setRole(value);
+                      }}
+                      {...radioItemA11y({ label: roleLabel(value), checked: selected })}
+                    >
+                      <Text className="flex-1 text-sm font-medium text-foreground">
+                        {roleLabel(value)}
+                      </Text>
+                      {selected && <Check size={16} color={selectionCheckColor(colors)} />}
+                    </Pressable>
+                  );
+                })}
+              </RowGroup>
             </RadioGroup>
           </View>
         )}

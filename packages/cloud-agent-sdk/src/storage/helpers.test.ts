@@ -1,5 +1,5 @@
 import type { Part } from '@kilocode/app-shared/opencode';
-import type { MessageInfo } from '../types';
+import type { MessageInfo, ReadonlyPart } from '../types';
 import {
   EMPTY_PARTS,
   appendPartTextChunks,
@@ -7,12 +7,15 @@ import {
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
+  createSubscriberRegistry,
   forgetPartUpdateTime,
-  insertPartSorted,
-  insertSorted,
+  insertSortedBy,
   isSupportedDeltaField,
-  notify,
+  messageIdsKey,
+  messageKey,
+  messageIdKey,
   orderMessageIds,
+  partsKey,
   publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
@@ -307,42 +310,44 @@ function upsert(arr: Part[], part: Part, eventTime?: number): Part[] {
   return upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, orderingEvidence);
 }
 
-describe('insertSorted', () => {
-  test('inserts into empty array', () => {
-    expect(insertSorted([], 'b')).toEqual(['b']);
+describe('insertSortedBy', () => {
+  const partKey = (part: Part): string => part.id;
+
+  test('inserts a message id into an empty array', () => {
+    expect(insertSortedBy([], 'b', messageIdKey)).toEqual(['b']);
   });
 
-  test('inserts at beginning, middle, and end', () => {
-    const arr = ['b', 'd'];
-    expect(insertSorted(arr, 'a')).toEqual(['a', 'b', 'd']);
-    expect(insertSorted(arr, 'c')).toEqual(['b', 'c', 'd']);
-    expect(insertSorted(arr, 'e')).toEqual(['b', 'd', 'e']);
+  test('inserts a part into an empty array', () => {
+    const part = makePart('b');
+    expect(insertSortedBy<Part>([], part, partKey)).toEqual([part]);
   });
 
-  test('does not mutate input', () => {
-    const arr = ['a', 'c'];
-    insertSorted(arr, 'b');
-    expect(arr).toEqual(['a', 'c']);
-  });
-});
-
-describe('insertPartSorted', () => {
-  test('inserts into empty array', () => {
-    const p = makePart('b');
-    expect(insertPartSorted([], p)).toEqual([p]);
+  test('inserts a message id at beginning, middle, and end', () => {
+    const ids = ['b', 'd'];
+    expect(insertSortedBy(ids, 'a', messageIdKey)).toEqual(['a', 'b', 'd']);
+    expect(insertSortedBy(ids, 'c', messageIdKey)).toEqual(['b', 'c', 'd']);
+    expect(insertSortedBy(ids, 'e', messageIdKey)).toEqual(['b', 'd', 'e']);
   });
 
-  test('inserts at beginning, middle, and end', () => {
-    const arr = [makePart('b'), makePart('d')];
-    expect(insertPartSorted(arr, makePart('a')).map(p => p.id)).toEqual(['a', 'b', 'd']);
-    expect(insertPartSorted(arr, makePart('c')).map(p => p.id)).toEqual(['b', 'c', 'd']);
-    expect(insertPartSorted(arr, makePart('e')).map(p => p.id)).toEqual(['b', 'd', 'e']);
+  test('inserts a part at beginning, middle, and end', () => {
+    const parts = [makePart('b'), makePart('d')];
+    const inserted = (id: string) =>
+      insertSortedBy(parts, makePart(id), partKey).map(part => part.id);
+    expect(inserted('a')).toEqual(['a', 'b', 'd']);
+    expect(inserted('c')).toEqual(['b', 'c', 'd']);
+    expect(inserted('e')).toEqual(['b', 'd', 'e']);
   });
 
-  test('does not mutate input', () => {
-    const arr = [makePart('a'), makePart('c')];
-    insertPartSorted(arr, makePart('b'));
-    expect(arr).toHaveLength(2);
+  test('does not mutate the message id array', () => {
+    const ids = ['a', 'c'];
+    insertSortedBy(ids, 'b', messageIdKey);
+    expect(ids).toEqual(['a', 'c']);
+  });
+
+  test('does not mutate the part array', () => {
+    const parts = [makePart('a'), makePart('c')];
+    insertSortedBy(parts, makePart('b'), partKey);
+    expect(parts).toHaveLength(2);
   });
 });
 
@@ -472,6 +477,49 @@ describe('tool part lifecycle ordering', () => {
     const result = upsert(arr, makeToolPart('p-1', 'completed'), 150);
     expect(toolStatus(result, 'p-1')).toBe('running');
     expect(result).toBe(arr);
+  });
+
+  test('drops a rejected update without reading its payload and copies an accepted one', () => {
+    // The accept path owns the copy. A copy reads every own enumerable
+    // property, so a counting getter on a bulky payload shows whether a
+    // dropped update is read at all.
+    const arr = upsert([], makeToolPart('p-1', 'completed'), 200);
+    let payloadReads = 0;
+    const withPayload = (part: Part): Part => {
+      Object.defineProperty(part, 'text', {
+        get() {
+          payloadReads += 1;
+          return 'x'.repeat(1_024);
+        },
+        enumerable: true,
+        configurable: true,
+      });
+      return part;
+    };
+
+    const stale = upsert(arr, withPayload(makeToolPart('p-1', 'running')), 100);
+    expect(stale).toBe(arr);
+    expect(payloadReads).toBe(0);
+
+    const preview = withPayload(makeToolPart('p-1', 'completed'));
+    Object.defineProperty(preview, 'cloudDetail', {
+      value: {
+        version: 1,
+        revision: 1,
+        omitted: ['state.output'],
+        omittedCount: 1,
+        omittedBytes: 64,
+      },
+      enumerable: true,
+    });
+    const bounded = upsert(arr, preview, 300);
+    expect(bounded).toBe(arr);
+    expect(payloadReads).toBe(0);
+
+    const accepted = upsert(arr, withPayload(makeToolPart('p-2', 'running')), 300);
+    expect(accepted).not.toBe(arr);
+    expect(payloadReads).toBe(1);
+    expect(JSON.stringify(accepted.find(part => part.id === 'p-2'))).toContain('xxxxxxxxxx');
   });
 
   test('drops a terminal update that carries no ordering evidence over a live running task', () => {
@@ -695,6 +743,17 @@ describe('createReadonlyPartView', () => {
     delete (view as Record<string, unknown>)['text'];
     expect((view as Part & { text: string }).text).toBe('hello');
   });
+
+  test('mutations through the view do not reach the stored part', () => {
+    const stored = makePart('p1', 'hello');
+    const view = createReadonlyPartView(stored);
+    (view as { text: string }).text = 'changed';
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete (view as Record<string, unknown>)['id'];
+    expect((stored as Part & { text: string }).text).toBe('hello');
+    expect(stored.id).toBe('p1');
+    expect((view as { text: string }).text).toBe('hello');
+  });
 });
 
 describe('applyTextDeltas', () => {
@@ -759,13 +818,12 @@ describe('appendPartTextChunks', () => {
 
 describe('publishPartsChanged', () => {
   test('invalidates the message snapshot and notifies only its channel', () => {
-    const snapshot = new Map<string, Part[] | null>([['msg-1', [makePart('a')]]]);
+    const snapshot = new Map<string, readonly ReadonlyPart[] | null>([['msg-1', [makePart('a')]]]);
     const partsCallback = jest.fn();
     const messageCallback = jest.fn();
-    const subscribers = new Map<string, Set<() => void>>([
-      ['parts:msg-1', new Set([partsCallback])],
-      ['message:msg-1', new Set([messageCallback])],
-    ]);
+    const subscribers = createSubscriberRegistry();
+    subscribers.subscribe('parts:msg-1', partsCallback);
+    subscribers.subscribe('message:msg-1', messageCallback);
 
     publishPartsChanged(snapshot, subscribers, 'msg-1');
 
@@ -788,25 +846,48 @@ describe('createSeedTextPart', () => {
   });
 });
 
-describe('notify', () => {
+describe('createSubscriberRegistry', () => {
   test('calls all registered callbacks for matching key', () => {
     const cb1 = jest.fn();
     const cb2 = jest.fn();
-    const subs = new Map([['k', new Set([cb1, cb2])]]);
-    notify(subs, 'k');
+    const registry = createSubscriberRegistry();
+    registry.subscribe(messageKey('msg-1'), cb1);
+    registry.subscribe(messageKey('msg-1'), cb2);
+    registry.notify(messageKey('msg-1'));
     expect(cb1).toHaveBeenCalledTimes(1);
     expect(cb2).toHaveBeenCalledTimes(1);
   });
 
   test('no-op for missing key', () => {
     const cb = jest.fn();
-    const subs = new Map([['k', new Set([cb])]]);
-    notify(subs, 'other');
+    const registry = createSubscriberRegistry();
+    registry.subscribe(partsKey('msg-1'), cb);
+    registry.notify(messageKey('msg-2'));
     expect(cb).not.toHaveBeenCalled();
   });
 
-  test('no-op for empty subscriber map', () => {
-    expect(() => notify(new Map(), 'k')).not.toThrow();
+  test('no-op for empty registry', () => {
+    expect(() => createSubscriberRegistry().notify(messageIdsKey)).not.toThrow();
+  });
+
+  test('built keys address the channels the registry notifies', () => {
+    const registry = createSubscriberRegistry();
+    const idsCb = jest.fn();
+    const messageCb = jest.fn();
+    const partsCb = jest.fn();
+    registry.subscribe(messageIdsKey, idsCb);
+    registry.subscribe(messageKey('msg-1'), messageCb);
+    registry.subscribe(partsKey('msg-1'), partsCb);
+
+    registry.notifyMessageIds();
+    registry.notifyMessage('msg-1');
+    registry.notifyParts('msg-1');
+
+    expect(idsCb).toHaveBeenCalledTimes(1);
+    expect(messageCb).toHaveBeenCalledTimes(1);
+    expect(partsCb).toHaveBeenCalledTimes(1);
+    registry.notifyMessage('msg-2');
+    expect(messageCb).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -13,6 +13,16 @@ import {
   normalizeRepositoryReviewInstructions,
 } from './repository-review-instructions';
 import { REVIEW_SUMMARY_HISTORY_START } from '../summary/history';
+import { resolveReviewGuidelines } from '../resolve-review-guidelines';
+
+jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+  fetchGitHubRepositoryDefaultBranchSha: jest.fn(async () => 'a'.repeat(40)),
+}));
+jest.mock('@/lib/integrations/platforms/github/regular-file-at-commit', () => ({
+  fetchGitHubRegularFileAtCommit: jest.fn(
+    async ({ path }: { path: string }) => `Rules from ${path}.`
+  ),
+}));
 
 describe('checked-in prompt templates', () => {
   it('validates the GitHub template', () => {
@@ -36,6 +46,52 @@ const baseConfig = {
 } satisfies CodeReviewAgentConfig;
 
 describe('generateReviewPrompt', () => {
+  it('renders imported blocks in order, labels every source, and gives repository text precedence', async () => {
+    const resolved = await resolveReviewGuidelines({
+      rawContent:
+        '---\nextends:\n  - acme/guidelines:frontend.md\n  - acme/guidelines:backend/api.md\n---\nRepository rules.',
+      platform: 'github',
+      repository: 'acme/app',
+      baseRef: 'main',
+      allowedRepositories: ['acme/guidelines'],
+      githubToken: 'synthetic-token',
+    });
+    const { prompt } = await generateReviewPrompt(baseConfig, 'acme/app', 42, {
+      repositoryReviewInstructions: resolved.content,
+    });
+    expect(prompt).toContain('## Source: acme/guidelines:frontend.md');
+    expect(prompt).toContain('## Source: acme/guidelines:backend/api.md');
+    expect(prompt).toContain('## Source: acme/app:REVIEW.md');
+    expect(prompt.indexOf('Rules from frontend.md.')).toBeLessThan(
+      prompt.indexOf('Rules from backend/api.md.')
+    );
+    expect(prompt.indexOf('Rules from backend/api.md.')).toBeLessThan(
+      prompt.indexOf('Repository rules.')
+    );
+    expect(prompt).toContain('The repository text wins on conflict.');
+    expect(prompt).not.toContain('# WHAT TO REVIEW');
+    expect(prompt).toContain(
+      'They do not override read-only mode, security/tooling constraints, platform API instructions'
+    );
+  });
+
+  it('keeps the exact prompt unchanged without extends', async () => {
+    const rawContent = '# Local policy\n\nOnly report verified regressions.';
+    const resolved = await resolveReviewGuidelines({
+      rawContent,
+      platform: 'github',
+      repository: 'acme/app',
+      baseRef: 'main',
+      allowedRepositories: [],
+    });
+    const original = await generateReviewPrompt(baseConfig, 'acme/app', 42, {
+      repositoryReviewInstructions: rawContent,
+    });
+    const updated = await generateReviewPrompt(baseConfig, 'acme/app', 42, {
+      repositoryReviewInstructions: resolved.content,
+    });
+    expect(updated).toEqual(original);
+  });
   it('always uses the checked-in GitHub template version and commands', async () => {
     const result = await generateReviewPrompt(baseConfig, 'owner/repo', 42);
 
@@ -81,6 +137,8 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain('## Code Review Summary');
     expect(prompt).toContain('### Files Reviewed');
     expect(prompt).toContain('### Issue Details');
+    expect(prompt).toContain('authored by this review');
+    expect(prompt).toContain('`user.kind` is `workspace_access_token`');
     expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatIssuesFound).not.toContain('<details>');
     expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatIssuesFound).not.toContain('<summary>');
     expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatIssuesFound).not.toContain('<b>');
@@ -319,13 +377,11 @@ describe('normalizeRepositoryReviewInstructions', () => {
   });
 
   it('caps very large instructions and appends a truncation note', () => {
-    const normalized = normalizeRepositoryReviewInstructions('a'.repeat(10_005));
+    const normalized = normalizeRepositoryReviewInstructions('a'.repeat(20_005));
 
-    expect(normalized?.content).toHaveLength(
-      10_000 + `\n\n[${REVIEW_INSTRUCTIONS_FILE} truncated after 10000 characters.]`.length
-    );
+    expect(normalized?.content).toHaveLength(20_000);
     expect(normalized?.content).toContain(
-      `[${REVIEW_INSTRUCTIONS_FILE} truncated after 10000 characters.]`
+      `[${REVIEW_INSTRUCTIONS_FILE} truncated after 20000 characters.]`
     );
     expect(normalized?.truncated).toBe(true);
   });

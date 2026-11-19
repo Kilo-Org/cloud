@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { Card } from '@/components/ui/card';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -19,6 +20,7 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 
 import { UsageBarChart } from './usage-bar-chart';
 import { UsageBreakdownList } from './usage-breakdown-list';
+import { selectUsageErrorView } from './usage-error-view';
 import { formatUsageCost, formatUsageCostPrecise } from './usage-format';
 
 const RANGE_OPTIONS = [
@@ -37,6 +39,22 @@ const METRIC_OPTIONS = [
   { value: 'tokens', labelKey: 'codeReviewer.reviewDetail.tokens' },
 ] as const;
 
+/**
+ * One tile of the totals grid: a value, its caption directly under it, then the
+ * optional detail below the caption, each pair one small gap apart.
+ *
+ * The content is top-aligned, so every tile of a row starts its value at the
+ * same padding as the row above, and spare height falls below the content
+ * instead of pushing the value and caption down.
+ *
+ * The detail holds a two-line floor, never a cap, so a detail that needs more
+ * lines still grows the tile, and every locale whose detail fits two lines
+ * loads at one height that its loading skeleton matches. A one-line detail
+ * starts at the top of that floor, so the caption keeps the same small gap
+ * whether the detail is short or long, and its spare line falls below.
+ *
+ * A larger font scale grows the tile with its text.
+ */
 function StatTile({
   label,
   value,
@@ -47,15 +65,18 @@ function StatTile({
   subtext?: string;
 }>) {
   return (
-    <View className="flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
-      <Text className="text-lg font-bold text-foreground">{value}</Text>
+    <Card className="flex-1">
+      <Text variant="figure">{value}</Text>
+      <Text variant="caption">{label}</Text>
       {subtext !== undefined && (
-        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-          {subtext}
-        </Text>
+        // Two caption lines' floor (28pt on the spacing scale): a one-line
+        // detail keeps the caption's gap, and a detail that needs more lines
+        // grows the tile instead of clipping the tokens breakdown.
+        <View className="min-h-8">
+          <Text variant="caption">{subtext}</Text>
+        </View>
       )}
-      <Text className="text-xs text-muted-foreground">{label}</Text>
-    </View>
+    </Card>
   );
 }
 
@@ -83,14 +104,22 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
   const summary = usage.summary;
   const empty = summary?.requestCount === 0;
   // No totals at all: the screen has nothing to show but the failure.
-  const failed = usage.isSummaryError && summary === undefined;
+  const failed = usage.summaryError !== null && summary === undefined;
   const loading = summary === undefined && !failed;
   // Totals loaded, but a refresh of them failed: keep the numbers and flag them
   // instead of presenting stale data as current.
-  const staleTotals = usage.isSummaryError && summary !== undefined;
+  const staleTotals = usage.summaryError !== null && summary !== undefined;
+  const summaryErrorView = failed || staleTotals ? selectUsageErrorView(usage.summaryError) : null;
+  const seriesErrorView =
+    usage.seriesError === null ? null : selectUsageErrorView(usage.seriesError);
+  const breakdownErrorView =
+    usage.breakdownError === null ? null : selectUsageErrorView(usage.breakdownError);
   const retryAll = () => {
     usage.refetch();
   };
+  // No range a reader picks can change a workspace that reports no usage, so
+  // the control is fixed with the state instead of inviting a dead change.
+  const unavailable = summaryErrorView?.name === 'unavailable';
 
   return (
     <View className="gap-6">
@@ -100,48 +129,64 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
           value={range}
           onChange={setRange}
           accessibilityLabel={t('usage.rangePicker')}
+          disabled={unavailable}
         />
         {scope.kind === 'organization' && !scope.orgWide && (
-          <Text className="text-xs text-muted-foreground">{t('usage.orgSelfNotice')}</Text>
+          <Text variant="caption">{t('usage.orgSelfNotice')}</Text>
         )}
       </View>
 
-      {failed && (
+      {summaryErrorView !== null && (
         <QueryError
-          variant={usage.isPaused ? 'offline' : 'neutral'}
-          onRetry={retryAll}
-          isRetrying={usage.isFetching}
-          placement="top"
-        />
-      )}
-
-      {staleTotals && (
-        <QueryError
-          variant={usage.isPaused ? 'offline' : 'neutral'}
-          onRetry={retryAll}
+          variant={summaryErrorView.variant}
+          title={summaryErrorView.name === 'unavailable' ? t('usage.unavailableTitle') : undefined}
+          message={
+            summaryErrorView.name === 'unavailable' ? t('usage.unavailableDescription') : undefined
+          }
+          onRetry={summaryErrorView.showRetry ? retryAll : undefined}
           isRetrying={usage.isFetching}
           placement="top"
         />
       )}
 
       {loading && (
+        // The four tiles and the chart at their loaded size: a tile is a
+        // `Card` stack of a figure line, the tokens tile's caption and the
+        // label line, so the skeleton prints the same bars in the same order.
         <View className="gap-6">
           <View className="gap-3">
             <View className="flex-row gap-3">
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
+              <Card className="flex-1">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </Card>
+              <Card className="flex-1">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </Card>
             </View>
             <View className="flex-row gap-3">
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
-              <Skeleton className="h-[76px] flex-1 rounded-lg bg-muted-soft" />
+              <Card className="flex-1">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+                <View className="min-h-8">
+                  <Skeleton className="h-3 w-20" />
+                </View>
+              </Card>
+              <Card className="flex-1">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </Card>
             </View>
           </View>
-          <Skeleton className="h-[148px] w-full rounded-lg bg-muted-soft" />
+          <Card>
+            <Skeleton className="h-32 w-full rounded-lg" />
+          </Card>
         </View>
       )}
 
       {!loading && !failed && empty && (
-        <EmptyState icon={LineChart} title={t('usage.emptyTitle')} placement="static" />
+        <EmptyState icon={LineChart} title={t('usage.emptyTitle')} placement="top" />
       )}
 
       {!loading && !failed && summary !== undefined && !empty && (
@@ -191,10 +236,18 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
               onChange={setMetric}
               accessibilityLabel={t('usage.metricPicker')}
             />
-            {usage.isSeriesError ? (
+            {seriesErrorView !== null ? (
               <QueryError
-                variant={usage.isPaused ? 'offline' : 'neutral'}
-                onRetry={retryAll}
+                variant={seriesErrorView.variant}
+                title={
+                  seriesErrorView.name === 'unavailable' ? t('usage.unavailableTitle') : undefined
+                }
+                message={
+                  seriesErrorView.name === 'unavailable'
+                    ? t('usage.unavailableDescription')
+                    : undefined
+                }
+                onRetry={seriesErrorView.showRetry ? retryAll : undefined}
                 isRetrying={usage.isFetching}
               />
             ) : (
@@ -205,10 +258,18 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
             )}
           </View>
 
-          {usage.isBreakdownError ? (
+          {breakdownErrorView !== null ? (
             <QueryError
-              variant={usage.isPaused ? 'offline' : 'neutral'}
-              onRetry={retryAll}
+              variant={breakdownErrorView.variant}
+              title={
+                breakdownErrorView.name === 'unavailable' ? t('usage.unavailableTitle') : undefined
+              }
+              message={
+                breakdownErrorView.name === 'unavailable'
+                  ? t('usage.unavailableDescription')
+                  : undefined
+              }
+              onRetry={breakdownErrorView.showRetry ? retryAll : undefined}
               isRetrying={usage.isFetching}
             />
           ) : (

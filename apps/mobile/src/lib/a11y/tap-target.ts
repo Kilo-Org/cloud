@@ -18,6 +18,13 @@ export const MIN_TAP_TARGET_DP = 28;
 export const TOUCH_TARGET_DP = 44;
 
 /**
+ * The floor a control renders on its own node at {@link TOUCH_TARGET_DP}.
+ * Explicit px, because NativeWind's rem is 14pt here — no scale step lands on
+ * 44pt (`min-h-12` measures 42).
+ */
+export const TOUCH_TARGET_CLASS = 'min-h-[44px]';
+
+/**
  * Android's minimum touch-target size (`<Button>` 48dp rule, the size the
  * control-size audit reports from the node's own view rect). `hitSlop` widens
  * the touch region but not the rect, so an icon-only control meets this only
@@ -59,6 +66,42 @@ export const STATE_ACTION_CLASS = 'min-h-[48px]';
  * `min-h-11` scale step below both.
  */
 export const ROW_TARGET_CLASS = 'min-h-[48px]';
+
+/**
+ * The frame a tab entry renders on its own pressable node. A tab sized by its
+ * label is only as wide as the word: the Agents/To-dos switch measured 25pt in
+ * RTL and 40pt in English, under the design target on the horizontal axis even
+ * though the row floor held the vertical one. The floor is applied on both
+ * axes, so a short label in any locale still offers a 48pt target.
+ */
+export const TAB_TARGET_CLASS = 'min-h-[48px] min-w-[48px]';
+
+/**
+ * The frame a stacked form gives its pickers — Account, Run on, Repository and
+ * the branch row under them. One field shape for the whole column, so a form
+ * never shows two trigger heights side by side.
+ *
+ * It carries no vertical padding of its own on purpose: a floor placed on the
+ * frame is measured against its border box, so a state whose content is
+ * already {@link ROW_TARGET_CLASS} tall renders one border taller than a state
+ * whose content is a line of text, and the column moves as that state arrives.
+ * The body inside it owns the height instead (see
+ * {@link FIELD_TRIGGER_BODY_CLASS}).
+ */
+export const FIELD_TRIGGER_FRAME_CLASS =
+  'flex-row items-center rounded-lg border border-border bg-secondary px-3';
+
+/**
+ * The content box inside {@link FIELD_TRIGGER_FRAME_CLASS}. Every trigger and
+ * every state of one renders in this box, so all of them measure
+ * `48 dp + the frame's two borders` (50 dp) — above `DESIGN.md:364`'s 44pt
+ * floor, and the height the controls beside them take rather than their own:
+ * a 48 dp action on the same row stretches to this frame's outer edges, so the
+ * two boxes line up instead of one sitting a border inside the other. A value
+ * line, a skeleton, a note or a 48 dp action all fit inside it without growing
+ * the frame.
+ */
+export const FIELD_TRIGGER_BODY_CLASS = 'min-h-[48px] flex-1 flex-row items-center gap-2';
 
 /**
  * The frame a screen header's titled control renders on its own pressable
@@ -112,28 +155,52 @@ export const DENSE_ROW_HIT_SLOP = {
 } as const;
 
 /**
- * The box a Home section header's text action renders, in dp. It matches the
- * header's label box, so a row with an action is no taller than a row without
- * one, and every Home section keeps one gap to the block above it.
+ * The box a section header's text action renders, in dp. It carries the target
+ * on its own node, and its vertical margins cancel the box back down to the
+ * header's one-line content band, so a header with an action is exactly as tall
+ * as one without and every section keeps the same gap to the block above it.
  */
 export const SECTION_ACTION_FRAME_DP = 28;
 
-/** The box a Home section header's text action renders, as {@link SECTION_ACTION_FRAME_DP}. */
-export const SECTION_ACTION_BOX_CLASS = 'min-h-[28px] min-w-[48px]';
+/**
+ * The line a section header's eyebrow label lays out on, in dp: `Text`'s
+ * `EYEBROW_LINE_HEIGHT_DP` (`components/ui/text.tsx`), which the eyebrow
+ * variant applies in every script. The action cancels against this line, not
+ * the glyph size, so its copy centres on the section label.
+ */
+export const SECTION_ACTION_LABEL_LINE_DP = 22;
+
+/**
+ * The box a section header's text action renders, as {@link SECTION_ACTION_FRAME_DP}:
+ * `-my-[3px]` is `-(28 - 22) / 2`, the eyebrow's line box. The box then holds
+ * no height of its own — its margin box is the label's line, centred on it, and
+ * the row's own `py-2` (7pt a side) is taller than the 3pt overhang — so the
+ * box neither paints nor receives a touch past the row's bounds (Android
+ * delivers a touch only inside a parent view) while the label keeps its line
+ * and its padding.
+ */
+export const SECTION_ACTION_BOX_CLASS = 'min-h-[28px] min-w-[48px] -my-[3px]';
+
+/**
+ * The box a compact action renders at the end of a caption line — the markdown
+ * code fence's copy control. The line there is the `caption` variant's 14dp box
+ * (`text-xs`), not the eyebrow's {@link SECTION_ACTION_LABEL_LINE_DP} line a
+ * section header uses, so it cancels its own slack (`-(28 - 14) / 2`) and the
+ * fence header stays one line tall instead of growing to the box. The width
+ * floor and the vertical slop are the section header action's.
+ */
+export const CAPTION_ACTION_BOX_CLASS = 'min-h-[28px] min-w-[48px] -my-[7px]';
 
 /**
  * Per-side vertical `hitSlop` of a {@link SECTION_ACTION_FRAME_DP} action:
- * `28 + 9 + 9 = 46 dp`, past the `DESIGN.md:364` 44 dp target even after the
- * box renders a fraction of a dp short. The header row pads the box by the same
- * amount ({@link SECTION_HEADER_ROW_PADDING_CLASS}), so the whole reach stays
- * inside the row and Android delivers every touch in it.
+ * `28 + 9 + 9 = 46 dp`, past the `DESIGN.md:364` 44 dp target. React Native does
+ * not deliver a touch outside the view that holds it, so the delivered area is
+ * the box the row carries (28 dp, exactly the audit floor) and the slop is the
+ * declared reach the control-size audit reads.
  */
 export const SECTION_ACTION_HIT_SLOP_DP = 9;
 
-/** The vertical padding of a Home section header row, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
-export const SECTION_HEADER_ROW_PADDING_CLASS = 'py-[9px]';
-
-/** The `hitSlop` a Home section header action renders, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
+/** The `hitSlop` a section header action renders, as {@link SECTION_ACTION_HIT_SLOP_DP}. */
 export const SECTION_ACTION_HIT_SLOP = {
   top: SECTION_ACTION_HIT_SLOP_DP,
   bottom: SECTION_ACTION_HIT_SLOP_DP,
@@ -150,6 +217,60 @@ export const SECTION_ACTION_HIT_SLOP = {
 export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify-center';
 
 /**
+ * The pull toward the row's end edge that puts a
+ * {@link COMPACT_CONTROL_BOX_CLASS} control's glyph on the row's inset: the box
+ * sits 9pt inside the row's 16pt end padding, so its 16pt glyph ends 16pt from
+ * the edge, where the leading icon starts. 7pt, not the scale's 8pt, which
+ * would leave the glyph a point off the inset.
+ */
+export const COMPACT_CONTROL_ROW_END_CLASS = '-me-[7px]';
+
+/**
+ * A settings row's content band: the row's 48pt frame
+ * (`ROW_FRAME_CLASS`) less its 10.5pt vertical padding a side. A trailing
+ * control that contributes more than this sets the row's height, so it must
+ * cancel down to it.
+ */
+const ROW_FRAME_CONTENT_DP = 27;
+
+/**
+ * The vertical margin a full {@link TOUCH_TARGET_DP} control cancels per side
+ * when it is hosted in a {@link ROW_FRAME_CONTENT_DP}-tall row:
+ * `(44 - 27) / 2 = 8.5`. A control-size audit reads the control's own node
+ * rect, so `hitSlop` cannot lift a compact box and the node itself must render
+ * the target; the negative margin then keeps the node from setting the row's
+ * height, contributing the content band instead. The measured Android switch
+ * node is 44.19dp tall, so the row lands on the same 48pt frame as the
+ * `KvRow` beside it instead of the 53pt one a 32dp contribution produced. The
+ * row's 10.5pt padding keeps the overhang inside the row's bounds, because
+ * Android drops a touch outside a parent view.
+ */
+export const TOUCH_TARGET_OVERHANG_DP = (TOUCH_TARGET_DP - ROW_FRAME_CONTENT_DP) / 2;
+
+/**
+ * The host a row gives a `Switch` when the row is not itself on
+ * {@link TOUCH_TARGET_DP} — the slash command row, whose content band is its
+ * text lines. The switch's node renders the target and cancels the excess with a
+ * negative vertical margin, so a host that took only that layout height (the
+ * row's content band) would be the parent a touch must land in, and Android
+ * delivers a touch only inside the parent view: the 44dp control would receive
+ * the band. The host takes the target as its own height, centring the node in
+ * it, and cancels the same overhang, so the row still sees only the content band.
+ */
+export const SWITCH_HOST_CLASS = 'h-[44px] -my-[8.5px] shrink-0 items-center justify-center';
+
+/**
+ * The label pressable inside a `ROW_FRAME_CLASS` row cancels the frame's
+ * vertical padding and pads itself back by the same amount, so its own node
+ * spans the whole 48pt row while its content stays on the content band. A
+ * control-size audit reads the pressable's own rect, and `hitSlop` does not
+ * lift it: a 27pt pressable with slop measured below the 28pt floor. A
+ * `min-h-[48px]` floor inside the padded frame instead made every preference
+ * row 69pt tall beside a 48pt `KvRow`.
+ */
+export const ROW_FRAME_CONTENT_PRESS_CLASS = '-my-3 py-3';
+
+/**
  * Per-side `hitSlop` for {@link COMPACT_CONTROL_BOX_CLASS}, so the touch region
  * is 32 + 16 = 48pt. 48, not 44: Android lays a target out in whole physical
  * pixels, and a 44dp box at density 420 measured 43.81dp in the run behind
@@ -157,6 +278,42 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
  * `DESIGN.md:364`'s 44pt rather than landing on it.
  */
 export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
+
+/**
+ * The `hitSlop` a {@link COMPACT_CONTROL_BOX_CLASS} control renders, as
+ * {@link COMPACT_CONTROL_HIT_SLOP_DP}. A control that takes its box as a
+ * `style` object takes the slop as this object.
+ */
+export const COMPACT_CONTROL_HIT_SLOP = {
+  top: COMPACT_CONTROL_HIT_SLOP_DP,
+  bottom: COMPACT_CONTROL_HIT_SLOP_DP,
+  left: COMPACT_CONTROL_HIT_SLOP_DP,
+  right: COMPACT_CONTROL_HIT_SLOP_DP,
+} as const;
+
+/**
+ * The box an in-field clear control renders at the end of a search field.
+ *
+ * The control sits inside the field's content box next to its `TextInput`, so
+ * this box carries the target on its own node rather than through `hitSlop`:
+ * `hitSlop` grows the touch region but not the frame a control-size audit
+ * reads, and a reach toward the input would take taps the field itself should
+ * get. The box is {@link ICON_TARGET_DP}, not the 44pt design target, because
+ * Android lays a control out in whole physical pixels and a 44pt box measures
+ * under the target there; this is the reason {@link COMPACT_CONTROL_HIT_SLOP_DP}
+ * reaches past 44pt instead of onto it.
+ *
+ * A box taller than the shared single-line `Input`'s `min-h-[44px]` would grow
+ * the field, so it cancels the difference in layout: `-my-[7px]` is 7pt a side
+ * at NativeWind's 14pt rem, so the box contributes 48 - 14 = 34pt to the row's
+ * cross size — under the input's floor, which therefore keeps setting the
+ * field's height. The margin does not move the border box: the row centres that
+ * box against the input's 44pt content area, so it overhangs the content area
+ * by `(48 - 44) / 2 = 2pt` each side and still paints and hit-tests its whole
+ * height inside the field's 7pt `py-2` padding, with 5pt to spare before the
+ * field's own edge. The same shape as `LINE_ACTION_BOX_CLASS` on a line of copy.
+ */
+export const FIELD_CLEAR_BOX_CLASS = 'h-[48px] w-[48px] -my-[7px] items-center justify-center';
 
 /**
  * Per-side `hitSlop` of the shared `Button`'s compact size (`sm`), whose
@@ -225,6 +382,35 @@ export const CHIP_HIT_SLOP = {
 } as const;
 
 /**
+ * The box the credits screen's failed-balance retry renders, in dp. The box is
+ * the touch target on its own node, as `DESIGN.md:364` measures: 46dp is past
+ * the 44pt floor even after Android truncates the fractional layout to whole
+ * pixels (46dp is 120.75px at 2.625px/dp, so 120px still measures 45.7dp), the
+ * same reach the command card's controls carry ({@link LINE_ACTION_REACH_DP}).
+ *
+ * A 28dp frame plus a uniform slop does not hold here, which is why this
+ * control breaks from the slop shapes above. The amount slot's 28dp box
+ * measures about 28.2dp on this device, and the retry's bottom side faces the
+ * caption slot, the card's later sibling: touch dispatch hands a point inside
+ * a sibling's box to that sibling, so the slot took back the bottom side past
+ * the 3.5dp gap under the amount (delivered: the full 8dp above, about 3dp
+ * below — under `DESIGN.md`'s 44pt). The caption slot paints text only, so it
+ * is touch-transparent and the box's own bottom edge reaches the target.
+ */
+export const BALANCE_RETRY_TARGET_DP = 46;
+
+/**
+ * The negative vertical margin the retry's box carries, per side: the box
+ * overflows its own flex line without adding height to the amount slot, so
+ * `46 - 2 * 9 = 28dp` stays in flow and the credits card keeps one height in
+ * every state of the balance read, with the copy below it never moving. A
+ * literal class string, because NativeWind only compiles the classes it finds
+ * in source.
+ */
+export const BALANCE_RETRY_CANCEL_DP = 9;
+export const BALANCE_RETRY_TARGET_CLASS = 'min-h-[46px] -my-[9px]';
+
+/**
  * The box a text-only action renders so its own node carries the platform's
  * minimum touch target: `DESIGN.md:364`'s 44pt on iOS and
  * {@link ICON_TARGET_DP}'s 48dp on Android. The agents history link is one such
@@ -248,6 +434,31 @@ export const CHIP_HIT_SLOP = {
  */
 export function textActionTargetClass(): string {
   return Platform.OS === 'android' ? 'min-h-[48px] min-w-[48px]' : 'min-h-[44px] min-w-[44px]';
+}
+
+/** The target {@link textActionTargetClass} renders, in dp, on the live platform. */
+export function textActionTargetDp(): number {
+  return Platform.OS === 'android' ? ICON_TARGET_DP : TOUCH_TARGET_DP;
+}
+
+/**
+ * The vertical margin a row's text action cancels per side, so the row lays out
+ * on its content band instead of on the platform's target — the switch's own
+ * cancellation ({@link TOUCH_TARGET_OVERHANG_DP}), taken at the action's
+ * target.
+ *
+ * The action keeps {@link textActionTargetClass}'s box on its own node, because
+ * a control-size audit reads that node's rect. Without the margin the node
+ * contributes its whole target to the frame: a row with a text action laid out
+ * at 65pt on iOS and 69dp on Android beside a two-line row's 57.75pt, so a
+ * group grew when one of its rows swapped a text action for a button (the
+ * Integrations hub's Connect and Disconnect rows, 2026-11-18 gate). Cancelling
+ * to {@link ROW_FRAME_CONTENT_DP} leaves the node inside the row's own `py-3`
+ * padding, which keeps every touch on it inside the row's bounds — Android
+ * delivers a touch only inside a parent view.
+ */
+export function textActionRowOverhangDp(): number {
+  return (textActionTargetDp() - ROW_FRAME_CONTENT_DP) / 2;
 }
 
 /**
@@ -450,6 +661,52 @@ export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
 
 /** The `hitSlop` {@link LINE_ACTION_BOX_CLASS} renders, reaching past 44dp each way. */
 export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as const;
+
+/**
+ * The full vertical reach of a {@link LINE_ACTION_BOX_CLASS} control: the
+ * `h-[46px]` box the command card's controls render as, past the 44pt
+ * target. The reach is the box itself, not `box + hitSlop`: the box is the
+ * target on its own node, and React Native's parent-bounds rule makes any
+ * slop past a control's frame unreliable at a row's outer side (measured:
+ * the vertical slop band reorders, a tap past the outer edge does nothing).
+ */
+export const LINE_ACTION_REACH_DP = 46;
+
+/**
+ * The overlay a command card renders its reorder and delete controls in, as
+ * the absolutely positioned row the card itself parents. Each control's box
+ * is the whole touch target ({@link LINE_ACTION_REACH_DP} tall and wide on
+ * its own node), so the parent-bounds rule cannot clip either axis and no
+ * `hitSlop` is involved; the band is the boxes' parent and exactly their
+ * height.
+ *
+ * `top-0` pins the band to the card's top edge, so the boxes reach into the
+ * card's top padding: the glyph centres at the band's 23dp midpoint, a
+ * quarter dp from the one-text-line label row's centre (22.75dp). The band's
+ * bottom edge (46dp from the card's top) stops above the field, whose gap
+ * from the label row the card widens with {@link COMMAND_ROW_FIELD_GAP_CLASS}
+ * (field top 47.5dp), so a tap aimed at the field's top strip lands on the
+ * field. `end-[14px]` puts the boxes' outer edge on the card's content edge
+ * (`p-4` = 14dp), so the delete control's whole 46dp width is tappable where
+ * the old slop past its box was dead. `gap-3` keeps a 10.5dp band between
+ * neighbouring boxes that the boxes do not cover, so a tap beside one control
+ * cannot reach the next. The row covers the label's tail horizontally, so
+ * `box-none` keeps the band itself touch-transparent and the label under it
+ * stays pressable.
+ */
+export const LINE_ACTION_OVERLAY_CLASS =
+  'absolute end-[14px] top-0 flex-row items-center gap-3 h-[46px]';
+
+/**
+ * The gap between a command card's label row and its field, as a literal
+ * class. The 46dp control band ({@link LINE_ACTION_REACH_DP}) ends at 46dp
+ * from the card's top; the label row ends at `p-4` + one `text-sm` line
+ * (14 + 17.5 = 31.5dp), so a 16dp gap puts the field's top edge at 47.5dp —
+ * 1.5dp below the band's bottom edge. The shared field's own `gap-1.5` (6dp)
+ * would put the band's bottom 8dp into the field, where a tap aimed at the
+ * input's top strip would reorder or delete instead.
+ */
+export const COMMAND_ROW_FIELD_GAP_CLASS = 'gap-y-[16px]';
 
 /**
  * The class an inline-link connector carries so the two links' facing reaches do

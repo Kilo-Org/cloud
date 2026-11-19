@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
 import { selectionHaptic } from '@/lib/haptics';
-import { type Href, type ImperativeRouter, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import {
   BookOpenCheck,
   Brain,
@@ -15,23 +15,33 @@ import { Keyboard, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { SectionHeader } from '@/components/ui/section-header';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
+import {
+  CHIP_HIT_SLOP,
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  FIELD_TRIGGER_BODY_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
+} from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
   freeModelFreeLabel,
-  getFreeModelDataAccessibilityLabel,
   modelNameStatesFree,
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { type SinglePushRoute, useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { modelPickerCostLabel } from '@/lib/model-cost';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ModelPickerSelection, type ModelPickerSelectionScope } from '@/lib/picker-bridge';
 import { modelPickerSlot } from '@/lib/route-registry';
+import { selectionCheckColor } from '@/lib/selection-check-color';
 import { cn } from '@/lib/utils';
 
 import { modelSelectorBadges } from './model-selector-badges';
@@ -44,10 +54,18 @@ type ModelSelectorProps = {
   /** Whether this chip's `onSelect` stores the picked thinking effort. */
   acceptsVariant: boolean;
   onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
+  /** Called as the chip opens the picker, so a caller can mark the field as visited. */
+  onOpen?: () => void;
   disabled?: boolean;
   isLoading?: boolean;
   /** Agent name that pins the model; when set with `disabled`, the chip is locked. */
   lockLabel?: string;
+  /**
+   * `chip` is the composer's inline pill, beside the mode chip. `field` is the
+   * form's picker: a label above the 48pt select box, on the field-label
+   * column the text fields use, for a form that lists its picks as fields.
+   */
+  presentation?: 'chip' | 'field';
 };
 
 type ModelPickerSelectionScopeContextValue = {
@@ -66,6 +84,13 @@ const UNFENCED_SELECTION_CONTEXT: ModelPickerSelectionScopeContextValue = {
 };
 
 const ModelPickerSelectionScopeContext = createContext(UNFENCED_SELECTION_CONTEXT);
+
+/**
+ * The selection check's own square, and therefore the width every row reserves
+ * for it. The column and the glyph read the same number, so a row that gains a
+ * check never moves the model name or the favourite control beside it.
+ */
+const CHECK_COLUMN_DP = 18;
 
 export function ModelPickerSelectionScopeProvider({
   children,
@@ -97,7 +122,7 @@ function toSessionModelOption(option: ModelOption | SessionModelOption): Session
 }
 
 export function openModelPicker(
-  router: ImperativeRouter,
+  push: SinglePushRoute,
   params: {
     options: (ModelOption | SessionModelOption)[];
     value: string;
@@ -134,7 +159,7 @@ export function openModelPicker(
   // strip of the screen behind it below the sheet. Dismiss the keyboard first
   // so the sheet anchors at the window bottom (e1 spot check).
   Keyboard.dismiss();
-  router.push(`/(app)/agent-chat/model-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
+  push(`/(app)/agent-chat/model-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
 }
 
 export function ModelSelector({
@@ -143,34 +168,60 @@ export function ModelSelector({
   options,
   acceptsVariant,
   onSelect,
+  onOpen,
   disabled = false,
   isLoading = false,
   lockLabel,
+  presentation = 'chip',
 }: Readonly<ModelSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const selectionContext = useContext(ModelPickerSelectionScopeContext);
 
   if (isLoading) {
-    return (
+    const loadingBar = (
       <View
         accessible
         accessibilityRole="button"
         accessibilityState={{ busy: true, disabled: true }}
         accessibilityLabel={t('common.model')}
-        className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5"
+        className={
+          presentation === 'field'
+            ? undefined
+            : 'min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5'
+        }
       >
-        <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
-          {t('common.model')}
-        </Text>
-        <ChevronDown size={14} color={colors.mutedForeground} />
+        {/* The bar stands in for the label line and takes that line's own box:
+            `text-sm` sets one 17.5 dp line, which is the scale's `h-5`, so the
+            pill is the height it will have once the model arrives. Its width is
+            the nearest spacing step rather than the arriving label's measured
+            width: that width belongs to the label, and a pinned bar would be a
+            pixel value the contract does not allow. `bg-muted-soft` for the
+            reason recorded on the repository loading row: the default
+            `bg-skeleton-fill` equals this pill's `bg-secondary` in the light
+            palette and would paint nothing. The wrapper keeps the busy label for
+            assistive tech without a text node that reads as a resolved value. */}
+        <Skeleton className="h-5 w-20 bg-muted-soft" />
+        <View className="opacity-50">
+          <ChevronDown size={presentation === 'field' ? 16 : 14} color={colors.mutedForeground} />
+        </View>
       </View>
     );
+    if (presentation === 'field') {
+      return (
+        <View className="gap-2">
+          <FormFieldLabel label={t('common.model')} />
+          <View className={FIELD_TRIGGER_FRAME_CLASS}>
+            <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>{loadingBar}</View>
+          </View>
+        </View>
+      );
+    }
+    return loadingBar;
   }
 
   const pickerOptions = options.map(option => toSessionModelOption(option));
-  const effectivelyDisabled = disabled || pickerOptions.every(option => option.unavailable);
   const selectedModel = pickerOptions.find(option => option.id === value);
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
@@ -190,25 +241,45 @@ export function ModelSelector({
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
-  const dataLabel = collectsData ? getFreeModelDataAccessibilityLabel(label) : label;
-  const modelLabel = byok ? `${dataLabel}, ${BYOK_MODEL_LABEL}` : dataLabel;
-  const accessibilityLabel =
-    (hasVariants && variantLabel
+  const chipParts = [
+    label,
+    collectsData ? freeModelDataLabel() : undefined,
+    byok ? BYOK_MODEL_LABEL : undefined,
+  ].filter((part): part is string => part !== undefined);
+  const modelLabel = formatList(chipParts, i18n.language);
+  const spokenModel =
+    hasVariants && variantLabel
       ? t('agentChat.modelSelector.thinkingEffortWithModel', {
           model: modelLabel,
           variant: variantLabel,
         })
-      : modelLabel) +
-    (lockLabel && disabled ? t('agentChat.modelSelector.lockedByAgent', { agent: lockLabel }) : '');
+      : modelLabel;
+  // The chip names one model, so it states that model's state. Every option
+  // being unavailable is therefore not what decides the announcement.
+  const selectedUnavailable = selectedModel?.unavailable === true;
+  // An empty catalog has nothing to choose, so the chip stays disabled instead
+  // of opening a sheet with no rows; an unavailable catalog keeps its press so
+  // the picker can explain each model.
+  const chipDisabled = disabled || pickerOptions.length === 0;
+  const accessibilityLabel = [
+    spokenModel,
+    selectedUnavailable ? t('agentChat.modelSelector.unavailable') : undefined,
+    lockLabel && disabled
+      ? t('agentChat.modelSelector.lockedByAgent', { agent: lockLabel })
+      : undefined,
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join(t('common.sentenceJoiner'));
   // A pinned variant is meaningful even when the locked option carries a single
   // variant, so surface the badge whenever a lock label is present.
   const showVariantBadge = variantLabel !== '' && (hasVariants || Boolean(lockLabel));
 
   function handlePress() {
-    if (effectivelyDisabled) {
+    if (chipDisabled) {
       return;
     }
-    openModelPicker(router, {
+    onOpen?.();
+    openModelPicker(pushOnce, {
       options: pickerOptions,
       value,
       variant,
@@ -218,46 +289,76 @@ export function ModelSelector({
     });
   }
 
+  const selectorBody = (
+    <View className="min-w-0 shrink flex-row items-center gap-1.5">
+      <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
+        {label}
+      </Text>
+      {byok ? (
+        <View className="rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-700">
+          <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
+            {BYOK_MODEL_LABEL}
+          </Text>
+        </View>
+      ) : null}
+      {collectsData ? <BookOpenCheck size={12} color={colors.warn} /> : null}
+      {showVariantBadge ? (
+        <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
+          <Brain size={12} color={colors.mutedForeground} />
+          {/* The label is text, not the chip's chevron/icon, so it keeps
+           * full theme contrast against the badge surface. The muted token
+           * falls below 4.5:1 on `neutral-200`/`neutral-800`, which the
+           * dim-only-chevron/icon rule does not cover (D2). */}
+          <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
+            {variantLabel}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+  const pressableProps = {
+    onPress: handlePress,
+    disabled: chipDisabled,
+    accessibilityRole: 'button' as const,
+    accessibilityLabel,
+    accessibilityState: { disabled: chipDisabled },
+  };
+
+  if (presentation === 'field') {
+    // The form's picker: the label above the shared 48pt select box, the way
+    // the text fields above it name their inputs. The pill belongs to the
+    // composer, where it sits beside the mode chip; inside a field column it
+    // read as a third control type (design review, 2026-11-18).
+    return (
+      <View className="gap-2">
+        <FormFieldLabel label={t('common.model')} />
+        <Pressable
+          {...pressableProps}
+          className={cn(FIELD_TRIGGER_FRAME_CLASS, !chipDisabled && 'active:opacity-70')}
+        >
+          <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
+            {selectorBody}
+            <View className={cn(chipDisabled && 'opacity-50')}>
+              <ChevronDown size={16} color={colors.mutedForeground} />
+            </View>
+          </View>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <Pressable
-      onPress={handlePress}
-      disabled={effectivelyDisabled}
+      {...pressableProps}
       // The chip's own 27.81pt frame is the visual; the vertical slop carries
       // its touch region past the 44pt design target without growing the row.
       hitSlop={CHIP_HIT_SLOP}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: effectivelyDisabled }}
       className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
     >
-      <View className="min-w-0 shrink flex-row items-center gap-1.5">
-        <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
-          {label}
-        </Text>
-        {byok ? (
-          <View className="rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-700">
-            <Text className="text-[10px] font-medium text-foreground" numberOfLines={1}>
-              {BYOK_MODEL_LABEL}
-            </Text>
-          </View>
-        ) : null}
-        {collectsData ? <BookOpenCheck size={12} color={colors.warn} /> : null}
-        {showVariantBadge ? (
-          <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
-            <Brain size={12} color={colors.mutedForeground} />
-            {/* The label is text, not the chip's chevron/icon, so it keeps
-             * full theme contrast against the badge surface. The muted token
-             * falls below 4.5:1 on `neutral-200`/`neutral-800`, which the
-             * dim-only-chevron/icon rule does not cover (D2). */}
-            <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
-              {variantLabel}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      {selectorBody}
       {/* The label stays at full theme contrast; a disabled chip dims only its
        * chevron so the pill text keeps the WCAG AA 4.5:1 ratio (D2). */}
-      <View className={cn(effectivelyDisabled && 'opacity-50')}>
+      <View className={cn(chipDisabled && 'opacity-50')}>
         <ChevronDown size={14} color={colors.mutedForeground} />
       </View>
     </Pressable>
@@ -332,10 +433,10 @@ export function ModelPickerOptionRow({
   // shares one right-alignment column and the check can never sit right of
   // it.
   return (
-    <View className="border-b border-border">
+    <View className="border-b-[0.5px] border-hair-soft">
       <View className="flex-row items-center gap-3 pr-4">
         <Pressable
-          className="min-h-9 flex-1 flex-row items-center py-3 pl-4 active:bg-secondary"
+          className="min-h-9 min-w-0 flex-1 flex-row items-center ps-4 py-3 active:bg-secondary"
           onPress={() => {
             onSelectModel(option);
           }}
@@ -344,7 +445,7 @@ export function ModelPickerOptionRow({
           accessibilityLabel={accessibilityLabel}
           accessibilityState={{ disabled: option.unavailable, selected }}
         >
-          <View className="flex-1">
+          <View className="min-w-0 flex-1">
             {/* The disabled cue is the name's muted token, not a row opacity:
              * the metadata below and the `unavailable` line stay readable,
              * which a row-level 50% opacity took below 4.5:1. */}
@@ -362,7 +463,15 @@ export function ModelPickerOptionRow({
               </Text>
             ) : null}
             {option.displayId ? (
-              <Text selectable className="font-mono text-xs text-muted-foreground">
+              // The subtitle names a source, and a repository path can be long, so
+              // it stays one line: a wrapped path would make one row taller than
+              // its neighbours for a value the person reads at a glance.
+              <Text
+                selectable
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                className="font-mono text-xs text-muted-foreground"
+              >
                 {option.displayId}
               </Text>
             ) : null}
@@ -379,16 +488,14 @@ export function ModelPickerOptionRow({
               <View className="mt-1 flex-row items-center gap-1 self-start">
                 {showFreeBadge ? (
                   <View className="rounded-full bg-good px-2 py-0.5">
-                    <Text className="text-[11px] font-medium text-good-foreground">
+                    <Text className="text-xs font-medium text-good-foreground">
                       {freeModelFreeLabel()}
                     </Text>
                   </View>
                 ) : null}
                 {byok ? (
                   <View className="rounded-full bg-neutral-200 px-2 py-0.5 dark:bg-neutral-700">
-                    <Text className="text-[11px] font-medium text-foreground">
-                      {BYOK_MODEL_LABEL}
-                    </Text>
+                    <Text className="text-xs font-medium text-foreground">{BYOK_MODEL_LABEL}</Text>
                   </View>
                 ) : null}
                 {collectsData ? (
@@ -404,9 +511,9 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
-        <View className="w-[18px] items-center justify-center">
+        <View className="items-center justify-center" style={{ width: CHECK_COLUMN_DP }}>
           {selected ? (
-            <Check size={18} color={option.unavailable ? colors.mutedForeground : colors.primary} />
+            <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors, option.unavailable)} />
           ) : null}
         </View>
         <Pressable
@@ -414,8 +521,8 @@ export function ModelPickerOptionRow({
             selectionHaptic();
             onToggleFavorite(option);
           }}
-          hitSlop={12}
-          className="min-h-[44px] min-w-[44px] items-center justify-center"
+          hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+          className={cn(COMPACT_CONTROL_BOX_CLASS, 'items-center justify-center')}
           accessibilityRole="button"
           accessibilityLabel={
             isFavorite
@@ -433,17 +540,16 @@ export function ModelPickerOptionRow({
       </View>
       {acceptsVariant && selected && option.variants.length > 1 ? (
         <View className="px-4 pb-3">
-          <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {t('agentChat.modelSelector.thinkingEffort')}
-          </Text>
+          <SectionHeader label={t('agentChat.modelSelector.thinkingEffort')} />
           <View className="flex-row flex-wrap gap-2">
             {option.variants.map(thinkingVariant => {
               const active = thinkingVariant === selectedVariant;
               return (
                 <Pressable
                   key={thinkingVariant}
+                  hitSlop={CHIP_HIT_SLOP}
                   className={cn(
-                    'min-h-[44px] items-center justify-center rounded-full px-4 active:opacity-70',
+                    'items-center justify-center rounded-full px-4 py-1.5 active:opacity-70',
                     active ? 'bg-foreground' : 'bg-secondary'
                   )}
                   onPress={() => {

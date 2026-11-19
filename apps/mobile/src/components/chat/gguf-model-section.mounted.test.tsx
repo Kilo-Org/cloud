@@ -9,7 +9,7 @@ import {
 } from '@/lib/chat/gguf-records';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
-import { GgufDownloadControls } from './gguf-model-section';
+import { GgufDownloadControls, GgufModelSection } from './gguf-model-section';
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -25,10 +25,26 @@ vi.mock('@/components/chat/backend-provider-choices', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#666666' }),
 }));
+const store = vi.hoisted(() => {
+  const empty: GgufDownloadsSnapshot = {
+    models: [],
+    download: null,
+    failure: null,
+    loadFailed: false,
+  };
+  return { retryLoad: vi.fn(), snapshot: empty };
+});
+
 vi.mock('@/lib/chat/gguf-models', () => ({
-  ggufDownloadActions: { start: vi.fn(), pause: vi.fn(), resume: vi.fn(), cancel: vi.fn() },
+  ggufDownloadActions: {
+    start: vi.fn(),
+    pause: vi.fn(),
+    resume: vi.fn(),
+    cancel: vi.fn(),
+    retryLoad: store.retryLoad,
+  },
   ggufUrlSource: vi.fn(),
-  useGgufModels: () => ({ models: [], download: null, failure: null }),
+  useGgufModels: () => store.snapshot,
 }));
 
 const FILE_ID = 'q2_k-file';
@@ -49,6 +65,7 @@ const PAUSED: GgufDownload = {
   pending: false,
   written: 250,
   total: 1_000,
+  retrying: false,
 };
 
 let view: RenderWithProvidersResult | undefined = undefined;
@@ -85,7 +102,10 @@ async function mountRow(
 
 describe('the model row control names', () => {
   it('starts the download name with the visible label and adds the row detail', async () => {
-    const [download] = await mountRow({ models: [], download: null, failure: null }, 'q2_k');
+    const [download] = await mountRow(
+      { models: [], download: null, failure: null, loadFailed: false },
+      'q2_k'
+    );
 
     expect(download?.visible).not.toBe('');
     expect(download?.label?.startsWith(download.visible)).toBe(true);
@@ -93,8 +113,14 @@ describe('the model row control names', () => {
   });
 
   it('uses the row detail on the delete and transfer controls too', async () => {
-    const downloaded = await mountRow({ models: [RECORD], download: null, failure: null }, 'q2_k');
-    const transferring = await mountRow({ models: [], download: PAUSED, failure: null }, 'q2_k');
+    const downloaded = await mountRow(
+      { models: [RECORD], download: null, failure: null, loadFailed: false },
+      'q2_k'
+    );
+    const transferring = await mountRow(
+      { models: [], download: PAUSED, failure: null, loadFailed: false },
+      'q2_k'
+    );
 
     expect([...downloaded, ...transferring]).toHaveLength(3);
     for (const control of [...downloaded, ...transferring]) {
@@ -104,7 +130,12 @@ describe('the model row control names', () => {
   });
 
   it('leaves the name to the visible text when no detail distinguishes the row', async () => {
-    const controls = await mountRow({ models: [RECORD], download: null, failure: null });
+    const controls = await mountRow({
+      models: [RECORD],
+      download: null,
+      failure: null,
+      loadFailed: false,
+    });
 
     expect(controls).toHaveLength(1);
     expect(controls[0]?.label).toBeUndefined();
@@ -112,7 +143,10 @@ describe('the model row control names', () => {
   });
 
   it('ignores a blank detail instead of naming the control with empty brackets', async () => {
-    const controls = await mountRow({ models: [], download: null, failure: null }, '   ');
+    const controls = await mountRow(
+      { models: [], download: null, failure: null, loadFailed: false },
+      '   '
+    );
 
     expect(controls[0]?.label).toBeUndefined();
     expect(controls[0]?.visible).not.toBe('');
@@ -123,8 +157,39 @@ describe('the model row control names', () => {
       models: [],
       download: { ...PAUSED, pending: true },
       failure: null,
+      loadFailed: false,
     });
 
     expect(controls.map(control => control.disabled)).toEqual([true, false]);
+  });
+});
+
+describe('the saved-list load failure', () => {
+  it('renders the load failure with a retry that reloads', async () => {
+    store.snapshot = { models: [], download: null, failure: null, loadFailed: true };
+    view?.unmount();
+    view = await renderWithProviders(
+      createElement(GgufModelSection, { onBrowse: () => undefined })
+    );
+
+    const failureRow = view.renderer.root
+      .findAll(node => (node.type as string) === 'Text')
+      .map(node => node.props.children as string);
+    expect(failureRow).toContain('Could not load models');
+    expect(failureRow).toContain('Try again');
+
+    const retry = view.renderer.root
+      .findAll(node => (node.type as string) === 'Button')
+      .find(button =>
+        button
+          .findAll(node => (node.type as string) === 'Text')
+          .some(node => node.props.children === 'Try again')
+      );
+    if (!retry) {
+      throw new Error('the retry control was not rendered');
+    }
+    (retry.props.onPress as () => void)();
+
+    expect(store.retryLoad).toHaveBeenCalledTimes(1);
   });
 });

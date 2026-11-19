@@ -1,9 +1,11 @@
+import { type Href } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import {
   applyVariableEdit,
@@ -22,13 +24,15 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { KeyRound } from '@/components/ui/icons';
+import { KeyRound, Plus } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileVars } from '@/lib/hooks/use-agent-profiles';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_VARS: readonly ProfileVarSource[] = [];
@@ -59,12 +63,19 @@ function initialVariableEdit(row: VariableRow | undefined): VariableEdit {
 export function ProfileVariablesScreen({
   profileId,
   organizationId,
-}: Readonly<{ profileId: string; organizationId?: string }>) {
+  backFallback,
+}: Readonly<{
+  profileId: string;
+  organizationId?: string;
+  /** The Profiles list of the stack that mounted this screen. */
+  backFallback: Href;
+}>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const varsQuery = useAgentProfileVars(profileId, organizationId);
   const { setVar, deleteVar } = useAgentProfileMutations(organizationId);
-  const canManage = useCanManageOrganizationProfiles(organizationId);
+  const permission = useOrganizationProfilePermission(organizationId);
+  const canManage = permission === 'allowed';
 
   const serverVars: readonly ProfileVarSource[] = varsQuery.data ?? NO_VARS;
   // The screen owns the list so a saved edit shows immediately; the sync below
@@ -160,9 +171,10 @@ export function ProfileVariablesScreen({
       return;
     }
     confirm({
-      title: t('common.delete'),
-      message: key,
-      confirmLabel: t('common.delete'),
+      // An identifier reads position by position, so it keeps its left-to-right direction.
+      title: t('profiles.variableDeleteTitle', { key: isolateLtrBidiText(key) }),
+      message: t('profiles.variableDeleteMessage'),
+      confirmLabel: t('profiles.variableDeleteConfirm'),
       onConfirm: () => {
         void runDelete(key);
       },
@@ -204,59 +216,71 @@ export function ProfileVariablesScreen({
         description={null}
         placement="top"
         action={
-          canManage ? (
-            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
-              <Text>{t('profiles.addVariable')}</Text>
-            </Button>
-          ) : null
+          <ProfileManageSlot permission={permission}>
+            <StateAction label={t('profiles.addVariable')} icon={Plus} onPress={startAdd} />
+          </ProfileManageSlot>
         }
       />
     );
   } else {
+    const renderRow = (row: VariableRow) => (
+      <VariableRowView
+        key={row.key}
+        row={row}
+        isDeleting={deleteVar.isPending}
+        onEdit={
+          canManage
+            ? () => {
+                beginEdit(row.key);
+              }
+            : undefined
+        }
+        onDelete={
+          canManage
+            ? () => {
+                confirmDelete(row.key);
+              }
+            : undefined
+        }
+      />
+    );
+    // The edited row's form takes that row's place in the group: the rows above
+    // and below keep their order around it, and each run of rows stays one
+    // `RowGroup` because the form block is not a row.
+    const editedIndex = rows.findIndex(row => isEditing && row.key === editingKey);
     content = (
-      <>
-        {rows.map(row =>
-          isEditing && row.key === editingKey ? (
-            renderEditForm(false, initialVariableEdit(row))
-          ) : (
-            <VariableRowView
-              key={row.key}
-              row={row}
-              isDeleting={deleteVar.isPending}
-              onEdit={
-                canManage
-                  ? () => {
-                      beginEdit(row.key);
-                    }
-                  : undefined
-              }
-              onDelete={
-                canManage
-                  ? () => {
-                      confirmDelete(row.key);
-                    }
-                  : undefined
-              }
-            />
-          )
+      <View className="gap-3">
+        {editedIndex === -1 ? (
+          <RowGroup>{rows.map(row => renderRow(row))}</RowGroup>
+        ) : (
+          <>
+            {editedIndex > 0 ? (
+              <RowGroup>{rows.slice(0, editedIndex).map(row => renderRow(row))}</RowGroup>
+            ) : null}
+            {renderEditForm(false, initialVariableEdit(rows[editedIndex]))}
+            {editedIndex < rows.length - 1 ? (
+              <RowGroup>{rows.slice(editedIndex + 1).map(row => renderRow(row))}</RowGroup>
+            ) : null}
+          </>
         )}
 
         {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
 
-        {showAdd && canManage ? (
-          <Button onPress={startAdd}>
-            <Text>{t('profiles.addVariable')}</Text>
-          </Button>
-        ) : null}
-
-        {atVariableCap && canManage ? (
-          <AccessibleStatus
-            message={t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS })}
-            tone="warn"
-            className="text-sm"
-          />
-        ) : null}
-      </>
+        <ProfileManageSlot permission={permission}>
+          {showAdd && atVariableCap ? (
+            <AccessibleStatus
+              message={t('profiles.variableLimitReached', { max: MAX_PROFILE_VARS })}
+              tone="warn"
+              className="text-sm"
+            />
+          ) : null}
+          {showAdd ? (
+            <Button disabled={atVariableCap} onPress={startAdd}>
+              <Text>{t('profiles.addVariable')}</Text>
+            </Button>
+          ) : null}
+        </ProfileManageSlot>
+      </View>
     );
   }
 
@@ -266,10 +290,11 @@ export function ProfileVariablesScreen({
         profileId={profileId}
         organizationId={organizationId}
         title={t('profiles.variablesTitle')}
+        backFallback={backFallback}
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}

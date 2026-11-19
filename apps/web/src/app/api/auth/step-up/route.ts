@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 
-import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
+import { checkFirewallRateLimit, firewallRateLimitRefusal } from '@/lib/auth/firewall-rate-limit';
 import { authenticationResponseSchema } from '@/lib/auth/passkey-response';
 import { getWebRelyingParty } from '@/lib/auth/passkey';
 import {
@@ -11,6 +11,8 @@ import {
   verifyStepUp,
 } from '@/lib/auth/session-step-up';
 import { getUserFromSessionForStepUp } from '@kilocode/web-shared/lib/user/server';
+import { PRIVILEGED_ACTION_CLASSES } from '@kilocode/web-shared/lib/admin/privileged-access';
+import { stepUpOperationSchema } from '@kilocode/web-shared/lib/admin/step-up-binding';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 
 /**
@@ -22,11 +24,17 @@ const STEP_UP_OPTIONS_RATE_LIMIT_ID = 'admin-step-up-options';
 const STEP_UP_VERIFY_RATE_LIMIT_ID = 'admin-step-up-verify';
 
 const requestSchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('options') }),
+  z.object({
+    action: z.literal('options'),
+    actionClass: z.enum(PRIVILEGED_ACTION_CLASSES).optional(),
+    binding: stepUpOperationSchema.nullish(),
+  }),
   z.object({
     action: z.literal('verify'),
     challengeId: z.uuid(),
     response: authenticationResponseSchema,
+    actionClass: z.enum(PRIVILEGED_ACTION_CLASSES).optional(),
+    binding: stepUpOperationSchema.nullish(),
   }),
 ]);
 
@@ -86,19 +94,21 @@ export async function POST(request: NextRequest) {
       rateLimitKey: rateLimitKey(action, user.id),
     }
   );
-  if (limit === 'limited') {
-    return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
-  }
-  if (limit === 'unavailable') {
-    return NextResponse.json({ error: 'RATE_LIMIT_UNAVAILABLE' }, { status: 503 });
-  }
+  const refusal = firewallRateLimitRefusal(limit);
+  if (refusal) return refusal;
 
   try {
+    // The dialog echoes the class and operation a refusal named. With neither,
+    // the request is the plain session step-up that refreshes the dialog status.
+    const actionClass = parsed.data.actionClass ?? 'platform_read';
+    const binding = parsed.data.binding ?? null;
+
     if (parsed.data.action === 'options') {
       const { challengeId, options } = await createStepUpOptions({
         userId: user.id,
         webSessionId,
-        actionClass: 'platform_read',
+        actionClass,
+        binding,
       });
       return NextResponse.json({ challengeId, options });
     }
@@ -109,7 +119,8 @@ export async function POST(request: NextRequest) {
       webSessionPepper,
       challengeId: parsed.data.challengeId,
       response: parsed.data.response,
-      actionClass: 'platform_read',
+      actionClass,
+      binding,
     });
     return NextResponse.json({ verified: true, expiresAt: proof.expires_at });
   } catch (error) {

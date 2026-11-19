@@ -24,8 +24,24 @@ export const databaseTypeParsers: pg.CustomTypesConfig = {
 
 export type CreateDrizzleClientOptions = {
   connectionString: string;
-  poolConfig?: Partial<pg.PoolConfig>;
+  /**
+   * Pool settings this client does not derive itself. `types` is left out of the type because the
+   * pool is created with the module's `databaseTypeParsers`, which raw results and the export paths
+   * expect. Every connection key is left out too: the pool is built from this client's
+   * `connectionString` argument (`user`, `password`, `host`, `port`, `database`) and from its
+   * dedicated `ssl` option, and both stay authoritative. Like `GetWorkerDbOptions`, this is a
+   * type-level reservation: a value widened to `pg.PoolConfig` still assigns.
+   */
+  poolConfig?: Omit<
+    Partial<pg.PoolConfig>,
+    'types' | 'connectionString' | 'user' | 'password' | 'host' | 'port' | 'database' | 'ssl'
+  >;
   logger?: boolean;
+  /**
+   * Replaces the TLS settings that `getDatabaseClientConfig` derives from the connection string
+   * and `DATABASE_CA`. The override is intentional: local and test PostgreSQL servers are often
+   * plaintext, and `DATABASE_CA` in the environment would otherwise force TLS on them.
+   */
   ssl?: { ca: string } | false;
 };
 
@@ -50,7 +66,13 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
   return { db, pool, schema };
 }
 
-export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max'>;
+/**
+ * Settings `getWorkerDb` fixes for every pool it creates: the connection string, `max: 1` because
+ * Hyperdrive owns pooling, and `types` because the pool is created with the module's int8 parser.
+ * The type reserves all three. Structural typing still accepts a value that a caller widened to
+ * `pg.PoolConfig`, so this reservation is a type-level guard rather than a runtime one.
+ */
+export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max' | 'types'>;
 
 /**
  * Convenience wrapper for Cloudflare Workers using Hyperdrive.

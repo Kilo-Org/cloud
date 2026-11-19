@@ -5,21 +5,21 @@
 // sibling under the tab body (see pr-review-discussion-tab.tsx): the body
 // keeps flex-1, the bar keeps its natural height.
 //
-// Keyboard: KeyboardAvoidingView lifts the bar above the keyboard while it is
-// open; while it is closed the lift is 0 and useDetailScreenBottomPadding
-// (applied to the inner view) clears the device safe area. The two are separate
-// because the lift view owns its own padding slot.
+// Keyboard: KeyboardLiftView lifts the bar above the keyboard while it is open;
+// while it is closed the lift is 0 and useDetailScreenBottomPadding (applied to
+// the inner view) clears the device safe area. The two are separate because the
+// lift view owns its own padding slot.
 
 import { MessageSquarePlus } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 type PrCommentCtaProps = Readonly<{
@@ -40,6 +40,7 @@ export function PrCommentCta({ onPress, keyboardLift }: PrCommentCtaProps) {
   const colors = useThemeColors();
   const bottomPadding = useDetailScreenBottomPadding();
   const { bottom } = useSafeAreaInsets();
+  const { height: keyboardHeight } = useKeyboardState();
   const bar = (
     <View className="px-4 pt-3" style={{ paddingBottom: bottomPadding }}>
       <Button
@@ -56,11 +57,10 @@ export function PrCommentCta({ onPress, keyboardLift }: PrCommentCtaProps) {
   // another surface's keyboard at all. The bar's inner padding already includes
   // the platform's bottom inset (`useDetailScreenBottomPadding`), so the lift is
   // reduced by that inset and the button never floats a navigation-bar height
-  // above the keyboard.
+  // above the keyboard. The lift itself comes from the keyboard's own state, so
+  // it cannot fall short of a container frame the platform reported late.
   return keyboardLift ? (
-    <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={keyboardInsetOffset(bottom)}>
-      {bar}
-    </KeyboardAvoidingView>
+    <KeyboardLiftView height={Math.max(0, keyboardHeight - bottom)}>{bar}</KeyboardLiftView>
   ) : (
     bar
   );

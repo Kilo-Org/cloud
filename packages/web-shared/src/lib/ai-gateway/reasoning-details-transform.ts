@@ -8,10 +8,8 @@ import {
   ReasoningDetailsTransform,
   type ProviderResponseTransforms,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+import { mapMistralThinkingToReasoningDetails } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 
 function getGoogleExtraContent(value: Record<string, unknown>) {
   const extraContent = value.extra_content;
@@ -159,6 +157,9 @@ export function applyReasoningDetailsResponseTransform(
       break;
     case ReasoningDetailsTransform.Reasoning:
       mapReasoningStringToDetails(value, 'reasoning');
+      break;
+    case ReasoningDetailsTransform.MistralThinking:
+      mapMistralThinkingToReasoningDetails(value);
       break;
     case null:
       break;

@@ -1,12 +1,11 @@
 import { useRouter } from 'expo-router';
-import { Check } from '@/components/ui/icons';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { PickerSheet } from '@/components/picker-sheet';
+import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type BranchPickerBridge } from '@/lib/picker-bridge';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 
@@ -18,7 +17,6 @@ import { branchPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/ro
  */
 export default function BranchPickerScreen() {
   const router = useRouter();
-  const colors = useThemeColors();
   const { t } = useTranslation();
   useRouteRegistry(UNFENCED_ROUTE_KEY);
   // Lazy init reads the slot synchronously on first render — no effect, no
@@ -40,6 +38,7 @@ export default function BranchPickerScreen() {
       <PickerSheet
         title={t('agentChat.newSession.branchPickerTitle')}
         onDone={close}
+        onCancel={close}
         scrollable={false}
         expired
       />
@@ -56,10 +55,8 @@ export default function BranchPickerScreen() {
           are real but not the whole repository, so the sheet says so before the
           list starts rather than after a thousand rows. */}
       {bridge.truncated ? (
-        <View className="border-b border-hair-soft px-4 py-3">
-          <Text className="text-sm text-muted-foreground">
-            {t('agentChat.newSession.branchListIncomplete')}
-          </Text>
+        <View className="border-b-[0.5px] border-hair-soft px-4 py-3">
+          <Text variant="muted">{t('agentChat.newSession.branchListIncomplete')}</Text>
         </View>
       ) : null}
       <View>
@@ -67,24 +64,30 @@ export default function BranchPickerScreen() {
           const isSelected = branch === bridge.selectedBranch;
           const isDefault = branch === bridge.defaultBranch;
           return (
-            <Pressable
+            <ChoiceRow
               key={branch}
-              className="flex-row items-center gap-3 border-b border-hair-soft px-4 py-3 active:bg-secondary"
-              accessibilityRole="button"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={t('agentChat.newSession.branchAccessibility', { label: branch })}
+              className="border-b-[0.5px] border-hair-soft"
+              selected={isSelected}
+              accessibleName={t('agentChat.newSession.branchAccessibility', { label: branch })}
               onPress={() => {
                 handleSelect(bridge, branch);
               }}
             >
-              <Text className="flex-1 text-base text-foreground">{branch}</Text>
-              {isDefault ? (
-                <Text className="text-xs text-muted-foreground">
-                  {t('agentChat.newSession.branchDefault')}
+              <View className="min-w-0 flex-1 flex-row items-center gap-2">
+                <Text
+                  className="min-w-0 flex-1 text-sm font-medium"
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                >
+                  {branch}
                 </Text>
-              ) : null}
-              {isSelected ? <Check size={18} color={colors.primary} /> : null}
-            </Pressable>
+                {isDefault ? (
+                  <Text variant="muted" className="text-xs">
+                    {t('agentChat.newSession.branchDefault')}
+                  </Text>
+                ) : null}
+              </View>
+            </ChoiceRow>
           );
         })}
       </View>

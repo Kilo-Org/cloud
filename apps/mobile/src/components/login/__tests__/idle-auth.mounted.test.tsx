@@ -8,7 +8,6 @@ import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { openBrowserAsync } from 'expo-web-browser';
 import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
@@ -24,11 +23,9 @@ import {
   MIN_TAP_TARGET_DP,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
-import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import { i18n } from '@/i18n';
 
 import { IdleAuth } from '../idle-auth';
-import { PROVIDER_GLYPH_SLOT_CLASS } from '../provider-buttons';
 
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 
@@ -81,8 +78,9 @@ vi.mock('@/lib/auth/use-native-auth', () => ({
 }));
 
 vi.mock('@/lib/login-draft', () => ({
-  setLoginEmailDraft: vi.fn(),
-  setSsoRecoveryDraft: vi.fn(),
+  beginLoginEmail: vi.fn(),
+  holdLoginEmail: vi.fn(),
+  holdSsoRecovery: vi.fn(),
 }));
 
 vi.mock('expo-apple-authentication', () => ({
@@ -114,13 +112,10 @@ vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
 vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Mail: 'Mail' }));
 
-vi.mock('expo-web-browser', () => ({
-  openBrowserAsync: vi.fn(),
-}));
+const mockedPush = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/config', () => ({
-  TERMS_URL: 'https://app.kilo.ai/terms-app',
-  PRIVACY_URL: 'https://app.kilo.ai/privacy-app',
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockedPush }),
 }));
 
 // The real hook pulls expo-router, which the mounted project cannot load.
@@ -295,39 +290,6 @@ function labelText(button: I): I {
   return button.find(n => typeof n.type === 'string' && (n.type as string) === 'Text');
 }
 
-/**
- * Every node inside a provider Button that carries the reserved glyph-slot
- * className. The slot is what puts the label on the same axis in all three
- * rows, so the suite asserts exactly one per row and that all three match.
- */
-function glyphSlots(button: I): I[] {
-  return button.findAll(n => String(n.props.className).includes(PROVIDER_GLYPH_SLOT_CLASS));
-}
-
-function glyphSlot(button: I): I {
-  const slots = glyphSlots(button);
-  const slot = slots[0];
-  if (!slot || slots.length !== 1) {
-    throw new Error(`expected exactly one glyph slot, found ${slots.length}`);
-  }
-  return slot;
-}
-
-/**
- * The compiled flex layout of a label's own className, through the app's own
- * pipeline. Only the classes that decide the label's line allocation are
- * compiled, so the assertion protects native sizing rather than utility names;
- * pixel wrapping is verified on device.
- */
-async function compiledLabelLayout(label: I) {
-  const classes = (label.props.className as string)
-    .split(' ')
-    .filter(className => /^(?:flex-|text-center$)/.test(className))
-    .join(' ');
-  const declarations = classes ? await compiledDeclarations(classes) : [];
-  return declarations;
-}
-
 /** The compiled declarations of an arbitrary className, through the app's pipeline. */
 async function compiledDeclarations(classes: string) {
   const { css } = await postcss([tailwindcss()]).process(
@@ -355,16 +317,6 @@ async function compiledNumber(classes: string, property: string): Promise<number
   return undefined;
 }
 
-/** The value of one compiled declaration, through the app's pipeline. */
-async function compiledValue(classes: string, property: string): Promise<unknown> {
-  for (const declaration of await compiledDeclarations(classes)) {
-    if (!Array.isArray(declaration) && property in (declaration as object)) {
-      return (declaration as Record<string, unknown>)[property];
-    }
-  }
-  return undefined;
-}
-
 /** A Button that keeps the default (brand-filled) variant is a primary action. */
 function filledPrimaryLabels(root: I): (string | undefined)[] {
   return root
@@ -373,7 +325,7 @@ function filledPrimaryLabels(root: I): (string | undefined)[] {
     .map(b => b.props.accessibilityLabel as string | undefined);
 }
 
-/** Every provider control that carries a leading glyph before its label. */
+/** Every provider control the sign-in screen renders: Apple, Google and the passkey. */
 function providerRows(root: I): I[] {
   return ['Sign in with Apple', 'Sign in with Google', 'Sign in with a passkey'].map(label =>
     findButton(root, label)
@@ -404,29 +356,16 @@ describe('IdleAuth provider chrome parity', () => {
     const google = findButton(renderer.root, 'Sign in with Google');
     const passkey = findButton(renderer.root, 'Sign in with a passkey');
 
-    // One variant means one border colour and width (border-border) and one
-    // fill (bg-card); one className means one corner radius and height. The
-    // native AppleAuthenticationButton drew its own darker, thicker border, so
-    // Apple now renders the app's own outline Button like its two siblings.
+    // One variant and size mean one border, fill, radius, height and label role
+    // across the three. The native AppleAuthenticationButton drew its own
+    // darker, thicker border, so Apple now renders the app's own outline
+    // Button like its two siblings.
     for (const button of [apple, google, passkey]) {
       expect(button.props.variant).toBe('outline');
       expect(button.props.size).toBe('lg');
-      expect(String(button.props.className)).toContain('min-h-[44px]');
-      expect(String(button.props.className)).toContain('rounded-[8px]');
     }
     expect(apple.props.className).toBe(google.props.className);
     expect(apple.props.className).toBe(passkey.props.className);
-
-    // One label size and weight across the three.
-    const labelClasses = [apple, google, passkey].map(button =>
-      String(labelText(button).props.className)
-    );
-    for (const classes of labelClasses) {
-      expect(classes).toContain('text-[17px]');
-      expect(classes).toContain('font-medium');
-    }
-    expect(labelClasses[0]).toBe(labelClasses[1]);
-    expect(labelClasses[0]).toBe(labelClasses[2]);
 
     // Apple's HIG mark replaces the native chrome, drawn inside the button.
     expect(apple.findByType('AppleLogo')).toBeTruthy();
@@ -438,79 +377,21 @@ describe('IdleAuth provider chrome parity', () => {
     });
   });
 
-  it('centers every provider label on the button, not beside its mark', async () => {
+  it('draws the provider mark inside each row ahead of its label', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
-    for (const button of providerRows(renderer.root)) {
-      // The label owns the whole content width and centers inside it…
-      expect(String(labelText(button).props.className).split(/\s+/)).toContain('flex-1');
-      const rowClasses = String(button.props.className).split(/\s+/);
-      expect(rowClasses).toContain('justify-center');
-      // …and the row adds no gap an in-flow mark could push the label by.
-      expect(rowClasses.filter(name => name.startsWith('gap-'))).toEqual([]);
-      expect(String(glyphSlot(button).props.className)).toBe(PROVIDER_GLYPH_SLOT_CLASS);
+    // The three provider rows read as one group: each is the shared outline
+    // Button holding its mark beside the label, and the busy state is the
+    // button's own spinner rather than a slot the row reserves.
+    const rows = providerRows(renderer.root);
+    expect(rows.map(row => row.children.find(child => typeof child !== 'string')?.type)).toEqual([
+      'AppleLogo',
+      'GoogleLogo',
+      'KeyRound',
+    ]);
+    for (const row of rows) {
+      expect(labelText(row).props.children).toBe(row.props.accessibilityLabel);
     }
-
-    // Compiled once, because every row shares the slot className asserted above:
-    // the mark sits out of flow at the leading edge, vertically centered, so it
-    // contributes no width to the row the label is centered in.
-    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'position')).toBe('absolute');
-    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'justifyContent')).toBe('center');
-    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'top')).toBe(0);
-    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'bottom')).toBe(0);
-
-    // The mark is inset off the rounded edge, on the leading edge in either
-    // direction, and the row's content box starts where the mark ends: the
-    // centered copy can never run under the mark, and the two insets being equal
-    // is what keeps the label on the button's own axis.
-    const markInset = await compiledNumber(PROVIDER_GLYPH_SLOT_CLASS, 'insetInlineStart');
-    const markWidth = await compiledNumber(PROVIDER_GLYPH_SLOT_CLASS, 'width');
-    expect(markInset).toBe(16);
-    expect(markWidth).toBe(18);
-    const rowPaddings = await Promise.all(
-      providerRows(renderer.root).map(button =>
-        compiledNumber(String(button.props.className), 'paddingInline')
-      )
-    );
-    expect(rowPaddings).toHaveLength(3);
-    expect(rowPaddings.every(padding => padding === (markInset ?? 0) + (markWidth ?? 0))).toBe(
-      true
-    );
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('sizes the primary Continue label like the provider rows', async () => {
-    const renderer = await mountIdleAuth(vi.fn<StartFn>());
-
-    const proceed = findButton(renderer.root, 'Continue with email');
-    const google = findButton(renderer.root, 'Sign in with Google');
-    // The filled primary action reads at the provider label size; at the button
-    // variant's 14pt it read weaker than the two outlined ways in above it.
-    expect(await compiledNumber(String(labelText(proceed).props.className), 'fontSize')).toBe(
-      await compiledNumber(String(labelText(google).props.className), 'fontSize')
-    );
-    // It keeps the brand fill, so it still reads as the primary action.
-    expect(proceed.props.variant).toBeUndefined();
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('gives every provider row a leading glyph', async () => {
-    const renderer = await mountIdleAuth(vi.fn<StartFn>());
-
-    // The three provider rows read as one group: each carries a leading mark in
-    // the same reserved slot (the passkey row used to be label-only text). The
-    // mark lives inside the row's slot, so the slot is what puts the label on
-    // one axis and holds the mark, the spinner, or nothing.
-    const leadingTypes = providerRows(renderer.root).map(
-      row => glyphSlot(row).children.find(child => typeof child !== 'string')?.type
-    );
-    expect(leadingTypes).toEqual(['AppleLogo', 'GoogleLogo', 'KeyRound']);
 
     act(() => {
       renderer.unmount();
@@ -690,10 +571,12 @@ describe('IdleAuth passkey control', () => {
 
     const btn = findButton(renderer.root, 'Sign in with a passkey');
     expect(btn.props.disabled).toBe(true);
+    // Button owns the busy spinner (from `loading`), so the row adds no
+    // indicator of its own.
+    expect(btn.props.loading).toBe(true);
     expect(
       btn.findAll(n => typeof n.type === 'string' && (n.type as string) === 'ActivityIndicator')
-    ).toHaveLength(1);
-    expect(btn.parent?.props.pointerEvents).toBe('none');
+    ).toHaveLength(0);
   });
 
   it('renders no passkey control without the native module', async () => {
@@ -711,8 +594,7 @@ describe('IdleAuth passkey control', () => {
   // The reported capture: the Arabic passkey label ("تسجيل الدخول بمفتاح
   // المرور") wrapped onto two lines and made the passkey button visibly taller
   // than the single-line Google button directly above it. Both provider rows
-  // keep the label on the icon's line at one row height: no `flex-wrap` on the
-  // row, and the label's `flex-1` box takes the whole remaining width.
+  // are the shared Button, so one button anatomy keeps them at one height.
   it.each(['ar', 'en'])('keeps both provider rows on one line in %s', async language => {
     providers.googleConfigured = true;
     passkeySupport.supported = true;
@@ -720,21 +602,18 @@ describe('IdleAuth passkey control', () => {
 
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
     const copies = [i18n.t('login.signInWithGoogle'), i18n.t('login.signInWithPasskey')];
+    const buttons = copies.map(copy => renderer.root.findByProps({ accessibilityLabel: copy }));
 
-    for (const copy of copies) {
-      const text = renderer.root.find(
-        n =>
-          typeof n.type === 'string' && (n.type as string) === 'Text' && n.props.children === copy
-      );
-      const labelClasses = String(text.props.className).split(/\s+/);
-      expect(labelClasses).toContain('flex-1');
-      expect(labelClasses).toContain('text-center');
-      const button = renderer.root.findByProps({ accessibilityLabel: copy });
-      // The row itself must not wrap either: a wrapping row moves the label
-      // onto a second line and grows the button again.
-      expect(button.props.className).not.toContain('flex-wrap');
+    for (const [index, copy] of copies.entries()) {
+      const button = buttons[index];
+      // The row itself must not wrap: a wrapping row moves the label onto a
+      // second line and grows the button again.
+      expect(String(button?.props.className)).not.toContain('flex-wrap');
+      // One button class across the two rows keeps their heights matched.
+      expect(button?.props.className).toBe(buttons[0]?.props.className);
       // The full label stays the control's accessible name.
-      expect(button.props.accessibilityLabel).toBe(copy);
+      expect(button?.props.accessibilityLabel).toBe(copy);
+      expect(labelText(button as I).props.children).toBe(copy);
     }
 
     await i18n.changeLanguage('en');
@@ -749,23 +628,16 @@ describe('IdleAuth provider label layout', () => {
     providers.googleConfigured = true;
   });
 
-  it('keeps every provider label on one line at equal button heights', async () => {
-    // The Apple row is a provider row too: left on the pre-fix flex-wrap +
-    // shrink classes it would let its label wrap onto its own flex line and
-    // grow taller than the two siblings it is drawn to match.
+  it('keeps every provider label on one line and scalable', async () => {
+    // The Apple row is a provider row too: left on wrapping chrome it would let
+    // its label take a second flex line and grow taller than the two siblings
+    // it is drawn to match.
     providers.appleAvailable = true;
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
-    const apple = findButton(renderer.root, 'Sign in with Apple');
-    const google = findButton(renderer.root, 'Sign in with Google');
-    const passkey = findButton(renderer.root, 'Sign in with a passkey');
-
-    for (const button of [apple, google, passkey]) {
-      // A label must never be pushed onto its own flex line, so the icon stays
-      // on the label's line and the stacked buttons keep one height.
+    const rows = providerRows(renderer.root);
+    for (const button of rows) {
       expect(String(button.props.className).split(/\s+/)).not.toContain('flex-wrap');
-      // Keep the 44pt floor so Dynamic Type can still grow the control.
-      expect(String(button.props.className)).toContain('min-h-[44px]');
 
       const label = labelText(button);
       // Larger accessibility text may still wrap naturally; never hide part of
@@ -776,70 +648,21 @@ describe('IdleAuth provider label layout', () => {
       expect(label.props.allowFontScaling).not.toBe(false);
     }
 
-    // The three provider controls carry one row class, so none of them can
-    // drift back to the wrapping chrome on its own.
-    expect(String(apple.props.className)).toBe(String(google.props.className));
-
-    // flexBasis 0% + flexGrow 1 gives each label the whole remaining row width:
-    // the remedy the resend-code label already ships (PR #6384).
-    const oneLineLabel = { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' };
-    expect(await compiledLabelLayout(labelText(apple))).toEqual([oneLineLabel]);
-    expect(await compiledLabelLayout(labelText(google))).toEqual([oneLineLabel]);
-    expect(await compiledLabelLayout(labelText(passkey))).toEqual([oneLineLabel]);
+    // The three provider controls carry one button class, so none of them can
+    // drift onto its own chrome.
+    expect(String(rows[0]?.props.className)).toBe(String(rows[1]?.props.className));
+    expect(String(rows[0]?.props.className)).toBe(String(rows[2]?.props.className));
 
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('keeps the passkey row height while the ceremony runs', async () => {
-    nativeAuth.busy = 'passkey';
-    const renderer = await mountIdleAuth(vi.fn<StartFn>());
-
-    const button = findButton(renderer.root, 'Sign in with a passkey');
-    expect(button.props.disabled).toBe(true);
-    expect(
-      button.findAll(n => typeof n.type === 'string' && (n.type as string) === 'ActivityIndicator')
-    ).toHaveLength(1);
-    // The inline indicator must not change the row's height: the label keeps its
-    // one-line layout and the button keeps the 44pt floor.
-    expect(String(button.props.className)).toContain('min-h-[44px]');
-    expect(await compiledLabelLayout(labelText(button))).toEqual([
-      { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' },
-    ]);
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('reserves one identical glyph slot per provider row', async () => {
-    providers.appleAvailable = true;
-    providers.googleConfigured = true;
-    const renderer = await mountIdleAuth(vi.fn<StartFn>());
-
-    const buttons = [
-      findButton(renderer.root, 'Sign in with Apple'),
-      findButton(renderer.root, 'Sign in with Google'),
-      findButton(renderer.root, 'Sign in with a passkey'),
-    ];
-    // Exactly one slot per row, with the identical className, so the three
-    // flex-1 labels start from the same x with the marks in the same place.
-    const slotClasses = buttons.map(button => String(glyphSlot(button).props.className));
-    expect(slotClasses[0]).toBe(PROVIDER_GLYPH_SLOT_CLASS);
-    expect(slotClasses[1]).toBe(slotClasses[0]);
-    expect(slotClasses[2]).toBe(slotClasses[0]);
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('keeps the passkey label className byte-identical while the ceremony runs', async () => {
+  it('keeps the passkey row identical while the ceremony runs', async () => {
     const idle = await mountIdleAuth(vi.fn<StartFn>());
-    const idleClasses = String(
-      labelText(findButton(idle.root, 'Sign in with a passkey')).props.className
-    );
+    const idleButton = findButton(idle.root, 'Sign in with a passkey');
+    const idleClasses = String(idleButton.props.className);
+    const idleLabel = String(labelText(idleButton).props.children);
     act(() => {
       idle.unmount();
     });
@@ -847,21 +670,22 @@ describe('IdleAuth provider label layout', () => {
     nativeAuth.busy = 'passkey';
     const busy = await mountIdleAuth(vi.fn<StartFn>());
     const busyButton = findButton(busy.root, 'Sign in with a passkey');
-    // The spinner takes the reserved slot, so the label does not move.
-    expect(glyphSlot(busyButton)).toBeTruthy();
-    expect(String(labelText(busyButton).props.className)).toBe(idleClasses);
+    // Button owns the busy spinner (from `loading`), so the row adds no
+    // indicator of its own and its chrome and copy stay unchanged.
+    expect(busyButton.props.loading).toBe(true);
+    expect(String(busyButton.props.className)).toBe(idleClasses);
+    expect(String(labelText(busyButton).props.children)).toBe(idleLabel);
 
     act(() => {
       busy.unmount();
     });
   });
 
-  it('keeps the Apple label className byte-identical while the request runs', async () => {
+  it('keeps the Apple row identical while the request runs', async () => {
     providers.appleAvailable = true;
     const idle = await mountIdleAuth(vi.fn<StartFn>());
-    const idleClasses = String(
-      labelText(findButton(idle.root, 'Sign in with Apple')).props.className
-    );
+    const idleButton = findButton(idle.root, 'Sign in with Apple');
+    const idleClasses = String(idleButton.props.className);
     act(() => {
       idle.unmount();
     });
@@ -869,10 +693,11 @@ describe('IdleAuth provider label layout', () => {
     nativeAuth.busy = 'apple';
     const busy = await mountIdleAuth(vi.fn<StartFn>());
     const busyButton = findButton(busy.root, 'Sign in with Apple');
-    // Replacing the 18pt mark with the spinner inside the same slot cannot
-    // move the label.
-    expect(glyphSlot(busyButton)).toBeTruthy();
-    expect(String(labelText(busyButton).props.className)).toBe(idleClasses);
+    // The button's own spinner replaces nothing the row sized, so the label and
+    // the chrome do not move while the request runs.
+    expect(busyButton.props.loading).toBe(true);
+    expect(String(busyButton.props.className)).toBe(idleClasses);
+    expect(String(labelText(busyButton).props.children)).toBe(busyButton.props.accessibilityLabel);
 
     act(() => {
       busy.unmount();
@@ -1026,21 +851,28 @@ describe('IdleAuth email continue copy', () => {
     });
   });
 
-  it('opens the browser for Terms and Privacy Policy', async () => {
+  it('opens Terms and Privacy Policy in their native screens', async () => {
     const start = vi.fn<StartFn>();
+    mockedPush.mockClear();
     const renderer = await mountIdleAuth(start);
 
     const terms = findLink(renderer.root, 'Terms of Use');
     act(() => {
       (terms.props.onPress as () => void)();
     });
-    expect(openBrowserAsync).toHaveBeenCalledWith(TERMS_URL);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'terms' },
+    });
 
     const privacy = findLink(renderer.root, 'Privacy Policy');
     act(() => {
       (privacy.props.onPress as () => void)();
     });
-    expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'privacy' },
+    });
   });
 
   it('reads the whole sentence from one accessible wrapper in visible order', async () => {
@@ -1067,18 +899,24 @@ describe('IdleAuth email continue copy', () => {
       { name: 'openPrivacy', label: 'Privacy Policy' },
     ]);
 
-    // The wrapper's action handlers open the same URLs the hidden links do.
+    // The wrapper's action handlers open the same screens the hidden links do.
     const handleAction = wrapper.props.onAccessibilityAction as (event: {
       nativeEvent: { actionName: string };
     }) => void;
     act(() => {
       handleAction({ nativeEvent: { actionName: 'openTerms' } });
     });
-    expect(openBrowserAsync).toHaveBeenCalledWith(TERMS_URL);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'terms' },
+    });
     act(() => {
       handleAction({ nativeEvent: { actionName: 'openPrivacy' } });
     });
-    expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
+    expect(mockedPush).toHaveBeenCalledWith({
+      pathname: '/(auth)/legal/[document]',
+      params: { document: 'privacy' },
+    });
 
     act(() => {
       renderer.unmount();

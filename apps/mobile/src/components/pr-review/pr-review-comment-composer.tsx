@@ -8,7 +8,7 @@
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { impactHaptic, notificationHaptic } from '@/lib/haptics';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, ScrollView, type ScrollViewInstance, type TextInput, View } from 'react-native';
 
@@ -16,10 +16,7 @@ import {
   PrFormSheetHeader,
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
-import {
-  ComposerInlineError,
-  useComposerInlineError,
-} from '@/components/pr-review/composer-inline-error';
+import { ComposerInlineError } from '@/components/pr-review/composer-inline-error';
 import {
   CommentBodyField,
   ComposerFooter,
@@ -29,16 +26,25 @@ import {
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { type SurfaceAttempt } from '@/lib/surface-feedback';
 import { clearDraft, prCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { buildSuggestionFence } from '@/lib/pr-review/build-suggestion-fence';
 import { getDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
+import { classifyPrInlineFailure, type PrInlineFailure } from '@/lib/pr-review/inline-failure';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { useCreateReviewCommentMutation } from '@/lib/pr-review/use-pr-review-mutations';
-import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrRef,
+  providerPrRefKey,
+  useProviderPrScopeOrNull,
+} from '@/lib/pr-review/provider-pr-ref';
 
 type CommentComposerMode =
   | { kind: 'create'; headSha: string }
@@ -67,6 +73,16 @@ type PrReviewCommentComposerProps = Readonly<{
   eyebrow: string;
   onDismiss: () => void;
 }>;
+
+/** Failure kinds whose recovery lives outside the primary control. */
+const BLOCKING = new Set<PrInlineFailure['kind']>([
+  'body-empty',
+  'bad-request',
+  'forbidden',
+  'reconnect',
+  'not-found',
+  'not-recorded',
+]);
 
 export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const {
@@ -127,17 +143,20 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     bodyRef.current = draft.value ?? initialBody;
     bodyBaselineRef.current = draft.value ?? initialBody;
   }
-  const {
-    inlineError,
-    inlineErrorKind,
-    inlineErrorIsLocal,
-    setInlineError,
-    setInlineErrorKind,
-    setInlineErrorIsLocal,
-    clearBadRequestOnBodyEdit,
-  } = useComposerInlineError(createComment.error, isEdit);
+  const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<PrInlineFailure>();
+  // The route publishes the provider scope for every pr-review screen; a
+  // GitLab/Bitbucket composer names its own provider in the reconnect copy.
+  const platform = useProviderPrScopeOrNull()?.ref.platform;
 
-  const isSubmitting = !isEdit && createComment.isPending;
+  const isSubmitting = feedback.status === 'pending';
+  // The Terms gate runs before the write is dispatched, so it must not lock
+  // dismissal: a stalled status read would otherwise leave a dead Cancel behind
+  // a spinner. Cancel stays live while the gate is the only work in flight.
+  const [awaitingGate, setAwaitingGate] = useState(false);
+  const dismissalLocked = isSubmitting && !awaitingGate;
+  // The attempt admitted for a submit whose Terms gate is still running; a
+  // dismissal abandons it so the continuation leaves nothing to write.
+  const gateAttemptRef = useRef<SurfaceAttempt<PrInlineFailure> | null>(null);
   const lineRangeLabel = composerRangeLabel(line, startLine);
 
   // automaticallyAdjustKeyboardInsets can scroll the focused field under the
@@ -157,7 +176,11 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   function handleBodyChange(value: string) {
     bodyRef.current = value;
     setHasBody(value.trim().length > 0);
-    clearBadRequestOnBodyEdit();
+    // An edit retires the recoverable rejections — including the local
+    // empty-body validation.
+    clearWhere(
+      f => f.kind === 'bad-request' || f.kind === 'body-empty' || f.kind === 'not-recorded'
+    );
     if (draftUserId) {
       saveDraft(draftUserId, commentDraftKey, value);
     }
@@ -167,15 +190,19 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (mode.kind !== 'create') {
       return;
     }
-    const body = bodyRef.current;
-    if (body.trim().length === 0) {
-      setInlineError(t('prReview.composer.bodyEmpty'));
-      setInlineErrorIsLocal(true);
+    const attempt = begin();
+    if (attempt === null) {
       return;
     }
-    setInlineError(null);
-    setInlineErrorKind(null);
-    setInlineErrorIsLocal(false);
+    const body = bodyRef.current;
+    if (body.trim().length === 0) {
+      attempt.fail({
+        kind: 'body-empty',
+        message: t('prReview.composer.bodyEmpty'),
+        announce: 'here',
+      });
+      return;
+    }
     pending.addComment({
       id: Crypto.randomUUID(),
       path,
@@ -185,6 +212,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       body,
       commitSha: mode.headSha,
     });
+    attempt.abandon();
     if (draftUserId) {
       void clearDraft(draftUserId, commentDraftKey);
     }
@@ -196,24 +224,54 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (mode.kind !== 'create') {
       return;
     }
-    const body = bodyRef.current;
-    if (body.trim().length === 0) {
-      setInlineError(t('prReview.composer.bodyEmpty'));
-      setInlineErrorKind('bad-request');
-      setInlineErrorIsLocal(true);
+    const attempt = begin();
+    if (attempt === null) {
       return;
     }
-    setInlineError(null);
-    setInlineErrorKind(null);
-    setInlineErrorIsLocal(false);
+    const body = bodyRef.current;
+    if (body.trim().length === 0) {
+      attempt.fail({
+        kind: 'body-empty',
+        message: t('prReview.composer.bodyEmpty'),
+        announce: 'here',
+      });
+      return;
+    }
+    // Confirmed offline: fail at once with the retryable copy instead of
+    // starting a write React Query pauses, which would look like a stuck
+    // submit. The body stays intact and the same tap retries.
+    if (connectionRefusesWrites()) {
+      attempt.fail({
+        kind: 'retryable',
+        message: t('prReview.mutationError.couldNotPostComment'),
+        announce: 'here',
+      });
+      return;
+    }
+    setAwaitingGate(true);
+    gateAttemptRef.current = attempt;
     const outcome = await ensureTermsAcceptedOutcome();
-    if (outcome.kind === 'outdated') {
-      setInlineError(t('prReview.discussion.termsOutdatedCopy'));
-      setInlineErrorKind('bad-request');
-      setInlineErrorIsLocal(false);
+    // A newer attempt may own the slot by now (the user cancelled this one and
+    // started another while this gate was pending): only the owner clears it.
+    if (gateAttemptRef.current === attempt) {
+      gateAttemptRef.current = null;
+      setAwaitingGate(false);
+    }
+    if (!attempt.owns()) {
+      // Dismissed (or unmounted) while the gate ran: this token no longer owns
+      // the phase, so it must not dispatch the write.
       return;
     }
     if (outcome.kind === 'dismissed') {
+      attempt.abandon();
+      return;
+    }
+    if (outcome.kind === 'outdated') {
+      attempt.fail({
+        kind: 'bad-request',
+        message: t('prReview.discussion.termsOutdatedCopy'),
+        announce: 'toast',
+      });
       return;
     }
     try {
@@ -243,13 +301,23 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
               commitSha: mode.headSha,
             }
       );
+      attempt.succeed();
       if (draftUserId) {
         void clearDraft(draftUserId, commentDraftKey);
       }
       notificationHaptic(Haptics.NotificationFeedbackType.Success);
       onDismiss();
-    } catch {
-      // Classified into inlineError by the effect above.
+    } catch (error) {
+      const classified = await classifyPrInlineFailure(error, {
+        surface: 'composer',
+        platform,
+        announce: 'toast',
+      });
+      if (classified.kind === 'failure') {
+        attempt.fail(classified.failure);
+      } else {
+        attempt.abandon();
+      }
     }
   }
 
@@ -267,9 +335,12 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   }
 
   function handleCancel() {
-    if (isSubmitting) {
+    if (dismissalLocked) {
       return;
     }
+    // A pending gate is not a write: leaving abandons the admitted attempt.
+    gateAttemptRef.current?.abandon();
+    gateAttemptRef.current = null;
     const dirty = isEdit
       ? bodyRef.current !== bodyBaselineRef.current
       : bodyRef.current.trim().length > 0;
@@ -301,7 +372,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     }
     bodyRef.current = block;
     setHasBody(block.trim().length > 0);
-    clearBadRequestOnBodyEdit();
+    clearWhere(
+      f => f.kind === 'bad-request' || f.kind === 'body-empty' || f.kind === 'not-recorded'
+    );
     // Persist the inserted suggestion like a typed change, so a process kill
     // after Insert (with no later keystroke) does not lose the suggestion.
     if (draftUserId) {
@@ -328,12 +401,36 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   // keyboard has expanded the sheet and compacted the body field.
   const showInsertSuggestion = suggestionAvailable && keyboardVisible;
 
+  // A failure whose recovery lives outside the primary control keeps it down:
+  // empty body needs an edit, a rejection may have changed the PR, and
+  // forbidden/reconnect/not-found/not-recorded each have their own next step.
   const primaryDisabled =
-    isSubmitting ||
-    inlineErrorKind === 'forbidden' ||
-    inlineErrorKind === 'reconnect' ||
-    (!isEdit && inlineErrorKind === 'bad-request') ||
-    (isEdit && !hasBody);
+    isSubmitting || (failure !== null && BLOCKING.has(failure.kind)) || (isEdit && !hasBody);
+
+  // One row, never both: the reason is set only when Insert cannot apply, so the
+  // copy can never attach to the button, and the button renders only when there
+  // is no reason. A selected line with the keyboard still closed draws neither —
+  // Insert is available, just withheld until the sheet expands.
+  let suggestionControl: ReactNode = null;
+  if (suggestionDisabledReason !== null) {
+    suggestionControl = (
+      <Text testID="pr-comment-suggestion-unavailable" className="text-xs text-muted-foreground">
+        {suggestionDisabledReason}
+      </Text>
+    );
+  } else if (showInsertSuggestion) {
+    suggestionControl = (
+      <Button
+        variant="ghost"
+        size="sm"
+        onPress={handleInsertSuggestion}
+        accessibilityLabel={t('prReview.composer.insertSuggestionA11y')}
+        className="self-start"
+      >
+        <Text>{t('prReview.composer.insertSuggestion')}</Text>
+      </Button>
+    );
+  }
 
   // PickerSheet invariant: [header, ScrollView] as direct children (no
   // wrapper View, no sticky-footer sibling). Footer is trailing scroll
@@ -350,7 +447,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-4 px-6 pt-4">
+        <View className={SCREEN_BODY_CLASS}>
           <ContextPreview
             selection={selection}
             fallbackPath={path}
@@ -379,29 +476,15 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
                 }
               />
             )}
-            {showInsertSuggestion ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onPress={handleInsertSuggestion}
-                accessibilityLabel={t('prReview.composer.insertSuggestionA11y')}
-                accessibilityHint={suggestionDisabledReason ?? undefined}
-                className="self-start"
-              >
-                <Text>{t('prReview.composer.insertSuggestion')}</Text>
-              </Button>
-            ) : null}
+            {suggestionControl}
           </View>
-          <ComposerInlineError
-            inlineError={inlineError}
-            inlineErrorKind={inlineErrorKind}
-            inlineErrorIsLocal={inlineErrorIsLocal}
-          />
+          <ComposerInlineError feedback={feedback} />
         </View>
 
         <ComposerFooter
           isEdit={isEdit}
           isSubmitting={isSubmitting}
+          dismissalLocked={dismissalLocked}
           primaryDisabled={primaryDisabled}
           onSave={handleSave}
           onCommentNow={() => {

@@ -8,6 +8,7 @@ import {
   listRemoteMcpServers,
   parseRemoteMcpServers,
   setRemoteMcpServerEnabled,
+  type StoredRemoteMcpServer,
   updateRemoteMcpServer,
 } from './remote-mcp-store';
 
@@ -24,21 +25,13 @@ vi.mock('@sentry/react-native', () => ({ captureException }));
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError } }));
 
-// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-function flushMicrotasks(): Promise<void> {
-  return new Promise(resolve => {
-    setImmediate(resolve);
-  });
-}
-
 // The store is a module-level singleton that latches its one disk read, so a
 // fresh module graph gives a truly cold store whose preload-then-read can be
-// exercised end to end.
-async function freshStore(): Promise<typeof RemoteMcpStoreModule> {
+// exercised end to end. Awaiting the import settles module evaluation, which
+// starts the read but does not wait for it.
+function freshStore(): Promise<typeof RemoteMcpStoreModule> {
   vi.resetModules();
-  const mod = import('./remote-mcp-store');
-  await Promise.resolve();
-  return mod;
+  return import('./remote-mcp-store');
 }
 
 /** A complete draft, so each test names only the field it is about. */
@@ -47,6 +40,33 @@ function draft(
     Partial<Parameters<typeof addRemoteMcpServer>[0]>
 ): Parameters<typeof addRemoteMcpServer>[0] {
   return { auth: { type: 'none' }, enabled: true, ...fields };
+}
+
+/** A persisted row, so a test writes only the fields it is about. */
+function row(id: string, fields: Partial<StoredRemoteMcpServer> = {}): StoredRemoteMcpServer {
+  return {
+    id,
+    name: id,
+    url: `https://${id}.example/mcp`,
+    auth: { type: 'none' },
+    enabled: true,
+    ...fields,
+  };
+}
+
+/**
+ * The invariant every stored id holds, whichever path wrote it: it is neither
+ * the built-in server's own id nor an id that carries on from it, because the
+ * tool names of such an id are names the built-in server may offer itself, it
+ * stays callable-name safe, and no two of them are the same. Which free id is
+ * chosen is incidental and is not pinned.
+ */
+function expectFreeIds(ids: readonly string[]): void {
+  expect(new Set(ids).size).toBe(ids.length);
+  for (const id of ids) {
+    expect(id).not.toMatch(/^kilo(_|$)/u);
+    expect(id).toMatch(/^[A-Za-z0-9_-]+$/u);
+  }
 }
 
 beforeEach(() => {
@@ -66,73 +86,74 @@ describe('parseRemoteMcpServers', () => {
   });
 
   it('drops an entry whose id is not callable-name safe', () => {
-    expect(
-      parseRemoteMcpServers(
-        JSON.stringify([
-          {
-            id: 'has space',
-            name: 'Bad',
-            url: 'https://bad.example/mcp',
-            auth: { type: 'none' },
-            enabled: true,
-          },
-        ])
-      )
-    ).toEqual([]);
+    const unsafe = row('has space', { name: 'Bad', url: 'https://bad.example/mcp' });
+
+    expect(parseRemoteMcpServers(JSON.stringify([unsafe]))).toEqual([]);
+  });
+
+  it('loads a reserved entry beside a free one, each under its own id', () => {
+    const reserved = row('kilo', {
+      name: 'Kilo',
+      url: 'https://kilo.example/mcp/',
+      auth: { type: 'bearer', token: 'secret' },
+      enabled: false,
+    });
+    const kept = row('kilo-2', { name: 'Kilo Two' });
+    const servers = parseRemoteMcpServers(JSON.stringify([reserved, kept]));
+
+    expect(servers).toEqual([
+      { ...reserved, id: expect.any(String), url: 'https://kilo.example/mcp' },
+      kept,
+    ]);
+    expect(servers[0]?.id).not.toBe(kept.id);
+    expectFreeIds(servers.map(server => server.id));
+  });
+
+  it('loads two entries whose ids extend the built-in one under distinct free ids', () => {
+    const first = row('kilo_notes', { name: 'Notes' });
+    const second = row('kilo_notes', { name: 'More Notes', url: 'https://more.example/mcp' });
+    const servers = parseRemoteMcpServers(JSON.stringify([first, second]));
+
+    expect(servers).toEqual([
+      { ...first, id: expect.any(String) },
+      { ...second, id: expect.any(String) },
+    ]);
+    expectFreeIds(servers.map(server => server.id));
+  });
+
+  it('keeps an endpoint for the row written first, whichever id it carries', () => {
+    const first = row('kilo', { name: 'Kilo', url: 'https://one.example/mcp' });
+    const servers = parseRemoteMcpServers(
+      JSON.stringify([first, row('notes', { name: 'Notes', url: 'https://one.example/mcp' })])
+    );
+
+    expect(servers).toEqual([{ ...first, id: expect.any(String) }]);
+    expectFreeIds(servers.map(server => server.id));
   });
 
   it('normalizes a stored URL and keeps a valid server', () => {
-    expect(
-      parseRemoteMcpServers(
-        JSON.stringify([
-          {
-            id: 'alpha',
-            name: 'Alpha',
-            url: 'https://alpha.example/mcp/',
-            auth: { type: 'bearer', token: 'secret' },
-            enabled: false,
-          },
-        ])
-      )
-    ).toEqual([
-      {
-        id: 'alpha',
-        name: 'Alpha',
-        url: 'https://alpha.example/mcp',
-        auth: { type: 'bearer', token: 'secret' },
-        enabled: false,
-      },
+    const stored = row('alpha', {
+      name: 'Alpha',
+      url: 'https://alpha.example/mcp/',
+      auth: { type: 'bearer', token: 'secret' },
+      enabled: false,
+    });
+
+    expect(parseRemoteMcpServers(JSON.stringify([stored]))).toEqual([
+      { ...stored, url: 'https://alpha.example/mcp' },
     ]);
   });
 
   it('keeps one server when two persisted rows name one root endpoint', () => {
-    expect(
-      parseRemoteMcpServers(
-        JSON.stringify([
-          {
-            id: 'alpha',
-            name: 'Alpha',
-            url: 'https://alpha.example/',
-            auth: { type: 'bearer', token: 'secret' },
-            enabled: true,
-          },
-          {
-            id: 'beta',
-            name: 'Beta',
-            url: 'https://alpha.example',
-            auth: { type: 'none' },
-            enabled: true,
-          },
-        ])
-      )
-    ).toEqual([
-      {
-        id: 'alpha',
-        name: 'Alpha',
-        url: 'https://alpha.example',
-        auth: { type: 'bearer', token: 'secret' },
-        enabled: true,
-      },
+    const first = row('alpha', {
+      name: 'Alpha',
+      url: 'https://alpha.example/',
+      auth: { type: 'bearer', token: 'secret' },
+    });
+    const second = row('beta', { name: 'Beta', url: 'https://alpha.example' });
+
+    expect(parseRemoteMcpServers(JSON.stringify([first, second]))).toEqual([
+      { ...first, url: 'https://alpha.example' },
     ]);
   });
 
@@ -169,8 +190,33 @@ describe('remote MCP server store', () => {
 
     expect(() =>
       addRemoteMcpServer(draft({ name: 'Second', url: 'https://remote.example/mcp' }))
-    ).toThrow('Remote MCP URL is already saved.');
+    ).toThrow(expect.objectContaining({ problem: 'duplicateUrl' }));
     expect(listRemoteMcpServers()).toHaveLength(1);
+  });
+
+  it('refuses an edit that names a missing server', () => {
+    expect(() => updateRemoteMcpServer('missing', { name: 'Ghost' })).toThrow(
+      expect.objectContaining({ problem: 'notFound' })
+    );
+    expect(() => deleteRemoteMcpServer('missing')).toThrow(
+      expect.objectContaining({ problem: 'notFound' })
+    );
+    expect(() => setRemoteMcpServerEnabled('missing', false)).toThrow(
+      expect.objectContaining({ problem: 'notFound' })
+    );
+  });
+
+  it('refuses an edit that reuses another server URL', () => {
+    addRemoteMcpServer(draft({ name: 'Alpha', url: 'https://a.example/mcp' }));
+    const second = addRemoteMcpServer(draft({ name: 'Beta', url: 'https://b.example/mcp' }));
+
+    expect(() => updateRemoteMcpServer(second.id, { url: 'https://a.example/mcp' })).toThrow(
+      expect.objectContaining({ problem: 'duplicateUrl' })
+    );
+    expect(listRemoteMcpServers().map(server => server.url)).toEqual([
+      'https://a.example/mcp',
+      'https://b.example/mcp',
+    ]);
   });
 
   it('uniquifies ids for two servers with the same name', () => {
@@ -180,6 +226,26 @@ describe('remote MCP server store', () => {
     expect(first.id).toBe('github');
     expect(second.id).toBe('github-2');
     expect(listRemoteMcpServers().map(server => server.id)).toEqual(['github', 'github-2']);
+  });
+
+  it('stores a server named Kilo outside the built-in namespace', () => {
+    const first = addRemoteMcpServer(draft({ name: 'Kilo', url: 'https://one.example/mcp' }));
+    const second = addRemoteMcpServer(draft({ name: 'Kilo', url: 'https://two.example/mcp' }));
+
+    expectFreeIds([first.id, second.id]);
+    expect(listRemoteMcpServers()).toEqual([first, second]);
+  });
+
+  it('stores a draft that requests an id inside the built-in namespace under a free one', () => {
+    const plain = addRemoteMcpServer(
+      draft({ name: 'Notes', url: 'https://a.example/mcp', id: 'kilo' })
+    );
+    const extended = addRemoteMcpServer(
+      draft({ name: 'More', url: 'https://b.example/mcp', id: 'kilo_notes' })
+    );
+
+    expectFreeIds([plain.id, extended.id]);
+    expect(listRemoteMcpServers()).toEqual([plain, extended]);
   });
 
   it('edits a server in place and keeps its id and position', () => {
@@ -223,8 +289,9 @@ describe('remote MCP server store', () => {
     getItemAsync.mockResolvedValue('{not json');
     const mod = await freshStore();
 
-    await flushMicrotasks();
+    await mod.whenRemoteMcpServersLoaded();
 
+    expect(mod.getRemoteMcpServersHasLoaded()).toBe(true);
     expect(mod.listRemoteMcpServers()).toEqual([]);
   });
 
@@ -239,7 +306,7 @@ describe('remote MCP server store', () => {
     getItemAsync.mockResolvedValue(JSON.stringify([stored]));
     const mod = await freshStore();
 
-    await flushMicrotasks();
+    await mod.whenRemoteMcpServersLoaded();
 
     expect(mod.listRemoteMcpServers()).toEqual([stored]);
   });
@@ -257,7 +324,7 @@ describe('remote MCP server store', () => {
     expect(mod.getRemoteMcpServersHasLoaded()).toBe(false);
 
     read.resolve(null);
-    await flushMicrotasks();
+    await mod.whenRemoteMcpServersLoaded();
 
     expect(mod.getRemoteMcpServersHasLoaded()).toBe(true);
   });
@@ -283,7 +350,10 @@ describe('remote MCP server store', () => {
         },
       ])
     );
-    await flushMicrotasks();
+    // The merge lands in the store's value before the load promise resolves
+    // (secure-store-preference sets the merge, then marks the load settled), so
+    // the list is final here without polling.
+    await mod.whenRemoteMcpServersLoaded();
 
     expect(mod.listRemoteMcpServers().map(server => server.id)).toEqual(['existing', 'new']);
   });

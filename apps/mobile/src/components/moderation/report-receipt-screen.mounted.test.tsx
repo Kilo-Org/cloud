@@ -10,6 +10,15 @@ import type * as ReactQuery from '@tanstack/react-query';
 
 const RECEIPT_ID = '11111111-1111-4111-8111-111111111111';
 
+// The four next-step sentences the screen may state, as the real catalog renders
+// them; a state that states none of them proves the line stayed silent.
+const NEXT_STEP_SENTENCES = [
+  'A moderator will review this report. The outcome will appear on this screen, and you can appeal after a decision.',
+  'The outcome will appear on this screen, and you can appeal after a decision.',
+  'The appeal outcome will appear on this screen.',
+  'The appeal decision is final. No further appeal can be filed.',
+] as const;
+
 type MutationOptions = {
   onSuccess?: () => void;
   onError?: (error: Error) => void;
@@ -27,6 +36,7 @@ type ScreenState = {
   mutate: Mock;
   alert: Mock;
   toastError: Mock;
+  performCopy: Mock;
 };
 
 const state = vi.hoisted((): ScreenState => ({
@@ -41,9 +51,18 @@ const state = vi.hoisted((): ScreenState => ({
   mutate: vi.fn(),
   alert: vi.fn(),
   toastError: vi.fn(),
+  performCopy: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({ View: 'View', Alert: { alert: state.alert } }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Pressable: 'Pressable',
+  useColorScheme: () => 'light',
+  Alert: { alert: state.alert },
+}));
+// RowSkeleton renders through RowFrame, whose trailing renderer calls the
+// selection haptic; the real module loads expo-haptics' runtime (`__DEV__`).
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('expo-router', () => ({ useLocalSearchParams: () => state.params }));
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
@@ -87,6 +106,11 @@ vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'Invalid
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Copy: 'Copy' }));
+vi.mock('@/components/agents/use-message-copy', () => ({ performCopy: state.performCopy }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#666666' }),
+}));
 
 const BUTTON = 'Button' as ElementType;
 
@@ -98,8 +122,24 @@ async function mount() {
   return view.renderer.root;
 }
 
+/** A `Text` node's visible string, whichever shape the primitive handed it. */
+function textOf(node: { props: { children?: unknown } }) {
+  const children = Array.isArray(node.props.children) ? node.props.children : [node.props.children];
+  return children.filter(child => typeof child === 'string').join('');
+}
+
 function texts(root: ReactTestRenderer['root']) {
-  return root.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children);
+  return root.findAll(node => Object.is(node.type, 'Text')).map(node => textOf(node));
+}
+
+function textNode(root: ReactTestRenderer['root'], value: string) {
+  const node = root
+    .findAll(candidate => Object.is(candidate.type, 'Text'))
+    .find(candidate => textOf(candidate) === value);
+  if (!node) {
+    throw new Error(`missing text node for ${value}`);
+  }
+  return node;
 }
 
 function appealButton(root: ReactTestRenderer['root']) {
@@ -116,6 +156,7 @@ beforeEach(() => {
   state.mutate.mockClear();
   state.alert.mockClear();
   state.toastError.mockClear();
+  state.performCopy.mockClear();
 });
 
 afterEach(() => {
@@ -128,6 +169,35 @@ describe('ReportReceiptScreen', () => {
     const root = await mount();
 
     expect(texts(root)).toEqual(expect.arrayContaining([RECEIPT_ID, 'Received', 'None submitted']));
+  });
+
+  it('copies the receipt id from its single copy control', async () => {
+    const root = await mount();
+
+    const copyControls = root.findAll(node => node.props.accessibilityLabel === 'Copy receipt ID');
+    expect(copyControls).toHaveLength(1);
+
+    const [copyControl] = copyControls;
+    if (!copyControl) {
+      throw new Error('missing copy control');
+    }
+
+    // The id cuts at the middle, so both ends of a truncated identifier stay
+    // visible; the status values are prose and cut at the tail, where the word
+    // that carries the meaning sits.
+    expect(textNode(root, RECEIPT_ID).props.numberOfLines).toBe(1);
+    expect(textNode(root, RECEIPT_ID).props.ellipsizeMode).toBe('middle');
+    expect(textNode(root, 'Received').props.numberOfLines).toBe(1);
+    expect(textNode(root, 'Received').props.ellipsizeMode).toBe('tail');
+    expect(textNode(root, 'None submitted').props.numberOfLines).toBe(1);
+    expect(textNode(root, 'None submitted').props.ellipsizeMode).toBe('tail');
+
+    act(() => {
+      (copyControl.props.onPress as () => void)();
+    });
+
+    expect(state.performCopy).toHaveBeenCalledTimes(1);
+    expect(state.performCopy).toHaveBeenCalledWith(RECEIPT_ID);
   });
 
   it('offers no appeal while the report is still being received', async () => {
@@ -150,6 +220,9 @@ describe('ReportReceiptScreen', () => {
 
     expect(state.alert).toHaveBeenCalledTimes(1);
     expect(state.mutate).not.toHaveBeenCalled();
+    // The Android Back gesture must cancel this alert, so the appeal is sent
+    // only when its confirm button is pressed.
+    expect(state.alert.mock.calls[0]?.[3]).toEqual({ cancelable: true });
 
     const buttons = (state.alert.mock.calls[0]?.[2] ?? []) as AlertButton[];
     act(() => {
@@ -163,8 +236,68 @@ describe('ReportReceiptScreen', () => {
     state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'rejected', appealStatus: 'submitted' };
     const root = await mount();
 
-    expect(texts(root)).toContain('Appeal in review');
+    expect(texts(root)).toContain('Under review');
     expect(appealButton(root)).toBeUndefined();
+  });
+
+  it('states that a moderator will review a report just received', async () => {
+    const root = await mount();
+
+    expect(texts(root)).toContain(NEXT_STEP_SENTENCES[0]);
+    expect(appealButton(root)).toBeUndefined();
+  });
+
+  it('states where the outcome of a report under review appears', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'open', appealStatus: 'none' };
+    const root = await mount();
+
+    expect(texts(root)).toContain(NEXT_STEP_SENTENCES[1]);
+  });
+
+  it('states where the outcome of a submitted appeal appears', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'rejected', appealStatus: 'submitted' };
+    const root = await mount();
+
+    expect(texts(root)).toContain(NEXT_STEP_SENTENCES[2]);
+    expect(appealButton(root)).toBeUndefined();
+  });
+
+  it('states that an appeal decision is final', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'accepted' };
+    const root = await mount();
+
+    expect(texts(root)).toContain(NEXT_STEP_SENTENCES[3]);
+    expect(appealButton(root)).toBeUndefined();
+  });
+
+  it('states that a declined appeal decision is final', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'rejected' };
+    const root = await mount();
+
+    expect(texts(root)).toContain(NEXT_STEP_SENTENCES[3]);
+    expect(appealButton(root)).toBeUndefined();
+  });
+
+  it('says nothing beyond the appeal button when the appeal is the next step', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'actioned', appealStatus: 'none' };
+    const root = await mount();
+
+    for (const sentence of NEXT_STEP_SENTENCES) {
+      expect(texts(root)).not.toContain(sentence);
+    }
+    expect(appealButton(root)).toBeDefined();
+  });
+
+  it('says nothing about a next step for a status it does not know', async () => {
+    state.receipt = { receiptId: RECEIPT_ID, triageStatus: 'escalated', appealStatus: 'none' };
+    const root = await mount();
+
+    // The unknown status still renders through the row's fallback, so the silence
+    // below is asserted on a screen that painted its content.
+    expect(texts(root)).toContain('escalated');
+    for (const sentence of NEXT_STEP_SENTENCES) {
+      expect(texts(root)).not.toContain(sentence);
+    }
   });
 
   it('treats a receipt the server does not hold as an invalid link', async () => {

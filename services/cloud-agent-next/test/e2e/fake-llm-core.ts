@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 
 import { isAdminAuthorized } from './fake-llm-admin.js';
 import { supervisionScenario } from './fake-llm-supervision.js';
+import { backgroundActivityScenario } from './fake-llm-background-activity.js';
 import { fakeCompactionSummary } from './fake-llm-compaction.js';
 
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
@@ -539,13 +540,18 @@ export function normalizeToolResult(raw: string): ToolResultNormalization {
 
 export type ReadResultPath = { ok: true; path: string | null } | { ok: false; message: string };
 
+// Kilo v2-104 renders the path and selected line range as a plain-text header.
+const NATIVE_READ_FILE_HEADER = /^Read file (.+), (?:0 lines|lines \d+-\d+)(?:\r?\n|$)/;
+
 /**
- * The read tool's reported path: an envelope field or a `<path>` element in the
- * unwrapped output. The two sources must agree; a conflicting pair is rejected
- * rather than silently preferring one, so a result can never be relabelled.
+ * The read tool reports its path in a native header or a legacy XML element.
+ * If the envelope also has a path, the two sources must agree.
  */
 function readResultPath(normalized: NormalizedToolResult): ReadResultPath {
-  const inner = normalized.output.match(/<path>\s*([^<]+?)\s*<\/path>/)?.[1] ?? null;
+  const inner =
+    normalized.output.match(NATIVE_READ_FILE_HEADER)?.[1] ??
+    normalized.output.match(/<path>\s*([^<]+?)\s*<\/path>/)?.[1] ??
+    null;
   if (normalized.envelopePath !== null && inner !== null && normalized.envelopePath !== inner) {
     return { ok: false, message: 'conflicting read result path metadata' };
   }
@@ -619,27 +625,53 @@ type Message = {
  * echo an empty completion.
  */
 export function extractLastUserMessageText(body: unknown): string {
-  if (typeof body !== 'object' || body === null) return '';
+  return lastUserMessageTextParts(body).join('');
+}
+
+/** The text parts of the last user message, skipping reminder-only messages. */
+function lastUserMessageTextParts(body: unknown): string[] {
+  if (typeof body !== 'object' || body === null) return [];
   const messages = (body as { messages?: unknown }).messages;
-  if (!Array.isArray(messages)) return '';
+  if (!Array.isArray(messages)) return [];
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i] as Message;
     if (msg?.role !== 'user') continue;
     const content = msg.content;
-    const text =
+    const parts =
       typeof content === 'string'
-        ? content
+        ? [content]
         : Array.isArray(content)
           ? content
               .filter(part => part?.type === 'text' || part?.type === undefined)
               .map(part => part.text ?? '')
-              .join('')
-          : '';
-    if (/^\s*<system-reminder>[\s\S]*<\/system-reminder>\s*$/.test(text)) continue;
-    return text;
+          : [];
+    if (/^\s*<system-reminder>[\s\S]*<\/system-reminder>\s*$/.test(parts.join(''))) continue;
+    return parts;
   }
-  return '';
+  return [];
+}
+
+/**
+ * The scope and prompt of the last user message. The scope marker leads the
+ * whole text, or one text part: the server puts its own context in a synthetic
+ * text part before the user's prompt. A marker inside a part's text, as in a
+ * title request that quotes the prompt, is not a scope.
+ */
+export function extractRequestPromptScope(body: unknown): {
+  scope: string | undefined;
+  text: string;
+} {
+  const parts = lastUserMessageTextParts(body);
+  const whole = extractPromptScope(parts.join(''));
+  if (whole.scope !== undefined) return whole;
+  for (const [index, part] of parts.entries()) {
+    const scoped = extractPromptScope(part);
+    if (scoped.scope === undefined) continue;
+    const text = [...parts.slice(0, index), scoped.text, ...parts.slice(index + 1)].join('');
+    return { scope: scoped.scope, text };
+  }
+  return whole;
 }
 
 /**
@@ -892,8 +924,14 @@ function readFileContents(result: string): string {
   } catch {
     content = result;
   }
-  const enclosed = content.match(/<(?:content|file)>\s*\n?([\s\S]*?)\n?<\/(?:content|file)>/);
-  if (enclosed?.[1] !== undefined) content = enclosed[1];
+  if (NATIVE_READ_FILE_HEADER.test(content)) {
+    content = content
+      .replace(NATIVE_READ_FILE_HEADER, '')
+      .replace(/\r?\n\[Output truncated\. Continue reading with offset: \d+\]\s*$/, '');
+  } else {
+    const enclosed = content.match(/<(?:content|file)>\s*\n?([\s\S]*?)\n?<\/(?:content|file)>/);
+    if (enclosed?.[1] !== undefined) content = enclosed[1];
+  }
   return content
     .split(/\r?\n/)
     .filter(line => !/^\s*\((?:End of file|Showing lines)/.test(line))
@@ -950,12 +988,28 @@ const TRANSCRIPTION_MODELS = [
   {
     id: 'fake-transcribe',
     name: 'Fake Transcribe',
+    created: 0,
+    description: 'Deterministic fake speech-to-text model for cloud-agent E2E harness.',
+    architecture: {
+      input_modalities: ['audio'],
+      output_modalities: ['text'],
+      tokenizer: 'fake',
+    },
+    top_provider: { is_moderated: false, context_length: 128000 },
     context_length: 128000,
     pricing: { prompt: '0', completion: '0' },
   },
   {
     id: 'fake-transcribe-broken',
     name: 'Broken Transcriber',
+    created: 0,
+    description: 'Fake speech-to-text model whose transcription request 404s.',
+    architecture: {
+      input_modalities: ['audio'],
+      output_modalities: ['text'],
+      tokenizer: 'fake',
+    },
+    top_provider: { is_moderated: false, context_length: 128000 },
     context_length: 128000,
     pricing: { prompt: '0', completion: '0' },
   },
@@ -1794,6 +1848,7 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
   'background-task'(args, ctx) {
     runChildTask(args, ctx, true);
   },
+  'background-activity': backgroundActivityScenario,
 
   cron(args, ctx) {
     runSchedule(
@@ -1930,7 +1985,7 @@ async function handleChatCompletions(
   const messageCount = Array.isArray(messages) ? messages.length : 0;
   const bodyModel = isRecord(body) && typeof body.model === 'string' ? body.model : undefined;
   const lastUserText = extractLastUserMessageText(body);
-  const { scope, text: prompt } = extractPromptScope(lastUserText);
+  const { scope, text: prompt } = extractRequestPromptScope(body);
   state.lastUserText = lastUserText;
   const directive = parseDirective(prompt);
   const tools = advertisedTools(body);

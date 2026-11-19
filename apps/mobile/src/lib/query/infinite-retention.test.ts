@@ -5,6 +5,7 @@ import {
   hasRetentionBudget,
   INFINITE_QUERY_MAX_PAGES,
   reconcileFirstPage,
+  stoppedAtRetentionBound,
   withInfiniteRetention,
 } from '@/lib/query/infinite-retention';
 
@@ -55,6 +56,31 @@ describe('hasRetentionBudget', () => {
   });
 });
 
+describe('stoppedAtRetentionBound', () => {
+  it('is false before any page has loaded', () => {
+    expect(stoppedAtRetentionBound(0, false)).toBe(false);
+  });
+
+  it('is false while the list still has budget left', () => {
+    expect(stoppedAtRetentionBound(4, true, 5)).toBe(false);
+    expect(stoppedAtRetentionBound(4, false, 5)).toBe(false);
+  });
+
+  it('is true at the bound when the server still reports more', () => {
+    expect(stoppedAtRetentionBound(5, true, 5)).toBe(true);
+  });
+
+  it('is false at the bound when the server reports the end', () => {
+    expect(stoppedAtRetentionBound(5, false, 5)).toBe(false);
+  });
+
+  it('honours a custom maxPages', () => {
+    expect(stoppedAtRetentionBound(2, true, 2)).toBe(true);
+    expect(stoppedAtRetentionBound(1, true, 2)).toBe(false);
+    expect(stoppedAtRetentionBound(2, false, 2)).toBe(false);
+  });
+});
+
 describe('reconcileFirstPage', () => {
   const prefix = ['trpc', 'cliSessionsV2', 'list'];
   const fullKey = [...prefix, { input: { organizationId: 'org-1' } }];
@@ -66,7 +92,6 @@ describe('reconcileFirstPage', () => {
     const gate: { release?: () => void } = {};
     let hold = false;
     const calls: number[] = [];
-    // eslint-disable-next-line require-await -- the held fetch is the point: the recipe resolves it from the test.
     const queryFn = async ({ pageParam }: { pageParam: number }): Promise<Page> => {
       calls.push(pageParam);
       if (hold) {
@@ -254,17 +279,44 @@ describe('reconcileFirstPage', () => {
     unsubscribe();
   });
 
-  it('marks the prefix stale without refetching it', async () => {
-    const queryClient = new QueryClient();
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    queryClient.setQueryData(fullKey, {
+  it('marks the entries stale without fetching any of them', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const calls: number[] = [];
+    // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
+    const queryFn = async ({ pageParam }: { pageParam: number }): Promise<Page> => {
+      calls.push(pageParam);
+      return page([{ id: `p${pageParam}`, title: `p${pageParam}` }]);
+    };
+    const observer = new InfiniteQueryObserver(queryClient, {
+      queryKey: fullKey,
+      queryFn,
+      initialPageParam: 0,
+      getNextPageParam: () => undefined,
+      // A screen still waiting on its filters: nothing here may fetch.
+      enabled: false,
+    });
+    const seeded = {
       pages: [page([{ id: 'a', title: 'a' }])],
       pageParams: [0],
-    });
+    };
+    queryClient.setQueryData(fullKey, seeded);
+    // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
+    const unsubscribe = observer.subscribe(() => {});
+    // Another list's entry: the reconcile marks stale only its own prefix.
+    const otherKey = ['trpc', 'cliSessionsV3', 'list', { input: {} }];
+    queryClient.setQueryData(otherKey, { items: [] });
 
     await reconcileFirstPage(queryClient, prefix);
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: prefix, refetchType: 'none' });
+    // Stale, so its next mount refetches, and unfetched: nothing ran now.
+    expect(queryClient.getQueryState(fullKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(fullKey)?.fetchStatus).toBe('idle');
+    expect(calls).toEqual([]);
+    // The rows stay for the screen that is about to show them.
+    expect(queryClient.getQueryData(fullKey)).toEqual(seeded);
+    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+
+    unsubscribe();
   });
 
   it('leaves a non-infinite entry under the same prefix untouched', async () => {

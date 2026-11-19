@@ -18,7 +18,7 @@ import {
   getVercelRuntimeIdentity,
   startVercelSnapshotBuild,
   type VercelSnapshotBuildStartInput,
-} from '@/lib/cloud-agent-next/cloud-agent-client';
+} from '@/lib/cloud-agent-next/cloud-agent-internal-api';
 import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import {
   discoverVercelProjects,

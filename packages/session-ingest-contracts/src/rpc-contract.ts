@@ -6,6 +6,7 @@ import {
   type CloudAgentWorktreeId,
 } from './cloud-agent-session-scope';
 import { storedSessionIdSchema } from './kilo-session-id';
+import { needsPartTextRepair } from './part-text';
 
 export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
@@ -47,6 +48,28 @@ export const CLI_SESSION_VERSION_BY_RUNTIME_HARNESS = {
   kilo2: 2,
 } as const satisfies Record<RecordCloudAgentSessionHarnessParams['runtimeHarness'], number>;
 
+export const sessionTitleSchema = z.string().trim().min(1).max(200);
+
+const cloudAgentSessionTitleTargetSchema = z.object({
+  sessionId: sessionIdSchema,
+  kiloUserId: z.string().min(1),
+  cloudAgentSessionId: cloudAgentSessionIdSchema,
+});
+
+// Strip-mode, as the parameter objects these replace always were: an extra key
+// is dropped rather than rejected, so naming the schemas changes no caller.
+export const setGeneratedTitleForCloudAgentSchema = cloudAgentSessionTitleTargetSchema.extend({
+  title: sessionTitleSchema,
+});
+export type SetGeneratedTitleForCloudAgentParams = z.infer<
+  typeof setGeneratedTitleForCloudAgentSchema
+>;
+
+export const canGenerateTitleForCloudAgentSchema = cloudAgentSessionTitleTargetSchema;
+export type CanGenerateTitleForCloudAgentParams = z.infer<
+  typeof canGenerateTitleForCloudAgentSchema
+>;
+
 export const cloudAgentWorktreeLocationSchema = z
   .object({
     sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
@@ -82,12 +105,20 @@ export const cloudAgentWorktreeDeletionSchema = z
     worktreeId: cloudAgentWorktreeIdSchema,
     kiloUserId: z.string().min(1),
     organizationId: z.uuid().optional(),
+  })
+  .strict();
+export type CloudAgentWorktreeDeletionParams = z.infer<typeof cloudAgentWorktreeDeletionSchema>;
+
+export const beginCloudAgentWorktreeDeletionSchema = cloudAgentWorktreeDeletionSchema
+  .extend({
     // Begin-only precondition: the worktree must still have exactly one root
     // session and it must be this session. Descendants are allowed.
     onlyIfSoleSessionId: sessionIdSchema.optional(),
   })
   .strict();
-export type CloudAgentWorktreeDeletionParams = z.infer<typeof cloudAgentWorktreeDeletionSchema>;
+export type BeginCloudAgentWorktreeDeletionParams = z.infer<
+  typeof beginCloudAgentWorktreeDeletionSchema
+>;
 
 export const cloudAgentWorktreeDeletionStateSchema = z
   .object({
@@ -227,7 +258,8 @@ export const createSessionForCloudAgentSchema = z.object({
     .string()
     .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
     .optional(),
-  organizationId: z.string().optional(),
+  /** Must be an organization the acting user is a live member of. */
+  organizationId: z.uuid().optional(),
   createdOnPlatform: z.string().min(1),
   title: z.string().optional(),
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
@@ -255,6 +287,7 @@ export type CreateSessionForCloudAgentParams = z.input<typeof createSessionForCl
  */
 export type SessionCloneRejectionCode =
   | 'source_access_denied'
+  | 'organization_access_denied'
   | 'organization_mismatch'
   | 'malformed_source_data'
   | 'missing_source_body'
@@ -577,6 +610,20 @@ export function validateCloudAgentWorkspacesCursor(cursor: string): boolean {
   return workspacesCursorCodec.validate(cursor);
 }
 
+type OpaqueCursorValidator = (cursor: string) => boolean;
+
+/** Adds `<field> is not a valid <label>` when a present cursor does not validate. */
+function refineCursor(
+  cursor: string | undefined,
+  field: string,
+  label: string,
+  validate: OpaqueCursorValidator,
+  ctx: z.RefinementCtx
+): void {
+  if (cursor === undefined || validate(cursor)) return;
+  ctx.addIssue({ code: 'custom', path: [field], message: `${field} is not a valid ${label}` });
+}
+
 export const listCloudAgentRootSessionsSchema = z
   .object({
     kiloUserId: z.string().min(1),
@@ -586,15 +633,15 @@ export const listCloudAgentRootSessionsSchema = z
     start: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
   })
   .strict()
-  .superRefine((params, ctx) => {
-    if (params.cursor !== undefined && !validateCloudAgentRootSessionsCursor(params.cursor)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cursor'],
-        message: 'cursor is not a valid Cloud Agent root sessions cursor',
-      });
-    }
-  });
+  .superRefine((params, ctx) =>
+    refineCursor(
+      params.cursor,
+      'cursor',
+      'Cloud Agent root sessions cursor',
+      validateCloudAgentRootSessionsCursor,
+      ctx
+    )
+  );
 export type ListCloudAgentRootSessionsParams = z.input<typeof listCloudAgentRootSessionsSchema>;
 export type CloudAgentRootSessionSummary = {
   kiloSessionId: string;
@@ -625,15 +672,15 @@ export const listCloudAgentWorkspacesSchema = z
     repositoryUrl: z.string().min(1).max(2048).optional(),
   })
   .strict()
-  .superRefine((params, ctx) => {
-    if (params.cursor !== undefined && !validateCloudAgentWorkspacesCursor(params.cursor)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cursor'],
-        message: 'cursor is not a valid Cloud Agent workspaces cursor',
-      });
-    }
-  });
+  .superRefine((params, ctx) =>
+    refineCursor(
+      params.cursor,
+      'cursor',
+      'Cloud Agent workspaces cursor',
+      validateCloudAgentWorkspacesCursor,
+      ctx
+    )
+  );
 export type ListCloudAgentWorkspacesParams = z.input<typeof listCloudAgentWorkspacesSchema>;
 
 export const getCloudAgentWorkspaceSchema = z
@@ -644,18 +691,15 @@ export const getCloudAgentWorkspaceSchema = z
     sessionCursor: z.string().min(1).max(256).optional(),
   })
   .strict()
-  .superRefine((params, ctx) => {
-    if (
-      params.sessionCursor !== undefined &&
-      !validateCloudAgentRootSessionsCursor(params.sessionCursor)
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['sessionCursor'],
-        message: 'sessionCursor is not a valid Cloud Agent root sessions cursor',
-      });
-    }
-  });
+  .superRefine((params, ctx) =>
+    refineCursor(
+      params.sessionCursor,
+      'sessionCursor',
+      'Cloud Agent root sessions cursor',
+      validateCloudAgentRootSessionsCursor,
+      ctx
+    )
+  );
 export type GetCloudAgentWorkspaceParams = z.input<typeof getCloudAgentWorkspaceSchema>;
 
 export type CloudAgentWorkspaceSummary = {
@@ -1102,24 +1146,19 @@ type NormalizedPersistedStoredMessage = {
 };
 
 /**
- * The generated `Part` types declare `text: string` on text and reasoning
- * parts, but persisted storage can hold a part without the field (Sentry
- * KILO-APP-99). A single such part fails the strict `kiloSdkPartSchema`, so
- * the WHOLE history page degrades to `invalid_data` and the agent chat
- * transcript never renders. Mirror the SDK's `normalizeMissingPartText`
- * (packages/cloud-agent-sdk/src/part-utils.ts — this package cannot import
- * the SDK, it depends back on us): fill absent or non-string text with `''`
- * so the part renders nothing downstream instead of poisoning the page.
- * Returns `null` when the part needs no fix (not a text/reasoning part, or it
- * already carries string text); otherwise a copy with `text: ''`.
+ * Fill absent or non-string text on a persisted text or reasoning part so the
+ * part renders nothing downstream instead of poisoning the page: a single such
+ * part fails the strict `kiloSdkPartSchema`, so the WHOLE history page degrades
+ * to `invalid_data` and the agent chat transcript never renders.
+ *
+ * Returns `null` when the part needs no fix; otherwise a copy with `text: ''`.
+ * The rule itself is declared once in `needsPartTextRepair` (`./part-text`),
+ * shared with the SDK's wire normalizer.
  */
 function normalizePersistedMissingPartText(
   part: Record<string, unknown>
 ): Record<string, unknown> | null {
-  const type = part['type'];
-  if (type !== 'text' && type !== 'reasoning') return null;
-  if (typeof part['text'] === 'string') return null;
-  return { ...part, text: '' };
+  return needsPartTextRepair(part) ? { ...part, text: '' } : null;
 }
 
 function normalizePersistedKiloSdkParts(value: unknown): {
@@ -1312,10 +1351,34 @@ export function validateKiloSdkMessagesCursor(cursor: string): boolean {
   }
 }
 
+/** Optional opaque continuation cursor, capped so an oversized value never reaches the decoder. */
+const optionalMessageCursorField = z
+  .string()
+  .min(1)
+  .max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH)
+  .optional();
+
+/** Bounded positive page size with the shared default, for schemas that always bound the read. */
+const boundedMessageHistoryLimitField = z
+  .number()
+  .int()
+  .positive()
+  .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
+  .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE);
+
+/** Adds `<field> is not a valid message cursor` when a present cursor does not decode. */
+function refineMessageCursor(
+  cursor: string | undefined,
+  field: 'before' | 'cursor',
+  ctx: z.RefinementCtx
+): void {
+  refineCursor(cursor, field, 'message cursor', validateKiloSdkMessagesCursor, ctx);
+}
+
 export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessionSchema
   .extend({
     limit: z.number().int().nonnegative().max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE).optional(),
-    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
+    before: optionalMessageCursorField,
   })
   .superRefine((params, ctx) => {
     if (params.before !== undefined && (params.limit === undefined || params.limit === 0)) {
@@ -1326,13 +1389,7 @@ export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessi
       });
       return;
     }
-    if (params.before !== undefined && !validateKiloSdkMessagesCursor(params.before)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['before'],
-        message: 'before is not a valid message cursor',
-      });
-    }
+    refineMessageCursor(params.before, 'before', ctx);
   });
 export type GetCloudAgentRootSessionMessagesParams = z.input<
   typeof getCloudAgentRootSessionMessagesSchema
@@ -1347,9 +1404,10 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
 /**
  * Generic authorized paginated history request used by `cliSessionsV2` for any
  * Kilo session (root cloud-agent, child, or remote CLI) the user owns and
- * still has organization access to. Reuses the existing opaque cursor and
- * bounded DO reader so the new method is byte-identical to
- * `getCloudAgentRootSessionMessages` aside from the access-check boundary.
+ * still has organization access to. Reuses the opaque cursor codec and the
+ * bounded DO reader of `getCloudAgentRootSessionMessages`; the two request
+ * schemas differ in their `limit` bounds and in the `kiloSessionId` shape, as
+ * the paragraphs below state.
  *
  * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and must be
  * a positive integer; the schema applies `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE`
@@ -1368,24 +1426,10 @@ export const getSessionMessagesSchema = z
   .object({
     kiloUserId: z.string().min(1),
     kiloSessionId: storedSessionIdSchema,
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
-      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
+    limit: boundedMessageHistoryLimitField,
+    before: optionalMessageCursorField,
   })
-  .superRefine((params, ctx) => {
-    if (params.before === undefined) return;
-    if (!validateKiloSdkMessagesCursor(params.before)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['before'],
-        message: 'before is not a valid message cursor',
-      });
-    }
-  });
+  .superRefine((params, ctx) => refineMessageCursor(params.before, 'before', ctx));
 export type GetSessionMessagesParams = z.input<typeof getSessionMessagesSchema>;
 export type AuthorizedSessionMessages = {
   kiloSessionId: string;
@@ -1393,13 +1437,39 @@ export type AuthorizedSessionMessages = {
 };
 export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 
+/**
+ * tRPC wire input for `cliSessionsV2.getSessionMessagesPage`, the paginated
+ * access-checked history call the mobile client and the web app both make
+ * against the web router (which forwards the page read to this contract's
+ * worker RPC). Sharing the schema keeps tRPC-level validation identical to
+ * the worker's own bounded reader.
+ *
+ * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and defaults
+ * to `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE` when omitted, so the request is
+ * always bounded before it reaches the session store. `cursor` is the opaque
+ * continuation cursor validated by `validateKiloSdkMessagesCursor`; a caller
+ * receives one from a previous page and passes it back to walk older history.
+ *
+ * `session_id` takes `storedSessionIdSchema`, the same rule the worker reader
+ * applies. The boundary accepts exactly the ids the reader addresses: bounded,
+ * URL-safe, and including ids minted before the canonical `ses_…` shape. The
+ * ownership and organization check owns authorization, not the id shape.
+ */
+export const getSessionMessagesPageInputSchema = z
+  .object({
+    session_id: storedSessionIdSchema,
+    limit: boundedMessageHistoryLimitField,
+    cursor: optionalMessageCursorField,
+  })
+  .superRefine((params, ctx) => refineMessageCursor(params.cursor, 'cursor', ctx));
+
 export type SessionIngestRpcMethods = {
   publishCloudAgentSessionStatus: (params: PublishCloudAgentSessionStatusParams) => Promise<void>;
   recordCloudAgentSessionHarness: (
     params: RecordCloudAgentSessionHarnessParams
   ) => Promise<boolean>;
   beginCloudAgentWorktreeDeletion: (
-    params: CloudAgentWorktreeDeletionParams
+    params: BeginCloudAgentWorktreeDeletionParams
   ) => Promise<CloudAgentWorktreeDeletionState>;
   retireCloudAgentWorktreeIfSoleMember: (
     params: RetireCloudAgentWorktreeIfSoleMemberParams
@@ -1419,17 +1489,10 @@ export type SessionIngestRpcMethods = {
   createSessionForCloudAgent: (
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;
-  setGeneratedTitleForCloudAgent: (params: {
-    sessionId: string;
-    kiloUserId: string;
-    cloudAgentSessionId: string;
-    title: string;
-  }) => Promise<{ applied: boolean }>;
-  canGenerateTitleForCloudAgent: (params: {
-    sessionId: string;
-    kiloUserId: string;
-    cloudAgentSessionId: string;
-  }) => Promise<boolean>;
+  setGeneratedTitleForCloudAgent: (
+    params: SetGeneratedTitleForCloudAgentParams
+  ) => Promise<{ applied: boolean }>;
+  canGenerateTitleForCloudAgent: (params: CanGenerateTitleForCloudAgentParams) => Promise<boolean>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
   deleteHostedWorkspaceSession: (
     params: DeleteHostedWorkspaceSessionParams

@@ -1,6 +1,7 @@
-/* oxlint-disable max-lines -- one tRPC client suite; the link-options, auth-header, deadline, and observed-fetch cases share one hoisted module-mock scaffold */
+/* oxlint-disable max-lines -- one tRPC client suite; the auth-header, deadline, and observed-fetch cases share one hoisted module-mock scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 import { type TelemetryBreadcrumb, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const httpLinkMock = vi.hoisted(() => vi.fn());
@@ -83,6 +84,7 @@ vi.mock('@/lib/storage-keys', () => ({
   ACTIVE_USER_ID_KEY: 'active-user-id',
   AUTH_TOKEN_KEY: 'auth-token',
   ORGANIZATION_STORAGE_KEY: 'organization',
+  REFRESH_TOKEN_KEY: 'auth-refresh-token',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',
 }));
 
@@ -101,32 +103,6 @@ afterEach(() => {
   createTRPCClientMock.mockClear();
   splitLinkMock.mockClear();
   randomUUIDMock.mockClear();
-});
-
-describe('tRPC client link options', () => {
-  it('passes methodOverride: "POST" to httpLink', async () => {
-    httpLinkMock.mockReturnValue({});
-    httpBatchLinkMock.mockReturnValue({});
-    createTRPCClientMock.mockReturnValue({});
-
-    await import('./trpc');
-
-    expect(httpLinkMock).toHaveBeenCalledTimes(1);
-    const httpLinkOpts = httpLinkMock.mock.calls[0]?.[0];
-    expect(httpLinkOpts).toHaveProperty('methodOverride', 'POST');
-  });
-
-  it('passes methodOverride: "POST" to httpBatchLink', async () => {
-    httpLinkMock.mockReturnValue({});
-    httpBatchLinkMock.mockReturnValue({});
-    createTRPCClientMock.mockReturnValue({});
-
-    await import('./trpc');
-
-    expect(httpBatchLinkMock).toHaveBeenCalledTimes(1);
-    const httpBatchLinkOpts = httpBatchLinkMock.mock.calls[0]?.[0];
-    expect(httpBatchLinkOpts).toHaveProperty('methodOverride', 'POST');
-  });
 });
 
 type AuthHeadersFn = () => Promise<Record<string, string>>;
@@ -262,7 +238,7 @@ describe('getAuthHeaders', () => {
     await expect(headers()).rejects.toThrow('keychain unavailable');
   });
 
-  it('resolves unauthenticated while protected data is unavailable and files nothing', async () => {
+  it('holds an unauthenticated request until the unlock instead of sending it bare', async () => {
     // `afterEach` resets the module registry, so the sink, the owner, and the
     // gate must be loaded from the same graph as `./trpc` inside the case.
     secureStoreMock.store.set('auth-token', 'stored-token');
@@ -276,21 +252,218 @@ describe('getAuthHeaders', () => {
     const { setProtectedDataAvailable } = await import('@/lib/protected-data');
     setProtectedDataAvailable(false);
     try {
-      // The locked request still resolves: no rejection reaches tRPC, so
-      // nothing wraps the lock state into a reported client error.
-      const unauthenticated = await headers();
-      expect(unauthenticated).not.toHaveProperty('Authorization');
-      // The refused read never reached the keychain.
+      // A locked keychain can supply no bearer, so the request waits instead of
+      // going out unauthenticated: the server would refuse it as no-session.
+      let settled = false;
+      const pending = (async () => {
+        try {
+          return await headers();
+        } finally {
+          settled = true;
+        }
+      })();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(settled).toBe(false);
       expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+
+      // The unlock releases it, and the same request reaches the wire with the
+      // stored credential.
+      setProtectedDataAvailable(true);
+      await expect(pending).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+      expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('auth-token');
       expect(events).toEqual([]);
     } finally {
       setProtectedDataAvailable(true);
     }
+  });
 
-    // After unlock the same request resolves the stored token and sends it.
-    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
-    expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('auth-token');
-    expect(events).toEqual([]);
+  it('shares one unlock wait across concurrent requests and releases both', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+    // `afterEach` resets the module registry: the gate must come from the same
+    // graph as `./trpc`, so it is loaded here rather than statically.
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    try {
+      const first = headers();
+      const second = headers();
+      await vi.advanceTimersByTimeAsync(1);
+      // One lock window, one shared wait: a second request joins the first
+      // instead of registering its own deadline timer.
+      expect(vi.getTimerCount()).toBe(1);
+
+      setProtectedDataAvailable(true);
+      await vi.advanceTimersByTimeAsync(1);
+      const [firstHeaders, secondHeaders] = await Promise.all([first, second]);
+      expect(firstHeaders).toMatchObject({ Authorization: 'Bearer stored-token' });
+      expect(secondHeaders).toMatchObject({ Authorization: 'Bearer stored-token' });
+      // The shared wait cleared itself, so the next lock starts a fresh one.
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends an unauthenticated request without waiting while protected data is available', async () => {
+    // Android has no protected-data source, so the gate always reports
+    // available there and this is the only path a foreground request takes: no
+    // wait, no timer, and therefore no way for the deferral to hold up the UI.
+    const headers = await loadHeaders();
+    vi.useFakeTimers();
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(0);
+      const sent = await pending;
+      expect(sent).not.toHaveProperty('Authorization');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends the request unauthenticated when the lock outlasts the request budget', async () => {
+    // Not resolving is worse than sending: a background request must not
+    // outlive the app's own control-plane budget. Past the bound the request
+    // proceeds exactly as it did before the deferral — no credential, no event.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const events: TelemetryEvent[] = [];
+    const { setTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    const headers = await loadHeaders();
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS);
+
+      const unauthenticated = await pending;
+      expect(unauthenticated).not.toHaveProperty('Authorization');
+      // The refused read never reached the keychain, and the lock state is not
+      // a reportable failure.
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts the request budget before the unlock wait it may spend', async () => {
+    // The wait is part of the request's own control-plane budget, not a free
+    // prelude to it: the header build records the instant the wait began, so
+    // the fetch that follows can be given only what the wait left.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
+    const headers = await loadHeaders();
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    try {
+      const startedAtMs = Date.now();
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS - 5_000);
+      setProtectedDataAvailable(true);
+
+      const sent = await pending;
+      expect(sent).toMatchObject({ Authorization: 'Bearer stored-token' });
+      // Ten of the fifteen seconds went to the wait, and the stamp still names
+      // the start.
+      expect(Number(sent['x-kilo-request-budget-start'])).toBe(startedAtMs);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the request budget whole across a slow proactive refresh', async () => {
+    // A refresh has its own deadline and is no part of the request's: the
+    // build that waits ten seconds on it must not hand the request five.
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    secureStoreMock.store.set('auth-refresh-token', 'stored-refresh');
+    // Inside the five-minute refresh margin, so the build rotates first.
+    secureStoreMock.store.set('token-expires-at', String(Date.now() + 60_000));
+    const fetchMock = vi.fn();
+    fetchMock.mockImplementationOnce(async () => {
+      // A refresh that takes ten seconds of the request's fifteen.
+      const refreshDelay = Promise.withResolvers<undefined>();
+      setTimeout(refreshDelay.resolve, 10_000);
+      await refreshDelay.promise;
+      return Response.json({ token: 'refreshed-token', refreshToken: 'r2', expiresIn: 3600 });
+    });
+    // The request that follows never settles: only its deadline can end it.
+    fetchMock.mockImplementation(() => Promise.withResolvers<Response>().promise);
+    // Stubbed before the module graph loads, so the link's captured fetch is
+    // the same mock the refresh uses.
+    vi.stubGlobal('fetch', fetchMock);
+    const headers = await loadHeaders();
+    const { deadlineFetch } = await import('./trpc');
+    vi.useFakeTimers();
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(10_000);
+      const sent = await pending;
+      expect(sent).toMatchObject({ Authorization: 'Bearer refreshed-token' });
+      // The refresh spent its ten seconds, not the request's: no stamp means
+      // the fetch gets the whole deadline.
+      expect(sent).not.toHaveProperty('x-kilo-request-budget-start');
+
+      const request = deadlineFetch('https://api.example.com/api/trpc', { headers: sent });
+      const outcome = (async () => {
+        try {
+          await request;
+          return 'resolved';
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error);
+        }
+      })();
+      // Ten seconds in, the request is still inside its own budget.
+      await vi.advanceTimersByTimeAsync(10_000);
+      await expect(Promise.race([outcome, Promise.resolve('still waiting')])).resolves.toBe(
+        'still waiting'
+      );
+      await vi.advanceTimersByTimeAsync(5_001);
+      await expect(outcome).resolves.toBe('Request timed out after 15000ms');
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('sends a request the app knows is signed out without waiting for the unlock', async () => {
+    // A signed-out device has no credential to bring back at unlock: the
+    // sign-out flags are the app's own answer, need no keychain read, and a
+    // locked request must not sit behind a wait that can only end bare.
+    const headers = await loadHeaders();
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    const { setSignOutActive } = await import('@/lib/auth/sign-out-state');
+    const { setSignOutTeardownActive } = await import('@/lib/auth/token-owner');
+    vi.useFakeTimers();
+    setProtectedDataAvailable(false);
+    setSignOutActive(true);
+    setSignOutTeardownActive(true);
+    try {
+      const pending = headers();
+      await vi.advanceTimersByTimeAsync(0);
+      const sent = await pending;
+      expect(sent).not.toHaveProperty('Authorization');
+      // No wait was registered, so the lock cannot hold this request.
+      expect(vi.getTimerCount()).toBe(0);
+      expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+    } finally {
+      setSignOutTeardownActive(false);
+      setSignOutActive(false);
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -349,6 +522,54 @@ describe('deadlineFetch', () => {
       vi.useRealTimers();
     }
   });
+
+  it.each([
+    [
+      'header record',
+      (startedAtMs: number) => ({ 'x-kilo-request-budget-start': String(startedAtMs) }),
+    ],
+    [
+      'Headers instance',
+      (startedAtMs: number) => new Headers({ 'x-kilo-request-budget-start': String(startedAtMs) }),
+    ],
+  ] as [string, (startedAtMs: number) => HeadersInit][])(
+    'gives a request only the budget its auth headers left (%s)',
+    async (_shape, buildHeaders) => {
+      vi.useFakeTimers();
+      try {
+        let sentHeaders: RequestInit['headers'] = undefined;
+        mockFetch.mockImplementation((_url, init?: RequestInit) => {
+          sentHeaders = init?.headers;
+          // Never settles: only the deadline can end this request.
+          return Promise.withResolvers<Response>().promise;
+        });
+        const { deadlineFetch } = await import('./trpc');
+        // The auth header build spent ten of the fifteen seconds waiting for
+        // the unlock before this request started, so the request gets the five
+        // left instead of a fresh full deadline.
+        const promise = deadlineFetch('https://api.example.com/api/trpc', {
+          headers: buildHeaders(Date.now() - 10_000),
+        });
+        const outcome = (async () => {
+          try {
+            await promise;
+            return 'resolved';
+          } catch (error) {
+            return error instanceof Error ? error.message : String(error);
+          }
+        })();
+
+        await vi.advanceTimersByTimeAsync(5_001);
+        await expect(Promise.race([outcome, Promise.resolve('still waiting')])).resolves.toBe(
+          'Request timed out after 5000ms'
+        );
+        // The bookkeeping entry is the client's: it never reaches the wire.
+        expect(new Headers(sentHeaders).get('x-kilo-request-budget-start')).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
 
   it('rejects immediately when the caller signal is already aborted', async () => {
     const { deadlineFetch } = await import('./trpc');

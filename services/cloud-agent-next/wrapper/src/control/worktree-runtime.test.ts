@@ -44,3 +44,71 @@ describe('buildWorktreeKiloEnvironment notifier env', () => {
     expect(env.GH_STACK_NO_UPDATE_NOTIFIER).toBe('1');
   });
 });
+
+describe('buildWorktreeKiloEnvironment platform names', () => {
+  it('uses the platform home and store and keeps the rest of the profile environment', () => {
+    const env = buildWorktreeKiloEnvironment(
+      '/workspace/a',
+      '/home/worktree-a',
+      kilo(),
+      {
+        SESSION_HOME: '/tmp/other-home',
+        SESSION_ID: 'other-session',
+        pnpm_config_store_dir: '/tmp/store',
+        API_KEY: 'kept',
+      },
+      {}
+    );
+
+    expect(env.HOME).toBe('/home/worktree-a');
+    expect(env).not.toHaveProperty('SESSION_HOME');
+    expect(env).not.toHaveProperty('SESSION_ID');
+    expect(env).not.toHaveProperty('pnpm_config_store_dir');
+    expect(env.API_KEY).toBe('kept');
+  });
+});
+
+describe('buildWorktreeKiloEnvironment model context limits', () => {
+  function configOf(env: Record<string, string>) {
+    return JSON.parse(env.KILO_CONFIG_CONTENT);
+  }
+
+  it('writes personal context caps as provider model limit entries', () => {
+    const env = buildWorktreeKiloEnvironment(
+      '/workspace/a',
+      '/home/worktree-a',
+      kilo(),
+      {},
+      {},
+      undefined,
+      { modelContextLimits: { 'openai/gpt-6.1-sol': 300_000, 'kilo/openai/gpt-6-sol': 250_000 } }
+    );
+
+    expect(configOf(env).provider.kilo.models).toEqual({
+      'openai/gpt-6.1-sol': { limit: { context: 300_000 } },
+      'openai/gpt-6-sol': { limit: { context: 250_000 } },
+    });
+  });
+
+  it('omits the models block when no caps are configured', () => {
+    const withoutLimits = buildWorktreeKiloEnvironment(
+      '/workspace/a',
+      '/home/worktree-a',
+      kilo(),
+      {},
+      {}
+    );
+    const withEmptyLimits = buildWorktreeKiloEnvironment(
+      '/workspace/a',
+      '/home/worktree-a',
+      kilo(),
+      {},
+      {},
+      undefined,
+      { modelContextLimits: {} }
+    );
+
+    expect(configOf(withoutLimits).provider.kilo.models).toBeUndefined();
+    expect(configOf(withEmptyLimits).provider.kilo.models).toBeUndefined();
+  });
+});

@@ -393,16 +393,20 @@ jobs:
               - '.npmrc'
       # The script chain behind `pnpm run test:scripts`. Every entry below comes
       # from what a suite in that chain imports or reads: scripts/** for the
-      # web-env, mobile-artifacts, mobile-sbom, kilo-app-release and
-      # kilo-mcp-release suites; dev/** for dev-local; tools/oxlint/** for the
-      # plugin suite. The rewrites suite also enumerates the route directories
-      # of both apps, the dev-local suites read the mobile design-gate sources,
-      # the web env example, the auto-routing and meter dev-vars examples, the
-      # fake LLM used by the tunnel tests, the native build workflow, the web
-      # load-env module and three workspace packages. None of this is web source
-      # outside those paths, so a web-only diff no longer starts the chain. Add
-      # an entry here when a suite starts reading a new path: a missing entry
-      # stops its suite silently on the change it protects.
+      # web-env, mobile-artifacts, mobile-sbom, kilo-app-release,
+      # kilo-mcp-release and kilo-extension-release suites; dev/** for
+      # dev-local; tools/oxlint/** for the plugin suite. The rewrites suite also
+      # enumerates the route directories of both apps, the dev-local suites read
+      # the mobile design-gate sources, the web env example, the auto-routing and
+      # meter dev-vars examples, the fake LLM used by the tunnel tests, the
+      # native build workflow, the web load-env module and three workspace
+      # packages. The extension suite pins the store build's sources allowlist in
+      # apps/extension/wxt.config.ts, and the store release workflow is the other
+      # caller of the notes script it tests, so a change to either starts the
+      # chain. None of this is web source outside those paths, so a web-only diff
+      # no longer starts the chain. Add an entry here when a suite starts reading
+      # a new path: a missing entry stops its suite silently on the change it
+      # protects.
       - name: Detect script-suite changes
         id: filter_test_scripts
         continue-on-error: true
@@ -425,6 +429,9 @@ jobs:
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
               - '.github/workflows/mobile-native-build.yml'
+              - '.github/workflows/extension-store-release.yml'
+              - '.github/workflows/kilo-mcp-release.yml'
+              - 'apps/extension/wxt.config.ts'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
               - 'packages/session-ingest-contracts/**'
@@ -454,6 +461,9 @@ jobs:
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
               - '.github/workflows/mobile-native-build.yml'
+              - '.github/workflows/extension-store-release.yml'
+              - '.github/workflows/kilo-mcp-release.yml'
+              - 'apps/extension/wxt.config.ts'
               - 'packages/db/**'
               - 'packages/worker-utils/**'
               - 'packages/session-ingest-contracts/**'
@@ -1135,6 +1145,12 @@ jobs:
       UPSTASH_REDIS_REST_URL: http://localhost:8079
       UPSTASH_REDIS_REST_TOKEN: example_token
       JEST_MAX_WORKERS: 2
+      # The dev-local tmux suite attaches a real client through script(1). A
+      # runner whose TERM is unset or dumb leaves tmux unable to drive that
+      # terminal ("terminal does not support clear"), the attach never
+      # completes, and the foreign-client test times out. Pin a real type so
+      # the suite does not depend on the runner image's terminal environment.
+      TERM: xterm-256color
 
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -1174,6 +1190,15 @@ jobs:
         # service, so it applies the migrations instead of relying on the meter
         # step above.
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-ingest test:postgres
+
+      - name: Run worker-utils membership Postgres tests
+        # The detector names a workspace in the dependency closure of
+        # `@kilocode/worker-utils`, so this step runs whenever the membership
+        # rule or one of its readers changes.
+        if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true' || needs.changes.outputs.data_meter == 'true'
+        # The suite reads the organizations and memberships tables directly, so
+        # it applies the migrations when it is the only step that runs.
+        run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter @kilocode/worker-utils test:postgres
 
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:
@@ -1262,16 +1287,16 @@ jobs:
           node-version-file: '.nvmrc'
 
       # The build runs one Next production build, and that build's type check
-      # reads the app's tsconfig include: the app sources and tests, the
-      # web-shared sources the config maps in, the ai-gateway sources a web test
-      # imports, and the sources of one billing service that two web tests import
-      # inside apps/web. That service imports @kilocode/organization-entitlement,
-      # so its dependents are selected rather than every other workspace: a
-      # project outside the install scope has no node_modules, and the type check
-      # then fails on an unresolvable import. Only those closures and the root
-      # project are installed, so the job stops linking the workspaces its build
-      # never reads. Widen the filter when a step here imports a workspace
-      # outside the closure.
+      # reads the app's tsconfig include: the app sources and tests, the two
+      # web-shared ambient declaration files the config lists, the ai-gateway
+      # sources a web test imports, and the sources of one billing service that
+      # two web tests import inside apps/web. That service imports
+      # @kilocode/organization-entitlement, so its dependents are selected
+      # rather than every other workspace: a project outside the install scope
+      # has no node_modules, and the type check then fails on an unresolvable
+      # import. Only those closures and the root project are installed, so the
+      # job stops linking the workspaces its build never reads. Widen the filter
+      # when a step here imports a workspace outside the closure.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter 'web...' --filter 'ai-gateway...' --filter '...@kilocode/organization-entitlement' --filter kilocode-monorepo
 
@@ -1356,8 +1381,8 @@ jobs:
           cp ../web/.env .env
           cp ../web/.env.test .env.production.local
 
-      - name: Check ai-gateway usage queue targets
-        run: pnpm --filter ai-gateway run test:usage-queue
+      - name: Check ai-gateway Vercel config
+        run: pnpm --filter ai-gateway run test:vercel-config
 
       - name: Build ai-gateway
         env:
@@ -1497,12 +1522,13 @@ jobs:
           build_dir=$(mktemp -d "$RUNNER_TEMP/wrapper-build.XXXXXX")
           trap 'rm -rf "$build_dir"' EXIT
 
-          # Match Dockerfile inputs without access to workspace node_modules.
+          # Keep application dependencies isolated; source-map injection needs the build-only CLI.
           tar -C services/cloud-agent-next --exclude=node_modules --exclude=dist \
-            -cf - wrapper src/shared | tar -C "$build_dir" -xf -
+            -cf - wrapper src/shared scripts/sentry-source-maps.ts | tar -C "$build_dir" -xf -
           cd "$build_dir/wrapper"
           bun install --production
           ln -sfn "$build_dir/wrapper/node_modules" "$build_dir/node_modules"
+          ln -s "$GITHUB_WORKSPACE/services/cloud-agent-next/node_modules/@sentry/cli" node_modules/@sentry/cli
           bun run build.ts --install-dir "$build_dir/bin"
 
       - name: Test cloud-agent-next checkers

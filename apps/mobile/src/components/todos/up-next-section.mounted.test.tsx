@@ -42,9 +42,9 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
   useAgentSessionNavigator: () => vi.fn(),
 }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/ui/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/todos/use-start-todo', () => ({
-  useStartTodo: () => ({ review: vi.fn(), startNow: vi.fn(), startingTodoId: null }),
+  useStartTodo: () => ({ review: vi.fn(), startNow: vi.fn(), isStarting: () => false }),
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/directional-icons', () => ({
@@ -71,7 +71,7 @@ const ACTION_LABEL: Record<string, true> = {
   'notifications.action.openSession': true,
   'agentChat.newSession.startSession': true,
 };
-const CIRCLE_CLASS = 'size-10 items-center justify-center rounded-full bg-secondary';
+const CIRCLE_CLASS = 'size-10 items-center justify-center rounded-full bg-background';
 
 /** The row's own pressable is labelled with the item title, so only these two match. */
 function trailingActions(root: ReactTestInstance): ReactTestInstance[] {

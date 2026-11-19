@@ -1,4 +1,4 @@
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { sql, eq, and, isNull, type SQL } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import * as z from 'zod';
@@ -18,6 +18,21 @@ function hashSignInCode(email: string, code: string): string {
 }
 
 /**
+ * The stored identity of a magic-link token: the SHA-256 hex digest of the
+ * plaintext that goes in the URL.
+ *
+ * Issuance and verification must derive the same digest or a freshly issued
+ * link stops verifying, so both call this. The digest is unkeyed because the
+ * plaintext is 32 random bytes — a database leak yields no shortcut back to a
+ * live link. The algorithm and encoding are a storage contract: rows written
+ * by earlier releases hold this digest, so changing either strands every
+ * issued link.
+ */
+function hashMagicLinkToken(plaintextToken: string): string {
+  return createHash('sha256').update(plaintextToken).digest('hex');
+}
+
+/**
  * The row identity of a redeemable sign-in code, shared by every path that
  * settles one: the address the code was delivered to, the hash of the code,
  * the sign-in-code purpose, an unconsumed row, and the challenge when the
@@ -26,6 +41,12 @@ function hashSignInCode(email: string, code: string): string {
  * A path that needs more — a live reservation, an unexpired row, attempt
  * budget — appends its own clauses through `clauses`, so the row identity
  * itself is never restated and cannot drift between paths.
+ *
+ * When a challenge is supplied, this identity is narrower than the row it
+ * belongs to: the address predicate stays, because a settlement must never
+ * move from the delivered address to another address that shares a challenge.
+ * `signInCodeRowWhere` is the hash-free row identity used by paths that
+ * resolve a row before hashing the code.
  */
 function signInCodeWhere({
   codeEmail,
@@ -48,6 +69,44 @@ function signInCodeWhere({
   );
 }
 
+/**
+ * The row identity of a sign-in code without its hash: the discriminator the
+ * caller resolved the row by — the challenge when it has one, otherwise the
+ * delivered address — plus the sign-in-code purpose and an unconsumed row.
+ *
+ * Paths that do not yet know the code hash resolve a row with this and append
+ * what they need through `clauses`.
+ */
+function signInCodeRowWhere({
+  codeEmail,
+  challengeId,
+  clauses = [],
+}: {
+  codeEmail: string;
+  challengeId?: string;
+  clauses?: SQL[];
+}) {
+  return and(
+    challengeId
+      ? eq(magic_link_tokens.challenge_id, challengeId)
+      : eq(magic_link_tokens.email, codeEmail),
+    eq(magic_link_tokens.purpose, 'sign_in_code'),
+    isNull(magic_link_tokens.consumed_at),
+    ...clauses
+  );
+}
+
+/**
+ * Serializes issuance and reservation for one delivered address. Both callers
+ * run inside a transaction, so PostgreSQL releases the advisory lock when it
+ * ends.
+ */
+async function lockSignInCodeEmail(tx: DrizzleTransaction, codeEmail: string): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sign-in-code:${codeEmail}`}, 0))`
+  );
+}
+
 export type MagicLinkToken = z.infer<typeof MagicLinkToken>;
 export const MagicLinkToken = z.object({
   token_hash: z.string(),
@@ -64,9 +123,6 @@ export const MagicLinkTokenWithPlaintext = MagicLinkToken.extend({
 });
 
 /**
- * Generate a new magic link token using Node's crypto module.
- * The token is generated in JS and the hash is stored in the database.
- *
  * @param email - The email address to associate with the token
  * @param expiresInMinutes - Number of minutes until the token expires (default: 30)
  * @returns The created token record with the plaintext token (for sending in email)
@@ -76,7 +132,7 @@ export async function createMagicLinkToken(
   expiresInMinutes: number = 30
 ): Promise<MagicLinkTokenWithPlaintext> {
   const plaintext_token = randomBytes(32).toString('hex');
-  const token_hash = createHash('sha256').update(plaintext_token).digest('hex');
+  const token_hash = hashMagicLinkToken(plaintext_token);
   const expires_at = new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString();
 
   const [inserted] = await db
@@ -106,7 +162,7 @@ export async function createMagicLinkToken(
 export async function verifyAndConsumeMagicLinkToken(
   plaintextToken: string
 ): Promise<MagicLinkToken | null> {
-  const token_hash = createHash('sha256').update(plaintextToken).digest('hex');
+  const token_hash = hashMagicLinkToken(plaintextToken);
 
   const result = await db
     .update(magic_link_tokens)
@@ -158,18 +214,8 @@ export async function createSignInCode(
   const expires_at = new Date(Date.now() + SIGN_IN_CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
   await db.transaction(async tx => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sign-in-code:${codeEmail}`}, 0))`
-    );
-    await tx
-      .delete(magic_link_tokens)
-      .where(
-        and(
-          eq(magic_link_tokens.email, codeEmail),
-          eq(magic_link_tokens.purpose, 'sign_in_code'),
-          isNull(magic_link_tokens.consumed_at)
-        )
-      );
+    await lockSignInCodeEmail(tx, codeEmail);
+    await tx.delete(magic_link_tokens).where(signInCodeRowWhere({ codeEmail }));
     await tx.insert(magic_link_tokens).values({
       token_hash,
       email: codeEmail,
@@ -207,30 +253,20 @@ export async function reserveSignInCode(
   const attemptsKey = challengeId ? 'attempts' : 'legacy_attempts';
   const attemptsColumn = magic_link_tokens[attemptsKey];
 
-  const lookupWhere = challengeId
-    ? and(
-        eq(magic_link_tokens.challenge_id, challengeId),
-        eq(magic_link_tokens.purpose, 'sign_in_code'),
-        isNull(magic_link_tokens.consumed_at),
-        sql`${magic_link_tokens.expires_at} > NOW()`
-      )
-    : and(
-        eq(magic_link_tokens.email, codeEmail),
-        eq(magic_link_tokens.purpose, 'sign_in_code'),
-        isNull(magic_link_tokens.consumed_at),
-        sql`${magic_link_tokens.expires_at} > NOW()`
-      );
-
   return db.transaction(async tx => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sign-in-code:${codeEmail}`}, 0))`
-    );
+    await lockSignInCodeEmail(tx, codeEmail);
 
     const [row] = await tx
       .select()
       .from(magic_link_tokens)
       .for('update')
-      .where(lookupWhere)
+      .where(
+        signInCodeRowWhere({
+          codeEmail,
+          challengeId,
+          clauses: [sql`${magic_link_tokens.expires_at} > NOW()`],
+        })
+      )
       .limit(1);
 
     if (!row) {
@@ -261,6 +297,7 @@ export async function reserveSignInCode(
           signInCodeWhere({
             codeEmail,
             tokenHash: token_hash,
+            challengeId,
             clauses: [
               sql`${magic_link_tokens.expires_at} > NOW()`,
               sql`${attemptsColumn} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`,
@@ -282,24 +319,10 @@ export async function reserveSignInCode(
 
     const attemptGuard = sql`${magic_link_tokens.attempts} + ${magic_link_tokens.legacy_attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`;
 
-    const incrementWhere = challengeId
-      ? and(
-          eq(magic_link_tokens.challenge_id, challengeId),
-          eq(magic_link_tokens.purpose, 'sign_in_code'),
-          isNull(magic_link_tokens.consumed_at),
-          attemptGuard
-        )
-      : and(
-          eq(magic_link_tokens.email, codeEmail),
-          eq(magic_link_tokens.purpose, 'sign_in_code'),
-          isNull(magic_link_tokens.consumed_at),
-          attemptGuard
-        );
-
     await tx
       .update(magic_link_tokens)
       .set({ [attemptsKey]: sql`${attemptsColumn} + 1` })
-      .where(incrementWhere);
+      .where(signInCodeRowWhere({ codeEmail, challengeId, clauses: [attemptGuard] }));
 
     // ponytail: remove legacy counter and no-challenge path when
     // native_signin_code_legacy_no_challenge_count drains to 0 for
@@ -313,37 +336,53 @@ export async function reserveSignInCode(
 }
 
 /**
- * Commit a reserved sign-in code by setting consumed_at.
+ * Marks a sign-in code consumed and clears its reservation, reporting the
+ * outcome from the returned row count.
+ *
+ * `requireLiveReservation` selects the contract of the caller: commit demands
+ * a reservation that has not lapsed, consume settles regardless, because the
+ * caller is already settled and this only prevents a second settlement.
+ */
+async function settleSignInCode({
+  email,
+  code,
+  challengeId,
+  requireLiveReservation,
+}: {
+  email: string;
+  code: string;
+  challengeId?: string;
+  requireLiveReservation: boolean;
+}): Promise<boolean> {
+  const codeEmail = getDeliveredEmailAddress(email);
+  const settled = await db
+    .update(magic_link_tokens)
+    .set({ consumed_at: sql`NOW()`, reserved_until: null })
+    .where(
+      signInCodeWhere({
+        codeEmail,
+        tokenHash: hashSignInCode(codeEmail, code),
+        challengeId,
+        clauses: requireLiveReservation ? [sql`${magic_link_tokens.reserved_until} > NOW()`] : [],
+      })
+    )
+    .returning();
+
+  return settled.length > 0;
+}
+
+/**
+ * Commit a reserved sign-in code.
  * Must be called only after a successful settlement.
- * The reservation must still be live (reserved_until > NOW()).
  *
  * When challengeId is supplied, the commit is scoped to the challenge.
- *
- * Returns true when the code was committed, false when the reservation
- * lapsed or the row was already consumed.
  */
 export async function commitSignInCode(
   email: string,
   code: string,
   challengeId?: string
 ): Promise<boolean> {
-  const codeEmail = getDeliveredEmailAddress(email);
-  const token_hash = hashSignInCode(codeEmail, code);
-
-  const committed = await db
-    .update(magic_link_tokens)
-    .set({ consumed_at: sql`NOW()`, reserved_until: null })
-    .where(
-      signInCodeWhere({
-        codeEmail,
-        tokenHash: token_hash,
-        challengeId,
-        clauses: [sql`${magic_link_tokens.reserved_until} > NOW()`],
-      })
-    )
-    .returning();
-
-  return committed.length > 0;
+  return settleSignInCode({ email, code, challengeId, requireLiveReservation: true });
 }
 
 /**
@@ -378,16 +417,7 @@ export async function consumeSignInCode(
   code: string,
   challengeId?: string
 ): Promise<boolean> {
-  const codeEmail = getDeliveredEmailAddress(email);
-  const token_hash = hashSignInCode(codeEmail, code);
-
-  const consumed = await db
-    .update(magic_link_tokens)
-    .set({ consumed_at: sql`NOW()`, reserved_until: null })
-    .where(signInCodeWhere({ codeEmail, tokenHash: token_hash, challengeId }))
-    .returning();
-
-  return consumed.length > 0;
+  return settleSignInCode({ email, code, challengeId, requireLiveReservation: false });
 }
 
 export async function deleteSignInCode(email: string, code: string): Promise<void> {

@@ -226,6 +226,64 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     expect(captured.reports[0]?.run).toMatchObject({ status: 'failed', container });
   });
 
+  it('logs a bounded reason when a preparing route becomes unknown', async () => {
+    const { stub, peer } = await setup();
+    const attemptId = peer.attemptId;
+    peer.prepareView = { state: 'preparing', attemptId };
+    await runInDurableObject(stub, async instance => {
+      const fields = vi.spyOn(logger, 'withFields');
+      try {
+        await instance.send(promptPayload('m1'));
+        await instance.onRoute({ state: 'unknown' });
+        expect(
+          fields.mock.calls
+            .map(([record]) => record)
+            .filter(
+              record =>
+                record.diagnosticEvent === 'session_startup_finished' &&
+                record.attemptId === attemptId
+            )
+        ).toEqual([
+          expect.objectContaining({ outcome: 'failed', reason: 'preparation_incomplete' }),
+        ]);
+      } finally {
+        fields.mockRestore();
+      }
+    });
+  });
+
+  it('logs one startup outcome for an immediate failure without a preparation row', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'byoc_credential_missing',
+    };
+    await runInDurableObject(stub, async instance => {
+      const fields = vi.spyOn(logger, 'withFields');
+      try {
+        await instance.send(promptPayload('m1'));
+        await instance.onRoute(peer.prepareView);
+        const startups = fields.mock.calls
+          .map(([record]) => record)
+          .filter(record => record.diagnosticEvent === 'session_startup_finished');
+        expect(startups).toEqual([
+          expect.objectContaining({
+            sessionId,
+            attemptId: peer.attemptId,
+            outcome: 'failed',
+            reason: 'byoc_credential_missing',
+            durationMs: expect.any(Number),
+          }),
+        ]);
+        expect(startups[0]).not.toHaveProperty('preparationMs');
+      } finally {
+        fields.mockRestore();
+      }
+    });
+    expect(await messageStatus(stub, 'm1')).toBe('failed');
+  });
+
   it('captures a new immediate preparation failure after a previously failed attempt', async () => {
     const { stub, peer } = await setup();
     const captured = await installCapturedQueues(stub);
@@ -787,9 +845,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
         await running('follow-up');
         await instance.onOutcome({ sessionId, status: 'completed', lastMessageId: 'follow-up' });
         await instance.alarm();
-        return withFields.mock.calls
-          .map(call => call[0] as Record<string, unknown>)
-          .filter(fields => fields.diagnosticEvent === 'session_message_committed');
+        return withFields.mock.calls.map(call => call[0] as Record<string, unknown>);
       } finally {
         withFields.mockRestore();
         info.mockRestore();
@@ -803,9 +859,27 @@ describe('SandboxSessionV2 reports and callbacks', () => {
         captured.reports.find(report => report.run.messageId === messageId)?.run
       ).toMatchObject({ status: 'completed', container: connected });
       expect(committed).toContainEqual(
-        expect.objectContaining({ messageId, toState: 'completed', runtimeHarness: 'kilo2' })
+        expect.objectContaining({
+          diagnosticEvent: 'session_message_committed',
+          messageId,
+          toState: 'completed',
+          runtimeHarness: 'kilo2',
+        })
       );
     }
+    expect(
+      committed.filter(fields => fields.diagnosticEvent === 'session_startup_finished')
+    ).toEqual([
+      expect.objectContaining({
+        sessionId,
+        attemptId: peer.attemptId,
+        allocationId: connected.allocationId,
+        provider: connected.provider,
+        outcome: 'ready',
+        durationMs: expect.any(Number),
+        preparationMs: expect.any(Number),
+      }),
+    ]);
   });
 
   it('emits the session_message_committed diagnostic for accepted and terminal transitions', async () => {

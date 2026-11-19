@@ -1,3 +1,4 @@
+import type { DirectByokProviderMetaId } from './direct-byok-meta';
 import type { DirectByokProvider } from './types';
 import alibabaTokenPlan from './alibaba-token-plan';
 import bedrockByok from './bedrock-byok';
@@ -6,7 +7,6 @@ import chutesByok from './chutes-byok';
 import edenai from './edenai';
 import inceptronByok from './inceptron-byok';
 import kimiCoding from './kimi-coding';
-import martian from './martian';
 import morph from './morph';
 import neuralwatt from './neurowatt';
 import nvidiaByok from './nvidia-byok';
@@ -19,7 +19,10 @@ import xiaomiTokenPlanAms from './xiaomi-token-plan-ams';
 import xiaomiTokenPlanSgp from './xiaomi-token-plan-sgp';
 import zaiCoding from './zai-coding';
 
-export default [
+/** Fails to compile with the offending type when `T` is not `never`. */
+export type AssertNever<T extends never> = T;
+
+const DIRECT_BYOK_PROVIDERS = [
   alibabaTokenPlan,
   bedrockByok,
   byteplusCoding,
@@ -27,7 +30,6 @@ export default [
   edenai,
   inceptronByok,
   kimiCoding,
-  martian,
   morph,
   neuralwatt,
   nvidiaByok,
@@ -40,3 +42,13 @@ export default [
   xiaomiTokenPlanSgp,
   zaiCoding,
 ] satisfies ReadonlyArray<DirectByokProvider>;
+
+/** A provider the shared metadata names without a definition; such a provider cannot be used. */
+type UndefinedDirectByokProviderId = Exclude<
+  DirectByokProviderMetaId,
+  (typeof DIRECT_BYOK_PROVIDERS)[number]['id']
+>;
+
+export type EveryDirectByokProviderHasDefinition = AssertNever<UndefinedDirectByokProviderId>;
+
+export default DIRECT_BYOK_PROVIDERS;

@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   formatSeatCount,
+  getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
   getScheduledSeatChange,
   type OrgSeatSubscription,
+  seatCountReadout,
 } from '@/components/organization/billing-model';
 
 /** 2026-01-01T00:00:00Z, the paid period's end in these cases. */
@@ -187,6 +189,20 @@ describe('formatSeatCount', () => {
   });
 });
 
+describe('seatCountReadout', () => {
+  it('writes the isolated fraction for an enforced organization with bought seats', () => {
+    expect(seatCountReadout({ seatsEnforced: true, used: 3, total: 4 })).toBe('\u20663 / 4\u2069');
+  });
+
+  it('holds a seat-enforcing organization with none bought at the used count', () => {
+    expect(seatCountReadout({ seatsEnforced: true, used: 3, total: 0 })).toBe('3');
+  });
+
+  it('holds an unenforced organization at the used count with a positive total', () => {
+    expect(seatCountReadout({ seatsEnforced: false, used: 3, total: 5 })).toBe('3');
+  });
+});
+
 describe('getAutoTopUpReadout', () => {
   it('writes the enabled state with both amounts', () => {
     expect(getAutoTopUpReadout({ enabled: true, amountCents: 5000, thresholdCents: 1000 })).toEqual(
@@ -198,5 +214,19 @@ describe('getAutoTopUpReadout', () => {
     expect(
       getAutoTopUpReadout({ enabled: false, amountCents: 5000, thresholdCents: 1000 }).status
     ).toBe('Disabled');
+  });
+});
+
+describe('getAutoTopUpLinkLabel', () => {
+  it('asks to manage it when it is on', () => {
+    expect(getAutoTopUpLinkLabel(true)).toBe('Manage auto top-up');
+  });
+
+  it('asks to set it up when it is off', () => {
+    expect(getAutoTopUpLinkLabel(false)).toBe('Set up auto top-up');
+  });
+
+  it('asks to set it up when the read has no state yet', () => {
+    expect(getAutoTopUpLinkLabel(undefined)).toBe('Set up auto top-up');
   });
 });

@@ -8,7 +8,9 @@ import { Text } from '@/components/ui/text';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
-import { formatDate, formatMoneyFromCents } from '@/lib/format';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getInvoiceDownloadErrorMessage,
@@ -97,7 +99,7 @@ function InvoiceRowContent({
             {title}
           </Text>
           <Text className="text-sm font-medium text-foreground">
-            {formatMoneyFromCents(invoice.amount_due, i18n.language)}
+            {isolateLtrBidiText(formatPrefixedMoney(invoice.amount_due / 100, i18n.language))}
           </Text>
         </View>
         <View className="flex-row items-center justify-between">
@@ -105,7 +107,7 @@ function InvoiceRowContent({
             {formatDate(new Date(invoice.created * 1000), i18n.language)}
           </Text>
           <View className={cn('rounded-full px-2 py-0.5', meta.pillClass)}>
-            <Text className={cn('text-[11px] font-medium', meta.textClass)}>{meta.label}</Text>
+            <Text className={cn('text-xs font-medium', meta.textClass)}>{meta.label}</Text>
           </View>
         </View>
       </View>
@@ -114,7 +116,10 @@ function InvoiceRowContent({
   );
 }
 
-export const InvoiceRow = memo(function InvoiceRow({ invoice }: Readonly<{ invoice: Invoice }>) {
+export const InvoiceRow = memo(function InvoiceRow({
+  invoice,
+  last = false,
+}: Readonly<{ invoice: Invoice; last?: boolean }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [sharing, setSharing] = useState(false);
@@ -123,9 +128,17 @@ export const InvoiceRow = memo(function InvoiceRow({ invoice }: Readonly<{ invoi
     sharing,
   });
 
+  // A flat list row: full-bleed, content from the page gutter, one hairline
+  // between rows and none after the last.
+  const rowClassName = cn(
+    ROW_TARGET_CLASS,
+    'flex-row items-center gap-3 px-4 py-3',
+    !last && 'border-b-[0.5px] border-hair-soft'
+  );
+
   if (rowState === 'no-affordance') {
     return (
-      <View className="rounded-lg bg-secondary p-3">
+      <View className={rowClassName}>
         <InvoiceRowContent invoice={invoice} />
       </View>
     );
@@ -163,7 +176,7 @@ export const InvoiceRow = memo(function InvoiceRow({ invoice }: Readonly<{ invoi
       accessibilityLabel={t('organization.invoices.downloadA11y', {
         number: firstNonEmpty(invoice.number, invoice.description, invoice.id),
       })}
-      className="rounded-lg bg-secondary p-3 active:opacity-80 disabled:opacity-60"
+      className={cn(rowClassName, 'active:opacity-70')}
     >
       <InvoiceRowContent
         invoice={invoice}

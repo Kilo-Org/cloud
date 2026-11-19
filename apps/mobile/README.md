@@ -48,7 +48,7 @@ originating run identity, and old teardown owns only that run's resources.
 Foreign-run events are dropped before controller delivery and iOS transcript
 deduplication. A genuine failed-start error and end remain valid without start.
 
-The versioned `expo-speech-recognition@57.1.1` patch, its workspace registration,
+The versioned `expo-speech-recognition@58.0.1` patch, its workspace registration,
 and its lockfile hash form one native compatibility change. Rebuild both native
 clients; reloading JavaScript onto an older recognizer binary is not supported.
 
@@ -242,9 +242,11 @@ Native compatibility requirements:
   deprecation lint rule; other deprecated APIs remain checked.
 - `expo-share-intent` 9.x targets SDK 58. Keep its Expo, linking and constants
   peers aligned with the app; rebuild the development clients after upgrading it.
-- `react-native-css` forwards React Native's native component registry through its
-  CommonJS facade for Router's native screen host, so the styling facade needs no
-  patch of its own.
+- `react-native-css` resolves every `react-native` import to a styling proxy. The
+  proxy already forwards React Native's native component registry for Router's native
+  screen host; the repository patch also forwards every export the proxy does not
+  name, so a package that reads one (expo-asset's `AssetRegistry`) gets it.
+  `node scripts/assert-react-native-resolution.mjs` in `pnpm test` guards it.
 - The `llama.rn` iOS patch installs JSI bindings through React Native's TurboModule
   runtime hook and conforms to the generated native spec.
 - The iOS App Actions bridge uses `@JS` for Expo's noncopyable JavaScript values.
@@ -305,7 +307,7 @@ their default resource classes. The production builder requires a paid EAS plan.
 - Home widgets keep a 16pt band on all four sides, including the updating placeholder.
 - Check the medium placeholder on a 164pt-tall card: its header, bars and footer must fit within 132pt or SwiftUI centres the overflow into the padding.
 - Arabic Live Activity direction comes from `homeWidgetLocale` in the shared app group, not the simulator language.
-- The Live Activity direction override is native code in `patches/expo-widgets@58.0.17.patch`. Rebuild the iOS extension after changing the patch; restarting Metro alone leaves the installed extension unchanged.
+- The Live Activity direction override is native code in `patches/expo-widgets@58.0.28.patch`. Rebuild the iOS extension after changing the patch; restarting Metro alone leaves the installed extension unchanged.
 - After switching the app language, reopen the development client on Metro before applying a fixture and capturing widgets.
 
 #### Responsive layout checks

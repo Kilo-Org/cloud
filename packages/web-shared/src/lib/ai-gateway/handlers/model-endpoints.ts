@@ -1,10 +1,16 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterAliasTarget } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
+import {
+  getProviderDisplayPricing,
+  getVercelModelForPricing,
+  getVercelPricingMetadata,
+  isVercelEndpointOfProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-endpoint-pricing';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
-import { applyCustomPricingToPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
-import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import type { Endpoint } from '@kilocode/db/schema-types';
 
 const CACHE_CONTROL = 'public, max-age=0, s-maxage=60, stale-while-revalidate=60';
 
@@ -21,9 +27,9 @@ export async function handleModelEndpointsRequest(
     );
   }
 
-  const [models, customPricingConfig] = await Promise.all([
+  const [models, vercel] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
-    getCustomPricingConfig(),
+    getVercelPricingMetadata(),
   ]);
   const storedModel = models[modelId];
 
@@ -34,24 +40,59 @@ export async function handleModelEndpointsRequest(
     );
   }
 
+  // A latest alias is served by its target, so it lists the target's endpoints and prices.
+  const aliasTargetId = getOpenRouterAliasTarget(models, modelId);
+  const servingModel = (aliasTargetId && models[aliasTargetId]) || storedModel;
+  const vercelModel = getVercelModelForPricing(vercel, servingModel.id);
+  const { reasoning: _reasoning, ...modelMetadata } = storedModel;
+  const openRouterEndpoints = servingModel.endpoints.map(endpoint => {
+    const pricing = getProviderDisplayPricing(
+      endpoint.tag,
+      endpoint.pricing,
+      vercelModel,
+      'shortContext'
+    );
+    return pricing ? { ...endpoint, pricing } : endpoint;
+  });
+  const vercelOnlyEndpoints = getVercelOnlyProviderEndpoints(
+    servingModel.endpoints,
+    vercelModel?.endpoints ?? []
+  );
+
   return NextResponse.json(
     {
       data: {
-        ...storedModel,
-        endpoints: storedModel.endpoints.map(endpoint => {
-          if (!endpoint.pricing) return endpoint;
-          const displayPricing = getModelDisplayPricing(endpoint.pricing);
-          return {
-            ...endpoint,
-            pricing: applyCustomPricingToPricing(
-              customPricingConfig,
-              storedModel.id,
-              displayPricing ?? endpoint.pricing
-            ),
-          };
-        }),
+        ...modelMetadata,
+        endpoints: [...openRouterEndpoints, ...vercelOnlyEndpoints],
       },
     },
     { headers: { 'Cache-Control': CACHE_CONTROL } }
   );
+}
+
+/**
+ * The Vercel endpoints of providers that serve the model through Vercel AI Gateway only, tagged
+ * with Vercel's provider id. Providers OpenRouter also lists are already priced from both gateways.
+ */
+function getVercelOnlyProviderEndpoints(
+  openRouterEndpoints: readonly Endpoint[],
+  vercelEndpoints: readonly Endpoint[]
+): Endpoint[] {
+  const openRouterProviders = openRouterEndpoints.flatMap(
+    endpoint => endpoint.tag ?? endpoint.provider_name ?? []
+  );
+  return vercelEndpoints.flatMap(endpoint => {
+    const provider = endpoint.provider_name ?? endpoint.tag;
+    if (
+      !provider ||
+      openRouterProviders.some(openRouterProvider =>
+        isVercelEndpointOfProvider(endpoint, openRouterProvider)
+      )
+    ) {
+      return [];
+    }
+    const { pricing: vercelPricing, ...rest } = endpoint;
+    const pricing = getModelDisplayPricing(vercelPricing);
+    return [{ ...rest, tag: provider, provider_name: provider, ...(pricing && { pricing }) }];
+  });
 }

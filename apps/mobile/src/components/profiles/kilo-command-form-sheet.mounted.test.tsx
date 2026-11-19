@@ -3,13 +3,20 @@ import { createElement, type ReactNode, type Ref } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { KiloCommandFormSheet } from '@/components/profiles/kilo-command-form-sheet';
-import { act, type ReactTestInstance } from '@/test/renderer';
+import {
+  KiloCommandFormSheet,
+  type KiloCommandSaveFailure,
+} from '@/components/profiles/kilo-command-form-sheet';
+import { type KiloCommandSource } from '@/components/profiles/profile-kilo-commands-model';
+import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
+import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
   onClose: vi.fn(),
   onCreate: vi.fn(),
+  onUpdate: vi.fn(),
   confirm: vi.fn(),
   scrollTo: vi.fn(),
 }));
@@ -26,6 +33,7 @@ vi.mock('react-native', async () => {
   return {
     Platform: { OS: 'ios' },
     useColorScheme: () => 'light',
+    Pressable: 'Pressable',
     View: 'View',
     Switch: 'Switch',
     ScrollView: forwardRef(function ScrollViewStub(
@@ -43,7 +51,19 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The subtask row is the shared `PreferenceRow`: its spinner reaches the icon
+// barrel (whose lucide modules this project cannot parse in the mounted
+// environment) and its flip calls the haptics wrapper, which reaches `expo`.
+vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
+});
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({
     confirm: (request: unknown) => {
@@ -128,8 +148,8 @@ function confirmRequest(index: number): ConfirmRequest | undefined {
 function mountSheet(
   options: {
     existingNames?: readonly string[];
-    nameConflictFromServer?: boolean;
-    saveFailure?: string | null;
+    saveFailure?: KiloCommandSaveFailure | null;
+    onFieldEdited?: () => void;
   } = {}
 ) {
   return renderWithProviders(
@@ -144,8 +164,8 @@ function mountSheet(
         h.onCreate(payload);
       },
       onUpdate: () => undefined,
-      nameConflictFromServer: options.nameConflictFromServer ?? false,
       saveFailure: options.saveFailure ?? null,
+      onFieldEdited: options.onFieldEdited ?? (() => undefined),
     })
   );
 }
@@ -303,8 +323,12 @@ describe('KiloCommandFormSheet duplicate name', () => {
     unmount();
   });
 
-  it('shows a conflict the server reported and drops it once the name changes', async () => {
-    const { renderer, unmount } = await mountSheet({ nameConflictFromServer: true });
+  it('shows a conflict the server reported and asks the caller to drop it on edit', async () => {
+    const onFieldEdited = vi.fn<() => void>();
+    const { renderer, unmount } = await mountSheet({
+      saveFailure: { kind: 'name-conflict' },
+      onFieldEdited,
+    });
 
     expect(findField(renderer.root, 'Command name').props.error).toBe(
       i18n.t('profiles.slashCommands.duplicateName')
@@ -315,15 +339,34 @@ describe('KiloCommandFormSheet duplicate name', () => {
         'another-name'
       );
     });
+    // The refusal is retired by the caller's store, not mirrored here.
+    expect(onFieldEdited).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps a template refusal ahead of a server name conflict', async () => {
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'name-conflict' } });
+
+    act(() => {
+      (findField(renderer.root, 'Command name').props.onChangeText as (v: string) => void)(
+        'ok-name'
+      );
+    });
+    callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
+
+    // The field's own refusal wins: the name conflict has nothing to say about
+    // an empty template.
+    expect(findField(renderer.root, 'Template').props.error).toBe(
+      i18n.t('profiles.slashCommands.templateRequired')
+    );
     expect(findField(renderer.root, 'Command name').props.error).toBeUndefined();
 
     unmount();
   });
 
   it('shows a save failure the caller cannot name inside the sheet', async () => {
-    const { renderer, unmount } = await mountSheet({
-      saveFailure: i18n.t('profiles.slashCommands.saveFailed'),
-    });
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'refused' } });
 
     expect(
       findAll(renderer.root, 'Text').some(
@@ -376,13 +419,136 @@ describe('KiloCommandFormSheet subtask row', () => {
     const label = i18n.t('profiles.slashCommands.subtask');
     const labels = findAll(renderer.root, 'Text').filter(node => node.props.children === label);
     expect(labels).toHaveLength(1);
-    expect(labels[0]?.props).toMatchObject({
-      accessible: false,
-      importantForAccessibility: 'no',
-    });
+    // The row's text column is the switch's label, not a second stop: the
+    // control that wraps it hides its descendants from the reader.
+    let labelColumnHidden = false;
+    for (let node = labels[0]?.parent; node; node = node.parent) {
+      if (node.props.importantForAccessibility === 'no-hide-descendants') {
+        labelColumnHidden = true;
+        break;
+      }
+    }
+    expect(labelColumnHidden).toBe(true);
 
     const toggles = findAll(renderer.root, 'Switch');
     expect(toggles.map(node => node.props.accessibilityLabel)).toEqual([label]);
+
+    unmount();
+  });
+});
+
+describe('KiloCommandFormSheet refetched command', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+  });
+
+  afterEach(() => {
+    // The draft is module-level: a later case must not reopen on it.
+    resetFormDraftsForTests();
+  });
+
+  it('submits the text the field shows when the profile refetches while the sheet is open', () => {
+    const command: KiloCommandSource = {
+      id: 'cmd-1',
+      name: 'release-notes',
+      description: 'Draft the release notes',
+      template: 'Summarize $ARGUMENTS',
+      agent: 'reviewer',
+      model: null,
+      subtask: false,
+      enabled: true,
+      sortOrder: 0,
+    };
+    /* One host whose `command` prop the case replaces, so the sheet stays
+       mounted the way a refetch leaves it. */
+    function SheetHost({ refetched }: Readonly<{ refetched: KiloCommandSource }>) {
+      return createElement(KiloCommandFormSheet, {
+        draftScope: 'profiles:slash-commands:profile-1',
+        command: refetched,
+        existingNames: [],
+        isSaving: false,
+        onClose: () => {
+          h.onClose();
+        },
+        onCreate: (payload: unknown) => {
+          h.onCreate(payload);
+        },
+        onUpdate: (payload: unknown) => {
+          h.onUpdate(payload);
+        },
+        onFieldEdited: () => undefined,
+      });
+    }
+    const mounted: { renderer?: TestRenderer.ReactTestRenderer } = {};
+    act(() => {
+      mounted.renderer = TestRenderer.create(createElement(SheetHost, { refetched: command }));
+    });
+    const renderer = mounted.renderer;
+    if (!renderer) {
+      throw new Error('the sheet did not mount');
+    }
+
+    // A refetch under the open sheet reports the command with no template. The
+    // field keeps the text it mounted with, so Save must send that text instead
+    // of refusing a visibly non-empty field.
+    act(() => {
+      renderer.update(createElement(SheetHost, { refetched: { ...command, template: '' } }));
+    });
+    callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
+
+    expect(findField(renderer.root, 'Template').props.error).toBeUndefined();
+    expect(h.onUpdate).toHaveBeenCalledWith({
+      name: 'release-notes',
+      description: 'Draft the release notes',
+      template: 'Summarize $ARGUMENTS',
+      agent: 'reviewer',
+      model: null,
+      subtask: false,
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('KiloCommandFormSheet cap refusal', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('states the command cap as a warning when a create is refused at the limit', async () => {
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'limit' } });
+
+    const message = i18n.t('profiles.slashCommands.limitReached', {
+      max: MAX_PROFILE_KILO_COMMANDS,
+    });
+    const status = findAll(renderer.root, 'Text').find(node => node.props.children === message);
+
+    expect(status).toBeTruthy();
+    expect(status?.props.className).toContain('text-warn');
+    expect(
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+      )
+    ).toBe(false);
+
+    unmount();
+  });
+
+  it('keeps the generic copy for a refusal that is not the cap', async () => {
+    const { renderer, unmount } = await mountSheet({ saveFailure: { kind: 'refused' } });
+
+    const status = findAll(renderer.root, 'Text').find(
+      node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+    );
+
+    expect(status).toBeTruthy();
+    expect(status?.props.className).toContain('text-destructive');
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS })
+    );
 
     unmount();
   });

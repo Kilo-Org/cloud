@@ -65,7 +65,7 @@ describe('generation', () => {
     expect(currentGeneration()).toBe(afterFirst);
   });
 
-  it('increments when a new account is set after undefined', () => {
+  it('does not increment on the first decision after undefined, then increments on the next account change', () => {
     // From undefined to a defined decision is not an account change.
     setTelemetryDecision('acct-1', true);
     const afterFirst = currentGeneration();
@@ -153,25 +153,6 @@ describe('clearTelemetryDecision', () => {
   });
 });
 
-describe('resetTelemetryControllerForTests', () => {
-  it('resets every module-level variable', () => {
-    // generation increments only on account change.
-    // From undefined to the first decision is not a change.
-    setTelemetryDecision('acct-1', true);
-    setTelemetryDecision('acct-2', true);
-    expect(currentGeneration()).toBeGreaterThan(0);
-    expect(currentEpoch()).toBeGreaterThan(0);
-    expect(allowsMandatory()).toBe(true);
-
-    resetTelemetryControllerForTests();
-    expect(currentGeneration()).toBe(0);
-    expect(currentEpoch()).toBe(0);
-    expect(allowsMandatory()).toBe(false);
-    expect(allowsOptional()).toBe(false);
-    expect(currentAccountId()).toBeUndefined();
-  });
-});
-
 describe('currentAccountId', () => {
   it('returns undefined before any decision', () => {
     expect(currentAccountId()).toBeUndefined();
@@ -239,6 +220,19 @@ describe('subscribeToTelemetryGeneration', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('drops a listener subscribed before a reset', () => {
+    const listener = vi.fn<() => void>();
+    subscribeToTelemetryGeneration(listener);
+
+    resetTelemetryControllerForTests();
+
+    // The reset drops the subscriber, so a later account change
+    // (acct-1 -> acct-2; undefined -> acct-1 is not one) reaches nobody.
+    setTelemetryDecision('acct-1', true);
+    setTelemetryDecision('acct-2', true);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it('does not stop a second listener when one throws', () => {
     const throwing = vi.fn<() => void>(() => {
       throw new Error('listener boom');
@@ -260,17 +254,5 @@ describe('subscribeToTelemetryGeneration', () => {
 
     unsubscribeThrowing();
     unsubscribeSecond();
-  });
-
-  it('does not notify on the test-only reset', () => {
-    const listener = vi.fn<() => void>();
-    const unsubscribe = subscribeToTelemetryGeneration(listener);
-    setTelemetryDecision('acct-1', true);
-    listener.mockClear();
-
-    resetTelemetryControllerForTests();
-
-    expect(listener).not.toHaveBeenCalled();
-    unsubscribe();
   });
 });

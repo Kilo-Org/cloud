@@ -19,11 +19,15 @@ import {
 } from '@/lib/security-agent';
 import {
   isSecuritySyncInProgress,
+  isSecurityTrialRefusal,
   mapSecuritySyncOperationError,
   securityConfigMutationMessage,
   securityRetainsOperationKey,
   securitySyncIntentFingerprint,
 } from '@/lib/security-agent-ledger';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
 
@@ -39,16 +43,44 @@ function useSecurityAgentConfigQueryKey(scope: string) {
 
 export function useSaveSecurityAgentConfig(
   scope: string,
-  { announceSaved = true }: Readonly<{ announceSaved?: boolean }> = {}
+  {
+    /**
+     * The success toast. A screen with a more specific saved outcome of its own
+     * (Automation's queued count) turns it off and announces in its place.
+     */
+    announceSaved = true,
+    /**
+     * The failure toast. On by default, where it is a save's only failure
+     * surface. `SettingsSaveButton` screens that render their refusal inline
+     * turn it off: the inline line announces the refusal there, and a toast
+     * would add a second copy of the same sentence. The rollback runs either way.
+     */
+    announceFailed = true,
+  }: Readonly<{ announceSaved?: boolean; announceFailed?: boolean }> = {}
 ) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
+  // The scope is the organization id in an organization scope, and the role
+  // read takes it as its override: a screen opened for one organization reads
+  // that organization's role, not whichever one the device has selected. The
+  // personal scope's literal matches no membership, so a personal surface keeps
+  // the copy it had — a personal scope has no organization plan to fix.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
 
   // onError policy: roll back the onMutate snapshot (latest generation only)
-  // and toast the localized config-write copy. The server's own sentence is
-  // English and stays untranslated on the device, so a marked refusal reads
-  // catalog copy and anything else reads the generic sentence.
+  // and toast the config-write refusal in the copy its reader gets. A marked
+  // refusal reads catalog copy and anything else reads the generic sentence,
+  // because the server's own sentence is English and cannot be translated on
+  // the device. The lapsed-trial refusal is the one that also offers a step,
+  // and only to a role that can take it.
+  //
+  // The toast owns the refusal for a caller that has no surface of its own
+  // (the default). A settings screen that renders the refusal inline passes
+  // `announceFailed: false`: its inline status line is the single announcement
+  // owner there, and a toast would announce the same sentence a second time and
+  // draw a second copy of it. The rollback runs either way.
   return useMutation({
     // Reachability is the save's outcome, not a precondition: the default
     // `networkMode: 'online'` pauses the mutation while the connectivity
@@ -94,7 +126,15 @@ export function useSaveSecurityAgentConfig(
           old ? { ...old, ...restoredFields } : old
         );
       }
-      announcingToast.error(securityConfigMutationMessage(error));
+      // The rollback above runs on every failure; the announcement follows the
+      // caller's contract (inline status line vs. toast).
+      if (announceFailed) {
+        announceTrialRefusal(
+          securityConfigMutationMessage(error, canManageBilling),
+          billingAction,
+          isTrialExpiredRefusal(error)
+        );
+      }
     },
     onSuccess: result => {
       // Saving pops the settings screen, and the screen it returns to can fail
@@ -143,11 +183,16 @@ export function useSetSecurityAgentEnabled(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
+  // Same scope-as-organization-id role read as the save above.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
 
   // onError policy: roll back the onMutate snapshot (latest generation only)
-  // and toast the localized config-write copy. The server's own sentence is
-  // English and stays untranslated on the device, so a marked refusal reads
-  // catalog copy and anything else reads the generic sentence.
+  // and toast the config-write refusal in the copy its reader gets. A marked
+  // refusal reads catalog copy and anything else reads the generic sentence,
+  // because the server's own sentence is English and cannot be translated on
+  // the device. The lapsed-trial refusal is the one that also offers a step,
+  // and only to a role that can take it.
   return useMutation({
     // Same reason as the config save above: pausing while the connectivity
     // manager reports offline keeps the switch in its optimistic position with
@@ -181,7 +226,11 @@ export function useSetSecurityAgentEnabled(scope: string) {
           old ? { ...old, isEnabled: previous.isEnabled } : old
         );
       }
-      announcingToast.error(securityConfigMutationMessage(error));
+      announceTrialRefusal(
+        securityConfigMutationMessage(error, canManageBilling),
+        billingAction,
+        isTrialExpiredRefusal(error)
+      );
     },
     onSuccess: result => {
       if ('initialSyncAdmissionFailed' in result && result.initialSyncAdmissionFailed) {
@@ -229,6 +278,10 @@ export function useTriggerSecuritySync(scope: string) {
   // P1-E-40c: Security sync is reconcile-first — persist the row so a crash
   // mid-flight surfaces a card on relaunch instead of auto-replaying.
   const { writeReconcileFirst, remove: removeOutboxRow, whenLoaded } = useMutationOutbox();
+  // Same scope-as-organization-id role read as the config write above: the
+  // mapped copy and the step its toast offers follow this reader.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
 
   return useMutation({
     // A manual sync is a tap with a visible pending state, not a background
@@ -280,7 +333,7 @@ export function useTriggerSecuritySync(scope: string) {
         // A retryable failure whose key survives is ambiguous: the server may
         // have accepted the command, so a relaunch must reconcile, not re-POST.
         // A settled intent keeps no row — its key can never be replayed.
-        throw mapSecuritySyncOperationError(error);
+        throw mapSecuritySyncOperationError(error, canManageBilling);
       }
     },
     onError: error => {
@@ -290,7 +343,9 @@ export function useTriggerSecuritySync(scope: string) {
       if (isSecuritySyncInProgress(error)) {
         return;
       }
-      announcingToast.error(error.message);
+      // The mapped error already carries this reader's copy; only the trial
+      // refusal adds the step, and only for a role that can take it.
+      announceTrialRefusal(error.message, billingAction, isSecurityTrialRefusal(error));
     },
     onSuccess: result => {
       if (result.commandId) {

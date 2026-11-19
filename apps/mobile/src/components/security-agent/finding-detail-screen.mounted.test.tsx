@@ -9,6 +9,9 @@ import { SecurityCommandRetryCard } from './security-command-retry-card';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
+import type * as ReactI18nextModule from 'react-i18next';
+
 import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -19,6 +22,7 @@ import { FindingRemediationPanel } from './finding-remediation-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type SecurityFinding } from '@/lib/security-agent';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { TRIAL_ENDED_BILLING_COPY_KEY, TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
 import { FindingDetailScreen } from './finding-detail-screen';
 
 const dismissDraft = vi.hoisted(() => ({
@@ -43,6 +47,10 @@ const analysis = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
+const useSecurityAnalysis = vi.hoisted(() =>
+  vi.fn((_scope: string, _findingId: string, _enabled?: boolean) => analysis)
+);
+
 const capability = vi.hoisted(() => ({ canManage: true }));
 
 const trackInteraction = vi.hoisted(() => ({ mutate: vi.fn() }));
@@ -53,6 +61,7 @@ const focusEffect = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   // The header reads the window to decide whether its actions share the title
@@ -60,6 +69,7 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   Ban: 'Ban',
   ShieldOff: 'ShieldOff',
   ChevronDown: 'ChevronDown',
@@ -73,7 +83,11 @@ vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronLeft: 'C
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', async importOriginal => ({
+  // The refusal module imports `@/i18n`, whose init registers this plugin.
+  ...(await importOriginal<typeof ReactI18nextModule>()),
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
 vi.mock('expo-router', () => ({
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: () => ({
@@ -87,19 +101,39 @@ vi.mock('expo-router', () => ({
   useFocusEffect: focusEffect,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#666',
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
 }));
+// The refusal hooks read the reader's role through the organization query
+// chain; this harness has no organization provider and the chain pulls the Expo
+// runtime it cannot load, so the boundary is stubbed and the real money-role
+// rule decides from the role a case sets.
+const trialRole = vi.hoisted(() => ({ role: undefined as string | undefined }));
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ role: trialRole.role }),
+  };
+});
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
-  useSecurityAnalysis: () => analysis,
+  useSecurityAnalysis: (scope: string, findingId: string, enabled?: boolean) =>
+    useSecurityAnalysis(scope, findingId, enabled),
 }));
+const dismissFailureCopy = vi.hoisted(() =>
+  vi.fn((draft: { lastError: string | null }) => draft.lastError ?? '')
+);
+
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
-  securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
+  securityDismissFailureCopy: dismissFailureCopy,
 }));
 vi.mock('./security-command-retry-card', () => ({ SecurityCommandRetryCard: 'RetryCard' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -164,6 +198,7 @@ function findingTabs(tree: R): TestRenderer.ReactTestInstance[] {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  trialRole.role = undefined;
   dismissDraft.draft = null;
   finding.isLoading = false;
   finding.isFetching = false;
@@ -258,6 +293,44 @@ describe('FindingDetailScreen pane containers', () => {
   });
 });
 
+describe('FindingDetailScreen analysis query activation', () => {
+  // The analysis query polls while a run is active, so it stays disabled until
+  // an analysis surface (analysis or remediation) is the selected tab: the
+  // details tab reads the finding, never its analysis.
+  function enabledArg(): unknown {
+    return useSecurityAnalysis.mock.lastCall?.[2];
+  }
+
+  function pressTab(tree: R, index: number) {
+    act(findingTabs(tree)[index]?.props.onPress as () => void);
+  }
+
+  it('reads the analysis only while an analysis surface is selected', () => {
+    const tree = renderScreen();
+    expect(enabledArg()).toBeFalsy();
+
+    pressTab(tree, 1);
+    expect(enabledArg()).toBe(true);
+
+    pressTab(tree, 2);
+    expect(enabledArg()).toBe(true);
+
+    pressTab(tree, 0);
+    expect(enabledArg()).toBeFalsy();
+  });
+
+  it('keeps the analysis query off while the finding is unavailable', () => {
+    finding.isError = true;
+    finding.error = { data: { code: 'NOT_FOUND' } };
+    finding.data = undefined;
+    const tree = renderScreen();
+
+    expect(tree.root.findAllByType(CenteredState)).toHaveLength(1);
+    expect(useSecurityAnalysis).toHaveBeenCalled();
+    expect(enabledArg()).toBeFalsy();
+  });
+});
+
 describe('FindingDetailScreen dismiss retry card states', () => {
   it.each([
     null,
@@ -280,6 +353,94 @@ describe('FindingDetailScreen dismiss retry card states', () => {
     };
     const card = renderScreen().root.findByType(SecurityCommandRetryCard);
     expect(card.props).toMatchObject({ lastError, retryable });
+  });
+
+  it('gives a billing role the plan step under a stored trial refusal', () => {
+    trialRole.role = 'owner';
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: 'The organization trial has ended.',
+      lastErrorKey: TRIAL_ENDED_BILLING_COPY_KEY,
+      retryable: false,
+    };
+    const card = renderScreen().root.findByType(SecurityCommandRetryCard);
+
+    expect(card.props.action).toMatchObject({ label: 'organization.hub.manageBilling' });
+    // The step ends the refusal; the Retry/Discard rules still come from the
+    // stored failure, and a terminal one keeps the card without a retry.
+    expect(card.props.retryable).toBe(false);
+  });
+
+  it('keeps a stored trial refusal on the member copy with no step', () => {
+    trialRole.role = 'member';
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: 'The organization trial has ended.',
+      lastErrorKey: TRIAL_ENDED_COPY_KEY,
+      retryable: false,
+    };
+    const card = renderScreen().root.findByType(SecurityCommandRetryCard);
+
+    expect(card.props.action).toBeUndefined();
+  });
+
+  // The stored key names which refusal the draft recorded, not which reader saw
+  // it: a draft written while the role read was unresolved gains the sentence
+  // and the step together when a billing role opens it, and a draft written by
+  // a billing role keeps the ask-an-owner copy, without a step, for a member.
+  it('gives a billing role the step under a refusal stored with the ask-an-owner key', () => {
+    trialRole.role = 'owner';
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: 'The organization trial has ended.',
+      lastErrorKey: TRIAL_ENDED_COPY_KEY,
+      retryable: false,
+    };
+    const card = renderScreen().root.findByType(SecurityCommandRetryCard);
+
+    expect(card.props.action).toMatchObject({ label: 'organization.hub.manageBilling' });
+    // The sentence is re-translated from the same role answer that built the
+    // step, never from the reader the draft was written for.
+    expect(dismissFailureCopy).toHaveBeenCalledWith(
+      expect.objectContaining({ lastErrorKey: TRIAL_ENDED_COPY_KEY }),
+      true
+    );
+  });
+
+  it('keeps a member on the ask-an-owner copy with no step for a billing-keyed draft', () => {
+    trialRole.role = 'member';
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: 'The organization trial has ended.',
+      lastErrorKey: TRIAL_ENDED_BILLING_COPY_KEY,
+      retryable: false,
+    };
+    const card = renderScreen().root.findByType(SecurityCommandRetryCard);
+
+    expect(card.props.action).toBeUndefined();
+    expect(dismissFailureCopy).toHaveBeenCalledWith(
+      expect.objectContaining({ lastErrorKey: TRIAL_ENDED_BILLING_COPY_KEY }),
+      false
+    );
+  });
+
+  it('adds no step to a stored failure that is not the trial refusal', () => {
+    trialRole.role = 'owner';
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: 'boom',
+      lastErrorKey: 'securityAgent.mutations.actionBlocked',
+      retryable: true,
+    };
+    const card = renderScreen().root.findByType(SecurityCommandRetryCard);
+
+    expect(card.props.action).toBeUndefined();
+    expect(card.props.retryable).toBe(true);
   });
 
   it('drops the card on discard by clearing the draft', () => {
@@ -319,10 +480,12 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
 
   it('keeps Back available during loading without offering Retry', () => {
     finding.isLoading = true;
+    finding.isFetching = true;
     finding.data = undefined;
     const tree = renderScreen();
 
-    expect(tree.root.findAllByType(Skeleton)).toHaveLength(4);
+    // Four body skeletons plus the bar on the header's reserved eyebrow line.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
     expectSafeBack(tree);
@@ -335,6 +498,9 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     const tree = renderScreen();
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
+    // The header keeps the eyebrow line it reserved while loading, and no bar
+    // paints over it once the read has failed: this state leaves no skeleton.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
     expectSafeBack(tree);
   });
 
@@ -354,7 +520,9 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
     expect(tree.root.findByType(QueryError).props.isRetrying).toBe(true);
-    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+    // The body stays on the error surface; only the header's reserved eyebrow
+    // bar remains, so the retry window paints no body skeleton.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(1);
 
     finding.isFetching = false;
     finding.data = { status: 'open', repo_full_name: 'org/recovered' };
@@ -377,7 +545,8 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     renderScreen('finding-2');
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
-    expect(tree.root.findAllByType(Skeleton)).toHaveLength(4);
+    // Four body skeletons plus the bar on the header's reserved eyebrow line.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
   });
 
   it('recovers the finding through Retry after a transient load failure', () => {
@@ -417,6 +586,10 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     ).toHaveLength(1);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    // The first frame of every open is the loading one, so the not-found answer
+    // keeps the line it reserved then instead of pulling the title up — held
+    // blank, because no read is running to fill it.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
     expectSafeBack(tree);
   });
 });

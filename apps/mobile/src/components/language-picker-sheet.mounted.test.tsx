@@ -8,6 +8,7 @@ import { i18n } from '@/i18n';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import type * as ApplyLanguageModule from '@/i18n/apply-language';
 import { LanguagePickerSheet } from '@/components/language-picker-sheet';
+import { LanguageSearchField } from '@/components/language-search-field';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -109,8 +110,16 @@ vi.mock('@/i18n/apply-language', async importOriginal => {
 });
 // The apply path records the direction relaunch; the record itself is covered
 // by the apply-language suite, and its real store pulls in the native keychain.
-vi.mock('@/i18n/direction-attempt', () => ({ writeDirectionAttemptAsync }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/i18n/direction-attempt', () => ({
+  writeDirectionAttemptAsync,
+  // No running app path has an attempt record here: the sheet's apply always
+  // relaunches once for the language it names.
+  readDirectionAttemptAsync: vi.fn(() => Promise.resolve(null)),
+}));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/picker-sheet', () => ({
   // Mirrors the shell: `headerContent` is pinned chrome unless the caller put
   // it in its own body (`headerInBody`), and the prop is exposed for assertions.
@@ -275,12 +284,24 @@ describe('LanguagePickerSheet apply', () => {
     // the typed query.
     expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
-    expect(emptyState?.props.placement).toBeUndefined();
+    // The list's content box owns where the state sits: it fills the sheet body
+    // and centres the state in it, and the state itself opens no scroller of
+    // its own that would collapse to its own height.
+    expect(emptyState?.props.placement).toBe('static');
+    const emptyContentStyle: unknown =
+      renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(emptyContentStyle).toMatchObject({ flexGrow: 1, justifyContent: 'center' });
 
     act(() => {
       (input.props.onChangeText as (value: string) => void)('');
     });
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+    // Rows keep the box at its own height, so the first row starts where the
+    // list starts instead of being pushed down a filled body.
+    const listContentStyle: unknown =
+      renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    // Rows own the page gutter themselves, so the list adds no horizontal pad.
+    expect(listContentStyle).toEqual({ paddingBottom: 16 });
 
     renderer.unmount();
   });
@@ -306,13 +327,14 @@ describe('LanguagePickerSheet apply', () => {
 
     const sheet = findByType(renderer.root, 'PickerSheet')[0];
     expect(sheet?.props.headerInBody).toBe(true);
-    const listHeader = renderer.root.findByType(flashListMock).props
-      .ListHeaderComponent as TestRenderer.ReactTestInstance | null;
-    expect(String(listHeader?.props.className)).toContain('rounded-full');
-    // The list's content padding replaces the pinned side margin, so the field
-    // keeps its width and lines up with the rows it now scrolls with.
-    expect(String(listHeader?.props.className)).not.toContain('mx-4');
-    expect(String(listHeader?.props.className)).toContain('mx-0');
+    // The extracted `LanguageSearchField` owns the pill chrome: its own
+    // instance carries no className, so step into its rendered `View`.
+    const field = renderer.root.findByType(LanguageSearchField);
+    const pill = field.findByType('View');
+    expect(String(pill.props.className)).toContain('rounded-full');
+    // The field keeps the page gutter as the list header too, so the rows it
+    // scrolls with and the field itself share one inset.
+    expect(String(pill.props.className)).toContain('mx-4');
     // One field on screen: the list header, not a second copy in the chrome.
     expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
 
@@ -372,6 +394,11 @@ describe('LanguagePickerSheet apply', () => {
     expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+    // The field is the list's own header here, so the content box must stay
+    // top-aligned: centring the empty state would push the field off the top.
+    const compactContentStyle: unknown =
+      renderer.root.findByType(flashListMock).props.contentContainerStyle;
+    expect(compactContentStyle).toEqual({ paddingBottom: 16 });
 
     act(() => {
       (input.props.onChangeText as (value: string) => void)('');

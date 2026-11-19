@@ -13,7 +13,11 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { logger } from './logger.js';
-import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
+import {
+  InsufficientCreditsError,
+  startSecurityAnalysis,
+  type StartSecurityAnalysisResult,
+} from './launch.js';
 import {
   AutoAnalysisOwnerMessageSchema,
   AUTO_ANALYSIS_MAX_ATTEMPTS,
@@ -115,15 +119,27 @@ function classifyLaunchFailureMessage(
   return { code: 'START_CALL_AMBIGUOUS', class: 'retryable' };
 }
 
-function classifyLaunchStartResult(startResult: {
-  started: boolean;
-  error?: string;
-}): LaunchFailureClassification {
+const NON_RETRYABLE_DECLARED_FAILURES: readonly AutoAnalysisFailureCode[] = [
+  'PERMISSION_DENIED_PERMANENT',
+  'INVALID_CONFIG',
+  'UNSUPPORTED_SEVERITY',
+];
+
+function classifyLaunchStartResult(
+  startResult: StartSecurityAnalysisResult
+): LaunchFailureClassification {
   if (startResult.error === 'Analysis already in progress') {
     return { code: 'SKIPPED_ALREADY_IN_PROGRESS', class: 'non_retryable' };
   }
   if (startResult.error?.includes("analysis requires 'open' status")) {
     return { code: 'SKIPPED_NO_LONGER_ELIGIBLE', class: 'non_retryable' };
+  }
+  const declared = startResult.failureCode;
+  if (declared !== undefined) {
+    return {
+      code: declared,
+      class: NON_RETRYABLE_DECLARED_FAILURES.includes(declared) ? 'non_retryable' : 'retryable',
+    };
   }
 
   return classifyLaunchFailureMessage(startResult.error);

@@ -9,14 +9,21 @@ import {
   ProfileNameField,
 } from '@/components/profiles/profile-bound-field';
 import { SheetHeader } from '@/components/sheet-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Card } from '@/components/ui/card';
 import { Lock } from '@/components/ui/icons';
-import { Switch } from '@/components/ui/switch';
+import { RowGroup } from '@/components/ui/row-group';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
+import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { draftProfileCountItems, formatProfileCountItems } from '@/lib/profile-count-labels';
+import { cn } from '@/lib/utils';
 
 /** One manual environment variable as the sheet saves it. */
 type SaveProfileVar = Readonly<{ key: string; value: string; isSecret: boolean }>;
@@ -39,6 +46,14 @@ export type SaveProfileSheetProps = Readonly<{
   onSave: (submission: SaveProfileSubmission) => Promise<boolean>;
 }>;
 
+/** The save's own refusal; the sheet's one line is the copy, so no message travels. */
+type SaveProfileFailure = { readonly kind: 'save-failed' };
+
+/** The sheet's one line for this failure; it has a single refusal arm. */
+function saveFailureMessage(t: (key: string) => string): string {
+  return t('profiles.saveFailed');
+}
+
 /**
  * The `Save as Profile` sheet. Mounted only while open, so every open seeds
  * fresh fields. Fields are uncontrolled (refs) per the app's iOS text-input
@@ -59,7 +74,9 @@ export function SaveProfileSheet({
   const descriptionRef = useRef('');
   const [setAsDefault, setSetAsDefault] = useState(false);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const save = useSurfaceFeedback<SaveProfileFailure>();
+  const feedback = save.feedback;
+  const isSaving = feedback.status === 'pending';
 
   const hasSecrets = envVars.some(envVar => envVar.isSecret);
   // Both numbers are counted messages, so the line agrees with each one instead
@@ -74,6 +91,7 @@ export function SaveProfileSheet({
       nameField.valueRef.current.trim().length > 0 ||
       descriptionRef.current.trim().length > 0 ||
       setAsDefault,
+    isRunning: () => isSaving,
     onDiscard: onClose,
   });
 
@@ -90,14 +108,24 @@ export function SaveProfileSheet({
     }
     setDescriptionError(null);
 
-    setIsSubmitting(true);
+    const attempt = save.begin();
+    if (attempt === null) {
+      return;
+    }
     try {
       const saved = await onSave({ name, description, setAsDefault });
+      // The sheet closing is its own new state, so a success publishes no phase.
+      // It is still fenced: a token from a closed sheet is dead, and the panel's
+      // instance id stops this closure from closing its successor.
       if (saved) {
-        onClose();
+        if (attempt.abandon()) {
+          onClose();
+        }
+        return;
       }
-    } finally {
-      setIsSubmitting(false);
+      attempt.fail({ kind: 'save-failed' });
+    } catch {
+      attempt.fail({ kind: 'save-failed' });
     }
   };
 
@@ -110,28 +138,46 @@ export function SaveProfileSheet({
         }}
         onCancel={requestClose}
         doneLabel={t('common.save')}
-        doneDisabled={isSubmitting}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         <Text variant="muted">{t('agentChat.newSession.saveProfileDescription')}</Text>
+        {/* The refusal overlays the copy this slot already lays out, so a
+            rejected save never inserts space and the fields cannot move. */}
+        <View testID="save-profile-status">
+          <View
+            className="opacity-0"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            testID="save-profile-status-reserve"
+          >
+            <Text className="text-sm">{saveFailureMessage(t)}</Text>
+          </View>
+          {save.failure !== null ? (
+            <View className="absolute inset-0 justify-center" testID="save-profile-status-live">
+              <AccessibleStatus className="text-sm" message={saveFailureMessage(t)} />
+            </View>
+          ) : null}
+        </View>
         <ProfileNameField
           defaultValue=""
           error={nameField.error}
-          disabled={isSubmitting}
+          disabled={isSaving}
           autoCorrect={false}
           onChangeText={nameField.handleChangeText}
         />
         <ProfileDescriptionField
           defaultValue=""
           error={descriptionError ?? undefined}
-          disabled={isSubmitting}
+          disabled={isSaving}
           autoCorrect={false}
           onChangeText={value => {
             descriptionRef.current = value;
@@ -141,32 +187,33 @@ export function SaveProfileSheet({
           }}
         />
 
-        <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-          <Text className="flex-1 text-sm font-medium text-foreground">
-            {t('profiles.setAsDefault')}
-          </Text>
-          <Switch
-            value={setAsDefault}
-            accessibilityLabel={t('profiles.setAsDefault')}
-            disabled={isSubmitting}
-            onValueChange={setSetAsDefault}
-          />
-        </View>
+        <RowGroup>
+          <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
+            <Text className="flex-1 text-sm font-medium text-foreground">
+              {t('profiles.setAsDefault')}
+            </Text>
+            {renderRowTrailing({
+              kind: 'switch',
+              value: setAsDefault,
+              accessibilityLabel: t('profiles.setAsDefault'),
+              disabled: isSaving,
+              onValueChange: setSetAsDefault,
+            })}
+          </View>
+        </RowGroup>
 
         {summary.length > 0 || hasSecrets ? (
-          <View className="gap-1 rounded-lg bg-muted p-3">
+          <Card>
             {summary.length > 0 ? (
               <Text className="text-sm font-medium text-foreground">{summary}</Text>
             ) : null}
             {hasSecrets ? (
-              <View className="mt-1 flex-row items-center gap-1.5">
+              <View className="flex-row items-center gap-1.5">
                 <Lock size={12} color={colors.mutedForeground} />
-                <Text className="text-xs text-muted-foreground">
-                  {t('agentChat.newSession.secretsEncrypted')}
-                </Text>
+                <Text variant="caption">{t('agentChat.newSession.secretsEncrypted')}</Text>
               </View>
             ) : null}
-          </View>
+          </Card>
         ) : null}
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />

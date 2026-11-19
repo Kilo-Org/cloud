@@ -238,16 +238,58 @@ describe('getProvider local fake deterministic routing', () => {
   });
 
   test('routes transcription requests to FAKE_LLM_URL only when enabled', async () => {
-    expect(await getTranscriptionProvider()).toEqual({ provider: OPENROUTER, userByok: null });
+    storeKeys();
+    const input = { requestedModel: 'fake-transcribe', user, organizationId: undefined };
+    expect(await getTranscriptionProvider(input)).toEqual({ provider: OPENROUTER, userByok: null });
 
     const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811' });
-    const { provider, userByok } = await getTranscriptionProvider();
+    const { provider, userByok } = await getTranscriptionProvider(input);
     expect(provider).toMatchObject({
       type: 'openrouter',
       apiUrl: 'http://localhost:8811/api/openrouter',
       apiKey: 'local-fake-llm',
     });
     expect(userByok).toBeNull();
+    env.restore();
+  });
+
+  test('routes transcription requests to the owner OpenRouter key, otherwise to OpenRouter', async () => {
+    const input = { requestedModel: 'openai/whisper-1', user, organizationId: undefined };
+    const openRouterKey: BYOKResult = {
+      decryptedAPIKey: 'user-openrouter-key',
+      providerId: 'openrouter',
+    };
+
+    storeKeys();
+    expect(await getTranscriptionProvider(input)).toEqual({ provider: OPENROUTER, userByok: null });
+
+    storeKeys({ ...openRouterKey, isEnabled: false });
+    expect(await getTranscriptionProvider(input)).toEqual({ provider: OPENROUTER, userByok: null });
+
+    const decrypt = storeKeys(openRouterKey);
+    const result = await getTranscriptionProvider({ ...input, organizationId: ORG_ID });
+    expect(result.provider).toMatchObject({ type: 'openrouter', apiKey: 'user-openrouter-key' });
+    expect(result.userByok).toEqual([openRouterKey]);
+    expect(decrypt.mock.calls).toEqual([['openrouter']]);
+    expect(getStoredByokKeys).toHaveBeenLastCalledWith(expect.anything(), {
+      type: 'organization',
+      id: ORG_ID,
+    });
+  });
+
+  test('the local fake transcription provider wins over the owner OpenRouter key', async () => {
+    const decrypt = storeKeys({ decryptedAPIKey: 'user-openrouter-key', providerId: 'openrouter' });
+    const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811' });
+
+    const { provider, userByok } = await getTranscriptionProvider({
+      requestedModel: 'fake-transcribe',
+      user,
+      organizationId: undefined,
+    });
+
+    expect(provider).toMatchObject({ apiKey: 'local-fake-llm' });
+    expect(userByok).toBeNull();
+    expect(decrypt).not.toHaveBeenCalled();
     env.restore();
   });
 
@@ -319,23 +361,6 @@ describe('getProvider auto small free model routing', () => {
     expect((await firstRoute(result)).provider).toBe(OPENROUTER);
     expect(shouldRouteToVercel).toHaveBeenCalledWith(
       expect.objectContaining({ requestedModel: 'openai/gpt-5-nano', boundedSpending: true }),
-      expect.any(Function)
-    );
-  });
-
-  test('forwards the organization Vercel AI Gateway setting to the Vercel routing decision', async () => {
-    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
-
-    const result = await getProvider(
-      getProviderInput({
-        ...providerInput('openai/gpt-5-nano'),
-        organizationDisabledVercelAiGateway: true,
-      })
-    );
-
-    expect((await firstRoute(result)).provider).toBe(OPENROUTER);
-    expect(shouldRouteToVercel).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationDisabledVercelAiGateway: true }),
       expect.any(Function)
     );
   });
@@ -816,6 +841,7 @@ describe('getProvider direct BYOK routing', () => {
         models: async () => [],
         supportedChatApis: ['chat_completions'],
         resolveUpstream,
+        chatCompletionsHeaders: () => ({}),
       },
       model: {
         id: 'zai.glm-5',
@@ -993,6 +1019,7 @@ describe('getProvider direct BYOK routing', () => {
     expect(await firstRoute(result)).toMatchObject({
       provider: { type: 'direct-byok', apiKey: 'zai-key' },
       bypassAccessCheck: false,
+      directByokPolicyProviderId: 'z-ai',
     });
   });
 

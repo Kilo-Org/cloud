@@ -1,5 +1,4 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
-import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -8,29 +7,26 @@ import { useTranslation } from 'react-i18next';
 import { getLanguageSnapshot } from '@/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { useTRPC } from '@/lib/trpc';
 import { SheetHeader } from '@/components/sheet-header';
+import { Card } from '@/components/ui/card';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-import { useMessageDetailsCopyFeedback } from './message-details-copy';
+import { DetailsCopyAction } from './message-details-copy-action';
 import { getMessageDetailsContent } from './message-details-content';
 import { type MessageDeliveryStatement } from './message-failure-state';
 import { MessageTextSelectSheet } from './message-text-select-sheet';
 import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
-import {
-  buildReportAiResponseErrorToast,
-  buildReportAiResponseInput,
-  classifyReportAiResponseFailure,
-  reportAiResponseSubmittedToast,
-  shouldShowReportAiResponse,
-} from './report-ai-response';
+import { useMessageReport } from './use-message-report';
 
 type MessageDetailsSheetProps = {
   visible: boolean;
@@ -66,11 +62,17 @@ export function MessageDetailsSheet({
 }: Readonly<MessageDetailsSheetProps>) {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const trpc = useTRPC();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const [reportedMessageId, setReportedMessageId] = useState<string | null>(null);
+  const { showReport, handleReport } = useMessageReport(message, confirm);
   const [selectVisible, setSelectVisible] = useState(false);
+  // The session hides the sheet without unmounting it, so a reopen must start
+  // from Details rather than the Select text view left open last time.
+  useEffect(() => {
+    if (!visible) {
+      setSelectVisible(false);
+    }
+  }, [visible]);
   const content = useMemo(
     () => (message ? getMessageDetailsContent(message, modelOptions, deliveryState) : null),
     // `getLanguageSnapshot()` re-resolves the captured copy (role labels,
@@ -79,60 +81,6 @@ export function MessageDetailsSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- language drives the resolved copy inside getMessageDetailsContent
     [message, modelOptions, deliveryState, getLanguageSnapshot()]
   );
-  const copyFeedback = useMessageDetailsCopyFeedback(visible, message?.info.id ?? null);
-
-  const reportMutation = useMutation(
-    trpc.moderation.reportContent.mutationOptions({
-      onSuccess: (result, input) => {
-        setReportedMessageId(input.targetId);
-        announcingToast.success(reportAiResponseSubmittedToast(result.receiptId));
-      },
-      onError: (error, input) => {
-        const failure = classifyReportAiResponseFailure(error);
-        const errorToast = buildReportAiResponseErrorToast(failure, () => {
-          reportMutation.mutate(input);
-        });
-        announcingToast.error(
-          errorToast.message,
-          errorToast.action ? { action: errorToast.action } : undefined
-        );
-      },
-    })
-  );
-
-  const showReport =
-    message !== null &&
-    shouldShowReportAiResponse(message) &&
-    message.info.id !== reportedMessageId;
-
-  useEffect(() => {
-    if (!visible) {
-      setSelectVisible(false);
-    }
-  }, [visible]);
-
-  const handleCopy = () => {
-    copyFeedback.handleCopy(content?.copyText);
-  };
-
-  const handleReport = () => {
-    if (!message) {
-      return;
-    }
-    const input = buildReportAiResponseInput(message);
-    if (!input) {
-      return;
-    }
-    confirm({
-      title: t('agentChat.messageDetails.reportAiResponse'),
-      message: t('agentChat.messageDetails.reportAiResponseConfirm'),
-      confirmLabel: t('agentChat.messageDetails.report'),
-      onConfirm: () => {
-        reportMutation.mutate(input);
-      },
-    });
-  };
-
   return (
     <SessionPageSheet
       dismissible
@@ -149,14 +97,14 @@ export function MessageDetailsSheet({
         key={cancelQueuedFeedback?.attempt}
         message={visible ? (cancelQueuedFeedback?.message ?? null) : null}
         tone="error"
-        className="px-6 pt-4 text-sm"
+        className="px-4 pt-4 text-sm"
       />
       {/* Keep recovery guidance readable without replaying the outcome announcement. */}
       {visible &&
       message &&
       cancelQueuedGuidance &&
       cancelQueuedFeedback?.message !== cancelQueuedGuidance ? (
-        <Text className="px-6 pt-4 text-sm text-destructive">{cancelQueuedGuidance}</Text>
+        <Text className="px-4 pt-4 text-sm text-destructive">{cancelQueuedGuidance}</Text>
       ) : null}
       {selectVisible ? (
         <MessageTextSelectSheet
@@ -175,7 +123,10 @@ export function MessageDetailsSheet({
           />
 
           {content ? (
-            <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+            <ScrollView
+              className="flex-1"
+              contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
+            >
               {/* The two actions are independent: Copy is scoped to the message
                   text, while Select text also offers the thinking block and tool
                   output, so a message with only those parts still renders the
@@ -184,17 +135,12 @@ export function MessageDetailsSheet({
               {content.copyText || content.canSelectText ? (
                 <View className="mb-6 gap-2">
                   {content.copyText ? (
-                    <Pressable
-                      onPress={handleCopy}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('agentChat.messageDetails.copyMessage')}
-                      className="rounded-md border border-border px-4 py-3 active:opacity-70"
-                      testID="message-details-copy"
-                    >
-                      <Text className="text-center text-base font-medium text-foreground">
-                        {t('agentChat.messageDetails.copyMessage')}
-                      </Text>
-                    </Pressable>
+                    <DetailsCopyAction
+                      // A new message and a hide/show each get a fresh feedback
+                      // owner, which is what the deleted reset effect did.
+                      key={`${message?.info.id ?? 'none'}:${visible ? 'shown' : 'hidden'}`}
+                      copyText={content.copyText}
+                    />
                   ) : null}
 
                   {content.canSelectText ? (
@@ -211,18 +157,6 @@ export function MessageDetailsSheet({
                         {t('agentChat.messageDetails.selectText')}
                       </Text>
                     </Pressable>
-                  ) : null}
-
-                  {copyFeedback.status ? (
-                    <Text
-                      className={cn(
-                        'text-center text-sm',
-                        copyFeedback.state === 'failed' ? 'text-destructive' : 'text-foreground'
-                      )}
-                      testID="message-details-copy-feedback"
-                    >
-                      {copyFeedback.status}
-                    </Text>
                   ) : null}
                 </View>
               ) : null}
@@ -282,43 +216,40 @@ export function MessageDetailsSheet({
               ) : null}
 
               <View className="gap-4">
-                <Row label={t('common.role')}>
-                  <Text className="text-base font-medium text-foreground">{content.roleLabel}</Text>
-                </Row>
-
-                {content.sentTimeLabel ? (
-                  <Row label={t('agentChat.messageDetails.sent')}>
-                    <Text className="text-base font-medium text-foreground tabular-nums">
-                      {content.sentTimeLabel}
-                    </Text>
-                  </Row>
-                ) : null}
-
-                {content.modelLabel ? (
-                  <Row label={t('common.model')}>
+                <Card>
+                  <Row label={t('common.role')}>
                     <Text className="text-base font-medium text-foreground">
-                      {content.modelLabel}
+                      {content.roleLabel}
                     </Text>
                   </Row>
-                ) : null}
+
+                  {content.sentTimeLabel ? (
+                    <Row label={t('agentChat.messageDetails.sent')}>
+                      <Text className="text-base font-medium text-foreground tabular-nums">
+                        {content.sentTimeLabel}
+                      </Text>
+                    </Row>
+                  ) : null}
+
+                  {content.modelLabel ? (
+                    <Row label={t('common.model')}>
+                      <Text className="text-base font-medium text-foreground">
+                        {content.modelLabel}
+                      </Text>
+                    </Row>
+                  ) : null}
+                </Card>
               </View>
 
               {content.costLabel && content.tokenRows ? (
-                <View className="mt-8 gap-4">
-                  <Text className="text-sm font-semibold text-foreground">
-                    {t('agentChat.messageDetails.costAndTokens')}
-                  </Text>
-                  <Row label={t('common.cost')}>
-                    <Text className="text-base font-medium text-foreground tabular-nums">
-                      {content.costLabel}
-                    </Text>
-                  </Row>
-                  <View className="gap-3">
+                <Section label={t('agentChat.messageDetails.costAndTokens')}>
+                  <RowGroup>
+                    <KvRow label={t('common.cost')} value={content.costLabel} valueFace="numeric" />
                     {content.tokenRows.map(row => (
                       <TokenRow key={row.label} label={row.label} value={row.value} />
                     ))}
-                  </View>
-                </View>
+                  </RowGroup>
+                </Section>
               ) : null}
             </ScrollView>
           ) : null}

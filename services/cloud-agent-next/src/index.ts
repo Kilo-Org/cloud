@@ -1,13 +1,43 @@
+import { instrumentCloudAgentDurableObject } from './sentry.js';
+import { SandboxControlV2 } from './control-plane/sandbox/sandbox-do.js';
+import { SandboxSessionV2 } from './control-plane/session/session-do.js';
+import { CloudAgentWorkspaceDO } from './control-plane/workspace/workspace-do.js';
+import { SandboxContainers as SandboxContainersBase } from './sandbox-containers/SandboxContainers.js';
+import { StreamTicketNonceDO as StreamTicketNonceDOBase } from './persistence/StreamTicketNonceDO.js';
+import { UserKiloFacade as UserKiloFacadeBase } from './kilo-facade/user-kilo-facade.js';
+import { PreviewTunnel as PreviewTunnelBase } from './preview-tunnel/preview-tunnel-do.js';
+
 export { default } from './server.js';
 export { SandboxContainment, SandboxSmallContainment } from './legacy-runtime-tombstones.js';
 export { ContainersOutbound } from './sandbox-containers/containers-outbound.js';
 export { SessionSyncAuthorization } from './session-sync-authorization.js';
-// Production `SANDBOX_CONTROL` / `SANDBOX_SESSION` bindings. `wrangler.jsonc`
-// class names stay `SandboxControl` and `SandboxSession`.
-export { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
-export { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
-export { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 export { EnvironmentBuild } from './environment-build/environment-build-do.js';
 export { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
-export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
-export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
+// Production `SANDBOX_CONTROL` / `SANDBOX_SESSION` bindings. `wrangler.jsonc`
+// class names stay `SandboxControl` and `SandboxSession`.
+export const SandboxControl = instrumentCloudAgentDurableObject(
+  SandboxControlV2,
+  'sandbox-control'
+);
+export type SandboxControl = SandboxControlV2;
+export const SandboxSession = instrumentCloudAgentDurableObject(SandboxSessionV2, 'session');
+export type SandboxSession = SandboxSessionV2;
+export const CloudAgentWorkspace = instrumentCloudAgentDurableObject(
+  CloudAgentWorkspaceDO,
+  'workspace'
+);
+export type CloudAgentWorkspace = CloudAgentWorkspaceDO;
+export const SandboxContainers = instrumentCloudAgentDurableObject(
+  SandboxContainersBase,
+  'sandbox-container'
+);
+export type SandboxContainers = SandboxContainersBase;
+export const StreamTicketNonceDO = instrumentCloudAgentDurableObject(
+  StreamTicketNonceDOBase,
+  'stream-ticket'
+);
+export type StreamTicketNonceDO = StreamTicketNonceDOBase;
+export const UserKiloFacade = instrumentCloudAgentDurableObject(UserKiloFacadeBase, 'kilo-facade');
+export type UserKiloFacade = UserKiloFacadeBase;
+export const PreviewTunnel = instrumentCloudAgentDurableObject(PreviewTunnelBase, 'preview-tunnel');
+export type PreviewTunnel = PreviewTunnelBase;

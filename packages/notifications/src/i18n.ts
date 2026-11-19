@@ -97,7 +97,11 @@ import zu from './locales/zu.json';
  * key.
  *
  * `tools/i18n/check-catalogs.mjs` fails when this map, the `./locales` imports
- * and the catalog files disagree.
+ * and the catalog files disagree. It also reads the trees that render these
+ * catalogs — this package and the workers under `services` — so a key
+ * `translatePush` names must exist here, a key no source names is reported
+ * once, and a value still written in English is reported for the language that
+ * carries it.
  */
 const pushCatalogs = {
   af,
@@ -213,7 +217,7 @@ export function resolvePushLocale(locale: string | null | undefined): string {
 }
 
 /**
- * Translate a catalog key for a push locale. Unknown locales use English.
+ * Translate a catalog key for a push locale.
  * An unknown key returns `fallback` when provided; otherwise it returns the
  * key itself (test-only convenience — production callers pass a fallback).
  */

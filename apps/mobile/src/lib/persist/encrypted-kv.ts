@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one encrypted store: the key, the open recovery, and every kv query share one module-level open */
 import * as Sentry from '@sentry/react-native';
 import { and, asc, eq, like, sql } from 'drizzle-orm';
 // The `drizzle-orm/expo-sqlite` barrel also pulls in `useLiveQuery`, which
@@ -7,6 +8,11 @@ import { drizzle } from 'drizzle-orm/expo-sqlite/driver';
 import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from '@/lib/auth/secure-store';
+import {
+  deleteStoredValueSafe,
+  readStoredValueSafe,
+  writeStoredValueSafe,
+} from '@/lib/auth/secure-store-value';
 import * as SQLite from 'expo-sqlite';
 import migrations from '../../../drizzle/migrations';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
@@ -15,7 +21,7 @@ import {
   ProtectedDataUnavailableError,
   whenProtectedDataAvailable,
 } from '@/lib/protected-data';
-import { PERSIST_DB_KEY } from '@/lib/storage-keys';
+import { PERSIST_DB_KEY, PERSIST_MIGRATION_FAILURES_KEY } from '@/lib/storage-keys';
 import { kv } from './schema';
 
 /**
@@ -35,10 +41,32 @@ import { kv } from './schema';
  * thread; the exported API stays async because opening and keying do not.
  *
  * Opening is single-flight: one module-level open promise, awaited by every
- * caller. A wrong key or a corrupt file fails the `sqlite_master` probe and
- * is recovered by closing, deleting the database, generating a fresh key,
- * and reopening — the loss is accepted (cache and drafts are recoverable
- * losses), startup is never blocked, and the reset is reported to Sentry.
+ * caller. A wrong key or a corrupt file fails the `sqlite_master` probe. That
+ * failure is recovered by closing, deleting the database, generating a fresh
+ * key, and reopening. The reset is reported to Sentry and startup is never
+ * blocked. The unreadable file is the trigger. It also holds the durable
+ * chats table and the harness SDK's conversation tables, which are lost with
+ * it. A failed migration is different. The file opened and keyed correctly,
+ * so the failure is reported under the migration operation and rethrown
+ * without deleting anything — unless the rejection carries a corruption
+ * signal, which means the file is unreadable after all, and the same
+ * delete-and-recreate recovery runs. A streak of counted migration failures
+ * is the bounded exception: once such a failure has repeated on this many
+ * consecutive launches (`MIGRATION_FAILURE_RESET_THRESHOLD`, counted in
+ * SecureStore beside the key), the open falls back to the same
+ * delete-and-recreate recovery — a wedge would leave the store, and with it
+ * the chats and conversation tables, unusable on every later launch.
+ * Corruption resets immediately. A lock and an engine limit never spend a
+ * count, because deleting the file cannot lift either. A migration that
+ * succeeds clears the count. A busy or locked failure is the third case. A
+ * lock is evidence about another connection, not about the file, so it is
+ * reported under the open operation and rethrown with the file and the key
+ * intact — including a lock or an engine limit that surfaces inside the
+ * migration, which is reported there under the open operation instead of the
+ * migration one. The memo is dropped for both, so the next caller retries
+ * the open once the lock clears or the limit lifts; a monotonic cooldown
+ * bounds the retries after the first one, and a clean open or a locked
+ * device ends the episode and its cooldown.
  */
 
 const DATABASE_NAME = 'kilo-persist.db';
@@ -55,7 +83,6 @@ const BUSY_TIMEOUT_MS = 5000;
 // interpolation, and the open is routed into delete-and-recreate recovery.
 const DB_KEY_PATTERN = /^[0-9a-f]{64}$/;
 
-/** True when `key` is exactly 64 lowercase hex characters (32 bytes). */
 export function isValidDbKey(key: string): boolean {
   return DB_KEY_PATTERN.test(key);
 }
@@ -116,6 +143,41 @@ async function generateAndStoreKey(): Promise<string> {
   const key = await generateHexKey();
   await SecureStore.setItemAsync(PERSIST_DB_KEY, key);
   return key;
+}
+
+// The bounded escape hatch for a store that fails to open launch after
+// launch: a buggy shipped migration, a downgrade to a build whose code cannot
+// apply the file's newer schema, or another failing migration that repeats.
+// Only that class counts. A lock is transient evidence about another
+// connection, and an engine limit (a full disk, a read-only file, a denied
+// permission) says nothing about the file's contents: deleting the file cannot
+// lift either, and the recreated file meets the same limit after the chats and
+// conversation tables are already gone. After this many counted failures the
+// open falls back to the same delete-and-recreate recovery a failed probe runs:
+// a bounded, reported loss instead of a wedge that leaves drafts, the chats
+// table and the conversation tables unreachable. The count lives beside the key
+// in SecureStore, not in the failing database.
+const MIGRATION_FAILURE_RESET_THRESHOLD = 3;
+
+/** Counts one consecutive migration failure in SecureStore; a failed read or write leaves the count untouched. Returns the new consecutive count. */
+async function recordMigrationFailure(): Promise<number> {
+  const next = (await readMigrationFailureCount()) + 1;
+  await writeStoredValueSafe(PERSIST_MIGRATION_FAILURES_KEY, String(next));
+  return next;
+}
+
+/** Reads the consecutive migration-failure count; a failed or unparseable read counts as zero. */
+async function readMigrationFailureCount(): Promise<number> {
+  const stored = await readStoredValueSafe(PERSIST_MIGRATION_FAILURES_KEY);
+  const current = Number.parseInt(stored ?? '0', 10);
+  return Number.isNaN(current) ? 0 : current;
+}
+
+/** Clears the consecutive migration-failure count after a successful migration. */
+async function clearMigrationFailureCount(): Promise<void> {
+  // `deleteStoredValueSafe` is the total delete; a failed clear must not fail
+  // the successful open it rides on.
+  await deleteStoredValueSafe(PERSIST_MIGRATION_FAILURES_KEY);
 }
 
 /**
@@ -236,12 +298,103 @@ async function openWithKey(key: string): Promise<KVDatabase> {
   }
 }
 
-async function probeAndMigrate(db: KVDatabase): Promise<void> {
+// A failed migration is tagged with this message before it leaves
+// `migrateSchema`. The open catch reads the tag: a migration failed on a file
+// that opened and keyed correctly, which delete-and-recreate must not touch —
+// it would discard a readable file the migration itself did not damage. A
+// class would trip the file's one-class lint rule, so the tag travels on a
+// plain Error.
+const MIGRATION_FAILURE_MESSAGE = 'encrypted-kv: schema migration failed on a keyed database';
+
+// Damage in a non-first page passes the `sqlite_master` count and surfaces
+// inside `migrate()` instead. These engine messages mean the file itself is
+// unreadable, so the open routes them into the same delete-and-recreate
+// recovery as a failed probe. Every other migrate rejection is a migration
+// failure, a lock, or an engine limit on a readable file and keeps the file.
+const CORRUPTION_SIGNALS = [
+  'SQLITE_CORRUPT',
+  'SQLITE_NOTADB',
+  'file is not a database',
+  'database disk image is malformed',
+];
+
+// A lock is transient evidence about another connection, not about the file.
+// The engine reports it from the `sqlite_master` probe and from `PRAGMA key`
+// alike, and neither says anything about the key or the file's contents, so
+// the open must not read them as an unreadable file.
+const BUSY_SIGNALS = [
+  'SQLITE_BUSY',
+  'SQLITE_LOCKED',
+  'database is locked',
+  'database table is locked',
+];
+
+// An engine limit is neither about the key nor about the file's contents: the
+// disk is full, the file is read-only, a permission is denied, or the path
+// cannot be opened. Deleting and recreating cannot lift it — the recreated file
+// meets the same limit while the stored chats and conversation tables are
+// already gone — so it never spends one of the bounded recovery attempts and
+// never deletes the file. A lock is the other such case (`BUSY_SIGNALS`). A
+// plain `disk I/O error` is deliberately absent: the engine reports an
+// unreadable page the same way, so it keeps counting toward the bounded
+// recovery instead.
+const ENVIRONMENT_SIGNALS = [
+  'SQLITE_FULL',
+  'database or disk is full',
+  'SQLITE_READONLY',
+  'attempt to write a readonly database',
+  'SQLITE_PERM',
+  'access permission denied',
+  'SQLITE_CANTOPEN',
+  'unable to open database file',
+];
+
+// Every check walks the `cause` chain: Drizzle wraps a failed statement in its
+// own error and keeps the engine error in `cause`, so a signal can sit one level
+// down.
+function carriesSignal(error: unknown, signals: readonly string[]): boolean {
+  let current = error;
+  for (let depth = 0; current instanceof Error && depth < 4; depth += 1) {
+    // A fresh binding keeps the `instanceof` narrowing that the loop's own
+    // reassignment of `current` drops.
+    const candidate = current;
+    if (signals.some(signal => candidate.message.includes(signal))) {
+      return true;
+    }
+    current = candidate.cause;
+  }
+  return false;
+}
+
+function isCorruptionSignal(error: unknown): boolean {
+  return carriesSignal(error, CORRUPTION_SIGNALS);
+}
+
+function isBusySignal(error: unknown): boolean {
+  return carriesSignal(error, BUSY_SIGNALS);
+}
+
+function isEnvironmentSignal(error: unknown): boolean {
+  return carriesSignal(error, ENVIRONMENT_SIGNALS);
+}
+
+function probeSchema(db: KVDatabase): void {
   // A wrong key or a corrupt file makes this throw (DEC-01 step 3).
   db.get(sql`SELECT count(*) FROM sqlite_master`);
+}
+
+async function migrateSchema(db: KVDatabase): Promise<void> {
   // Drizzle owns the schema; a recreated (deleted) file has no
-  // `__drizzle_migrations` table, so the migrations run again on it.
-  await migrate(db, migrations);
+  // `__drizzle_migrations` table, so the migrations run again on it. A failure
+  // here is a migration error on a file that opened and keyed correctly, not
+  // a corrupt file.
+  try {
+    await migrate(db, migrations);
+  } catch (error) {
+    // Tag every rejection, including a non-Error throw: the open must route
+    // each one through the migration branch, never into the destructive reset.
+    throw new Error(MIGRATION_FAILURE_MESSAGE, { cause: error });
+  }
 }
 
 /**
@@ -256,12 +409,53 @@ function reportAbortedReset(cause: unknown): never {
   throw cause;
 }
 
+/**
+ * Closes the handle, reports a failure that leaves the file intact under the
+ * open operation, and rethrows the cause. A lock and an engine limit both say
+ * nothing about the key or the file's contents. A handle that will not close is
+ * a leaked connection, which the relaunch clears; the failure itself is still
+ * the reported one.
+ */
+async function reportTransientOpenFailure(
+  db: KVDatabase | undefined,
+  cause: unknown
+): Promise<never> {
+  if (db) {
+    await closeQuietly(db.$client);
+  }
+  Sentry.captureException(cause, {
+    level: 'warning',
+    tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+  });
+  throw cause;
+}
+
+/**
+ * Closes the handle, reports a kept-file migration failure under the
+ * migration operation, and rethrows the cause.
+ */
+async function keepDatabaseAndRethrow(db: KVDatabase | undefined, cause: unknown): Promise<never> {
+  if (db) {
+    await closeQuietly(db.$client);
+  }
+  Sentry.captureException(cause, {
+    level: 'error',
+    tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+  });
+  throw cause;
+}
+
 async function openEncryptedDatabase(): Promise<KVDatabase> {
   const key = await readOrCreateKey();
   let db: KVDatabase | undefined = undefined;
   try {
     db = await openWithKey(key);
-    await probeAndMigrate(db);
+    // The probe throws synchronously, before any await can interleave.
+    probeSchema(db);
+    await migrateSchema(db);
+    // A file that migrates cleanly breaks any earlier failure streak: the
+    // next failed launch counts as the first, not the fourth.
+    await clearMigrationFailureCount();
     return db;
   } catch (openError) {
     // The device locked during the open, so the failure says nothing about the
@@ -282,27 +476,82 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       });
       throw openError;
     }
+    // The file opened and keyed correctly, so the migration failed there. A
+    // corruption signal means the file is unreadable after all: route it into
+    // the delete-and-recreate recovery below, like a failed probe. A lock and
+    // an engine limit are reported and rethrown with the file intact. Any
+    // other rejection is a migration failure on a readable file — it is
+    // counted, and only a streak reaching the threshold routes it into the
+    // delete-and-recreate recovery, because deleting the file would lose the
+    // chats and conversation tables the failure never touched.
+    let resetCause = openError;
+    if (openError instanceof Error && openError.message === MIGRATION_FAILURE_MESSAGE) {
+      // A lock reached through the migration is still a lock — transient
+      // evidence about another connection, not about the file. An engine limit
+      // is the same kind of evidence: a full disk or a read-only file cannot be
+      // fixed by deleting the store. Neither spends one of the bounded recovery
+      // attempts.
+      if (isBusySignal(openError.cause) || isEnvironmentSignal(openError.cause)) {
+        await reportTransientOpenFailure(db, openError.cause);
+      }
+      // A corruption signal means the file is unreadable after all: route it
+      // into the delete-and-recreate recovery below, like a failed probe. The
+      // corruption report rides on the reset report; a separate capture would
+      // file the same unreadable file twice. The close stays with the shared
+      // reset block, which closes the handle exactly once.
+      if (isCorruptionSignal(openError.cause)) {
+        resetCause = openError.cause;
+      } else {
+        // A counted failure on a readable file: the report rides on either
+        // outcome below, so a separate capture would file the same failure
+        // twice.
+        const failureCount = await recordMigrationFailure();
+        // Under the threshold the file stays: close the handle, report under
+        // the migration operation, and rethrow. At the threshold, mirror the
+        // corruption branch: do not close the handle here (the shared reset
+        // block closes it exactly once, and the reset report covers this
+        // failure) and fall through into the delete-and-recreate recovery.
+        if (failureCount >= MIGRATION_FAILURE_RESET_THRESHOLD) {
+          resetCause = openError.cause;
+        } else {
+          await keepDatabaseAndRethrow(db, openError.cause);
+        }
+      }
+    }
+    // The probe reported a lock or an engine limit, not a bad file: report it
+    // and rethrow with the store intact. Deleting it would discard readable
+    // data neither condition is about, and a recreated file meets the same
+    // limit.
+    if (isBusySignal(resetCause) || isEnvironmentSignal(resetCause)) {
+      await reportTransientOpenFailure(db, resetCause);
+    }
     // Wrong key, corrupt file, or a tampered key: cache and drafts are
     // recoverable losses. Close, delete the file, regenerate the key, and
-    // reopen (DEC-01 step 4).
+    // reopen (DEC-01 step 4). This file also holds the durable chats table and
+    // the harness SDK's conversation tables. This recovery is the last resort
+    // for them, and it runs only when the file cannot be read.
     if (db) {
-      // The probe or migration failed after the handle opened. A handle that
-      // will not close must not be replaced by a second connection to the same
-      // file: abort the reset and report the original open error instead.
+      // The probe failed after the handle opened. A handle that will not close
+      // must not be replaced by a second connection to the same file: abort
+      // the reset and report the original open error instead.
       if (!(await closeQuietly(db.$client))) {
-        reportAbortedReset(openError);
+        reportAbortedReset(resetCause);
       }
-    } else if (openError instanceof Error && unclosedOpenErrors.has(openError)) {
+    } else if (resetCause instanceof Error && unclosedOpenErrors.has(resetCause)) {
       // The failed open never returned a handle, and its handle is still open.
-      reportAbortedReset(openError);
+      reportAbortedReset(resetCause);
     }
     let reopened: KVDatabase | undefined = undefined;
     try {
       await SQLite.deleteDatabaseAsync(DATABASE_NAME);
       const freshKey = await generateAndStoreKey();
       reopened = await openWithKey(freshKey);
-      await probeAndMigrate(reopened);
-      Sentry.captureException(openError, {
+      probeSchema(reopened);
+      await migrateSchema(reopened);
+      // The recreated file migrated cleanly: the next failed launch counts as
+      // the first, not the fourth.
+      await clearMigrationFailureCount();
+      Sentry.captureException(resetCause, {
         level: 'warning',
         tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
       });
@@ -327,6 +576,32 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
 
 let openPromise: Promise<KVDatabase> | null = null;
 
+// After a busy failure the next caller retries the open at once; a cooldown
+// only gates the retries after that first one. It keeps a lock that outlives
+// `BUSY_TIMEOUT_MS` from turning every store call into a full open that
+// blocks the JS thread for the busy timeout and files one Sentry event per
+// call. Inside the window the memoized rejection fails fast; once the window
+// passes, `openDatabase` drops that memo and the next caller reopens. The
+// flag marks a memo that holds a busy rejection, so only that memo is ever
+// dropped.
+const BUSY_RETRY_COOLDOWN_MS = 10_000;
+
+// The window is measured on a monotonic reading, so a device clock correction
+// cannot stretch it. On `Date.now()` a step backwards leaves the recorded end
+// in the future and serves the memoized rejection until the clock catches up.
+function cooldownNow(): number {
+  return performance.now();
+}
+
+let busyRetryNotBefore = 0;
+let busyMemoRejected = false;
+
+/** Ends the recorded busy episode: nothing is memoized and no cooldown is armed. */
+function endBusyEpisode(): void {
+  busyMemoRejected = false;
+  busyRetryNotBefore = 0;
+}
+
 /**
  * The key lives in the keychain, which refuses every call while the device is
  * locked. A background run waits for unlock instead of failing the open, and
@@ -335,13 +610,38 @@ let openPromise: Promise<KVDatabase> | null = null;
 async function openWhenProtectedDataAvailable(): Promise<KVDatabase> {
   await whenProtectedDataAvailable();
   try {
-    return await openEncryptedDatabase();
+    const db = await openEncryptedDatabase();
+    endBusyEpisode();
+    return db;
   } catch (error) {
     // The key read and write sit outside the open's own lock check, and the
     // keychain refuses them with a raw native error, not the typed one. Any
-    // failure while locked drops the memo.
+    // failure while locked drops the memo, and with it the cooldown of the
+    // episode it recorded.
     if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
       openPromise = null;
+      endBusyEpisode();
+    }
+    // A busy failure is transient: the lock clears, so the open must retry
+    // instead of rejecting for the rest of the process. An engine limit behaves
+    // the same way from the caller's side — the person frees disk space or the
+    // permission is restored while the app keeps running — so it reuses this
+    // retry instead of staying memoized until relaunch. The cooldown bounds the
+    // retry: inside the window the memoized rejection fails fast, and a longer
+    // lock or limit costs one open per window instead of one per store call.
+    if (isBusySignal(error) || isEnvironmentSignal(error)) {
+      if (cooldownNow() >= busyRetryNotBefore) {
+        // Drop the memo and start the window. The flag stays false: nothing
+        // is memoized now, and the guard must not fire on the reopen this
+        // drop starts.
+        openPromise = null;
+        busyMemoRejected = false;
+        busyRetryNotBefore = cooldownNow() + BUSY_RETRY_COOLDOWN_MS;
+      } else {
+        // Inside the window: the rejected promise stays memoized and the
+        // guard drops it once the window passes.
+        busyMemoRejected = true;
+      }
     }
     throw error;
   }
@@ -355,8 +655,20 @@ async function openDatabase(): Promise<KVDatabase> {
   // database, regenerate the key, and report to Sentry once per call — and
   // the read cache calls on every query settle. Nothing an open failure hits
   // is transient: a wrong key, a corrupt file, and a build without SQLCipher
-  // all need a relaunch or a rebuild. A locked device is the one exception
-  // (see `openWhenProtectedDataAvailable`).
+  // all need a relaunch or a rebuild. Two exceptions drop the memo and retry
+  // on the next call: a locked device (see `openWhenProtectedDataAvailable`)
+  // and a busy, locked, or engine-limit failure, which the same function
+  // clears. The retry is bounded by a cooldown: inside the window the
+  // memoized rejection fails fast, and once the window passes the memo is
+  // dropped, so the next caller reopens after the lock cleared or the limit
+  // lifted. This branch also claims the retry by clearing the flag, so
+  // concurrent callers that
+  // arrive while the reopen is in flight await the same promise instead of
+  // each starting another open.
+  if (openPromise && busyMemoRejected && cooldownNow() >= busyRetryNotBefore) {
+    openPromise = null;
+    busyMemoRejected = false;
+  }
   openPromise ??= openWhenProtectedDataAvailable();
   return openPromise;
 }
@@ -365,6 +677,7 @@ async function openDatabase(): Promise<KVDatabase> {
 // (the same pattern as `inFlightSaveCount` in save-chain.ts).
 export function resetEncryptedKvOpenForTests(): void {
   openPromise = null;
+  endBusyEpisode();
 }
 
 /**
@@ -373,7 +686,16 @@ export function resetEncryptedKvOpenForTests(): void {
  * The chat store is the one: it hands this handle to the harness SDK, which
  * keeps the conversations in tables of its own on the same file. One file
  * means one key, one SQLCipher probe, and one delete-and-recreate recovery
- * rather than a second copy of all three.
+ * rather than a second copy of all three. The delete runs on a failed probe,
+ * on a migration rejection that carries a corruption signal, or on a
+ * migration failure that has repeated on enough consecutive launches to
+ * trigger the bounded recovery (`MIGRATION_FAILURE_RESET_THRESHOLD`). Locks
+ * and engine limits never count toward it and never delete the file, a
+ * successful migration clears the count, and every other failed migration
+ * reports and rethrows with the file intact. A busy or locked failure reports
+ * and rethrows the same way: a lock says nothing about the file or the key. A
+ * probe that reports a lock or an engine limit keeps the file too, because
+ * neither is evidence about its contents.
  */
 export async function encryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
   const db = await openDatabase();
@@ -392,11 +714,24 @@ export async function getItem(scope: string, k: string): Promise<string | null> 
   return row?.v ?? null;
 }
 
+type KvWrite = { readonly value: string; readonly signal?: AbortSignal };
+
 /** Writes or overwrites one value, recording `Date.now()`. */
-export async function setItem(scope: string, k: string, v: string): Promise<void> {
+export async function setItem(scope: string, k: string, value: string): Promise<void> {
+  await setItemWithSignal(scope, k, { value });
+}
+
+export async function setItemWithSignal(
+  scope: string,
+  k: string,
+  { value: v, signal }: KvWrite
+): Promise<void> {
   validateItemKey(scope, k);
   validateValue(v);
   const db = await openDatabase();
+  if (signal?.aborted) {
+    throw new Error('The storage operation was cancelled');
+  }
   const updatedAt = Date.now();
   db.insert(kv)
     .values({ scope, k, v, updatedAt })
@@ -405,9 +740,12 @@ export async function setItem(scope: string, k: string, v: string): Promise<void
 }
 
 /** Removes one value; a missing key is not an error. */
-export async function removeItem(scope: string, k: string): Promise<void> {
+export async function removeItem(scope: string, k: string, signal?: AbortSignal): Promise<void> {
   validateItemKey(scope, k);
   const db = await openDatabase();
+  if (signal?.aborted) {
+    throw new Error('The storage operation was cancelled');
+  }
   db.delete(kv)
     .where(and(eq(kv.scope, scope), eq(kv.k, k)))
     .run();

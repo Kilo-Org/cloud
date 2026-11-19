@@ -6,7 +6,6 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { native_admission_challenges, native_attested_keys } from '@kilocode/db/schema';
 import { eq, and, lt, isNull, gt } from 'drizzle-orm';
-import { checkRateLimit } from '@vercel/firewall';
 import type { NextRequest } from 'next/server';
 import {
   appAttestClientDataHash,
@@ -14,7 +13,7 @@ import {
   verifyAppleAssertion,
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
-import { reportFirewallRateLimitIssue } from './firewall-rate-limit';
+import { checkFirewallRateLimit } from './firewall-rate-limit';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────
@@ -79,11 +78,6 @@ export function resetAdmissionCountersForTests(): void {
   admissionCountersWindowStart = 0;
 }
 
-/** Exported for tests: the counts accumulated in the open window. */
-export function pendingAdmissionCountsForTests(): Record<string, number> {
-  return Object.fromEntries(admissionCounters);
-}
-
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type AdmissionPlatform = 'ios' | 'android';
@@ -117,33 +111,24 @@ const CHALLENGE_RATE_LIMIT_ID = 'native-admission-challenge';
 /**
  * Issue a server-side challenge for native admission.
  *
- * Uses the shared `@vercel/firewall` check per client IP, matching the email
- * sign-in rate-limit pattern. Only an answer that permits the caller issues a
- * challenge: a limited caller is refused, and so is any answer that carries an
- * error, including a rule that is not configured. The unconfigured rule is
- * reported through the shared throttled reporter, so it stays visible without
- * one report per request.
+ * Runs the shared `checkFirewallRateLimit` per client IP, matching the email
+ * sign-in rate-limit pattern, so the whole app keeps one check-and-report path.
+ * Only an answer that permits the caller issues a challenge: a limited caller
+ * is refused, and so is a limiter that could not be consulted. The shared
+ * helper reports both an unconfigured rule and a limiter that could not be
+ * evaluated through one throttled reporter.
  */
 export async function issueAdmissionChallenge(
   request: NextRequest,
   ipAddress: string
 ): Promise<{ challenge: string; expiresIn: number }> {
-  const { rateLimited, error } = await checkRateLimit(CHALLENGE_RATE_LIMIT_ID, {
+  const limit = await checkFirewallRateLimit(CHALLENGE_RATE_LIMIT_ID, {
+    source: 'native_admission_challenge',
     request,
     rateLimitKey: `native-challenge:${ipAddress}`,
   });
 
-  if (error === 'not-found') {
-    reportFirewallRateLimitIssue(
-      CHALLENGE_RATE_LIMIT_ID,
-      'native_admission_challenge',
-      `Firewall rate limit '${CHALLENGE_RATE_LIMIT_ID}' is not configured`
-    );
-  }
-
-  // Only an answer that permits the caller issues a challenge: a limited
-  // caller and an answer that carries an error both refuse here.
-  if (rateLimited || error) {
+  if (limit !== 'allowed') {
     throw new ChallengeRateLimitError();
   }
 
@@ -194,7 +179,6 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   if (obj['platform'] !== 'ios' && obj['platform'] !== 'android') return undefined;
   if (obj['kind'] !== 'attestation' && obj['kind'] !== 'assertion') return undefined;
   if (typeof obj['challenge'] !== 'string' || !obj['challenge']) return undefined;
-  // payload: non-empty base64 string within MAX_ADMISSION_PAYLOAD_CHARS
   if (typeof obj['payload'] !== 'string' || !obj['payload']) return undefined;
   if (payloadExceedsMaxLength(obj)) return undefined;
 
@@ -203,7 +187,6 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   const keyId = obj['keyId'];
 
   if (platform === 'ios') {
-    // iOS requires keyId for both attestation and assertion
     if (typeof keyId !== 'string' || !keyId) return undefined;
   }
 
@@ -337,6 +320,25 @@ export async function verifyAdmissionAsync(
 
 // ── Apple (iOS) admission ──────────────────────────────────────────────────
 
+type AttestedKeyExecutor = typeof db | DrizzleTransaction;
+
+/**
+ * The attested-key row for one key id on one platform, read through the
+ * supplied executor so a caller inside a transaction sees its own writes.
+ *
+ * Ownership is not implied: the row may belong to another account, and each
+ * caller applies its own ownership predicate.
+ */
+function findAttestedKey(
+  executor: AttestedKeyExecutor,
+  keyId: string,
+  platform: AdmissionPlatform
+) {
+  return executor.query.native_attested_keys.findFirst({
+    where: and(eq(native_attested_keys.key_id, keyId), eq(native_attested_keys.platform, platform)),
+  });
+}
+
 async function verifyAppleAdmission(
   admission: AdmissionPayload
 ): Promise<VerifyAdmissionOk | { ok: false; errorCode: string }> {
@@ -357,9 +359,7 @@ async function verifyAppleAdmission(
 
     // Check whether this keyId already exists — the caller uses this for
     // preflight ownership checks before committing a sign-in code.
-    const existingKey = await db.query.native_attested_keys.findFirst({
-      where: and(eq(native_attested_keys.key_id, keyId), eq(native_attested_keys.platform, 'ios')),
-    });
+    const existingKey = await findAttestedKey(db, keyId, 'ios');
 
     return {
       ok: true,
@@ -372,9 +372,7 @@ async function verifyAppleAdmission(
 
   // kind === 'assertion': verify against existing key
   // Must have an existing attested key
-  const existingKey = await db.query.native_attested_keys.findFirst({
-    where: and(eq(native_attested_keys.key_id, keyId), eq(native_attested_keys.platform, 'ios')),
-  });
+  const existingKey = await findAttestedKey(db, keyId, 'ios');
 
   if (!existingKey) {
     captureMessage('apple_assertion_unknown_key');
@@ -385,7 +383,6 @@ async function verifyAppleAdmission(
   // (we return the existing user id for that check)
 
   const assertionResult = await verifyAppleAssertion(
-    keyId,
     appAttestClientDataHash(challenge),
     payload,
     existingKey.public_key
@@ -503,12 +500,7 @@ export async function persistAttestedKey(
       .onConflictDoNothing();
 
     // Verify the inserted key belongs to this user (cross-user collision check)
-    const inserted = await executor.query.native_attested_keys.findFirst({
-      where: and(
-        eq(native_attested_keys.key_id, keyId),
-        eq(native_attested_keys.platform, verification.platform)
-      ),
-    });
+    const inserted = await findAttestedKey(executor, keyId, verification.platform);
 
     if (!inserted || inserted.kilo_user_id !== userId) {
       captureMessage('native_attested_key_cross_user_collision');

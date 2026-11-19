@@ -97,7 +97,7 @@ describe('adminAutoFreeConfigRouter', () => {
   });
 
   it('stores, updates, and clears the config without touching routing config', async () => {
-    await db.insert(ai_gateway_config).values({ config: { vercel_routing_enabled: false } });
+    await db.insert(ai_gateway_config).values({ config: { vercel_routing_opt_out_models: [] } });
     const caller = await createCallerForUser(admin.id);
 
     await caller.admin.autoFreeConfig.set({ config });
@@ -111,7 +111,7 @@ describe('adminAutoFreeConfigRouter', () => {
     expect((await caller.admin.autoFreeConfig.get()).config).toBeNull();
 
     const [row] = await db.select().from(ai_gateway_config);
-    expect(row.config).toEqual({ vercel_routing_enabled: false });
+    expect(row.config).toEqual({ vercel_routing_opt_out_models: [] });
   });
 
   it('creates the singleton row when none exists', async () => {
@@ -127,6 +127,7 @@ describe('adminAutoFreeConfigRouter', () => {
         preferred_models: null,
         unavailable_models: null,
         vercel_model_id_overrides: null,
+        latest_alias_targets: null,
         preferred_provider_order: null,
         custom_pricing: null,
       },

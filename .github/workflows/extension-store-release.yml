@@ -1,10 +1,18 @@
 name: Extension Store Release
 
 # Push-button build of store-submittable extension zips for marketing: Chrome MV3
-# (Chrome Web Store), Firefox MV3 + sources (Firefox Add-ons). Uploads the zips as
-# a run artifact named after the built version, then — on main only — patch-bumps
-# apps/extension/package.json and opens the bump PR so the next run produces a
-# higher version (stores reject re-used version numbers).
+# (Chrome Web Store), Firefox MV3 + sources (Firefox Add-ons). Uploads the zips and
+# one CycloneDX SBOM per browser as a run artifact named after the built version,
+# then — on main only —
+#
+# - tags the commit that built them `kilo-extension-release/<version>` and
+#   publishes a GitHub Release with the notes and both SBOMs;
+# - patch-bumps apps/extension/package.json, writes the changelog section for the
+#   released version into the bump PR, and opens that PR, so the next run builds
+#   a higher version (stores reject re-used version numbers).
+#
+# A version is released once: the tag pins it to the commit its store zips were
+# built from, so a dispatch of an already-released version fails before it builds.
 
 on:
   workflow_dispatch:
@@ -21,6 +29,15 @@ jobs:
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
+    # What the release job publishes: the version names the tag, the artifact
+    # and the SBOM files; the hashes and component counts are what each SBOM
+    # recorded for its zip.
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      chrome_sha256: ${{ steps.sbom.outputs.chrome_sha256 }}
+      chrome_components: ${{ steps.sbom.outputs.chrome_components }}
+      firefox_sha256: ${{ steps.sbom.outputs.firefox_sha256 }}
+      firefox_components: ${{ steps.sbom.outputs.firefox_components }}
     env:
       # Store builds MUST ship analytics so extension WAU is measurable; the
       # "Require PostHog key for store builds" step fails the run when the secret
@@ -48,8 +65,25 @@ jobs:
           echo "Building version $CURRENT"
           PENDING=$(git ls-remote --heads origin 'extension-version-bump-*' | awk '{print $2}' | paste -sd' ' -)
           if [ -n "$PENDING" ]; then
-            echo "::error::Pending version-bump branch(es): $PENDING — merge the open bump PR, or close it and delete the branch (git push origin --delete <branch>), then press again. Re-using a version produces artifacts the stores reject."
+            echo "::error::Pending version-bump branch(es): $PENDING — merge the open bump PR, then press again. Version $CURRENT was already built, so the next build needs the higher version the bump carries; closing the PR leaves $CURRENT in place. Re-using a version produces artifacts the stores reject."
             exit 1
+          fi
+          # A version is released once. The tag records the commit the store
+          # artifacts were built from, so a dispatch of that same version on
+          # another commit would publish a release GitHub already holds for
+          # different bytes. The tag is annotated: ask for its peeled commit
+          # first, and fall back to the unpeeled ref for a tag pushed as-is.
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            TAG="kilo-extension-release/$CURRENT"
+            HEAD_SHA=$(git rev-parse HEAD)
+            TAGGED=$(git ls-remote origin "refs/tags/$TAG^{}" | awk '{print $1}')
+            if [ -z "$TAGGED" ]; then
+              TAGGED=$(git ls-remote origin "refs/tags/$TAG" | awk '{print $1}')
+            fi
+            if [ -n "$TAGGED" ] && [ "$TAGGED" != "$HEAD_SHA" ]; then
+              echo "::error::Version $CURRENT is already released at $TAGGED, and this run is at $HEAD_SHA. Merge the open version-bump PR if one exists; otherwise re-run the failed jobs of the run that built $TAGGED (gh run rerun <run-id> --failed), which publishes the release and opens the bump PR."
+              exit 1
+            fi
           fi
           echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
 
@@ -75,10 +109,18 @@ jobs:
       - name: Verify (typecheck, lint, unit tests)
         run: pnpm --filter kilo-extension verify
 
+      # Each build records the modules it read, which the SBOM below turns into
+      # components. Only these two steps get the record: the sources-zip rebuild
+      # must build without it, which also proves the plugin leaves the output
+      # bytes alone.
       - name: Zip (Chrome MV3)
+        env:
+          KILO_EXTENSION_SBOM_MODULES_DIR: ${{ runner.temp }}/sbom-modules/chrome
         run: pnpm --filter kilo-extension zip
 
       - name: Zip (Firefox MV3 + AMO sources)
+        env:
+          KILO_EXTENSION_SBOM_MODULES_DIR: ${{ runner.temp }}/sbom-modules/firefox
         run: pnpm --filter kilo-extension zip:firefox
 
       - name: Confirm expected zips exist
@@ -88,6 +130,53 @@ jobs:
                 "apps/extension/.output/kilo-extension-$V-firefox.zip" \
                 "apps/extension/.output/kilo-extension-$V-sources.zip"
 
+      # The sources zip is the only thing a reviewer can rebuild, and its
+      # allowlist lives in wxt.config.ts: a workspace dependency the list misses
+      # still builds here, where the whole monorepo is checked out, and would
+      # only surface when AMO rejects the archive. Rebuild it the way
+      # SOURCE_BUILD.md describes and diff the result against the package being
+      # uploaded. The key comes from the job env and is never echoed.
+      - name: Verify the sources zip rebuilds the Firefox package
+        run: |
+          set -euo pipefail
+          V="${{ steps.version.outputs.version }}"
+          WORK="$(mktemp -d)"
+          trap 'rm -rf "$WORK"' EXIT
+          mkdir -p "$WORK/sources" "$WORK/package"
+          unzip -q "apps/extension/.output/kilo-extension-$V-sources.zip" -d "$WORK/sources"
+          unzip -q "apps/extension/.output/kilo-extension-$V-firefox.zip" -d "$WORK/package"
+          cd "$WORK/sources"
+          pnpm install --frozen-lockfile --filter kilo-extension... --ignore-scripts
+          pnpm --filter kilo-extension --config.verify-deps-before-run=false build:firefox
+          diff -rq "$WORK/package" "$WORK/sources/apps/extension/.output/firefox-mv3"
+          echo "The sources zip rebuilds kilo-extension-$V-firefox.zip file for file."
+
+      # One SBOM per store zip, from the module record its build wrote. The
+      # script prints the zip's SHA-256 and its component count; the release
+      # publishes both beside the file.
+      - name: Generate SBOMs
+        id: sbom
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          COMMIT="$(git rev-parse HEAD)"
+          for BROWSER in chrome firefox; do
+            OUT=$(node scripts/kilo-extension-sbom.mjs \
+              --modules-dir "$RUNNER_TEMP/sbom-modules/$BROWSER" \
+              --zip "apps/extension/.output/kilo-extension-$VERSION-$BROWSER.zip" \
+              --browser "$BROWSER" \
+              --version "$VERSION" \
+              --lockfile pnpm-lock.yaml \
+              --commit "$COMMIT" \
+              --out "apps/extension/.output/kilo-extension-$VERSION-$BROWSER.cyclonedx.json")
+            printf '%s\n' "$OUT"
+            SHA=$(printf '%s\n' "$OUT" | sed -n 's/^artifact_sha256=//p')
+            COMPONENTS=$(printf '%s\n' "$OUT" | sed -n 's/^components=//p')
+            echo "${BROWSER}_sha256=$SHA" >> "$GITHUB_OUTPUT"
+            echo "${BROWSER}_components=$COMPONENTS" >> "$GITHUB_OUTPUT"
+          done
+
       - name: Upload store artifacts
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
@@ -96,14 +185,144 @@ jobs:
             apps/extension/.output/kilo-extension-${{ steps.version.outputs.version }}-chrome.zip
             apps/extension/.output/kilo-extension-${{ steps.version.outputs.version }}-firefox.zip
             apps/extension/.output/kilo-extension-${{ steps.version.outputs.version }}-sources.zip
+            apps/extension/.output/kilo-extension-${{ steps.version.outputs.version }}-chrome.cyclonedx.json
+            apps/extension/.output/kilo-extension-${{ steps.version.outputs.version }}-firefox.cyclonedx.json
           if-no-files-found: error
           overwrite: true
           # Store handoff can take weeks; 30 days beats the repo's 7-day CI-debug
-          # norm while keeping the ~74 MB sources zips from piling up forever.
+          # norm while keeping the extension's source and package zips around
+          # long enough for a reviewer to ask for the source upload again.
           retention-days: 30
 
-  bump-version:
+  release:
     needs: build-artifacts
+    # A branch dispatch must not tag: the version it built is main's, and the
+    # tag pins that commit. Same canonical-repo guard as bump-version.
+    if: github.ref == 'refs/heads/main' && github.repository == 'Kilo-Org/cloud'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: write # push the release tag, publish the release
+    # The changelog section the bump PR carries: the same notes the release
+    # shows, so a reader of either sees one list.
+    outputs:
+      notes: ${{ steps.notes.outputs.notes }}
+    steps:
+      # Full history and tags: the release range starts at the previous tag.
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Download store artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: extension-store-${{ needs.build-artifacts.outputs.version }}
+          path: ${{ runner.temp }}/store
+
+      # A release tag that does not contain HEAD belongs to an earlier commit.
+      # sed -n '1p' consumes the whole list, so git never SIGPIPEs into a closed pipe under pipefail.
+      - name: Find the previous release
+        id: previous
+        run: |
+          set -euo pipefail
+          PREVIOUS=$(git tag --list 'kilo-extension-release/*' --sort=-creatordate --no-contains HEAD | sed -n '1p')
+          echo "tag=$PREVIOUS" >> "$GITHUB_OUTPUT"
+          echo "Previous release: ${PREVIOUS:-none}"
+
+      - name: Notes for the changelog
+        id: notes
+        env:
+          PREVIOUS: ${{ steps.previous.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PREVIOUS" ]; then
+            node scripts/kilo-extension-release-notes.mjs body --from "$PREVIOUS" --to HEAD > "$RUNNER_TEMP/extension-notes.md"
+          else
+            node scripts/kilo-extension-release-notes.mjs body > "$RUNNER_TEMP/extension-notes.md"
+          fi
+          cat "$RUNNER_TEMP/extension-notes.md"
+          {
+            echo 'notes<<EXTENSION_NOTES_EOF'
+            cat "$RUNNER_TEMP/extension-notes.md"
+            echo 'EXTENSION_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # Same token as the kilo-app and kilo-mcp release tags: GitHub refuses a
+      # GITHUB_TOKEN tag push when the tagged commit's .github/workflows differs
+      # from every branch tip. The token reaches only this step, never
+      # .git/config. A rerun reuses the tag an earlier attempt pushed.
+      - name: Tag the release
+        env:
+          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
+          VERSION: ${{ needs.build-artifacts.outputs.version }}
+          CHROME_SHA256: ${{ needs.build-artifacts.outputs.chrome_sha256 }}
+          FIREFOX_SHA256: ${{ needs.build-artifacts.outputs.firefox_sha256 }}
+        run: |
+          set -euo pipefail
+          TAG="kilo-extension-release/$VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null 2>&1; then
+            echo "Tag $TAG already exists — reusing it."
+            exit 0
+          fi
+          AUTH=$(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0=
+          export GIT_CONFIG_KEY_1=http.https://github.com/.extraheader GIT_CONFIG_VALUE_1="AUTHORIZATION: basic $AUTH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG" \
+            -m "chrome-sha256=$CHROME_SHA256" \
+            -m "firefox-sha256=$FIREFOX_SHA256"
+          git push origin "refs/tags/$TAG"
+
+      # --latest=false: an extension release must not replace the release
+      # GitHub shows as the repository's latest one.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build-artifacts.outputs.version }}
+          CHROME_SHA256: ${{ needs.build-artifacts.outputs.chrome_sha256 }}
+          CHROME_COMPONENTS: ${{ needs.build-artifacts.outputs.chrome_components }}
+          FIREFOX_SHA256: ${{ needs.build-artifacts.outputs.firefox_sha256 }}
+          FIREFOX_COMPONENTS: ${{ needs.build-artifacts.outputs.firefox_components }}
+        run: |
+          set -euo pipefail
+          TAG="kilo-extension-release/$VERSION"
+          NOTES="$RUNNER_TEMP/extension-release.md"
+          {
+            echo "## Changes"
+            echo
+            cat "$RUNNER_TEMP/extension-notes.md"
+            echo
+            echo "## SBOM"
+            echo
+            echo "| Artifact | SHA-256 | npm components |"
+            echo "| --- | --- | --- |"
+            echo "| kilo-extension-$VERSION-chrome.zip | \`$CHROME_SHA256\` | $CHROME_COMPONENTS |"
+            echo "| kilo-extension-$VERSION-firefox.zip | \`$FIREFOX_SHA256\` | $FIREFOX_COMPONENTS |"
+            echo
+            echo "The SHA-256 names the uploaded zip, the same bytes the SBOM beside it describes."
+          } > "$NOTES"
+          TITLE="kilo-extension $VERSION"
+          SBOMS=(
+            "$RUNNER_TEMP/store/kilo-extension-$VERSION-chrome.cyclonedx.json"
+            "$RUNNER_TEMP/store/kilo-extension-$VERSION-firefox.cyclonedx.json"
+          )
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes-file "$NOTES" --latest=false
+            gh release upload "$TAG" "${SBOMS[@]}" --clobber
+          else
+            gh release create "$TAG" --verify-tag --latest=false --title "$TITLE" --notes-file "$NOTES" "${SBOMS[@]}"
+          fi
+
+  bump-version:
+    needs: [build-artifacts, release]
     # Only a main dispatch bumps: a branch dispatch would open a PR carrying
     # unrelated commits. Also guarded to the canonical repo: a fork dispatch
     # would otherwise push a bump branch and open a PR against the fork.
@@ -133,13 +352,26 @@ jobs:
           echo "old=$OLD" >> "$GITHUB_OUTPUT"
           echo "new=$NEW" >> "$GITHUB_OUTPUT"
 
+      # The section the released version earns. The notes arrive through env,
+      # never as script text: a pull request subject can carry anything.
+      - name: Write the changelog section
+        env:
+          NOTES: ${{ needs.release.outputs.notes }}
+          OLD: ${{ steps.bump.outputs.old }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$NOTES" > "$RUNNER_TEMP/extension-notes.md"
+          node scripts/kilo-extension-release-notes.mjs write \
+            --heading "## $OLD ($(date -u +%Y-%m-%d))" \
+            --body-file "$RUNNER_TEMP/extension-notes.md"
+
       - name: Push bump branch
         run: |
           NEW="${{ steps.bump.outputs.new }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "extension-version-bump-$NEW"
-          git add apps/extension/package.json
+          git add apps/extension/package.json apps/extension/CHANGELOG.md
           git commit -m "chore(extension): bump version to $NEW"
           git push -u origin "extension-version-bump-$NEW"
 
@@ -153,21 +385,24 @@ jobs:
           cat > /tmp/bump-pr-body.md <<EOF
           ## What
 
-          Bumps apps/extension (kilo-extension) version $OLD -> $NEW.
+          Bumps apps/extension (kilo-extension) version $OLD -> $NEW and adds the
+          $OLD section to apps/extension/CHANGELOG.md.
 
           ## Why
 
           The Extension Store Release workflow built store-submittable artifacts for
-          version $OLD (run: $RUN_URL). Stores reject re-used version numbers, so the
+          version $OLD, tagged that commit as kilo-extension-release/$OLD and published
+          its release (run: $RUN_URL). Stores reject re-used version numbers, so the
           version is patch-bumped after every successful artifact build to keep the
-          next build submittable.
+          next build submittable. The changelog section lists what shipped in $OLD.
 
           ## What to do
 
           1. Required checks show as pending: PRs opened with the default GITHUB_TOKEN
              do not trigger workflow runs. Close and reopen this PR (or push an empty
              commit) to start CI.
-          2. Review and merge. Only the version line changed; no product code.
+          2. Review and merge. Only the version line and the changelog changed; no
+             product code. The next dispatch builds $NEW.
           EOF
           gh pr create --base main \
             --title "chore(extension): bump version to $NEW" \

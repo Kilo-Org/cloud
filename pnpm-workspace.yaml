@@ -16,7 +16,7 @@ catalog:
   # Workers-compatible JSON Schema validator for the kilo-mcp call tool.
   # AJV cannot run on Workerd: it compiles schemas with `new Function`, which
   # the Workers runtime forbids. Pinned exactly.
-  '@cfworker/json-schema': 4.1.1
+  '@cfworker/json-schema': 4.1.6
   '@octokit/auth-app': 8.2.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
@@ -31,14 +31,17 @@ catalog:
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260707.2
+  # vitest 4, for the workspaces that cannot run vitest 5; the `catalogs.vitest5`
+  # note below says which workspaces stay here and why.
   '@vitest/coverage-v8': 4.1.12
   '@vitest/ui': 4.1.12
-  '@workos-inc/node': 11.0.0
+  '@workos-inc/node': 12.2.0
   aws4fetch: 1.0.20
+  dotenv: 18.0.10
   drizzle-kit: 0.31.11
-  drizzle-orm: 0.45.2
-  hono: 4.13.13
-  jose: 6.2.12
+  drizzle-orm: 0.45.4
+  hono: 4.13.16
+  jose: 6.2.17
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
   # apps/web builds its CSS with this and the workspace override below forces one
@@ -53,20 +56,25 @@ catalog:
   # its own instead of a second pin here.
   typescript: 7.0.2
   ulid: 3.0.2
+  # vitest 4; the `catalogs.vitest5` note below says which workspaces take
+  # `catalog:vitest5` instead.
   vitest: 4.1.12
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
   zod: 4.6.7
 
 catalogs:
-  # Active test stack: vitest 5 plus its companions at the same version.
-  # Workspaces still on the default `catalog:` entries above at vitest 4 are the
-  # ones that test through `@cloudflare/vitest-pool-workers` (it peers only
-  # `^4.1.0`, so vitest 5 breaks its pool) and the excluded features.
+  # Active test stack: vitest 5 plus its companions at the same version. Take it
+  # with `catalog:vitest5`.
+  # Two kinds of workspace still read the default `catalog:` pins at vitest 4:
+  # the suites whose config loads `cloudflareTest` from
+  # @cloudflare/vitest-pool-workers, which peers only `^4.1.0` and so cannot run
+  # vitest 5; and the excluded-feature and node-environment workspaces that have
+  # not moved, where nothing in the config needs vitest 4.
   vitest5:
-    '@vitest/coverage-v8': 5.0.5
-    '@vitest/ui': 5.0.5
-    vitest: 5.0.5
+    '@vitest/coverage-v8': 5.1.0
+    '@vitest/ui': 5.1.0
+    vitest: 5.1.0
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
@@ -111,6 +119,15 @@ minimumReleaseAgeExclude:
   - '@types/bun@1.4.4'
   - bun-types@1.4.4
 overrides:
+  # The AWS SDK v3 graph resolves these two smithy packages through caret ranges
+  # from every one of its parents (^3.24.4 and ^4.12.5), and the versions it
+  # picked, @smithy/core 3.24.4 and @smithy/smithy-client 4.12.5, are deprecated
+  # upstream for a custom-logger redaction bug. Pinning the fixed releases keeps
+  # the whole graph on one copy each and off the deprecated snapshots, including
+  # after a later re-resolution; move them through a reviewed change here and in
+  # the lockfile, as the note further down requires.
+  '@smithy/core': 3.40.0
+  '@smithy/smithy-client': 4.15.2
   # One pg client in the tree: drizzle-orm's optional peers include pg, so two
   # pg versions split drizzle-orm into two packages and their SQL types stop
   # being assignable to each other across workspace imports.
@@ -129,7 +146,7 @@ overrides:
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
   storybook: 10.6.2
-  next: 16.4.2
+  next: 16.4.5
   preact: 10.28.4
   adm-zip: 0.6.1
   baseline-browser-mapping: 2.11.20
@@ -150,7 +167,6 @@ overrides:
   esbuild: '>=0.28.1 <0.29'
   lodash: 4.18.1
   diff: 8.0.3
-  fast-xml-parser: 5.7.3
   fflate@^0.4.8: 0.4.9
   fflate@^0.8.2: 0.8.3
   vite: '>=8.1.6 <8.2.0'
@@ -162,7 +178,7 @@ overrides:
   dompurify: 3.4.17
   handlebars: 4.7.10
   brace-expansion: 5.0.12
-  node-forge: 1.4.2
+  node-forge: 1.4.3
   proxy-addr: 2.0.8
   compression: 1.8.2
   source-map-js: 1.2.2
@@ -174,9 +190,16 @@ overrides:
   # would silently change the zod the shipped MCP client is built against.
   # Follow the catalog pin so the two cannot drift apart.
   '@modelcontextprotocol/sdk>zod': 'catalog:'
+  # cmdk declares ranges for these Radix packages, so the lockfile keeps an
+  # older copy of each beside the version apps/web now pins. A blanket entry
+  # would also move the copies that other parents' ranges resolve, so name the
+  # parent and the reviewed version.
+  'cmdk>@radix-ui/react-compose-refs': 1.1.5
+  'cmdk>@radix-ui/react-id': 1.1.4
+  'cmdk>@radix-ui/react-primitive': 2.2.0
   picomatch@^2: 2.3.2
-  picomatch@^4: 4.0.4
-  yaml: 2.8.4
+  picomatch@^4: 4.0.7
+  yaml: 2.9.1
   undici@^7: 7.30.1
   path-to-regexp: 8.4.2
   ip-address: 10.7.1
@@ -192,8 +215,11 @@ overrides:
   # future dependent, bounded to the reviewed major.
   serialize-javascript: '>=7.0.3 <8'
   hono: 'catalog:'
-  '@modelcontextprotocol/sdk@1.29.0': 1.32.1
-  '@modelcontextprotocol/sdk@1.32.1>@hono/node-server': 2.0.10
+  # openclaw depends on @modelcontextprotocol/sdk 1.29.0 exactly, and
+  # @google/genai then peers onto that copy; lift both onto the 1.32.2 that
+  # apps/extension and packages/harness-sdk pin so the tree keeps one MCP
+  # server. Drop the entry when openclaw's own range admits 1.32.2.
+  '@modelcontextprotocol/sdk@1.29.0': 1.32.2
   # @simplewebauthn/server's ASN.1 parser must come from the same
   # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
   # schemas into. apps/web pins asn1-schema/-x509 to 2.8.0 for its Apple App
@@ -209,15 +235,25 @@ overrides:
   # no release for the advisories fixed in 6.24.0-6.28.1, so it moves to the
   # same 6.x copy as above, which also drops its @fastify/busboy dependency.
   undici@^5: 6.29.1
-  # Further vercel CLI transitives with exact vulnerable pins: @vercel/fun,
-  # @vercel/python-analysis and @vercel/backends respectively. eas-cli likewise
-  # pins vulnerable minimatch 5, nanoid 3 and ajv 8 (ajv also via
-  # @vercel/static-config).
+  # Exact pins for vulnerable transitive ranges. Each range key covers every
+  # dependent that asks that range, so the list under it names the ones present
+  # today; a parent bump shows which pin to re-check. The @vercel/* parents are
+  # the CLI transitives this group was opened for.
+  #   @tootallnate/once@^2 — @vercel/fun
+  #   nanoid@^3 — eas-cli, expo-router, postcss
+  #   minimatch@^5 — eas-cli, filelist, readdir-glob
+  #   ajv@^8 — @modelcontextprotocol/sdk, @segment/ajv-human-errors,
+  #     @vercel/static-config, addons-linter, ajv-formats, ajv-keywords,
+  #     eas-cli, schema-utils
+  #   minimatch@^10 — @expo/fingerprint, @oclif/core,
+  #     @typescript-eslint/typescript-estree, @vercel/python-analysis,
+  #     @vercel/queue, glob, openclaw, test-exclude
   '@tootallnate/once@^2': 2.0.1
   minimatch@^5: 5.1.9
   nanoid@^3: 3.3.20
   ajv@^8: 8.20.0
   minimatch@^10: 10.2.6
+  # Parent-scoped because only @vercel/backends needs this fix.
   '@vercel/backends>srvx': 0.11.22
   # zod 4 below 4.6.6 grows issue lists without bound on oversized arrays.
   # Exact pins in @kilocode/plugin and the vercel CLI follow the catalog instead.
@@ -227,7 +263,6 @@ overrides:
   # https://github.com/parcel-bundler/lightningcss/issues/1081
   lightningcss: 1.30.1
   axios: 1.20.0
-  fast-uri: 3.1.8
   joi: 17.13.9
   postcss-selector-parser@^7.0.0: 7.1.6
   postcss-selector-parser@6.0.10: 7.1.6
@@ -239,7 +274,7 @@ overrides:
   linkify-it: 5.0.2
   protobufjs: 7.6.5
   sharp: 0.35.5
-  tar: 7.5.21
+  tar: 7.5.22
   pbkdf2: 3.1.7
   shell-quote: 1.11.0
   # Keep one @slack/web-api in the tree. @chat-adapter/slack needs ^7.18.0 while
@@ -249,7 +284,19 @@ overrides:
   # @chat-adapter/slack moves to @slack/web-api 8.
   '@slack/web-api': 7.19.0
   # Keep the app, widgets peer and router on one native-module copy.
-  '@expo/ui': 58.0.17
+  '@expo/ui': 58.0.28
+  # Two SDK modules still ask for an older patch of these two than the app and
+  # the rest of expo do: expo-notifications asks expo-application ~58.1.1 and
+  # expo-linking asks expo-constants ~58.0.12. Both ranges admit the newer
+  # version, so pin the newer one and ship one native module each instead of two
+  # JavaScript bindings over the same native module. Drop these two entries when
+  # expo-notifications and expo-linking move to the SDK's own versions.
+  expo-application: 58.1.2
+  expo-constants: 58.0.16
+  # eas-cli pins @expo/spawn-async 1.7.2 while the other Expo packages ask for
+  # ^1.8.0, which leaves two copies of the same spawn helper in the tree. The
+  # 1.8.0 API is a superset of 1.7.2, so align every dependent on it.
+  '@expo/spawn-async': 1.8.0
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false). An injected
@@ -280,6 +327,8 @@ packageExtensions:
     peerDependencies:
       '@types/react': '*'
 patchedDependencies:
+  # Reinitializing Sentry's async context at each cold DO loses in-flight scopes.
+  '@sentry/cloudflare@10.69.0': patches/@sentry+cloudflare@10.69.0.patch
   # Text date styles for the glanceable widgets and Live Activity: `elapsed`
   # ("31 minutes", no seconds) and `ago` ("3 minutes ago"). Also separates a
   # bottom sheet's drag gesture from its back/scrim dismissal and lets a caller
@@ -290,26 +339,20 @@ patchedDependencies:
   # A sheet whose content clears the status bar itself can say so, and then
   # Material3 stops reserving that inset: a dialog window reports it only after
   # the sheet was measured, which used to move the sheet's whole content.
-  '@expo/ui@58.0.17': patches/@expo+ui@58.0.17.patch
-  expo-dev-launcher@58.0.14: patches/expo-dev-launcher@58.0.14.patch
-  # The app owns the layout direction: the picker forces RTL for an RTL language
-  # and relaunches, and the unset build-time template value must not reset that
-  # choice before React renders, or the relaunched app comes back in the other
-  # direction on every launch. Android links the package's published AAR unless
-  # apps/mobile/package.json lists expo-localization under
-  # expo.autolinking.android.buildFromSource, so this patch only takes effect
-  # there while that entry stays.
-  expo-localization@58.0.4: patches/expo-localization@58.0.4.patch
+  # The version in the key must equal the `'@expo/ui'` override above.
+  '@expo/ui@58.0.28': patches/@expo+ui@58.0.28.patch
+  expo-dev-launcher@58.0.20: patches/expo-dev-launcher@58.0.20.patch
   # A zero badge count must not cancel every app notification: upstream called
   # cancelAll(), which removed the ongoing Active Agents card on Android.
-  expo-notifications@58.1.4: patches/expo-notifications@58.1.4.patch
+  expo-notifications@58.1.9: patches/expo-notifications@58.1.9.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
   # router — rank static-suffix siblings before catch-all index routes, and
   # keep the bottom tab bar from becoming one accessibility element (iOS named
   # it after the first tab and treated it as the container of every screen);
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,
   # includeEnded instance reads, factory-registered push-to-start URL.
-  expo-router@58.0.19: patches/expo-router@58.0.19.patch
+  expo-router@58.0.31: patches/expo-router@58.0.31.patch
+  expo-widgets@58.0.28: patches/expo-widgets@58.0.28.patch
   # Typed-routes generation must skip colocated tests, exactly like the Metro
   # blockList in apps/mobile/metro.config.js already does for the runtime
   # bundle. A `*.test.tsx` next to a route registers as a route, and a
@@ -317,7 +360,7 @@ patchedDependencies:
   # layout; the generator then drops the group's entire subtree, so every
   # `(tabs)` route vanishes from the generated `Href` union and typecheck
   # rejects valid navigations.
-  '@expo/router-server@58.0.13': patches/@expo+router-server@58.0.13.patch
+  '@expo/router-server@58.0.22': patches/@expo+router-server@58.0.22.patch
   # workerd has no undici ALPN support and the bundle must not read package.json
   # at runtime: use globalThis.fetch and inline the SDK version the push request
   # headers report. The patch hard-codes 6.1.0, so it is pinned to that release
@@ -325,17 +368,20 @@ patchedDependencies:
   expo-server-sdk@6.1.0: patches/expo-server-sdk@6.1.0.patch
   # Correlate native recognition callbacks with their originating run; the app
   # consumes only kiloEvent, and old native teardown owns only old resources.
-  expo-speech-recognition@57.1.1: patches/expo-speech-recognition@57.1.1.patch
+  expo-speech-recognition@58.0.1: patches/expo-speech-recognition@58.0.1.patch
   # Android: keep the React host after a headless expo-task-manager run. The
   # loader destroyed the host after each background task, and a destroyed host
   # keeps its native memory, so each background push or refresh added a new
   # instance until a native allocation aborted the process (KILO-APP-3EF).
-  expo-modules-core@58.0.18: patches/expo-modules-core@58.0.18.patch
+  expo-modules-core@58.1.0: patches/expo-modules-core@58.1.0.patch
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
-  expo-task-manager@58.0.12: patches/expo-task-manager@58.0.12.patch
-  expo-widgets@58.0.17: patches/expo-widgets@58.0.17.patch
+  # iOS: hold the execution request for the length of a launch. A task that
+  # finishes on another thread releases it mid-launch, and the launch then sends
+  # `maybeEvaluate` to a freed object, which is the background-task launch crash
+  # (expo/expo#51789, expo/expo#47316).
+  expo-task-manager@58.0.14: patches/expo-task-manager@58.0.14.patch
   # PurchaseConnector.create returns the native promise, so a create failure
   # is observable. Android: compile against the project's Kotlin stdlib, not
   # the 2.4.10 default that RN 0.86's Kotlin 2.1 compiler cannot read. The
@@ -364,21 +410,20 @@ patchedDependencies:
   # text layout threw ("Required value was null"). Start each instance's tags at
   # the range it claims (apps/mobile/src/lib/view-tag-range.ts,
   # modules/kilo-view-tag-range), defaulting to the platform's own start.
-  react-native@0.88.0: patches/react-native@0.88.0.patch
+  react-native@0.88.1: patches/react-native@0.88.1.patch
   # Android: defer sheet insets registration to ON_RESUME when React has no
   # current activity during fragment ON_START; react-native-screens#4531.
-  react-native-screens@4.30.0: patches/react-native-screens@4.30.0.patch
+  react-native-screens@4.30.1: patches/react-native-screens@4.30.1.patch
   # React Native installs on-device JSI bindings through its TurboModule runtime hook.
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
+  # The version in the key must equal the `stripe` catalog pin above.
   stripe@23.0.0: patches/stripe@23.0.0.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
-  # Keep lease renewal errors categorical; neither runtime may log receipt handles.
-  '@vercel/queue@0.8.0': patches/@vercel+queue@0.8.0.patch
   # Give the Apple @ExpoModule class scan 60 s instead of the hard-coded 5 s.
   # Slow macOS CI runners exceed 5 s; the configure phase then leaves modules
   # out of the modules provider and the iOS build fails. Keep src/ and build/
   # aligned: the build/ copy is the one autolinking runs.
-  expo-modules-autolinking@58.0.13: patches/expo-modules-autolinking@58.0.13.patch
+  expo-modules-autolinking@58.1.0: patches/expo-modules-autolinking@58.1.0.patch
   # Session list, agent transcript and the other recycling lists. FlashList
   # reads a row key and an item type from its engaged index range and from the
   # maintainVisibleContentPosition anchor, and both come from the layout
@@ -387,8 +432,18 @@ patchedDependencies:
   # past the rows that arrived. The patch bounds the engaged-index passes and
   # answers an out-of-range key and type without calling the list's callbacks,
   # so those are never handed an undefined row that keyExtractor would
-  # dereference. Remove once an upstream release carries both guards.
+  # dereference. It also reads a row layout through the bounds-safe accessor, so
+  # a stale onLayout or render-stack entry past a shrink draws nothing instead of
+  # throwing, and it drops the forced child re-render whose rows the collection
+  # already drew, so the parent's layout effect and the collection's commit no
+  # longer re-enter each other until React's nested update limit. Remove once an
+  # upstream release carries every guard.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
+  # NativeWind's `react-native` proxy names only the exports its wrapper components
+  # need; every other export, such as the `AssetRegistry` that expo-asset reads, was
+  # `undefined`, which breaks the whole module that imports it. Forward the rest from
+  # the real module. Remove once upstream forwards them itself.
+  react-native-css@3.1.0-rc.1: patches/react-native-css@3.1.0-rc.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

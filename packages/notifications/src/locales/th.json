@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "เซสชันเอเจนต์ของคุณมีการอัปเดต",
-      "chatMessage": "คุณมีข้อความใหม่",
-      "instanceLifecycle": "อินสแตนซ์ของคุณมีการอัปเดต",
-      "scheduledAction": "การดำเนินการที่กำหนดไว้มีการอัปเดต",
       "lowBalance": "ยอดคงเหลือของคุณต้องได้รับการดูแล",
       "spendAlert": "ค่าใช้จ่ายของคุณต้องได้รับการดูแล",
       "securityFinding": "พบปัญหาความปลอดภัยที่ต้องได้รับการดูแล",
@@ -13,30 +10,9 @@
       "activeAgentsGlanceable": "เอเจนต์ที่กำลังทำงานมีการอัปเดต"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "งานเสร็จสมบูรณ์"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "ล้มเหลว: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "ถูกขัดจังหวะ: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · ไม่มีชื่อ",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,54 +24,23 @@
       "title": "การแจ้งเตือนค่าใช้จ่าย",
       "body": "ค่าใช้จ่ายของ {{scopeName}} เกิน ${{amountUsd}}"
     },
-    "securityFindingNew": {
-      "title": "พบปัญหาความปลอดภัยใหม่ ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}} ใน {{repoFullName}}"
+    },
+    "securityFindingNew": {
+      "title": "พบปัญหาความปลอดภัยใหม่ ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "คำเตือน SLA",
-      "body": "{{findingTitle}} ใน {{repoFullName}}"
+      "title": "คำเตือน SLA"
     },
     "securityFindingSlaBreach": {
-      "title": "ละเมิด SLA",
-      "body": "{{findingTitle}} ใน {{repoFullName}}"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "การตรวจสอบความปลอดภัยมีการอัปเดต"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} พร้อมแล้ว",
-      "body": "แตะเพื่อเริ่มแชท"
-    },
-    "startFailed": {
-      "title": "{{instanceName}} เริ่มต้นไม่สำเร็จ",
-      "body": "เริ่มต้นล้มเหลว"
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} จะรีสตาร์ทเร็ว ๆ นี้",
-      "body": "กำหนดให้รีสตาร์ทที่ {{when}}"
-    },
-    "restartCancelled": {
-      "title": "ยกเลิกการรีสตาร์ท {{instanceName}} แล้ว",
-      "body": "การรีสตาร์ทที่กำหนดไว้ก่อนหน้านี้ถูกยกเลิกแล้ว"
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} จะอัปเกรดเร็ว ๆ นี้",
-      "bodyWithTag": "อัปเกรดเป็น {{targetImageTag}} ที่ {{when}}",
-      "bodyWithoutTag": "กำหนดอัปเกรดที่ {{when}}"
-    },
-    "versionChangeCancelled": {
-      "title": "ยกเลิกการอัปเกรด {{instanceName}} แล้ว",
-      "body": "การอัปเกรดที่กำหนดไว้ก่อนหน้านี้ถูกยกเลิกแล้ว"
+      "title": "ละเมิด SLA"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "เซสชัน Kilo ของคุณพร้อมให้ควบคุมจากโทรศัพท์ของคุณ"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

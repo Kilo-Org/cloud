@@ -65,12 +65,10 @@ export type WebhookEvent = {
 };
 
 /**
- * GitHub requester information
+ * Persisted requester and pending-approval metadata shapes. They are declared
+ * once, by the zod schemas that validate the stored JSON.
  */
-export type GitHubRequester = {
-  id: string;
-  login: string;
-};
+export type { GitHubRequester, KiloRequester, PendingApprovalMetadata } from './schemas';
 
 export type InstallationToken = {
   token: string;
@@ -87,25 +85,4 @@ export type GitHubInstallationData = {
   permissions: Record<string, unknown>;
   events: string[];
   created_at: string;
-};
-
-/**
- * Kilo User requester information
- */
-
-export type KiloRequester = {
-  kilo_user_id: string;
-  kilo_user_email: string;
-  kilo_user_name: string;
-  requested_at: string;
-};
-
-/**
- * Pending approval metadata structure
- */
-export type PendingApprovalMetadata = {
-  status: string;
-  requester?: KiloRequester;
-  github_requester?: GitHubRequester;
-  github_request_id?: string;
 };

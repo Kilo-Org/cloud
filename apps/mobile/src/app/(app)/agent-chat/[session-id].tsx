@@ -22,11 +22,11 @@ import { SessionContextMetrics } from '@/components/agents/session-context-metri
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { useSessionSlowLoadPhase } from '@/components/agents/session-slow-load';
 import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
-import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { SessionPermanentError } from '@/components/agents/session-permanent-error';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { parseParam } from '@/lib/route-params';
+import { parseOrganizationScope } from '@/lib/cloud-agent-scope';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { isAddressableStoredSessionId } from '@/lib/session-id-shape';
 import { useRestoredRouteOpen } from '@/lib/hooks/use-restored-route-open';
@@ -43,7 +43,7 @@ export default function SessionDetailScreen() {
   const confirmation = useIdentityConfirmation();
   const {
     'session-id': rawSessionId,
-    organizationId: routeOrganizationId,
+    organizationId: rawOrganizationId,
     via,
     spawned,
     cloned,
@@ -86,7 +86,12 @@ export default function SessionDetailScreen() {
   // or a `string[]`, both of which parseParam rejects. Optional params keep
   // the existing first-element unwrapping below.
   const sessionId = parseParam(rawSessionId);
-  // Param can be string | string[] depending on how the route was opened.
+  // Param can be string | string[] depending on how the route was opened. The
+  // organization decides which procedures every request below uses, and those
+  // validate it as a UUID: a hand-built link (or a navigation that lost the
+  // param) must read as "no route scope" so the metadata read resolves the real
+  // one, instead of failing every org-scoped request with a permanent 400.
+  const routeOrganizationId = parseOrganizationScope(rawOrganizationId);
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
   const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
@@ -278,7 +283,6 @@ export default function SessionDetailScreen() {
             </View>
           }
           headerRightShrinks
-          className="pb-1"
         />
         <SessionSkeletonMessages sessionId={sessionId} />
         {isPendingWritable ? <SessionComposerSkeleton /> : <SessionReadOnlyFooterPlaceholder />}
@@ -354,7 +358,6 @@ export default function SessionDetailScreen() {
       variant = 'permission';
     }
     const retry = identityFailed ? confirmation.retry : () => void sessionQuery.refetch();
-    const copyText = buildTerminalErrorCopyText({ sessionId, title, message });
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -362,7 +365,6 @@ export default function SessionDetailScreen() {
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
           backFallback={AGENTS_SESSIONS_HREF}
-          className="pb-1"
         />
         <SessionPermanentError
           variant={variant}
@@ -370,7 +372,6 @@ export default function SessionDetailScreen() {
           message={message}
           retry={notFound || unauthorized ? undefined : retry}
           isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
-          copyText={copyText}
           restoredRouteOpen={restoredOpen && (notFound || unauthorized)}
         />
       </View>

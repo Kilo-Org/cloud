@@ -16,13 +16,17 @@ import { AppUnlockFeedback } from '@/components/app-unlock-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { useAppUnlock } from '@/lib/app-unlock-context';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
 import { useHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
 /**
  * General settings subpage. Rows are moved verbatim from the former
@@ -75,83 +79,87 @@ export function GeneralSettingsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('preferences.general')} />
+      <ScreenHeader title={t('preferences.general')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 gap-3 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <View className="gap-2">
-          <PreferenceRow
-            icon={Shield}
-            title={t('preferences.biometricUnlock')}
-            subtitle={t('preferences.biometricUnlockSubtitle')}
-            value={unlock.enabled}
-            disabled={unlock.busy || unlock.status !== 'unlocked'}
-            busy={unlock.busy}
-            onValueChange={handleUnlockChange}
-          />
+        <Section>
+          <RowGroup>
+            <PreferenceRow
+              icon={Shield}
+              title={t('preferences.biometricUnlock')}
+              subtitle={t('preferences.biometricUnlockSubtitle')}
+              value={unlock.enabled}
+              disabled={unlock.busy || unlock.status !== 'unlocked'}
+              busy={unlock.busy}
+              onValueChange={handleUnlockChange}
+            />
+          </RowGroup>
           <AppUnlockFeedback outcome={unlock.purpose === 'setting' ? unlock.outcome : null} />
-        </View>
-        <PreferenceRow
-          icon={Brain}
-          title={t('preferences.autoExpandThinking')}
-          subtitle={
-            hideThinking
-              ? t('preferences.autoExpandThinkingInactiveSubtitle')
-              : t('preferences.autoExpandThinkingSubtitle')
-          }
-          inactiveSubtitle={
-            hideThinking
-              ? t('preferences.autoExpandThinkingSubtitle')
-              : t('preferences.autoExpandThinkingInactiveSubtitle')
-          }
-          value={defaultExpanded}
-          // The row states a dependency on the hide-thinking preference, so it
-          // stays inert until both stored values are known.
-          disabled={!reasoningLoaded || !hideThinkingLoaded || hideThinking}
-          onValueChange={setDefaultExpanded}
-        />
-        <PreferenceRow
-          icon={EyeOff}
-          title={t('preferences.hideThinking')}
-          subtitle={t('preferences.hideThinkingSubtitle')}
-          value={hideThinking}
-          disabled={!hideThinkingLoaded}
-          onValueChange={setHideThinking}
-        />
-        <PreferenceRow
-          icon={Rows3}
-          title={t('preferences.condenseToolCalls')}
-          subtitle={t('preferences.condenseToolCallsSubtitle')}
-          value={condenseToolCalls}
-          disabled={!condenseToolCallsLoaded}
-          onValueChange={setCondenseToolCalls}
-        />
-        <PreferenceRow
-          icon={Smartphone}
-          title={t('preferences.keepScreenOn')}
-          subtitle={t('preferences.keepScreenOnSubtitle')}
-          value={keepScreenOn}
-          disabled={!keepScreenOnLoaded}
-          onValueChange={setKeepScreenOn}
-        />
-        <PreferenceRow
-          icon={MessageSquare}
-          title={t('preferences.prReviewAttribution')}
-          subtitle={t('preferences.prReviewAttributionSubtitle')}
-          value={prReviewFooter}
-          disabled={!prReviewFooterLoaded}
-          onValueChange={setPrReviewFooter}
-        />
-        <PreferenceRow
-          icon={CornerDownLeft}
-          title={t('preferences.returnSendsMessage')}
-          subtitle={t('preferences.returnSendsMessageSubtitle')}
-          value={returnSendsMessage}
-          disabled={!hasLoaded}
-          onValueChange={setReturnSendsMessage}
-        />
+        </Section>
+        <RowGroup>
+          <PreferenceRow
+            icon={Brain}
+            title={t('preferences.autoExpandThinking')}
+            subtitle={
+              hideThinking
+                ? t('preferences.autoExpandThinkingInactiveSubtitle')
+                : t('preferences.autoExpandThinkingSubtitle')
+            }
+            inactiveSubtitle={
+              hideThinking
+                ? t('preferences.autoExpandThinkingSubtitle')
+                : t('preferences.autoExpandThinkingInactiveSubtitle')
+            }
+            value={defaultExpanded}
+            // The row states a dependency on the hide-thinking preference, so it
+            // stays inert until both stored values are known.
+            disabled={!reasoningLoaded || !hideThinkingLoaded || hideThinking}
+            onValueChange={setDefaultExpanded}
+          />
+          <PreferenceRow
+            icon={EyeOff}
+            title={t('preferences.hideThinking')}
+            subtitle={t('preferences.hideThinkingSubtitle')}
+            value={hideThinking}
+            disabled={!hideThinkingLoaded}
+            onValueChange={setHideThinking}
+          />
+          <PreferenceRow
+            icon={Rows3}
+            title={t('preferences.condenseToolCalls')}
+            subtitle={t('preferences.condenseToolCallsSubtitle')}
+            value={condenseToolCalls}
+            disabled={!condenseToolCallsLoaded}
+            onValueChange={setCondenseToolCalls}
+          />
+          <PreferenceRow
+            icon={Smartphone}
+            title={t('preferences.keepScreenOn')}
+            subtitle={t('preferences.keepScreenOnSubtitle')}
+            value={keepScreenOn}
+            disabled={!keepScreenOnLoaded}
+            onValueChange={setKeepScreenOn}
+          />
+          <PreferenceRow
+            icon={MessageSquare}
+            title={t('preferences.prReviewAttribution')}
+            subtitle={t('preferences.prReviewAttributionSubtitle')}
+            value={prReviewFooter}
+            disabled={!prReviewFooterLoaded}
+            onValueChange={setPrReviewFooter}
+          />
+          <PreferenceRow
+            icon={CornerDownLeft}
+            title={t('preferences.returnSendsMessage')}
+            subtitle={t('preferences.returnSendsMessageSubtitle')}
+            value={returnSendsMessage}
+            disabled={!hasLoaded}
+            onValueChange={setReturnSendsMessage}
+          />
+        </RowGroup>
       </TabScreenScrollView>
     </View>
   );

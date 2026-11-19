@@ -3,22 +3,26 @@ import { useRouter } from 'expo-router';
 import { type ReactNode, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
 import { SheetTitleRow } from '@/components/sheet-title-row';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { ListTodo } from '@/components/ui/icons';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { invalidateTodoQueries, useSessionTodo, useTodoCandidates } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useOrganization } from '@/lib/organization-context';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { todoItemPath } from '@/lib/todos/todo-routes';
 import { type TodoCandidate } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
+
+import { TODO_SHEET_STATE_BODY_CLASS } from './todo-sheet-body';
 
 /** `To-do: <title>` under the session header while the session belongs to a to-do. */
 export function SessionTodoChip({ sessionId }: Readonly<{ sessionId: string }>) {
@@ -72,9 +76,8 @@ function SessionTodoCandidatesSheet({
   const { t } = useTranslation();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { bottom } = useSafeAreaInsets();
-  const { organizationId } = useOrganization();
-  const candidates = useTodoCandidates(sessionId, organizationId, visible);
+  const bottomClearance = useDetailScreenBottomPadding();
+  const candidates = useTodoCandidates(sessionId, visible);
   const linkSession = useMutation(
     trpc.todos.items.linkSession.mutationOptions({
       onError: error => {
@@ -95,7 +98,7 @@ function SessionTodoCandidatesSheet({
   let body: ReactNode = null;
   if (candidates.isPending) {
     body = (
-      <View className="items-center py-8">
+      <View className={cn('items-center', TODO_SHEET_STATE_BODY_CLASS)}>
         <ActivityIndicator />
       </View>
     );
@@ -103,22 +106,23 @@ function SessionTodoCandidatesSheet({
     body = (
       <QueryError
         placement="static"
+        inset="gutter"
         onRetry={() => void candidates.refetch()}
         isRetrying={candidates.isFetching}
       />
     );
   } else if (groups.length === 0) {
     body = (
-      <Text className="px-5 py-8 text-center text-sm text-muted-foreground">
+      <Text
+        className={cn(TODO_SHEET_STATE_BODY_CLASS, 'text-center text-sm text-muted-foreground')}
+      >
         {t('todos.candidates.empty')}
       </Text>
     );
   } else {
     body = groups.map(group => (
       <View key={group.listId} className="pb-2">
-        <Text variant="eyebrow" className="px-5 pb-1 pt-3">
-          {group.listName}
-        </Text>
+        <SectionHeader label={group.listName} inset />
         {group.items.map(item => (
           <Pressable
             key={item.id}
@@ -128,9 +132,9 @@ function SessionTodoCandidatesSheet({
             }}
             accessibilityRole="button"
             accessibilityLabel={item.title}
-            className="min-h-12 justify-center border-b border-hair-soft px-5 py-2 active:opacity-70"
+            className="min-h-14 justify-center border-b-[0.5px] border-hair-soft px-4 py-3 active:opacity-70"
           >
-            <Text className="text-base text-foreground" numberOfLines={2}>
+            <Text className="text-sm text-foreground" numberOfLines={2}>
               {item.title}
             </Text>
           </Pressable>
@@ -149,9 +153,10 @@ function SessionTodoCandidatesSheet({
       dismissGestures={false}
       snapPoints={['70%']}
     >
-      <View className="flex-1 pt-4">
+      {/* The title row takes the under-handle padding itself. */}
+      <View className="flex-1">
         <SheetTitleRow title={t('todos.linkToTodo')} onClose={onClose} />
-        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottomClearance }}>
           {body}
         </ScrollView>
       </View>
@@ -202,13 +207,13 @@ export function SessionTodoLinkRow({ sessionId }: Readonly<{ sessionId: string }
         }
         {...linkedA11y}
         accessibilityRole="button"
-        className="min-h-11 flex-row items-center gap-2 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 active:opacity-70')}
       >
         <ListTodo size={16} color={colors.mutedForeground} />
         <Text className="min-w-0 flex-1 text-base font-medium text-foreground" numberOfLines={1}>
           {todo ? t('todos.sessionTodo', { title: todo.title }) : t('todos.linkToTodo')}
         </Text>
-        <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+        <RowChevron />
       </Pressable>
       <SessionTodoCandidatesSheet
         sessionId={sessionId}

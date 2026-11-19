@@ -3,11 +3,16 @@
  *
  * Both audits read the same message catalogs: a catalog is a tree of messages,
  * a plural family is a set of keys that differ only by their category suffix,
- * and a family may count through `{{count}}`. Those are facts about the
- * catalogs, not rules of either gate, so they live here. Each audit keeps its
- * own allowlists, wording and exit behavior, including what it does with a key
- * that is not a plural category.
+ * a family may count through `{{count}}`, and only a family with both `_one` and
+ * `_other` is complete enough to be owed by every locale. Those are facts about
+ * the catalogs, not rules of either gate, so they live here. So is which
+ * families a locale must complete before its copy can count: both audits ask
+ * that question, so the answer lives here too. Each audit keeps its own
+ * allowlists, wording and exit behavior, including what it does with a key that
+ * is not a plural category.
  */
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** The plural categories i18next selects from, as they end a catalog key. */
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
@@ -22,6 +27,36 @@ export function pluralParts(key) {
     return null;
   }
   return { base: key.slice(0, -match[0].length), category: match[1] };
+}
+
+/**
+ * The kind of a `.json`-named entry of `dir`: 'file' names a regular file,
+ * 'unreadable' an entry stat cannot follow (stat threw), and 'other' an
+ * entry that exists but is not a regular file, such as a directory named
+ * like a catalog.
+ */
+export function catalogEntryKind(dir, name) {
+  try {
+    return statSync(join(dir, name)).isFile() ? 'file' : 'other';
+  } catch {
+    return 'unreadable';
+  }
+}
+
+/**
+ * The locale tags on disk in `dir`, sorted, without the `.json` extension.
+ *
+ * The tag's path must name a regular file, following symlinks: a directory
+ * named like a catalog is not a catalog, and reading it as one would end the
+ * audit in a stack trace, while a symlink to a real catalog audits like the
+ * file it names. An entry stat cannot follow is kept as a tag anyway,
+ * deliberately: the audit's own later read of that path reports the problem.
+ */
+export function catalogTags(dir) {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter(entry => entry.name.endsWith('.json') && catalogEntryKind(dir, entry.name) !== 'other')
+    .map(entry => entry.name.replace(/\.json$/, ''))
+    .sort();
 }
 
 /**
@@ -55,4 +90,88 @@ export function countPlaceholderBases(messages) {
       .filter(([, value]) => COUNT_PLACEHOLDER.test(value))
       .map(([key]) => pluralParts(key)?.base ?? key)
   );
+}
+
+/**
+ * The base key of every plural family a catalog declares, in catalog order.
+ *
+ * A key that ends in a category is a member of a family whatever the other
+ * members are, so this set is every base the catalog names — it is not the set
+ * of complete families, and a key-parity rule must use it as is: a locale that
+ * declares one member of an English family must not read its other siblings as
+ * extra keys.
+ */
+export function pluralFamilyBases(messages) {
+  const bases = new Set();
+  for (const key of messages.keys()) {
+    const parts = pluralParts(key);
+    if (parts) {
+      bases.add(parts.base);
+    }
+  }
+  return bases;
+}
+
+/**
+ * Whether a catalog declares a plural family for `base`. English needs the
+ * `_one` and `_other` categories, so a family is complete only when both are
+ * present.
+ */
+export function declaresPluralFamily(messages, base) {
+  return messages.has(`${base}_one`) && messages.has(`${base}_other`);
+}
+
+/**
+ * The families every locale owes the categories its own plural rules require.
+ *
+ * A family English declares is owed, unless English builds its copy from
+ * `{{count}}` — the variable that is the count. Those families were accepted
+ * with the flat-key fallback: a locale whose wording inflects no word keeps the
+ * one string and renders it at every count, so it owes no categories until it
+ * declares a member itself. A family built from `{{displayCount}}` or
+ * `{{itemCount}}` carries the caller's formatted number instead and gets no such
+ * fallback.
+ */
+export function familiesOwedByEveryLocale(english) {
+  const numeralFamilies = countPlaceholderBases(english);
+  return new Set(
+    [...pluralFamilyBases(english)].filter(
+      family => declaresPluralFamily(english, family) && !numeralFamilies.has(family)
+    )
+  );
+}
+
+/**
+ * The categories a locale lacks, by family base, for every family it must
+ * complete: a Map from the family base to the categories the tag selects that
+ * the locale does not carry, in the tag's category order.
+ *
+ * A family the locale declares itself — a member key with a category suffix —
+ * must carry every category its tag selects, whatever English ships. A family
+ * English declares and every locale owes (`familiesOwedByEveryLocale`) is
+ * mandatory when the locale carries the family's flat base key, and then every
+ * category the tag selects must be present. Every other family is not this
+ * locale's problem: a locale that lacks an owed family's base key is a
+ * key-parity finding, not a category finding.
+ *
+ * A complete family is absent from the Map, so an empty Map means the locale is
+ * complete. Both audits ask this question, so the answer lives here and neither
+ * audit carries the rule.
+ */
+export function missingPluralCategories(english, locale, tag) {
+  const required = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+  const owed = familiesOwedByEveryLocale(english);
+  const localeFamilies = pluralFamilyBases(locale);
+  const missing = new Map();
+  for (const family of new Set([...pluralFamilyBases(english), ...localeFamilies])) {
+    const mandatory = localeFamilies.has(family) || (owed.has(family) && locale.has(family));
+    if (!mandatory) {
+      continue;
+    }
+    const absent = required.filter(category => !locale.has(`${family}_${category}`));
+    if (absent.length > 0) {
+      missing.set(family, absent);
+    }
+  }
+  return missing;
 }

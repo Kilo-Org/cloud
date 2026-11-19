@@ -379,10 +379,11 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   const awaitingUpdate = home?.awaitingUpdate === true;
   const feedback = content ? safeText(props.actionFeedback) : null;
   const failed = feedback === 'couldNotApprove';
-  // An untitled agent is still named, so its row never reads as blank.
-  const rawTitle = home === undefined ? null : safeText(home.primaryTitle);
-  const title = rawTitle === null ? null : (filledText(rawTitle) ?? COPY.agent ?? 'Agent');
+  // A content surface always names its agent, including the shared rule's null
+  // for an untitled session, so its title never reads as a blank line. Props
+  // persisted without a Home presentation keep drawing no title at all.
   const agentTitle = (value: unknown) => filledText(value) ?? COPY.agent ?? 'Agent';
+  const title = content && home !== undefined ? agentTitle(home.primaryTitle) : null;
   const secondaryRows = (
     home === undefined ? records(props.countLines) : records(home.secondaryCounts)
   )
@@ -928,12 +929,22 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     </VStack>
   );
   const sectionLabel = (label: string) => text(label, 12, palette.muted, 'semibold');
-  // The scheduled line under the label: the next wake, Awaiting update, or the title.
+  // The scheduled line under the label: Awaiting update inside the retry
+  // window, the clock time the wake was due after it, the next wake, or the
+  // title. A past wake keeps the line rather than leaving the slot empty.
   const scheduledLine = (size: number, color: string) => {
     if (awaitingUpdate) {
       return text(COPY.awaitingUpdate ?? 'Awaiting update', size, palette.muted);
     }
     if (scheduledAt !== null) {
+      if (scheduledAt.getTime() <= today.getTime()) {
+        return (
+          <HStack spacing={3}>
+            {text(COPY.wasDue ?? 'Was due', size, palette.muted)}
+            {when(scheduledAt, size, palette.muted, 'short')}
+          </HStack>
+        );
+      }
       return (
         <HStack spacing={3}>
           {text(COPY.nextRun ?? 'Next run', size, color)}

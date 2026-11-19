@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
 import {
   COMPATIBLE_USER_AGENT,
+  type DirectByokAiSdkProvider,
   type DirectByokModel,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
@@ -16,9 +16,9 @@ import {
 import { getPrimaryCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/catalog-models';
 import {
   getOpenRouterModelsMetadataFromDatabase,
-  isValidOpenRouterModelId,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { isByokServableCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
@@ -61,10 +61,12 @@ function getDirectByokAiSdkProvider(
   provider: DirectByokProvider,
   model: DirectByokModel,
   id: string
-) {
-  return provider.getModelChatApi
-    ? AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)]
-    : getAiSdkProvider(id, provider.id);
+): DirectByokAiSdkProvider | undefined {
+  if (provider.getModelChatApi) {
+    return AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)];
+  }
+  const choice = provider.getAiSdkProvider?.(id);
+  return choice ? choice.aiSdkProvider : getAiSdkProvider(id);
 }
 
 function convertModel(provider: DirectByokProvider, model: DirectByokModel) {
@@ -143,7 +145,7 @@ export async function listDirectByokCatalogModels(
   if (!provider?.models_dev_id) return [];
   const entries: DirectByokCatalogEntry[] = [];
   for (const [catalogModelId, model] of getPrimaryCatalogModels(await provider.models())) {
-    if (await isLiveCatalogModelId(catalogModelId)) entries.push({ catalogModelId, model });
+    if (await isByokServableCatalogModelId(catalogModelId)) entries.push({ catalogModelId, model });
   }
   return entries;
 }
@@ -160,15 +162,12 @@ function isCatalogModeKey(key: EnabledByokProvider): boolean {
   return key.serveCatalogModels && supportsCatalogMode(key.providerId);
 }
 
-// The catalog can drift between syncs, so a stored mapping only counts while its id is current.
-async function isLiveCatalogModelId(catalogModelId: string): Promise<boolean> {
-  return isValidOpenRouterModelId(catalogModelId);
-}
-
 /** The catalog id that replaces `model`'s bespoke id in catalog mode, or null when unmapped. */
 export async function getDirectByokCatalogModelId(model: DirectByokModel): Promise<string | null> {
   const catalogModelId = model.catalog_model_id;
-  return catalogModelId && (await isLiveCatalogModelId(catalogModelId)) ? catalogModelId : null;
+  return catalogModelId && (await isByokServableCatalogModelId(catalogModelId))
+    ? catalogModelId
+    : null;
 }
 
 export type DirectByokCatalogModel = { provider: DirectByokProvider; model: DirectByokModel };
@@ -190,8 +189,9 @@ export async function findDirectByokCatalogModels(
     })
   );
   const found = candidates.flat();
-  if (found.length === 0 || !(await isLiveCatalogModelId(catalogModelId))) return [];
-  if (targetModelId !== catalogModelId && !(await isLiveCatalogModelId(targetModelId))) return [];
+  if (found.length === 0 || !(await isByokServableCatalogModelId(catalogModelId))) return [];
+  if (targetModelId !== catalogModelId && !(await isByokServableCatalogModelId(targetModelId)))
+    return [];
   return found;
 }
 
@@ -204,7 +204,11 @@ async function addLatestAliasModelIds(providersByModelId: CatalogModeProviders):
   for (const [modelId, storedModel] of Object.entries(storedModels)) {
     const targetModelId = storedModel.alias_target?.slug;
     const targetProviders = targetModelId ? providersByModelId.get(targetModelId) : undefined;
-    if (modelId.startsWith('~') && targetProviders && (await isLiveCatalogModelId(modelId))) {
+    if (
+      modelId.startsWith('~') &&
+      targetProviders &&
+      (await isByokServableCatalogModelId(modelId))
+    ) {
       providersByModelId.set(modelId, targetProviders);
     }
   }
@@ -315,14 +319,26 @@ export async function getDirectByokModel(requestedModel: string): Promise<{
   return { provider: null, model: null };
 }
 
+/** Models the owner's enabled keys serve. */
+export async function getDirectByokModelsForOwner(owner: ByokOwner) {
+  return getDirectByokModels(await getEnabledByokProviders(readDb, owner));
+}
+
 export async function getDirectByokModelsForOrganization(organizationId: string) {
-  const keys = await getEnabledByokProviders(readDb, { type: 'organization', id: organizationId });
-  return keys.length === 0 ? [] : await getDirectByokModels(keys);
+  return getDirectByokModelsForOwner({ type: 'organization', id: organizationId });
 }
 
 export async function getDirectByokModelsForUser(userId: string) {
-  const keys = await getEnabledByokProviders(readDb, { type: 'user', id: userId });
-  return keys.length === 0 ? [] : await getDirectByokModels(keys);
+  return getDirectByokModelsForOwner({ type: 'user', id: userId });
+}
+
+/**
+ * The URL string of a fetch input: a string as it arrives, a `URL` by its `href`, and a `Request`
+ * by its `url`. Interpolating the input would turn a `Request` into `[object Request]`.
+ */
+function fetchInputUrlString(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  return input instanceof URL ? input.href : input.url;
 }
 
 /**
@@ -350,12 +366,9 @@ export async function createAiSdkProvider(
     baseURL: chatCompletionsUrl,
     apiKey: awsBedrock || apiKeyHeader ? undefined : apiKey,
     name: 'openaiCompatible',
-    headers: {
-      ...(apiKeyHeader === 'x-api-key' && { 'x-api-key': apiKey }),
-      ...(directByokProvider.id === 'opencode-go' && { 'x-opencode-session': randomUUID() }),
-    },
+    headers: directByokProvider.chatCompletionsHeaders(upstream),
     fetch: async (url, init) => {
-      const requestUrl = disableUrlSuffix ? chatCompletionsUrl : String(url);
+      const requestUrl = disableUrlSuffix ? chatCompletionsUrl : fetchInputUrlString(url);
       const headers = new Headers(init?.headers);
       headers.set('user-agent', COMPATIBLE_USER_AGENT);
       if (!awsBedrock || typeof init?.body !== 'string') {

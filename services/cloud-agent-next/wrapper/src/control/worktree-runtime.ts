@@ -19,7 +19,9 @@ import {
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import {
-  CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  CLOUD_WEB_SEARCH_DISABLED_ENV,
+  CLOUD_WEB_SEARCH_PROVIDER_ENV,
+  RESERVED_ENV_VARS,
   RESERVED_ENV_VAR_PREFIXES,
   SYSTEM_GIT_CONFIG_ENV,
   isStrippedGitConfigEnvVar,
@@ -74,6 +76,23 @@ export class WorktreeKiloRuntimeError extends Error {
   }
 }
 
+/**
+ * Personal per-model context caps become `provider.kilo.models.<id>.limit.context`
+ * entries, so Kilo compacts the conversation against the lowered window. The
+ * config key is the gateway model id without the `kilo/` provider prefix.
+ */
+function buildModelContextLimitEntries(
+  limits: ControlPlaneRouteSpec['modelContextLimits']
+): Record<string, { limit: { context: number } }> | undefined {
+  if (!limits || Object.keys(limits).length === 0) return undefined;
+  const entries: Record<string, { limit: { context: number } }> = {};
+  for (const [model, context] of Object.entries(limits)) {
+    const id = model.replace(/^kilo\//, '');
+    if (id) entries[id] = { limit: { context } };
+  }
+  return Object.keys(entries).length > 0 ? entries : undefined;
+}
+
 export function buildWorktreeKiloEnvironment(
   directory: string,
   home: string,
@@ -83,17 +102,22 @@ export function buildWorktreeKiloEnvironment(
   mcp?: SessionAttachPayload['mcp'],
   runtimeConfig?: Pick<
     ControlPlaneRouteSpec,
-    'permission' | 'githubReviewTarget' | 'createdOnPlatform'
+    | 'permission'
+    | 'githubReviewTarget'
+    | 'createdOnPlatform'
+    | 'modelContextLimits'
+    | 'webSearchDisabled'
+    | 'webSearchProvider'
   > & {
     cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   }
 ): Record<string, string> {
   const env: Record<string, string> = {};
-  const reserved = new Set<string>(CONTROL_RUNTIME_RESERVED_ENV_VARS);
+  // The platform sets the control-runtime and session-identity names, and
+  // supplies its own HOME and XDG paths below.
+  const reserved = new Set<string>(RESERVED_ENV_VARS);
   const isRuntimeOwned = (name: string): boolean =>
-    reserved.has(name) ||
-    name === 'HOME' ||
-    RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
+    reserved.has(name) || RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
 
   for (const [name, value] of Object.entries(inherited)) {
     if (
@@ -106,14 +130,17 @@ export function buildWorktreeKiloEnvironment(
     }
   }
   for (const [name, value] of Object.entries(environment)) {
+    const runtimeOwned =
+      reserved.has(name) || RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
     if (
-      (!isRuntimeOwned(name) || BITBUCKET_METADATA_ENV_VARS.has(name)) &&
+      (!runtimeOwned || BITBUCKET_METADATA_ENV_VARS.has(name)) &&
       !isStrippedGitConfigEnvVar(name)
     ) {
       env[name] = value;
     }
   }
 
+  const modelLimitEntries = buildModelContextLimitEntries(runtimeConfig?.modelContextLimits);
   let config = JSON.stringify({
     autoupdate: false,
     snapshot: false,
@@ -126,6 +153,7 @@ export function buildWorktreeKiloEnvironment(
           ...(kilo.organizationId ? { kilocodeOrganizationId: kilo.organizationId } : {}),
           baseURL: kilo.targets.providerBaseUrl,
         },
+        ...(modelLimitEntries ? { models: modelLimitEntries } : {}),
       },
     },
     ...(mcp || runtimeConfig?.cloudAgentMcp
@@ -178,6 +206,10 @@ export function buildWorktreeKiloEnvironment(
     XDG_STATE_HOME: path.join(home, '.local', 'state'),
     XDG_RUNTIME_DIR: path.join(home, '.run'),
     KILO_PLATFORM: 'cloud-agent',
+    ...(runtimeConfig?.webSearchDisabled ? { [CLOUD_WEB_SEARCH_DISABLED_ENV]: '1' } : {}),
+    ...(runtimeConfig?.webSearchProvider
+      ? { [CLOUD_WEB_SEARCH_PROVIDER_ENV]: runtimeConfig.webSearchProvider }
+      : {}),
     ...(runtimeConfig?.githubReviewTarget
       ? {
           [GITHUB_REVIEW_TARGET_ENV]: serializeGitHubReviewTarget(runtimeConfig.githubReviewTarget),

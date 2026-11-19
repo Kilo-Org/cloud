@@ -1,14 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildHomeWidgetDetails, HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
+import { GLANCEABLE_TITLE_LIMIT } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { buildHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 
-import { LIVE_ACTIVITY_RELEVANCE, sessionLiveActivityContentStateSchema } from './push-data';
+import { LIVE_ACTIVITY_RELEVANCE } from './push-presentation';
 import {
   aggregateLiveActivityRelevance,
   buildSessionLiveActivityContentState,
   sessionLiveActivityRelevance,
   sessionLiveActivityTitle,
 } from './session-live-activity';
+import { sessionLiveActivityContentStateSchema } from './session-live-content';
 
 const options = {
   approvalKey: 'a'.repeat(64),
@@ -31,14 +33,14 @@ describe('sessionLiveActivityTitle', () => {
 
   it('caps the title on a character boundary', () => {
     const family = '👨‍👩‍👧';
-    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 8)}${family}`)).toBe(
-      `${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 8)}${family}`
+    expect(sessionLiveActivityTitle(`${'x'.repeat(GLANCEABLE_TITLE_LIMIT - 8)}${family}`)).toBe(
+      `${'x'.repeat(GLANCEABLE_TITLE_LIMIT - 8)}${family}`
     );
-    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 7)}${family}`)).toBe(
-      'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 7)
+    expect(sessionLiveActivityTitle(`${'x'.repeat(GLANCEABLE_TITLE_LIMIT - 7)}${family}`)).toBe(
+      'x'.repeat(GLANCEABLE_TITLE_LIMIT - 7)
     );
-    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 2)}🇷🇸`)).toBe(
-      'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 2)
+    expect(sessionLiveActivityTitle(`${'x'.repeat(GLANCEABLE_TITLE_LIMIT - 2)}🇷🇸`)).toBe(
+      'x'.repeat(GLANCEABLE_TITLE_LIMIT - 2)
     );
   });
 
@@ -56,8 +58,8 @@ describe('sessionLiveActivityTitle', () => {
       buildHomeWidgetDetails([{ status: 'permission', title: stored }]).waitingAgents[0]?.title
     ).toBe('Deploy the fix');
     // They also must not charge the title cap, or the cut hides text that draws.
-    const capped = `${'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 6)}\u2061\u2062\u2063\u2064bcdef`;
-    const visible = `${'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 6)}bcdef`;
+    const capped = `${'a'.repeat(GLANCEABLE_TITLE_LIMIT - 6)}\u2061\u2062\u2063\u2064bcdef`;
+    const visible = `${'a'.repeat(GLANCEABLE_TITLE_LIMIT - 6)}bcdef`;
     expect(sessionLiveActivityTitle(capped)).toBe(visible);
     expect(
       buildHomeWidgetDetails([{ status: 'permission', title: capped }]).waitingAgents[0]?.title
@@ -72,8 +74,8 @@ describe('sessionLiveActivityTitle', () => {
     expect(sessionLiveActivityTitle(`${placeholder} about the deploy`)).toBe(
       `${placeholder} about the deploy`
     );
-    const long = `${placeholder} ${'x'.repeat(HOME_WIDGET_TITLE_LIMIT)}`;
-    expect(sessionLiveActivityTitle(long)).toBe(long.slice(0, HOME_WIDGET_TITLE_LIMIT));
+    const long = `${placeholder} ${'x'.repeat(GLANCEABLE_TITLE_LIMIT)}`;
+    expect(sessionLiveActivityTitle(long)).toBe(long.slice(0, GLANCEABLE_TITLE_LIMIT));
   });
 });
 
@@ -205,6 +207,49 @@ describe('buildSessionLiveActivityContentState', () => {
     expect(local.permissionCommand).toBeNull();
   });
 
+  it('replaces the remembered facts a row carries and keeps the ones it omits', () => {
+    const pushed = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_11',
+        status: 'busy',
+        currentStep: { verb: 'editing', target: 'auth.ts' },
+        plan: { done: 1, total: 4, current: 'Read the tests' },
+        changes: { files: 2, added: 10, removed: 1 },
+      },
+      options
+    );
+
+    // A carried fact replaces the remembered one outright; the two never merge.
+    const replaced = buildSessionLiveActivityContentState(
+      {
+        id: 'ses_11',
+        status: 'permission',
+        currentStep: { verb: 'running', target: 'schema.ts' },
+        plan: { done: 2, total: 4, current: 'Write the migration' },
+        changes: { files: 3, added: 40, removed: 4 },
+        permissionCommand: 'pnpm test',
+      },
+      { ...options, previous: pushed }
+    );
+    expect(replaced.currentStep).toEqual({
+      verb: 'running',
+      target: 'schema.ts',
+    });
+    expect(replaced.plan).toEqual({ done: 2, total: 4, current: 'Write the migration' });
+    expect(replaced.changes).toEqual({ files: 3, added: 40, removed: 4 });
+    expect(replaced.permissionCommand).toBe('pnpm test');
+
+    // A row that carries none of them keeps every fact the card already shows.
+    const kept = buildSessionLiveActivityContentState(
+      { id: 'ses_11', status: 'permission' },
+      { ...options, previous: replaced }
+    );
+    expect(kept.currentStep).toEqual(replaced.currentStep);
+    expect(kept.plan).toEqual(replaced.plan);
+    expect(kept.changes).toEqual(replaced.changes);
+    expect(kept.permissionCommand).toBe('pnpm test');
+  });
+
   it('drops the permission command with the key it belongs to', () => {
     const question = buildSessionLiveActivityContentState(
       { id: 'ses_3', status: 'question', permissionCommand: 'rm -rf build' },
@@ -255,6 +300,58 @@ describe('buildSessionLiveActivityContentState', () => {
     // A running row never carries an outcome.
     expect(
       buildSessionLiveActivityContentState({ id: 'ses_7', status: 'busy' }, options).outcome
+    ).toBeNull();
+  });
+
+  it('carries the remembered outcome into a finished row that states none', () => {
+    const pushed = buildSessionLiveActivityContentState(
+      { id: 'ses_f3', status: 'idle', outcome: 'pr_opened' },
+      options
+    );
+    expect(pushed).toMatchObject({ outcome: { kind: 'pr_opened' } });
+    const carriedOutcome = buildSessionLiveActivityContentState(
+      { id: 'ses_f3', status: 'idle' },
+      { ...options, previous: pushed }
+    );
+    expect(carriedOutcome.outcome).toEqual({ kind: 'pr_opened' });
+
+    // A row that omits the diff keeps the one the push delivered.
+    const diff = { files: 2, added: 5, removed: 1 };
+    const pushedChanges = buildSessionLiveActivityContentState(
+      { id: 'ses_f4', status: 'idle', changes: diff },
+      options
+    );
+    expect(pushedChanges).toMatchObject({ outcome: { kind: 'changes' } });
+    const rebuilt = buildSessionLiveActivityContentState(
+      { id: 'ses_f4', status: 'idle' },
+      { ...options, previous: pushedChanges }
+    );
+    expect(rebuilt.outcome).toEqual({ kind: 'changes' });
+    expect(rebuilt.changes).toEqual(diff);
+  });
+
+  it('re-derives the outcome when the row states that no pull request is open', () => {
+    const pushed = buildSessionLiveActivityContentState(
+      { id: 'ses_f5', status: 'idle', outcome: 'pr_opened' },
+      options
+    );
+    const rebuilt = buildSessionLiveActivityContentState(
+      { id: 'ses_f5', status: 'idle', prOpened: false },
+      { ...options, previous: pushed }
+    );
+    expect(rebuilt.outcome).toEqual({ kind: 'none' });
+  });
+
+  it('never carries a remembered outcome into a working row', () => {
+    const pushed = buildSessionLiveActivityContentState(
+      { id: 'ses_f3', status: 'idle', outcome: 'pr_opened' },
+      options
+    );
+    expect(
+      buildSessionLiveActivityContentState(
+        { id: 'ses_f6', status: 'busy' },
+        { ...options, previous: pushed }
+      ).outcome
     ).toBeNull();
   });
 
@@ -314,6 +411,18 @@ describe('buildSessionLiveActivityContentState', () => {
         options
       )
     ).toMatchObject({ statusKind: 'running', scheduledAt: null });
+  });
+
+  it('reads a serialized absent fact like an omitted one', () => {
+    // The shared row type accepts an explicit null where a producer
+    // serializes an absent value; the shared reader treats null, absent and
+    // unparseable as one outcome, so both shapes build the same card state.
+    const omitted = buildSessionLiveActivityContentState({ id: 's', status: 'scheduled' }, options);
+    const serialized = buildSessionLiveActivityContentState(
+      { id: 's', status: 'scheduled', statusUpdatedAt: null, scheduledAt: null, title: null },
+      options
+    );
+    expect(serialized).toEqual(omitted);
   });
 
   it('reads a stored time like the Home widget, even where Date.parse cannot', () => {

@@ -1,10 +1,12 @@
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
 import { z } from 'zod';
-import {
-  CloudAgentAuthoritySchema,
-  validateCloudAgentAuthorityClaims,
-} from './cloud-agent-authority';
+import { CloudAgentAuthoritySchema } from './cloud-agent-authority';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
+import {
+  assertKiloTokenIssuedAt,
+  checkKiloTokenAuthorityClaims,
+  verifyKiloTokenSignature,
+} from './kilo-token-verification';
 
 export const KILO_TOKEN_VERSION = 3;
 const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);
@@ -47,11 +49,19 @@ export const kiloTokenPayload = z.object({
 });
 
 export type KiloTokenPayload = z.infer<typeof kiloTokenPayload>;
-const signKiloTokenPayload = kiloTokenPayload.omit({ iat: true, exp: true }).strict();
+// `cloudAgentAuthority` is intentionally excluded: authority tokens are minted only by
+// the policy path (signModernKiloToken / buildModernKiloTokenPayload in
+// kilo-token-policy.ts), which enforces the delegated-workload binding. The strict
+// parse makes that boundary a runtime refusal, not just a TypeScript one.
+const signKiloTokenPayload = kiloTokenPayload
+  .omit({ iat: true, exp: true, cloudAgentAuthority: true })
+  .strict();
 
 /**
  * Optional claims beyond the core fields (userId, pepper, version, env).
- * Derived from KiloTokenPayload so sign and verify stay in sync.
+ * Derived from KiloTokenPayload so sign and verify stay in sync, minus
+ * `cloudAgentAuthority`: that claim is minted only by the token policy path
+ * (`signModernKiloToken`), and the strict sign schema rejects it here.
  */
 export type SignKiloTokenExtra = Pick<
   KiloTokenPayload,
@@ -127,19 +137,15 @@ export async function verifyKiloToken(
   secret: string,
   options?: { audience?: string }
 ): Promise<KiloTokenPayload> {
-  const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
-    algorithms: ['HS256'],
+  const { payload } = await verifyKiloTokenSignature(token, secret, {
     audience: options?.audience,
   });
   if (options?.audience === undefined && payload.aud !== undefined) {
     throw new Error('Unexpected token audience');
   }
 
-  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
-    validateCloudAgentAuthorityClaims(payload);
-    if (typeof payload.iat !== 'number' || payload.iat > Math.floor(Date.now() / 1000)) {
-      throw new Error('Token issued in the future');
-    }
+  if (checkKiloTokenAuthorityClaims(payload)) {
+    assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
   }
 
   return kiloTokenPayload.parse(payload);

@@ -26,13 +26,13 @@ import { fetchGeneration } from './providers/upstream-request';
 import { OPENROUTER } from './providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from './providers/definitions/vercel';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { isStagingDeployment } from '@kilocode/web-shared/lib/constants';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { hasPaymentMethod } from '@kilocode/web-shared/lib/admin-utils-serverside';
 import type { SQL } from 'drizzle-orm';
 import { and, eq, sql } from 'drizzle-orm';
-import { sentryRootSpan } from '../getRootSpan';
 import {
   mutateOrganizationUsage,
   scheduleOrganizationLowBalanceAlert,
@@ -88,6 +88,8 @@ import {
   providerReportsIsByok,
   drainSseStream,
   contentPartSchema,
+  arrayContainingSchema,
+  nonEmptyStringSchema,
   extractVercelIsByok,
   extractVercelUpstreamId,
   parseUsageWithRecovery,
@@ -368,8 +370,8 @@ export async function toInsertableDbUsageRecord(
   // (error 22021) and crash the microdollar_usage CTE insert, leaving the
   // request un-billed. See KILOCODE-WEB-1G3Z.
   const dirtyFields: string[] = [];
-  stripNulBytesInPlace(core as unknown as Record<string, unknown>, dirtyFields);
-  stripNulBytesInPlace(metadata as unknown as Record<string, unknown>, dirtyFields);
+  stripNulBytesInPlace(core, dirtyFields);
+  stripNulBytesInPlace(metadata, dirtyFields);
   if (dirtyFields.length > 0) {
     // Log to Axiom (not Sentry) — this is a one-off source-attribution probe,
     // not an issue to triage. Once the dominant field is identified via
@@ -440,11 +442,9 @@ async function enqueueUsageWithinLifetime(
 type UsageAccountingTransport = 'queue' | 'direct';
 
 function usageAccountingTransport(): UsageAccountingTransport {
-  const vercelEnv = process.env.VERCEL_ENV;
-  const targetEnv = process.env.VERCEL_TARGET_ENV;
-  const staging = targetEnv === 'staging' && vercelEnv !== 'production';
-  const production = vercelEnv === 'production' && targetEnv === 'production';
-  return staging || production ? 'queue' : 'direct';
+  const production =
+    process.env.VERCEL_ENV === 'production' && process.env.VERCEL_TARGET_ENV === 'production';
+  return isStagingDeployment() || production ? 'queue' : 'direct';
 }
 
 export async function logMicrodollarUsage(
@@ -1434,6 +1434,44 @@ function chatContentText(content: z.infer<typeof chatMessageSchema>['content']):
     .join('');
 }
 
+const generatedReasoningDetailSchema = z.union([
+  z.looseObject({ text: nonEmptyStringSchema }),
+  z.looseObject({ summary: nonEmptyStringSchema }),
+]);
+
+const generatedToolCallSchema = z.looseObject({
+  function: z.union([
+    z.looseObject({ name: nonEmptyStringSchema }),
+    z.looseObject({ arguments: nonEmptyStringSchema }),
+  ]),
+});
+
+// Mistral nests reasoning text in `thinking` content parts.
+const generatedContentPartSchema = z.union([
+  z.looseObject({ text: nonEmptyStringSchema }),
+  z.looseObject({ thinking: arrayContainingSchema(z.looseObject({ text: nonEmptyStringSchema })) }),
+]);
+
+// Role-only, finish, and usage chunks carry no generated tokens, and neither
+// does encrypted reasoning.
+const generatedOutputDeltaSchema = z.union([
+  z.looseObject({
+    content: z.union([nonEmptyStringSchema, arrayContainingSchema(generatedContentPartSchema)]),
+  }),
+  z.looseObject({ reasoning: nonEmptyStringSchema }),
+  z.looseObject({ reasoning_content: nonEmptyStringSchema }),
+  z.looseObject({ reasoning_details: arrayContainingSchema(generatedReasoningDetailSchema) }),
+  z.looseObject({ refusal: nonEmptyStringSchema }),
+  z.looseObject({ tool_calls: arrayContainingSchema(generatedToolCallSchema) }),
+  z.looseObject({ images: z.array(z.unknown()).min(1) }),
+  z.looseObject({
+    audio: z.union([
+      z.looseObject({ transcript: nonEmptyStringSchema }),
+      z.looseObject({ data: nonEmptyStringSchema }),
+    ]),
+  }),
+]);
+
 const chatUsageChunkSchema = chatUsageFieldsSchema.extend({
   choices: z
     .array(
@@ -1472,36 +1510,20 @@ export async function parseMicrodollarUsageFromStream(
     name: 'openrouter-stream-processing',
     op: 'performance',
   });
-  const timeToFirstTokenSpan = startInactiveSpan({
-    name: 'time-to-first-token',
-    op: 'performance',
-  });
-
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = ''; // for abuse investigation
   let reportedError = statusCode >= 400;
   let effectiveStatusCode = statusCode;
-  const startedAt = performance.now();
-  let firstTokenReceived = false;
   let usage: z.infer<typeof openRouterUsageSchema> | null = null;
   let inference_provider: string | null = null;
   let finish_reason: unknown = null;
   let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
   const onEvent = (event: EventSourceMessage) => {
-    if (!firstTokenReceived) {
-      sentryRootSpan()?.setAttribute(
-        'openrouter.time_to_first_token_ms',
-        performance.now() - startedAt
-      );
-      firstTokenReceived = true;
-      timeToFirstTokenSpan.end();
-    }
-
     if (event.data === '[DONE]') {
       metadataCapture?.captureVercelMetadata('[DONE]');
-      return;
+      return false;
     }
 
     const rawJson: unknown = JSON.parse(event.data);
@@ -1548,6 +1570,8 @@ export async function parseMicrodollarUsageFromStream(
     finish_reason = choice?.finish_reason ?? finish_reason;
 
     responseContent += chatContentText(choice?.delta?.content);
+
+    return json.choices?.some(c => generatedOutputDeltaSchema.safeParse(c.delta).success) ?? false;
   };
 
   const { wasAborted, malformedEventCount, timing } = await drainSseStream(
@@ -1555,6 +1579,7 @@ export async function parseMicrodollarUsageFromStream(
     onEvent,
     streamProcessingSpan,
     requestStartedAt,
+    'openrouter.time_to_first_token_ms',
     () => ({ kiloUserId, provider, messageId, model })
   );
 

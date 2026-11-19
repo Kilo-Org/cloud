@@ -357,6 +357,7 @@ async function setup(
   }
   return {
     sandbox,
+    sandboxId,
     workspaceId,
     session,
     sessionId,
@@ -1144,6 +1145,17 @@ describe('idle workspace disk checkpoint', () => {
       workspaceId: test.workspaceId,
       directory: test.registration.spec.directory,
     });
+    const restoredAllocationId = (await test.sandbox.getAllocationState()).allocationId;
+    wrapper.send({
+      type: 'session.restore_attempt',
+      sessionId: test.sessionId,
+      attempt: 1,
+      durationMs: 54,
+      downloadMs: 20,
+      importMs: 30,
+      outcome: 'restored',
+      willRetry: false,
+    });
     wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
     await test.messageState('m2', 'accepted');
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
@@ -1174,6 +1186,19 @@ describe('idle workspace disk checkpoint', () => {
           reason: 'confirmed',
           workspaceId: test.workspaceId,
           sourceAllocationId,
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'snapshot_restore_attempt_finished',
+          stage: 'wrapper_restore',
+          snapshotKind: 'session',
+          sessionId: test.sessionId,
+          allocationId: restoredAllocationId,
+          attemptId: expect.any(String),
+          durationMs: 54,
+          downloadMs: 20,
+          importMs: 30,
+          outcome: 'restored',
+          willRetry: false,
         }),
         expect.objectContaining({
           diagnosticEvent: 'workspace_snapshot_fenced',
@@ -1648,6 +1673,89 @@ describe('idle workspace disk checkpoint', () => {
       success: true,
     });
     test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
+  it('writes restoration recovery for one preparation attempt', async () => {
+    const test = await setup();
+    await test.checkpoint();
+    const capturedAt = (await test.snapshot())?.capturedAt;
+    if (capturedAt === undefined) throw new Error('Missing checkpoint');
+    await test.cold();
+    await test.session.send(prompt('m2'));
+    const { wrapper } = await test.connect(1);
+    const launch = test.launchEnvs[1];
+    if (launch === undefined) throw new Error('Missing restore launch');
+    await runInDurableObject(test.sandbox, instance =>
+      instance['applyEvent']({
+        type: 'hello-accepted',
+        at: Date.now(),
+        allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+        connectionId: crypto.randomUUID(),
+        wrapperId: 'wrapper-1',
+      })
+    );
+
+    const fields = vi.spyOn(logger, 'withFields');
+    wrapper.send({
+      type: 'session.failed',
+      sessionId: test.sessionId,
+      reason: 'workspace_setup_failed',
+      step: 'restore',
+    });
+    await waitFor(() =>
+      expect(
+        fields.mock.calls.filter(
+          call =>
+            call[0].sessionId === test.sessionId &&
+            call[0].reason === 'workspace_setup_failed' &&
+            call[0].step === 'restore'
+        )
+      ).toHaveLength(1)
+    );
+    expect(
+      await runInDurableObject(
+        test.sandbox,
+        instance => readWorkspaceSnapshotAllocation(instance['db'])?.recovery
+      )
+    ).toBeUndefined();
+    expect(
+      await test.sandbox.getWorkspaceSnapshotRecovery({ sessionId: test.sessionId })
+    ).toBeNull();
+    expect(
+      await runInDurableObject(test.sandbox, instance => readRoute(instance['db'], test.sessionId))
+    ).toMatchObject({ state: 'preparing' });
+
+    const replacement = await FakeWrapper.connect({
+      sandboxId: test.sandboxId,
+      credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+    });
+    test.wrappers.push(replacement);
+    expect(
+      await replacement.hello({
+        wrapperId: 'wrapper-replacement',
+        allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+        workspaceSnapshots: true,
+      })
+    ).toMatchObject({ type: 'welcome' });
+    replacement.send({
+      type: 'session.failed',
+      sessionId: test.sessionId,
+      reason: 'workspace_setup_failed',
+      step: 'restore',
+    });
+    await waitFor(async () => {
+      expect(
+        await test.sandbox.getWorkspaceSnapshotRecovery({ sessionId: test.sessionId })
+      ).toEqual({ capturedAt });
+    });
+    await waitFor(async () => {
+      const route = await runInDurableObject(test.sandbox, instance =>
+        readRoute(instance['db'], test.sessionId)
+      );
+      expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    });
+    expect(test.launchEnvs).toHaveLength(2);
+    test.wrappers.forEach(item => item.close());
   });
 
   it('withdraws Start fresh after a newer capture, so removal keeps it', async () => {

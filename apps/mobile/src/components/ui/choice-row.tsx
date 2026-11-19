@@ -1,14 +1,11 @@
-import { selectionHaptic } from '@/lib/haptics';
-import { Check } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
 
+import { RowFrame } from '@/components/ui/row-frame';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatList } from '@/lib/format';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { selectionHaptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
 type ChoiceRowProps = {
@@ -23,7 +20,13 @@ type ChoiceRowProps = {
    */
   accessibleName?: string;
   selected: boolean;
-  onPress: () => void;
+  /**
+   * Runs the selection. Return `false` when the press does not apply — a save
+   * in flight, a locked scope — and the row skips its selection tick, so the
+   * haptic never announces a choice that did not happen. `void` counts as
+   * applied, which keeps every existing caller unchanged.
+   */
+  onPress: (() => void) | (() => boolean);
   disabled?: boolean;
   /** Marks the row as busy for a11y, e.g. while its own save is in flight. */
   busy?: boolean;
@@ -31,6 +34,8 @@ type ChoiceRowProps = {
   multi?: boolean;
   /** Extra classes on the row container, e.g. a divider border. */
   className?: string;
+  /** Test handle for the row's own control, for native E2E scripts. */
+  testID?: string;
   /**
    * Custom row content instead of the default label/description text — e.g. an
    * icon-prefixed row. A caller that supplies it owns the disabled cue: the row
@@ -54,33 +59,27 @@ export function ChoiceRow({
   busy,
   multi,
   className,
+  testID,
   children,
 }: Readonly<ChoiceRowProps>) {
-  const colors = useThemeColors();
   // A busy row needs an explicit accessible name: React Native replaces the
   // name derived from the child `Text` nodes with its own content description
   // (label + busy state) as soon as a state has no node setter, and it does
   // not restore the derived name once the state clears.
   const namedParts =
     children == null ? [label, description].flatMap(part => (part ? [part] : [])) : [];
-  // The check is the row's only non-text affordance, so a disabled row dims it
-  // instead of dimming the copy, whose caption is read.
-  let checkColor = 'transparent';
-  if (selected) {
-    checkColor = disabled ? colors.mutedForeground : colors.foreground;
-  }
 
   return (
-    <Pressable
-      className={cn(
-        ROW_TARGET_CLASS,
-        'flex-row items-center justify-between py-3 active:opacity-70',
-        className
-      )}
+    <RowFrame
+      testID={testID}
+      className={className}
+      trailing={{ kind: 'check', selected, disabled }}
       disabled={disabled}
       onPress={() => {
-        selectionHaptic();
-        onPress();
+        const applied = onPress();
+        if (applied !== false) {
+          selectionHaptic();
+        }
       }}
       {...selectableRowA11y({
         multi: Boolean(multi),
@@ -94,21 +93,20 @@ export function ChoiceRow({
       }
     >
       {children ?? (
-        <View className="flex-1 pe-3">
+        <>
+          {/* The disabled cue is the label's muted token, not a row opacity: a
+              caption under a dimmed row drops to roughly 2:1 on the row
+              surface, and this one is read, not decorative. */}
           <Text className={cn('text-sm font-medium', disabled && 'text-muted-foreground')}>
             {label}
           </Text>
           {description ? (
-            // The disabled cue is the label's muted token, not a row opacity:
-            // a caption under a dimmed row drops to roughly 2:1 on the row
-            // surface, and this one is read, not decorative.
             <Text variant="muted" className="mt-0.5 text-xs">
               {description}
             </Text>
           ) : null}
-        </View>
+        </>
       )}
-      <Check size={18} color={checkColor} />
-    </Pressable>
+    </RowFrame>
   );
 }

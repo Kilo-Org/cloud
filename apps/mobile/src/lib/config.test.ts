@@ -58,10 +58,19 @@ describe('KILO_MCP_URL', () => {
     await expect(mcpUrl()).resolves.toBeUndefined();
   });
 
-  it('uses KILO_MCP_URL when the build supplies one', async () => {
+  it('rejects an insecure KILO_MCP_URL override in a production build', async () => {
     state.extra = {
       ...REQUIRED_EXTRA,
       isProductionBuild: true,
+      kiloMcpUrl: 'http://localhost:8815',
+    };
+    await expect(mcpUrl()).rejects.toThrow(/scheme/);
+  });
+
+  it('accepts the local KILO_MCP_URL override in a development bundle', async () => {
+    vi.stubGlobal('__DEV__', true);
+    state.extra = {
+      ...REQUIRED_EXTRA,
       kiloMcpUrl: 'http://localhost:8815',
     };
     await expect(mcpUrl()).resolves.toBe('http://localhost:8815');
@@ -103,5 +112,32 @@ describe('SESSION_SYNC_URL', () => {
     vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', 'file:///native-preview');
     state.extra = REQUIRED_EXTRA;
     await expect(syncUrl()).rejects.toThrow('Invalid scheme');
+  });
+});
+
+describe('production host contract', () => {
+  function loadConfig(): Promise<unknown> {
+    vi.resetModules();
+    return vi.importActual('@/lib/config');
+  }
+
+  it('rejects a non-allowlisted host in a production build', async () => {
+    state.extra = {
+      ...REQUIRED_EXTRA,
+      apiBaseUrl: 'https://evil.example.com',
+      isProductionBuild: true,
+    };
+
+    await expect(loadConfig()).rejects.toThrow(/outside the allowlist/);
+  });
+
+  it('loads a non-production build with the same host', async () => {
+    state.extra = {
+      ...REQUIRED_EXTRA,
+      apiBaseUrl: 'https://evil.example.com',
+      isProductionBuild: false,
+    };
+
+    await expect(loadConfig()).resolves.toBeDefined();
   });
 });

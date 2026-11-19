@@ -10,7 +10,7 @@ import type * as TextModule from '@/components/ui/text';
 import { AgentSessionListScreen } from './session-list-screen';
 import { OwnedKeyboardLift } from './owned-keyboard-lift';
 import { RowsRefreshControl } from './rows-refresh-control';
-import { FAB_MARGIN, FAB_SIZE } from './session-list-content';
+import { FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { LiveSessionListEmptyState } from './live-session-list-empty-state';
@@ -90,6 +90,15 @@ const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<
 // letterspaced capitals are LTR-only and must drop under RTL, keeping the
 // Arabic label's joins.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+// The screen's graph reaches `expo` through the session helpers and its rows
+// reach the haptics module; both read the `__DEV__` global the test renderer
+// does not provide, so the native edges stop here.
+vi.mock('expo', () => ({ requireOptionalNativeModule: () => null }));
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: readFilterRecord,
 }));
@@ -290,13 +299,17 @@ vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   X: 'X',
   SlidersHorizontal: 'SlidersHorizontal',
+  RotateCcw: 'RotateCcw',
+  ArrowLeft: 'ArrowLeft',
 }));
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/session-list-content', () => ({
   AgentSessionListContent: 'AgentSessionListContent',
-  FAB_MARGIN: 16,
-  FAB_SIZE: 48,
 }));
+vi.mock('@/components/ui/fab', async () => {
+  const actual = (await vi.importActual('@/components/ui/fab')) as Record<string, unknown>;
+  return { ...actual, FAB_MARGIN: 16, FAB_SIZE: 48 };
+});
 vi.mock('@/components/agents/session-status-filter-bar', () => ({
   SessionStatusFilterBar: 'SessionStatusFilterBar',
 }));
@@ -333,7 +346,7 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
     state.sessionId = id;
   },
 }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/ui/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/text', async importOriginal => {
@@ -360,6 +373,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#777777',
   useThemeColors: () => ({
     primaryForeground: '#ffffff',
     foreground: '#000000',
@@ -480,12 +494,19 @@ function pressControl(testID: string) {
 }
 /** Fire the body wrapper's layout with the height the list can use. */
 function layoutBody(height: number) {
-  const keyboardFrame = liftNode().findByType('View');
-  const wrapper = nodes('View').find(
-    node => node.props.onLayout !== undefined && node !== keyboardFrame
+  // The lift's own frame reports the keyboard container (see
+  // `layoutKeyboardFrame`); the body wrapper `useAgentsListChrome` measures is
+  // the one other `onLayout` view inside the lifted region. Scoping to the lift
+  // is what makes this the body: the header above it draws its own `onLayout`
+  // views (the row reports its width, an in-row slot its measured extent), and
+  // those must never receive a body height.
+  const frame = liftNode().findByType('View');
+  const wrappers = descendantsOf(liftNode(), 'View').filter(
+    node => node !== frame && node.props.onLayout !== undefined
   );
-  if (!wrapper) {
-    throw new Error('Missing body wrapper');
+  const [wrapper] = wrappers;
+  if (wrappers.length !== 1 || !wrapper) {
+    throw new Error(`Expected one measured body wrapper, found ${wrappers.length}`);
   }
   const onLayout = wrapper.props.onLayout as (event: {
     nativeEvent: { layout: { height: number } };
@@ -734,25 +755,32 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(action('New session')).toBeDefined();
   });
 
-  it('names the accepted-empty history route by its destination instead of a bare See-all', async () => {
+  it('names the accepted-empty body history link and the header control after the same destination', async () => {
     await renderScreen();
-    const history = action('Session history');
-    expect(history.props.testID).toBe('agents-view-history-empty');
-    expect(history.findByType(Text).children).toEqual(['Session history']);
-    // The body action is the second route into stored history: pressing it must
+    const historyLabel = i18n.t('agents.sessionList.pastSessions');
+    const bodyLink = nodes('Pressable').find(
+      node => node.props.testID === 'agents-view-history-empty'
+    );
+    if (!bodyLink) {
+      throw new Error('Missing body history link');
+    }
+    expect(bodyLink.props.accessibilityLabel).toBe(historyLabel);
+    expect(bodyLink.findByType(Text).children).toEqual([historyLabel]);
+    // One destination carries one name, so the header control and the body link
+    // both read it; only their test ids tell the two controls apart.
+    expect(headerAction().props.accessibilityLabel).toBe(historyLabel);
+    // The body link is the second route into stored history: pressing it must
     // reach the same destination the header control does.
-    press('Session history');
+    pressControl('agents-view-history-empty');
     expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
-    // The non-empty live list keeps the history route in the header, under its
-    // own destination copy instead of this body label.
+    // The non-empty live list keeps the history route in the header alone: the
+    // body link is gone, and the header keeps the same name.
     state.live.activeSessions = [row];
     await renderScreen();
-    expect(action(i18n.t('agents.sessionList.pastSessions')).props.testID).toBe(
-      'agents-view-history'
+    expect(nodes('Pressable').some(node => node.props.testID === 'agents-view-history-empty')).toBe(
+      false
     );
-    expect(
-      nodes('Pressable').filter(node => node.props.accessibilityLabel === 'Session history')
-    ).toHaveLength(0);
+    expect(headerAction().props.accessibilityLabel).toBe(historyLabel);
   });
 
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
@@ -789,9 +817,10 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(84);
     const createAction = action('New session');
     const label = createAction.findByType(Text);
-    expect(createAction.props.className).toContain('max-w-full');
+    // The state's one action is a `StateAction`: a label-sized control on the
+    // shared 48pt state-action floor, whose label the control itself sizes.
     expect(createAction.props.className).toContain('min-h-[48px]');
-    expect(label.props.className).toBe('shrink text-center');
+    expect(label.props.className).toBeUndefined();
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
@@ -1247,7 +1276,7 @@ describe('AgentSessionListScreen live presentation', () => {
     await renderScreen();
     expect(fab()?.props.style).toEqual({
       bottom: state.tabBarHeight + 16,
-      right: 20,
+      right: 14,
       width: 48,
       height: 48,
     });
@@ -1258,7 +1287,7 @@ describe('AgentSessionListScreen live presentation', () => {
     await renderScreen();
     expect(fab()?.props.style).toEqual({
       bottom: state.tabBarHeight + 16,
-      right: 79,
+      right: 73,
       width: 48,
       height: 48,
     });

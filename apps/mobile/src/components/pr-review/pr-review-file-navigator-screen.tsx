@@ -10,6 +10,7 @@ import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-na
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
@@ -147,7 +148,7 @@ function NavigatorError({
   }
   if (state?.kind === 'reconnect') {
     return (
-      <CenteredState contentContainerClassName="px-6">
+      <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
         <PrReviewReconnectNotice />
       </CenteredState>
     );

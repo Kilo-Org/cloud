@@ -224,26 +224,26 @@ describe('disabled toolbar badge label contrast (WCAG AA text)', () => {
   });
 });
 
-describe('disabled primary fill contrast (WCAG AA text)', () => {
-  // A disabled default-variant Button paints primaryForeground on
-  // `--primary-disabled`; the pair must clear 4.5:1 in both themes so the
-  // label (and any child that hard-codes primaryForeground) stays legible.
-  it('light theme: primaryForeground vs primaryDisabled >= 4.5:1', () => {
-    const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabled);
+describe('disabled primary action fill contrast (WCAG AA text)', () => {
+  // A disabled default-variant Button paints its label on the palette's muted
+  // pair (`--muted` fill, `--muted-foreground` ink). Both schemes clear 4.5:1
+  // and the fill stays clearly below the enabled brand fill, so an inactive
+  // Start never reads as a second action colour.
+  it('light theme: mutedForeground vs muted >= 4.5:1', () => {
+    const ratio = contrastRatio(lightColors.mutedForeground, lightColors.muted);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
-  it('dark theme: primaryForeground vs primaryDisabled >= 4.5:1', () => {
-    const ratio = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
+  it('dark theme: mutedForeground vs muted >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.mutedForeground, darkColors.muted);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
   it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
-    // The disabled fill is a neutral grey that must read as a superseded
-    // control next to the enabled brand fill, not as a second brand colour
-    // (2.69:1 between the two fills), or a disabled Start would look tappable
-    // and an enabled one would lose its emphasis.
-    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabled);
+    // The plate must read as a superseded control next to the enabled brand
+    // fill, not as a second brand colour, or a disabled Start would look
+    // tappable and an enabled one would lose its emphasis.
+    const separation = contrastRatio(darkColors.primary, darkColors.muted);
     expect(separation).toBeGreaterThanOrEqual(1.5);
   });
 });
@@ -293,6 +293,34 @@ describe('warn foreground token contrast (WCAG AA text)', () => {
     // Precomputed ≈ 9.29:1 for #1A1A10 on #F2B05F.
     const ratio = contrastRatio(darkColors.warnForeground, darkColors.warn);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+});
+
+describe('offline banner warn-solid pair contrast', () => {
+  it('light theme: warnSolidForeground vs warnSolid >= 4.5:1', () => {
+    // Precomputed ≈ 5.30:1 for #FFFFFF on #956011.
+    const ratio = contrastRatio(lightColors.warnSolidForeground, lightColors.warnSolid);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: warnSolidForeground vs warnSolid >= 4.5:1', () => {
+    // Precomputed ≈ 6.14:1 for #FFFFFF on #8A5614.
+    const ratio = contrastRatio(darkColors.warnSolidForeground, darkColors.warnSolid);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  // The band is a full-width surface, so WCAG 1.4.11 asks for 3:1 off the page
+  // it covers; below that it stops reading as a distinct surface.
+  it('light theme: warnSolid vs background >= 3:1', () => {
+    // Precomputed ≈ 5.08:1 for #956011 on #FBFAF5.
+    const ratio = contrastRatio(lightColors.warnSolid, lightColors.background);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+  });
+
+  it('dark theme: warnSolid vs background >= 3:1', () => {
+    // Precomputed ≈ 3.14:1 for #8A5614 on #0E0E10.
+    const ratio = contrastRatio(darkColors.warnSolid, darkColors.background);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
   });
 });
 

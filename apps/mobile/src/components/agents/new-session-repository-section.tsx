@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { Card } from '@/components/ui/card';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { QueryError } from '@/components/query-error';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { RepositoryBranchSelector } from '@/components/agents/repository-branch-selector';
@@ -103,10 +105,8 @@ export function NewSessionRepositorySection({
     null;
 
   return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('common.repository')}
-      </Text>
+    <View className="gap-2">
+      <FormFieldLabel label={t('common.repository')} />
 
       {/*
         The picker renders unconditionally. Its trigger always reserves its
@@ -218,12 +218,12 @@ export function NewSessionRepositorySection({
     const noteKey = connectNoteKey(platform);
     return (
       <CollapsibleSection
-        className="mt-3 rounded-lg border border-border bg-card"
-        contentClassName="gap-3"
-        // The connected-but-empty card below is a `p-4` surface, and the two are
-        // mutually exclusive states of the same region, so this one keeps that
-        // 14 dp inset instead of the section's 10.5 dp default.
-        inset="roomy"
+        className="mt-3"
+        // The body is plain copy and buttons, not a surface of its own, so it
+        // takes the section's own gutter: without it the text started at the
+        // page edge while the header's row started at 14pt. The section draws
+        // no surface around the body, so nothing is nested inside its card.
+        contentClassName="gap-3 px-4"
         titleClassName="font-semibold"
         title={t(copy.connectTitle)}
         // The card stacks under the repository picker in a scrolling column,
@@ -239,7 +239,9 @@ export function NewSessionRepositorySection({
         }}
       >
         <View className="gap-1">
-          <Text variant="muted">{t(copy.connectDescription)}</Text>
+          {copy.connectDescription ? (
+            <Text variant="muted">{t(copy.connectDescription)}</Text>
+          ) : null}
           {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
         </View>
         {renderConnectActions(platform)}
@@ -264,7 +266,7 @@ export function NewSessionRepositorySection({
   function renderConnectedEmptyCard(platform: RepositoryPlatform): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
     return (
-      <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+      <Card className="mt-3">
         <View className="gap-1">
           <Text className="text-sm font-semibold text-foreground">{t(copy.connectedTitle)}</Text>
           <Text variant="muted">{t(copy.emptyDescription)}</Text>
@@ -272,7 +274,7 @@ export function NewSessionRepositorySection({
         <View className="flex-row gap-2">
           <RepositoryRefreshButton onRefreshRepos={onRefreshRepos} isRetrying={isRetrying} />
         </View>
-      </View>
+      </Card>
     );
   }
 }

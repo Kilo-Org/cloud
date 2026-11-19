@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { previewTargetSchema } from './shared/preview-target.js';
+import { AGENT_SANDBOX_PROVIDERS } from './shared/sandbox-provider.js';
 
 /**
  * The claims an entry ticket carries. The parse keeps only the declared
@@ -50,7 +51,7 @@ export type PreviewEntryClaims = z.infer<typeof previewEntryClaimsSchema>;
 const previewClaimsSchema = z.intersection(
   previewEntryClaimsSchema,
   z.object({
-    provider: z.literal('cloudflare-containers'),
+    provider: z.enum(AGENT_SANDBOX_PROVIDERS),
     logicalSandboxId: z.string().min(1),
     allocationRef: z.string().min(1),
   })

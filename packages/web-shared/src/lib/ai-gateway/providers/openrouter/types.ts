@@ -25,14 +25,18 @@ export type OpenRouterProviderConfig = {
   data_collection?: 'allow' | 'deny';
   /** `true` excludes providers that store prompts at all, so it also excludes training. */
   zdr?: boolean;
+  /**
+   * Best-effort preference for providers that support every requested parameter. Support varies
+   * by upstream; a provider may still serve the request without applying some parameters.
+   */
   require_parameters?: boolean;
+  /**
+   * Best-effort preference for upstream provider fallback. Support varies by upstream, and
+   * `false` does not prevent Kilo from retrying on another route.
+   */
   allow_fallbacks?: boolean;
   max_price?: { prompt?: number; completion?: number; request?: number; image?: number };
 };
-
-export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterProviderConfig {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 export type VercelInferenceProviderConfig =
   | { apiKey: string; baseURL?: string }
@@ -69,6 +73,11 @@ export type OpenRouterPlugin = {
 export type OpenRouterReasoningConfig = {
   effort?: OpenAI.Chat.Completions.ChatCompletionReasoningEffort;
   max_tokens?: number;
+  /**
+   * Best-effort request to omit reasoning from Chat Completions responses, not to disable it.
+   * Support varies by upstream, and some models return reasoning that clients must replay on
+   * later turns.
+   */
   exclude?: boolean;
   enabled?: boolean;
 };
@@ -116,6 +125,9 @@ export type GatewayMessagesRequest = SharedGatewayRequestProperties &
   Anthropic.MessageCreateParams & {
     user?: string;
     session_id?: string;
+    // Sampling parameters that clients still send but SDK 1.x dropped from `MessageCreateParams`.
+    temperature?: number;
+    top_p?: number;
     thinking?: Anthropic.ThinkingConfigParam & { block_binding?: ThinkingBlockBinding };
   };
 
@@ -130,6 +142,10 @@ export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreatePa
     // https://openrouter.ai/docs/use-cases/reasoning-tokens#controlling-reasoning-tokens
     reasoning?: OpenRouterReasoningConfig;
 
+    /**
+     * Legacy best-effort preference for returning reasoning. On OpenRouter, `false` is
+     * equivalent to `reasoning.exclude: true`. Other routes may not honor either flag.
+     */
     include_reasoning?: boolean;
   };
 

@@ -11,11 +11,16 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
+
 import { ScrollView } from 'react-native';
+import { i18n } from '@/i18n';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { type SecurityFinding } from '@/lib/security-agent';
 import { mapSecurityDismissOperationError } from '@/lib/security-agent-ledger';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
+import { TRIAL_ENDED_BILLING_COPY_KEY, TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
 import { SettingsRecoveryStatus } from './settings-recovery-status';
 import { DismissFindingScreen } from './dismiss-finding-screen';
 
@@ -38,6 +43,19 @@ const SERVICE_UNAVAILABLE_MESSAGE = vi.hoisted(() => 'Security service is unavai
 const SERVICE_UNAVAILABLE_COPY = vi.hoisted(
   () => 'The security service is unavailable. Try again.'
 );
+
+// The two sentences the trial refusal has, one per reader, and the step the
+// billing one offers.
+const TRIAL_MEMBER_COPY = i18n.t(TRIAL_ENDED_COPY_KEY);
+const TRIAL_BILLING_COPY = i18n.t(TRIAL_ENDED_BILLING_COPY_KEY);
+const BILLING_ACTION_LABEL = i18n.t('organization.hub.manageBilling');
+
+/** The lapsed-trial refusal as the organization gate sends it. */
+function trialRefusal(): Error {
+  return Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+    data: { code: 'FORBIDDEN' },
+  });
+}
 
 const routerBack = vi.hoisted(() => vi.fn());
 type MockedFinding = Pick<
@@ -75,6 +93,9 @@ const dismissDraft = vi.hoisted(() => ({
   persist: vi.fn(),
   clear: vi.fn(),
 }));
+// The sheet's commit is its header's Done control, so the harness records the
+// header props the screen passes instead of looking for an inline button.
+const sheetHeader = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -82,12 +103,33 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   ActivityIndicator: 'ActivityIndicator',
+  // The refusal step is a Pressable, and the shared status reads the platform
+  // for its live region.
+  Pressable: 'Pressable',
+  Platform: { OS: 'android' },
+  I18nManager: { isRTL: false },
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff' }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
 }));
+// The refusal hooks read the reader's role through the organization query
+// chain; this harness has no organization provider and the chain pulls the Expo
+// runtime it cannot load, so the boundary is stubbed and the real money-role
+// rule decides from the role a case sets.
+const trialRole = vi.hoisted(() => ({ role: undefined as string | undefined }));
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ role: trialRole.role }),
+  };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ mutedForeground: '#000', primaryForeground: '#fff' }),
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
@@ -101,8 +143,16 @@ vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
   securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/sheet-header', () => ({
+  SheetHeader: (props: Record<string, unknown>) => {
+    sheetHeader.props = props;
+    return null;
+  },
+}));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/security-agent/settings-recovery-status', () => ({
   SettingsRecoveryStatus: 'SettingsRecoveryStatus',
@@ -115,7 +165,7 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({
   },
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
@@ -149,20 +199,21 @@ function selectReason(): void {
   });
 }
 
-function findDismissButton(root: I): I {
-  const nodes = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
-  if (nodes.length !== 1) {
-    throw new Error(`expected 1 dismissal Button, got ${nodes.length}`);
-  }
-  const n = nodes[0];
-  if (!n) {
-    throw new Error('dismissal Button not found');
-  }
-  return n;
+/** The commit control's disabled state, as the sheet header received it. */
+function doneDisabled(): boolean | undefined {
+  return sheetHeader.props.doneDisabled as boolean | undefined;
 }
 
-function buttonDisabled(root: I): boolean | undefined {
-  return findDismissButton(root).props.disabled as boolean | undefined;
+/** The commit control's in-flight state, as the sheet header received it. */
+function doneBusy(): boolean | undefined {
+  return sheetHeader.props.doneBusy as boolean | undefined;
+}
+
+/** Presses the sheet header's Done control, the sheet's only commit. */
+function submit(): void {
+  act(() => {
+    (sheetHeader.props.onDone as () => void)();
+  });
 }
 
 function renderedTexts(root: I): string[] {
@@ -185,8 +236,19 @@ function findCommentInput(root: I): I {
   return n;
 }
 
+/** The billing step a refusal renders under the sentence that names it. */
+function billingSteps(root: I): I[] {
+  return root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Pressable' &&
+      n.props.accessibilityLabel === BILLING_ACTION_LABEL
+  );
+}
+
 describe('DismissFindingScreen dismissal CTA states', () => {
   beforeEach(() => {
+    trialRole.role = undefined;
     dismiss.mutate.mockClear();
     dismiss.isPending = false;
     dismiss.isError = false;
@@ -257,8 +319,8 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       expect(tree.root.findByType(ScrollView)).toBe(scroll);
       expect(findCommentInput(tree.root)).toBe(input);
       expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
-      expect(buttonDisabled(tree.root)).toBe(false);
-      act(findDismissButton(tree.root).props.onPress as () => void);
+      expect(doneDisabled()).toBe(false);
+      submit();
       expect(dismiss.mutate).toHaveBeenCalledWith(
         { findingId: 'finding-1', reason: 'not_used', comment: 'Keep this comment' },
         expect.any(Object)
@@ -318,10 +380,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('keeps the dismissal CTA enabled once a reason is chosen', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
   });
 
   it('keeps the dismissal CTA enabled after a retryable failure and shows its copy', () => {
@@ -330,17 +392,35 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
   });
 
-  it('disables the dismissal CTA and shows the persistence-failure copy after a non-retryable error', () => {
+  it('keeps the dismissal CTA live for a ledger persistence failure, whose copy invites the retry', () => {
     dismiss.isError = true;
     dismiss.error = mapSecurityDismissOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    // The key was rotated, so a resubmit is a fresh intent; leaving the CTA
+    // down would give the reader "try again later" with no way to try.
+    expect(doneDisabled()).toBe(false);
+    expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
+  });
+
+  it('keeps the CTA live when a stored draft predates the retry rule', () => {
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: PERSISTENCE_FAILED_MESSAGE,
+      lastErrorKey: null,
+      retryable: false,
+    };
+
+    const root = renderScreen();
+    selectReason();
+
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
@@ -350,7 +430,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
     // The raw server message is replaced by the state-specific copy.
     expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
@@ -362,7 +442,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(SERVICE_UNAVAILABLE_COPY);
     // The old ambiguous sentence must not be what the reader is told.
     expect(renderedTexts(root.root)).not.toContain(
@@ -370,21 +450,73 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     );
   });
 
-  it('disables the dismissal CTA while the dismissal is pending', () => {
-    dismiss.isPending = true;
+  it('gives a billing role the trial sentence and the step that ends it', () => {
+    trialRole.role = 'owner';
+    dismiss.isError = true;
+    dismiss.error = mapSecurityDismissOperationError(trialRefusal(), true);
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    // The plan is the fix, so the CTA stays down while the step out is offered.
+    expect(doneDisabled()).toBe(true);
+    expect(renderedTexts(root.root)).toContain(TRIAL_BILLING_COPY);
+    expect(renderedTexts(root.root)).not.toContain(TRIAL_MEMBER_COPY);
+    expect(billingSteps(root.root)).toHaveLength(1);
+  });
+
+  it('keeps every other role on the owner-naming sentence, with no step', () => {
+    trialRole.role = 'member';
+    dismiss.isError = true;
+    dismiss.error = mapSecurityDismissOperationError(trialRefusal());
+    const root = renderScreen();
+    selectReason();
+
+    expect(doneDisabled()).toBe(true);
+    expect(renderedTexts(root.root)).toContain(TRIAL_MEMBER_COPY);
+    expect(billingSteps(root.root)).toHaveLength(0);
+  });
+
+  it('a refusal mapped before the role settled re-reads as the billing sentence once the reader can change the plan', () => {
+    trialRole.role = 'owner';
+    dismiss.isError = true;
+    // Mapped while the membership list was still unresolved, so the sentence
+    // baked on the error is the member-worded one.
+    dismiss.error = mapSecurityDismissOperationError(trialRefusal(), false);
+    const root = renderScreen();
+    selectReason();
+
+    expect(doneDisabled()).toBe(true);
+    expect(renderedTexts(root.root)).toContain(TRIAL_BILLING_COPY);
+    expect(renderedTexts(root.root)).not.toContain(TRIAL_MEMBER_COPY);
+    expect(billingSteps(root.root)).toHaveLength(1);
+  });
+
+  it('a refusal mapped before the role settled re-reads as the owner-naming sentence once the reader loses the plan', () => {
+    trialRole.role = 'member';
+    dismiss.isError = true;
+    // Mapped while the membership list still read as a billing role.
+    dismiss.error = mapSecurityDismissOperationError(trialRefusal(), true);
+    const root = renderScreen();
+    selectReason();
+
+    expect(doneDisabled()).toBe(true);
+    expect(renderedTexts(root.root)).toContain(TRIAL_MEMBER_COPY);
+    expect(billingSteps(root.root)).toHaveLength(0);
+  });
+
+  it('marks the dismissal CTA busy while the dismissal is pending', () => {
+    dismiss.isPending = true;
+    renderScreen();
+    selectReason();
+
+    expect(doneBusy()).toBe(true);
   });
 
   it('submits the dismissal and pops the screen only on success', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     expect(dismiss.mutate).toHaveBeenCalledWith(
       expect.objectContaining({ findingId: 'finding-1', reason: 'not_used' }),
@@ -393,12 +525,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('records the intent as a draft before submitting', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     expect(dismissDraft.persist).toHaveBeenCalledWith({
       reason: 'not_used',
@@ -410,12 +540,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('clears the draft and pops on authoritative accept', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onSuccess?: () => void;
@@ -429,12 +557,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists lastError and retryable on a retryable failure', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onError?: (error: Error) => void;
@@ -453,12 +579,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists retry copy and a retryable draft when the Worker was unreachable', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onError?: (error: Error) => void;
@@ -477,12 +601,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists the configuration copy and non-retryable on a missing-configuration failure', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onError?: (error: Error) => void;
@@ -499,9 +621,37 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       retryable: false,
     });
   });
+
+  it('reopening after a terminal rejection shows the stored copy and keeps the CTA down', () => {
+    // The rejection happened before a command id existed, so only the durable
+    // draft records it; the reopened sheet has no live mutation error.
+    dismissDraft.draft = {
+      reason: 'not_used',
+      comment: '',
+      lastError: CONFIGURATION_COPY,
+      lastErrorKey: null,
+      retryable: false,
+    };
+
+    const root = renderScreen();
+
+    expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
+    expect(doneDisabled()).toBe(true);
+
+    // Choosing a reason is a new intent but not a new request: resubmitting the
+    // same unrecoverable dismissal cannot succeed, so the CTA stays down.
+    selectReason();
+    expect(doneDisabled()).toBe(true);
+  });
 });
 
 describe('DismissFindingScreen draft persistence on type', () => {
+  beforeEach(() => {
+    dismissDraft.draft = null;
+    dismissDraft.hydrated = true;
+    dismissDraft.persist.mockClear();
+  });
+
   it('persists the reason as a draft on selection', () => {
     renderScreen();
     selectReason();

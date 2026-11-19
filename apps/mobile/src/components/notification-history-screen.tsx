@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View, type ViewStyle } from 'react-native';
 import { toast } from 'sonner-native';
@@ -14,13 +14,13 @@ import { ScreenHeader } from '@/components/screen-header';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { BellOff } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FilterChip } from '@/components/ui/filter-chip';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { useAuth } from '@/lib/auth/auth-context';
-import { openClawNotificationWebUrl } from '@/lib/claw-notification';
-import { WEB_BASE_URL } from '@/lib/config';
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
 import { pendingDeepLinkOptionsForData } from '@/lib/notification-actions';
 import {
@@ -30,10 +30,12 @@ import {
   notificationHistoryTarget,
 } from '@/lib/notification-history';
 import { useNotificationMasterGate } from '@/lib/hooks/use-notification-master-gate';
+import { isRetiredPushType } from '@/lib/retired-push-types';
 import { type HistoryRow, HistoryRowView } from '@/components/notification-history-row';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import {
   hasRetentionBudget,
   reconcileFirstPage,
@@ -49,7 +51,12 @@ const PAGE_SIZE = 30;
 const MAX_PAGES = 10;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 16 } satisfies ViewStyle;
+
+/**
+ * Space under the list's last element, past the tab bar's own clearance, so the
+ * cap notice and the next-page retry sit above the band rather than against it.
+ */
+const FOOTER_BOTTOM_GAP = 32;
 
 /**
  * The pushes this account received, newest first: one row per recorded
@@ -109,8 +116,41 @@ export function NotificationHistoryScreen() {
   // `reconcileFirstPage` keeps the retained pages until page one arrives, so
   // the rows a refresh started from stay on screen (and scroll survives) even
   // when the refetch is paused by lost connectivity or fails.
-  const items = flatItems;
-  const hasListContent = items.length > 0 || query.isFetchNextPageError;
+  // A stored page can still hold a row of a kind this build retired; the list
+  // never draws one.
+  const items = useMemo(
+    () => flatItems.filter(row => !isRetiredPushType(row.pushType)),
+    [flatItems]
+  );
+  // A page can be nothing but retired rows. Rather than report an account with
+  // no notifications, the list reads on until it has a row to show or the
+  // retention window ends.
+  const { fetchNextPage, hasNextPage, isFetchNextPageError, isFetchingNextPage } = query;
+  const readingOn = items.length === 0 && (hasNextPage || isFetchingNextPage);
+  const hasListContent = items.length > 0 || readingOn || isFetchNextPageError;
+  useEffect(() => {
+    // A failed next page keeps the cursor and clears the fetching flag, so an
+    // unguarded read-on would re-request the same page for as long as the list
+    // stays empty; the footer's Retry is the single recovery, as `onEndReached`
+    // already assumes.
+    if (
+      authToken == null ||
+      items.length > 0 ||
+      !hasNextPage ||
+      isFetchingNextPage ||
+      isFetchNextPageError
+    ) {
+      return;
+    }
+    void fetchNextPage();
+  }, [
+    authToken,
+    fetchNextPage,
+    hasNextPage,
+    isFetchNextPageError,
+    isFetchingNextPage,
+    items.length,
+  ]);
   // A query that is disabled never leaves `pending`; only a signed-in read can.
   // The push banner and the filter chips both sit above the list, so the list
   // waits for the same reads they do: a row that settles first is pushed down
@@ -124,30 +164,22 @@ export function NotificationHistoryScreen() {
 
   const openRow = useCallback(
     (payload: Record<string, unknown>) => {
-      const target = notificationHistoryTarget(payload, WEB_BASE_URL);
+      const target = notificationHistoryTarget(payload);
       if (target === null) {
         toast.error(t('notifications.history.openFailed'));
         return;
       }
-      if (target.destination.kind === 'external') {
-        // A KiloClaw row has no mobile screen to open: it opens its web page
-        // in the in-app browser, like a tap on the notification itself.
-        void openClawNotificationWebUrl(target.destination.url);
-        return;
-      }
       // The same slot a notification response fills: the root layout navigates.
-      setPendingDeepLink(
-        target.destination.href,
-        'notification',
-        pendingDeepLinkOptionsForData(target.data)
-      );
+      setPendingDeepLink(target.href, 'notification', pendingDeepLinkOptionsForData(target.data));
     },
     [t]
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: HistoryRow }) => <HistoryRowView row={item} now={now} onOpen={openRow} />,
-    [now, openRow]
+    ({ item, index }: { item: HistoryRow; index: number }) => (
+      <HistoryRowView row={item} now={now} last={index === items.length - 1} onOpen={openRow} />
+    ),
+    [now, openRow, items.length]
   );
 
   const handleRefresh = () => {
@@ -186,7 +218,7 @@ export function NotificationHistoryScreen() {
   // The page bound, not the server, ends the list: say so.
   const capped = !query.hasNextPage && (query.data?.pages.at(-1)?.nextCursor ?? null) !== null;
   let footer = (
-    <View className="pb-8" style={{ paddingBottom: paddingBottom + 32 }}>
+    <View className="px-4" style={{ paddingBottom: paddingBottom + FOOTER_BOTTOM_GAP }}>
       {capped ? (
         <Text variant="muted" className="text-center text-xs">
           {t('notifications.history.capped')}
@@ -196,7 +228,7 @@ export function NotificationHistoryScreen() {
   );
   if (query.isFetchNextPageError) {
     footer = (
-      <View className="pb-8" style={{ paddingBottom: paddingBottom + 32 }}>
+      <View className="px-4" style={{ paddingBottom: paddingBottom + FOOTER_BOTTOM_GAP }}>
         <Button
           variant="ghost"
           onPress={() => {
@@ -208,44 +240,56 @@ export function NotificationHistoryScreen() {
       </View>
     );
   } else if (query.isFetchingNextPage) {
-    footer = <Skeleton className="mb-3 h-20 rounded-2xl" />;
+    footer = <RowSkeleton subtitle />;
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.history.title')} showBackButton />
+      <ScreenHeader
+        title={t('notifications.history.title')}
+        showBackButton
+        backFallback={PROFILE_TAB_HREF}
+      />
       <View className="flex-1">
         {gate.settled && gate.answered && !gate.pushEnabled ? (
-          <View className="mx-4 mb-3 gap-2 rounded-lg border border-border bg-card p-3">
-            <View className="flex-row items-center gap-2">
-              <BellOff size={16} color={colors.mutedForeground} />
-              <Text className="flex-1 text-sm">{t('notifications.history.bannerBody')}</Text>
-            </View>
-            <Button
-              variant="outline"
-              size="sm"
-              onPress={() => {
-                router.push('/(app)/notifications' as Href);
-              }}
-            >
-              <Text>{t('notifications.history.bannerAction')}</Text>
-            </Button>
+          <View className="px-4 pb-3">
+            <Card>
+              <View className="flex-row items-center gap-2">
+                <BellOff size={16} color={colors.mutedForeground} />
+                <Text className="flex-1 text-sm">{t('notifications.history.bannerBody')}</Text>
+              </View>
+              <Button
+                variant="outline"
+                size="sm"
+                onPress={() => {
+                  router.push('/(app)/notifications' as Href);
+                }}
+              >
+                <Text>{t('notifications.history.bannerAction')}</Text>
+              </Button>
+            </Card>
           </View>
         ) : null}
 
         {bodyPending ? (
-          <View className="mx-4 mb-3 flex-row gap-2">
+          <View className="mb-3 flex-row gap-2 px-4">
             <Skeleton className="h-8 w-16 rounded-full" />
             <Skeleton className="h-8 w-24 rounded-full" />
             <Skeleton className="h-8 w-20 rounded-full" />
           </View>
         ) : (
+          // One row that scrolls sideways: every chip keeps its whole face and
+          // the row's own gutter sits at both ends, so the last chip is never
+          // clipped by the screen edge and no chip wraps onto a line of its own.
+          // A horizontal scroller grows into the column's free height unless it
+          // is told not to, which stretched every chip down to the empty state;
+          // `grow-0` keeps it one chip tall, and `mb-3` matches the skeleton row.
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             accessibilityRole="tablist"
-            className="grow-0"
-            contentContainerClassName="gap-2 px-4"
+            className="mb-3 grow-0"
+            contentContainerClassName="items-center gap-2 px-4"
           >
             {filters.map(filter => (
               <FilterChip
@@ -265,15 +309,17 @@ export function NotificationHistoryScreen() {
 
         <View className="mt-3 flex-1">
           {loading ? (
-            <View className="gap-3 px-4">
-              <Skeleton className="h-20 rounded-2xl" />
-              <Skeleton className="h-20 rounded-2xl" />
-              <Skeleton className="h-20 rounded-2xl" />
+            <View>
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
             </View>
           ) : null}
 
           {failure ? (
             <QueryError
+              placement="top"
+              inset="gutter"
               message={t('notifications.history.loadError')}
               onRetry={() => {
                 void query.refetch();
@@ -285,6 +331,8 @@ export function NotificationHistoryScreen() {
 
           {!loading && !failure && !hasListContent ? (
             <EmptyState
+              placement="top"
+              inset="gutter"
               icon={BellOff}
               refreshControl={refreshControl}
               title={t(
@@ -309,7 +357,6 @@ export function NotificationHistoryScreen() {
               data={items}
               keyExtractor={item => item.id}
               renderItem={renderItem}
-              contentContainerStyle={listContentContainerStyle}
               // FlashList adds its own control from this pair; the element
               // below is for the state scrollers that accept one.
               refreshing={refreshing}

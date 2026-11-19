@@ -6,9 +6,9 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import jwt from 'jsonwebtoken';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type {
-  ControlPlaneSessionPeer,
+import {
   SandboxControlV2,
+  type ControlPlaneSessionPeer,
 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
@@ -380,7 +380,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     ['vercel', true],
     ['cloudflare-containers', false],
   ] as const)(
-    '%s contained=%s forwards renewed authorization after JWT expiry and allocation replacement',
+    '%s contained=%s fences credential renewal and rejects a request racing allocation replacement',
     async (providerName, contained) => {
       const startedAt = Date.now();
       const sessionId = newSessionId();
@@ -389,6 +389,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       const provider = createProvider();
       const broker = createFakeCredentialBroker();
       const sandboxStub = await installSandbox(sandboxId, provider, broker);
+      const fence = vi.spyOn(SandboxControlV2.prototype, 'getRuntimeCredentialProxyFence');
       const { seal, token, delegationExpiresAt } = await sealedRuntimeAuthorization(sessionId);
       const sessionStub = await createVercelSession({
         sessionId,
@@ -432,10 +433,13 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       );
 
       let membershipPresent = true;
+      let membershipReads = 0;
+      let membershipGate: Promise<void> | undefined;
       await runInDurableObject(sessionStub, instance => {
         // Keep the real persisted renewal and binding policy; only the database reads are fake.
-        instance.getRuntimeToken = async () =>
+        instance['getStoredRuntimeToken'] = async (secret, beforeRenew) =>
           renewStoredRuntimeAuthorization({
+            beforeRenew,
             metadata: await instance.getMetadata(),
             getAuthorization: () => instance.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY),
             putAuthorization: authorization =>
@@ -448,7 +452,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
             renew: authorization =>
               renewRuntimeAuthorization({
                 authorization,
-                secret: SECRET,
+                secret,
                 connectionString: 'fake',
                 now: new Date(Date.now()),
                 adapters: {
@@ -459,10 +463,13 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
                     blockedReason: null,
                     isBot: false,
                   }),
-                  getMembership: async () =>
-                    membershipPresent
+                  getMembership: async () => {
+                    membershipReads += 1;
+                    await membershipGate;
+                    return membershipPresent
                       ? { id: 'membership_1', role: 'member', organizationDeletedAt: null }
-                      : null,
+                      : null;
+                  },
                 },
               }),
           });
@@ -504,30 +511,59 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         INTERNAL_API_SECRET_PROD: { get: async () => 'integration-test-secret' },
         SESSION_INGEST: { fetch: sessionIngestFetch },
       } as Env;
-      const forward = async (currentHandle: string) => {
+      const request = (currentHandle: string, path: string, method: string) =>
+        worker.fetch(
+          new Request(`${WORKER_URL}${path}`, {
+            method,
+            headers: { authorization: `Bearer ${currentHandle}` },
+          }),
+          requestEnv,
+          createExecutionContext()
+        );
+      const forward = async (currentHandle: string, expectedFenceReads: number[]) => {
         for (const [index, path] of paths.entries()) {
-          const response = await worker.fetch(
-            new Request(`${WORKER_URL}${path}`, {
-              method: methods[index],
-              headers: { authorization: `Bearer ${currentHandle}` },
-            }),
-            requestEnv,
-            createExecutionContext()
-          );
+          const before = fence.mock.calls.length;
+          const response = await request(currentHandle, path, methods[index]);
           expect(response.status).toBe(200);
           expect(await response.text()).toBe('authorized');
+          expect(fence.mock.calls.length - before).toBe(expectedFenceReads[index]);
         }
       };
-      await forward(handle);
+      await forward(handle, [2, 1, 1]);
 
-      await sessionStub.stop();
-      wrapper.heartbeat(false);
-      await waitFor(async () =>
-        expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
-      );
-      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
-      await sessionStub.send(promptPayload(messageId()));
-      await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+      vi.mocked(Date.now).mockReturnValue(startedAt + 122 * 60_000);
+      const renewal = Promise.withResolvers<void>();
+      membershipGate = renewal.promise;
+      const previousMembershipReads = membershipReads;
+      const previousFenceReads = fence.mock.calls.length;
+      const racing = request(handle, '/api/profile', 'GET');
+      try {
+        await waitFor(() => expect(membershipReads).toBeGreaterThan(previousMembershipReads));
+        expect(fence.mock.calls.length - previousFenceReads).toBe(1);
+        await sessionStub.stop();
+        wrapper.heartbeat(false);
+        await waitFor(async () =>
+          expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
+        );
+        await sessionStub.send(promptPayload(messageId()));
+        await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+        await waitFor(async () => {
+          const allocation = await sandboxStub.getAllocationState();
+          expect(allocation.kind).toBe('starting');
+          expect(allocation.allocationId).not.toBe(identity.allocationId);
+        });
+        const grant = await runInDurableObject(sessionStub, (_instance, state) =>
+          state.storage.get(RUNTIME_PROXY_GRANT_KEY)
+        );
+        expect(grant).toMatchObject({ grantId: runtimeProxyHandleGrantId(handle) });
+      } finally {
+        membershipGate = undefined;
+        renewal.resolve();
+      }
+      expect((await racing).status).toBe(401);
+      expect(destinations).toHaveLength(3);
+      expect(fence.mock.calls.length - previousFenceReads).toBe(2);
+
       const nextEnv = provider.launchEnvs[1];
       const replacement = await FakeWrapper.connect({
         sandboxId,
@@ -542,7 +578,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       const nextHandle = nextFrame.credentials?.proxy?.handle ?? '';
       expect(nextHandle === handle).toBe(false);
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
-      await forward(nextHandle);
+      await forward(nextHandle, [1, 1, 1]);
       expect(destinations).toHaveLength(6);
       const siblingKiloSessionId = kiloSessionId();
       const siblingDenied = await worker.fetch(
@@ -579,7 +615,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(destinations).toHaveLength(6);
 
       membershipPresent = false;
-      vi.mocked(Date.now).mockReturnValue(startedAt + 122 * 60_000);
+      vi.mocked(Date.now).mockReturnValue(startedAt + 183 * 60_000);
       const denied = await worker.fetch(
         new Request(`${WORKER_URL}/api/profile`, {
           headers: { authorization: `Bearer ${nextHandle}` },
@@ -624,11 +660,11 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     expect(await stub.getSession()).toEqual({ type: 'session-not-found' });
   });
 
-  it('mints a handle on the connected prepare, projects it into the credentials, and resolves it', async () => {
+  it('resolves a fresh token with one fence read and rejects it if the allocation is replaced first', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
     const provider = createProvider();
-    await installSandbox(sandboxId, provider);
+    const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
     const sessionStub = await createVercelSession({
       sessionId,
@@ -636,6 +672,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       sandboxId,
       kiloToken: token,
       seal,
+      provider: 'cloudflare-containers',
     });
 
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
@@ -653,8 +690,62 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     expect(typeof handle).toBe('string');
     expect((handle ?? '').length).toBeGreaterThan(0);
     expect(frame.credentials?.proxy?.targets.backendBaseUrl).toBe(FACADE_BASE);
-    // The handle is a real grant bound to this route: the proxy resolves it.
+    const fence = vi.spyOn(SandboxControlV2.prototype, 'getRuntimeCredentialProxyFence');
     expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '')).not.toBeNull();
+    expect(fence).toHaveBeenCalledOnce();
+
+    let tokenRead = false;
+    const releaseToken = Promise.withResolvers<void>();
+    await runInDurableObject(sessionStub, instance => {
+      const original = instance['getStoredRuntimeToken'].bind(instance);
+      instance['getStoredRuntimeToken'] = async (secret, beforeRenew) => {
+        const current = await original(secret, beforeRenew);
+        tokenRead = true;
+        await releaseToken.promise;
+        return current;
+      };
+    });
+    fence.mockClear();
+    const upstream = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('authorized'));
+    const racing = worker.fetch(
+      new Request(`${WORKER_URL}/api/profile`, {
+        headers: { authorization: `Bearer ${handle}` },
+      }),
+      { ...env, WORKER_URL } as Env,
+      createExecutionContext()
+    );
+    try {
+      await waitFor(() => expect(tokenRead).toBe(true));
+      const { providerRef } = await sandboxStub.getAllocationState();
+      if (providerRef === null) throw new Error('missing allocation provider reference');
+      expect(
+        await sandboxStub.requestBillingStop({
+          allocationRef: providerRef,
+          billingFailure: {
+            code: 'INSUFFICIENT_CREDITS',
+            payer: { type: 'user', id: USER_ID },
+            retryable: true,
+            remainingMicrodollars: 0,
+            minimumRequiredMicrodollars: 5_000_000,
+          },
+        })
+      ).toBe(true);
+      await waitFor(async () => {
+        const replacement = await sandboxStub.getAllocationState();
+        expect(replacement.kind).toBe('starting');
+        expect(replacement.allocationId).not.toBe(allocationId);
+      });
+      expect(
+        await runInDurableObject(sessionStub, (_instance, state) =>
+          state.storage.get(RUNTIME_PROXY_GRANT_KEY)
+        )
+      ).toMatchObject({ grantId: runtimeProxyHandleGrantId(handle ?? '') });
+    } finally {
+      releaseToken.resolve();
+    }
+    expect((await racing).status).toBe(401);
+    expect(upstream).not.toHaveBeenCalled();
+    expect(fence).toHaveBeenCalledOnce();
   });
 
   it('delivers a private scoped MCP grant separately from model aliases and never in launch env or persisted route specs', async () => {
@@ -679,9 +770,9 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
           onEvents: notification => peer.onEvents(notification),
           onOutcome: outcome => peer.onOutcome(outcome),
           issueRuntimeCredentialProxyGrant: fence => peer.issueRuntimeCredentialProxyGrant(fence),
-          issueCloudAgentMcpGrant: async () => mcpGrant,
         };
       };
+      instance.cloudAgentMcpGrantFor = async () => mcpGrant;
     });
     await createVercelSession({
       sessionId,
@@ -752,9 +843,9 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
             onEvents: notification => peer.onEvents(notification),
             onOutcome: outcome => peer.onOutcome(outcome),
             issueRuntimeCredentialProxyGrant: fence => peer.issueRuntimeCredentialProxyGrant(fence),
-            issueCloudAgentMcpGrant: issueMcpGrant,
           };
         };
+        instance.cloudAgentMcpGrantFor = issueMcpGrant;
         Object.assign(instance, { grantIssueTimeoutMs: () => 100 });
       });
       const session = await createVercelSession({
@@ -778,7 +869,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       ).not.toBeNull();
       expect(await sandbox.status({ sessionId })).toMatchObject({ view: { state: 'preparing' } });
       expect(issueMcpGrant).toHaveBeenCalledTimes(1);
-      expect(fields).toHaveBeenCalledWith({ sandboxId, sessionId, anchorSessionId: sessionId });
+      expect(fields).toHaveBeenCalledWith({ sandboxId, sessionId, workspaceSessionId: sessionId });
       expect(warn).toHaveBeenCalledWith(
         'Optional Cloud Agent MCP grant unavailable; continuing without it'
       );
@@ -858,11 +949,11 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       let resolvingToken = false;
       if (disconnectAt === 'during token resolution') {
         await runInDurableObject(sessionStub, instance => {
-          const original = instance.getRuntimeToken.bind(instance);
-          instance.getRuntimeToken = async () => {
+          const original = instance['getStoredRuntimeToken'].bind(instance);
+          instance['getStoredRuntimeToken'] = async (secret, beforeRenew) => {
             resolvingToken = true;
             await tokenGate.promise;
-            return original();
+            return original(secret, beforeRenew);
           };
         });
       }

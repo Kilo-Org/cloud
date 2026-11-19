@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import {
   changeText,
   findField,
@@ -47,7 +47,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => true,
+  useOrganizationProfilePermission: () => 'allowed',
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileOverview: () => h.query,
@@ -120,7 +120,7 @@ vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   CornerDownLeft: 'CornerDownLeft',
@@ -251,6 +251,27 @@ describe('ProfileOverviewScreen unsaved metadata guard', () => {
     await waitFor(() => h.success.mock.calls.length > 0);
 
     expect(h.guard.enabled).toBe(false);
+  });
+
+  // The delete dialog used to offer `common.delete` as its label, so the one
+  // action that removes the whole profile read like any other delete.
+  it('asks for the profile delete with a label that names this profile', async () => {
+    h.mutations.deleteProfile.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer } = await mountScreen();
+
+    await pressDelete(renderer.root, h.confirm);
+
+    const request = h.confirm.mock.calls[0]?.[0] as
+      | { title: string; message: string; confirmLabel: string }
+      | undefined;
+    expect(request).toMatchObject({
+      title: i18n.t('profiles.deleteTitle'),
+      message: i18n.t('profiles.deleteMessage'),
+      confirmLabel: i18n.t('profiles.deleteConfirm'),
+    });
+    expect(request?.confirmLabel).not.toBe(i18n.t('common.delete'));
+
+    await waitFor(() => h.back.mock.calls.length > 0);
   });
 
   it('does not ask about the edits of a profile that was just deleted', async () => {

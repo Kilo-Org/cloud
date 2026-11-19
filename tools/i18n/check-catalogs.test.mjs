@@ -14,16 +14,20 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test, { after } from 'node:test';
 
+import { flattenCatalog, missingPluralCategories } from '../lib/catalogs.mjs';
 import { checkCatalogs } from './check-catalogs.mjs';
 
 // The checker parses with oxc through the shared scanner, so the import-only
 // probe links the repository's dependency tree at its own root.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
-const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'source-files.mjs'];
+const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'entry-point.mjs', 'source-files.mjs'];
 const WORDING_EXCEPTIONS = readFileSync(
   new URL('./wording-exceptions.json', import.meta.url),
   'utf8'
 );
+// The checker the command fixtures run, read once so a case can hand over a
+// patched copy of the same text.
+const CHECKER_SOURCE = readFileSync(new URL('./check-catalogs.mjs', import.meta.url), 'utf8');
 
 const ENGLISH = {
   agents: {
@@ -69,6 +73,10 @@ function run({
   translated = TRANSLATED,
   source = SOURCE,
   language = 'ru',
+  pushEnglish = {},
+  pushTranslated = {},
+  pushSource = '',
+  wordingExceptions = WORDING_EXCEPTIONS,
   extraFiles = {},
 } = {}) {
   const root = fixture({
@@ -76,8 +84,9 @@ function run({
     'apps/mobile/src/example.ts': source,
     'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
     [`apps/mobile/src/i18n/locales/${language}.json`]: JSON.stringify(translated),
-    'packages/notifications/src/locales/en.json': '{}',
-    [`packages/notifications/src/locales/${language}.json`]: '{}',
+    'packages/notifications/src/locales/en.json': JSON.stringify(pushEnglish),
+    [`packages/notifications/src/locales/${language}.json`]: JSON.stringify(pushTranslated),
+    'packages/notifications/src/push-copy.ts': pushSource,
     // The push locale module the catalog checker reads: one import and one
     // registry entry per fixture catalog, as the real module writes them.
     'packages/notifications/src/i18n.ts': [
@@ -85,7 +94,9 @@ function run({
       `import ${language.replaceAll('-', '_')} from './locales/${language}.json';`,
       `const pushCatalogs = { 'en': en, '${language}': ${language.replaceAll('-', '_')} };`,
     ].join('\n'),
-    'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
+    ...(wordingExceptions === null
+      ? {}
+      : { 'tools/i18n/wording-exceptions.json': wordingExceptions }),
     ...extraFiles,
   });
   return checkCatalogs(root).problems;
@@ -94,15 +105,13 @@ function run({
 /**
  * A fixture tree that can run the checker as CI does: a copy of the checker,
  * its shared modules and its wording exceptions, and the repository's
- * dependency tree linked at the root the command resolves from.
+ * dependency tree linked at the root the command resolves from. `checker`
+ * replaces the checker's source text, for a case that runs a patched copy.
  */
-function cliFixture(files) {
+function cliFixture(files, checker = CHECKER_SOURCE) {
   const root = fixture({
     ...files,
-    'tools/i18n/check-catalogs.mjs': readFileSync(
-      new URL('./check-catalogs.mjs', import.meta.url),
-      'utf8'
-    ),
+    'tools/i18n/check-catalogs.mjs': checker,
     'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
   });
   mkdirSync(join(root, 'tools/lib'), { recursive: true });
@@ -260,6 +269,165 @@ test('reports an unparsed file by its path below the tree it was read from', () 
   );
 });
 
+test('accepts values that read as a brace or a key-shaped run', () => {
+  // A message may quote a brace, or a `"key": 1` fragment, without the scan
+  // mistaking either for the catalog's own structure.
+  const english = {
+    agents: {
+      title: 'Agents',
+      open: 'Keep the lone { in place',
+      close: 'Keep the lone } in place',
+      total: 'Read {{"total": 1, "title": 2}} as text',
+      headline: 'Also read {{"total": 1, "title": 2}} as text',
+    },
+  };
+  const found = run({
+    extraFiles: { 'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english) },
+    translated: {
+      agents: {
+        title: 'Агенты',
+        open: 'Оставьте одиночную { на месте',
+        close: 'Оставьте одиночную } на месте',
+        total: 'Читайте {{"total": 1, "title": 2}} как текст',
+        headline: 'Читайте ещё {{"total": 1, "title": 2}} как текст',
+      },
+    },
+    source: [
+      "t('agents.title');",
+      "t('agents.open');",
+      "t('agents.close');",
+      "t('agents.total');",
+      "t('agents.headline');",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('still reports a repeated key after a value closes a brace', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': [
+        '{',
+        '  "agents": {',
+        '    "summary": "Read as text",',
+        '    "title": "Agents }",',
+        '    "summary": "Read as text"',
+        '  }',
+        '}',
+      ].join('\n'),
+    },
+    translated: { agents: { summary: 'Читается как текст', title: 'Агенты }' } },
+    source: "t('agents.title');\nt('agents.summary');",
+  });
+  assert.deepEqual(found, ['mobile/en: duplicate key "summary"']);
+});
+
+test('reports unbalanced English catalog braces once, without a missing-key cascade', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': [
+        '{',
+        '  "agents": {',
+        '    "title": "Agents }",',
+        '    "summary": "Read as text"',
+        '}',
+      ].join('\n'),
+    },
+    source: "t('agents.title');\nt('agents.summary');",
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /cannot audit catalog: its strings and braces do not balance/);
+});
+
+test('reports a balanced catalog JSON rejects in the same one problem line', () => {
+  // The braces match, so only JSON.parse can reject the file; a stack trace here
+  // would hide which catalog is broken.
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/en.json': '{\n  "agents": {\n    "title" "Agents"\n  }\n}\n',
+    },
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /^mobile\/en: cannot audit catalog: /);
+});
+
+test('reports an unreadable locale catalog without inventing missing keys', () => {
+  // The skipped locale carries no values, so it can say neither that a key is
+  // missing nor that a key was left in English.
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/ru.json': [
+        '{',
+        '  "agents": {',
+        '    "title": "Агенты }",',
+        '    "liveCount_one": "{{count}} сеанс"',
+        '}',
+      ].join('\n'),
+    },
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(
+    found[0],
+    /^mobile\/ru: cannot audit catalog: its strings and braces do not balance/
+  );
+});
+
+test('reports a missing wording-exceptions file instead of throwing', () => {
+  // The exception map is read before the language registry, so a tree without
+  // one reports it once and still audits everything else: the copy that reads
+  // the same in every locale is reported alongside the read failure.
+  const found = run({
+    wordingExceptions: null,
+    english: { agents: { title: 'Agents' } },
+    translated: { agents: { title: 'Agents' } },
+    source: "t('agents.title');",
+  });
+  assert.ok(found.length > 0, 'expected problems');
+  assert.match(
+    found.join('\n'),
+    /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: /
+  );
+  assert.match(found.join('\n'), /mobile: "agents\.title" equals English in every locale/);
+});
+
+test('reports a malformed wording-exceptions file instead of throwing', () => {
+  const found = run({ wordingExceptions: '{' });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: ./
+  );
+});
+
+test('reports a valid JSON wording-exceptions value of the wrong shape', () => {
+  // JSON.parse accepts every one of these, so the shape of the parsed value is
+  // the only thing between the file and the callers that index it by tag.
+  for (const shape of ['null', '[]', '0', '"text"']) {
+    const found = run({ wordingExceptions: shape });
+    assert.match(
+      found.join('\n'),
+      /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: expected an object that maps each tag to a list of English strings/
+    );
+  }
+});
+
+test('reports a wording-exceptions entry that is not a list of strings', () => {
+  // A number is not iterable, a null entry is not a set of strings, and a bare
+  // string iterates character by character in the callers.
+  for (const entry of [5, null, 'Agents']) {
+    const found = run({ wordingExceptions: JSON.stringify({ ru: entry }) });
+    assert.match(
+      found.join('\n'),
+      /check-catalogs: cannot read tools\/i18n\/wording-exceptions\.json: expected an object that maps each tag to a list of English strings/
+    );
+  }
+});
+
+test('accepts a wording-exceptions map of tag to string list', () => {
+  const found = run({ wordingExceptions: JSON.stringify({ ru: [] }) });
+  assert.ok(!found.join('\n').includes('cannot read'), found.join('\n'));
+});
+
 test('ignores a mounted-harness helper while a source file still reports its keys', () => {
   const source = "t('agents.missing');\n";
   const inSource = run({ source });
@@ -313,12 +481,108 @@ test('rejects the English live-session empty state in a translated catalog', () 
   assert.match(found.join('\n'), /mobile\/ru: "home\.noLiveSessions" must be translated/);
 });
 
+test('accepts a translated live-session empty state', () => {
+  const english = { home: { noLiveSessions: 'Nothing running right now' } };
+  const found = run({
+    english,
+    translated: { home: { noLiveSessions: 'Сейчас ничего не запущено' } },
+    source: "t('home.noLiveSessions');",
+  });
+  assert.deepEqual(found, []);
+});
+
 test('rejects an empty translated value', () => {
   const found = run({
     translated: { agents: { ...TRANSLATED.agents, title: '' } },
   });
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(found.join('\n'), /mobile\/ru: "agents\.title" is empty/);
+});
+
+test('accepts a bare-space sentence joiner in the markless Thai catalog', () => {
+  // Thai closes no sentence with a mark, so its joiner is the space it
+  // separates sentences with; the empty-value rule must not read it as
+  // untranslated.
+  const found = run({
+    language: 'th',
+    english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
+    translated: { common: { sentenceJoiner: ' ' }, agents: TRANSLATED.agents },
+    source: `${SOURCE}\nt('common.sentenceJoiner');`,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a whitespace-only sentence joiner in a catalog that closes sentences', () => {
+  // A catalog whose copy carries sentence marks must name one in its joiner;
+  // a blanked joiner would silently join sentences with nothing.
+  const found = run({
+    english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
+    translated: { common: { sentenceJoiner: ' ' }, agents: TRANSLATED.agents },
+    source: `${SOURCE}\nt('common.sentenceJoiner');`,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "common\.sentenceJoiner" is empty/);
+});
+
+test('rejects an empty sentence joiner in the markless Thai catalog', () => {
+  const found = run({
+    language: 'th',
+    english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
+    translated: { common: { sentenceJoiner: '' }, agents: TRANSLATED.agents },
+    source: `${SOURCE}\nt('common.sentenceJoiner');`,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/th: "common\.sentenceJoiner" is empty/);
+});
+
+test('rejects a locale value that is a serialized JSON object', () => {
+  // A translation store once shipped an action label wrapped in a JSON
+  // object; the reader would see the braces and quotes instead of the words.
+  const found = run({
+    translated: { agents: { ...TRANSLATED.agents, title: '{"value": "Localized agents"}' } },
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.title" is serialized JSON/);
+});
+
+test('rejects scalar JSON copied into a catalog', () => {
+  const found = run({
+    english: { agents: { ...ENGLISH.agents } },
+    translated: {
+      agents: {
+        ...TRANSLATED.agents,
+        title: '9',
+        liveCount_one: 'true',
+        liveCount_other: 'null',
+      },
+    },
+    source: SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.title" is serialized JSON/);
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.liveCount_one" is serialized JSON/);
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.liveCount_other" is serialized JSON/);
+});
+
+test('accepts prose copy that only starts with a bracket', () => {
+  // A bracket that opens prose copy does not make it a serialized object:
+  // `[{{provider}}] агенты` never parses as JSON. English keeps the same
+  // placeholder, so the two catalogs agree on it.
+  const found = run({
+    english: { agents: { title: '[{{provider}}] agents' } },
+    translated: { agents: { title: '[{{provider}}] агенты' } },
+    source: "t('agents.title');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects an English value that is a serialized JSON object', () => {
+  const found = run({
+    english: { agents: { ...ENGLISH.agents, title: '{"value": "Agents"}' } },
+    source: "t('agents.title');\nt('agents.liveCount', { count: 2 });",
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/en: "agents\.title" is serialized JSON/);
 });
 
 test('rejects a trailing space that English does not carry', () => {
@@ -585,7 +849,7 @@ test('rejects unknown placeholders in a locale-specific plural category', () => 
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(
     found.join('\n'),
-    /mobile\/ru: "agents\.liveCount_few" uses placeholder \{\{total\}\}, which the English family does not/
+    /mobile\/ru: "agents\.liveCount_few" placeholders differ from English \(count\)/
   );
 });
 
@@ -891,6 +1155,52 @@ test('accepts a flat counted key kept untranslated to a family in another locale
   assert.deepEqual(found, []);
 });
 
+test('leaves an incomplete English family unowed by a locale', () => {
+  // English declares only the `_one` category of the family, so it is not a
+  // family every locale owes. Neither value interpolates {{count}}: a locale
+  // that keeps only the flat base key owes no categories for it.
+  const found = run({
+    english: { counts: { items: 'items', items_one: 'one item' } },
+    translated: { counts: { items: 'lokal' } },
+    source: "t('counts.items', { count: 2 });",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('names the categories a locale must complete for each family', () => {
+  // A family the locale declares owes every category its tag selects, whether
+  // it declares the family through a member or through the flat base key of an
+  // owed English family; a locale that carries neither owes nothing for it. A
+  // counted flat English key becomes the locale's problem once the locale
+  // declares the family.
+  const english = flattenCatalog({
+    agents: {
+      open_one: '{{displayCount}} open session',
+      open_other: '{{displayCount}} open sessions',
+    },
+  });
+  const counted = flattenCatalog({ counts: { items: '{{count}} items' } });
+  const flatKey = flattenCatalog({ agents: { open: 'x' } });
+  const oneMember = flattenCatalog({ agents: { open_one: 'x' } });
+  const declared = flattenCatalog({
+    counts: { items: 'x', items_one: 'x', items_other: 'x' },
+  });
+
+  assert.deepEqual(
+    [...missingPluralCategories(english, flatKey, 'ru')],
+    [['agents.open', ['one', 'few', 'many', 'other']]]
+  );
+  assert.deepEqual(
+    [...missingPluralCategories(english, oneMember, 'ru')],
+    [['agents.open', ['few', 'many', 'other']]]
+  );
+  assert.deepEqual([...missingPluralCategories(english, flattenCatalog({}), 'ru')], []);
+  assert.deepEqual(
+    [...missingPluralCategories(counted, declared, 'ru')],
+    [['counts.items', ['few', 'many']]]
+  );
+});
+
 test('rejects an incomplete locale-declared family for a counted key', () => {
   const found = run({
     english: COUNTED,
@@ -926,7 +1236,7 @@ test('rejects a wrong placeholder in a locale-declared counted family', () => {
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(
     found.join('\n'),
-    /mobile\/ru: "counts\.items_one" uses placeholder \{\{total\}\}, which the English family does not/
+    /mobile\/ru: "counts\.items_one" placeholders differ from English \(count\)/
   );
 });
 
@@ -1346,6 +1656,462 @@ test('rejects a push locale registry with no initializer', () => {
   );
 });
 
+// The push catalog binds its keys two ways: a literal handed to
+// `translatePush`, and a payload `i18nKey` base that the worker and the app
+// expand to `.title`/`.body`. `translatePush` returns its fallback for a key the
+// catalog does not define, so the lock screen would carry English copy and no
+// check would say so. Both directions of the usage check read that shape here.
+const PUSH_ENGLISH = {
+  generic: { title: 'Kilo', body: { chatMessage: 'You have a new message' } },
+};
+const PUSH_TRANSLATED = {
+  generic: { title: 'Kilo', body: { chatMessage: 'Tienes un mensaje nuevo' } },
+};
+const PUSH_SOURCE = [
+  "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+  "translatePush(locale, 'generic.body.chatMessage', undefined, 'You have a new message');",
+].join('\n');
+
+test('accepts a push key the source passes to translatePush', () => {
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: PUSH_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a push key no catalog defines, which would ship its English fallback', () => {
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: `${PUSH_SOURCE}\ntranslatePush(locale, 'generic.body.chatMesage', undefined, 'x');`,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: source uses "generic\.body\.chatMesage", which en\.json does not define/
+  );
+});
+
+test('rejects an English push key no source uses', () => {
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: PUSH_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: en\.json defines "generic\.body\.scheduledAction", which no source file uses/
+  );
+});
+
+test('accepts a push key no source names in full, because the payload carries its base', () => {
+  // A producer sends `i18nKey: 'sessionReady'`; the worker appends `.title` and
+  // `.body`. Both halves of the family are used, so neither is dead copy.
+  const found = run({
+    pushEnglish: {
+      sessionReady: {
+        title: '{{sessionTitle}}',
+        body: 'Your Kilo session is ready to control from your phone',
+      },
+    },
+    pushTranslated: {
+      sessionReady: {
+        title: '{{sessionTitle}}',
+        body: 'Tu sesión de Kilo está lista para controlarla desde tu teléfono',
+      },
+    },
+    pushSource: "const push = { i18nKey: 'sessionReady' };",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a push source that builds its key from the payload', () => {
+  // `translatePush(locale, `${i18nKey}.title`)` is the mechanism the catalog
+  // exists for, not a key the audit can read. It must not be reported.
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: [
+      PUSH_SOURCE,
+      'const title = translatePush(locale, `${base}.title`, params, stored);',
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a leaf table whose built key the source names at runtime', () => {
+  // The catalog leaf lives in a table and the key is built from it. The leaf
+  // literal beside the built head is the only place the key is named, so the
+  // dead-key rule must read both together.
+  const found = run({
+    pushEnglish: PUSH_ENGLISH,
+    pushTranslated: PUSH_TRANSLATED,
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a push key under a built head that no leaf names', () => {
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: [
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications: en\.json defines "generic\.body\.scheduledAction", which no source file uses/
+  );
+});
+
+test('rejects a push value left in English in one locale', () => {
+  // The mobile rule only fires when a value is English in every locale, which a
+  // single untranslated locale never is.
+  const found = run({
+    pushEnglish: {
+      internal: {
+        lowBalance: {
+          title: 'Low balance alert',
+          body: '{{organizationName}} balance fell below ${{minimumBalanceUsd}}',
+        },
+      },
+    },
+    pushTranslated: {
+      internal: {
+        lowBalance: {
+          title: 'Low balance alert',
+          body: 'El saldo de {{organizationName}} cayó por debajo de ${{minimumBalanceUsd}}',
+        },
+      },
+    },
+    pushSource: "const push = { i18nKey: 'internal.lowBalance' };",
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications\/ru: "internal\.lowBalance\.title" is English; translate it/
+  );
+});
+
+test('accepts a one-token push value that reads the same in every language', () => {
+  // A product name and a bare placeholder carry no grammar to translate.
+  const found = run({
+    pushEnglish: { generic: { title: 'Kilo' }, sessionReady: { title: '{{sessionTitle}}' } },
+    pushTranslated: { generic: { title: 'Kilo' }, sessionReady: { title: '{{sessionTitle}}' } },
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "const push = { i18nKey: 'sessionReady' };",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+// One key per piece of copy holds for the push catalog too: two producers that
+// state the same thing read one entry, or a translator can drift them apart.
+const DUPLICATE_PUSH_ENGLISH = {
+  generic: { title: 'Kilo', body: { securityUpdate: 'A security check has an update' } },
+  internal: { securityLifecycle: { title: 'Kilo', body: 'A security check has an update' } },
+};
+const DUPLICATE_PUSH_SOURCE = [
+  "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+  "translatePush(locale, 'generic.body.securityUpdate', undefined, 'A security check has an update');",
+  "const push = { i18nKey: 'internal.securityLifecycle' };",
+].join('\n');
+
+test('rejects two push keys that hold one piece of copy', () => {
+  const found = run({
+    pushEnglish: DUPLICATE_PUSH_ENGLISH,
+    pushTranslated: {
+      generic: { title: 'Kilo', body: { securityUpdate: 'Проверка безопасности обновилась' } },
+      internal: { securityLifecycle: { title: 'Kilo', body: 'Обновление проверки безопасности' } },
+    },
+    pushSource: DUPLICATE_PUSH_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications\/en: 2 keys hold the copy "A security check has an update"/
+  );
+});
+
+test('accepts push producers that read one shared key', () => {
+  // Both session producers state the session title, so one entry carries it and
+  // each payload names its own base.
+  const found = run({
+    pushEnglish: {
+      session: { title: '{{sessionTitle}}' },
+      agentSession: { notification: { body: '{{message}}' } },
+      sessionReady: { body: 'Your Kilo session is ready to control from your phone' },
+    },
+    pushTranslated: {
+      session: { title: '{{sessionTitle}}' },
+      agentSession: { notification: { body: '{{message}}' } },
+      sessionReady: { body: 'Сессия Kilo готова к управлению с телефона' },
+    },
+    pushSource: [
+      "const sessionPush = { i18nKey: 'agentSession.notification' };",
+      "const readyPush = { i18nKey: 'sessionReady' };",
+      "translatePush(locale, 'session.title', undefined, '{{sessionTitle}}');",
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+// A language whose preposition for this message is the English word keeps the
+// copy: reviewed per (value, tag) in NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS.
+const SHARED_PREPOSITION_ENGLISH = {
+  internal: {
+    securityFindingNew: {
+      title: 'New security finding ({{severity}})',
+      body: '{{findingTitle}} in {{repoFullName}}',
+    },
+  },
+};
+const SHARED_PREPOSITION_SOURCE = "const push = { i18nKey: 'internal.securityFindingNew' };";
+const SINGLE_ENGLISH = { agents: { title: 'Agents' } };
+const SINGLE_SOURCE = "t('agents.title');";
+
+test('accepts a push value a reviewed exception lists for its language', () => {
+  const found = run({
+    english: SINGLE_ENGLISH,
+    translated: { agents: { title: 'Agenten' } },
+    source: SINGLE_SOURCE,
+    language: 'de',
+    pushEnglish: SHARED_PREPOSITION_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingNew: {
+          title: 'Neue Sicherheitsfeststellung ({{severity}})',
+          body: '{{findingTitle}} in {{repoFullName}}',
+        },
+      },
+    },
+    pushSource: SHARED_PREPOSITION_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('still rejects that push value in a language the exceptions do not list', () => {
+  const found = run({
+    english: SINGLE_ENGLISH,
+    translated: { agents: { title: 'Агенты' } },
+    source: SINGLE_SOURCE,
+    language: 'ru',
+    pushEnglish: SHARED_PREPOSITION_ENGLISH,
+    pushTranslated: {
+      internal: {
+        securityFindingNew: {
+          title: 'Новая находка ({{severity}})',
+          body: '{{findingTitle}} in {{repoFullName}}',
+        },
+      },
+    },
+    pushSource: SHARED_PREPOSITION_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /notifications\/ru: "internal\.securityFindingNew\.body" is English; translate it/
+  );
+});
+
+// Two non-English catalogs let a case leave one of them in English while the
+// other translates the same key. The every-locale rule then stays silent (the
+// value is not identical everywhere), so only the per-catalog rule can see the
+// catalog that never translated.
+const PER_CATALOG_LANGUAGES = "export const SUPPORTED_LANGUAGES = ['en', 'fr', 'ru'];";
+const PER_CATALOG_PUSH_REGISTRY = [
+  "import en from './locales/en.json';",
+  "import fr from './locales/fr.json';",
+  "import ru from './locales/ru.json';",
+  "const pushCatalogs = { 'en': en, 'fr': fr, 'ru': ru };",
+].join('\n');
+const PER_CATALOG_FRENCH_PUSH = {
+  'packages/notifications/src/locales/fr.json': '{}',
+  'packages/notifications/src/i18n.ts': PER_CATALOG_PUSH_REGISTRY,
+};
+
+/** The audit over a tree whose French catalog may keep a value in English. */
+function runWithFrench({ english, french, russian, source }) {
+  return run({
+    english,
+    translated: russian,
+    source,
+    extraFiles: {
+      ...PER_CATALOG_FRENCH_PUSH,
+      'apps/mobile/src/i18n/languages.ts': PER_CATALOG_LANGUAGES,
+      'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(french),
+    },
+  });
+}
+
+test('rejects a mobile value one catalog left in English while another translated it', () => {
+  const found = runWithFrench({
+    english: { agents: { title: 'Your agents' } },
+    french: { agents: { title: 'Your agents' } },
+    russian: { agents: { title: 'Ваши агенты' } },
+    source: "t('agents.title');",
+  });
+  assert.ok(
+    found.includes(
+      'mobile/fr: "agents.title" is English; translate it, or list the value for "fr" in MOBILE_ENGLISH_COPY_EXCEPTIONS'
+    ),
+    found.join('\n')
+  );
+  assert.ok(!found.some(problem => problem.startsWith('mobile/ru:')), found.join('\n'));
+  assert.ok(
+    !found.some(problem => problem.includes('equals English in every locale')),
+    'the every-locale rule must stay silent when one catalog translated the key'
+  );
+});
+
+test('accepts that value translated in the catalog that kept it', () => {
+  const found = runWithFrench({
+    english: { agents: { title: 'Your agents' } },
+    french: { agents: { title: 'Vos agents' } },
+    russian: { agents: { title: 'Ваши агенты' } },
+    source: "t('agents.title');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts an allowlisted proper noun left in English in one catalog', () => {
+  // `agentChat.toolCard.toolBash` is allowlisted and its value is a bare
+  // lowercase word, so this case proves the allowlist skip rather than the
+  // prose skip. `profile.providerApple` is the brief's own example; its value
+  // carries no prose, so it passes whichever skip runs first.
+  const found = runWithFrench({
+    english: {
+      agentChat: { toolCard: { toolBash: 'bash' } },
+      profile: { providerApple: 'Apple' },
+    },
+    french: {
+      agentChat: { toolCard: { toolBash: 'bash' } },
+      profile: { providerApple: 'Apple' },
+    },
+    russian: {
+      agentChat: { toolCard: { toolBash: 'терминал' } },
+      profile: { providerApple: 'Эппл' },
+    },
+    source: "t('agentChat.toolCard.toolBash');\nt('profile.providerApple');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a placeholder-only and a capitalised product name left in English', () => {
+  const found = runWithFrench({
+    english: { agents: { tokenOnly: '{{name}}', brand: 'Kilo Code' } },
+    french: { agents: { tokenOnly: '{{name}}', brand: 'Kilo Code' } },
+    russian: { agents: { tokenOnly: '{{name}} привет', brand: 'Кило Код' } },
+    source: "t('agents.tokenOnly');\nt('agents.brand');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a mobile value its catalog lists as English on purpose', () => {
+  const english = { prReview: { terms: { mergeRequest: 'Merge request' } } };
+  const russian = { prReview: { terms: { mergeRequest: 'Запрос на слияние' } } };
+  const source = "t('prReview.terms.mergeRequest');";
+  const problem =
+    'mobile/fr: "prReview.terms.mergeRequest" is English; translate it, or list the value for "fr" in MOBILE_ENGLISH_COPY_EXCEPTIONS';
+
+  // With the shipped, empty map the value is reported, so the case below proves
+  // the exception entry is what accepts it.
+  const reported = runWithFrench({ english, french: english, russian, source });
+  assert.ok(reported.includes(problem), reported.join('\n'));
+
+  // The shipped map already holds entries, so the case swaps the whole literal
+  // body for one that names only the value this fixture audits: the fixture's
+  // own assertion then proves the entry is what accepts the value.
+  const mapBody = /const MOBILE_ENGLISH_COPY_EXCEPTIONS = \{[\s\S]*?\n\};/.exec(
+    CHECKER_SOURCE
+  )?.[0];
+  assert.ok(mapBody, 'the shipped checker ships the exception map literal');
+  const withException = CHECKER_SOURCE.replace(
+    mapBody,
+    [
+      'const MOBILE_ENGLISH_COPY_EXCEPTIONS = {',
+      "  fr: { 'Merge request': 'the Git noun French keeps in English' },",
+      '};',
+    ].join('\n')
+  );
+  assert.notEqual(withException, CHECKER_SOURCE, 'the case must fill the exception map');
+  const root = cliFixture(
+    {
+      ...standardFiles({ english, translated: russian, source }),
+      ...PER_CATALOG_FRENCH_PUSH,
+      'apps/mobile/src/i18n/languages.ts': PER_CATALOG_LANGUAGES,
+      'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(english),
+    },
+    withException
+  );
+  const result = cli(root);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('still reports a mobile value left in English in every locale', () => {
+  const found = run({
+    english: { agents: { title: 'Your agents' } },
+    translated: { agents: { title: 'Your agents' } },
+    source: "t('agents.title');",
+  });
+  assert.ok(
+    found.includes('mobile: "agents.title" equals English in every locale'),
+    found.join('\n')
+  );
+  assert.ok(
+    found.includes(
+      'mobile/ru: "agents.title" is English; translate it, or list the value for "ru" in MOBILE_ENGLISH_COPY_EXCEPTIONS'
+    ),
+    found.join('\n')
+  );
+});
+
 test('importing the module reads and audits nothing', () => {
   // A root holding only the checker and its shared modules: no catalogs, no
   // wording exceptions, no source tree. Anything the module does on import
@@ -1391,6 +2157,186 @@ test('reports a broken catalog through the command and exits non-zero', () => {
   assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
 });
+
+test('reports a directory named like a catalog through the command and skips it', () => {
+  // `catalogTags` counts only regular files, and the membership rule names the
+  // directory itself, so the run prints one line and exits 1 instead of
+  // reading the directory as a catalog (a stack trace) or passing silently.
+  const root = cliFixture({
+    ...standardFiles(),
+    'apps/mobile/src/i18n/locales/xx.json/keep.txt': '',
+  });
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /mobile: catalog "xx\.json" is not a regular file; remove it or make it a catalog/
+  );
+  assert.doesNotMatch(result.stderr, /EISDIR|mobile\/xx/);
+  assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
+});
+
+test('reports a locale file the filesystem refuses through the command', () => {
+  // The read sits inside the same handling as the JSON.parse it feeds: one
+  // problem line here instead of an uncaught ENOENT ending the audit. The
+  // unreadable entry is English's own: `checkCatalogs` reads it through
+  // `parseCatalog` unconditionally, whatever the tag set says.
+  const root = cliFixture(standardFiles());
+  rmSync(join(root, 'apps/mobile/src/i18n/locales/en.json'));
+  symlinkSync(
+    join(root, 'missing-locale-target'),
+    join(root, 'apps/mobile/src/i18n/locales/en.json')
+  );
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /mobile\/en: cannot audit catalog: ENOENT/);
+  assert.doesNotMatch(result.stderr, /Error:|at /);
+});
+
+test('reports an unreadable supported-language list as one problem line', () => {
+  // The path exists but the read refuses it: a directory named like the module.
+  // The membership rule would call every catalog file an unsupported language
+  // once the list is unknown, so it is skipped and the missing key still shows.
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  const root = cliFixture(standardFiles({ translated }));
+  const languages = join(root, 'apps/mobile/src/i18n/languages.ts');
+  rmSync(languages);
+  mkdirSync(languages);
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^mobile: cannot audit the supported-language list: EISDIR/m);
+  assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  assert.doesNotMatch(result.stderr, /is not a supported language/);
+  assert.doesNotMatch(result.stderr, /^\s+at /m);
+});
+
+test('reports a missing supported-language list without inventing unsupported catalogs', () => {
+  // A removed file is the other way the tag set is unknown; the membership rule
+  // stays off for the same reason, and the run still reports the missing key.
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  const root = cliFixture(standardFiles({ translated }));
+  rmSync(join(root, 'apps/mobile/src/i18n/languages.ts'));
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^mobile: no supported-language list at apps\/mobile\/src\/i18n\/languages\.ts/m
+  );
+  assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  assert.doesNotMatch(result.stderr, /is not a supported language/);
+  assert.doesNotMatch(result.stderr, /^\s+at /m);
+});
+
+test('reports an unreadable push locale registry as one problem line', () => {
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  const root = cliFixture(standardFiles({ translated }));
+  const registry = join(root, 'packages/notifications/src/i18n.ts');
+  rmSync(registry);
+  mkdirSync(registry);
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^notifications: cannot audit the push locale registry: EISDIR/m);
+  assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  assert.doesNotMatch(result.stderr, /^\s+at /m);
+});
+
+test('reports an unreadable catalog folder as one problem line', () => {
+  // A listing that throws would end the run. One line names the folder, and
+  // the rules that need its tag set skip rather than repeat it per rule.
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  const root = cliFixture(standardFiles({ translated }));
+  rmSync(join(root, 'packages/notifications/src/locales'), { recursive: true });
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^notifications: cannot audit the catalog folder: ENOENT/m);
+  assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  assert.doesNotMatch(result.stderr, /^\s+at /m);
+  const folderLines = result.stderr
+    .split('\n')
+    .filter(line => line.startsWith('notifications: cannot audit the catalog folder:'));
+  assert.equal(folderLines.length, 1, result.stderr);
+});
+
+// The descriptor policy guard keeps a misconfigured catalog from throwing: the
+// copy rules and the base-key reader are used after the catalogs' value
+// problems are collected, so a throw there would hide them. Each case patches
+// the notifications descriptor away from the checker source and leaves a mobile
+// problem in the tree, so the run must still print what it collected.
+const POLICY_PUSH_FILES = {
+  'packages/notifications/src/locales/en.json': JSON.stringify({
+    internal: { securityFindingNew: { title: 'New finding', body: 'Body' } },
+  }),
+  'packages/notifications/src/locales/ru.json': JSON.stringify({
+    internal: { securityFindingNew: { title: 'Новая находка', body: 'Текст' } },
+  }),
+  'packages/notifications/src/push-copy.ts': '',
+};
+
+// A descriptor-editing patch rewrites the notifications descriptor however the
+// upstream source words it: a rule list of one entry or two, a four-space tab,
+// or a line the merge moved. A literal replace would pass while patching
+// nothing when any of that drifts.
+const NOTIFICATIONS_DESCRIPTOR = /name: 'notifications',[\s\S]*?collectsDestructiveKeys: false,\n/;
+const editDescriptor = (source, edit) => {
+  const descriptors = source.match(new RegExp(NOTIFICATIONS_DESCRIPTOR.source, 'g')) ?? [];
+  assert.equal(
+    descriptors.length,
+    1,
+    'the notifications descriptor must be unique in the checker source'
+  );
+  const edited = edit(descriptors[0]);
+  assert.notEqual(edited, descriptors[0], 'the edit must change the descriptor');
+  return source.replace(descriptors[0], edited);
+};
+const WITHOUT_BASE_KEY_DESCRIPTOR = descriptor =>
+  descriptor.replace(/^(\s*)baseKeyOf:[^\n]*\n/m, '');
+
+for (const { label, field, patch } of [
+  {
+    label: 'without a base-key reader',
+    field: 'baseKeyOf',
+    patch: source => editDescriptor(source, WITHOUT_BASE_KEY_DESCRIPTOR),
+  },
+  {
+    label: 'with an empty copy-rule list',
+    field: 'englishCopyRules',
+    patch: source =>
+      editDescriptor(source, descriptor =>
+        descriptor.replace(/(\s*)englishCopyRules:\s*\[[^\]]*\],/, '$1englishCopyRules: [],')
+      ),
+  },
+  {
+    label: 'with a non-callable entry in its copy-rule list',
+    field: 'englishCopyRules',
+    patch: source =>
+      editDescriptor(source, descriptor =>
+        descriptor.replace(
+          /(\s*)englishCopyRules:\s*\[[^\]]*\],/,
+          "$1englishCopyRules: [checkPushEnglishCopy, 'not a rule'],"
+        )
+      ),
+  },
+]) {
+  test(`reports a descriptor ${label} through the command`, () => {
+    const patched = patch(CHECKER_SOURCE);
+    assert.notEqual(patched, CHECKER_SOURCE, 'the case must change the checker source');
+    const translated = { agents: { ...TRANSLATED.agents } };
+    delete translated.agents.title;
+    const root = cliFixture({ ...standardFiles({ translated }), ...POLICY_PUSH_FILES }, patched);
+    const result = cli(root);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      new RegExp(`notifications: the catalog descriptor declares no usable ${field}`)
+    );
+    assert.doesNotMatch(result.stderr, /TypeError/);
+    assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  });
+}
 
 // A confirmation's safe button falls back to the catalog's own Cancel label
 // (`cancelLabel ?? t('common.cancel')`), so a destructive label translated with
@@ -1602,4 +2548,354 @@ test('rejects a consent destructive label that reads as the Cancel word, and acc
     source: CONSENT_SOURCE,
   });
   assert.deepEqual(distinct, []);
+});
+
+test('reads the supported tags from the array literal, not from a comment inside it', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = [
+  'en',
+  // Sentinels: 'xx' is never shipped.
+  'ru',
+];
+`,
+    },
+  });
+  assert.deepEqual(found, []);
+});
+
+/**
+ * The translated catalog with one mobile key removed, so a case that loses the
+ * tag list can show the audit still reports a finding of the catalog's own.
+ */
+function translatedWithGap() {
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  return translated;
+}
+
+test('reports a SUPPORTED_LANGUAGES element that is not a string literal', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru', ...EXTRA_TAGS];`,
+    },
+  });
+  // One line: an unreadable element leaves the tag list unknown, and the
+  // membership rule stays off instead of calling every catalog unsupported.
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES has an element this check cannot read',
+  ]);
+});
+
+test('reports a missing SUPPORTED_LANGUAGES declaration', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const OTHER_TAGS = ['en', 'ru'];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared',
+  ]);
+});
+
+test('reports an undeclared SUPPORTED_LANGUAGES once and still audits the catalogs', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const OTHER_TAGS = ['en', 'ru'];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared',
+    'mobile/ru: missing key "agents.title"',
+  ]);
+});
+
+test('reports a SUPPORTED_LANGUAGES initializer that is not an array literal once', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': [
+        `const TAGS = ['en', 'ru'];`,
+        `export const SUPPORTED_LANGUAGES = TAGS;`,
+      ].join('\n'),
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not an array literal',
+    'mobile/ru: missing key "agents.title"',
+  ]);
+});
+
+test('reports an unreadable SUPPORTED_LANGUAGES element once and still audits the catalogs', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru', ...EXTRA_TAGS];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES has an element this check cannot read',
+    'mobile/ru: missing key "agents.title"',
+  ]);
+});
+
+test('reports an unparseable SUPPORTED_LANGUAGES file as its parse error only', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru'\n`,
+    },
+  });
+  // The parse error already names the cause, so "not declared" would repeat it,
+  // and the unknown tag list keeps the membership rule off. The tag-list reader
+  // and the mobile catalog's own source scan both parse this file, so the line
+  // is not counted here.
+  const text = found.join('\n');
+  assert.match(text, /apps\/mobile\/src\/i18n\/languages\.ts:2: cannot parse: /);
+  assert.doesNotMatch(text, /is not declared/);
+  assert.doesNotMatch(text, /is not a supported language/);
+  assert.match(text, /mobile\/ru: missing key "agents\.title"/);
+});
+
+test('reports a catalog file no supported language names in both catalogs', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en'];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'mobile: catalog "ru.json" is not a supported language',
+    'notifications: catalog "ru.json" is not a supported language',
+  ]);
+});
+
+// A catalog file for a tag the supported-language list does not name is the
+// membership rule's finding and nothing else: the locale audit never reads it,
+// so a stray file reports one line however broken its copy is.
+test('audits only the supported tags on disk', () => {
+  const found = run({
+    language: 'ru',
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/de.json': JSON.stringify({
+        agents: { title: 'Agenten', extra: 'stray' },
+      }),
+    },
+  });
+  const text = found.join('\n');
+  assert.match(text, /^mobile: catalog "de\.json" is not a supported language$/m);
+  assert.doesNotMatch(text, /mobile\/de:/);
+  assert.deepEqual(
+    found.filter(problem => !problem.startsWith('mobile: catalog "de.json" is not')),
+    []
+  );
+});
+
+// `Intl.PluralRules('pt_BR')` refuses an underscore tag, and so would the
+// catalog's own uppercase comparison. One line names the tag; a stack trace
+// would not.
+test('reports a supported tag Intl refuses as one problem line', () => {
+  const found = run({
+    language: 'pt_BR',
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/de.json': JSON.stringify({ agents: { title: 'Agenten' } }),
+    },
+  });
+  const text = found.join('\n');
+  assert.match(text, /^mobile\/pt_BR: cannot audit catalog: /m);
+  assert.doesNotMatch(text, /^\s+at /m);
+  assert.match(text, /^mobile: catalog "de\.json" is not a supported language$/m);
+  assert.ok(found.length > 0, 'expected a problem');
+});
+
+// A plural family the locale completes with categories English does not ship.
+// Each added form passes the same value rules as an English-keyed form, read
+// against the family's English reference for its category.
+const WINDOW_ENGLISH = {
+  agents: {
+    title: 'Agents',
+    window_one: '{{displayCount}} session since {{start}}',
+    window_other: '{{displayCount}} sessions since {{start}}',
+  },
+};
+const WINDOW_TRANSLATED = {
+  agents: {
+    title: 'Локальные агенты',
+    window_one: '{{displayCount}} сессия с {{start}}',
+    window_few: '{{displayCount}} сессии с {{start}}',
+    window_many: '{{displayCount}} сессий с {{start}}',
+    window_other: '{{displayCount}} сессии с {{start}}',
+  },
+};
+const WINDOW_SOURCE = "t('agents.title');\nt('agents.window', { count: 2 });";
+
+/** The window fixture with one added form replaced and extra keys merged in. */
+function runWindow(windowFew, extra = {}) {
+  return run({
+    language: 'ru',
+    english: WINDOW_ENGLISH,
+    translated: {
+      agents: { ...WINDOW_TRANSLATED.agents, window_few: windowFew, ...extra },
+    },
+    source: WINDOW_SOURCE,
+  });
+}
+
+test('accepts the added plural forms a locale completes', () => {
+  assert.deepEqual(runWindow(WINDOW_TRANSLATED.agents.window_few), []);
+});
+
+test('rejects an empty added plural form', () => {
+  const found = runWindow('');
+  assert.match(found.join('\n'), /^mobile\/ru: "agents\.window_few" is empty$/m);
+});
+
+test('rejects an added plural form that drops a placeholder English carries', () => {
+  const found = runWindow('{{displayCount}} сессии');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" placeholders differ from English \(displayCount,start\)$/m
+  );
+});
+
+test('rejects a changed $t() reference in an added plural form', () => {
+  const found = runWindow('{{displayCount}} сессии с {{start}} $t(common.back)');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" \$t\(\) references differ from English \(none\)$/m
+  );
+});
+
+test('rejects a changed $TOKEN token in an added plural form', () => {
+  const found = runWindow('{{displayCount}} сессии с {{start}} $ARGUMENTS');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" \$TOKEN expansion tokens differ from English \(none\)$/m
+  );
+});
+
+test('rejects a different leading space in an added plural form', () => {
+  const found = runWindow(' {{displayCount}} сессии с {{start}}');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" leading or trailing space differs from English$/m
+  );
+});
+
+test('rejects an added plural form that quotes the English label', () => {
+  const found = runWindow('{{displayCount}} сессии с {{start}} "Agents"');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" quotes the English label "Agents"; name its key with \$t\(\)$/m
+  );
+});
+
+// A zero category words its own answer — "none" beside a noun reads badly — so
+// it may drop the family's visible count without a review entry.
+test('accepts a zero added form that drops the visible count', () => {
+  const found = runWindow(WINDOW_TRANSLATED.agents.window_few, {
+    window_zero: 'нет сессий с {{start}}',
+  });
+  assert.deepEqual(found, []);
+});
+
+// Arabic names its dual with a word form, and the review names that key.
+test('accepts an added form the worded-count review names', () => {
+  const found = run({
+    language: 'ar',
+    english: WORDED_ENGLISH,
+    translated: {
+      securityAgent: {
+        dashboard: {
+          title: 'لوحة المعلومات',
+          daysOverdue_zero: 'لا تأخير',
+          daysOverdue_one: 'متأخرة يومًا واحدًا',
+          daysOverdue_two: 'متأخرة يومين',
+          daysOverdue_few: 'متأخرة {{displayCount}} أيام',
+          daysOverdue_many: 'متأخرة {{displayCount}} يومًا',
+          daysOverdue_other: 'متأخرة {{displayCount}} يوم',
+        },
+      },
+    },
+    source: WORDED_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a dropped count in an unreviewed added form', () => {
+  const found = runWindow('сессии с {{start}}');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" drops \{\{displayCount\}\} without a reviewed worded form \(WORDED_COUNTS\)$/m
+  );
+});
+
+// The registry diagnostics name the catalog they read instead of a hard-coded
+// `notifications:`, so a second catalog cannot inherit the wrong name.
+test('the registry diagnostics name the catalog', () => {
+  assert.doesNotMatch(CHECKER_SOURCE, /notifications: the push locale registry/);
+  const found = run({
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `const pushCatalogs = { 'en': en, 'ru': en, 'de': ru };`,
+      ].join('\n'),
+    },
+  });
+  const text = found.join('\n');
+  assert.match(
+    text,
+    /^notifications: the push locale registry names "de" with no catalog import$/m
+  );
+  assert.match(
+    text,
+    /^notifications: the push locale registry binds "ru" to "en" instead of the "ru" catalog import$/m
+  );
+});
+
+// A catalog file no supported language names is the membership rule's finding;
+// the registry owes it neither an import nor an entry.
+test('does not owe a push registry entry to an unsupported catalog file', () => {
+  const found = run({
+    extraFiles: { 'packages/notifications/src/locales/de.json': '{}' },
+  });
+  const text = found.join('\n');
+  assert.match(text, /^notifications: catalog "de\.json" is not a supported language$/m);
+  assert.doesNotMatch(text, /catalog "de\.json" has no import in/);
+  assert.doesNotMatch(text, /catalog "de\.json" has no push locale registry entry/);
+});
+
+// The count a form must show comes from the whole family, not from the one
+// English reference the form is read against: English's `_one` may spell its
+// numeral out while `_other` carries the placeholder, and a form that answers
+// to the reference with no numeral must still show the count.
+test('rejects an added form that drops the family count its reference lacks', () => {
+  const found = run({
+    language: 'ru',
+    english: {
+      agents: {
+        title: 'Agents',
+        items_one: 'one item',
+        items_other: '{{displayCount}} items',
+      },
+    },
+    translated: {
+      agents: {
+        title: 'Локальные агенты',
+        items_one: 'один элемент',
+        items_few: 'несколько элементов',
+        items_many: '{{displayCount}} элементов',
+        items_other: '{{displayCount}} элементов',
+      },
+    },
+    source: "t('agents.title');\nt('agents.items', { count: 2 });",
+  });
+  const text = found.join('\n');
+  assert.match(
+    text,
+    /^mobile\/ru: "agents\.items_few" drops \{\{displayCount\}\} without a reviewed worded form \(WORDED_COUNTS\)$/m
+  );
+  // One line for the value: the specific count message replaces the general one.
+  assert.doesNotMatch(text, /"agents\.items_few" placeholders differ from English/);
 });

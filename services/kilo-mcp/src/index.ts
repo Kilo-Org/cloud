@@ -36,6 +36,7 @@ import {
   forwardable,
   isTokenRequest,
   readTokenBody,
+  type TokenRequestContext,
 } from './oauth/refresh-reuse';
 import {
   CLIENT_REGISTRATION_TTL_SECONDS,
@@ -194,7 +195,7 @@ const TOOLS = [
         },
         input: {
           description:
-            'Arguments matching the endpoint input schema from search. Usually an object, but some endpoints take a scalar or array — pass exactly the value the schema describes. Omit for endpoints that take no input.',
+            'Arguments matching the endpoint input schema from search. Usually an object, but some endpoints take a scalar or array — pass exactly the value the schema describes. A JSON-encoded object or array is decoded and validated against the same schema. Valid string inputs are kept unchanged. Omit for endpoints that take no input.',
         },
       },
       required: ['path'],
@@ -224,7 +225,7 @@ const PROTECTED_TOOLS = [
         },
         input: {
           description:
-            'Arguments matching the endpoint input schema from search. Usually an object, but some endpoints take a scalar or array — pass exactly the value the schema describes. Omit for endpoints that take no input.',
+            'Arguments matching the endpoint input schema from search. Usually an object, but some endpoints take a scalar or array — pass exactly the value the schema describes. A JSON-encoded object or array is decoded and validated against the same schema. Valid string inputs are kept unchanged. Omit for endpoints that take no input.',
         },
       },
       required: ['path'],
@@ -1123,11 +1124,16 @@ const providerOptions: OAuthProviderOptions<Env> = {
   tokenExchangeCallback: options => tokenExchangeCallback(options),
 };
 
-function fetchWithProvider(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+function fetchWithProvider(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  attribution: TokenRequestContext = { tokenUserId: null, unverifiedTokenUserId: null }
+): Promise<Response> {
   const analytics = createMcpAnalytics({ env, ctx });
   const provider = new OAuthProvider<Env>({
     ...providerOptions,
-    onError: error => onError(error, { analytics }),
+    onError: error => onError(error, { analytics, ...attribution }),
   });
   return provider.fetch(request, env, ctx);
 }
@@ -1151,8 +1157,8 @@ export class KiloMcpOAuthStore extends OAuthStore {
     // The provider's token route never dispatches a handler or uses ctx beyond
     // our analytics waitUntil. The DO state supplies that request lifetime.
     const tokenContext: Pick<ExecutionContext, 'waitUntil' | 'props'> = this.ctx;
-    return this.forwardToken(request, req =>
-      fetchWithProvider(req, this.env, tokenContext as ExecutionContext)
+    return this.forwardToken(request, (req, context) =>
+      fetchWithProvider(req, this.env, tokenContext as ExecutionContext, context)
     );
   }
 }

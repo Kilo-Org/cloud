@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Ձեր գործակալի նիստն ունի թարմացում",
-      "chatMessage": "Դուք ունեք նոր հաղորդագրություն",
-      "instanceLifecycle": "Ձեր օրինակն ունի թարմացում",
-      "scheduledAction": "Պլանավորված գործողությունն ունի թարմացում",
       "lowBalance": "Ձեր մնացորդն ուշադրության կարիք ունի",
       "spendAlert": "Ձեր ծախսն ուշադրության կարիք ունի",
       "securityFinding": "Անվտանգության հայտնաբերումն ուշադրության կարիք ունի",
@@ -13,30 +10,9 @@
       "activeAgentsGlanceable": "Ակտիվ գործակալներն ունեն թարմացում"
     }
   },
-  "cloudAgentSession": {
-    "completed": {
-      "title": "{{sessionTitle}}",
-      "body": "Առաջադրանքն ավարտված է"
-    },
-    "failed": {
-      "title": "{{sessionTitle}}",
-      "body": "Ձախողվեց: {{detail}}"
-    },
-    "interrupted": {
-      "title": "{{sessionTitle}}",
-      "body": "Ընդհատվեց: {{detail}}"
-    }
-  },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Անվերնագիր",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -48,54 +24,23 @@
       "title": "Ծախսի ծանուցում",
       "body": "{{scopeName}}-ի ծախսը գերազանցել է ${{amountUsd}}-ը"
     },
-    "securityFindingNew": {
-      "title": "Նոր անվտանգության հայտնաբերում ({{severity}})",
+    "securityFinding": {
       "body": "{{findingTitle}}-ը {{repoFullName}}-ում"
+    },
+    "securityFindingNew": {
+      "title": "Նոր անվտանգության հայտնաբերում ({{severity}})"
     },
     "securityFindingSlaWarning": {
-      "title": "SLA նախազգուշացում",
-      "body": "{{findingTitle}}-ը {{repoFullName}}-ում"
+      "title": "SLA նախազգուշացում"
     },
     "securityFindingSlaBreach": {
-      "title": "SLA խախտում",
-      "body": "{{findingTitle}}-ը {{repoFullName}}-ում"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Անվտանգության ստուգումն ունի թարմացում"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}}-ը պատրաստ է",
-      "body": "Հպեք՝ զրույց սկսելու համար։"
-    },
-    "startFailed": {
-      "title": "{{instanceName}}-ը չհաջողվեց գործարկել",
-      "body": "Գործարկումը ձախողվեց։"
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}}-ը շուտով կվերագործարկվի",
-      "body": "Նախատեսված է վերագործարկվել {{when}}-ին։"
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}}-ի վերագործարկումը չեղարկված է",
-      "body": "Նախկինում նախատեսված վերագործարկումը չեղարկված է։"
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}}-ը շուտով կթարմացվի",
-      "bodyWithTag": "Թարմացնել {{targetImageTag}}-ին {{when}}-ին։",
-      "bodyWithoutTag": "Նախատեսված թարմացում {{when}}-ին։"
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}}-ի թարմացումը չեղարկված է",
-      "body": "Նախկինում նախատեսված թարմացումը չեղարկված է։"
+      "title": "SLA խախտում"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Ձեր Kilo նիստը պատրաստ է կառավարվելու ձեր հեռախոսից"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

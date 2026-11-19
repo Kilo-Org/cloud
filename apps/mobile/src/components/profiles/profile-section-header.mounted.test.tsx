@@ -1,8 +1,12 @@
+import { type Href } from 'expo-router';
 import { type ComponentProps, createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { act, TestRenderer } from '@/test/renderer';
+
+/** The destination the Profile tab's routes pass to this header. */
+const PROFILES_LIST_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 
 const h = vi.hoisted(() => ({
   overview: { data: undefined as { name: string } | undefined, isPending: true },
@@ -53,9 +57,15 @@ function renderHeader(
   return renderer;
 }
 
-/** The header's text lines, in the order the heading renders them. */
+/**
+ * The header's text lines, in the order the heading renders them. The heading
+ * block only: the title and subtitle each sit in their own `min-w-0 flex-1`
+ * column under it, and the leading column lays a zero-ink twin of the subtitle
+ * beside the title that is not a line any reader sees.
+ */
 function headerLines(renderer: TestRenderer.ReactTestRenderer): string[] {
   return renderer.root
+    .findByProps({ className: 'min-w-0 flex-1 justify-center' })
     .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
     .map(node => String(node.props.children));
 }
@@ -80,6 +90,7 @@ describe('ProfileSectionHeader mounted', () => {
       profileId: 'profile-1',
       organizationId: 'org-1',
       title: 'Profile agents',
+      backFallback: PROFILES_LIST_HREF,
     });
 
     expect(headerLines(renderer)).toEqual(['Profile agents', 'Shared Agency Review Profile']);
@@ -88,7 +99,11 @@ describe('ProfileSectionHeader mounted', () => {
   });
 
   it('holds the subtitle line with a placeholder while the profile read is unsettled', () => {
-    const renderer = renderHeader({ profileId: 'profile-1', title: 'Skills' });
+    const renderer = renderHeader({
+      profileId: 'profile-1',
+      title: 'Skills',
+      backFallback: PROFILES_LIST_HREF,
+    });
 
     // The reserved line is the same style as the name that replaces it, so the
     // header keeps its height instead of growing when the name arrives; while
@@ -99,7 +114,11 @@ describe('ProfileSectionHeader mounted', () => {
     act(() => {
       h.overview = { data: undefined, isPending: false };
       renderer.update(
-        createElement(ProfileSectionHeader, { profileId: 'profile-1', title: 'Skills' })
+        createElement(ProfileSectionHeader, {
+          profileId: 'profile-1',
+          title: 'Skills',
+          backFallback: PROFILES_LIST_HREF,
+        })
       );
     });
     expect(placeholders(renderer)).toHaveLength(0);
@@ -111,6 +130,7 @@ describe('ProfileSectionHeader mounted', () => {
     const renderer = renderHeader({
       profileId: 'profile-1',
       title: 'Setup commands',
+      backFallback: PROFILES_LIST_HREF,
       onBack,
     });
 

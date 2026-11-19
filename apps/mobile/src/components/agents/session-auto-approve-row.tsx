@@ -1,18 +1,19 @@
-import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { Switch } from '@/components/ui/switch';
-import { Text } from '@/components/ui/text';
+import { RowFrame } from '@/components/ui/row-frame';
 
 import { type SessionAutoApproveState } from './session-auto-approve';
 
 /**
  * Per-session auto-approve toggle: title + subtitle on the left, a native
- * `Switch` on the right. A selection haptic is a capability both iOS and
- * Android have, so there is one implementation: the screen that owns the
- * session state fires the single `selectionHaptic()` for the commit,
- * and this row adds no platform-specific module of its own. Disabled and
- * labelled "unavailable" for a session that cannot receive permission asks.
+ * `Switch` on the right, on the shared row frame inside the caller's
+ * `RowGroup`. A selection haptic is a capability both iOS and Android have, so
+ * there is one implementation: the trailing cell ticks it once per flip.
+ * Disabled and labelled "unavailable" for a session that cannot receive
+ * permission asks.
+ *
+ * The row carries no leading `IconTile`: it has never had one, and the session
+ * header has no icon to give it.
  */
 export function SessionAutoApproveRow({
   state,
@@ -24,25 +25,23 @@ export function SessionAutoApproveRow({
   const { t } = useTranslation();
   const title = t('agentChat.autoApprove.title');
   return (
-    <View
+    <RowFrame
       testID="session-auto-approve-row"
-      className="flex-row items-center justify-between rounded-lg bg-secondary p-4"
-    >
-      <View className="flex-1 pr-3">
-        <Text className="text-sm font-medium">{title}</Text>
-        <Text variant="muted" className="text-xs">
-          {state === 'unavailable'
+      title={title}
+      subtitle={{
+        text:
+          state === 'unavailable'
             ? t('agentChat.autoApprove.unavailable')
-            : t('agentChat.autoApprove.description')}
-        </Text>
-      </View>
-      <Switch
-        testID="session-auto-approve-switch"
-        accessibilityLabel={title}
-        value={state === 'on'}
-        disabled={state === 'unavailable'}
-        onValueChange={onValueChange}
-      />
-    </View>
+            : t('agentChat.autoApprove.description'),
+      }}
+      trailing={{
+        kind: 'switch',
+        testID: 'session-auto-approve-switch',
+        accessibilityLabel: title,
+        value: state === 'on',
+        disabled: state === 'unavailable',
+        onValueChange,
+      }}
+    />
   );
 }

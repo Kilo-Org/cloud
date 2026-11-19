@@ -33,6 +33,12 @@ type RenameModalProps<TSaveResult> = {
    * (organization rename, for example).
    */
   errorCopy?: (error: unknown) => string;
+  /**
+   * Whether a trimmed value may be saved. Defaults to any non-empty value; a
+   * caller whose stored value must carry a visible character passes
+   * `hasVisibleText` instead.
+   */
+  isAcceptableValue?: (trimmed: string) => boolean;
 };
 
 // Mount this component only while the dialog should be open (e.g. `{visible && <RenameModal ... />}`)
@@ -46,6 +52,7 @@ export function RenameModal<TSaveResult>({
   maxLength = 50,
   multiline = false,
   errorCopy,
+  isAcceptableValue = trimmed => trimmed.length > 0,
 }: Readonly<RenameModalProps<TSaveResult>>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -139,7 +146,7 @@ export function RenameModal<TSaveResult>({
 
   return (
     <DialogCard onClose={handleClose} placement="top">
-      <Text className="text-base font-semibold">{title}</Text>
+      <Text variant="heading">{title}</Text>
       <Input
         ref={inputRef}
         accessible
@@ -165,7 +172,7 @@ export function RenameModal<TSaveResult>({
             setText(val);
           }
           const trimmed = val.trim();
-          setCanSave(trimmed.length > 0 && trimmed !== openingValue);
+          setCanSave(isAcceptableValue(trimmed) && trimmed !== openingValue);
         }}
         autoFocus={Platform.OS !== 'android'}
         maxLength={maxLength}
@@ -186,7 +193,7 @@ export function RenameModal<TSaveResult>({
           disabled={!canSave || saveInFlight}
           loading={pending}
         >
-          <Text className="text-primary-foreground">{t('common.save')}</Text>
+          <Text>{t('common.save')}</Text>
         </Button>
       </View>
     </DialogCard>

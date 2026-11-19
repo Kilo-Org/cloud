@@ -55,6 +55,8 @@ const state = vi.hoisted(() => {
     pageSize: undefined as number | undefined,
     /** A failure for a non-first page only. */
     pageError: undefined as Error | undefined,
+    /** Cursors requested after page one; an unbounded read-on would grow this. */
+    pageRequests: 0,
     /** The rendered list's paging hook, so a test can drive a next page. */
     listProps: undefined as { onEndReached?: () => void; onRefresh?: () => void } | undefined,
   };
@@ -91,6 +93,9 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  // The flat list's rows draw the shared `RowChevron`, whose directional glyph
+  // reads `I18nManager.isRTL` on every render.
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   View: 'View',
   Pressable: 'Pressable',
@@ -99,9 +104,17 @@ vi.mock('react-native', () => ({
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
-vi.mock('@/components/ui/icons', () => ({ BellOff: 'BellOff' }));
+vi.mock('@/components/ui/icons', () => ({
+  // The flat row's trailing chevron is the shared directional glyph.
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  BellOff: 'BellOff',
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -140,6 +153,9 @@ vi.mock('@/lib/trpc', () => ({
             queryKey: [HISTORY_PATH, { input, type: 'infinite' }],
             initialPageParam: undefined,
             queryFn: ({ pageParam }: { pageParam: string | undefined }) => {
+              if (pageParam !== undefined) {
+                state.pageRequests += 1;
+              }
               if (pageParam !== undefined && state.pageError) {
                 throw state.pageError;
               }
@@ -263,6 +279,7 @@ beforeEach(() => {
   state.historyOptions = [];
   state.pageSize = undefined;
   state.pageError = undefined;
+  state.pageRequests = 0;
   state.listProps = undefined;
   vi.clearAllMocks();
 });
@@ -323,6 +340,37 @@ describe('NotificationHistoryScreen', () => {
     expect(mocks.toastError).toHaveBeenCalledWith('This notification no longer opens anywhere.');
     expect(mocks.setPendingDeepLink).not.toHaveBeenCalled();
     expect(byType('Cell')).toHaveLength(1);
+  });
+
+  it('hides a stored row of a retired kind and keeps the rows it still routes', async () => {
+    state.rows = [
+      row({
+        id: 'retired',
+        pushType: 'chat.message',
+        payload: { type: 'chat.message', conversationId: 'c1' },
+      }),
+      row({ id: 'kept' }),
+    ];
+    await mount();
+
+    expect(byType('Cell')).toHaveLength(1);
+    expect(byType('Pressable')).toHaveLength(1);
+  });
+
+  it('reads past a page of retired rows instead of reporting an empty account', async () => {
+    state.rows = [
+      row({
+        id: 'retired',
+        pushType: 'chat.message',
+        payload: { type: 'chat.message', conversationId: 'c1' },
+      }),
+      row({ id: 'kept' }),
+    ];
+    state.pageSize = 1;
+    await mount();
+
+    await waitFor(() => byType('Cell').length === 1);
+    expect(byType('EmptyState')).toHaveLength(0);
   });
 
   it('states the retention window when the account has no rows', async () => {
@@ -525,6 +573,26 @@ describe('NotificationHistoryScreen', () => {
     // 24dp of tab bar plus the footer's own 32dp.
     const footer = byType('View').find(node => footerPadding(node) === 56);
     expect(footer).toBeDefined();
+  });
+
+  it('stops reading on after a failed next page instead of retrying without bound', async () => {
+    // Page one is nothing but a retired row, so the list reads on: the failed
+    // second page keeps the cursor and clears the fetching flag, and only the
+    // footer's Retry may request it again.
+    state.pageSize = 1;
+    state.pageError = new Error('paging failed');
+    state.rows = [
+      row({
+        id: 'retired',
+        pushType: 'chat.message',
+        payload: { type: 'chat.message', conversationId: 'c1' },
+      }),
+      row({ id: 'kept' }),
+    ];
+    await mount();
+
+    await waitFor(() => withText(byType('Button'), 'Retry loading more') !== undefined);
+    expect(state.pageRequests).toBe(1);
   });
 
   it('settles the chip row offline instead of holding its skeletons', async () => {

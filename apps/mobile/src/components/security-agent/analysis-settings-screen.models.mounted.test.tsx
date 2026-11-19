@@ -43,8 +43,16 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Alert: { alert: vi.fn() },
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+}));
+// The model rows open the picker through the guarded push; the picker itself is
+// mocked below, so the function only has to exist.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => vi.fn(),
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
@@ -65,6 +73,7 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({ mutedForeground: '#000000' }),
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -72,7 +81,13 @@ vi.mock('@/components/ui/input', () => ({ Input: 'Input' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
-vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain', Search: 'Search', Wrench: 'Wrench' }));
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  Brain: 'Brain',
+  Check: 'Check',
+  Search: 'Search',
+  Wrench: 'Wrench',
+}));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: (props: { children?: ReactNode }): ReactNode => props.children ?? null,
   radioItemA11y: () => ({}),
@@ -196,19 +211,19 @@ describe('AnalysisSettingsScreen depth picker touch target', () => {
 
   // Regression: a depth pill was sized by its `py-2` frame alone and rendered
   // under the design target, so only the label band was tappable. The floor has
-  // to be the pill node's own class; `hitSlop` would not move the rect a
+  // to be the segment node's own class; `hitSlop` would not move the rect a
   // control-size audit measures.
   it('carries the shared row floor on every depth option', async () => {
     const renderer = await mountScreen();
-    const pills = hostElements(renderer, 'Pressable').filter(element =>
-      String(element.props.className).includes('rounded-full')
-    );
+    // The depth picker is the only Pressable surface this screen mounts (the
+    // model rows and the save action are stubbed), so its segments are the
+    // whole set.
+    const pills = hostElements(renderer, 'Pressable');
 
     expect(pills).toHaveLength(3);
     for (const pill of pills) {
       expect(String(pill.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
-      // The pill lays out as a column, so the taller box needs `justify-center`
-      // for its one-line label to stay centred instead of sitting at the top.
+      // The segment centres its one-line label inside the taller box.
       expect(String(pill.props.className).split(' ')).toContain('justify-center');
       expect(pill.props.hitSlop).toBeUndefined();
     }

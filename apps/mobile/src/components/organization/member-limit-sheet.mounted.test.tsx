@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the surface, role-gate and validation cases share the sheet's mounted harness. */
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,7 +8,6 @@ import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
-import { LowBalanceAlertSheet } from './low-balance-alert-sheet';
 import { MemberLimitSheet } from './member-limit-sheet';
 import {
   type OrganizationBoundaryFixture,
@@ -35,6 +35,7 @@ const query = vi.hoisted(() => ({
     | undefined,
   isLoading: false,
   isPending: false,
+  isPaused: false,
   isError: false,
   isFetching: false,
   refetch: vi.fn(),
@@ -68,7 +69,10 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 // The real clearance reads the tab bar and the keyboard, neither of which this
 // suite models: the surface still renders its body as the ScrollView host.
 vi.mock('@/components/tab-screen', () => ({ SheetScrollView: 'ScrollView' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
@@ -82,7 +86,11 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check', Lock: 'Lock' }));
+vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: 'ArrowLeft',
+  Check: 'Check',
+  Lock: 'Lock',
+}));
 vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { success: vi.fn() } }));
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: vi.fn(),
@@ -93,7 +101,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => boundary,
   useOrgWithMembers: () => query,
   isActiveOrgMember: (member: { status: string }) => member.status === 'active',
-  isMoneyRole: (role: string) => role === 'owner' || role === 'billing_manager',
+  isMoneyRole: (role: string) => role === 'owner' || role === 'admin' || role === 'billing_manager',
 }));
 const mutations = vi.hoisted(() => {
   const updateMember = {
@@ -123,6 +131,7 @@ beforeEach(() => {
   query.data = undefined;
   query.isLoading = false;
   query.isPending = false;
+  query.isPaused = false;
   query.isError = false;
   query.refetch.mockClear();
   updateMember.mutate.mockClear();
@@ -133,7 +142,6 @@ beforeEach(() => {
 
 const sheets = [
   { name: 'member limit', element: createElement(MemberLimitSheet, { memberId: 'member-1' }) },
-  { name: 'low balance alert', element: createElement(LowBalanceAlertSheet) },
 ];
 
 describe('organization sheet surfaces', () => {
@@ -187,12 +195,49 @@ describe('organization sheet surfaces', () => {
   });
 
   it.each([...sheets, { name: 'invite', element: createElement(InviteMemberSheet) }])(
-    'keeps $name permission denial outside a scroller',
+    'keeps $name permission denial under the sheet header',
     async ({ element }) => {
       boundary.role = 'member';
       const { renderer, unmount } = await renderWithProviders(element);
-      expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
+      const header = renderer.root.find(node => String(node.type) === 'SheetHeader');
+      // The denial keeps the sheet's title and close control, so the state
+      // carries no way out of its own.
+      expect(propsOf(header).variant).toBe('close');
+      const emptyState = renderer.root.find(node => String(node.type) === 'EmptyState');
+      expect(propsOf(emptyState).action).toBeUndefined();
       expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
+      unmount();
+    }
+  );
+});
+
+describe('MemberLimitSheet role gate', () => {
+  function deniedEmptyState(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+    // `PermissionDenied` is not mocked here, so its description reaches the
+    // stubbed `EmptyState` as a prop.
+    return propsOf(renderer.root.find(node => String(node.type) === 'EmptyState'));
+  }
+
+  it('opens the limit form for an admin, who manages members like the web card', async () => {
+    boundary.role = 'admin';
+    const { renderer, unmount } = await mountLimitForm(1200);
+
+    expect(renderer.root.findAll(node => String(node.type) === 'FormField')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'Button').length).toBeGreaterThan(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    unmount();
+  });
+
+  it.each([{ role: 'member' }, { role: 'billing_manager' }])(
+    'denies a $role with the shared role copy',
+    async ({ role }) => {
+      boundary.role = role;
+      const { renderer, unmount } = await mountLimitForm(1200);
+
+      expect(deniedEmptyState(renderer).description).toBe(
+        i18n.t('organization.memberLimit.permissionDenied')
+      );
+      expect(renderer.root.findAll(node => String(node.type) === 'FormField')).toHaveLength(0);
       unmount();
     }
   );
@@ -228,11 +273,10 @@ function formField(renderer: TestRenderer.ReactTestRenderer): Record<string, unk
 }
 
 function saveButton(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
-  const [save] = renderer.root.findAll(node => String(node.type) === 'Button');
-  if (!save) {
-    throw new Error('the limit form rendered no save button');
-  }
-  return propsOf(save);
+  // Save moved into the shared header, so the control's unavailable state is
+  // the header's own `doneDisabled`.
+  const header = renderer.root.find(node => String(node.type) === 'SheetHeader');
+  return { disabled: propsOf(header).doneDisabled };
 }
 
 const rangeMessage = i18n.t('organization.memberLimit.rangeError', {
@@ -249,16 +293,31 @@ describe('MemberLimitSheet error copy', () => {
       .map(node => propsOf(node).message as string | null);
   }
 
-  it('explains a lapsed organization plan instead of echoing the server sentence', async () => {
-    updateMember.isError = true;
-    updateMember.error = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+  /** The labels of the steps painted under a refusal line, in screen order. */
+  function stepLabels(renderer: TestRenderer.ReactTestRenderer): string[] {
+    return renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .map(node => propsOf(node).accessibilityLabel as string | undefined)
+      .filter((label): label is string => typeof label === 'string');
+  }
+
+  const trialRefusal = () =>
+    Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
       data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
     });
+
+  it('explains a lapsed organization plan instead of echoing the server sentence', async () => {
+    updateMember.isError = true;
+    updateMember.error = trialRefusal();
     const { renderer, unmount } = await mountLimitForm(1200);
 
     const messages = accessibleStatusMessages(renderer);
-    expect(messages).toContain(i18n.t('common.organizationTrialEnded'));
+    // An owner may change the plan, so the copy offers the step and the sheet
+    // paints it under the line.
+    expect(messages).toContain(i18n.t('common.organizationTrialEndedBilling'));
+    expect(messages).not.toContain(i18n.t('common.organizationTrialEnded'));
     expect(messages).not.toContain(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+    expect(stepLabels(renderer)).toEqual([i18n.t('organization.hub.manageBilling')]);
     unmount();
   });
 
@@ -272,6 +331,30 @@ describe('MemberLimitSheet error copy', () => {
     const messages = accessibleStatusMessages(renderer);
     expect(messages).toContain(i18n.t('common.couldNotSaveSetting'));
     expect(messages).not.toContain('Failed to update user role');
+    // A failure that is not the plan refusal offers no step.
+    expect(stepLabels(renderer)).toEqual([]);
+    unmount();
+  });
+});
+
+describe('MemberLimitSheet pending membership read', () => {
+  // A pending (not fetching yet, no data) read with no cached payload must
+  // reach the skeleton, not the member-not-found state: the sheet had no
+  // answer yet.
+  it('shows the skeleton, not member-not-found, while the read is pending and unfetched', async () => {
+    query.isPending = true;
+    query.isLoading = false;
+    query.data = undefined;
+
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(MemberLimitSheet, { memberId: 'member-1' })
+    );
+
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     unmount();
   });
 });

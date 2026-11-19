@@ -197,13 +197,66 @@ describe('ack store state machine', () => {
     expect(isAttentionAcked('s1', { raiseId: 'permission' })).toBe(true);
   });
 
-  it('reads a status-only ack as answered for every raise of that status', () => {
+  it('a status-only ack answers a dated raise it can order, not one after it', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-12T10:00:00.000Z'));
     ackSessionAttention('s1', 'permission');
 
-    // Nothing the ack holds can tell two permissions apart, so it answers both;
-    // a raise of the other kind is a different raise.
-    expect(isAttentionAcked('s1', { raiseId: 'R2', status: 'permission' })).toBe(true);
-    expect(isAttentionAcked('s1', { raiseId: 'R2', status: 'question' })).toBe(false);
+    // A raise dated before the answer is the one the person answered.
+    expect(
+      isAttentionAcked('s1', { raiseId: '2026-10-12T09:59:30.000Z', status: 'permission' })
+    ).toBe(true);
+    // A raise after it is a new raise, whichever status it carries.
+    expect(
+      isAttentionAcked('s1', { raiseId: '2026-10-12T10:00:30.000Z', status: 'permission' })
+    ).toBe(false);
+    expect(
+      isAttentionAcked('s1', { raiseId: '2026-10-12T10:00:30.000Z', status: 'question' })
+    ).toBe(false);
+  });
+
+  it('a dated raise observed after a status-only ack shows its badge', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-12T10:00:00.000Z'));
+    const earlier = '2026-10-12T09:59:30.000Z';
+    const later = '2026-10-12T10:00:30.000Z';
+    ackSessionAttention('s1', 'permission');
+    expect(isAttentionAcked('s1', { raiseId: earlier, status: 'permission' })).toBe(true);
+
+    /* The stored row arrives with its own status time: the raise it names is
+       newer than the answer, so it is a raise the person has not answered. */
+    reconcileSessionAttention('s1', 'permission', later);
+
+    expect(isAttentionAcked('s1', { raiseId: later, status: 'permission' })).toBe(false);
+    expect(
+      shouldShowNeedsInput({
+        status: 'permission',
+        raiseId: later,
+        isAcked: isAttentionAcked('s1', { raiseId: later, status: 'permission' }),
+      })
+    ).toBe(true);
+  });
+
+  it('a different status dated before a status-only ack is not answered by it', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-12T10:00:00.000Z'));
+    ackSessionAttention('s1', 'permission');
+
+    /* A question raised before the permission was answered is a different raise:
+       the answer names a permission, so nothing about it answers a question. */
+    expect(
+      isAttentionAcked('s1', { raiseId: '2026-10-12T09:59:30.000Z', status: 'question' })
+    ).toBe(false);
+    expect(
+      shouldShowNeedsInput({
+        status: 'question',
+        raiseId: '2026-10-12T09:59:30.000Z',
+        isAcked: isAttentionAcked('s1', {
+          raiseId: '2026-10-12T09:59:30.000Z',
+          status: 'question',
+        }),
+      })
+    ).toBe(true);
   });
 
   it('does not reuse a raise that was already answered', () => {
@@ -394,11 +447,9 @@ describe('entry shape and re-raise', () => {
 
   it('acking a re-raised entry acks the new raise, not the old one', () => {
     ackSessionAttention('s1', 'question', 'R1');
-    // re-raise
     reconcileSessionAttention('s1', 'question', 'R2');
     expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
 
-    // user answers the new raise
     ackSessionAttention('s1', 'question', 'R2');
     expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(true);
     expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
@@ -411,7 +462,6 @@ describe('durable persistence', () => {
     ackSessionAttention('s1', 'question', 'R1');
     await __flushSessionAttentionWritesForTests();
 
-    // Simulated restart: clear the in-memory store, then re-hydrate from KV.
     __resetSessionAttentionForTests();
     await __hydrateSessionAttentionForTests();
 
@@ -726,40 +776,33 @@ describe('revision snapshot and listener notification', () => {
   it('bumps revision on mutating reconciles and stays stable on no-ops', () => {
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribe(listener);
-
-    const initial = getRevisionSnapshot();
-    let mutations = 0;
+    const start = getRevisionSnapshot();
 
     // ack → mutation
     ackSessionAttention('s1', 'question', 'R1');
-    if (getRevisionSnapshot() !== initial) {
-      mutations += 1;
-    }
+    expect(getRevisionSnapshot()).toBe(start + 1);
+    expect(listener).toHaveBeenCalledTimes(1);
 
     // the same raise observed → no-op
     reconcileSessionAttention('s1', 'question', 'R1');
-    if (getRevisionSnapshot() !== initial + mutations) {
-      mutations += 1;
-    }
+    expect(getRevisionSnapshot()).toBe(start + 1);
+    expect(listener).toHaveBeenCalledTimes(1);
 
-    const afterMutations = getRevisionSnapshot();
-
-    // no-op reconciles: no entry → no change; resolved entry + same raise → no change
+    // no entry → no-op; same raise again → no-op
     reconcileSessionAttention('s2', 'busy', null);
     reconcileSessionAttention('s1', 'question', 'R1');
-
-    expect(getRevisionSnapshot()).toBe(afterMutations);
-    expect(listener).toHaveBeenCalledTimes(mutations);
+    expect(getRevisionSnapshot()).toBe(start + 1);
+    expect(listener).toHaveBeenCalledTimes(1);
 
     // re-raise → mutation
     reconcileSessionAttention('s1', 'question', 'R2');
-    expect(getRevisionSnapshot()).toBe(afterMutations + 1);
-    expect(listener).toHaveBeenCalledTimes(mutations + 1);
+    expect(getRevisionSnapshot()).toBe(start + 2);
+    expect(listener).toHaveBeenCalledTimes(2);
 
     // delete → mutation
     reconcileSessionAttention('s1', 'busy', null);
-    expect(getRevisionSnapshot()).toBe(afterMutations + 2);
-    expect(listener).toHaveBeenCalledTimes(mutations + 2);
+    expect(getRevisionSnapshot()).toBe(start + 3);
+    expect(listener).toHaveBeenCalledTimes(3);
 
     unsubscribe();
   });

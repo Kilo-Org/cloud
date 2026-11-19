@@ -5,7 +5,9 @@ import { Pressable, View } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
+import { PR_REVIEW_TAB_HIT_SLOP } from '@/lib/pr-review/pr-review-tab-target';
 import { cn } from '@/lib/utils';
 
 export type PrReviewTabId = 'overview' | 'files' | 'discussion';
@@ -50,7 +52,11 @@ export function PrReviewTabSelector({
 }: PrReviewTabSelectorProps) {
   const { t } = useTranslation();
   return (
-    <View accessibilityRole="tablist" className="flex-row gap-1 rounded-lg bg-secondary p-1">
+    // The row stays a pill track because each tab also carries a count badge and
+    // its own disabled state, which `SegmentedControl` does not express; the
+    // pill radius is the contract's control role and keeps the row out of the
+    // hand-built-card pattern.
+    <View accessibilityRole="tablist" className="flex-row rounded-full bg-secondary p-1">
       {TABS.map(tab => {
         const active = tab.id === activeTab;
         const disabled = disabledTabs.includes(tab.id);
@@ -62,6 +68,7 @@ export function PrReviewTabSelector({
           <Pressable
             key={tab.id}
             {...tabEntryA11y({ selected: active, disabled })}
+            hitSlop={PR_REVIEW_TAB_HIT_SLOP}
             disabled={disabled}
             onPress={() => {
               if (active) {
@@ -71,13 +78,9 @@ export function PrReviewTabSelector({
               onChange(tab.id);
             }}
             className={cn(
-              'flex-1 items-center justify-center rounded-md py-2 active:opacity-70',
-              // Dark paints `bg-card` below the row's `bg-secondary`, so the
-              // selected pill takes the palette's elevated neutral fill
-              // instead: the same raised-surface step a filled neutral control
-              // uses, so the pill stays the neutral raised surface light mode
-              // shows rather than a tinted accent that pulls the eye.
-              active && 'bg-card shadow-sm shadow-[#0000000D] dark:bg-secondary-fill',
+              ROW_TARGET_CLASS,
+              'flex-1 justify-center rounded-full px-2 py-2 active:opacity-70',
+              active && 'bg-background',
               disabled && 'opacity-60'
             )}
           >
@@ -94,9 +97,7 @@ export function PrReviewTabSelector({
                 // `muted` equals the row's `secondary` in both palettes, so the
                 // badge fills with `muted-soft` to read as a pill at all.
                 <View className="min-w-5 items-center justify-center rounded-full bg-muted-soft px-1.5 py-0.5">
-                  <Text className="text-center text-[11px] font-medium text-foreground">
-                    {badge}
-                  </Text>
+                  <Text className="text-center text-xs font-medium text-foreground">{badge}</Text>
                 </View>
               ) : null}
             </View>

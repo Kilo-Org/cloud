@@ -2,7 +2,7 @@
 // confidence its events recorded, and every summary figure is one accessible
 // element whose label reads the count with what it counts.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,13 +40,20 @@ vi.mock('@/lib/format', () => ({
 }));
 vi.mock('@/lib/utils', () => ({
   capitalize: (value: string) => value.charAt(0).toUpperCase() + value.slice(1),
+  cn: (...values: unknown[]) => values.filter(Boolean).join(' '),
   parseTimestamp: (value: unknown) => value,
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
-  CollapsibleSection: 'CollapsibleSection',
+  // The real section resolves a function child inside its expanded branch; this
+  // suite renders the body unconditionally so it can read the expanded rows.
+  CollapsibleSection: ({ children }: { children: ReactNode | (() => ReactNode) }) =>
+    typeof children === 'function' ? children() : children,
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -110,6 +117,20 @@ const FINDING = {
       label: 'Auto dismissed',
       afterState: { status: 'ignored', reason_code: 'not_used' },
       metadata: { reason_code: 'not_used', confidence: 'high' },
+    }),
+    auditEvent({
+      id: 'e4',
+      action: 'security.finding.status_change',
+      label: 'Status changed',
+      beforeState: { status: 'open' },
+      afterState: { status: 'fixed' },
+    }),
+    auditEvent({
+      id: 'e5',
+      action: 'security.finding.severity_changed',
+      label: 'Severity changed',
+      beforeState: { severity: 'critical' },
+      afterState: { severity: 'high' },
     }),
   ],
 };
@@ -200,6 +221,14 @@ describe('AuditReportScreen evidence', () => {
     const root = renderScreen();
 
     expect(textStrings(root.root)).toContain('Confidence: Medium');
+  });
+
+  it('shows the previous and new value of a status and a severity change', () => {
+    const root = renderScreen();
+    const strings = textStrings(root.root);
+
+    expect(strings).toContain('Status: Open → Fixed');
+    expect(strings).toContain('Severity: Critical → High');
   });
 
   it('reads each summary figure as one element with its count and label', () => {

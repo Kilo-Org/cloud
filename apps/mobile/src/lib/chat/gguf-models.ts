@@ -126,24 +126,43 @@ let loaded = false;
  */
 const BACKGROUND_LISTENER = Symbol.for('kilo.gguf.backgroundListener');
 
-/** The saved list is read on first use rather than at import, so startup does no file work. */
-function ggufStore() {
-  if (!loaded) {
-    loaded = true;
-    downloads.load();
-    const previous = (globalThis as Partial<Record<symbol, { remove: () => void }>>)[
-      BACKGROUND_LISTENER
-    ];
-    previous?.remove();
-    // A background app may be killed for its memory; the context loads again on the next answer.
-    const subscription = AppState.addEventListener('change', state => {
-      if (state === 'background') {
-        void model.release();
-      }
-    });
-    (globalThis as Partial<Record<symbol, { remove: () => void }>>)[BACKGROUND_LISTENER] =
-      subscription;
+/**
+ * The saved list is read on first use rather than at import, so startup does no file work.
+ *
+ * The latch is set only after `load()` succeeded and the background listener is
+ * installed: a read that failed must be retryable, and a listener that was never
+ * installed would let a loaded llama context survive into the background. A failed
+ * read is not retried from the snapshot getter — that runs while rendering — so the
+ * picker's retry calls `retryLoad`.
+ */
+function ensureGgufStore(options: { retry?: boolean } = {}): void {
+  if (loaded) {
+    return;
   }
+  if (downloads.snapshot().loadFailed && options.retry !== true) {
+    return;
+  }
+  if (!downloads.load()) {
+    return;
+  }
+  // A failed attempt installs neither the listener nor the latch, so the previous
+  // instance's listener (fast refresh) stays until a successful attempt replaces it.
+  const subscription = AppState.addEventListener('change', state => {
+    if (state === 'background') {
+      void model.release();
+    }
+  });
+  const previous = (globalThis as Partial<Record<symbol, { remove: () => void }>>)[
+    BACKGROUND_LISTENER
+  ];
+  previous?.remove();
+  (globalThis as Partial<Record<symbol, { remove: () => void }>>)[BACKGROUND_LISTENER] =
+    subscription;
+  loaded = true;
+}
+
+function ggufStore() {
+  ensureGgufStore();
   return downloads;
 }
 
@@ -194,6 +213,10 @@ export const ggufDownloadActions = {
   dismissFailure: () => {
     ggufStore().dismissFailure();
   },
+  /** Read the saved list again after `snapshot.loadFailed`; the picker's retry. */
+  retryLoad: () => {
+    ensureGgufStore({ retry: true });
+  },
   remove: async (fileId: string) => {
     await ggufStore().remove(fileId);
   },
@@ -212,11 +235,66 @@ export function useGgufModels(): GgufDownloadsSnapshot {
   return useSyncExternalStore(subscribe, current, current);
 }
 
+function parseUrl(url: string): URL | null {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
+
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
+const HF_HOST = 'huggingface.co';
+
+/**
+ * The repository a Hugging Face file link points into, or `null` when the link
+ * names no repository file.
+ */
+function hfRepositoryPath(pathname: string): string | null {
+  const [owner, repo, marker] = pathname.split('/').filter(segment => segment !== '');
+  if (owner === undefined || repo === undefined) {
+    return null;
+  }
+  // A downloadable repository file is `<owner>/<repo>/resolve/…`. A dataset or a
+  // space repeats its kind as the first segment, so it names no model repository.
+  if (marker !== 'resolve') {
+    return null;
+  }
+  return `${decodeSegment(owner)}/${decodeSegment(repo)}`;
+}
+
+/**
+ * Where a downloaded model came from, for the picker's subtitle: a Hugging Face
+ * repository file reads as its repository, any other link as its host. A link
+ * that does not parse has no place to name, so the row shows no subtitle.
+ */
+export function ggufModelLocator(url: string): string {
+  const parsed = parseUrl(url);
+  if (parsed === null) {
+    return '';
+  }
+  if (parsed.hostname === HF_HOST) {
+    const repository = hfRepositoryPath(parsed.pathname);
+    if (repository !== null) {
+      return repository;
+    }
+  }
+  return parsed.hostname;
+}
+
 export function ggufModelOptions(models: readonly GgufModelRecord[]): SessionModelOption[] {
   return models.map(record => ({
     id: localTargetId('gguf', record.fileId),
     name: record.name,
-    displayId: record.fileId,
+    // The file id is an opaque content hash, so the subtitle names the source instead.
+    displayId: ggufModelLocator(record.url),
     variants: record.thinking ? [...THINKING_SWITCH_VARIANTS] : [],
     isPreferred: false,
     showGatewayMetadata: false,

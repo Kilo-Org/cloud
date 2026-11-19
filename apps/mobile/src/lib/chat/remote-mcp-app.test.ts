@@ -1,9 +1,11 @@
+// eslint-disable-next-line import/no-nodejs-modules -- runs the page's own script in a node context
+import { createContext, runInContext } from 'node:vm';
+
 import { describe, expect, it } from 'vitest';
 
 import {
   contentSecurityPolicy,
   DEFAULT_VIEW_HEIGHT,
-  MAX_VIEW_BYTES,
   VIEW_HOST_PAGE,
   viewArguments,
   viewDocument,
@@ -14,6 +16,11 @@ import {
  * The document a view is drawn from, and the page that draws it: the policy a
  * server-declared resource gets, and the sandbox it cannot leave.
  */
+
+/** The policy the CSP metadata a resource declared produces. */
+function policyOf(csp: Readonly<Record<string, unknown>>): string {
+  return contentSecurityPolicy({ ui: { csp } });
+}
 
 describe('the policy a view runs under', () => {
   it('is nothing at all when the resource declared nothing', () => {
@@ -32,13 +39,9 @@ describe('the policy a view runs under', () => {
   });
 
   it('keeps only the origins the resource named, for what it named them for', () => {
-    const policy = contentSecurityPolicy({
-      ui: {
-        csp: {
-          connectDomains: ['https://api.example'],
-          resourceDomains: ['https://cdn.example'],
-        },
-      },
+    const policy = policyOf({
+      connectDomains: ['https://api.example'],
+      resourceDomains: ['https://cdn.example'],
     });
     expect(policy).toContain('connect-src https://api.example');
     expect(policy).toContain("script-src 'unsafe-inline' https://cdn.example");
@@ -47,24 +50,20 @@ describe('the policy a view runs under', () => {
   });
 
   it('drops a request that would widen the sandbox rather than trust it', () => {
-    const policy = contentSecurityPolicy({
-      ui: {
-        csp: {
-          connectDomains: [
-            '*',
-            "'unsafe-eval'",
-            'https://ok.example',
-            'https://a.example/x;y',
-            'https://*',
-            'https://*.example',
-            'http://*',
-            'https://*:8443',
-            'https://ok.example/path',
-            'https://user@ok.example',
-          ],
-          resourceDomains: ["'unsafe-inline' 'unsafe-eval'", 'data:text/html,<script>'],
-        },
-      },
+    const policy = policyOf({
+      connectDomains: [
+        '*',
+        "'unsafe-eval'",
+        'https://ok.example',
+        'https://a.example/x;y',
+        'https://*',
+        'https://*.example',
+        'http://*',
+        'https://*:8443',
+        'https://ok.example/path',
+        'https://user@ok.example',
+      ],
+      resourceDomains: ["'unsafe-inline' 'unsafe-eval'", 'data:text/html,<script>'],
     });
     expect(policy).toContain('connect-src https://ok.example');
     expect(policy).not.toContain('*');
@@ -75,19 +74,15 @@ describe('the policy a view runs under', () => {
   });
 
   it('names each source as the origin it is, and nothing longer', () => {
-    const policy = contentSecurityPolicy({
-      ui: {
-        csp: {
-          connectDomains: [
-            'https://api.example:8443',
-            'wss://socket.example',
-            'https://slash.example/',
-            'https://смр.example',
-          ],
-          resourceDomains: ['http://127.0.0.1:8080', 'https://cdn.example'],
-          baseUriDomains: ['https://[::1]:3000'],
-        },
-      },
+    const policy = policyOf({
+      connectDomains: [
+        'https://api.example:8443',
+        'wss://socket.example',
+        'https://slash.example/',
+        'https://смр.example',
+      ],
+      resourceDomains: ['http://127.0.0.1:8080', 'https://cdn.example'],
+      baseUriDomains: ['https://[::1]:3000'],
     });
     expect(policy).toContain(
       'connect-src https://api.example:8443 wss://socket.example https://slash.example https://смр.example'
@@ -99,16 +94,12 @@ describe('the policy a view runs under', () => {
   });
 
   it('drops a port no origin can have', () => {
-    const policy = contentSecurityPolicy({
-      ui: {
-        csp: {
-          connectDomains: [
-            'https://api.example:0',
-            'https://api.example:99999',
-            'https://api.example:443',
-          ],
-        },
-      },
+    const policy = policyOf({
+      connectDomains: [
+        'https://api.example:0',
+        'https://api.example:99999',
+        'https://api.example:443',
+      ],
     });
     expect(policy).toContain('connect-src https://api.example:443');
     expect(policy).not.toContain(':0');
@@ -143,21 +134,18 @@ describe('the document a view draws', () => {
     );
   });
 
-  it('keeps the policy ahead of every part of the document, at any head position', () => {
-    /* Each resource writes its head marker in a different position; the policy
-       is still the first token the parser reads, after the doctype. */
-    const documents = [
-      '<!-- <head> --><html><head><title>x</title></head><body></body></html>',
-      '<script>const tag = "<head>";</script><html><head><title>x</title></head></html>',
-      '<style>/* <head> */</style><html><head><title>x</title></head></html>',
-      '<html data-note="<head>"><head><title>x</title></head></html>',
-    ];
-    for (const html of documents) {
-      const document = viewDocument(html, "default-src 'none'");
-      expect(document.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
-      expect(document.indexOf('Content-Security-Policy')).toBeLessThan(document.indexOf('<head>'));
-      expect(document.split('Content-Security-Policy')).toHaveLength(2);
-    }
+  /* Each resource writes its head marker in a different position; the policy
+     is still the first token the parser reads, after the doctype. */
+  it.each([
+    '<!-- <head> --><html><head><title>x</title></head><body></body></html>',
+    '<script>const tag = "<head>";</script><html><head><title>x</title></head></html>',
+    '<style>/* <head> */</style><html><head><title>x</title></head></html>',
+    '<html data-note="<head>"><head><title>x</title></head></html>',
+  ])('keeps the policy ahead of every part of the document, at any head position', html => {
+    const document = viewDocument(html, "default-src 'none'");
+    expect(document.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
+    expect(document.indexOf('Content-Security-Policy')).toBeLessThan(document.indexOf('<head>'));
+    expect(document.split('Content-Security-Policy')).toHaveLength(2);
   });
 
   it('keeps a byte-order mark and a doctype in front of the policy', () => {
@@ -182,27 +170,22 @@ describe('the document a view draws', () => {
     );
   });
 
-  it('places the policy in front of every token the document’s prologue does not own', () => {
-    /* Each document starts with a declaration that a parser reads as a comment
-       of some length, and then with markup of its own. The policy follows the
-       prologue the parser actually reads, so it comes before that markup. */
-    const documents = [
-      '<?x><script>run()</script>?><!doctype html><html><head></head></html>',
-      '<!--><script>run()</script>--><!doctype html><html><head></head></html>',
-      '<!---><script>run()</script><!doctype html><html><head></head></html>',
-      '<!note><script>run()</script><!doctype html><html><head></head></html>',
-      '<!----><script>run()</script><!doctype html><html><head></head></html>',
-      '<!-- a --!><script>run()</script><!-- b --><!doctype html><html><head></head></html>',
-      '<!-- never closed <script>run()</script>',
-    ];
-    for (const html of documents) {
-      const document = viewDocument(html, "default-src 'none'");
-      expect(document.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
-      expect(document.indexOf('Content-Security-Policy')).toBeLessThan(
-        document.indexOf('<script>')
-      );
-      expect(document.split('Content-Security-Policy')).toHaveLength(2);
-    }
+  /* Each document starts with a declaration that a parser reads as a comment
+     of some length, and then with markup of its own. The policy follows the
+     prologue the parser actually reads, so it comes before that markup. */
+  it.each([
+    '<?x><script>run()</script>?><!doctype html><html><head></head></html>',
+    '<!--><script>run()</script>--><!doctype html><html><head></head></html>',
+    '<!---><script>run()</script><!doctype html><html><head></head></html>',
+    '<!note><script>run()</script><!doctype html><html><head></head></html>',
+    '<!----><script>run()</script><!doctype html><html><head></head></html>',
+    '<!-- a --!><script>run()</script><!-- b --><!doctype html><html><head></head></html>',
+    '<!-- never closed <script>run()</script>',
+  ])('places the policy in front of every token the document’s prologue does not own', html => {
+    const document = viewDocument(html, "default-src 'none'");
+    expect(document.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
+    expect(document.indexOf('Content-Security-Policy')).toBeLessThan(document.indexOf('<script>'));
+    expect(document.split('Content-Security-Policy')).toHaveLength(2);
   });
 
   it('keeps a byte-order mark first when the document has no doctype', () => {
@@ -220,6 +203,60 @@ describe('the document a view draws', () => {
   });
 });
 
+type FrameWindow = { postMessage: (data: unknown, targetOrigin: string) => void };
+
+/** The iframe the page owns: the document it swaps in, and no URL of its own. */
+type Frame = { contentWindow: FrameWindow | null; srcdoc: string; src?: string; title?: string };
+
+/** The seam the app calls on the page, and the event a stray message arrives as. */
+type Host = { mount: (html: string, label?: string) => void; deliver: (text: string) => void };
+type RelayEvent = { source?: unknown; data?: unknown };
+
+/**
+ * The page as a webview runs it: its own script in a fresh context over one
+ * iframe, one bridge and the listeners it registers.
+ */
+const runPage = () => {
+  const script = /<script>([\s\S]*)<\/script>/.exec(VIEW_HOST_PAGE)?.[1] ?? '';
+  const posted: string[] = [];
+  const delivered: { data: unknown; targetOrigin: string }[] = [];
+  const listeners: ((event: RelayEvent) => void)[] = [];
+  const frameWindow: FrameWindow = {
+    postMessage: (data, targetOrigin) => {
+      delivered.push({ data, targetOrigin });
+    },
+  };
+  const frame: Frame = { contentWindow: frameWindow, srcdoc: '' };
+  const sandbox: Record<string, unknown> = {
+    document: { getElementById: (id: string) => (id === 'view' ? frame : null) },
+    ReactNativeWebView: {
+      postMessage: (text: string) => {
+        posted.push(text);
+      },
+    },
+    addEventListener: (type: string, listener: (event: RelayEvent) => void) => {
+      if (type === 'message') {
+        listeners.push(listener);
+      }
+    },
+  };
+  const context = createContext(sandbox);
+  // The page reads `window` as itself, the way a webview's global object is.
+  runInContext(`window = globalThis;\n${script}`, context);
+  return {
+    host: sandbox.kiloMcpHost as Host,
+    frame,
+    frameWindow,
+    posted,
+    delivered,
+    emit: (event: RelayEvent) => {
+      for (const listener of listeners) {
+        listener(event);
+      }
+    },
+  };
+};
+
 describe('the page a view is drawn in', () => {
   it('runs the view in a sandbox that can script and nothing else', () => {
     expect(VIEW_HOST_PAGE).toContain('sandbox="allow-scripts"');
@@ -234,17 +271,56 @@ describe('the page a view is drawn in', () => {
     }
   });
 
-  it('relays only the sandbox’s own messages, and posts them as text', () => {
-    expect(VIEW_HOST_PAGE).toContain('event.source !== view.contentWindow');
-    expect(VIEW_HOST_PAGE).toContain('window.ReactNativeWebView.postMessage(text)');
+  it('draws the resource document into the frame, and gives it no URL to fetch', () => {
+    const page = runPage();
+    page.host.mount('<p>halo</p>');
+    expect(page.frame.srcdoc).toBe('<p>halo</p>');
+    // The view cannot reach the network on its own say.
+    expect(page.frame.src).toBeUndefined();
   });
 
-  it('is the only document the webview loads, and it loads it as a file', () => {
-    // The sandbox's document comes from the resource, not from a URL the page
-    // fetches: `srcdoc` is what keeps the view from reaching the network on
-    // its own say.
-    expect(VIEW_HOST_PAGE).toContain('view.srcdoc = html');
-    expect(MAX_VIEW_BYTES).toBeGreaterThan(0);
+  it('names the frame for assistive technology when the mount carries a label', () => {
+    const page = runPage();
+    page.host.mount('<p>halo</p>', 'Interactive chart');
+    expect(page.frame.title).toBe('Interactive chart');
+    expect(page.frame.srcdoc).toBe('<p>halo</p>');
+  });
+
+  it('replaces the frame name on a second mount', () => {
+    const page = runPage();
+    page.host.mount('<p>halo</p>', 'Interactive chart');
+    page.host.mount('<p>again</p>', 'Trading table');
+    expect(page.frame.title).toBe('Trading table');
+    expect(page.frame.srcdoc).toBe('<p>again</p>');
+  });
+
+  it('leaves an existing frame name alone when the mount carries no label', () => {
+    const page = runPage();
+    page.host.mount('<p>halo</p>', 'Interactive chart');
+    page.host.mount('<p>again</p>');
+    expect(page.frame.title).toBe('Interactive chart');
+    expect(page.frame.srcdoc).toBe('<p>again</p>');
+  });
+
+  it('relays only the frame’s own messages, and posts them as text', () => {
+    const page = runPage();
+    page.emit({ source: {}, data: 'x' });
+    expect(page.posted).toEqual([]);
+    page.emit({ source: undefined, data: 'x' });
+    expect(page.posted).toEqual([]);
+    page.emit({ source: page.frameWindow, data: 'hello' });
+    expect(page.posted).toEqual(['hello']);
+    page.emit({ source: page.frameWindow, data: { kind: 'chart' } });
+    expect(page.posted).toEqual(['hello', '{"kind":"chart"}']);
+  });
+
+  it('delivers a bridge message into the frame, and nothing while no frame is there', () => {
+    const page = runPage();
+    page.host.deliver('{"kind":"chart"}');
+    expect(page.delivered).toEqual([{ data: { kind: 'chart' }, targetOrigin: '*' }]);
+    page.frame.contentWindow = null;
+    page.host.deliver('{"kind":"chart"}');
+    expect(page.delivered).toHaveLength(1);
   });
 });
 

@@ -27,28 +27,24 @@ export type IntegrationAction = 'connect' | 'disconnect';
 type ProviderDefinition = {
   scope: readonly IntegrationScope[];
   hiddenUnlessInstalled: boolean;
-  /**
-   * Roles the provider's connect flow accepts; `null` means any organization
-   * member, because a first-time OAuth connect only proves membership.
-   */
-  connectRoles: readonly OrganizationRole[] | null;
-  /** Roles the provider's disconnect procedure accepts; `null` means any member. */
-  disconnectRoles: readonly OrganizationRole[] | null;
-  /** Roles a connect that replaces an existing integration needs. */
-  replaceRoles?: readonly OrganizationRole[];
+  /** Roles the provider's connect flow accepts, first connect and replacement alike. */
+  connectRoles: readonly OrganizationRole[];
+  /** Roles the provider's disconnect procedure accepts. */
+  disconnectRoles: readonly OrganizationRole[];
 };
 
-/** Bitbucket's hub page gate: `organizationBitbucketRouter.getStatus.canManage`. */
-const BITBUCKET_ROLES = ['owner', 'billing_manager'] as const satisfies readonly OrganizationRole[];
-
 /**
- * Mirrors the server, per action, instead of one role set per provider:
- * `githubApps.uninstallApp` and `slack.uninstallApp` name
- * `ORGANIZATION_MANAGE_ROLES`, while `slack`, `linear` and `discord` connects
- * and the `gitlab`/`discord`/`linear` disconnects run through
- * `resolveAuthorizedOwner`, whose default is `ORGANIZATION_BILLING_ROLES`.
- * `resolveGitLabOAuthOwner` only requires billing roles when it replaces an
- * existing integration, so a member may make GitLab's first connect.
+ * Mirrors the server, per action, instead of one role set per provider. The
+ * Slack connect, the Slack uninstall and the GitHub uninstall ask for
+ * `ORGANIZATION_MANAGE_ROLES`. The Linear, Discord and GitLab connects and the
+ * `gitlab`/`discord`/`linear` disconnects ask for `ORGANIZATION_BILLING_ROLES`.
+ * Every organization GitLab connect starts at `resolveGitLabOAuthOwner`, which
+ * requires `ORGANIZATION_BILLING_ROLES` at the OAuth start and at the callback,
+ * for a first connect and for a replacement.
+ *
+ * Bitbucket's row runs the same organization procedures its connect sheet does
+ * (`organizations.bitbucket.connect`/`replaceToken`/`refreshRepositories`/
+ * `disconnect`), and every one of them is an `organizationBillingProcedure`.
  */
 const PROVIDERS = {
   github: {
@@ -66,8 +62,7 @@ const PROVIDERS = {
   gitlab: {
     scope: ['personal', 'organization'],
     hiddenUnlessInstalled: false,
-    connectRoles: null,
-    replaceRoles: ORGANIZATION_BILLING_ROLES,
+    connectRoles: ORGANIZATION_BILLING_ROLES,
     disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
   discord: {
@@ -82,16 +77,14 @@ const PROVIDERS = {
     connectRoles: ORGANIZATION_BILLING_ROLES,
     disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
-  // Bitbucket is org-only and web-managed: the row opens the web page, so the
-  // page's own gate is the rule. `organizationBitbucketRouter.getStatus`
-  // computes `canManage = role === 'owner' || role === 'billing_manager'`, and
-  // that flag is what renders its Connect form and its management controls —
-  // admins land on a read-only notice, so they get no mobile action either.
+  // Bitbucket is org-only and connected in the app: the hub's Connect opens the
+  // workspace-token sheet and a connected row disconnects natively, so the row
+  // follows the procedure it calls rather than a page's own gate.
   bitbucket: {
     scope: ['organization'],
     hiddenUnlessInstalled: false,
-    connectRoles: BITBUCKET_ROLES,
-    disconnectRoles: BITBUCKET_ROLES,
+    connectRoles: ORGANIZATION_BILLING_ROLES,
+    disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
 } satisfies Record<IntegrationProvider, ProviderDefinition>;
 
@@ -116,14 +109,10 @@ export function visibleIntegrationProviders(
 /** The roles the server procedure behind this action requires. */
 function rolesFor(
   definition: ProviderDefinition,
-  action: IntegrationAction,
-  installed: boolean | undefined
-): readonly OrganizationRole[] | null {
+  action: IntegrationAction
+): readonly OrganizationRole[] {
   if (action === 'disconnect') {
     return definition.disconnectRoles;
-  }
-  if (installed === true && definition.replaceRoles) {
-    return definition.replaceRoles;
   }
   return definition.connectRoles;
 }
@@ -137,21 +126,83 @@ function rolesFor(
 export function canManageProvider(input: {
   provider: IntegrationProvider;
   scope: IntegrationScope;
+  /** The caller's organization role. An unresolved role (`undefined`) offers nothing. */
   role: string | undefined;
   action: IntegrationAction;
-  /** Whether the connection already exists, so a connect would replace it. */
-  installed?: boolean;
 }): boolean {
   if (input.scope === 'personal') {
     return true;
   }
-  const allowedRoles = rolesFor(PROVIDERS[input.provider], input.action, input.installed);
-  // `null` names any member: the connect flow only proves membership. A viewer
-  // whose role is not resolved yet gets nothing.
-  if (allowedRoles === null) {
-    return input.role != null;
-  }
+  const allowedRoles = rolesFor(PROVIDERS[input.provider], input.action);
   return allowedRoles.some(allowedRole => allowedRole === input.role);
+}
+
+/**
+ * Whether the row offers the viewer no action at all. It asks the same question
+ * the trailing button asks, with the action that row would show, so the answer
+ * can never disagree with the control beside it. The hub names the roles that
+ * can change such a row once, above the list, instead of under every row.
+ */
+export function providerRowBlocked(input: {
+  provider: IntegrationProvider;
+  scope: IntegrationScope;
+  role: string | undefined;
+  installed?: boolean;
+}): boolean {
+  return !canManageProvider({
+    provider: input.provider,
+    scope: input.scope,
+    role: input.role,
+    action: input.installed ? 'disconnect' : 'connect',
+  });
+}
+
+/** The order the hub names roles in, so the sentence reads the same every time. */
+const NAMED_ROLE_ORDER = [
+  'owner',
+  'admin',
+  'billing_manager',
+] as const satisfies readonly OrganizationRole[];
+
+/**
+ * The roles that can change the connections this viewer has no action on. The
+ * hub names them once, above the list, instead of under every blocked row, and
+ * a role appears only when it can change at least one of those rows: the
+ * provider role sets differ, so an admin reaches GitHub and Slack while a
+ * billing manager reaches GitLab, Discord, Linear and Bitbucket.
+ */
+export function blockedConnectionRoles(input: {
+  rows: readonly {
+    provider: IntegrationProvider;
+    installed: boolean;
+    actionPending: boolean;
+  }[];
+  scope: IntegrationScope;
+  role: string | undefined;
+}): OrganizationRole[] {
+  const union = new Set<OrganizationRole>();
+  for (const row of input.rows) {
+    // A row whose connections read has not landed offers no action yet, and
+    // says nothing about the role that would own it once the read settles.
+    const blocked =
+      !row.actionPending &&
+      providerRowBlocked({
+        provider: row.provider,
+        scope: input.scope,
+        role: input.role,
+        installed: row.installed,
+      });
+    if (blocked) {
+      const allowedRoles = rolesFor(
+        PROVIDERS[row.provider],
+        row.installed ? 'disconnect' : 'connect'
+      );
+      for (const allowedRole of allowedRoles) {
+        union.add(allowedRole);
+      }
+    }
+  }
+  return NAMED_ROLE_ORDER.filter(named => union.has(named));
 }
 
 /**

@@ -20,6 +20,7 @@ import { type VariableEdit } from '@/components/profiles/profile-variables-model
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useAgentProfileList, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
@@ -55,7 +56,7 @@ type AdvancedConfigPanelProps = Readonly<{
   /** The route's organization scope; `undefined` is a personal session. */
   organizationId?: string;
   /**
-   * The session's profile override, or null to use the effective default.
+   * The pick this session will run on, or null when nothing picked resolves.
    * Used for the resource summary; the Environment row owns profile selection.
    */
   selectedProfileId: string | null;
@@ -117,7 +118,19 @@ export function AdvancedConfigPanel({
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<ProfileSelectorProfile | null>(null);
-  const [isSaveOpen, setIsSaveOpen] = useState(false);
+  const [saveSheetInstance, setSaveSheetInstance] = useState<number | null>(null);
+  // Open-instance ownership: a late settlement from a sheet that has since
+  // been closed and reopened must not close the one that replaced it.
+  const saveSheetInstanceRef = useRef(0);
+  const openSaveSheet = () => {
+    saveSheetInstanceRef.current += 1;
+    setSaveSheetInstance(saveSheetInstanceRef.current);
+  };
+  const closeSaveSheet = (instance: number) => {
+    if (saveSheetInstanceRef.current === instance) {
+      setSaveSheetInstance(null);
+    }
+  };
   // This panel's top inside the composer's scroll content, reported by its
   // root's layout. Expanding never moves anything above the disclosure row, so
   // the collapsed measurement still holds when the reveal is requested.
@@ -246,31 +259,35 @@ export function AdvancedConfigPanel({
 
   return (
     <View
-      className="mt-5"
+      testID="advanced-config-panel"
       onLayout={event => {
         contentOffsetRef.current = event.nativeEvent.layout.y;
       }}
     >
-      <Pressable
-        className={cn(
-          ROW_TARGET_CLASS,
-          'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2.5 active:opacity-70'
-        )}
-        onPress={toggleExpanded}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={t('agentChat.newSession.advancedConfig')}
-        accessibilityState={{ expanded: isExpanded, disabled }}
-      >
-        <Text className="text-sm font-medium text-foreground">
-          {t('agentChat.newSession.advancedConfig')}
-        </Text>
-        {isExpanded ? (
-          <ChevronUp size={18} color={colors.mutedForeground} />
-        ) : (
-          <ChevronDown size={18} color={colors.mutedForeground} />
-        )}
-      </Pressable>
+      <RowGroup>
+        <Pressable
+          className={cn(
+            ROW_TARGET_CLASS,
+            'flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-70'
+          )}
+          onPress={toggleExpanded}
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={t('agentChat.newSession.advancedConfig')}
+          accessibilityState={{ expanded: isExpanded, disabled }}
+        >
+          <Text className="text-sm font-medium text-foreground">
+            {t('agentChat.newSession.advancedConfig')}
+          </Text>
+          {/* A disclosure caret, not a navigation chevron: it names the state of
+              the block under the row. */}
+          {isExpanded ? (
+            <ChevronUp size={16} color={colors.mutedForeground} />
+          ) : (
+            <ChevronDown size={16} color={colors.mutedForeground} />
+          )}
+        </Pressable>
+      </RowGroup>
 
       {isExpanded ? (
         // The revealed body is nested under the disclosure row it belongs to: a
@@ -285,7 +302,7 @@ export function AdvancedConfigPanel({
           />
 
           {effectiveVars > 0 || effectiveCommands > 0 ? (
-            <Text className="text-xs text-muted-foreground">{profileSummary}</Text>
+            <Text variant="caption">{profileSummary}</Text>
           ) : null}
 
           <ManualEnvVarsEditor
@@ -301,9 +318,7 @@ export function AdvancedConfigPanel({
 
           {hasManualConfig ? (
             <Button
-              onPress={() => {
-                setIsSaveOpen(true);
-              }}
+              onPress={openSaveSheet}
               disabled={disabled}
               accessibilityLabel={t('agentChat.newSession.saveAsProfile')}
             >
@@ -323,12 +338,13 @@ export function AdvancedConfigPanel({
         </View>
       ) : null}
 
-      {isSaveOpen ? (
+      {saveSheetInstance !== null ? (
         <SaveProfileSheet
+          key={saveSheetInstance}
           envVars={manualVars}
           setupCommands={setupCommands}
           onClose={() => {
-            setIsSaveOpen(false);
+            closeSaveSheet(saveSheetInstance);
           }}
           onSave={handleSaveProfile}
         />

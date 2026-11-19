@@ -14,8 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
+import { type PageRunFailure } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import { type SurfaceFeedback } from '@/lib/surface-feedback';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
@@ -64,11 +66,23 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ canGoBack: () => false, back: vi.fn() }),
 }));
 
-vi.mock('@/components/ui/icons', () => ({ Search: 'Search' }));
+vi.mock('@/components/ui/icons', () => ({
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  Search: 'Search',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// `Button` (the later-page retry CTA) wraps its label in this provider, so the
+// text mock must export the same context the real module does.
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
@@ -137,10 +151,10 @@ type ViewedResult = {
 
 type FetchAllResult = {
   run: () => unknown;
-  isRunning: boolean;
   loadedFiles: number;
   totalFiles: null;
-  error: unknown;
+  feedback: SurfaceFeedback<PageRunFailure>;
+  failure: PageRunFailure | null;
 };
 
 let listQueryResult: ListQueryResult = {
@@ -163,10 +177,10 @@ let viewedResult: ViewedResult = {
 };
 let fetchAllResult: FetchAllResult = {
   run: fetchAllRunMock,
-  isRunning: false,
+  feedback: { status: 'idle' },
   loadedFiles: 0,
   totalFiles: null,
-  error: null,
+  failure: null,
 };
 
 vi.mock('@/lib/pr-review/diff/pr-review-file-list-state', () => ({
@@ -265,10 +279,10 @@ describe('PrDiffFileNavigator later-page retry (finding 1)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -322,10 +336,10 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -353,10 +367,19 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
       expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
       expect(flashListProps.current).toBeNull();
       expect(findSearchInput(renderer)).toBeDefined();
-      const retries = renderer.root.findAllByProps({ accessibilityLabel: 'Retry loading files' });
+      // The retry CTA is the shared `Button`, which forwards this label to the
+      // pressable it renders; count the host node so the composite and its
+      // element are not read as two controls.
+      const retries = renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' && node.props.accessibilityLabel === 'Retry loading files'
+      );
       if (kind === 'retryable' || kind === 'reconnect') {
         expect(retries).toHaveLength(1);
-        const retry = renderer.root.findByProps({ accessibilityLabel: 'Retry loading files' });
+        const retry = retries[0];
+        if (!retry) {
+          throw new Error('missing retry');
+        }
         act(() => {
           (retry.props.onPress as () => void)();
         });
@@ -410,10 +433,10 @@ describe('PrDiffFileNavigator onEndReached gating (finding 3)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -460,10 +483,10 @@ describe('PrDiffFileNavigator active-search fetch-to-completion (finding 4)', ()
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -481,10 +504,10 @@ describe('PrDiffFileNavigator active-search fetch-to-completion (finding 4)', ()
   it('shows the load-all retry when fetch-to-completion has an error', async () => {
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'failed', failure: { kind: 'load-all-failed', at: 1 } },
       loadedFiles: 1,
       totalFiles: null,
-      error: new Error('page failed'),
+      failure: { kind: 'load-all-failed', at: 1 },
     };
     const { renderer } = await mountNavigator();
 
@@ -516,10 +539,10 @@ describe('PrDiffFileNavigator stale row callbacks (finding 5)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -573,10 +596,10 @@ describe('PrDiffFileNavigator list bottom inset (plan §6)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -643,10 +666,10 @@ describe('PrDiffFileNavigator viewed-set provider keying (s6)', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -705,7 +728,8 @@ describe('PrDiffFileNavigator viewed-set provider keying (s6)', () => {
 // App (Bitbucket Cloud has no such App).
 describe('PrDiffFileNavigator provider wording', () => {
   const GITHUB_APP_CLAUSE = "the Kilo GitHub App isn't installed on it";
-  const NEUTRAL_DESCRIPTION = 'It may be deleted, or you may lack access.';
+  const NEUTRAL_DESCRIPTION =
+    'The connection may have failed, or the item may be deleted or inaccessible.';
 
   const GITLAB_REF: ProviderPrRef = {
     platform: 'gitlab',
@@ -733,10 +757,10 @@ describe('PrDiffFileNavigator provider wording', () => {
     viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
   });
 
@@ -752,6 +776,24 @@ describe('PrDiffFileNavigator provider wording', () => {
       },
       files: [],
       firstPageErrorState: { kind },
+      laterPageError: false,
+    };
+  }
+
+  // The 0-listed-files state: the read answered, and the navigator has no row
+  // to show, which is the empty state rather than a terminal error.
+  function setEmptyState() {
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [],
+      firstPageErrorState: null,
       laterPageError: false,
     };
   }
@@ -810,6 +852,41 @@ describe('PrDiffFileNavigator provider wording', () => {
 
     expect(text).toContain("You don't have permission to view this pull request.");
   });
+
+  // The navigator's 0-listed-files state is the same shared empty state the
+  // Files tab renders, so it reads the provider key too: a GitLab merge
+  // request is never described as a pull request.
+  const PULL_REQUEST_EMPTY = 'This pull request has no file changes.';
+  const MERGE_REQUEST_EMPTY = 'This merge request has no file changes.';
+
+  function emptyDescription(renderer: RenderWithProvidersResult['renderer']) {
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    return empty.props.description as string;
+  }
+
+  it('describes a GitLab empty file list as a merge request', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(GITLAB_REF));
+
+    expect(description).toBe(MERGE_REQUEST_EMPTY);
+  });
+
+  it('keeps the pull-request empty copy for GitHub', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(GITHUB_REF));
+
+    expect(description).toBe(PULL_REQUEST_EMPTY);
+  });
+
+  it('keeps the pull-request empty copy for Bitbucket', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(BITBUCKET_REF));
+
+    expect(description).toBe(PULL_REQUEST_EMPTY);
+  });
 });
 
 // The listed-file progress line inflects for the language it renders in, so the
@@ -832,10 +909,10 @@ describe('PrDiffFileNavigator listed-file progress', () => {
     viewedResult = { isViewed: () => true, toggle: vi.fn(() => undefined), isLoading: false };
     fetchAllResult = {
       run: fetchAllRunMock,
-      isRunning: false,
+      feedback: { status: 'idle' },
       loadedFiles: 0,
       totalFiles: null,
-      error: null,
+      failure: null,
     };
     await i18n.changeLanguage('fr');
   });

@@ -45,10 +45,12 @@ export const LANGUAGE_PREFERENCE_KEY = 'language-preference';
 export const LANGUAGE_RETURN_TARGET_KEY = 'language-return-target';
 /** Language whose forced layout direction the last launch already reloaded for. */
 export const LANGUAGE_DIRECTION_ATTEMPT_KEY = 'language-direction-attempt';
-/** Login email draft, persisted before an RTL language reload. */
+/** Login email draft, persisted before an RTL language reload. Read only by the migration that deletes it. */
 export const LOGIN_EMAIL_DRAFT_KEY = 'login-email-draft';
-/** Login SSO-recovery banner draft, persisted before an RTL language reload. */
+/** Login SSO-recovery banner draft, persisted before an RTL language reload. Read only by the migration that deletes it. */
 export const LOGIN_SSO_RECOVERY_DRAFT_KEY = 'login-sso-recovery-draft';
+/** The one sign-in attempt record: the draft a reload reads, or the tombstone that retires it. */
+export const LOGIN_DRAFT_RECORD_KEY = 'login-draft-record';
 export const KEEP_SCREEN_ON_KEY = 'keep-session-screen-on';
 /** Profile credit balance masked as `*****`. Device preference; survives reboot. */
 export const HIDE_BALANCE_KEY = 'hide-balance';
@@ -88,10 +90,15 @@ export const REMOTE_MCP_OAUTH_KEY = 'remote-mcp-oauth';
 export const CHAT_BACKENDS_KEY = 'chat-backends';
 /** Provider platforms whose new-session "Connect <provider>" CTA the user collapsed. */
 export const COLLAPSED_CONNECT_CTAS_KEY = 'collapsed-connect-ctas';
-/** Master switch for the glanceable Active Agents surfaces (widgets, Live Activity,
- * Android ongoing). Off blanks every surface and unregisters its push tokens. */
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';
+/**
+ * Consecutive encrypted-store migration failures across launches, beside
+ * `PERSIST_DB_KEY`. Durable outside the database on purpose: the failing
+ * database cannot hold its own counter. A successful migration deletes the
+ * item; a threshold reached falls back to delete-and-recreate (DEC-01 step 4).
+ */
+export const PERSIST_MIGRATION_FAILURES_KEY = 'persist-db-migration-failures';
 /**
  * Identity hint for the cold-start read-cache restore (DEC-01). Class
  * `account-metadata`: written when the authenticated identity resolves and
@@ -178,6 +185,14 @@ export const LAST_OPENED_SESSION_KEY = 'last-opened-session';
  * account never restores another account's route (see `lib/last-route.ts`).
  */
 export const LAST_ROUTE_KEY = 'last-route';
+
+/**
+ * The scope names the app last showed behind the Code Reviewer headers. Holds
+ * `{ version, userId, entries }`; the account id inside the record scopes it,
+ * so one account's names never paint under another account's header (see
+ * `lib/code-reviewer-scope-name.ts`).
+ */
+export const REVIEWER_SCOPE_NAMES_KEY = 'reviewer-scope-names';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,

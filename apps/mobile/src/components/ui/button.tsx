@@ -15,25 +15,25 @@ const buttonVariants = cva(
       variant: {
         default: 'bg-primary active:opacity-80 shadow-sm shadow-[#0000000D]',
         destructive: 'bg-destructive-solid active:opacity-80 shadow-sm shadow-[#0000000D]',
-        // The dark card surface sits a step above the near-black background, and
-        // the default hairline (7% white) is too faint to separate the control
-        // from it, so an outlined control would read as unpainted black-on-black
-        // in dark mode. Same surface/border pair the app's other dark cards use.
-        outline:
-          'border-border bg-card dark:border-neutral-700 dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
+        // The one secondary control: a surface and a border that carry the same
+        // weight in both schemes, so the light card does not read as raised
+        // while the dark one reads as outlined. `--input` is the palette's
+        // control border (45% ink light, 35% ink dark); `--border`'s 7% white in
+        // dark is too faint to separate the control from the near-black page.
+        outline: 'border-input bg-card dark:bg-secondary active:opacity-80 border',
         // A destructive action that shares a footer with a filled primary must
         // not compete with it for attention: the fill stays with the safe,
         // forward action, so the destructive one keeps its warning ink and
         // outline and paints no fill of its own.
         'outline-destructive':
-          'border-destructive bg-card dark:bg-secondary active:opacity-80 border shadow-sm shadow-[#0000000D]',
+          'border-destructive bg-card dark:bg-secondary active:opacity-80 border',
         // A filled neutral action keeps its own fill rather than the surface
         // token: `--secondary` is also the dark card an outlined control paints
         // (above), so a filled action in that colour reads as the same control
         // as the outlined one beside it, as it did in the discard-draft sheet
         // and the permission card. `--secondary-fill` equals `--secondary` in
         // light and takes a visible step above it in dark.
-        secondary: 'bg-secondary-fill active:opacity-80 shadow-sm shadow-[#0000000D]',
+        secondary: 'bg-secondary-fill active:opacity-80',
         ghost: 'active:opacity-60',
         link: '',
         // A soft accent action is low-emphasis, so it paints a tint of the
@@ -168,6 +168,19 @@ const buttonLabelClasses = Object.fromEntries(
   Object.entries(BUTTON_INK).map(([variant, ink]) => [variant, ink.label])
 ) as Record<ButtonVariant, string>;
 
+/**
+ * The pair a disabled (not busy) primary action paints: the palette's muted
+ * surface and the muted ink that reads on it (4.6:1 light, 4.5:1 dark). A
+ * brand or taupe fill reads as a second colour rather than as an inactive
+ * control; the muted step is the one every disabled row in the app already
+ * uses. The label takes the complete class set rather than overriding the
+ * variant's ink, so no two colour utilities compete. A caller that paints its
+ * own mark on this fill takes `useMutedDisabledInk` from
+ * `@/lib/hooks/use-theme-colors`.
+ */
+const MUTED_DISABLED_FILL_CLASS = 'bg-muted';
+const MUTED_DISABLED_LABEL_CLASS = 'text-center text-sm font-semibold text-muted-foreground';
+
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
     variant: buttonLabelClasses,
@@ -206,6 +219,11 @@ function Button({
   ...props
 }: ButtonProps) {
   const colors = useThemeColors();
+  // The announced busy state: `loading` wins when it is set, otherwise the
+  // caller's own declaration stands (a control that spins its own glyph opts
+  // out of the loading layout). Busyness alone does not refuse input — the
+  // caller that owns the request decides that, as `StateAction` does.
+  const busy = loading ?? accessibilityState?.busy;
   const isDisabled = Boolean(disabled) || Boolean(loading);
   const isPrimary = (variant ?? 'default') === 'default';
   // A default-variant fill is a saturated brand colour with a contrasting ink
@@ -215,13 +233,18 @@ function Button({
   // A disabled (not busy) primary instead takes a muted fill that still
   // contrasts with the ink label, so the label stays legible. A busy primary
   // keeps the brand fill and its spinner so it still reads as working.
-  const isMutedDisabled = isDisabled && !loading && isPrimary;
+  //
+  // A control that announces busy keeps that enabled face even when it also
+  // refuses presses: the spinner (or the caller's own busy glyph) is its state
+  // signal, and dimming it would read as unavailable instead of working.
+  const isFaceDisabled = isDisabled && busy !== true;
+  const isMutedDisabled = isFaceDisabled && !loading && isPrimary;
   // Dimming is a disabled signal, and a busy control has nothing visible to
   // signal with: the label is already transparent and the spinner sits alone in
   // the slot. Halving the control's opacity then halves the indicator too, which
   // leaves an icon-only button looking empty on a dark surface. Keep the busy
   // control at full strength in both themes.
-  const isDimmed = isDisabled && !isPrimary && !loading;
+  const isDimmed = isFaceDisabled && !isPrimary && !loading;
   // On Android, a node's accessible name is only rewritten while the incoming
   // state still carries `busy`. A loading button therefore keeps announcing its
   // busy state after the request settles unless its label prop holds a real
@@ -290,13 +313,15 @@ function Button({
   }
   // oxlint-enable anti-slop/no-runtime-typeof
   return (
-    <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
+    <TextClassContext.Provider
+      value={isMutedDisabled ? MUTED_DISABLED_LABEL_CLASS : buttonTextVariants({ variant, size })}
+    >
       <Pressable
         className={cn(
           isDimmed && 'opacity-50',
           buttonVariants({ variant, size }),
           buttonGapVariants({ size }),
-          isMutedDisabled && 'bg-primary-disabled',
+          isMutedDisabled && MUTED_DISABLED_FILL_CLASS,
           className
         )}
         role="button"
@@ -305,10 +330,7 @@ function Button({
         accessibilityState={{
           ...accessibilityState,
           disabled: isDisabled,
-          // A caller that shows its own busy response (for example an icon that
-          // spins while the same glyph stays drawn) declares `busy` without
-          // opting into the loading layout; `loading` still wins when it is set.
-          busy: loading ?? accessibilityState?.busy,
+          busy,
         }}
         hitSlop={hitSlop ?? (size === 'sm' ? COMPACT_BUTTON_HIT_SLOP : undefined)}
         {...props}

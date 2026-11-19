@@ -1,15 +1,16 @@
 import { type Href } from 'expo-router';
-import { FolderGit2 } from '@/components/ui/icons';
+import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
+import { BitbucketSetupRecovery } from '@/components/code-reviewer/bitbucket-setup-recovery';
 import { repositoryEmptyCopy } from '@/components/code-reviewer/repository-empty-copy';
 import { RepositoryModelOverrides } from '@/components/code-reviewer/repository-model-overrides';
 import { RepositoryRowsList } from '@/components/code-reviewer/repository-rows-list';
 import { RepositorySyncFooter } from '@/components/code-reviewer/repository-sync-footer';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
@@ -17,16 +18,12 @@ import {
   AllRepositoriesSummary,
   RepositoryModeChoice,
 } from '@/components/code-reviewer/repository-selection-mode';
-import { Button } from '@/components/ui/button';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { TAB_SCREEN_TRAILING_GAP, useTabScreenFrame } from '@/components/tab-screen';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { repositoryModelOverrideHandlers } from '@/lib/code-reviewer-repo-models';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
 import {
   isPersonal,
   useBitbucketReadiness,
@@ -39,9 +36,8 @@ import { useRepositoryAccessSync } from '@/lib/hooks/use-repository-access-sync'
 import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
-import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
+import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
-import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -55,9 +51,9 @@ export default function ReposRoute() {
 
 function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const config = useReviewConfig(scope, platform);
-  const configBody = useReviewConfigBody(config);
+  const configBody = useQueryBodyState(config);
   const { data } = config;
-  const configFailure = reviewConfigFailure(configBody, config.isFetching);
+  const configFailure = queryBodyFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
   const toggleRepo = useRepoSelectionToggle(scope, platform);
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
@@ -179,24 +175,20 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
       />
     );
   } else if (!reposLoading && bitbucketNotReady) {
+    const readiness = bitbucketReadiness.data;
     repoState = (
-      <CenteredState>
-        <View className="items-center gap-2 px-6">
+      <CenteredState contentContainerClassName="px-4">
+        {readiness ? (
+          <BitbucketSetupRecovery
+            scope={scope}
+            readiness={readiness}
+            message={t('common.couldNotLoadRepositories')}
+          />
+        ) : (
           <Text variant="muted" className="text-center text-xs">
-            {t('codeReviewer.repos.unavailable')}
+            {t('common.couldNotLoadRepositories')}
           </Text>
-          <Button
-            variant="outline"
-            size="sm"
-            onPress={() => {
-              void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
-                label: t('codeReviewer.bitbucket.setup'),
-              });
-            }}
-          >
-            <Text>{t('codeReviewer.repos.finishSetup')}</Text>
-          </Button>
-        </View>
+        )}
       </CenteredState>
     );
   } else if (confirmedEmpty) {
@@ -211,14 +203,13 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         description={emptyStateCopy.description}
         action={
           manageAccess ? (
-            <Button
-              className={STATE_ACTION_CLASS}
+            <StateAction
+              label={t('codeReviewer.repos.manageAccess')}
+              icon={ShieldCheck}
               loading={manageAccess.pending}
               disabled={manageAccess.pending}
               onPress={manageAccess.handlePress}
-            >
-              <Text>{t('codeReviewer.repos.manageAccess')}</Text>
-            </Button>
+            />
           ) : undefined
         }
       />
@@ -263,8 +254,8 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
 
       {rowsBody && reposLoading && (
         <View className="gap-3 pt-2">
-          <Skeleton className="h-12 w-full rounded-lg" />
-          <Skeleton className="h-12 w-full rounded-lg" />
+          <RowSkeleton subtitle />
+          <RowSkeleton subtitle />
         </View>
       )}
 

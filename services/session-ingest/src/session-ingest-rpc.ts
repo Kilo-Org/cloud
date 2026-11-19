@@ -24,6 +24,7 @@ import {
 } from '@kilocode/db/schema';
 import {
   activeOrganizationJoinCondition,
+  hasOrganizationAccess,
   organizationMembershipJoinCondition,
   parentOrganizationJoinCondition,
   parentOrganizationMembershipJoinCondition,
@@ -38,14 +39,19 @@ import {
   type PublishCloudAgentSessionStatusParams,
   recordCloudAgentSessionHarnessSchema,
   type RecordCloudAgentSessionHarnessParams,
-  cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeDeletionManifestSchema,
   cloudAgentWorktreeDeletionSchema,
+  beginCloudAgentWorktreeDeletionSchema,
   cloudAgentWorktreeLocationSchema,
   recordCloudAgentWorktreeCleanupSchema,
   canDestroyCloudAgentWorktreeSandboxSchema,
   retireCloudAgentWorktreeIfSoleMemberSchema,
+  setGeneratedTitleForCloudAgentSchema,
+  canGenerateTitleForCloudAgentSchema,
+  type BeginCloudAgentWorktreeDeletionParams,
+  type SetGeneratedTitleForCloudAgentParams,
+  type CanGenerateTitleForCloudAgentParams,
   type CloudAgentWorktreeDeletionParams,
   type RecordCloudAgentWorktreeCleanupParams,
   type CanDestroyCloudAgentWorktreeSandboxParams,
@@ -138,17 +144,6 @@ import { applyMetadataChanges } from './ingest/metadata';
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
   'Cloud Agent root session identity conflict';
-
-const setGeneratedTitleForCloudAgentSchema = z.object({
-  sessionId: sessionIdSchema,
-  kiloUserId: z.string().min(1),
-  cloudAgentSessionId: cloudAgentSessionIdSchema,
-  title: reportSessionTitleSchema.shape.title,
-});
-
-const canGenerateTitleForCloudAgentSchema = setGeneratedTitleForCloudAgentSchema.omit({
-  title: true,
-});
 
 type CliSessionsV2Row = typeof cli_sessions_v2.$inferSelect;
 
@@ -254,8 +249,8 @@ function destinationIdentityConflicts(
 }
 
 export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIngestRpcMethods {
-  async beginCloudAgentWorktreeDeletion(params: CloudAgentWorktreeDeletionParams) {
-    return beginWorktreeDeletion(this.env, cloudAgentWorktreeDeletionSchema.parse(params));
+  async beginCloudAgentWorktreeDeletion(params: BeginCloudAgentWorktreeDeletionParams) {
+    return beginWorktreeDeletion(this.env, beginCloudAgentWorktreeDeletionSchema.parse(params));
   }
 
   async recordCloudAgentWorktreeCleanup(params: RecordCloudAgentWorktreeCleanupParams) {
@@ -317,6 +312,23 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     params: CreateSessionForCloudAgentParams
   ): Promise<CreateSessionForCloudAgentResult> {
     const parsed = createSessionForCloudAgentSchema.parse(params);
+
+    // The row and its worktree both carry this organization, so the create
+    // confirms the acting user may act for it before any attribution. The
+    // check runs before the clone so a refused create leaves no destination
+    // work behind.
+    if (parsed.organizationId !== undefined) {
+      const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+      if (
+        !(await hasOrganizationAccess(db, {
+          kiloUserId: parsed.kiloUserId,
+          organizationId: parsed.organizationId,
+        }))
+      ) {
+        return { status: 'rejected', code: 'organization_access_denied' };
+      }
+    }
+
     const inputGitUrl = parsed.gitUrl === undefined ? undefined : normalizeGitUrl(parsed.gitUrl);
 
     // Require available ingest storage before any clone or row write, so the
@@ -616,12 +628,9 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     return setCloudAgentSessionVersion(getWorkerDb(this.env.HYPERDRIVE.connectionString), input);
   }
 
-  async setGeneratedTitleForCloudAgent(params: {
-    sessionId: string;
-    kiloUserId: string;
-    cloudAgentSessionId: string;
-    title: string;
-  }): Promise<{ applied: boolean }> {
+  async setGeneratedTitleForCloudAgent(
+    params: SetGeneratedTitleForCloudAgentParams
+  ): Promise<{ applied: boolean }> {
     const parsed = setGeneratedTitleForCloudAgentSchema.parse(params);
     const input = reportSessionTitleSchema.parse({ title: parsed.title, generated: true });
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
@@ -646,11 +655,9 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     return { applied: true };
   }
 
-  async canGenerateTitleForCloudAgent(params: {
-    sessionId: string;
-    kiloUserId: string;
-    cloudAgentSessionId: string;
-  }): Promise<boolean> {
+  async canGenerateTitleForCloudAgent(
+    params: CanGenerateTitleForCloudAgentParams
+  ): Promise<boolean> {
     const parsed = canGenerateTitleForCloudAgentSchema.parse(params);
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 

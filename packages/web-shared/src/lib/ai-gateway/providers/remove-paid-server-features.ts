@@ -3,6 +3,7 @@ import type {
   OpenRouterPlugin,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 
 // Plugins OpenRouter does not bill separately. Every other plugin id, including
 // ids added later, is removed.
@@ -15,10 +16,6 @@ const FREE_PDF_PARSER_PLUGIN = {
   pdf: { engine: 'cloudflare-ai' },
 } satisfies OpenRouterPlugin;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function isFreePlugin(plugin: unknown): plugin is OpenRouterPlugin {
   return isRecord(plugin) && typeof plugin.id === 'string' && FREE_PLUGIN_IDS.has(plugin.id);
 }
@@ -28,6 +25,17 @@ function getServerToolType(tool: unknown): string | null {
     return null;
   }
   return tool.type === 'function' || tool.type === 'custom' ? null : tool.type;
+}
+
+/** Whether the request asks for a plugin or server tool that a gateway bills separately. */
+export function requestsPaidServerFeatures(request: GatewayRequest): boolean {
+  // The request body is unvalidated client JSON, so its declared types are not trusted here.
+  const body: { tools?: unknown; plugins?: unknown } = request.body;
+  const plugins = body.plugins === undefined || body.plugins === null ? [] : [body.plugins].flat();
+  return (
+    plugins.some(plugin => !isFreePlugin(plugin)) ||
+    (Array.isArray(body.tools) && body.tools.some(tool => getServerToolType(tool) !== null))
+  );
 }
 
 /**

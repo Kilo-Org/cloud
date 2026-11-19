@@ -15,6 +15,7 @@ import {
 
 import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { InputFrame } from '@/components/ui/input-frame';
 import { Text } from '@/components/ui/text';
 import { VoiceInputButton } from '@/components/voice-input-control';
 import { useMotionPolicy } from '@/lib/a11y/motion';
@@ -189,10 +190,10 @@ export function ChatComposerInputRow({
           </Pressable>
         ) : null}
 
-        <View
+        <InputFrame
           className={cn(
             COMPOSER_CONTROL_GAP_CLASS,
-            'flex-1 overflow-hidden rounded-[20px] border border-border bg-card',
+            'flex-1 overflow-hidden',
             !inputEditable && 'opacity-50'
           )}
           onLayout={onInputLayout}
@@ -248,7 +249,7 @@ export function ChatComposerInputRow({
             autoCapitalize="sentences"
             autoCorrect
           />
-        </View>
+        </InputFrame>
 
         {returnSendsMessage ? (
           <View className={COMPOSER_CONTROL_GAP_CLASS}>
@@ -272,13 +273,12 @@ export function ChatComposerInputRow({
 
         {/* The toggle stays in the row whether or not the OS recognizer answers
             available: a tap re-probes it and either starts a session or says why
-            it cannot, so the control never disappears without a word. `lg`
-            renders its own 48dp target box, so the row adds no slop and the
-            box cannot reach into a neighbour. */}
+            it cannot, so the control never disappears without a word. It renders
+            the shared 48dp target box on its own node, so the row adds no slop
+            and the box cannot reach into a neighbour. */}
         <View className={COMPOSER_CONTROL_GAP_CLASS}>
           <VoiceInputButton
             disabled={voiceDisabled}
-            size="lg"
             status={voiceInputStatus}
             onPress={onToggleVoice}
           />

@@ -1,34 +1,29 @@
-import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, useWindowDimensions, View } from 'react-native';
-import { toast } from 'sonner-native';
+import { ScrollView, View } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
-import {
-  PasskeyListRow,
-  type PasskeyRow,
-  type PasskeysResult,
-} from '@/components/passkey-list-row';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { PasskeyListRow } from '@/components/passkey-list-row';
+import { PasskeyVerificationPanel } from '@/components/passkey-verification-panel';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
-import { useTabBarBottomPadding } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { KeyRound, Plus } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { IconButton } from '@/components/ui/icon-button';
+import { KeyRound, Plus, RotateCcw } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
-import { passkeysSupported, registerPasskey } from '@/lib/auth/passkey-client';
-import { isShortViewport } from '@/lib/centered-state-layout';
-import {
-  isLatestMutationGeneration,
-  nextMutationGeneration,
-} from '@/lib/hooks/mutation-generations';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type AddFailure, addFailureNoticeKey } from '@/lib/passkeys/add-failure-notice';
+import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { addFailureNoticeKey } from '@/lib/passkeys/add-failure-notice';
+import { type PasskeyRow } from '@/lib/passkeys/passkey-types';
+import { usePasskeyManagement } from '@/lib/passkeys/use-passkey-management';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 /** Rows the skeleton reserves so loading→content does not resize the list. */
@@ -50,20 +45,12 @@ function InlineFailure({
 }: Readonly<{ message: string; onRetry: () => void; pending: boolean }>) {
   const { t } = useTranslation();
   return (
-    <View className="flex-row items-center gap-3 rounded-lg border border-border bg-card p-3">
+    <Card className="flex-row items-center">
       <Text accessibilityRole="alert" className="min-w-0 flex-1 text-sm text-muted-foreground">
         {message}
       </Text>
-      <Button
-        variant="outline"
-        size="sm"
-        className={STATE_ACTION_CLASS}
-        loading={pending}
-        onPress={onRetry}
-      >
-        <Text>{t('common.retry')}</Text>
-      </Button>
-    </View>
+      <StateAction label={t('common.retry')} icon={RotateCcw} loading={pending} onPress={onRetry} />
+    </Card>
   );
 }
 
@@ -71,123 +58,50 @@ function InlineFailure({
  * Passkeys for the signed-in user: the list, creation through the platform
  * authenticator, rename, and removal behind a confirmation.
  *
- * Four states: loading reserves the final rows' boxes, empty offers creation as
- * its only action, happy lists a row per passkey, and a failure is either
- * retryable in place (the list request or a removal, with whatever the query
- * last rendered kept — the rows or the empty state) or non-retryable (a device
- * that cannot create passkeys, or an account that cannot add one from this app:
- * the control is not offered and the notice that says why takes the hint's
- * place while the existing rows stay). A cancelled creation sheet changed
- * nothing, so the list is left as it was and the toast says so. A retry is
- * single-flight — its control is disabled while the request it starts is
- * pending — and a removal failure is only actionable while that delete runs or
- * its row has rolled back, never after the server list drops it.
+ * A native session cannot mint, rename or remove a credential on its bearer
+ * alone: the server asks for fresh primary proof, and this screen gives it in
+ * the app. Every operation opens the verification panel first, which offers a
+ * passkey when the account has one and a code to the account's own address
+ * always; the authorization that proof mints is single-use and covers exactly
+ * the operation that asked for it. A dismissed panel changed nothing, so the
+ * list is left as it was. A refusal that no in-app step can fix (a sign-in that
+ * cannot manage passkeys) withdraws the control and says so, and a session the
+ * server has ended puts the person back on sign-in.
  *
- * The Add control is the screen's one action and sits outside the scrolling
- * list, in the footer above the tab bar: the header and the control then keep
- * the same coordinates whatever the query renders (skeletons, no rows, rows),
- * so data arriving never moves the control the user is reaching for.
+ * Four list states: loading reserves the final rows' boxes, empty states the
+ * list, happy lists a row per passkey, and a failure is either retryable in
+ * place (the list request or a removal, with whatever the query last rendered
+ * kept — the rows or the empty state) or non-retryable. A cancelled creation
+ * sheet changed nothing, so the list is left as it was and the toast says so.
+ * A retry is single-flight — its control is disabled while the request it
+ * starts is pending — and a removal failure is only actionable while that
+ * delete runs or its row has rolled back, never after the server list drops it.
+ *
+ * The header's "+" is the screen's one create control, as on every list screen
+ * with a create action; the empty state carries the title and its hint only.
  */
 export function PasskeysScreen() {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { token } = useAuth();
-  const tabBarBottomPadding = useTabBarBottomPadding();
-  // The body sits between the header and a footer that already reserves the
-  // tab bar, so in a phone held sideways its band is only a few dozen points
-  // tall and the full stack starts below the fold. Centered states learn this
-  // from their measured band; this plain body asks the window instead.
-  const windowSize = useWindowDimensions();
+  const { userId, email } = useCurrentUserId();
 
-  const listKey = trpc.user.getPasskeys.queryKey();
-  // Stable per-cache key for the removal generations: overlapping removals must
-  // not let an older failure's snapshot overwrite a newer one's state.
-  const removalKey = hashKey(listKey);
   const { data, isPending, isError, isFetching, refetch } = useQuery({
     ...trpc.user.getPasskeys.queryOptions(),
     enabled: token != null,
   });
   const passkeys = data?.passkeys ?? [];
 
+  const management = usePasskeyManagement({
+    accountId: userId,
+    email,
+    passkeys,
+    onListChanged: () => void refetch(),
+  });
+
   const [renameTarget, setRenameTarget] = useState<PasskeyRow | null>(null);
-  const [failedRemoveId, setFailedRemoveId] = useState<string | null>(null);
-  const [addFailure, setAddFailure] = useState<AddFailure | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
-
-  // A build without the native passkey module, or a platform that cannot hold
-  // one, must not offer an Add control whose only possible result is the
-  // unsupported notice — the login screen reads the same synchronous gate
-  // before it renders its passkey button. A ceremony that comes back
-  // `unsupported` proves the same thing, so it drops the control too, and so
-  // does `unavailable`: the request cannot succeed from this app. Any other
-  // failure keeps it, because it starts a fresh ceremony.
-  const canCreatePasskeys =
-    passkeysSupported() && addFailure !== 'unsupported' && addFailure !== 'unavailable';
-
-  const remove = useMutation(
-    trpc.user.deletePasskey.mutationOptions({
-      // The delete is the obviously reversible one: drop the row now and put it
-      // back from the snapshot when the server refuses.
-      onMutate: async ({ id }) => {
-        await queryClient.cancelQueries({ queryKey: listKey });
-        const generation = nextMutationGeneration(removalKey);
-        const previous = queryClient.getQueryData<PasskeysResult>(listKey);
-        queryClient.setQueryData<PasskeysResult>(listKey, old =>
-          old ? { ...old, passkeys: old.passkeys.filter(passkey => passkey.id !== id) } : old
-        );
-        return { previous, generation };
-      },
-      onError: (error, { id }, context) => {
-        // Only the newest removal owns the cache: an older failure's snapshot
-        // predates a newer removal's optimistic write, so replaying it would
-        // resurrect the row the newer removal already took over. The newer
-        // write reconciles with the server at settle.
-        if (context && isLatestMutationGeneration(removalKey, context.generation)) {
-          queryClient.setQueryData(listKey, context.previous);
-          setFailedRemoveId(id);
-        }
-        toast.error(error.message);
-      },
-      onSuccess: (_result, { id }, context) => {
-        if (isLatestMutationGeneration(removalKey, context.generation)) {
-          setFailedRemoveId(current => (current === id ? null : current));
-        }
-        toast.success(t('profile.passkeyRemoved'));
-      },
-      // Reconcile with the server either way, so a rollback cannot leave a row
-      // the server does not have or hide one it does.
-      onSettled: () => void refetch(),
-    })
-  );
-
-  // The removal failure stays actionable while the delete it names is in
-  // flight and after that delete rolls the row back. Once a reconciled list no
-  // longer holds the passkey, the same delete can only fail again, so the
-  // notice goes away with the row it referred to.
-  const removalInFlight = remove.isPending && remove.variables.id === failedRemoveId;
-  const removeFailureId =
-    failedRemoveId !== null &&
-    (removalInFlight || passkeys.some(passkey => passkey.id === failedRemoveId))
-      ? failedRemoveId
-      : null;
-
-  const rename = useMutation(
-    trpc.user.renamePasskey.mutationOptions({
-      onSuccess: () => {
-        toast.success(t('profile.passkeyRenamed'));
-        void refetch();
-      },
-      // A failed rename must reach the user even if the modal is dismissed,
-      // so the hook reports it (apps/mobile/AGENTS.md); RenameModal also keeps
-      // the message inline while it stays open for another try.
-      onError: error => {
-        toast.error(error.message);
-      },
-    })
-  );
 
   const confirmRemove = (passkey: PasskeyRow) => {
     confirm({
@@ -199,90 +113,41 @@ export function PasskeysScreen() {
       // the row is about to lose.
       confirmLabel: t('profile.removePasskey'),
       onConfirm: () => {
-        remove.mutate({ id: passkey.id });
+        management.handleRemovePasskey(passkey.id);
       },
     });
   };
 
-  const handleAdd = async () => {
-    if (isAdding) {
-      return;
-    }
-    setAddFailure(null);
-    setIsAdding(true);
-    try {
-      const result = await registerPasskey();
-      if (result.status === 'ok') {
-        toast.success(t('profile.passkeyAdded'));
-        void refetch();
-        return;
-      }
-      if (result.failure === 'cancelled') {
-        // The sheet was dismissed: nothing was written, so the list is unchanged.
-        toast.error(t('profile.passkeyAddCancelled'));
-        return;
-      }
-      setAddFailure(result.failure);
-    } catch {
-      // A rejection — the request-token read behind the ceremony, say — wrote
-      // nothing, so the same control starts a fresh ceremony.
-      setAddFailure('failed');
-    } finally {
-      // Always: a rejection must not leave the control loading forever.
-      setIsAdding(false);
-    }
-  };
-
-  // The control is full width in every state, in its own footer slot. Its
-  // label's box takes the row's remaining width, so the one line the platform
-  // lays out always has room to spare: a label sized to its own content
-  // measured at its longest word's width and wrapped onto a second line the
-  // button's min height then clipped (e4/p3 spot check: "Add a / passkey" in a
-  // full-width button). The label's right margin mirrors the glyph and its row
-  // gap, which keeps the centred label on the button's own centre.
-  const addControl = canCreatePasskeys ? (
-    <Button
-      variant="outline"
-      className="w-full"
-      loading={isAdding}
-      onPress={() => {
-        void handleAdd();
-      }}
-    >
-      <Plus size={16} color={colors.foreground} />
-      <Text className="mr-[24px] flex-1 text-center">{t('profile.addPasskey')}</Text>
-    </Button>
-  ) : null;
-
-  // On a device that cannot create passkeys the notice is not a reaction to a
-  // press: it is the reason no Add control is offered, shown beside the rows.
-  const noticeKey = addFailureNoticeKey(canCreatePasskeys, addFailure);
+  // The header's "+" is the screen's one create control; the empty state keeps
+  // only its title and description. On a device that cannot create passkeys the
+  // notice is not a reaction to a press: it is the reason no Add control is
+  // offered, so it stays in the body beside the rows it explains.
+  const noticeKey = addFailureNoticeKey(management.canCreatePasskeys, management.addFailure);
   const addFailureNotice = noticeKey ? (
     <Text accessibilityRole="alert" className="text-sm text-muted-foreground">
       {t(noticeKey)}
     </Text>
   ) : null;
 
-  // The notice and the control it explains share the footer. The one exception
-  // is the empty state on a device or account that cannot create passkeys: there
-  // the notice replaces the hint that would name the withdrawn control, so the
-  // footer must not repeat it. Every other body — the skeleton and a failed
-  // first load included — keeps the notice in the footer, where it is the only
-  // explanation for the control that is no longer offered.
+  // The one exception is the empty state on a device or account that cannot
+  // create passkeys: there the notice replaces the hint that would name the
+  // withdrawn control, so the body must not repeat it. Every other body — the
+  // skeleton and a failed first load included — keeps the notice in the body,
+  // where it is the only explanation for the control that is no longer offered.
   const emptyBodyRendered = !isPending && !(isError && data === undefined) && passkeys.length === 0;
-  const footerNotice = emptyBodyRendered && !canCreatePasskeys ? null : addFailureNotice;
+  const bodyNotice = emptyBodyRendered && !management.canCreatePasskeys ? null : addFailureNotice;
 
   let failureNotice: ReactNode = null;
-  if (removeFailureId !== null) {
+  if (management.removeFailureId !== null) {
     failureNotice = (
       <InlineFailure
         message={t('profile.passkeyRemoveFailed')}
         // The retry names one passkey's delete, so it is locked by that delete
-        // alone: another removal in flight must not load this control.
-        pending={removalInFlight}
-        onRetry={() => {
-          remove.mutate({ id: removeFailureId });
-        }}
+        // alone: another removal in flight must not load this control. A delete
+        // needs fresh proof again, so the retry asks for it rather than
+        // re-sending a refused call.
+        pending={management.removalInFlight}
+        onRetry={management.handleRetryRemove}
       />
     );
   } else if (isError && data !== undefined) {
@@ -297,37 +162,34 @@ export function PasskeysScreen() {
     );
   }
 
+  // A state that is the whole surface — no intro, no list, no panel above it —
+  // renders in the screen body, centred in the band between the header and the
+  // footer. Under the verification panel, or above a failed-refresh notice, the
+  // same state is placed at the top. The empty state's Add action is inline in
+  // its slot and the footer drops its own, so the control does not move.
+  const panelOpen = management.verification.state.phase !== 'closed';
+  let hoistedState = false;
+  if (!panelOpen && !isPending) {
+    hoistedState =
+      (isError && data === undefined) || (passkeys.length === 0 && failureNotice === null);
+  }
+
   let body: ReactNode = null;
   if (isPending) {
     // Loading is checked ahead of error and empty: the first frame of a cold
     // open must be the skeleton, never the empty state.
     body = (
-      <View className="gap-3">
+      <RowGroup leadingTile>
         {SKELETON_ROWS.map(index => (
-          <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            {/* Reserves the loaded row's 30 dp IconTile frame. */}
-            <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg" />
-            <View className="flex-1 gap-1.5">
-              <Skeleton className="h-5 w-28" />
-              <Skeleton className="h-4 w-40" />
-            </View>
-            {/* Reserve the row controls' final 44x44pt boxes (the glyphs stay
-                16pt) so a loaded row is the same height as its skeleton. */}
-            <View className="min-h-[44px] min-w-[44px] items-center justify-center">
-              <Skeleton className="h-4 w-4 rounded" />
-            </View>
-            <View className="min-h-[44px] min-w-[44px] items-center justify-center">
-              <Skeleton className="h-4 w-4 rounded" />
-            </View>
-          </View>
+          <RowSkeleton key={index} tile subtitle trailingControl />
         ))}
-      </View>
+      </RowGroup>
     );
   } else if (isError && data === undefined) {
     body = (
       <QueryError
         variant="server"
-        placement="top"
+        placement={hoistedState ? 'center' : 'top'}
         title={t('profile.passkeysCouldNotLoad')}
         message={t('profile.passkeysLoadFailed')}
         onRetry={() => void refetch()}
@@ -342,19 +204,16 @@ export function PasskeysScreen() {
     // A failed background refresh is reported above the empty state, not
     // hidden by it: the cached list is empty, so the notice is the only thing
     // that says the request failed and offers the retry.
-    //
-    // The state carries no action of its own: the Add control it describes
-    // lives in the footer, where it holds the same coordinates whether the
-    // query renders this state or a list of rows.
     body = (
       <>
         {failureNotice}
         <EmptyState
-          placement="top"
-          compact={isShortViewport(windowSize.width, windowSize.height)}
+          placement={hoistedState ? 'center' : 'top'}
           icon={KeyRound}
           title={t('profile.passkeysEmpty')}
-          description={canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice}
+          description={
+            management.canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice
+          }
         />
       </>
     );
@@ -362,41 +221,74 @@ export function PasskeysScreen() {
     body = (
       <>
         {failureNotice}
-        <View className="gap-3">
+        <RowGroup leadingTile>
           {passkeys.map(passkey => (
             <PasskeyListRow
               key={passkey.id}
               passkey={passkey}
-              disabled={remove.isPending}
+              disabled={management.removing || management.verifying}
               onRename={setRenameTarget}
               onRemove={confirmRemove}
             />
           ))}
-        </View>
+        </RowGroup>
       </>
     );
   }
 
   return (
     <View testID="passkeys-screen" className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.passkeysTitle')} />
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="gap-3 px-4 pt-4"
-        showsVerticalScrollIndicator={false}
-      >
-        {body}
-      </ScrollView>
-
-      {/* The Add control's slot: outside the scrolling body and above the tab
-          bar, it holds the coordinates the empty state first shows it at while
-          the query renders skeletons, no rows, or rows. The notice that
-          explains a failed or unavailable add shares the slot, beside the
-          control it is about. */}
-      <View className="gap-2 px-4 pt-3" style={{ paddingBottom: tabBarBottomPadding }}>
-        {footerNotice}
-        {addControl}
-      </View>
+      <ScreenHeader
+        title={t('profile.passkeysTitle')}
+        backFallback={PROFILE_TAB_HREF}
+        headerRight={
+          management.canCreatePasskeys ? (
+            <IconButton
+              accessibilityLabel={t('profile.addPasskey')}
+              // A second operation waits for the proof already being given: the
+              // panel owns the next step while it is open.
+              disabled={management.isAdding || management.verifying}
+              accessibilityState={{
+                busy: management.isAdding,
+                disabled: management.isAdding || management.verifying,
+              }}
+              onPress={management.handleAddPasskey}
+            >
+              <Plus size={20} color={colors.foreground} />
+            </IconButton>
+          ) : undefined
+        }
+      />
+      {hoistedState ? (
+        <>
+          {bodyNotice === null ? null : <View className={SCREEN_GUTTER_CLASS}>{bodyNotice}</View>}
+          {body}
+        </>
+      ) : (
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          showsVerticalScrollIndicator={false}
+          // The panel's code field lives in this scroller, so the native inset is
+          // what keeps the field and the controls under it above the keyboard.
+          automaticallyAdjustKeyboardInsets
+        >
+          {management.verification.state.phase !== 'closed' && (
+            <PasskeyVerificationPanel
+              state={management.verification.state}
+              onChoosePasskey={management.verification.handleChoosePasskey}
+              onChooseEmail={management.verification.handleChooseEmail}
+              onChooseSso={management.verification.handleChooseSso}
+              onReopenApproval={management.verification.handleReopenApproval}
+              onSubmitCode={management.verification.handleSubmitCode}
+              onResendCode={management.verification.handleResendCode}
+              onCancel={management.verification.handleCancel}
+            />
+          )}
+          {bodyNotice}
+          {body}
+        </ScrollView>
+      )}
 
       {renameTarget && (
         <RenameModal
@@ -404,7 +296,12 @@ export function PasskeysScreen() {
           placeholder={t('profile.passkeyName')}
           initialValue={renameTarget.name ?? ''}
           maxLength={64}
-          onSave={name => rename.mutateAsync({ id: renameTarget.id, name })}
+          onSave={name => {
+            management.handleRenamePasskey(renameTarget, name);
+            // The write happens after the proof, so the modal closes now: a
+            // dismissed panel therefore writes nothing.
+            return Promise.resolve();
+          }}
           onClose={() => {
             setRenameTarget(null);
           }}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,11 +21,13 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
-import { Switch } from '@/components/ui/switch';
-import { Text } from '@/components/ui/text';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
-import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
+import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
+import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -65,7 +67,21 @@ function nameErrorMessage(
   return undefined;
 }
 
+/**
+ * The save's refusal: the per-profile command cap, a name the server already
+ * has, or any other refusal.
+ */
+export type KiloCommandSaveFailure =
+  | { readonly kind: 'limit' }
+  | { readonly kind: 'name-conflict' }
+  | { readonly kind: 'refused' };
+
 type KiloCommandFormSheetProps = Readonly<{
+  /**
+   * The scope this form's fields are drafted under, shared with the screen's
+   * `useProfileFormDraft`, so a remount reopens the form on what was typed.
+   */
+  draftScope?: string;
   command: KiloCommandSource | null;
   /** Names of the profile's other commands, so a duplicate fails validation inline. */
   existingNames?: readonly string[];
@@ -73,57 +89,61 @@ type KiloCommandFormSheetProps = Readonly<{
   onClose: () => void;
   onCreate: (payload: KiloCommandCreatePayload) => void;
   onUpdate: (payload: KiloCommandUpdatePayload) => void;
-  /** A server-side name conflict, shown on the name field like a validation error. */
-  nameConflictFromServer?: boolean;
-  /** A failure the caller cannot name, shown inside the sheet instead of only a toast. */
-  saveFailure?: string | null;
+  /** The command's last refusal, each arm rendered where it belongs in the sheet. */
+  saveFailure?: KiloCommandSaveFailure | null;
+  /** A field changed, so the refusal it corrects no longer applies. */
+  onFieldEdited: () => void;
 }>;
 
 /**
  * The add/edit slash command sheet. Mounted only while open, so every open
  * seeds fresh fields from the command it edits. Text fields are uncontrolled
- * (refs), per the app's iOS text-input rule; the subtask flag is state.
+ * (refs), per the app's iOS text-input rule; the subtask flag is state. Both the
+ * refs and the flag are drafts in `draftScope`, so a remount — Android activity
+ * recreation, or the route going away and coming back — reopens the form on what
+ * was typed rather than on the server's copy; the screen clears the scope when
+ * it opens or closes the form.
  *
  * Save validates through `validateKiloCommandForm`; a refused input shows the
  * matching `profiles.slashCommands.*` message under the field at fault. The
  * name field keeps exactly what was typed, so a name outside the server's
  * pattern is refused under the field rather than rewritten into a shorter one
  * the reader never chose. A name the profile already uses is refused here from
- * `existingNames`, and one only the server can detect (a stale list) arrives as
- * `nameConflictFromServer` and shows the same message under the field. Any
- * other refused save arrives as `saveFailure` and renders one line inside the
- * sheet, because a toast behind the open sheet is invisible. Create omits empty
- * optional fields so the DB default applies; update sends `null` so an emptied
- * field clears.
+ * `existingNames`, and one only the server can detect (a stale list) arrives in
+ * `saveFailure` as `name-conflict` and shows the same message under the field.
+ * A create the profile's cap refuses arrives as `limit` and renders the cap
+ * copy as a warning; any other refused save arrives as `refused` and renders
+ * one line inside the sheet, because a toast behind the open sheet is
+ * invisible. Create omits empty optional fields so the DB default applies;
+ * update sends `null` so an emptied field clears.
  */
 export function KiloCommandFormSheet({
+  draftScope,
   command,
   existingNames = [],
   isSaving,
   onClose,
   onCreate,
   onUpdate,
-  nameConflictFromServer = false,
   saveFailure = null,
+  onFieldEdited,
 }: KiloCommandFormSheetProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const initial = initialKiloCommandFormState(command ?? undefined);
-  const nameRef = useRef(initial.name);
-  const descriptionRef = useRef(initial.description);
-  const templateRef = useRef(initial.template);
-  const agentRef = useRef(initial.agent);
-  const modelRef = useRef(initial.model);
-  const [subtask, setSubtask] = useState(initial.subtask);
+  // The values the fields are drawn from belong to the open form, not to the
+  // query: a refetch can rewrite `command` under the sheet, and `FormField`
+  // writes `defaultValue` once at mount. A mount-time snapshot is therefore what
+  // the field shows, and the draft fallback `useFormDraftRef` reads, so Save
+  // submits exactly the text on screen.
+  const [initial] = useState(() => initialKiloCommandFormState(command ?? undefined));
+  const scope = draftScope;
+  const nameRef = useFormDraftRef(scope, 'name', initial.name);
+  const descriptionRef = useFormDraftRef(scope, 'description', initial.description);
+  const templateRef = useFormDraftRef(scope, 'template', initial.template);
+  const agentRef = useFormDraftRef(scope, 'agent', initial.agent);
+  const modelRef = useFormDraftRef(scope, 'model', initial.model);
+  const [subtask, setSubtask] = useFormDraftState(scope, 'subtask', initial.subtask);
   const [error, setError] = useState<KiloCommandFormError | null>(null);
-  // The screen raises the server-reported conflict after a refused save; it stays
-  // up until the name changes, so it never outlives the input it describes.
-  const [serverConflict, setServerConflict] = useState(nameConflictFromServer);
-  useEffect(() => {
-    if (nameConflictFromServer) {
-      setServerConflict(true);
-    }
-  }, [nameConflictFromServer]);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name' | 'template'>();
 
   const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
@@ -134,6 +154,7 @@ export function KiloCommandFormSheet({
       agentRef.current !== initial.agent ||
       modelRef.current !== initial.model ||
       subtask !== initial.subtask,
+    isRunning: () => isSaving,
     onDiscard: onClose,
   });
 
@@ -160,7 +181,17 @@ export function KiloCommandFormSheet({
     }
   };
 
-  const nameError = nameErrorMessage(t, error, serverConflict);
+  const nameError = nameErrorMessage(t, error, saveFailure?.kind === 'name-conflict');
+  // The one refusal line: a create past the cap names the cap as a warning, and
+  // any other refusal keeps the error tone.
+  let refusalMessage: string | null = null;
+  let refusalTone: 'warn' | 'error' = 'error';
+  if (saveFailure?.kind === 'limit') {
+    refusalMessage = t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS });
+    refusalTone = 'warn';
+  } else if (saveFailure?.kind === 'refused') {
+    refusalMessage = t('profiles.slashCommands.saveFailed');
+  }
 
   return (
     <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
@@ -175,15 +206,15 @@ export function KiloCommandFormSheet({
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <AccessibleStatus message={saveFailure} className="text-sm" />
+        <AccessibleStatus message={refusalMessage} tone={refusalTone} className="text-sm" />
         <FormField
           label={t('profiles.slashCommands.name')}
-          defaultValue={initial.name}
+          defaultValue={nameRef.current}
           error={nameError}
           disabled={isSaving}
           required
@@ -195,12 +226,12 @@ export function KiloCommandFormSheet({
           onChangeText={value => {
             nameRef.current = value;
             setError(null);
-            setServerConflict(false);
+            onFieldEdited();
           }}
         />
         <FormField
           label={t('profiles.slashCommands.description')}
-          defaultValue={initial.description}
+          defaultValue={descriptionRef.current}
           disabled={isSaving}
           maxLength={MAX_KILO_COMMAND_DESCRIPTION_LENGTH}
           placeholder={t('profiles.descriptionPlaceholder')}
@@ -210,7 +241,7 @@ export function KiloCommandFormSheet({
         />
         <FormField
           label={t('profiles.slashCommands.template')}
-          defaultValue={initial.template}
+          defaultValue={templateRef.current}
           error={error === 'template-required' ? t(ERROR_KEYS[error]) : undefined}
           disabled={isSaving}
           required
@@ -229,7 +260,7 @@ export function KiloCommandFormSheet({
         />
         <FormField
           label={t('common.agent')}
-          defaultValue={initial.agent}
+          defaultValue={agentRef.current}
           disabled={isSaving}
           autoCapitalize="none"
           autoCorrect={false}
@@ -240,7 +271,7 @@ export function KiloCommandFormSheet({
         />
         <FormField
           label={t('profiles.agents.model')}
-          defaultValue={initial.model}
+          defaultValue={modelRef.current}
           disabled={isSaving}
           autoCapitalize="none"
           autoCorrect={false}
@@ -249,17 +280,15 @@ export function KiloCommandFormSheet({
             modelRef.current = value;
           }}
         />
-        <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-          <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
-            {t('profiles.slashCommands.subtask')}
-          </Text>
-          <Switch
+        <RowGroup>
+          <PreferenceRow
+            title={t('profiles.slashCommands.subtask')}
             value={subtask}
             disabled={isSaving}
-            accessibilityLabel={t('profiles.slashCommands.subtask')}
             onValueChange={setSubtask}
           />
-        </View>
+        </RowGroup>
+        <View className="h-3" />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

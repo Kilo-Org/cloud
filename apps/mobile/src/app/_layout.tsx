@@ -41,7 +41,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
-import { I18nManager, View, type ViewInstance } from 'react-native';
+import { View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -54,6 +54,7 @@ import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
+import { SettingsConfirmHost } from '@/components/settings-confirm-host';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
@@ -84,25 +85,16 @@ import {
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
+import { clearDirectionAttemptAsync } from '@/i18n/direction-attempt';
+import { retryLanguageStartupDirectionAsync } from '@/i18n/startup-direction-run';
 import {
-  clearDirectionAttemptAsync,
-  readDirectionAttemptAsync,
-  writeDirectionAttemptAsync,
-} from '@/i18n/direction-attempt';
-import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
-import {
-  retryLanguageStartupDirectionAsync,
-  runLanguageStartupDirectionGuardedAsync,
-} from '@/i18n/startup-direction-run';
-import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
-import {
-  getResolvedLanguage,
   preloadLanguagePreference,
   useLanguagePreference,
 } from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
-import { prewarmIntl } from '@/lib/intl-cache';
+import { useLanguageStartupPreparation } from '@/lib/hooks/use-language-startup-preparation';
 import {
+  applyConsumedPendingDeepLink,
   captureLaunchDeepLink,
   clearPendingDeepLink,
   consumePendingDeepLink,
@@ -117,7 +109,6 @@ import { useOrganization } from '@/lib/organization-context';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
-  renameAndroidNotificationChannels,
   setupNotificationBackgroundHandler,
   setupNotificationHandler,
   setupNotificationPermissionGate,
@@ -170,6 +161,7 @@ import {
 import { setSentryContext } from '@/lib/sentry-context';
 import { initSentry } from '@/lib/sentry-init';
 import { installErrorReporting } from '@/lib/telemetry/install-error-reporting';
+import { isKeychainInteractionRefused } from '@/lib/telemetry/secure-store-events';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { reapTempFiles } from '@/lib/temp-file-registry';
@@ -279,9 +271,6 @@ function RootLayoutNav({
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const { hasLoaded: languageHasLoaded } = useLanguagePreference();
   const { t } = useTranslation();
-  // True when the cold-start RTL reload failed after syncRtl forced the native
-  // direction; the app then shows a Retry/Continue screen instead of painting LTR.
-  const [languageReloadFailed, setLanguageReloadFailed] = useState(false);
   const {
     userId,
     email,
@@ -432,150 +421,20 @@ function RootLayoutNav({
     }
   }, [themeHasLoaded, themePreference]);
 
-  // Reopen the screen the user was on before an RTL reload: the target rides
-  // in a ref (the SecureStore read is one-shot), and the navigation runs only
-  // after the root navigator's mount effects. The stash bumps a state epoch,
-  // so the deferred effect re-runs after the target lands — the effect cannot
-  // observe a bare ref.
-  const languageReturnTargetRef = useRef<LanguageReturnTarget | null>(null);
-  const [languageReturnEpoch, setLanguageReturnEpoch] = useState(0);
-  const routerRef = useRef(router);
-  routerRef.current = router;
-  const runLanguageReturnNavigationRef = useRef<(() => void) | null>(null);
-  runLanguageReturnNavigationRef.current = () => {
-    const target = languageReturnTargetRef.current;
-    if (target === null) {
-      return;
-    }
-    languageReturnTargetRef.current = null;
-    if (target === 'login') {
-      routerRef.current.replace('/(auth)/login');
-    } else if (target === 'profile') {
-      routerRef.current.replace('/(app)/(tabs)/(3_profile)' as Href);
-    } else {
-      // Two steps, not one `replace`: the relaunched stack has no entry
-      // below the reopened screen, so a lone `replace` leaves the header's
-      // back control with nothing to pop.
-      routerRef.current.replace('/(app)/(tabs)/(3_profile)' as Href);
-      routerRef.current.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
-    }
-  };
-  const runLanguageReturnNavigation = () => {
-    const run = runLanguageReturnNavigationRef.current;
-    if (run) {
-      run();
-    }
-  };
+  // The startup language preparation: one pass per preference load, plus the
+  // deferred readiness-driven return navigation (both effects moved into the
+  // hook). Its returned failure bit owns the Retry/Continue screen below.
+  const { languageReloadFailed, dismissLanguageReloadFailure } = useLanguageStartupPreparation({
+    navigationReady,
+    setLanguageReady,
+  });
 
-  // Resolve the active language once the stored preference has loaded, then
-  // prepare the direction and catalog before first paint. A direction change
-  // forces RTL and reloads the app; a catalog failure falls back to English so
-  // the splash still hides. Held in `isLoading` so the tree never paints
-  // English and then swaps.
-  useEffect(() => {
-    if (!languageHasLoaded) {
-      return undefined;
-    }
-    let cancelled = false;
-
-    const prepareLanguage = async () => {
-      const resolved = getResolvedLanguage();
-      // Guarded: the direction step's effects are native calls, and a thrown
-      // one must not skip the ready gate below, or the app stays behind this
-      // layout's loading surface with nothing to recover from. A rejection is
-      // reported once and then takes the same terminal path as a direction the
-      // platform refused (`retry` -> the Retry/Continue screen).
-      const direction = await runLanguageStartupDirectionGuardedAsync(
-        {
-          language: resolved,
-          isRtl: I18nManager.isRTL,
-          shouldBeRtl: isRtlLanguage(resolved),
-        },
-        {
-          syncRtl,
-          readAttempt: readDirectionAttemptAsync,
-          writeAttempt: writeDirectionAttemptAsync,
-          clearAttempt: clearDirectionAttemptAsync,
-          reload: reloadAppAsync,
-        },
-        error => {
-          Sentry.captureException(error, {
-            tags: { 'error.subsystem': 'startup', 'error.operation': 'language_direction' },
-          });
-        }
-      );
-      if (direction === 'reloaded') {
-        // The native reload tears down this JS context; nothing below runs.
-        return;
-      }
-      // A direction that could not be applied still loads the language, then
-      // shows the Retry/Continue screen instead of first-painting in the wrong
-      // direction.
-      const reloadFailed = direction === 'retry';
-      // Reopen the screen the user was on before an RTL reload. Read once,
-      // after the reload path, so the helper's one-shot delete is the only read.
-      // On a failed reload the key stays in SecureStore, so Retry's successful
-      // reloadAppAsync() still reopens the right screen on the relaunch.
-      // The target rides in a ref: the read is one-shot, so the navigation
-      // cannot re-read it — the deferred effect below navigates once the root
-      // navigator's mount effects have run (navigationReady).
-      let returnTarget: LanguageReturnTarget | null = null;
-      if (!reloadFailed) {
-        try {
-          returnTarget = await readLanguageReturnTarget();
-        } catch {
-          // Failed read: fall through so the splash still hides.
-        }
-      }
-      if (returnTarget !== null) {
-        languageReturnTargetRef.current = returnTarget;
-        setLanguageReturnEpoch(epoch => epoch + 1);
-        if (navigationReady) {
-          runLanguageReturnNavigation();
-        }
-      }
-      try {
-        // The plural-rules polyfill must be in place before the first render in the new language.
-        prewarmIntl(resolved);
-        await i18n.changeLanguage(resolved);
-      } catch {
-        // The plural-rules polyfill must be in place before the first render in the new language.
-        prewarmIntl('en');
-        await i18n.changeLanguage('en');
-      }
-      void renameAndroidNotificationChannels();
-      // The module-scope category registration ran under the English default
-      // while the stored preference was still loading; re-register the
-      // Approve / Reply / Open PR / Open session buttons in the applied
-      // language (same localization pass as the channel rename above).
-      void registerNeedsInputCategories();
-      if (!cancelled) {
-        if (reloadFailed) {
-          setLanguageReloadFailed(true);
-        }
-        setLanguageReady(true);
-      }
-    };
-
-    void prepareLanguage();
-    return () => {
-      cancelled = true;
-    };
-  }, [languageHasLoaded, navigationReady, router, setLanguageReady]);
-
-  // Deferred half of the language return: fires when the navigator finishes
-  // mounting after prepareLanguage stashed the target (the epoch bump makes
-  // this effect re-run after the stash, so a stash landing after the ready
-  // flip is still consumed).
-  useEffect(() => {
-    if (!navigationReady || languageReturnTargetRef.current === null) {
-      return;
-    }
-    runLanguageReturnNavigation();
-  }, [navigationReady, languageReturnEpoch, router]);
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
+  // Groups are not part of `pathname`, so both the (app) and the (auth)
+  // legal screen answer to `/legal/<document>`.
+  const onLegalRoute = pathname.startsWith('/legal/');
   const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
   const onGateRoute = (segments as readonly string[]).includes('share-gate');
   const {
@@ -692,9 +551,13 @@ function RootLayoutNav({
       }
 
       if (result.status === 'error') {
-        Sentry.captureException(result.error, {
-          tags: { 'error.subsystem': 'consent', 'error.operation': 'read_decision' },
-        });
+        // A locked device refusing the keychain read is that device state, not
+        // a defect; the gate reports its own retry state below either way.
+        if (!isKeychainInteractionRefused(result.error)) {
+          Sentry.captureException(result.error, {
+            tags: { 'error.subsystem': 'consent', 'error.operation': 'read_decision' },
+          });
+        }
         setNeedsConsent(false);
         setOptionalConsentState(false);
         setConsentChecked(false);
@@ -845,6 +708,7 @@ function RootLayoutNav({
         needsConsent,
         onConsentRoute,
         onConsentReviewRoute,
+        onLegalRoute,
         languageReloadFailed,
         restoreFailed,
       }),
@@ -861,6 +725,7 @@ function RootLayoutNav({
       needsConsent,
       onConsentRoute,
       onConsentReviewRoute,
+      onLegalRoute,
       languageReloadFailed,
       restoreFailed,
     ]
@@ -1061,22 +926,17 @@ function RootLayoutNav({
     if (pendingDeepLink === null || !isShellReady || !navigationReady) {
       return;
     }
-    const pending = consumePendingDeepLink();
-    if (!pending) {
-      return;
-    }
-    // Switch to the destination's organization before navigating, in the same
-    // effect body with nothing awaited between: the route reads the new
-    // organization on its first render instead of fetching the old scope and
-    // showing an empty list. A destination with no organization (Personal)
-    // leaves the selection unchanged.
-    if (pending.organizationId !== null) {
-      setOrganizationId(pending.organizationId);
-    }
-    const navigation = resolvePendingNavigation(pending.href);
-    if (navigation) {
-      router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
-    }
+    // The shared step switches to the destination's organization before
+    // navigating, in the same effect body with nothing awaited between: the
+    // route reads the new organization on its first render instead of fetching
+    // the old scope and showing an empty list. A destination with no
+    // organization (Personal) leaves the selection unchanged.
+    applyConsumedPendingDeepLink(consumePendingDeepLink(), setOrganizationId, href => {
+      const navigation = resolvePendingNavigation(href);
+      if (navigation) {
+        router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
+      }
+    });
   }, [pendingDeepLink, isShellReady, navigationReady, router, setOrganizationId]);
 
   useEffect(() => {
@@ -1132,22 +992,7 @@ function RootLayoutNav({
     hasRestoreError,
     hasBootstrapError,
     hidden,
-  } = resolveBootstrapDecision({
-    isLoading,
-    updateRequired,
-    inForceUpdate,
-    inAuthGroup,
-    hasToken: token != null,
-    userIdLoading: identityLoading,
-    userIdError: identityError,
-    consentCheckError: consentCheckError != null,
-    consentChecked,
-    needsConsent,
-    onConsentRoute,
-    onConsentReviewRoute,
-    languageReloadFailed,
-    restoreFailed,
-  });
+  } = decision;
 
   // Post-startup hidden windows (a sign-in's redirect + consent check, a
   // sign-out's redirect to login) have no splash over them, so the hidden
@@ -1290,7 +1135,7 @@ function RootLayoutNav({
           });
         }}
         onContinue={() => {
-          setLanguageReloadFailed(false);
+          dismissLanguageReloadFailure();
         }}
       />
     );
@@ -1430,6 +1275,7 @@ function RootLayout() {
                 </StateSurface>
               </AppContentReveal>
               <AnimatedSplashOverlay />
+              <SettingsConfirmHost />
             </AppRootProviders>
           </OfflineBannerSpaceGate>
         </ThemeProvider>

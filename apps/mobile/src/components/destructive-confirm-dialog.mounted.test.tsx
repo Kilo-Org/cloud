@@ -5,16 +5,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+
 import { DestructiveConfirmDialog } from './destructive-confirm-dialog';
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
+  StatusBar: { currentHeight: 0 },
   Text: 'Text',
+  useWindowDimensions: () => ({ fontScale: 1, height: 844, scale: 3, width: 390 }),
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+// The sheet header draws its own close control and reads the window insets.
+vi.mock('@/components/ui/icons', () => ({ Share: 'Share', X: 'X' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
@@ -108,19 +117,33 @@ describe('DestructiveConfirmDialog', () => {
   it('gives the confirm action the destructive fill and cancel a neutral one', () => {
     const root = mount();
 
-    expect(pressableWith(root, 'bg-destructive')).toBeDefined();
-    expect(pressableWith(root, 'border-border')).toBeDefined();
+    expect(pressableWith(root, 'bg-destructive-solid')).toBeDefined();
+    expect(pressableWith(root, 'border-input')).toBeDefined();
     expect(
       root.findAll(
-        node => isType(node, 'Pressable') && classNameOf(node).includes('bg-destructive')
+        node => isType(node, 'Pressable') && classNameOf(node).includes('bg-destructive-solid')
       )
+    ).toHaveLength(1);
+  });
+
+  it('draws the title in the sheet header over a gutted body', () => {
+    const root = mount();
+
+    // The title is the sheet header's, not a hand-built heading inside the
+    // card, so it sits on the header row with the close control.
+    expect(
+      root.findAll(node => isType(node, 'Text') && node.children.includes('Sign out?'))
+    ).toHaveLength(1);
+    // The body keeps the page gutter and the sheet's own section gap.
+    expect(
+      root.findAll(node => isType(node, 'View') && classNameOf(node) === SCREEN_BODY_CLASS)
     ).toHaveLength(1);
   });
 
   it('labels the confirm action with the sign-out copy', () => {
     const root = mount();
 
-    const confirm = pressableWith(root, 'bg-destructive');
+    const confirm = pressableWith(root, 'bg-destructive-solid');
     expect(
       confirm.findAll(node => isType(node, 'Text') && node.children.includes('Sign out'))
     ).toHaveLength(1);
@@ -139,7 +162,7 @@ describe('DestructiveConfirmDialog', () => {
   it('keeps the request on screen through dismissal, then runs the action', () => {
     const root = mount();
 
-    callProp(pressableWith(root, 'bg-destructive'), 'onPress');
+    callProp(pressableWith(root, 'bg-destructive-solid'), 'onPress');
 
     // The sheet is dismissing, not empty: the title and the message are still
     // drawn while the native dismissal runs, and the destructive action has not
@@ -162,10 +185,41 @@ describe('DestructiveConfirmDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  // The extra choice is a save-and-stay, not a decision about the removal, so
+  // the sheet goes either way: the reader lands on the screen the save was
+  // about and reads the outcome there, and a second press cannot queue another
+  // save behind a sheet that never left.
+  it('dismisses the sheet before running the extra action', () => {
+    const onExtra = vi.fn<() => void>();
+    const root = mount({ extraAction: { label: 'Save changes', onPress: onExtra } });
+
+    const extra = pressableWith(root, 'bg-secondary-fill');
+    expect(
+      extra.findAll(node => isType(node, 'Text') && node.children.includes('Save changes'))
+    ).toHaveLength(1);
+
+    callProp(extra, 'onPress');
+
+    // Dismissing, not dismissed: the action waits for the sheet to report the
+    // finished dismissal, exactly as Discard and Keep editing do.
+    expect(root.find(node => isType(node, 'BottomSheet')).props.index).toBe(-1);
+    expect(onExtra).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+
+    callProp(
+      root.find(node => isType(node, 'BottomSheet')),
+      'onDismiss'
+    );
+    expect(onExtra).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it('runs the destructive action only when the destructive control is pressed', () => {
     const root = mount();
 
-    callProp(pressableWith(root, 'border-border'), 'onPress');
+    callProp(pressableWith(root, 'border-input'), 'onPress');
     expect(onConfirm).not.toHaveBeenCalled();
 
     callProp(
@@ -207,7 +261,7 @@ describe('DestructiveConfirmDialog', () => {
   it('renders a supplied cancel label instead of the default Cancel', () => {
     const root = mount({ cancelLabel: 'Keep editing' });
 
-    const cancel = pressableWith(root, 'border-border');
+    const cancel = pressableWith(root, 'border-input');
     expect(
       cancel.findAll(node => isType(node, 'Text') && node.children.includes('Keep editing'))
     ).toHaveLength(1);
@@ -222,5 +276,42 @@ describe('DestructiveConfirmDialog', () => {
     expect(
       root.findAll(node => isType(node, 'Text') && node.children.includes('Cancel'))
     ).toHaveLength(1);
+  });
+
+  // The host asks a withdrawn request's dialog to put itself away with the
+  // safe choice: the flag arriving starts the dismissal with `onCancel` held
+  // over, and the destructive action can no longer run.
+  it('dismisses with the safe choice when the dismissal is requested', () => {
+    const root = mount({ dismissRequested: true });
+
+    const sheet = root.find(node => isType(node, 'BottomSheet'));
+    expect(sheet.props.index).toBe(-1);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+
+    callProp(sheet, 'onDismiss');
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  // A choice the person already made wins: the flag arriving after the
+  // destructive press must not override the pending action, so the sheet still
+  // goes out through it and the safe choice never fires.
+  it('does not override a pending destructive choice when the dismissal is then requested', () => {
+    const root = mount();
+
+    callProp(pressableWith(root, 'bg-destructive'), 'onPress');
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    // The request was withdrawn while the person's dismissal was in flight;
+    // the flag arriving must not redirect the sheet to the safe choice.
+    mount({ dismissRequested: true, onCancel: () => undefined });
+
+    const sheet = root.find(node => isType(node, 'BottomSheet'));
+    expect(sheet.props.index).toBe(-1);
+
+    callProp(sheet, 'onDismiss');
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onCancel).not.toHaveBeenCalled();
   });
 });

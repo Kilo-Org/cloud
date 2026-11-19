@@ -1,9 +1,9 @@
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, lt, sql } from 'drizzle-orm';
 
 import type { AttemptClass, AttemptOutcome } from '../dispatch/app-client';
 import type { CursorSource, EventFailureState } from '../types';
-import { CURSOR_KEY, SEED_CURSOR_KEY } from '../util/constants';
+import { CURSOR_KEY, PARKED_EVENT_RETENTION_MS, SEED_CURSOR_KEY } from '../util/constants';
 import {
   directoryConflicts,
   eventFailures,
@@ -206,6 +206,13 @@ function clearAllDirectoryLimits(db: Db): void {
  * not always the attempt's own: a conflict can be parked as terminal when no
  * later event can clear it, and its reason then names the directory rule rather
  * than only the app's answer.
+ *
+ * The row describes the **latest** park decision. An operator who rewinds
+ * `WORKOS_EVENT_CURSOR` and parks the same event again gets this park's class,
+ * status, reason and attempt count, so the record names the current failure
+ * instead of the first one, and the retention window is measured from this
+ * `parked_at`, so the row keeps a full window rather than inheriting the age of
+ * a park from weeks earlier.
  */
 export function parkEvent(
   db: Db,
@@ -215,28 +222,96 @@ export function parkEvent(
   attempts: number,
   now: number
 ): void {
+  const row = {
+    event_id: event.id,
+    event_type: event.event,
+    class: record.class,
+    status: outcome.status,
+    error: record.reason ?? '',
+    attempts,
+    parked_at: now,
+  };
+
   db.insert(parkedEvents)
-    .values({
-      event_id: event.id,
-      event_type: event.event,
-      class: record.class,
-      status: outcome.status,
-      error: record.reason ?? '',
-      attempts,
-      parked_at: now,
+    .values(row)
+    .onConflictDoUpdate({
+      target: parkedEvents.event_id,
+      set: {
+        event_type: row.event_type,
+        class: row.class,
+        status: row.status,
+        error: row.error,
+        attempts: row.attempts,
+        parked_at: row.parked_at,
+      },
     })
-    .onConflictDoNothing()
     .run();
   clearFailure(db, event.id);
 }
 
-export function parkedCount(db: Db): number {
+/**
+ * The instant a parked row's window ends, measured back from `now`. The count
+ * and the delete both read this boundary, so neither can report one thing
+ * while the other acts on another.
+ */
+function parkedCutoff(now: number): number {
+  return now - PARKED_EVENT_RETENTION_MS;
+}
+
+/**
+ * Counts the parked rows still inside the retention window.
+ *
+ * The cutoff is the one the prune applies, so a row past its window is never
+ * reported, even before an alarm tick removes it from storage. The comparison
+ * is `>=`, the complement of the prune's strict `<`, so a row parked exactly on
+ * the boundary is counted here and kept by that tick: the count and the delete
+ * apply one rule.
+ */
+export function parkedCount(db: Db, now: number): number {
   return (
     db
       .select({ count: sql<number>`count(*)` })
       .from(parkedEvents)
+      .where(gte(parkedEvents.parked_at, parkedCutoff(now)))
       .get()?.count ?? 0
   );
+}
+
+/**
+ * Expires parked rows older than the retention window and reports how many it
+ * removed.
+ *
+ * The comparison is strictly older than the cutoff: a row parked exactly
+ * `PARKED_EVENT_RETENTION_MS` ago is kept by this tick and removed by a later
+ * one. Every row carries the `parked_at` its window is measured from, so a row
+ * written before this policy expires once its cutoff passes. The comparison is
+ * a range on `parked_at`, which the table's index serves, so neither statement
+ * scans the table.
+ *
+ * Only `parked_events` is affected. The cursor, `event_failures`,
+ * `directory_conflicts`, `parked_activations`, and every directory row at
+ * WorkOS are untouched, so expiry drops a recovery record and never data the
+ * loop applied.
+ *
+ * The count is read before the delete because drizzle's durable-sqlite `run()`
+ * returns `void`, and asking the delete to `returning` the removed ids would
+ * hold one id per deleted row in memory for a tick that removes many. The two
+ * statements run back to back inside one synchronous Durable Object turn, so
+ * nothing can park a row between the count and the delete. A throw between them
+ * propagates to the alarm's guard, which logs it, and the next tick counts and
+ * deletes again with a later cutoff: a lost count costs a log line, never a
+ * missed row.
+ */
+export function pruneParkedEvents(db: Db, now: number): number {
+  const cutoff = parkedCutoff(now);
+  const removed =
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(parkedEvents)
+      .where(lt(parkedEvents.parked_at, cutoff))
+      .get()?.count ?? 0;
+  db.delete(parkedEvents).where(lt(parkedEvents.parked_at, cutoff)).run();
+  return removed;
 }
 
 /** The conflict window a directory has open, keyed on the event that opened it. */
@@ -284,7 +359,8 @@ export function openConflictWindow(
  * Closes the window when the event that opened it applies.
  *
  * A `where`-less delete would clear every directory's window; the pair of keys
- * keeps it to the one event.
+ * keeps it to the one event. This is the only per-directory removal: nothing
+ * else closes a window, and only an operator cursor reset clears every one.
  */
 export function closeConflictWindow(db: Db, directoryId: string, eventId: string): void {
   db.delete(directoryConflicts)
@@ -298,12 +374,16 @@ export function closeConflictWindow(db: Db, directoryId: string, eventId: string
 }
 
 /**
- * Drops both records for one directory: an activation that applied binds its
- * organization, so neither the conflict window nor the parked-activation marker
- * describes it any more.
+ * Drops a directory's parked-activation marker: an activation that applied
+ * binds its organization, so the marker no longer describes the directory.
+ *
+ * The conflict window is deliberately not part of this. It records stream time
+ * the directory has already spent and is measured from the event whose conflict
+ * opened it, so it is removed by that event applying or by an operator cursor
+ * reset. An activation applying is neither, and a directory's stream time must
+ * not depend on which of its events the stream happens to reach.
  */
-export function clearDirectoryLimits(db: Db, directoryId: string): void {
-  db.delete(directoryConflicts).where(eq(directoryConflicts.directory_id, directoryId)).run();
+export function clearParkedActivation(db: Db, directoryId: string): void {
   db.delete(parkedActivations).where(eq(parkedActivations.directory_id, directoryId)).run();
 }
 

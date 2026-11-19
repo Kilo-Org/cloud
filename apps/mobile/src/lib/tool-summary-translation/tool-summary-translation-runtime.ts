@@ -112,7 +112,7 @@ const CACHE_CAP = 500;
  * One commit's rows mount together, so a short window collects them before the
  * first request goes out. Ten rows mounted in one commit become one batch.
  */
-const BATCH_WINDOW_MS = 40;
+export const BATCH_WINDOW_MS = 40;
 /** One request carries at most this many distinct texts. */
 const MAX_BATCH_TEXTS = 20;
 /** At most this many requests are in flight; the rest wait in the queue. */
@@ -148,9 +148,10 @@ const queue: QueueItem[] = [];
 // Every summary that was asked for but has not resolved, keyed like the cache.
 // A failed batch leaves its items here so `retryUnresolvedTranslations` can
 // re-queue them when the session transport comes back; a resolving batch
-// removes them. `ensureTranslation` drops the same part's other source texts,
-// so at most one text per part is remembered. Insertion order is oldest-first,
-// so eviction is `keys().next()`.
+// removes them. `ensureTranslation` drops another source text of the same part
+// once no mounted surface still asks for it, so the memory holds one entry per
+// text a surface renders. Insertion order is oldest-first, so eviction is
+// `keys().next()`.
 const retryable = new Map<string, QueueItem>();
 // Consecutive failed batch outcomes per key. `runBatch` bumps each served
 // key's count when the batch produced no translation for it and clears it on
@@ -636,8 +637,6 @@ function takeBatch(): FlushBatch | null {
     syncQueuedKeys();
     return null;
   }
-  // The first eligible item decides the request's language and model: one
-  // request carries exactly one of each.
   const { language } = head;
   const modelId = head.model.id;
   const texts: string[] = [];

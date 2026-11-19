@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Clipboard } from '@/components/ui/icons';
-import { IconButton } from '@/components/ui/icon-button';
 import { Text } from '@/components/ui/text';
+import { CAPTION_ACTION_BOX_CLASS, SECTION_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 import { CodeBlock } from './code-block';
 import { performCopy } from './use-message-copy';
@@ -30,6 +31,10 @@ type MarkdownCodeFenceProps = {
  *
  * Without a host handler the copy button still copies the fence's source,
  * matching the renderer's own button.
+ *
+ * The language chip is a stop of its own, named by the language it shows, so
+ * Android does not fold it into the message group's name ahead of the role;
+ * an unnamed fence keeps a bare chip rather than an empty focus stop.
  */
 export function MarkdownCodeFence({
   code,
@@ -42,27 +47,35 @@ export function MarkdownCodeFence({
   const copy = onCopyCode ?? ((source: string) => void performCopy(source));
   return (
     <View
-      className="my-1 overflow-hidden rounded-lg px-3 pt-2 pb-3"
+      className="my-1 overflow-hidden rounded-lg px-3 pb-3"
       // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the card color is the markdown variant's runtime palette
       style={{ backgroundColor: palette.codeBackground }}
     >
-      <View className="mb-1 flex-row items-center justify-between">
+      <View className="mb-1 flex-row items-center justify-between py-2">
         <Text
-          className="text-[11px] font-medium"
+          variant="caption"
           // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the label tracks the markdown variant's palette
           style={{ color: palette.mutedTextColor }}
           numberOfLines={1}
+          {...(language ? { accessible: true, accessibilityLabel: language } : {})}
         >
           {language ?? ''}
         </Text>
-        <IconButton
+        {/* The copy control keeps a compact box cancelling to the caption
+            line's own height, so the fence header is one line tall and the box
+            never sets the row's height (the same rule as a section header,
+            apps/mobile/AGENTS.md). */}
+        <Pressable
+          className={cn(CAPTION_ACTION_BOX_CLASS, 'items-center justify-center active:opacity-70')}
+          hitSlop={SECTION_ACTION_HIT_SLOP}
+          accessibilityRole="button"
           accessibilityLabel={t('common.copy')}
           onPress={() => {
             copy(code);
           }}
         >
           <Clipboard size={14} color={palette.mutedTextColor} />
-        </IconButton>
+        </Pressable>
       </View>
       <CodeBlock
         code={code}

@@ -48,7 +48,10 @@ const queryOptionsMock = vi.hoisted(() => vi.fn());
 // The route builds its narrowed foreground key from this session-scoped input.
 const cliSessionGetQueryKeyMock = vi.hoisted(() => vi.fn(() => [['cliSessionsV2', 'get']]));
 const organizations = vi.hoisted(() => [
-  { organizationId: 'org-a', organizationName: 'Session organization' },
+  {
+    organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+    organizationName: 'Session organization',
+  },
 ]);
 const createMobileManagerMock = vi.hoisted(() => vi.fn());
 const authState = vi.hoisted(() => ({
@@ -133,6 +136,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
   DirectionalChevronLeft: 'ChevronLeft',
   DirectionalChevronRight: 'ChevronRight',
 }));
@@ -148,8 +152,12 @@ vi.mock('@/lib/user-web-connection-lifecycle', () => ({
   createNativeUserWebConnectionLifecycleHooks: () => ({}),
 }));
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#999999',
+  useThemeColors: () => ({}),
+}));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   ChevronDown: 'ChevronDown',
   Clock: 'Clock',
@@ -717,12 +725,17 @@ describe('SessionDetailScreen relaunch restore', () => {
 
 describe('SessionDetailScreen display scope', () => {
   it.each([
-    { label: 'route organization', route: 'org-a', data: null, expected: 'org-a' },
+    {
+      label: 'route organization',
+      route: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+      data: null,
+      expected: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+    },
     {
       label: 'fetched organization',
       route: undefined,
-      data: { organization_id: 'org-a' },
-      expected: 'org-a',
+      data: { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' },
+      expected: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     },
     {
       label: 'explicit Personal',
@@ -731,6 +744,15 @@ describe('SessionDetailScreen display scope', () => {
       expected: null,
     },
     { label: 'legacy Personal', route: undefined, data: {}, expected: null },
+    {
+      // A hand-built link can carry a value the org procedures reject. It must
+      // not become the route scope: reading as absent lets the metadata read
+      // resolve the real organization instead of failing every request.
+      label: 'unusable route organization',
+      route: 'not-a-uuid',
+      data: { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' },
+      expected: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+    },
   ])('passes resolved $label without changing global scope', async state => {
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
@@ -780,7 +802,7 @@ describe('SessionDetailScreen display scope', () => {
         const buttonLabels = findByType(renderer.root, 'Button').flatMap(button =>
           findByType(button, 'Text').flatMap(node => node.children)
         );
-        expect(buttonLabels).toEqual(['Copy', 'Back to sessions']);
+        expect(buttonLabels).toEqual(['Back to sessions']);
       }
       expect(globalContext.organizationId).toBe('global-org');
       expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
@@ -800,12 +822,12 @@ describe('SessionDetailScreen display scope', () => {
 
     queryState.isError = false;
     queryState.error = null;
-    queryState.data = { organization_id: 'org-a' };
+    queryState.data = { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' };
     await updateRoute(renderer);
 
     expect(queryState.refetch).not.toHaveBeenCalled();
     expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'displayScope')).toEqual({
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
       isResolved: true,
     });
     expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
@@ -905,13 +927,15 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
     // transcript and drop the composer text under it.
     queryState.isPending = false;
     queryState.fetchStatus = 'idle';
-    queryState.data = { organization_id: 'org-a' };
+    queryState.data = { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' };
     await updateRoute(renderer);
 
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
     expect(managers).toHaveLength(1);
     expect(managers.at(-1)?.manager).toBe(mountedManager);
-    expect(propOf(renderer.root.findByType(AgentSessionProvider), 'organizationId')).toBe('org-a');
+    expect(propOf(renderer.root.findByType(AgentSessionProvider), 'organizationId')).toBe(
+      '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10'
+    );
   });
 });
 
@@ -1257,7 +1281,7 @@ function childIds({ store, manager }: ManagerProbe): string[] {
 async function startChildPage(pageKind: 'first' | 'older') {
   useLocalSearchParamsMock.mockReturnValue({
     'session-id': 'ses_12345678901234567890123456',
-    organizationId: 'org-a',
+    organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
   });
   const renderer = await mountRoute();
   const current = managers.at(-1);
@@ -1305,7 +1329,7 @@ describe.each(['first', 'older'] as const)('SessionDetailScreen %s child-page sc
       change: () => {
         useLocalSearchParamsMock.mockReturnValue({
           'session-id': 'ses_12345678901234567890123457',
-          organizationId: 'org-a',
+          organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
         });
       },
     },
@@ -1314,7 +1338,7 @@ describe.each(['first', 'older'] as const)('SessionDetailScreen %s child-page sc
       change: () => {
         useLocalSearchParamsMock.mockReturnValue({
           'session-id': 'ses_12345678901234567890123456',
-          organizationId: 'org-b',
+          organizationId: '7c1e4b2d-5a3f-4e8c-b9d6-1f2a3b4c5d6e',
         });
       },
     },
@@ -1443,7 +1467,9 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
       queryFn: async () => {
         const account = requestAccount;
         await Promise.resolve();
-        return account === 'A' ? { organization_id: 'org-a' } : metadata.promise;
+        return account === 'A'
+          ? { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' }
+          : metadata.promise;
       },
     }));
     const client = new QueryClient({
@@ -1472,7 +1498,7 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(rootRequests.slice(requestsBeforeReplacement)).toEqual([]);
 
     await act(async () => {
-      metadata.resolve({ organization_id: 'org-b' });
+      metadata.resolve({ organization_id: '7c1e4b2d-5a3f-4e8c-b9d6-1f2a3b4c5d6e' });
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
@@ -1486,7 +1512,7 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     setSignOutActive(false);
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
     expect(rootRequests).toEqual([]);
@@ -1530,7 +1556,13 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(propOf(error, 'variant')).toBe(variant);
     expect(propOf(error, 'onRetry')).toBeUndefined();
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
-    expect(findByType(renderer.root, 'Button')).toHaveLength(2);
+    // Copy left the card when the state took one recovery action; the way back
+    // is the only button the body draws.
+    const buttons = findByType(renderer.root, 'Button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0] && findByType(buttons[0], 'Text').flatMap(text => text.children)).toEqual([
+      i18n.t('agentChat.session.backToSessions'),
+    ]);
   });
 });
 
@@ -1540,7 +1572,7 @@ describe('SessionDetailScreen fresh authentication scope', () => {
     beginReplacement();
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
 
@@ -1560,7 +1592,7 @@ describe('SessionDetailScreen fresh authentication scope', () => {
     commitAccount('A');
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
     expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
@@ -1645,7 +1677,7 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     });
 
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
     );
     expect(rootRequests).toEqual([]);
   });
@@ -1662,7 +1694,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
   });
 
-  it.each([undefined, 'org-a'])(
+  it.each([undefined, '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10'])(
     'shows the header and existing skeletons while identity is pending with organization %s',
     async organizationId => {
       useLocalSearchParamsMock.mockReturnValue({
@@ -1797,7 +1829,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
     });
 
     // Truncated to the tabs entry: the composer is no longer on the stack.
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(rootRequests).toEqual([]);
   });
 
@@ -1844,7 +1876,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
 
 describe.each([
   { route: 'personal', organizationId: undefined },
-  { route: 'explicit organization', organizationId: 'org-a' },
+  { route: 'explicit organization', organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' },
 ])('SessionDetailScreen title isolation on $route routes', ({ organizationId }) => {
   it.each(['retained replacement', 'fresh pending mount'] as const)(
     'does not restore an inherited title after %s confirms with delayed metadata',
@@ -1860,7 +1892,9 @@ describe.each([
         queryFn: async () => {
           const account = requestAccount;
           await Promise.resolve();
-          return account === 'A' ? { organization_id: 'org-a' } : routeMetadata.promise;
+          return account === 'A'
+            ? { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' }
+            : routeMetadata.promise;
         },
       }));
       const client = new QueryClient({
@@ -1923,7 +1957,7 @@ describe.each([
         expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
         expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
         await act(async () => {
-          routeMetadata.resolve({ organization_id: 'org-b' });
+          routeMetadata.resolve({ organization_id: '7c1e4b2d-5a3f-4e8c-b9d6-1f2a3b4c5d6e' });
           await vi.advanceTimersByTimeAsync(0);
         });
       }
@@ -2029,7 +2063,7 @@ describe('SessionDetailScreen malformed part transcript', () => {
 
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
 
@@ -2116,7 +2150,7 @@ describe('SessionDetailScreen malformed patch part transcript', () => {
 
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
 

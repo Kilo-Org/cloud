@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement, Fragment, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 
 import { ReviewMemoryScreen } from './review-memory-screen';
 import { collectText } from './review-memory-screen.test-helpers';
@@ -41,6 +41,11 @@ const h = vi.hoisted(() => {
   };
 });
 
+// The migrated proposal rows draw through `RowSkeleton`, whose row primitive
+// reaches the haptics module; that import loads the expo runtime, which needs
+// `__DEV__` in this harness. The haptic is the primitive's own contract.
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn(), notificationAsync: vi.fn() }));
+
 vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',
@@ -48,6 +53,8 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   Platform: { OS: 'android' },
   useColorScheme: () => 'light',
+  // The migrated list rows draw their chevron through the directional icon.
+  I18nManager: { isRTL: false },
 }));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({
@@ -81,6 +88,7 @@ vi.mock('expo-router', () => ({
   useFocusEffect: (effect: () => (() => void) | undefined) => {
     h.focusEffect = effect;
   },
+  useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
@@ -89,9 +97,16 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain' }));
+vi.mock('@/components/ui/icons', () => ({
+  Brain: 'Brain',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
@@ -107,6 +122,21 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: h.success, error: h.error },
+}));
+// The proposal sheet reads the reader's organization role for its refusal line
+// (`@/lib/trial-refusal`), which resolves the membership list; only the list and
+// the persisted selection are faked here.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: 'member' }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: h.openUrl }));
 vi.mock('@/lib/trpc', () => ({
@@ -204,6 +234,24 @@ function firstRow(root: ReactTestInstance) {
     throw new Error('Missing proposal row');
   }
   return row;
+}
+
+/**
+ * Reports the native dismissal the presented sheet waits for: closing sets its
+ * `visible` false, and the screen drops it only from this report.
+ */
+async function dismissSheet(root: ReactTestInstance) {
+  await waitFor(() => one(root, 'SessionPageSheet').props.visible === false);
+  const { onDismiss } = one(root, 'SessionPageSheet').props as {
+    visible?: boolean;
+    onDismiss?: () => void;
+  };
+  if (onDismiss === undefined) {
+    throw new TypeError('Missing sheet dismissal report');
+  }
+  act(() => {
+    onDismiss();
+  });
 }
 async function mountOpen() {
   const ui = await renderWithProviders(createElement(ReviewMemoryScreen, { scope: 'personal' }));
@@ -420,6 +468,7 @@ describe('review memory proposal interaction', () => {
     act(() => {
       confirmation.onConfirm();
     });
+    await dismissSheet(ui.renderer.root);
     await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
     expect(h.rows[0]?.status).toBe('rejected');
     expect(
@@ -579,6 +628,7 @@ describe('review memory proposal interaction', () => {
     act(() => {
       h.preventRemoveHandler?.({ data: { action: { type: 'POP' } }, repeat: () => undefined });
     });
+    await dismissSheet(ui.renderer.root);
     await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
     expect(
       hosts(ui.renderer.root, 'Pressable').filter(node => node.props.accessibilityRole === 'button')
@@ -628,6 +678,7 @@ describe('review memory proposal interaction', () => {
     // A replace or reset is the app's own redirect (sign-out, consent,
     // force-update), not an abandoned screen: the form goes with it and the
     // intercepted action still runs.
+    await dismissSheet(ui.renderer.root);
     await waitFor(() => hosts(ui.renderer.root, 'SessionPageSheet').length === 0);
     expect(repeat).toHaveBeenCalledOnce();
     expect(h.confirm).not.toHaveBeenCalled();

@@ -4,6 +4,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { CATALOG_CACHE_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/handlers/catalog-cache-headers';
 import { getModelsByProviderSnapshot } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-snapshot.server';
 import {
   isModelAllowedForProviderKey,
@@ -24,6 +25,9 @@ export async function handleModelsByProviderRequest() {
     );
   }
 
+  // Public catalog read. Every caller receives the public catalog, and a
+  // verified organization member receives it filtered to that member's own
+  // model access; `gateway-admission.ts` covers the inference admission rule.
   const auth = await getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,
@@ -64,14 +68,13 @@ export async function handleModelsByProviderRequest() {
         total_providers: providers.length,
         total_models: providers.reduce((total, provider) => total + provider.models.length, 0),
       },
-      { headers: { 'Cache-Control': 'private, no-store' } }
+      { headers: CATALOG_CACHE_HEADERS.perCaller }
     );
   }
 
-  // The response now varies by authenticated organization, so a shared-cache
-  // entry could otherwise be served to an org member and bypass filtering.
-  // Keep this catalog per-client rather than shared (`s-maxage`).
+  // Organization members receive a filtered body from this route, so the
+  // catalog responses stay out of shared caches.
   return NextResponse.json(snapshot, {
-    headers: { 'Cache-Control': 'private, max-age=0, must-revalidate' },
+    headers: CATALOG_CACHE_HEADERS.shared,
   });
 }

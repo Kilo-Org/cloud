@@ -20,7 +20,7 @@ import {
 } from './format';
 import { RequestSheetFrame } from './RequestSheetFrame';
 import { RoutingDecisionFlow } from './RoutingDecisionFlow';
-import { gatewayName } from './routing-labels';
+import { gatewayName, partnerInferenceProviderOf } from './routing-labels';
 
 type RequestLogsOutputs = inferRouterOutputs<RootRouter>['organizations']['requestLogs'];
 export type RequestLogRow = RequestLogsOutputs['list'][number];
@@ -77,6 +77,7 @@ export function RequestSummary({
           { label: 'Feature', value: row.feature ?? ABSENT },
           { label: 'Project', value: row.project_id ?? ABSENT },
           { label: 'Editor', value: request?.editor_name ?? ABSENT },
+          { label: 'User Agent', value: row.user_agent_name },
           { label: 'Mode', value: request?.mode ?? ABSENT },
           copyableItem('Session', request?.session_id),
           copyableItem('Request ID', row.id),
@@ -114,7 +115,10 @@ export function RoutingSections({ metadata }: { metadata: RequestLogDetails['met
         <RoutingDecisionFlow routing={routing} />
       </DetailSection>
       {routing.byok_failover_attempts.length > 0 && (
-        <ByokFailoverSection attempts={routing.byok_failover_attempts} />
+        <ByokFailoverSection
+          attempts={routing.byok_failover_attempts}
+          partnerInferenceProvider={partnerInferenceProviderOf(routing.steps)}
+        />
       )}
       {routing.enkrypt && <EnkryptReportSection report={routing.enkrypt} />}
       {routing.enkrypt_output && <EnkryptOutputReportSection report={routing.enkrypt_output} />}

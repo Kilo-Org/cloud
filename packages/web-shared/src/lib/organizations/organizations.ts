@@ -543,6 +543,13 @@ export async function updateUserRoleInOrganization(
   return txn ? run(txn) : db.transaction(run);
 }
 
+/**
+ * Raised when the target organization row is deleted or never existed. Distinct
+ * from the SSO-misconfiguration sentence below, which applies only where the
+ * policy status is `misconfigured`.
+ */
+export const ORGANIZATION_MISSING_MESSAGE = 'This organization is no longer available';
+
 export const CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER =
   'Child organizations can only invite people who are already members of the parent organization.';
 
@@ -775,9 +782,8 @@ export async function inviteUserToOrganization(
   const run = async (tx: DrizzleTransaction): Promise<OrganizationInvitation> => {
     const membershipRule = await decideChildOrganizationMembership(tx, organizationId, { email });
     if (membershipRule === 'organization_missing') {
-      throw new Error('Organization SSO policy is misconfigured');
+      throw new Error(ORGANIZATION_MISSING_MESSAGE);
     }
-    // A child org can invite only people who already belong to its live parent.
     if (membershipRule === 'refused') {
       throw new Error(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
     }
@@ -925,6 +931,32 @@ export type InvitationAuthenticationContext = {
   ssoSourceOrganizationId?: string;
 };
 
+async function expireOrganizationInvitation(
+  tx: DrizzleTransaction,
+  invitation: OrganizationInvitation
+): Promise<void> {
+  await tx
+    .update(organization_invitations)
+    .set({ expires_at: sql`NOW()` })
+    .where(eq(organization_invitations.id, invitation.id));
+  // A delivery already recorded as delivered or failed keeps its own history;
+  // only a delivery still owed for this invitation is stopped.
+  await tx
+    .update(external_side_effect_outbox)
+    .set({
+      status: 'failed',
+      claimed_at: null,
+      next_attempt_at: null,
+      last_error: 'revoked',
+    })
+    .where(
+      and(
+        eq(external_side_effect_outbox.invitation_id, invitation.id),
+        inArray(external_side_effect_outbox.status, ['pending', 'sending'])
+      )
+    );
+}
+
 async function revokeStaleOrganizationInvitation(
   tx: DrizzleTransaction,
   invitation: OrganizationInvitation,
@@ -942,19 +974,7 @@ async function revokeStaleOrganizationInvitation(
     .limit(1);
 
   if (removal && new Date(invitation.created_at) <= new Date(removal.removedAt)) {
-    await tx
-      .update(organization_invitations)
-      .set({ expires_at: sql`NOW()` })
-      .where(eq(organization_invitations.id, invitation.id));
-    await tx
-      .update(external_side_effect_outbox)
-      .set({
-        status: 'failed',
-        claimed_at: null,
-        next_attempt_at: null,
-        last_error: 'revoked',
-      })
-      .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+    await expireOrganizationInvitation(tx, invitation);
     return true;
   }
 
@@ -1074,7 +1094,11 @@ export async function acceptOrganizationInvite(
           return failureResult(ORGANIZATION_INVITATION_SSO_AUTHENTICATION_REQUIRED);
         }
       } else if (ssoPolicy.status === 'required' && acceptingUserDomain === ssoPolicy.domain) {
-        return failureResult('Invitation requires authentication through organization SSO');
+        // The invitation predates the required policy, so it names no source
+        // organization and no session can satisfy it. Expire it so the address is
+        // free for a fresh SSO invitation.
+        await expireOrganizationInvitation(tx, invitation);
+        return failureResult('Invitation is no longer valid');
       }
 
       const existingMembership = await tx
@@ -1215,22 +1239,6 @@ export async function mutateOrganizationSettings(
   };
 
   return txn ? run(txn) : db.transaction(run);
-}
-
-export async function updateOrganizationSettings(
-  organizationId: Organization['id'],
-  settings: OrganizationSettings,
-  txn?: DrizzleTransaction
-): Promise<OrganizationSettings> {
-  const validated = OrganizationSettingsSchema.parse(settings);
-  await (txn || db)
-    .update(organizations)
-    .set({
-      settings: validated,
-    })
-    .where(eq(organizations.id, organizationId));
-
-  return validated;
 }
 
 // Atomically update the recommendations-digest flag inside the settings JSONB

@@ -8,6 +8,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type * as ReactI18next from 'react-i18next';
 
+import { PR_REVIEW_TAB_HIT_SLOP } from '@/lib/pr-review/pr-review-tab-target';
+
 import { type PrReviewTabId, PrReviewTabSelector } from './pr-review-tab-selector';
 
 vi.mock('react-native', () => ({
@@ -65,6 +67,7 @@ type Pill = {
   readonly props: {
     readonly disabled?: boolean;
     readonly accessibilityState?: { readonly selected: boolean; readonly disabled?: boolean };
+    readonly hitSlop?: { readonly top?: number; readonly bottom?: number };
     readonly onPress?: () => void;
   };
 };
@@ -122,6 +125,16 @@ describe('PrReviewTabSelector failure states', () => {
     const { pills } = renderSelector({ activeTab: 'overview' });
     for (const pill of pills) {
       expect(pill.props).toEqual(expect.objectContaining({ disabled: false }));
+    }
+  });
+
+  it('gives every tab the shared vertical slop', () => {
+    // The pill fills the shared row floor; the slop the row has always carried
+    // costs nothing on top of that box and keeps the touch area clear of the
+    // track's padding.
+    const { pills } = renderSelector({ activeTab: 'overview' });
+    for (const pill of pills) {
+      expect(pill.props.hitSlop).toEqual(PR_REVIEW_TAB_HIT_SLOP);
     }
   });
 });

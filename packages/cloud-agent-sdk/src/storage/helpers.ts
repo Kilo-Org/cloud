@@ -1,162 +1,32 @@
 import type { Part, TextPart } from '@kilocode/app-shared/opencode';
+import type { ReadonlyPart } from '../types';
 import { partSettledAt } from '../part-utils';
 import { isPreviewOfStoredTool } from '../tool-detail-marker';
-import type { MessageInfo } from '../types';
+import type { SessionSubscriptionKey } from './types';
 
-function compareIds(left: string, right: string): number {
-  if (left < right) return -1;
-  return left > right ? 1 : 0;
+function messageIdKey(value: string): string {
+  return value;
 }
 
-type OrderRow = {
-  id: string;
-  /** Rank key: the row's server time, or its array position when times cannot be read. */
-  key: number;
-  /** A client row without a server time; its turn sorts after every placed turn. */
-  unplaced: boolean;
-  /** Array position of the row that opens this row's turn. */
-  turn: number;
-};
+const partIdKey = (part: Part): string => part.id;
 
 /**
- * The transcript's row order, one turn after another.
- *
- * A turn is a user row and the assistant rows that answer it (`parentID`,
- * followed through assistant parents). Turns are ordered by the time of the
- * row that opens them, and the other rows of a turn follow it in their own time
- * order. So a turn stays together: a prompt queued while an earlier turn still
- * runs sorts after every step of that turn, and a reply never sorts above the
- * prompt it answers. An assistant row whose prompt is not in the store (an
- * older page, another session) opens a turn of its own.
- *
- * The store keeps `messageIds` sorted by id because that order is the only one
- * it can maintain incrementally. A session written by another client, an
- * import, or an older id scheme holds ids in any order, and the worker's
- * history read orders every page by `time.created`
- * (`compareKiloSdkMessageInfo`), so the id order never stands in for the
- * transcript's order.
- *
- * A row is placed by server time: `time.created` of a stored row, and
- * `queuedAt` (the server queue time) of a client-materialised `synthetic` row.
- * A synthetic row without `queuedAt` carries only the device clock, which
- * cannot be ranked against server times. It is the newest submission, so its
- * turn sorts after every placed turn.
- *
- * Returns `ids` itself while the array already follows that order, so an
- * unchanged transcript keeps its reference. While a placed row has no readable
- * time, turns keep the array's order: the wire boundary rejects such a row,
- * and a guess would reorder a transcript on data the store cannot place.
+ * Insert `item` before the first element whose sort key is not less than the
+ * item's key, so equal keys keep their arriving order. Returns a new array and
+ * leaves `arr` untouched.
  */
-function orderMessageIds(
-  ids: readonly string[],
-  messages: ReadonlyMap<string, MessageInfo>
-): readonly string[] {
-  const positions = new Map<string, number>();
-  for (let index = 0; index < ids.length; index += 1) positions.set(ids[index] ?? '', index);
-
-  const times: Array<{ time: number; unplaced: boolean } | undefined> = [];
-  let timesReadable = true;
-  for (const id of ids) {
-    const placement = readPlacement(messages.get(id));
-    if (placement === undefined) timesReadable = false;
-    times.push(placement);
-  }
-
-  const rows: OrderRow[] = ids.map((id, index) => {
-    const placement = times[index];
-    return {
-      id,
-      key: timesReadable && placement ? placement.time : index,
-      unplaced: timesReadable && placement?.unplaced === true,
-      turn: turnStart(index, ids, positions, messages),
-    };
-  });
-
-  const compare = (left: OrderRow, right: OrderRow): number => {
-    const leftTurn = rows[left.turn];
-    const rightTurn = rows[right.turn];
-    if (leftTurn === undefined || rightTurn === undefined) return 0;
-    if (leftTurn !== rightTurn) return compareOrderRows(leftTurn, rightTurn);
-    if (left === right) return 0;
-    if (left === leftTurn) return -1;
-    if (right === rightTurn) return 1;
-    return compareOrderRows(left, right);
-  };
-  if (rows.every((row, index) => index === 0 || compare(rows[index - 1] ?? row, row) <= 0)) {
-    return ids;
-  }
-  const ordered = [...rows].sort(compare);
-  return ordered.every((row, index) => row.id === ids[index]) ? ids : ordered.map(row => row.id);
-}
-
-function readPlacement(
-  info: MessageInfo | undefined
-): { time: number; unplaced: boolean } | undefined {
-  const created: unknown = info?.time?.created;
-  const readableCreated = typeof created === 'number' && Number.isFinite(created) ? created : 0;
-  if (info?.role === 'user' && info.synthetic === true) {
-    const queuedAt: unknown = info.queuedAt;
-    return typeof queuedAt === 'number' && Number.isFinite(queuedAt)
-      ? { time: queuedAt, unplaced: false }
-      : { time: readableCreated, unplaced: true };
-  }
-  if (typeof created !== 'number' || !Number.isFinite(created)) return undefined;
-  return { time: created, unplaced: false };
-}
-
-/**
- * The array position of the row that opens the turn of the row at `index`. A
- * missing parent, a self reference, a parent in another session, or a parent
- * cycle ends the chain at the row itself, so no row is ever hidden.
- */
-function turnStart(
-  index: number,
-  ids: readonly string[],
-  positions: ReadonlyMap<string, number>,
-  messages: ReadonlyMap<string, MessageInfo>
-): number {
-  let current = index;
-  for (let steps = 0; steps <= ids.length; steps += 1) {
-    const info = messages.get(ids[current] ?? '');
-    if (info?.role !== 'assistant') return current;
-    const parent = positions.get(info.parentID);
-    if (parent === undefined || parent === current) return current;
-    if (messages.get(ids[parent] ?? '')?.sessionID !== info.sessionID) return current;
-    current = parent;
-  }
-  return index;
-}
-
-function compareOrderRows(left: OrderRow, right: OrderRow): number {
-  if (left.unplaced !== right.unplaced) return left.unplaced ? 1 : -1;
-  if (left.key !== right.key) return left.key < right.key ? -1 : 1;
-  return compareIds(left.id, right.id);
-}
-
-function insertSorted(arr: string[], id: string): string[] {
+function insertSortedBy<T>(arr: readonly T[], item: T, key: (value: T) => string): T[] {
   const result = [...arr];
-  let low = 0,
-    high = result.length;
+  let low = 0;
+  let high = result.length;
+  const itemKey = key(item);
   while (low < high) {
     const mid = (low + high) >>> 1;
-    if ((result[mid] ?? '') < id) low = mid + 1;
+    const midValue = result[mid];
+    if (midValue !== undefined && key(midValue) < itemKey) low = mid + 1;
     else high = mid;
   }
-  result.splice(low, 0, id);
-  return result;
-}
-
-function insertPartSorted(arr: Part[], part: Part): Part[] {
-  const result = [...arr];
-  let low = 0,
-    high = result.length;
-  while (low < high) {
-    const mid = (low + high) >>> 1;
-    const midPart = result[mid];
-    if (midPart !== undefined && midPart.id < part.id) low = mid + 1;
-    else high = mid;
-  }
-  result.splice(low, 0, part);
+  result.splice(low, 0, item);
   return result;
 }
 
@@ -173,6 +43,9 @@ function insertPartSorted(arr: Part[], part: Part): Part[] {
  * not stable across a clone either.
  */
 type PartOrderingEvidence = Map<string, number>;
+
+/** Per-message cached part views: the views, an invalidation marker, or nothing. */
+type PartsSnapshot = Map<string, readonly ReadonlyPart[] | null>;
 
 function partOrderingKey(messageID: string, partId: string): string {
   return `${messageID}\u0000${partId}`;
@@ -236,23 +109,73 @@ function toolRunningStartedAt(part: Part): number | undefined {
 /**
  * A tool part advances pending → running → terminal and never moves backwards.
  * A snapshot, history or DO replay can re-deliver an older part version over
- * newer live state, so a lower-ranked update is dropped, and a terminal update
- * is applied only when it carries ordering evidence that it postdates the
- * stored update (the event's own time, or the tool state's `time.end` when a
- * replay carries no event time). Over a running part, that evidence must also
- * postdate the stored running update's ordering evidence — the later of its
- * recorded event time (when the update came from the wire) and the run's
- * `time.start` (the only evidence a replayed running part carries, and the bound
- * that keeps an inherited older event time from dropping the guard below the
- * live run): a terminal whose settle time predates the live run is an
- * out-of-order replay, not a completion. A terminal with no evidence at all
- * never replaces a live running task.
- *
- * The same ordering evidence settles the mirror case: a run whose `time.start`
- * postdates a stored terminal's settle time is a newer observation of that part
- * (a reopen replay of the live run over a stale cached terminal), so it
- * replaces it instead of being dropped as a backwards lifecycle step.
+ * newer live state, so a lower-ranked update is dropped (unless it reopens a
+ * settled run — see `runningReopensTerminal`), and a terminal update is applied
+ * only when it carries ordering evidence that it postdates the stored update
+ * (the event's own time, or the tool state's `time.end` when a replay carries
+ * no event time). A terminal with no evidence at all never replaces a live
+ * running task.
  */
+
+/** Ordering evidence of a terminal update: its event time, else its settle time. */
+function terminalOrder(part: Part, eventTime: number | undefined): number | undefined {
+  return eventTime ?? partSettledAt(part);
+}
+
+/**
+ * Ordering evidence of a stored running part: the later of the event time the
+ * update that applied it carried and the run's `time.start`.
+ */
+function runningOrder(stored: Part, storedEventTime: number | undefined): number | undefined {
+  const startedAt = toolRunningStartedAt(stored);
+  if (storedEventTime === undefined || startedAt === undefined) {
+    return storedEventTime ?? startedAt;
+  }
+  return Math.max(storedEventTime, startedAt);
+}
+
+/** A terminal update over a stored terminal applies only when it postdates it. */
+function terminalBeatsTerminal(
+  stored: Part,
+  incoming: Part,
+  storedEventTime: number | undefined,
+  eventTime: number | undefined
+): boolean {
+  const incomingOrder = terminalOrder(incoming, eventTime);
+  const storedOrder = terminalOrder(stored, storedEventTime);
+  if (incomingOrder === undefined || storedOrder === undefined) return false;
+  return incomingOrder > storedOrder;
+}
+
+/** A terminal update over a stored running part applies only when it postdates both evidence pieces. */
+function terminalBeatsRunning(
+  stored: Part,
+  incoming: Part,
+  storedEventTime: number | undefined,
+  eventTime: number | undefined
+): boolean {
+  const incomingOrder = terminalOrder(incoming, eventTime);
+  if (incomingOrder === undefined) return false;
+  // The stored running part carries two pieces of evidence: the event time of
+  // the update that last applied it (which can be inherited from an older part
+  // replaced on the same id) and the run's own `time.start`. A terminal must
+  // postdate both, so bound the guard by the later one — inherited older
+  // evidence must not drop it below the live run.
+  const storedOrder = runningOrder(stored, storedEventTime);
+  return storedOrder === undefined || incomingOrder > storedOrder;
+}
+
+/** A running update over a stored terminal applies only when the run started after its settle time. */
+function runningReopensTerminal(stored: Part, incoming: Part): boolean {
+  const runningStartedAt = toolRunningStartedAt(incoming);
+  const storedSettledAt = partSettledAt(stored);
+  return (
+    runningStartedAt !== undefined &&
+    storedSettledAt !== undefined &&
+    runningStartedAt > storedSettledAt
+  );
+}
+
 function isStaleToolLifecycleUpdate(
   stored: Part,
   incoming: Part,
@@ -268,41 +191,21 @@ function isStaleToolLifecycleUpdate(
   }
 
   if (incomingRank < storedRank) {
+    // Running (1) over terminal (2): the run reopens the settled run only when
+    // its start postdates the settle time. Every other lower-ranked update is
+    // stale.
     if (incomingRank === 1 && storedRank === 2) {
-      const runningStartedAt = toolRunningStartedAt(incoming);
-      const storedSettledAt = partSettledAt(stored);
-      if (
-        runningStartedAt !== undefined &&
-        storedSettledAt !== undefined &&
-        runningStartedAt > storedSettledAt
-      ) {
-        return false;
-      }
+      return !runningReopensTerminal(stored, incoming);
     }
     return true;
   }
 
   if (incomingRank === 2 && storedRank === 2) {
-    const incomingOrder = eventTime ?? partSettledAt(incoming);
-    const storedOrder = storedEventTime ?? partSettledAt(stored);
-    if (incomingOrder === undefined || storedOrder === undefined) return true;
-    return incomingOrder <= storedOrder;
+    return !terminalBeatsTerminal(stored, incoming, storedEventTime, eventTime);
   }
 
   if (incomingRank === 2 && storedRank === 1) {
-    const incomingOrder = eventTime ?? partSettledAt(incoming);
-    if (incomingOrder === undefined) return true;
-    // The stored running part carries two pieces of evidence: the event time of
-    // the update that last applied it (which can be inherited from an older part
-    // replaced on the same id) and the run's own `time.start`. A terminal must
-    // postdate both, so bound the guard by the later one — inherited older
-    // evidence must not drop it below the live run.
-    const runningStartedAt = toolRunningStartedAt(stored);
-    const storedOrder =
-      storedEventTime === undefined || runningStartedAt === undefined
-        ? (storedEventTime ?? runningStartedAt)
-        : Math.max(storedEventTime, runningStartedAt);
-    if (storedOrder !== undefined && incomingOrder <= storedOrder) return true;
+    return !terminalBeatsRunning(stored, incoming, storedEventTime, eventTime);
   }
 
   return false;
@@ -315,7 +218,6 @@ function upsertPartDroppingStaleSyntheticParts(
   evidence: PartOrderingEvidence,
   authoritative = false
 ): Part[] {
-  const nextPart = clonePart(part);
   const incomingIsSynthetic = Reflect.get(part, 'synthetic') === true;
   // A non-synthetic text or file part drops the synthetic placeholder parts of
   // the same type on its message: the optimistic text row and the optimistic
@@ -347,6 +249,9 @@ function upsertPartDroppingStaleSyntheticParts(
     // A later history page or replay may carry a bounded preview of a tool call
     // this storage already holds in full; keep the complete copy.
     if (existing !== undefined && isPreviewOfStoredTool(existing, part)) return arr;
+    // The rejection paths above drop the incoming part, so they must not pay
+    // for a copy of it.
+    const nextPart = clonePart(part);
     const nextArr = [...filtered];
     nextArr[idx] = nextPart;
     // Remember the ordering evidence the accepted update actually won on: its
@@ -361,22 +266,22 @@ function upsertPartDroppingStaleSyntheticParts(
     return nextArr;
   }
 
+  const nextPart = clonePart(part);
   rememberPartUpdateTime(evidence, nextPart, eventTime);
-  return insertPartSorted(filtered, nextPart);
+  return insertSortedBy(filtered, nextPart, partIdKey);
 }
 
-const STRUCTURAL_PART_FIELDS = new Set(['id', 'messageID', 'sessionID', 'type']);
 const SUPPORTED_DELTA_FIELDS = new Set(['text']);
 
 function isSupportedDeltaField(field: string): boolean {
-  return SUPPORTED_DELTA_FIELDS.has(field) && !STRUCTURAL_PART_FIELDS.has(field);
+  return SUPPORTED_DELTA_FIELDS.has(field);
 }
 
 function clonePart(part: Part): Part {
   return structuredClone(part);
 }
 
-function createReadonlyPartView(part: Part): Part {
+function createReadonlyPartView(part: Part): ReadonlyPart {
   return new Proxy(part, {
     set() {
       return true;
@@ -430,7 +335,7 @@ function appendPartTextChunks(
   const existing = idx >= 0 ? arr[idx] : undefined;
   if (!existing) {
     // Part not yet known for this message — create it with the chunks as seed.
-    return insertPartSorted(arr, createSeedTextPart(messageId, partId, chunks.join('')));
+    return insertSortedBy(arr, createSeedTextPart(messageId, partId, chunks.join('')), partIdKey);
   }
   const updatedPart = applyTextDeltas(existing, chunks);
   if (updatedPart === existing) {
@@ -447,12 +352,12 @@ function appendPartTextChunks(
  * snapshot.
  */
 function publishPartsChanged(
-  snapshot: Map<string, Part[] | null>,
-  subscribers: Map<string, Set<() => void>>,
+  snapshot: PartsSnapshot,
+  subscribers: SubscriberRegistry,
   messageId: string
 ): void {
   snapshot.set(messageId, null);
-  notify(subscribers, `parts:${messageId}`);
+  subscribers.notifyParts(messageId);
 }
 
 function createSeedTextPart(messageId: string, partId: string, text: string): TextPart {
@@ -465,11 +370,58 @@ function createSeedTextPart(messageId: string, partId: string, text: string): Te
   };
 }
 
-function notify(subscribers: Map<string, Set<() => void>>, key: string): void {
-  const subs = subscribers.get(key);
-  if (subs) {
-    for (const cb of subs) cb();
-  }
+const messageIdsKey: SessionSubscriptionKey = 'messageIds';
+
+/** Subscription key of one message row's channel. */
+function messageKey(messageId: string): SessionSubscriptionKey {
+  return `message:${messageId}`;
+}
+
+/** Subscription key of one message's parts channel. */
+function partsKey(messageId: string): SessionSubscriptionKey {
+  return `parts:${messageId}`;
+}
+
+type SubscriberRegistry = {
+  subscribe(key: SessionSubscriptionKey, callback: () => void): () => void;
+  notify(key: SessionSubscriptionKey): void;
+  notifyMessageIds(): void;
+  notifyMessage(messageId: string): void;
+  notifyParts(messageId: string): void;
+};
+
+function createSubscriberRegistry(): SubscriberRegistry {
+  const subscribers = new Map<string, Set<() => void>>();
+  const notify = (key: SessionSubscriptionKey): void => {
+    const subs = subscribers.get(key);
+    if (subs) {
+      for (const cb of subs) cb();
+    }
+  };
+  return {
+    subscribe(key, callback) {
+      let set = subscribers.get(key);
+      if (!set) {
+        set = new Set();
+        subscribers.set(key, set);
+      }
+      set.add(callback);
+      return () => {
+        set.delete(callback);
+        if (set.size === 0) subscribers.delete(key);
+      };
+    },
+    notify,
+    notifyMessageIds() {
+      notify(messageIdsKey);
+    },
+    notifyMessage(messageId) {
+      notify(messageKey(messageId));
+    },
+    notifyParts(messageId) {
+      notify(partsKey(messageId));
+    },
+  };
 }
 
 const EMPTY_PARTS: readonly Part[] = Object.freeze([]);
@@ -481,13 +433,16 @@ export {
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
+  createSubscriberRegistry,
   forgetPartUpdateTime,
-  insertPartSorted,
-  insertSorted,
-  orderMessageIds,
+  insertSortedBy,
   isSupportedDeltaField,
-  notify,
+  messageIdsKey,
+  messageKey,
+  messageIdKey,
+  partsKey,
   publishPartsChanged,
   upsertPartDroppingStaleSyntheticParts,
 };
-export type { PartOrderingEvidence };
+export { orderMessageIds } from './message-order';
+export type { PartOrderingEvidence, PartsSnapshot, SessionSubscriptionKey, SubscriberRegistry };

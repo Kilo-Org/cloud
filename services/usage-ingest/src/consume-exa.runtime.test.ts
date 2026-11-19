@@ -1,12 +1,8 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import type { RequestListener } from 'node:http';
 import { expect, it } from 'vitest';
-import { unstable_readConfig, unstable_startWorker } from 'wrangler';
 import { enkryptMessage, enkryptRecord } from './enkrypt-usage.test-fixture';
 import { exaMessage, exaRecord } from './exa-usage.test-fixture';
+import { withTaggedConsumerRuntime } from './tagged-consumer.test-fixture';
 import { usage } from './usage.test-fixture';
 
 type ExaReply = 'recorded' | 'duplicate' | 'admission' | 'wrong_echo' | 'missing_echo';
@@ -14,7 +10,7 @@ type ExaReply = 'recorded' | 'duplicate' | 'admission' | 'wrong_echo' | 'missing
 it('routes tagged Exa messages through workerd and keeps LLM and Enkrypt dispositions', async () => {
   const calls: { path: string | undefined; body: unknown; source: unknown }[] = [];
   let exaReply: ExaReply = 'recorded';
-  const writer = createServer(async (request, response) => {
+  const handleWrite: RequestListener = async (request, response) => {
     let body = '';
     for await (const chunk of request) body += chunk;
     const event = JSON.parse(body);
@@ -45,61 +41,8 @@ it('routes tagged Exa messages through workerd and keeps LLM and Enkrypt disposi
     } else {
       response.end(JSON.stringify({ status: exaReply, usageId: event.id }));
     }
-  });
-  const directory = await mkdtemp(join(tmpdir(), 'usage-exa-'));
-  let worker: Awaited<ReturnType<typeof unstable_startWorker>> | undefined;
-  const logs: unknown[] = [];
-  try {
-    await new Promise<void>((resolve, reject) => {
-      writer.once('error', reject);
-      writer.listen(0, '127.0.0.1', resolve);
-    });
-    const address = writer.address();
-    if (!address || typeof address === 'string') throw new Error('Expected loopback writer');
-    const service = unstable_readConfig({
-      config: fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href),
-    });
-    const config = join(directory, 'wrangler.json');
-    await writeFile(
-      config,
-      JSON.stringify({
-        name: 'usage-exa-runtime',
-        main: fileURLToPath(new URL('./index.ts', import.meta.url).href),
-        compatibility_date: service.compatibility_date,
-        compatibility_flags: service.compatibility_flags,
-        vars: {
-          ...service.vars,
-          USAGE_WRITER_URL: `http://127.0.0.1:${address.port}/api/internal/usage/record`,
-          USAGE_WRITER_SECRET: 'synthetic-writer-secret',
-          USAGE_WRITER_PROTECTION_BYPASS: 'synthetic-bypass-secret',
-        },
-      })
-    );
-    worker = await unstable_startWorker({
-      config,
-      dev: {
-        remote: false,
-        persist: false,
-        server: { hostname: '127.0.0.1', port: 0 },
-        inspector: false,
-        watch: false,
-        structuredLogsHandler: (log: unknown) => logs.push(log),
-      },
-    });
-    expect((await worker.fetch('http://usage-ingest.test/')).status).toBe(404);
-    const runtime = worker.raw.runtimes.find(runtime => runtime.mf)?.mf;
-    if (!runtime) throw new Error('Expected local workerd runtime');
-    const entrypoint = await runtime.getWorker();
-    const deliver = (...bodies: unknown[]) =>
-      entrypoint.queue(
-        'local-usage',
-        bodies.map((body, index) => ({
-          id: `queue-${index}`,
-          timestamp: new Date(),
-          attempts: 1,
-          body,
-        }))
-      );
+  };
+  await withTaggedConsumerRuntime('exa', handleWrite, async ({ deliver, logs }) => {
     const exaCall = { path: '/api/internal/exa-usage/record', body: exaRecord, source: 'queue' };
 
     for (const reply of ['recorded', 'duplicate'] as const) {
@@ -181,17 +124,5 @@ it('routes tagged Exa messages through workerd and keeps LLM and Enkrypt disposi
     ]) {
       if (sensitive) expect(serialized).not.toContain(sensitive);
     }
-  } finally {
-    try {
-      await worker?.dispose();
-    } finally {
-      writer.closeAllConnections();
-      if (writer.listening) {
-        await new Promise<void>((resolve, reject) =>
-          writer.close(error => (error ? reject(error) : resolve()))
-        );
-      }
-      await rm(directory, { recursive: true, force: true });
-    }
-  }
+  });
 }, 30_000);

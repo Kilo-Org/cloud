@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -159,6 +159,36 @@ function validate(workflow) {
     notes.run,
     /notes<<NOTES_EOF/,
     'the notes must reach the changelog job as a heredoc output'
+  );
+  assert.equal(
+    notes.env?.KILO_CHANGELOG_API_KEY,
+    '${{ steps.mint-notes.outputs.token }}',
+    'the notes step must receive the minted gateway token'
+  );
+
+  // The credential is minted from the shared secret the MCP catalog job
+  // already holds: a failed mint must leave the notes step on the deterministic
+  // block instead of failing the release, and the token must never be printed.
+  const mint = step(workflow, 'check-changes', 'mint-notes');
+  assert.ok(mint, 'check-changes: the notes token mint step (id mint-notes) is missing');
+  assert.equal(mint['continue-on-error'], true, 'a failed mint must not fail the release');
+  assert.equal(
+    mint.env?.MCP_CATALOG_TOKEN_SECRET,
+    '${{ secrets.MCP_CATALOG_TOKEN_SECRET }}',
+    'the mint must authenticate with the shared MCP catalog secret'
+  );
+  assert.match(
+    mint.run,
+    /\/api\/internal\/mcp-catalog\/token/,
+    'the mint must call the internal token endpoint'
+  );
+  assert.match(mint.run, /::add-mask::\$token/, 'the minted token must be masked');
+  assert.doesNotMatch(mint.run, /echo "\$token"/, 'the minted token must never be printed');
+  assert.match(mint.run, /token=\$token" >> "\$GITHUB_OUTPUT"/, 'the mint must publish the token');
+  const checkChangesSteps = workflow.jobs['check-changes'].steps;
+  assert.ok(
+    checkChangesSteps.indexOf(mint) < checkChangesSteps.indexOf(notes),
+    'the mint must run before the notes step'
   );
 
   const cap = step(workflow, 'check-changes', 'cap');
@@ -741,6 +771,132 @@ test('release retries preserve shipped sections on a bump branch without a PR', 
         error.status === 128 &&
         /missing\.git.*does not appear to be a git repository/.test(error.stderr.toString())
     );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test('the changelog land step reports the verified head and refuses an unverified branch', () => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-land-'));
+  const output = join(work, 'output');
+  const runnerTemp = join(work, 'temp');
+  const branch = 'kilo-app-version-bump-1.0.13';
+  const land = step(readWorkflow(), 'changelog', 'land');
+  // The step runs the script from the checkout root, so each fixture repo needs
+  // the real script and the area map it reads copied in at the same paths.
+  const scriptSource = new URL('../scripts/kilo-app-release-notes.mjs', import.meta.url);
+  const scriptPath = 'scripts/kilo-app-release-notes.mjs';
+  const areaSource = new URL('../apps/mobile/src/components/changelog-areas.json', import.meta.url);
+  const areaPath = 'apps/mobile/src/components/changelog-areas.json';
+  const outputs = {
+    'check-changes': { version: '1.0.13' },
+    'build-and-submit': { ios_build: '43', android_build: '43' },
+  };
+  const body = land.run.replaceAll(
+    /\$\{\{\s*needs\.([^.]+)\.outputs\.([a-z_]+)\s*\}\}/g,
+    (_, job, key) => outputs[job][key]
+  );
+  const git = (cwd, args) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+
+  // A repository whose main carries the app, the script and a conforming
+  // version-bump branch; `extra` adds one more commit to that branch.
+  const makeRepo = (name, extra) => {
+    const repo = join(work, name);
+    const remote = join(work, `${name}-remote.git`);
+    execFileSync('git', ['init', '-q', '--bare', remote], { stdio: 'pipe' });
+    execFileSync('git', ['clone', '-q', remote, repo], { stdio: 'pipe' });
+    git(repo, ['config', 'user.name', 'Release Test']);
+    git(repo, ['config', 'user.email', 'release@example.invalid']);
+    git(repo, ['config', 'commit.gpgsign', 'false']);
+    mkdirSync(join(repo, 'apps/mobile'), { recursive: true });
+    mkdirSync(join(repo, 'apps/mobile/src/components'), { recursive: true });
+    mkdirSync(join(repo, 'scripts'), { recursive: true });
+    copyFileSync(scriptSource, join(repo, scriptPath));
+    copyFileSync(areaSource, join(repo, areaPath));
+    writeFileSync(join(repo, 'apps/mobile/CHANGELOG.md'), '# Kilo App Changelog\n\nprose\n');
+    writeFileSync(join(repo, 'apps/mobile/app.config.ts'), "  version: '1.0.12',\n");
+    git(repo, ['add', '-A']);
+    git(repo, ['commit', '-q', '-m', 'chore: seed']);
+    git(repo, ['branch', '-M', 'main']);
+    git(repo, ['push', '-q', 'origin', 'main']);
+
+    git(repo, ['checkout', '-q', '-b', branch]);
+    writeFileSync(join(repo, 'apps/mobile/app.config.ts'), "  version: '1.0.13',\n");
+    git(repo, ['add', '-A']);
+    git(repo, ['commit', '-q', '-m', 'chore(kilo-app): bump version to 1.0.13']);
+    if (extra) {
+      mkdirSync(join(repo, 'apps/mobile/src'), { recursive: true });
+      writeFileSync(join(repo, 'apps/mobile/src/a.ts'), 'export const a = 1;\n');
+      git(repo, ['add', '-A']);
+      git(repo, ['commit', '-q', '-m', 'feat(kilo-app): extra change']);
+    }
+    git(repo, ['push', '-q', 'origin', branch]);
+    git(repo, ['checkout', '-q', 'main']);
+    const tip = () => git(remote, ['rev-parse', `refs/heads/${branch}`]);
+    return { repo, remote, tip };
+  };
+
+  const runLand = repo => {
+    writeFileSync(output, '');
+    try {
+      execFileSync('bash', ['-e', '-o', 'pipefail', '-c', body], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: output,
+          RUNNER_TEMP: runnerTemp,
+          BRANCH: branch,
+          NOTES: '- a shipped change (#91)',
+          PENDING: 'kilo-app-changelog-pending',
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      return { status: 0, stderr: '' };
+    } catch (error) {
+      return { status: error.status, stderr: error.stderr.toString() };
+    }
+  };
+
+  try {
+    mkdirSync(runnerTemp, { recursive: true });
+
+    const conforming = makeRepo('conforming', false);
+    const before = conforming.tip();
+    const landed = runLand(conforming.repo);
+    assert.equal(landed.status, 0, landed.stderr);
+    const published = Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => line.split('='))
+    );
+    assert.equal(published.landed, 'true');
+    assert.match(published.head ?? '', /^[0-9a-f]{40}$/);
+    assert.equal(published.head, conforming.tip());
+    assert.notEqual(published.head, before);
+    const files = (published.files ?? '').split(', ');
+    assert.equal(files.length, 2, `expected two files, got ${published.files}`);
+    assert.deepEqual(
+      [...files].sort(),
+      ['apps/mobile/CHANGELOG.md', 'apps/mobile/app.config.ts'].sort()
+    );
+
+    const unverified = makeRepo('unverified', true);
+    const unverifiedTip = unverified.tip();
+    const refused = runLand(unverified.repo);
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /refusing to land ## 1\.0\.13 \(build 43\)/);
+    assert.match(refused.stderr, /apps\/mobile\/src\/a\.ts/);
+    assert.doesNotMatch(readFileSync(output, 'utf8'), /^landed=true$/m);
+    assert.equal(unverified.tip(), unverifiedTip);
+    // The refused section is carried, not dropped, so the next build can write
+    // it above its own.
+    git(unverified.repo, ['fetch', '-q', 'origin', 'kilo-app-changelog-pending']);
+    const carried = git(unverified.repo, ['show', 'FETCH_HEAD:apps/mobile/CHANGELOG.pending.md']);
+    assert.match(carried, /## 1\.0\.13 \(build 43\)/);
+    assert.match(carried, /- a shipped change \(#91\)/);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -1656,3 +1812,47 @@ for (const [name, mutate] of Object.entries(toolchainMutations)) {
     );
   });
 }
+
+test('the changelog history workflow rewrites through the mint and opens a PR', () => {
+  const history = load(
+    readFileSync(
+      new URL('../.github/workflows/kilo-app-changelog-history.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  assert.ok(history.on.workflow_dispatch !== undefined, 'the rewrite must be manual only');
+  assert.equal(history.on.push, undefined, 'a push must never rewrite the shipped notes');
+  assert.equal(history.permissions.contents, 'write');
+  assert.equal(history.permissions['pull-requests'], 'write');
+  // `gh pr create --assignee` is an Issues API operation.
+  assert.equal(history.permissions.issues, 'write', 'the PR assignee needs issues: write');
+
+  const jobSteps = history.jobs.rewrite.steps;
+  const mint = jobSteps.find(item => item.id === 'mint');
+  assert.ok(mint, 'the history workflow must mint its own token');
+  assert.equal(mint['continue-on-error'], true);
+  assert.equal(mint.env.MCP_CATALOG_TOKEN_SECRET, '${{ secrets.MCP_CATALOG_TOKEN_SECRET }}');
+  assert.match(mint.run, /::add-mask::\$token/);
+
+  const rewrite = jobSteps.find(item =>
+    item.run?.includes('kilo-app-changelog-rewrite-history.mjs')
+  );
+  assert.ok(rewrite, 'the history workflow must run the rewrite script');
+  assert.equal(rewrite.env.KILO_CHANGELOG_API_KEY, '${{ steps.mint.outputs.token }}');
+  // A partial rewrite (exit 3) is recorded and the PR step still lands what it
+  // has; any other failure code fails the job before the PR is opened.
+  assert.match(rewrite.run, /set \+e/, 'the rewrite step must read the exit code itself');
+  assert.match(rewrite.run, /status=\$\{PIPESTATUS\[0\]\}/);
+  assert.match(rewrite.run, /\[ "\$status" -ne 3 \][\s\S]*exit "\$status"/);
+  assert.match(rewrite.run, />> "\$GITHUB_STEP_SUMMARY"/);
+
+  const open = jobSteps.find(item => item.run?.includes('gh pr create'));
+  assert.ok(open, 'the history workflow must open the changelog PR');
+  assert.equal(open.env.GH_TOKEN, '${{ secrets.GITHUB_TOKEN }}');
+  assert.match(open.run, /apps\/mobile\/CHANGELOG\.md/);
+  assert.ok(
+    jobSteps.indexOf(mint) < jobSteps.indexOf(rewrite) &&
+      jobSteps.indexOf(rewrite) < jobSteps.indexOf(open),
+    'the history workflow must mint, rewrite, then open the PR'
+  );
+});

@@ -42,6 +42,15 @@ export type StoreCreditProductsOptions = {
 };
 
 /**
+ * The cache key of the joined credit-pack catalog for one account. Exported so
+ * a development fixture can seed the exact entry this hook reads; there is no
+ * second spelling of the key anywhere.
+ */
+export function creditStoreProductsKey(userId: string | undefined) {
+  return ['credits', 'store-products', userId] as const;
+}
+
+/**
  * What the screen has settled on: the packs it renders, whether the store is
  * unavailable, and the message key for it. Kept across a retry so the screen
  * keeps showing this view instead of blanking back to the loading placeholders.
@@ -76,7 +85,21 @@ function sameSettledView(
 export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { userId } = useCurrentUserId();
+  const identity = useCurrentUserId();
+  const { userId, refetchAsync: refetchIdentity } = identity;
+  // The catalogue is gated on the identity read: without a user id neither the
+  // backend catalogue nor the store price lookup can run, so a failed identity
+  // read is the one state where nothing settles and no retry exists yet. It is
+  // reported to the screen as its own retryable failure rather than as a blank
+  // list, which is what an operator saw when the read timed out.
+  //
+  // Only the settled failure counts. `isUnreachable` also covers an attempt
+  // that has not answered yet, so using it would paint this card over a read
+  // that then succeeds — a false error, and movement on the screen this change
+  // exists to hold still. The read settles while offline by policy, so it
+  // either answers or fails.
+  const identityFailed = userId == null && identity.isError;
+  const [retryingIdentity, setRetryingIdentity] = useState(false);
   const [storeErrorMessage, setStoreErrorMessage] = useState<string | null>(null);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
 
@@ -88,7 +111,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     storefront === 'play' ? STORE_FAILURE_PLAY_KEY : STORE_FAILURE_KEY;
 
   const productsQuery = useQuery({
-    queryKey: ['credits', 'store-products', userId],
+    queryKey: creditStoreProductsKey(userId),
     queryFn: async () => {
       const loadedProducts = await loadStoreCreditProducts({
         fetchStoreProducts: options.fetchStoreProducts,
@@ -115,9 +138,13 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   // timer, so the handle is kept in a ref: a fetch that answers the bound
   // cancels it in the effect below, or it would re-raise the banner over the
   // packs the store had just priced.
+  //
+  // A failed identity read never arms it: the pack area cannot settle at all
+  // there, and the account card already explains why with its own retry. Arming
+  // it would raise a second card blaming the store for a backend failure.
   const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (options.connected) {
+    if (options.connected || identityFailed) {
       return undefined;
     }
     const timer = setTimeout(() => {
@@ -130,7 +157,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
         connectionTimeoutRef.current = null;
       }
     };
-  }, [options.connected, connectionAttempt, storeConnectionTimeoutKey]);
+  }, [options.connected, identityFailed, connectionAttempt, storeConnectionTimeoutKey]);
 
   // The backend catalog on its own, so a store that failed to answer still has
   // the pack amounts to render. The loader reads the same query through the
@@ -158,6 +185,24 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     }
     await refetchProducts();
   }, [reconnectStore, refetchProducts]);
+
+  // One press recovers both surfaces: the identity read first, because it gates
+  // both catalogue reads, then the store prices the answered catalogue asks
+  // for. The identity read answers the id it produced, so a repeat failure
+  // leaves the store read alone: a manual refetch bypasses `enabled`, and
+  // running it with no user id would paint prices or a second banner beside
+  // this card.
+  const retryIdentity = useCallback(async () => {
+    setRetryingIdentity(true);
+    try {
+      const answeredUserId = await refetchIdentity();
+      if (answeredUserId !== undefined) {
+        await refetch();
+      }
+    } finally {
+      setRetryingIdentity(false);
+    }
+  }, [refetchIdentity, refetch]);
 
   const queryErrorMessage = getAuthoredProductsErrorMessageKey(productsQuery.error);
 
@@ -201,9 +246,9 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   const storeUnavailable =
     !catalogEmpty && (productsState.storeUnavailable || backendProductsQuery.isError);
 
-  // A store failure must not blank the rows: keep the backend packs with no
-  // store price, so the amounts stay on screen and each row shows the
-  // price-unavailable note instead of disappearing.
+  // A store failure must not change what the catalogue sells: keep the backend
+  // packs with no store price, so a store that answered and skipped one pack
+  // still leaves that row in place with its price-unavailable note.
   const unpricedBackendProducts = useMemo<StoreCreditProduct[]>(
     () =>
       (backendProductsQuery.data?.products ?? []).map(backend => ({
@@ -264,10 +309,18 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   // without fetching, and the packs the backend catalog already named render
   // from the fallback above instead of hiding behind placeholders. Only a first
   // load with nothing known yet shows the placeholders.
+  //
+  // An unresolved identity keeps those placeholders up: the store query stays
+  // disabled until the identity answers, so `productsQuery.isLoading` is false
+  // and the screen would otherwise paint an empty list the moment the store
+  // connects and then fill it. A failed identity read ends the wait instead —
+  // it is an error with a retry, not something the placeholders can resolve.
+  const identityPending = userId == null && !identityFailed;
   const isLoading =
+    !identityFailed &&
     settledView === null &&
     storeErrorMessage === null &&
-    (productsQuery.isLoading || !options.connected);
+    (identityPending || productsQuery.isLoading || !options.connected);
 
   return {
     products: view.products,
@@ -283,5 +336,10 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     // an empty catalog. A pending, paused or failed store query is not.
     catalogEmpty,
     refetch,
+    // The identity read failed, so neither catalogue read can run: the screen
+    // offers its own retry instead of an empty pack area.
+    identityUnavailable: identityFailed,
+    isRetryingIdentity: retryingIdentity,
+    retryIdentity,
   };
 }

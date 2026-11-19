@@ -1,12 +1,25 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
-import { withDORetry } from '../utils/do-retry.js';
 import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
-import { isAllowedEgressUrl, nativeEgressAllowlistSchema } from './egress-policy.js';
-import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
-import { egressDomainSchema } from '@kilocode/worker-utils/egress-allowlist';
+import { getSentryConfig } from '../shared/sentry.js';
+import { nativeEgressAllowlistSchema } from '../sandbox-control/egress-policy.js';
+import { egressAuditStore, proxySandboxEgress } from '../egress/sandbox-egress.js';
 
-const SESSION_SYNC_HOSTNAME = new URL(CLOUD_AGENT_SESSION_SYNC_ORIGIN).hostname;
+type SentryEnv = Parameters<typeof getSentryConfig>[0];
+
+/** The configured Sentry envelope endpoint, which the runtime may reach in every egress mode. */
+function trustedSentryEnvelopeHostname(request: Request, env: SentryEnv): string | undefined {
+  const sentry = getSentryConfig(env);
+  if (!sentry || request.method !== 'POST') return undefined;
+  const dsn = new URL(sentry.dsn);
+  const url = new URL(request.url);
+  return url.origin === dsn.origin &&
+    !url.username &&
+    !url.password &&
+    url.pathname === `/api${dsn.pathname}/envelope/`
+    ? dsn.hostname
+    : undefined;
+}
 
 export type ContainersOutboundProps = {
   containerId: string;
@@ -15,7 +28,10 @@ export type ContainersOutboundProps = {
   allocationRef?: string;
 };
 
-export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, ContainersOutboundProps> {
+export class ContainersOutbound extends WorkerEntrypoint<
+  Cloudflare.Env & SentryEnv,
+  ContainersOutboundProps
+> {
   async fetch(request: Request): Promise<Response> {
     const { containerId, egressAllowlist, egressAudit, allocationRef } = this.ctx.props;
     if (
@@ -32,64 +48,29 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
     if (!policy.success) {
       return new Response('Egress policy unavailable', { status: 502 });
     }
-    const url = new URL(request.url);
-    const allowed = policy.data === undefined || isAllowedEgressUrl(url, policy.data);
-    if (egressAudit === true) {
-      try {
-        const input = EgressAuditRequestSchema.parse({
-          requestId: crypto.randomUUID(),
-          allocationRef,
-          timestamp: new Date().toISOString(),
-          method: request.method.slice(0, 32),
-          hostname: url.hostname.slice(0, 253).replace(/[^a-zA-Z0-9._:[\]-]/g, '_'),
-          protocol: url.protocol,
-          port: Number(url.port || (url.protocol === 'https:' ? 443 : 80)),
-          decision: allowed ? 'allowed' : 'denied',
-        });
-        await withDORetry(
-          () =>
-            this.env.SANDBOX_CONTAINERS.get(this.env.SANDBOX_CONTAINERS.idFromString(containerId)),
-          async stub => {
-            try {
-              await stub.recordEgressRequest(input);
-            } catch (error) {
-              throw Object.assign(new Error('Egress audit persistence failed'), {
-                retryable: error instanceof Error && Reflect.get(error, 'retryable') === true,
-              });
+    const sentryHostname =
+      policy.data === undefined ? undefined : trustedSentryEnvelopeHostname(request, this.env);
+    // The pinned allowlist stays unchanged; only this request may reach the envelope host.
+    const allowlist =
+      policy.data === undefined || sentryHostname === undefined
+        ? policy.data
+        : (nativeEgressAllowlistSchema.safeParse([...policy.data, sentryHostname]).data ??
+          policy.data);
+    return proxySandboxEgress(
+      request,
+      this.env,
+      {
+        ...(allowlist === undefined ? {} : { allowlist }),
+        ...(egressAudit === true && allocationRef !== undefined
+          ? {
+              audit: {
+                allocationRef,
+                store: () => egressAuditStore(this.env, { containerId }),
+              },
             }
-          },
-          'recordEgressRequest',
-          {
-            maxAttempts: 3,
-            baseBackoffMs: 100,
-            maxBackoffMs: 500,
-            scope: { deadlineAt: Date.now() + 5_000 },
-          }
-        );
-      } catch {
-        return new Response('Egress audit unavailable', { status: 502 });
-      }
-    }
-    if (!allowed) return new Response('Egress destination disallowed', { status: 403 });
-    if (egressAudit === true || policy.data !== undefined) {
-      const headers = new Headers(request.headers);
-      if (policy.data !== undefined) headers.set('Host', url.host);
-      request = new Request(request, { headers, redirect: 'manual' });
-    }
-    // Match the allowlist's canonical form so `session-sync.kiloapps.io.` cannot skip the binding.
-    if (egressDomainSchema.safeParse(url.hostname).data === SESSION_SYNC_HOSTNAME) {
-      // The runtime handle must reach Session Sync only through its binding.
-      if (url.origin !== CLOUD_AGENT_SESSION_SYNC_ORIGIN) {
-        return new Response('Session Sync requires HTTPS', { status: 403 });
-      }
-      if (!this.env.SESSION_SYNC) {
-        return Response.json(
-          { error: { code: 'auth_unavailable', retryable: true } },
-          { status: 503 }
-        );
-      }
-      return this.env.SESSION_SYNC.fetch(request);
-    }
-    return handleManagedScmOutbound(request, this.env, { containerId });
+          : {}),
+      },
+      upstream => handleManagedScmOutbound(upstream, this.env, { containerId })
+    );
   }
 }

@@ -8,15 +8,14 @@ import { SheetHeader } from '@/components/sheet-header';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { SlidersHorizontal } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
-import { kiloMcpState, mcpEnabledFor, watchKiloMcp } from '@/lib/chat/kilo-mcp';
-import {
-  refreshChatTools,
-  retryKiloMcp,
-  setMcpEnabled as setChatMcpEnabled,
-} from '@/lib/chat/registry';
+import { kiloMcpState, watchKiloMcp } from '@/lib/chat/kilo-mcp';
+import { chatFlagBehind } from '@/lib/chat/chat-flag';
+import { refreshChatTools, retryChatFlag, retryKiloMcp, setChatFlag } from '@/lib/chat/registry';
 import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
 import { type ChatPlace } from '@/lib/chat/scope';
+import { snapshotOf, watch } from '@/lib/chat/state';
 import {
   isSettingsToolsEnabled,
   setSettingsToolsEnabled,
@@ -36,6 +35,8 @@ import {
 import { McpServerFormSheet, type McpServerFormTarget } from './mcp-server-form-sheet';
 import { McpServersSection } from './mcp-servers-section';
 import { WebSearchRow, type WebSearchSetting } from './web-search-row';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 
 /**
  * The chat-tools sheet.
@@ -104,53 +105,38 @@ export function useMcpSettings(place: ChatPlace | null, sessionId: string): McpS
     isSettingsToolsEnabled
   );
   const remote = useRemoteMcpServers(place);
-  const [enabled, setEnabledState] = useState(true);
+  /* The flag is the chat's own: it carries the choice and whether this session
+     is on it, and the registry publishes it with everything else about the
+     chat. Reading it here means no second boolean can disagree with it. */
+  const kiloTools = useSyncExternalStore(
+    useCallback(listener => watch(sessionId, listener), [sessionId]),
+    useCallback(() => snapshotOf(sessionId).kiloTools, [sessionId])
+  );
   const [retrying, setRetrying] = useState(false);
-
-  useEffect(() => {
-    // The read is async and the session id can change under it (a model switch),
-    // so the run keeps its own flag: a value that answers late for the session
-    // that left is dropped, and a flag shared between runs could not tell the
-    // run that was replaced from the one that replaced it.
-    let cancelled = false;
-    const read = async () => {
-      const stored = await mcpEnabledFor(sessionId);
-      if (!cancelled) {
-        setEnabledState(stored);
-      }
-    };
-    void read();
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId]);
 
   const setEnabled = useCallback(
     (next: boolean) => {
-      /* The switch moves at once, so the tap answers without waiting for the
-         write. The write and the move it makes can both fail, and the chat is
-         then still on the tool set it had: the switch is put back where it was
-         and the reason is said out loud, rather than left claiming a tool set
-         the live session never got. */
-      const previous = enabled;
-      setEnabledState(next);
       void (async () => {
         try {
-          await setChatMcpEnabled(sessionId, next);
+          await setChatFlag({ sessionId, place, flag: 'kiloTools', next });
         } catch (error) {
-          setEnabledState(previous);
           toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
         }
       })();
     },
-    [enabled, sessionId, t]
+    [place, sessionId, t]
   );
 
   const retry = useCallback(() => {
     setRetrying(true);
     void (async () => {
       try {
-        await retryKiloMcp(sessionId);
+        /* A choice that is saved but not applied is moved onto this chat; a
+           server that never answered is asked again. They are different
+           failures with different recoveries. */
+        await (chatFlagBehind(kiloTools)
+          ? retryChatFlag({ sessionId, place, flag: 'kiloTools' })
+          : retryKiloMcp(sessionId));
       } catch (error) {
         /* A Retry can fail before it reaches the server — the chat may not be
            movable — and the sheet then keeps the failure it already showed.
@@ -161,7 +147,7 @@ export function useMcpSettings(place: ChatPlace | null, sessionId: string): McpS
         setRetrying(false);
       }
     })();
-  }, [sessionId, t]);
+  }, [kiloTools, place, sessionId, t]);
 
   /**
    * Moves the group switch and the tool list together.
@@ -177,7 +163,7 @@ export function useMcpSettings(place: ChatPlace | null, sessionId: string): McpS
   }, []);
 
   return {
-    view: mcpSettingsView(state, enabled),
+    view: mcpSettingsView(state, kiloTools),
     setEnabled,
     retry,
     retrying,
@@ -298,23 +284,25 @@ export function McpSettingsSheet({
       />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pb-6 pt-4"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
         showsVerticalScrollIndicator={false}
       >
         <WebSearchRow setting={webSearch} />
 
         {/* 1. The one switch for the settings-changing tools. */}
         <View className="gap-2">
-          <PreferenceRow
-            icon={SlidersHorizontal}
-            title={t(settingsTools.titleKey)}
-            subtitle={t(settingsTools.subtitleKey)}
-            value={settings.settingsToolsEnabled}
-            disabled={false}
-            onValueChange={next => {
-              settings.setSettingsToolsEnabled(next);
-            }}
-          />
+          <RowGroup>
+            <PreferenceRow
+              icon={SlidersHorizontal}
+              title={t(settingsTools.titleKey)}
+              subtitle={t(settingsTools.subtitleKey)}
+              value={settings.settingsToolsEnabled}
+              disabled={false}
+              onValueChange={next => {
+                settings.setSettingsToolsEnabled(next);
+              }}
+            />
+          </RowGroup>
           {/* One line's height in every state, so on -> off never moves what
               follows it. */}
           <View className="min-h-6 justify-center px-1">

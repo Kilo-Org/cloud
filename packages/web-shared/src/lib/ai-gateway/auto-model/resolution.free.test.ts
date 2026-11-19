@@ -49,7 +49,7 @@ describe('getAutoFreeCandidates', () => {
   beforeEach(() => {
     jest
       .mocked(getRuntimeGatewayRoutingConfig)
-      .mockResolvedValue({ vercelEnabled: true, vercelOptOutModels: new Set() });
+      .mockResolvedValue({ vercelOptOutModels: new Set() });
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set(['test/present:free']));
     configure([AUTO_SMALL_TARGET_MODELS.free, 'test/present:free', 'test/absent:free']);
   });
@@ -61,20 +61,14 @@ describe('getAutoFreeCandidates', () => {
     }
   );
 
-  it('includes free models Vercel serves while Kilo routes them to Vercel', async () => {
+  it('includes free models Vercel serves unless they are opted out of Vercel routing', async () => {
     configure(['test/present:free', 'reflection/beam-free']);
     expect(await getAutoFreeCandidates('chat_completions')).toEqual([
       'reflection/beam-free',
       'test/present:free',
     ]);
 
-    jest
-      .mocked(getRuntimeGatewayRoutingConfig)
-      .mockResolvedValue({ vercelEnabled: false, vercelOptOutModels: new Set() });
-    expect(await getAutoFreeCandidates('chat_completions')).toEqual(['test/present:free']);
-
     jest.mocked(getRuntimeGatewayRoutingConfig).mockResolvedValue({
-      vercelEnabled: true,
       vercelOptOutModels: new Set(['reflection/beam-free']),
     });
     expect(await getAutoFreeCandidates('chat_completions')).toEqual(['test/present:free']);

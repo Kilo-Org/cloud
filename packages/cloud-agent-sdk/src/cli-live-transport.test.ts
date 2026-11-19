@@ -20,6 +20,7 @@ import {
   type UserWebSystemEvent,
 } from './user-web-connection';
 import type { KiloSessionId, SessionSnapshot, SessionSnapshotPageOutcome } from './types';
+import type { SessionSnapshotFailure } from './snapshot-page';
 import { kiloId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
 import type { RemoteAttachmentPart } from './transport';
 
@@ -187,7 +188,7 @@ function createConnection(): FakeUserWebConnection {
 function createTransportWithSinks(opts?: {
   connection?: FakeUserWebConnection;
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onCapabilityChange?: () => void;
@@ -1287,7 +1288,7 @@ describe('CliLiveTransport unified user web connection', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('snapshot unavailable');
+    expect(onError).toHaveBeenCalledWith('snapshot unavailable', undefined);
     expect(chatEvents).toHaveLength(1);
     expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
     transport.destroy();
@@ -3702,9 +3703,10 @@ describe('CliLiveTransport exitSession', () => {
 });
 
 // Page-seam + reconnect: transport uses fetchSnapshotPage for the initial
-// bounded read AND for reconnect/delayed resync replays, but only the initial
-// read fires onInitialPageLoaded. A reconnect must never reset the user's
-// already-advanced older-pages cursor back to the latest 50.
+// bounded read AND for reconnect/delayed resync replays. Only the first page
+// that applies fires onInitialPageLoaded, so a reconnect never resets the
+// user's already-advanced older-pages cursor back to the latest 50 — and a
+// reconnect page that supersedes the in-flight read still seeds it.
 
 type FetchPage = (
   kiloSessionId: KiloSessionId,
@@ -3720,7 +3722,7 @@ type CreatePageTransportOptions = {
     nextCursor: string | null;
     omittedItemCount: number;
   }) => void;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
 };
 
 function createPageTransport(options: CreatePageTransportOptions) {
@@ -3830,6 +3832,53 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     transport.destroy();
   });
 
+  it('seeds the cursor from a reconnect page that supersedes the in-flight initial read', async () => {
+    jest.useFakeTimers();
+    try {
+      const reconnectPage = makeLivePage({ nextCursor: 'cursor-R', omittedItemCount: 1 });
+      // This package's `lib` target predates `Promise.withResolvers`.
+      let resolveInitial!: (page: SessionSnapshotPageOutcome | null) => void;
+      const initialRead = new Promise<SessionSnapshotPageOutcome | null>(resolve => {
+        resolveInitial = resolve;
+      });
+      const fetchSnapshotPage = jest
+        .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+        .mockReturnValueOnce(initialRead)
+        .mockResolvedValueOnce(reconnectPage);
+      const onInitialPageLoaded = jest.fn();
+      const { transport, userWebConnection } = createPageTransport({
+        fetchSnapshotPage,
+        onInitialPageLoaded,
+      });
+
+      transport.connect();
+      await Promise.resolve();
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+
+      // The shared socket reconnects while the connect() read is still in
+      // flight. Its page is the first one that applies, so it must seed the
+      // manager's older-pages cursor even though the connect() read started
+      // first.
+      userWebConnection.emitReconnect();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+      expect(onInitialPageLoaded).toHaveBeenLastCalledWith(reconnectPage);
+
+      // The superseded connect() read lands afterwards: it must not seed a
+      // second time and must not clear the recorded cursor.
+      resolveInitial(makeLivePage({ nextCursor: 'cursor-S' }));
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+      expect(onInitialPageLoaded).toHaveBeenLastCalledWith(reconnectPage);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('does not call onInitialPageLoaded on the delayed resync replay', async () => {
     jest.useFakeTimers();
     try {
@@ -3875,7 +3924,10 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable');
+    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable', {
+      kind: 'retryable_failure',
+      message: 'Session history temporarily unavailable',
+    });
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     // No session.created was emitted because no successful page replayed.
     expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
@@ -3896,7 +3948,10 @@ describe('CliLiveTransport page-seam + reconnect', () => {
       transport.connect();
       await Promise.resolve();
       await Promise.resolve();
-      expect(onError).toHaveBeenCalledWith(failure.expected);
+      expect(onError).toHaveBeenCalledWith(failure.expected, {
+        kind: failure.kind,
+        message: failure.expected,
+      });
       expect(onInitialPageLoaded).not.toHaveBeenCalled();
       transport.destroy();
     }
@@ -3913,7 +3968,7 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session not found');
+    expect(onError).toHaveBeenCalledWith('Session not found', undefined);
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     transport.destroy();
   });

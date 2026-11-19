@@ -14,7 +14,7 @@ import {
   isRetriggerableReviewStatus,
 } from '@kilocode/app-shared/code-review';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { statusMeta } from '@/components/code-reviewer/review-list-screen';
+import { statusMeta } from '@/components/code-reviewer/review-list-rows';
 import {
   findingsEmptyCopyKey,
   flattenCouncilFindings,
@@ -32,16 +32,21 @@ import {
 } from '@/components/code-reviewer/review-detail-sections';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
+import { type HeaderEyebrow } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Card } from '@/components/ui/card';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { i18n } from '@/i18n';
 import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { isPersonal, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
@@ -148,26 +153,29 @@ export function ReviewDetailScreen({
   }
 
   // One header for every state. The eyebrow is the review's repository, which
-  // only the payload knows, so its line is reserved from the first frame: the
-  // title above the body must not move when the review lands — nor when a
-  // refetch drops it back to loading, nor on the error branches that paint the
-  // same header.
-  const header = (
-    <ReviewerHeader
-      title={t('codeReviewer.reviewDetail.title')}
-      eyebrow={loadedReview?.repo_full_name}
-      reserveEyebrow
-    />
-  );
+  // only the payload knows, so its line is reserved while the read is pending —
+  // with the placeholder bar, because the label is on its way — and after the
+  // read stopped, where the same line stays reserved and blank so the title
+  // keeps its place without an animation: a retry re-enters the loading state on
+  // that line, so neither the failure nor the retry moves the title.
+  let eyebrow: HeaderEyebrow = { kind: 'held' };
+  if (loadedReview) {
+    eyebrow = { kind: 'ready', text: loadedReview.repo_full_name };
+  } else if (isLoading) {
+    eyebrow = { kind: 'loading' };
+  }
+  const eyebrowProps = eyebrowHeaderProps(eyebrow);
+  const header = <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} {...eyebrowProps} />;
 
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
         {header}
-        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+        <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-            <Skeleton className="h-14 w-full rounded-lg" />
-            <Skeleton className="h-40 w-full rounded-lg" />
+            <RowSkeleton subtitle />
+            <RowSkeleton subtitle />
+            <RowSkeleton subtitle />
           </Animated.View>
         </TabScreenScrollView>
         {dialog}
@@ -255,7 +263,7 @@ export function ReviewDetailScreen({
         prTitle={review.pr_title}
         statusLabel={meta.label}
       />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         {/* A background poll failure must not blank out an already-loaded review. */}
         {isError && (
           <Text variant="muted" className="text-center text-xs">
@@ -277,12 +285,10 @@ export function ReviewDetailScreen({
         <View className="gap-2">
           <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
           {reviewMessage ? (
-            <View
-              className={cn(
-                'rounded-lg p-3',
-                cancellationLabel ? 'bg-secondary' : 'bg-danger-tile-bg'
-              )}
-            >
+            // A failure keeps the danger tile under it: the red ink alone on
+            // the card surface read as ordinary copy, and the tint is the
+            // palette's own danger token, not a hand-built card fill.
+            <Card className={cancellationLabel ? undefined : 'bg-danger-tile-bg'}>
               <Text
                 variant={cancellationLabel ? 'muted' : undefined}
                 className={cn('text-xs', !cancellationLabel && 'text-destructive')}
@@ -290,23 +296,22 @@ export function ReviewDetailScreen({
               >
                 {reviewMessage}
               </Text>
-            </View>
+            </Card>
           ) : null}
         </View>
 
         {/* Findings: flattened from the council result, paginated in memory. */}
-        <View className="gap-2">
-          <Text className="text-sm font-medium">{t('common.findings')}</Text>
+        <Section label={t('common.findings')}>
           {visibleFindings.length === 0 ? (
             // The empty result sits in the same card as every other section's
             // body, so an ended review reads as a filled section, not a caption.
-            <View className="rounded-lg bg-secondary p-4">
+            <Card>
               <Text variant="muted" className="text-xs">
                 {t(findingsEmptyCopyKey(review.status))}
               </Text>
-            </View>
+            </Card>
           ) : (
-            <View className="gap-2">
+            <View className="gap-3">
               {visibleFindings.map((finding, index) => (
                 <FindingCard key={index} finding={finding} />
               ))}
@@ -322,7 +327,7 @@ export function ReviewDetailScreen({
               ) : null}
             </View>
           )}
-        </View>
+        </Section>
 
         {/* Council: decision plus specialist names/votes as text. */}
         {review.council_result ? <CouncilSection councilResult={review.council_result} /> : null}
@@ -336,9 +341,8 @@ export function ReviewDetailScreen({
         />
 
         {/* Metadata: technical details after the outcome. */}
-        <View className="gap-2">
-          <Text className="text-sm font-medium">{t('common.details')}</Text>
-          <View className="gap-1 rounded-lg bg-secondary p-4">
+        <Section label={t('common.details')}>
+          <Card className="gap-1">
             <MetaRow label={t('common.branch')} value={`${review.head_ref} → ${review.base_ref}`} />
             <MetaRow label={t('common.platform')} value={reviewerPlatformLabel(review.platform)} />
             {review.model ? <MetaRow label={t('common.model')} value={review.model} /> : null}
@@ -365,7 +369,7 @@ export function ReviewDetailScreen({
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
               <MetaRow
                 label={t('common.cost')}
-                value={formatMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
+                value={formatPrefixedMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
               />
             ) : null}
             {tokenUsage.input > 0 || tokenUsage.output > 0 ? (
@@ -377,8 +381,8 @@ export function ReviewDetailScreen({
                 })}
               />
             ) : null}
-          </View>
-        </View>
+          </Card>
+        </Section>
 
         {/* Actions. The pull request is the screen's primary action, so it takes
             the filled primary style; every other action stays secondary. */}
@@ -411,7 +415,7 @@ export function ReviewDetailScreen({
           {/* The transcript is a secondary way to read the same review, so it
               sits beside the primary action and never above the title. */}
           <Button
-            variant="secondary"
+            variant="outline"
             accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
             onPress={() => {
               setTranscriptReviewId(reviewId);

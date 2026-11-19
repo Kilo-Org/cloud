@@ -4,11 +4,13 @@ import {
   buildHomeWidgetDetails,
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
+  emptyHomeWidgetDetails,
+  glanceableSessionTitle,
   homeWidgetRefreshAt,
   homeWidgetDataSchema,
-  HOME_WIDGET_TITLE_LIMIT,
+  homeWidgetResponseSchema,
 } from './home-widget';
-import { GLANCEABLE_STALE_MS } from './glanceable-agents-snapshot';
+import { GLANCEABLE_STALE_MS, GLANCEABLE_TITLE_LIMIT } from './glanceable-agents-snapshot';
 
 const now = Date.parse('2026-10-09T10:00:00.000Z');
 const scope = { userId: 'oauth/private-user', organizationId: null, now };
@@ -58,25 +60,41 @@ describe('Home-only widget policy', () => {
       scheduledAt: '2026-10-09T09:55:00.000Z',
       awaitingUpdate: true,
     });
-    expect(homeWidgetRefreshAt(data, now)).toBe(now + 30 * 60 * 1000);
+    // The wake at 09:55 is past, so the request is its one retry at 10:10.
+    expect(homeWidgetRefreshAt(data, now)).toBe(now + 10 * 60 * 1000);
   });
 
   it('keeps missing titles empty for local fallback and never leaks extra row fields', () => {
     const row = {
       status: 'busy',
-      title: `\n${'x'.repeat(HOME_WIDGET_TITLE_LIMIT + 1)}`,
+      title: `\n${'x'.repeat(GLANCEABLE_TITLE_LIMIT + 1)}`,
       id: 'private-session',
       prompt: 'private-prompt',
       repository: 'private-repository',
     };
     const data = buildHomeWidgetData({ ...scope, sessions: [row] });
     expect(homeWidgetDataSchema.safeParse(data).success).toBe(true);
-    expect(data.details.primaryTitle).toHaveLength(HOME_WIDGET_TITLE_LIMIT);
+    expect(data.details.primaryTitle).toHaveLength(GLANCEABLE_TITLE_LIMIT);
     expect(JSON.stringify(data.snapshot)).not.toContain('xxx');
     for (const forbidden of [row.id, row.prompt, row.repository, scope.userId]) {
       expect(JSON.stringify(data)).not.toContain(forbidden);
     }
     expect(buildHomeWidgetDetails([{ status: 'permission' }]).waitingAgents[0]?.title).toBe('');
+  });
+
+  it('names a session through the shared rule and keeps a title that extends the placeholder', () => {
+    const placeholder = 'New session - 2026-09-22T01:09:45.623Z';
+    expect(glanceableSessionTitle(placeholder)).toBeNull();
+    expect(glanceableSessionTitle(' \n ')).toBeNull();
+    expect(glanceableSessionTitle('Named')).toBe('Named');
+    expect(glanceableSessionTitle(`${placeholder} follow-up`)).toBe(`${placeholder} follow-up`);
+    expect(glanceableSessionTitle('a'.repeat(GLANCEABLE_TITLE_LIMIT + 5))).toHaveLength(
+      GLANCEABLE_TITLE_LIMIT
+    );
+    // The stored details keep the plain cut, so every app build reads a payload.
+    expect(
+      buildHomeWidgetDetails([{ status: 'permission', title: placeholder }]).waitingAgents[0]?.title
+    ).toBe(placeholder);
   });
 
   it('carries only printed characters in a title', () => {
@@ -146,20 +164,20 @@ describe('Home-only widget policy', () => {
     const details = buildHomeWidgetDetails([
       {
         status: 'permission',
-        title: `${'\u200b'.repeat(400)}${'y'.repeat(HOME_WIDGET_TITLE_LIMIT + 10)}`,
+        title: `${'\u200b'.repeat(400)}${'y'.repeat(GLANCEABLE_TITLE_LIMIT + 10)}`,
       },
     ]);
-    expect(details.waitingAgents[0]?.title).toHaveLength(HOME_WIDGET_TITLE_LIMIT);
+    expect(details.waitingAgents[0]?.title).toHaveLength(GLANCEABLE_TITLE_LIMIT);
   });
 
   it('preserves complete emoji at the title limit', () => {
-    for (const padding of [HOME_WIDGET_TITLE_LIMIT - 2, HOME_WIDGET_TITLE_LIMIT - 1]) {
+    for (const padding of [GLANCEABLE_TITLE_LIMIT - 2, GLANCEABLE_TITLE_LIMIT - 1]) {
       const prefix = 'a'.repeat(padding);
       const details = buildHomeWidgetDetails([
         { status: 'permission', title: `\u200b${prefix}🚀next` },
       ]);
       expect(details.primaryTitle).toBe(
-        padding === HOME_WIDGET_TITLE_LIMIT - 2 ? `${prefix}🚀` : prefix
+        padding === GLANCEABLE_TITLE_LIMIT - 2 ? `${prefix}🚀` : prefix
       );
       expect(details.waitingAgents[0]?.title).toBe(details.primaryTitle);
     }
@@ -167,8 +185,8 @@ describe('Home-only widget policy', () => {
 
   it('preserves a joined emoji at the title limit', () => {
     const family = '👨‍👩‍👧';
-    const fits = 'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 8);
-    const overflows = 'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 7);
+    const fits = 'a'.repeat(GLANCEABLE_TITLE_LIMIT - 8);
+    const overflows = 'a'.repeat(GLANCEABLE_TITLE_LIMIT - 7);
     const fitting = buildHomeWidgetDetails([
       { status: 'permission', title: `${fits}${family}next` },
     ]);
@@ -228,6 +246,116 @@ describe('Home-only widget policy', () => {
       canApprove: false,
       approvalKey: null,
     });
+    expect(buildHomeWidgetDetails([{ status: 'permission', title: 'Approve' }]).primaryKind).toBe(
+      'needsInput'
+    );
+    expect(buildHomeWidgetDetails([{ status: 'busy', title: 'Running' }]).primaryKind).toBe(
+      'running'
+    );
+    expect(
+      buildHomeWidgetDetails([
+        { status: 'scheduled', title: 'Soon', scheduledAt: '2026-10-09T11:00:00Z' },
+      ]).primaryKind
+    ).toBe('scheduled');
+    expect(buildHomeWidgetDetails([{ status: 'idle', title: 'Quiet' }]).primaryKind).toBe('idle');
+    expect(buildHomeWidgetDetails([]).primaryKind).toBeNull();
+  });
+
+  it('drops an approval key the schema rejects, keeping a valid key and null unchanged', () => {
+    const malformed = ['', 'a'.repeat(63), 'A'.repeat(64), 'g'.repeat(64), 'a'.repeat(65)];
+    for (const approvalKey of malformed) {
+      const data = buildHomeWidgetData({
+        ...scope,
+        sessions: [{ status: 'permission', title: 'Approve', approvalKey }],
+      });
+      expect(data.details.approvalKey).toBeNull();
+      expect(homeWidgetDataSchema.safeParse(data).success).toBe(true);
+      expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+        canApprove: false,
+        approvalKey: null,
+      });
+    }
+    const valid = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve', approvalKey: 'a'.repeat(64) }],
+    });
+    expect(valid.details.approvalKey).toBe('a'.repeat(64));
+  });
+
+  it('derives the approval key and Approve from one availability rule when the counts differ', () => {
+    const approvalKey = 'a'.repeat(64);
+    // A permission row sets both counts, so a schema-valid payload whose counts
+    // diverge moves one count on the snapshot the builder produced.
+    const approvable = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve', approvalKey }],
+    });
+    const approvableWithoutWait = {
+      ...approvable,
+      snapshot: { ...approvable.snapshot, needsInput: 0 },
+    };
+    expect(homeWidgetDataSchema.safeParse(approvableWithoutWait).success).toBe(true);
+    expect(buildHomeWidgetPresentation(approvableWithoutWait, now)).toMatchObject({
+      canApprove: true,
+      approvalKey,
+    });
+    // No consumer reads `home.approvalKey` without `canApprove`, so a key no
+    // Approve can submit must not leave this policy at all.
+    const waitWithoutApproval = {
+      ...approvable,
+      snapshot: { ...approvable.snapshot, needsApproval: 0 },
+    };
+    expect(homeWidgetDataSchema.safeParse(waitWithoutApproval).success).toBe(true);
+    expect(buildHomeWidgetPresentation(waitWithoutApproval, now)).toMatchObject({
+      canApprove: false,
+      approvalKey: null,
+    });
+    // An approvable count with no valid key offers no Approve and carries no key.
+    const approvalWithoutKey = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve' }],
+    });
+    const approvalWithoutKeyOrWait = {
+      ...approvalWithoutKey,
+      snapshot: { ...approvalWithoutKey.snapshot, needsInput: 0 },
+    };
+    expect(homeWidgetDataSchema.safeParse(approvalWithoutKeyOrWait).success).toBe(true);
+    expect(buildHomeWidgetPresentation(approvalWithoutKeyOrWait, now)).toMatchObject({
+      canApprove: false,
+      approvalKey: null,
+    });
+  });
+
+  it('hides a title whose kind no longer matches the presented kind', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'busy', title: 'Running' }],
+    });
+    data.details = { ...data.details, primaryKind: 'needsInput', primaryTitle: 'Old wait' };
+    expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+      primaryKind: 'running',
+      primaryCount: 1,
+      primaryTitle: null,
+    });
+  });
+
+  it('keeps the title of a stored payload that carries no kind', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve', approvalKey: 'a'.repeat(64) }],
+    });
+    const olderDetails: Record<string, unknown> = { ...data.details };
+    delete olderDetails.primaryKind;
+    const parsed = homeWidgetDataSchema.parse({ snapshot: data.snapshot, details: olderDetails });
+    expect(parsed.details.primaryKind).toBeUndefined();
+    expect(parsed.details.primaryTitle).toBe('Approve');
+    expect(buildHomeWidgetPresentation(parsed, now).primaryTitle).toBe('Approve');
+    // A payload that carries an explicit null kind is the same unknown kind.
+    const nullKind = homeWidgetDataSchema.parse({
+      snapshot: data.snapshot,
+      details: { ...data.details, primaryKind: null },
+    });
+    expect(buildHomeWidgetPresentation(nullKind, now).primaryTitle).toBe('Approve');
   });
 
   it('retains expired counts and honest checkedAt without inventing activity at a missed wake', () => {
@@ -245,7 +373,8 @@ describe('Home-only widget policy', () => {
       primaryCount: 1,
       checkedAt: new Date(now).toISOString(),
       stale: true,
-      awaitingUpdate: true,
+      // The 10:15 wake and its 10:30 retry are long past, so no update is promised.
+      awaitingUpdate: false,
       canCreate: true,
     });
     expect(homeWidgetRefreshAt(data, later)).toBe(later + 30 * 60 * 1000);
@@ -289,6 +418,14 @@ describe('Home-only widget policy', () => {
     });
   });
 
+  it('keeps each terminal payload empty lists its own, so one scope cannot fill another', () => {
+    const first = buildHomeWidgetData({ ...scope, sessions: [], status: 'privacy' });
+    const second = buildHomeWidgetData({ ...scope, sessions: [], status: 'privacy' });
+    first.details.waitingAgents.push({ title: 'Private', kind: 'permission' });
+    expect(second.details.waitingAgents).toEqual([]);
+    expect(emptyHomeWidgetDetails().waitingAgents).toEqual([]);
+  });
+
   it('requests active/quiet cadence and an earlier future wake without tight overdue polling', () => {
     const active = buildHomeWidgetData({ ...scope, sessions: [{ status: 'busy' }] });
     const idle = buildHomeWidgetData({ ...scope, sessions: [{ status: 'idle' }] });
@@ -301,7 +438,52 @@ describe('Home-only widget policy', () => {
     expect(homeWidgetRefreshAt(idle, now)).toBe(now + 2 * 60 * 60 * 1000);
     expect(homeWidgetRefreshAt(empty, now)).toBe(now + 2 * 60 * 60 * 1000);
     expect(homeWidgetRefreshAt(scheduled, now)).toBe(now + 5 * 60 * 1000);
-    expect(homeWidgetRefreshAt(scheduled, now + 5 * 60 * 1000)).toBe(now + 35 * 60 * 1000);
+    // At the wake instant the 15-minute retry is the earliest request.
+    expect(homeWidgetRefreshAt(scheduled, now + 5 * 60 * 1000)).toBe(now + 20 * 60 * 1000);
+  });
+
+  it('retries a passed wake once and then backs off to the active interval', () => {
+    const future = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'scheduled', scheduledAt: '2026-10-09T10:05:00Z' }],
+    });
+    const wake = now + 5 * 60 * 1000;
+    // Before the wake: the wake itself is the request and no update is promised.
+    expect(homeWidgetRefreshAt(future, now)).toBe(wake);
+    expect(buildHomeWidgetPresentation(future, now).awaitingUpdate).toBe(false);
+    expect(buildHomeWidgetPresentationTimeline(future, now).map(entry => entry.at)).toContain(wake);
+
+    const passed = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'scheduled', scheduledAt: '2026-10-09T09:59:00Z' }],
+    });
+    const retry = now + 14 * 60 * 1000;
+    // One minute after the wake, the one retry at wake + 15 minutes is the request.
+    expect(homeWidgetRefreshAt(passed, now)).toBe(retry);
+    expect(buildHomeWidgetPresentation(passed, now).awaitingUpdate).toBe(true);
+    // The retry deadline is still a native boundary while the wake itself is past.
+    expect(buildHomeWidgetPresentationTimeline(passed, now).map(entry => entry.at)).toEqual([
+      now,
+      retry,
+      now + 30 * 60 * 1000,
+    ]);
+    // At the retry deadline the card stops promising an update and backs off.
+    expect(buildHomeWidgetPresentation(passed, retry).awaitingUpdate).toBe(false);
+    expect(homeWidgetRefreshAt(passed, retry)).toBe(retry + 30 * 60 * 1000);
+    // Forty minutes past the wake is ordinary active cadence.
+    const late = now + 39 * 60 * 1000;
+    expect(buildHomeWidgetPresentation(passed, late).awaitingUpdate).toBe(false);
+    expect(homeWidgetRefreshAt(passed, late)).toBe(late + 30 * 60 * 1000);
+
+    const terminal = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'scheduled', scheduledAt: '2026-10-09T09:59:00Z' }],
+    });
+    terminal.snapshot.status = 'signed_out';
+    expect(buildHomeWidgetPresentationTimeline(terminal, now).map(entry => entry.at)).toEqual([
+      now,
+    ]);
+    expect(homeWidgetRefreshAt(terminal, now)).toBe(now + 2 * 60 * 60 * 1000);
   });
 
   it('refreshes uncertain empty snapshots on the active cadence', () => {
@@ -327,17 +509,55 @@ describe('native Home presentation timeline', () => {
     expect(timeline.map(entry => entry.at)).toEqual([
       now,
       now + 5 * 60 * 1000,
+      now + 20 * 60 * 1000,
       now + GLANCEABLE_STALE_MS,
     ]);
     expect(timeline[1]?.home.awaitingUpdate).toBe(true);
-    expect(timeline[2]?.home.stale).toBe(true);
+    // The retry deadline ends the promised update.
+    expect(timeline[2]?.home.awaitingUpdate).toBe(false);
+    expect(timeline[3]?.home.stale).toBe(true);
     for (const entry of timeline) {
       expect(entry.home).toEqual(buildHomeWidgetPresentation(data, entry.at));
     }
     data.snapshot.scheduledAt = new Date(now + GLANCEABLE_STALE_MS).toISOString();
-    expect(buildHomeWidgetPresentationTimeline(data, now)).toHaveLength(2);
-    expect(buildHomeWidgetPresentationTimeline(data, now + GLANCEABLE_STALE_MS)).toHaveLength(1);
+    expect(buildHomeWidgetPresentationTimeline(data, now)).toHaveLength(3);
+    expect(buildHomeWidgetPresentationTimeline(data, now + GLANCEABLE_STALE_MS)).toHaveLength(2);
     data.snapshot.status = 'privacy';
     expect(buildHomeWidgetPresentationTimeline(data, now)).toHaveLength(1);
+  });
+
+  it('keeps every built timeline inside the response schema the client parses', () => {
+    // The published timeline is capped, and a cap below the longest policy
+    // output would make the app silently drop a whole response.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'scheduled', scheduledAt: '2026-10-09T10:05:00Z' }],
+    });
+    const timeline = buildHomeWidgetPresentationTimeline(data, now);
+    expect(timeline).toHaveLength(4);
+    expect(
+      homeWidgetResponseSchema.safeParse({
+        ...data,
+        home: buildHomeWidgetPresentation(data, now),
+        refreshAt: homeWidgetRefreshAt(data, now),
+        presentationTimeline: timeline,
+      }).success
+    ).toBe(true);
+  });
+
+  it('flips the stale flag exactly at the boundary the timeline publishes', () => {
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        { status: 'permission', title: 'Approve', statusUpdatedAt: '2026-10-09T09:55:00Z' },
+      ],
+    });
+    const deadline = now + 30 * 60 * 1000;
+    const timeline = buildHomeWidgetPresentationTimeline(data, now);
+    expect(timeline.map(entry => entry.at)).toEqual([now, deadline]);
+    expect(buildHomeWidgetPresentation(data, deadline - 1).stale).toBe(false);
+    expect(buildHomeWidgetPresentation(data, deadline).stale).toBe(true);
+    expect(timeline[1]?.home.stale).toBe(true);
+    expect(timeline[1]?.home).toEqual(buildHomeWidgetPresentation(data, deadline));
   });
 });

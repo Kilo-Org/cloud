@@ -1,4 +1,5 @@
 import { type KiloMcpState } from '@/lib/chat/kilo-mcp';
+import { type ChatFlag, chatFlagBehind, chatFlagValueOf } from '@/lib/chat/chat-flag';
 import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
 import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
 import { normalizeRemoteMcpUrl } from '@/lib/chat/remote-mcp-url';
@@ -23,6 +24,7 @@ type McpStatusKey =
   | 'modelChat.mcp.available'
   | 'modelChat.mcp.connecting'
   | 'modelChat.mcp.none'
+  | 'modelChat.mcp.notApplied'
   | 'modelChat.mcp.off'
   | 'modelChat.mcp.unauthorized'
   | 'modelChat.mcp.unavailable'
@@ -31,6 +33,7 @@ type McpStatusKey =
 /** The sentence that says what the status means, when one is needed. */
 type McpDescriptionKey =
   | 'modelChat.mcp.noneDescription'
+  | 'modelChat.mcp.notAppliedDescription'
   | 'modelChat.mcp.offDescription'
   | 'modelChat.mcp.unauthorizedDescription'
   | 'modelChat.mcp.unavailableDescription'
@@ -112,8 +115,34 @@ function retryable(kind: 'unauthorized' | 'unreachable' | 'missing' | 'protocol'
   };
 }
 
-export function mcpSettingsView(state: KiloMcpState, enabled: boolean): McpSettingsView {
-  if (!enabled) {
+/**
+ * The not-applied view: the choice is saved, this chat's session is not on it,
+ * and a Retry is what moves the session onto it.
+ *
+ * The switch keeps the saved choice in both directions: a saved **off** whose
+ * move failed draws off, with the same line and the same Retry. Reading the
+ * connection here would claim a tool set the person did not ask for.
+ */
+function behind(flag: ChatFlag): McpSettingsView {
+  return {
+    enabled: chatFlagValueOf(flag, true),
+    toggleable: true,
+    statusKey: 'modelChat.mcp.notApplied',
+    descriptionKey: 'modelChat.mcp.notAppliedDescription',
+    toolCount: 0,
+    retry: true,
+    busy: false,
+    tone: 'warn',
+  };
+}
+
+export function mcpSettingsView(state: KiloMcpState, flag: ChatFlag): McpSettingsView {
+  /* Before the connection branches: a choice this session is not on is about the
+     choice, and no connection state can say whether it landed. */
+  if (chatFlagBehind(flag)) {
+    return behind(flag);
+  }
+  if (!chatFlagValueOf(flag, true)) {
     return OFF;
   }
   if (state.status === 'connecting') {
@@ -136,7 +165,7 @@ export function mcpSettingsView(state: KiloMcpState, enabled: boolean): McpSetti
         statusKey: 'modelChat.mcp.none',
         descriptionKey: 'modelChat.mcp.noneDescription',
         toolCount: 0,
-        retry: false,
+        retry: true,
         busy: false,
         tone: 'warn',
       };

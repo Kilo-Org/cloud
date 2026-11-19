@@ -8,10 +8,9 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { SessionChangesBody } from '@/components/session-changes/session-changes-body';
 import { SessionChangesCommentDialog } from '@/components/session-changes/session-changes-comment-dialog';
 import { SessionChangesReviewSheet } from '@/components/session-changes/session-changes-review-sheet';
@@ -19,8 +18,10 @@ import { useSessionChangesData } from '@/components/session-changes/use-session-
 import { useSessionChangesFile } from '@/components/session-changes/use-session-changes-file';
 import { useSessionChangesReview } from '@/components/session-changes/use-session-changes-review';
 import { Button } from '@/components/ui/button';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { IconButton } from '@/components/ui/icon-button';
 import { RefreshCw } from '@/components/ui/icons';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
@@ -34,7 +35,6 @@ import {
 
 export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string }>) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
   const colors = useThemeColors();
 
   const data = useSessionChangesData(sessionId);
@@ -92,10 +92,11 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
     snapshot,
     legacyDiffQuery,
     legacyFiles,
-    refreshing,
+    feedback,
+    failure,
     refresh,
-    refreshFailed,
   } = data;
+  const refreshing = feedback.status === 'pending';
   const {
     dialog,
     commentTarget,
@@ -140,12 +141,31 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
     return undefined;
   }, [snapshot, legacyDiffQuery.isSuccess, legacyDiffQuery.dataUpdatedAt, t]);
 
+  // The eyebrow is the capture time above the title. Its line is reserved while
+  // a read is pending — with the placeholder bar, because the time is on its way
+  // — and after a read fails, where the same line stays blank so the title keeps
+  // its place without pulsing. It is dropped only when a read settled
+  // successfully without a capture time: the title then centres alone instead of
+  // keeping a line no label fills.
+  const captureReadPending =
+    cloudAgentSessionId === null ? readOnly && legacyDiffQuery.isPending : changesQuery.isPending;
+  const captureReadFailed =
+    cloudAgentSessionId === null ? readOnly && legacyDiffQuery.isError : changesQuery.isError;
+  let eyebrow: HeaderEyebrow = { kind: 'none' };
+  if (asOf !== undefined) {
+    eyebrow = { kind: 'ready', text: asOf };
+  } else if (sessionQuery.isPending || captureReadPending) {
+    eyebrow = { kind: 'loading' };
+  } else if (sessionQuery.isError || captureReadFailed) {
+    eyebrow = { kind: 'held' };
+  }
+  const eyebrowProps = eyebrowHeaderProps(eyebrow);
+
   return (
     <View className="flex-1 bg-background" testID="session-changes-screen">
       <ScreenHeader
         title={openFile === null ? t('common.changes') : openFile.path}
-        eyebrow={asOf}
-        reserveEyebrow
+        {...eyebrowProps}
         titleNumberOfLines={1}
         onBack={
           openFile === null
@@ -168,7 +188,7 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
           )
         }
       />
-      {refreshFailed ? (
+      {failure === null ? null : (
         <Pressable
           onPress={refresh}
           accessibilityRole="button"
@@ -176,9 +196,9 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
           className="border-b border-hair-soft bg-warn-tile-bg px-4 py-2"
           testID="session-changes-refresh-error"
         >
-          <Text className="text-xs text-warn">{t('common.couldNotRefresh')}</Text>
+          <Text className="text-xs text-warn">{failure.message}</Text>
         </Pressable>
-      ) : null}
+      )}
       {sent ? (
         <View className="border-b border-hair-soft bg-secondary px-4 py-2">
           <Text variant="muted" className="text-xs" testID="session-changes-review-sent">
@@ -242,10 +262,7 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
         )}
       </View>
       {draft.comments.length > 0 ? (
-        <View
-          className="flex-row justify-end border-t border-hair-soft bg-background px-4 py-2"
-          style={{ paddingBottom: Math.max(insets.bottom, 8) }}
-        >
+        <ScreenFooter>
           <Button
             onPress={() => {
               setReviewOpen(true);
@@ -256,7 +273,7 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
               {t('agentChat.sessionChanges.reviewTitle', { count: draft.comments.length })}
             </Text>
           </Button>
-        </View>
+        </ScreenFooter>
       ) : null}
       {commentTarget === null ? null : (
         <SessionChangesCommentDialog

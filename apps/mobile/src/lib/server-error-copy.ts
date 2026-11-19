@@ -6,10 +6,11 @@
 // sentences, matched whole; anything unrecognized falls back to the localized
 // generic line, and a raw server sentence never reaches a screen.
 
-import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
 import { ORGANIZATION_INVITE_SEAT_LIMIT_REACHED } from '@kilocode/app-shared/organizations';
 
 import { i18n } from '@/i18n';
+import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** The server's denial message for an organization the caller cannot use. */
@@ -28,6 +29,9 @@ export const ORGANIZATION_TRIAL_EXPIRED_MESSAGE = 'Organization trial has expire
 /** `organizations.members.invite`: the address already belongs to a member. */
 export const ORGANIZATION_MEMBER_EXISTS_MESSAGE =
   'This user is already a member of this organization';
+
+/** `organizations.members.invite`: the organization row is deleted or never existed. */
+const ORGANIZATION_MISSING_MESSAGE = 'This organization is no longer available';
 
 /** `organizations.members.invite`: an invitation for the address is outstanding. */
 export const ORGANIZATION_PENDING_INVITATION_MESSAGE =
@@ -52,11 +56,24 @@ const ORGANIZATION_INVITE_NOT_RESENDABLE_MESSAGE = 'This invitation can no longe
 const ORGANIZATION_INVITE_MISSING_MESSAGE = 'Invitation not found';
 
 /**
+ * `cloudAgentNext.prepareSession` clone rejections that mean the copy was
+ * interrupted rather than the form being wrong: the source transcript changed
+ * while it was read, or the copy's own staging failed. Both carry the stable
+ * code as the message, and both clear on another attempt.
+ */
+const CLONE_SOURCE_CHANGED_MESSAGE = 'source_digest_changed';
+const CLONE_STAGING_FAILED_MESSAGE = 'clone_setup_failed';
+
+/**
  * The i18n key for a server sentence the app explains, or `undefined` when it
  * has none. A `switch` keeps the mapping exhaustive and typo-free without an
  * open string dictionary.
+ *
+ * `canManageBilling` reaches the one sentence whose explanation depends on the
+ * reader: the trial refusal offers the plan step to a role that can take it and
+ * names the owner who can to everyone else.
  */
-function copyKeyFor(message: string): string | undefined {
+function copyKeyFor(message: string, canManageBilling: boolean): string | undefined {
   switch (message) {
     case ORGANIZATION_ACCESS_MESSAGE: {
       return 'agentChat.newSession.checkOrganizationAccess';
@@ -65,7 +82,7 @@ function copyKeyFor(message: string): string | undefined {
       return 'agentChat.session.modelUnavailable';
     }
     case ORGANIZATION_TRIAL_EXPIRED_MESSAGE: {
-      return 'common.organizationTrialEnded';
+      return trialRefusalCopyKey(canManageBilling);
     }
     case ORGANIZATION_MEMBER_EXISTS_MESSAGE: {
       return 'organization.inviteMember.alreadyMember';
@@ -75,6 +92,9 @@ function copyKeyFor(message: string): string | undefined {
     }
     case ORGANIZATION_PENDING_INVITATION_MESSAGE: {
       return 'organization.inviteMember.pendingInvitation';
+    }
+    case ORGANIZATION_MISSING_MESSAGE: {
+      return 'organization.inviteMember.organizationUnavailable';
     }
     case ORGANIZATION_SELF_ROLE_MESSAGE: {
       return 'organization.members.ownRoleChange';
@@ -93,6 +113,12 @@ function copyKeyFor(message: string): string | undefined {
     }
     case ORGANIZATION_INVITE_MISSING_MESSAGE: {
       return 'queryError.notFoundDescription';
+    }
+    case CLONE_SOURCE_CHANGED_MESSAGE:
+    case CLONE_STAGING_FAILED_MESSAGE: {
+      // The source session is still being written to, or the copy's staging
+      // failed: the same clone can be started again once it settles.
+      return 'agentChat.session.cloneFailedRetry';
     }
     case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_found: {
       return 'queryError.notFoundDescription';
@@ -131,18 +157,30 @@ function copyKeyFor(message: string): string | undefined {
  * none. Surfaces that persist a failure (or re-translate it after a language
  * change) keep the key; everything that renders once reads
  * `knownServerErrorMessage`.
+ *
+ * `canManageBilling` selects the reader's copy for the trial refusal; every
+ * other sentence has one explanation and ignores it.
  */
-export function knownServerErrorCopyKey(error: unknown): string | null {
+export function knownServerErrorCopyKey(error: unknown, canManageBilling = false): string | null {
   const message = readTrpcErrorField(error, 'message');
-  return message == null ? null : (copyKeyFor(message) ?? null);
+  return message == null ? null : (copyKeyFor(message, canManageBilling) ?? null);
+}
+
+/**
+ * Whether this rejection is the organization subscription gate's trial
+ * refusal. A surface that shows the refusal to a reader who can change the plan
+ * adds the billing step beside it; every other failure keeps its own recovery.
+ */
+export function isTrialExpiredRefusal(error: unknown): boolean {
+  return readTrpcErrorField(error, 'message') === ORGANIZATION_TRIAL_EXPIRED_MESSAGE;
 }
 
 /**
  * The localized copy for a server rejection the app knows how to explain, or
  * `null` when it carries no explanation of its own.
  */
-export function knownServerErrorMessage(error: unknown): string | null {
-  const key = knownServerErrorCopyKey(error);
+export function knownServerErrorMessage(error: unknown, canManageBilling = false): string | null {
+  const key = knownServerErrorCopyKey(error, canManageBilling);
   return key == null ? null : i18n.t(key);
 }
 
@@ -151,6 +189,6 @@ export function knownServerErrorMessage(error: unknown): string | null {
  * server sentence gets its own explanation, everything else the generic line.
  * Organization surfaces call this instead of reading `error.message`.
  */
-export function organizationErrorMessage(error: unknown): string {
-  return knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong');
+export function organizationErrorMessage(error: unknown, canManageBilling = false): string {
+  return knownServerErrorMessage(error, canManageBilling) ?? i18n.t('common.somethingWentWrong');
 }

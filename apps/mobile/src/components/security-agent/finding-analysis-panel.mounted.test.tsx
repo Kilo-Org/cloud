@@ -36,6 +36,10 @@ const startAnalysis = vi.hoisted(() => ({
   isPending: false,
 }));
 
+const useSecurityAnalysisCapacity = vi.hoisted(() =>
+  vi.fn((_scope: string, _enabled?: boolean) => capacity)
+);
+
 const kvRows = vi.hoisted(() => ({
   labels: [] as string[],
   values: new Map<string, unknown>(),
@@ -53,17 +57,19 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useFocusEffect: () => undefined,
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
   ScanSearch: 'ScanSearch',
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
-  useSecurityAnalysisCapacity: () => capacity,
+  useSecurityAnalysisCapacity,
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useStartSecurityAnalysis: () => startAnalysis,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
     primaryForeground: '#fff',
     foreground: '#000',
@@ -79,7 +85,10 @@ vi.mock('@/components/security-agent/collapsible-section', () => ({
 vi.mock('@/components/security-agent/finding-status-badge', () => ({
   FindingStatusBadge: () => null,
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/kv-row', () => ({
@@ -528,5 +537,38 @@ describe('FindingAnalysisPanel identifier values', () => {
     );
     expect(location, 'the panel draws the located path').toBeDefined();
     expect(location?.props.style).toMatchObject({ direction: 'ltr', writingDirection: 'ltr' });
+  });
+});
+
+describe('FindingAnalysisPanel capacity read activation', () => {
+  // Only a startable analysis needs the admission counters, so the read (and
+  // its full-capacity poll) stays off everywhere else.
+  beforeEach(() => {
+    capacity.state = 'available';
+    capacity.isLoading = false;
+    capacity.isError = false;
+    useSecurityAnalysisCapacity.mockClear();
+  });
+
+  it('reads capacity for an open finding with no analysis yet', () => {
+    renderPanel(analysisFixture({ status: null }));
+
+    expect(useSecurityAnalysisCapacity.mock.lastCall?.[1]).toBe(true);
+  });
+
+  it('skips the capacity read once the finding has a finished analysis', () => {
+    renderPanel(analysisFixture({ status: 'completed' }));
+
+    expect(useSecurityAnalysisCapacity.mock.lastCall?.[1]).toBe(false);
+  });
+
+  it.each([
+    ['while the analysis loads', { isLoading: true }],
+    ['after a failed analysis read', { isError: true }],
+    ['with no analysis response', {}],
+  ] as const)('keeps the capacity read off %s', (_label, props) => {
+    renderPanel(undefined, props);
+
+    expect(useSecurityAnalysisCapacity.mock.lastCall?.[1]).toBeFalsy();
   });
 });

@@ -3,7 +3,14 @@ import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatClockTime, formatCurrency, formatDate, formatDuration } from '@/lib/format';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import {
+  formatClockTime,
+  formatDate,
+  formatDuration,
+  formatPrefixedMoney,
+  formatPrefixedUsd,
+} from '@/lib/format';
 import { useComputeRates } from '@/lib/hooks/use-session-compute';
 import {
   computeHourlyUsdFromCentsPerSecond,
@@ -27,14 +34,22 @@ type SessionComputeSectionProps = {
 function formatComputeAmount(microdollars: number): string {
   return (
     formatSessionTotalCost(microdollars) ??
-    formatCurrency(microdollars / 1_000_000, i18n.language, 4)
+    isolateLtrBidiText(
+      formatPrefixedUsd(microdollars / 1_000_000, i18n.language, {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+      })
+    )
   );
 }
 
 /** The hour rate a charged run was billed at, from its per-second rate. */
 function formatRunRate(rateCentsPerSecond: number): string {
   return i18n.t('cloudAgent.compute.perHour', {
-    rate: formatCurrency(computeHourlyUsdFromCentsPerSecond(rateCentsPerSecond), i18n.language, 2),
+    rate: formatPrefixedMoney(
+      computeHourlyUsdFromCentsPerSecond(rateCentsPerSecond),
+      i18n.language
+    ),
   });
 }
 
@@ -89,7 +104,7 @@ export function SessionComputeSection({
       return null;
     }
     return (
-      <View className="mt-2 gap-2 border-t border-border pt-3">
+      <View className="mt-2 gap-2 border-t-[0.5px] border-hair-soft pt-3">
         <View className="flex-row items-center justify-between gap-3">
           <Text className="text-sm font-semibold text-foreground">
             {t('cloudAgent.compute.title')}
@@ -125,7 +140,10 @@ export function SessionComputeSection({
   );
 
   return (
-    <View className="mt-2 gap-2 border-t border-border pt-3" testID="session-compute-section">
+    <View
+      className="mt-2 gap-2 border-t-[0.5px] border-hair-soft pt-3"
+      testID="session-compute-section"
+    >
       <View className="flex-row items-center justify-between gap-3">
         <Text className="text-sm font-semibold text-foreground">
           {t('cloudAgent.compute.title')}
@@ -175,7 +193,7 @@ export function SessionComputeSection({
                 <Text className="text-xs text-foreground">{label}</Text>
                 <Text className="text-xs text-foreground tabular-nums">
                   {t('cloudAgent.compute.perHour', {
-                    rate: formatCurrency(rate.hourlyUsd, i18n.language, 2),
+                    rate: formatPrefixedMoney(rate.hourlyUsd, i18n.language),
                   })}
                 </Text>
               </View>

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { sessionLiveText } from '@kilocode/session-ingest-contracts';
+import {
+  characterCut,
+  sessionDisplayLine,
+  sessionLiveText,
+} from '@kilocode/session-ingest-contracts';
 
 describe('sessionLiveText', () => {
   it('keeps only the characters it draws', () => {
@@ -41,6 +45,15 @@ describe('sessionLiveText', () => {
   it('still maps line breaks and control characters to one space', () => {
     expect(sessionLiveText('a\u0000b\nc', 40)).toBe('a b c');
     expect(sessionLiveText('  a\u2028\u2029b  ', 40)).toBe('a b');
+    // The C1 range is control too: U+0080, the next-line break U+0085 and the
+    // control-sequence introducer U+009B all draw nothing of their own.
+    expect(sessionLiveText('a\u0080b\u0085c\u009bd', 40)).toBe('a b c d');
+    expect(sessionLiveText('\u0085', 40)).toBeNull();
+  });
+
+  it('maps the C1 range to a space before the white space collapses', () => {
+    expect(sessionDisplayLine('report\u0085fdp.exe')).toBe('report fdp.exe');
+    expect(sessionDisplayLine('a\u0080b\u009fc')).toBe('a b c');
   });
 
   it('cuts on character boundaries, not inside a drawn sequence', () => {
@@ -102,6 +115,38 @@ describe('sessionLiveText', () => {
       vi.stubGlobal('Intl', actual);
       vi.resetModules();
     }
+  });
+
+  it('reads a cap outside the line as a boundary inside it', async () => {
+    const actual = globalThis.Intl;
+    try {
+      vi.stubGlobal('Intl', { Segmenter: undefined });
+      vi.resetModules();
+      // A dynamic import re-evaluates the module, which is the only way to reach
+      // the absent-segmenter branch once the module has cached its segmenter.
+      const { characterCut: withoutSegmenter } =
+        await import('@kilocode/session-ingest-contracts/session-live-summary');
+      for (const line of ['ab\u{1F1F7}\u{1F1F8}cd', 'ab\u{1F600}cd']) {
+        expect(withoutSegmenter(line, line.length)).toBe(line.length);
+        expect(withoutSegmenter(line, line.length + 5)).toBe(line.length);
+        expect(withoutSegmenter(line, 0)).toBe(0);
+        expect(withoutSegmenter(line, -3)).toBe(0);
+      }
+      // In-range caps keep the fallback's code unit boundary. A cap inside a
+      // surrogate pair reads as the pair's start, and the index just past a
+      // flag's first indicator is the boundary between the two indicators.
+      expect(withoutSegmenter('ab\u{1F1F7}\u{1F1F8}cd', 3)).toBe(2);
+      expect(withoutSegmenter('ab\u{1F1F7}\u{1F1F8}cd', 4)).toBe(4);
+      expect(withoutSegmenter('ab\u{1F600}cd', 3)).toBe(2);
+      expect(withoutSegmenter('ab\u{1F600}cd', 4)).toBe(4);
+    } finally {
+      vi.stubGlobal('Intl', actual);
+      vi.resetModules();
+    }
+    // The segmenter branch answers the same two cap ends.
+    const line = 'ab\u{1F600}cd';
+    expect(characterCut(line, line.length + 5)).toBe(line.length);
+    expect(characterCut(line, 0)).toBe(0);
   });
 
   it('reads a segmenter that arrives after an earlier cut', async () => {

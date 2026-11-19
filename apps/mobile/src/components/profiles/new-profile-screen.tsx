@@ -1,5 +1,5 @@
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -18,12 +18,14 @@ import {
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   getProfileOverviewPath,
   type ProfileManagementStack,
@@ -58,6 +60,7 @@ export function NewProfileScreen({
   stack,
   initialOwner,
   returnToCaller = false,
+  backFallback,
   organizationId,
 }: Readonly<{
   /** The Stack this screen is mounted in; the created profile opens in it. */
@@ -73,6 +76,8 @@ export function NewProfileScreen({
    * profile: a caller collecting a profile keeps its own state and place.
    */
   returnToCaller?: boolean;
+  /** Where the header's Back lands when the form opens with no history to pop. */
+  backFallback?: Href;
   /**
    * The organization the caller is scoped to. It replaces the active account
    * for this form, so a caller whose scope is not the active account still
@@ -151,10 +156,10 @@ export function NewProfileScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.newProfile')} />
+      <ScreenHeader title={t('profiles.newProfile')} backFallback={backFallback} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
@@ -171,10 +176,10 @@ export function NewProfileScreen({
         />
 
         {canOwnOrganization ? (
-          <View className="gap-1">
-            <Text className="text-sm font-medium text-foreground">
-              {t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
-            </Text>
+          <View className="gap-1.5">
+            <FormFieldLabel
+              label={t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
+            />
             <SegmentedControl
               // The create carries the organization only when Organization is
               // chosen; the options come from the active context.
@@ -189,7 +194,7 @@ export function NewProfileScreen({
               accessibilityLabel={t(OWNER_LABEL_KEY, { defaultValue: t(OWNER_LABEL_FALLBACK_KEY) })}
             />
             {owner === 'organization' && org ? (
-              <Text className="text-sm text-muted-foreground">{org.organizationName}</Text>
+              <Text variant="muted">{org.organizationName}</Text>
             ) : null}
           </View>
         ) : null}

@@ -9,19 +9,22 @@ import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
 import { MemberRow } from '@/components/organization/member-row';
+import {
+  type MemberRemovalStore,
+  useMemberRemovalFeedback,
+} from '@/components/organization/member-removal-feedback';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
+import { RowGroup, RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SectionHeader } from '@/components/ui/section-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { collator } from '@/lib/intl-cache';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
@@ -34,7 +37,8 @@ import {
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
+import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 import { buildMembersListItems, type MembersListItem } from './members-list-items';
 import { selectOrgListErrorView } from './org-list-error-view';
@@ -62,19 +66,20 @@ function sortInvitedMembers(invites: InvitedOrgMember[]): InvitedOrgMember[] {
   });
 }
 
-function MemberRowSkeleton({ last }: Readonly<{ last?: boolean }>) {
-  return (
-    <View className={!last ? 'border-b-[0.5px] border-hair-soft' : undefined}>
-      <View className="gap-1.5 px-3 py-3">
-        <Skeleton className="h-4 w-32 rounded" />
-        <Skeleton className="h-3 w-44 rounded" />
-      </View>
-    </View>
-  );
-}
+const ListTopPad = () => <View className="pt-3" />;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingTop: 16, flexGrow: 1 } satisfies ViewStyle;
+
+/** The refused removal this row must state, read from the screen-level store. */
+function readRemovalFailure(snapshot: MemberRemovalStore['snapshot'], memberId: string) {
+  const phase = snapshot.states.get(memberId);
+  return phase?.status === 'failed' ? phase.failure : null;
+}
+
+/** One admission per member; the store refuses a second concurrent attempt. */
+function admitRemoval(removals: MemberRemovalStore, memberId: string) {
+  return removals.begin(memberId);
+}
 
 export function OrganizationMembersScreen() {
   const router = useRouter();
@@ -84,6 +89,7 @@ export function OrganizationMembersScreen() {
   const orgWithMembers = useOrgWithMembers(organizationId);
   const { userId: currentUserId } = useCurrentUserId();
   const paddingBottom = useTabBarBottomPadding();
+  const removals = useMemberRemovalFeedback();
 
   const members = orgWithMembers.data?.members ?? [];
   const activeMembers = sortActiveMembers(members.filter(m => isActiveOrgMember(m)));
@@ -94,11 +100,30 @@ export function OrganizationMembersScreen() {
     [activeMembers, invitedMembers]
   );
 
+  const handleRemovalStarted = (memberId: string) => admitRemoval(removals, memberId);
+  // A refused removal renders until the row's next action for that member
+  // supersedes it. The store retires only a failed entry with this match; a
+  // pending attempt is left alone. The failure family has one kind, so any
+  // failure is this row's refusal.
+  const handleRemovalCleared = (memberId: string) => {
+    removals.clear(memberId, () => true);
+  };
+
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.members.title')} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.members.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
+      />
+    );
   }
 
-  const isLoading = orgWithMembers.isLoading;
+  // isPending (no data AND no error) rather than isLoading: an offline paused
+  // fetch has isLoading false but no data — it must keep the list skeleton
+  // instead of rendering a settled body, until the read answers (reconnect)
+  // or the person retries, while a real error still reaches QueryError (the
+  // invariant low-balance-alert-screen states for the same read).
+  const isMembersPending = orgWithMembers.isPending;
   const isError = orgWithMembers.isError && !orgWithMembers.data;
   const enableUsageLimits = orgWithMembers.data?.settings.enable_usage_limits !== false;
   // Web's member card only pairs spend with the limit for a sales-demo
@@ -109,6 +134,13 @@ export function OrganizationMembersScreen() {
   // mirroring the server's `assertOwnerAuthority` and the web's role dropdowns.
   const canManageMembers = canManageOrganization(role);
   const canManageOwners = canManageOrganizationOwners(role);
+  // The self-row gates compare a row's id against the acting id, so they need
+  // a resolved identity: a row whose comparison runs while the identity read
+  // is unresolved (a paused or failed read with no id yet) would read
+  // "not me" for every id, so both gates stay closed until the id exists. The
+  // server still refuses a self role change or self removal; this keeps the
+  // client from offering them.
+  const canManageRow = canManageMembers && currentUserId != null;
 
   const errorView = isError ? selectOrgListErrorView(orgWithMembers.error) : null;
 
@@ -116,6 +148,7 @@ export function OrganizationMembersScreen() {
     <EmptyState
       icon={Users}
       placement={items.length > 0 ? 'top' : 'center'}
+      inset="gutter"
       title={t('organization.members.emptyTitle')}
       description={
         canInvite
@@ -124,74 +157,64 @@ export function OrganizationMembersScreen() {
       }
       action={
         canInvite ? (
-          <Button
-            className={STATE_ACTION_CLASS}
+          <StateAction
+            label={t('organization.inviteMember.title')}
+            icon={UserPlus}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
             }}
-          >
-            <Text className="text-primary-foreground">{t('organization.inviteMember.title')}</Text>
-          </Button>
+          />
         ) : undefined
       }
     />
   );
 
+  // A member's or invite's rounded corners follow its run inside one group: the
+  // rows after a section header start the run, and the last row of the group
+  // closes it. The group is a card, so it keeps the 14pt page gutter inside the
+  // full-bleed list rather than running to the screen edge.
+  const positionOf = (index: number, last: boolean) =>
+    rowGroupPosition({ first: index === 0 || items[index - 1]?.kind === 'section', last });
+
   const renderItem = ({ item, index }: { item: MembersListItem; index: number }) => {
     switch (item.kind) {
       case 'section': {
-        return (
-          <View className="bg-background px-6 pb-2 pt-4">
-            <Text variant="eyebrow">{item.title}</Text>
-          </View>
-        );
+        return <SectionHeader label={item.title} inset />;
       }
       case 'members-empty': {
         return emptyState;
       }
       case 'member': {
-        const isFirst = index === 0 || items[index - 1]?.kind === 'section';
         return (
-          <View
-            className={cn(
-              'mx-6 bg-secondary',
-              isFirst && 'rounded-t-lg',
-              item.last && 'rounded-b-lg'
-            )}
-          >
+          <RowGroupItem position={positionOf(index, item.last)} className="mx-4">
             <MemberRow
               member={item.member}
               canManage={
-                canManageMembers &&
+                canManageRow &&
                 item.member.id !== currentUserId &&
                 (item.member.role !== 'owner' || canManageOwners)
               }
+              canManageLimit={canManageRow && item.member.id !== currentUserId}
               callerRole={role}
               enableUsageLimits={enableUsageLimits}
               isSalesDemo={isSalesDemo}
               organizationId={organizationId}
-              last={item.last}
+              removalFailure={readRemovalFailure(removals.snapshot, item.member.id)}
+              onRemovalStarted={handleRemovalStarted}
+              onRemovalCleared={handleRemovalCleared}
             />
-          </View>
+          </RowGroupItem>
         );
       }
       case 'invite': {
-        const isFirst = index === 0 || items[index - 1]?.kind === 'section';
         return (
-          <View
-            className={cn(
-              'mx-6 bg-secondary',
-              isFirst && 'rounded-t-lg',
-              item.last && 'rounded-b-lg'
-            )}
-          >
+          <RowGroupItem position={positionOf(index, item.last)} className="mx-4">
             <InvitedMemberRow
               invite={item.invite}
               canManage={canManageMembers && (item.invite.role !== 'owner' || canManageOwners)}
               organizationId={organizationId}
-              last={item.last}
             />
-          </View>
+          </RowGroupItem>
         );
       }
       default: {
@@ -202,7 +225,7 @@ export function OrganizationMembersScreen() {
   };
 
   let emptyBody: ReactNode = null;
-  if (!isLoading && errorView) {
+  if (!isMembersPending && errorView) {
     emptyBody = (
       <QueryError
         variant={errorView.variant}
@@ -210,7 +233,7 @@ export function OrganizationMembersScreen() {
         isRetrying={orgWithMembers.isFetching}
       />
     );
-  } else if (!isLoading && items.length === 0) {
+  } else if (!isMembersPending && items.length === 0) {
     emptyBody = emptyState;
   }
 
@@ -218,6 +241,7 @@ export function OrganizationMembersScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('organization.members.title')}
+        backFallback={ORGANIZATION_HUB_PATH}
         headerRight={
           canInvite ? (
             <IconButton
@@ -234,6 +258,8 @@ export function OrganizationMembersScreen() {
       {emptyBody ?? (
         <FlashList
           style={listStyle}
+          // The design gate's proof readiness marker for this route.
+          testID="organization-members-list"
           data={items}
           renderItem={renderItem}
           keyExtractor={item => {
@@ -257,16 +283,16 @@ export function OrganizationMembersScreen() {
             }
           }}
           getItemType={item => item.kind}
+          ListHeaderComponent={<ListTopPad />}
           ListEmptyComponent={
-            <View className="mx-6 rounded-lg bg-secondary">
-              <MemberRowSkeleton />
-              <MemberRowSkeleton />
-              <MemberRowSkeleton last />
-            </View>
+            <RowGroup className="mx-4">
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+            </RowGroup>
           }
           ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={listContentContainerStyle}
         />
       )}
     </View>

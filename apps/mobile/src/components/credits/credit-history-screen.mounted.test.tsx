@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { type CreditPurchaseEntry } from '@/lib/credits/credit-history';
 
 import { PersonalCreditHistoryScreen } from './credit-history-screen';
@@ -48,6 +48,7 @@ const state = vi.hoisted(() => ({
     },
     entries: [] as unknown[],
     hasMore: false,
+    isRetentionLimited: false,
   },
   blocks: {
     data: undefined as unknown,
@@ -73,10 +74,16 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
-vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'min-h-[48px]' }));
+vi.mock('@/lib/a11y/tap-target', () => ({
+  STATE_ACTION_CLASS: 'min-h-[48px]',
+  TOUCH_TARGET_OVERHANG_DP: 8,
+}));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/components/credits/credit-history-rows', () => ({
   PurchaseHistoryRow: 'PurchaseHistoryRow',
@@ -102,7 +109,7 @@ function purchase(overrides: Partial<CreditPurchaseEntry> = {}): CreditPurchaseE
   return {
     id: 'purchase-1',
     date: '2026-11-12T10:00:00.000Z',
-    description: 'Credit purchase',
+    kind: 'purchase',
     amount_mUsd: 10_000_000,
     expiryDate: '2027-11-12T00:00:00.000Z',
     creditSource: 'stripe',
@@ -141,6 +148,7 @@ beforeEach(() => {
   state.purchases.query.fetchNextPage.mockClear();
   state.purchases.entries = [];
   state.purchases.hasMore = false;
+  state.purchases.isRetentionLimited = false;
   state.blocks.data = undefined;
   state.blocks.isError = false;
   state.blocks.isPending = false;
@@ -197,6 +205,67 @@ describe('PersonalCreditHistoryScreen', () => {
 
     expect(nodesOfType(renderer, 'PurchaseHistoryRow')).toHaveLength(1);
     expect(texts(renderer)).not.toContain("Couldn't load credit activity.");
+    unmount();
+  });
+
+  it('keeps the profile tab as the Back destination when there is no history', async () => {
+    state.purchases.entries = [purchase()];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    // A restored route can open with nothing to pop, so the header itself
+    // carries the tab root as the destination its Back lands on.
+    expect(nodesOfType(renderer, 'ScreenHeader')[0]?.props.backFallback).toBe(
+      '/(app)/(tabs)/(3_profile)'
+    );
+    unmount();
+  });
+
+  it('names the retention bound with no Load more at the bound', async () => {
+    state.purchases.entries = [purchase()];
+    state.purchases.isRetentionLimited = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    // The purchase read stopped at the cache's page bound, so the footer names
+    // the bound where "Load more" would otherwise sit.
+    expect(texts(renderer)).toContain(i18n.t('credits.history.retentionLimit'));
+    expect(
+      nodesOfType(renderer, 'Button').some(node => node.props.accessibilityLabel === 'Load more')
+    ).toBe(false);
+    expect(texts(renderer)).not.toContain('Older credit activity is available.');
+    unmount();
+  });
+
+  it('keeps the truncated note and Load more below the bound', async () => {
+    state.purchases.entries = [purchase()];
+    state.purchases.hasMore = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    expect(texts(renderer)).toContain('Older credit activity is available.');
+    expect(texts(renderer)).not.toContain(i18n.t('credits.history.retentionLimit'));
+    expect(
+      nodesOfType(renderer, 'Button').some(node => node.props.accessibilityLabel === 'Load more')
+    ).toBe(true);
+    unmount();
+  });
+
+  it('never renders the two notes together when the impossible flag pairing is forced', async () => {
+    // The hooks can never return the bound flag next to `hasMore: true`, so
+    // force the pairing from the mock side and hold the footer to one note.
+    state.purchases.entries = [purchase()];
+    state.purchases.hasMore = true;
+    state.purchases.isRetentionLimited = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    expect(texts(renderer)).not.toContain(i18n.t('credits.history.retentionLimit'));
+    expect(texts(renderer)).toContain('Older credit activity is available.');
     unmount();
   });
 });

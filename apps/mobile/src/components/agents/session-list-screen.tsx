@@ -6,10 +6,10 @@ import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Bot, History } from '@/components/ui/icons';
+import { Bot, History, SlidersHorizontal, X } from '@/components/ui/icons';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
@@ -29,7 +29,7 @@ import { useLiveSessionQuery } from '@/components/agents/use-live-session-query'
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { SessionListFab } from '@/components/agents/session-list-fab';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
-import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import { FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
 import {
   useAgentsBottomBands,
   useSessionListInsets,
@@ -38,11 +38,10 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
 import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
-import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { IconButton } from '@/components/ui/icon-button';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { STATE_ACTION_CLASS, textActionTargetClass } from '@/lib/a11y/tap-target';
+import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { holdSessionListTouch } from '@/lib/session-list-touch-gate';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
@@ -231,34 +230,32 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
     router.setParams({ status: undefined });
   }, [router]);
 
-  // The header link opens the stored-session list, so it names that surface: a
-  // bare `home.seeAll` here claimed a longer live list that is not on screen
-  // (finding live-now-all).
+  // Both routes into the stored-session list — the header control and the
+  // accepted-empty body link — name that surface: a bare `home.seeAll` here
+  // claimed a longer live list that is not on screen (finding live-now-all),
+  // and two names for one destination read as two different surfaces.
   const historyLabel = t('agents.sessionList.pastSessions');
-  const viewHistoryLabel = t('agents.sessionList.viewHistory');
-  const historyControl = (label: string) => (
+  const openHistory = () => {
+    router.push('/(app)/(tabs)/(2_agents)/history' as Href);
+  };
+  const emptyStateHistoryAction = (
     <Pressable
-      onPress={() => {
-        router.push('/(app)/(tabs)/(2_agents)/history' as Href);
-      }}
+      onPress={openHistory}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={historyLabel}
       testID="agents-view-history-empty"
       className={cn(textActionTargetClass(), 'min-w-0 shrink justify-center active:opacity-70')}
     >
       <Text className="text-sm text-primary" numberOfLines={1}>
-        {label}
+        {historyLabel}
       </Text>
     </Pressable>
   );
-  const viewHistoryAction = historyControl(viewHistoryLabel);
   const historyAction = (
     <IconButton
       accessibilityLabel={historyLabel}
       testID="agents-view-history"
-      onPress={() => {
-        router.push('/(app)/(tabs)/(2_agents)/history' as Href);
-      }}
+      onPress={openHistory}
     >
       <History size={20} color={colors.mutedForeground} />
     </IconButton>
@@ -373,26 +370,20 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const noMatchActions = (
     <View className="flex-row flex-wrap items-center justify-center gap-2">
       {isSearching ? (
-        <Button
-          variant="outline"
-          size={compactEmptyState ? 'sm' : 'default'}
+        <StateAction
+          label={t('common.clearSearch')}
+          icon={X}
           testID="agents-clear-search"
           onPress={clearNoMatchSearch}
-          className={STATE_ACTION_CLASS}
-        >
-          <Text>{t('common.clearSearch')}</Text>
-        </Button>
+        />
       ) : null}
       {filtersNarrow ? (
-        <Button
-          variant="outline"
-          size={compactEmptyState ? 'sm' : 'default'}
+        <StateAction
+          label={t('common.clearFilters')}
+          icon={SlidersHorizontal}
           testID="agents-clear-filters"
           onPress={clearNoMatchFilters}
-          className={STATE_ACTION_CLASS}
-        >
-          <Text>{t('common.clearFilters')}</Text>
-        </Button>
+        />
       ) : null}
     </View>
   );
@@ -430,7 +421,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         organizationId={organizationId}
         refreshControl={refreshControl}
         compact={compactLiveEmptyState}
-        historyAction={viewHistoryAction}
+        historyAction={emptyStateHistoryAction}
       />
     );
   } else if (hasLiveRows) {
@@ -528,7 +519,6 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
               showSearchBusy={false}
               onChangeText={query.handleSearchChange}
               defaultValue={query.searchQuery}
-              compact
               onClearSearch={query.handleClearSearch}
               onFocus={keyboard.handleInputFocus}
               onBlur={keyboard.handleInputBlur}

@@ -4,7 +4,7 @@ import { unstable_readConfig } from 'wrangler';
 
 const config = fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href);
 
-it('bounds production EU processing to 450 direct Frankfurt writer calls, 500 with the hedge consumer', () => {
+it('bounds production EU processing to 450 direct Frankfurt writer calls, 475 with the hedge consumer', () => {
   const production = unstable_readConfig({ config });
   expect(production.services).toEqual([]);
   expect(production.queues.producers).toEqual([
@@ -14,9 +14,9 @@ it('bounds production EU processing to 450 direct Frankfurt writer calls, 500 wi
   ]);
   expect(production.vars.USAGE_WRITER_URL).toBe('https://app.kilo.ai/api/internal/usage/record');
   expect(production.vars.USAGE_INGEST_PARALLELISM).toBe('2');
-  expect(production.vars.USAGE_INGEST_HEDGE_MODE).toBe('off');
+  expect(production.vars.USAGE_INGEST_HEDGE_MODE).toBe('on');
   expect(production.vars.USAGE_INGEST_HEDGE_DELAY_MS).toBe('1000');
-  expect(production.vars.USAGE_INGEST_HEDGE_PERCENT).toBe('50');
+  expect(production.vars.USAGE_INGEST_HEDGE_PERCENT).toBe('100');
   expect(production.vars).not.toHaveProperty('USAGE_INGEST_DIAGNOSTICS');
   expect(production.vars.USAGE_WRITER_SECRET).toBeUndefined();
   expect(production.queues.consumers).toEqual([
@@ -31,7 +31,7 @@ it('bounds production EU processing to 450 direct Frankfurt writer calls, 500 wi
     },
     {
       queue: 'usage-ingest-processing',
-      max_batch_size: 6,
+      max_batch_size: 1,
       max_batch_timeout: 0,
       max_concurrency: 25,
       max_retries: 20,
@@ -44,10 +44,10 @@ it('bounds production EU processing to 450 direct Frankfurt writer calls, 500 wi
     throw new Error('Missing production queue cap');
   const parallelism = Number(production.vars.USAGE_INGEST_PARALLELISM);
   expect(main.max_concurrency * parallelism).toBe(450);
-  expect((main.max_concurrency + hedge.max_concurrency) * parallelism).toBe(500);
+  expect(main.max_concurrency * parallelism + hedge.max_concurrency).toBe(475);
 });
 
-it('keeps staging on one EU queue plus the hedge queue with at most 450 concurrent writer calls', () => {
+it('keeps staging on one EU queue plus the hedge queue with at most 425 concurrent writer calls', () => {
   const staging = unstable_readConfig({ config, env: 'staging' });
   expect(staging.services).toEqual([]);
   expect(staging.vars.USAGE_WRITER_URL).toBe(
@@ -79,13 +79,14 @@ it('keeps staging on one EU queue plus the hedge queue with at most 450 concurre
   let writerBudget = 0;
   for (const consumer of staging.queues.consumers) {
     // Keep the deployed queue policy explicit; the parallelism flag does not change batching.
-    expect(consumer.max_batch_size).toBe(2);
+    expect(consumer.max_batch_size).toBe(consumer.queue.endsWith('-eu') ? 2 : 1);
     expect(consumer.max_batch_timeout).toBe(0);
     expect(consumer.max_retries).toBe(20);
     expect(consumer.retry_delay).toBe(60);
     expect(Number.isInteger(consumer.max_concurrency)).toBe(true);
-    if (typeof consumer.max_concurrency !== 'number') throw new Error('Missing queue cap');
-    writerBudget += consumer.max_concurrency * 2;
+    if (typeof consumer.max_concurrency !== 'number' || typeof consumer.max_batch_size !== 'number')
+      throw new Error('Missing queue cap or batch size');
+    writerBudget += consumer.max_concurrency * Math.min(2, consumer.max_batch_size);
   }
-  expect(writerBudget).toBe(450);
+  expect(writerBudget).toBe(425);
 });

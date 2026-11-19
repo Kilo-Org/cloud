@@ -8,14 +8,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { CenteredState } from '@/components/centered-state';
-import { DestinationOptionRow } from '@/components/destination-option-row';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { type ShareCliSpawnRow } from './share-cli-spawn';
@@ -31,8 +33,6 @@ type ShareDestinationListProps = {
   destinations: readonly ShareDestinationRow[];
   onSelect: (row: ShareDestinationRow) => void;
   onRetry: () => void;
-  /** The stale share's only way out: close the sheet and drop its staged id. */
-  onDismiss: () => void;
   instances: readonly ShareCliSpawnRow[];
   spawningConnectionId: string | null;
   instanceRowsDisabled: boolean;
@@ -66,9 +66,7 @@ function SkeletonRows() {
   return (
     <View>
       {Array.from({ length: SKELETON_COUNT }, (_, i) => (
-        <View key={i} className="py-1.5">
-          <Skeleton className="mx-[22px] h-[76px] rounded-none" />
-        </View>
+        <RowSkeleton key={i} variant="session" subtitle last={i === SKELETON_COUNT - 1} />
       ))}
     </View>
   );
@@ -76,7 +74,7 @@ function SkeletonRows() {
 
 function EmptyMessage({ message }: { message: string }) {
   return (
-    <View className="items-center px-6 pt-8">
+    <View className="items-center px-4 pt-3">
       <Text className="text-center text-sm text-muted-foreground">{message}</Text>
     </View>
   );
@@ -94,23 +92,41 @@ function CliInstanceRows({
   onSpawnInstance: (row: ShareCliSpawnRow) => void;
 }) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   return (
     <View>
-      <SessionListSectionHeader title={t('share.connectedCli')} count={instances.length} />
-      {instances.map(row => (
-        <DestinationOptionRow
-          key={row.connectionId}
-          icon={Terminal}
-          title={row.name}
-          subtitle={row.projectName}
-          accessibilityLabel={t('share.newSessionOn', { name: row.name })}
-          disabled={instanceRowsDisabled}
-          busy={spawningConnectionId === row.connectionId}
-          onPress={() => {
-            onSpawnInstance(row);
-          }}
-        />
-      ))}
+      <SessionListSectionHeader
+        title={t('share.connectedCli')}
+        count={instances.length}
+        accessibilityLabel={t('share.connectedCliAccessibility', {
+          title: t('share.connectedCli'),
+          count: instances.length,
+          displayCount: formatNumber(instances.length, i18n.language),
+        })}
+      />
+      <View className="px-4 pt-3">
+        <RowGroup leadingTile>
+          {instances.map(row => (
+            <ConfigureRow
+              key={row.connectionId}
+              icon={Terminal}
+              title={row.name}
+              subtitle={row.projectName}
+              variant="action"
+              disabled={instanceRowsDisabled}
+              accessibilityLabel={t('share.newSessionOn', { name: row.name })}
+              trailing={
+                spawningConnectionId === row.connectionId ? (
+                  <ActivityIndicator size="small" color={colors.mutedForeground} />
+                ) : undefined
+              }
+              onPress={() => {
+                onSpawnInstance(row);
+              }}
+            />
+          ))}
+        </RowGroup>
+      </View>
     </View>
   );
 }
@@ -121,7 +137,6 @@ export function ShareDestinationList({
   destinations,
   onSelect,
   onRetry,
-  onDismiss,
   instances,
   spawningConnectionId,
   instanceRowsDisabled,
@@ -185,27 +200,19 @@ export function ShareDestinationList({
   let body: ReactNode = null;
 
   if (state.kind === 'stale-share') {
+    // The sheet's header already closes it, so the state repeats no Close
+    // action of its own.
     body = (
       <EmptyState
         className="bg-background"
         icon={Share2}
         title={t('share.staleTitle')}
         description={state.message}
-        action={
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
-            onPress={onDismiss}
-            accessibilityLabel={t('common.close')}
-          >
-            <Text>{t('common.close')}</Text>
-          </Button>
-        }
       />
     );
   } else if (state.kind === 'non-retryable-classification') {
     body = (
-      <CenteredState className="bg-background" contentContainerClassName="px-6">
+      <CenteredState className="bg-background" contentContainerClassName="px-4">
         <Text className="text-center text-sm text-muted-foreground">{state.message}</Text>
       </CenteredState>
     );
@@ -216,7 +223,7 @@ export function ShareDestinationList({
     (state.kind === 'empty' || (state.kind === 'happy' && filtered.length === 0))
   ) {
     body = (
-      <CenteredState className="bg-background" contentContainerClassName="px-6">
+      <CenteredState className="bg-background" contentContainerClassName="px-4">
         <Text className="text-center text-sm text-muted-foreground">
           {state.kind === 'empty' ? state.message : t('share.noMatchingSessions')}
         </Text>
@@ -227,7 +234,9 @@ export function ShareDestinationList({
     if (state.kind === 'loading') {
       emptyContent = <SkeletonRows />;
     } else if (state.kind === 'retryable') {
-      emptyContent = <QueryError message={state.message} onRetry={onRetry} placement="top" />;
+      emptyContent = (
+        <QueryError message={state.message} onRetry={onRetry} placement="top" inset="gutter" />
+      );
     } else if (state.kind === 'empty') {
       emptyContent = <EmptyMessage message={state.message} />;
     } else if (search.trim()) {

@@ -5,15 +5,15 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SectionHeader } from '@/components/home/section-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
-import { ScreenHeader } from '@/components/screen-header';
+import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { TodoNotesSection } from '@/components/todos/todo-notes-section';
 import { TodoSessionRow } from '@/components/todos/todo-session-row';
 import { TodoStartActions } from '@/components/todos/todo-start-actions';
+import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { Circle, CircleCheck } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,8 +22,9 @@ import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTodoItem, useTodoItemMutations } from '@/lib/hooks/use-todos';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
-import { selectTodoQueryErrorView } from '@/lib/todos/todo-query-error';
+import { selectTodoItemQueryErrorView } from '@/lib/todos/todo-query-error';
 import { type TodoItemDetail } from '@/lib/todos/todo-types';
 
 const LISTS_HREF = '/(app)/(tabs)/(2_agents)' as Href;
@@ -85,7 +86,7 @@ function TodoDonePrompt({ todo }: Readonly<{ todo: TodoItemDetail }>) {
 
 function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const { update, unlinkSession } = useTodoItemMutations(todo.listId);
   const now = useNowTicker(60_000);
   const [renaming, setRenaming] = useState(false);
@@ -108,10 +109,14 @@ function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: bottom + 24 }}
+          contentContainerStyle={{ paddingBottom: bottomClearance }}
         >
           <TodoDonePrompt todo={todo} />
           <TodoNotesSection todo={todo} />
+          {/* The notes block above ends flush, so the sessions header owns the
+              break between the two sections: its own `py-2` leaves the label the
+              same 8 dp of air every other section header has, above and below
+              the line. */}
           <SectionHeader label={t('todos.item.sessions')} />
           {todo.sessions.length === 0 ? (
             <Text className="px-4 pb-2 text-sm text-ink2">{t('todos.item.noSessions')}</Text>
@@ -151,27 +156,36 @@ function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
 
 /** One to-do: its title over its list, Markdown notes, linked sessions, and the ways to reach or start one. */
 export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
+  const { t } = useTranslation();
   const query = useTodoItem(itemId);
   const todo = query.data;
-  const errorView = selectTodoQueryErrorView(query.error);
+  const errorView = selectTodoItemQueryErrorView(query.error);
 
   if (todo) {
     return <TodoDetailBody key={todo.id} todo={todo} />;
   }
 
+  // A live read keeps the loaded header's geometry: the only line it cannot
+  // name yet is the to-do's list, so the eyebrow line stays reserved with the
+  // placeholder bar over it, and the body lands without moving. A read that
+  // stopped has no label coming without a retry, so the terminal states wear
+  // the plain header — the title and the back control on its first line.
+  const eyebrow: HeaderEyebrow = query.isError ? { kind: 'none' } : { kind: 'loading' };
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title=""
+        title={t('todos.segment.todos')}
         titleNumberOfLines={2}
         reserveTitleSpace
-        reserveEyebrow
+        {...eyebrowHeaderProps(eyebrow)}
         backFallback={LISTS_HREF}
       />
       {query.isError ? (
+        // The state is the whole body under the header, so it centres in it
+        // rather than pinning to its top (the placement rule: centre owns the
+        // surface, top only sits under intro text or controls).
         <QueryError
           variant={errorView.variant}
-          placement="top"
           onRetry={errorView.showRetry ? () => void query.refetch() : undefined}
           isRetrying={query.isFetching}
         />

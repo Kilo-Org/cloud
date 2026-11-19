@@ -3,11 +3,9 @@ import { PlugZap, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { usePathname } from 'expo-router';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { GitHubIcon } from '@/components/icons/github-icon';
 import { PrReviewGateActionGroup } from '@/components/pr-review/pr-review-gate-action-group';
 import { PrReviewGateHeader } from '@/components/pr-review/pr-review-gate-header';
@@ -15,10 +13,7 @@ import { PrReviewGateItemLine } from '@/components/pr-review/pr-review-gate-item
 import { PrReviewGateLoading } from '@/components/pr-review/pr-review-gate-loading';
 import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-connect-gate';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import {
   PR_REVIEW_GATE_ICON_TILE_CLASS,
@@ -27,7 +22,6 @@ import {
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform, type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
-import { cn } from '@/lib/utils';
 
 type PrReviewConnectGateProps = {
   readonly children: ReactNode;
@@ -42,7 +36,7 @@ type PrReviewConnectGateProps = {
   /**
    * The PR/MR the route opened, when it names one. The gate prints it above
    * the account line so the reader can tell which item they are connecting
-   * for; a mount with no known item (the entry route) keeps the generic copy.
+   * for; a mount with no known item keeps the generic copy.
    */
   readonly prRef?: ProviderPrRef;
 };
@@ -69,14 +63,19 @@ type PrReviewConnectGateProps = {
  *  - non-retryable: Bitbucket personal → org-only explanation, no CTA
  *
  * The entry screen is provider-neutral — a pasted GitLab or Bitbucket link
- * must work for a user with no GitHub connection — so the gate is a
- * pass-through there; the provider gates protect each detail route.
+ * must work for a user with no GitHub connection — so it mounts no gate at all;
+ * the provider gates protect each detail route.
  *
  * The GitHub CTA calls `githubApps.connectUserAuthorization` and opens the
  * returned URL with the shared auth-session launcher. Backing out of the sign-in
  * sheet returns the CTA to idle so the user can retry, on both platforms; there
  * is nothing to roll back because the auth flow is server-driven, and the status
  * re-check runs without holding the CTA.
+ *
+ * Each mount decides its arm from its own props, never from the route on top:
+ * an overlay route (a picker sheet, for example) changes the app-wide pathname
+ * while the screen under it stays mounted, and a mount that read that pathname
+ * would swap its own content for a gate the reader never asked for.
  */
 export function PrReviewConnectGate({
   children,
@@ -84,13 +83,6 @@ export function PrReviewConnectGate({
   organizationId = null,
   prRef,
 }: PrReviewConnectGateProps) {
-  const pathname = usePathname();
-  // The entry route (`(app)/pr-review` → pathname `/pr-review`) is the one
-  // PR-review surface that serves all three providers at once; gating it on
-  // any single connection would lock out the other two.
-  if (pathname === '/pr-review') {
-    return <>{children}</>;
-  }
   if (platform === 'github') {
     return <GitHubConnectGate prRef={prRef}>{children}</GitHubConnectGate>;
   }
@@ -107,7 +99,6 @@ function GitHubConnectGate({
 }: Readonly<{ children: ReactNode; prRef?: ProviderPrRef }>) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const colors = useThemeColors();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
@@ -229,24 +220,15 @@ function GitHubConnectGate({
           }
           action={
             <PrReviewGateActionGroup>
-              <Button
-                className={cn('w-full flex-row gap-2', STATE_ACTION_CLASS)}
+              <StateAction
+                label={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
+                icon={GitHubIcon}
+                loading={connecting}
                 disabled={connecting}
                 onPress={() => {
                   void handleConnect();
                 }}
-              >
-                <View className="size-4 items-center justify-center">
-                  {connecting ? (
-                    <ActivityIndicator size="small" color={colors.primaryForeground} />
-                  ) : (
-                    <GitHubIcon size={16} color={colors.primaryForeground} />
-                  )}
-                </View>
-                <Text>
-                  {revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
-                </Text>
-              </Button>
+              />
             </PrReviewGateActionGroup>
           }
         />

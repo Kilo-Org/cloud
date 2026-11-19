@@ -1,7 +1,21 @@
 import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
-import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  existingChatWorkspaceSettingsError,
+  hasExistingChatWorkspaceSettings,
+  triggerChatIdRequired,
+  triggerChatIdSchema,
+  triggerChatRequiresCreator,
+  webhookTriggerTargetSchema,
+} from '@kilocode/worker-utils/webhook-trigger-target';
+import { checkWorkspaceChatTarget } from '@kilocode/worker-utils/cloud-agent-session-access';
+import {
+  createTRPCRouter,
+  baseProcedure,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateCloudAgentToken } from '@kilocode/web-shared/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -13,12 +27,15 @@ import {
   type EnvironmentResponse,
 } from '@kilocode/cloud-agent-profile';
 import { TRPCError } from '@trpc/server';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
+import pLimit from 'p-limit';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
 import {
   cloud_agent_webhook_triggers,
+  cli_sessions_v2,
+  cloud_agent_worktrees,
   organization_memberships,
   agent_environment_profiles,
   kiloclaw_instances,
@@ -33,6 +50,7 @@ import {
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
+import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
 import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import {
   triggerIdSchema,
@@ -60,25 +78,24 @@ import {
 
 const TRIGGER_WRITE_ROLES: OrganizationRole[] = ['owner', 'admin', 'member'];
 
-// Input schemas
-const variantSchema = z
-  .string()
-  .max(50)
-  .regex(/^[a-zA-Z]+$/);
+// `list` reads the worker once per row to answer editability. The cap keeps a
+// large organization's list from turning one query into an unbounded burst.
+const TRIGGER_EDITABILITY_CONCURRENCY = 4;
 
 export const WebhookTriggerCreateInput = z
   .object({
     triggerId: triggerIdCreateSchema,
     organizationId: z.string().uuid().optional(),
     runAsCreator: z.boolean().optional(),
-    targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
+    targetType: webhookTriggerTargetSchema.default('cloud_agent'),
+    cloudAgentSessionId: triggerChatIdSchema.optional(),
     // KiloClaw Chat target fields
     kiloclawInstanceId: z.string().uuid().optional(),
     // Cloud Agent target fields (optional — required only when targetType = 'cloud_agent')
     githubRepo: z.string().min(1, 'GitHub repo is required').optional(),
     mode: webhookTriggerModeSchema.optional(),
     model: z.string().min(1, 'Model is required').optional(),
-    variant: variantSchema.optional(),
+    variant: agentVariantSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
     environmentId: z.string().uuid().nullable().optional(),
     profileId: z.string().uuid().nullable().optional(),
@@ -104,7 +121,7 @@ export const WebhookTriggerCreateInput = z
   .superRefine((data, ctx) => {
     if (
       data.bodySchema != null &&
-      (data.targetType !== 'cloud_agent' || data.activationMode !== 'webhook')
+      (data.targetType === 'kiloclaw_chat' || data.activationMode !== 'webhook')
     ) {
       ctx.addIssue({
         code: 'custom',
@@ -113,7 +130,7 @@ export const WebhookTriggerCreateInput = z
       });
     }
     if (data.runAsCreator) {
-      if (!data.organizationId || data.targetType !== 'cloud_agent') {
+      if (!data.organizationId || data.targetType === 'kiloclaw_chat') {
         ctx.addIssue({
           code: 'custom',
           message: 'Run as creator is only available for organization Cloud Agent triggers',
@@ -173,12 +190,38 @@ export const WebhookTriggerCreateInput = z
         });
       }
     }
-    if (data.targetType === 'cloud_agent') {
-      if (!data.githubRepo)
-        ctx.addIssue({ code: 'custom', message: 'GitHub repo is required', path: ['githubRepo'] });
+    if (data.targetType === 'cloud_agent' && !data.githubRepo) {
+      ctx.addIssue({ code: 'custom', message: 'GitHub repo is required', path: ['githubRepo'] });
+    }
+    if (data.targetType !== 'kiloclaw_chat') {
       if (!data.mode) ctx.addIssue({ code: 'custom', message: 'Mode is required', path: ['mode'] });
       if (!data.model)
         ctx.addIssue({ code: 'custom', message: 'Model is required', path: ['model'] });
+    }
+    if (data.targetType === 'cloud_agent_chat') {
+      if (!data.cloudAgentSessionId) {
+        ctx.addIssue({
+          code: 'custom',
+          message: triggerChatIdRequired,
+          path: ['cloudAgentSessionId'],
+        });
+      }
+      if (data.organizationId && !data.runAsCreator) {
+        ctx.addIssue({
+          code: 'custom',
+          message: triggerChatRequiresCreator,
+          path: ['runAsCreator'],
+        });
+      }
+      if (hasExistingChatWorkspaceSettings(data)) {
+        ctx.addIssue({ code: 'custom', message: existingChatWorkspaceSettingsError });
+      }
+    } else if (data.cloudAgentSessionId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'A chat ID is only used for an existing chat target.',
+        path: ['cloudAgentSessionId'],
+      });
     }
     if (data.targetType === 'kiloclaw_chat') {
       if (!data.kiloclawInstanceId)
@@ -204,15 +247,18 @@ export const WebhookTriggerCreateInput = z
     }
   });
 
-// Note: targetType and kiloclawInstanceId are immutable after creation.
-// To change the target type or instance, delete and recreate the trigger.
 export const WebhookTriggerUpdateInput = z
   .object({
     triggerId: triggerIdSchema,
     organizationId: z.string().uuid().optional(),
+    cloudAgentSessionId: z
+      .never({
+        error: 'The target chat cannot be changed. Create a new trigger to use a different chat.',
+      })
+      .optional(),
     mode: webhookTriggerModeSchema.optional(),
     model: z.string().min(1).optional(),
-    variant: variantSchema.nullable().optional(),
+    variant: agentVariantSchema.nullable().optional(),
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
     environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().min(1).max(10000).optional(),
@@ -337,6 +383,48 @@ function assertCanEditExecutionUserTrigger(
   });
 }
 
+/**
+ * Whether an organization viewer may write a trigger, and why not when they may
+ * not — the same rule `assertCanEditExecutionUserTrigger` enforces on update and
+ * `ensureOrganizationAccess` enforces on the router. A caller that renders a
+ * write control needs the answer before the person taps it.
+ */
+function triggerEditability(
+  actorRole: OrganizationRole | undefined,
+  executionUserId: string | null,
+  userId: string
+): { canEdit: boolean; canEditReason: WebhookTriggerEditRestriction | null } {
+  const canEdit =
+    actorRole !== undefined &&
+    TRIGGER_WRITE_ROLES.includes(actorRole) &&
+    (!executionUserId || executionUserId === userId || canManageOrganization(actorRole));
+  // A creator-run trigger names its creator only when that is someone else.
+  const creatorRunLock = executionUserId !== null && executionUserId !== userId;
+  return { canEdit, canEditReason: canEdit ? null : creatorRunLock ? 'creator_run' : 'role' };
+}
+
+/**
+ * The viewer's role for a trigger surface: the write role they hold when they
+ * hold one, otherwise their highest-priority role for read access. `list` must
+ * resolve this exactly as `get` does, or a row's write control disagrees with
+ * the screen it opens — a child-org member who also inherits a parent-org
+ * billing manager role resolves to `billing_manager` unfiltered, which no
+ * trigger write accepts.
+ */
+async function resolveTriggerViewerRole(
+  ctx: TRPCContext,
+  organizationId: string
+): Promise<OrganizationRole> {
+  try {
+    return await ensureOrganizationAccess(ctx, organizationId, TRIGGER_WRITE_ROLES);
+  } catch (error) {
+    if (!(error instanceof TRPCError) || error.code !== 'UNAUTHORIZED') {
+      throw error;
+    }
+    return ensureOrganizationAccess(ctx, organizationId);
+  }
+}
+
 async function getOrganizationTriggerExecutionUserId(
   organizationId: string,
   triggerId: string,
@@ -359,6 +447,27 @@ async function getOrganizationTriggerExecutionUserId(
 function assertCreatorWebhookSecretStrength(secret: string): void {
   if (secret.trim().length < MIN_CREATOR_WEBHOOK_SECRET_LENGTH) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE });
+  }
+}
+
+async function assertExistingChatTarget(
+  cloudAgentSessionId: string | null | undefined,
+  userId: string,
+  organizationId: string | undefined
+): Promise<void> {
+  if (!cloudAgentSessionId) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: triggerChatIdRequired });
+  }
+  const failure = await checkWorkspaceChatTarget(db, {
+    cloudAgentSessionId,
+    userId,
+    organizationId: organizationId ?? null,
+  });
+  if (failure) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Cloud Agent chat not found or not accessible',
+    });
   }
 }
 
@@ -451,7 +560,12 @@ async function getSandboxSelection(
   githubRepo?: string
 ): Promise<SandboxSelectionCapabilities | undefined> {
   if (!organizationId) return undefined;
-  return createCloudAgentNextClient(generateCloudAgentToken(user)).getSandboxSelectionOptions(
+  const workflowUser = await prepareCloudAgentWorkflowUser(user);
+  const token = generateCloudAgentWorkflowToken(workflowUser, {
+    tokenSource: 'webhook-trigger',
+    expiresIn: TOKEN_EXPIRY.oneHour,
+  });
+  return createCloudAgentNextClient(token).getSandboxSelectionOptions(
     sandboxSelectionInput(organizationId, githubRepo)
   );
 }
@@ -509,6 +623,46 @@ async function assertSandboxAllocationAvailable(
 }
 
 export const webhookTriggersRouter = createTRPCRouter({
+  listChatTargets: baseProcedure
+    .input(z.object({ organizationId: z.string().uuid().optional() }))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) await ensureOrganizationAccess(ctx, input.organizationId);
+      const userId = ctx.user.id;
+      const chatScope = input.organizationId
+        ? eq(cli_sessions_v2.organization_id, input.organizationId)
+        : isNull(cli_sessions_v2.organization_id);
+      const workspaceScope = input.organizationId
+        ? eq(cloud_agent_worktrees.organization_id, input.organizationId)
+        : isNull(cloud_agent_worktrees.organization_id);
+      const chats = await db
+        .select({
+          id: cli_sessions_v2.cloud_agent_session_id,
+          title: cli_sessions_v2.title,
+          workspaceName: cloud_agent_worktrees.name,
+        })
+        .from(cli_sessions_v2)
+        .innerJoin(
+          cloud_agent_worktrees,
+          eq(cli_sessions_v2.cloud_agent_worktree_id, cloud_agent_worktrees.worktree_id)
+        )
+        .where(
+          and(
+            eq(cli_sessions_v2.kilo_user_id, userId),
+            eq(cloud_agent_worktrees.kilo_user_id, userId),
+            chatScope,
+            workspaceScope,
+            isNotNull(cli_sessions_v2.cloud_agent_session_id),
+            isNull(cloud_agent_worktrees.deletion_started_at)
+          )
+        )
+        .orderBy(desc(cli_sessions_v2.updated_at))
+        .limit(50);
+      return chats.flatMap(chat => {
+        const id = triggerChatIdSchema.safeParse(chat.id);
+        return id.success ? [{ ...chat, id: id.data }] : [];
+      });
+    }),
+
   capabilities: baseProcedure
     .input(
       z.object({
@@ -534,21 +688,33 @@ export const webhookTriggersRouter = createTRPCRouter({
   /**
    * List triggers for current user or organization.
    * Reads from PostgreSQL only (can't enumerate DOs).
+   *
+   * `withEditability` also answers, per organization row, whether this viewer
+   * may write it — the question `get` answers for one trigger. That answer
+   * depends on the execution identity the worker holds for a run-as-creator
+   * trigger, so it costs one worker read per row, capped and isolated per row:
+   * a worker failure leaves that row at what the viewer's role alone allows
+   * rather than failing a list the database can serve. A surface that renders a
+   * write control per row asks for it and the web list, which does not, keeps
+   * its single database read. Without the flag an organization row reports
+   * `canEdit: null` (unknown), never a guessed `false`.
    */
   list: baseProcedure
     .input(
       z.object({
         organizationId: z.string().uuid().optional(),
-        targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).optional(),
+        targetType: webhookTriggerTargetSchema.optional(),
         activationMode: z.enum(['webhook', 'scheduled']).optional(),
+        withEditability: z.boolean().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
       const userId = ctx.user.id;
 
       // Verify org membership if organizationId provided
+      let actorRole: OrganizationRole | undefined;
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        actorRole = await resolveTriggerViewerRole(ctx, input.organizationId);
       }
 
       // Query PostgreSQL with ownership + optional target type filter
@@ -559,8 +725,9 @@ export const webhookTriggersRouter = createTRPCRouter({
             isNull(cloud_agent_webhook_triggers.organization_id)
           );
       const filters = [ownerFilter];
-      if (input.targetType)
+      if (input.targetType) {
         filters.push(eq(cloud_agent_webhook_triggers.target_type, input.targetType));
+      }
       if (input.activationMode)
         filters.push(eq(cloud_agent_webhook_triggers.activation_mode, input.activationMode));
       const whereClause = and(...filters);
@@ -583,7 +750,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         .where(whereClause)
         .orderBy(cloud_agent_webhook_triggers.created_at);
 
-      return triggers.map(trigger => ({
+      const rows = triggers.map(trigger => ({
         ...trigger,
         inboundUrl: buildInboundUrl(
           input.organizationId ? undefined : userId,
@@ -591,6 +758,47 @@ export const webhookTriggersRouter = createTRPCRouter({
           trigger.triggerId
         ),
       }));
+
+      // One row shape for every branch: a caller's type must not depend on the
+      // scope or the flag, or a cache write of one list cannot accept another.
+      const projectRow = (
+        row: (typeof rows)[number],
+        canEdit: boolean | null,
+        canEditReason: WebhookTriggerEditRestriction | null
+      ) => ({ ...row, canEdit, canEditReason });
+
+      const organizationId = input.organizationId;
+      const readsEditability = organizationId !== undefined && input.withEditability === true;
+      const limit = pLimit(TRIGGER_EDITABILITY_CONCURRENCY);
+      return Promise.all(
+        rows.map(row =>
+          limit(async () => {
+            if (organizationId === undefined) {
+              return projectRow(row, true, null);
+            }
+            if (!readsEditability) {
+              return projectRow(row, null, null);
+            }
+            // The worker client throws on a transient error. That is one row's
+            // unknown execution identity, not a reason to fail a list the
+            // database can serve, so it degrades exactly like `found: 'error'`
+            // and keeps what the viewer's role alone allows.
+            let executionUserId: string | null = null;
+            try {
+              const workerResult = await getWorkerTrigger(undefined, organizationId, row.triggerId);
+              executionUserId =
+                workerResult.found === true ? (workerResult.config.executionUserId ?? null) : null;
+            } catch (error) {
+              console.error('Worker request failed while reading list editability', {
+                triggerId: row.triggerId,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+            const editability = triggerEditability(actorRole, executionUserId, userId);
+            return projectRow(row, editability.canEdit, editability.canEditReason);
+          })
+        )
+      );
     }),
 
   /**
@@ -609,18 +817,7 @@ export const webhookTriggersRouter = createTRPCRouter({
 
       let actorRole: OrganizationRole | undefined;
       if (input.organizationId) {
-        try {
-          actorRole = await ensureOrganizationAccess(
-            ctx,
-            input.organizationId,
-            TRIGGER_WRITE_ROLES
-          );
-        } catch (error) {
-          if (!(error instanceof TRPCError) || error.code !== 'UNAUTHORIZED') {
-            throw error;
-          }
-          actorRole = await ensureOrganizationAccess(ctx, input.organizationId);
-        }
+        actorRole = await resolveTriggerViewerRole(ctx, input.organizationId);
       }
 
       // Verify ownership via PostgreSQL
@@ -662,21 +859,15 @@ export const webhookTriggersRouter = createTRPCRouter({
       );
 
       const executionUserId = workerResult.config.executionUserId ?? null;
-      const canEdit =
-        !input.organizationId ||
-        (actorRole !== undefined &&
-          TRIGGER_WRITE_ROLES.includes(actorRole) &&
-          (!executionUserId || executionUserId === userId || canManageOrganization(actorRole)));
+      // A trigger of the viewer's own is always theirs to change.
+      const { canEdit, canEditReason } = input.organizationId
+        ? triggerEditability(actorRole, executionUserId, userId)
+        : { canEdit: true, canEditReason: null };
       const canRun = !input.organizationId
         ? !executionUserId || executionUserId === userId
         : actorRole !== undefined &&
           TRIGGER_WRITE_ROLES.includes(actorRole) &&
           (!executionUserId || executionUserId === userId);
-      const canEditReason: WebhookTriggerEditRestriction = canEdit
-        ? null
-        : executionUserId && executionUserId !== userId
-          ? 'creator_run'
-          : 'role';
 
       return {
         ...workerResult.config,
@@ -716,6 +907,10 @@ export const webhookTriggersRouter = createTRPCRouter({
           message: 'Run as creator requires direct organization membership',
         });
       }
+    }
+
+    if (input.targetType === 'cloud_agent_chat') {
+      await assertExistingChatTarget(input.cloudAgentSessionId, userId, input.organizationId);
     }
 
     if (input.sandboxAllocation !== undefined) {
@@ -791,6 +986,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           user_id: input.organizationId ? null : userId,
           organization_id: input.organizationId ?? null,
           target_type: input.targetType,
+          cloud_agent_session_id: input.cloudAgentSessionId ?? null,
           activation_mode: input.activationMode,
           kiloclaw_instance_id: input.kiloclawInstanceId ?? null,
           github_repo: input.githubRepo ?? null,
@@ -822,6 +1018,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         input.triggerId,
         {
           targetType: input.targetType,
+          cloudAgentSessionId: input.cloudAgentSessionId,
           executionUserId: input.runAsCreator ? userId : undefined,
           kiloclawInstanceId: input.kiloclawInstanceId,
           githubRepo: input.githubRepo,
@@ -926,6 +1123,37 @@ export const webhookTriggersRouter = createTRPCRouter({
       }
     }
 
+    const hasConfigurationUpdates = [
+      input.mode,
+      input.model,
+      input.variant,
+      input.sandboxAllocation,
+      input.environmentId,
+      input.promptTemplate,
+      input.profileId,
+      input.bodySchema,
+      input.autoCommit,
+      input.condenseOnComplete,
+      input.webhookAuth,
+      input.cronExpression,
+      input.cronTimezone,
+    ].some(value => value !== undefined);
+    const isDeactivationOnly = input.isActive === false && !hasConfigurationUpdates;
+
+    if (dbTrigger.target_type === 'cloud_agent_chat' && !isDeactivationOnly) {
+      if (input.organizationId && !executionUserId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: triggerChatRequiresCreator });
+      }
+      if (hasExistingChatWorkspaceSettings(input)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: existingChatWorkspaceSettingsError });
+      }
+      await assertExistingChatTarget(
+        dbTrigger.cloud_agent_session_id,
+        executionUserId ?? userId,
+        input.organizationId
+      );
+    }
+
     if (input.sandboxAllocation !== undefined && dbTrigger.target_type === 'kiloclaw_chat') {
       throw new TRPCError({
         code: 'BAD_REQUEST',
@@ -951,7 +1179,7 @@ export const webhookTriggersRouter = createTRPCRouter({
 
     if (
       input.bodySchema != null &&
-      (dbTrigger.target_type !== 'cloud_agent' || dbTrigger.activation_mode !== 'webhook')
+      (dbTrigger.target_type === 'kiloclaw_chat' || dbTrigger.activation_mode !== 'webhook')
     ) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
@@ -983,24 +1211,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       );
     }
 
-    const hasUpdates = [
-      input.mode,
-      input.model,
-      input.variant,
-      input.sandboxAllocation,
-      input.environmentId,
-      input.promptTemplate,
-      input.profileId,
-      input.bodySchema,
-      input.autoCommit,
-      input.condenseOnComplete,
-      input.isActive,
-      input.webhookAuth,
-      input.cronExpression,
-      input.cronTimezone,
-    ].some(value => value !== undefined);
-
-    if (!hasUpdates) {
+    if (!hasConfigurationUpdates && input.isActive === undefined) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: 'No updates provided',
@@ -1210,6 +1421,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         triggerId: triggerIdSchema,
         organizationId: z.string().uuid().optional(),
         limit: z.number().min(1).max(100).default(50),
+        includeLegacySessionIds: z.boolean().default(false),
       })
     )
     .query(async ({ ctx, input }): Promise<EnrichedCapturedRequest[]> => {
@@ -1244,12 +1456,15 @@ export const webhookTriggersRouter = createTRPCRouter({
         });
       }
 
-      // Enrich requests with kiloSessionId by looking up cloudAgentSessionId in cli_sessions
+      // The mobile app, which shares this procedure, can open only cli_sessions_v2
+      // sessions; a viewer that also opens legacy v1 sessions passes includeLegacySessionIds.
       const cloudAgentSessionIds = result.requests
         .map(r => r.cloudAgentSessionId)
         .filter((id): id is string => id !== null);
 
-      const sessionIdMap = await resolveCloudAgentSessionIds(cloudAgentSessionIds);
+      const sessionIdMap = await resolveCloudAgentSessionIds(cloudAgentSessionIds, {
+        includeLegacyV1: input.includeLegacySessionIds,
+      });
 
       return result.requests.map(request => ({
         ...request,

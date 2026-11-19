@@ -106,6 +106,50 @@ export function withRtlWritingDirection(style: TextStyle | undefined): TextStyle
 export const LTR_TEXT_DIRECTION: TextStyle = { direction: 'ltr', writingDirection: 'ltr' };
 
 /**
+ * A field value that names something — a path, a command, an identifier — or
+ * that is a number: its characters keep their left-to-right order, and the
+ * block sits on the same start edge as the label above it.
+ *
+ * `LTR_TEXT_DIRECTION` covers the order but not the edge. Both platforms
+ * resolve a named start edge against the node's own layout direction, and this
+ * node pins that direction to left to right
+ * (`TextAttributeProps.getTextAlignment`, `RCTResolveTextAlignment`), so a
+ * relative alignment would resolve against the pinned direction and the value
+ * would stay at the far left under a right-aligned label. The physical right
+ * edge is the start edge in a right-to-left interface, and it is the one value
+ * that lands there on both: `TextInput` maps `'start'` to `Gravity.START` but
+ * `'right'` to `Gravity.RIGHT` on Android, and the other platform resolves both
+ * names against the pinned direction, where only `'right'` reaches that edge.
+ *
+ * Read per call, not at module load: the interface direction is a runtime
+ * setting the app can change without reloading this module.
+ */
+export function ltrValueTextStyle(): TextStyle {
+  return I18nManager.isRTL ? { ...LTR_TEXT_DIRECTION, textAlign: 'right' } : LTR_TEXT_DIRECTION;
+}
+
+/**
+ * A field whose value is code (a shell command, a config line): the value keeps
+ * its left-to-right order and its left edge in every interface. Unlike a named
+ * value (`ltrValueTextStyle`), which sits on the label's start edge, a command
+ * reads from the left and must not follow a right-aligned label in a
+ * right-to-left interface.
+ *
+ * The family's default ligatures are switched off as well: JetBrains Mono draws
+ * the `--` of a flag as one long dash, so `pnpm install --frozen-lockfile` reads
+ * as prose dashes instead of the two hyphens the shell needs. These are the
+ * feature names the platform's text stack recognises; a face without them
+ * ignores the request.
+ */
+export function codeFieldTextStyle(): TextStyle {
+  return {
+    ...LTR_TEXT_DIRECTION,
+    textAlign: 'left',
+    fontVariant: ['no-common-ligatures', 'no-discretionary-ligatures', 'no-contextual'],
+  };
+}
+
+/**
  * The start alignment for a block of prose. A renderer that resolves a
  * paragraph's direction from its first strong character — the native markdown
  * text does — leaves a Latin reply at the left edge of a right-to-left

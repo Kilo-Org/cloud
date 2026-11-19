@@ -15,9 +15,19 @@ import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
  * The row reports the effort the chat's session asks with, which is the value
  * the composer chip and the model picker show for a chat that has sent. It says
  * the model default only for a session that asks with none, and it is not drawn
- * at all for a target that offers no effort.
+ * at all for a target that offers no effort. The same sheet's USED context row
+ * paints a lone placeholder until a usage report arrives.
  */
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: 'ArrowLeft',
+  ArrowRight: 'ArrowRight',
+  Check: 'Check',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  LogOut: 'LogOut',
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
@@ -197,5 +207,13 @@ describe('the thinking effort of the chat details', () => {
 
     expect(texts).not.toContain(i18n.t('agentChat.modelSelector.thinkingEffort'));
     expect(texts).not.toContain(i18n.t('modelChat.details.effortDefault'));
+  });
+
+  it('paints a lone placeholder for used tokens before a usage report', async () => {
+    // `record` prompts nothing, so the sheet has no usage to report.
+    const texts = await mount('high');
+
+    expect(texts).toContain('-');
+    expect(texts).not.toContain(i18n.t('agentChat.contextUsage.tokens'));
   });
 });

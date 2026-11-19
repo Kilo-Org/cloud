@@ -1,6 +1,9 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
-import type { ReasoningDetailUnion } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
+import {
+  ReasoningDetailType,
+  type ReasoningDetailUnion,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
 import type {
   GatewayMessagesRequest,
   GatewayRequest,
@@ -150,10 +153,10 @@ function chatContentPieces(
 /** Summaries restate the raw reasoning, and encrypted reasoning cannot be read. */
 function reasoningDetailTexts(detail: ReasoningDetailUnion): Text[] {
   switch (detail.type) {
-    case 'reasoning.text':
+    case ReasoningDetailType.Text:
       return [detail.text];
-    case 'reasoning.summary':
-    case 'reasoning.encrypted':
+    case ReasoningDetailType.Summary:
+    case ReasoningDetailType.Encrypted:
       return [];
     default:
       return jsonTexts(detail satisfies never);
@@ -263,7 +266,13 @@ function chatCompletionsParts(body: OpenRouterChatCompletionRequest): ScanPieces
   };
 }
 
-type AnthropicBlock = Anthropic.Beta.BetaContentBlockParam;
+/** No longer in the SDK types, but clients can still send it. */
+type MidConversationSystemBlock = {
+  type: 'mid_conv_system';
+  content: Anthropic.Beta.BetaTextBlockParam[];
+};
+
+type AnthropicBlock = Anthropic.Beta.BetaContentBlockParam | MidConversationSystemBlock;
 
 function anthropicTextBlocksTexts(blocks: Anthropic.Beta.BetaTextBlockParam[]): Text[] {
   return blocks.map(block => block.text);
@@ -321,6 +330,13 @@ function anthropicToolResultPieces(content: AnthropicToolResultContent | undefin
         return [omitted(`${header} image`)];
       case 'tool_reference':
         return [];
+      case 'browser_state':
+        // Tab titles and URLs come from the pages the model browsed.
+        return [
+          piece(`${header} browser state`, [
+            jsonText({ tabs: part.tabs, state_changes: part.state_changes }),
+          ]),
+        ];
       default:
         return unrecognized(header, part);
     }
@@ -419,6 +435,16 @@ function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
     case 'redacted_thinking':
     case 'fallback':
       return [];
+    case 'mcp_tool_listing':
+      return block.tools.map(tool =>
+        toolDefinition(tool.name, [tool.description, jsonText(tool.input_schema)])
+      );
+    case 'tool_addition':
+      return block.tool.type === 'tool_definition'
+        ? anthropicToolDefinitionPieces(block.tool.definition).pieces
+        : [];
+    case 'tool_removal':
+      return [];
     default:
       return unrecognized(role, block);
   }
@@ -429,7 +455,7 @@ function anthropicMessageItems(message: Anthropic.Beta.BetaMessageParam): Item[]
   if (typeof message.content === 'string') return [[piece(message.role, [message.content])]];
   const items: Item[] = [];
   let previous: AnthropicBlock | undefined;
-  for (const block of message.content) {
+  for (const block of message.content ?? []) {
     const pieces = anthropicBlockPieces(message.role, block);
     const item = items.at(-1);
     if (item && block.type === 'text' && previous?.type === 'text') item.push(...pieces);

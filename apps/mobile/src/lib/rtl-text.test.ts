@@ -2,16 +2,20 @@ import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  codeFieldTextStyle,
   containsJoinedScript,
   hasRtlScript,
-  JOINED_SCRIPT,
+  ltrValueTextStyle,
   rtlBlockTextAlign,
   withoutMonoFamily,
 } from './rtl-text';
 
 // `rtl-text` imports `I18nManager` for its direction helpers; the real module
-// is Flow-syntax source this node project cannot load.
-vi.mock('react-native', () => ({ I18nManager: { isRTL: false } }));
+// is Flow-syntax source this node project cannot load. Hoisted so a test can
+// flip the interface direction between calls.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+
+vi.mock('react-native', () => ({ I18nManager: i18nManager }));
 
 // U+0870 and U+089F are the first and last characters of Arabic Extended-B,
 // the block between Arabic Supplement (ends U+077F) and Arabic Extended-A
@@ -79,15 +83,6 @@ describe('hasRtlScript', () => {
     expect(hasRtlScript(true)).toBe(false);
     expect(hasRtlScript(null)).toBe(false);
   });
-});
-
-describe('JOINED_SCRIPT', () => {
-  it.each(['\u0600', '\u0750', '\u0870', '\u08A0', '\uFB50', '\uFE70'])(
-    'covers the block that starts at %j',
-    value => {
-      expect(JOINED_SCRIPT.test(value)).toBe(true);
-    }
-  );
 });
 
 describe('containsJoinedScript', () => {
@@ -202,5 +197,56 @@ describe('rtlBlockTextAlign', () => {
 
   it('leaves the renderer its natural alignment in a left-to-right interface', () => {
     expect(rtlBlockTextAlign(false)).toEqual({});
+  });
+});
+
+describe('ltrValueTextStyle', () => {
+  it('keeps a value in its natural left alignment in a left-to-right interface', () => {
+    expect(ltrValueTextStyle()).toEqual({ direction: 'ltr', writingDirection: 'ltr' });
+  });
+
+  // A path starts with a neutral character and a number can carry a sign, so a
+  // right-to-left paragraph would move either to the other end of the run. The
+  // alignment puts the block under its label, which already uses that edge.
+  it('pins a value to left-to-right order on the interface start edge in a right-to-left interface', () => {
+    i18nManager.isRTL = true;
+    try {
+      expect(ltrValueTextStyle()).toEqual({
+        direction: 'ltr',
+        writingDirection: 'ltr',
+        textAlign: 'right',
+      });
+    } finally {
+      i18nManager.isRTL = false;
+    }
+    expect(ltrValueTextStyle().textAlign).toBeUndefined();
+  });
+});
+
+describe('codeFieldTextStyle', () => {
+  // A command keeps its left edge in a right-to-left interface, where a named
+  // value sits on the label's right edge instead.
+  it('pins a command to the left edge in both directions', () => {
+    i18nManager.isRTL = true;
+    try {
+      expect(codeFieldTextStyle().textAlign).toBe('left');
+    } finally {
+      i18nManager.isRTL = false;
+    }
+    expect(codeFieldTextStyle()).toMatchObject({
+      direction: 'ltr',
+      writingDirection: 'ltr',
+      textAlign: 'left',
+    });
+  });
+
+  // The mono face draws the `--` of a flag as one long dash, so a command read
+  // off the screen shows a dash the shell does not accept.
+  it('turns the family ligatures off so a flag keeps its hyphens', () => {
+    expect(codeFieldTextStyle().fontVariant).toEqual([
+      'no-common-ligatures',
+      'no-discretionary-ligatures',
+      'no-contextual',
+    ]);
   });
 });

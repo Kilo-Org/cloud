@@ -9,7 +9,10 @@ import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 import { isGitHubOwnerName, isGitHubRepositoryName } from './repository-coordinates';
 import { lastLinkedPage } from './link-header';
-import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
+import {
+  assertGitHubInstallationRuntimeAuthorized,
+  GitHubRuntimeAuthorizationError,
+} from '../../github/runtime-authorization';
 
 export type { GitHubAppType } from './app-selector';
 
@@ -204,6 +207,42 @@ type GitHubBranch = {
   isDefault: boolean;
 };
 
+/**
+ * One paged read of the repositories an app installation can reach.
+ *
+ * Both callers mint their own token, so this takes the authenticated client and
+ * keeps the archived filter, the projection and the stop condition in one place.
+ */
+async function listInstallationRepositories(octokit: Octokit): Promise<GitHubRepository[]> {
+  const perPage = 100;
+  const repositories: GitHubRepository[] = [];
+  let page = 1;
+
+  while (true) {
+    const { data } = await octokit.apps.listReposAccessibleToInstallation({
+      per_page: perPage,
+      page,
+    });
+
+    repositories.push(
+      ...data.repositories
+        .filter(repository => !repository.archived)
+        .map(repository => ({
+          id: repository.id,
+          name: repository.name,
+          full_name: repository.full_name,
+          private: repository.private,
+          created_at: repository.created_at ?? new Date().toISOString(),
+        }))
+    );
+
+    if (data.repositories.length < perPage) break;
+    page++;
+  }
+
+  return repositories;
+}
+
 export async function fetchGitHubRepositories(
   installationId: string,
   appType: GitHubAppType = 'standard',
@@ -216,35 +255,7 @@ export async function fetchGitHubRepositories(
     expectedIntegrationId,
     purpose
   );
-  const octokit = new Octokit({ auth: tokenData.token });
-
-  const repositories: GitHubRepository[] = [];
-  let page = 1;
-  const perPage = 100;
-
-  while (true) {
-    const { data } = await octokit.apps.listReposAccessibleToInstallation({
-      per_page: 100,
-      page,
-    });
-
-    repositories.push(
-      ...data.repositories
-        .filter(repo => !repo.archived)
-        .map(repo => ({
-          id: repo.id,
-          name: repo.name,
-          full_name: repo.full_name,
-          private: repo.private,
-          created_at: repo.created_at ?? new Date().toISOString(),
-        }))
-    );
-
-    if (data.repositories.length < perPage) break;
-    page++;
-  }
-
-  return repositories;
+  return listInstallationRepositories(new Octokit({ auth: tokenData.token }));
 }
 
 export async function fetchGitHubRepositoriesForMaintenance(
@@ -252,26 +263,7 @@ export async function fetchGitHubRepositoriesForMaintenance(
   appType: GitHubAppType
 ): Promise<GitHubRepository[]> {
   const tokenData = await generateGitHubInstallationTokenForMaintenance(installationId, appType);
-  const octokit = new Octokit({ auth: tokenData.token });
-  const repositories: GitHubRepository[] = [];
-  let page = 1;
-  while (true) {
-    const response = await octokit.apps.listReposAccessibleToInstallation({ per_page: 100, page });
-    repositories.push(
-      ...response.data.repositories
-        .filter(repository => !repository.archived)
-        .map(repository => ({
-          id: repository.id,
-          name: repository.name,
-          full_name: repository.full_name,
-          private: repository.private,
-          created_at: repository.created_at ?? new Date().toISOString(),
-        }))
-    );
-    if (response.data.repositories.length < 100) break;
-    page += 1;
-  }
-  return repositories;
+  return listInstallationRepositories(new Octokit({ auth: tokenData.token }));
 }
 
 export async function fetchGitHubBranches(
@@ -435,9 +427,7 @@ export async function hasPRCommentWithMarker(
 
   const { comments, reachedScanLimit } = await scanPRIssueComments(octokit, owner, repo, prNumber);
 
-  const found = comments.some(
-    c => c.body?.includes(marker) && String(c.performed_via_github_app?.id ?? '') === appId
-  );
+  const found = comments.some(c => c.body?.includes(marker) && isAuthoredByApp(c, appId));
 
   logExceptInTest('[hasPRCommentWithMarker] Scanned comments', {
     owner,
@@ -453,7 +443,16 @@ export async function hasPRCommentWithMarker(
 
 /**
  * Returns the permission string ('admin' | 'maintain' | 'write' | 'read' | 'none') or null
- * if the lookup fails (e.g. the App lacks permission to query collaborators).
+ * when GitHub gives a definitive non-answer: the collaborator is unknown (404), GitHub
+ * reports a permission outside the known set, a 403 or 422 from the token mint or the
+ * lookup, or the installation is unavailable (the mint answers 404 or the runtime
+ * authorization rejects the installation). Rate limits are thrown as typed
+ * {@link GitHubRateLimitError}s so callers can surface the reset time; other thrown
+ * failures — App-credential rejections (typed
+ * {@link GitHubCredentialRejectionError}), installation-token rejections on the
+ * lookup (raw 401), server errors, and network failures — are thrown so callers
+ * can decide whether to retry rather than treating a temporary failure as a
+ * denial.
  */
 export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'read' | 'none';
 
@@ -467,14 +466,53 @@ export async function getCollaboratorPermissionLevel(
   appType: GitHubAppType = 'standard',
   expectedIntegrationId?: string
 ): Promise<CollaboratorPermission | null> {
+  let tokenData: InstallationToken;
   try {
-    const tokenData = await generateGitHubInstallationToken(
+    tokenData = await generateGitHubInstallationToken(
       installationId,
       appType,
       expectedIntegrationId
     );
-    const octokit = new Octokit({ auth: tokenData.token });
+  } catch (error) {
+    // GitHub answers the token mint for an installation it no longer exposes
+    // (removed or suspended) with a 404; without a token this App cannot query
+    // collaborators at all, so that is a definitive null.
+    if (isHttpError(error) && error.status === 404) return null;
+    // A rejected installation runtime authorization means no installation is
+    // connected for this request — a definitive "no installation connected"
+    // answer, not something to retry.
+    if (error instanceof GitHubRuntimeAuthorizationError) return null;
+    // 429 and rate-shaped 403s are typed rate-limit failures so callers can
+    // surface the reset time.
+    const rateLimit = toGitHubRateLimitError(error);
+    if (rateLimit) throw rateLimit;
+    // A 401 means the App credentials were rejected — Kilo's own failure, not
+    // a permission answer — so it must not settle the check as a denial. A
+    // fresh mint cannot clear it (the same credentials are sent again), so it
+    // is typed as a persistent configuration failure callers do not retry.
+    if (isHttpError(error) && error.status === 401) {
+      warnExceptInTest('[getCollaboratorPermissionLevel] Installation token mint failed', {
+        installationId,
+        owner,
+        repo,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new GitHubCredentialRejectionError(error);
+    }
+    // Any other 4xx (403 the installation cannot query collaborators, 422) is
+    // a definitive non-answer, not something to retry.
+    if (isHttpError(error) && error.status >= 400 && error.status < 500) return null;
+    warnExceptInTest('[getCollaboratorPermissionLevel] Installation token mint failed', {
+      installationId,
+      owner,
+      repo,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+  const octokit = new Octokit({ auth: tokenData.token });
 
+  try {
     const { data } = await octokit.repos.getCollaboratorPermissionLevel({
       owner,
       repo,
@@ -486,8 +524,38 @@ export async function getCollaboratorPermissionLevel(
       return data.permission as CollaboratorPermission;
     }
     return null;
-  } catch {
-    return null;
+  } catch (error) {
+    // GitHub answers for an unknown collaborator (or a repository the
+    // installation cannot reach) with a 404; that is a definitive null.
+    if (isHttpError(error) && error.status === 404) return null;
+    // 429 and rate-shaped 403s are typed rate-limit failures so callers can
+    // surface the reset time.
+    const rateLimit = toGitHubRateLimitError(error);
+    if (rateLimit) throw rateLimit;
+    // A 401 means the installation token was rejected — the permission was
+    // never evaluated, so it must not settle the check as a denial. Unlike the
+    // mint 401 this is not a credential-rejection class: a fresh mint can
+    // clear it (the installation token, not the App credentials, was
+    // refused), so the raw error is rethrown and stays retryable.
+    if (isHttpError(error) && error.status === 401) {
+      warnExceptInTest('[getCollaboratorPermissionLevel] Collaborator lookup failed', {
+        owner,
+        repo,
+        username,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    // Any other 4xx (403 the installation cannot query collaborators, 422) is
+    // a definitive non-answer, not something to retry.
+    if (isHttpError(error) && error.status >= 400 && error.status < 500) return null;
+    warnExceptInTest('[getCollaboratorPermissionLevel] Collaborator lookup failed', {
+      owner,
+      repo,
+      username,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   }
 }
 
@@ -552,16 +620,24 @@ export async function exchangeGitHubOAuthCode(
     throw new Error(`Missing GitHub ${appType} App credentials`);
   }
 
-  const response = await fetch('https://github.com/login/oauth/access_token', {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: credentials.clientId,
-      client_secret: credentials.clientSecret,
-      code,
-      ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      signal: AbortSignal.timeout(10_000),
+      redirect: 'error',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: credentials.clientId,
+        client_secret: credentials.clientSecret,
+        code,
+        ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+      }),
+    });
+  } catch (error) {
+    logExceptInTest('[exchangeGitHubOAuthCode] Token exchange request failed', { error });
+    throw error;
+  }
   if (!response.ok) {
     throw new Error(`GitHub OAuth code exchange failed (${response.status})`);
   }
@@ -594,7 +670,9 @@ export async function exchangeGitHubOAuthCode(
     auth: accessToken,
   });
 
-  const { data: githubUser } = await octokit.rest.users.getAuthenticated();
+  const { data: githubUser } = await octokit.rest.users.getAuthenticated({
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
 
   return {
     id: githubUser.id.toString(),
@@ -613,6 +691,16 @@ type PRIssueComment = {
   updated_at: string;
   performed_via_github_app?: { id?: number | string } | null;
 };
+
+type GitHubAppAuthorship = { performed_via_github_app?: { id?: number | string | null } | null };
+
+/**
+ * Reports whether the app that owns this credential created the comment.
+ * GitHub returns the app id as a number, so compare the string forms.
+ */
+function isAuthoredByApp(comment: GitHubAppAuthorship, appId: string): boolean {
+  return String(comment.performed_via_github_app?.id ?? '') === appId;
+}
 
 /**
  * Reads pull-request issue comments from both ends of the list within the
@@ -689,9 +777,7 @@ export async function findKiloReviewComment(
   });
 
   const markedComments = comments.filter(
-    c =>
-      c.body?.includes('<!-- kilo-review -->') &&
-      String(c.performed_via_github_app?.id ?? '') === appId
+    c => c.body?.includes('<!-- kilo-review -->') && isAuthoredByApp(c, appId)
   );
 
   if (markedComments.length > 0) {
@@ -760,8 +846,8 @@ type ReviewCommentExtras = {
 /**
  * Used to detect duplicates and track outdated inline comments.
  *
- * `authoredByKilo` reports whether this app identity created the comment, following the same
- * `performed_via_github_app.id` ownership test `findKiloReviewComment` applies to summaries.
+ * `authoredByKilo` reports whether this app identity created the comment, through the same
+ * `isAuthoredByApp` predicate the summary readers use.
  */
 export async function fetchPRInlineComments(
   installationId: string,
@@ -782,7 +868,7 @@ export async function fetchPRInlineComments(
 > {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
-  const kiloAppId = String(getGitHubAppCredentials(appType).appId);
+  const appId = String(getGitHubAppCredentials(appType).appId);
 
   const comments: Array<{
     id: number;
@@ -821,7 +907,7 @@ export async function fetchPRInlineComments(
         line: c.line ?? null,
         body,
         isOutdated: c.position == null,
-        authoredByKilo: String(c.performed_via_github_app?.id ?? '') === kiloAppId,
+        authoredByKilo: isAuthoredByApp(c, appId),
         user: { login: c.user?.login ?? 'unknown' },
       });
 
@@ -904,6 +990,7 @@ export async function fetchGitHubRootTextFileAtRef(params: {
       repo,
       path,
       ref,
+      request: { signal: AbortSignal.timeout(10_000) },
     });
 
     if (Array.isArray(data)) return null;
@@ -929,8 +1016,28 @@ export async function fetchGitHubRepositoryDefaultBranch(params: {
 }): Promise<string> {
   const { token, owner, repo } = params;
   const octokit = new Octokit({ auth: token });
-  const { data } = await octokit.repos.get({ owner, repo });
+  const { data } = await octokit.repos.get({
+    owner,
+    repo,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
   return data.default_branch;
+}
+
+export async function fetchGitHubRepositoryDefaultBranchSha(params: {
+  token: string;
+  owner: string;
+  repo: string;
+}): Promise<string> {
+  const branch = await fetchGitHubRepositoryDefaultBranch(params);
+  const octokit = new Octokit({ auth: params.token });
+  const { data } = await octokit.git.getRef({
+    owner: params.owner,
+    repo: params.repo,
+    ref: `heads/${branch}`,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
+  return data.object.sha;
 }
 
 export async function fetchGitHubRepositorySize(params: {
@@ -962,6 +1069,7 @@ export async function createGitHubBranch(params: {
     owner,
     repo,
     ref: `heads/${baseBranch}`,
+    request: { signal: AbortSignal.timeout(10_000) },
   });
 
   try {
@@ -970,6 +1078,7 @@ export async function createGitHubBranch(params: {
       repo,
       ref: `refs/heads/${branchName}`,
       sha: baseRef.object.sha,
+      request: { signal: AbortSignal.timeout(10_000) },
     });
   } catch (error) {
     if (
@@ -997,10 +1106,23 @@ export async function createOrUpdateGitHubRootTextFile(params: {
   let sha: string | undefined;
 
   try {
-    const { data } = await octokit.repos.getContent({ owner, repo, path, ref: branch });
+    const { data } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref: branch,
+      request: { signal: AbortSignal.timeout(10_000) },
+    });
     if (!Array.isArray(data)) {
       const existing = data as GitHubRepositoryContent;
       if (existing.type === 'file') {
+        if (
+          existing.encoding === 'base64' &&
+          typeof existing.content === 'string' &&
+          decodeGitHubBase64Content(existing.content) === content
+        ) {
+          return;
+        }
         sha = existing.sha;
       }
     }
@@ -1018,6 +1140,7 @@ export async function createOrUpdateGitHubRootTextFile(params: {
     message,
     content: Buffer.from(content, 'utf8').toString('base64'),
     ...(sha ? { sha } : {}),
+    request: { signal: AbortSignal.timeout(10_000) },
   });
 }
 
@@ -1039,9 +1162,38 @@ export async function createGitHubPullRequest(params: {
     body,
     head: headBranch,
     base: baseBranch,
+    request: { signal: AbortSignal.timeout(10_000) },
   });
 
   return { number: data.number, url: data.html_url };
+}
+
+export type GitHubHeadPullRequest = { number: number; url: string };
+
+/**
+ * Lists the repository's pull requests for a head branch, preferring the open
+ * one; the API returns newest first.
+ */
+export async function fetchGitHubPullRequestForHeadBranch(params: {
+  token: string;
+  owner: string;
+  repo: string;
+  headBranch: string;
+}): Promise<GitHubHeadPullRequest | null> {
+  const { token, owner, repo, headBranch } = params;
+  const octokit = new Octokit({ auth: token });
+  const { data } = await octokit.pulls.list({
+    owner,
+    repo,
+    state: 'all',
+    head: `${owner}:${headBranch}`,
+    per_page: 100,
+    request: { signal: AbortSignal.timeout(10_000) },
+  });
+
+  const matching = data.filter(pull => pull.head.ref === headBranch);
+  const pull = matching.find(candidate => candidate.state === 'open') ?? matching[0];
+  return pull ? { number: pull.number, url: pull.html_url } : null;
 }
 
 export async function getGitHubReviewComment(
@@ -1054,6 +1206,10 @@ export async function getGitHubReviewComment(
   id: number;
   body: string;
   userLogin: string | null;
+  /** GitHub account type of the comment author: 'User' | 'Bot' | 'Organization'. */
+  userType: string | null;
+  /** Numeric GitHub user id of the comment author; survives an App rename. */
+  userId: number | null;
   inReplyToId: number | null;
 } | null> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
@@ -1069,6 +1225,8 @@ export async function getGitHubReviewComment(
       id: data.id,
       body: data.body,
       userLogin: data.user?.login ?? null,
+      userType: data.user?.type ?? null,
+      userId: data.user?.id ?? null,
       inReplyToId: data.in_reply_to_id ?? null,
     };
   } catch (error) {
@@ -1150,6 +1308,28 @@ export class GitHubRateLimitError extends Error {
     this.name = 'GitHubRateLimitError';
     this.resetAt = resetAt;
   }
+}
+
+/**
+ * Thrown when GitHub rejects the App credentials with a 401 on the
+ * installation-token mint in {@link getCollaboratorPermissionLevel}. A mint
+ * 401 means the App ID or private key Kilo configured is not accepted, a
+ * persistent Kilo-side configuration failure that no retry or fresh mint can
+ * clear, so callers classify it as configuration instead of retrying. A 401 on
+ * the collaborator lookup is NOT wrapped: there a fresh mint can clear the
+ * rejection (the installation token was refused, not the App credentials), so
+ * the lookup rethrows the raw error and callers may retry.
+ */
+export class GitHubCredentialRejectionError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'GitHubCredentialRejectionError';
+    this.cause = cause;
+  }
+}
+
+export function isGitHubCredentialRejection(error: unknown): boolean {
+  return error instanceof GitHubCredentialRejectionError;
 }
 
 function getResponseHeader(error: unknown, name: string): string | undefined {
@@ -1601,9 +1781,8 @@ export async function fetchBatchedReviewDecisions(args: {
     }
     return result;
   } catch (error) {
-    if (isGitHubRateLimitError(error)) {
-      throw new GitHubRateLimitError(parseRateLimitResetAt(error));
-    }
+    const rateLimitError = toGitHubRateLimitError(error);
+    if (rateLimitError) throw rateLimitError;
     throw error;
   }
 }

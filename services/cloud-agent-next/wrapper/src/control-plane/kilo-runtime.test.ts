@@ -21,6 +21,7 @@ import {
   createKiloRuntimes,
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
+  kiloServerPort,
   liveRuntimeClient,
   parseKiloPidfile,
   prepareKiloFilesystem,
@@ -205,6 +206,7 @@ function createRuntime(options: {
   isIdle?: () => boolean | Promise<boolean>;
   prepareFilesystem?: KiloRuntimeOptions['prepareFilesystem'];
   sandboxProvider?: KiloRuntimeOptions['sandboxProvider'];
+  artifacts?: KiloRuntimeOptions['artifacts'];
   spawnKilo?: KiloProcessSpawner;
   timers?: ControlPlaneTimers;
   onRestart?: KiloRuntimeOptions['onRestart'];
@@ -243,6 +245,7 @@ function createRuntime(options: {
     // The real preparation writes under HOME; `prepareKiloFilesystem` has its own tests.
     prepareFilesystem: options.prepareFilesystem ?? (async () => {}),
     ...(options.sandboxProvider ? { sandboxProvider: options.sandboxProvider } : {}),
+    ...(options.artifacts ? { artifacts: options.artifacts } : {}),
     ...(options.sampleMemory ? { sampleMemory: options.sampleMemory } : {}),
     onMemoryHold: info => options.memoryHolds?.push(info.held),
     onRestart: info => {
@@ -357,25 +360,127 @@ describe('prepareKiloFilesystem', () => {
     }
   });
 
-  it('receives the runtime provider before Kilo starts', async () => {
+  it('adds the Artifacts guidance only when the synchronizer is enabled', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      const withArtifactsHome = path.join(root, 'with-artifacts');
+      await prepareKiloFilesystem(
+        { HOME: withArtifactsHome },
+        path.join(root, 'worktree-a'),
+        'cloudflare',
+        true
+      );
+      const withArtifacts = await fsp.readFile(
+        path.join(withArtifactsHome, '.kilocode', 'rules', 'cloud-agent.md'),
+        'utf8'
+      );
+      expect(withArtifacts).toContain('## Artifacts');
+      expect(withArtifacts).toContain('except for files saved in `/artifacts`');
+
+      const withoutArtifactsHome = path.join(root, 'without-artifacts');
+      await prepareKiloFilesystem(
+        { HOME: withoutArtifactsHome },
+        path.join(root, 'worktree-b'),
+        'cloudflare',
+        false
+      );
+      const withoutArtifacts = await fsp.readFile(
+        path.join(withoutArtifactsHome, '.kilocode', 'rules', 'cloud-agent.md'),
+        'utf8'
+      );
+      expect(withoutArtifacts).not.toContain('## Artifacts');
+      expect(withoutArtifacts).toContain(
+        'The filesystem is ephemeral and will not persist after the session ends.'
+      );
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('receives the runtime provider and artifact flag before Kilo starts', async () => {
     const providers: Array<string | undefined> = [];
+    const artifacts: Array<boolean | undefined> = [];
     const { runtime } = createRuntime({
       spawner: createSpawner(),
       feed: createFeedFactory(),
       scheduler: createScheduler(),
       probe: createProbe(true),
       sandboxProvider: 'vercel',
-      prepareFilesystem: async (_env, _directory, sandboxProvider) => {
+      artifacts: true,
+      prepareFilesystem: async (_env, _directory, sandboxProvider, enabled) => {
         providers.push(sandboxProvider);
+        artifacts.push(enabled);
       },
     });
     await runtime.ensure();
     expect(providers).toEqual(['vercel']);
+    expect(artifacts).toEqual([true]);
     await runtime.shutdown();
   });
 });
 
 describe('Kilo startup lifecycle', () => {
+  it('holds sibling prompts until the running CLI applies the workspace MCP refresh', async () => {
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      probe: createProbe(true),
+      scheduler: createScheduler(),
+      isIdle: () => false,
+    });
+    const client = await runtime.ensure();
+    const refresh = Promise.withResolvers<void>();
+    const materialized = Promise.withResolvers<void>();
+    const submitted = Promise.withResolvers<void>();
+    const events: string[] = [];
+    client.updateCloudAgentMcp = async () => {
+      await refresh.promise;
+      events.push('refreshed');
+    };
+    client.submit = async () => {
+      events.push('submitted');
+      submitted.resolve();
+    };
+    const turns = createTurnManager({
+      timers: TEST_TIMERS,
+      runtimes: { get: () => runtime },
+      emit: () => undefined,
+      materializeAttachments: async message => {
+        materialized.resolve();
+        return message;
+      },
+    });
+    turns.registerRoute({
+      sessionId: 'workspace_sibling',
+      kiloSessionId: 'ses_sibling',
+      directory: runtime.directory,
+      attemptId: 'sibling',
+    });
+    const installation = runtime.installCredentials(runtime.env, {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-mcp-grant',
+      expiresAt: 1_900_000_000,
+    });
+    try {
+      turns.submit('workspace_sibling', {
+        messageId: 'm1',
+        turn: { type: 'prompt', prompt: 'hello' },
+        agent: { mode: 'code', model: 'test/model' },
+      });
+      await materialized.promise;
+      await Bun.sleep(0);
+      expect(events).toEqual([]);
+      refresh.resolve();
+      await submitted.promise;
+      expect(events).toEqual(['refreshed', 'submitted']);
+    } finally {
+      refresh.resolve();
+      await installation;
+      turns.release('workspace_sibling');
+      await runtime.shutdown();
+    }
+  });
+
   it.each([0, 3600, -3600])('refreshes MCP with a proxy handle expiry delta of %s', async delta => {
     const exp = 1_800_000_000;
     const { runtime } = createRuntime({
@@ -443,7 +548,7 @@ describe('Kilo startup lifecycle', () => {
     await runtime.shutdown();
   });
   it.each(['rejection', 'timeout'])(
-    'does not reject general credential installation when MCP refresh fails by %s',
+    'recovers an MCP refresh %s when a sibling reuses the installed proxy handle',
     async failure => {
       const spawner = createSpawner();
       const { runtime, logs, restarts } = createRuntime({
@@ -452,6 +557,7 @@ describe('Kilo startup lifecycle', () => {
         probe: createProbe(true),
         scheduler: createScheduler(),
         isIdle: () => true,
+        env: { KILOCODE_TOKEN: proxyHandle(1_800_000_000) },
       });
       const client = await runtime.ensure();
       const grant = {
@@ -465,14 +571,21 @@ describe('Kilo startup lifecycle', () => {
           signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
         });
       };
-      await runtime.installCredentials({ HOME: '/new' }, grant);
+      await runtime.installCredentials(
+        { HOME: '/new', KILOCODE_TOKEN: proxyHandle(1_800_000_000) },
+        grant
+      );
       expect(runtime.env.HOME).toBe('/new');
       expect(logs).toContain(
         'control-plane MCP credential refresh failed; retaining pending credential restart'
       );
       expect(logs.join('\n')).not.toContain(grant.token);
+      expect(await runtime.applyPendingCredentials(() => false)).toBe(false);
+      expect(spawner.spawnCount()).toBe(1);
       expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
       expect(restarts).toEqual([{ reason: 'credentials' }]);
+      expect(spawner.spawnCount()).toBe(2);
+      expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
       await runtime.shutdown();
     },
     15_000
@@ -2645,6 +2758,38 @@ describe('createKiloRuntimes', () => {
     releaseShutdown.resolve();
     await retire;
     expect(runtimes.get('dir')).not.toBe(first);
+  });
+
+  it('reports the port of each live Kilo server', async () => {
+    const spawner = createSpawner();
+    const runtimes = createKiloRuntimes({
+      readSnapshot: async () => [],
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-server-ports-pids',
+      scheduler: createScheduler().scheduler,
+      spawnKilo: spawner.spawn,
+      openFeed: createFeedFactory().openFeed,
+      probeHealth: createProbe(false).probe,
+      readProcessStartTime: () => undefined,
+      log: () => undefined,
+    });
+    expect(runtimes.serverPorts()).toEqual([]);
+    await runtimes.ensure({ key: 'a', directory: '/tmp/a', env: {} });
+    await runtimes.ensure({ key: 'b', directory: '/tmp/b', env: {} });
+    // The fake spawner serves each process on a port equal to its pid.
+    const ports = spawner.processes.map(record => record.pid);
+    expect(runtimes.serverPorts()).toEqual(ports);
+
+    await runtimes.get('a')?.shutdown();
+    expect(runtimes.serverPorts()).toEqual([ports[1]]);
+    await runtimes.shutdown();
+    expect(runtimes.serverPorts()).toEqual([]);
+  });
+
+  it('reads no port from a Kilo URL without one', () => {
+    expect(kiloServerPort({ url: 'http://127.0.0.1:4096', authorization: 'x' })).toBe(4096);
+    expect(kiloServerPort({ url: 'not a url', authorization: 'x' })).toBeUndefined();
+    expect(kiloServerPort(undefined)).toBeUndefined();
   });
 
   it('summary counts a suspected runtime as suspected only', async () => {

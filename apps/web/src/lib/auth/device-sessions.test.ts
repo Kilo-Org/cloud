@@ -15,6 +15,7 @@ import {
   cleanupExpiredDeviceRefreshTokens,
   createDeviceSession,
   createDeviceSessionWithAttestedKey,
+  createDeviceSessionWithCredentials,
   issueSessionCredentials,
   rotateRefreshToken,
   revokeDeviceSession,
@@ -26,11 +27,14 @@ import {
   isDeviceSessionActive,
   resetDeviceSessionCacheForTest,
 } from '@kilocode/web-shared/lib/auth/device-session-cache';
-import { isBlockedTLD } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import type * as TokensModule from '@kilocode/web-shared/lib/tokens';
 import { getWorkOSOrganization } from '@/lib/user';
 
-jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/user/domain-gates'),
   isBlockedTLD: jest.fn(),
 }));
 
@@ -44,9 +48,19 @@ jest.mock('@/lib/user', () => ({
   getWorkOSOrganization: jest.fn(),
 }));
 
+// Token generation is the first step of minting a pair, so failing it proves a
+// mint failure rolls back the rows the transaction wrote before it.
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/tokens') as object),
+  generateApiToken: jest.fn(),
+}));
+
+const actualTokens = jest.requireActual<typeof TokensModule>('@kilocode/web-shared/lib/tokens');
+
 const mockIsEmailBlacklisted = jest.mocked(isEmailBlacklisted);
 const mockIsBlockedTLD = jest.mocked(isBlockedTLD);
 const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
+const mockGenerateApiToken = jest.mocked(generateApiToken);
 
 describe('device-sessions', () => {
   const testUserId = 'test-user-ds-' + Date.now();
@@ -58,6 +72,7 @@ describe('device-sessions', () => {
     mockIsEmailBlacklisted.mockResolvedValue(false);
     mockIsBlockedTLD.mockResolvedValue(false);
     mockGetWorkOSOrganization.mockResolvedValue(null);
+    mockGenerateApiToken.mockImplementation(actualTokens.generateApiToken);
 
     await db.insert(kilocode_users).values({
       id: testUserId,
@@ -169,6 +184,36 @@ describe('device-sessions', () => {
           and(eq(device_sessions.kilo_user_id, testUserId), isNull(device_sessions.revoked_at))
         );
       expect(live).toHaveLength(MAX_LIVE_APP_SESSIONS + 1);
+    });
+
+    test('a device-auth sign-in leaves an over-cap app-session set untouched', async () => {
+      // Rows outlive the cap rule, for example sessions created before it
+      // existed, so a device-auth sign-in must not enforce it either.
+      const seeded = await db
+        .insert(device_sessions)
+        .values(
+          Array.from({ length: MAX_LIVE_APP_SESSIONS + 1 }, () => ({
+            kilo_user_id: testUserId,
+            user_agent: 'seeded-agent',
+          }))
+        )
+        .returning({ id: device_sessions.id });
+
+      const deviceAuthSessionId = await createDeviceSession({
+        userId: testUserId,
+        deviceAuthRequestId: '33333333-3333-4333-8333-333333333333',
+      });
+
+      const rows = await db
+        .select({ id: device_sessions.id, revoked_at: device_sessions.revoked_at })
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+
+      const live = rows.filter(row => row.revoked_at === null);
+      expect(live).toHaveLength(MAX_LIVE_APP_SESSIONS + 2);
+      expect(live.map(row => row.id)).toEqual(
+        expect.arrayContaining([...seeded.map(row => row.id), deviceAuthSessionId])
+      );
     });
   });
 
@@ -1152,6 +1197,69 @@ describe('device-sessions', () => {
       } finally {
         await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
       }
+    });
+  });
+
+  describe('createDeviceSessionWithCredentials', () => {
+    test('creates the session and its credential pair together', async () => {
+      const result = await createDeviceSessionWithCredentials({
+        userId: testUserId,
+        userAgent: 'plain-agent',
+        user: fakeUser,
+      });
+
+      const sessions = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, result.sessionId));
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0]!.kilo_user_id).toBe(testUserId);
+      expect(sessions[0]!.user_agent).toBe('plain-agent');
+      expect(sessions[0]!.revoked_at).toBeNull();
+
+      const refreshRows = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, result.sessionId));
+      expect(refreshRows).toHaveLength(1);
+      expect(refreshRows[0]!.token_hash).toBe(
+        createHash('sha256').update(result.refreshToken).digest('hex')
+      );
+
+      expect(result.token.length).toBeGreaterThan(0);
+      expect(result.expiresIn).toBe(3600);
+    });
+
+    test('rolls back the session insert when minting the pair fails', async () => {
+      // The mint generates the access token before it writes the refresh token,
+      // so a failure here happens inside the transaction, after the session
+      // insert.
+      mockGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('synthetic mint failure');
+      });
+
+      await expect(
+        createDeviceSessionWithCredentials({
+          userId: testUserId,
+          userAgent: 'plain-agent',
+          user: fakeUser,
+        })
+      ).rejects.toThrow('synthetic mint failure');
+
+      const sessions = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+      expect(sessions).toHaveLength(0);
+
+      const refreshRows = await db
+        .select()
+        .from(device_refresh_tokens)
+        .innerJoin(device_sessions, eq(device_refresh_tokens.device_session_id, device_sessions.id))
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+      expect(refreshRows).toHaveLength(0);
+
+      mockGenerateApiToken.mockImplementation(actualTokens.generateApiToken);
     });
   });
 });

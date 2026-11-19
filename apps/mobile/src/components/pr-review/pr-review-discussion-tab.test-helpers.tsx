@@ -108,11 +108,17 @@ vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
 vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
   PrReviewUnavailableActions: 'PrReviewUnavailableActions',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
+vi.mock('@/components/ui/icons', () => ({
+  FolderOpen: 'FolderOpen',
+  MessageSquarePlus: 'MessageSquarePlus',
+}));
 vi.mock('@/components/pr-review/discussion/pr-review-discussion-list', () => ({
   PrReviewDiscussionList: 'PrReviewDiscussionList',
 }));
@@ -135,6 +141,7 @@ vi.mock('@/lib/pr-review/discussion/use-pr-comment-crud-mutations', () => ({
 // sonner-native, neither of which this node-environment suite can resolve.
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => hoisted.connectivity.value,
+  connectionRefusesWrites: () => hoisted.connectivity.value === 'offline',
 }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: {

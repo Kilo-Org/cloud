@@ -60,11 +60,10 @@ export const encryptedEnvelopeSchema = z.object({
 });
 
 /**
- * Keys the sandbox runtime owns. Mirrors
- * `services/cloud-agent-next/src/types.ts` `RESERVED_ENV_VARS` and
- * `services/cloud-agent-next/src/shared/runtime-environment.ts`
- * `CONTROL_RUNTIME_RESERVED_ENV_VARS`, plus the prefixes
- * `worktree-runtime.ts` drops. The profile package must not import from the
+ * Keys the sandbox runtime owns. Mirrors `RESERVED_ENV_VARS` and
+ * `CONTROL_RUNTIME_RESERVED_ENV_VARS` in
+ * `services/cloud-agent-next/src/shared/runtime-environment.ts`, plus the
+ * runtime-owned prefixes there. The profile package must not import from the
  * service, so the list is mirrored here; `environment-contracts.test.ts`
  * guards the documented contents.
  */
@@ -79,6 +78,10 @@ const RESERVED_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
   'CONTROL_LOG_UPLOAD_URL',
   'CONTROL_LOG_UPLOAD_GRANT',
   'CONTROL_WRAPPER_INSTANCE_ID',
+  'CLOUD_AGENT_SENTRY_DSN',
+  'CLOUD_AGENT_SENTRY_ENVIRONMENT',
+  'SANDBOX_TRANSFER_URL',
+  'SANDBOX_TRANSFER_GRANT',
 ]);
 
 const RESERVED_ENV_VAR_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;
@@ -236,6 +239,11 @@ type EnvironmentBuildInputBase = {
    * resolves it with the repository and context settings to pin one target.
    */
   sandboxAllocation: string | null;
+  /**
+   * The environment's saved network policy. Build admission reads it so the
+   * build target skips the same saved defaults as a session of this environment.
+   */
+  egressMode: EgressMode | null;
 };
 
 /**

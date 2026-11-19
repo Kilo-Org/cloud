@@ -5,7 +5,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
@@ -13,15 +12,21 @@ import { SheetTitleRow } from '@/components/sheet-title-row';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { ListTodo } from '@/components/ui/icons';
+import { IconTile } from '@/components/ui/icon-tile';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { i18n } from '@/i18n';
 import { invalidateTodoQueries, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { todoFromDraft } from '@/lib/todos/todo-model';
 import { todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
+
+import { TODO_SHEET_STATE_BODY_CLASS } from './todo-sheet-body';
 
 type SaveDraftAsTodoSheetProps = {
   visible: boolean;
@@ -48,7 +53,7 @@ export function SaveDraftAsTodoSheet({
   const router = useRouter();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const lists = useTodoLists(organizationId, visible);
   const [savingListId, setSavingListId] = useState<string | null>(null);
   // The create-list route is a formSheet, and the native sheet stacks above a
@@ -92,7 +97,7 @@ export function SaveDraftAsTodoSheet({
   let body: ReactNode = null;
   if (lists.isPending) {
     body = (
-      <View className="items-center py-8">
+      <View className={cn('items-center', TODO_SHEET_STATE_BODY_CLASS)}>
         <ActivityIndicator />
       </View>
     );
@@ -100,13 +105,14 @@ export function SaveDraftAsTodoSheet({
     body = (
       <QueryError
         placement="static"
+        inset="gutter"
         onRetry={() => void lists.refetch()}
         isRetrying={lists.isFetching}
       />
     );
   } else if (activeLists.length === 0) {
     body = (
-      <View className="gap-4 px-5 py-8">
+      <View className={cn('gap-4', TODO_SHEET_STATE_BODY_CLASS)}>
         <Text className="text-center text-sm text-muted-foreground">{t('todos.lists.empty')}</Text>
         <Button
           variant="outline"
@@ -126,16 +132,14 @@ export function SaveDraftAsTodoSheet({
         accessibilityRole="button"
         accessibilityLabel={list.name}
         accessibilityState={{ disabled: savingListId !== null }}
-        className="min-h-14 flex-row items-center gap-3 border-b border-hair-soft px-5 py-2 active:opacity-70"
+        className="min-h-14 flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3 active:opacity-70"
       >
-        <View className="size-8 items-center justify-center rounded-lg bg-secondary">
-          {list.emoji ? (
-            <Text className="text-base">{list.emoji}</Text>
-          ) : (
-            <ListTodo size={16} color={colors.mutedForeground} />
-          )}
-        </View>
-        <Text className="min-w-0 flex-1 text-base text-foreground" numberOfLines={1}>
+        <IconTile
+          tint={NEUTRAL_TINT}
+          icon={list.emoji ? undefined : ListTodo}
+          content={list.emoji ? <Text className="text-base">{list.emoji}</Text> : undefined}
+        />
+        <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
           {list.name}
         </Text>
         {savingListId === list.id ? <ActivityIndicator color={colors.mutedForeground} /> : null}
@@ -161,9 +165,10 @@ export function SaveDraftAsTodoSheet({
       dismissGestures={false}
       snapPoints={['60%']}
     >
-      <View className="flex-1 pt-4">
+      {/* The title row takes the under-handle padding itself. */}
+      <View className="flex-1">
         <SheetTitleRow title={t('todos.saveSheet.title')} onClose={onClose} />
-        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottomClearance }}>
           {body}
         </ScrollView>
       </View>

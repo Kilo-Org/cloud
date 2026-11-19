@@ -66,7 +66,8 @@ reason.
 
 ## Unified Elements
 
-One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces the "Use instead" column.
+One element per concern. `no-restricted-imports` in `.oxlintrc.json` is the
+authoritative list; this table summarizes the main concerns.
 
 | Concern | Element | Use instead of |
 |---|---|---|
@@ -74,14 +75,18 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
 | Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
 | Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
+| Form fields | `FormField` from `@/components/ui/form-field` | `react-hook-form`, `@tanstack/react-form` |
 | System confirm, non-destructive | `Alert.alert` | — |
 | Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
+| Keep awake | `useKeepAwake` from `@/lib/keep-awake` | `expo-keep-awake` |
 | Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
+| Skeleton | `Skeleton` from `@/components/ui/skeleton` | `moti`, `react-native-reanimated-skeleton`, `react-native-skeleton-placeholder` |
 | Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
 | Video | `expo-video` | `react-native-video`, `expo-av` |
 | Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
 | Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
 | Images | `Image` from `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Segmented control | `SegmentedControl` from `@/components/ui/segmented-control` | `@react-native-segmented-control/segmented-control` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
 | HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
@@ -104,8 +109,10 @@ Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone
 Omit empty-state descriptions that repeat the title or tell the user to use a disabled action.
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
-`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, new-session,
-conversation, manual-review and PR-discussion surfaces; the Agents list and the stored history render
+`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, conversation and
+manual-review surfaces. The new-session form and the PR-discussion comment bar render
+`@/components/keyboard-lift-view` instead, which pads by a height the screen computes from the keyboard state
+and animates it with the keyboard's own motion progress. The Agents list and the stored history render
 `@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
 writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
 the property it last applied stays on the native view). The pad never takes more room than the body can spare:
@@ -118,9 +125,13 @@ render a rotation produces, so a frame measured in the previous window is releas
 being trusted. `useKeyboardState` is the app's one keyboard-height read.
 The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
 A surface whose content
-pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`
-(`@/lib/keyboard-inset-offset`) — the provider's Android height spans the translucent navigation bar, so
-without the reduction the content floats a navigation-bar height above the keyboard.
+pads the platform's bottom inset itself passes `height={Math.max(0, keyboardHeight - bottom)}` to
+`@/components/keyboard-lift-view` — the provider's Android height spans the translucent navigation bar, so
+without the reduction the content floats a navigation-bar height above the keyboard. That view pads by the
+height the screen computes from `useKeyboardState` and animates it with the keyboard's own motion progress;
+a library `KeyboardAvoidingView` derives its lift from a container frame an async native call reports, and a
+frame that has not landed yet leaves the lift short by the container's own top (the pinned new-session footer
+stayed behind the keyboard that way).
 
 Nothing else may read the keyboard: no surface adds a listener beside the provider.
 
@@ -164,9 +175,30 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Fetch backend data through tRPC. Zod-parse only genuinely untrusted HTTP input at entry; do not re-parse trusted tRPC or shared-package data in components.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
 - Every mutation hook shows `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not in each component.
-- Use optimistic updates for obvious reversible mutations: snapshot in `onMutate`, roll back in `onError`, reconcile in `onSettled`.
+- Optimistic updates have one owner each. A value in the TanStack query cache belongs to its mutation: snapshot in `onMutate`, roll back in `onError` only while `isLatestMutationGeneration` says this mutation still owns the key, and reconcile in `onSettled`. Never add a second optimistic copy over a query-backed value.
+- A stored value has one owner. Change it only through that owner's API, and never keep a second optimistic copy beside it in a component.
 - After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
+
+## State Machines
+
+A phase that several flags, refs, nullable fields, or timers encode together is an implicit state machine. Do not write one.
+
+- Model each phase as one discriminated union with a tag for each state, and keep each payload inside the state that owns it.
+- Before you add a flag beside existing state, list the combinations it creates. If one is invalid, extend the union instead.
+- Tie every async result to the attempt that started it. A result whose attempt no longer owns the state publishes nothing.
+- For the status of an action a person starts (idle, pending, succeeded, failed), use `useSurfaceFeedback` from `@/lib/hooks/use-surface-feedback`, or `useKeyedSurfaceFeedback` for one action per row:
+  - Call `begin()` before the first `await`. When it returns `null`, an attempt is already running: do nothing, and do not add a second lock.
+  - Settle the attempt exactly once. Leave no entry behind that nothing renders; the doc in `@/lib/surface-feedback` says which settle keeps one.
+  - After an `await`, check `attempt.owns()` and the auth epoch before any effect outside the phase, such as closing a sheet, clearing a draft, posting, or changing account-bound UI.
+  - Give every failure a `kind`, keep its copy in the same object, and render it with a `switch` that ends in `assertSurfaceFailureHandled(failure)`.
+- Keep scoped module state (per account, organization, session, or request) keyed by that scope, and check the scope again before an async result publishes.
+- Settle async work by its own request identity, never by a shared attribute such as a product id or a name.
+- When an outcome cannot be tied to one request, keep the safe state and give the person an explicit way out. Never leave a state with no exit.
+- Scope a barrier to the account or identity that created it. Release it only on an authoritative outcome or the person's informed consent.
+- Progress UI ends when its own work ends. It never waits for an outcome to be attributed.
+- Retire retained state only when its identity still matches. At capacity, refuse new entries; never evict an unresolved one.
+- A regression test must fail on the code before the fix. Prove that once before the fix lands.
 
 ## React Native Rules
 
@@ -211,6 +243,53 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Never grow a row or a section header to a control's touch size. Keep the row one line tall and reach 44pt with `hitSlop` on a shared compact box from `@/lib/a11y/tap-target` (`LINE_ACTION_BOX_CLASS`, `SECTION_ACTION_BOX_CLASS`). A taller box leaves empty space above its text, and at the top of a screen that space reads as a hole under the title.
 - Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
 - Change only the visual properties the task names. A color fix does not change dimensions.
+
+### Layout contract
+
+One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/layout-baseline.json`).
+
+| Concern | Contract | Use |
+|---|---|---|
+| Page gutter | 14pt on every screen, header, sheet, list row, section header and empty state. No other horizontal page inset. | `SCREEN_GUTTER_CLASS` from `@/lib/layout` |
+| Screen body | Section gap 21pt, gutter, 10.5pt top pad. | `SCREEN_BODY_CLASS` from `@/lib/layout` as the scroll body's `contentContainerClassName` |
+| Section | Label plus content blocks, 10.5pt apart. | `Section` from `@/components/ui/section` |
+| Section header | A heading (the label carries the header role): 10pt mono uppercase eyebrow, muted; optional icon, 11pt mono primary action in a compact box that never changes the header's height, and notice. No hand-made labels. Gutter-free inside a padded body; `inset` for a full-bleed list; `actionTestID` for a native test handle. | `SectionHeader` from `@/components/ui/section-header`, or `Section` when it has content |
+| Settings and navigation rows | One grouped card per section; hairline between rows inset to the row text; none after the last. | `RowGroup` from `@/components/ui/row-group`; pass `leadingTile` for icon rows |
+| Grouped rows in a virtualized list | A list cannot pass its rows as one child array, so each cell draws its own rounded end, surface and trailing hairline. | `RowGroupItem` with `position` `first`/`middle`/`last` (`only` for a one-row section) |
+| Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line; up to two subtitle lines (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell) |
+| Flat list rows | Full-bleed, no card, content from the 14pt gutter, `border-b-[0.5px] border-hair-soft` hairline, `RowChevron`. A hue strip sits at the gutter. | `SessionRow`, which owns that geometry; callers add no padding of their own. Rows own no card and no grouped divider |
+| Card | Non-row block (balance, metric, form, info): `rounded-xl bg-secondary p-4`, inner `gap-3`, never nested. For full-bleed layered content the surface alone, with each layer owning its inset. | `Card` from `@/components/ui/card`; `padding="none"` for the bare surface |
+| Fields | A single-line `Input` owns its 44pt box and inset. A multiline field or a composer keeps its own text metrics inside the shared bordered surface; a read-only or preview box that swaps with a single-line field reuses its exported box. | `Input` from `@/components/ui/input`; `InputFrame` for a multiline/composer surface; `INPUT_BOX_SHAPE_CLASS` for the preview box |
+| Segmented control | The track and its loaded height are the control's own; a skeleton reserves that frame instead of a hand-sized box. Options may carry a badge, a disabled state and their own test handle. | `SegmentedControl` from `@/components/ui/segmented-control`; `SEGMENTED_FRAME_CLASS` / `SEGMENTED_FRAME_HEIGHT_CLASS` for a skeleton |
+| Radii | Controls `rounded-md`; tiles and thumbnails `rounded-lg`; cards, row groups and dialogs `rounded-xl`; pills, avatars and the FAB `rounded-full`. Nothing else. | the primitives above |
+| Dividers | 0.5pt `border-hair-soft`. Never `border-border` for a row divider. | `RowGroup`, `RowGroupItem`, flat list rows |
+| Typography roles | Large title 30pt/700 on tab roots; title 15.75pt/600; heading `text-base font-semibold`; body the `Text` default; secondary `variant="muted"`; caption `variant="caption"`; a metric figure `variant="figure"`, a half-width stat tile `variant="stat"`; eyebrow the 10pt mono one. No `text-[Npx]`, no `text-xl` or larger, no `uppercase` or `tracking-*` outside `components/ui`. | `Text` variants, `ScreenHeader`, `SectionHeader`, `Eyebrow` |
+| Screen intro | One muted body line under the header, above the first section, on every screen that carries intro text; never a caption size and never a hand-sized `text-xs`. | `Text` `variant="muted"` |
+| Screen header | First child of the screen root; `size="large"` on tab roots; never override its gutter, title typography or bottom padding. A badge on the title line goes through `titleAccessory`; a header a screen must measure (a pin under it) passes `titleRef`. | `ScreenHeader` |
+| Sheet header | Every formSheet route and imperative `Sheet`. The body uses the same body class. An eyebrow names the reference being edited; `doneBusy` marks a commit in flight; `variant="close"` is the header a surface with nothing to commit uses. | `SheetHeader` |
+| States | Loading, empty, error and happy states for every data screen. Every loading placeholder owns the loaded geometry — a row reserves through `RowSkeleton`, a section label through `SectionHeaderSkeleton`, a control through its own frame constant — so the swap to real content cannot move the screen. One placement rule: `center` when the state is the whole surface, `top` only when it sits under intro text or controls. A state's way out is the one action slot, filled with `StateAction` (primary, compact, label-sized, leading icon) at the slot's fixed gap. A state owns the 14pt gutter only when it is its surface's full-bleed content (a `center` state; a `top`/`static` one in a list's empty slot passes `inset="gutter"`); one laid out inside a body or card that already insets draws none, and no caller spells the inset itself. A state never repeats the screen's own way out: a header already draws the back chevron, so a denial under one carries no Back action (`PermissionDenied`'s `showBack`). | `RowSkeleton` (`variant="session"` for a flat list; `lines`, `tile`, `trailingControl`, `trailing="switch"`, `stack`), `SectionHeaderSkeleton`, `Skeleton`, `EmptyState` (`inset`, `action`), `StateAction`, `QueryError`, `CenteredState` |
+| Primary action | One per screen. A pinned footer is the shared bar, outside the scroll body; an inline action ends its section. | `ScreenFooter` from `@/components/ui/screen-footer` (`clearance` for the bottom band, `keyboard` for who lifts it) |
+| Create control | One per list screen: the header `+` creates, and the empty state carries the title and description only. | `ScreenHeader` `headerRight` with `IconButton` |
+| FAB | One 56pt round primary button, gutter-aligned above the tab bar. | `Fab` from `@/components/ui/fab` |
+| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans L1–L13 below the table, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
+
+`pnpm check:classes` reads every class string (and every `style`/`*Style` object) against `LAYOUT_RULES` in
+`tools/nativewind/check-classes.mjs`, which is the only description of the rules: **L1** an arbitrary spacing,
+type-size, line-height, tracking or radius value; **L2** a page inset written on a scroll body or a `CenteredState`
+content container, or any padding on a `ScreenHeader`/`SheetHeader`; **L3** `uppercase` or `tracking-*` outside a
+section label; **L4** a card surface built by hand (a card fill plus a card radius, even when the two sit in
+different branches of one className); **L5** `text-xl` or larger; **L6** a layout number in a `style` or `*Style`
+object (an inset or a measurement passes); **L7** a chevron imported straight from the icon modules instead of
+`RowChevron`; **L8** an arbitrary height, width or size that pins one box; **L9** a row divider drawn as
+`border-b`/`border-t` in `border-border` instead of `border-hair-soft`; **L10** `ScreenHeader` `titleContent`
+outside the three screens that own a title line; **L11** a `Sheet` without a `SheetHeader`; **L12** a horizontal
+padding or margin wider than the 14pt gutter (`px-`/`ps-`/`pe-`/`pl-`/`pr-`/`mx-`/`ms-`/`me-` at 5 and up); **L13** a
+`Button` inside an `EmptyState`/`QueryError` `action` slot instead of `StateAction`. A
+violation the migration has not reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call
+site and lower its line, never regenerate the baseline over a new violation.
+
+After you change anything in `components/ui`, run the design gate on
+`kiloapp:///(auth)/design-system-fixture` and on one migrated screen per changed primitive.
 
 ## Translations
 
@@ -269,10 +348,12 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - The standard matrix covers the default size, dark mode, a compact screen, and right-to-left on Android, and the default size, dark mode, and right-to-left on iOS. It keeps font scale and display density at their defaults.
 - After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
 - A scrolling screen must start with what it shows. Empty space above the first painted content, beyond the scroll content's top padding and one section break (24 dp), is a `leading-gap` error: a first block pushed down by a margin, or a box that holds its content at its bottom.
+- Every screen's content starts at the 14 pt page gutter. The `gutter` rule is an error for paint whose start edge lands inside the gutter and for a column that starts past it, measured from the safe-area edge, mirrored in right-to-left, and from a native sheet's or dialog's own root. A screen's header and each scrolling body are separate columns, so a 21 dp body under a 14 dp header fails. Full-bleed row backgrounds and dividers, the header's 48 pt back target and the title lines that follow it (the eyebrow, title and subtitle of one header share the title's column), a block's own inner padding, content after a row's leading element, centred states, horizontally scrolled content and a chat turn's failure footer (its container marked `message-failure-footer`) are excluded; unknown side insets skip the rule, and `run.skippedRules` names it.
 - Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
 - The sampler retains the newest layouts that fit its weight budget, up to a maximum count. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
 - Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
+- The gate disables LogBox's UI in the app runtime at every readiness wait, through each module that exposes `setDisabled`, so a warning toast does not paint over a capture. It never wraps `console.*`: the app already has wrappers there, and a replacement breaks them. A React "state update on a component that hasn't mounted yet" toast painted over a screen anyway is a `dev-overlay` warning, not a screen defect: it means disabling failed in that runtime, an environment problem the run log names. Dev warnings are not graded by the gate — developers see them in Metro and LogBox in normal use.
 - Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
 - A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
 - For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.
@@ -294,6 +375,12 @@ Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux servi
 The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds the registry (the conversations that are running), the layers (the plugins they run on) and the store (the list and its CRUD). The SDK saves one conversation; this app owns the list, the ordering, the titles, the deleting and the scoping.
 
 **A conversation can move, and the screen follows the state rather than a return value.** Switching models clones the conversation onto a new session, and the mover is not always the screen: a question typed on another model while an answer was arriving moves the chat from inside the registry. So the chat that was left points at the one it became, and `useChat` follows that.
+
+A chat flag is one `ChatFlag` on `ChatState` (`@/lib/chat/chat-flag`): read it and write it through `setChatFlag`, never with a `useState` mirror beside it. A refused persist rejects and restores the stored choice, including its application status and Retry when that choice is behind. `retryChatFlag` applies that saved choice again without another persist. Both flags and every move share the chat's registry turn.
+
+Resolve a queued operation's session inside its turn, because an earlier move can rename it. Keep send startup in that turn through assigning `chat.answering`; a tool retry rechecks the live chat inside its turn and defers while an answer streams. Closing skips only waiting skippable tickets, never a queued reopen. A skipped caller may settle early, but its queue tail still waits for its predecessor.
+
+Sign-out and account switch cancel only the old account's chat flags: drop waiting flag tickets and abandon a pending flag persist, whose captured `AbortSignal` fences the SQL write and later application/publication. Every non-flag operation, session move and runtime close is still awaited, with no teardown deadline. Once a flag begins moving a session, finish that move and its metadata migration before teardown continues. A deferred flag stays `moving` until its move publishes `current` or `behind`.
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 

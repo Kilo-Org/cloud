@@ -50,6 +50,7 @@ vi.mock('react-i18next', () => ({
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   ExternalLink: 'ExternalLink',
   ScanSearch: 'ScanSearch',
   Ban: 'Ban',
@@ -67,6 +68,7 @@ vi.mock('@/lib/hooks/use-security-findings', () => ({
   useStartSecurityAnalysis: () => startAnalysis,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({
     primaryForeground: '#fff',
     foreground: '#000',

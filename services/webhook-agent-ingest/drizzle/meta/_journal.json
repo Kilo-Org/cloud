@@ -57,6 +57,13 @@
       "when": 1793918446175,
       "tag": "0007_fresh_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794947808760,
+      "tag": "0008_existing_chat_target",
+      "breakpoints": true
     }
   ]
 }

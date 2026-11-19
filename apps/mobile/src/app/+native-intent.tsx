@@ -8,7 +8,7 @@ import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
-import { handleLoginFixturePath } from '@/lib/login-fixture';
+import { loginFixtureRoute } from '@/lib/login-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
 import { handleOrganizationInviteMemberFixturePath } from '@/lib/organization-invite-member-fixture';
 import { handlePrReviewCopyFixturePath } from '@/lib/pr-review/pr-review-copy-fixture-route';
@@ -71,10 +71,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (agentChatPickerRoute) {
       return agentChatPickerRoute;
     }
-    // Dev-only sign-in states (`dev/login-fixture/<state>`): the handler writes
-    // the resumed sign-in record and navigates itself, so this returns falsy.
-    if (handleLoginFixturePath(path)) {
-      return null;
+    // Dev-only sign-in states (`dev/login-fixture/<state>`): a screen of its own
+    // that writes the resumed sign-in record before the sign-in screen mounts.
+    const loginFixture = loginFixtureRoute(path);
+    if (loginFixture) {
+      return loginFixture;
     }
     // Dev-only chat conversation in a fixed state (`dev/chat-fixture/<state>`).
     const chatFixture = /(?:^|\/)dev\/chat-fixture\/([a-z]+)\/?(?:[?#].*)?$/.exec(path);

@@ -1,13 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { handleLoginFixturePath } from './login-fixture';
+import { loginFixtureRoute, writeLoginFixture } from './login-fixture';
 
-const mocks = vi.hoisted(() => ({
-  write: vi.fn(() => Promise.resolve()),
-  replace: vi.fn(),
-}));
+const mocks = vi.hoisted(() => ({ write: vi.fn(() => Promise.resolve()) }));
 
-vi.mock('expo-router', () => ({ router: { replace: mocks.replace } }));
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'http://localhost:3000' }));
 vi.mock('@/lib/auth/pending-external-auth', () => ({
   writePendingExternalAuth: mocks.write,
@@ -15,34 +11,34 @@ vi.mock('@/lib/auth/pending-external-auth', () => ({
 
 beforeEach(() => {
   mocks.write.mockClear();
-  mocks.replace.mockReset();
 });
 
-describe('handleLoginFixturePath', () => {
-  it.each([
-    ['pending', 'dev-seed-device-auth-pending'],
-    ['denied', 'dev-seed-device-auth-denied'],
-    ['expired', 'dev-seed-device-auth-missing'],
-    ['error', ''],
-  ])('resumes a %s sign-in, then opens the sign-in screen', async (state, deviceCode) => {
-    expect(handleLoginFixturePath(`/dev/login-fixture/${state}`)).toBe(true);
-    await vi.waitFor(() => {
-      expect(mocks.replace).toHaveBeenCalledWith('/(auth)/login');
-    });
-    expect(mocks.write).toHaveBeenCalledWith({
-      deviceCode,
-      userCode: 'DEVS-EED1',
-      verificationUrl: 'http://localhost:3000/device-auth?code=DEVS-EED1',
-      startedAt: expect.any(Number),
-    });
-    expect(mocks.write.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.replace.mock.invocationCallOrder[0] ?? 0
+describe('loginFixtureRoute', () => {
+  it('opens the fixture screen for each state', () => {
+    expect(loginFixtureRoute('/dev/login-fixture/denied')).toBe(
+      '/(auth)/login-fixture?state=denied'
     );
   });
 
   it('ignores other states and paths', () => {
-    expect(handleLoginFixturePath('/dev/login-fixture/approved')).toBe(false);
-    expect(handleLoginFixturePath('/dev/home-fixture/pending')).toBe(false);
-    expect(mocks.write).not.toHaveBeenCalled();
+    expect(loginFixtureRoute('/dev/login-fixture/approved')).toBeNull();
+    expect(loginFixtureRoute('/dev/home-fixture/pending')).toBeNull();
+  });
+});
+
+describe('writeLoginFixture', () => {
+  it.each([
+    ['pending', 'dev-seed-device-auth-pending', 'DEVP-ENDG'],
+    ['denied', 'dev-seed-device-auth-denied', 'DEVD-ENYD'],
+    ['expired', 'dev-seed-device-auth-missing', 'DEVX-PRDZ'],
+    ['error', '', 'DEVE-RRRR'],
+  ] as const)('resumes the %s sign-in with its own codes', async (state, deviceCode, userCode) => {
+    await writeLoginFixture(state);
+    expect(mocks.write).toHaveBeenCalledWith({
+      deviceCode,
+      userCode,
+      verificationUrl: `http://localhost:3000/device-auth?code=${userCode}`,
+      startedAt: expect.any(Number),
+    });
   });
 });

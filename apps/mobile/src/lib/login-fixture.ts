@@ -1,5 +1,3 @@
-import { router } from 'expo-router';
-
 import { writePendingExternalAuth } from '@/lib/auth/pending-external-auth';
 import { API_BASE_URL } from '@/lib/config';
 
@@ -7,10 +5,11 @@ import { API_BASE_URL } from '@/lib/config';
  * Development-only entry for the sign-in screen's device-auth states. The
  * screen restores a browser sign-in that survived process death from the
  * pending record and polls the server with its device code. This fixture writes
- * that same record and opens the same screen, so the real restore and the real
+ * that same record, and `src/app/(auth)/login-fixture.tsx` mounts the real
+ * `LoginScreen` only after the write landed, so the real restore and the real
  * poll produce each state from the local server's answer:
  *
- * - `pending`: the seeded pending request. The screen shows the code and the
+ * - `pending`: the seeded pending request. The screen shows its code and the
  *   "Continuing sign-in" line, and the server keeps answering 202.
  * - `denied`: the seeded denied request. The first poll gets 403 and the screen
  *   shows the denied banner above the sign-in form.
@@ -19,39 +18,49 @@ import { API_BASE_URL } from '@/lib/config';
  * - `error`: an empty device code. The server refuses the body with 400 and the
  *   screen shows the error banner.
  *
- * Open it signed out: `pnpm dev:seed app:device-auth-states` (once per local
- * database, for `pending` and `denied`), then
+ * The route is its own screen, pushed over whatever is open: a sign-in screen
+ * already on the stack keeps its mount, so its unmount cannot clear the record
+ * this route's screen restores.
+ *
+ * Open it: `pnpm dev:seed app:device-auth-states` (once per local database, for
+ * `pending` and `denied`), then
  * `kiloapp:///dev/login-fixture/<pending|denied|expired|error>`. The first poll
  * runs a few seconds after the screen opens.
  */
 const FIXTURE_PATH = /(?:^|\/)dev\/login-fixture\/(pending|denied|expired|error)\/?(?:[?#].*)?$/;
 
-/** The device codes `dev/seed/app/device-auth-states.ts` stores; keep the two in step. */
-const LOGIN_FIXTURE_DEVICE_CODES = {
-  pending: 'dev-seed-device-auth-pending',
-  denied: 'dev-seed-device-auth-denied',
-  expired: 'dev-seed-device-auth-missing',
-  error: '',
-} as const;
+const LOGIN_FIXTURE_STATES = ['pending', 'denied', 'expired', 'error'] as const;
 
-const USER_CODE = 'DEVS-EED1';
+type LoginFixtureState = (typeof LOGIN_FIXTURE_STATES)[number];
 
-export function handleLoginFixturePath(path: string): boolean {
-  const match = FIXTURE_PATH.exec(path);
-  const state = match?.[1];
-  if (state !== 'pending' && state !== 'denied' && state !== 'expired' && state !== 'error') {
-    return false;
-  }
-  void (async () => {
-    // The record must be on disk before the screen mounts: its restore reads
-    // the record once, on mount.
-    await writePendingExternalAuth({
-      deviceCode: LOGIN_FIXTURE_DEVICE_CODES[state],
-      userCode: USER_CODE,
-      verificationUrl: `${API_BASE_URL}/device-auth?code=${USER_CODE}`,
-      startedAt: Date.now(),
-    });
-    router.replace('/(auth)/login');
-  })();
-  return true;
+/**
+ * The resumed sign-in of each state. `pending` and `denied` are the requests
+ * `dev/seed/app/device-auth-states.ts` stores, device code and user code alike;
+ * keep the two in step. The other two name no stored request.
+ */
+const LOGIN_FIXTURE_REQUESTS = {
+  pending: { deviceCode: 'dev-seed-device-auth-pending', userCode: 'DEVP-ENDG' },
+  denied: { deviceCode: 'dev-seed-device-auth-denied', userCode: 'DEVD-ENYD' },
+  expired: { deviceCode: 'dev-seed-device-auth-missing', userCode: 'DEVX-PRDZ' },
+  error: { deviceCode: '', userCode: 'DEVE-RRRR' },
+} satisfies Record<LoginFixtureState, { deviceCode: string; userCode: string }>;
+
+export function isLoginFixtureState(value: string): value is LoginFixtureState {
+  return LOGIN_FIXTURE_STATES.some(state => state === value);
+}
+
+export function loginFixtureRoute(path: string): string | null {
+  const state = FIXTURE_PATH.exec(path)?.[1];
+  return state === undefined ? null : `/(auth)/login-fixture?state=${state}`;
+}
+
+/** Writes the state's resumed sign-in, as a browser sign-in in flight leaves it. */
+export async function writeLoginFixture(state: LoginFixtureState): Promise<void> {
+  const { deviceCode, userCode } = LOGIN_FIXTURE_REQUESTS[state];
+  await writePendingExternalAuth({
+    deviceCode,
+    userCode,
+    verificationUrl: `${API_BASE_URL}/device-auth?code=${userCode}`,
+    startedAt: Date.now(),
+  });
 }

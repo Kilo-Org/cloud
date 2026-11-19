@@ -1,10 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 
 import { expect, it } from 'vitest';
+
+import { swiftToolchain, type SwiftToolchain } from '../../src/test/swift-toolchain';
 
 const moduleSource = readFileSync(
   new URL('ios/KiloAppleModelModule.swift', import.meta.url),
@@ -25,31 +27,6 @@ function swiftFunctionSource(name: string): string {
   }
   const end = normalizedModuleSource.indexOf('func ', start + anchor.length);
   return normalizedModuleSource.slice(start, end === -1 ? normalizedModuleSource.length : end);
-}
-
-type SwiftToolchain = readonly [command: string, ...compilerArgs: string[]];
-
-// One availability rule for every platform: resolve the compiler the checks
-// invoke, and return the tuple only when the lookup finds an existing path.
-// macOS has no bare `swiftc` on PATH, so its lookup goes through
-// `xcrun --find`; every other platform uses `which`.
-function swiftToolchain(): SwiftToolchain | undefined {
-  const darwin = process.platform === 'darwin';
-  try {
-    const compilerPath = execFileSync(
-      darwin ? 'xcrun' : 'which',
-      darwin ? ['--find', 'swiftc'] : ['swiftc'],
-      {
-        encoding: 'utf8',
-      }
-    ).trim();
-    if (compilerPath.length === 0 || !existsSync(compilerPath)) {
-      return undefined;
-    }
-    return darwin ? ['xcrun', 'swiftc'] : ['swiftc'];
-  } catch {
-    return undefined;
-  }
 }
 
 const toolchain = swiftToolchain();
@@ -95,7 +72,7 @@ it('uses the counted transcript budget for generation and reported truncation', 
   expect(inferSource).toContain('completion.stop = "maxTokens"');
 });
 
-// The skip decision and the compiler the body invokes come from the one probe
+// The skip decision and the compiler the body receives come from the one probe
 // result, so a host with no usable toolchain skips instead of throwing.
 if (toolchain === undefined) {
   it.skip('executes the native budget boundary checks');

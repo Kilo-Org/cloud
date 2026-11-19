@@ -1165,6 +1165,49 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(lastStatusUpdateBody(fetchMock)).not.toMatchObject({ status: 'failed' });
   });
 
+  it('interrupts the discarded prepared session when a fresh-session retry is scheduled', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-discarded',
+          kiloSessionId: 'ses_discarded',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcError(500, 'Container failed with internal server error status: 500');
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: true });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const retrySchedulingStartedAt = Date.now();
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
+
+    const interruptCalls = fetchCalls(fetchMock, '/trpc/interruptSession');
+    expect(interruptCalls).toHaveLength(1);
+    expect(JSON.parse(String(interruptCalls[0]?.[1]?.body))).toEqual({
+      sessionId: 'agent-discarded',
+    });
+    expect(lastStatusUpdateBody(fetchMock)).not.toMatchObject({ status: 'failed' });
+  });
+
   it('fails the review when billing stays unavailable after the fresh-session retry', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
@@ -2904,6 +2947,172 @@ describe('CodeReviewOrchestrator recovery', () => {
       status: 'running',
       sessionId: 'agent-fresh-after-sandbox-500',
       cliSessionId: 'ses_fresh_after_sandbox_500',
+    });
+  });
+
+  it('interrupts the replaced live session when a follow-up sandbox retry is scheduled', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent-live-prev';
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/getSessionHealth')) {
+        return trpcSuccess({
+          cloudAgentSessionId: previousSessionId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        });
+      }
+      if (url.includes('/trpc/updateSession')) {
+        return trpcSuccess({ success: true });
+      }
+      if (url.includes('/trpc/sendMessageV2')) {
+        return trpcError(500, 'Container failed with internal server error status: 500');
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: true });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          previousCloudAgentSessionId: previousSessionId,
+          sessionInput: gitlabSessionInput(),
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const retrySchedulingStartedAt = Date.now();
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
+
+    const interruptCalls = fetchCalls(fetchMock, '/trpc/interruptSession');
+    expect(interruptCalls).toHaveLength(1);
+    expect(JSON.parse(String(interruptCalls[0]?.[1]?.body))).toEqual({
+      sessionId: previousSessionId,
+    });
+    expect(lastStatusUpdateBody(fetchMock)).not.toMatchObject({ status: 'failed' });
+  });
+
+  it('still schedules the fresh-session retry when the discarded session interrupt fails', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent-live-uninterruptible';
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/getSessionHealth')) {
+        return trpcSuccess({
+          cloudAgentSessionId: previousSessionId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        });
+      }
+      if (url.includes('/trpc/updateSession')) {
+        return trpcSuccess({ success: true });
+      }
+      if (url.includes('/trpc/sendMessageV2')) {
+        return trpcError(500, 'Container failed with internal server error status: 500');
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return new Response('interrupt unavailable', { status: 500 });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          previousCloudAgentSessionId: previousSessionId,
+          sessionInput: gitlabSessionInput(),
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const retrySchedulingStartedAt = Date.now();
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
+    expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
+
+    const failedStatusUpdates = fetchCalls(fetchMock, '/api/internal/code-review-status/').filter(
+      call => {
+        const init = call[1] as RequestInit | undefined;
+        if (typeof init?.body !== 'string') return false;
+        const body: { status?: string } = JSON.parse(init.body);
+        return body.status === 'failed';
+      }
+    );
+    expect(failedStatusUpdates).toHaveLength(0);
+  });
+
+  it('interrupts a session id shared by both recorded fields only once', async () => {
+    const stub = getReviewStub();
+    const sharedSessionId = 'agent-same';
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/getSessionHealth')) {
+        return trpcSuccess({
+          cloudAgentSessionId: sharedSessionId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        });
+      }
+      if (url.includes('/trpc/updateSession')) {
+        return trpcSuccess({ success: true });
+      }
+      if (url.includes('/trpc/sendMessageV2')) {
+        return trpcError(500, 'Container failed with internal server error status: 500');
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: true });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          previousCloudAgentSessionId: sharedSessionId,
+          sessionId: sharedSessionId,
+          sessionInput: gitlabSessionInput(),
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const retrySchedulingStartedAt = Date.now();
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
+
+    const interruptCalls = fetchCalls(fetchMock, '/trpc/interruptSession');
+    expect(interruptCalls).toHaveLength(1);
+    expect(JSON.parse(String(interruptCalls[0]?.[1]?.body))).toEqual({
+      sessionId: sharedSessionId,
     });
   });
 

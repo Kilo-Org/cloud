@@ -555,6 +555,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     const previousCliSessionId = this.state.cliSessionId;
     const previousSandboxId = this.state.sandboxId;
 
+    await this.interruptDiscardedSessions(source, 'retry_replaces_session');
+
     this.state.sandboxRetryAttempted = true;
     this.state.previousCloudAgentSessionId = undefined;
     this.state.sessionId = undefined;
@@ -1187,7 +1189,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
   /**
    * Stop a cloud-agent-next session that must not run or keep running.
-   * The review is already terminal, so a failed interrupt must not throw.
+   * The caller has decided the review no longer needs the session, so a failed
+   * interrupt must not throw.
    */
   private async interruptAbandonedSession(
     source: string,
@@ -1214,6 +1217,21 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         cloudAgentSessionId,
         error: interruptError instanceof Error ? interruptError.message : String(interruptError),
       });
+    }
+  }
+
+  /**
+   * Interrupt every cloud-agent-next session the caller is about to discard.
+   * Session ids that are unset or repeated across the recorded fields are
+   * interrupted once, in the order the session and the previous session are recorded.
+   */
+  private async interruptDiscardedSessions(source: string, reason: string): Promise<void> {
+    const sessionIds = [this.state.sessionId, this.state.previousCloudAgentSessionId].filter(
+      (sessionId): sessionId is string => typeof sessionId === 'string' && sessionId.length > 0
+    );
+
+    for (const cloudAgentSessionId of new Set(sessionIds)) {
+      await this.interruptAbandonedSession(source, cloudAgentSessionId, reason);
     }
   }
 

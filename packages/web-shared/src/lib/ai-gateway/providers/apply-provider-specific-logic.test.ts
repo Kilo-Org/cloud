@@ -867,6 +867,94 @@ describe('applyReasoningDetailsTransform', () => {
     });
   });
 
+  it('maps a Gemini detail whose id appears twice to the first matching tool call', () => {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'first', arguments: '{}' },
+              },
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'second', arguments: '{}' },
+              },
+            ],
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                data: 'duplicate-id-signature',
+                id: 'call-1',
+                format: 'google-gemini-v1',
+              },
+            ],
+          } as never,
+        ],
+      },
+    };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(request.body.messages[0]).toMatchObject({
+      tool_calls: [
+        {
+          function: { name: 'first' },
+          extra_content: { google: { thought_signature: 'duplicate-id-signature' } },
+        },
+        { function: { name: 'second' } },
+      ],
+    });
+  });
+
+  it('keeps a Gemini detail with no matching tool-call id on the message', () => {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'lookup', arguments: '{}' },
+              },
+            ],
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                data: 'unmatched-signature',
+                id: 'call-other',
+                format: 'google-gemini-v1',
+              },
+            ],
+          } as never,
+        ],
+      },
+    };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(request.body.messages[0]).toMatchObject({
+      extra_content: { google: { thought_signature: 'unmatched-signature' } },
+      tool_calls: [
+        {
+          id: 'call-1',
+        },
+      ],
+    });
+  });
+
   it('does not touch Messages requests', () => {
     const request = makeMessagesRequest('vendor/model');
 

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { todo_items, todo_lists } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 
@@ -12,47 +14,51 @@ export const usage = '<email>';
  * Personal to-do lists for one seeded account, one per state the to-do screens
  * have:
  *
- * - `NORMAL_LIST_ID` holds four open items with notes and one completed item,
- *   so the list shows both its open rows and its completed group.
- * - `LONG_LIST_ID` carries a list name and item titles that run past the row,
- *   which is the truncation case every to-do row and the detail header clamp.
- * - `DONE_LIST_ID` holds only completed items, so its open section is empty
- *   while the completed group is full.
- * - `EMPTY_LIST_ID` has no items, which is the list screen's own empty state.
+ * - the first list holds four open items with notes and one completed item, so
+ *   the list shows both its open rows and its completed group.
+ * - the second carries a list name and item titles that run past the row, which
+ *   is the truncation case every to-do row and the detail header clamp.
+ * - the third holds only completed items, so its open section is empty while the
+ *   completed group is full.
+ * - the fourth has no items, which is the list screen's own empty state.
  *
  * The lists are personal (`organization_id` null), so they reach Home's Up Next
  * section while no organization is selected: Home reads that section from the
  * selected account scope, and a selected organization shows that
  * organization's lists instead.
  *
- * A rerun deletes these four lists by their stable ids; `todo_items` cascades
- * from the list, so the second run ends with the same rows.
+ * Every id is derived from the account, so two seeded accounts keep their own
+ * rows and a rerun replaces the same ones. `position` uses the app's own
+ * fractional key alphabet (`apps/web/src/lib/todos/position.ts`): a key must end
+ * in a character other than `0`, and `todos.items.create` throws on one that
+ * does, so an added or reordered item needs these keys to parse.
  */
-const NORMAL_LIST_ID = '3b2f6a10-0000-4000-8000-5c1d2e3f4a01';
-const LONG_LIST_ID = '3b2f6a10-0000-4000-8000-5c1d2e3f4a02';
-const DONE_LIST_ID = '3b2f6a10-0000-4000-8000-5c1d2e3f4a03';
-const EMPTY_LIST_ID = '3b2f6a10-0000-4000-8000-5c1d2e3f4a04';
-
-const LIST_IDS = [NORMAL_LIST_ID, LONG_LIST_ID, DONE_LIST_ID, EMPTY_LIST_ID] as const;
-
-const NORMAL_ITEM_ID = '3b2f6a10-0000-4000-8000-5c1d2e3f4b01';
-const NORMAL_DONE_ITEM_ID = '3b2f6a10-0000-4000-8000-5c1d2e3f4b05';
-const LONG_ITEM_ID = '3b2f6a10-0000-4000-8000-5c1d2e3f4b06';
-const DONE_ITEM_ID = '3b2f6a10-0000-4000-8000-5c1d2e3f4b0a';
-
 const HOUR_MS = 60 * 60 * 1000;
+
+/** Stable UUID for one account's fixture key: a rerun replaces the same rows. */
+function seedUuid(key: string): string {
+  const hex = createHash('md5').update(`app:todos:${key}`).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
 
 function iso(offsetMs: number): string {
   return new Date(Date.now() + offsetMs).toISOString();
 }
 
 type ItemBlueprint = {
-  id: string;
-  listId: string;
+  key: string;
   title: string;
   notes: string | null;
   position: string;
   doneAt: string | null;
+};
+
+type ListBlueprint = {
+  key: string;
+  name: string;
+  emoji: string | null;
+  position: string;
+  items: readonly ItemBlueprint[];
 };
 
 /**
@@ -60,101 +66,121 @@ type ItemBlueprint = {
  * therefore keeps its position below the completed section, and the fixed
  * positions keep the order stable across reruns.
  */
-const ITEMS: readonly ItemBlueprint[] = [
+const LISTS: readonly ListBlueprint[] = [
   {
-    id: NORMAL_ITEM_ID,
-    listId: NORMAL_LIST_ID,
-    title: 'Write the release notes',
-    notes: 'Name the three screens that changed, then link the migration.',
-    position: 'a0',
-    doneAt: null,
-  },
-  {
-    id: '3b2f6a10-0000-4000-8000-5c1d2e3f4b02',
-    listId: NORMAL_LIST_ID,
-    title: 'Ask Dana to review the pricing copy',
-    notes: null,
+    key: 'normal',
+    name: 'Ship the release',
+    emoji: '🚀',
     position: 'a1',
-    doneAt: null,
+    items: [
+      {
+        key: 'normal-1',
+        title: 'Write the release notes',
+        notes: 'Name the three screens that changed, then link the migration.',
+        position: 'a1',
+        doneAt: null,
+      },
+      {
+        key: 'normal-2',
+        title: 'Ask Dana to review the pricing copy',
+        notes: null,
+        position: 'a2',
+        doneAt: null,
+      },
+      {
+        key: 'normal-3',
+        title: 'Reproduce the retry loop on a slow network',
+        notes:
+          'Turn the connection profile down to 3G, open the agents list, and wait for the\n' +
+          'retry banner. It should stop after the third attempt.',
+        position: 'a3',
+        doneAt: null,
+      },
+      {
+        key: 'normal-4',
+        title: 'Send the weekly summary',
+        notes: null,
+        position: 'a4',
+        doneAt: null,
+      },
+      {
+        key: 'normal-done',
+        title: 'Merge the schema migration',
+        notes: null,
+        position: 'a5',
+        doneAt: iso(-2 * HOUR_MS),
+      },
+    ],
   },
   {
-    id: '3b2f6a10-0000-4000-8000-5c1d2e3f4b03',
-    listId: NORMAL_LIST_ID,
-    title: 'Reproduce the retry loop on a slow network',
-    notes:
-      'Turn the connection profile down to 3G, open the agents list, and wait for the\r\n' +
-      'retry banner. It should stop after the third attempt.',
+    key: 'long',
+    name: 'Quarterly planning with a name long enough to clamp inside the list row',
+    emoji: null,
     position: 'a2',
-    doneAt: null,
+    items: [
+      {
+        key: 'long-1',
+        title:
+          'Rework the onboarding checklist so a new teammate can finish the first session, the first repository connection and the first pull request review without asking anyone',
+        notes:
+          'The checklist currently stops at the sign-in step. Each later step needs its own line, a\n' +
+          'link to the screen it names, and a way back to the checklist after the step finishes.\n' +
+          'Keep the order the product team wrote, because the sequence is the point.',
+        position: 'a1',
+        doneAt: null,
+      },
+      {
+        key: 'long-2',
+        title:
+          'Decide whether the settings screen keeps its disclosure rows when the account runs a long organization name that pushes every control onto a second line',
+        notes: null,
+        position: 'a2',
+        doneAt: null,
+      },
+      {
+        key: 'long-3',
+        title: 'Short one',
+        notes: null,
+        position: 'a3',
+        doneAt: null,
+      },
+    ],
   },
   {
-    id: '3b2f6a10-0000-4000-8000-5c1d2e3f4b04',
-    listId: NORMAL_LIST_ID,
-    title: 'Send the weekly summary',
-    notes: null,
+    key: 'done',
+    name: 'Finished this week',
+    emoji: '✅',
     position: 'a3',
-    doneAt: null,
+    items: [
+      {
+        key: 'done-1',
+        title: 'Book the offsite room',
+        notes: null,
+        position: 'a1',
+        doneAt: iso(-26 * HOUR_MS),
+      },
+      {
+        key: 'done-2',
+        title: 'Collect the snack preferences',
+        notes: 'Two people asked for the same thing.',
+        position: 'a2',
+        doneAt: iso(-20 * HOUR_MS),
+      },
+      {
+        key: 'done-3',
+        title: 'Send the calendar invite',
+        notes: null,
+        position: 'a3',
+        doneAt: iso(-3 * HOUR_MS),
+      },
+    ],
   },
   {
-    id: NORMAL_DONE_ITEM_ID,
-    listId: NORMAL_LIST_ID,
-    title: 'Merge the schema migration',
-    notes: null,
+    key: 'empty',
+    name: 'Nothing here yet',
+    emoji: null,
     position: 'a4',
-    doneAt: iso(-2 * HOUR_MS),
-  },
-  {
-    id: LONG_ITEM_ID,
-    listId: LONG_LIST_ID,
-    title:
-      'Rework the onboarding checklist so a new teammate can finish the first session, the first repository connection and the first pull request review without asking anyone',
-    notes:
-      'The checklist currently stops at the sign-in step. Each later step needs its own line, a\n' +
-      'link to the screen it names, and a way back to the checklist after the step finishes.\n' +
-      'Keep the order the product team wrote, because the sequence is the point.',
-    position: 'a0',
-    doneAt: null,
-  },
-  {
-    id: '3b2f6a10-0000-4000-8000-5c1d2e3f4b07',
-    listId: LONG_LIST_ID,
-    title:
-      'Decide whether the settings screen keeps its disclosure rows when the account runs a long organization name that pushes every control onto a second line',
-    notes: null,
-    position: 'a1',
-    doneAt: null,
-  },
-  {
-    id: '3b2f6a10-0000-4000-8000-5c1d2e3f4b08',
-    listId: LONG_LIST_ID,
-    title: 'Short one',
-    notes: null,
-    position: 'a2',
-    doneAt: null,
-  },
-  {
-    id: DONE_ITEM_ID,
-    listId: DONE_LIST_ID,
-    title: 'Book the offsite room',
-    notes: null,
-    position: 'a0',
-    doneAt: iso(-26 * HOUR_MS),
-  },
-  {
-    id: '3b2f6a10-0000-4000-8000-5c1d2e3f4b0b',
-    listId: DONE_LIST_ID,
-    title: 'Collect the snack preferences',
-    notes: 'Two people asked for the same thing.',
-    position: 'a1',
-    doneAt: iso(-20 * HOUR_MS),
-  },
-  {
-    id: '3b2f6a10-0000-4000-8000-5c1d2e3f4b0c',
-    listId: DONE_LIST_ID,
-    title: 'Send the calendar invite',
-    notes: null,
-    position: 'a2',
-    doneAt: iso(-3 * HOUR_MS),
+    items: [],
   },
 ];
 
@@ -187,56 +213,40 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const normalizedEmail = normalizeSeedEmail(email.trim());
   const userId = await resolveSeedUserId(normalizedEmail);
   const db = getSeedDb();
+  const listId = (key: string) => seedUuid(`${userId}:list:${key}`);
 
-  // Reset only this topic's rows: the four stable list ids own every item by the
-  // cascade on `todo_items`, so one delete clears both tables for them.
-  await db.delete(todo_lists).where(inArray(todo_lists.id, [...LIST_IDS]));
+  // Reset only this topic's rows for this account: the four stable list ids own
+  // every item by the cascade on `todo_items`, so one delete clears both tables.
+  await db.delete(todo_lists).where(
+    inArray(
+      todo_lists.id,
+      LISTS.map(list => listId(list.key))
+    )
+  );
 
-  await db.insert(todo_lists).values([
-    {
-      id: NORMAL_LIST_ID,
+  await db.insert(todo_lists).values(
+    LISTS.map(list => ({
+      id: listId(list.key),
       kilo_user_id: userId,
       organization_id: null,
-      name: 'Ship the release',
-      emoji: '🚀',
-      position: 'a0',
-    },
-    {
-      id: LONG_LIST_ID,
-      kilo_user_id: userId,
-      organization_id: null,
-      name: 'Quarterly planning with a name long enough to clamp inside the list row',
-      emoji: null,
-      position: 'a1',
-    },
-    {
-      id: DONE_LIST_ID,
-      kilo_user_id: userId,
-      organization_id: null,
-      name: 'Finished this week',
-      emoji: '✅',
-      position: 'a2',
-    },
-    {
-      id: EMPTY_LIST_ID,
-      kilo_user_id: userId,
-      organization_id: null,
-      name: 'Nothing here yet',
-      emoji: null,
-      position: 'a3',
-    },
-  ]);
+      name: list.name,
+      emoji: list.emoji,
+      position: list.position,
+    }))
+  );
 
   await db.insert(todo_items).values(
-    ITEMS.map(item => ({
-      id: item.id,
-      list_id: item.listId,
-      kilo_user_id: userId,
-      title: item.title,
-      notes: item.notes,
-      position: item.position,
-      done_at: item.doneAt,
-    }))
+    LISTS.flatMap(list =>
+      list.items.map(item => ({
+        id: seedUuid(`${userId}:item:${item.key}`),
+        list_id: listId(list.key),
+        kilo_user_id: userId,
+        title: item.title,
+        notes: item.notes,
+        position: item.position,
+        done_at: item.doneAt,
+      }))
+    )
   );
 
   console.log('This fixture represents:');
@@ -252,20 +262,20 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   return {
     userId,
     email: normalizedEmail,
-    normalListId: NORMAL_LIST_ID,
-    normalListDeepLink: `kiloapp:///(app)/todos/${NORMAL_LIST_ID}`,
-    longListId: LONG_LIST_ID,
-    longListDeepLink: `kiloapp:///(app)/todos/${LONG_LIST_ID}`,
-    doneListId: DONE_LIST_ID,
-    doneListDeepLink: `kiloapp:///(app)/todos/${DONE_LIST_ID}`,
-    emptyListId: EMPTY_LIST_ID,
-    emptyListDeepLink: `kiloapp:///(app)/todos/${EMPTY_LIST_ID}`,
-    openItemId: NORMAL_ITEM_ID,
-    openItemDeepLink: `kiloapp:///(app)/todos/item/${NORMAL_ITEM_ID}`,
-    doneItemId: NORMAL_DONE_ITEM_ID,
-    doneItemDeepLink: `kiloapp:///(app)/todos/item/${NORMAL_DONE_ITEM_ID}`,
-    longItemId: LONG_ITEM_ID,
-    longItemDeepLink: `kiloapp:///(app)/todos/item/${LONG_ITEM_ID}`,
+    normalListId: listId('normal'),
+    normalListDeepLink: `kiloapp:///(app)/todos/${listId('normal')}`,
+    longListId: listId('long'),
+    longListDeepLink: `kiloapp:///(app)/todos/${listId('long')}`,
+    doneListId: listId('done'),
+    doneListDeepLink: `kiloapp:///(app)/todos/${listId('done')}`,
+    emptyListId: listId('empty'),
+    emptyListDeepLink: `kiloapp:///(app)/todos/${listId('empty')}`,
+    openItemId: seedUuid(`${userId}:item:normal-1`),
+    openItemDeepLink: `kiloapp:///(app)/todos/item/${seedUuid(`${userId}:item:normal-1`)}`,
+    doneItemId: seedUuid(`${userId}:item:normal-done`),
+    doneItemDeepLink: `kiloapp:///(app)/todos/item/${seedUuid(`${userId}:item:normal-done`)}`,
+    longItemId: seedUuid(`${userId}:item:long-1`),
+    longItemDeepLink: `kiloapp:///(app)/todos/item/${seedUuid(`${userId}:item:long-1`)}`,
     homeDeepLink: 'kiloapp:///(app)/(tabs)/(0_home)',
   };
 }

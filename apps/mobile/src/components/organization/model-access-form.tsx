@@ -217,7 +217,9 @@ export function ModelAccessForm({
   // owner or admin build a draft only to collect the refusal — the same shape
   // as the hub's blocked rename control. The notice under the segments is the
   // one place the reason is painted; the status line stays clear because no
-  // edit is possible while the gate holds.
+  // edit is possible while the gate holds. Cancel is exempt from that gate,
+  // because it touches no server state and is the only way to discard a draft
+  // the gate trapped.
   const cannotSave = planEnded || !dirty || saving || savePayload.kind !== 'ready';
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
@@ -336,7 +338,7 @@ export function ModelAccessForm({
           <Button
             variant="outline"
             size="sm"
-            disabled={planEnded || !dirty || saving}
+            disabled={!dirty || saving}
             onPress={() => {
               clearWhere(() => true);
               setForm(previous => ({ ...previous, draft: previous.baseline }));

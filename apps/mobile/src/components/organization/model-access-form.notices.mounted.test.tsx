@@ -344,21 +344,47 @@ describe('ModelAccessForm lapsed-plan controls', () => {
     expect(labelledControl(next, appI18n.t('common.save')).props.disabled).toBe(false);
   });
 
-  it('paints save and cancel as the dimmed chips while the plan lapsed', () => {
+  it('paints save and cancel as the dimmed outline while the plan lapsed', () => {
+    // A clean draft holds both controls disabled for a reason of its own: Save
+    // through the plan gate, Cancel through `!dirty`. Each is the same dimmed
+    // outline the switches and the bulk-action chips paint, not a filled plate.
     const root = render({ canEdit: true, planEnded: true });
+
+    for (const label of [appI18n.t('common.save'), appI18n.t('common.cancel')]) {
+      const control = String(labelledControl(root, label).props.className ?? '');
+
+      expect(control).toContain('opacity-50');
+      expect(control).not.toContain('bg-primary');
+    }
+  });
+
+  it('keeps cancel usable to discard a draft the plan gate trapped', () => {
+    // The lists are read-only and Save is gated, so a draft the plan lapsed
+    // under could never be cleared if Cancel took the gate too. Cancel reaches
+    // no server state, so it stays live and restores the baseline locally.
+    const root = render({ canEdit: true, planEnded: true });
+    const baseline = root.findByType('ModelDenyList' as never).props.draft as ModelAccessDraft;
     changeDraft(root, draft => ({ ...draft, modelDenyList: ['anthropic/claude'] }));
 
-    const save = String(labelledControl(root, appI18n.t('common.save')).props.className ?? '');
-    const cancel = String(labelledControl(root, appI18n.t('common.cancel')).props.className ?? '');
+    expect(root.findByType('ModelDenyList' as never).props.draft).not.toEqual(baseline);
+    expect(labelledControl(root, appI18n.t('common.save')).props.disabled).toBe(true);
+    const cancel = labelledControl(root, appI18n.t('common.cancel'));
+    const enabled = cancel.props.disabled === false;
+    // A disabled pressable takes no press, exactly as on device, so a gated
+    // Cancel would leave the trapped draft in place.
+    if (enabled) {
+      act(() => {
+        (cancel.props.onPress as () => void)();
+      });
+    }
 
-    // A disabled primary keeps a filled plate beside the outlined chips around
-    // it, which would make the one action the plan refuses the most prominent
-    // element on the screen; the lapsed Save is the same dimmed outline the
-    // Cancel and the bulk-action chips paint.
-    expect(save).toContain('opacity-50');
-    expect(save).not.toContain('bg-primary');
-    expect(cancel).toContain('opacity-50');
-    expect(cancel).not.toContain('bg-primary');
+    // One report for both facts: the control is live beside the gated Save,
+    // and the draft it discards is the baseline again.
+    expect({
+      enabled,
+      draft: root.findByType('ModelDenyList' as never).props.draft,
+    }).toEqual({ enabled: true, draft: baseline });
+    expect(saved.mutateAsync).not.toHaveBeenCalled();
   });
 
   it('keeps save on the primary fill for a dirty draft on an active plan', () => {

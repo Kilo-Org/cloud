@@ -634,7 +634,19 @@ export async function applyStripeFundedKiloClawPeriod(
       });
     }
 
-    wasSuspended = !!targetRow.suspended_at;
+    // A paid row stays canceled while it still owns the Stripe ID only after the
+    // provider subscription ended (deleted webhook, terminal subscription.updated, or
+    // admin immediate cancel). Trial expiry cancels Stripe trials locally while the
+    // provider subscription lives on, so trial rows keep reactivating on payment.
+    // Stripe never revives an ended subscription, so a late invoice settles the ledger
+    // and the paid period but must not reactivate the row: nothing would renew or
+    // enforce it again.
+    const providerSubscriptionEnded =
+      targetRow.status === 'canceled' &&
+      targetRow.plan !== 'trial' &&
+      targetRow.stripe_subscription_id === stripeSubscriptionId;
+
+    wasSuspended = !providerSubscriptionEnded && !!targetRow.suspended_at;
     resolvedInstanceId = targetRow.instance_id ?? undefined;
     resolvedSubscriptionId = targetRow.id;
 
@@ -648,7 +660,8 @@ export async function applyStripeFundedKiloClawPeriod(
       checkoutConfirmedAt: params.checkoutConfirmedAt,
       switchQualification: switchQualification ?? undefined,
     });
-    requiresProviderNonRenewal ||= retirementDecision.anomalyReason !== null;
+    requiresProviderNonRenewal ||=
+      !providerSubscriptionEnded && retirementDecision.anomalyReason !== null;
     if (retirementDecision.anomalyReason) {
       reportKiloClawCommitRetirementAnomaly({
         reason: retirementDecision.anomalyReason,
@@ -789,11 +802,10 @@ export async function applyStripeFundedKiloClawPeriod(
         .where(eq(kilocode_users.id, userId));
     }
 
-    const updateSet = {
+    const periodSet = {
       instance_id: targetRow.instance_id,
       stripe_subscription_id: stripeSubscriptionId,
       payment_source: 'credits' as const,
-      status: 'active' as const,
       plan,
       current_period_start: periodStart,
       current_period_end: periodEnd,
@@ -802,12 +814,18 @@ export async function applyStripeFundedKiloClawPeriod(
       ...retirementDecision.subscriptionUpdate,
       past_due_since: null,
       auto_top_up_triggered_for_period: null,
-      ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
-      ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
       ...(shouldClearSchedule
         ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
         : {}),
     };
+    const updateSet = providerSubscriptionEnded
+      ? periodSet
+      : {
+          ...periodSet,
+          status: 'active' as const,
+          ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+          ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
+        };
 
     const [before] = await tx
       .select()
@@ -816,14 +834,15 @@ export async function applyStripeFundedKiloClawPeriod(
       .limit(1);
 
     shouldSendSubscriptionStartedEmailForNewSettlement =
-      shouldSendSubscriptionStartedEmailForActivation(before?.status ?? null) ||
-      (await didStripeSubscriptionCreatedRecordEligibleActivation({
-        tx,
-        subscriptionId: targetRow.id,
-        plan,
-        periodStart,
-        periodEnd,
-      }));
+      !providerSubscriptionEnded &&
+      (shouldSendSubscriptionStartedEmailForActivation(before?.status ?? null) ||
+        (await didStripeSubscriptionCreatedRecordEligibleActivation({
+          tx,
+          subscriptionId: targetRow.id,
+          plan,
+          periodStart,
+          periodEnd,
+        })));
     const [after] = await tx
       .update(kiloclaw_subscriptions)
       .set(updateSet)

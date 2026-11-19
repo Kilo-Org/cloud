@@ -56,7 +56,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
     '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
   );
   return {
-    getDirectByokModel: jest.fn().mockResolvedValue({ provider: null, model: null }),
+    getDirectByokModel: jest.fn().mockResolvedValue(null),
     findDirectByokCatalogModels: jest.fn().mockResolvedValue([]),
     getDirectByokCatalogModelId: jest.fn().mockResolvedValue(null),
     getDirectByokModelChatApis: actual.getDirectByokModelChatApis,
@@ -741,7 +741,7 @@ function policyName(id: 'nvidia-byok' | 'opencode-go' | 'synthetic' | 'zai-codin
 
 describe('getProvider direct BYOK routing', () => {
   afterEach(() => {
-    jest.mocked(getDirectByokModel).mockReset().mockResolvedValue({ provider: null, model: null });
+    jest.mocked(getDirectByokModel).mockReset().mockResolvedValue(null);
     jest.mocked(findDirectByokCatalogModels).mockReset().mockResolvedValue([]);
     jest.mocked(getDirectByokCatalogModelId).mockReset().mockResolvedValue(null);
     jest.mocked(getByokCredentials).mockReset().mockResolvedValue([]);

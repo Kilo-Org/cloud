@@ -282,7 +282,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             truncating — a long title must stay readable to confirm the
             finding. */}
         <Card>
-          <Text className="text-base font-medium">{finding.title}</Text>
+          <Text className="text-base font-medium" direction="auto">
+            {finding.title}
+          </Text>
           <Text variant="muted" className="text-xs">
             {finding.repo_full_name}
           </Text>

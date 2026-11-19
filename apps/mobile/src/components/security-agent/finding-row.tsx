@@ -258,7 +258,7 @@ export function FindingRow({
           <Eyebrow className={lookup(SEVERITY_TEXT_CLASS, finding.severity) ?? undefined}>
             {severityLabel}
           </Eyebrow>
-          <Text className="text-sm font-medium" numberOfLines={2}>
+          <Text className="text-sm font-medium" numberOfLines={2} direction="auto">
             {finding.title}
           </Text>
           <Text variant="caption" numberOfLines={1}>

@@ -214,7 +214,11 @@ export function BriefingDetailScreen() {
                         <Text>{label}</Text>
                         <BriefingSourceDetail source={source} t={t} language={i18n.language} />
                         <Text variant="caption">
-                          {formatBriefingTimestamp(source.occurredAt, i18n.language, report.timezone)}
+                          {formatBriefingTimestamp(
+                            source.occurredAt,
+                            i18n.language,
+                            report.timezone
+                          )}
                         </Text>
                       </Card>
                     </Pressable>

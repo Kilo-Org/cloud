@@ -114,11 +114,7 @@ export function BriefingCard({
   // counts and the summary stay evenly spaced inside the card.
   const body = (
     <>
-      <CardControl
-        accessibilityRole="button"
-        accessibilityLabel={scorecardLabel}
-        onPress={open}
-      >
+      <CardControl accessibilityRole="button" accessibilityLabel={scorecardLabel} onPress={open}>
         <BriefingScorecard report={report} />
       </CardControl>
       <View className="border-b-[0.5px] border-hair-soft" />

@@ -30,66 +30,6 @@ export function applyMistralModelSettings(requestToMutate: GatewayRequest) {
   dropToolStrictProperties(requestToMutate.body);
 }
 
-// Mistral's API rejects any other request or message field with a 422.
-const MISTRAL_REQUEST_FIELDS = [
-  'model',
-  'messages',
-  'temperature',
-  'top_p',
-  'max_tokens',
-  'stream',
-  'stream_options',
-  'stop',
-  'random_seed',
-  'response_format',
-  'tools',
-  'tool_choice',
-  'presence_penalty',
-  'frequency_penalty',
-  'n',
-  'parallel_tool_calls',
-  'prediction',
-  'safe_prompt',
-];
-const MISTRAL_MESSAGE_FIELDS = new Set([
-  'role',
-  'content',
-  'name',
-  'tool_calls',
-  'tool_call_id',
-  'prefix',
-]);
-/** Mistral's own API accepts these too, unlike Vertex AI's Mistral endpoint. */
-const MISTRAL_API_EXTRA_REQUEST_FIELDS = ['reasoning_effort', 'prompt_cache_key'];
-
-function deleteFieldsExcept(value: object, allowed: ReadonlySet<string>) {
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) Reflect.deleteProperty(value, key);
-  }
-}
-
-/** Reduces an OpenAI-style Chat Completions body to the fields Mistral's API accepts. */
-export function toMistralChatCompletionsBody(body: object, extraFields: readonly string[] = []) {
-  const maxCompletionTokens: unknown = Reflect.get(body, 'max_completion_tokens');
-  if (Reflect.get(body, 'max_tokens') === undefined && maxCompletionTokens !== undefined) {
-    Reflect.set(body, 'max_tokens', maxCompletionTokens);
-  }
-  const seed: unknown = Reflect.get(body, 'seed');
-  if (Reflect.get(body, 'random_seed') === undefined && seed !== undefined) {
-    Reflect.set(body, 'random_seed', seed);
-  }
-  deleteFieldsExcept(body, new Set([...MISTRAL_REQUEST_FIELDS, ...extraFields]));
-
-  const messages: unknown = Reflect.get(body, 'messages');
-  for (const message of Array.isArray(messages) ? messages : []) {
-    if (isRecord(message)) deleteFieldsExcept(message, MISTRAL_MESSAGE_FIELDS);
-  }
-  const tools: unknown = Reflect.get(body, 'tools');
-  for (const tool of Array.isArray(tools) ? tools : []) {
-    if (isRecord(tool) && isRecord(tool.function)) delete tool.function.strict;
-  }
-}
-
 function reasoningTextOf(message: Record<string, unknown>): string {
   const detailsText = Array.isArray(message.reasoning_details)
     ? message.reasoning_details
@@ -117,11 +57,15 @@ function contentChunksOf(content: unknown): unknown[] {
   return [];
 }
 
+/** Message fields that carry reasoning. Mistral rejects them, so their text is replayed as a
+ * `thinking` chunk instead. */
+const MESSAGE_REASONING_FIELDS = ['reasoning_details', 'reasoning_content', 'reasoning'];
+
 /**
  * Inverse of the Mistral thinking response transform, for Mistral's Chat Completions API:
- * replays assistant reasoning as the `thinking` content chunk Mistral expects back, carries
- * OpenRouter's `reasoning` object over as `reasoning_effort`, and drops every field Mistral
- * rejects.
+ * replays assistant reasoning as the `thinking` content chunk Mistral expects back and carries
+ * OpenRouter's `reasoning` object over as `reasoning_effort`. Other fields Mistral rejects are
+ * left to the definition's `remove_from_body`.
  */
 export function applyMistralThinkingRequestTransform(request: GatewayRequest) {
   if (request.kind !== 'chat_completions') return;
@@ -131,18 +75,18 @@ export function applyMistralThinkingRequestTransform(request: GatewayRequest) {
     isReasoningExplicitlyDisabled(request) || body.reasoning?.enabled === false
       ? 'none'
       : (body.reasoning?.effort ?? body.reasoning_effort ?? 'high');
+  delete body.reasoning;
 
   for (const message of body.messages) {
-    if (message.role !== 'assistant') continue;
     const record = message as unknown as Record<string, unknown>;
-    const thinking = reasoningTextOf(record);
+    const thinking = message.role === 'assistant' ? reasoningTextOf(record) : '';
+    for (const field of MESSAGE_REASONING_FIELDS) delete record[field];
     if (!thinking) continue;
     record.content = [
       { type: 'thinking', thinking: [{ type: 'text', text: thinking }] },
       ...contentChunksOf(record.content),
     ];
   }
-  toMistralChatCompletionsBody(body, MISTRAL_API_EXTRA_REQUEST_FIELDS);
 }
 
 /**

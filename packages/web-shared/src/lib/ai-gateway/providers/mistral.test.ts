@@ -200,46 +200,44 @@ describe('applyMistralThinkingRequestTransform', () => {
     ]);
   });
 
-  it('strips fields Mistral rejects and keeps reasoning_effort and prompt_cache_key', () => {
+  it('removes reasoning fields from every message and leaves other fields alone', () => {
     const request = chatRequest(
       [
+        { role: 'user', content: 'question', reasoning_content: 'stray' },
         {
           role: 'assistant',
           content: 'answer',
           reasoning_details: [{ type: 'reasoning.text', text: 'thoughts' }],
           reasoning_content: 'thoughts',
           reasoning: 'thoughts',
-          cache_control: { type: 'ephemeral' },
         },
       ],
       {
         reasoning: { effort: 'low' },
         usage: { include: true },
-        user: 'user-id',
-        provider: { only: ['mistral'] },
-        transforms: ['middle-out'],
         prompt_cache_key: 'cache-key',
         temperature: 0.3,
         max_completion_tokens: 100,
-        seed: 7,
       }
     );
 
     applyMistralThinkingRequestTransform(request);
 
+    // `usage` and other fields Mistral rejects are the definition's `remove_from_body` to drop.
     expect(request.body).toEqual({
       model: 'mistralai/mistral-medium-3.5',
       messages: [
+        { role: 'user', content: 'question' },
         {
           role: 'assistant',
           content: [thinkingChunk('thoughts'), { type: 'text', text: 'answer' }],
         },
       ],
       reasoning_effort: 'low',
+      usage: { include: true },
       prompt_cache_key: 'cache-key',
       temperature: 0.3,
-      max_tokens: 100,
-      random_seed: 7,
+      max_completion_tokens: 100,
     });
   });
 
@@ -270,12 +268,12 @@ describe('applyMistralThinkingRequestTransform', () => {
       responseTransforms: ReasoningDetailsTransform.MistralThinking,
       async transformRequest() {},
     };
-    const request = chatRequest(undefined, { user: 'user-id' });
+    const request = chatRequest(undefined, { reasoning: { effort: 'low' } });
 
     applyReasoningDetailsTransform(provider, request);
 
-    expect(request.body.reasoning_effort).toBe('high');
-    expect(request.body).not.toHaveProperty('user');
+    expect(request.body.reasoning_effort).toBe('low');
+    expect(request.body).not.toHaveProperty('reasoning');
   });
 });
 

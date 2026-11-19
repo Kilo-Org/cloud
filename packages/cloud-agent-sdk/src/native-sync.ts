@@ -6,6 +6,7 @@ import {
   type NativeSnapshotSession,
 } from './native-sync-snapshot';
 import { applyNativeEvent, applyNativeSessionEvent } from './native-conversation-reducer';
+import { messageIDFromEventID } from './message-id';
 import {
   reduceNativePendingRequests,
   type NativePendingRequests,
@@ -32,6 +33,12 @@ const envelopeSchema = z.object({
 const ticketSchema = z.object({ ticket: z.string(), expiresAt: z.iso.datetime() });
 const grantSchema = z.object({ token: z.string(), expiresAt: z.iso.datetime() });
 const commandStatusSchema = z.enum(['queued', 'delivered', 'expired']);
+const commandStatusRank: Record<z.infer<typeof commandStatusSchema>, number> = {
+  queued: 0,
+  delivered: 1,
+  expired: 2,
+};
+const commandAckSchema = z.object({ commandID: z.string(), status: commandStatusSchema });
 const instanceSchema = z.object({
   instanceID: z.string(),
   tenant: tenantSchema,
@@ -77,7 +84,7 @@ export type NativeSessionState = {
   messages: NativeSnapshotMessage[];
   pending: NativePendingRequests;
   events: NativeEvent[];
-  commands: Record<string, 'queued' | 'delivered' | 'expired'>;
+  commands: Record<string, z.infer<typeof commandStatusSchema>>;
   error?: string | undefined;
   /**
    * Set when automatic transcript reads stopped after repeated failures. The transport does
@@ -114,7 +121,7 @@ export type NativeSessionConnection = {
   replyQuestion(requestID: string, answers: string[][]): Promise<string>;
   rejectQuestion(requestID: string): Promise<string>;
   sendCommand(command: string, args?: string): Promise<string>;
-  getCommandStatus(commandID: string): Promise<'queued' | 'delivered' | 'expired'>;
+  getCommandStatus(commandID: string): Promise<z.infer<typeof commandStatusSchema>>;
   clear(): void;
   /** Retry the transcript after a latched snapshot failure with one fresh read cycle. */
   refresh(): void;
@@ -887,6 +894,17 @@ export class NativeSyncClient {
       state = { ...state, ...patch, error };
       listener(state);
     };
+    // Status moves only forward: a late POST/poll answer must not regress a frame-reported delivery.
+    const recordCommandStatus = (
+      commandID: string,
+      status: z.infer<typeof commandStatusSchema>
+    ): z.infer<typeof commandStatusSchema> => {
+      const current = state.commands[commandID];
+      if (current !== undefined && commandStatusRank[current] >= commandStatusRank[status])
+        return current;
+      publish({ commands: { ...state.commands, [commandID]: status } });
+      return status;
+    };
     const visible = (messages: NativeSnapshotMessage[]) =>
       clearedIDs.size === 0 ? messages : messages.filter(item => !clearedIDs.has(item.message.id));
     const beyond = (frame: NativeEvent, position: number) => {
@@ -1180,9 +1198,11 @@ export class NativeSyncClient {
             publish({ runnerConnected: body['runnerConnected'] === true });
           }
           if (frame.type === 'command_status' && typeof body['commandID'] === 'string') {
-            const parsed = commandStatusSchema.safeParse(body['status']);
-            if (parsed.success)
-              publish({ commands: { ...state.commands, [body['commandID']]: parsed.data } });
+            const parsed = commandAckSchema.safeParse({
+              commandID: body['commandID'],
+              status: body['status'],
+            });
+            if (parsed.success) recordCommandStatus(parsed.data.commandID, parsed.data.status);
           }
           if (frame.type === 'error')
             publish({
@@ -1218,8 +1238,7 @@ export class NativeSyncClient {
               ]),
             ];
           if (frame.type === 'session.moved') {
-            const eventID = z.string().startsWith('evt_').parse(record(body['data'])['id']);
-            const messageID = `msg_${eventID.slice(4)}`;
+            const messageID = messageIDFromEventID(record(body['data'])['id']);
             if (!messages.some(item => item.message.id === messageID && !item.incomplete))
               pendingSnapshotMessageIDs = [
                 ...new Set([...(pendingSnapshotMessageIDs ?? []), messageID]),
@@ -1343,7 +1362,7 @@ export class NativeSyncClient {
       if (options.liveOnly && (state.connection !== 'connected' || !state.runnerConnected))
         throw new NativeSyncError('runner_offline');
       const commandID = cloudAgentSdkRuntime.randomUUID();
-      const result = z.object({ commandID: z.string(), status: commandStatusSchema }).parse(
+      const result = commandAckSchema.parse(
         await this.request(
           `${path}/commands`,
           {
@@ -1353,7 +1372,7 @@ export class NativeSyncClient {
           organizationID
         )
       );
-      publish({ commands: { ...state.commands, [result.commandID]: result.status } });
+      recordCommandStatus(result.commandID, result.status);
       return result.commandID;
     };
     const live = (type: string, body: Record<string, unknown> = {}) => {
@@ -1395,17 +1414,14 @@ export class NativeSyncClient {
         );
       },
       getCommandStatus: async (commandID: string) => {
-        const result = z
-          .object({ commandID: z.string(), status: commandStatusSchema })
-          .parse(
-            await this.request(
-              `${path}/commands/${encodeURIComponent(commandID)}`,
-              undefined,
-              organizationID
-            )
-          );
-        publish({ commands: { ...state.commands, [result.commandID]: result.status } });
-        return result.status;
+        const result = commandAckSchema.parse(
+          await this.request(
+            `${path}/commands/${encodeURIComponent(commandID)}`,
+            undefined,
+            organizationID
+          )
+        );
+        return recordCommandStatus(result.commandID, result.status);
       },
       clear: () => {
         for (const item of state.messages) clearedIDs.add(item.message.id);

@@ -148,6 +148,7 @@
     "performance": "Arụmọrụ",
     "preferences": "Mmasị",
     "privacyPolicy": "Amụma nzuzo",
+    "termsOfService": "Usoro ojiji",
     "profile": "Profaịlụ",
     "reactions": "Mmeghachi omume",
     "recent": "Ndị na-adịbeghị anya",
@@ -218,8 +219,8 @@
     "verifyCode": "Nyochaa koodu",
     "resendCode": "Ziga koodu ọzọ",
     "termsPrefix": "Site n'ịga n'ihu, ị nabatara ",
+    "termsInSentence": "Ụkpụrụ ọrụ anyị",
     "terms": "Ụkpụrụ anyị",
-    "termsInSentence": "Ụkpụrụ anyị",
     "termsConnector": " na ",
     "termsSuffix": ".",
     "moreSignInOptions": "Nhọrọ nbanye ndị ọzọ",
@@ -767,7 +768,6 @@
       "replyPlaceholder": "Azịza gị…",
       "replyBody": "Ederede azịza",
       "submitReply": "Ziga azịza",
-      "termsTitle": "Usoro ojiji",
       "termsCopy": "Ị ga-erurịrị afọ 13 ma ọ bụ karịa tupu ị bipụta ozi.",
       "termsAcceptRetry": "Enweghị ike ịnakwere usoro ojiji. Lelee njikọ gị ma nwaa ọzọ.",
       "viewTerms": "Lelee usoro ojiji",
@@ -1029,7 +1029,10 @@
     "tabs": {
       "overview": "Nchịkọta",
       "files": "Faịlụ",
-      "discussion": "Mkparịta ụka"
+      "discussion": "Mkparịta ụka",
+      "discussionAccessibility_one": "{{title}}: okwu 1",
+      "discussionAccessibility": "{{title}}: okwu {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: okwu {{displayCount}}"
     },
     "fileStatus": {
       "modified": "Agbanwere",
@@ -1135,16 +1138,16 @@
     },
     "category": {
       "agentAttentionTitle": "Onye nnọchi anya chọrọ gị",
-      "agentAttentionSubtitle": "ajụjụ, arịrịọ ikike, azịza achọrọ",
+      "agentAttentionSubtitle": "Ajụjụ, arịrịọ ikike, azịza achọrọ",
       "agentUpdatesTitle": "Mmelite onye nnọchi anya",
-      "agentUpdatesSubtitle": "ozi onye nnọchi anya na-eziga mgbe ọ na-arụ ọrụ",
+      "agentUpdatesSubtitle": "Ozi onye nnọchi anya na-eziga mgbe ọ na-arụ ọrụ",
       "sessionStatusTitle": "Ọnọdụ nnọkọ",
-      "sessionStatusSubtitle": "agwụla / agaghị nke ọma / dị njikere ka ị chịkwaa ya",
-      "balanceAlertsSubtitle": "ịdọ aka na ntị mgbe ego ụlọ ọrụ fọdụrụ dị ntakịrị",
+      "sessionStatusSubtitle": "Agwụla / agaghị nke ọma / dị njikere ka ị chịkwaa ya",
+      "balanceAlertsSubtitle": "Ịdọ aka na ntị mgbe ego ụlọ ọrụ fọdụrụ dị ntakịrị",
       "balanceAlertsUnavailable": "Sonye na ụlọ ọrụ iji nweta ọkwa gbasara ego fọdụrụ.",
-      "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA",
+      "securityFindingsSubtitle": "Nchọpụta ọhụrụ na ncheta SLA",
       "securityFindingsUnavailable": "Gbanye Onye nnọchi anya nchebe Kilo n'oke iji nweta nchọpụta nchebe.",
-      "spendAlertsSubtitle": "ịgafe oke na mmụba kwa awa",
+      "spendAlertsSubtitle": "Ịgafe oke na mmụba kwa awa",
       "spendAlertsToggle": "Otu ọkwa gbasara mmefu"
     },
     "history": {
@@ -3024,6 +3027,7 @@
     "noSessions": "Enweghị nnọkọ na-arụ ọrụ",
     "noSessionsDescription": "Banye na ngwa Kilo na ngwaọrụ ọzọ, ọ ga-apụta ebe a.",
     "signedIn": "A banyere na {{signedIn}} · A hụrụ ikpeazụ na {{lastSeen}}",
+    "signedInThisDevice": "A banyere na {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Nbanye ngwa Kilo, nbanye Kilo CLI na nbanye ihe nchọgharị weebụ na-apụta ebe a. A naghị edepụta nbanye ihe ndezi koodu.",
     "thisDevice": "Ngwaọrụ a",
     "viewProfile": "Lelee profaịlụ",
@@ -3543,6 +3547,7 @@
       "truncated": "Awa a nwere arịrịọ karịa ndị ndepụta a na-egosi.",
       "emptyTitle": "Enweghị arịrịọ n'awa a",
       "emptyDescription": "Jiri Awa gara aga hụ arịrịọ ndị mbụ.",
+      "emptyBoundDescription": "Ndekọ arịrịọ anaghị alaghachi azụ karịa nke a.",
       "loadError": "Enweghị ike ibudata ndekọ arịrịọ.",
       "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ nwere ike ịgụ ndekọ arịrịọ ya.",
       "tokens": "{{input}} batara · {{output}} pụtara",
@@ -3777,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ihe nlereanya a chọrọ njikọ ịntanetị. Jikọọ ma nwaa ọzọ, ma ọ bụ gbanwee gaa n'ihe nlereanya dị na ngwaọrụ a.",
+    "connectionLost": "Njikọ gị na ihe nlereanya ahụ kwụsịrị. Lelee njikọ gị ma nwaa ọzọ.",
     "empty": {
       "title": "Malite nkata",
       "description": "Ziga ozi ka ị soro ihe nlereanya kparịta ụka."
@@ -4632,7 +4638,7 @@
     "topFeatures": "Njirimara a kacha eji",
     "emptyTitle": "Enweghị ojiji n'oge a",
     "unavailableTitle": "Ojiji adịghị",
-    "unavailableDescription": "Oghere ọrụ a anaghị akọ ojiji. Ịnwale ọzọ agaghị enyere aka.",
+    "unavailableDescription": "E debebeghị ojiji maka oghere ọrụ a. Kpọtụrụ ndị nkwado ma ọ bụrụ na ị na-atụ anya ịhụ ojiji ebe a.",
     "orgSelfNotice": "Ị na-ahụ ojiji nke gị n'ime nzukọ a.",
     "viewDetails": "Lee nkọwa ojiji"
   },
@@ -4640,7 +4646,7 @@
     "title": "Njikọ",
     "sectionTitle": "Ọrụ ejikọrọ",
     "entrySubtitle": "GitHub, Slack, Linear na ndị ọzọ",
-    "subtitle": "Jikọọ ngwaọrụ mmepe gị na usoro ọrụ gị na Kilo",
+    "subtitle": "Jikọọ ngwaọrụ mmepe gị na usoro ọrụ gị na Kilo.",
     "disconnect": "Kwụsị njikọ",
     "disconnectTitle": "Kwụsị njikọ {{provider}}?",
     "disconnectMessage": "Kilo agaghị azaghachi ọzọ na {{provider}}. Ị nwere ike ijikọ ọzọ mgbe ọ bụla.",

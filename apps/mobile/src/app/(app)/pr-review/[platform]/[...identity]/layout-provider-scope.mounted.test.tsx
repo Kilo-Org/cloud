@@ -48,7 +48,9 @@ vi.mock('@/components/use-feedback-prompt', () => ({
   FeedbackPromptProvider: ({ children }: { children: React.ReactNode }) =>
     React.createElement('FeedbackPromptProvider', null, children),
 }));
-vi.mock('@/lib/form-sheet', () => ({ useFormSheetScreenOptions: () => ({}) }));
+vi.mock('@/lib/form-sheet', () => ({
+  useFormSheetScreenOptions: () => ({ sheetAllowedDetents: [0.5, 0.94] }),
+}));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
 }));
@@ -63,17 +65,34 @@ vi.mock('@/lib/pr-review/pending-review-provider', () => ({
   PendingReviewProvider: ({ children }: { children: React.ReactNode }) =>
     React.createElement('PendingReviewProvider', null, children),
 }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ Platform: { OS: 'android' }, View: 'View' }));
+
+function render(): TestRenderer.ReactTestRenderer {
+  const rendered: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+  act(() => {
+    rendered.current = TestRenderer.create(<ProviderPrReviewLayout />);
+  });
+  if (!rendered.current) {
+    throw new Error('layout did not render');
+  }
+  return rendered.current;
+}
 
 function mount(): ProviderPrScope {
-  act(() => {
-    TestRenderer.create(<ProviderPrReviewLayout />);
-  });
+  render();
   const scope = captured.scope;
   if (!scope) {
     throw new Error('layout did not publish a scope');
   }
   return scope;
+}
+
+/** The detents the layout registers for one sheet route. */
+function detentsOf(renderer: TestRenderer.ReactTestRenderer, name: string): unknown {
+  const options: unknown = renderer.root.findByProps({ name }).props.options;
+  return options && typeof options === 'object' && 'sheetAllowedDetents' in options
+    ? options.sheetAllowedDetents
+    : undefined;
 }
 
 beforeEach(() => {
@@ -96,5 +115,15 @@ describe('provider PR-review layout scope', () => {
     route.query = { instance: 'gitlab.example.com' };
     const scope = mount();
     expect(scope.ref.platform === 'gitlab' && scope.ref.instanceHint).toBeUndefined();
+  });
+});
+
+describe('provider PR-review sheet detents', () => {
+  it('registers only the full detent for the merge sheet on Android', () => {
+    // Android lays the sheet out at its largest detent, so a half position
+    // would leave the Merge button below the visible edge, out of reach.
+    const renderer = render();
+    expect(detentsOf(renderer, 'merge')).toEqual([0.94]);
+    expect(detentsOf(renderer, 'review-submit')).toEqual([0.5, 0.94]);
   });
 });

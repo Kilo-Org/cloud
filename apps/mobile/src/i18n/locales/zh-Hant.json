@@ -149,6 +149,7 @@
     "performance": "效能",
     "preferences": "偏好設定",
     "privacyPolicy": "隱私權政策",
+    "termsOfService": "服務條款",
     "profile": "個人資料",
     "reactions": "表情回應",
     "recent": "最近",
@@ -218,8 +219,8 @@
     "verifyCode": "驗證",
     "resendCode": "重新傳送驗證碼",
     "termsPrefix": "繼續即表示你同意我們的",
+    "termsInSentence": "服務條款",
     "terms": "條款",
-    "termsInSentence": "條款",
     "termsConnector": "和",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登入選項",
@@ -2467,6 +2468,7 @@
     "noSessions": "沒有已登入的工作階段",
     "noSessionsDescription": "在其他裝置上登入 Kilo 應用程式後，該裝置就會顯示在這裡。",
     "signedIn": "登入時間：{{signedIn}} · 最後上線：{{lastSeen}}",
+    "signedInThisDevice": "登入時間：{{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "這裡會顯示來自 Kilo 應用程式、Kilo CLI 與網頁瀏覽器的登入。編輯器的登入不會列出。",
     "thisDevice": "此裝置",
     "webBrowser": "網頁瀏覽器",
@@ -2886,7 +2888,6 @@
       "submitReply": "送出回覆",
       "termsAcceptRetry": "同意服務條款時發生錯誤。請檢查連線後再試一次。",
       "termsCopy": "你必須年滿 13 歲才能發佈內容。",
-      "termsTitle": "服務條款",
       "threadAccessibilityLabel": "討論串 {{anchorLabel}}",
       "unavailable": "無法開啟討論。",
       "unavailableMessage": "此提取請求可能已移除。",
@@ -3240,6 +3241,9 @@
     },
     "tabs": {
       "discussion": "討論",
+      "discussionAccessibility": "{{title}}：{{displayCount}} 則留言",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}} 則留言",
+      "discussionAccessibility_one": "{{title}}：1 則留言",
       "files": "檔案",
       "overview": "總覽"
     },
@@ -3548,6 +3552,7 @@
       "truncated": "這一小時的請求多於清單顯示的數量。",
       "emptyTitle": "這一小時沒有請求",
       "emptyDescription": "使用「較早一小時」查看較早的請求。",
+      "emptyBoundDescription": "請求記錄最早只到這裡。",
       "loadError": "無法載入請求記錄。",
       "permissionDenied": "只有組織的擁有者、管理員或帳務管理員可以查看其請求記錄。",
       "tokens": "輸入 {{input}} · 輸出 {{output}}",
@@ -3777,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "此模型需要網路連線。請連線後再試一次，或切換至此裝置上的模型。",
+    "connectionLost": "與模型的連線已中斷。請檢查連線後再試一次。",
     "empty": {
       "title": "開始聊天",
       "description": "傳送訊息以與模型對話。"
@@ -4632,7 +4638,7 @@
     "topFeatures": "最常用功能",
     "emptyTitle": "此期間沒有用量",
     "unavailableTitle": "用量無法使用",
-    "unavailableDescription": "此工作區未回報用量。重試不會有幫助。",
+    "unavailableDescription": "此工作區尚未設定用量。若預期此處應顯示用量，請聯絡支援團隊。",
     "orgSelfNotice": "你看到的是你自己在此組織中的用量。",
     "viewDetails": "查看用量詳情"
   },
@@ -4640,7 +4646,7 @@
     "title": "整合",
     "sectionTitle": "已連結的服務",
     "entrySubtitle": "GitHub、Slack、Linear 等",
-    "subtitle": "將您的開發工具與工作流程連結至 Kilo",
+    "subtitle": "將您的開發工具與工作流程連結至 Kilo。",
     "disconnect": "中斷連結",
     "disconnectTitle": "要中斷與 {{provider}} 的連結嗎？",
     "disconnectMessage": "Kilo 將停止在 {{provider}} 中回應。您可以隨時重新連結。",

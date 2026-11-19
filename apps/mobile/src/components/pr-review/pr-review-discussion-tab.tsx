@@ -68,7 +68,6 @@ import { type Href, useIsFocused, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentModerationProvider } from '@/components/pr-review/discussion/comment-moderation';
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
@@ -106,7 +105,7 @@ import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-co
 import { type ProviderPrPlatform, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useStyleSideInsets } from '@/lib/screen-insets';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 
@@ -219,7 +218,7 @@ export function PrReviewDiscussionTab({
   // sensor housing. Spread only when nonzero: the skeleton wrapper's `px-4`
   // className gutter must survive portrait untouched (inline style wins over
   // className). Same treatment as the diff floating-actions bar.
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
 
   // Full re-sort of every loaded thread + first-page conversation comments
   // (R4: "Load more" may insert rows mid-list; accepted). Both inputs are

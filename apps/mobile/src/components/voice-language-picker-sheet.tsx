@@ -18,6 +18,7 @@ import { languageRows } from '@/i18n/language-rows';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
+import { useSideInsetMarginStyle, useSideInsetStyle } from '@/lib/screen-insets';
 import {
   reconcileVoiceInputLanguageTag,
   voiceInputLanguageDisplayName,
@@ -42,8 +43,9 @@ const listContentContainerStyle = { paddingBottom: 16 } satisfies ViewStyle;
 const SKELETON_ROW_COUNT = 6;
 
 function SkeletonRows() {
+  const sideInsetStyle = useSideInsetStyle();
   return (
-    <View className="pt-1">
+    <View className="pt-1" style={sideInsetStyle}>
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
         <RowSkeleton
           // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
@@ -101,6 +103,7 @@ function VoiceLanguageList({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const listRef = useRef<FlashListRef<VoiceLanguageOption>>(null);
   // `matchesQuery` folds the label, the description and every search term of
   // every option, so the filter only reruns when the option array or the query
@@ -131,7 +134,7 @@ function VoiceLanguageList({
     <FlashList<VoiceLanguageOption>
       nestedScrollEnabled
       ref={listRef}
-      style={[listStyle, { backgroundColor: colors.background }]}
+      style={[listStyle, { backgroundColor: colors.background }, sideInsetMarginStyle]}
       contentContainerStyle={listContentContainerStyle}
       data={filtered}
       // FlashList stores its props during render and can index `data` past its

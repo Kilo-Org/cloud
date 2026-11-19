@@ -149,6 +149,7 @@
     "performance": "性能",
     "preferences": "偏好设置",
     "privacyPolicy": "隐私政策",
+    "termsOfService": "服务条款",
     "profile": "个人资料",
     "reactions": "表情回应",
     "recent": "最近",
@@ -218,8 +219,8 @@
     "verifyCode": "验证",
     "resendCode": "重新发送验证码",
     "termsPrefix": "继续即表示你同意我们的",
+    "termsInSentence": "服务条款",
     "terms": "条款",
-    "termsInSentence": "条款",
     "termsConnector": "和",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登录方式",
@@ -2467,6 +2468,7 @@
     "noSessions": "暂无已登录的设备",
     "noSessionsDescription": "在其他设备上登录 Kilo 应用后，即可在这里看到该设备。",
     "signedIn": "登录于 {{signedIn}} · 最后在线 {{lastSeen}}",
+    "signedInThisDevice": "登录于 {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "这里会显示来自 Kilo 应用、Kilo CLI 和浏览器的登录。编辑器的登录不会列出。",
     "thisDevice": "此设备",
     "webBrowser": "浏览器",
@@ -2886,7 +2888,6 @@
       "submitReply": "提交回复",
       "termsAcceptRetry": "未能确认同意服务条款。请检查网络连接后重试。",
       "termsCopy": "年满 13 岁才能发布内容。",
-      "termsTitle": "服务条款",
       "threadAccessibilityLabel": "讨论串 {{anchorLabel}}",
       "unavailable": "无法查看讨论",
       "unavailableMessage": "此拉取请求可能已被删除。",
@@ -3240,6 +3241,9 @@
     },
     "tabs": {
       "discussion": "讨论",
+      "discussionAccessibility": "{{title}}：{{displayCount}} 条评论",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}} 条评论",
+      "discussionAccessibility_one": "{{title}}：1 条评论",
       "files": "文件",
       "overview": "概览"
     },
@@ -3548,6 +3552,7 @@
       "truncated": "该小时的请求数超出列表可显示的数量。",
       "emptyTitle": "该小时暂无请求",
       "emptyDescription": "使用“上一小时”查看更早的请求。",
+      "emptyBoundDescription": "请求日志最多只能追溯到此处。",
       "loadError": "无法加载请求日志。",
       "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
       "tokens": "输入 {{input}} · 输出 {{output}}",
@@ -3777,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "此模型需要联网。请连接网络后重试，或切换到此设备上的模型。",
+    "connectionLost": "与模型的连接已断开。请检查网络连接后重试。",
     "empty": {
       "title": "开始聊天",
       "description": "发送消息以与模型聊天。"
@@ -4632,7 +4638,7 @@
     "topFeatures": "常用功能",
     "emptyTitle": "此期间无用量",
     "unavailableTitle": "用量不可用",
-    "unavailableDescription": "此工作区未报告用量。重试不会有帮助。",
+    "unavailableDescription": "此工作区尚未设置用量。如果认为此处应显示用量，请联系支持团队。",
     "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
     "viewDetails": "查看用量详情"
   },
@@ -4640,7 +4646,7 @@
     "title": "集成",
     "sectionTitle": "已连接的服务",
     "entrySubtitle": "GitHub、Slack、Linear 等",
-    "subtitle": "将你的开发工具和工作流连接到 Kilo",
+    "subtitle": "将你的开发工具和工作流连接到 Kilo。",
     "disconnect": "断开连接",
     "disconnectTitle": "要断开 {{provider}} 的连接吗？",
     "disconnectMessage": "Kilo 将不再在 {{provider}} 中响应。你可以随时重新连接。",

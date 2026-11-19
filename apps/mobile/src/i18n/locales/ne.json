@@ -148,6 +148,7 @@
     "performance": "कार्यसम्पादन",
     "preferences": "रुचिहरू",
     "privacyPolicy": "गोपनीयता नीति",
+    "termsOfService": "सेवाका सर्तहरू",
     "profile": "प्रोफाइल",
     "reactions": "प्रतिक्रियाहरू",
     "recent": "हालैका",
@@ -218,8 +219,8 @@
     "verifyCode": "कोड प्रमाणित गर्नुहोस्",
     "resendCode": "कोड पुनः पठाउनुहोस्",
     "termsPrefix": "अघि बढ्दा तपाईं हाम्रा ",
+    "termsInSentence": "सेवाका सर्तहरू",
     "terms": "सर्तहरू",
-    "termsInSentence": "सर्तहरू",
     "termsConnector": " र ",
     "termsSuffix": "मा सहमत हुनुहुन्छ।",
     "moreSignInOptions": "थप साइन इन विकल्पहरू",
@@ -767,7 +768,6 @@
       "replyPlaceholder": "जवाफ…",
       "replyBody": "जवाफको पाठ",
       "submitReply": "जवाफ पठाउनुहोस्",
-      "termsTitle": "सेवाका सर्तहरू",
       "termsCopy": "पोस्ट गर्न तपाईंको उमेर कम्तीमा १३ वर्ष हुनुपर्छ।",
       "termsAcceptRetry": "सर्तहरू स्वीकार गर्न सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
       "viewTerms": "सर्तहरू हेर्नुहोस्",
@@ -1029,7 +1029,10 @@
     "tabs": {
       "overview": "अवलोकन",
       "files": "फाइलहरू",
-      "discussion": "छलफल"
+      "discussion": "छलफल",
+      "discussionAccessibility_one": "{{title}}: १ टिप्पणी",
+      "discussionAccessibility": "{{title}}: {{displayCount}} टिप्पणी",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} टिप्पणी"
     },
     "fileStatus": {
       "modified": "परिमार्जित",
@@ -3024,6 +3027,7 @@
     "noSessions": "कुनै सक्रिय सत्र छैन",
     "noSessionsDescription": "अर्को यन्त्रमा Kilo एपबाट साइन इन गर्नुहोस्। त्यसपछि त्यो यन्त्र यहाँ देखिनेछ।",
     "signedIn": "साइन इन: {{signedIn}} · अन्तिम पटक देखिएको: {{lastSeen}}",
+    "signedInThisDevice": "साइन इन: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "यहाँ Kilo एप, Kilo CLI र वेब ब्राउजरका साइन-इनहरू देखिन्छन्। एडिटरका साइन-इनहरू सूचीबद्ध छैनन्।",
     "thisDevice": "यो यन्त्र",
     "viewProfile": "प्रोफाइल हेर्नुहोस्",
@@ -3543,6 +3547,7 @@
       "truncated": "यो घण्टामा सूचीमा देखाइएभन्दा धेरै अनुरोधहरू छन्।",
       "emptyTitle": "यो घण्टामा कुनै अनुरोध छैन",
       "emptyDescription": "पहिलेका अनुरोधहरू हेर्न अघिल्लो घण्टा प्रयोग गर्नुहोस्।",
+      "emptyBoundDescription": "अनुरोधहरूको इतिहास यतिसम्म मात्र उपलब्ध छ।",
       "loadError": "अनुरोध लगहरू लोड गर्न सकिएन।",
       "permissionDenied": "संस्थाको मालिक, एडमिन वा बिलिङ प्रबन्धकले मात्र यसको अनुरोध लगहरू पढ्न सक्नुहुन्छ।",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
@@ -3777,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "यो मोडेललाई इन्टरनेट जडान चाहिन्छ। जडान गरेर फेरि प्रयास गर्नुहोस्, वा यस उपकरणमा रहेको मोडेलमा स्विच गर्नुहोस्।",
+    "connectionLost": "मोडेलसँगको जडान टुट्यो। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
     "empty": {
       "title": "कुराकानी सुरु गर्नुहोस्",
       "description": "मोडेलसँग कुरा गर्न सन्देश पठाउनुहोस्।"
@@ -4632,7 +4638,7 @@
     "topFeatures": "शीर्ष सुविधाहरू",
     "emptyTitle": "यस अवधिमा कुनै प्रयोग छैन",
     "unavailableTitle": "प्रयोग उपलब्ध छैन",
-    "unavailableDescription": "यो वर्कस्पेसले प्रयोगको जानकारी दिँदैन। फेरि प्रयास गर्नुले मद्दत गर्दैन।",
+    "unavailableDescription": "यो वर्कस्पेसका लागि प्रयोग मिलाइएको छैन। यहाँ प्रयोग देखिनुपर्ने हो भने सहायता टोलीलाई सम्पर्क गर्नुहोस्।",
     "orgSelfNotice": "तपाईं यस संगठनमा आफ्नै प्रयोग हेर्दै हुनुहुन्छ।",
     "viewDetails": "प्रयोग विवरण हेर्नुहोस्"
   },
@@ -4640,7 +4646,7 @@
     "title": "एकीकरणहरू",
     "sectionTitle": "जोडिएका सेवाहरू",
     "entrySubtitle": "GitHub, Slack, Linear र अन्य",
-    "subtitle": "आफ्ना विकास उपकरण र कार्यप्रवाहहरूलाई Kilo सँग जोड्नुहोस्",
+    "subtitle": "आफ्ना विकास उपकरण र कार्यप्रवाहहरूलाई Kilo सँग जोड्नुहोस्।",
     "disconnect": "विच्छेद गर्नुहोस्",
     "disconnectTitle": "{{provider}} विच्छेद गर्ने हो?",
     "disconnectMessage": "Kilo ले {{provider}} मा जवाफ दिन बन्द गर्नेछ। तपाईं जुनसुकै बेला पुनः जोड्न सक्नुहुन्छ।",

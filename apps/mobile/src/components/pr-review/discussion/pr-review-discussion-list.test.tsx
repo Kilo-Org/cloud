@@ -32,6 +32,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: undefined }),
 }));
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({

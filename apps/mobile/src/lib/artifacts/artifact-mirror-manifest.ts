@@ -28,12 +28,30 @@ const DISPLAY_NAME_FALLBACK_EXTENSION = 'bin';
 const SESSION_NAME_FALLBACK = 'Session';
 
 // Control characters: C0 controls (0x00-0x1F), DEL (0x7F), and C1 controls
-// (0x80-0x9F). Written in decimal because oxfmt normalizes hex literals to
-// lowercase, which `unicorn/number-literal-case` rejects.
+// (0x80-0x9F). These are unnameable, as are the Unicode bidi formatting
+// characters, which a file browser would otherwise use to reorder the painted
+// label: ARABIC LETTER MARK (0x061C), LEFT-TO-RIGHT MARK (0x200E), RIGHT-TO-LEFT
+// MARK (0x200F), LEFT-TO-RIGHT EMBEDDING through RIGHT-TO-LEFT OVERRIDE
+// (0x202A-0x202E), and LEFT-TO-RIGHT ISOLATE through POP DIRECTIONAL ISOLATE
+// (0x2066-0x2069). SOFT HYPHEN (0x00AD) and ZERO WIDTH SPACE (0x200B) are
+// unnameable too, because they paint nothing in a file browser and would only
+// pad the label. The joiners (0x200C, 0x200D) stay, because they shape the
+// letters of a name that is actually written in an RTL script. Written in
+// decimal because oxfmt normalizes hex literals to lowercase, which
+// `unicorn/number-literal-case` rejects.
 const C0_CONTROL_CODE_POINT_MAX = 31;
 const DELETE_CODE_POINT = 127;
 const C1_CONTROL_CODE_POINT_MIN = 128;
 const C1_CONTROL_CODE_POINT_MAX = 159;
+const SOFT_HYPHEN_CODE_POINT = 173;
+const ARABIC_LETTER_MARK_CODE_POINT = 1564;
+const ZERO_WIDTH_SPACE_CODE_POINT = 8203;
+const LEFT_TO_RIGHT_MARK_CODE_POINT = 8206;
+const RIGHT_TO_LEFT_MARK_CODE_POINT = 8207;
+const BIDI_EMBEDDING_CODE_POINT_MIN = 8234;
+const BIDI_EMBEDDING_CODE_POINT_MAX = 8238;
+const BIDI_ISOLATE_CODE_POINT_MIN = 8294;
+const BIDI_ISOLATE_CODE_POINT_MAX = 8297;
 
 const artifactMirrorFileSchema = z.object({
   id: z.string(),
@@ -104,9 +122,10 @@ export function serializeArtifactMirrorManifest(manifest: ArtifactMirrorManifest
  * Turn an agent-supplied name into a display name a file browser can show.
  *
  * Only the manifest ever holds this string (the on-disk name is the opaque file
- * id), but it still must not carry a path, a control character, or an unbounded
- * run of bytes. The extension is kept when the name has to be truncated, so the
- * browser can still map the file to an app.
+ * id), but it still must not carry a path, a control character, or a Unicode
+ * bidi formatting character, which a browser would otherwise use to reorder the
+ * painted label, nor an unbounded run of bytes. The extension is kept when the
+ * name has to be truncated, so the browser can still map the file to an app.
  */
 export function safeArtifactDisplayName({
   id,
@@ -277,26 +296,33 @@ function compareOldestFirst(
 function sanitizeArtifactName(raw: string): string {
   const basename = raw.slice(Math.max(raw.lastIndexOf('/'), raw.lastIndexOf('\\')) + 1);
 
-  let withoutControls = '';
+  let withoutUnnameable = '';
   for (const character of basename) {
     const codePoint = character.codePointAt(0) ?? 0;
-    if (!isControlCodePoint(codePoint)) {
-      withoutControls += character;
+    if (!isUnnameableCodePoint(codePoint)) {
+      withoutUnnameable += character;
     }
   }
 
-  const collapsed = withoutControls.replaceAll(/\s+/gu, ' ').trim();
+  const collapsed = withoutUnnameable.replaceAll(/\s+/gu, ' ').trim();
   if (collapsed.length === 0 || collapsed === '.' || collapsed === '..') {
     return '';
   }
   return boundArtifactDisplayName(collapsed);
 }
 
-function isControlCodePoint(codePoint: number): boolean {
+function isUnnameableCodePoint(codePoint: number): boolean {
   return (
     codePoint <= C0_CONTROL_CODE_POINT_MAX ||
     codePoint === DELETE_CODE_POINT ||
-    (codePoint >= C1_CONTROL_CODE_POINT_MIN && codePoint <= C1_CONTROL_CODE_POINT_MAX)
+    (codePoint >= C1_CONTROL_CODE_POINT_MIN && codePoint <= C1_CONTROL_CODE_POINT_MAX) ||
+    codePoint === SOFT_HYPHEN_CODE_POINT ||
+    codePoint === ZERO_WIDTH_SPACE_CODE_POINT ||
+    codePoint === ARABIC_LETTER_MARK_CODE_POINT ||
+    codePoint === LEFT_TO_RIGHT_MARK_CODE_POINT ||
+    codePoint === RIGHT_TO_LEFT_MARK_CODE_POINT ||
+    (codePoint >= BIDI_EMBEDDING_CODE_POINT_MIN && codePoint <= BIDI_EMBEDDING_CODE_POINT_MAX) ||
+    (codePoint >= BIDI_ISOLATE_CODE_POINT_MIN && codePoint <= BIDI_ISOLATE_CODE_POINT_MAX)
   );
 }
 

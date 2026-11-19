@@ -148,6 +148,7 @@
     "performance": "性能",
     "preferences": "設定",
     "privacyPolicy": "プライバシーポリシー",
+    "termsOfService": "利用規約",
     "profile": "プロフィール",
     "reactions": "リアクション",
     "recent": "最近",
@@ -218,8 +219,8 @@
     "verifyCode": "コードを確認",
     "resendCode": "コードを再送信",
     "termsPrefix": "続行すると、",
-    "terms": "利用規約",
     "termsInSentence": "利用規約",
+    "terms": "利用規約",
     "termsConnector": "および",
     "termsSuffix": "に同意したことになります。",
     "moreSignInOptions": "その他のサインイン方法",
@@ -2467,6 +2468,7 @@
     "noSessions": "サインイン中のセッションはありません",
     "noSessionsDescription": "別のデバイスでKiloアプリにサインインすると、ここに表示されます。",
     "signedIn": "サインイン：{{signedIn}}・最終アクセス：{{lastSeen}}",
+    "signedInThisDevice": "サインイン：{{signedIn}}・{{thisDevice}}",
     "signInScopeNote": "ここにはKiloアプリとKilo CLIとウェブブラウザーのサインインが表示されます。エディターのサインインは表示されません。",
     "thisDevice": "このデバイス",
     "viewProfile": "プロフィールを表示",
@@ -2886,7 +2888,6 @@
       "submitReply": "返信を送信",
       "termsAcceptRetry": "利用規約に同意できませんでした。接続を確認して、もう一度お試しください。",
       "termsCopy": "投稿できるのは13歳以上の方です。",
-      "termsTitle": "利用規約",
       "threadAccessibilityLabel": "ディスカッションスレッド {{anchorLabel}}",
       "unavailable": "ディスカッションを表示できません。",
       "unavailableMessage": "このプルリクエストは削除された可能性があります。",
@@ -3240,6 +3241,9 @@
     },
     "tabs": {
       "discussion": "ディスカッション",
+      "discussionAccessibility": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_one": "{{title}}：1件のコメント",
       "files": "ファイル",
       "overview": "概要"
     },
@@ -3548,6 +3552,7 @@
       "truncated": "この1時間には、一覧に表示しきれないリクエストがあります。",
       "emptyTitle": "この1時間のリクエストはありません",
       "emptyDescription": "「前の1時間」をタップすると、それより前のリクエストが表示されます。",
+      "emptyBoundDescription": "リクエストログはここまでしかさかのぼれません。",
       "loadError": "リクエストログを読み込めませんでした。",
       "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。",
       "tokens": "入力 {{input}} · 出力 {{output}}",
@@ -3777,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "このモデルにはインターネット接続が必要です。接続して再試行するか、このデバイス上のモデルに切り替えてください。",
+    "connectionLost": "モデルとの接続が切れました。接続を確認して、もう一度お試しください。",
     "empty": {
       "title": "チャットを開始",
       "description": "モデルと話すにはメッセージを送信してください。"
@@ -4632,7 +4638,7 @@
     "topFeatures": "上位の機能",
     "emptyTitle": "この期間の使用はありません",
     "unavailableTitle": "使用状況を利用できません",
-    "unavailableDescription": "このワークスペースは使用状況を報告していません。再試行しても解決しません。",
+    "unavailableDescription": "このワークスペースでは使用状況が設定されていません。ここに使用状況が表示されるはずの場合は、サポートにお問い合わせください。",
     "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
     "viewDetails": "使用状況の詳細を表示"
   },
@@ -4640,7 +4646,7 @@
     "title": "連携",
     "sectionTitle": "接続済みのサービス",
     "entrySubtitle": "GitHub、Slack、Linear など",
-    "subtitle": "開発ツールやワークフローを Kilo に接続します",
+    "subtitle": "開発ツールやワークフローを Kilo に接続します。",
     "disconnect": "接続を解除",
     "disconnectTitle": "{{provider}} の接続を解除しますか？",
     "disconnectMessage": "Kilo は {{provider}} で応答しなくなります。いつでも再接続できます。",

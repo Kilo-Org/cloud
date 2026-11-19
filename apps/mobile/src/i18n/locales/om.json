@@ -148,6 +148,7 @@
     "performance": "Raawwii",
     "preferences": "Filannoowwan",
     "privacyPolicy": "Imaammata eegumsa dhuunfaa",
+    "termsOfService": "Ulaagaalee tajaajilaa",
     "profile": "Proofaayilii",
     "reactions": "Deebiiwwan miiraa",
     "recent": "Kan dhihoo",
@@ -218,8 +219,8 @@
     "verifyCode": "Koodii mirkaneessi",
     "resendCode": "Koodii irra deebi'ii ergi",
     "termsPrefix": "Itti fufuun, kanneen keenya armaan gadiitti walii galta: ",
+    "termsInSentence": "Ulaagaalee tajaajilaa",
     "terms": "Ulaagaalee",
-    "termsInSentence": "Ulaagaalee",
     "termsConnector": " fi ",
     "termsSuffix": ".",
     "moreSignInOptions": "Filannoowwan seensaa dabalataa",
@@ -767,7 +768,6 @@
       "replyPlaceholder": "Deebii…",
       "replyBody": "Barruu deebii",
       "submitReply": "Deebii dhiheessi",
-      "termsTitle": "Ulaagaalee tajaajilaa",
       "termsCopy": "Maxxansuuf umuriin kee waggaa 13 ykn isaa ol ta'uu qaba.",
       "termsAcceptRetry": "Ulaagaalee fudhachuun hin danda'amne. Walqunnamtii kee ilaaliitii irra deebi'ii yaali.",
       "viewTerms": "Ulaagaalee ilaali",
@@ -1029,7 +1029,10 @@
     "tabs": {
       "overview": "Ilaalcha waliigalaa",
       "files": "Faayiloota",
-      "discussion": "Marii"
+      "discussion": "Marii",
+      "discussionAccessibility_one": "{{title}}: yaada 1",
+      "discussionAccessibility": "{{title}}: Yaadota {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: Yaadota {{displayCount}}"
     },
     "fileStatus": {
       "modified": "Fooyya'e",
@@ -1135,16 +1138,16 @@
     },
     "category": {
       "agentAttentionTitle": "Ergamaan si barbaada",
-      "agentAttentionSubtitle": "gaaffiiwwan, hayyama, deebii barbaachisu",
+      "agentAttentionSubtitle": "Gaaffiiwwan, hayyama, deebii barbaachisu",
       "agentUpdatesTitle": "Haaromsa ergamaa",
-      "agentUpdatesSubtitle": "ergaawwan hojii gidduutti ergamaa irraa dhufan",
+      "agentUpdatesSubtitle": "Ergaawwan hojii gidduutti ergamaa irraa dhufan",
       "sessionStatusTitle": "Haala turtii",
-      "sessionStatusSubtitle": "xumurame / hin milkoofne / to'achuuf qophaa'e",
-      "balanceAlertsSubtitle": "akeekkachiisa haftee dhaabbataa xiqqaa",
+      "sessionStatusSubtitle": "Xumurame / hin milkoofne / to'achuuf qophaa'e",
+      "balanceAlertsSubtitle": "Akeekkachiisa haftee dhaabbataa xiqqaa",
       "balanceAlertsUnavailable": "Akeekkachiisa haftee argachuuf dhaabbata makami.",
-      "securityFindingsSubtitle": "argannoowwan haaraa fi yaadachiisa SLA",
+      "securityFindingsSubtitle": "Argannoowwan haaraa fi yaadachiisa SLA",
       "securityFindingsUnavailable": "Argannoowwan nageenyaa argachuuf Kilo eejentii nageenyaa daangaa irratti dandeessisi.",
-      "spendAlertsSubtitle": "daarbii daangaa fi olka'iinsa sa'aatii",
+      "spendAlertsSubtitle": "Daarbii daangaa fi olka'iinsa sa'aatii",
       "spendAlertsToggle": "Ramaddii akeekkachiisa baasii"
     },
     "history": {
@@ -3024,6 +3027,7 @@
     "noSessions": "Turtiiwwan hojiirra jiran hin jiran",
     "noSessionsDescription": "Meeshaa biraa irratti appilikeeshinii Kilo tiin seeni; meeshaan sun asitti mul'ata.",
     "signedIn": "Yeroo seene {{signedIn}} · Dhumarratti kan mul'ate {{lastSeen}}",
+    "signedInThisDevice": "Yeroo seene {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Seensawwan appilikeeshinii Kilo, Kilo CLI fi biraawzarii weebii asitti mul'atu. Seensawwan gulaalaa hin tarreeffaman.",
     "thisDevice": "Meeshaa kana",
     "viewProfile": "Piroofaayilii ilaali",
@@ -3543,6 +3547,7 @@
       "truncated": "Sa'aatiin kun gaaffiiwwan tarree kana irratti mul'atan caalaa qaba.",
       "emptyTitle": "Sa'aatii kana keessatti gaaffiin hin jiru",
       "emptyDescription": "Sa'aatii darbe fayyadamuun gaaffiiwwan darban ilaali.",
+      "emptyBoundDescription": "Galmeewwan gaaffii kana caalaa duubatti hin deeman.",
       "loadError": "Galmeewwan gaaffii fe'uun hin danda'amne.",
       "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hogganaa kaffaltii qofa.",
       "tokens": "{{input}} seene · {{output}} ba'e",
@@ -3777,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "Modeeliin kun walqunnamtii interneetii barbaada. Walqunnamii irra deebi'ii yaali, ykn gara modeelii meeshaa kana irra jiruutti jijjiiri.",
+    "connectionLost": "Walqunnamtiin modeelii wajjin qabdu cite. Walqabannaa kee ilaaliitii deebi'ii yaali.",
     "empty": {
       "title": "Chaat jalqabi",
       "description": "Modeelii wajjin haasa'uuf ergaa ergi."
@@ -4632,7 +4638,7 @@
     "topFeatures": "Amaloota olaanoo",
     "emptyTitle": "Yeroo kana keessa itti fayyadamni hin jiru",
     "unavailableTitle": "Itti fayyadama hin argamne",
-    "unavailableDescription": "Iddoo hojii kun itti fayyadama hin gabaasu. Irra deebi'uun homaa hin fayyadu.",
+    "unavailableDescription": "Iddoo hojii kanaaf itti fayyadamni qophaa'ee hin jiru. Itti fayyadama asitti arguu yoo eegde, garee deeggarsaa qunnami.",
     "orgSelfNotice": "Itti fayyadama kee dhaabbata kana keessatti argaa jirta.",
     "viewDetails": "Bal'ina itti fayyadamaa ilaali"
   },
@@ -4640,7 +4646,7 @@
     "title": "Walitti hidhamiinsota",
     "sectionTitle": "Tajaajilawwan walitti hidhaman",
     "entrySubtitle": "GitHub, Slack, Linear fi kan biroo",
-    "subtitle": "Meeshaalee misoomaa fi adeemsa hojii kee Kilo waliin walitti hidhi",
+    "subtitle": "Meeshaalee misoomaa fi adeemsa hojii kee Kilo waliin walitti hidhi.",
     "disconnect": "Addaan kuti",
     "disconnectTitle": "{{provider}} addaan kutuu?",
     "disconnectMessage": "Kilo {{provider}} keessatti deebii kennuu ni dhaabata. Yeroo kamiyyuu irra deebitee walitti hidhuu dandeessa.",

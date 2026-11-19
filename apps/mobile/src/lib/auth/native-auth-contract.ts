@@ -138,6 +138,7 @@ const deviceAuthCodeResponseSchema = z.object({
   user_code: z.string().min(1).optional(),
   device_code: z.string().min(1).optional(),
   verificationUrl: z.string().min(1),
+  expiresIn: z.number().positive().optional(),
 });
 
 export type DeviceAuthTokenResult =
@@ -161,6 +162,8 @@ export type DeviceAuthCodeResult = {
   userCode: string;
   deviceCode: string;
   verificationUrl: string;
+  /** Seconds until the server's code expires. */
+  expiresIn?: number;
 };
 
 export function buildDeviceAuthPollRequest(deviceCode: string) {
@@ -185,7 +188,12 @@ export function parseDeviceAuthCodeResponse(value: unknown): DeviceAuthCodeResul
   if (result.data.device_code && result.data.verificationUrl.includes(deviceCode)) {
     return null;
   }
-  return { userCode, deviceCode, verificationUrl: result.data.verificationUrl };
+  return {
+    userCode,
+    deviceCode,
+    verificationUrl: result.data.verificationUrl,
+    expiresIn: result.data.expiresIn,
+  };
 }
 
 export function parseDeviceAuthTokenResponse(value: unknown): DeviceAuthTokenResult | null {

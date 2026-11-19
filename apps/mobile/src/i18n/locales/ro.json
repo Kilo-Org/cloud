@@ -149,6 +149,7 @@
     "performance": "Performanță",
     "preferences": "Preferințe",
     "privacyPolicy": "Politica de confidențialitate",
+    "termsOfService": "Termeni de utilizare",
     "profile": "Profil",
     "reactions": "Reacții",
     "recent": "Recente",
@@ -218,8 +219,8 @@
     "verifyCode": "Verifică codul",
     "resendCode": "Retrimite codul",
     "termsPrefix": "Dacă continui, accepți ",
+    "termsInSentence": "Termenii de serviciu",
     "terms": "Termenii de utilizare",
-    "termsInSentence": "Termenii de utilizare",
     "termsConnector": " și ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mai multe opțiuni de autentificare",
@@ -778,7 +779,6 @@
       "replyPlaceholder": "Răspuns…",
       "replyBody": "Textul răspunsului",
       "submitReply": "Trimite răspunsul",
-      "termsTitle": "Termeni de utilizare",
       "termsCopy": "Trebuie să ai cel puțin 13 ani pentru a publica mesaje.",
       "termsAcceptRetry": "Nu s-au putut accepta termenii de utilizare. Verifică conexiunea și încearcă din nou.",
       "viewTerms": "Vezi termenii",
@@ -1052,7 +1052,11 @@
     "tabs": {
       "overview": "Prezentare generală",
       "files": "Fișiere",
-      "discussion": "Discuție"
+      "discussion": "Discuție",
+      "discussionAccessibility_one": "{{title}}: 1 comentariu",
+      "discussionAccessibility": "{{title}}: {{displayCount}} de comentarii",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} de comentarii",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} comentarii"
     },
     "fileStatus": {
       "modified": "Modificat",
@@ -1159,16 +1163,16 @@
     },
     "category": {
       "agentAttentionTitle": "Agentul are nevoie de tine",
-      "agentAttentionSubtitle": "întrebări, solicitări de permisiune sau de informații",
+      "agentAttentionSubtitle": "Întrebări, solicitări de permisiune sau de informații",
       "agentUpdatesTitle": "Noutăți de la agent",
-      "agentUpdatesSubtitle": "mesaje de la agent în timpul executării sarcinii",
+      "agentUpdatesSubtitle": "Mesaje de la agent în timpul executării sarcinii",
       "sessionStatusTitle": "Starea sesiunii",
-      "sessionStatusSubtitle": "finalizată / eșuată / pregătită pentru control",
-      "balanceAlertsSubtitle": "avertismente de sold scăzut al organizației",
+      "sessionStatusSubtitle": "Finalizată / eșuată / pregătită pentru control",
+      "balanceAlertsSubtitle": "Avertismente de sold scăzut al organizației",
       "balanceAlertsUnavailable": "Alătură-te unei organizații pentru a primi alerte de sold.",
-      "securityFindingsSubtitle": "constatări noi și mementouri SLA",
+      "securityFindingsSubtitle": "Constatări noi și mementouri SLA",
       "securityFindingsUnavailable": "Activează Agentul de securitate Kilo într-un domeniu pentru a primi constatări de securitate.",
-      "spendAlertsSubtitle": "depășiri de praguri și vârfuri orare",
+      "spendAlertsSubtitle": "Depășiri de praguri și vârfuri orare",
       "spendAlertsToggle": "Categoria alerte de cheltuieli"
     },
     "history": {
@@ -3082,6 +3086,7 @@
     "noSessionsDescription": "Autentifică-te în aplicația Kilo pe alt dispozitiv, iar sesiunea va apărea aici.",
     "signInScopeNote": "Aici apar autentificările din aplicația Kilo, din Kilo CLI și din browserul web. Autentificările din editor nu sunt listate.",
     "signedIn": "Autentificare: {{signedIn}} · Ultima activitate: {{lastSeen}}",
+    "signedInThisDevice": "Autentificare: {{signedIn}} · {{thisDevice}}",
     "thisDevice": "Acest dispozitiv",
     "viewProfile": "Vezi profilul",
     "signOutThisDevice": "Deconectează acest dispozitiv",
@@ -3602,6 +3607,7 @@
       "truncated": "Această oră are mai multe cereri decât arată lista.",
       "emptyTitle": "Nicio cerere în această oră",
       "emptyDescription": "Apăsați „Ora anterioară” pentru a vedea cererile anterioare.",
+      "emptyBoundDescription": "Jurnalele de cereri nu sunt disponibile mai în urmă de atât.",
       "loadError": "Jurnalele de cereri nu au putut fi încărcate.",
       "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației.",
       "tokens": "{{input}} intrare · {{output}} ieșire",
@@ -3838,6 +3844,7 @@
   },
   "modelChat": {
     "offlineFailure": "Acest model necesită o conexiune la internet. Conectează-te și încearcă din nou sau comută la un model de pe acest dispozitiv.",
+    "connectionLost": "Conexiunea cu modelul s-a întrerupt. Verifică conexiunea și încearcă din nou.",
     "empty": {
       "title": "Începe un chat",
       "description": "Trimite un mesaj pentru a vorbi cu un model."
@@ -4708,7 +4715,7 @@
     "topFeatures": "Funcții principale",
     "emptyTitle": "Nicio utilizare în această perioadă",
     "unavailableTitle": "Utilizarea nu este disponibilă",
-    "unavailableDescription": "Acest spațiu de lucru nu raportează utilizare. Reîncercarea nu va ajuta.",
+    "unavailableDescription": "Utilizarea nu este configurată pentru acest spațiu de lucru. Contactați asistența dacă vă așteptați să vedeți utilizarea aici.",
     "orgSelfNotice": "Vezi propria utilizare în această organizație.",
     "viewDetails": "Vezi detaliile utilizării"
   },
@@ -4716,7 +4723,7 @@
     "title": "Integrări",
     "sectionTitle": "Servicii conectate",
     "entrySubtitle": "GitHub, Slack, Linear și altele",
-    "subtitle": "Conectează-ți instrumentele și fluxurile de lucru pentru dezvoltare la Kilo",
+    "subtitle": "Conectează-ți instrumentele și fluxurile de lucru pentru dezvoltare la Kilo.",
     "disconnect": "Deconectează",
     "disconnectTitle": "Deconectezi {{provider}}?",
     "disconnectMessage": "Kilo nu va mai răspunde în {{provider}}. Te poți reconecta oricând.",

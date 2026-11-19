@@ -84,8 +84,16 @@ test('local agents pair over loopback, list the session, and Stop all revokes it
     expect(hello.protocol).toStrictEqual([1]);
     expect(hello.contractSha).toHaveLength(64);
 
+    // The stamp is when the hub was last reachable; it lets a dead hub's endpoint be removed later.
     expect(await readExtensionLocalStorage(sidePanel, 'kiloLocalAgentEndpoints')).toStrictEqual({
-      endpoints: [{ hubId: FAKE_HUB_ID, key: LOCAL_AGENT_PAIRING_KEY, ws: hub.wsUrl }],
+      endpoints: [
+        {
+          hubId: FAKE_HUB_ID,
+          key: LOCAL_AGENT_PAIRING_KEY,
+          lastConnectedAt: expect.any(Number),
+          ws: hub.wsUrl,
+        },
+      ],
     });
     await expect
       .poll(async () =>

@@ -149,6 +149,7 @@
     "performance": "Performanse",
     "preferences": "Podešavanja",
     "privacyPolicy": "Politika privatnosti",
+    "termsOfService": "Uslovi korišćenja",
     "profile": "Profil",
     "reactions": "Reakcije",
     "recent": "Nedavno",
@@ -218,8 +219,8 @@
     "verifyCode": "Potvrdi kod",
     "resendCode": "Pošalji kod ponovo",
     "termsPrefix": "Nastavkom se slažeš sa našim ",
+    "termsInSentence": "Uslovima korišćenja usluge",
     "terms": "Uslovima korišćenja",
-    "termsInSentence": "Uslovima korišćenja",
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Još opcija za prijavu",
@@ -778,7 +779,6 @@
       "replyPlaceholder": "Odgovor…",
       "replyBody": "Tekst odgovora",
       "submitReply": "Pošalji odgovor",
-      "termsTitle": "Uslovi korišćenja",
       "termsCopy": "Za objavljivanje moraš da imaš najmanje 13 godina.",
       "termsAcceptRetry": "Nije moguće prihvatiti uslove korišćenja. Proveri vezu i pokušaj ponovo.",
       "viewTerms": "Pogledaj uslove",
@@ -1052,7 +1052,11 @@
     "tabs": {
       "overview": "Pregled",
       "files": "Datoteke",
-      "discussion": "Diskusija"
+      "discussion": "Diskusija",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentara",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentara",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentara"
     },
     "fileStatus": {
       "modified": "Izmenjeno",
@@ -1159,16 +1163,16 @@
     },
     "category": {
       "agentAttentionTitle": "Agent te čeka",
-      "agentAttentionSubtitle": "pitanja i zahtevi za dozvole ili unos",
+      "agentAttentionSubtitle": "Pitanja i zahtevi za dozvole ili unos",
       "agentUpdatesTitle": "Novosti od agenta",
-      "agentUpdatesSubtitle": "poruke agenta tokom rada na zadatku",
+      "agentUpdatesSubtitle": "Poruke agenta tokom rada na zadatku",
       "sessionStatusTitle": "Status sesije",
-      "sessionStatusSubtitle": "završeno / neuspešno / spremno za upravljanje",
-      "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
+      "sessionStatusSubtitle": "Završeno / neuspešno / spremno za upravljanje",
+      "balanceAlertsSubtitle": "Upozorenja o niskom saldu organizacije",
       "balanceAlertsUnavailable": "Pridružite se organizaciji da biste dobijali upozorenja o saldu.",
-      "securityFindingsSubtitle": "novi nalazi i podsetnici za SLA",
+      "securityFindingsSubtitle": "Novi nalazi i podsetnici za SLA",
       "securityFindingsUnavailable": "Omogućite Kilo bezbednosnog agenta na opsegu da biste dobijali bezbednosne nalaze.",
-      "spendAlertsSubtitle": "prekoračenja pragova i skokovi po satu",
+      "spendAlertsSubtitle": "Prekoračenja pragova i skokovi po satu",
       "spendAlertsToggle": "Kategorija obaveštenja o potrošnji"
     },
     "history": {
@@ -3082,6 +3086,7 @@
     "noSessionsDescription": "Prijavi se u aplikaciju Kilo na drugom uređaju i ta sesija će se prikazati ovde.",
     "signInScopeNote": "Ovde se prikazuju prijave preko aplikacije Kilo, Kilo CLI i veb pregledača. Prijave preko uređivača koda nisu navedene.",
     "signedIn": "Prijava: {{signedIn}} · Poslednja aktivnost: {{lastSeen}}",
+    "signedInThisDevice": "Prijava: {{signedIn}} · {{thisDevice}}",
     "thisDevice": "Ovaj uređaj",
     "viewProfile": "Prikaži profil",
     "signOutThisDevice": "Odjavi ovaj uređaj",
@@ -3602,6 +3607,7 @@
       "truncated": "U ovom satu ima više zahteva nego što lista prikazuje.",
       "emptyTitle": "Nema zahteva u ovom satu",
       "emptyDescription": "Koristite dugme „Prethodni sat” da biste videli ranije zahteve.",
+      "emptyBoundDescription": "Dnevnici zahteva ne sežu dalje u prošlost.",
       "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
       "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
       "tokens": "{{input}} ulaz · {{output}} izlaz",
@@ -3838,6 +3844,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ovaj model zahteva internet vezu. Povežite se i pokušajte ponovo ili pređite na model na ovom uređaju.",
+    "connectionLost": "Veza sa modelom je prekinuta. Proveri vezu i pokušaj ponovo.",
     "empty": {
       "title": "Započnite ćaskanje",
       "description": "Pošaljite poruku da razgovarate sa modelom."
@@ -4708,7 +4715,7 @@
     "topFeatures": "Najčešće funkcije",
     "emptyTitle": "Nema korišćenja u ovom periodu",
     "unavailableTitle": "Korišćenje nije dostupno",
-    "unavailableDescription": "Ovaj radni prostor ne prijavljuje korišćenje. Ponovni pokušaj neće pomoći.",
+    "unavailableDescription": "Korišćenje nije podešeno za ovaj radni prostor. Obratite se podršci ako ovde očekujete podatke o korišćenju.",
     "orgSelfNotice": "Vidite sopstveno korišćenje u ovoj organizaciji.",
     "viewDetails": "Prikaži detalje korišćenja"
   },
@@ -4716,7 +4723,7 @@
     "title": "Integracije",
     "sectionTitle": "Povezane usluge",
     "entrySubtitle": "GitHub, Slack, Linear i drugo",
-    "subtitle": "Povežite svoje razvojne alate i tokove rada sa platformom Kilo",
+    "subtitle": "Povežite svoje razvojne alate i tokove rada sa platformom Kilo.",
     "disconnect": "Prekini vezu",
     "disconnectTitle": "Prekinuti vezu sa uslugom {{provider}}?",
     "disconnectMessage": "Kilo više neće odgovarati u usluzi {{provider}}. Možete se ponovo povezati u bilo kom trenutku.",

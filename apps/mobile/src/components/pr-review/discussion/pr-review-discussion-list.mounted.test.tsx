@@ -149,7 +149,10 @@ vi.mock('@/lib/format', () => ({ formatNumber: String }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black' }),
 }));
-vi.mock('@/lib/screen-insets', () => ({ useDetailScreenBottomPadding: () => 0 }));
+vi.mock('@/lib/screen-insets', () => ({
+  useDetailScreenBottomPadding: () => 0,
+  useStyleSideInsets: () => ({ left: 0, right: 0 }),
+}));
 
 function noop(): void {
   // Callbacks not exercised by a test are inert.

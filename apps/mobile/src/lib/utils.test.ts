@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { timeAgo } from './utils';
+import { relativeTime, timeAgo } from './utils';
 
 describe('timeAgo', () => {
   afterEach(() => {
@@ -42,10 +42,22 @@ describe('timeAgo', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-23T12:00:00Z'));
 
-    expect(timeAgo(new Date('2026-08-23T12:05:00Z'), 'en')).toBe('in 5 minutes');
-    expect(timeAgo(new Date('2026-08-23T14:00:00Z'), 'en')).toBe('in 2 hours');
-    expect(timeAgo(new Date('2026-08-23T12:00:30Z'), 'en')).toBe('Just now');
+    expect(relativeTime(new Date('2026-08-23T12:05:00Z'), 'en')).toBe('in 5 minutes');
+    expect(relativeTime(new Date('2026-08-23T14:00:00Z'), 'en')).toBe('in 2 hours');
+    expect(relativeTime(new Date('2026-08-23T12:00:30Z'), 'en')).toBe('Just now');
   });
+
+  it('reads an event stamped after a trailing clock sample as now, never as ahead', () => {
+    // The list's minute ticker sampled the clock before the chat answered, and
+    // the timer can fire late, so the event can be more than a minute ahead of
+    // the sample.
+    const sampled = Date.parse('2026-08-23T14:34:00Z');
+    const answered = new Date('2026-08-23T14:35:05Z');
+
+    expect(timeAgo(answered, 'en', sampled)).toBe('Just now');
+    expect(timeAgo(new Date('2026-08-23T16:00:00Z'), 'en', sampled)).toBe('Just now');
+  });
+
   it('omits an invalid timestamp instead of formatting a relative time', () => {
     expect(timeAgo(new Date(Number.NaN))).toBe('');
   });

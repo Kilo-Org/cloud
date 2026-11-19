@@ -3463,8 +3463,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Expiré",
-      "planStatusTrialEndsOn": " · Fin de l'essai le {{date}}",
-      "planStatusTrialing": " · Essai",
       "planEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif.",
       "manageBilling": "Gérer la facturation",
       "renamePlaceholder": "Nom de l'organisation",

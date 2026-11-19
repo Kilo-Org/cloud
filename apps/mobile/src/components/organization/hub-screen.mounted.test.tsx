@@ -436,8 +436,9 @@ describe('Organization hub plan', () => {
     // value in the card.
     expect(entitledRow?.props.valueTone).toBeUndefined();
     // An entitled organization is not warned about a state it is not in, and it
-    // carries no status segment.
+    // carries no status segment and no trial caption.
     expect(entitledRow?.props.valueStatus).toBeUndefined();
+    expect(entitledRow?.props.caption).toBeUndefined();
     expect(refusals(entitled.renderer)).toHaveLength(0);
     entitled.unmount();
 
@@ -456,41 +457,40 @@ describe('Organization hub plan', () => {
       label: i18n.t('organization.hub.planStatusLapsed'),
       tone: 'danger',
     });
+    // No trial runs beside the lapse, so there is nothing for the caption line.
+    expect(lapsedRow?.props.caption).toBeUndefined();
     lapsed.unmount();
   });
 
-  it('states the running trial beside the plan it governs', async () => {
-    boundary.plan = 'enterprise';
+  it('states the running trial under the plan row, never inside its value', async () => {
     boundary.trialStatus = 'trial_active';
     boundary.trialEndsAt = '2026-11-24T00:00:00.000Z';
 
     const { renderer, unmount } = await renderHub();
 
-    const row = planRow(renderer);
-    // The tier keeps the row's ordinary ink and is never folded into a status
-    // word; the trial is the state beside it, in the hub's own words.
-    expect(row?.props.value).toBe(i18n.t('organization.hub.planEnterprise'));
-    expect(row?.props.valueTone).toBeUndefined();
-    // The status label is the composed hub readout, and it carries its own
-    // leading separator — KvRow concatenates value and status with none of
-    // its own, so a label like `TeamsTrial ends on …` fails here.
     const expectedDate = formatDate(new Date('2026-11-24T00:00:00.000Z'), i18n.language, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-    const status = row?.props.valueStatus;
-    expect(status).toMatchObject({
-      label: i18n.t('organization.hub.planStatusTrialEndsOn', { date: expectedDate }),
-      tone: 'default',
-    });
-    // The tier plus the trial sentence does not fit one line on a narrow
-    // window, so the row must state the trial end rather than ellipsize it;
-    // two lines fit the readout in every language the gate sweeps.
-    expect(row?.props.valueLines).toBe(2);
-    // The separator lives in the catalog value, so this pins it as the row's
-    // leading segment rather than folding the trial into the plan name.
-    expect(status).toMatchObject({ label: expect.stringMatching(/^ · /) });
+    const row = planRow(renderer);
+    // The tier alone on the value line, in the row's ordinary ink: the trial is
+    // a caption line of its own below the row, so a compact window keeps the
+    // value one line tall and a right-to-left interface cannot order the tier
+    // after the date.
+    expect(row?.props.value).toBe(i18n.t('organization.hub.planTeams'));
+    expect(String(row?.props.value)).not.toContain(expectedDate);
+    expect(row?.props.valueTone).toBeUndefined();
+    // The caption replaces the old wrapped value: no line count is raised on
+    // the value, and nothing states the trial as a value status.
+    expect(row?.props.valueLines).toBeUndefined();
+    expect(row?.props.valueStatus).toBeUndefined();
+    expect(row?.props.caption).toBe(
+      i18n.t('organization.billing.stateTrialEndsOn', { date: expectedDate })
+    );
+    // Its own line needs no leading separator, and it states the trial end
+    // rather than losing it to the value's ellipsis.
+    expect(String(row?.props.caption)).not.toMatch(/^ · /);
     // A running trial is not the lapsed state, so nothing above the card
     // explains an ending that has not happened.
     expect(refusals(renderer)).toHaveLength(0);

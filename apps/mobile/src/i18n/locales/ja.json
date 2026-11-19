@@ -3405,8 +3405,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 終了",
-      "planStatusTrialEndsOn": " · トライアルは{{date}}に終了",
-      "planStatusTrialing": " · トライアル中",
       "planEnded": "組織のトライアルは終了し、有効なプランがありません。",
       "manageBilling": "請求を管理",
       "renamePlaceholder": "組織名",

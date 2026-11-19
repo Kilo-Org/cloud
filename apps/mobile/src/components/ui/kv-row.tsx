@@ -41,11 +41,12 @@ type KvRowProps = {
   /** Allow the value text to be selected/copied (e.g. identifiers, versions, paths). */
   selectable?: boolean;
   /**
-   * A row whose value carries a sentence may wrap to this many lines instead
-   * of losing characters in the middle; the row grows to fit, like a
-   * selectable value.
+   * A second line under the row for the state the value cannot hold on one
+   * line — the trial a plan is running. It spans the whole row below both
+   * columns, so the value above stays a single line and the two never share a
+   * paragraph direction.
    */
-  valueLines?: number;
+  caption?: string;
   /** Extra classes for the value text only (e.g. `uppercase` for a status readout). */
   valueClassName?: string;
   /**
@@ -105,7 +106,7 @@ export function KvRow({
   last,
   className,
   selectable,
-  valueLines,
+  caption,
   valueClassName,
   valueAccessibilityLabel,
   valueDirection,
@@ -118,20 +119,14 @@ export function KvRow({
   // paints a clipped second line (SPOT-DEFECT: the finding-details Manifest
   // row). Clamp the values that can hold it; a selectable value wraps inside
   // the row and the row grows to fit it, so no glyph is cut off.
-  const valueLineLimit = selectable ? undefined : (valueLines ?? 1);
-  // One clamped line keeps the middle ellipsis — a long identifier loses its
-  // middle glyphs; a sentence wrapped to several lines cuts at its end instead.
-  let valueEllipsizeMode: 'middle' | 'tail' | undefined = undefined;
-  if (valueLineLimit !== undefined) {
-    valueEllipsizeMode = valueLineLimit > 1 ? 'tail' : 'middle';
-  }
+  const valueLineLimit = selectable ? undefined : 1;
   const valueText = (
     <Text
       variant={valueFace === 'mono' ? 'mono' : 'default'}
       selectable={selectable}
       accessibilityLabel={valueAccessibilityLabel}
       numberOfLines={valueLineLimit}
-      ellipsizeMode={valueEllipsizeMode}
+      ellipsizeMode={valueLineLimit ? 'middle' : undefined}
       style={valueDirection === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
       className={cn(
         'min-w-0 shrink text-right text-[13px]',
@@ -151,29 +146,36 @@ export function KvRow({
     </Text>
   );
   return (
-    <View
-      className={cn(
-        'flex-row items-center justify-between gap-3 py-3',
-        !last && 'border-b-[0.5px] border-hair-soft',
-        className
-      )}
-    >
-      <View className="shrink-0 flex-row items-center gap-2">
-        {dotTone ? <View className={cn('size-2 rounded-full', DOT_TONE[dotTone])} /> : null}
-        {Icon ? <Icon size={14} color={colors.mutedForeground} /> : null}
-        <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-          {label}
-        </Text>
-      </View>
-      {trailing === undefined ? (
-        valueText
-      ) : (
-        // The value keeps its right edge beside the control, so the pair reads
-        // as one trailing group on the row the control belongs to.
-        <View className="min-w-0 shrink flex-row items-center justify-end gap-3">
-          {valueText}
-          {trailing}
+    <View className={cn('py-3', !last && 'border-b-[0.5px] border-hair-soft', className)}>
+      <View className="flex-row items-center justify-between gap-3">
+        <View className="shrink-0 flex-row items-center gap-2">
+          {dotTone ? <View className={cn('size-2 rounded-full', DOT_TONE[dotTone])} /> : null}
+          {Icon ? <Icon size={14} color={colors.mutedForeground} /> : null}
+          <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+            {label}
+          </Text>
         </View>
+        {trailing === undefined ? (
+          valueText
+        ) : (
+          // The value keeps its right edge beside the control, so the pair reads
+          // as one trailing group on the row the control belongs to.
+          <View className="min-w-0 shrink flex-row items-center justify-end gap-3">
+            {valueText}
+            {trailing}
+          </View>
+        )}
+      </View>
+      {caption === undefined ? null : (
+        // Its own paragraph below both columns: the value above stays one line,
+        // and a right-to-left interface cannot reorder the caption against it.
+        <Text
+          className="pt-1 text-right text-xs text-muted-foreground"
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
+          {caption}
+        </Text>
       )}
     </View>
   );

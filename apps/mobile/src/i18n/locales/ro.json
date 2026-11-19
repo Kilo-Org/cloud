@@ -3647,8 +3647,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Încheiat",
-      "planStatusTrialEndsOn": " · Perioada de probă se încheie pe {{date}}",
-      "planStatusTrialing": " · Perioadă de probă",
       "planEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ.",
       "manageBilling": "Gestionează facturarea",
       "lowBalanceBelow": "Sub {{amount}}"

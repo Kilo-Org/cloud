@@ -3706,8 +3706,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Скончыўся",
-      "planStatusTrialEndsOn": " · Пробны перыяд заканчваецца {{date}}",
-      "planStatusTrialing": " · Пробны перыяд",
       "planEnded": "Пробны перыяд арганізацыі скончыўся, і ў яе няма актыўнага плана.",
       "manageBilling": "Кіраванне плацяжамі",
       "lowBalanceBelow": "Менш за {{amount}}"

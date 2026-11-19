@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { getOrgTrialStatusFromDays, isRunningTrialStage, RUNNING_TRIAL_STAGES } from '../trial';
+import type { OrganizationTrialStage } from '../types';
 
 describe('isRunningTrialStage', () => {
   it('accepts the four stages a trial is still running in', () => {
@@ -18,17 +19,50 @@ describe('isRunningTrialStage', () => {
     expect(isRunningTrialStage(undefined)).toBe(false);
   });
 
+  it('maps every stage of the union to an answer and reads that value', () => {
+    // The record spans the whole stage union, so a stage added to
+    // `OrganizationTrialStage` and omitted from the record is a type error and
+    // this list must name every stage. The predicate reads the mapped value,
+    // so an expired stage answers false even though it has a key.
+    const stages: readonly OrganizationTrialStage[] = [
+      'trial_active',
+      'trial_ending_soon',
+      'trial_ending_very_soon',
+      'trial_expires_today',
+      'trial_expired_soft',
+      'trial_expired_hard',
+    ];
+    expect(Object.keys(RUNNING_TRIAL_STAGES).sort()).toEqual([...stages].sort());
+
+    const runningStages = stages.filter(stage => RUNNING_TRIAL_STAGES[stage]);
+    expect(runningStages).toEqual([
+      'trial_active',
+      'trial_ending_soon',
+      'trial_ending_very_soon',
+      'trial_expires_today',
+    ]);
+
+    for (const stage of stages) {
+      const running = stage !== 'trial_expired_soft' && stage !== 'trial_expired_hard';
+      expect(RUNNING_TRIAL_STAGES[stage]).toBe(running);
+      expect(isRunningTrialStage(stage)).toBe(running);
+    }
+  });
+
   it('classifies exactly the stages the day-boundary classifier calls running', () => {
-    // One tie between the set and the classifier: every stage the day
-    // boundaries produce must answer the predicate the same way the
-    // classification reads, so a new stage cannot fall out of both silently.
-    // `trial_expired_soft` names a trial that has lapsed — the soft window is
-    // the paid grace the org may keep using, not a running trial — so only the
-    // four pre-expiry stages answer true.
+    // One tie between the running subset and the classifier: every stage the
+    // day boundaries produce must answer the predicate the same way the
+    // classification reads. `trial_expired_soft` names a trial that has lapsed
+    // — the soft window is the paid grace the org may keep using, not a
+    // running trial — so only the four pre-expiry stages answer true.
     for (let days = -30; days <= 30; days += 1) {
       const stage = getOrgTrialStatusFromDays(days);
       expect(isRunningTrialStage(stage)).toBe(days >= 0);
     }
-    expect(Object.keys(RUNNING_TRIAL_STAGES)).toHaveLength(4);
+    const runningKeys = Object.entries(RUNNING_TRIAL_STAGES)
+      .filter(([, running]) => running)
+      .map(([stage]) => stage);
+    expect(runningKeys).toHaveLength(4);
+    expect(Object.keys(RUNNING_TRIAL_STAGES)).toHaveLength(6);
   });
 });

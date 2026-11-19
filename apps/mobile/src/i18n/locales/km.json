@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · បានបញ្ចប់",
-      "planStatusTrialEndsOn": " · ការសាកល្បងបញ្ចប់នៅ {{date}}",
-      "planStatusTrialing": " · ការសាកល្បង",
       "planEnded": "ការសាកល្បងរបស់ស្ថាប័នបានបញ្ចប់ ហើយវាមិនមានគម្រោងសកម្មទេ។",
       "manageBilling": "គ្រប់គ្រងការគិតប្រាក់",
       "lowBalanceBelow": "ក្រោម {{amount}}"

@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · सकिएको",
-      "planStatusTrialEndsOn": " · ट्रायल {{date}} मा सकिन्छ",
-      "planStatusTrialing": " · ट्रायल",
       "planEnded": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन।",
       "manageBilling": "बिलिङ व्यवस्थापन गर्नुहोस्",
       "lowBalanceBelow": "{{amount}} भन्दा कम"

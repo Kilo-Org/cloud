@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · ختم شدہ",
-      "planStatusTrialEndsOn": " · ٹرائل {{date}} کو ختم ہوگا",
-      "planStatusTrialing": " · ٹرائل",
       "planEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔",
       "manageBilling": "بلنگ کا انتظام کریں",
       "lowBalanceBelow": "{{amount}} سے کم"

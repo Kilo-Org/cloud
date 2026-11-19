@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · അവസാനിച്ചു",
-      "planStatusTrialEndsOn": " · ട്രയൽ {{date}}-ന് അവസാനിക്കും",
-      "planStatusTrialing": " · ട്രയൽ",
       "planEnded": "സ്ഥാപനത്തിന്റെ ട്രയൽ അവസാനിച്ചു, അതിന് സജീവമായ പ്ലാൻ ഇല്ല.",
       "manageBilling": "ബില്ലിംഗ് നിയന്ത്രിക്കുക",
       "lowBalanceBelow": "{{amount}}-ന് താഴെ"

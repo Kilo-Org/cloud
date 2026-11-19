@@ -3647,8 +3647,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Beidzies",
-      "planStatusTrialEndsOn": " · Izmēģinājums beidzas {{date}}",
-      "planStatusTrialing": " · Izmēģinājums",
       "planEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna.",
       "manageBilling": "Norēķinu pārvaldība",
       "lowBalanceBelow": "Zem {{amount}}"

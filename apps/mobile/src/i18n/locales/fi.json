@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Päättynyt",
-      "planStatusTrialEndsOn": " · Kokeilu päättyy {{date}}",
-      "planStatusTrialing": " · Kokeilu",
       "planEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa.",
       "manageBilling": "Hallinnoi laskutusta",
       "lowBalanceBelow": "Alle {{amount}}"

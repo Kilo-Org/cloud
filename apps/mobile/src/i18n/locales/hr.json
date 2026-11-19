@@ -3647,8 +3647,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Istekao",
-      "planStatusTrialEndsOn": " · Probno razdoblje završava {{date}}",
-      "planStatusTrialing": " · Probno razdoblje",
       "planEnded": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan.",
       "manageBilling": "Upravljanje naplatom",
       "lowBalanceBelow": "Ispod {{amount}}"

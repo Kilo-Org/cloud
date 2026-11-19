@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Agwụla",
-      "planStatusTrialEndsOn": " · Nnwale ga-agwụ na {{date}}",
-      "planStatusTrialing": " · Nnwale",
       "planEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ.",
       "manageBilling": "Jikwaa ịgba ụgwọ",
       "lowBalanceBelow": "N'okpuru {{amount}}"

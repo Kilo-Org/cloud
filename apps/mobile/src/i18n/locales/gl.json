@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Rematado",
-      "planStatusTrialEndsOn": " · A proba remata o {{date}}",
-      "planStatusTrialing": " · Proba",
       "planEnded": "O período de proba da organización rematou e non ten ningún plan activo.",
       "manageBilling": "Xestionar a facturación",
       "lowBalanceBelow": "Por baixo de {{amount}}"

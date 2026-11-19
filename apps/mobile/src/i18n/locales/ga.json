@@ -3765,8 +3765,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Thart",
-      "planStatusTrialEndsOn": " · Críochnaíonn an triail ar {{date}}",
-      "planStatusTrialing": " · Triail",
       "planEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici.",
       "manageBilling": "Bainistigh billeáil",
       "lowBalanceBelow": "Faoi {{amount}}"

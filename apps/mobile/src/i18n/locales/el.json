@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Έληξε",
-      "planStatusTrialEndsOn": " · Η δοκιμή λήγει στις {{date}}",
-      "planStatusTrialing": " · Δοκιμαστική περίοδος",
       "planEnded": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα.",
       "manageBilling": "Διαχείριση χρέωσης",
       "lowBalanceBelow": "Κάτω από {{amount}}"

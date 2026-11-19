@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · پای ته رسېدلی",
-      "planStatusTrialEndsOn": " · آزمېښتي دوره په {{date}} پای ته رسېږي",
-      "planStatusTrialing": " · آزمېښتي دوره",
       "planEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري.",
       "manageBilling": "د بلونو مدیریت",
       "lowBalanceBelow": "له {{amount}} څخه کم"

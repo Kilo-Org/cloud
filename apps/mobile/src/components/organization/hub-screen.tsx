@@ -22,10 +22,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AddCreditsRow } from '@/components/add-credits-row';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
-import {
-  getOrgTrialHubStatusPill,
-  seatCountReadout,
-} from '@/components/organization/billing-model';
+import { getOrgTrialHubCaption, seatCountReadout } from '@/components/organization/billing-model';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   getOrgKiloPassRowState,
@@ -222,11 +219,10 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // exactly as it does for the new-session composer. Only the server's boolean
   // is read; nothing re-derives the plan state from seats or balance.
   const planEnded = org.isTrialExpiredForEnforcement;
-  // The pill speaks the trial's own words with the separator the plan row
-  // needs (KvRow concatenates value and status) — the hub readout, from the
-  // boundary row the server already classified — and is absent whenever the
-  // trial is not what governs the organization.
-  const trialPill = getOrgTrialHubStatusPill(org);
+  // The caption speaks the trial's own words on its own line below the plan
+  // row — the hub readout, from the boundary row the server already classified
+  // — and is absent whenever the trial is not what governs the organization.
+  const trialCaption = getOrgTrialHubCaption(org);
   const planName =
     org.plan === 'enterprise'
       ? t('organization.hub.planEnterprise')
@@ -370,14 +366,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           <KvRow
             label={t('organization.hub.plan')}
             value={planName}
-            // The tier plus the trial sentence does not fit one line on a
-            // narrow window, so the row must state the trial end rather than
-            // ellipsize it away.
-            valueLines={2}
+            // The trial sentence is a caption line of its own rather than a
+            // second value segment: the tier keeps one line, and a
+            // right-to-left interface cannot order the tier after the date.
+            // Nothing is ellipsized away.
+            caption={trialCaption ?? undefined}
             valueStatus={
               planEnded
                 ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
-                : (trialPill ?? undefined)
+                : undefined
             }
             valueFace="text"
             last

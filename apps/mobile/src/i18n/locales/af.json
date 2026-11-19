@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Het geëindig",
-      "planStatusTrialEndsOn": " · Proeftydperk eindig op {{date}}",
-      "planStatusTrialing": " · Proeftydperk",
       "planEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie.",
       "manageBilling": "Bestuur fakturering",
       "lowBalanceBelow": "Onder {{amount}}"

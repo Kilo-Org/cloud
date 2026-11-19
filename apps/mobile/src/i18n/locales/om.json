@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Xumurameera",
-      "planStatusTrialEndsOn": " · Yaaliin {{date}} irratti xumurama",
-      "planStatusTrialing": " · Yaalii",
       "planEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu.",
       "manageBilling": "Kaffaltii bulchi",
       "lowBalanceBelow": "{{amount}} gadi"

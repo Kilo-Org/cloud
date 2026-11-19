@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Lokið",
-      "planStatusTrialEndsOn": " · Prufutímabili lýkur {{date}}",
-      "planStatusTrialing": " · Prufutímabil",
       "planEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun.",
       "manageBilling": "Stjórna innheimtu",
       "lowBalanceBelow": "Undir {{amount}}"

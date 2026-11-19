@@ -3463,8 +3463,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · הסתיים",
-      "planStatusTrialEndsOn": " · תקופת הניסיון מסתיימת ב-{{date}}",
-      "planStatusTrialing": " · תקופת ניסיון",
       "planEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה.",
       "manageBilling": "ניהול חיובים",
       "renamePlaceholder": "שם הארגון",

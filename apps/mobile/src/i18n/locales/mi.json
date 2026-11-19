@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Kua mutu",
-      "planStatusTrialEndsOn": " · Ka mutu te whakamātautau ā te {{date}}",
-      "planStatusTrialing": " · Whakamātautau",
       "planEnded": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha.",
       "manageBilling": "Whakahaere utu",
       "lowBalanceBelow": "I raro i te {{amount}}"

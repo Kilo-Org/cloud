@@ -150,27 +150,18 @@ export function getOrgTrialStatusPill(trial: OrgTrialState): BillingState | null
 }
 
 /**
- * The hub's trial readout, in the copy the plan row shows beside its value.
- * `KvRow` concatenates value and status with no separator, so the hub label
- * carries its own leading one; the trial criteria and the date formatting
- * still come from the one shared helper (`runningTrialEnd` and the format
- * above), so this readout and the billing one cannot drift.
+ * The hub's trial readout, in the copy the plan row shows as its caption line
+ * below the value. The caption carries no leading separator because it is its
+ * own line under the row, not a segment appended to the value.
+ *
+ * The sentence is the billing row's own — this reads the shared
+ * `getOrgTrialStatusPill` label rather than a second catalog key, because one
+ * piece of copy belongs to one key: two keys with the same English string
+ * cannot be translated apart without the catalogs drifting, and `check:i18n`
+ * refuses them.
  */
-export function getOrgTrialHubStatusPill(trial: OrgTrialState): BillingState | null {
-  const end = runningTrialEnd(trial);
-  if (end == null) {
-    return null;
-  }
-  // Same neutral ink as the billing readout: a trial end date is a fact.
-  if (end.endsAt == null) {
-    return { label: i18n.t('organization.hub.planStatusTrialing'), tone: 'default' };
-  }
-  return {
-    label: i18n.t('organization.hub.planStatusTrialEndsOn', {
-      date: formatDate(end.endsAt, i18n.language, TRIAL_END_FORMAT),
-    }),
-    tone: 'default',
-  };
+export function getOrgTrialHubCaption(trial: OrgTrialState): string | null {
+  return getOrgTrialStatusPill(trial)?.label ?? null;
 }
 
 /**

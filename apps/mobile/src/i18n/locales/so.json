@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Dhamaatay",
-      "planStatusTrialEndsOn": " · Tijaabadu waxay dhammaanaysaa {{date}}",
-      "planStatusTrialing": " · Tijaabo",
       "planEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon.",
       "manageBilling": "Maaree biilasha",
       "lowBalanceBelow": "Ka yar {{amount}}"

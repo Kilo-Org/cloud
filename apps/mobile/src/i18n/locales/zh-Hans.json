@@ -3405,8 +3405,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 已结束",
-      "planStatusTrialEndsOn": " · 试用将于 {{date}} 结束",
-      "planStatusTrialing": " · 试用中",
       "planEnded": "组织的试用期已结束，且没有生效的套餐。",
       "manageBilling": "管理账单",
       "renamePlaceholder": "组织名称",

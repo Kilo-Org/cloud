@@ -3405,8 +3405,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · समाप्त",
-      "planStatusTrialEndsOn": " · ट्रायल {{date}} को खत्म होगा",
-      "planStatusTrialing": " · ट्रायल",
       "planEnded": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है।",
       "manageBilling": "बिलिंग प्रबंधित करें",
       "renamePlaceholder": "संगठन का नाम",

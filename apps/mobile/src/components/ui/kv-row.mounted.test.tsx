@@ -82,8 +82,8 @@ function renderRow(
     | {
         value: string;
         selectable?: boolean;
-        valueLines?: number;
         valueDirection?: 'ltr';
+        caption?: string;
         valueFace?: 'mono' | 'text' | 'numeric';
         valueStatus?: { label: string; tone: 'good' | 'warn' | 'danger' | 'muted' };
       }
@@ -148,18 +148,6 @@ describe('KvRow mounted layout', () => {
     );
     expect(text.props.numberOfLines).toBe(1);
     expect(text.props.ellipsizeMode).toBe('middle');
-  });
-
-  // A value that carries a sentence — the plan tier plus the trial end — must
-  // not lose characters in the middle; the default stays one line because a
-  // short value never needed more.
-  it('wraps a value that carries a sentence to the lines it is given', () => {
-    const text = valueText(
-      renderRow({ value: 'Enterprise · Trial ends on Nov 24', valueLines: 2 }),
-      'Enterprise · Trial ends on Nov 24'
-    );
-    expect(text.props.numberOfLines).toBe(2);
-    expect(text.props.ellipsizeMode).toBe('tail');
   });
 
   // A version range is written left to right, so a right-to-left interface lets
@@ -261,5 +249,40 @@ describe('KvRow value status', () => {
     // The label and the value paragraph, with no status node inside it.
     expect(nodes).toHaveLength(2);
     expect(nodes[1]?.props.children).toContain('Teams');
+  });
+});
+
+describe('KvRow caption', () => {
+  const captionText = 'Trial ends on Nov 24, 2026';
+
+  // The trial a plan is running cannot share the value's line: the tier keeps
+  // one line, and a right-to-left interface would otherwise order the tier
+  // after the date. So the caption is its own paragraph below both columns.
+  it('paints the caption as its own muted right-aligned line below the row', () => {
+    const root = renderRow({ value: 'Teams', valueFace: 'text', caption: captionText });
+    const caption = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes(captionText)
+    );
+
+    expect(String(caption.props.className)).toContain('pt-1');
+    expect(String(caption.props.className)).toContain('text-right');
+    expect(String(caption.props.className)).toContain('text-xs');
+    expect(String(caption.props.className)).toContain('text-muted-foreground');
+    expect(caption.props.numberOfLines).toBe(2);
+    expect(caption.props.ellipsizeMode).toBe('tail');
+
+    // Outside the value paragraph, so the two never share a bidi run …
+    const value = valueText(root, 'Teams');
+    expect(value.findAllByType('Text')).not.toContain(caption);
+    // … and below the row that holds both columns, not inside it.
+    expect(caption.parent).not.toBe(value.parent);
+    expect(String(caption.parent?.props.className)).not.toContain('flex-row');
+  });
+
+  it('paints no caption line on a row that carries none', () => {
+    const nodes = renderRow({ value: 'Teams' }).findAllByType('Text');
+
+    expect(nodes).toHaveLength(2);
+    expect(nodes.some(node => String(node.props.className).includes('text-xs'))).toBe(false);
   });
 });

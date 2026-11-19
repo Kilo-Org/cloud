@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Skaduar",
-      "planStatusTrialEndsOn": " · Prova përfundon më {{date}}",
-      "planStatusTrialing": " · Në provë",
       "planEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv.",
       "manageBilling": "Menaxho faturimin",
       "lowBalanceBelow": "Nën {{amount}}"

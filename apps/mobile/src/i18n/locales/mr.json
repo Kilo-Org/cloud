@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · संपली आहे",
-      "planStatusTrialEndsOn": " · चाचणी {{date}} रोजी संपेल",
-      "planStatusTrialing": " · चाचणी",
       "planEnded": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही.",
       "manageBilling": "बिलिंग व्यवस्थापित करा",
       "lowBalanceBelow": "{{amount}} पेक्षा कमी"

@@ -6,12 +6,14 @@ import {
   getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
-  getOrgTrialHubStatusPill,
+  getOrgTrialHubCaption,
   getOrgTrialStatusPill,
   getScheduledSeatChange,
   type OrgSeatSubscription,
   seatCountReadout,
 } from '@/components/organization/billing-model';
+import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 
 /** 2026-01-01T00:00:00Z, the paid period's end in these cases. */
 const PERIOD_END = 1_767_225_600;
@@ -279,34 +281,49 @@ describe('getOrgTrialStatusPill', () => {
   });
 });
 
-describe('getOrgTrialHubStatusPill', () => {
-  it('states the end date of a running trial with the row separator', () => {
-    const pill = getOrgTrialHubStatusPill({
+describe('getOrgTrialHubCaption', () => {
+  it('states the trial end as its own line, with no leading separator', () => {
+    const trial = {
       trialStatus: 'trial_ending_very_soon',
       trialEndsAt: '2026-11-19T00:00:00.000Z',
-    });
-    expect(pill?.tone).toBe('default');
-    // The hub label carries its own leading separator: KvRow concatenates the
-    // value and the status with none of its own.
-    expect(pill?.label.startsWith(' · ')).toBe(true);
-    expect(pill?.label).toContain('Trial ends on ');
+    };
+    const caption = getOrgTrialHubCaption(trial);
+
+    // The same key the billing row reads: one piece of copy belongs to one key.
+    expect(caption).toBe(
+      i18n.t('organization.billing.stateTrialEndsOn', {
+        date: formatDate(new Date('2026-11-19T00:00:00.000Z'), i18n.language, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        }),
+      })
+    );
+    expect(caption).toContain('Trial ends on ');
+
+    // The caption is its own line under the plan row, so it carries none of the
+    // separator the row used to concatenate the value and status with.
+    expect(caption?.startsWith(' ')).toBe(false);
+    expect(caption?.startsWith(' · ')).toBe(false);
   });
 
   it('falls back to the short status when the trial has no usable end', () => {
-    const pill = getOrgTrialHubStatusPill({
+    const caption = getOrgTrialHubCaption({
       trialStatus: 'trial_ending_very_soon',
       trialEndsAt: 'not-a-timestamp',
     });
-    expect(pill?.tone).toBe('default');
-    expect(pill?.label.startsWith(' · ')).toBe(true);
+
+    expect(caption).toBe(i18n.t('organization.billing.stateTrialing'));
+    expect(caption?.startsWith(' ')).toBe(false);
+    expect(caption?.startsWith(' · ')).toBe(false);
   });
 
-  it('has no pill when the trial is not what governs the organization', () => {
-    expect(getOrgTrialHubStatusPill({ trialStatus: 'subscribed', trialEndsAt: null })).toBeNull();
+  it('has no caption when the trial is not what governs the organization', () => {
+    expect(getOrgTrialHubCaption({ trialStatus: 'subscribed', trialEndsAt: null })).toBeNull();
     expect(
-      getOrgTrialHubStatusPill({ trialStatus: 'trial_expired_hard', trialEndsAt: null })
+      getOrgTrialHubCaption({ trialStatus: 'trial_expired_hard', trialEndsAt: null })
     ).toBeNull();
-    expect(getOrgTrialHubStatusPill({ trialStatus: null, trialEndsAt: null })).toBeNull();
+    expect(getOrgTrialHubCaption({ trialStatus: null, trialEndsAt: null })).toBeNull();
   });
 });
 

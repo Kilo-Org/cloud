@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Tamat",
-      "planStatusTrialEndsOn": " · Percubaan tamat pada {{date}}",
-      "planStatusTrialing": " · Percubaan",
       "planEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif.",
       "manageBilling": "Urus pengebilan",
       "lowBalanceBelow": "Di bawah {{amount}}"

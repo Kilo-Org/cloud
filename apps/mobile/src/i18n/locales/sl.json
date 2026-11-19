@@ -3706,8 +3706,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · je potekel",
-      "planStatusTrialEndsOn": " · Preizkusno obdobje se konča {{date}}",
-      "planStatusTrialing": " · Preizkusno obdobje",
       "planEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta.",
       "manageBilling": "Upravljanje obračunavanja",
       "lowBalanceBelow": "Pod {{amount}}"

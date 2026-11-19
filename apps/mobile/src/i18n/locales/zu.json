@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Oluphelile",
-      "planStatusTrialEndsOn": " · Isikhathi sokuzama siphela ngo-{{date}}",
-      "planStatusTrialing": " · Isikhathi sokuzama",
       "planEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo.",
       "manageBilling": "Phatha ukukhokha",
       "lowBalanceBelow": "Ngaphansi kwe-{{amount}}"

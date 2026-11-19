@@ -3588,8 +3588,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Ավարտված",
-      "planStatusTrialEndsOn": " · Փորձաշրջանն ավարտվում է՝ {{date}}",
-      "planStatusTrialing": " · Փորձաշրջան",
       "planEnded": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։",
       "manageBilling": "Կառավարել վճարումները",
       "lowBalanceBelow": "{{amount}}-ից ցածր"

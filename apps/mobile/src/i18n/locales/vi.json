@@ -3405,8 +3405,6 @@
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Đã kết thúc",
-      "planStatusTrialEndsOn": " · Dùng thử kết thúc vào {{date}}",
-      "planStatusTrialing": " · Dùng thử",
       "planEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động.",
       "manageBilling": "Quản lý thanh toán",
       "renamePlaceholder": "Tên tổ chức",

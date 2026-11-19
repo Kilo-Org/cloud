@@ -3,8 +3,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
-import { COMPACT_CONTROL_BOX_CLASS } from '@/lib/a11y/tap-target';
-
 import {
   BriefingNotificationCategoryRow,
   BriefingNotificationToggle,
@@ -76,7 +74,10 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
-vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({
+  RowSkeleton: 'RowSkeleton',
+  SwitchPlaceholder: 'SwitchPlaceholder',
+}));
 vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -204,14 +205,9 @@ it('shows the toggle placeholder instead of the switch while preferences load', 
   beginPreferencesLoad();
 
   const standalone = mount(BriefingNotificationToggle, {});
-  const [placeholder] = nodesOfType(standalone, 'Skeleton');
-  expect(placeholder?.props.className).toContain('rounded-full');
-  // The placeholder takes the box the switch contributes to the row's layout,
+  // The placeholder takes the host the switch contributes to the row's layout,
   // so the row the value lands in is the row already on screen.
-  const box = standalone.root.find(
-    node => (node.type as string) === 'View' && node.props.className === COMPACT_CONTROL_BOX_CLASS
-  );
-  expect(box.findAll(node => (node.type as string) === 'Skeleton')).toHaveLength(1);
+  expect(nodesOfType(standalone, 'SwitchPlaceholder')).toHaveLength(1);
   expect(nodesOfType(standalone, 'Switch')).toHaveLength(0);
   act(() => {
     standalone.unmount();

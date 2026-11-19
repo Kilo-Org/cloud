@@ -9,11 +9,9 @@ import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Newspaper } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
-import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { RowSkeleton, SwitchPlaceholder } from '@/components/ui/row-skeleton';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { COMPACT_CONTROL_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
@@ -78,9 +76,10 @@ function useBriefingNotificationSwitch() {
  * the way to the device's notification permission.
  *
  * While the preferences read is pending the value is unknown, so the switch's
- * slot holds a `Skeleton` and the row does not shift when the value arrives.
- * The switch contributes the compact control box to the row's layout, so the
- * placeholder takes that box and the pill inside keeps the control's own shape.
+ * slot holds the shared `SwitchPlaceholder` and the row does not shift when the
+ * value arrives. The switch contributes its host frame to the row's layout, so
+ * the placeholder takes that host and paints the control's own pill shape
+ * inside it.
  */
 export function BriefingNotificationToggle() {
   const router = useRouter();
@@ -91,9 +90,7 @@ export function BriefingNotificationToggle() {
       <View className="flex-row items-center gap-3">
         <Text className="min-w-0 flex-1">{t('agentBriefing.title')}</Text>
         {loading ? (
-          <View className={COMPACT_CONTROL_BOX_CLASS}>
-            <Skeleton className="h-[31px] w-[51px] rounded-full bg-muted-soft" />
-          </View>
+          <SwitchPlaceholder />
         ) : (
           renderRowTrailing({
             kind: 'switch',

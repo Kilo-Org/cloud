@@ -55,11 +55,13 @@ export function isPaidOrganizationSeatSubscriptionStatus(
  * Keep this list in step with the provider's subscription status registry and
  * the value the seat-purchase writer records (`organization-seats.ts` stores
  * the provider's `subscription.status`, or `'ended'`).
+ *
+ * The paid set is spread in first, so a status added to
+ * `PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES` is in this list structurally and
+ * can never narrow to the non-paying sentinel by omission.
  */
 export const ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES = [
-  'active',
-  'trialing',
-  'past_due',
+  ...PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES,
   'ended',
   'incomplete',
   'incomplete_expired',

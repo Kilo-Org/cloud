@@ -153,6 +153,15 @@ describe('classifyOrganizationEntitlement', () => {
 
 describe('toOrganizationSeatPurchaseSubscriptionStatus', () => {
   const paidStatuses: ReadonlySet<string> = new Set(PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES);
+  const knownStatuses: ReadonlySet<string> = new Set(
+    ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES
+  );
+
+  it('keeps every paid status in the known list', () => {
+    for (const status of PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES) {
+      expect(knownStatuses.has(status)).toBe(true);
+    }
+  });
 
   it('round-trips every named status unchanged', () => {
     for (const status of ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES) {

@@ -191,10 +191,19 @@ export function ChatComposerInputRow({
   const sendGapClass = COMPOSER_VOICE_SEND_GAP_CLASS;
   const sendHitSlop = composerFacingHitSlop(COMPOSER_CONTROL_HIT_SLOP_DP, 'start');
 
+  // The frame carries the row gap and the flex share itself, as the layout
+  // contract places it: the swipe detector and the Android touch fallback
+  // attach to this same view, so the field alone takes the dismiss swipe and
+  // no unpainted wrapper shifts the painted frame off the row's column.
   const inputField = (
     <InputFrame
-      className={cn('overflow-hidden', !inputEditable && 'opacity-50')}
+      className={cn(
+        COMPOSER_CONTROL_GAP_CLASS,
+        'flex-1 overflow-hidden',
+        !inputEditable && 'opacity-50'
+      )}
       onLayout={onInputLayout}
+      {...androidDismissTouchProps}
     >
       {/* The placeholder is a single-line overlay, not the input's own hint:
             Android lays the native hint out at the field's width with no line
@@ -270,17 +279,12 @@ export function ChatComposerInputRow({
           </Pressable>
         ) : null}
 
-        <View className={cn(COMPOSER_CONTROL_GAP_CLASS, 'flex-1')}>
-          {dismissKeyboardPan ? (
-            <GestureDetector gesture={dismissKeyboardPan}>
-              <View collapsable={false} {...androidDismissTouchProps}>
-                {inputField}
-              </View>
-            </GestureDetector>
-          ) : (
-            <View {...androidDismissTouchProps}>{inputField}</View>
-          )}
-        </View>
+        {dismissKeyboardPan ? (
+          <GestureDetector gesture={dismissKeyboardPan}>{inputField}</GestureDetector>
+        ) : (
+          inputField
+        )}
+
         {returnSendsMessage ? (
           <View className={COMPOSER_CONTROL_GAP_CLASS}>
             <Pressable

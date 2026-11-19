@@ -591,7 +591,7 @@ describe('ScreenHeader mounted', () => {
 
   it.each([
     { history: ['previous-screen', 'session-detail'], destination: 'previous-screen' },
-    { history: ['session-detail'], destination: '/(app)/(tabs)/(2_agents)/' },
+    { history: ['session-detail'], destination: '/(app)/(tabs)/(2_agents)' },
   ])(
     'returns from $history without retaining the session or opening its title',
     ({ history, destination }) => {

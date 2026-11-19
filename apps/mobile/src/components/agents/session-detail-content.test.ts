@@ -1418,7 +1418,7 @@ describe('SessionDetailContent display scope', () => {
     act(rename.props.onPress as () => void);
     expect(openRenameModal).toHaveBeenCalledOnce();
     pressHeaderBack(renderer);
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(globalContext.organizationId).toBe('global-org');
     expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
   });
@@ -3895,7 +3895,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
     );
   });
 
@@ -3928,12 +3928,12 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       // The card's Back returns to the sessions list through the same POP_TO
       // the session route's not-found card uses, so the two cards cannot drift.
       const routesBeforeCardBack = [...navigationRoutes];
-      const plantedRoutes: string[] = ['(app)', '/(app)/(tabs)/(2_agents)/', 'agent-chat/x'];
+      const plantedRoutes: string[] = ['(app)', '/(app)/(tabs)/(2_agents)', 'agent-chat/x'];
       navigationRoutes.splice(0, navigationRoutes.length, ...plantedRoutes);
       act(() => {
         (backToSessions.props.onPress as () => void)();
       });
-      expect(navigationRoutes).toEqual(['(app)', '/(app)/(tabs)/(2_agents)/']);
+      expect(navigationRoutes).toEqual(['(app)', '/(app)/(tabs)/(2_agents)']);
       navigationRoutes.splice(0, navigationRoutes.length, ...routesBeforeCardBack);
     }
 
@@ -3947,7 +3947,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
     expect(findReservedBand(header).findByProps({ className: 'min-h-21' })).toBeDefined();
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
     );
   });
 });

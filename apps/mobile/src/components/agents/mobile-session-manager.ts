@@ -398,7 +398,7 @@ export function createMobileAgentSessionManager({
       // Surface the owning CLI's per-session capabilities so the initial
       // `supportsAttachments` gate reflects whatever the mobile adapter
       // observed at resolution time. Heartbeat upgrades / downgrades
-      // arrive later via `onTransportCapabilitiesChange` from the
+      // arrive later via `onCliCapabilitiesReported` from the
       // cli-live-transport; the seed here just covers the window before
       // the first heartbeat lands.
       return {

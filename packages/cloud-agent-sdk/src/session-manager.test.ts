@@ -5,11 +5,10 @@ import {
   formatError,
   INTERRUPT_ABORT_SUPPRESSION_MS,
   type SessionManagerConfig,
-  type FetchedSessionData,
-  type AssociatedPrData,
   type StoredMessage,
   type SnapshotHistoryFailure,
 } from './session-manager';
+import type { FetchedSessionData, AssociatedPrData } from './types';
 import {
   createCloudAgentSession,
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
@@ -159,8 +158,8 @@ const mockSessionCallbacks: {
   onResolved?: (resolved: ResolvedSession) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
-  onTransportCapabilityChange?: () => void;
-  onTransportCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
+  onCliCapabilitiesReported?: (capabilities: { attachments?: boolean } | undefined) => void;
+  onComposerCapabilityChange?: () => void;
   onEvent?: (event: NormalizedEvent) => void;
   onMessageQueued?: (messageId: string) => void;
   onMessageCompleted?: (messageId: string) => void;
@@ -198,8 +197,8 @@ jest.mock('./session', () => ({
       onResolved?: (resolved: ResolvedSession) => void;
       onRemoteModelStateChange?: (state: RemoteModelState) => void;
       onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
-      onTransportCapabilityChange?: () => void;
-      onTransportCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
+      onCliCapabilitiesReported?: (capabilities: { attachments?: boolean } | undefined) => void;
+      onComposerCapabilityChange?: () => void;
       onEvent?: (event: NormalizedEvent) => void;
       onMessageQueued?: (messageId: string) => void;
       onMessageCompleted?: (messageId: string) => void;
@@ -265,9 +264,8 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onResolved = sessionConfig.onResolved;
       mockSessionCallbacks.onRemoteModelStateChange = sessionConfig.onRemoteModelStateChange;
       mockSessionCallbacks.onRemoteCommandStateChange = sessionConfig.onRemoteCommandStateChange;
-      mockSessionCallbacks.onTransportCapabilityChange = sessionConfig.onTransportCapabilityChange;
-      mockSessionCallbacks.onTransportCapabilitiesChange =
-        sessionConfig.onTransportCapabilitiesChange;
+      mockSessionCallbacks.onComposerCapabilityChange = sessionConfig.onComposerCapabilityChange;
+      mockSessionCallbacks.onCliCapabilitiesReported = sessionConfig.onCliCapabilitiesReported;
       mockSessionCallbacks.onEvent = sessionConfig.onEvent;
       mockSessionCallbacks.onMessageQueued = sessionConfig.onMessageQueued;
       mockSessionCallbacks.onMessageCompleted = sessionConfig.onMessageCompleted;
@@ -468,9 +466,8 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onSessionUpdated = undefined;
     mockSessionCallbacks.onReplayComplete = undefined;
     mockSessionCallbacks.onResolved = undefined;
-    mockSessionCallbacks.onRemoteModelStateChange = undefined;
-    mockSessionCallbacks.onTransportCapabilityChange = undefined;
-    mockSessionCallbacks.onTransportCapabilitiesChange = undefined;
+    mockSessionCallbacks.onComposerCapabilityChange = undefined;
+    mockSessionCallbacks.onCliCapabilitiesReported = undefined;
     mockSessionCallbacks.onEvent = undefined;
     mockSessionCallbacks.onMessageQueued = undefined;
     mockSessionCallbacks.onMessageCompleted = undefined;
@@ -2094,7 +2091,7 @@ describe('createSessionManager', () => {
         expect(mockSession.send).toHaveBeenCalledTimes(1);
 
         mockSession.canSend = false;
-        mockSessionCallbacks.onTransportCapabilityChange?.();
+        mockSessionCallbacks.onComposerCapabilityChange?.();
         expect(config.store.get(mgr.atoms.canSend)).toBe(false);
         mockSession.canSend = true;
         mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
@@ -2355,12 +2352,12 @@ describe('createSessionManager', () => {
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
 
       mockSession.canSend = false;
-      mockSessionCallbacks.onTransportCapabilityChange?.();
+      mockSessionCallbacks.onComposerCapabilityChange?.();
       expect(atomValue(config.store, mgr.atoms.canSend)).toBe(false);
       expect(atomValue(config.store, mgr.atoms.isReadOnly)).toBe(false);
 
       mockSession.canSend = true;
-      mockSessionCallbacks.onTransportCapabilityChange?.();
+      mockSessionCallbacks.onComposerCapabilityChange?.();
       expect(atomValue(config.store, mgr.atoms.canSend)).toBe(true);
     });
 
@@ -2998,7 +2995,7 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
       // Only an explicit negative downgrades.
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
 
       mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
@@ -11788,7 +11785,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
       // An absent heartbeat / sessions.list capability stays supported.
-      mockSessionCallbacks.onTransportCapabilitiesChange?.(undefined);
+      mockSessionCallbacks.onCliCapabilitiesReported?.(undefined);
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
     });
 
@@ -11815,7 +11812,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
     });
 
@@ -11825,10 +11822,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
     });
 
@@ -11839,10 +11836,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
     });
 
@@ -11853,10 +11850,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.(undefined);
+      mockSessionCallbacks.onCliCapabilitiesReported?.(undefined);
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
     });
 
@@ -11897,9 +11894,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
 
       // No capability value makes it supported for that consumer.
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
 
       // cloud-agent still flows through the cloud-only field it does know.
@@ -11981,7 +11978,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       mockSession.send.mockResolvedValue(undefined);
 
       const attachmentParts: RemoteAttachmentPart[] = [
@@ -12023,7 +12020,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       mockSession.send.mockResolvedValue(undefined);
 
       const attachmentParts: RemoteAttachmentPart[] = [
@@ -12156,7 +12153,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       mockSession.send.mockResolvedValue(undefined);
 
       const attachmentParts: RemoteAttachmentPart[] = [

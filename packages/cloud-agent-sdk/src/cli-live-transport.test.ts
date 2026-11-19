@@ -191,8 +191,8 @@ function createTransportWithSinks(opts?: {
   onError?: (message: string, failure?: SessionSnapshotFailure) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
-  onCapabilityChange?: () => void;
-  onCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
+  onComposerCapabilityChange?: () => void;
+  onCliCapabilitiesReported?: (capabilities: { attachments?: boolean } | undefined) => void;
 }) {
   const userWebConnection = opts?.connection ?? createConnection();
   const chatEvents: ChatEvent[] = [];
@@ -205,8 +205,8 @@ function createTransportWithSinks(opts?: {
     onError: opts?.onError,
     onRemoteModelStateChange: opts?.onRemoteModelStateChange,
     onRemoteCommandStateChange: opts?.onRemoteCommandStateChange,
-    onCapabilityChange: opts?.onCapabilityChange,
-    onCapabilitiesChange: opts?.onCapabilitiesChange,
+    onComposerCapabilityChange: opts?.onComposerCapabilityChange,
+    onCliCapabilitiesReported: opts?.onCliCapabilitiesReported,
   })({
     onChatEvent: event => chatEvents.push(event),
     onServiceEvent: event => serviceEvents.push(event),
@@ -903,7 +903,7 @@ describe('CliLiveTransport unified user web connection', () => {
     const capabilityChanges = jest.fn();
     const { transport } = createTransportWithSinks({
       connection,
-      onCapabilityChange: capabilityChanges,
+      onComposerCapabilityChange: capabilityChanges,
     });
 
     transport.connect();
@@ -4109,7 +4109,7 @@ describe('CliLiveTransport page-seam + reconnect', () => {
 });
 
 describe('CliLiveTransport remote attachment capabilities', () => {
-  it('publishes heartbeat attachments: true via onCapabilitiesChange', async () => {
+  it('publishes heartbeat attachments: true via onCliCapabilitiesReported', async () => {
     const connection = createConnection();
     jest
       .mocked(connection.sendCommand)
@@ -4119,7 +4119,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     const capabilities: ({ attachments?: boolean } | undefined)[] = [];
     const { transport, userWebConnection } = createTransportWithSinks({
       connection,
-      onCapabilitiesChange: capability => capabilities.push(capability),
+      onCliCapabilitiesReported: capability => capabilities.push(capability),
     });
 
     transport.connect();
@@ -4151,7 +4151,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     transport.destroy();
   });
 
-  it('publishes sessions.list capability changes via onCapabilitiesChange', async () => {
+  it('publishes sessions.list capability changes via onCliCapabilitiesReported', async () => {
     const connection = createConnection();
     jest
       .mocked(connection.sendCommand)
@@ -4161,7 +4161,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     const capabilities: ({ attachments?: boolean } | undefined)[] = [];
     const { transport, userWebConnection } = createTransportWithSinks({
       connection,
-      onCapabilitiesChange: capability => capabilities.push(capability),
+      onCliCapabilitiesReported: capability => capabilities.push(capability),
     });
 
     transport.connect();
@@ -4213,7 +4213,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     const capabilities: ({ attachments?: boolean } | undefined)[] = [];
     const { transport, userWebConnection } = createTransportWithSinks({
       connection,
-      onCapabilitiesChange: capability => capabilities.push(capability),
+      onCliCapabilitiesReported: capability => capabilities.push(capability),
     });
 
     transport.connect();

@@ -378,4 +378,103 @@ describe('verifyPlayIntegrity access token cache', () => {
     const result = await verifyPlayIntegrity('integrity-1', 'challenge-1');
     expect(result).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
   });
+
+  test('a credential the decode endpoint refuses is dropped, so the next admission mints a new token', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+    });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+    await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+      'Play Integrity API returned 401'
+    );
+
+    // A 401 is a credential refusal, so the next admission must not replay the
+    // rejected token: it mints a new one instead.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-two', expires_in: 3600 }),
+    });
+    const hash = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash));
+
+    const second = await verifyPlayIntegrity('integrity-2', 'challenge-2');
+    expect(second).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      'https://playintegrity.googleapis.com/v1/com.kilocode.kiloapp:decodeIntegrityToken',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer token-two' }),
+      })
+    );
+
+    const tokenCalls = mockFetch.mock.calls.filter(
+      ([url]) => url === 'https://oauth2.googleapis.com/token'
+    );
+    expect(tokenCalls).toHaveLength(2);
+  });
+
+  test('a credential the decode endpoint forbids is dropped, so the next admission mints a new token', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+    });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+
+    await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+      'Play Integrity API returned 403'
+    );
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-two', expires_in: 3600 }),
+    });
+    const hash = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash));
+
+    const second = await verifyPlayIntegrity('integrity-2', 'challenge-2');
+    expect(second).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      'https://playintegrity.googleapis.com/v1/com.kilocode.kiloapp:decodeIntegrityToken',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer token-two' }),
+      })
+    );
+
+    const tokenCalls = mockFetch.mock.calls.filter(
+      ([url]) => url === 'https://oauth2.googleapis.com/token'
+    );
+    expect(tokenCalls).toHaveLength(2);
+  });
+
+  test('a decode answer that is not a credential refusal keeps the cached token', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+    });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+      'Play Integrity API returned 500'
+    );
+
+    // A 500 is a provider condition, not a refused credential, so the cached
+    // token stays usable.
+    const hash = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+    mockFetch.mockResolvedValueOnce(validVerdict(hash));
+
+    const second = await verifyPlayIntegrity('integrity-2', 'challenge-2');
+    expect(second).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      'https://playintegrity.googleapis.com/v1/com.kilocode.kiloapp:decodeIntegrityToken',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer token-one' }),
+      })
+    );
+
+    const tokenCalls = mockFetch.mock.calls.filter(
+      ([url]) => url === 'https://oauth2.googleapis.com/token'
+    );
+    expect(tokenCalls).toHaveLength(1);
+  });
 });

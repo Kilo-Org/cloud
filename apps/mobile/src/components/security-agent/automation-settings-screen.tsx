@@ -234,7 +234,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
         variant="offline"
         message={t('securityAgent.automation.couldNotLoad')}
         onRetry={() => {
-          pausedRetry.retry();
+          void pausedRetry.retry();
         }}
         isRetrying={pausedRetry.isRetrying}
       />

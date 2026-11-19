@@ -184,7 +184,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
               ? 'securityAgent.dismiss.couldNotLoad'
               : 'securityAgent.dismiss.couldNotCheckPermissions'
           )}
-          onRetry={findingPaused ? findingRetry.retry : capabilityRetry.retry}
+          onRetry={() => {
+            void (findingPaused ? findingRetry.retry() : capabilityRetry.retry());
+          }}
           isRetrying={findingPaused ? findingRetry.isRetrying : capabilityRetry.isRetrying}
         />
       </DismissSheetFrame>

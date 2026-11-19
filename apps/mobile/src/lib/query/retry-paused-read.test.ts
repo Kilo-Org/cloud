@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { retryPausedRead, usePausedReadRetry } from './retry-paused-read';
+import { type PausedReadRetry, retryPausedRead, usePausedReadRetry } from './retry-paused-read';
 
 describe('retryPausedRead', () => {
   it('cancels the paused query first, then refetches it forced and raw keyed', async () => {
@@ -95,20 +95,25 @@ describe('usePausedReadRetry', () => {
       throw new Error('the hook did not render');
     }
 
-    let settled: Promise<void> | undefined;
-    act(() => {
-      settled = first.retry();
-    });
-    expect(observed.at(-1)?.isRetrying).toBe(true);
-    rejectAttempt(new Error('still offline'));
-    // Await the attempt the hook exposed, not a guessed duration.
-    await act(async () => {
-      await settled;
-    });
+    let settled: Promise<void> = Promise.resolve();
+    try {
+      act(() => {
+        settled = first.retry();
+      });
+      expect(observed.at(-1)?.isRetrying).toBe(true);
+      rejectAttempt(new Error('still offline'));
+      // Await the attempt the hook exposed, not a guessed duration.
+      await act(async () => {
+        await settled;
+      });
 
-    process.off('unhandledRejection', onUnhandled);
-    expect(unhandled).toEqual([]);
-    expect(observed.at(-1)?.isRetrying).toBe(false);
+      expect(unhandled).toEqual([]);
+      expect(observed.at(-1)?.isRetrying).toBe(false);
+    } finally {
+      // A failing assertion must still detach the process-wide listener, or
+      // it leaks into every later test in this worker.
+      process.off('unhandledRejection', onUnhandled);
+    }
 
     act(() => {
       ref.current?.unmount();

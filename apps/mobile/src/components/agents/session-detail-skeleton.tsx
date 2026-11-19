@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /**
  * Bubble height classes. The transcript is anchored to its newest message, so
@@ -50,9 +52,15 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
   const [first, second, third] = shapeFor(sessionId ?? '');
   return (
     <View className="flex-1 justify-end overflow-hidden px-4 pb-2">
-      <Skeleton className={`my-1 w-3/4 shrink self-start rounded-2xl rounded-tl-sm ${first}`} />
-      <Skeleton className={`my-1 w-1/2 shrink self-end rounded-2xl rounded-tr-sm ${second}`} />
-      <Skeleton className={`my-1 w-2/3 shrink self-start rounded-2xl rounded-tl-sm ${third}`} />
+      <Skeleton
+        className={`my-1 w-3/4 shrink self-start rounded-2xl rounded-tl-sm bg-muted-soft ${first}`}
+      />
+      <Skeleton
+        className={`my-1 w-1/2 shrink self-end rounded-2xl rounded-tr-sm bg-muted-soft ${second}`}
+      />
+      <Skeleton
+        className={`my-1 w-2/3 shrink self-start rounded-2xl rounded-tl-sm bg-muted-soft ${third}`}
+      />
     </View>
   );
 }
@@ -74,9 +82,9 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
  */
 export function SessionReadOnlyFooterPlaceholder() {
   return (
-    <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
-      <Skeleton className="mx-auto h-[17.5px] w-40 bg-muted-soft" />
-      <Skeleton className="h-[48px] bg-muted-soft" />
+    <View className="gap-3 border-t-[0.5px] border-hair-soft bg-secondary px-4 py-3">
+      <Skeleton className="mx-auto h-5 w-40 bg-muted-soft" />
+      <Skeleton className={cn('w-full bg-muted-soft', STATE_ACTION_CLASS)} />
     </View>
   );
 }
@@ -95,9 +103,10 @@ const COMPOSER_FIELD_BORDER = 2;
  * resolve and shoves the transcript up by its own height.
  *
  * Geometry follows ChatComposer's input row: a BlurBar wrapping the row's
- * `p-2.5 px-3`, the field's own box at `rounded-[20px]` and the two trailing
- * controls on the 48 pt voice toggle's target box — `ms-3` is the row's
- * COMPOSER_CONTROL_GAP_CLASS, repeated here because the row module owns it.
+ * `p-2.5 px-3`, the field's own box at the input frame's `rounded-md` radius
+ * (`INPUT_FRAME_CLASS`) and the two trailing controls on the 48 pt voice
+ * toggle's target box — `ms-3` is the row's COMPOSER_CONTROL_GAP_CLASS,
+ * repeated here because the row module owns it.
  *
  * Sizes are written in points, not scale steps: this app's rem is 14 pt, so
  * `h-11` paints 38.5 pt and would leave the slot 6 pt short of the composer that
@@ -112,7 +121,7 @@ export function SessionComposerSkeleton() {
   // The voice toggle renders the shared 48dp target box, so the row is 48 tall
   // on either platform; a shorter slot would leave the row short of the
   // composer that replaces it, and the transcript would move on resolve.
-  const control = 'h-[48px] w-[48px]';
+  const control = ICON_TARGET_BOX_CLASS;
   return (
     <BlurBar>
       <View className="p-2.5 px-3">
@@ -124,10 +133,10 @@ export function SessionComposerSkeleton() {
                 COMPOSER_FIELD_LINE * fontScale + COMPOSER_FIELD_PADDING + COMPOSER_FIELD_BORDER,
             }}
           >
-            <Skeleton className="h-full w-full rounded-[20px]" />
+            <Skeleton className="h-full w-full rounded-md" />
           </View>
-          <Skeleton className={`ms-3 rounded-full ${control}`} />
-          <Skeleton className={`ms-3 rounded-full ${control}`} />
+          <Skeleton className={cn('ms-3 rounded-full', control)} />
+          <Skeleton className={cn('ms-3 rounded-full', control)} />
         </View>
       </View>
     </BlurBar>

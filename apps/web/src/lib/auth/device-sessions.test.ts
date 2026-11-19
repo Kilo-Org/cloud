@@ -15,6 +15,7 @@ import {
   cleanupExpiredDeviceRefreshTokens,
   createDeviceSession,
   createDeviceSessionWithAttestedKey,
+  createDeviceSessionWithCredentials,
   issueSessionCredentials,
   rotateRefreshToken,
   revokeDeviceSession,
@@ -28,6 +29,8 @@ import {
 } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import type * as TokensModule from '@kilocode/web-shared/lib/tokens';
 import { getWorkOSOrganization } from '@/lib/user';
 
 jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
@@ -45,9 +48,19 @@ jest.mock('@/lib/user', () => ({
   getWorkOSOrganization: jest.fn(),
 }));
 
+// Token generation is the first step of minting a pair, so failing it proves a
+// mint failure rolls back the rows the transaction wrote before it.
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/tokens') as object),
+  generateApiToken: jest.fn(),
+}));
+
+const actualTokens = jest.requireActual<typeof TokensModule>('@kilocode/web-shared/lib/tokens');
+
 const mockIsEmailBlacklisted = jest.mocked(isEmailBlacklisted);
 const mockIsBlockedTLD = jest.mocked(isBlockedTLD);
 const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
+const mockGenerateApiToken = jest.mocked(generateApiToken);
 
 describe('device-sessions', () => {
   const testUserId = 'test-user-ds-' + Date.now();
@@ -59,6 +72,7 @@ describe('device-sessions', () => {
     mockIsEmailBlacklisted.mockResolvedValue(false);
     mockIsBlockedTLD.mockResolvedValue(false);
     mockGetWorkOSOrganization.mockResolvedValue(null);
+    mockGenerateApiToken.mockImplementation(actualTokens.generateApiToken);
 
     await db.insert(kilocode_users).values({
       id: testUserId,
@@ -1183,6 +1197,69 @@ describe('device-sessions', () => {
       } finally {
         await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
       }
+    });
+  });
+
+  describe('createDeviceSessionWithCredentials', () => {
+    test('creates the session and its credential pair together', async () => {
+      const result = await createDeviceSessionWithCredentials({
+        userId: testUserId,
+        userAgent: 'plain-agent',
+        user: fakeUser,
+      });
+
+      const sessions = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, result.sessionId));
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0]!.kilo_user_id).toBe(testUserId);
+      expect(sessions[0]!.user_agent).toBe('plain-agent');
+      expect(sessions[0]!.revoked_at).toBeNull();
+
+      const refreshRows = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, result.sessionId));
+      expect(refreshRows).toHaveLength(1);
+      expect(refreshRows[0]!.token_hash).toBe(
+        createHash('sha256').update(result.refreshToken).digest('hex')
+      );
+
+      expect(result.token.length).toBeGreaterThan(0);
+      expect(result.expiresIn).toBe(3600);
+    });
+
+    test('rolls back the session insert when minting the pair fails', async () => {
+      // The mint generates the access token before it writes the refresh token,
+      // so a failure here happens inside the transaction, after the session
+      // insert.
+      mockGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('synthetic mint failure');
+      });
+
+      await expect(
+        createDeviceSessionWithCredentials({
+          userId: testUserId,
+          userAgent: 'plain-agent',
+          user: fakeUser,
+        })
+      ).rejects.toThrow('synthetic mint failure');
+
+      const sessions = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+      expect(sessions).toHaveLength(0);
+
+      const refreshRows = await db
+        .select()
+        .from(device_refresh_tokens)
+        .innerJoin(device_sessions, eq(device_refresh_tokens.device_session_id, device_sessions.id))
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+      expect(refreshRows).toHaveLength(0);
+
+      mockGenerateApiToken.mockImplementation(actualTokens.generateApiToken);
     });
   });
 });

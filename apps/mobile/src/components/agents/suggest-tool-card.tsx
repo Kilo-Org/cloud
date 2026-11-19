@@ -4,6 +4,7 @@ import { Sparkles } from '@/components/ui/icons';
 import { type StandaloneSuggestion, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { useTranslation } from 'react-i18next';
 
+import { Card } from '@/components/ui/card';
 import { SelectableText } from '@/components/ui/selectable-text';
 
 import { FixedPartRow } from './fixed-part-row';
@@ -71,7 +72,7 @@ export function SuggestToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
     <View className="gap-3">
       <SelectableText className="text-sm text-foreground">{details.text}</SelectableText>
       {details.actions.map((action, index) => (
-        <View key={`${action.label}-${index}`} className="gap-1 rounded-lg bg-secondary p-3">
+        <Card key={`${action.label}-${index}`}>
           <SelectableText className="text-sm font-medium text-foreground">
             {action.label}
           </SelectableText>
@@ -81,7 +82,7 @@ export function SuggestToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
             </SelectableText>
           ) : null}
           <MonoScrollBlock content={action.prompt} textClassName="text-foreground" />
-        </View>
+        </Card>
       ))}
       {part.state.status === 'completed' && part.state.output ? (
         <MonoScrollBlock content={part.state.output} textClassName="text-foreground" />

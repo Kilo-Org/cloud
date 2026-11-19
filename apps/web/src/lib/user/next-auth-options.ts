@@ -6,7 +6,6 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
-import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 import type { NextAuthOptions, Account, User as NextUser, Profile } from 'next-auth';
 import NextAuth from 'next-auth';
@@ -1345,7 +1344,6 @@ export const authOptions: NextAuthOptions = {
         }
 
         const requestHeaders = await headers();
-        const watchwood = !isAccountLinking ? await readWatchwoodSignupAssessment() : undefined;
 
         if (accountInfo.provider === 'workos') {
           const { affiliateTrackingId, trackingContext } = !isAccountLinking
@@ -1366,7 +1364,7 @@ export const authOptions: NextAuthOptions = {
             accountInfo,
             requestHeaders,
             affiliateTrackingId,
-            { ...trackingContext, watchwood },
+            trackingContext,
             !isAccountLinking
               ? getInvitationTokenFromCallbackPath(redirectContext.callbackPath)
               : undefined
@@ -1459,7 +1457,7 @@ export const authOptions: NextAuthOptions = {
                 autoLinkToExistingUser,
                 requestHeaders,
                 affiliateTrackingId,
-                { ...trackingContext, watchwood },
+                trackingContext,
                 false,
                 undefined,
                 githubEmailProof ? { resolveEmailProof: githubEmailProof } : {}

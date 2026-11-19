@@ -189,6 +189,37 @@ describe('refreshGlanceableSessionsInputSchema', () => {
         .approvalChangedSessionIds
     ).toBeUndefined();
   });
+
+  it('rejects an approval hint naming a session outside the batch', () => {
+    expect(
+      refreshGlanceableSessionsInputSchema.safeParse({
+        userId: 'usr_1',
+        cliSessionIds: ['ses_1'],
+        approvalChangedSessionIds: ['ses_2'],
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a card-follow hint naming a session outside the batch', () => {
+    expect(
+      refreshGlanceableSessionsInputSchema.safeParse({
+        userId: 'usr_1',
+        cliSessionIds: ['ses_1'],
+        cardFollowSessionIds: ['ses_2'],
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts a valid subset of both hint lists', () => {
+    const parsed = refreshGlanceableSessionsInputSchema.parse({
+      userId: 'usr_1',
+      cliSessionIds: ['ses_1', 'ses_2', 'ses_3'],
+      approvalChangedSessionIds: ['ses_1', 'ses_3'],
+      cardFollowSessionIds: ['ses_2'],
+    });
+    expect(parsed.approvalChangedSessionIds).toEqual(['ses_1', 'ses_3']);
+    expect(parsed.cardFollowSessionIds).toEqual(['ses_2']);
+  });
 });
 
 describe('perRecipientResultSchema', () => {

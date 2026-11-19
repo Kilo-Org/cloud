@@ -76,11 +76,17 @@ describe('what the Kilo MCP sheet shows', () => {
   it('says there are none when the server answered with an empty list', () => {
     const view = mcpSettingsView({ status: 'ready', tools: [] }, saved(true));
 
+    /* The answer is still worth asking again — the retry reconnects and
+       reports what the server offers now — so the sheet draws the Retry. */
     expect(view).toMatchObject({
       enabled: true,
+      toggleable: true,
       statusKey: 'modelChat.mcp.none',
+      descriptionKey: 'modelChat.mcp.noneDescription',
       toolCount: 0,
-      retry: false,
+      busy: false,
+      tone: 'warn',
+      retry: true,
     });
   });
 

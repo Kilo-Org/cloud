@@ -72,7 +72,6 @@ describe('POST /api/auth/verify-turnstile client address', () => {
     expect(cookie).toBeDefined();
     const payload = jwt.verify(cookie ?? '', 'test-secret');
     expect(payload).toMatchObject({ ip: '1.2.3.4' });
-    expect(payload).not.toHaveProperty('watchwoodIp');
   });
 
   it('refuses to mint a token without a resolvable client address', async () => {

@@ -2,12 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import {
-  PROVIDER_GLYPH_SLOT_CLASS,
-  PROVIDER_ROW_CLASS,
-  ProviderButtons,
-} from '@/components/login/provider-buttons';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { ProviderButtons } from '@/components/login/provider-buttons';
 import { Button } from '@/components/ui/button';
 import { Mail } from '@/components/ui/icons';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -89,7 +84,7 @@ export function PendingLinkAuth({
           onPress={onStartAgain}
           accessibilityLabel={t('pendingLink.startAgain')}
         >
-          <Text className="text-[17px]">{t('pendingLink.startAgain')}</Text>
+          <Text>{t('pendingLink.startAgain')}</Text>
         </Button>
       </View>
     );
@@ -122,30 +117,14 @@ export function PendingLinkAuth({
         <Button
           variant="outline"
           size="lg"
-          // Same anatomy as the provider rows: the mark is out of flow at the
-          // leading edge, so the label centers on the button's own width and
-          // the row keeps the shared 44pt floor.
-          className={PROVIDER_ROW_CLASS}
+          className="w-full"
+          loading={busy === 'otp-send'}
           disabled={disabled}
-          // The mark replaces nothing here: the label stays visible and the
-          // slot shows the spinner, the same busy treatment as the provider
-          // rows above. The explicit state is what tells assistive technology
-          // the control is working, since this row does not use the button's
-          // `loading` layout.
-          accessibilityState={{ busy: busy === 'otp-send' }}
           onPress={onEmailCode}
           accessibilityLabel={t('pendingLink.emailCode')}
         >
-          <View className={PROVIDER_GLYPH_SLOT_CLASS}>
-            {busy === 'otp-send' ? (
-              <ActivityIndicator size="small" />
-            ) : (
-              <Mail size={18} color={colors.foreground} />
-            )}
-          </View>
-          <Text className="flex-1 text-center text-[17px] font-medium">
-            {t('pendingLink.emailCode')}
-          </Text>
+          <Mail size={18} color={colors.foreground} />
+          <Text>{t('pendingLink.emailCode')}</Text>
         </Button>
       )}
       {options.browser && (
@@ -157,7 +136,7 @@ export function PendingLinkAuth({
           onPress={onBrowser}
           accessibilityLabel={t('pendingLink.continueInBrowser')}
         >
-          <Text className="text-[17px] font-medium">{t('pendingLink.continueInBrowser')}</Text>
+          <Text>{t('pendingLink.continueInBrowser')}</Text>
         </Button>
       )}
       <Button

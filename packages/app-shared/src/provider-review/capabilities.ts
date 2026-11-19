@@ -5,8 +5,6 @@
  * probing provider endpoints, so an unsupported action degrades to a
  * reason string the UI can show — never to a silent failure.
  *
- * `ProviderReviewCapability` makes the rule structural: the unsupported branch
- * must carry a reason field, and the supported branch cannot carry any copy.
  * The per-provider constants below are the single source of that copy, and
  * they are readonly, so the one shared supported value cannot be rewritten in
  * place through any provider's table.

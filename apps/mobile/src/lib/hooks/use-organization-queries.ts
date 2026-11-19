@@ -5,7 +5,11 @@ import { useMemo } from 'react';
 
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useOrganization } from '@/lib/organization-context';
-import { hasRetentionBudget, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import {
+  hasRetentionBudget,
+  stoppedAtRetentionBound,
+  withInfiniteRetention,
+} from '@/lib/query/infinite-retention';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
@@ -88,7 +92,11 @@ export function useOrgWithMembers(organizationId: string | null) {
   return useQuery(
     trpc.organizations.withMembers.queryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: organizationId != null }
+      {
+        enabled: organizationId != null,
+        // A paused first read leaves the member list with no exit.
+        ...SETTLE_WHILE_OFFLINE,
+      }
     )
   );
 }
@@ -118,10 +126,11 @@ export function useOrgParentLink(
   const reportedParentLink = listParentLink ?? membershipParentLink;
   const topLevelConfirmed = membershipParentLink === null;
   const parentLink = reportedParentLink ?? (topLevelConfirmed ? null : undefined);
-  // No membership payload and a failed or paused fetch: the payload that would
-  // settle anything waiting on it will not arrive on its own.
-  const membershipUnavailable =
-    membership.data == null && (membership.isError || membership.isPaused);
+  // No membership payload behind a failed fetch: the payload that would settle
+  // anything waiting on it will not arrive on its own. The read settles while
+  // offline too (`SETTLE_WHILE_OFFLINE`), so `isPaused` is no longer the pause
+  // signal it was; an offline confirmed device reads the failure here.
+  const membershipUnavailable = membership.data == null && membership.isError;
   return { membership, parentLink, membershipUnavailable };
 }
 
@@ -155,7 +164,11 @@ export function useOrgKiloPassSummary(organizationId: string | null, enabled: bo
   return useQuery(
     trpc.organizations.kiloPass.summary.queryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: enabled && organizationId != null }
+      {
+        enabled: enabled && organizationId != null,
+        // A paused first read leaves the summary row with no exit.
+        ...SETTLE_WHILE_OFFLINE,
+      }
     )
   );
 }
@@ -165,7 +178,11 @@ export function useOrgUsageStats(organizationId: string | null) {
   return useQuery(
     trpc.organizations.usageStats.queryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: organizationId != null }
+      {
+        enabled: organizationId != null,
+        // A paused first read leaves the usage rows with no exit.
+        ...SETTLE_WHILE_OFFLINE,
+      }
     )
   );
 }
@@ -197,6 +214,8 @@ export function buildOrgCreditTransactionsPageQueryOptions(
           lastPage.hasMore && hasRetentionBudget(pages.length)
             ? (lastPage.nextCursor ?? undefined)
             : undefined,
+        // A paused first page leaves the skeleton rows with no exit.
+        ...SETTLE_WHILE_OFFLINE,
       }
     )
   );
@@ -217,8 +236,14 @@ export function useOrgCreditTransactionsPage(organizationId: string | null) {
   // `hasNextPage` folds the builder's refusal bound into the server's last-page
   // `hasMore`, so the "Load more" control hides at the retention bound.
   const hasMore = query.hasNextPage;
+  // The hidden "Load more" alone cannot say whether the list ended or was cut
+  // by the bound; the last page's own `hasMore` answers it.
+  const isRetentionLimited = stoppedAtRetentionBound(
+    pages?.length ?? 0,
+    pages?.at(-1)?.hasMore === true
+  );
 
-  return { query, entries, hasMore };
+  return { query, entries, hasMore, isRetentionLimited };
 }
 
 /**
@@ -242,7 +267,6 @@ export function buildOrgInvoicesPageQueryOptions(
           lastPage.hasMore && hasRetentionBudget(pages.length)
             ? (lastPage.nextCursor ?? undefined)
             : undefined,
-        // A paused first page leaves the skeleton rows with no exit.
         ...SETTLE_WHILE_OFFLINE,
       }
     )
@@ -264,6 +288,12 @@ export function useOrgInvoicesPage(organizationId: string | null) {
   // `hasNextPage` folds the builder's refusal bound into the server's last-page
   // `hasMore`, so the "Load more" control hides at the retention bound.
   const hasMore = query.hasNextPage;
+  // The hidden "Load more" alone cannot say whether the list ended or was cut
+  // by the bound; the last page's own `hasMore` answers it.
+  const isRetentionLimited = stoppedAtRetentionBound(
+    pages?.length ?? 0,
+    pages?.at(-1)?.hasMore === true
+  );
 
-  return { query, entries, hasMore };
+  return { query, entries, hasMore, isRetentionLimited };
 }

@@ -72,11 +72,8 @@ import type { Env } from '../types.js';
 import type { ProviderStartupCommand } from '../sandbox-control/provider.js';
 import { EgressAuditRequestSchema, type GetEgressAuditInput } from '../shared/egress-audit.js';
 import { EgressAuditStore } from './egress-audit.js';
-import {
-  nativeEgressAllowlistSchema,
-  nativeEgressPolicySchema,
-  type NativeEgressPolicy,
-} from './egress-policy.js';
+import { nativeEgressAllowlistSchema } from '../sandbox-control/egress-policy.js';
+import { nativeEgressPolicySchema, type NativeEgressPolicy } from './egress-policy.js';
 import type { NativeRuntimeImage } from '../sandbox-control/startup-selection.js';
 import { ContainersLaunchInterruptedError } from './launch-interrupted.js';
 import { readSentryIdentity, sentryIdentityFromBilling } from '../sentry-identity.js';

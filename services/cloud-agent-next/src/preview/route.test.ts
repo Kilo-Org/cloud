@@ -41,6 +41,7 @@ const WORKTREE_ORIGIN = `http://${WORKTREE_HOST}`;
 const env = { NEXTAUTH_SECRET: SECRET, PREVIEW_HOST_SUFFIX: SUFFIX } as unknown as Env;
 
 const FENCE = {
+  transport: 'durable-object',
   provider: 'cloudflare-containers',
   logicalSandboxId: 'workspace-container',
   allocationRef: 'allocation-ref',
@@ -1097,5 +1098,59 @@ describe('preview upstream forwarding', () => {
     );
     expect(response.status).toBe(200);
     expect(fetchUpstream).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('preview through the wrapper tunnel', () => {
+  const TUNNEL = {
+    transport: 'wrapper-tunnel',
+    provider: 'vercel',
+    logicalSandboxId: 'sbx_vercel',
+    allocationRef: 'allocation-2',
+  } as const;
+  const TUNNEL_TARGET: ResolvedPreviewTarget = { status: 'ok', coordinates: TUNNEL };
+
+  it('mints a cookie bound to the tunnel allocation on entry', async () => {
+    const { deps } = fixture({ target: TUNNEL_TARGET });
+    const response = await handlePreviewRequest(entryRequest(entryTicket()), env, deps);
+    expect(response.status).toBe(303);
+    const cookie = response.headers.get('set-cookie') ?? '';
+    const token = cookie.slice(cookie.indexOf('=') + 1, cookie.indexOf(';'));
+    expect(validatePreviewSessionToken(token, SECRET)).toMatchObject({
+      success: true,
+      claims: { provider: 'vercel', logicalSandboxId: 'sbx_vercel', allocationRef: 'allocation-2' },
+    });
+  });
+
+  it('sends a matching cookie to the tunnel upstream with the allocation marker', async () => {
+    const { deps, fetchUpstream } = fixture({ target: TUNNEL_TARGET });
+    const response = await handlePreviewRequest(proxyRequest(sessionToken(TUNNEL)), env, deps);
+    expect(response.status).toBe(200);
+    expect(coordinatesOf(fetchUpstream)).toEqual(TUNNEL);
+    const upstream = upstreamRequestOf(fetchUpstream);
+    expect(upstream.headers.get('x-kilo-preview-allocation')).toBe('allocation-2');
+    expect(upstream.headers.get('x-kilo-preview-port')).toBe(String(PORT));
+  });
+
+  it.each([
+    ['a replaced allocation', { ...TUNNEL, allocationRef: 'allocation-1' }],
+    ['the Containers fence', FENCE],
+  ])('fails closed for a cookie minted for %s', async (_name, fence) => {
+    const { deps, fetchUpstream } = fixture({ target: TUNNEL_TARGET });
+    const response = await handlePreviewRequest(proxyRequest(sessionToken(fence)), env, deps);
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe(PREVIEW_SESSION_MISSING_TEXT);
+    expect(fetchUpstream).not.toHaveBeenCalled();
+  });
+});
+
+describe('preview target from a Sandbox DO on the previous release', () => {
+  it('sends Containers coordinates without a transport to the Containers upstream', async () => {
+    const { transport: _transport, ...legacy } = FENCE;
+    const target = { status: 'ok', coordinates: legacy } as unknown as ResolvedPreviewTarget;
+    const { deps, fetchUpstream } = fixture({ target });
+    const response = await handlePreviewRequest(proxyRequest(sessionToken(FENCE)), env, deps);
+    expect(response.status).toBe(200);
+    expect(coordinatesOf(fetchUpstream)).toEqual(FENCE);
   });
 });

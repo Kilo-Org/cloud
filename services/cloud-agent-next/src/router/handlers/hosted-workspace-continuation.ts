@@ -418,6 +418,7 @@ function buildChildRequest(
     clone: { cloneFromKiloSessionId: source.sourceKiloSessionId },
     agent: source.agent,
     repository: repositoryInputToSessionRepository(input.repository),
+    ...(plan.request.runtime ? { runtime: plan.request.runtime } : {}),
     ...(plan.request.profile ? { profile: plan.request.profile } : {}),
     ...(plan.request.environment ? { environment: plan.request.environment } : {}),
     ...(plan.request.environmentSandboxAllocation

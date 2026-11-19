@@ -93,6 +93,9 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  // The flat list's rows draw the shared `RowChevron`, whose directional glyph
+  // reads `I18nManager.isRTL` on every render.
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   View: 'View',
   Pressable: 'Pressable',
@@ -101,9 +104,17 @@ vi.mock('react-native', () => ({
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
-vi.mock('@/components/ui/icons', () => ({ BellOff: 'BellOff' }));
+vi.mock('@/components/ui/icons', () => ({
+  // The flat row's trailing chevron is the shared directional glyph.
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  BellOff: 'BellOff',
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));

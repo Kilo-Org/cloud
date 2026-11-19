@@ -19,7 +19,6 @@ const USER_ID = 'user-1';
 // cloud-agent-next-router.test.ts does so the router module loads without
 // network, PostHog, or R2 clients.
 jest.mock('@kilocode/web-shared/lib/tokens', () => ({
-  generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
   generateInternalServiceToken: jest.fn(),
   TOKEN_EXPIRY: 60,
 }));

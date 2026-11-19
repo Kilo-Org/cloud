@@ -137,6 +137,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
             repoFullName: input.repoFullName,
             commands: input.commands,
             sandboxAllocation: input.sandboxAllocation,
+            egressMode: input.egressMode,
           }),
       },
       provider: createBuilderProvider({

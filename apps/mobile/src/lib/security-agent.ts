@@ -81,8 +81,6 @@ export function isMissingBatchProcedureError(error: unknown): boolean {
   );
 }
 
-// Splits the tracked ids into the server-bounded batch slice (first 100) and
-// the per-command overflow (the rest).
 export function splitTrackedCommandIds(trackedIds: readonly string[]) {
   return {
     batchIds: trackedIds.slice(0, BATCH_COMMAND_LIMIT),

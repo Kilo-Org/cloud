@@ -31,7 +31,8 @@ type RowProps = {
   busy?: boolean;
   multi?: boolean;
   disabled?: boolean;
-  onPress?: () => void;
+  onPress?: (() => void) | (() => boolean);
+  testID?: string;
   children?: ReactNode;
 };
 
@@ -62,6 +63,14 @@ afterEach(() => {
 });
 
 describe('ChoiceRow accessible name', () => {
+  it('takes the contract row anatomy', () => {
+    const classes = String(
+      rowControl(renderRow({ label: 'Balanced', selected: false })).props.className
+    ).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+  });
+
   it('names a row after its label alone when it has no caption', () => {
     const control = rowControl(renderRow({ label: 'Balanced', selected: false }));
 
@@ -146,6 +155,27 @@ describe('ChoiceRow selection haptic', () => {
 
     expect(onPress).toHaveBeenCalledOnce();
   });
+
+  // A press that the screen refuses — a save in flight, a locked scope — must
+  // not announce a choice that did not happen.
+  it('ticks only when the caller accepts the press', () => {
+    const accepted = rowControl(
+      renderRow({ label: 'Balanced', selected: false, onPress: () => true })
+    );
+    act(() => {
+      (accepted.props.onPress as () => void)();
+    });
+    expect(Haptics.selectionAsync).toHaveBeenCalledOnce();
+
+    vi.mocked(Haptics.selectionAsync).mockReset();
+    const refused = rowControl(
+      renderRow({ label: 'Balanced', selected: false, onPress: () => false })
+    );
+    act(() => {
+      (refused.props.onPress as () => void)();
+    });
+    expect(Haptics.selectionAsync).not.toHaveBeenCalled();
+  });
 });
 
 describe('ChoiceRow disabled cue', () => {
@@ -194,5 +224,15 @@ describe('ChoiceRow touch target', () => {
       expect(String(control.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
       expect(control.props.hitSlop).toBeUndefined();
     }
+  });
+});
+
+describe('ChoiceRow test handle', () => {
+  it("puts the caller's testID on the row control", () => {
+    const control = rowControl(
+      renderRow({ label: 'Balanced', selected: true, testID: 'choice-1' })
+    );
+
+    expect(control.props.testID).toBe('choice-1');
   });
 });

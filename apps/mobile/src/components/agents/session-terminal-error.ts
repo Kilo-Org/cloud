@@ -144,6 +144,7 @@ const DELIVERY_FAILED_INDICATORS = new Set([
  */
 const STATUS_COPY_KEY_BY_CODE = {
   'agent-connection-lost': 'agentChat.sessionConnection.connectionLost',
+  'agent-connection-reconnecting': 'agentChat.sessionConnection.reconnecting',
   'session-stopped': 'agentChat.session.stopped',
   'setting-up-environment': 'agentChat.composer.preparingPlaceholder',
   'wrapping-up': 'agentChat.composer.finalizingPlaceholder',

@@ -1,6 +1,7 @@
 import type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
 import type { RuntimeSkillInput } from './runtime-profile.js';
+import { findReservedEnvVarName } from './runtime-environment.js';
 
 export type { WorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
 
@@ -348,6 +349,7 @@ export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSe
 
   const materialized = value.materialized;
   if (!isRecord(materialized) || !isRecord(materialized.env)) return false;
+  if (findReservedEnvVarName(Object.keys(materialized.env)) !== undefined) return false;
 
   if (
     value.runtimeCredentialProxy !== undefined &&

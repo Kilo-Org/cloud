@@ -12,6 +12,7 @@ import {
   type CloudAgentPrWatch,
 } from '@kilocode/db/schema';
 import {
+  beginCloudAgentWorktreeDeletionSchema,
   cloudAgentWorktreeDeletionManifestSchema,
   cloudAgentWorktreeDeletionSchema,
   WORKTREE_MEMBERSHIP_CHANGED,
@@ -2007,16 +2008,22 @@ describe('worktree deletion contract', () => {
   it('exports the membership-changed code and accepts the sole-session precondition', () => {
     expect(WORKTREE_MEMBERSHIP_CHANGED).toBe('worktree_membership_changed');
     expect(
-      cloudAgentWorktreeDeletionSchema.parse({
+      beginCloudAgentWorktreeDeletionSchema.parse({
         ...params,
         onlyIfSoleSessionId: kiloId(0),
       })
     ).toEqual({ ...params, onlyIfSoleSessionId: kiloId(0) });
     expect(() =>
-      cloudAgentWorktreeDeletionSchema.parse({
+      beginCloudAgentWorktreeDeletionSchema.parse({
         ...params,
         onlyIfSoleSessionId: 'not-a-session-id',
       })
+    ).toThrow();
+    expect(cloudAgentWorktreeDeletionSchema.parse({ ...params })).toEqual({ ...params });
+    // The precondition belongs to begin alone; the other deletion operations
+    // must not accept it, so a caller cannot believe it fenced their call.
+    expect(() =>
+      cloudAgentWorktreeDeletionSchema.parse({ ...params, onlyIfSoleSessionId: kiloId(0) })
     ).toThrow();
   });
 });

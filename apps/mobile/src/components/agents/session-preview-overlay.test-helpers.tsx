@@ -184,6 +184,7 @@ vi.mock('@/components/ui/text', async () => {
 });
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   Lock: 'Lock',
   MessageCircle: 'MessageCircle',
@@ -193,6 +194,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#999999',
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#666666' }),
 }));
 

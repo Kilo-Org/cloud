@@ -19,6 +19,7 @@ import { cn, firstNonEmpty } from '@/lib/utils';
 import { type MemberRemovalFailure, removalRefusalMessage } from './member-removal-feedback';
 import { assignableMemberRoles } from './organization-role-options';
 import { OrganizationPlanRefusal } from './plan-refusal';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type SurfaceAttempt } from '@/lib/surface-feedback';
 
 type MemberRowProps = {
@@ -39,8 +40,6 @@ type MemberRowProps = {
   onRemovalStarted?: (memberId: string) => SurfaceAttempt<MemberRemovalFailure> | null;
   /** Retires this member's shown removal refusal; the row calls it when a newer action supersedes it. */
   onRemovalCleared?: (memberId: string) => void;
-  /** Suppress bottom divider on the last row of a group. */
-  last?: boolean;
 };
 
 const ROLE_LABEL_KEYS = {
@@ -65,7 +64,6 @@ export function MemberRow({
   removalFailure = null,
   onRemovalStarted,
   onRemovalCleared,
-  last,
 }: Readonly<MemberRowProps>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -235,17 +233,12 @@ export function MemberRow({
   }
 
   const inner = (
-    <View
-      className={cn(
-        'flex-row items-center justify-between gap-3 py-3',
-        !last && 'border-b-[0.5px] border-hair-soft'
-      )}
-    >
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3 px-4 py-3')}>
       <View className="min-w-0 flex-1">
         <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
           {displayName}
         </Text>
-        <Text className="mt-0.5 text-xs text-muted-foreground" numberOfLines={1}>
+        <Text variant="caption" className="mt-0.5" numberOfLines={1}>
           {member.email}
         </Text>
       </View>
@@ -253,14 +246,14 @@ export function MemberRow({
         {/* `font-semibold`, not the medium the small chips use elsewhere: the
             Android Arabic fallback ships Regular and Bold only, so a 500 label
             paints Regular for Arabic while the Latin label gets Roboto Medium,
-            and at 11px that reads as a faded chip. 600 resolves to Noto Naskh
-            Arabic Bold, so both scripts carry the same ink. */}
+            and at the caption size that reads as a faded chip. 600 resolves to
+            Noto Naskh Arabic Bold, so both scripts carry the same ink. */}
         <View className="rounded-full bg-muted px-2 py-0.5">
-          <Text className="text-[11px] font-semibold text-muted-foreground">
+          <Text variant="caption" className="font-semibold">
             {roleLabel(member.role)}
           </Text>
         </View>
-        {spendLine !== null && <Text className="text-xs text-muted-foreground">{spendLine}</Text>}
+        {spendLine !== null && <Text variant="caption">{spendLine}</Text>}
       </View>
     </View>
   );
@@ -273,7 +266,7 @@ export function MemberRow({
   // opens the menu.
   if (actionOptions.length === 0) {
     return (
-      <View className="px-3">
+      <View>
         {inner}
         {refusal}
         {dialog}
@@ -296,7 +289,7 @@ export function MemberRow({
             ? t('organization.members.manageA11y', { name: displayName })
             : [t('organization.members.manageA11y', { name: displayName }), member.email].join(', ')
         }
-        className="px-3 active:opacity-70"
+        className="active:opacity-70"
       >
         {inner}
         {refusal}

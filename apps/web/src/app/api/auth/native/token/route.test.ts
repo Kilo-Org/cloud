@@ -92,6 +92,7 @@ import {
   createDeviceSession,
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
+  createDeviceSessionWithCredentials,
   revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
 import {
@@ -125,6 +126,7 @@ const mockPersistAttestedKey = jest.mocked(persistAttestedKey);
 const mockCreateDeviceSession = jest.mocked(createDeviceSession);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
+const mockCreateDeviceSessionWithCredentials = jest.mocked(createDeviceSessionWithCredentials);
 const mockIsNativeTokenAddressRateLimited = jest.mocked(isNativeTokenAddressRateLimited);
 const mockIsNativeTokenUserRateLimited = jest.mocked(isNativeTokenUserRateLimited);
 const mockRevokeDeviceSession = jest.mocked(revokeDeviceSession);
@@ -179,6 +181,12 @@ describe('POST /api/auth/native/token', () => {
     mockCreateDeviceSessionWithAttestedKey.mockResolvedValue({
       token: 'short-jwt',
       refreshToken: 'refresh-xyz',
+      expiresIn: 3600,
+      sessionId: 'session-1',
+    });
+    mockCreateDeviceSessionWithCredentials.mockResolvedValue({
+      token: 'session-jwt',
+      refreshToken: 'session-refresh',
       expiresIn: 3600,
       sessionId: 'session-1',
     });
@@ -352,6 +360,40 @@ describe('POST /api/auth/native/token', () => {
       expect(response.status).toBe(503);
       expect(await response.json()).toEqual({ error: 'NONCE_STORE_UNAVAILABLE' });
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('revokes the minted session when the token cannot be generated', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('mint failed');
+      });
+
+      await expect(
+        POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }))
+      ).rejects.toThrow('mint failed');
+
+      expect(mockCreateDeviceSession).toHaveBeenCalledTimes(1);
+      expect(mockRevokeDeviceSession).toHaveBeenCalledWith('session-1', 'sign_in_not_completed');
+    });
+
+    it('propagates the original error when the cleanup revoke fails', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('mint failed');
+      });
+      mockRevokeDeviceSession.mockRejectedValueOnce(new Error('revoke failed'));
+
+      await expect(
+        POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }))
+      ).rejects.toThrow('mint failed');
+
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_session_cleanup_failed');
     });
   });
 
@@ -790,6 +832,19 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(403);
       expect(mockReleaseSignInCode).toHaveBeenCalled();
+    });
+
+    it('keeps the refusal when releasing the reservation fails', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'BLOCKED' } as never);
+      mockReleaseSignInCode.mockRejectedValueOnce(new Error('release failed'));
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'BLOCKED' });
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_reservation_release_failed');
     });
 
     it('returns 403 SIGNUP-STEP-UP with the methods and releases the reservation', async () => {
@@ -1974,10 +2029,11 @@ describe('POST /api/auth/native/token', () => {
       });
       mockFindUserById.mockResolvedValue(fakeUser);
       mockCreateDeviceSession.mockResolvedValue('device-session-1');
-      mockIssueSessionCredentials.mockResolvedValue({
+      mockCreateDeviceSessionWithCredentials.mockResolvedValue({
         token: 'session-jwt',
         refreshToken: 'session-refresh',
         expiresIn: 3600,
+        sessionId: 'device-session-1',
       });
     });
 
@@ -1993,11 +2049,13 @@ describe('POST /api/auth/native/token', () => {
       });
       expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1');
       expect(mockFindUserById).toHaveBeenCalledWith(fakeUser.id);
-      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+      expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
         userId: fakeUser.id,
         userAgent: undefined,
+        user: fakeUser,
       });
-      expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'device-session-1');
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       // The ticket is the identity proof: no account settlement.
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
       expect(mockPersistAttestedKey).not.toHaveBeenCalled();
@@ -2007,6 +2065,7 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).not.toHaveBeenCalled();
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
     });
 
     it('mints a legacy long-lived token when the client does not support refresh', async () => {
@@ -2034,8 +2093,8 @@ describe('POST /api/auth/native/token', () => {
 
       expect(replayed.status).toBe(401);
       expect(await replayed.json()).toEqual({ error: 'INVALID_TICKET' });
-      expect(mockCreateDeviceSession).toHaveBeenCalledTimes(1);
-      expect(mockIssueSessionCredentials).toHaveBeenCalledTimes(1);
+      expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledTimes(1);
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
 
@@ -2096,6 +2155,31 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCheckDomainSignInEligibility).toHaveBeenCalledWith(fakeUser.google_user_email);
       expect(mockCreateDeviceSession).not.toHaveBeenCalled();
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('propagates a failed credential transaction with no session left to revoke', async () => {
+      mockCreateDeviceSessionWithCredentials.mockRejectedValueOnce(new Error('create failed'));
+
+      await expect(POST(createRequest({ ...ticketBody, supportsRefresh: true }))).rejects.toThrow(
+        'create failed'
+      );
+
+      // The session and its credentials commit together, so a create that fails
+      // persisted nothing for the cleanup path to revoke.
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+    });
+
+    it('surfaces the credential transaction error even when a cleanup revoke would fail', async () => {
+      mockCreateDeviceSessionWithCredentials.mockRejectedValueOnce(new Error('create failed'));
+      mockRevokeDeviceSession.mockRejectedValueOnce(new Error('revoke failed'));
+
+      await expect(POST(createRequest({ ...ticketBody, supportsRefresh: true }))).rejects.toThrow(
+        'create failed'
+      );
+
+      expect(mockRevokeDeviceSession).not.toHaveBeenCalled();
+      expect(mockCaptureMessage).not.toHaveBeenCalledWith('native_token_session_cleanup_failed');
     });
 
     it('requires a ticket', async () => {

@@ -4,7 +4,7 @@ import { TestRenderer } from '@/test/renderer';
 
 import { NewSessionProfileRow } from './new-session-environment-row';
 
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 
 import { i18n } from '@/i18n';
 
@@ -44,7 +44,7 @@ const EMPTY_PROFILE = {
   agentCount: 0,
 };
 
-const CARD_CHROME = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5`;
+const CARD_CHROME = FIELD_TRIGGER_FRAME_CLASS;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 

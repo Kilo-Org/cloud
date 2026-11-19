@@ -16,7 +16,7 @@ import {
   onlineHost,
   readySession,
   summary,
-} from './native-remote-test-helpers';
+} from './native-remote.test-helpers';
 
 const mocks = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));

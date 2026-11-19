@@ -16,7 +16,7 @@ catalog:
   # Workers-compatible JSON Schema validator for the kilo-mcp call tool.
   # AJV cannot run on Workerd: it compiles schemas with `new Function`, which
   # the Workers runtime forbids. Pinned exactly.
-  '@cfworker/json-schema': 4.1.1
+  '@cfworker/json-schema': 4.1.6
   '@octokit/auth-app': 8.2.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
@@ -31,6 +31,8 @@ catalog:
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260707.2
+  # vitest 4, for the workspaces that cannot run vitest 5; the `catalogs.vitest5`
+  # note below says which workspaces stay here and why.
   '@vitest/coverage-v8': 4.1.12
   '@vitest/ui': 4.1.12
   '@workos-inc/node': 12.2.0
@@ -39,7 +41,7 @@ catalog:
   drizzle-kit: 0.31.11
   drizzle-orm: 0.45.4
   hono: 4.13.16
-  jose: 6.2.12
+  jose: 6.2.17
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
   # apps/web builds its CSS with this and the workspace override below forces one
@@ -54,16 +56,21 @@ catalog:
   # its own instead of a second pin here.
   typescript: 7.0.2
   ulid: 3.0.2
+  # vitest 4; the `catalogs.vitest5` note below says which workspaces take
+  # `catalog:vitest5` instead.
   vitest: 4.1.12
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
   zod: 4.6.7
 
 catalogs:
-  # Active test stack: vitest 5 plus its companions at the same version.
-  # Workspaces still on the default `catalog:` entries above at vitest 4 are the
-  # ones that test through `@cloudflare/vitest-pool-workers` (it peers only
-  # `^4.1.0`, so vitest 5 breaks its pool) and the excluded features.
+  # Active test stack: vitest 5 plus its companions at the same version. Take it
+  # with `catalog:vitest5`.
+  # Two kinds of workspace still read the default `catalog:` pins at vitest 4:
+  # the suites whose config loads `cloudflareTest` from
+  # @cloudflare/vitest-pool-workers, which peers only `^4.1.0` and so cannot run
+  # vitest 5; and the excluded-feature and node-environment workspaces that have
+  # not moved, where nothing in the config needs vitest 4.
   vitest5:
     '@vitest/coverage-v8': 5.1.0
     '@vitest/ui': 5.1.0
@@ -208,6 +215,10 @@ overrides:
   # future dependent, bounded to the reviewed major.
   serialize-javascript: '>=7.0.3 <8'
   hono: 'catalog:'
+  # openclaw depends on @modelcontextprotocol/sdk 1.29.0 exactly, and
+  # @google/genai then peers onto that copy; lift both onto the 1.32.2 that
+  # apps/extension and packages/harness-sdk pin so the tree keeps one MCP
+  # server. Drop the entry when openclaw's own range admits 1.32.2.
   '@modelcontextprotocol/sdk@1.29.0': 1.32.2
   # @simplewebauthn/server's ASN.1 parser must come from the same
   # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
@@ -224,14 +235,25 @@ overrides:
   # no release for the advisories fixed in 6.24.0-6.28.1, so it moves to the
   # same 6.x copy as above, which also drops its @fastify/busboy dependency.
   undici@^5: 6.29.1
-  # Further vercel CLI transitives with exact vulnerable pins: @vercel/fun,
-  # @vercel/python-analysis and @vercel/backends respectively (ajv also via
-  # @vercel/static-config).
+  # Exact pins for vulnerable transitive ranges. Each range key covers every
+  # dependent that asks that range, so the list under it names the ones present
+  # today; a parent bump shows which pin to re-check. The @vercel/* parents are
+  # the CLI transitives this group was opened for.
+  #   @tootallnate/once@^2 — @vercel/fun
+  #   nanoid@^3 — eas-cli, expo-router, postcss
+  #   minimatch@^5 — eas-cli, filelist, readdir-glob
+  #   ajv@^8 — @modelcontextprotocol/sdk, @segment/ajv-human-errors,
+  #     @vercel/static-config, addons-linter, ajv-formats, ajv-keywords,
+  #     eas-cli, schema-utils
+  #   minimatch@^10 — @expo/fingerprint, @oclif/core,
+  #     @typescript-eslint/typescript-estree, @vercel/python-analysis,
+  #     @vercel/queue, glob, openclaw, test-exclude
   '@tootallnate/once@^2': 2.0.1
   minimatch@^5: 5.1.9
   nanoid@^3: 3.3.20
   ajv@^8: 8.20.0
   minimatch@^10: 10.2.6
+  # Parent-scoped because only @vercel/backends needs this fix.
   '@vercel/backends>srvx': 0.11.22
   # zod 4 below 4.6.6 grows issue lists without bound on oversized arrays.
   # Exact pins in @kilocode/plugin and the vercel CLI follow the catalog instead.
@@ -317,6 +339,7 @@ patchedDependencies:
   # A sheet whose content clears the status bar itself can say so, and then
   # Material3 stops reserving that inset: a dialog window reports it only after
   # the sheet was measured, which used to move the sheet's whole content.
+  # The version in the key must equal the `'@expo/ui'` override above.
   '@expo/ui@58.0.28': patches/@expo+ui@58.0.28.patch
   expo-dev-launcher@58.0.20: patches/expo-dev-launcher@58.0.20.patch
   # A zero badge count must not cancel every app notification: upstream called
@@ -393,10 +416,9 @@ patchedDependencies:
   react-native-screens@4.30.1: patches/react-native-screens@4.30.1.patch
   # React Native installs on-device JSI bindings through its TurboModule runtime hook.
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
+  # The version in the key must equal the `stripe` catalog pin above.
   stripe@23.0.0: patches/stripe@23.0.0.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
-  # Keep lease renewal errors categorical; neither runtime may log receipt handles.
-  '@vercel/queue@0.8.0': patches/@vercel+queue@0.8.0.patch
   # Give the Apple @ExpoModule class scan 60 s instead of the hard-coded 5 s.
   # Slow macOS CI runners exceed 5 s; the configure phase then leaves modules
   # out of the modules provider and the iOS build fails. Keep src/ and build/
@@ -417,6 +439,11 @@ patchedDependencies:
   # longer re-enter each other until React's nested update limit. Remove once an
   # upstream release carries every guard.
   '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
+  # NativeWind's `react-native` proxy names only the exports its wrapper components
+  # need; every other export, such as the `AssetRegistry` that expo-asset reads, was
+  # `undefined`, which breaks the whole module that imports it. Forward the rest from
+  # the real module. Remove once upstream forwards them itself.
+  react-native-css@3.1.0-rc.1: patches/react-native-css@3.1.0-rc.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

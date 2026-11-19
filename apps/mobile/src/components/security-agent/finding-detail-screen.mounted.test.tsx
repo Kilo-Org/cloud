@@ -215,7 +215,9 @@ function mountedViewSwitch() {
 
 /** Pick one of the screen's views the way a press on the control does. */
 function selectView(view: string): void {
-  act(mountedViewSwitch().onChange(view));
+  act(() => {
+    mountedViewSwitch().onChange(view);
+  });
 }
 
 beforeEach(() => {

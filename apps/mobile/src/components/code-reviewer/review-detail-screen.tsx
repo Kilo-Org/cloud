@@ -347,11 +347,12 @@ export function ReviewDetailScreen({
               shared one: the gate's check run and the council's votes above
               stand at this same pitch. */}
           <RowGroup>
+            <KvRow label={t('common.branch')} value={`${review.head_ref} → ${review.base_ref}`} />
             <KvRow
-              label={t('common.branch')}
-              value={`${review.head_ref} → ${review.base_ref}`}
+              label={t('common.platform')}
+              value={reviewerPlatformLabel(review.platform)}
+              valueFace="text"
             />
-            <KvRow label={t('common.platform')} value={reviewerPlatformLabel(review.platform)} valueFace="text" />
             {review.model ? <KvRow label={t('common.model')} value={review.model} /> : null}
             <KvRow
               label={t('codeReviewer.reviewDetail.created')}

@@ -1,7 +1,9 @@
 import {
   count,
   max,
+  min,
   eq,
+  or,
   and,
   gt,
   gte,
@@ -42,10 +44,10 @@ const storedEventRowSchema = z.object({
 
 // v1 rows store `message.updated` with `info`; native v2 rows store
 // `conversation.message.updated` with the native `message` and row-level identity.
-const assistantRowSql = (payload = 'payload') =>
+const assistantRowSql = (payload: string) =>
   `json_extract(${payload}, '$.event') IN ('message.updated', 'conversation.message.updated')
   AND COALESCE(json_extract(${payload}, '$.properties.info.role'), json_extract(${payload}, '$.properties.message.type')) = 'assistant'`;
-const messageFieldSql = (v1: string, v2: string, payload = 'payload') =>
+const messageFieldSql = (v1: string, v2: string, payload: string) =>
   `COALESCE(json_extract(${payload}, '$.properties.info.${v1}'), json_extract(${payload}, '$.properties.${v2}'))`;
 
 const conversationMessagePayloadSchema = z.object({
@@ -281,6 +283,47 @@ export function prefixUpperBound(prefix: string): string | null {
 }
 
 export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStorage) {
+  /**
+   * Root assistant rows of the Cloud turn that `promptMessageId` started. Kilo
+   * parents each assistant message to the last user or synthetic message before
+   * it, so a mid-turn instruction becomes the parent of later replies, including
+   * the final answer. The turn starts at its first stored row (the prompt or a
+   * reply to it) and includes every later root assistant row, so read it when
+   * the turn settles, before a later turn starts.
+   */
+  function turnAssistantRows(sessionId: string, kiloSessionId: string, promptMessageId: string) {
+    const starts = alias(events, 'turn_starts');
+    const startPayload = '"turn_starts"."payload"';
+    const turnStart = db
+      .select({ id: min(starts.id) })
+      .from(starts)
+      .where(
+        and(
+          eq(starts.session_id, sessionId),
+          eq(starts.stream_event_type, 'kilocode'),
+          gte(starts.entity_id, 'message/'),
+          lt(starts.entity_id, 'message0'),
+          eq(sql.raw(messageFieldSql('sessionID', 'sessionID', startPayload)), kiloSessionId),
+          or(
+            eq(starts.entity_id, `message/${promptMessageId}`),
+            and(
+              sql.raw(assistantRowSql(startPayload)),
+              eq(sql.raw(messageFieldSql('parentID', 'parentID', startPayload)), promptMessageId)
+            )
+          )
+        )
+      );
+    return and(
+      eq(events.session_id, sessionId),
+      eq(events.stream_event_type, 'kilocode'),
+      gte(events.entity_id, 'message/'),
+      lt(events.entity_id, 'message0'),
+      sql.raw(assistantRowSql('"events"."payload"')),
+      eq(sql.raw(messageFieldSql('sessionID', 'sessionID', '"events"."payload"')), kiloSessionId),
+      gte(events.id, sql`(${turnStart})`)
+    );
+  }
+
   return {
     insert(params: InsertEventParams): EventId {
       const row = db
@@ -404,33 +447,19 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
         .all() satisfies StoredEvent[];
     },
 
+    /** The last root assistant message of the turn, its final answer. */
     getAssistantAnswerForUserMessage(
       sessionId: string,
       kiloSessionId: string,
-      parentMessageId: string
+      promptMessageId: string
     ): AssistantAnswer | null {
-      const messageRow = parseStoredEventRow(
-        rawSql
-          .exec(
-            `
-            SELECT id, execution_id, session_id, stream_event_type, payload, timestamp
-            FROM events
-            WHERE session_id = ?
-              AND stream_event_type = 'kilocode'
-              AND entity_id IS NOT NULL
-              AND substr(entity_id, 1, 8) = 'message/'
-              AND ${assistantRowSql()}
-              AND ${messageFieldSql('sessionID', 'sessionID')} = ?
-              AND ${messageFieldSql('parentID', 'parentID')} = ?
-            ORDER BY id DESC
-            LIMIT 1
-            `,
-            sessionId,
-            kiloSessionId,
-            parentMessageId
-          )
-          .toArray()[0]
-      );
+      const messageRow = db
+        .select()
+        .from(events)
+        .where(turnAssistantRows(sessionId, kiloSessionId, promptMessageId))
+        .orderBy(desc(events.id))
+        .limit(1)
+        .get();
       if (!messageRow) return null;
 
       return readAssistantAnswer(sessionId, rawSql, messageRow);
@@ -439,7 +468,7 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
     getRecentAssistantAnswersForUserMessage(
       sessionId: string,
       kiloSessionId: string,
-      parentMessageId: string
+      promptMessageId: string
     ): AssistantAnswer[] {
       const removals = alias(events, 'message_removals');
       const rows = db
@@ -447,19 +476,7 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
         .from(events)
         .where(
           and(
-            eq(events.session_id, sessionId),
-            eq(events.stream_event_type, 'kilocode'),
-            gte(events.entity_id, 'message/'),
-            lt(events.entity_id, 'message0'),
-            sql.raw(assistantRowSql('"events"."payload"')),
-            eq(
-              sql.raw(messageFieldSql('sessionID', 'sessionID', '"events"."payload"')),
-              kiloSessionId
-            ),
-            eq(
-              sql.raw(messageFieldSql('parentID', 'parentID', '"events"."payload"')),
-              parentMessageId
-            ),
+            turnAssistantRows(sessionId, kiloSessionId, promptMessageId),
             notExists(
               db
                 .select({ id: removals.id })

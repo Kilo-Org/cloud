@@ -104,6 +104,35 @@ it.each([
   ).toEqual([{ text: 'Earlier activity', tools: [] }, answer]);
 });
 
+it('answers with the last assistant message after a mid-turn synthetic message', async () => {
+  const { queries, publish } = await fixture();
+  const conversationMessage = (message: Record<string, unknown>) => ({
+    type: 'conversation.message.updated',
+    properties: { sessionID: kiloSessionId, source, message },
+  });
+  publish(
+    conversationMessage({ id: userMessageId, type: 'user', time: { created: 1 }, text: 'Go' })
+  );
+  publish(assistantUpdate('msg_assistant_1', 'Start Docker in the background.', userMessageId));
+  publish(
+    conversationMessage({
+      id: 'msg_synthetic',
+      type: 'synthetic',
+      time: { created: 2 },
+      text: 'Background task finished.',
+    })
+  );
+  publish(assistantUpdate('msg_assistant_2', 'Final answer', 'msg_synthetic'));
+
+  const answer = { text: 'Final answer', tools: [] };
+  expect(queries.getAssistantAnswerForUserMessage(sessionId, kiloSessionId, userMessageId)).toEqual(
+    answer
+  );
+  expect(
+    queries.getRecentAssistantAnswersForUserMessage(sessionId, kiloSessionId, userMessageId)
+  ).toEqual([{ text: 'Start Docker in the background.', tools: [] }, answer]);
+});
+
 it('does not inherit a callback parent from another Kilo session', async () => {
   const { queries, publish } = await fixture();
   const entityId = 'message/msg_assistant_2';

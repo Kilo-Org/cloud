@@ -44,7 +44,7 @@ import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/pr
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getOpenRouterModelsMetadataFromDatabase,
-  getOpenRouterSystemOneModelsFromDatabase,
+  getOpenRouterSystemOneModelIdsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -97,7 +97,7 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getCachedVercelInferenceProviderIdsForModel: jest.fn(),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
-  getOpenRouterSystemOneModelsFromDatabase: jest.fn(),
+  getOpenRouterSystemOneModelIdsFromDatabase: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
@@ -395,7 +395,7 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
     jest
-      .mocked(getOpenRouterSystemOneModelsFromDatabase)
+      .mocked(getOpenRouterSystemOneModelIdsFromDatabase)
       .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(pricedSystemOneModels);
     jest.mocked(getCachedVercelInferenceProviderIdsForModel).mockResolvedValue(null);
@@ -907,7 +907,7 @@ describe('handleSystemOneRequest', () => {
   );
 
   it('answers 503 when the catalog has no metadata for the model', async () => {
-    jest.mocked(getOpenRouterSystemOneModelsFromDatabase).mockResolvedValue(new Set());
+    jest.mocked(getOpenRouterSystemOneModelIdsFromDatabase).mockResolvedValue(new Set());
 
     const response = await handleSystemOneRequest(
       makeRequest({ ...requestBody, model: 'vendor/unlisted-decide' })

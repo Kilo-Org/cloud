@@ -669,7 +669,7 @@
     },
     "instructions": {
       "title": "カスタム指示",
-      "deprecation": "カスタム指示は廃止予定です。これらのガイドラインをリポジトリ内のREVIEW.mdファイルに移動してください。",
+      "deprecation": "カスタム指示は削除されます。これらのガイドラインをリポジトリ内のREVIEW.mdファイルに移動してください。",
       "placeholder": "例：エラー処理の規則に従っているか確認…",
       "clearTitle": "カスタム指示を削除しますか？",
       "clearMessage": "空のフィールドを保存すると、このレビュアーに保存されているカスタム指示が削除されます。"
@@ -700,6 +700,7 @@
       "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
       "description": "{{organization}}用のワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "descriptionReconnect": "{{organization}}用の新しいワークスペースアクセストークンを作成し、下に貼り付けてください。",
+      "descriptionOverview": "{{organization}}用のワークスペースアクセストークンを作成し、次の画面で貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
       "tokenPlaceholder": "ワークスペースアクセストークン",
       "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"
@@ -2629,6 +2630,8 @@
     "retryHint": "Kilo Passの状態の取得を再試行します。",
     "endedOn": "{{date}}に終了しました",
     "notAvailableInApp": "Kilo Passはアプリでは利用できません。",
+    "notAvailableTitle": "Kilo Passはアプリでは提供されていません",
+    "noPassDescription": "このアカウントにはKilo Passがありません。",
     "statusActive": "有効",
     "statusTrialing": "トライアル中",
     "statusPastDue": "支払い延滞",
@@ -3238,6 +3241,9 @@
     },
     "tabs": {
       "discussion": "ディスカッション",
+      "discussionAccessibility": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_one": "{{title}}：1件のコメント",
       "files": "ファイル",
       "overview": "概要"
     },
@@ -3470,7 +3476,7 @@
       "retentionLimit": "最新の請求書を表示しています。"
     },
     "lowBalanceAlert": {
-      "enableA11y": "残高アラートを有効にする",
+      "subtitle": "この組織の残高が設定した金額を下回ったときに、指定したメールアドレスにアラートを送信します。",
       "notifyEmailsLabel": "通知先メールアドレス",
       "permissionDenied": "請求アラートを管理する権限がありません。",
       "separateEmailsHint": "複数のメールアドレスはカンマで区切ってください。",
@@ -3776,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "このモデルにはインターネット接続が必要です。接続して再試行するか、このデバイス上のモデルに切り替えてください。",
+    "connectionLost": "モデルとの接続が切れました。接続を確認して、もう一度お試しください。",
     "empty": {
       "title": "チャットを開始",
       "description": "モデルと話すにはメッセージを送信してください。"
@@ -4533,6 +4540,7 @@
     "empty": "このブリーフ期間中のアクティビティはありません",
     "emptyHint": "スケジュールされたブリーフにアクティビティがあると、クラウドとCLIのコーディングセッションがここに表示されます。",
     "loadError": "ブリーフィングを読み込めませんでした",
+    "estimateLoadError": "推定を読み込めませんでした。",
     "view": "ブリーフィングを読む",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}、$t(agentBriefing.snapshotPullRequests) {{pullRequests}}、$t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4938,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "エンタープライズ機能",
-    "enterpriseOnly": "これはエンタープライズ限定の機能です。",
+    "enterpriseOnly": "プロバイダーとモデルは Enterprise プランで利用できます。",
     "readOnly": "これらの設定を変更できるのは組織の所有者と管理者のみです。",
     "loadError": "プロバイダーとモデルを読み込めませんでした",
     "tabModels": "モデル",

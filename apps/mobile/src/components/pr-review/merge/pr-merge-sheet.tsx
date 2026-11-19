@@ -51,7 +51,8 @@ type PrMergeSheetProps = Readonly<{
   initialMethod: PrMergeMethod;
   mode: 'merge' | 'enable-auto-merge';
   sheetTitle: string;
-  eyebrow: string;
+  /** The reference under the title; absent when the route names no request. */
+  eyebrow?: string;
   prRef?: ProviderPrRef;
   mergeState?: ProviderPrMergeState | null;
   autoMergeCapability?: ProviderReviewCapability;
@@ -160,7 +161,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     };
   }, []);
 
-  // Footer Cancel discards; header back passively dismisses and retains the draft.
+  // Footer Discard clears the draft; header back passively dismisses and retains it.
   function handleCancel() {
     clearMergeDraft();
     onDismiss();

@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Översikt",
       "files": "Filer",
-      "discussion": "Diskussion"
+      "discussion": "Diskussion",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentarer",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentarer"
     },
     "fileStatus": {
       "modified": "Ändrad",
@@ -1223,7 +1226,7 @@
     },
     "instructions": {
       "title": "Anpassade instruktioner",
-      "deprecation": "Funktionen för anpassade instruktioner ska fasas ut. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
+      "deprecation": "Funktionen för anpassade instruktioner kommer att tas bort. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
       "placeholder": "t.ex. följ våra regler för felhantering…",
       "clearTitle": "Ta bort anpassade instruktioner?",
       "clearMessage": "Om du sparar ett tomt fält tas de anpassade instruktioner som sparats för den här granskaren bort."
@@ -1389,6 +1392,7 @@
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "descriptionReconnect": "Skapa en ny åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
+      "descriptionOverview": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den på nästa skärm.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
       "tokenPlaceholder": "Åtkomsttoken för arbetsytan",
       "tokenRefused": "Bitbucket accepterade inte den här åtkomsttoken för arbetsytan. Kontrollera att den har behörigheterna ovan och försök igen."
@@ -1920,7 +1924,7 @@
       "githubAppSettings": "Inställningarna för GitHub-appen",
       "manageAccess": "Hantera GitHub-appens åtkomst",
       "noRepositories": "Inga kodarkiv",
-      "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv",
+      "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv.",
       "selectAtLeastOne": "Välj minst ett kodarkiv."
     },
     "scopeEntry": {
@@ -3183,6 +3187,8 @@
     "retryHint": "Försöker läsa in Kilo Pass-status igen.",
     "endedOn": "Avslutad {{date}}",
     "notAvailableInApp": "Kilo Pass är inte tillgängligt i appen.",
+    "notAvailableTitle": "Kilo Pass finns inte i appen",
+    "noPassDescription": "Det här kontot har inget Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Provperiod",
     "statusPastDue": "Betalning förfallen",
@@ -3465,7 +3471,7 @@
       "retentionLimit": "Visar de senaste fakturorna."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktivera varning för lågt saldo",
+      "subtitle": "Skicka en varning via e-post till de adresser du anger när organisationens saldo understiger det belopp du ställer in.",
       "notifyEmailsLabel": "E-postadresser för varningar",
       "permissionDenied": "Du har inte behörighet att hantera faktureringsvarningar.",
       "separateEmailsHint": "Separera flera e-postadresser med kommatecken.",
@@ -3776,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "Den här modellen kräver en internetanslutning. Anslut och försök igen, eller byt till en modell på den här enheten.",
+    "connectionLost": "Anslutningen till modellen bröts. Kontrollera anslutningen och försök igen.",
     "empty": {
       "title": "Starta en chatt",
       "description": "Skicka ett meddelande för att prata med en modell."
@@ -4533,6 +4540,7 @@
     "empty": "Ingen aktivitet under den här rapportperioden",
     "emptyHint": "Dina kodningssessioner i molnet och CLI visas här när en schemalagd rapport har aktivitet.",
     "loadError": "Det gick inte att läsa in rapporter",
+    "estimateLoadError": "Det gick inte att läsa in uppskattningen.",
     "view": "Läs rapport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4938,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Företagsfunktion",
-    "enterpriseOnly": "Det här är en funktion som endast är tillgänglig för företag.",
+    "enterpriseOnly": "Leverantörer och modeller är tillgängliga på Enterprise-planen.",
     "readOnly": "Endast organisationsägare och administratörer kan ändra dessa inställningar.",
     "loadError": "Leverantörer och modeller kunde inte läsas in",
     "tabModels": "Modeller",

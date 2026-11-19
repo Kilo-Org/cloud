@@ -19,6 +19,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { selectInvoiceErrorVariant } from '@/lib/organization-invoice-error-variant';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 
 /**
  * What the list reads from a scope's paged invoice query. The personal and the
@@ -110,6 +111,7 @@ export function InvoiceListScreen({
 }: InvoiceListScreenProps) {
   const { t } = useTranslation();
   const paddingBottom = useTabBarBottomPadding();
+  const sideInsetStyle = useSideInsetStyle();
   const committedConnectivity = useCommittedConnectivityStatus();
   // An invoice can appear without a screen change (a renewal charging while the
   // app is open), so both bodies offer the same pull over the read.
@@ -260,7 +262,9 @@ export function InvoiceListScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} subtitle={subtitle} backFallback={backFallback} />
-      {body}
+      <View className="flex-1" style={sideInsetStyle}>
+        {body}
+      </View>
     </View>
   );
 }

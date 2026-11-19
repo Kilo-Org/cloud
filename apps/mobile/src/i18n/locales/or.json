@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "ସାରାଂଶ",
       "files": "ଫାଇଲ୍",
-      "discussion": "ଆଲୋଚନା"
+      "discussion": "ଆଲୋଚନା",
+      "discussionAccessibility_one": "{{title}}: 1ଟି ମନ୍ତବ୍ୟ",
+      "discussionAccessibility": "{{title}}: {{displayCount}} ମନ୍ତବ୍ୟ",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} ମନ୍ତବ୍ୟ"
     },
     "fileStatus": {
       "modified": "ପରିବର୍ତ୍ତିତ",
@@ -1223,7 +1226,7 @@
     },
     "instructions": {
       "title": "ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ",
-      "deprecation": "ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ ସୁବିଧାର ବ୍ୟବହାର ବନ୍ଦ କରିବାକୁ ଯୋଜନା ଅଛି। ଏହା ବଦଳରେ ଏହି ନିର୍ଦ୍ଦେଶାବଳୀ ଆପଣଙ୍କ ରିପୋଜିଟୋରୀର ଏକ REVIEW.md ଫାଇଲ୍‌ରେ ରଖନ୍ତୁ।",
+      "deprecation": "ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ ସୁବିଧା ହଟାଯିବ। ଏହା ବଦଳରେ ଏହି ନିର୍ଦ୍ଦେଶାବଳୀ ଆପଣଙ୍କ ରିପୋଜିଟୋରୀର ଏକ REVIEW.md ଫାଇଲ୍‌ରେ ରଖନ୍ତୁ।",
       "placeholder": "ଉଦାହରଣ: ତ୍ରୁଟି ପରିଚାଳନା ପାଇଁ ଆମ ନିୟମ ମାନନ୍ତୁ…",
       "clearTitle": "ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ ହଟାଇବେ କି?",
       "clearMessage": "ଖାଲି କ୍ଷେତ୍ର ସଞ୍ଚୟ କଲେ ଏହି ସମୀକ୍ଷକ ପାଇଁ ସଂରକ୍ଷିତ ନିଜସ୍ୱ ନିର୍ଦ୍ଦେଶ ହଟିଯିବ।"
@@ -1389,6 +1392,7 @@
       "managedOnWeb": "{{organization}}ର Bitbucket ସଂଯୋଗ ଏକ କମ୍ପ୍ୟୁଟରରୁ ୱେବରେ ପରିଚାଳନା କରାଯାଏ।",
       "description": "{{organization}} ପାଇଁ ଏକ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ତଳେ ପେଷ୍ଟ କରନ୍ତୁ।",
       "descriptionReconnect": "{{organization}} ପାଇଁ ଏକ ନୂଆ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ତଳେ ପେଷ୍ଟ କରନ୍ତୁ।",
+      "descriptionOverview": "{{organization}} ପାଇଁ ଏକ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ପରବର୍ତ୍ତୀ ସ୍କ୍ରିନରେ ପେଷ୍ଟ କରନ୍ତୁ।",
       "scopes": "ଆକାଉଣ୍ଟ: ପଢ଼ିବା · ରିପୋଜିଟୋରୀ: ପଢ଼ିବା/ଲେଖିବା · ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ: ପଢ଼ିବା · ୱେବ୍‌ହୁକ୍: ପଢ଼ିବା/ଲେଖିବା",
       "tokenPlaceholder": "କାର୍ଯ୍ୟକ୍ଷେତ୍ରର ଆକ୍ସେସ୍ ଟୋକେନ୍",
       "tokenRefused": "Bitbucket ଏହି କାର୍ଯ୍ୟକ୍ଷେତ୍ର ଆକ୍ସେସ୍ ଟୋକେନ୍‌କୁ ଗ୍ରହଣ କରିନାହିଁ। ଏଥିରେ ଉପରେ ଦିଆଯାଇଥିବା ସ୍କୋପ୍‌ଗୁଡ଼ିକ ଅଛି କି ନାହିଁ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
@@ -3183,6 +3187,8 @@
     "retryHint": "Kilo Pass ର ସ୍ଥିତି ପୁଣି ଲୋଡ୍ କରେ।",
     "endedOn": "{{date}}ରେ ସମାପ୍ତ",
     "notAvailableInApp": "Kilo Pass ଆପ୍‌ରେ ଉପଲବ୍ଧ ନାହିଁ।",
+    "notAvailableTitle": "Kilo Pass ଆପ୍‌ରେ ନାହିଁ",
+    "noPassDescription": "ଏହି ଆକାଉଣ୍ଟରେ କୌଣସି Kilo Pass ନାହିଁ।",
     "statusActive": "ସକ୍ରିୟ",
     "statusTrialing": "ପରୀକ୍ଷାଧୀନ",
     "statusPastDue": "ଦେୟ ବିଳମ୍ବିତ",
@@ -3465,7 +3471,7 @@
       "retentionLimit": "ସର୍ବାଧିକ ନୂଆ ଇନଭଏସ୍ ଦେଖାଯାଉଛି।"
     },
     "lowBalanceAlert": {
-      "enableA11y": "କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କତା ଚାଲୁ କରନ୍ତୁ",
+      "subtitle": "ଏହି ସଂସ୍ଥାର ବ୍ୟାଲାନ୍ସ ଆପଣ ସେଟ୍ କରିଥିବା ରାଶିରୁ କମ୍ ହେଲେ ଆପଣ ତାଲିକାଭୁକ୍ତ କରିଥିବା ଠିକଣାଗୁଡ଼ିକୁ ଇମେଲ୍ ମାଧ୍ୟମରେ ସତର୍କତା ପଠାନ୍ତୁ।",
       "notifyEmailsLabel": "ସତର୍କତା ପାଇବା ପାଇଁ ଇମେଲ୍ ଠିକଣା",
       "permissionDenied": "ବିଲିଂ ସତର୍କତା ପରିଚାଳନା କରିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "separateEmailsHint": "ଏକାଧିକ ଇମେଲ୍ ଠିକଣା ମଧ୍ୟରେ କମା ଦିଅନ୍ତୁ।",
@@ -3776,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "ଏହି ମଡେଲ୍ ପାଇଁ ଇଣ୍ଟରନେଟ୍ ସଂଯୋଗ ଆବଶ୍ୟକ। ସଂଯୋଗ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ, କିମ୍ବା ଏହି ଡିଭାଇସରେ ଥିବା ଏକ ମଡେଲ୍‌କୁ ବଦଳାନ୍ତୁ।",
+    "connectionLost": "ମଡେଲ୍ ସହିତ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହୋଇଗଲା। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "empty": {
       "title": "ଏକ ଚାଟ୍ ଆରମ୍ଭ କରନ୍ତୁ",
       "description": "ଏକ ମଡେଲ୍ ସହିତ କଥା ହେବାକୁ ଏକ ସନ୍ଦେଶ ପଠାନ୍ତୁ।"
@@ -4533,6 +4540,7 @@
     "empty": "ଏହି ରିପୋର୍ଟ ଅବଧିରେ କୌଣସି କାର୍ଯ୍ୟକଳାପ ନାହିଁ",
     "emptyHint": "ଏକ ଅନୁସୂଚିତ ରିପୋର୍ଟରେ କାର୍ଯ୍ୟକଳାପ ଥିଲେ ଆପଣଙ୍କ କ୍ଲାଉଡ ଓ CLI କୋଡିଂ ସେସନ ଏଠାରେ ଦେଖାଯିବ।",
     "loadError": "ରିପୋର୍ଟ ଲୋଡ କରାଯାଇପାରିଲା ନାହିଁ",
+    "estimateLoadError": "ଆକଳନ ଲୋଡ କରାଯାଇପାରିଲା ନାହିଁ।",
     "view": "ରିପୋର୍ଟ ପଢନ୍ତୁ",
     "viewWithPreview": "$t(agentBriefing.view)। {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4938,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ଉଦ୍ୟୋଗୀୟ ବୈଶିଷ୍ଟ୍ୟ",
-    "enterpriseOnly": "ଏହା କେବଳ ଉଦ୍ୟୋଗୀୟ ବୈଶିଷ୍ଟ୍ୟ।",
+    "enterpriseOnly": "ପ୍ରଦାତା ଏବଂ ମଡେଲଗୁଡ଼ିକ ଏଣ୍ଟରପ୍ରାଇଜ୍ ପ୍ଲାନରେ ଉପଲବ୍ଧ।",
     "readOnly": "କେବଳ ସଂସ୍ଥାର ମାଲିକ ଏବଂ ପ୍ରଶାସକ ଏହି ସେଟିଂସମୂହକୁ ପରିବର୍ତ୍ତନ କରିପାରିବେ।",
     "loadError": "ପ୍ରଦାତା ଏବଂ ମଡେଲଗୁଡ଼ିକ ଲୋଡ ହୋଇପାରିଲା ନାହିଁ",
     "tabModels": "ମଡେଲଗୁଡ଼ିକ",

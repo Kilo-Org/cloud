@@ -669,7 +669,7 @@
     },
     "instructions": {
       "title": "تعليمات مخصصة",
-      "deprecation": "من المقرر إيقاف ميزة التعليمات المخصصة. انقل هذه الإرشادات إلى ملف REVIEW.md في مستودعك بدلًا منها.",
+      "deprecation": "ستتم إزالة ميزة التعليمات المخصصة. انقل هذه الإرشادات إلى ملف REVIEW.md في مستودعك بدلًا منها.",
       "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…",
       "clearTitle": "إزالة التعليمات المخصصة؟",
       "clearMessage": "سيؤدي حفظ الحقل فارغًا إلى حذف التعليمات المخصصة المخزّنة لهذا المراجع."
@@ -700,6 +700,7 @@
       "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
       "description": "أنشئ رمز وصول لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
       "descriptionReconnect": "أنشئ رمز وصول جديدًا لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
+      "descriptionOverview": "أنشئ رمز وصول لمساحة العمل للمؤسسة {{organization}} ثم الصقه في الشاشة التالية.",
       "scopes": "الصلاحيات المطلوبة: الحساب: قراءة · المستودعات: قراءة/كتابة · طلبات السحب: قراءة · خطافات الويب: قراءة/كتابة.",
       "tokenPlaceholder": "رمز وصول مساحة العمل",
       "tokenRefused": "لم يقبل Bitbucket رمز وصول مساحة العمل هذا. تحقق من أنه يتضمن الصلاحيات المذكورة أعلاه، ثم أعد المحاولة."
@@ -2769,6 +2770,8 @@
     "retryHint": "يعيد محاولة التحقق من حالة Kilo Pass.",
     "endedOn": "انتهى في {{date}}",
     "notAvailableInApp": "Kilo Pass غير متاح في التطبيق.",
+    "notAvailableTitle": "Kilo Pass غير موجود في التطبيق",
+    "noPassDescription": "لا يملك هذا الحساب Kilo Pass.",
     "statusActive": "نشط",
     "statusTrialing": "تجريبي",
     "statusPastDue": "الدفع متأخر",
@@ -3466,6 +3469,13 @@
     },
     "tabs": {
       "discussion": "المناقشة",
+      "discussionAccessibility": "{{title}}: التعليقات: {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: التعليقات: {{displayCount}}",
+      "discussionAccessibility_one": "{{title}}: تعليق واحد",
+      "discussionAccessibility_zero": "{{title}}: عدد التعليقات: {{displayCount}}",
+      "discussionAccessibility_two": "{{title}}: تعليقان",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} تعليقات",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} تعليقًا",
       "files": "الملفات",
       "overview": "نظرة عامة"
     },
@@ -3702,7 +3712,7 @@
       "retentionLimit": "يتم عرض أحدث الفواتير."
     },
     "lowBalanceAlert": {
-      "enableA11y": "تفعيل تنبيه انخفاض الرصيد",
+      "subtitle": "أرسل تنبيهًا بالبريد الإلكتروني إلى العناوين التي تدرجها عندما ينخفض رصيد هذه المؤسسة عن المبلغ الذي تحدده.",
       "notifyEmailsLabel": "عناوين البريد الإلكتروني للتنبيهات",
       "permissionDenied": "ليست لديك صلاحية لإدارة تنبيهات الفوترة.",
       "separateEmailsHint": "افصل بين عناوين البريد الإلكتروني بفواصل.",
@@ -4016,6 +4026,7 @@
   },
   "modelChat": {
     "offlineFailure": "يحتاج هذا النموذج إلى اتصال بالإنترنت. اتصل وحاول مرة أخرى، أو انتقل إلى نموذج على هذا الجهاز.",
+    "connectionLost": "انقطع الاتصال بالنموذج. تحقق من اتصالك وحاول مرة أخرى.",
     "empty": {
       "title": "بدء محادثة",
       "description": "أرسل رسالة للتحدث مع نموذج."
@@ -4817,6 +4828,7 @@
     "empty": "لا يوجد نشاط في نافذة هذا التقرير",
     "emptyHint": "ستظهر هنا جلسات البرمجة السحابية وجلسات CLI عندما يحتوي تقرير مجدول على نشاط.",
     "loadError": "تعذّر تحميل التقارير",
+    "estimateLoadError": "تعذّر تحميل التقدير.",
     "view": "قراءة التقرير",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}، $t(agentBriefing.snapshotPullRequests) {{pullRequests}}، $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5238,7 +5250,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ميزة خطة الشركات",
-    "enterpriseOnly": "هذه الميزة متاحة لخطة الشركات فقط.",
+    "enterpriseOnly": "المزوّدون والنماذج متاحون في خطة Enterprise.",
     "readOnly": "يمكن لمالكي المؤسسة ومسؤوليها فقط تغيير هذه الإعدادات.",
     "loadError": "تعذّر تحميل المزوّدين والنماذج",
     "tabModels": "النماذج",

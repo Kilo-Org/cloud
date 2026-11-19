@@ -669,7 +669,7 @@
     },
     "instructions": {
       "title": "Пользовательские инструкции",
-      "deprecation": "Поддержку пользовательских инструкций планируется прекратить. Перенесите эти рекомендации в файл REVIEW.md в вашем репозитории.",
+      "deprecation": "Пользовательские инструкции будут удалены. Перенесите эти рекомендации в файл REVIEW.md в вашем репозитории.",
       "placeholder": "например: проверять соблюдение наших правил обработки ошибок…",
       "clearTitle": "Удалить пользовательские инструкции?",
       "clearMessage": "Сохранение пустого поля удалит пользовательские инструкции, заданные для этого ревьюера."
@@ -700,6 +700,7 @@
       "managedOnWeb": "Подключение Bitbucket для {{organization}} управляется в веб-версии с компьютера.",
       "description": "Создайте токен доступа к рабочему пространству для {{organization}} и вставьте его ниже.",
       "descriptionReconnect": "Создайте новый токен доступа к рабочему пространству для {{organization}} и вставьте его ниже.",
+      "descriptionOverview": "Создайте токен доступа к рабочему пространству для {{organization}} и вставьте его на следующем экране.",
       "scopes": "Аккаунт: чтение · Репозитории: чтение/запись · Пул-реквесты: чтение · Вебхуки: чтение/запись",
       "tokenPlaceholder": "Токен доступа к рабочему пространству",
       "tokenRefused": "Bitbucket не принял этот токен доступа к рабочему пространству. Проверьте, что у него есть указанные выше права, затем попробуйте снова."
@@ -2699,6 +2700,8 @@
     "retryHint": "Повторно загружает статус Kilo Pass.",
     "endedOn": "Завершена {{date}}",
     "notAvailableInApp": "Kilo Pass недоступен в приложении.",
+    "notAvailableTitle": "Kilo Pass нет в приложении",
+    "noPassDescription": "У этого аккаунта нет Kilo Pass.",
     "statusActive": "Активен",
     "statusTrialing": "Пробный период",
     "statusPastDue": "Платёж просрочен",
@@ -3352,6 +3355,11 @@
     },
     "tabs": {
       "discussion": "Обсуждение",
+      "discussionAccessibility": "{{title}}: {{displayCount}} комментария",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} комментария",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} комментарий",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} комментария",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} комментариев",
       "files": "Файлы",
       "overview": "Обзор"
     },
@@ -3586,7 +3594,7 @@
       "retentionLimit": "Показаны последние счета."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Включить оповещение о низком балансе",
+      "subtitle": "Отправлять оповещение по почте на указанные адреса, когда баланс этой организации опускается ниже заданной суммы.",
       "notifyEmailsLabel": "Адреса для оповещений",
       "permissionDenied": "У вас нет прав на управление оповещениями об оплате.",
       "separateEmailsHint": "Укажите адреса через запятую.",
@@ -3896,6 +3904,7 @@
   },
   "modelChat": {
     "offlineFailure": "Этой модели требуется подключение к интернету. Подключитесь и повторите попытку или переключитесь на модель на этом устройстве.",
+    "connectionLost": "Соединение с моделью прервалось. Проверьте подключение и попробуйте снова.",
     "empty": {
       "title": "Начать чат",
       "description": "Отправьте сообщение, чтобы поговорить с моделью."
@@ -4675,6 +4684,7 @@
     "empty": "Нет активности в этом окне сводки",
     "emptyHint": "Ваши облачные и CLI-сессии появятся здесь, когда в запланированной сводке будет активность.",
     "loadError": "Не удалось загрузить сводки",
+    "estimateLoadError": "Не удалось загрузить оценку.",
     "view": "Читать сводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5088,7 +5098,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Корпоративная функция",
-    "enterpriseOnly": "Это функция только для корпоративных клиентов.",
+    "enterpriseOnly": "Провайдеры и модели доступны на тарифе Enterprise.",
     "readOnly": "Только владельцы и администраторы организации могут изменять эти настройки.",
     "loadError": "Не удалось загрузить провайдеров и модели",
     "tabModels": "Модели",

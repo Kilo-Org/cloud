@@ -1578,6 +1578,7 @@ export const controlPlaneNativeOperationSchema = z.discriminatedUnion('name', [
   z.object({ name: z.literal('session.status') }).strict(),
   z.object({ name: z.literal('session.todo') }).strict(),
   z.object({ name: z.literal('session.background') }).strict(),
+  z.object({ name: z.literal('session.board') }).strict(),
   z
     .object({
       name: z.literal('session.diff'),

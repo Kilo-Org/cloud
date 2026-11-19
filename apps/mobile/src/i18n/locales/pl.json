@@ -669,7 +669,7 @@
     },
     "instructions": {
       "title": "Własne instrukcje",
-      "deprecation": "Planowane jest wycofanie obsługi niestandardowych instrukcji. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
+      "deprecation": "Niestandardowe instrukcje zostaną usunięte. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
       "placeholder": "np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…",
       "clearTitle": "Usunąć własne instrukcje?",
       "clearMessage": "Zapisanie pustego pola usuwa własne instrukcje zapisane dla tego recenzenta."
@@ -700,6 +700,7 @@
       "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
       "description": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
       "descriptionReconnect": "Utwórz nowy token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
+      "descriptionOverview": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go na następnym ekranie.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
       "tokenPlaceholder": "Token dostępu do obszaru roboczego",
       "tokenRefused": "Bitbucket nie zaakceptował tego tokenu dostępu do obszaru roboczego. Sprawdź, czy ma powyższe uprawnienia, a następnie spróbuj ponownie."
@@ -2699,6 +2700,8 @@
     "retryHint": "Ponownie sprawdza stan Kilo Pass.",
     "endedOn": "Zakończono {{date}}",
     "notAvailableInApp": "Kilo Pass nie jest dostępny w aplikacji.",
+    "notAvailableTitle": "Kilo Pass nie jest oferowany w aplikacji",
+    "noPassDescription": "To konto nie ma Kilo Pass.",
     "statusActive": "Aktywny",
     "statusTrialing": "Okres próbny",
     "statusPastDue": "Płatność zaległa",
@@ -3352,6 +3355,11 @@
     },
     "tabs": {
       "discussion": "Dyskusja",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentarza",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentarza",
+      "discussionAccessibility_one": "{{title}}: 1 komentarz",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentarze",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentarzy",
       "files": "Pliki",
       "overview": "Podsumowanie"
     },
@@ -3586,7 +3594,7 @@
       "retentionLimit": "Wyświetlane są najnowsze faktury."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Włącz powiadomienie o niskim saldzie",
+      "subtitle": "Wyślij alert e-mailem na podane adresy, gdy saldo tej organizacji spadnie poniżej ustawionej kwoty.",
       "notifyEmailsLabel": "Adresy e-mail odbiorców",
       "permissionDenied": "Nie masz uprawnień do zarządzania powiadomieniami o rozliczeniach.",
       "separateEmailsHint": "Oddziel adresy e-mail przecinkami.",
@@ -3896,6 +3904,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ten model wymaga połączenia z internetem. Połącz się i spróbuj ponownie lub przełącz się na model na tym urządzeniu.",
+    "connectionLost": "Połączenie z modelem zostało przerwane. Sprawdź połączenie i spróbuj ponownie.",
     "empty": {
       "title": "Rozpocznij czat",
       "description": "Wyślij wiadomość, aby porozmawiać z modelem."
@@ -4675,6 +4684,7 @@
     "empty": "Brak aktywności w tym oknie raportu",
     "emptyHint": "Twoje sesje kodowania w chmurze i CLI pojawią się tutaj, gdy zaplanowany raport ma aktywność.",
     "loadError": "Nie udało się wczytać raportów",
+    "estimateLoadError": "Nie udało się wczytać szacunku.",
     "view": "Przeczytaj raport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5088,7 +5098,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funkcja dla przedsiębiorstw",
-    "enterpriseOnly": "Ta funkcja jest dostępna tylko dla przedsiębiorstw.",
+    "enterpriseOnly": "Dostawcy i modele to funkcja dostępna w planie Enterprise.",
     "readOnly": "Tylko właściciele i administratorzy organizacji mogą zmieniać te ustawienia.",
     "loadError": "Nie udało się załadować dostawców i modeli",
     "tabModels": "Modele",

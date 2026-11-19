@@ -1,5 +1,5 @@
 import {
-  GENERIC_PUSH_TITLE_KEY,
+  genericPushTitle,
   NOTIFICATION_HISTORY_CATEGORIES,
   type NotificationHistoryCategory,
   pushBodyCatalogKey,
@@ -76,7 +76,7 @@ export function notificationHistoryCopy(
   const title = translatedPart(row, locale, 'title');
   const body = translatedPart(row, locale, 'body');
   const titleTemplate = translatedPart({ ...row, i18nParams: null }, locale, 'title');
-  return titleTemplate.trim() === translatePush(locale, GENERIC_PUSH_TITLE_KEY).trim()
+  return titleTemplate.trim() === genericPushTitle(locale).trim()
     ? { headline: body, detail: null }
     : { headline: title, detail: body };
 }

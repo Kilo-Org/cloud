@@ -1114,7 +1114,14 @@
     "tabs": {
       "overview": "Trosolwg",
       "files": "Ffeiliau",
-      "discussion": "Trafodaeth"
+      "discussion": "Trafodaeth",
+      "discussionAccessibility_one": "{{title}}: 1 sylw",
+      "discussionAccessibility": "{{title}}: {{displayCount}} sylw",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} sylw",
+      "discussionAccessibility_zero": "{{title}}: {{displayCount}} sylw",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} sylw",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} sylw",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} sylw"
     },
     "fileStatus": {
       "modified": "Wedi'i addasu",
@@ -1315,7 +1322,7 @@
     },
     "instructions": {
       "title": "Cyfarwyddiadau personol",
-      "deprecation": "Mae bwriad i roi'r gorau i gefnogi cyfarwyddiadau personol. Symudwch y canllawiau hyn i ffeil REVIEW.md yn eich ystorfa yn lle hynny.",
+      "deprecation": "Bydd cyfarwyddiadau personol yn cael eu dileu. Symudwch y canllawiau hyn i ffeil REVIEW.md yn eich ystorfa yn lle hynny.",
       "placeholder": "e.e. Gorfodi ein rheolau trin gwallau…",
       "clearTitle": "Tynnu'r cyfarwyddiadau personol?",
       "clearMessage": "Bydd cadw maes gwag yn dileu'r cyfarwyddiadau personol sydd wedi'u cadw ar gyfer yr adolygydd hwn."
@@ -1481,6 +1488,7 @@
       "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
       "description": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo isod.",
       "descriptionReconnect": "Crëwch docyn mynediad gweithle newydd ar gyfer {{organization}} a'i ludo isod.",
+      "descriptionOverview": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo ar y sgrin nesaf.",
       "scopes": "Cyfrif: darllen · Ystorfeydd: darllen/ysgrifennu · Ceisiadau tynnu: darllen · Bachau gwe: darllen/ysgrifennu",
       "tokenPlaceholder": "Tocyn mynediad gweithle",
       "tokenRefused": "Ni dderbyniodd Bitbucket y tocyn mynediad gweithle hwn. Gwiriwch fod ganddo'r cwmpasau uchod, yna ceisiwch eto."
@@ -3415,6 +3423,8 @@
     "retryHint": "Mae hwn yn ceisio llwytho statws Kilo Pass eto.",
     "endedOn": "Wedi dod i ben {{date}}",
     "notAvailableInApp": "Nid yw Kilo Pass ar gael yn yr ap.",
+    "notAvailableTitle": "Nid yw Kilo Pass yn yr ap",
+    "noPassDescription": "Nid oes gan y cyfrif hwn Kilo Pass.",
     "statusActive": "Gweithredol",
     "statusTrialing": "Ar brawf",
     "statusPastDue": "Taliad yn hwyr",
@@ -3697,7 +3707,7 @@
       "retentionLimit": "Yn dangos yr anfonebau diweddaraf."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Galluogi rhybudd balans isel",
+      "subtitle": "Anfon rhybudd drwy e-bost i'r cyfeiriadau a restrwch pan fo balans y sefydliad hwn yn disgyn o dan y swm a osodwch.",
       "notifyEmailsLabel": "Cyfeiriadau e-bost i'w hysbysu",
       "permissionDenied": "Nid oes gennych ganiatâd i reoli rhybuddion bilio.",
       "separateEmailsHint": "Defnyddiwch gomâu i wahanu cyfeiriadau e-bost.",
@@ -4016,6 +4026,7 @@
   },
   "modelChat": {
     "offlineFailure": "Mae angen cysylltiad rhyngrwyd ar y model hwn. Cysylltwch a rhowch gynnig arall arni, neu newidiwch i fodel ar y ddyfais hon.",
+    "connectionLost": "Collwyd y cysylltiad â'r model. Gwiriwch eich cysylltiad a cheisiwch eto.",
     "empty": {
       "title": "Dechrau sgwrs",
       "description": "Anfonwch neges i siarad â model."
@@ -4817,6 +4828,7 @@
     "empty": "Dim gweithgarwch yn y cyfnod briff hwn",
     "emptyHint": "Bydd eich sesiynau codio cwmwl a CLI yn ymddangos yma pan fydd briff a drefnwyd yn cynnwys gweithgarwch.",
     "loadError": "Methu llwytho briffiau",
+    "estimateLoadError": "Methu llwytho'r amcangyfrif.",
     "view": "Darllen y briff",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5238,7 +5250,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Nodwedd menter",
-    "enterpriseOnly": "Nodwedd ar gyfer mentrau yn unig yw hon.",
+    "enterpriseOnly": "Mae darparwyr a modelau ar gael ar y cynllun Enterprise.",
     "readOnly": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu newid y gosodiadau hyn.",
     "loadError": "Methu llwytho darparwyr a modelau",
     "tabModels": "Modelau",

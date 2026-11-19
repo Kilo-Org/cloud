@@ -137,10 +137,15 @@ export function parseSourceEntry(dir, root, file, text) {
  * the path and the error, and the walk continues. An audit must report a file
  * it could not read rather than drop it, and one refusal must not discard the
  * findings the walk already collected.
+ *
+ * The walk reads through `read`, which defaults to `readFileSync`, so a caller
+ * can supply the read itself and a test can fail one file without the
+ * filesystem's help. A throw from it is reported exactly like a throw from the
+ * filesystem, so the contract has one name whichever reader refused.
  */
-export function* parseSourceTree(dir, root, skip) {
+export function* parseSourceTree(dir, root, skip, read = readFileSync) {
   for (const file of sourceFiles(dir, skip)) {
-    yield readSourceEntry(dir, root, file);
+    yield readSourceEntry(dir, root, file, read);
   }
 }
 
@@ -148,11 +153,15 @@ export function* parseSourceTree(dir, root, skip) {
  * One walked file read and parsed. A refused read still yields the entry's
  * shared shape — the path, an empty text, and an empty tree — so the caller
  * meets one problem line where it would have read the file's own findings.
+ *
+ * The text comes from `read`, which defaults to `readFileSync`, so a caller can
+ * supply the read itself. A throw from it lands in the same catch as one from
+ * the filesystem, so a failure reports the same single problem line either way.
  */
-function readSourceEntry(dir, root, file) {
+export function readSourceEntry(dir, root, file, read = readFileSync) {
   let text;
   try {
-    text = readFileSync(file, 'utf8');
+    text = read(file, 'utf8');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const entry = parseSourceEntry(dir, root, file, '');

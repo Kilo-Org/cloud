@@ -8,6 +8,7 @@
     "empty": "No activity in this brief window",
     "emptyHint": "Your cloud and CLI coding sessions appear here when a scheduled brief has activity.",
     "loadError": "Could not load briefs",
+    "estimateLoadError": "Couldn't load the estimate.",
     "view": "Read brief",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -1117,7 +1118,10 @@
     "tabs": {
       "overview": "Overview",
       "files": "Files",
-      "discussion": "Discussion"
+      "discussion": "Discussion",
+      "discussionAccessibility_one": "{{title}}, 1 comment",
+      "discussionAccessibility": "{{title}}, {{displayCount}} comments",
+      "discussionAccessibility_other": "{{title}}, {{displayCount}} comments"
     },
     "fileStatus": {
       "modified": "Modified",
@@ -1314,7 +1318,7 @@
     },
     "instructions": {
       "title": "Custom instructions",
-      "deprecation": "Custom instructions is planned for deprecation. Move these guidelines into a REVIEW.md file in your repository instead.",
+      "deprecation": "Custom instructions will be removed. Move these guidelines into a REVIEW.md file in your repository instead.",
       "placeholder": "e.g. Enforce our error-handling conventions…",
       "clearTitle": "Remove custom instructions?",
       "clearMessage": "Saving an empty field deletes the custom instructions stored for this reviewer."
@@ -1480,6 +1484,7 @@
       "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",
       "description": "Create a Workspace Access Token for {{organization}}, then paste it below.",
       "descriptionReconnect": "Create a new Workspace Access Token for {{organization}}, then paste it below.",
+      "descriptionOverview": "Create a Workspace Access Token for {{organization}}, then paste it on the next screen.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
       "tokenPlaceholder": "Workspace access token",
       "tokenRefused": "Bitbucket did not accept this workspace token. Check that it has the scopes above, then try again."
@@ -2011,7 +2016,7 @@
       "githubAppSettings": "GitHub App settings",
       "manageAccess": "Manage GitHub App access",
       "noRepositories": "No repositories",
-      "noRepositoriesDescription": "Grant the Kilo GitHub App access to repositories",
+      "noRepositoriesDescription": "Grant the Kilo GitHub App access to repositories.",
       "selectAtLeastOne": "Select at least one repository."
     },
     "scopeEntry": {
@@ -3286,6 +3291,8 @@
     "retryHint": "Retries Kilo Pass state.",
     "endedOn": "Ended {{date}}",
     "notAvailableInApp": "Kilo Pass isn't available in the app.",
+    "notAvailableTitle": "Kilo Pass isn't in the app",
+    "noPassDescription": "This account has no Kilo Pass.",
     "statusActive": "Active",
     "statusTrialing": "Trialing",
     "statusPastDue": "Payment past due",
@@ -3570,12 +3577,12 @@
     "lowBalanceAlert": {
       "emailsInvalid": "One or more email addresses are not valid.",
       "emailsRequired": "Enter at least one email address.",
-      "enableA11y": "Enable low balance alert",
       "notifyEmailsLabel": "Notify emails",
       "permissionDenied": "You don't have permission to manage billing alerts.",
       "saveEmailsError": "Some email addresses were not accepted. Check them and try again.",
       "saveError": "Couldn't save the low balance alert.",
       "separateEmailsHint": "Separate multiple emails with commas.",
+      "subtitle": "Email an alert to the addresses you list when this organization's balance falls below the amount you set.",
       "thresholdLabel": "Alert below (USD)",
       "thresholdPlaceholder": "Enter an amount",
       "title": "Low balance alert",
@@ -3867,6 +3874,7 @@
   },
   "modelChat": {
     "offlineFailure": "This model needs an internet connection. Connect and try again, or switch to a model on this device.",
+    "connectionLost": "The connection to the model was lost. Check your connection and try again.",
     "empty": {
       "title": "Start a chat",
       "description": "Send a message to talk to a model."
@@ -4938,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise feature",
-    "enterpriseOnly": "This is an enterprise only feature.",
+    "enterpriseOnly": "Providers and models are available on the Enterprise plan.",
     "readOnly": "Only organization owners and admins can change these settings.",
     "loadError": "Providers and models couldn't load",
     "tabModels": "Models",

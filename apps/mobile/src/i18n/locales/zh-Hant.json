@@ -669,7 +669,7 @@
     },
     "instructions": {
       "title": "自訂指示",
-      "deprecation": "自訂指示功能預計將停止使用。請改將這些準則移至存放庫中的 REVIEW.md 檔案。",
+      "deprecation": "自訂指示功能即將移除。請改將這些準則移至存放庫中的 REVIEW.md 檔案。",
       "placeholder": "例如：確保程式碼符合我們的錯誤處理規範…",
       "clearTitle": "移除自訂指示？",
       "clearMessage": "儲存空白欄位將刪除此檢閱者所儲存的自訂指示。"
@@ -700,6 +700,7 @@
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
       "description": "為 {{organization}} 建立工作區存取權杖，然後貼到下方。",
       "descriptionReconnect": "為 {{organization}} 建立新的工作區存取權杖，然後貼到下方。",
+      "descriptionOverview": "為 {{organization}} 建立工作區存取權杖，然後在下一個畫面貼上。",
       "scopes": "帳戶：讀取 · 存放庫：讀取／寫入 · PR：讀取 · Webhook：讀取／寫入",
       "tokenPlaceholder": "工作區存取權杖",
       "tokenRefused": "Bitbucket 未接受此工作區存取權杖。請確認其具有上方列出的權限範圍，然後再試一次。"
@@ -2629,6 +2630,8 @@
     "retryHint": "重新取得 Kilo Pass 狀態。",
     "endedOn": "已於 {{date}} 結束",
     "notAvailableInApp": "Kilo Pass 無法在應用程式內使用。",
+    "notAvailableTitle": "應用程式內未提供 Kilo Pass",
+    "noPassDescription": "此帳號沒有 Kilo Pass。",
     "statusActive": "使用中",
     "statusTrialing": "試用中",
     "statusPastDue": "付款逾期",
@@ -3238,6 +3241,9 @@
     },
     "tabs": {
       "discussion": "討論",
+      "discussionAccessibility": "{{title}}：{{displayCount}} 則留言",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}} 則留言",
+      "discussionAccessibility_one": "{{title}}：1 則留言",
       "files": "檔案",
       "overview": "總覽"
     },
@@ -3470,7 +3476,7 @@
       "retentionLimit": "顯示最近的發票。"
     },
     "lowBalanceAlert": {
-      "enableA11y": "啟用餘額不足提醒",
+      "subtitle": "當此組織的餘額低於您設定的金額時，透過電子郵件向您列出的地址發送提醒。",
       "notifyEmailsLabel": "通知收件地址",
       "permissionDenied": "你沒有管理帳單提醒的權限。",
       "separateEmailsHint": "請以逗號分隔多個電子郵件地址。",
@@ -3776,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "此模型需要網路連線。請連線後再試一次，或切換至此裝置上的模型。",
+    "connectionLost": "與模型的連線已中斷。請檢查連線後再試一次。",
     "empty": {
       "title": "開始聊天",
       "description": "傳送訊息以與模型對話。"
@@ -4533,6 +4540,7 @@
     "empty": "此簡報時段無活動",
     "emptyHint": "當排定的簡報有活動時，你的雲端與 CLI 程式設計工作階段會顯示在這裡。",
     "loadError": "無法載入簡報",
+    "estimateLoadError": "無法載入預估。",
     "view": "閱讀簡報",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scorecardLabel": "$t(agentBriefing.view)：$t(agentBriefing.selectedSessions) {{sessions}}，$t(agentBriefing.snapshotPullRequests) {{pullRequests}}，$t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4938,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "企業版功能",
-    "enterpriseOnly": "這是僅限企業版的功能。",
+    "enterpriseOnly": "供應商與模型僅適用於 Enterprise 方案。",
     "readOnly": "只有組織擁有者與管理員可以變更這些設定。",
     "loadError": "無法載入供應商與模型",
     "tabModels": "模型",

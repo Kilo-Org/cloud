@@ -117,7 +117,7 @@ function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
               break between the two sections: its own `py-2` leaves the label the
               same 8 dp of air every other section header has, above and below
               the line. */}
-          <SectionHeader label={t('todos.item.sessions')} />
+          <SectionHeader label={t('todos.item.sessions')} inset />
           {todo.sessions.length === 0 ? (
             <Text className="px-4 pb-2 text-sm text-ink2">{t('todos.item.noSessions')}</Text>
           ) : (

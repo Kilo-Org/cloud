@@ -1070,7 +1070,12 @@
     "tabs": {
       "overview": "Přehled",
       "files": "Soubory",
-      "discussion": "Diskuse"
+      "discussion": "Diskuse",
+      "discussionAccessibility_one": "{{title}}: 1 komentář",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentářů",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentářů",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentáře",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentáře"
     },
     "fileStatus": {
       "modified": "Upraven",
@@ -1269,7 +1274,7 @@
     },
     "instructions": {
       "title": "Vlastní pokyny",
-      "deprecation": "Podporu vlastních pokynů plánujeme ukončit. Přesuňte tyto pokyny do souboru REVIEW.md ve svém repozitáři.",
+      "deprecation": "Vlastní pokyny budou odstraněny. Přesuňte tyto pokyny do souboru REVIEW.md ve svém repozitáři.",
       "placeholder": "např. vyžadovat dodržování našich pravidel pro zpracování chyb…",
       "clearTitle": "Odebrat vlastní pokyny?",
       "clearMessage": "Uložení prázdného pole smaže vlastní pokyny uložené pro tohoto recenzenta."
@@ -1435,6 +1440,7 @@
       "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "descriptionReconnect": "Vytvořte nový přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
+      "descriptionOverview": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej na další obrazovce.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
       "tokenPlaceholder": "Přístupový token pracovního prostoru",
       "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
@@ -3299,6 +3305,8 @@
     "retryHint": "Znovu načte stav Kilo Pass.",
     "endedOn": "Ukončeno {{date}}",
     "notAvailableInApp": "Kilo Pass není v aplikaci k dispozici.",
+    "notAvailableTitle": "Kilo Pass v aplikaci není",
+    "noPassDescription": "Tento účet nemá Kilo Pass.",
     "statusActive": "Aktivní",
     "statusTrialing": "Zkušební",
     "statusPastDue": "Platba po splatnosti",
@@ -3581,7 +3589,7 @@
       "retentionLimit": "Zobrazují se nejnovější faktury."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Povolit upozornění na nízký zůstatek",
+      "subtitle": "Poslat e-mailem upozornění na zadané adresy, když zůstatek této organizace klesne pod nastavenou částku.",
       "notifyEmailsLabel": "E-mailové adresy pro upozornění",
       "permissionDenied": "Nemáte oprávnění spravovat upozornění k fakturaci.",
       "separateEmailsHint": "Více e-mailových adres oddělte čárkami.",
@@ -3896,6 +3904,7 @@
   },
   "modelChat": {
     "offlineFailure": "Tento model vyžaduje připojení k internetu. Připojte se a zkuste to znovu, nebo přepněte na model v tomto zařízení.",
+    "connectionLost": "Připojení k modelu bylo přerušeno. Zkontrolujte připojení a zkuste to znovu.",
     "empty": {
       "title": "Začněte chatovat",
       "description": "Pošlete zprávu, abyste si popovídali s modelem."
@@ -4675,6 +4684,7 @@
     "empty": "Žádná aktivita v tomto období přehledu",
     "emptyHint": "Vaše cloudové a CLI relace programování se zde zobrazí, když naplánovaný přehled zaznamená aktivitu.",
     "loadError": "Přehledy se nepodařilo načíst",
+    "estimateLoadError": "Odhad se nepodařilo načíst.",
     "view": "Číst přehled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5088,7 +5098,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funkce pro Enterprise",
-    "enterpriseOnly": "Tato funkce je dostupná pouze v tarifu Enterprise.",
+    "enterpriseOnly": "Poskytovatelé a modely jsou k dispozici v plánu Enterprise.",
     "readOnly": "Tato nastavení mohou měnit jen vlastníci a správci organizace.",
     "loadError": "Poskytovatele a modely se nepodařilo načíst",
     "tabModels": "Modely",

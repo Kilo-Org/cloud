@@ -13,6 +13,9 @@ import {
  * Every seed topic the batch manifest needs, in the order they must run, keyed
  * by the step name a `{{seed:<step>.<key>}}` link template names. Each topic
  * prints its ids with `--json`, so the map never reads the database itself.
+ * `screens` names the screens whose content a step provides even where no link
+ * templates its ids (a row whose expected screen is one of them, or below one,
+ * selects the step), and `needs` the steps it builds on.
  * Order matters: the reviewer analytics topic seeds the organizations the
  * account-pair topic created, and every topic needs the signed-in account.
  * `sessions` also needs the account's GitHub integration on the fixture
@@ -24,11 +27,34 @@ export const SEED_STEPS: readonly Readonly<{
   step: string;
   topic: string;
   args: (email: string) => string[];
+  screens?: readonly string[];
+  needs?: readonly string[];
 }>[] = [
-  { step: 'org-pair', topic: 'app:mobile-org-account-pair', args: email => [email] },
-  { step: 'reviewer-analytics', topic: 'app:mobile-reviewer-analytics', args: email => [email] },
-  { step: 'profile-caps', topic: 'app:mobile-profile-caps', args: email => ['--email', email] },
-  { step: 'security-findings', topic: 'app:security-agent-findings', args: email => [email] },
+  {
+    step: 'org-pair',
+    topic: 'app:mobile-org-account-pair',
+    args: email => [email],
+    screens: ['(app)/(tabs)/(3_profile)/organization'],
+  },
+  {
+    step: 'reviewer-analytics',
+    topic: 'app:mobile-reviewer-analytics',
+    args: email => [email],
+    screens: ['(app)/code-reviewer/[scope]/analytics'],
+    needs: ['org-pair'],
+  },
+  {
+    step: 'profile-caps',
+    topic: 'app:mobile-profile-caps',
+    args: email => ['--email', email],
+    screens: ['(app)/profile-management', '(app)/(tabs)/(3_profile)/profiles'],
+  },
+  {
+    step: 'security-findings',
+    topic: 'app:security-agent-findings',
+    args: email => [email],
+    screens: ['(app)/security-agent/[scope]/findings'],
+  },
   {
     step: 'security-org-scopes',
     topic: 'app:mobile-security-agent-notification-scopes',
@@ -38,6 +64,7 @@ export const SEED_STEPS: readonly Readonly<{
     step: 'review-list',
     topic: 'code-reviews:review-list',
     args: email => ['--email', email, '--count', '60'],
+    screens: ['(app)/code-reviewer/[scope]/reviews'],
   },
   {
     step: 'sessions',
@@ -88,13 +115,27 @@ function parseSeedJson(stdout: string): Record<string, SeedValue> {
   return values;
 }
 
-/** The steps the given rows reference, in `SEED_STEPS` order. */
+/**
+ * The steps the given rows need, in `SEED_STEPS` order: every step a link
+ * template names, every step that provides a row's expected screen, and the
+ * steps those build on.
+ */
 export function stepsFor(rows: readonly ManifestRow[]): string[] {
   const named = new Set(
     rows.flatMap(row =>
       templateReferences(row.link).map(reference => /^seed:([a-z0-9-]+)\./.exec(reference)?.[1])
     )
   );
+  for (const entry of SEED_STEPS) {
+    const provides = (entry.screens ?? []).some(screen =>
+      rows.some(row => row.screen === screen || row.screen.startsWith(`${screen}/`))
+    );
+    if (provides) named.add(entry.step);
+  }
+  // `needs` only points at earlier steps, so one pass in reverse order closes it.
+  for (const entry of [...SEED_STEPS].reverse()) {
+    if (named.has(entry.step)) for (const need of entry.needs ?? []) named.add(need);
+  }
   return SEED_STEPS.map(entry => entry.step).filter(step => named.has(step));
 }
 

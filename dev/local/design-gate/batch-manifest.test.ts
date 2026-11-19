@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  MANIFEST_COLUMNS,
+  parseManifest,
+  readManifest,
   linkTarget,
   parseShard,
   resolveTemplates,
@@ -10,6 +13,7 @@ import {
   type RouteFile,
   type SeedMap,
 } from './batch-manifest';
+import { SEED_STEPS, stepsFor } from './seed-all';
 
 const route = (file: string): RouteFile => ({
   file,
@@ -115,4 +119,19 @@ test('a missing id fails with every unresolved reference named', () => {
     /no --seeds map/
   );
   assert.throws(() => resolveTemplates('kiloapp:///x/{{org-pair}}', seeds), /not a \{\{seed/);
+});
+
+test('seed steps follow link templates, provided screens and their needs', () => {
+  const [analytics] = parseManifest(
+    [
+      MANIFEST_COLUMNS.join('\t'),
+      'T1-G13a\tT1\tsigned-in\tstandard\tandroid\thappy\t-\tkiloapp:///(app)/code-reviewer/personal/analytics\tscreen\t(app)/code-reviewer/[scope]/analytics',
+    ].join('\n')
+  );
+  assert.ok(analytics);
+  assert.deepEqual(stepsFor([analytics]), ['org-pair', 'reviewer-analytics']);
+  assert.deepEqual(
+    stepsFor(readManifest()),
+    SEED_STEPS.map(entry => entry.step)
+  );
 });

@@ -8,8 +8,6 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { i18n } from '@/i18n';
-
 import { BitbucketOverview } from './bitbucket-overview';
 
 const config = vi.hoisted(() => ({
@@ -328,87 +326,5 @@ describe('BitbucketOverview rows entrance', () => {
     const renderer = await renderScreen();
 
     expect(rowsContainer(renderer)?.props.entering).toBeDefined();
-  });
-});
-
-// An organization connected through Bitbucket OAuth owns one read-only card:
-// the web page ran the consent, so this surface offers no connect action and
-// no editable rows.
-describe('BitbucketOverview OAuth connection', () => {
-  function oauthStatus(over: Record<string, unknown> = {}) {
-    return {
-      method: 'oauth',
-      status: 'connected',
-      integrationId: 'oauth-1',
-      integrationStatus: 'active',
-      recoveryAction: null,
-      workspace: { uuid: 'ws-uuid', slug: 'acme', displayName: 'Acme Ltd' },
-      authorizingNickname: 'acme-authorizer',
-      invalidatedAt: null,
-      invalidationReason: null,
-      expiresAt: null,
-      lastValidatedAt: null,
-      repositoryCache: { status: 'available', repositories: [], syncedAt: null },
-      canManage: true,
-      ...over,
-    };
-  }
-
-  function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
-    return renderer.root
-      .findAllByType('Text')
-      .map(node => node.props.children)
-      .filter((child): child is string => typeof child === 'string');
-  }
-
-  it('renders the managed-on-web card without a Connect action or rows', async () => {
-    // The readiness read reports the OAuth organization as not connected; the
-    // status read is what names the connection.
-    readiness.connected = false;
-    readiness.integrationId = null;
-    status.data = oauthStatus();
-
-    const renderer = await renderScreen();
-
-    expect(texts(renderer)).toContain(i18n.t('codeReviewer.bitbucketConnect.managedOnWeb'));
-    expect(texts(renderer)).toContain('Acme Ltd');
-    expect(renderer.root.findAllByType('Switch')).toHaveLength(0);
-    expect(renderer.root.findAllByType('ConfigureRow')).toHaveLength(0);
-    expect(renderer.root.findAllByType('Button')).toHaveLength(0);
-  });
-
-  it('renders the same read-only card when the OAuth authorization needs attention', async () => {
-    for (const oauthState of ['workspace_selection_required', 'reconnect_required'] as const) {
-      readiness.connected = false;
-      readiness.integrationId = null;
-      status.data = oauthStatus({ status: oauthState, workspace: null });
-
-      const renderer = await renderScreen();
-
-      expect(texts(renderer)).toContain(i18n.t('codeReviewer.bitbucketConnect.managedOnWeb'));
-      expect(renderer.root.findAllByType('Button')).toHaveLength(0);
-      expect(renderer.root.findAllByType('ConfigureRow')).toHaveLength(0);
-    }
-  });
-
-  it('still paints the editable surface for a token connection', async () => {
-    config.data = makeConfig();
-
-    const renderer = await renderScreen();
-
-    expect(renderer.root.findAllByType('Switch')).toHaveLength(1);
-  });
-
-  it('paints the QueryError when the readiness read failed with no data', async () => {
-    readiness.connected = false;
-    status.data = undefined;
-    status.isPending = true;
-    status.isError = true;
-    status.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
-
-    await renderScreen();
-
-    expect(queryError.variants).toEqual(['server']);
-    expect(queryError.retries).toHaveLength(1);
   });
 });

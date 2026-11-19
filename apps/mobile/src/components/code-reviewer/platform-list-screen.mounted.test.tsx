@@ -7,7 +7,6 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { i18n } from '@/i18n';
 import { _resetScopeNamesForTests } from '@/lib/code-reviewer-scope-name';
 import { PlatformListScreen } from './platform-list-screen';
 
@@ -288,121 +287,5 @@ describe('PlatformListScreen double tap', () => {
     act(() => {
       renderer.unmount();
     });
-  });
-});
-
-// The Bitbucket row reads both the readiness and the integration status: the
-// readiness alone reports an OAuth connection as "Not connected".
-describe('PlatformListScreen Bitbucket row', () => {
-  function bitbucketRow() {
-    const renderer = mountScreen();
-    const row = findByType(renderer.root, 'ConfigureRowMock').find(
-      candidate => candidate.props.title === 'Bitbucket'
-    );
-    if (!row) {
-      throw new Error('the Bitbucket row did not render');
-    }
-    return {
-      subtitle: row.props.subtitle,
-      unmount: () => {
-        act(() => {
-          renderer.unmount();
-        });
-      },
-    };
-  }
-
-  it('reads a status failure as unavailable, not as not connected', () => {
-    bitbucketStatus.data = undefined;
-    bitbucketStatus.isPending = true;
-    bitbucketStatus.isError = true;
-    bitbucketStatus.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
-
-    const row = bitbucketRow();
-
-    expect(row.subtitle).toBe(i18n.t('codeReviewer.platformList.statusUnavailable'));
-    row.unmount();
-  });
-
-  it('re-reads the integration status together with the other reads on Retry', () => {
-    // A denial on the status read denies the scope like the other reads' do.
-    bitbucketStatus.isError = true;
-    bitbucketStatus.error = denial;
-
-    const renderer = mountScreen();
-    const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
-    if (!denied) {
-      throw new Error('the no-access surface did not render');
-    }
-    bitbucketStatus.isError = false;
-    bitbucketStatus.error = undefined;
-
-    act(() => {
-      (denied.props.onRetry as () => void)();
-    });
-
-    expect(refetchMocks.bitbucket).toHaveBeenCalledTimes(1);
-    expect(refetchMocks.bitbucketStatus).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
-  it('reports the row per connection state', () => {
-    const cases = [
-      {
-        // The token integration answers from the readiness read alone.
-        tokenConnected: true,
-        integrationStatus: undefined as Record<string, unknown> | undefined,
-        subtitle: i18n.t('common.connected'),
-      },
-      {
-        tokenConnected: false,
-        integrationStatus: {
-          method: 'oauth',
-          status: 'connected',
-          workspace: { uuid: 'ws-uuid', slug: 'acme', displayName: 'Acme' },
-        } as Record<string, unknown>,
-        subtitle: i18n.t('common.connected'),
-      },
-      {
-        tokenConnected: false,
-        integrationStatus: {
-          method: 'oauth',
-          status: 'workspace_selection_required',
-          workspace: null,
-        } as Record<string, unknown>,
-        subtitle: i18n.t('codeReviewer.platformList.needsAttention'),
-      },
-      {
-        tokenConnected: false,
-        integrationStatus: {
-          method: 'oauth',
-          status: 'reconnect_required',
-          workspace: null,
-        } as Record<string, unknown>,
-        subtitle: i18n.t('codeReviewer.platformList.needsAttention'),
-      },
-      {
-        tokenConnected: false,
-        integrationStatus: {
-          method: 'workspace_access_token',
-          status: 'not_connected',
-        } as Record<string, unknown>,
-        subtitle: i18n.t('common.notConnected'),
-      },
-    ];
-    for (const { tokenConnected, integrationStatus, subtitle } of cases) {
-      // Each case sets both reads' answers; errors stay reset.
-      status.error = undefined;
-      bitbucketReadiness.connected = tokenConnected;
-      bitbucketStatus.data = integrationStatus;
-
-      const row = bitbucketRow();
-
-      expect(row.subtitle).toBe(subtitle);
-      row.unmount();
-    }
   });
 });

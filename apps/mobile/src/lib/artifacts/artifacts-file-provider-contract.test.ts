@@ -36,6 +36,22 @@ const FILE_PROVIDER_DOMAIN_IDENTIFIER = 'com.kilocode.kiloapp.artifacts';
 // Read-only: no write, delete or rename capability, and no write entry point.
 const REFUSED_ENTRY_POINTS = ['createItem(', 'modifyItem(', 'deleteItem('];
 const WRITE_CAPABILITIES = ['allowsWriting', 'allowsDeleting', 'allowsRenaming'];
+// The bidi code points the manifest writer names through constants; its
+// predicate's ranges are declared in decimal (oxfmt normalizes hex literals).
+const CODE_POINT_CONSTANTS = [
+  'ARABIC_LETTER_MARK_CODE_POINT',
+  'LEFT_TO_RIGHT_MARK_CODE_POINT',
+  'RIGHT_TO_LEFT_MARK_CODE_POINT',
+  'BIDI_EMBEDDING_CODE_POINT_MIN',
+  'BIDI_EMBEDDING_CODE_POINT_MAX',
+  'BIDI_ISOLATE_CODE_POINT_MIN',
+  'BIDI_ISOLATE_CODE_POINT_MAX',
+  'C0_CONTROL_CODE_POINT_MAX',
+  'DELETE_CODE_POINT',
+  'C1_CONTROL_CODE_POINT_MIN',
+  'C1_CONTROL_CODE_POINT_MAX',
+];
+
 // The helpers expo-widgets' `ExpoWidgetsTarget` is composed from; the plugin
 // composes its target the same way instead of writing pbxproj by hand.
 const XCODE_HELPERS = [
@@ -142,6 +158,49 @@ describe('artifacts File Provider extension contract', () => {
     // appends to the per-fetch UUID directory is sanitized again as a
     // last-resort fallback, so an unsafe name can never reach the path API.
     expect(extensionSource).toContain('let stagedName = ArtifactPath.isSafeComponent(filename)');
+  });
+
+  it('drops the same code points as the manifest writer', () => {
+    // Two sanitizers read one contract: the writer decides what a manifest
+    // name may contain, and the extension applies the same strip to an index
+    // an older build wrote. A stale index must not paint a name the writer
+    // would refuse, so the two predicates have to hold the same set — and the
+    // extension's own predicate asserts nothing about its numbers (the shape
+    // test above pins only its signature), so this reads both sides.
+    const writerPredicate = /function isUnnameableCodePoint[\s\S]*?\n\}/u.exec(
+      manifestWriterSource
+    )?.[0];
+    const swiftPredicate = extensionSource
+      .slice(
+        extensionSource.indexOf('private static func isUnnameableScalar'),
+        extensionSource.indexOf('private static func splitExtension')
+      )
+      .replaceAll(/\/\/.*$/gmu, '');
+    expect(writerPredicate).toBeDefined();
+    expect(swiftPredicate).toContain('isUnnameableScalar');
+    // The type name carries its own digits; read only the body's comparison
+    // values, never the signature.
+    const swiftValues = [
+      ...new Set(
+        [...swiftPredicate.slice(swiftPredicate.indexOf('{')).matchAll(/\d+/gu)].map(m => m[0])
+      ),
+    ];
+    // The writer names its bounds through constants; read their values so a
+    // range change on either side fails here.
+    const writerValues = CODE_POINT_CONSTANTS.map(name => {
+      const value = new RegExp(String.raw`const ${name} = (\d+);`, 'u').exec(
+        manifestWriterSource
+      )?.[1];
+      expect(value, `${name} must be a plain decimal constant`).toBeDefined();
+      return value as string;
+    });
+    expect(new Set(swiftValues)).toEqual(new Set(writerValues));
+    // The joiners shape an RTL name's letters, so both sides keep them.
+    expect(swiftPredicate).not.toMatch(/\b(?:8204|8205)\b/u);
+    expect(writerPredicate).not.toMatch(/\b(?:8204|8205)\b/u);
+    // And the strip must consult the predicate, so the constants above cannot
+    // go dead while `sanitizeArtifactName` keeps copying every code point.
+    expect(manifestWriterSource).toContain('if (!isUnnameableCodePoint(codePoint)) {');
   });
 
   it('exposes an item version and honours the requested version', () => {

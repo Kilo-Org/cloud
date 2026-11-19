@@ -9,10 +9,19 @@ type NoFields = Record<never, never>;
  * The payload a success result may carry.
  *
  * `successResult` merges its payload with an object spread, which copies own
- * properties only. A primitive payload would be dropped, and the result would
- * not carry the value its type promises, so a payload must be an object.
+ * properties only. A primitive payload would be dropped, an array would arrive
+ * as its index properties, and a function would arrive as an empty object, so
+ * the declared payload would not be the value the result carries. The payload
+ * is therefore limited to an object that is not an array and not callable.
  */
 type SuccessFields = object;
+
+/** Rejects the payloads the object spread would reshape or drop. */
+type SpreadablePayload<TOk> = TOk extends readonly unknown[]
+  ? never
+  : TOk extends (...args: never[]) => unknown
+    ? never
+    : TOk;
 
 export type SuccessResult<TOk extends SuccessFields = NoFields> = { success: true } & TOk;
 export type CustomFailureResult<TErr> = { success: false } & TErr;
@@ -49,12 +58,20 @@ export function trpcFailure(
   return failureResult(new TRPCError(...opts));
 }
 
+function mergeSuccessPayload<TOk extends SuccessFields>(
+  okValue: TOk | undefined
+): SuccessResult<TOk | NoFields> {
+  return { ...okValue, success: true };
+}
+
 export function successResult(): SuccessResult<NoFields>;
-export function successResult<TOk extends SuccessFields>(okValue: TOk): SuccessResult<TOk>;
+export function successResult<TOk extends SuccessFields>(
+  okValue: TOk & SpreadablePayload<TOk>
+): SuccessResult<TOk>;
 export function successResult<TOk extends SuccessFields>(
   okValue?: TOk
 ): SuccessResult<TOk | NoFields> {
-  return { ...okValue, success: true };
+  return mergeSuccessPayload(okValue);
 }
 
 export function assertNoTrpcError<TOk extends SuccessFields>(
@@ -95,8 +112,8 @@ export function whenOkTry<TOk extends SuccessFields, TOk2 extends SuccessFields,
 }
 export function whenOk<TOk extends SuccessFields, TOk2 extends SuccessFields, TErr>(
   result: Result<TOk, TErr>,
-  map: (val: TOk) => TOk2
+  map: (val: TOk) => TOk2 & SpreadablePayload<TOk2>
 ): Result<TOk2, TErr> {
   if (!result.success) return result;
-  return successResult(map(result));
+  return mergeSuccessPayload(map(result));
 }

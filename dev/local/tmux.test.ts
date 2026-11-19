@@ -344,9 +344,12 @@ test(
 
     const savedTmux = process.env.TMUX;
     try {
-      // Wait for the decoy client to attach (up to 2 s).
+      // Wait for the decoy client to attach.  `script(1)` starts a pty and
+      // then execs tmux, so under load the first seconds can pass before the
+      // session even exists; the old 2 s budget failed whole runs on CI
+      // runners where the first `script` poll lost that race.
       let clientReady = false;
-      for (let i = 0; i < 20 && !clientReady; i++) {
+      for (let i = 0; i < 60 && !clientReady; i++) {
         try {
           const attached = tmuxOutput(
             'display-message',
@@ -360,6 +363,9 @@ test(
           // Session not yet visible.
         }
         if (!clientReady) execFileSync('sleep', ['0.1']);
+      }
+      if (!clientReady) {
+        clientProc.kill('SIGTERM');
       }
       assert.ok(clientReady, 'decoy session must have an attached client');
 

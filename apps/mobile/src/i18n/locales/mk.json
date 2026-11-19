@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Општо",
       "files": "Датотеки",
-      "discussion": "Дискусија"
+      "discussion": "Дискусија",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} коментар",
+      "discussionAccessibility": "{{title}}: {{displayCount}} коментари",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} коментари"
     },
     "fileStatus": {
       "modified": "Изменета",

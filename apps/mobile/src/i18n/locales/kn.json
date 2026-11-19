@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "ಅವಲೋಕನ",
       "files": "ಫೈಲ್‌ಗಳು",
-      "discussion": "ಚರ್ಚೆ"
+      "discussion": "ಚರ್ಚೆ",
+      "discussionAccessibility_one": "{{title}}: 1 ಕಾಮೆಂಟ್",
+      "discussionAccessibility": "{{title}}: {{displayCount}} ಟಿಪ್ಪಣಿಗಳು",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} ಟಿಪ್ಪಣಿಗಳು"
     },
     "fileStatus": {
       "modified": "ಮಾರ್ಪಡಿಸಲಾಗಿದೆ",

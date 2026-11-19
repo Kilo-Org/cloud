@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Taƙaitaccen bayani",
       "files": "Fayiloli",
-      "discussion": "Tattaunawa"
+      "discussion": "Tattaunawa",
+      "discussionAccessibility_one": "{{title}}: tsokaci 1",
+      "discussionAccessibility": "{{title}}: tsokace-tsokace {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: tsokace-tsokace {{displayCount}}"
     },
     "fileStatus": {
       "modified": "An gyara",

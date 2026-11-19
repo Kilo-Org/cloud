@@ -1048,7 +1048,11 @@
     "tabs": {
       "overview": "Prezentare generală",
       "files": "Fișiere",
-      "discussion": "Discuție"
+      "discussion": "Discuție",
+      "discussionAccessibility_one": "{{title}}: 1 comentariu",
+      "discussionAccessibility": "{{title}}: {{displayCount}} de comentarii",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} de comentarii",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} comentarii"
     },
     "fileStatus": {
       "modified": "Modificat",

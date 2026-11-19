@@ -172,6 +172,50 @@ describe('background activity authorization', () => {
   });
 });
 
+describe('agent board reads', () => {
+  const board = { ownerSessionID: kiloSessionId, revision: 1, messages: [], hasMore: false };
+  it('reads only the registered session through the named operation', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({ ok: true, result: board });
+    await expect(harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })).resolves.toEqual(
+      board
+    );
+    expect(access).toHaveBeenCalledWith(
+      expect.objectContaining({ kiloUserId: userId, cloudAgentSessionId: sessionId })
+    );
+    expect(harness.stub.kiloRequest).toHaveBeenCalledWith({ name: 'session.board' });
+  });
+  it('does not read a foreign chat', async () => {
+    const harness = setup();
+    access.mockRejectedValueOnce(new Error('denied'));
+    await expect(harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })).rejects.toThrow(
+      'denied'
+    );
+    expect(harness.stub.kiloRequest).not.toHaveBeenCalled();
+  });
+  it('answers null for an offline sandbox or a runtime without a board, and unavailable for an invalid board', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
+    });
+    await expect(
+      harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })
+    ).resolves.toBeNull();
+    harness.stub.kiloRequest.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'unsupported', message: 'session.board is not supported', retryable: false },
+    });
+    await expect(
+      harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })
+    ).resolves.toBeNull();
+    harness.stub.kiloRequest.mockResolvedValueOnce({ ok: true, result: { messages: 'invalid' } });
+    await expect(
+      harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+});
+
 describe('getSession runtime agents', () => {
   it('projects stored mode, hidden and disable while retaining subagents', async () => {
     const harness = setup();

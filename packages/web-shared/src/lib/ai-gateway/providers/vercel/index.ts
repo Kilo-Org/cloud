@@ -380,24 +380,22 @@ function getByokProvidersExcludingIgnored(
 
 /**
  * The request-level fields both routing paths forward: the caller's sort
- * preference, data-handling choices, fallback models and session affinity.
+ * preference, data-handling choices and session affinity.
+ *
+ * Caller fallback models are not among them: `removeModelsFallback` deletes
+ * `body.models` and `body.fallbacks` before any Vercel setting is built, so a
+ * fallback id never reaches this gateway in either spelling.
  */
 function getSharedGatewayOptions(
   request: GatewayRequest
 ): Pick<
   NonNullable<VercelProviderConfig['gateway']>,
-  | 'sort'
-  | 'zeroDataRetention'
-  | 'disallowPromptTraining'
-  | 'models'
-  | 'sessionId'
-  | 'sessionAffinity'
+  'sort' | 'zeroDataRetention' | 'disallowPromptTraining' | 'sessionId' | 'sessionAffinity'
 > {
   const provider = request.body.provider;
   return {
     sort: convertProviderSort(provider?.sort),
     ...getDataHandlingOptions(provider),
-    models: request.body.models,
     ...getSessionAffinityOptions(request),
   };
 }
@@ -612,5 +610,4 @@ export async function applyVercelSettings(
   }
 
   delete requestToMutate.body.provider;
-  delete requestToMutate.body.models;
 }

@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Nchịkọta",
       "files": "Faịlụ",
-      "discussion": "Mkparịta ụka"
+      "discussion": "Mkparịta ụka",
+      "discussionAccessibility_one": "{{title}}: okwu 1",
+      "discussionAccessibility": "{{title}}: okwu {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: okwu {{displayCount}}"
     },
     "fileStatus": {
       "modified": "Agbanwere",

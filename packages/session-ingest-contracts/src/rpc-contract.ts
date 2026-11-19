@@ -7,6 +7,7 @@ import {
 } from './cloud-agent-session-scope';
 import { storedSessionIdSchema } from './kilo-session-id';
 import { needsPartTextRepair } from './part-text';
+import { sessionLiveSummarySchema } from './session-live-summary';
 
 export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
@@ -18,13 +19,25 @@ const statusTransitionIdSchema = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$
 
 /**
  * The Session DO's projection of a Cloud Agent session into its `cli_sessions_v2` row. Kilo v2
- * has no session-ingest client, so this is also how its transcript activity and native renames
- * reach the row: `lastActivityAt` only moves forward, and `rename` is present only while a
- * native rename is undelivered. A rename rides every publication from the first one that
- * carried it, named by `rename.transitionId`, until one is delivered. Ingest applies it only
- * while the stored status transition is older than `rename.transitionId`, so a late publication
- * and a repeat after delivery cannot replace a newer title. A first delivery that has not landed
- * still can, because a user rename carries no ordering signal.
+ * has no session-ingest client, so this is also how its transcript activity, native renames,
+ * session card summary and cost reach the row: `lastActivityAt` only moves forward, and
+ * `rename` is present only while a native rename is undelivered. A rename rides every
+ * publication from the first one that carried it, named by `rename.transitionId`, until one is
+ * delivered. Ingest applies it only while the stored status transition is older than
+ * `rename.transitionId`, so a late publication and a repeat after delivery cannot replace a newer
+ * title. A first delivery that has not landed still can, because a user rename carries no
+ * ordering signal.
+ *
+ * `liveSummary` and `totalCostMicrodollars` are present only for a Kilo v2 transcript; Kilo v1
+ * keeps reporting both through its ingest client. Ingest writes the summary with the status
+ * transition, so a late older publication cannot replace a newer summary, and moves the cost
+ * forward only, as it does for a Kilo v1 report. A publication whose `transitionId` is not newer
+ * than the stored one counts as stale and its summary is dropped, so every summary change must
+ * carry a new `transitionId`.
+ *
+ * The schema is strict: a receiver that predates a field rejects the whole publication, status
+ * included. Deploy a new field to the receiver before any sender sends it, and do not roll the
+ * receiver back past a sender that sends it.
  */
 export const publishCloudAgentSessionStatusSchema = z
   .object({
@@ -39,6 +52,8 @@ export const publishCloudAgentSessionStatusSchema = z
       .object({ title: sessionTitleSchema, transitionId: statusTransitionIdSchema })
       .strict()
       .optional(),
+    liveSummary: sessionLiveSummarySchema.optional(),
+    totalCostMicrodollars: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   })
   .strict();
 export type PublishCloudAgentSessionStatusParams = z.infer<

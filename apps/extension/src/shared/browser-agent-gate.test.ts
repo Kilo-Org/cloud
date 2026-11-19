@@ -419,6 +419,74 @@ describe('origin grants', () => {
     });
   });
 
+  describe('a call on an iframe element', () => {
+    const iframeSession = () =>
+      createSession({
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 12,
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      });
+
+    it('needs act on the owner document for an evaluate granted only on the hosted frame', async () => {
+      const result = await run({
+        args: { function: '() => document.cookie', target: 'e12' },
+        authorized: [{ class: 'act', origin: 'https://pay.example.com' }],
+        session: iframeSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'act', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('allows an evaluate granted on both the owner document and the hosted frame', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [
+          { class: 'act', origin: 'https://app.example.com' },
+          { class: 'act', origin: 'https://pay.example.com' },
+        ],
+        session: iframeSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://pay.example.com' });
+    });
+
+    it('needs read on the owner document for a screenshot granted only on the hosted frame', async () => {
+      const result = await run({
+        args: { target: 'e12' },
+        authorized: [{ class: 'read', origin: 'https://pay.example.com' }],
+        session: iframeSession(),
+        toolName: 'browser_take_screenshot',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'read', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('leaves a plain element of the main document needing only the main grant', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e5' },
+        authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+        session: createSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://app.example.com' });
+    });
+  });
+
   it('allows an act inside a granted frame and marks it as a frame target', async () => {
     const result = await run({
       args: { target: 'e12' },

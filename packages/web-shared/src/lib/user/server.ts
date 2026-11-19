@@ -364,9 +364,14 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
  * Reads the browser session only. A request that presents a credential is
  * refused, never downgraded to its session, because these callers mint or
  * exchange credentials and must not do so for a bearer caller.
+ *
+ * Both session-only entry points (`resolveSessionOnly` and
+ * `getUserFromSessionForCredentialIssuanceOrRedirect`) take the
+ * credential-presence answer from `authViaTokenFromHeaders` and differ only in
+ * their outcome, a 401 versus a redirect, so the presence rule has one home.
  */
 async function resolveSessionOnly(opts: RequiredPermissions): Promise<GetAuthResponse> {
-  if ((await headers()).has('authorization')) {
+  if (authViaTokenFromHeaders(await headers())) {
     return authError(401, 'Unauthorized', '?');
   }
 
@@ -389,7 +394,7 @@ export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   loggedOutRedirectUrl = '/users/sign_in'
 ): Promise<User> {
-  if ((await headers()).has('authorization')) {
+  if (authViaTokenFromHeaders(await headers())) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
 
@@ -560,7 +565,7 @@ async function resolveUserFromAuth(
         cloudAgentAuthority: scope,
       });
     }
-    return result.user ? { ...result, cloudAgentAuthority: scope } : result;
+    return result;
   }
 
   return resolveUserFromSession(opts, readDb);
@@ -794,6 +799,7 @@ async function validateUserAuthorization({
     botId,
     tokenSource,
     deviceSessionId,
+    cloudAgentAuthority,
     webSessionId: webSession?.id,
     webSessionPepper: webSession?.pepper,
     authenticatedAt: webSession?.authenticatedAt,

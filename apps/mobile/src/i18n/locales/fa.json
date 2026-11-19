@@ -497,7 +497,7 @@
     },
     "changelog": "تازه‌ها",
     "changelogVersionPending": "یادداشت‌های نسخهٔ {{version}} با به‌روزرسانی بعدی برنامه می‌رسند.",
-    "changelogGroupNew": "تازه‌ها",
+    "changelogGroupNew": "جدید",
     "changelogFixesIn": "رفع اشکالات و بهبودها در {{areas}}.",
     "changelogFixesPolish": "رفع اشکالات و بهبودها در سراسر برنامه.",
     "changelogAreas": {

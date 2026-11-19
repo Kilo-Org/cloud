@@ -497,7 +497,7 @@
     },
     "changelog": "Novità",
     "changelogVersionPending": "Le note della versione {{version}} arriveranno con il prossimo aggiornamento dell'app.",
-    "changelogGroupNew": "Novità",
+    "changelogGroupNew": "Nuovo",
     "changelogFixesIn": "Correzioni e miglioramenti in {{areas}}.",
     "changelogFixesPolish": "Correzioni e miglioramenti in tutta l'app.",
     "changelogAreas": {

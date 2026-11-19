@@ -115,24 +115,58 @@ describe('local agents settings', () => {
     });
   });
 
-  it('drops a command error once the agent it was about is gone', async () => {
+  it.each([
+    ['Stop all', STOP_ALL_FAILED],
+    ['Disconnect 11111111', DISCONNECT_FAILED],
+  ])('shows the %s failure after the background already cleared the rows', async (button, text) => {
+    seedRunningAgent();
+    // The background's order: the rows go first, then the step that fails answers `{ ok: false }`.
+    fixture.sendMessage.mockImplementation(async () => {
+      fixture.items.set('session:kiloLocalAgentControllers', { controllers: [] });
+      for (const notify of fixture.watchers) {
+        notify();
+      }
+      await vi.waitFor(() => {
+        expect(view.queryByRole('button', { name: 'Stop all' })).toBeNull();
+      });
+
+      return { ok: false };
+    });
+    const view = render(<LocalAgentsSettings />);
+
+    fireEvent.click(await view.findByRole('button', { name: button }));
+
+    await expect(view.findByText(text)).resolves.toBeDefined();
+  });
+
+  it('drops a command error when the switch turns off, here or elsewhere', async () => {
     seedRunningAgent();
     fixture.sendMessage.mockResolvedValue({ ok: false });
     const view = render(<LocalAgentsSettings />);
+    const toggle = await view.findByRole('switch', { name: 'Allow local agents' });
 
-    fireEvent.click(await view.findByRole('button', { name: 'Disconnect 11111111' }));
-    await expect(view.findByText(DISCONNECT_FAILED)).resolves.toBeDefined();
+    fireEvent.click(await view.findByRole('button', { name: 'Stop all' }));
+    await expect(view.findByText(STOP_ALL_FAILED)).resolves.toBeDefined();
+    fireEvent.click(toggle);
+    await vi.waitFor(() => {
+      expect(view.queryByText(STOP_ALL_FAILED)).toBeNull();
+    });
+    fireEvent.click(toggle);
+    await vi.waitFor(() => {
+      expect(toggle.getAttribute('aria-checked')).toBe('true');
+    });
+    expect(view.queryByText(STOP_ALL_FAILED)).toBeNull();
 
-    // The CLI's connection ended: its row, and the Disconnect it failed, leave the list.
-    fixture.items.set('session:kiloLocalAgentControllers', { controllers: [] });
+    fireEvent.click(await view.findByRole('button', { name: 'Stop all' }));
+    await expect(view.findByText(STOP_ALL_FAILED)).resolves.toBeDefined();
+    // Another surface turns the switch off: the stored setting changes under the page.
+    fixture.items.set('local:kiloLocalAgentSettings', { enabled: false });
     for (const notify of fixture.watchers) {
       notify();
     }
-
     await vi.waitFor(() => {
-      expect(view.queryByText(DISCONNECT_FAILED)).toBeNull();
+      expect(view.queryByText(STOP_ALL_FAILED)).toBeNull();
     });
-    expect(view.queryByRole('button', { name: 'Stop all' })).toBeNull();
   });
 
   it('shows a paired CLI that cannot be reached instead of the native-host hint', async () => {

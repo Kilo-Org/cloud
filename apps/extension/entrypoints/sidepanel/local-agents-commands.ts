@@ -4,8 +4,6 @@ import {
   localAgentCommandResponseSchema,
 } from '@/src/shared/local-agents/commands';
 
-/* The commands the "Local agents" section sends to the background, and what each failure reads. */
-
 export type LocalAgentsCommand =
   | { kind: 'stop_all' }
   | { controllerId: string; kind: 'disconnect' };
@@ -15,7 +13,7 @@ export const LOCAL_AGENTS_COMMAND_ERRORS = {
   stop_all: "Couldn't stop the agents. Try again.",
 } satisfies Record<LocalAgentsCommand['kind'], string>;
 
-/** True only when the background ran the command; no answer, or one it cannot read, is a failure. */
+/** An unreadable answer counts as a failure: only `{ ok: true }` proves the background ran the command. */
 export const sendLocalAgentCommand = async (command: LocalAgentsCommand): Promise<boolean> => {
   try {
     const response = localAgentCommandResponseSchema.safeParse(

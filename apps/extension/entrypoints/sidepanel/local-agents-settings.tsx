@@ -88,8 +88,8 @@ export const LocalAgentsSettings = (): JSX.Element => {
   const [pairingNotice, setPairingNotice] = useState<LocalAgentPairingNotice | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  /* The command that failed; its line sits next to the button it retries and leaves with it. */
-  const [commandError, setCommandError] = useState<LocalAgentsCommand | null>(null);
+  /* Not tied to the rows: the background clears them before the step that can fail, so the error outlives them. */
+  const [commandError, setCommandError] = useState<LocalAgentsCommand['kind'] | null>(null);
   const saveChainRef = useRef(createSerialAsyncChain());
 
   const refresh = useCallback(async () => {
@@ -144,6 +144,7 @@ export const LocalAgentsSettings = (): JSX.Element => {
     const next = !enabled;
     setEnabled(next);
     setSaveError(false);
+    setCommandError(null);
 
     // Rapid toggles each write the whole record; one chain keeps the last click authoritative.
     void saveChainRef.current.enqueue(async () => {
@@ -164,7 +165,7 @@ export const LocalAgentsSettings = (): JSX.Element => {
     setCommandError(null);
     void (async (): Promise<void> => {
       if (!(await sendLocalAgentCommand(command))) {
-        setCommandError(command);
+        setCommandError(command.kind);
       }
     })();
   }, []);
@@ -231,11 +232,6 @@ export const LocalAgentsSettings = (): JSX.Element => {
               {STOP_ALL_LABEL}
             </button>
           </div>
-          {commandError?.kind === 'stop_all' ? (
-            <p className="type-body mt-2 text-status-red-400">
-              {LOCAL_AGENTS_COMMAND_ERRORS.stop_all}
-            </p>
-          ) : null}
           <ul className="mt-2 flex flex-col gap-2">
             {view.controllerGroups.map(group => (
               <li
@@ -260,12 +256,6 @@ export const LocalAgentsSettings = (): JSX.Element => {
                     {DISCONNECT_LABEL}
                   </button>
                 </div>
-                {commandError?.kind === 'disconnect' &&
-                commandError.controllerId === group.controllerId ? (
-                  <p className="type-body mt-2 text-status-red-400">
-                    {LOCAL_AGENTS_COMMAND_ERRORS.disconnect}
-                  </p>
-                ) : null}
                 <ul className="mt-2 flex flex-col gap-1">
                   {group.agents.map(agent => (
                     <li className="min-w-0" key={agent.sessionHandle}>
@@ -283,6 +273,12 @@ export const LocalAgentsSettings = (): JSX.Element => {
             ))}
           </ul>
         </>
+      ) : null}
+
+      {enabled === true && commandError !== null ? (
+        <p className="type-body mt-2 text-status-red-400">
+          {LOCAL_AGENTS_COMMAND_ERRORS[commandError]}
+        </p>
       ) : null}
     </section>
   );

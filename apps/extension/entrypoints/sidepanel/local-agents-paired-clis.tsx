@@ -13,7 +13,6 @@ const REACHABILITY_LABELS = {
 const UNREACHABLE_HINT =
   'Start the Kilo CLI again to pair this browser. An entry that stays unreachable is removed after a day.';
 
-/** The Kilo CLIs this browser paired with over loopback, each with whether it can be reached now. */
 export const LocalAgentsPairedClis = ({
   endpoints,
 }: {

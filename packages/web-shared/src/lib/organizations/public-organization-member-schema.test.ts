@@ -18,9 +18,9 @@ const ACTIVE_MEMBER = {
 
 describe('PublicActiveOrganizationMemberSchema', () => {
   it('carries the child-organization memberships on the admin shape', () => {
-    expect(ActiveOrganizationMemberSchema.parse(ACTIVE_MEMBER).childOrganizationMemberships).toEqual(
-      [{ id: 'org_child', name: 'Child', role: 'member' }]
-    );
+    expect(
+      ActiveOrganizationMemberSchema.parse(ACTIVE_MEMBER).childOrganizationMemberships
+    ).toEqual([{ id: 'org_child', name: 'Child', role: 'member' }]);
   });
 
   it('strips the child-organization memberships and the usage fields it hides', () => {

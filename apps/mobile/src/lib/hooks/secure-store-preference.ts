@@ -1,7 +1,10 @@
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
-import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
+import {
+  deleteAccountMetadataWithRetry,
+  setAccountMetadata,
+} from '@/lib/auth/account-metadata-write';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 
 function noop(): void {
@@ -249,13 +252,14 @@ export function createSecureStorePreference<T>(options: {
   };
 
   /**
-   * Deletes the stored value and reports whether the delete landed, so a read
+   * Deletes the stored value, retrying a transient refusal so the removed value
+   * converges off the disk, and reports whether the delete landed, so a read
    * that starts after a clear() knows whether the disk can still hold the
    * snapshot the clear removed.
    */
   const remove = async (): Promise<boolean> => {
     try {
-      await deleteAccountMetadata(key);
+      await deleteAccountMetadataWithRetry(key);
       return true;
     } catch {
       // Best effort; the in-memory value is already reset.
@@ -400,7 +404,6 @@ export function createSecureStorePreference<T>(options: {
       // the clear, must wait for the delete instead of reading the snapshot
       // this clear removed. remove() never rejects, so holding it is safe.
       clearDeletion = remove();
-      void clearDeletion;
       emit();
       releaseDrainWaiters();
     },

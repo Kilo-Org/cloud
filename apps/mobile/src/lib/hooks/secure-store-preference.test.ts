@@ -507,18 +507,57 @@ describe('createSecureStorePreference', () => {
       serialize: value => (value ? 'true' : 'false'),
     });
 
-    /* The clear runs before any read starts and its delete never lands, so the
-       disk still holds the snapshot the clear removed. A read of that
-       snapshot would bring the removed value back, so the store must not
-       start one. */
-    store.clear();
-    const unsubscribe = store.subscribe(noopListener);
-    await store.whenLoaded();
+    /* The clear runs before any read starts and its delete spends the whole
+       retry budget without landing, so the disk still holds the snapshot the
+       clear removed. A read of that snapshot would bring the removed value
+       back, so the store must not start one. */
+    vi.useFakeTimers();
+    try {
+      store.clear();
+      const unsubscribe = store.subscribe(noopListener);
+      const loading = store.whenLoaded();
+      await vi.runAllTimersAsync();
+      await loading;
 
-    expect(getItemAsync).not.toHaveBeenCalled();
-    expect(store.get()).toBe(false);
-    expect(store.getRequested()).not.toBe(true);
-    unsubscribe();
+      expect(deleteItemAsync).toHaveBeenCalledTimes(4);
+      expect(getItemAsync).not.toHaveBeenCalled();
+      expect(store.get()).toBe(false);
+      expect(store.getRequested()).not.toBe(true);
+      unsubscribe();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries a refused delete so a clear converges on disk', async () => {
+    deleteItemAsync
+      .mockRejectedValueOnce(new Error('keychain refused'))
+      .mockResolvedValue(undefined);
+    getItemAsync.mockResolvedValue(null);
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    /* One transient refusal must not pin the removed value: the retry lands
+       the delete, so the read that follows may start and the store reads the
+       default. */
+    vi.useFakeTimers();
+    try {
+      store.clear();
+      store.subscribe(noopListener);
+      const loading = store.whenLoaded();
+      await vi.runAllTimersAsync();
+      await loading;
+
+      expect(deleteItemAsync).toHaveBeenCalledTimes(2);
+      expect(getItemAsync).toHaveBeenCalled();
+      expect(store.get()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('preload() starts the disk read once and a following subscribe() does not start a second read', async () => {

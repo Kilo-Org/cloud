@@ -119,6 +119,8 @@ export function LiveSessionHeaderNotice({
         // so a pressable sized by its label measured 25.1 × 14.1 dp, under the
         // 28 dp floor. The box cancels its own height back to that line, so
         // the header stays one line tall, and its slop carries the 44 dp reach.
+        // The header's notice slot spans the row's padding, so the whole box
+        // sits inside the view that receives its touches.
         <Pressable
           onPress={notice.handleRetry}
           disabled={notice.retrying}
@@ -130,7 +132,7 @@ export function LiveSessionHeaderNotice({
           }
           className={cn(
             LINE_ACTION_BOX_CLASS,
-            'min-w-[36px] shrink-0 items-center justify-center active:opacity-70'
+            'min-w-10 shrink-0 items-center justify-center active:opacity-70'
           )}
         >
           <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>

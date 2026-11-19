@@ -137,14 +137,16 @@ export function FixedPartRow({
   return (
     // One node is both the outline and the control: a shell that clipped the
     // pressable would also clip its slop, and the row's `py-2` frame around one
-    // `text-sm` line measures 31.6 dp, so the slop is what reaches 44 dp.
+    // `text-sm` line measures 31.6 dp, so the slop is what reaches 44 dp. The
+    // press cue is an opacity step, not a fill: a fill beside the outline's
+    // radius would make this node a hand-built card.
     <Pressable
       className={cn(
         // The default hairline is 7% white in dark, which all but vanishes on the
         // near-black page: a dashed outline then reads as no outline at all. The
         // dark page takes the neutral step the outlined control uses, so a row
         // keeps the separation it has in the light scheme.
-        'flex-row items-center gap-2 overflow-hidden rounded-lg border border-border px-3 py-2 active:bg-secondary dark:border-neutral-700',
+        'flex-row items-center gap-2 overflow-hidden rounded-lg border border-border px-3 py-2 active:opacity-70 dark:border-neutral-700',
         variant === 'dashed' && 'border-dashed'
       )}
       hitSlop={PART_ROW_HIT_SLOP}

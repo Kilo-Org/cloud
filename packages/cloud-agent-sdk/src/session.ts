@@ -61,12 +61,18 @@ const REMOTE_SESSION_ORGANIZATION_MISMATCH =
   "A new session stays in this session's organization. Switch organization first.";
 
 /**
- * Cool-down before the read-only upgrade watcher re-arms after a re-resolve
- * that stayed read-only. Subscribing makes the server re-send sessions.list
- * for the watched session; without this window that re-send would immediately
- * re-fire the watcher that just armed.
+ * Initial cool-down before the read-only upgrade watcher re-arms after a
+ * re-resolve that stayed read-only (or failed). Subscribing makes the server
+ * re-send sessions.list for the watched session; without this window that
+ * re-send would immediately re-fire the watcher that just armed.
  */
 const READ_ONLY_REARM_COOLDOWN_MS = 1_000;
+/**
+ * Cap for the escalating re-arm backoff. Inconclusive attempts retry at 1s,
+ * 2s, 4s ... up to this ceiling, so a transient presence outage still closes
+ * the eventual-consistency window without an unbounded resolve loop.
+ */
+const READ_ONLY_REARM_MAX_BACKOFF_MS = 30_000;
 
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
@@ -281,6 +287,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   // connection as this one brings nothing new, so it must not re-resolve.
   let lastUpgradeEvidence: { status: string; connectionId?: string | undefined } | null = null;
   let rearmTimer: ReturnType<typeof setTimeout> | null = null;
+  // Current backoff delay for inconclusive (stay-read-only or failed) upgrade
+  // attempts. Resets whenever the watcher sees genuinely new evidence.
+  let rearmBackoffMs = READ_ONLY_REARM_COOLDOWN_MS;
 
   // A session resolves to 'read-only' when the CLI hasn't (yet) reported it as
   // active — but that signal is eventually consistent: enabling remote on the
@@ -317,6 +326,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         lastUpgradeEvidence.connectionId === evidence.connectionId;
       if (unchanged) return;
       lastUpgradeEvidence = evidence;
+      rearmBackoffMs = READ_ONLY_REARM_COOLDOWN_MS;
       void handleUpgradeTrigger();
     });
     disarmUpgradeWatcher = () => {
@@ -356,7 +366,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       config.onError?.(message);
       serviceState.setActivity({ type: 'idle' });
       serviceState.setStatus({ type: 'error', message });
-      armUpgradeWatcher();
+      scheduleUpgradeRetry();
       return;
     }
 
@@ -376,14 +386,29 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     }
 
     // Still read-only: keep the current transport (snapshot and history stay
-    // intact) and re-arm after a cool-down so a heartbeat stream or a presence
-    // outage cannot drive a reconnect loop.
+    // intact) and re-arm on a backoff so a heartbeat stream or a presence
+    // outage cannot drive a reconnect loop. The backoff also clears the
+    // evidence at re-arm time, so an idle CLI's identical rows retry the
+    // resolve once per interval — the eventual-consistency window still
+    // closes after a transient outage.
     config.onResolved?.(resolved);
+    scheduleUpgradeRetry();
+  }
+
+  /**
+   * Re-arm the upgrade watcher after a backoff that doubles with each
+   * inconclusive attempt and clears the last observed row, so the next
+   * payload — even a verbatim repeat — retries the resolve. New evidence
+   * resets the backoff.
+   */
+  function scheduleUpgradeRetry(): void {
     clearRearmTimer();
     rearmTimer = setTimeout(() => {
       rearmTimer = null;
+      lastUpgradeEvidence = null;
       armUpgradeWatcher();
-    }, READ_ONLY_REARM_COOLDOWN_MS);
+    }, rearmBackoffMs);
+    rearmBackoffMs = Math.min(rearmBackoffMs * 2, READ_ONLY_REARM_MAX_BACKOFF_MS);
   }
 
   function connectInternal(): void {
@@ -391,6 +416,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     disarmUpgradeWatcher?.();
     disarmUpgradeWatcher = null;
     lastUpgradeEvidence = null;
+    rearmBackoffMs = READ_ONLY_REARM_COOLDOWN_MS;
     if (transport) {
       transport.destroy();
       transport = null;
@@ -611,6 +637,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
     if (resolved.type === 'read-only') {
       lastUpgradeEvidence = null;
+      rearmBackoffMs = READ_ONLY_REARM_COOLDOWN_MS;
       armUpgradeWatcher();
     }
   }

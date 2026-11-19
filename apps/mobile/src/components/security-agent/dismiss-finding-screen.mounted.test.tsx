@@ -420,20 +420,17 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     }
   );
 
-  it.each(['unknown', 'online'] as const)(
-    'keeps the skeleton for a pause while connectivity is %s',
-    state => {
-      // The online manager also pauses on an unsettled NetInfo report, which is
-      // the normal cold-launch window: that is not a connection failure yet.
-      finding.data = undefined;
-      finding.isPending = true;
-      finding.fetchStatus = 'paused';
-      connectivity.committed = state;
-      const tree = renderScreen();
+  it('keeps the skeleton for a pause while connectivity is unsettled', () => {
+    // The online manager also pauses on an unsettled NetInfo report, which is
+    // the normal cold-launch window: that is not a connection failure yet.
+    finding.data = undefined;
+    finding.isPending = true;
+    finding.fetchStatus = 'paused';
+    connectivity.committed = 'unknown';
+    const tree = renderScreen();
 
-      expect(findAllFailures(tree.root)).toHaveLength(0);
-    }
-  );
+    expect(findAllFailures(tree.root)).toHaveLength(0);
+  });
 
   it('keeps the skeleton for a first finding read still in flight', () => {
     finding.data = undefined;

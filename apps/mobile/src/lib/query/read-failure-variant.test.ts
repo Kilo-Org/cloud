@@ -118,15 +118,17 @@ describe('isReadPausedBeforeData', () => {
     ).toBe(true);
   });
 
-  it('keeps the loading gate while connectivity is still unsettled', () => {
+  it('keeps the loading gate only while connectivity is unsettled', () => {
     // The manager also pauses on an `unknown` NetInfo report, which is the
     // normal cold-launch window: a pause there is not a connection failure.
     expect(
       isReadPausedBeforeData({ isPending: true, fetchStatus: 'paused', connectivity: 'unknown' })
     ).toBe(false);
+    // A settled online connection still names the pause offline: the read sent
+    // nothing, so the app's probe is the more recent answer than NetInfo.
     expect(
       isReadPausedBeforeData({ isPending: true, fetchStatus: 'paused', connectivity: 'online' })
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('is false for a pending read still in flight', () => {

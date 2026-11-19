@@ -1,10 +1,15 @@
-/* eslint-disable max-lines -- one sheet owns the reason/comment draft, three load-failure gates (finding, paused, capability) and the refusal card; main sat 16 lines under the cap before the paused gate */
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 
+import { DismissSheetFrame } from '@/components/security-agent/dismiss-sheet-frame';
+import {
+  DISMISS_REASONS,
+  type DismissReason,
+  isDismissReason,
+} from '@/components/security-agent/dismissal-reasons';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { RefusalStatus } from '@/components/refusal-status';
@@ -35,50 +40,10 @@ import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
 
-// The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
-// (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
-// pairs from the task brief, matching web's dismissal reason picker.
-const DISMISS_REASONS = [
-  { value: 'fix_started', labelKey: 'securityAgent.dismiss.reasonFixStarted' },
-  { value: 'no_bandwidth', labelKey: 'securityAgent.dismiss.reasonNoBandwidth' },
-  { value: 'tolerable_risk', labelKey: 'securityAgent.dismiss.reasonTolerableRisk' },
-  { value: 'inaccurate', labelKey: 'securityAgent.dismiss.reasonInaccurate' },
-  { value: 'not_used', labelKey: 'securityAgent.dismiss.reasonNotUsed' },
-] as const;
-
-type DismissReason = (typeof DISMISS_REASONS)[number]['value'];
-
-function isDismissReason(value: string): value is DismissReason {
-  return DISMISS_REASONS.some(reason => reason.value === value);
-}
-
 type DismissFindingScreenProps = {
   scope: string;
   findingId: string;
 };
-
-/**
- * The chrome the states without a form share: the sheet's title and its close
- * button, over one of the body states below.
- */
-function DismissSheetFrame({ children }: Readonly<{ children: ReactNode }>) {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const headerTopInset = useFormSheetHeaderTopInset();
-  return (
-    <View className="flex-1 bg-background">
-      <SheetHeader
-        title={t('securityAgent.dismiss.title')}
-        variant="close"
-        topInset={headerTopInset}
-        onDone={() => {
-          router.back();
-        }}
-      />
-      {children}
-    </View>
-  );
-}
 
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();

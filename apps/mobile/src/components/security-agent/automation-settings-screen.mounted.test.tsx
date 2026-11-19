@@ -162,20 +162,17 @@ describe('AutomationSettingsScreen approval gate', () => {
     expect(config.refetch).toHaveBeenCalledOnce();
   });
 
-  it.each(['unknown', 'online'] as const)(
-    'keeps the skeleton for a pause while connectivity is %s',
-    state => {
-      // The online manager also pauses on an unsettled NetInfo report, which is
-      // the normal cold-launch window: that is not a connection failure yet.
-      config.data = null;
-      config.isPending = true;
-      config.fetchStatus = 'paused';
-      connectivity.committed = state;
-      renderScreen();
+  it('keeps the skeleton for a pause while connectivity is unsettled', () => {
+    // The online manager also pauses on an unsettled NetInfo report, which is
+    // the normal cold-launch window: that is not a connection failure yet.
+    config.data = null;
+    config.isPending = true;
+    config.fetchStatus = 'paused';
+    connectivity.committed = 'unknown';
+    renderScreen();
 
-      expect(platformError.props).toBeNull();
-    }
-  );
+    expect(platformError.props).toBeNull();
+  });
 
   it('keeps the skeleton for a first read still in flight', () => {
     config.data = null;

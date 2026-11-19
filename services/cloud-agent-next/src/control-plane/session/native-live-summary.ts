@@ -9,6 +9,7 @@ import {
   type SessionLiveFailureKind,
   type SessionLiveSummary,
 } from '@kilocode/session-ingest-contracts';
+import { webUrlHost } from '@kilocode/worker-utils';
 import { logger } from '../../logger.js';
 
 const NATIVE_LIVE_SUMMARY_KEY = 'native_live_summary';
@@ -64,7 +65,7 @@ export function foldNativeLiveSummary(
       const input = typeof item.state.input === 'string' ? {} : item.state.input;
       if (name.toLowerCase() === 'todowrite') plan = sessionLivePlan(input);
       if (item.state.status === 'streaming' || item.state.status === 'running')
-        step = sessionLiveToolStep(name, input);
+        step = sessionLiveToolStep(name, input, webUrlHost);
     } else if (
       item.type === 'reasoning' &&
       item.time?.completed === undefined &&

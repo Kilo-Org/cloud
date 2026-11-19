@@ -55,6 +55,19 @@ describe('native live summary', () => {
     expect(state.summary.step).toEqual({ verb: 'running', target: 'pnpm test' });
   });
 
+  it('maps a Kilo v2 web fetch to its host and falls back to the text', () => {
+    const fetched = foldNativeLiveSummary(
+      EMPTY_NATIVE_LIVE_SUMMARY_STATE,
+      assistant([tool('webfetch', 'running', { url: 'https://docs.example.com:8443/a?b=1' })])
+    );
+    expect(fetched.summary.step).toEqual({ verb: 'searching', target: 'docs.example.com:8443' });
+    const unparsed = foldNativeLiveSummary(
+      EMPTY_NATIVE_LIVE_SUMMARY_STATE,
+      assistant([tool('webfetch', 'running', { url: 'docs.example.com/a' })])
+    );
+    expect(unparsed.summary.step).toEqual({ verb: 'searching', target: 'docs.example.com/a' });
+  });
+
   it('keeps the step of a finished tool and thinks only on unfinished trailing reasoning', () => {
     const started = foldNativeLiveSummary(
       EMPTY_NATIVE_LIVE_SUMMARY_STATE,

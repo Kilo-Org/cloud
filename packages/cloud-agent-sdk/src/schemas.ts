@@ -15,13 +15,17 @@ import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 export * from './cloud-conversation-schemas';
 export { PREPARATION_MAX_DETAIL_LENGTH, preparationStepSchema } from './preparation-step';
 
-export const cloudWorktreeChangesReadyDataSchema = z
+/**
+ * The wire payload of either refresh channel: a strictly positive revision,
+ * rejected when any other field rides along.
+ */
+const channelRevisionDataSchema = z
   .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
   .strict();
 
-export const cloudWorkspaceArtifactsChangedDataSchema = z
-  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
-  .strict();
+export const cloudWorktreeChangesReadyDataSchema = channelRevisionDataSchema;
+
+export const cloudWorkspaceArtifactsChangedDataSchema = channelRevisionDataSchema;
 
 export const streamErrorSchema = z.object({
   type: z.literal('error'),

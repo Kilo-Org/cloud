@@ -44,17 +44,21 @@ export function getFilePartKind(input: { mime: string; filename?: string }): Fil
   return 'other';
 }
 
-function resolveName(filename: string | undefined): string {
-  // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'), which
-  // languages inflect by number; this key is the standalone noun label.
-  return filename && filename.trim() !== '' ? filename : i18n.t('common.file');
+function hasName(filename: string | undefined): filename is string {
+  return filename !== undefined && filename.trim() !== '';
 }
 
 export function getFilePartAccessibilityLabel(kind: FilePartKind, filename?: string): string {
-  const name = resolveName(filename);
   if (kind === 'image') {
-    return i18n.t('agentChat.filePart.openFullScreen', { name });
+    // An image with no name — a photo attached to a chat — is named as an
+    // image, never as the generic "File" the other kinds fall back to.
+    return hasName(filename)
+      ? i18n.t('agentChat.filePart.openFullScreen', { name: filename })
+      : i18n.t('agentChat.filePart.viewImage');
   }
+  // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'), which
+  // languages inflect by number; this key is the standalone noun label.
+  const name = hasName(filename) ? filename : i18n.t('common.file');
   if (kind === 'markdown') {
     return i18n.t('agentChat.filePart.preview', { name });
   }

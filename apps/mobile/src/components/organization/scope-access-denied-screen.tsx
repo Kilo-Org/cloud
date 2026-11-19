@@ -4,7 +4,8 @@ import { View } from 'react-native';
 
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { StateAction } from '@/components/empty-state';
-import { ArrowLeft, RotateCcw } from '@/components/ui/icons';
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
+import { RotateCcw } from '@/components/ui/icons';
 import { type OrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
@@ -17,19 +18,21 @@ import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
  * Leaving leads: Back to profile drops the stale selection, exactly like the
  * shared organization boundary's absent-override state, so the reader lands on
  * a scope they can open. Retry only re-resolves the membership, for an owner
- * who restores access while the reader waits.
+ * who restores access while the reader waits. A deleted organization cannot
+ * come back, so the not-found state is the shared one with Back alone.
  */
 export function ScopeAccessDeniedScreen({
   title,
-  eyebrow,
+  subtitle,
   kind,
   onRetry,
   isRetrying = false,
   backFallback,
 }: Readonly<{
-  /** ScreenHeader's title: the product name, or the organization's name. */
+  /** ScreenHeader's title: the product's name. */
   title: string;
-  eyebrow?: string;
+  /** The line under the title: the organization the reader may not see. */
+  subtitle?: string;
   /** `'not-found'` for an organization that no longer exists. */
   kind: Exclude<OrganizationScopeAccess, 'granted'>;
   onRetry: () => void;
@@ -40,11 +43,20 @@ export function ScopeAccessDeniedScreen({
   const router = useRouter();
   const { t } = useTranslation();
   const notFound = kind === 'not-found';
+  const backToProfile = (
+    <StateAction
+      label={t('organization.boundary.backToProfile')}
+      icon={DirectionalArrowLeft}
+      onPress={() => {
+        router.replace(PROFILE_TAB_HREF);
+      }}
+    />
+  );
 
   return (
     <PlatformErrorScreen
       title={title}
-      eyebrow={eyebrow}
+      subtitle={subtitle}
       backFallback={backFallback}
       variant={notFound ? 'not-found' : 'permission'}
       message={t(
@@ -53,24 +65,22 @@ export function ScopeAccessDeniedScreen({
           : 'organization.boundary.accessDeniedDescription'
       )}
       action={
-        <View className="gap-3">
-          {/* Leaving is the recovery this surface leads with, so it holds the
-              one filled control. Retry only re-resolves the membership, and
-              the state slot has one action shape for both. */}
-          <StateAction
-            label={t('organization.boundary.backToProfile')}
-            icon={ArrowLeft}
-            onPress={() => {
-              router.replace(PROFILE_TAB_HREF);
-            }}
-          />
-          <StateAction
-            label={t('common.retry')}
-            icon={RotateCcw}
-            loading={isRetrying}
-            onPress={onRetry}
-          />
-        </View>
+        notFound ? (
+          backToProfile
+        ) : (
+          <View className="gap-3">
+            {/* Leaving is the recovery this surface leads with, so it holds the
+                one filled control. Retry only re-resolves the membership, and
+                the state slot has one action shape for both. */}
+            {backToProfile}
+            <StateAction
+              label={t('common.retry')}
+              icon={RotateCcw}
+              loading={isRetrying}
+              onPress={onRetry}
+            />
+          </View>
+        )
       }
     />
   );

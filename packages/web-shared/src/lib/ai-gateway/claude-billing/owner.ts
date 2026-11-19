@@ -10,24 +10,26 @@ export type ClaudeBillingOwner =
   | { kind: 'organization'; organizationId: string };
 
 /**
- * The owner columns of a connection. The cross-region read applies the
- * predicate to a wire answer that may omit a column, so a column can be absent.
+ * The owner columns of a connection: a personal connection names the user id,
+ * an organization connection the organization id, and neither names both.
  */
-type ClaudeBillingOwnerColumns = Partial<
-  Pick<ClaudeBillingConnectionRow, 'kilo_user_id' | 'organization_id'>
+export type ClaudeBillingOwnerColumns = Pick<
+  ClaudeBillingConnectionRow,
+  'kilo_user_id' | 'organization_id'
 >;
 
 /**
  * Whether a connection belongs to an owner, which is the predicate
  * `claudeBillingOwnerWhere` applies in the database. The local read uses it on a
  * row it selected and the cross-region read uses it on the row another
- * deployment answers with, so both reads bind a connection to the same owner.
+ * deployment answers with, which may omit a column, so the columns are partial.
+ * Both reads bind a connection to the same owner.
  *
  * The organization identifiers compare without case, because a UUID column
  * compares by value and a request may name the organization in any case.
  */
 export function claudeBillingOwnerMatches(
-  columns: ClaudeBillingOwnerColumns,
+  columns: Partial<ClaudeBillingOwnerColumns>,
   owner: ClaudeBillingOwner
 ): boolean {
   const organizationId = columns.organization_id?.toLowerCase();

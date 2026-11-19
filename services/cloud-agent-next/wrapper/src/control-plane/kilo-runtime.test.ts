@@ -21,6 +21,7 @@ import {
   createKiloRuntimes,
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
+  KiloWorktreePolicyMismatchError,
   kiloServerPort,
   liveRuntimeClient,
   parseKiloPidfile,
@@ -2928,6 +2929,136 @@ describe('createKiloRuntimes', () => {
     expect(drift).toBeInstanceOf(KiloWorktreeMcpMismatchError);
     // Drift must not silently recreate the runtime with the changed servers.
     expect(created).toBe(1);
+  });
+
+  it('reuses a warm runtime for the same authorization policy and rejects policy drift', async () => {
+    let created = 0;
+    const runtimes = createKiloRuntimes({
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-policy-test-pids',
+      createRuntime: options => {
+        created += 1;
+        return {
+          directory: options.directory,
+          env: options.env,
+          client: {},
+          ensure: async () => ({}),
+          installCredentials: async () => undefined,
+          applyPendingCredentials: async () => false,
+          isSuspected: () => false,
+          isRestarting: () => false,
+          isUnavailable: () => false,
+          shutdown: async () => undefined,
+        } as unknown as KiloRuntime;
+      },
+    });
+    const config = (permission: unknown, reviewTarget?: string) => ({
+      KILO_CONFIG_CONTENT: JSON.stringify({ permission }),
+      ...(reviewTarget ? { KILO_GITHUB_REVIEW_TARGET: reviewTarget } : {}),
+    });
+    const input = (env: Record<string, string>) => ({
+      key: '/tmp/policy-dir',
+      directory: '/tmp/policy-dir',
+      env,
+    });
+
+    await runtimes.ensure(input(config('allow')));
+    // A rotated Kilo credential and provider key keep the policy: reuse.
+    await runtimes.ensure(
+      input({
+        KILOCODE_TOKEN: 'kcp1.rotated',
+        KILO_CONFIG_CONTENT: JSON.stringify({
+          permission: 'allow',
+          provider: { apiKey: 'rotated' },
+        }),
+      })
+    );
+    expect(created).toBe(1);
+
+    // The workspace MCP grant rotates between routes on one key: reuse.
+    await runtimes.ensure(
+      input({
+        KILO_CONFIG_CONTENT: JSON.stringify({
+          permission: 'allow',
+          mcp: { 'kilo-cloud-agent': { headers: { Authorization: 'Bearer grant-b' } } },
+        }),
+      })
+    );
+    expect(created).toBe(1);
+
+    // A different command policy never shares the runtime's policy.
+    let permissionDrift: unknown;
+    try {
+      await runtimes.ensure(input(config({ bash: { '*': 'deny', 'git status': 'allow' } })));
+    } catch (error) {
+      permissionDrift = error;
+    }
+    expect(permissionDrift).toBeInstanceOf(KiloWorktreePolicyMismatchError);
+    expect(created).toBe(1);
+
+    // A different trusted review target is a policy drift too.
+    let targetDrift: unknown;
+    try {
+      await runtimes.ensure(input(config('allow', 'acme/widgets#42')));
+    } catch (error) {
+      targetDrift = error;
+    }
+    expect(targetDrift).toBeInstanceOf(KiloWorktreePolicyMismatchError);
+    expect(created).toBe(1);
+
+    // A live credential install cannot change the policy siblings run under,
+    // and the runtime keeps its own configuration.
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      env: config({ edit: 'deny' }),
+    });
+    let installDrift: unknown;
+    try {
+      await runtime.installCredentials(config({ edit: 'allow' }));
+    } catch (error) {
+      installDrift = error;
+    }
+    expect(installDrift).toBeInstanceOf(KiloWorktreePolicyMismatchError);
+    expect(JSON.parse(runtime.env.KILO_CONFIG_CONTENT ?? '{}')).toEqual({
+      permission: { edit: 'deny' },
+    });
+    await runtime.shutdown();
+  });
+
+  it('signs an unreadable runtime configuration by its own text', async () => {
+    // A configuration that cannot be read compares by its own text, so a
+    // credential install admits it only when the text is identical.
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      env: { KILO_CONFIG_CONTENT: 'not json' },
+    });
+    let drift: unknown;
+    try {
+      await runtime.installCredentials({ KILO_CONFIG_CONTENT: '{"permission":' });
+    } catch (error) {
+      drift = error;
+    }
+    expect(drift).toBeInstanceOf(KiloWorktreePolicyMismatchError);
+    expect(runtime.env.KILO_CONFIG_CONTENT).toBe('not json');
+    await runtime.shutdown();
+
+    // The identical configuration is accepted.
+    const { runtime: unreadable } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      env: { KILO_CONFIG_CONTENT: '{"permission":' },
+    });
+    await unreadable.installCredentials({ KILO_CONFIG_CONTENT: '{"permission":' });
+    expect(unreadable.env.KILO_CONFIG_CONTENT).toBe('{"permission":');
+    await unreadable.shutdown();
   });
 
   it('rejects a proxy/non-proxy credential-class mismatch and never recreates the runtime', async () => {

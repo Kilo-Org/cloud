@@ -54,7 +54,6 @@ import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-cl
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
 import { hasVisibleComposerText } from '@/lib/composer-text';
-import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
@@ -524,32 +523,21 @@ export function NewSessionPrompt({
           setTopChromeHeight(event.nativeEvent.layout.height);
         }}
       >
-        {isModelsError && modelOptions.length === 0 ? (
-          <QueryError
-            placement="top"
-            inset="gutter"
-            variant="server"
-            title={t('agentChat.newSession.couldNotLoadModels')}
-            message={t('organization.boundary.loadErrorMessage')}
-            onRetry={() => {
-              onRefetchModels();
-            }}
-            className="border-b-[0.5px] border-hair-soft py-4"
-          />
-        ) : (
-          <ChatToolbar
-            modeControl={{ mode, onModeChange, customOptions }}
-            model={model}
-            variant={variant}
-            modelOptions={modelOptions}
-            onModelSelect={onModelSelect}
-            disabled={isCreating}
-            isLoadingModels={isLoadingModels}
-            modelLocked={modelLocked}
-            modelLockLabel={modelLockLabel}
-            className="border-b-[0.5px] border-hair-soft bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-          />
-        )}
+        {/* A failed models read keeps the toolbar: the pinned footer names that
+            failure as the reason Start waits and carries its Retry, so the
+            composer does not state it a second time above the prompt. */}
+        <ChatToolbar
+          modeControl={{ mode, onModeChange, customOptions }}
+          model={model}
+          variant={variant}
+          modelOptions={modelOptions}
+          onModelSelect={onModelSelect}
+          disabled={isCreating}
+          isLoadingModels={isLoadingModels}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
+          className="border-b-[0.5px] border-hair-soft bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+        />
         {sharePrefill.failed ? (
           <SharePrefillFailure
             onRetry={() => {

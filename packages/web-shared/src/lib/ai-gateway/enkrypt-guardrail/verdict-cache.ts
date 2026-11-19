@@ -93,7 +93,14 @@ export type EnkryptCachedScanResult = Omit<EnkryptGuardrailScanResult, 'report'>
 
 type ReadyConfig = Extract<EnkryptGuardrailConfig, { status: 'ready' }>;
 
-type ScanDependencies = EnkryptDetectDependencies & { store: EnkryptVerdictCacheStore | null };
+type ScanDependencies = EnkryptDetectDependencies & {
+  store: EnkryptVerdictCacheStore | null;
+  /**
+   * Called with a call's cache entry as soon as the call finishes, before the next call starts, so
+   * the entry can be written while the scan goes on. The same object is also in the part's result.
+   */
+  onCacheEntry?: (entry: EnkryptVerdictCacheEntry) => void;
+};
 
 function configHash(config: ReadyConfig): Buffer {
   return createHash('sha256')
@@ -337,23 +344,19 @@ function cacheableVerdict(
 }
 
 /**
- * What to cache for the calls of a part, each the scan of one unit: an allow or a genuine block, or
- * for a failed call a short-lived allow, so the next request rescans only the units without a
- * verdict, and a failed unit only once its allow expired. A call that was skipped, because the
- * request was blocked first, caches nothing. Writes are deferred and auto-pipelined, and an
- * allow is never overwritten.
+ * What to cache for a call, the scan of one unit: an allow or a genuine block, or for a failed call
+ * a short-lived allow, so the next request rescans only the units without a verdict, and a failed
+ * unit only once its allow expired. A call that was skipped, because the request was blocked
+ * first, caches nothing. The caller writes each entry as its call finishes, and an allow is never
+ * overwritten.
  */
-function callCacheEntries(
-  calls: KeyedUnit[],
-  results: (EnkryptGuardrailScanResult | null)[],
+function callCacheEntry(
+  { key }: KeyedUnit,
+  result: EnkryptGuardrailScanResult | null,
   cache: VerdictCache | null
-): EnkryptVerdictCacheEntry[] {
-  if (!cache) return [];
-  return calls.flatMap(({ key }, index): EnkryptVerdictCacheEntry[] => {
-    const result = results[index];
-    const cacheable = result ? cacheableVerdict(result, cache.config) : null;
-    return cacheable && key ? [{ key, ...cacheable }] : [];
-  });
+): EnkryptVerdictCacheEntry | null {
+  const cacheable = cache && result ? cacheableVerdict(result, cache.config) : null;
+  return cacheable && key ? { key, ...cacheable } : null;
 }
 
 /** Calls that failed but whose units are cached as allowed briefly anyway; see `isFailedAllow`. */
@@ -487,9 +490,12 @@ type PartPlan = {
   scans: EnkryptGuardrailScan[];
   /** `scans` in the order they run, newest unit first. */
   scanOrder: EnkryptGuardrailScan[];
+  /** The unit each scan that makes a call scans. */
+  unitOfScan: Map<EnkryptGuardrailScan, KeyedUnit>;
   cachedBlock: boolean;
   finish(
-    resultOf: (scan: EnkryptGuardrailScan) => EnkryptGuardrailScanResult | null
+    resultOf: (scan: EnkryptGuardrailScan) => EnkryptGuardrailScanResult | null,
+    entryOf: (scan: EnkryptGuardrailScan) => EnkryptVerdictCacheEntry | null
   ): EnkryptCachedScanResult;
 };
 
@@ -513,6 +519,14 @@ function callScans(
     text: call.text,
     coverage: { ...coverage, chunk: { index, count: calls.length } },
   }));
+}
+
+/** Pairs each scan of `callScans` that makes a call with its unit. */
+function scanUnitEntries(
+  scans: EnkryptGuardrailScan[],
+  calls: KeyedUnit[]
+): [EnkryptGuardrailScan, KeyedUnit][] {
+  return calls.map((call, index) => [required(scans[index]), call]);
 }
 
 /**
@@ -564,6 +578,7 @@ async function planSegmentsPart(
     return {
       scans: [],
       scanOrder: [],
+      unitOfScan: new Map(),
       cachedBlock: true,
       finish: () => ({
         verdict: { action: 'block', message: guardrailBlockMessage(detectors, null) },
@@ -578,8 +593,9 @@ async function planSegmentsPart(
   return {
     scans,
     scanOrder: newestFirst(scans, calls),
+    unitOfScan: new Map(scanUnitEntries(scans, calls)),
     cachedBlock: false,
-    finish(resultOf) {
+    finish(resultOf, entryOf) {
       const results = scans.map(resultOf);
       const result = combineChunks(scans, results);
       return {
@@ -593,7 +609,7 @@ async function planSegmentsPart(
           call_outcomes: callOutcomes(calls, results),
           calls_skipped: skippedCalls(results),
         },
-        cacheEntries: callCacheEntries(calls, results, cache),
+        cacheEntries: scans.flatMap(scan => entryOf(scan) ?? []),
       };
     },
   };
@@ -806,8 +822,11 @@ async function planTools(
     scanOrder: plans
       .toReversed()
       .flatMap(plan => ('scans' in plan ? newestFirst(plan.scans, plan.calls) : [])),
+    unitOfScan: new Map(
+      plans.flatMap(plan => ('scans' in plan ? scanUnitEntries(plan.scans, plan.calls) : []))
+    ),
     cachedBlock: plans.some(plan => 'verdict' in plan && plan.verdict !== 'allow'),
-    finish(resultOf) {
+    finish(resultOf, entryOf) {
       const outcomes = plans.map((plan): ToolOutcome => {
         const { tool, characters, cachedCharacters, totalUnits, cachedUnits } = plan;
         if ('verdict' in plan) {
@@ -830,7 +849,7 @@ async function planTools(
           outcome: {
             kind: 'scanned',
             result: combineChunks(plan.scans, results),
-            cacheEntries: callCacheEntries(plan.calls, results, cache),
+            cacheEntries: plan.scans.flatMap(scan => entryOf(scan) ?? []),
             failedCallsCached: failedCallsCached(results, cache),
             callsCached: callsCached(results, cache),
             callOutcomes: callOutcomes(plan.calls, results),
@@ -896,14 +915,17 @@ async function planTools(
  * no call, so it does not stop the others.
  *
  * Each finished call is cached on its own, so when the deadline cuts a long conversation short, the
- * next request rescans only the calls that did not finish. A call the deadline leaves no time to
- * start is not made, and fails like one that ran out of time. They all share one deadline, started
+ * next request rescans only the calls that did not finish. Its entry goes to `deps.onCacheEntry` as
+ * soon as it finishes, so a concurrent request of the organization, such as a parallel subagent
+ * with the same system prompt and tools, can already use it while this scan goes on; the part's
+ * result holds the same entry object. A call the deadline leaves no time to start is not made, and
+ * fails like one that ran out of time. They all share one deadline, started
  * before the lookups unless `deps.deadline` is given, so the part results arrive within
  * `deps.timeoutMs` plus the lookup.
  */
 export async function scanRequestWithVerdictCache(
   { parts, ...request }: EnkryptGuardrailRequest,
-  { store, ...deps }: ScanDependencies
+  { store, onCacheEntry, ...deps }: ScanDependencies
 ): Promise<EnkryptCachedScanResult[]> {
   const scanDeps: EnkryptDetectDependencies = {
     ...deps,
@@ -918,7 +940,9 @@ export async function scanRequestWithVerdictCache(
   ]);
   const plans = [tools, system, conversation].filter(plan => plan !== null);
   const scanOrder = [conversation, system, tools].flatMap(plan => plan?.scanOrder ?? []);
+  const unitOfScan = new Map(plans.flatMap(plan => [...plan.unitOfScan]));
   const results = new Map<EnkryptGuardrailScan, EnkryptGuardrailScanResult | null>();
+  const entries = new Map<EnkryptGuardrailScan, EnkryptVerdictCacheEntry>();
   let blocked = plans.some(plan => plan.cachedBlock);
   for (const scan of scanOrder) {
     // A scan of no text makes no call; it only reports a fully cached part.
@@ -929,8 +953,19 @@ export async function scanRequestWithVerdictCache(
     const result = await scanRequest(scan, scanDeps);
     results.set(scan, result);
     blocked ||= result.verdict.action === 'block';
+    const unit = unitOfScan.get(scan);
+    const entry = unit && callCacheEntry(unit, result, cache);
+    if (entry) {
+      entries.set(scan, entry);
+      onCacheEntry?.(entry);
+    }
   }
-  return plans.map(plan => plan.finish(scan => required(results.get(scan))));
+  return plans.map(plan =>
+    plan.finish(
+      scan => required(results.get(scan)),
+      scan => entries.get(scan) ?? null
+    )
+  );
 }
 
 export async function rememberRequestVerdict(

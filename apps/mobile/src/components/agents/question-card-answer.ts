@@ -32,14 +32,6 @@ export function pressSingleChoice(answer: SingleAnswer, choice: number): SingleA
 }
 
 /**
- * Choose the custom field on a single-choice question. A radio re-press keeps
- * the answer — and its typed text — as it is.
- */
-export function pressSingleCustom(answer: SingleAnswer): SingleAnswer {
-  return answer.kind === 'custom' ? answer : { kind: 'custom' };
-}
-
-/**
  * Select the custom field for a single-choice question while it holds text.
  *
  * Empty text clears a custom answer and nothing else: typing a space in the
@@ -71,17 +63,6 @@ export function toggleMultiChoice(answer: MultiAnswer, choice: number): MultiAns
     return chosen.size > 0 ? { kind: 'presets-and-custom', chosen } : { kind: 'custom' };
   }
   return chosen.size > 0 ? { kind: 'presets', chosen } : MULTI_NONE;
-}
-
-/** Add or remove the custom field, keeping any chosen presets. */
-export function toggleMultiCustom(answer: MultiAnswer): MultiAnswer {
-  if (answer.kind === 'presets') {
-    return { kind: 'presets-and-custom', chosen: answer.chosen };
-  }
-  if (answer.kind === 'presets-and-custom') {
-    return answer.chosen.size > 0 ? { kind: 'presets', chosen: answer.chosen } : MULTI_NONE;
-  }
-  return answer.kind === 'custom' ? MULTI_NONE : { kind: 'custom' };
 }
 
 /** Select the custom field while it holds text; empty text removes it and keeps the presets. */

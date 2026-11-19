@@ -1,7 +1,8 @@
+import Stripe from 'stripe';
 import { client } from '@kilocode/web-shared/lib/stripe-client';
 
 export type PaymentMethodInfo = {
-  type: string;
+  type: Stripe.PaymentMethod.Type;
   last4: string | null;
   brand: string | null;
   linkEmail: string | null;
@@ -10,7 +11,12 @@ export type PaymentMethodInfo = {
 
 /**
  * Retrieves payment method info from Stripe for a given payment method ID.
- * Returns null if the payment method ID is null/undefined, doesn't exist, or was deleted.
+ *
+ * Returns null only when the id is null/undefined, or when Stripe reports the
+ * resource is missing because the payment method was deleted. Every other
+ * Stripe failure — authentication, rate limit, permissions, network — is
+ * thrown to the caller, so it is reported instead of being shown as an absent
+ * payment method.
  */
 export async function retrievePaymentMethodInfo(
   stripePaymentMethodId: string | null | undefined
@@ -27,8 +33,13 @@ export async function retrievePaymentMethodInfo(
       linkEmail: paymentMethod.link?.email ?? null,
       stripePaymentMethodId: paymentMethod.id,
     };
-  } catch {
-    // Payment method may have been deleted from Stripe
-    return null;
+  } catch (error) {
+    if (
+      error instanceof Stripe.errors.StripeInvalidRequestError &&
+      error.code === 'resource_missing'
+    ) {
+      return null;
+    }
+    throw error;
   }
 }

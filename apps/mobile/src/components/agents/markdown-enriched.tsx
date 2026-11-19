@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 
 import { ImageViewer } from '@/components/ui/image-viewer';
 import { TOKEN_DARK_LIGHT } from '@/lib/pr-review/diff/syntax-colors';
-import { rtlBlockTextAlign } from '@/lib/rtl-text';
 
 import {
   type MarkdownCopyCodeHandler,
@@ -42,18 +41,16 @@ const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 const BODY_LINE_HEIGHT = 24;
 
-function enrichedStyle(palette: MarkdownPalette, alignBlocksWithInterface: boolean): MarkdownStyle {
+function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
   const half = palette.codeTokenScheme === 'onLight' ? 'light' : 'dark';
   const headings = getMarkdownHeadingStyles(palette);
   // The native renderer resolves each paragraph's direction from its first
-  // strong character, so an English reply stays at the left edge of a
-  // right-to-left interface while the Thought row and the failure block around
-  // it sit on the start edge. Naming the interface start keeps the assistant
-  // turn in one column; the run inside the line still reads left to right. A
-  // body with its own base direction passes `false` and keeps the renderer's
-  // natural alignment.
-  const blockTextAlign = rtlBlockTextAlign(alignBlocksWithInterface);
+  // strong character. That is the rule for markdown, which is always copy the
+  // app did not write: an English reply keeps its left edge and the punctuation
+  // that ends it inside a right-to-left interface, and an Arabic one still sits
+  // on the right. Naming the interface's start edge instead right-aligned the
+  // English and left the punctuation of a wrapped line at the wrong end.
   const heading = (level: keyof typeof headings) => {
     const style = headings[level];
     return {
@@ -62,7 +59,6 @@ function enrichedStyle(palette: MarkdownPalette, alignBlocksWithInterface: boole
       fontWeight: style.fontWeight,
       marginTop: style.marginTop,
       marginBottom: style.marginBottom,
-      ...blockTextAlign,
     };
   };
   return {
@@ -76,7 +72,6 @@ function enrichedStyle(palette: MarkdownPalette, alignBlocksWithInterface: boole
       lineHeight: BODY_LINE_HEIGHT,
       marginTop: 0,
       marginBottom: 4,
-      ...blockTextAlign,
     },
     h1: heading('h1'),
     h2: heading('h2'),
@@ -167,13 +162,9 @@ export function MarkdownEnriched({
 }: Readonly<MarkdownEnrichedProps>) {
   const { t } = useTranslation();
   const [viewer, setViewer] = useState<{ uri: string; filename: string } | null>(null);
-  // A document body that names its own direction keeps the renderer's natural
-  // alignment, so the English legal text stays left aligned in a right-to-left
-  // interface; chat keeps naming the interface start edge.
-  const markdownStyle = useMemo(
-    () => enrichedStyle(palette, I18nManager.isRTL && documentDirection !== 'ltr'),
-    [palette, documentDirection]
-  );
+  // Markdown is always copy the app did not write, so every block keeps the
+  // renderer's own per-paragraph direction (`enrichedStyle`).
+  const markdownStyle = useMemo(() => enrichedStyle(palette), [palette]);
   const images = useMemo(() => findMarkdownImages(value), [value]);
   // One flag per image, so trusting a host or confirming a URI re-renders
   // with the real image and a revoke gates it again.

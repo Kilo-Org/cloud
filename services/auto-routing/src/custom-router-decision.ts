@@ -1,10 +1,10 @@
 import {
   customRouterCandidateModel,
   customRouterEntryKey,
-  customRouterEntryRef,
   customRouterModelId,
   isVirtualAutoModelId,
   parseCustomRouterCandidateModel,
+  toCustomRouterEntryRef,
   type AutoRoutingDecision,
   type CustomRouterClientEntryId,
   type CustomRouterDecision,
@@ -200,7 +200,7 @@ export function customRouterDecision(
     );
   }
   const classification = run.response.classifierResult?.classification ?? null;
-  const entry = customRouterEntryRef(fallback);
+  const entry = toCustomRouterEntryRef(fallback);
   return {
     model: customRouterCandidateModel(entry),
     entry,

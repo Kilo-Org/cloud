@@ -19,6 +19,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX', X: 'X' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',

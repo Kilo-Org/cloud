@@ -3,9 +3,9 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { Text } from '@/components/ui/text';
 import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
-import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -96,9 +96,11 @@ export function LaunchFolderField({
         <Text className="mb-2 text-sm font-medium text-muted-foreground">
           {t('agentChat.folderPicker.fieldLabel')}
         </Text>
-        <Text className="text-sm text-muted-foreground">
-          {stripInlineCodeMarkers(t('agentChat.instancePicker.noCliInstancesDescription'))}
-        </Text>
+        <InlineCodeText
+          className="text-sm text-muted-foreground"
+          codeClassName="text-muted-foreground"
+          value={t('agentChat.instancePicker.noCliInstancesDescription')}
+        />
       </View>
     );
   }

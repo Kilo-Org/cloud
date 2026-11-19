@@ -94,7 +94,7 @@ export async function sweepAgentBriefings(now = new Date()) {
               ...emptySummary,
               status: pending ? 'pending' : 'unavailable',
               model: setting.model,
-              ...(expired && active ? { error: 'time_limit', finishedAt: iso } : {}),
+              ...(expired && active ? { error: 'not_admitted', finishedAt: iso } : {}),
               authorization: {
                 model: setting.model,
                 maxSpendMicrodollars: setting.max_spend_microdollars,
@@ -168,7 +168,7 @@ export async function sweepAgentBriefings(now = new Date()) {
         .update(agent_briefing_snapshots)
         .set({
           job_due_at: null,
-          summary: sql`${agent_briefing_snapshots.summary} || ${JSON.stringify({ status: 'unavailable', finishedAt: iso, error: 'time_limit' })}::jsonb`,
+          summary: sql`${agent_briefing_snapshots.summary} || ${JSON.stringify({ status: 'unavailable', finishedAt: iso, error: 'not_admitted' })}::jsonb`,
         })
         .where(
           and(
@@ -249,6 +249,8 @@ export async function generatePendingAgentBriefings() {
       )
     )
     .orderBy(asc(agent_briefing_snapshots.job_due_at))
+    // Platform-wide, at most two generations run at once and each is capped at a
+    // 600-second duration; this selection feeds that chosen policy's pool.
     .limit(2);
   const results = await Promise.allSettled(reports.map(report => runBriefingSummary(report.id)));
   const rejected = results.filter(result => result.status === 'rejected').length;

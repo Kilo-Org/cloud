@@ -314,6 +314,7 @@ describe('createNativeUserWebConnectionLifecycleHooks', () => {
     netInfoListener({ isConnected: true, isInternetReachable: true });
     expect(onOnlineCallback).toHaveBeenCalledTimes(1);
 
-    expect(removeOnlineListener).toBe(removeNetInfoListener);
+    removeOnlineListener();
+    expect(removeNetInfoListener).toHaveBeenCalledTimes(1);
   });
 });

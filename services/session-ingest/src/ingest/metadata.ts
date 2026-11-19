@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
+import type { PublishCloudAgentSessionStatusParams } from '@kilocode/session-ingest-contracts';
 import { hasOrganizationAccess, normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 
 import type { Env } from '../env';
@@ -176,7 +177,8 @@ export async function applyMetadataChanges(
   sessionId: string,
   mergedChanges: Map<string, string | null>,
   ctx?: { waitUntil(promise: Promise<unknown>): void },
-  expectedCloudAgentSessionId?: string
+  expectedCloudAgentSessionId?: string,
+  nativeRename?: PublishCloudAgentSessionStatusParams['rename']
 ): Promise<void> {
   if (mergedChanges.size === 0) return;
 
@@ -195,7 +197,7 @@ export async function applyMetadataChanges(
   /** True only when an organization_id write was actually applied (authorized claim or explicit null clear). */
   let organizationIdWriteApplied = false;
 
-  /** True only when an agent-generated title write was actually applied (placeholder was still unset). */
+  /** True only when a title write was actually applied: an agent-generated title over the placeholder, or a native rename. */
   let titleWriteApplied = false;
 
   /** True only when a git_url write was actually applied (non-Cloud-Agent write or Cloud Agent null-to-value heal). */
@@ -314,6 +316,24 @@ export async function applyMetadataChanges(
         });
         delete updates.title;
       }
+    }
+
+    // A native rename rides every publication from the first one that carried it until one is
+    // delivered, so the same rename can arrive twice. Apply it only while the stored status
+    // transition is older than the one named in the rename: that rejects a late older
+    // publication and a repeat after the rename landed, even when a user renamed the session in
+    // between. Neither user rename path carries an ordering signal — the web rename and the
+    // reported title both leave status_transition_id alone — so a first delivery that has not
+    // landed yet can still replace a user rename made in the meantime. That is last-write-wins,
+    // exactly as for a CLI rename report.
+    if (
+      nativeRename !== undefined &&
+      !isDefaultSessionTitle(nativeRename.title) &&
+      (currentRow.statusTransitionId === null ||
+        currentRow.statusTransitionId < nativeRename.transitionId)
+    ) {
+      updates.title = nativeRename.title;
+      titleWriteApplied = true;
     }
 
     // Membership check only for non-null org claims; run on the same tx as the UPDATE.

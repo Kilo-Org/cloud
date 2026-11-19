@@ -93,6 +93,9 @@ function catalogsOf(root) {
  * The value records why the split is real. Adding an entry claims the call sites
  * mean different things; removing one promises the copy means the same thing
  * everywhere it appears.
+ *
+ * Each key is the copy compared through `wording()`, so it is trimmed, case
+ * folded and stripped of trailing sentence punctuation.
  */
 const TWO_SENSE_COPY = new Map([
   [
@@ -107,6 +110,10 @@ const TWO_SENSE_COPY = new Map([
   [
     'contact support',
     'the recovery action beside a Code Reviewer alert, versus the support contact beside the AI Guardrails availability notice',
+  ],
+  [
+    'terms of service',
+    "the document's own title on the Legal screen and the PR-discussion alert, versus the form the sign-in consent sentence's verb governs in an inflected language",
   ],
   [
     'receipt',
@@ -1004,14 +1011,9 @@ function placeholderTokens(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map(match => match[1]);
 }
 
-/** The `{{token}}` set of one string, as a sorted, counted signature. */
-function placeholders(value) {
-  return placeholderTokens(value).sort().join(',');
-}
-
-/** The tokens of a `placeholders` signature. */
-function signatureTokens(signature) {
-  return signature === '' ? [] : signature.split(',');
+/** The sorted, comma-joined signature the diagnostics print for one token list. */
+function signature(tokens) {
+  return tokens.slice().sort().join(',');
 }
 
 /** The `$t(key)` set of one string. A copy names a label; it never spells it. */
@@ -1313,10 +1315,12 @@ function scanSource(catalog, root) {
   }
   // A key the source builds from the catalog has no literal of its own, so the
   // literals beside it stand in for it: `generic.body.` plus `chatMessage` is
-  // `generic.body.chatMessage`. The set is copied because the expansion grows
-  // it while it runs.
+  // `generic.body.chatMessage`. The literals are snapshotted once: a second
+  // head must not prefix a key an earlier head already synthesized, since
+  // `a.` then `b.` over the literal `c` would also yield `b.a.c`.
+  const literals = [...referenced];
   for (const prefix of keyPrefixes) {
-    for (const value of [...referenced]) {
+    for (const value of literals) {
       referenced.add(`${prefix}${value}`);
     }
   }
@@ -1636,16 +1640,17 @@ function familyVisibleCounts(english, base) {
 
 /**
  * Whether a plural category's placeholder set is English's plus tokens from its
- * own family. Returns false for a non-plural key, for a dropped required token,
- * and for a token no value of the family uses.
+ * own family. `actualTokens` and `expectedTokens` are the category's own
+ * `{{token}}` lists, one element per placeholder. Returns false for a non-plural
+ * key, for a dropped required token, and for a token no value of the family uses.
  */
-function addsFamilyPlaceholderOnly(english, key, actual, expected) {
+function addsFamilyPlaceholderOnly(english, key, actualTokens, expectedTokens) {
   const parts = pluralParts(key);
   if (!parts) {
     return false;
   }
-  const required = new Set(signatureTokens(expected));
-  const used = new Set(signatureTokens(actual));
+  const required = new Set(expectedTokens);
+  const used = new Set(actualTokens);
   if (used.size <= required.size) {
     return false;
   }
@@ -1872,15 +1877,21 @@ function checkEnglishCopies({ catalogName, english }) {
   // The per-line bucket phrases are registered once in PER_LINE_BUCKET_PHRASES,
   // which checkSharedWordings also reads.
   for (const [value, keys] of byCopy) {
-    if (
-      keys.length < 2 ||
-      TWO_SENSE_COPY.has(wording(value)) ||
-      keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))
-    ) {
+    if (keys.length < 2 || keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))) {
       continue;
     }
+    const folded = wording(value);
+    if (TWO_SENSE_COPY.has(folded)) {
+      continue;
+    }
+    // The remedy prints the folded form, because that is the one the exemption
+    // lookup compares; adding the raw copy would not exempt it.
+    const foldNote =
+      folded === value
+        ? ''
+        : ' (entries are compared after trimming, case folding and dropping trailing sentence punctuation)';
     problems.push(
-      `${catalogName}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add the string to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs with the two senses it carries.`
+      `${catalogName}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add "${folded}" to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs${foldNote} with the two senses it carries.`
     );
   }
   return problems;
@@ -2204,12 +2215,12 @@ function checkValuePlaceholders({
   requiredCounts,
 }) {
   const problems = [];
-  const expected = placeholders(englishValue);
-  const actual = placeholders(value);
-  const expectedSet = placeholderTokens(englishValue);
-  const actualSet = placeholderTokens(value);
-  const dropped = expectedSet.filter(name => !actualSet.includes(name));
-  const added = actualSet.some(name => !expectedSet.includes(name));
+  const expectedTokens = placeholderTokens(englishValue);
+  const actualTokens = placeholderTokens(value);
+  const expected = signature(expectedTokens);
+  const actual = signature(actualTokens);
+  const dropped = expectedTokens.filter(name => !actualTokens.includes(name));
+  const added = actualTokens.some(name => !expectedTokens.includes(name));
   // A visible count the form must show and does not. `requiredCounts` comes
   // from the whole family, not from the reference, because a reference may
   // spell its own numeral out ("1 live session") while a sibling carries the
@@ -2218,7 +2229,9 @@ function checkValuePlaceholders({
   // names its key, category and locale. A form that also uses a token the
   // family never uses is the mismatch below instead: its signature names both.
   const missingCounts =
-    countsMayBeWorded || added ? [] : [...requiredCounts].filter(name => !actualSet.includes(name));
+    countsMayBeWorded || added
+      ? []
+      : [...requiredCounts].filter(name => !actualTokens.includes(name));
   for (const name of missingCounts) {
     problems.push(
       `${label}: "${key}" drops {{${name}}} without a reviewed worded form (WORDED_COUNTS)`
@@ -2238,7 +2251,7 @@ function checkValuePlaceholders({
       ));
   if (
     actual !== expected &&
-    !addsFamilyPlaceholderOnly(english, key, actual, expected) &&
+    !addsFamilyPlaceholderOnly(english, key, actualTokens, expectedTokens) &&
     !explained
   ) {
     problems.push(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
@@ -2249,10 +2262,10 @@ function checkValuePlaceholders({
       `${label}: "${key}" $t() references differ from English (${expectedRefs || 'none'})`
     );
   }
-  const expectedTokens = expansionTokens(englishValue).join(',');
-  if (expansionTokens(value).join(',') !== expectedTokens) {
+  const expectedExpansions = expansionTokens(englishValue).join(',');
+  if (expansionTokens(value).join(',') !== expectedExpansions) {
     problems.push(
-      `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedTokens || 'none'})`
+      `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedExpansions || 'none'})`
     );
   }
   return problems;

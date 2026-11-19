@@ -1792,30 +1792,33 @@ describe('webhook trigger request listing', () => {
   it('resolves session ids from cli_sessions_v2 only by default', async () => {
     const bothId = crypto.randomUUID();
     const v1OnlyId = crypto.randomUUID();
+    const v2SessionId = 'ses_2f0aa1c1c1c1c1c1c1c1c1c1';
     mockListWorkerRequests.mockResolvedValueOnce({
       success: true,
       requests: [capturedRequest(bothId), capturedRequest(v1OnlyId)],
     });
     mockSelectSessions.mockResolvedValueOnce([
-      { cloudAgentSessionId: bothId, sessionId: 'ses_v2_both' },
+      { cloudAgentSessionId: bothId, sessionId: v2SessionId },
     ]);
 
     const requests = await createCaller({ user }).listRequests({ triggerId: 'trigger-id' });
 
-    expect(requests.map(r => r.kiloSessionId)).toEqual(['ses_v2_both', null]);
+    expect(requests.map(r => r.kiloSessionId)).toEqual([v2SessionId, null]);
   });
 
   it('resolves legacy v1 session ids when includeLegacySessionIds is set', async () => {
     const bothId = crypto.randomUUID();
     const v1OnlyId = crypto.randomUUID();
+    const v1SessionIdForBoth = crypto.randomUUID();
+    const v1SessionIdOnly = crypto.randomUUID();
     mockListWorkerRequests.mockResolvedValueOnce({
       success: true,
       requests: [capturedRequest(bothId), capturedRequest(v1OnlyId)],
     });
     mockSelectSessions
       .mockResolvedValueOnce([
-        { cloudAgentSessionId: bothId, sessionId: 'ses_v1_both' },
-        { cloudAgentSessionId: v1OnlyId, sessionId: 'ses_v1_only' },
+        { cloudAgentSessionId: bothId, sessionId: v1SessionIdForBoth },
+        { cloudAgentSessionId: v1OnlyId, sessionId: v1SessionIdOnly },
       ])
       .mockResolvedValueOnce([]);
 
@@ -1824,7 +1827,7 @@ describe('webhook trigger request listing', () => {
       includeLegacySessionIds: true,
     });
 
-    expect(requests.map(r => r.kiloSessionId)).toEqual(['ses_v1_both', 'ses_v1_only']);
+    expect(requests.map(r => r.kiloSessionId)).toEqual([v1SessionIdForBoth, v1SessionIdOnly]);
   });
 });
 

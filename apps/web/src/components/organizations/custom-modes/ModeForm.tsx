@@ -24,6 +24,7 @@ import {
   isOrganizationAutoTargetModel,
   isOrganizationCustomRouterTarget,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { modeSlugFromName } from '@kilocode/app-shared/organizations';
 
 const availableGroups = [
   { value: 'read', label: 'Read Files' },
@@ -252,10 +253,10 @@ export function ModeForm({
   // Auto-generate slug from name for new modes
   useEffect(() => {
     if (!mode && formData.name) {
-      const slug = formData.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
+      const slug = modeSlugFromName(
+        formData.name,
+        existingModes.map(existing => existing.slug)
+      );
       setFormData(prev => ({ ...prev, slug }));
     }
   }, [formData.name, mode]);

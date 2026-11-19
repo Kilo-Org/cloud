@@ -17,7 +17,6 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Text } from '@/components/ui/text';
 import {
   setThemePreference,
   type ThemePreference,
@@ -69,9 +68,6 @@ export function PreferencesScreen() {
               }}
             />
           </RowGroup>
-          {/* The explanation is the caption the card answers to, so the Voice
-              input row keeps its two-line subtitle budget whatever the width. */}
-          <Text variant="caption">{t('preferences.gatewayTranscriptionSubtitle')}</Text>
         </Section>
 
         <Section label={t('preferences.appearance')}>

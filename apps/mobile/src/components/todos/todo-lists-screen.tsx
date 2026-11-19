@@ -25,7 +25,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 import { useSideInsetStyle } from '@/lib/screen-insets';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_DP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { todoListPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
@@ -224,6 +224,9 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
           </View>
         }
         allowInlineActionsStacking={false}
+        // The history button cannot shrink; the account picker beside it
+        // truncates instead.
+        inlineActionsMinWidth={ICON_TARGET_DP}
       />
       <View style={sideInsetStyle} className={SCREEN_GUTTER_CLASS}>
         <View

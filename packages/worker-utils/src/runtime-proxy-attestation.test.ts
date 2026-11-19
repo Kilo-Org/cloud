@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_ISSUER,
+  RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH,
   verifyRuntimeProxyAttestation,
 } from './runtime-proxy-attestation.js';
 import { sha256Hex } from './sha256.js';
@@ -21,6 +22,18 @@ const input = {
 
 describe('runtime proxy attestation', () => {
   it('binds a short-lived proof to the exact bearer and runtime identity', async () => {
+    const proof = await issueRuntimeProxyAttestation(input);
+    await expect(verifyRuntimeProxyAttestation({ ...input, value: proof, now })).resolves.toBe(
+      true
+    );
+  });
+
+  it('rejects a value longer than the exported maximum length and still accepts a genuine proof', async () => {
+    const oversized = 'a'.repeat(RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH + 1);
+    await expect(verifyRuntimeProxyAttestation({ ...input, value: oversized, now })).resolves.toBe(
+      false
+    );
+
     const proof = await issueRuntimeProxyAttestation(input);
     await expect(verifyRuntimeProxyAttestation({ ...input, value: proof, now })).resolves.toBe(
       true

@@ -6,26 +6,31 @@
 // this path a mid-session block first shows a generic error on whatever surface
 // the person touched.
 //
-// The same fences as the read hook apply: no raise during a sign-out teardown
-// (an attempt that settles while Sign out runs must not re-raise the
-// explanation over the login route), and a raise never publishes over an
-// already-raised state (the identity read owns the clear).
+// The fences match the read hook's and one more: no raise while an auth
+// transition owns the credentials (`isSignOutActive`, and the teardown guard
+// that also covers the sign-in window between its start and its credential
+// publication — a refusal from the previous session settling in that window
+// must not raise an explanation for the account just signed in), and a raise
+// never publishes over an already-raised state (the identity read owns the
+// clear).
 
 import { isBlockedAccountActive, setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { isSignOutTeardownActive } from '@/lib/auth/auth-transition-state';
 import { isAccountBlockedTrpcError } from '@/lib/trpc-error';
 
 /**
  * Raises the blocked-account explanation from any procedure's refusal. Total:
- * never throws, and a refusal that arrives during a sign-out teardown, with no
- * session to explain, or for an already-raised state changes nothing — the
- * identity read's hook owns those transitions.
+ * never throws, and a refusal that arrives during an auth transition (sign-out
+ * teardown, or the sign-in window before its credentials publish), or for an
+ * already-raised state, changes nothing — the identity read's hook owns the
+ * clear.
  */
 export function raiseBlockedAccountFromRefusal(error: unknown): void {
   if (!isAccountBlockedTrpcError(error)) {
     return;
   }
-  if (isSignOutActive() || isBlockedAccountActive()) {
+  if (isSignOutActive() || isSignOutTeardownActive() || isBlockedAccountActive()) {
     return;
   }
   setBlockedAccountActive(true);

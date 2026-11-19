@@ -2397,6 +2397,64 @@ describe('bootstrap and foreground race fencing', () => {
 
     unmount();
   }, 30_000);
+
+  it('a previous-session refusal cannot raise while a sign-in transition runs', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const blockedAccount = await import('@/lib/auth/blocked-account-state');
+    const { isSignOutActive } = await import('@/lib/auth/sign-out-state');
+    const { isSignOutTeardownActive } = await import('@/lib/auth/auth-transition-state');
+    const { releaseChatsForAccountSwitch } = await import('@/lib/chat/sign-out');
+    blockedAccount.setBlockedAccountActive(false);
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    // Park the sign-in inside its transition: the release await is the gap
+    // where both fences were cleared before the token publishes, so a refusal
+    // from the previous session settling there would raise over the new
+    // account. The sample is taken only once the sign-in is parked there.
+    const releaseGate = Promise.withResolvers<undefined>();
+    const releasePark = Promise.withResolvers<undefined>();
+    vi.mocked(releaseChatsForAccountSwitch).mockImplementationOnce(async () => {
+      releaseGate.resolve(undefined);
+      await releasePark.promise;
+    });
+
+    let signInDone = false;
+    const trackSignIn = async (): Promise<void> => {
+      try {
+        await getCtx().signIn('active-token', 'active-refresh', 3600);
+      } finally {
+        signInDone = true;
+      }
+    };
+    const signInSettled = trackSignIn();
+    void signInSettled;
+    const signInPromise = signInSettled;
+
+    // Drive the sign-in to the parked release inside act, sample the fences
+    // there (the clears happen only at credential publication after this
+    // await), then let the release settle so the sign-in publishes.
+    await act(async () => {
+      await releaseGate.promise;
+    });
+    expect(signInDone).toBe(false);
+    expect([isSignOutActive(), isSignOutTeardownActive()]).toEqual([true, true]);
+
+    // The previous session's blocked refusal settles in this same gap; the
+    // fences keep it from raising (no direct raise call here: the assertion
+    // pins the fence state the raise reads, not a call made by hand).
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    releasePark.resolve(undefined);
+    await act(async () => {
+      await signInPromise;
+    });
+
+    expect(signInDone).toBe(true);
+    expect(getCtx().token).toBe('active-token');
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    unmount();
+  }, 30_000);
 });
 
 describe('reactive auth epoch', () => {

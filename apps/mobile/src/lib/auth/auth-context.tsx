@@ -436,19 +436,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         }
         // Clear the guard so a later refused refresh can sign out again.
         isSignedOutReference.current = false;
-        // Credentials published on the winning epoch: the teardown window
-        // ends, so refresh may rotate the new session and request-token cold
-        // reads may warm the owner again.
-        setSignOutTeardownActive(false);
         setSessionEnded(false);
-        // A successful sign-in is the one event that proves the block no
-        // longer applies, so it clears the blocked-account explanation the
-        // signed-out surface would otherwise keep showing.
-        setBlockedAccountActive(false);
-        // Credentials published on the winning epoch: the sign-out fence opens
-        // so the read-cache mount can subscribe for the new session, and the
-        // reactive `isSigningOut` follows the same flag.
-        setSignOutActive(false);
         trackEvent('login');
         resetPurchaseErrorToastDedup();
         // A direct account switch must not keep the prior account's query
@@ -460,6 +448,23 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         await Promise.allSettled([releaseChatsForAccountSwitch()]);
         queryClient.clear();
         setToken(tokenValue);
+        // The teardown window and the sign-out fence close only here, after
+        // the new credentials are published: a request from the previous
+        // session that settles between the await above and this block carries
+        // its own refusal, and must not raise the blocked-account explanation
+        // (or any other previous-session state) over the account just signed
+        // in. React batches the same synchronous block into one render, so the
+        // read-cache mount subscribes on the first new-session commit exactly
+        // as before.
+        setSignOutTeardownActive(false);
+        // A successful sign-in is the one event that proves the block no
+        // longer applies, so it clears the blocked-account explanation the
+        // signed-out surface would otherwise keep showing.
+        setBlockedAccountActive(false);
+        // The sign-out fence opens so the read-cache mount can subscribe for
+        // the new session, and the reactive `isSigningOut` follows the same
+        // flag.
+        setSignOutActive(false);
         // A Quick Action tapped while the app was signed out parks its launch
         // URL natively, and the signed-in launcher mount is its only reader.
         // Take the account-independent destination before the teardown below

@@ -40,7 +40,7 @@ type BlockedAccountFromAccountReadInput = {
    *  `error` for the duration (the overlay would flicker off and return on the
    *  next refusal). */
   readonly fetching: boolean;
-  /** Run once on the transition from a raise this hook made to an answered
+  /** Run once on the transition from a raised explanation to an answered
    *  read; the app uses it to refetch the surfaces whose reads were refused
    *  while the account was blocked. */
   readonly onAnswered?: () => void;
@@ -48,13 +48,16 @@ type BlockedAccountFromAccountReadInput = {
 
 /**
  * Raises the blocked-account explanation from the current-user read, and
- * clears it once that read answers again.
+ * clears the explanation once that read answers again — whoever raised it:
+ * this hook, or another procedure's refusal through the shared query-cache
+ * path. An answered read is the one event that proves the block no longer
+ * applies.
  *
- * Only a raise this hook made is ever cleared here. The refresh route raises
- * the same flag before it tears the session down, and no session is left for a
- * later read to answer for, so an answered read must not dismiss that
- * explanation — sign-out or a new sign-in is its only exit. `enabled` is false
- * in exactly that state (no token), so even a cached answer cannot clear it.
+ * The refresh route raises the same flag before it tears the session down, and
+ * no session is left for a later read to answer for, so an answered read must
+ * not dismiss that explanation — sign-out or a new sign-in is its only exit.
+ * `enabled` is false in exactly that state (no token), so even a cached answer
+ * cannot clear it.
  *
  * The clear also requires `!fetching`: only an attempt that has settled as an
  * answer dismisses the explanation. A retry in flight has not answered yet, so
@@ -74,7 +77,6 @@ type BlockedAccountFromAccountReadInput = {
  * it belongs to a session that has ended.
  */
 export function useBlockedAccountFromAccountRead(input: BlockedAccountFromAccountReadInput): void {
-  const raisedHere = useRef(false);
   // The error object the current raise came from, so the same refusal seen
   // again is not a second raise.
   const raisedFor = useRef<unknown>(null);
@@ -96,7 +98,6 @@ export function useBlockedAccountFromAccountRead(input: BlockedAccountFromAccoun
     if (!input.enabled) {
       // No session: a cached refusal from the session that ended must neither
       // raise nor clear anything.
-      raisedHere.current = false;
       raisedFor.current = null;
       return;
     }
@@ -105,17 +106,15 @@ export function useBlockedAccountFromAccountRead(input: BlockedAccountFromAccoun
         return;
       }
       raisedFor.current = input.error;
-      raisedHere.current = true;
       setBlockedAccountActive(true);
       return;
     }
     // An answered read proves the block no longer applies, whoever raised the
-    // explanation: this hook's raise, or another procedure's refusal through
-    // the shared query-cache path. The answered read clears any active
+    // explanation: this hook, or another procedure's refusal through the
+    // shared query-cache path. The answered read clears any active
     // explanation and refetches the tree; a flag already cleared externally
     // (Sign out, sign-in) makes the condition false, so nothing runs.
     if (verdict === 'answered' && !input.fetching && isBlockedAccountActive()) {
-      raisedHere.current = false;
       raisedFor.current = null;
       setBlockedAccountActive(false);
       onAnswered.current?.();

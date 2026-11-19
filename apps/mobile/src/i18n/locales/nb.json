@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "KI-vernetiltak",
-    "permissionDenied": "Bare organisasjonseiere og administratorer kan administrere KI-vernetiltak.",
+    "permissionDenied": "Bare organisasjonseiere og administratorer kan administrere KI-vernetiltak. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "KI-vernetiltak er ikke aktivert",
     "unavailable": "Kilo aktiverer KI-vernetiltak for en organisasjon på forespørsel. Kontakt {{supportEmail}}, og Kilo-teamet slår dem på for organisasjonen din.",
     "contactSupport": "Kontakt kundestøtte",

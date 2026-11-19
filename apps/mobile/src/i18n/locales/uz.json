@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "AI himoya to'siqlari",
-    "permissionDenied": "Faqat tashkilot egalari va administratorlari AI himoya to'siqlarini boshqara oladi.",
+    "permissionDenied": "Faqat tashkilot egalari va administratorlari AI himoya to'siqlarini boshqara oladi. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI himoya to'siqlari yoqilmagan",
     "unavailable": "Kilo so'rov bo'yicha tashkilot uchun AI himoya to'siqlarini yoqadi. {{supportEmail}} bilan bog'laning, Kilo jamoasi ularni tashkilotingiz uchun yoqadi.",
     "contactSupport": "Yordam xizmatiga murojaat qilish",

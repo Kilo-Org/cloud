@@ -4901,7 +4901,7 @@
   },
   "organizationGuardrails": {
     "title": "Bariere de protecție AI",
-    "permissionDenied": "Doar proprietarii și administratorii organizației pot gestiona barierele de protecție AI.",
+    "permissionDenied": "Doar proprietarii și administratorii organizației pot gestiona barierele de protecție AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Barierele de protecție AI nu sunt activate",
     "unavailable": "Kilo activează barierele de protecție AI pentru o organizație la cerere. Contactează {{supportEmail}}, iar echipa Kilo le activează pentru organizația dumneavoastră.",
     "contactSupport": "Contactează asistența",

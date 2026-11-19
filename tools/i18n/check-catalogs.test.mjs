@@ -2017,7 +2017,9 @@ test('accepts a mobile value its catalog lists as English on purpose', () => {
   // The shipped map already holds entries, so the case swaps the whole literal
   // body for one that names only the value this fixture audits: the fixture's
   // own assertion then proves the entry is what accepts the value.
-  const mapBody = /const MOBILE_ENGLISH_COPY_EXCEPTIONS = \{[\s\S]*?\n\};/.exec(CHECKER_SOURCE)?.[0];
+  const mapBody = /const MOBILE_ENGLISH_COPY_EXCEPTIONS = \{[\s\S]*?\n\};/.exec(
+    CHECKER_SOURCE
+  )?.[0];
   assert.ok(mapBody, 'the shipped checker ships the exception map literal');
   const withException = CHECKER_SOURCE.replace(
     mapBody,

@@ -931,6 +931,43 @@ const inferScreenshotType = (
   return extension === 'webp' ? 'webp' : 'png';
 };
 
+/**
+ * One image of the tab's viewport, base64: fresh when the browser can make a
+ * frame on request, which a background tab otherwise refuses for up to a
+ * second. An element clip and a full-page capture keep the plain path — a
+ * forced frame is the viewport.
+ */
+const readScreenshotData = async (
+  deps: BrowserReadActionDeps,
+  input: {
+    readonly clip: z.infer<typeof elementClipSchema> | undefined;
+    readonly clipScale: number;
+    readonly fullPage: boolean;
+    readonly type: 'jpeg' | 'png' | 'webp';
+  }
+): Promise<string | undefined> => {
+  const fresh =
+    input.clip === undefined && !input.fullPage
+      ? await deps.session.captureViewportImage(input.type)
+      : undefined;
+
+  if (fresh !== undefined) {
+    return fresh;
+  }
+
+  const parsed = screenshotDataSchema.safeParse(
+    await deps.session.send('Page.captureScreenshot', {
+      format: input.type,
+      // The surface is the tab's own compositor output; a viewport capture never extends past it.
+      fromSurface: true,
+      ...(input.clip === undefined ? {} : { clip: { ...input.clip, scale: input.clipScale } }),
+      ...(input.fullPage ? { captureBeyondViewport: true } : {}),
+    })
+  );
+
+  return parsed.success ? parsed.data.data : undefined;
+};
+
 const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_, deps) => {
   const parsed = browserTakeScreenshotArgumentsSchema.safeParse(arguments_);
 
@@ -961,16 +998,14 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
   // A device-pixel element capture renders the clip at the tab's device pixel ratio; the mask boxes move with it.
   const clipScale = clip !== undefined && scale === 'device' ? (geometry?.scale ?? 1) : 1;
 
-  const response = await deps.session.send('Page.captureScreenshot', {
-    format: type,
-    // The surface is the tab's own compositor output; a viewport capture never extends past it.
-    fromSurface: true,
-    ...(clip === undefined ? {} : { clip: { ...clip, scale: clipScale } }),
-    ...(fullPage === true ? { captureBeyondViewport: true } : {}),
+  const data = await readScreenshotData(deps, {
+    clip,
+    clipScale,
+    fullPage: fullPage === true,
+    type,
   });
-  const shot = screenshotDataSchema.safeParse(response);
 
-  if (!shot.success) {
+  if (data === undefined) {
     return fail('The browser did not return screenshot data.');
   }
 
@@ -982,7 +1017,7 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
           clip: { height: clip.height, left: clip.x, top: clip.y, width: clip.width },
           clipScale,
         }),
-    dataUrl: `data:${mediaType};base64,${shot.data.data}`,
+    dataUrl: `data:${mediaType};base64,${data}`,
     fullPage: fullPage === true,
     ...(geometry === undefined ? {} : { geometry }),
     mediaType,

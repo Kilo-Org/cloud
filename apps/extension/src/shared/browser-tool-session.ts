@@ -118,9 +118,25 @@ const DETACH_REASON_TARGET_CLOSED = 'target_closed';
  * Evidence: https://github.com/BrowserMCP/mcp/blob/main/packages/mcp/spikes/hidden-tabs/RESULTS.md
  */
 const INPUT_COMMAND_TIMEOUT_MS = 5000;
+/**
+ * Bound on the frame a background tab's screencast is asked for. Chrome makes
+ * that frame on the request in about 11 ms (measured on the click-then-
+ * screenshot cycle); past this bound the plain capture takes over, so a
+ * screenshot is never slower or absent because of the shortcut.
+ */
+const SCREENCAST_FRAME_TIMEOUT_MS = 250;
+const SCREENCAST_FRAME_EVENT = 'Page.screencastFrame';
 const FOCUS_EMULATION_METHOD = 'Emulation.setFocusEmulationEnabled';
 const visibilityStateSchema = z.object({
   result: z.object({ value: z.string().optional() }).optional(),
+});
+const layoutViewportSchema = z.object({
+  layoutViewport: z.object({ clientHeight: z.number(), clientWidth: z.number() }).optional(),
+});
+const screencastFrameSchema = z.object({
+  data: z.string(),
+  metadata: z.object({ deviceHeight: z.number(), deviceWidth: z.number() }).optional(),
+  sessionId: z.number(),
 });
 
 export interface BrowserConsoleMessage {
@@ -293,6 +309,21 @@ export interface BrowserToolSession {
    * `browser.scripting.executeScript` in the MAIN world.
    */
   readonly backend: BrowserToolBackend;
+  /**
+   * One base64 image of the tab's viewport, of the page as it is now, taken
+   * without activating the tab. Chrome renders an inactive tab about one frame
+   * per second, so `Page.captureScreenshot` of a page that just changed waits
+   * for that frame (~1 s on the measured click-then-screenshot cycle); a
+   * screencast frame is made on request (~11 ms), and the focus emulation the
+   * session holds from attach is what makes the renderer paint the change.
+   *
+   * `undefined` when no frame arrives in time, its size is not the layout
+   * viewport (the mask geometry is laid over this image, so it must be the size
+   * a plain capture of the viewport is), or the platform has no screencast. The
+   * caller then captures the ordinary way: a screenshot never fails because of
+   * this.
+   */
+  readonly captureViewportImage: (format: 'jpeg' | 'png' | 'webp') => Promise<string | undefined>;
   /**
    * Runs one upstream browser tool. On the scripting backend this is the only
    * way to reach the page: snapshot, find, screenshot, wait_for, evaluate,
@@ -1449,6 +1480,9 @@ export const createBrowserToolSession = ({
   let attached = false;
   let disposed = false;
   let focusEmulated = false;
+  // The capture waiting on a screencast frame, so an event that arrives between commands is delivered.
+  let pendingScreencastFrame: ((params: Record<string, unknown> | undefined) => void) | undefined =
+    undefined;
   let attachPromise: Promise<void> | undefined = undefined;
   // Bumped by every Debugger.detach for this tab, so an attach in flight can tell that the debugger it just acquired is gone.
   let detachCount = 0;
@@ -1793,6 +1827,12 @@ export const createBrowserToolSession = ({
       return;
     }
 
+    if (method === SCREENCAST_FRAME_EVENT) {
+      // The frame a capture is waiting for; one nobody waits for any more is dropped.
+      pendingScreencastFrame?.(params);
+      return;
+    }
+
     if (method === 'Runtime.consoleAPICalled') {
       handleConsoleApiCalled(params);
       return;
@@ -2042,6 +2082,106 @@ export const createBrowserToolSession = ({
     const parsed = visibilityStateSchema.safeParse(response);
 
     return parsed.success ? parsed.data.result?.value : undefined;
+  };
+
+  const stopScreencast = async (): Promise<void> => {
+    try {
+      await debuggerApi?.sendCommand(target, 'Page.stopScreencast');
+    } catch {
+      // A tab that is already gone has nothing left to stop.
+    }
+  };
+
+  /**
+   * The screencast's next frame, asked for on this call: `Page.startScreencast`
+   * makes the compositor produce one and the event brings it back. The waiter
+   * is registered before the command goes out, so the answer cannot be missed,
+   * and a frame that answers a capture nobody waits for any more is dropped.
+   *
+   * `undefined` when no frame arrives inside the bound — the caller falls back.
+   */
+  const readScreencastFrame = async (
+    format: 'jpeg' | 'png' | 'webp'
+  ): Promise<z.infer<typeof screencastFrameSchema> | undefined> => {
+    if (debuggerApi === undefined) {
+      return undefined;
+    }
+
+    const { promise, resolve } = Promise.withResolvers<Record<string, unknown> | undefined>();
+    const timer = setTimeout(() => {
+      // eslint-disable-next-line unicorn/no-useless-undefined -- an expired bound answers with no frame
+      resolve(undefined);
+    }, SCREENCAST_FRAME_TIMEOUT_MS);
+
+    pendingScreencastFrame = resolve;
+
+    try {
+      await debuggerApi.sendCommand(target, 'Page.startScreencast', {
+        everyNthFrame: 1,
+        format,
+      });
+
+      const parsed = screencastFrameSchema.safeParse(await promise);
+
+      if (!parsed.success) {
+        return undefined;
+      }
+
+      await debuggerApi.sendCommand(target, 'Page.screencastFrameAck', {
+        sessionId: parsed.data.sessionId,
+      });
+
+      return parsed.data;
+    } catch {
+      // A screencast this browser refuses leaves the ordinary capture in place.
+      return undefined;
+    } finally {
+      clearTimeout(timer);
+      pendingScreencastFrame = undefined;
+      await stopScreencast();
+    }
+  };
+
+  const captureViewportImage = async (
+    format: 'jpeg' | 'png' | 'webp'
+  ): Promise<string | undefined> => {
+    if (debuggerApi === undefined) {
+      return undefined;
+    }
+
+    await attach();
+
+    try {
+      const metrics = layoutViewportSchema.safeParse(
+        await debuggerApi.sendCommand(target, 'Page.getLayoutMetrics')
+      );
+      const layout = metrics.data?.layoutViewport;
+
+      if (!metrics.success || layout === undefined) {
+        return undefined;
+      }
+
+      // An inactive tab reports no damage to the compositor, so its first screencast frame would be
+      // The stale frame the plain capture waits a second for; focus emulation makes the change paint.
+      if (!focusEmulated) {
+        await applyFocusEmulation();
+      }
+
+      const frame = await readScreencastFrame(format);
+
+      if (frame?.metadata === undefined) {
+        return undefined;
+      }
+
+      // The mask geometry is laid over this image: it must be the device-pixel size a plain capture of this viewport is.
+      return frame.metadata.deviceWidth === layout.clientWidth &&
+        frame.metadata.deviceHeight === layout.clientHeight
+        ? frame.data
+        : undefined;
+    } catch {
+      // A tab that cannot be measured is captured the ordinary way.
+      return undefined;
+    }
   };
 
   /**
@@ -3127,6 +3267,10 @@ export const createBrowserToolSession = ({
         throwIfCancelled();
         return runCallTool(toolName, args ?? {}, refs);
       },
+      captureViewportImage: format => {
+        throwIfCancelled();
+        return captureViewportImage(format);
+      },
       childFrames: () => new Map(childFrames),
       consoleMessages: () => [...consoleBuffer],
       // A caller view owns only its ref registry: disposing it must not detach the tab's shared attachment.
@@ -3172,6 +3316,7 @@ export const createBrowserToolSession = ({
     backend,
     bindCaller: (callerKey, guard) => createCallerView(callerKey, callerRefs(callerKey), guard),
     callTool: (toolName, args) => runCallTool(toolName, args ?? {}, defaultRefs),
+    captureViewportImage,
     childFrames: () => new Map(childFrames),
     consoleMessages: () => [...consoleBuffer],
     dispose,

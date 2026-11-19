@@ -199,6 +199,13 @@ export const launchExtensionContext = async (
     readonly downloadsPath?: string;
     /** Optional permissions Chrome cannot be asked for by automation, granted at load time in a copy of the build; `[]` loads the shipped manifest. */
     readonly grantPermissions?: readonly string[];
+    /**
+     * Playwright's own default arguments to drop as well as `--enable-automation`.
+     * Playwright disables three throttling switches so test runs stay fast; a
+     * spec that measures what a real user's Chrome does drops them here, and a
+     * background tab is throttled the way it is in the wild.
+     */
+    readonly ignoreDefaultArgs?: readonly string[];
   } = {}
 ): Promise<{
   context: BrowserContext;
@@ -229,7 +236,7 @@ export const launchExtensionContext = async (
     ...(options.downloadsPath === undefined ? {} : { downloadsPath: options.downloadsPath }),
     ...(executablePath === undefined ? { channel } : { executablePath }),
     headless: !isHeaded,
-    ignoreDefaultArgs: ['--enable-automation'],
+    ignoreDefaultArgs: ['--enable-automation', ...(options.ignoreDefaultArgs ?? [])],
     userAgent: EXTENSION_E2E_USER_AGENT,
   });
 

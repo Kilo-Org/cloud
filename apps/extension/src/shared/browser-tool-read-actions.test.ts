@@ -43,6 +43,7 @@ const createSession = ({
   consoleMessages = [],
   frameOwnerBackendNodeId = 99,
   frameTree,
+  freshFrame,
   layoutMetrics,
   layoutMetricsError = false,
   requestsSinceLoad = [],
@@ -59,6 +60,8 @@ const createSession = ({
   consoleMessages?: BrowserConsoleMessage[];
   frameOwnerBackendNodeId?: number;
   frameTree?: Record<string, unknown>;
+  /** The frame the tab's screencast would hand back; absent means the session could not force one. */
+  freshFrame?: string;
   layoutMetrics?: Record<string, unknown>;
   layoutMetricsError?: boolean;
   requestsSinceLoad?: BrowserNetworkRequest[];
@@ -67,14 +70,24 @@ const createSession = ({
   screenshot?: string;
   timeOrigin?: number;
   webMcpTools?: { description?: string; name?: string; title?: string }[];
-} = {}): { commands: RecordedCommand[]; session: BrowserToolPageSession } => {
+} = {}): {
+  commands: RecordedCommand[];
+  freshRequests: string[];
+  session: BrowserToolPageSession;
+} => {
   const commands: RecordedCommand[] = [];
+  const freshRequests: string[] = [];
 
   const session: BrowserToolPageSession = {
     attach: async () => {
       if (attachError !== undefined) {
         throw attachError;
       }
+    },
+    captureViewportImage: async format => {
+      freshRequests.push(format);
+
+      return freshFrame;
     },
     consoleMessages: () => consoleMessages,
     networkRequestsSinceLoad: () => requestsSinceLoad,
@@ -147,7 +160,7 @@ const createSession = ({
     },
   };
 
-  return { commands, session };
+  return { commands, freshRequests, session };
 };
 
 const consoleMessage = (
@@ -357,6 +370,58 @@ describe('browser_take_screenshot', () => {
       },
     };
   };
+
+  it('takes the frame the tab can force instead of waiting for the next presented one', async () => {
+    const { commands, freshRequests, session } = createSession({ freshFrame: 'RlJFU0g=' });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session);
+
+    expect(result.ok).toBe(true);
+    expect(freshRequests).toStrictEqual(['png']);
+    // The forced frame is the image: no plain capture went out.
+    expect(commands.some(command => command.method === 'Page.captureScreenshot')).toBe(false);
+    expect(result.ok ? result.value : undefined).toMatchObject({
+      dataUrl: 'data:image/png;base64,RlJFU0g=',
+      mediaType: 'image/png',
+    });
+  });
+
+  it('falls back to a plain capture when the tab cannot force a frame', async () => {
+    const { commands, session } = createSession({ screenshot: 'UExBSU4=' });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session);
+
+    expect(result.ok ? result.value : undefined).toMatchObject({
+      dataUrl: 'data:image/png;base64,UExBSU4=',
+    });
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: { format: 'png', fromSurface: true },
+    });
+  });
+
+  it('never takes a forced frame for a full-page or an element capture', async () => {
+    const { freshRequests, session } = createSession({ freshFrame: 'RlJFU0g=' });
+
+    await runReadBrowserTool('browser_take_screenshot', { fullPage: true, type: 'png' }, session);
+    await runReadBrowserTool('browser_take_screenshot', { target: 'e12' }, session);
+
+    expect(freshRequests).toStrictEqual([]);
+  });
+
+  it('masks the forced frame with the viewport geometry, in the image the mask is applied to', async () => {
+    const { session } = createSession({ frameTree: FRAME_TREE_WITH_PAY, freshFrame: 'RlJFU0g=' });
+    const { inputs, mask } = recordMask();
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.dataUrl).toBe('data:image/png;base64,RlJFU0g=');
+  });
 
   it('masks a withheld frame inside an element capture in the clip coordinate space', async () => {
     // The clip is the iframe's own rect, so its page-space box lands at the image origin.

@@ -1,4 +1,4 @@
-/* eslint-disable max-lines, max-classes-per-file -- the page-global fakes below need several instanceof-identity classes in this one test file */
+/* eslint-disable max-lines, max-classes-per-file, vitest/max-expects -- the page-global fakes below need several instanceof-identity classes in this one test file, and one contract is several assertions */
 import { describe, expect, it, vi } from 'vitest';
 import {
   FIREFOX_PLATFORM_LIMIT,
@@ -32,14 +32,24 @@ const ENABLED_DOMAINS = [
 const createDebuggerApi = ({
   documentNodeId = 11,
   gate,
+  layoutViewport,
   responseBodies,
+  screencast,
   selectorMatches = [42],
   visibilityState = 'visible',
 }: {
   documentNodeId?: number;
   /** When set, `sendCommand` waits on `gate.wait` before resolving the gated method. */
   gate?: { readonly command: string; readonly wait: Promise<void> };
+  /** What `Page.getLayoutMetrics` reports, in device pixels. */
+  layoutViewport?: { readonly clientHeight: number; readonly clientWidth: number };
   responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
+  /** The frame `Page.startScreencast` pushes back, on a macrotask like the real event. */
+  screencast?: {
+    readonly data: string;
+    readonly deviceHeight: number;
+    readonly deviceWidth: number;
+  };
   selectorMatches?: readonly number[];
   visibilityState?: string;
 } = {}): {
@@ -105,6 +115,24 @@ const createDebuggerApi = ({
 
       if (method === 'DOM.querySelectorAll') {
         return { nodeIds: selectorMatches };
+      }
+
+      if (method === 'Page.getLayoutMetrics') {
+        return layoutViewport === undefined ? {} : { layoutViewport };
+      }
+
+      if (method === 'Page.startScreencast' && screencast !== undefined) {
+        const frame = screencast;
+
+        setTimeout(() => {
+          for (const listener of eventListeners) {
+            listener({}, 'Page.screencastFrame', {
+              data: frame.data,
+              metadata: { deviceHeight: frame.deviceHeight, deviceWidth: frame.deviceWidth },
+              sessionId: 3,
+            });
+          }
+        }, 0);
       }
 
       if (method === 'Network.getResponseBody') {
@@ -180,18 +208,28 @@ const createSession = ({
   tabId = 7,
   url = 'https://example.com/',
   gate,
+  layoutViewport,
   responseBodies,
+  screencast,
   selectorMatches,
 }: {
   tabId?: number;
   url?: string;
   gate?: { readonly command: string; readonly wait: Promise<void> };
+  layoutViewport?: { readonly clientHeight: number; readonly clientWidth: number };
   responseBodies?: Record<string, { base64Encoded?: boolean; body: string }>;
+  screencast?: {
+    readonly data: string;
+    readonly deviceHeight: number;
+    readonly deviceWidth: number;
+  };
   selectorMatches?: readonly number[];
 } = {}) => {
   const debuggerApi = createDebuggerApi({
     ...(gate === undefined ? {} : { gate }),
+    ...(layoutViewport === undefined ? {} : { layoutViewport }),
     ...(responseBodies === undefined ? {} : { responseBodies }),
+    ...(screencast === undefined ? {} : { screencast }),
     ...(selectorMatches === undefined ? {} : { selectorMatches }),
   });
   const tabsApi = createTabsApi({ url });
@@ -1425,5 +1463,82 @@ describe('browser tool session scripting backend', () => {
     expect(
       debuggerBackedSession.getToolUnavailableError('kilo_browser_console_messages')
     ).toBeUndefined();
+  });
+});
+
+describe('background tab viewport capture', () => {
+  const LAYOUT = { clientHeight: 557, clientWidth: 1000 };
+
+  it('returns the frame the screencast pushes, acked and then stopped', async () => {
+    const { debuggerApi, session } = createSession({
+      layoutViewport: LAYOUT,
+      screencast: {
+        data: 'RlJFU0g=',
+        deviceHeight: LAYOUT.clientHeight,
+        deviceWidth: LAYOUT.clientWidth,
+      },
+    });
+
+    await expect(session.captureViewportImage('png')).resolves.toBe('RlJFU0g=');
+
+    const methods = debuggerApi.commands.map(command => command.method);
+
+    expect(methods).toContain('Page.startScreencast');
+    expect(methods).toContain('Page.screencastFrameAck');
+    expect(methods).toContain('Page.stopScreencast');
+    // The page is told it is looked at before the frame is asked for, which is what makes an inactive tab paint.
+    expect(methods.indexOf('Emulation.setFocusEmulationEnabled')).toBeLessThan(
+      methods.indexOf('Page.startScreencast')
+    );
+    expect(debuggerApi.commands).toContainEqual({
+      method: 'Page.startScreencast',
+      params: { everyNthFrame: 1, format: 'png' },
+    });
+  });
+
+  it('falls back when no frame arrives inside the bound, and drops a late one', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { debuggerApi, session } = createSession({ layoutViewport: LAYOUT });
+      const capture = session.captureViewportImage('png');
+
+      await vi.advanceTimersByTimeAsync(400);
+
+      await expect(capture).resolves.toBeUndefined();
+      // The screencast is stopped even when nothing came back.
+      expect(debuggerApi.commands.map(command => command.method)).toContain('Page.stopScreencast');
+
+      debuggerApi.emitEvent(7, 'Page.screencastFrame', {
+        data: 'TEFURQ==',
+        metadata: { deviceHeight: LAYOUT.clientHeight, deviceWidth: LAYOUT.clientWidth },
+        sessionId: 4,
+      });
+
+      // The late frame answers nothing: the next capture is a fresh request, not this image.
+      const next = session.captureViewportImage('png');
+
+      await vi.advanceTimersByTimeAsync(400);
+
+      await expect(next).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('refuses a frame that is not the size a plain capture of this viewport is', async () => {
+    const { session } = createSession({
+      layoutViewport: LAYOUT,
+      // A frame at another scale would put the mask boxes off the pixels they must cover.
+      screencast: { data: 'TlVSU0VSQ0FTVA==', deviceHeight: 1114, deviceWidth: 2000 },
+    });
+
+    await expect(session.captureViewportImage('png')).resolves.toBeUndefined();
+  });
+
+  it('takes no frame on a platform without the debugger', async () => {
+    const { session } = createScriptingSession();
+
+    await expect(session.captureViewportImage('png')).resolves.toBeUndefined();
   });
 });

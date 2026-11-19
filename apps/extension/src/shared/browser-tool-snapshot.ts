@@ -12,6 +12,7 @@ import type { BrowserToolRefEntry, BrowserToolSession } from './browser-tool-ses
 export type BrowserToolPageSession = Pick<
   BrowserToolSession,
   | 'attach'
+  | 'captureViewportImage'
   | 'consoleMessages'
   | 'networkRequestsSinceLoad'
   | 'registerRefs'

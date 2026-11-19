@@ -286,6 +286,7 @@ export const openPairedAgentSession = async ({
   enableSwitch,
   extensionId,
   hub,
+  share = true,
   sidePanel,
   title,
 }: {
@@ -296,6 +297,12 @@ export const openPairedAgentSession = async ({
   context: BrowserContext;
   extensionId: string;
   hub: FakeHub;
+  /**
+   * `false` shares nothing, so the session's first `browser_navigate` opens its
+   * own tab — the flow that leaves the agent on an inactive tab, which is what
+   * the CLI does. `tabId` is then 0 until a page tool opens that tab.
+   */
+  share?: boolean;
   sidePanel: Page;
   title: string;
 }): Promise<LocalAgentSession> => {
@@ -314,10 +321,15 @@ export const openPairedAgentSession = async ({
     title,
   });
   const { sessionHandle } = z.object({ sessionHandle: z.string() }).parse(opened.result);
-  const shared = await sendAgentRpc(hub, controllerId, 2, 'session.shareActiveTab', {
-    sessionHandle,
-  });
-  const tabId = z.number().parse(shared.result?.['tabId']);
+  let tabId = 0;
+
+  if (share) {
+    const shared = await sendAgentRpc(hub, controllerId, 2, 'session.shareActiveTab', {
+      sessionHandle,
+    });
+
+    tabId = z.number().parse(shared.result?.['tabId']);
+  }
 
   let nextId = 10;
 

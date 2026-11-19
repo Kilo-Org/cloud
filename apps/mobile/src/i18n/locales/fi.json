@@ -1222,7 +1222,7 @@
     },
     "instructions": {
       "title": "Mukautetut ohjeet",
-      "deprecation": "Mukautetut ohjeet on tarkoitus poistaa käytöstä. Siirrä nämä ohjeet koodivarastosi REVIEW.md-tiedostoon.",
+      "deprecation": "Mukautetut ohjeet poistetaan. Siirrä nämä ohjeet koodivarastosi REVIEW.md-tiedostoon.",
       "placeholder": "esim. noudata virheenkäsittelykäytäntöjämme…",
       "clearTitle": "Poistetaanko mukautetut ohjeet?",
       "clearMessage": "Tyhjän kentän tallentaminen poistaa tälle koodikatselmoijalle tallennetut mukautetut ohjeet."
@@ -1388,6 +1388,7 @@
       "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
       "description": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
       "descriptionReconnect": "Luo uusi työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
+      "descriptionOverview": "Luo työtilan käyttöoikeustunnus ja liitä se seuraavalla näytöllä.",
       "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
       "tokenPlaceholder": "Työtilan käyttöoikeustunnus",
       "tokenRefused": "Bitbucket ei hyväksynyt tätä työtilan käyttöoikeustunnusta. Tarkista, että siinä on yllä olevat oikeudet, ja yritä sitten uudelleen."
@@ -1919,7 +1920,7 @@
       "githubAppSettings": "GitHub-sovelluksen asetukset",
       "manageAccess": "Hallinnoi GitHub-sovelluksen käyttöoikeuksia",
       "noRepositories": "Ei koodivarastoja",
-      "noRepositoriesDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin",
+      "noRepositoriesDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin.",
       "selectAtLeastOne": "Valitse vähintään yksi koodivarasto."
     },
     "scopeEntry": {
@@ -3176,6 +3177,8 @@
     "retryHint": "Yrittää hakea Kilo Passin tilan uudelleen.",
     "endedOn": "Päättynyt {{date}}",
     "notAvailableInApp": "Kilo Pass ei ole saatavilla sovelluksessa.",
+    "notAvailableTitle": "Kilo Pass ei ole sovelluksessa",
+    "noPassDescription": "Tällä tilillä ei ole Kilo Passia.",
     "statusActive": "Aktiivinen",
     "statusTrialing": "Kokeilujakso",
     "statusPastDue": "Maksu erääntynyt",
@@ -3457,7 +3460,7 @@
       "retentionLimit": "Näytetään uusimmat laskut."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Ota saldohälytys käyttöön",
+      "subtitle": "Lähetä sähköpostivaroitus antamiisi osoitteisiin, kun tämän organisaation saldo laskee asettamasi summan alle.",
       "notifyEmailsLabel": "Vastaanottajien sähköpostiosoitteet",
       "permissionDenied": "Sinulla ei ole oikeutta hallita laskutushälytyksiä.",
       "separateEmailsHint": "Erota sähköpostiosoitteet pilkuilla.",
@@ -4928,7 +4931,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise-ominaisuus",
-    "enterpriseOnly": "Tämä ominaisuus on saatavilla vain Enterprise-tilauksessa.",
+    "enterpriseOnly": "Palveluntarjoajat ja mallit ovat saatavilla Enterprise-paketissa.",
     "readOnly": "Vain organisaation omistajat ja ylläpitäjät voivat muuttaa näitä asetuksia.",
     "loadError": "Palveluntarjoajia ja malleja ei voitu ladata",
     "tabModels": "Mallit",

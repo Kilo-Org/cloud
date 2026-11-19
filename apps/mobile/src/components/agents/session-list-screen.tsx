@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { AppState, Keyboard, Pressable, View } from 'react-native';
+import { AppState, Keyboard, View } from 'react-native';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,15 +38,12 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
 import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
-import { Text } from '@/components/ui/text';
 import { IconButton } from '@/components/ui/icon-button';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { holdSessionListTouch } from '@/lib/session-list-touch-gate';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
-import { cn } from '@/lib/utils';
 
 import {
   type Href,
@@ -230,27 +227,14 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
     router.setParams({ status: undefined });
   }, [router]);
 
-  // Both routes into the stored-session list — the header control and the
-  // accepted-empty body link — name that surface: a bare `home.seeAll` here
-  // claimed a longer live list that is not on screen (finding live-now-all),
-  // and two names for one destination read as two different surfaces.
+  // The header control names the stored-session list: a bare `home.seeAll`
+  // here claimed a longer live list that is not on screen (finding
+  // live-now-all). The accepted-empty body carries no second route to it, so
+  // one destination keeps one name.
   const historyLabel = t('agents.sessionList.pastSessions');
   const openHistory = () => {
     router.push('/(app)/(tabs)/(2_agents)/history' as Href);
   };
-  const emptyStateHistoryAction = (
-    <Pressable
-      onPress={openHistory}
-      accessibilityRole="button"
-      accessibilityLabel={historyLabel}
-      testID="agents-view-history-empty"
-      className={cn(textActionTargetClass(), 'min-w-0 shrink justify-center active:opacity-70')}
-    >
-      <Text className="text-sm text-primary" numberOfLines={1}>
-        {historyLabel}
-      </Text>
-    </Pressable>
-  );
   const historyAction = (
     <IconButton
       accessibilityLabel={historyLabel}
@@ -421,7 +405,6 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         organizationId={organizationId}
         refreshControl={refreshControl}
         compact={compactLiveEmptyState}
-        historyAction={emptyStateHistoryAction}
       />
     );
   } else if (hasLiveRows) {

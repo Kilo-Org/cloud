@@ -1222,7 +1222,7 @@
     },
     "instructions": {
       "title": "Maxsus ko‘rsatmalar",
-      "deprecation": "Maxsus ko'rsatmalar funksiyasini bekor qilish rejalashtirilgan. Bu ko'rsatmalarni repozitoriyangizdagi REVIEW.md fayliga ko'chiring.",
+      "deprecation": "Maxsus ko'rsatmalar funksiyasi olib tashlanadi. Bu ko'rsatmalarni repozitoriyangizdagi REVIEW.md fayliga ko'chiring.",
       "placeholder": "masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…",
       "clearTitle": "Maxsus ko‘rsatmalar olib tashlansinmi?",
       "clearMessage": "Bo'sh maydonni saqlash ushbu ko'rib chiquvchi uchun saqlangan maxsus ko'rsatmalarni o'chiradi."
@@ -1388,6 +1388,7 @@
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
       "description": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "descriptionReconnect": "{{organization}} uchun yangi ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
+      "descriptionOverview": "Ish maydoniga kirish tokenini yarating va uni keyingi ekranda joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
       "tokenPlaceholder": "Ish maydoniga kirish tokeni",
       "tokenRefused": "Bitbucket bu ish maydoniga kirish tokenini qabul qilmadi. U yuqoridagi ruxsatlarga ega ekanligini tekshirib, qayta urinib ko'ring."
@@ -3176,6 +3177,8 @@
     "retryHint": "Kilo Pass holatini qayta yuklashga urinadi.",
     "endedOn": "Yakunlandi: {{date}}",
     "notAvailableInApp": "Kilo Pass ilovada mavjud emas.",
+    "notAvailableTitle": "Kilo Pass ilovada yo'q",
+    "noPassDescription": "Bu hisobda Kilo Pass yo'q.",
     "statusActive": "Faol",
     "statusTrialing": "Sinov muddati",
     "statusPastDue": "To'lov muddati o'tgan",
@@ -3457,7 +3460,7 @@
       "retentionLimit": "Eng so'nggi hisob-fakturalar ko'rsatilmoqda."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Balans kamayishi haqida ogohlantirishni yoqish",
+      "subtitle": "Bu tashkilot balansi siz belgilagan miqdordan pastga tushganda, siz ko'rsatgan manzillarga email orqali ogohlantirish yuborish.",
       "notifyEmailsLabel": "Xabar yuboriladigan manzillar",
       "permissionDenied": "To'lov ogohlantirishlarini boshqarishga ruxsatingiz yo'q.",
       "separateEmailsHint": "Elektron pochta manzillarini vergul bilan ajrating.",
@@ -4928,7 +4931,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Korxona xususiyati",
-    "enterpriseOnly": "Bu faqat korxonalar uchun mavjud xususiyat.",
+    "enterpriseOnly": "Provayderlar va modellar Enterprise tarifida mavjud.",
     "readOnly": "Faqat tashkilot egalari va administratorlari bu sozlamalarni o'zgartira oladi.",
     "loadError": "Provayderlar va modellarni yuklab bo'lmadi",
     "tabModels": "Modellar",

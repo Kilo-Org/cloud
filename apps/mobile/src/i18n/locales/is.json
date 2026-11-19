@@ -1222,7 +1222,7 @@
     },
     "instructions": {
       "title": "Sérsniðnar leiðbeiningar",
-      "deprecation": "Fyrirhugað er að hætta stuðningi við sérsniðnar leiðbeiningar í stillingunum. Færðu þær í REVIEW.md-skrá í geymslunni þinni í staðinn.",
+      "deprecation": "Sérsniðnar leiðbeiningar í stillingunum verða fjarlægðar. Færðu þær í REVIEW.md-skrá í geymslunni þinni í staðinn.",
       "placeholder": "t.d. fylgja reglum okkar um villumeðhöndlun…",
       "clearTitle": "Fjarlægja sérsniðnar leiðbeiningar?",
       "clearMessage": "Ef þú vistar tóman reit eyðast þær sérsniðnu leiðbeiningar sem geymdar eru fyrir þennan yfirferðaraðila."
@@ -1388,6 +1388,7 @@
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "descriptionReconnect": "Búðu til nýjan aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
+      "descriptionOverview": "Búðu til aðgangstóka vinnusvæðis og límdu hann á næsta skjá.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
       "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
       "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."
@@ -3176,6 +3177,8 @@
     "retryHint": "Reynir aftur að sækja stöðu Kilo Pass.",
     "endedOn": "Lokið {{date}}",
     "notAvailableInApp": "Kilo Pass er ekki tiltækt í appinu.",
+    "notAvailableTitle": "Kilo Pass er ekki í appinu",
+    "noPassDescription": "Þessi aðgangur er ekki með Kilo Pass.",
     "statusActive": "Virkt",
     "statusTrialing": "Á prufutímabili",
     "statusPastDue": "Greiðsla fram yfir gjalddaga",
@@ -3457,7 +3460,7 @@
       "retentionLimit": "Nýjustu reikningarnir eru sýndir."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Virkja viðvörun um lága inneign",
+      "subtitle": "Sendu viðvörun í tölvupósti á netföngin sem þú tilgreinir þegar inneign stofnunarinnar fer undir upphæðina sem þú stillir.",
       "notifyEmailsLabel": "Tölvupóstföng viðtakenda",
       "permissionDenied": "Þú hefur ekki heimild til að stjórna innheimtuviðvörunum.",
       "separateEmailsHint": "Aðgreindu tölvupóstföng með kommum.",
@@ -4928,7 +4931,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fyrirtækjaeiginleiki",
-    "enterpriseOnly": "Þetta er eingöngu fyrirtækjaeiginleiki.",
+    "enterpriseOnly": "Veitendur og líkön eru í boði með Enterprise-áskrift.",
     "readOnly": "Aðeins eigendur og stjórnendur samtaka geta breytt þessum stillingum.",
     "loadError": "Ekki tókst að hlaða veitendum og líkönum",
     "tabModels": "Líkön",

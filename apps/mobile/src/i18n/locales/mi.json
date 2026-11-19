@@ -1222,7 +1222,7 @@
     },
     "instructions": {
       "title": "Ngā tohutohu ake",
-      "deprecation": "Ka whakamutua te tautoko mō ngā tohutohu ake ā tōna wā. Nekehia ēnei aratohu ki tētahi kōnae REVIEW.md i tō pūranga.",
+      "deprecation": "Ka tangohia ngā tohutohu ake. Nekehia ēnei aratohu ki tētahi kōnae REVIEW.md i tō pūranga.",
       "placeholder": "hei tauira, kia ū ki ā mātou tikanga whakahaere hapa…",
       "clearTitle": "Tangohia ngā tohutohu ake?",
       "clearMessage": "Ki te tiakia he āpure tuatau, ka mukua ngā tohutohu ake kua penapenatia mō tēnei kaiarotake."
@@ -1388,6 +1388,7 @@
       "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o {{organization}} i runga ipurangi, mā tētahi rorohiko.",
       "description": "Hangaia he tohu uru mokowāmahi mō {{organization}}, kātahi ka whakapiri ki raro nei.",
       "descriptionReconnect": "Hangaia he tohu uru mokowāmahi hōu mō {{organization}}, kātahi ka whakapiri ki raro nei.",
+      "descriptionOverview": "Hangaia he tohu uru mokowāmahi, kātahi ka whakapiri ki te mata e whai ake nei.",
       "scopes": "Pūkete: pānui · Pūranga: pānui/tuhi · Tono kume: pānui · Matau tukutuku: pānui/tuhi",
       "tokenPlaceholder": "Tohu uru mokowāmahi",
       "tokenRefused": "Kāore a Bitbucket i whakaae ki tēnei tohu uru mokowāmahi. Tirohia kei a ia ngā whakaaetanga kei runga ake nei, kātahi ka whakamātau anō."
@@ -1919,7 +1920,7 @@
       "githubAppSettings": "Ngā tautuhinga taupānga GitHub",
       "manageAccess": "Whakahaeretia te uru o te taupānga GitHub",
       "noRepositories": "Kāore he pūranga",
-      "noRepositoriesDescription": "Tukua te taupānga GitHub a Kilo kia uru ki ngā pūranga",
+      "noRepositoriesDescription": "Tukua te taupānga GitHub a Kilo kia uru ki ngā pūranga.",
       "selectAtLeastOne": "Kōwhiria kia kotahi neke atu te pūranga."
     },
     "scopeEntry": {
@@ -3176,6 +3177,8 @@
     "retryHint": "Ka whakamātau anō ki te tiki i te tūnga Kilo Pass.",
     "endedOn": "Kua mutu i te {{date}}",
     "notAvailableInApp": "Kāore a Kilo Pass e wātea ana i te taupānga.",
+    "notAvailableTitle": "Kāore a Kilo Pass i roto i te taupānga",
+    "noPassDescription": "Kāore he Kilo Pass o tēnei pūkete.",
     "statusActive": "Hohe",
     "statusTrialing": "Kei te whakamātautau",
     "statusPastDue": "Utu kua tōmuri",
@@ -3457,7 +3460,7 @@
       "retentionLimit": "E whakaatu ana i ngā nama tino hou."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Whakahohea te whakatūpato toenga iti",
+      "subtitle": "Tukuna he matohi mā te īmēra ki ngā wāhitau ka rārangitia e koe ina heke te toenga o tēnei whakahaere ki raro iho i te moni ka tautuhia e koe.",
       "notifyEmailsLabel": "Ngā wāhitau īmēra mō ngā whakatūpato",
       "permissionDenied": "Kāore ō whakaaetanga ki te whakahaere i ngā whakatūpato utu.",
       "separateEmailsHint": "Wehewehea ngā wāhitau īmēra ki ngā piko.",
@@ -4928,7 +4931,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Āhuatanga umanga nui",
-    "enterpriseOnly": "He āhuatanga mō te umanga nui anake tēnei.",
+    "enterpriseOnly": "Ka wātea ngā kaiwhakarato me ngā tauira i te mahere Enterprise.",
     "readOnly": "Ka taea e ngā kaipupuri me ngā kaiwhakahaere o te whakahaere anake te huri i ēnei tautuhinga.",
     "loadError": "Kāore i taea te uta i ngā kaiwhakarato me ngā tauira",
     "tabModels": "Ngā tauira",

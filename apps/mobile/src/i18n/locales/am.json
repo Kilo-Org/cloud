@@ -1222,7 +1222,7 @@
     },
     "instructions": {
       "title": "ብጁ መመሪያዎች",
-      "deprecation": "ብጁ መመሪያዎችን የመጠቀም ባህሪ ከአገልግሎት ሊወጣ ታቅዷል። በምትኩ እነዚህን መመሪያዎች በማከማቻዎ ውስጥ ወዳለ REVIEW.md ፋይል ያዛውሩ።",
+      "deprecation": "ብጁ መመሪያዎችን የመጠቀም ባህሪ ይወገዳል። በምትኩ እነዚህን መመሪያዎች በማከማቻዎ ውስጥ ወዳለ REVIEW.md ፋይል ያዛውሩ።",
       "placeholder": "ለምሳሌ፦ የስህተት አያያዝ መመሪያዎቻችን መከበራቸውን ያረጋግጡ…",
       "clearTitle": "ብጁ መመሪያዎችን ማስወገድ ይፈልጋሉ?",
       "clearMessage": "ባዶውን መስክ ማስቀመጥ ለዚህ ገምጋሚ የተከማቹትን ብጁ መመሪያዎች ይሰርዛል።"
@@ -1388,6 +1388,7 @@
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
       "description": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
       "descriptionReconnect": "ለ{{organization}} አዲስ የሥራ ቦታ መዳረሻ ቶከን እንደገና ይፍጠሩና ከታች ይለጥፉት።",
+      "descriptionOverview": "የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና በሚቀጥለው ማያ ገጽ ላይ ይለጥፉት።",
       "scopes": "መለያ፦ ማንበብ · ማከማቻዎች፦ ማንበብ/መጻፍ · የኮድ ውህደት ጥያቄዎች፦ ማንበብ · ዌብሁኮች፦ ማንበብ/መጻፍ",
       "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን",
       "tokenRefused": "Bitbucket ይህን የሥራ ቦታ ቶከን አልተቀበለውም። ከላይ ያሉት አስፈላጊ ፈቃዶች እንዳሉት ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
@@ -3176,6 +3177,8 @@
     "retryHint": "የKilo Pass ሁኔታን ለማግኘት እንደገና ይሞክራል።",
     "endedOn": "በ{{date}} ተጠናቋል",
     "notAvailableInApp": "Kilo Pass በመተግበሪያው ውስጥ አይገኝም።",
+    "notAvailableTitle": "Kilo Pass በመተግበሪያው ውስጥ የለም",
+    "noPassDescription": "ይህ መለያ Kilo Pass የለውም።",
     "statusActive": "ንቁ",
     "statusTrialing": "በሙከራ ላይ",
     "statusPastDue": "ክፍያ ዘግይቷል",
@@ -3457,7 +3460,7 @@
       "retentionLimit": "የቅርብ ጊዜ ደረሰኞችን በማሳየት ላይ።"
     },
     "lowBalanceAlert": {
-      "enableA11y": "የዝቅተኛ ቀሪ ሂሳብ ማንቂያን ያንቁ",
+      "subtitle": "የዚህ ድርጅት ቀሪ ሂሳብ ካስቀመጡት መጠን በታች ሲወርድ ለዘረዘሯቸው አድራሻዎች በኢሜይል ማንቂያ ላክ።",
       "notifyEmailsLabel": "ማንቂያ የሚላክላቸው ኢሜይሎች",
       "permissionDenied": "የክፍያ ማንቂያዎችን ለማስተዳደር ፈቃድ የለዎትም።",
       "separateEmailsHint": "ብዙ የኢሜይል አድራሻዎችን በነጠላ ሰረዝ ይለዩ።",
@@ -4928,7 +4931,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "የኢንተርፕራይዝ ባህሪ",
-    "enterpriseOnly": "ይህ ለኢንተርፕራይዝ ብቻ የሆነ ባህሪ ነው።",
+    "enterpriseOnly": "አቅራቢዎች እና ሞዴሎች በኢንተርፕራይዝ ፕላን ይገኛሉ።",
     "readOnly": "እነዚህን ቅንብሮች መቀየር የሚችሉት የድርጅቱ ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
     "loadError": "አቅራቢዎችን እና ሞዴሎችን መጫን አልተቻለም",
     "tabModels": "ሞዴሎች",

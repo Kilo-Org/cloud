@@ -667,7 +667,7 @@
     },
     "instructions": {
       "title": "Eigen instructies",
-      "deprecation": "De functie voor aangepaste instructies wordt op termijn uitgefaseerd. Verplaats deze richtlijnen naar een REVIEW.md-bestand in je repository.",
+      "deprecation": "De functie voor aangepaste instructies wordt verwijderd. Verplaats deze richtlijnen naar een REVIEW.md-bestand in je repository.",
       "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…",
       "clearTitle": "Eigen instructies verwijderen?",
       "clearMessage": "Door een leeg veld op te slaan worden de eigen instructies verwijderd die voor deze reviewer zijn opgeslagen."
@@ -698,6 +698,7 @@
       "managedOnWeb": "De Bitbucket-verbinding voor {{organization}} wordt via het web op een computer beheerd.",
       "description": "Maak voor {{organization}} een toegangstoken voor de werkruimte en plak het hieronder.",
       "descriptionReconnect": "Maak voor {{organization}} een nieuw toegangstoken voor de werkruimte en plak het hieronder.",
+      "descriptionOverview": "Maak een toegangstoken voor de werkruimte en plak het op het volgende scherm.",
       "scopes": "Vereiste rechten: account lezen, repositories lezen en schrijven, PR's lezen en webhooks lezen en schrijven.",
       "tokenPlaceholder": "Toegangstoken voor de werkruimte",
       "tokenRefused": "Bitbucket heeft dit toegangstoken voor de werkruimte niet geaccepteerd. Controleer of het de rechten hierboven heeft en probeer het daarna opnieuw."
@@ -2621,6 +2622,8 @@
     "retryHint": "Haalt de Kilo Pass-status opnieuw op.",
     "endedOn": "Beëindigd op {{date}}",
     "notAvailableInApp": "Kilo Pass is niet beschikbaar in de app.",
+    "notAvailableTitle": "Kilo Pass zit niet in de app",
+    "noPassDescription": "Dit account heeft geen Kilo Pass.",
     "statusActive": "Actief",
     "statusTrialing": "Proefperiode",
     "statusPastDue": "Achterstallige betaling",
@@ -3462,7 +3465,7 @@
       "retentionLimit": "De meest recente facturen worden weergegeven."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Waarschuwing voor laag saldo inschakelen",
+      "subtitle": "Stuur een waarschuwing per e-mail naar de opgegeven adressen wanneer het saldo van deze organisatie onder het ingestelde bedrag zakt.",
       "notifyEmailsLabel": "E-mailadressen voor meldingen",
       "permissionDenied": "Je hebt geen toestemming om factureringswaarschuwingen te beheren.",
       "separateEmailsHint": "Scheid meerdere e-mailadressen met komma's.",
@@ -4928,7 +4931,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Functie voor ondernemingen",
-    "enterpriseOnly": "Deze functie is alleen beschikbaar voor ondernemingen.",
+    "enterpriseOnly": "Aanbieders en modellen zijn beschikbaar in het Enterprise-abonnement.",
     "readOnly": "Alleen eigenaren en beheerders van de organisatie kunnen deze instellingen wijzigen.",
     "loadError": "Aanbieders en modellen konden niet worden geladen",
     "tabModels": "Modellen",

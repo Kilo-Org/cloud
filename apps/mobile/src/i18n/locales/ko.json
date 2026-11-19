@@ -667,7 +667,7 @@
     },
     "instructions": {
       "title": "사용자 지정 지침",
-      "deprecation": "사용자 지정 지침 기능은 지원이 중단될 예정입니다. 이 지침을 저장소의 REVIEW.md 파일로 옮기세요.",
+      "deprecation": "사용자 지정 지침 기능은 제거될 예정입니다. 이 지침을 저장소의 REVIEW.md 파일로 옮기세요.",
       "placeholder": "예: 오류 처리 규칙 적용…",
       "clearTitle": "사용자 지정 지침을 제거하시겠습니까?",
       "clearMessage": "빈 필드를 저장하면 이 검토자에 대해 저장된 사용자 지정 지침이 삭제됩니다."
@@ -698,6 +698,7 @@
       "managedOnWeb": "{{organization}}의 Bitbucket 연결은 컴퓨터에서 웹으로 관리됩니다.",
       "description": "{{organization}}용 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
       "descriptionReconnect": "{{organization}}용 새 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
+      "descriptionOverview": "작업 영역 액세스 토큰을 생성한 다음 다음 화면에서 붙여넣으세요.",
       "scopes": "계정: 읽기 · 저장소: 읽기/쓰기 · 풀 리퀘스트: 읽기 · 웹훅: 읽기/쓰기",
       "tokenPlaceholder": "작업 영역 액세스 토큰",
       "tokenRefused": "Bitbucket에서 이 작업 영역 토큰을 수락하지 않았습니다. 위의 권한이 포함되어 있는지 확인한 후 다시 시도하세요."
@@ -2621,6 +2622,8 @@
     "retryHint": "Kilo Pass 상태를 다시 확인합니다.",
     "endedOn": "{{date}}에 종료됨",
     "notAvailableInApp": "Kilo Pass는 앱에서 사용할 수 없습니다.",
+    "notAvailableTitle": "Kilo Pass는 앱에서 제공되지 않습니다",
+    "noPassDescription": "이 계정에는 Kilo Pass가 없습니다.",
     "statusActive": "활성",
     "statusTrialing": "체험 중",
     "statusPastDue": "결제 연체",
@@ -3462,7 +3465,7 @@
       "retentionLimit": "최근 청구서를 표시합니다."
     },
     "lowBalanceAlert": {
-      "enableA11y": "잔액 부족 알림 켜기",
+      "subtitle": "이 조직의 잔액이 설정한 금액 아래로 떨어지면 입력한 주소로 이메일 알림을 보냅니다.",
       "notifyEmailsLabel": "알림 수신 이메일 주소",
       "permissionDenied": "결제 알림을 관리할 권한이 없습니다.",
       "separateEmailsHint": "이메일 주소를 여러 개 입력할 때는 쉼표로 구분하세요.",
@@ -4928,7 +4931,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "엔터프라이즈 기능",
-    "enterpriseOnly": "이 기능은 엔터프라이즈 전용 기능입니다.",
+    "enterpriseOnly": "공급자와 모델은 엔터프라이즈 요금제에서 사용할 수 있습니다.",
     "readOnly": "조직 소유자와 관리자만 이 설정을 변경할 수 있습니다.",
     "loadError": "공급자와 모델을 불러오지 못했습니다",
     "tabModels": "모델",

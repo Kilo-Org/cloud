@@ -8,7 +8,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 import { BitbucketOverview } from './bitbucket-overview';
 
@@ -109,7 +109,7 @@ vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
-  classifyProviderState: () => ({ status: 'connected' }),
+  classifyProviderState: () => ({ status: readiness.connected ? 'connected' : 'disconnected' }),
   useBitbucketReadiness: () => ({
     isLoading: false,
     isError: false,
@@ -239,6 +239,24 @@ describe('BitbucketOverview config body', () => {
     await renderScreen();
 
     expect(queryError.variants).toEqual(['offline']);
+  });
+
+  it('names the next screen instead of a field this screen does not have', async () => {
+    readiness.connected = false;
+    config.data = makeConfig();
+
+    const renderer = await renderScreen();
+
+    const copy = renderer.root
+      .findAllByType('Text')
+      .map(node => node.props.children)
+      .join(' ');
+    // The token field lives on the sheet the action opens, so the reason names
+    // that step; "paste it below" pointed at a button with no field under it.
+    expect(copy).toContain(i18n.t('codeReviewer.bitbucketConnect.descriptionOverview'));
+    // The overview has no organization name to interpolate, so its copy must
+    // not carry a placeholder the reader would see.
+    expect(copy).not.toContain('{{organization}}');
   });
 });
 

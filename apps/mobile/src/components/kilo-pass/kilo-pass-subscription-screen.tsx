@@ -282,22 +282,14 @@ export function KiloPassSubscriptionScreen() {
       />
     );
   }
-  if (detail.kind === 'none') {
+  // No pass: the title is the reason — Kilo Pass is not available in the app —
+  // and the description states the account's status. Kilo Pass is sold in
+  // neither store and the app links to no web billing, so no action follows.
+  if (detail.kind === 'none' || subscription == null) {
     return (
       <KiloPassMessageBody
-        title={t('organization.kiloPass.notSubscribed')}
-        description={t('kiloPass.notAvailableInApp')}
-      />
-    );
-  }
-  if (subscription == null) {
-    // A detail — active or ended — is derived from a subscription, so this only
-    // narrows the type; the message keeps the screen total rather than throwing
-    // on it.
-    return (
-      <KiloPassMessageBody
-        title={t('organization.kiloPass.notSubscribed')}
-        description={t('kiloPass.notAvailableInApp')}
+        title={t('kiloPass.notAvailableTitle')}
+        description={t('kiloPass.noPassDescription')}
       />
     );
   }

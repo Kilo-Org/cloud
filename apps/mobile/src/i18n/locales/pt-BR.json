@@ -634,7 +634,7 @@
     },
     "instructions": {
       "title": "Instruções personalizadas",
-      "deprecation": "Está prevista a descontinuação das instruções personalizadas. Transfira essas orientações para um arquivo REVIEW.md no seu repositório.",
+      "deprecation": "As instruções personalizadas serão removidas. Transfira essas orientações para um arquivo REVIEW.md no seu repositório.",
       "placeholder": "ex.: seguir nossas convenções de tratamento de erros…",
       "clearTitle": "Remover instruções personalizadas?",
       "clearMessage": "Salvar um campo vazio exclui as instruções personalizadas armazenadas para este revisor."
@@ -665,6 +665,7 @@
       "managedOnWeb": "A conexão do Bitbucket para {{organization}} é gerenciada na web, em um computador.",
       "description": "Crie um token de acesso do espaço de trabalho para {{organization}} e cole-o abaixo.",
       "descriptionReconnect": "Crie um novo token de acesso do espaço de trabalho para {{organization}} e cole-o abaixo.",
+      "descriptionOverview": "Crie um token de acesso do espaço de trabalho e cole-o na próxima tela.",
       "scopes": "Conta: leitura · Repositórios: leitura/gravação · PRs: leitura · Webhooks: leitura/gravação",
       "tokenPlaceholder": "Token de acesso do espaço de trabalho",
       "tokenRefused": "O Bitbucket não aceitou este token de acesso do espaço de trabalho. Verifique se ele tem os escopos acima e tente novamente."
@@ -2662,6 +2663,8 @@
     "retryHint": "Tenta consultar o status do Kilo Pass novamente.",
     "endedOn": "Encerrado {{date}}",
     "notAvailableInApp": "O Kilo Pass não está disponível no app.",
+    "notAvailableTitle": "O Kilo Pass não é oferecido no app",
+    "noPassDescription": "Esta conta não tem Kilo Pass.",
     "statusActive": "Ativo",
     "statusTrialing": "Em teste",
     "statusPastDue": "Pagamento em atraso",
@@ -3526,7 +3529,7 @@
       "retentionLimit": "Mostrando as faturas mais recentes."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Ativar alerta de saldo baixo",
+      "subtitle": "Envie um alerta por e-mail para os endereços informados quando o saldo desta organização ficar abaixo do valor definido.",
       "notifyEmailsLabel": "E-mails para receber alertas",
       "permissionDenied": "Você não tem permissão para gerenciar alertas de cobrança.",
       "separateEmailsHint": "Separe vários e-mails com vírgulas.",
@@ -5009,7 +5012,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Recurso empresarial",
-    "enterpriseOnly": "Este é um recurso exclusivo para empresas.",
+    "enterpriseOnly": "Provedores e modelos estão disponíveis no plano Enterprise.",
     "readOnly": "Somente proprietários e administradores da organização podem alterar estas configurações.",
     "loadError": "Não foi possível carregar provedores e modelos",
     "tabModels": "Modelos",

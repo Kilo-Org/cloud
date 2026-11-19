@@ -153,6 +153,9 @@ export function FindingFilterModal({
         <ConfigureRow
           icon={RotateCcw}
           title={t('securityAgent.filter.reset')}
+          // Reset applies the default filters in place: no destination, so
+          // no chevron.
+          variant="action"
           onPress={() => {
             onChange(DEFAULT_SECURITY_FINDING_FILTERS);
           }}

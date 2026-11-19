@@ -195,11 +195,14 @@ function patternIsCoveredBy(left: string, right: string): boolean {
 }
 
 /**
- * The profile entries written with a strictly broader pattern before the
- * narrower pattern it covers, so the profile's most specific verdict is the one
- * the runtime resolves last. Coverage is a strict partial order, so Kahn over
- * the broader-first edges with the author's index as the tie-break keeps equal
- * and incomparable patterns in the order the author wrote.
+ * The profile entries with a strictly broader pattern placed before the narrower
+ * patterns it covers, so the profile's most specific verdict is the one the
+ * runtime resolves last. Coverage is a strict partial order, so this is one
+ * deterministic topological sort of the broader-first edges: the lowest author
+ * index among the entries that no unplaced pattern covers is taken first. A
+ * broader pattern therefore always precedes the narrower patterns it covers, and
+ * a pair the relation leaves unordered keeps the author's order only while the
+ * sort places no other entry between the two.
  */
 function agentEntriesBroadestFirst(
   entries: Array<[string, PermissionAction]>
@@ -229,12 +232,13 @@ function agentEntriesBroadestFirst(
 /**
  * Combine a session pattern map with an agent pattern map so both apply.
  *
- * The rendered map orders each tool's profile rules from the broadest pattern to
- * the narrowest, so the profile's most specific decision is the one the runtime
- * applies. Rules the author writes with equal patterns, or patterns where
- * neither covers the other, keep the order the author wrote, so a profile's
- * exception written after its own refusal survives, and each session decision it
- * carries follows it.
+ * The rendered map orders each tool's profile rules so that a broader pattern
+ * precedes the narrower patterns it covers, so the profile's most specific
+ * decision is the one the runtime applies. A pair of patterns with no coverage
+ * relation keeps the author's order only while no other rule is placed between
+ * the two, so a profile's exception written after its own refusal survives where
+ * the exception is the narrower of the two, and each session decision it carries
+ * follows it.
  *
  * A profile refusal applies as written. A profile ask applies as written too.
  * A profile allowance is kept only where the session writes an allow for that

@@ -577,6 +577,12 @@ describe('narrowProfilePermission', () => {
     }) as PermissionMap;
     expect(refusal['bash']).toEqual({ 'git log *': 'deny', 'git *': 'ask' });
     expect(allowance['bash']).toEqual({ 'git log *': 'allow', 'git *': 'ask' });
+    // The profile decides the kept pattern, so its verdict settles the command
+    // and the ask decides only the commands the profile named no rule for.
+    expect(resolve(session, refusal, 'bash', 'git log --oneline')).toBe('deny');
+    expect(resolve(session, refusal, 'bash', 'git status')).toBe('ask');
+    expect(resolve(session, allowance, 'bash', 'git log --oneline')).toBe('allow');
+    expect(resolve(session, allowance, 'bash', 'git status')).toBe('ask');
   });
 
   it('drops an empty agent map', () => {

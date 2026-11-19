@@ -14,8 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
-  BALANCE_RETRY_FRAME_CLASS,
-  BALANCE_RETRY_HIT_SLOP,
+  BALANCE_RETRY_TARGET_CLASS,
   LEGAL_LINK_BOX_CLASS,
   LEGAL_LINK_ROW_CLASS,
 } from '@/lib/a11y/tap-target';
@@ -285,11 +284,12 @@ export function CreditPurchaseScreen() {
   };
 
   const renderBalanceValue = () => {
-    // Every branch below is one `h-8` tall, the amount's own line box: the
-    // card's height stays the same in all three states, so the packs below never
-    // move when the read settles. The skeleton keeps the value's box,
-    // and the failed read's target keeps the box too: its tap area comes from
-    // the hit slop, not from a taller box, which would move the packs below.
+    // Every branch paints inside the amount's own line box: the card's height
+    // stays the same in all three states, so the packs below never move when
+    // the read settles. The skeleton keeps the value's box, and the failed
+    // read's target keeps it in flow too: its own node is the full target and
+    // `BALANCE_RETRY_TARGET_CLASS`'s negative margin cancels the half that
+    // overflows the line, which a taller in-flow box would add to the card.
     if (balancePending) {
       return <Skeleton className="h-8 w-24 rounded" />;
     }
@@ -298,8 +298,7 @@ export function CreditPurchaseScreen() {
         <Pressable
           accessibilityLabel={t('profile.failedToLoadBalance')}
           accessibilityRole="button"
-          className={cn(BALANCE_RETRY_FRAME_CLASS, 'justify-center active:opacity-70')}
-          hitSlop={BALANCE_RETRY_HIT_SLOP}
+          className={cn(BALANCE_RETRY_TARGET_CLASS, 'justify-center active:opacity-70')}
           onPress={() => {
             void refetchBalance();
           }}
@@ -390,6 +389,12 @@ export function CreditPurchaseScreen() {
                 sentence grows the floor instead of truncating. */}
             <View
               className="mt-1 justify-center"
+              // The slot paints text only and holds nothing to press, so it
+              // stays out of touch dispatch: it is the card's later sibling
+              // under the amount, and a view that takes a point back would
+              // swallow the failed read's retry target wherever the two
+              // overlap.
+              pointerEvents="none"
               style={{ minHeight: expiryCaptionFloor(fontScale) }}
               testID="credit-expiry-slot"
             >
@@ -497,6 +502,12 @@ export function CreditPurchaseScreen() {
                 // drops them when initialization fails), so even a priced row
                 // cannot complete: keep every row disabled until it reconnects.
                 const disabled = purchasing || !connected || !hasStorePrice;
+                // A disabled row recedes by its own labels, never by its whole
+                // surface: the title and price sit at reduced foreground ink (70%),
+                // which still outranks the muted ink of the note under them, so the
+                // title stays the strongest line while the row reads lighter than an
+                // enabled one. The note keeps its muted ink at full strength.
+                const labelClass = disabled ? 'text-foreground opacity-70' : 'text-foreground';
                 // The trailing slot holds the store price only: it keeps its one
                 // line and its full width, so the title yields and a price a user
                 // pays is never truncated.
@@ -541,15 +552,19 @@ export function CreditPurchaseScreen() {
                   .join(', ');
 
                 return (
+                  // A disabled row recedes by its own labels, never by its shell:
+                  // the title and the price sit at reduced foreground ink (70%),
+                  // above the muted ink of the one line under them, so the title
+                  // stays the row's strongest line while the note still states
+                  // when the credits expire at full muted strength. The row's
+                  // shell, border, padding, accessibility label and
+                  // accessibilityState do not change.
                   <Pressable
                     key={pack.backend.appleProductId}
                     accessibilityLabel={rowAccessibilityLabel}
                     accessibilityRole="button"
                     accessibilityState={{ busy: rowCompleting, disabled }}
-                    className={cn(
-                      'justify-center rounded-xl border border-border bg-card px-5 active:opacity-80',
-                      disabled && 'opacity-50'
-                    )}
+                    className="justify-center rounded-xl border border-border bg-card px-5 active:opacity-80"
                     disabled={disabled}
                     onPress={() => {
                       handlePackPress(pack);
@@ -561,11 +576,16 @@ export function CreditPurchaseScreen() {
                         reserves, so a longer pack name truncates instead of
                         growing the row. */}
                     <View className="flex-row items-start justify-between gap-4">
-                      <Text className="flex-1 font-semibold text-foreground" numberOfLines={1}>
+                      <Text className={cn('flex-1 font-semibold', labelClass)} numberOfLines={1}>
                         {packLabel}
                       </Text>
                       {storePrice !== null && (
-                        <Text className="shrink-0 text-base font-semibold text-foreground tabular-nums">
+                        <Text
+                          className={cn(
+                            'shrink-0 text-base font-semibold tabular-nums',
+                            labelClass
+                          )}
+                        >
                           {storePrice}
                         </Text>
                       )}

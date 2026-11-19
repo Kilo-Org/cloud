@@ -419,6 +419,67 @@ describe('prepareKiloFilesystem', () => {
 });
 
 describe('Kilo startup lifecycle', () => {
+  it('holds sibling prompts until the running CLI applies the workspace MCP refresh', async () => {
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      probe: createProbe(true),
+      scheduler: createScheduler(),
+      isIdle: () => false,
+    });
+    const client = await runtime.ensure();
+    const refresh = Promise.withResolvers<void>();
+    const materialized = Promise.withResolvers<void>();
+    const submitted = Promise.withResolvers<void>();
+    const events: string[] = [];
+    client.updateCloudAgentMcp = async () => {
+      await refresh.promise;
+      events.push('refreshed');
+    };
+    client.submit = async () => {
+      events.push('submitted');
+      submitted.resolve();
+    };
+    const turns = createTurnManager({
+      timers: TEST_TIMERS,
+      runtimes: { get: () => runtime },
+      emit: () => undefined,
+      materializeAttachments: async message => {
+        materialized.resolve();
+        return message;
+      },
+    });
+    turns.registerRoute({
+      sessionId: 'workspace_sibling',
+      kiloSessionId: 'ses_sibling',
+      directory: runtime.directory,
+      attemptId: 'sibling',
+    });
+    const installation = runtime.installCredentials(runtime.env, {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-mcp-grant',
+      expiresAt: 1_900_000_000,
+    });
+    try {
+      turns.submit('workspace_sibling', {
+        messageId: 'm1',
+        turn: { type: 'prompt', prompt: 'hello' },
+        agent: { mode: 'code', model: 'test/model' },
+      });
+      await materialized.promise;
+      await Bun.sleep(0);
+      expect(events).toEqual([]);
+      refresh.resolve();
+      await submitted.promise;
+      expect(events).toEqual(['refreshed', 'submitted']);
+    } finally {
+      refresh.resolve();
+      await installation;
+      turns.release('workspace_sibling');
+      await runtime.shutdown();
+    }
+  });
+
   it.each([0, 3600, -3600])('refreshes MCP with a proxy handle expiry delta of %s', async delta => {
     const exp = 1_800_000_000;
     const { runtime } = createRuntime({

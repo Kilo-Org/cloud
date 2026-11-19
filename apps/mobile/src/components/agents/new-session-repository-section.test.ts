@@ -72,9 +72,9 @@ vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
 
 /** The rendered Text node holding exactly `copy`, if it is mounted. */
 function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
-  // The Bitbucket card's header now carries the same copy as its action, so the
-  // action label is picked by the row's own centre alignment instead of by
-  // position in the tree.
+  // The action label is the row's centre-aligned Text; the card headers carry
+  // their own title copy, so the centre alignment keeps this lookup on the
+  // action regardless of its position in the tree.
   return renderer.root
     .findAllByType('Text' as never)
     .find(
@@ -236,12 +236,12 @@ describe('NewSessionRepositorySection connect card open action', () => {
     // A label box sized to the label's own measured width is a fraction
     // narrower than the glyphs Android lays out, so "Open GitLab" wrapped onto
     // two lines. The label takes the row's remaining width instead, and
-    // `numberOfLines` pins the single line. Bitbucket's action now uses the
-    // shared Connect label, so its card header and its action share copy.
+    // `numberOfLines` pins the single line. Bitbucket's action reads the bare
+    // "Connect" verb while its card header keeps the "Connect Bitbucket" title.
     for (const copy of [
       i18n.t('agentChat.newSession.openGithub'),
       i18n.t('agentChat.newSession.openGitlab'),
-      i18n.t('common.connectBitbucket'),
+      i18n.t('common.connect'),
     ]) {
       const label = textNode(renderer, copy);
       expect(label, copy).toBeDefined();

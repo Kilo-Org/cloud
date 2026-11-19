@@ -22,6 +22,7 @@ const COPY: Record<string, string> = {
   'glanceable.checked': 'Checked',
   'glanceable.lastKnown': 'Last known',
   'glanceable.awaitingUpdate': 'Awaiting update',
+  'glanceable.wasDue': 'Was due',
   'glanceable.nextRun': 'Next run',
   'glanceable.newAgent': 'New agent',
   'glanceable.waitingForYou': 'Waiting for you',

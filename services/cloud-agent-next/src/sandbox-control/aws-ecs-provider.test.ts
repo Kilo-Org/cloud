@@ -92,12 +92,12 @@ describe('ECS through the shared AWS allocation lifecycle', () => {
     expect([...f.tasks.values()][0].lastStatus).toBe('STOPPED');
   });
 
-  it('persists compute termination before failed S3 cleanup and retries only the object deletion', async () => {
+  it('keeps a confirmed ECS stop terminal when S3 cleanup fails and retries only the object deletion', async () => {
     const f = ecsProviderFixture();
     const ref = await create(f);
     await f.adapter().launch(ref, startup);
     f.failDelete(true);
-    expect(await f.adapter().stop(ref)).toBe('retryable');
+    expect(await f.adapter().stop(ref)).toBe('terminal');
     expect(f.operations.get(intent.intentId)?.phase).toBe('terminated');
     expect([...f.tasks.values()][0].lastStatus).toBe('STOPPED');
     f.failDelete(false);

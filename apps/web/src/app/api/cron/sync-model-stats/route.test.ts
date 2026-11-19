@@ -268,7 +268,10 @@ describe('GET /api/cron/sync-model-stats', () => {
 
     expect((await GET(request())).status).toBe(200);
     expect(syncOpenRouterModels).toHaveBeenCalledWith(
-      [monitoredModel, { ...raw, name: enhanced.name, pricing: enhanced.pricing, retires_on: '2026-11-20' }],
+      [
+        monitoredModel,
+        { ...raw, name: enhanced.name, pricing: enhanced.pricing, retires_on: '2026-11-20' },
+      ],
       [monitoredModel.id]
     );
     expectExistingSyncCalls();

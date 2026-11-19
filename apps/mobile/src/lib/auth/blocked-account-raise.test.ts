@@ -6,6 +6,7 @@ import {
   subscribeBlockedAccount,
 } from '@/lib/auth/blocked-account-state';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
+import { setSignOutTeardownActive } from '@/lib/auth/auth-transition-state';
 import { raiseBlockedAccountFromRefusal } from '@/lib/auth/blocked-account-raise';
 
 const BLOCKED_REFUSAL = { data: { code: 'FORBIDDEN', accountBlocked: true } };
@@ -15,6 +16,7 @@ describe('raiseBlockedAccountFromRefusal', () => {
   beforeEach(() => {
     setBlockedAccountActive(false);
     setSignOutActive(false);
+    setSignOutTeardownActive(false);
   });
 
   it('raises the explanation for a blocked refusal', () => {
@@ -47,12 +49,24 @@ describe('raiseBlockedAccountFromRefusal', () => {
     setBlockedAccountActive(false);
   });
 
-  it('does not raise during a sign-out teardown', () => {
+  it('does not raise while the sign-out fence is closed', () => {
     setSignOutActive(true);
 
     raiseBlockedAccountFromRefusal(BLOCKED_REFUSAL);
 
     expect(isBlockedAccountActive()).toBe(false);
     setSignOutActive(false);
+  });
+
+  it('does not raise while the teardown guard is closed', () => {
+    // The guard covers the sign-in window (transition start to credential
+    // publication) as well as sign-out: a refusal from the previous session
+    // settling in that window must not raise over the account just signed in.
+    setSignOutTeardownActive(true);
+
+    raiseBlockedAccountFromRefusal(BLOCKED_REFUSAL);
+
+    expect(isBlockedAccountActive()).toBe(false);
+    setSignOutTeardownActive(false);
   });
 });

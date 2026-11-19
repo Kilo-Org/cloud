@@ -12,6 +12,9 @@ import {
   KILO_ACTIVITY_MESSAGE_LIMIT,
   DrainSessionError,
   isKiloServerUnreachableError,
+  forgetOutstandingRuleset,
+  hasOutstandingRuleset,
+  rememberOutstandingRuleset,
   SessionRulesetNotAppliedError,
   type WrapperKiloClient,
 } from './kilo-api';
@@ -1068,6 +1071,31 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       expect(stub.updates[1]).toEqual({ queryDirectory: directory, body: { permission } });
     });
 
+    it('keeps the owed ruleset marker across a fresh process', async () => {
+      const sessionId = 'ses_record_permission_durable';
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberOutstandingRuleset(sessionId, permission);
+      try {
+        // A new process shares only the filesystem, not module memory.
+        const script = `
+          import { readOutstandingRuleset } from ${JSON.stringify(new URL('./kilo-api.ts', import.meta.url).href)};
+          const owed = await readOutstandingRuleset(${JSON.stringify(sessionId)});
+          console.log(JSON.stringify(owed ?? null));
+        `;
+        const proc = Bun.spawn([process.execPath, '--eval', script], {
+          stdout: 'pipe',
+          stderr: 'pipe',
+          env: process.env,
+        });
+        const output = await new Response(proc.stdout).text();
+        expect(await proc.exited).toBe(0);
+        expect(JSON.parse(output.trim())).toEqual(permission);
+      } finally {
+        await forgetOutstandingRuleset(sessionId);
+      }
+      expect(await hasOutstandingRuleset(sessionId)).toBe(false);
+    });
+
     it('applies the owed ruleset on the next call instead of reusing an incomplete record', async () => {
       const sessionId = 'ses_record_permission_owed';
       const directory = temporaryDirectory('kilo-api-permission-owed-target-');
@@ -1111,6 +1139,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       const error = await createClient(stub.url)
         .ensureSession(sessionId, directory)
         .catch((error: unknown) => error);
+      await forgetOutstandingRuleset(sessionId);
 
       expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
       expect((error as Error).message).toContain('Session ruleset not applied');
@@ -1131,6 +1160,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       const error = await createClient(stub.url)
         .ensureSession(sessionId, directory)
         .catch((error: unknown) => error);
+      await forgetOutstandingRuleset(sessionId);
 
       expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
       expect((error as SessionRulesetNotAppliedError).retryable).toBe(false);

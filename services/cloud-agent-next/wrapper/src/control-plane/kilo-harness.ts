@@ -64,7 +64,7 @@ async function sessionExists(
   // it takes the same path and the create step applies the ruleset.
   const recorded = parsed.data.directory;
   if (typeof recorded !== 'string') return false;
-  if (hasOutstandingRuleset(sessionId)) return false;
+  if (await hasOutstandingRuleset(sessionId)) return false;
   return sameDirectory(recorded, directory);
 }
 

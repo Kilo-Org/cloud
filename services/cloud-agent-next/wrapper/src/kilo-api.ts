@@ -21,6 +21,7 @@ import {
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import fsp from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { logToFile } from './utils.js';
 import { kiloClientConfig, kiloServerHeaders, type KiloServer } from './kilo-server-auth.js';
@@ -212,11 +213,42 @@ export class SessionRulesetNotAppliedError extends Error {
  * after it. When that call fails, the record stays in place without its
  * rules; the next prepare must apply the ruleset before the route is reused,
  * not skip the call because the record is already there.
+ *
+ * The record lives in the sandbox, so the marker must outlive this process: a
+ * wrapper restart inside a surviving allocation would otherwise lose it.
  */
-const outstandingRulesets = new Map<string, PermissionRuleset>();
+function outstandingRulesetPath(sessionId: string): string {
+  const home = process.env.HOME && process.env.HOME.length > 0 ? process.env.HOME : os.tmpdir();
+  return path.join(home, '.kilo-control', 'rulesets', `${encodeURIComponent(sessionId)}.json`);
+}
 
-export function hasOutstandingRuleset(sessionId: string): boolean {
-  return outstandingRulesets.has(sessionId);
+export async function rememberOutstandingRuleset(
+  sessionId: string,
+  permission: PermissionRuleset
+): Promise<void> {
+  const file = outstandingRulesetPath(sessionId);
+  await fsp.mkdir(path.dirname(file), { recursive: true });
+  await fsp.writeFile(file, JSON.stringify(permission), { mode: 0o600 });
+}
+
+export async function forgetOutstandingRuleset(sessionId: string): Promise<void> {
+  await fsp.rm(outstandingRulesetPath(sessionId), { force: true });
+}
+
+export async function readOutstandingRuleset(
+  sessionId: string
+): Promise<PermissionRuleset | undefined> {
+  try {
+    const raw = await fsp.readFile(outstandingRulesetPath(sessionId), 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as PermissionRuleset) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function hasOutstandingRuleset(sessionId: string): Promise<boolean> {
+  return (await readOutstandingRuleset(sessionId)) !== undefined;
 }
 
 export type DrainSessionErrorKind =
@@ -660,7 +692,7 @@ export function createWrapperKiloClient(
       // transient failure on that second call is retried here: the enclosing
       // step retry would find the record in place and return early.
       const applyRuleset = async (permission: PermissionRuleset): Promise<void> => {
-        outstandingRulesets.set(sessionId, permission);
+        await rememberOutstandingRuleset(sessionId, permission);
         const attemptOnce = async () => {
           const restoreTimeout = AbortSignal.timeout(8_000);
           const restored = await v2Client.session.update(
@@ -673,7 +705,7 @@ export function createWrapperKiloClient(
         for (let attempt = 1; attempt <= 3; attempt += 1) {
           try {
             await attemptOnce();
-            outstandingRulesets.delete(sessionId);
+            await forgetOutstandingRuleset(sessionId);
             return;
           } catch (error) {
             lastError = error;
@@ -713,7 +745,7 @@ export function createWrapperKiloClient(
         ) {
           // A record that still owes its ruleset is not complete: apply it
           // before the route is reused instead of returning as if it were.
-          const owed = outstandingRulesets.get(sessionId);
+          const owed = await readOutstandingRuleset(sessionId);
           if (owed === undefined) return;
           await applyRuleset(owed);
           return;

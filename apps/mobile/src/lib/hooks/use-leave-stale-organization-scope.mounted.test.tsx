@@ -55,6 +55,7 @@ const navigation = vi.hoisted(() => ({
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => params.value,
+  usePathname: () => '/organization/invoices',
   useRouter: () => router,
   useNavigation: () => navigation,
 }));

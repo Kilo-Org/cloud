@@ -22,29 +22,33 @@ import { briefingSummaryStatusKey, visibleHomeBriefing } from '@/lib/agent-brief
 import { cn } from '@/lib/utils';
 import { formatCalendarDate, formatNumber } from '@/lib/format';
 
-export function BriefingScorecard({ report }: { readonly report: BriefingReport }) {
-  const { t, i18n } = useTranslation();
-  const rows = [
+/** One source of truth for the scorecard counts, in announced order. */
+const briefingScorecardRows = (report: BriefingReport) =>
+  [
     {
-      label: t('agentBriefing.selectedSessions'),
+      labelKey: 'agentBriefing.selectedSessions',
       amount: report.scorecard.sessions,
     },
     {
-      label: t('agentBriefing.snapshotPullRequests'),
+      labelKey: 'agentBriefing.snapshotPullRequests',
       amount: report.scorecard.pullRequests,
     },
     {
-      label: t('agentBriefing.snapshotBlockers'),
+      labelKey: 'agentBriefing.snapshotBlockers',
       amount: report.scorecard.blockers,
     },
-  ];
+  ] as const;
+
+export function BriefingScorecard({ report }: { readonly report: BriefingReport }) {
+  const { t, i18n } = useTranslation();
+  const rows = briefingScorecardRows(report);
   return (
     <View className="gap-2">
       {rows.map(row => (
-        <View key={row.label} className="flex-row items-center gap-2">
+        <View key={row.labelKey} className="flex-row items-center gap-2">
           <Text variant="figure">{formatNumber(row.amount, i18n.language)}</Text>
           <Text variant="muted" numberOfLines={1} className="min-w-0 shrink">
-            {row.label}
+            {t(row.labelKey)}
           </Text>
         </View>
       ))}
@@ -97,6 +101,13 @@ export function BriefingCard({
   const open = () => {
     router.push(`${BRIEFING_PATH}/${report.id}` as Href);
   };
+  // The control's name carries the action and the three counts, in the same
+  // formatted values the scorecard rows announce.
+  const scorecardLabel = t('agentBriefing.scorecardLabel', {
+    sessions: formatNumber(report.scorecard.sessions, i18n.language),
+    pullRequests: formatNumber(report.scorecard.pullRequests, i18n.language),
+    blockers: formatNumber(report.scorecard.blockers, i18n.language),
+  });
   // The frame's taller layer stretches the embedded card, so no slack is left
   // below it: the divider follows the counts, and the summary row takes the
   // height the frame reserves beyond them and centers its content in it, so the
@@ -105,7 +116,7 @@ export function BriefingCard({
     <>
       <CardControl
         accessibilityRole="button"
-        accessibilityLabel={t('agentBriefing.view')}
+        accessibilityLabel={scorecardLabel}
         onPress={open}
       >
         <BriefingScorecard report={report} />

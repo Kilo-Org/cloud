@@ -64,7 +64,7 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#FFFFFF',
-  useThemeColors: () => ({ warnForeground: '#FFFFFF' }),
+  useThemeColors: () => ({ warnSolidForeground: '#FFFFFF' }),
 }));
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
@@ -193,6 +193,13 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
     const alert = findHost(renderer.root, 'Animated.View')[0];
     expect(alert?.props.accessibilityRole).toBe('alert');
     expect(alert?.props.accessibilityLabel).toBe('No internet connection');
+    // The banner is a solid surface, not the warn ink token: the fill and the
+    // label ink come from the same solid pair, and the icon takes its ink as a
+    // prop because className colors do not reach a Lucide glyph.
+    expect(alert?.props.className).toContain('bg-warn-solid');
+    const label = findHost(renderer.root, 'Text')[0];
+    expect(label?.props.className).toContain('text-warn-solid-foreground');
+    expect(findHost(renderer.root, 'WifiOff')[0]?.props.color).toBe('#FFFFFF');
     expect(findHost(renderer.root, 'WifiOff')).toHaveLength(1);
     expect(announceForA11y).toHaveBeenCalledExactlyOnceWith('No internet connection');
   });

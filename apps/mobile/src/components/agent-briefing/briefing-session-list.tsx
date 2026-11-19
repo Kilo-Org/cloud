@@ -20,7 +20,7 @@ export function BriefingSessionList({ report }: Readonly<{ report: BriefingRepor
           <ConfigureRow
             key={session.sessionId}
             icon={Bot}
-            title={session.title || t('agents.sessionRow.untitled')}
+            title={session.title ?? t('agents.sessionRow.untitled')}
             onPress={() => {
               setOrganizationId(report.context.organizationId);
               router.push(briefingSessionHref(report, session.sessionId));

@@ -15,8 +15,8 @@ import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
- * TLDs refused for new signups until an admin changes the stored list. `.shop`
- * and `.top` are the long-standing defaults.
+ * TLDs refused for new signups until an admin changes the stored list. These are
+ * the long-standing defaults.
  */
 export const DEFAULT_BLOCKED_SIGNUP_TLDS = ['shop', 'top'];
 

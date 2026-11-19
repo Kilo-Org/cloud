@@ -60,7 +60,11 @@ function catalogsOf(root) {
       dir: join(root, 'apps/mobile/src/i18n/locales'),
       sourceRoots: [join(root, 'apps/mobile/src')],
       baseKeyOf: pluralBaseKey,
-      englishCopyRules: [checkEnglishCopies, checkMobileEnglishIdentical],
+      englishCopyRules: [
+        checkEnglishCopies,
+        checkMobileEnglishIdentical,
+        checkMobileLocaleEnglishCopy,
+      ],
       calledKeyOf: mobileCalledKey,
       keyPrefixOf: null,
       collectsDestructiveKeys: true,
@@ -291,6 +295,17 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // A product name has nothing to translate, so every catalog keeps the spelling
   // the gateway and its documentation publish.
   'organizationModelAccess.openrouter',
+  // The consent screen's analytics sentence ends in the processor's own
+  // product name and domain, so every catalog spells it the same way.
+  'consent.gatewayWho',
+  // Duration unit symbols and the per-hour rate format: a short unit a
+  // catalog writes in its own language (`sa`, `saac`, `ชม.`) is that
+  // catalog's decision and reads on the screen this key renders, so the
+  // audit does not judge whether the symbol matches English; `{{rate}}/h` is
+  // a value already formatted in the reader's locale.
+  'common.durationHourShort',
+  'common.durationMinuteShort',
+  'cloudAgent.compute.perHour',
 ]);
 
 /**
@@ -324,6 +339,332 @@ const NOTIFICATIONS_ENGLISH_COPY_EXCEPTIONS = {
   de: ['{{findingTitle}} in {{repoFullName}}'],
   it: ['{{findingTitle}} in {{repoFullName}}'],
   nl: ['{{findingTitle}} in {{repoFullName}}'],
+};
+
+/**
+ * Mobile English copy one catalog keeps on purpose, each entry with the reason
+ * it is the finished copy there: a borrowed technical term the locale really
+ * writes in English, for instance.
+ *
+ * Shape: tag → { English value: reason }. `checkMobileLocaleEnglishCopy` skips
+ * a value this map holds for that tag, so the entry is the only place that
+ * promises the English word is correct for the catalog; the reason is what a
+ * reviewer reads instead of re-deriving the decision. The value must match
+ * `en.json` exactly, because the rule compares whole strings.
+ */
+const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
+  af: {
+    '{{count}} agent':
+      'Afrikaans counts the borrowed "agent" noun (profiles.agents section reads "Agent naam", "Voeg agent by"), so the singular count label matches',
+    '{{itemCount}} item; {{last}}':
+      'Afrikaans singular of the borrowed "item" noun is "item" (toolCard.filesBadge_one reads "{{displayCount}} item"), so the label matches',
+    '{{itemCount}} items; {{last}}':
+      'Afrikaans plural of the borrowed "item" noun is "items", so the condensed label keeps English word shape (toolRun.sheetTitle is native "Nutsmiddel-oproepe")',
+    'Medium sandbox':
+      'Afrikaans delegates sandbox tiers to English: the catalog\'s own large tier reads "Groot sandbox" (cloudAgent.compute.largeSandbox), so the medium tier matches with the borrowed "Medium sandbox"',
+  },
+  az: {
+    '{{count}} agent':
+      'Azerbaijani "agent" is the same word (borrowed agent = agent, profiles.agents uses it natively), so the one-category count label matches',
+    'Agent slug':
+      'Azerbaijani keeps the technical slug noun (slugPlaceholder "my-agent-1" is untouched), so the label stays "Agent slug" with the agent word natively spelled',
+    'Bearer token':
+      'Azerbaijani keeps the auth scheme name "Bearer token" (the HTTP authentication scheme is a proper product term), matching the sibling mcpOAuth tokens',
+    token: 'Azerbaijani borrows "token" (plural "tokenlər"), so the one-category value matches',
+  },
+  bs: {
+    '{{count}} agent': 'Bosnian spells agent the same way in the singular (Agenti, agenta)',
+    'Bearer token':
+      'Bearer is the HTTP authorization scheme name and Bosnian borrows token unchanged',
+    'merge request':
+      "GitLab's Bosnian locale leaves Merge request untranslated, and this catalog uses it as a declined loan noun everywhere (merge requesta, merge requestu)",
+    'Merge request':
+      "GitLab's Bosnian locale leaves Merge request untranslated, and this catalog uses it as a declined loan noun everywhere (merge requesta, merge requestu)",
+    'Merge request !{{number}}':
+      "GitLab's Bosnian locale leaves Merge request untranslated, and this catalog uses it as a declined loan noun everywhere (merge requesta, merge requestu)",
+    token: 'Bosnian keeps the singular token unchanged; its plural is tokena',
+  },
+  ca: {
+    '{{count}} agent': 'Catalan spells agent the same way in the singular',
+    '{{count}} agents': 'Catalan spells the plural agents the same way',
+    '{{count}} secret': 'Catalan spells secret the same way in the singular',
+    '{{count}} secrets': 'Catalan spells the plural secrets the same way',
+  },
+  cs: {
+    '{{count}} agent':
+      'Czech singular "1 agent" is spelled identically (profiles.agents section declined "agent" natively), so the one-category value matches',
+    'merge request':
+      'GitLab\'s own Czech locale file (locale/cs_CZ/gitlab.po, msgid "Merge request") leaves "Merge request" untranslated while translating merge as sloučit/sloučení ("Tento merge request byl sloučen."); our capitalized-copy convention keeps "Merge request" in all three mergeRequest keys',
+    'Merge request':
+      'GitLab\'s own Czech locale file (locale/cs_CZ/gitlab.po, msgid "Merge request") leaves "Merge request" untranslated; our capitalized-copy convention keeps "Merge request" in all three mergeRequest keys',
+    'Merge request !{{number}}':
+      'GitLab\'s own Czech locale file (locale/cs_CZ/gitlab.po, msgid "Merge request") leaves "Merge request" untranslated; the !{{number}} suffix is GitLab\'s own URL convention (merge_requests/!123)',
+    token:
+      'Czech singular "1 token" matches (plural "tokenů" already translated in tokens_other), so the one-category value matches',
+  },
+  da: {
+    '{{count}} agent': 'Danish spells agent the same way in the singular; its plural is agenter',
+    'Download model':
+      "download is the Danish verb downloade in the imperative; the catalog's other labels read Download model til enheden",
+    'Send review':
+      'Send is the Danish imperative of sende and review is the borrowed noun this block already uses (Review sendt til agenten)',
+  },
+  de: {
+    'Name (optional)':
+      'German spells both words identically: "Name" is the German word and "(optional)" is a natively German loan adjective, matching the catalog\'s own "API-Schlüssel (optional)" and "Zusammenfassung (optional)" unnamed labels elsewhere',
+  },
+  et: {
+    '{{count}} agent': 'Estonian "agent" is the same word, so the one-category count label matches',
+    dollar:
+      'Estonian "dollar" is the same word (agents.sessionRow dollar/dollar area, gen. "dollarit" elsewhere), so the one-category value matches',
+    token: 'Estonian borrows "token" (plural "tokenid"), so the one-category value matches',
+  },
+  eu: {
+    token: 'Basque "token" is a loaned root (plural "tokenak"), so the one-category value matches',
+  },
+  fi: {
+    token: 'Finnish keeps the nominative singular token unchanged; its partitive is tokenia',
+  },
+  fil: {
+    '{{count}} tool':
+      'Filipino counts the English-loan noun bare: the catalog\'s own phrase "Mga available na tool: {{count}}" (modelChat.mcp.available) keeps the tool noun untranslated',
+    '{{itemCount}} item; {{last}}':
+      'Filipino keeps the borrowed "item" noun here (plural "mga item" elsewhere in the catalog) and the native `;` between them, so the family stays one form',
+    'Access key ID':
+      'Filipino keeps AWS field names in English, as the whole profile.providerKeys section does around accessKeyId',
+    'API key':
+      'Filipino keeps this technical term in English: the catalog\'s own keys read "ang key" (profile.providerKeys.add)',
+    'Audit log':
+      'Filipino borrows this term as Taglish: the audit actions around it are Taglish but this section title reads like the borrowed noun the catalog uses for log entries',
+    'Auto top-up':
+      'Filipino keeps this already-loanword term untranslated: "auto top-up" recurs in organization.billing.manageAutoTopUp ("Pamahalaan ang auto top-up") and setupAutoTopUp ("I-set up ang auto top-up")',
+    'AWS region':
+      'Filipino keeps the AWS product name in English (profile.providerKeys.accessKeyId keeps AWS field names)',
+    'Bearer token':
+      'Filipino keeps the technical terms in English: modelChat.mcpOAuth.fieldToken leaves "Token" untranslated next to authBearer',
+    commit:
+      'Filipino keeps the Git noun in English: the family\'s other form reads "na commit" (prReview.overview.commit_other) and mergedAgo="Na-merge {{time}}"',
+    'Context window: {{value}}':
+      'Filipino keeps the technical context-window term in English: agentChat.contextUsage.ofWindowTokens says "sa {{window}} na token"',
+    'Deployment name':
+      'Filipino keeps the English technical term: profile.providerKeys.incompleteMapping says "... at deployment name"',
+    'Download code':
+      'Filipino treats the verb as English loan (mag-download) and the label names the code: profile.dataExport.codePlaceholder="Code mula sa email" and getCodeA11y="I-email sa akin ang download code"',
+    'Gateway model slug':
+      'Filipino keeps this three-term technical slug in English: profile.providerKeys.incompleteMapping="Kailangan ng Mapping {{number}} ang parehong gateway model slug at deployment name."',
+    'Google Cloud project':
+      'Filipino keeps the Google Cloud product name in English: profile.providerKeys fields are translated around it (clientEmail="Email ng service account") while the product name stays',
+    'Kilo app':
+      '"Kilo app" names the product and is used untranslated in deviceSessions.signInScopeNote',
+    'Kilo app · Android':
+      '"Kilo app" is the untranslated product name; Android is the unchanged system name (deviceSessions.kiloCli="Kilo CLI" stays English)',
+    'Kilo app · iOS':
+      '"Kilo app" is the untranslated product name; iOS is the unchanged system name (deviceSessions.kiloCli="Kilo CLI" stays English)',
+    'Kilo system':
+      '"Kilo" is the product name, so the value names the system and cannot be translated (securityAgent.auditReport actors elsewhere say "Tagapangasiwa ng Kilo", keeping the name)',
+    'merge request':
+      'Filipino keeps GitLab\'s merge request in English: GitLab\'s Filipino translation catalog translates only ~29% of strings, and the catalog itself mixes both (codeReviewer.manualReview.mergeRequestUrl="URL ng merge request")',
+    'Merge request':
+      'Filipino keeps GitLab\'s merge request in English (GitLab Filipino translation coverage is ~29%): the catalog mixes both (prReview.merge.terminal.closedMergeRequest="Nakasara ang merge request na ito")',
+    'Merge request !{{number}}':
+      'Filipino keeps GitLab\'s merge request in English (GitLab Filipino translation coverage is ~29%): the catalog mirrors it in codeReviewer.manualReview.mergeRequestUrl="URL ng merge request"',
+    'Prompt injection':
+      'Filipino keeps the technical term in English: organizationGuardrails.detector.promptInjection.description says "Nade-detect ang mga pagtatangka"',
+    'Secret access key':
+      'Filipino keeps AWS field names in English (profile.providerKeys.accessKeyId)',
+    token:
+      'Filipino keeps the technical token noun in English: agentChat.contextUsage.ofWindowTokens="sa {{window}} na token" and plural form tokensWithPercentage keep it',
+  },
+  fr: {
+    '{{count}} agent':
+      'French "agent" is spelled the same (singular), so the count label is correct French',
+    '{{count}} agents':
+      'French spells "agents" identically (plural of agent); the count label is correct French (profiles.agents.limitReached uses "{{max}} agents" too)',
+    '{{count}} secret':
+      'French "secret" is spelled the same (singular); the MCP count label reads correctly',
+    '{{count}} secrets':
+      'French plural "secrets" is spelled the same, so the MCP count label matches',
+  },
+  hr: {
+    '{{count}} agent':
+      "Croatian spells the noun 'agent' identically; plural inflects ('{{count}} agenata')",
+    'Bearer token':
+      "Croatian keeps the OAuth scheme name 'Bearer token' as an English technical term; the family counts with the loanword (tokens_other 'tokena')",
+    token:
+      "Croatian uses the loanword token; the counted singular is identical, the plural is 'tokena'",
+  },
+  ht: {
+    'merge request':
+      'GitLab has no Haitian Creole locale, and this catalog names the GitLab object in English in every sibling string (Pataje merge request la)',
+    'Merge request':
+      'GitLab has no Haitian Creole locale, and this catalog names the GitLab object in English in every sibling string (Merge request la pa disponib)',
+    'Merge request !{{number}}':
+      'GitLab has no Haitian Creole locale, and this catalog names the GitLab object in English in every sibling string (Merge request la pa disponib)',
+  },
+  hu: {
+    cent: "Hungarian spells the currency subunit 'cent' identically to English (MNB coin/cash naming); the sessionRow family already renders cent/cent_other as 'cent'",
+    commit:
+      "Hungarian developer copy keeps the Git noun 'commit' unchanged, as the same catalog does in the prReview.overview commit/commit_other rows and in agents.triggers.autoCommit context",
+    token:
+      "Hungarian borrowed technical term 'token': the established loanword here (sibling contextUsage tokens/tokens_other/tokensWithPercentage and reviewDetail.tokens all keep 'token')",
+  },
+  id: {
+    'Edit server: {{name}}':
+      'The accessibility twin of the same row label, so it keeps the borrowed "Edit server" wording the block uses everywhere',
+    'Edit server':
+      'Bahasa Indonesia borrows the verb-edit + server noun as-is: the whole mcp block reads "Tambah server MCP", "Hapus server", "URL server", and KBBI records "server" as the standard loan',
+    commit:
+      "Bahasa Indonesia keeps the Git noun at every count ('komit' is not this catalog's wording; overview commit/commit_other and toolRun labels read 'commit')",
+    token:
+      "Bahasa Indonesia writes the LLM/context unit as the loanword 'token' (KBBI has no replacement; the catalog renders the concept identically in 5 sibling keys: contextUsage tokens, tokens_other, tokensWithPercentage, reviewDetail.tokens, usage.entrySubtitle)",
+  },
+  ig: {
+    'Gateway model slug':
+      'Igbo borrows the slug/deployment field names: this catalog\'s own provider-key sentences keep "slug" and "deployment name" untranslated inside Igbo sentences',
+  },
+  it: {
+    '{{displayCount}} file':
+      "Italian 'file' is an invariable loanword (garzantina: il file / i file) and this catalog's own common.file, prReview.fileList and filesBadge_other rows keep it",
+    commit:
+      "Italian developer copy uses the English Git noun 'commit' (Treccani/Zingarelli loanword for the VCS entry), matching this catalog's own prReview.overview.commit rows",
+    'merge request':
+      "Italian keeps GitLab's English product name (GitLab docs in Italian use 'merge request'; sibling codeReviewer.manualReview.invalidMergeRequestUrl 'URL valido di una merge request' and mergeRequestUrl 'URL della merge request')",
+    'Merge request': 'Same product-name loanword, capitalised as a UI heading like the English',
+    'Merge request !{{number}}':
+      'Same product-name loanword with the GitLab ref marker, as English',
+    token:
+      "Italian loanword for the session/LLM unit; the catalog renders this concept with 'token' in five sibling keys (contextUsage tokens*, tokensWithPercentage, reviewDetail.tokens)",
+  },
+  mg: {
+    commit:
+      'Malagasy borrows the Git noun "commit"; the counted singular matches the family\'s English-identical loan form',
+    'Gateway model slug':
+      'Malagasy borrows the technical slug term: the catalog\'s own provider-key sentences keep "slug" and "deployment name" in English inside Malagasy sentences',
+  },
+  mi: {
+    'Gateway model slug':
+      'Te reo Māori has no established kupu for gateway model slug (Te Aka/Glosbe have no compounds; NCSC glossary has no entry); the mi catalog keeps the English engineering term and wraps it with Māori grammar ("Hononga {{number}}")',
+  },
+  ms: {
+    token:
+      "Bahasa Melayu writes the LLM/context unit as the loanword 'token' (DBP kamus lists no replacement; the catalog renders the concept identically in sibling keys contextUsage tokens, tokens_other, tokensWithPercentage, reviewDetail.tokens)",
+  },
+  nb: {
+    '{{count}} agent': 'Norwegian spells agent the same way in the singular',
+    token: 'Norwegian keeps the singular token unchanged; its plural is tokener',
+  },
+  nl: {
+    '{{count}} agent':
+      "Dutch spells the noun 'agent' identically; the plural inflects to '{{count}} agenten'",
+    '{{count}} open':
+      "Dutch spells the adjective 'open' identically; todos.lists counts open items",
+    '{{displayCount}} open':
+      "Dutch spells the adjective 'open' identically; sibling dashboard lines render '{{displayCount}} kritiek' and '{{displayCount}} hoog'",
+    commit: "Dutch lowercases the Git noun 'commit' exactly as English does",
+    'Online hosts':
+      "Dutch keeps the loanword host (sibling nativeRemote.hostsEmpty says 'Geen online hosts') and online is the same word in Dutch",
+  },
+  pl: {
+    '{{count}} agent':
+      "Polish spells the noun 'agent' identically; plural inflects ('{{count}} agentow' and 'agenta')",
+    token: "Polish uses the loanword token; counted singular identical, plural 'tokeny'/'tokenow'",
+  },
+  pt: {
+    commit:
+      "Portuguese developer copy uses the English Git noun 'commit'; the catalog's own prReview.overview.commit_other also equals the loanword for the same concept",
+  },
+  'pt-BR': {
+    '{{itemCount}} item; {{last}}':
+      'Counted item list; "item" is the catalog\'s own word for a tool-run entry ("itens" in the plural members)',
+    commit:
+      'The pt-BR catalog\'s commit-count family reads "alterações registradas" for plurals and keeps "commit" as the noun elsewhere (prReview.headLine "commit de origem {{sha}}")',
+    'merge request':
+      '"Merge request" is the catalog\'s established borrowed term for the GitLab noun across all 21 MR keys ("Compartilhar merge request", "Merge request indisponível")',
+    'Merge request':
+      '"Merge request" is the catalog\'s established borrowed term for the GitLab noun across all 21 MR keys',
+    'Merge request !{{number}}':
+      "Same borrowed term with the reference suffix; the catalog's mergeRequestUnavailable/accessDenied keys use it identically",
+  },
+  ro: {
+    '{{count}} agent':
+      'Romanian "agent" is the same Latin loanword spelled identically (catalog: "Agent", "Agenți"); {{count}} agent is correct copy',
+    '{{count}} secret':
+      'Romanian "secret" is the same Latin loanword spelled identically (catalog: "secret", "secrete"); {{count}} secret is correct copy',
+    'Agent slug':
+      'The ro catalog\'s slug family borrows the term ("Introduceți un slug de agent"); the label reads as the catalog does elsewhere',
+    commit:
+      'Romanian GitLab keeps the Git noun (ro_RO gitlab.po: "Commit" → "Commit"); the ro catalog itself renders "de commituri"',
+    'Deployment name':
+      'This ro catalog consistently borrows "deployment name" in the same section (modelMappingsDescription, incompleteMapping), so changing one key would split the wording',
+    'Gateway model slug':
+      'The ro catalog borrows the term verbatim in the same section (modelMappingsDescription, incompleteMapping); slug stays English as in ro_RO gitlab.po ("Project slug" → "Slug de proiect")',
+    'merge request':
+      'Romanian GitLab UI keeps the English term (locale/ro_RO gitlab.po, 249 translated MR strings all write "merge request"/"merge request-uri")',
+    'Merge request':
+      'Romanian GitLab UI keeps the English term, capitalised as in English (ro_RO gitlab.po: "Merge request" → "Merge request")',
+    'Merge request !{{number}}':
+      'Same GitLab English term with the reference suffix, as the catalog renders the standard-type headings',
+    token:
+      'Romanian GitLab keeps the noun (ro_RO gitlab.po: "Access Token" → "Token de acces"); the ro catalog itself renders "tokenuri"',
+  },
+  sk: {
+    '{{count}} agent':
+      'Slovak counts the model-word forms bare (profiles.counts.agents_other="{{count}} agentov", profiles.agents.limitReached="najviac {{max}} agentov"): singular "{{count}} agent" matches them',
+    'merge request':
+      'Slovak keeps GitLab\'s term untranslated: the whole sk catalog already uses "merge request" (prReview.connect.gitlabInstanceMismatchDescription="...ale tento merge request je na {{requested}}")',
+    'Merge request':
+      'Slovak keeps GitLab\'s untranslated "merge request" term throughout its catalog (prReview.terms.mergeRequestUnavailable="Merge request nie je dostupný")',
+    'Merge request !{{number}}':
+      'Slovak keeps GitLab\'s untranslated "merge request" term throughout its catalog (codeReviewer.manualReview.mergeRequestUrl="URL adresa merge requestu")',
+    token:
+      'Slovak keeps the technical token noun: plurals are "tokeny/tokenu/tokenov" (agentChat.contextUsage.tokens_*), so the singular "token" matches',
+  },
+  sl: {
+    '{{count}} agent':
+      'Slovenian "agent" is the same loanword (catalog: "Agent"); {{count}} agent is correct copy',
+  },
+  sq: {
+    token:
+      "Albanian borrows the noun unchanged: family is 'token' (one) vs 'tokene' (other); the counted singular is identical to English",
+  },
+  sr: {
+    'Bearer token':
+      'The HTTP scheme name "Bearer" plus the catalog\'s own "Token" noun (fieldToken "Token", tokens_other "tokeni"), so the auth row reads the scheme the way siblings spell it',
+    '{{count}} agent':
+      'Serbian "agent" is the same loanword (catalog: "Agent"); {{count}} agent is correct copy',
+    token:
+      'Serbian dev usage keeps "token"; the catalog itself renders "Token", "tokeni", "tokena"',
+  },
+  sv: {
+    '{{count}} agent': 'Swedish spells agent the same way in the singular',
+    cent: 'Swedish writes cent the same way',
+    dollar: 'Swedish writes dollar the same way',
+    'merge request':
+      "GitLab's Swedish locale leaves Merge request untranslated, and this catalog inflects it as a Swedish loan noun (merge requesten)",
+    'Merge request':
+      "GitLab's Swedish locale leaves Merge request untranslated, and this catalog inflects it as a Swedish loan noun (den här merge requesten)",
+    'Merge request !{{number}}':
+      "GitLab's Swedish locale leaves Merge request untranslated, and this catalog inflects it as a Swedish loan noun (den här merge requesten)",
+    token: 'Swedish leaves the singular token unchanged and uses the same form for the plural',
+  },
+  th: {
+    'merge request':
+      "GitLab's Thai locale has no translated string, and this catalog names the GitLab object in English in every sibling string (แชร์ merge request)",
+    'Merge request':
+      "GitLab's Thai locale has no translated string, and this catalog names the GitLab object in English in every sibling string (เปิด merge request ไม่ได้)",
+    'Merge request !{{number}}':
+      "GitLab's Thai locale has no translated string, and this catalog names the GitLab object in English in every sibling string (เปิด merge request ไม่ได้)",
+  },
+  uz: {
+    '{{count}} agent':
+      "Uzbek spells the noun 'agent' identically; the count word 'ta' carries the number",
+    token:
+      'Uzbek uses the loanword token identical to English; the counted singular is the same form',
+  },
+  vi: {
+    commit: 'Vietnamese dev usage keeps "commit"; the vi catalog renders "commit" at every count',
+    token: 'Vietnamese dev usage keeps "token"; the vi catalog renders "token" at every count',
+  },
 };
 
 /**
@@ -666,6 +1007,22 @@ function nestingRefs(value) {
  */
 function expansionTokens(value) {
   return [...value.matchAll(/\$[A-Z][A-Z0-9_]*/g)].map(match => match[0]).sort();
+}
+
+/**
+ * Whether one value still carries prose: a word of its own that starts with a
+ * lowercase letter. Placeholders, `$t()` references and `$TOKEN` expansions are
+ * removed first, so a value built only from them says nothing of its own, and an
+ * acronym or a capitalised product name starts no lowercase letter and reads
+ * the same in every language. The lookbehind keeps a lowercase letter inside a
+ * word (`e.g.`, `iOS`) from counting as a word start.
+ */
+function carriesEnglishProse(value) {
+  const stripped = value
+    .replace(/\{\{[^}]*\}\}/g, ' ')
+    .replace(/\$t\([^)]*\)/g, ' ')
+    .replace(/\$[A-Z][A-Z0-9_]*/g, ' ');
+  return /(?<![\p{L}\p{N}_-])\p{Ll}/u.test(stripped);
 }
 
 /** The leading and trailing whitespace of one string, as a signature. */
@@ -2054,6 +2411,40 @@ function checkMobileEnglishIdentical({ catalogName, english, localeValues }) {
     }
     if (allEqual) {
       problems.push(`${catalogName}: "${key}" equals English in every locale`);
+    }
+  }
+  return problems;
+}
+
+function checkMobileLocaleEnglishCopy({ catalogName, english, localeValues }) {
+  const problems = [];
+  // The every-locale rule above stays silent about a key that one catalog
+  // translated and another left in English, because the value differs between
+  // locales. Judge each catalog on its own: a value that still equals English
+  // and carries prose of its own was not translated there, unless the key is
+  // allowlisted or the catalog lists that exact value in
+  // MOBILE_ENGLISH_COPY_EXCEPTIONS. An unreadable catalog carries no values, so
+  // it says nothing here.
+  if (localeValues.size === 0) {
+    return problems;
+  }
+  for (const [tag, translated] of localeValues) {
+    for (const [key, englishValue] of english) {
+      if (translated.get(key) !== englishValue) {
+        continue;
+      }
+      if (ENGLISH_IDENTICAL_ALLOWLIST.has(key) || VERBATIM_KEYS.includes(key)) {
+        continue;
+      }
+      if (!carriesEnglishProse(englishValue)) {
+        continue;
+      }
+      if (Object.hasOwn(MOBILE_ENGLISH_COPY_EXCEPTIONS[tag] ?? {}, englishValue)) {
+        continue;
+      }
+      problems.push(
+        `${catalogName}/${tag}: "${key}" is English; translate it, or list the value for "${tag}" in MOBILE_ENGLISH_COPY_EXCEPTIONS`
+      );
     }
   }
   return problems;

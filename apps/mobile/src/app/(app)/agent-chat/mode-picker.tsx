@@ -75,7 +75,9 @@ export default function ModePickerScreen() {
     const Icon = getModeIcon(item.value);
     const selected = item.value === currentValue;
     const isBuiltin = 'labelKey' in item;
-    const label = isBuiltin ? t(getBuiltinModeLabelKey(item.value) ?? '') : item.label;
+    const label = isBuiltin
+      ? t(getBuiltinModeLabelKey(item.value) ?? '')
+      : item.label || t('agentChat.modeSelector.customMode');
     const description = isBuiltin
       ? t(getBuiltinModeDescriptionKey(item.value) ?? '')
       : item.description;
@@ -84,10 +86,11 @@ export default function ModePickerScreen() {
       <ChoiceRow
         className="border-b-[0.5px] border-hair-soft"
         selected={selected}
-        accessibleName={t('agentChat.modePicker.modeLabel', {
-          label,
-          description,
-        })}
+        accessibleName={
+          description !== ''
+            ? t('agentChat.modePicker.modeLabel', { label, description })
+            : t('agentChat.modeSelector.accessibility', { label })
+        }
         onPress={() => {
           handleSelect(item.value);
         }}
@@ -98,9 +101,11 @@ export default function ModePickerScreen() {
             <Text className="text-sm font-medium" numberOfLines={1}>
               {label}
             </Text>
-            <Text variant="muted" className="mt-0.5 text-xs">
-              {description}
-            </Text>
+            {description !== '' && (
+              <Text variant="muted" className="mt-0.5 text-xs">
+                {description}
+              </Text>
+            )}
           </View>
         </View>
       </ChoiceRow>

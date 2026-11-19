@@ -36,7 +36,7 @@ const VARIANT_ICONS = {
 
 const VARIANT_META_KEYS = {
   neutral: { title: 'common.somethingWentWrong', description: 'queryError.neutralDescription' },
-  offline: { title: 'queryError.offlineTitle', description: 'common.somethingWentWrong' },
+  offline: { title: 'queryError.offlineTitle', description: 'queryError.offlineDescription' },
   permission: {
     title: 'common.accessDenied',
     description: 'queryError.permissionDescription',

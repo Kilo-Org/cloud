@@ -122,6 +122,9 @@ export function ScheduleSettings({
       {fields.map(field => {
         const time = times[field.key];
         const pickerValue = briefingPickerDate(time);
+        // One value for what the button shows and announces, in the locale
+        // convention the picker itself uses.
+        const clock = formatClockTime(pickerValue, i18n.resolvedLanguage ?? i18n.language);
         return (
           <View key={field.key} className="gap-2">
             <Text>{field.label}</Text>
@@ -130,13 +133,13 @@ export function ScheduleSettings({
               disabled={offline || update.isPending}
               accessibilityLabel={t('agentBriefing.scheduleTimeLabel', {
                 label: field.label,
-                time,
+                time: clock,
               })}
               onPress={() => {
                 setActiveTime(field.key);
               }}
             >
-              <Text>{formatClockTime(pickerValue, i18n.language)}</Text>
+              <Text>{clock}</Text>
             </Button>
             {activeTime === field.key ? (
               <>

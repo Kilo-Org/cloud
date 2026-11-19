@@ -1,6 +1,7 @@
 import { type ElementType } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { formatNumber } from '@/lib/format';
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { AdaptiveHomeCardFrame } from '@/components/home/adaptive-home-card-frame';
@@ -25,8 +26,8 @@ vi.mock('@/lib/a11y/tap-target', () => ({
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn<() => void>() }) }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, values?: { value?: string }) =>
-      values?.value === undefined ? key : `${key}:${values.value}`,
+    t: (key: string, values?: Record<string, unknown>) =>
+      values === undefined ? key : `${key}:${JSON.stringify(values)}`,
     i18n: { language: 'en' },
   }),
 }));
@@ -128,6 +129,20 @@ function pressablesIn(renderer: ReactTestRenderer) {
 }
 
 describe('BriefingCard in the Home card frame', () => {
+  it('names the scorecard control after its action with the three counts', () => {
+    const label = pressablesIn(renderCardInFrame('drawn'))[0]?.props.accessibilityLabel;
+    // The name carries the three counts, each formatted the way the scorecard
+    // rows format it (same `formatNumber` call, same locale).
+    const { sessions, pullRequests, blockers } = briefingReport.scorecard;
+    expect(label).toBe(
+      `agentBriefing.scorecardLabel:${JSON.stringify({
+        sessions: formatNumber(sessions, 'en'),
+        pullRequests: formatNumber(pullRequests, 'en'),
+        blockers: formatNumber(blockers, 'en'),
+      })}`
+    );
+  });
+
   it('keeps every control pressable in the layer the frame draws', () => {
     const pressables = pressablesIn(renderCardInFrame('drawn'));
     expect(pressables).toHaveLength(3);

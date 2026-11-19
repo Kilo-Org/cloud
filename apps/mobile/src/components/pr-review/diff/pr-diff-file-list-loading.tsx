@@ -36,7 +36,7 @@ export function PrDiffFileListLoading() {
       {SKELETON_ROWS.map(index => (
         <View
           key={`file-list-skeleton-${index}`}
-          className="flex-row items-center gap-3 border-b border-hair-soft px-4 py-3"
+          className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3"
         >
           <Skeleton className="h-5 w-5 rounded-md" />
           <View className="flex-1 gap-1.5">

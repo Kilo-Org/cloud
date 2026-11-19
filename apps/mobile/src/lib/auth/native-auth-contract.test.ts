@@ -76,7 +76,7 @@ describe('parseTokenResponse', () => {
   });
 });
 
-// --- parseTokenPair (full refresh pair) ---
+// --- parseTokenPair ---
 
 describe('parseTokenPair', () => {
   it('parses a complete token pair', () => {

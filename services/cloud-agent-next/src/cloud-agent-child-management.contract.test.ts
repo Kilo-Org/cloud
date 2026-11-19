@@ -15,6 +15,10 @@ vi.mock('./sandbox-session/session-stub.js', () => ({
   getSandboxSessionStub: getSandboxSessionStubMock,
 }));
 
+vi.mock('./control-plane/workspace/workspace-stub.js', () => ({
+  getWorkspaceStub: getSandboxSessionStubMock,
+}));
+
 vi.mock('./session-access.js', () => ({
   requireCurrentSessionAccess: requireCurrentSessionAccessMock,
 }));
@@ -59,9 +63,9 @@ function metadata(organizationId: string | null) {
 
 function stub(overrides: Record<string, unknown> = {}) {
   return {
-    assertCloudAgentManagementAuthority: vi.fn().mockResolvedValue(undefined),
+    assertAuthority: vi.fn().mockResolvedValue(undefined),
     getMetadata: vi.fn().mockResolvedValue(metadata(null)),
-    listCloudAgentChildSessions: vi.fn().mockResolvedValue({ sessions: [] }),
+    listChildren: vi.fn().mockResolvedValue({ sessions: [] }),
     ...overrides,
   };
 }

@@ -2,7 +2,9 @@ import { enrolledByocVercelOwner } from './byoc/vercel-owner.js';
 import {
   fetchByocVercelEnrollment,
   fetchByocVercelEnrollmentForUser,
+  type ByocVercelEnrollment,
 } from './byoc/vercel-credential-resolver.js';
+import { vercelRuntimeBaseDigest } from './byoc/vercel-runtime-base.js';
 import { TRPCError } from '@trpc/server';
 import { billingModeSchema, type BillingMode } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
@@ -17,6 +19,8 @@ import {
   type SandboxAllocation,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import { PROVIDER_DESCRIPTORS } from './shared/sandbox-provider.js';
 import { getDefaultSandboxDestination, isOrgInList } from './sandbox-id.js';
 import { containersBillingIdentity } from './container-usage-context.js';
 import type { Env } from './types.js';
@@ -43,24 +47,51 @@ export function isRetiredSandboxAllocation(allocation: SandboxAllocation): boole
  * Provider tool capability a session needs from its sandbox image. `review`
  * publishes code-review output (gh/glab/bb and the GitHub review publisher MCP);
  * `remediation` opens security-remediation pull requests (gh/glab/bb). The
- * Vercel snapshot ships none of these binaries, so a Vercel choice is
- * ineligible for either, independent of the repository platform.
+ * provider table owns which providers ship these tools. A Vercel snapshot from
+ * an older base lacks them, so `vercelRuntimeUpgradeReason` gates it. Code
+ * review keeps its trusted `crv-` sandbox through session routing.
  */
 export type SandboxAllocationCapability = 'review' | 'remediation';
 
 const VERCEL_NOT_ENROLLED_REASON =
   'Configure Vercel BYOC in Cloud Agent settings to use Vercel compute';
 const VERCEL_NOT_READY_REASON = 'Vercel compute setup is not ready';
+export const VERCEL_RUNTIME_UPGRADE_REASON =
+  'This session needs a newer Vercel runtime. In Cloud Agent settings, open Compute and choose "Upgrade runtime".';
+
+/**
+ * A snapshot from an older base can lack the tools a capability needs. The stored
+ * digest names the base of the snapshot that sessions use; a missing one is old.
+ */
+export async function vercelRuntimeUpgradeReason(
+  enrollment: Pick<ByocVercelEnrollment, 'runtimeDigest'>,
+  capability: SandboxAllocationCapability | undefined
+): Promise<string | undefined> {
+  if (capability === undefined) return undefined;
+  if (enrollment.runtimeDigest === (await vercelRuntimeBaseDigest())) return undefined;
+  return VERCEL_RUNTIME_UPGRADE_REASON;
+}
+
+/** Allocation-time form of `vercelRuntimeUpgradeReason` for an explicit choice. */
+export async function assertVercelRuntimeSupports(
+  enrollment: Pick<ByocVercelEnrollment, 'runtimeDigest'>,
+  capability: SandboxAllocationCapability | undefined
+): Promise<void> {
+  const reason = await vercelRuntimeUpgradeReason(enrollment, capability);
+  if (reason) throw new TRPCError({ code: 'BAD_REQUEST', message: reason });
+}
 
 export function sandboxAllocationProviderCapabilityReason(
   allocation: SandboxAllocation,
   capability: SandboxAllocationCapability | undefined
 ): string | undefined {
   if (capability === undefined) return undefined;
-  if (getSandboxAllocationProvider(allocation) !== 'vercel') return undefined;
+  const provider = getSandboxAllocationProvider(allocation);
+  if (providerSupports(provider, 'scmCliTools')) return undefined;
+  const { label } = PROVIDER_DESCRIPTORS[provider];
   return capability === 'review'
-    ? 'Vercel sandboxes do not include the code-review publishing tools'
-    : 'Vercel sandboxes do not include the security-remediation command-line tools';
+    ? `${label} sandboxes do not include the code-review publishing tools`
+    : `${label} sandboxes do not include the security-remediation command-line tools`;
 }
 
 export function sandboxAllocationUnavailableReason(
@@ -177,21 +208,24 @@ export type VercelSelectionReadiness = {
 
 export async function resolveVercelSelectionReadiness(
   env: Env,
-  owner: SelectionOwner
+  owner: SelectionOwner,
+  capability?: SandboxAllocationCapability
 ): Promise<VercelSelectionReadiness> {
   const byocOwner = enrolledByocVercelOwner(env, owner);
   if (byocOwner === undefined) return {};
+  let enrollment: ByocVercelEnrollment;
   try {
-    const enrollment =
+    enrollment =
       byocOwner.organizationId !== undefined
         ? await fetchByocVercelEnrollment(env, byocOwner.organizationId)
         : await fetchByocVercelEnrollmentForUser(env, byocOwner.userId);
-    return enrollment.setupStatus === 'ready'
-      ? {}
-      : { vercelUnavailableReason: VERCEL_NOT_READY_REASON };
   } catch {
     return { vercelUnavailableReason: VERCEL_NOT_READY_REASON };
   }
+  if (enrollment.setupStatus !== 'ready')
+    return { vercelUnavailableReason: VERCEL_NOT_READY_REASON };
+  const upgradeReason = await vercelRuntimeUpgradeReason(enrollment, capability);
+  return upgradeReason ? { vercelUnavailableReason: upgradeReason } : {};
 }
 
 export async function assertSandboxAllocationAvailable(

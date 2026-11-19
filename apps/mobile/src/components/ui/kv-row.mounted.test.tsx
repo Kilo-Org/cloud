@@ -10,6 +10,7 @@ import { KvRow } from './kv-row';
 // the RTL cases flip.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({ I18nManager: i18nManager, Text: 'Text', View: 'View' }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/icons', () => ({}));
@@ -82,8 +83,9 @@ function renderRow(
     | {
         value: string;
         selectable?: boolean;
-        valueDirection?: 'ltr';
+        testID?: string;
         caption?: string;
+        valueDirection?: 'ltr';
         valueFace?: 'mono' | 'text' | 'numeric';
         valueStatus?: { label: string; tone: 'good' | 'warn' | 'danger' | 'muted' };
       }
@@ -130,6 +132,15 @@ afterEach(() => {
 });
 
 describe('KvRow mounted layout', () => {
+  it('takes the contract row anatomy without a divider of its own', () => {
+    const root = renderRow({ value: '1.2.3' });
+    const row = root.findAll(node => Object.is(node.type, 'View'))[0];
+    const classes = String(row?.props.className).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+    expect(classes.some(name => name.startsWith('border-'))).toBe(false);
+  });
+
   // Android's `selectable` routes the value through ReactTextView, which drops
   // the `maxLines` clamp on attach, so a clamped selectable value wrapped past
   // the one-line row height and painted a clipped second line (SPOT-DEFECT:
@@ -284,5 +295,15 @@ describe('KvRow caption', () => {
 
     expect(nodes).toHaveLength(2);
     expect(nodes.some(node => String(node.props.className).includes('text-xs'))).toBe(false);
+  });
+});
+
+describe('KvRow test handle', () => {
+  it("puts the caller's testID on the row container", () => {
+    const row = renderRow({ value: '1.2.3', testID: 'kv-1' }).find(
+      node => typeof node.type === 'string' && node.props.testID === 'kv-1'
+    );
+
+    expect(row.type).toBe('View');
   });
 });

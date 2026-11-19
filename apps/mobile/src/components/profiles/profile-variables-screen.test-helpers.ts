@@ -62,8 +62,9 @@ export function pressPressable(root: ReactTestInstance, label: string): void {
 }
 
 function findButton(root: ReactTestInstance, label: string): ReactTestInstance {
-  const button = findAll(root, 'Button').find(
-    node => node.findAll(child => child.props.children === label).length > 0
+  const button = [...findAll(root, 'Button'), ...findAll(root, 'StateAction')].find(
+    node =>
+      node.props.label === label || node.findAll(child => child.props.children === label).length > 0
   );
   if (!button) {
     throw new Error(`button ${label} was not rendered`);

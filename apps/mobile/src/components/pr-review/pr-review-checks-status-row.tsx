@@ -49,8 +49,6 @@ type PrReviewChecksStatusRowProps = {
   readonly status: PrReviewChecksStatus;
   /** How many checks this row counts; must match the expanded children. */
   readonly count: number;
-  /** Hairline between two group rows in the card, omitted on the last one. */
-  readonly showSeparator: boolean;
   /** The checks this row counts, rendered with the page's existing detail. */
   readonly children: ReactNode;
 };
@@ -58,12 +56,12 @@ type PrReviewChecksStatusRowProps = {
 /**
  * One collapsed-by-default status group: a header row (icon, count label,
  * chevron) that expands to the checks it counts. The state lives here, not in
- * the section, so the section gains no hook after its early returns.
+ * the section, so the section gains no hook after its early returns. The
+ * separators between groups belong to the `RowGroup` around them.
  */
 export function PrReviewChecksStatusRow({
   status,
   count,
-  showSeparator,
   children,
 }: Readonly<PrReviewChecksStatusRowProps>) {
   const colors = useThemeColors();
@@ -106,7 +104,6 @@ export function PrReviewChecksStatusRow({
           </Animated.View>
         ) : null}
       </Animated.View>
-      {showSeparator ? <View className="border-b-[0.5px] border-hair-soft" /> : null}
     </View>
   );
 }

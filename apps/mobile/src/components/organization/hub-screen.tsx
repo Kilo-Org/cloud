@@ -38,10 +38,16 @@ import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { IconButton } from '@/components/ui/icon-button';
+import { IconTile } from '@/components/ui/icon-tile';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { i18n } from '@/i18n';
 import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
@@ -52,6 +58,7 @@ import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   isMoneyRole,
@@ -65,7 +72,6 @@ import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { billingHrefFor } from '@/lib/trial-refusal';
-import { cn } from '@/lib/utils';
 
 type OrganizationHubScreenProps = Readonly<{
   /** Explicit org id from a deep link (e.g. /organizations/<id>/overview). */
@@ -157,6 +163,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // never paint an amount the person may have hidden one screen away.
   const { hideBalance, hasLoaded: hideBalanceLoaded } = useHideBalancePreference();
   const hideOrgBalance = hideBalance || !hideBalanceLoaded;
+  // Reactive offline wording: a read that settled by failing while the device
+  // is confirmed offline names the connection, not a server fault.
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   if (isResolving || organizationId == null || org == null) {
     return (
@@ -192,8 +201,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   } else if (orgWithMembers.data != null) {
     lowBalanceSubtitle = t('common.off');
   } else if (membershipUnavailable) {
+    // The membership read settles offline too (`SETTLE_WHILE_OFFLINE`), so the
+    // offline wording reads from the committed connectivity state, the same
+    // source the offline banner paints — `isPaused` can no longer distinguish
+    // a device-window offline read.
     lowBalanceSubtitle = t(
-      orgWithMembers.isPaused ? 'queryError.offlineTitle' : 'common.somethingWentWrong'
+      committedConnectivity === 'offline' ? 'queryError.offlineTitle' : 'common.somethingWentWrong'
     );
   }
   const lowBalanceLoading = orgWithMembers.data == null && !membershipUnavailable;
@@ -294,7 +307,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         {/* A lapsed plan blocks every new session for every member of this
@@ -322,63 +335,66 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             }
           />
         ) : null}
-        <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
-          {showMoney && (
+        <Animated.View entering={FadeIn.duration(200)}>
+          <RowGroup>
+            {showMoney && (
+              <KvRow
+                label={t('organization.hub.balance')}
+                value={hideOrgBalance ? HIDDEN_BALANCE : balanceAmount}
+                valueFace="numeric"
+                // The amount's symbol and sign are neutral to the paragraph's
+                // direction, so the run carries its own left-to-right order.
+                valueDirection="ltr"
+                // An empty balance offers the top-up on the amount's own line: a
+                // row of its own would hold nothing but this control, and
+                // `lineAction` keeps that line one text line tall.
+                trailing={
+                  org.balance === 0 ? (
+                    <AddCreditsRow inline lineAction url={organizationBillingUrl(organizationId)} />
+                  ) : undefined
+                }
+                // Always pass the label: a node React Native stops handing a
+                // label keeps its previous native value on Android, so a
+                // masked row that reveals its amount would still announce
+                // "Balance hidden" (the credits card's own note).
+                valueAccessibilityLabel={
+                  hideOrgBalance ? t('profile.balanceHidden') : balanceAmount
+                }
+              />
+            )}
             <KvRow
-              label={t('organization.hub.balance')}
-              value={hideOrgBalance ? HIDDEN_BALANCE : balanceAmount}
+              label={t('organization.hub.organizationSeats')}
+              // `requireSeats` is the enforcement switch; total is the raw
+              // purchased capacity and can legitimately be zero, so the shared
+              // readout prints the used count alone until seats were bought.
+              value={seatCountReadout({
+                seatsEnforced: org.requireSeats,
+                used: org.seatCount.used,
+                total: org.seatCount.total,
+              })}
               valueFace="numeric"
-              // The amount's symbol and sign are neutral to the paragraph's
-              // direction, so the run carries its own left-to-right order.
-              valueDirection="ltr"
-              // An empty balance offers the top-up on the amount's own line: a
-              // row of its own would hold nothing but this control, and
-              // `lineAction` keeps that line one text line tall.
-              trailing={
-                org.balance === 0 ? (
-                  <AddCreditsRow inline lineAction url={organizationBillingUrl(organizationId)} />
-                ) : undefined
-              }
-              // Always pass the label: a node React Native stops handing a
-              // label keeps its previous native value on Android, so a
-              // masked row that reveals its amount would still announce
-              // "Balance hidden" (the credits card's own note).
-              valueAccessibilityLabel={hideOrgBalance ? t('profile.balanceHidden') : balanceAmount}
             />
-          )}
-          <KvRow
-            label={t('organization.hub.organizationSeats')}
-            // `requireSeats` is the enforcement switch; total is the raw
-            // purchased capacity and can legitimately be zero, so the shared
-            // readout prints the used count alone until seats were bought.
-            value={seatCountReadout({
-              seatsEnforced: org.requireSeats,
-              used: org.seatCount.used,
-              total: org.seatCount.total,
-            })}
-            valueFace="numeric"
-          />
-          {/* The plan is the tier the seats belong to, so it closes the card
+            {/* The plan is the tier the seats belong to, so it closes the card
               the seats are counted in and paints in every state. A lapsed plan
               states that in this row: the tier alone beside the block above
               would read as an active plan, and the tier keeps the row's own ink
               so only the state carries the warning. */}
-          <KvRow
-            label={t('organization.hub.plan')}
-            value={planName}
-            // The trial sentence is a caption line of its own rather than a
-            // second value segment: the tier keeps one line, and a
-            // right-to-left interface cannot order the tier after the date.
-            // Nothing is ellipsized away.
-            caption={trialCaption ?? undefined}
-            valueStatus={
-              planEnded
-                ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
-                : undefined
-            }
-            valueFace="text"
-            last
-          />
+            <KvRow
+              label={t('organization.hub.plan')}
+              value={planName}
+              // The trial sentence is a caption line of its own rather than a
+              // second value segment: the tier keeps one line, and a
+              // right-to-left interface cannot order the tier after the date.
+              // Nothing is ellipsized away.
+              caption={trialCaption ?? undefined}
+              valueStatus={
+                planEnded
+                  ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
+                  : undefined
+              }
+              valueFace="text"
+            />
+          </RowGroup>
         </Animated.View>
 
         <OrgUsageStats
@@ -388,7 +404,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           }}
         />
 
-        <View className="rounded-lg bg-secondary px-3">
+        <RowGroup leadingTile>
           <ConfigureRow
             icon={Users}
             title={t('organization.members.title')}
@@ -401,7 +417,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           <ConfigureRow
             icon={Plug}
             title={t('integrations.title')}
-            last={!showMoney && inAppSettingsRows.length === 0}
             onPress={() => {
               router.push(`/(app)/(tabs)/(3_profile)/integrations?org=${organizationId}` as Href);
             }}
@@ -471,7 +486,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               <ConfigureRow
                 icon={Wallet}
                 title={t('notifications.channel.spend')}
-                last={inAppSettingsRows.length === 0}
                 onPress={() => {
                   router.push(
                     `/(app)/(tabs)/(3_profile)/spend-alerts?org=${organizationId}` as Href
@@ -482,18 +496,17 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           )}
           {/* The destinations this app reads and writes itself. They close the
               card — see `visibleInAppSettingsRows`. */}
-          {inAppSettingsRows.map((row, index) => (
+          {inAppSettingsRows.map(row => (
             <ConfigureRow
               key={row.area}
               icon={row.icon}
               title={row.title}
-              last={index === inAppSettingsRows.length - 1}
               onPress={() => {
                 router.push(row.href);
               }}
             />
           ))}
-        </View>
+        </RowGroup>
 
         {/* The areas this app does not reimplement. Each row opens the page
             that already owns the setting, and the row set follows the web
@@ -501,17 +514,13 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             the gates leave with no destination paints no heading: the group is
             the only place they were listed, so an empty one would name nothing. */}
         {settingsRows == null || settingsRows.length === 0 ? null : (
-          <View className="gap-2">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('organization.settingsOnWeb.title')}
-            </Text>
-            <View className="rounded-lg bg-secondary px-3">
-              {settingsRows.map((row, index) => (
+          <Section label={t('organization.settingsOnWeb.title')}>
+            <RowGroup leadingTile>
+              {settingsRows.map(row => (
                 <ConfigureRow
                   key={row.area}
                   icon={row.icon}
                   title={row.title}
-                  last={index === settingsRows.length - 1}
                   onPress={() => {
                     if (row.target.kind === 'app-shell') {
                       void openAppShellHandoff(row.target.target, { label: row.title });
@@ -521,8 +530,8 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                   }}
                 />
               ))}
-            </View>
-          </View>
+            </RowGroup>
+          </Section>
         )}
       </TabScreenScrollView>
 
@@ -582,17 +591,9 @@ function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
     : `${t('kiloPass.title')}. ${state.subtitle}`;
 
   const inner = (
-    <View className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft py-3">
-      <View
-        className={cn(
-          'h-[30px] w-[30px] items-center justify-center rounded-lg border',
-          tint.tileBgClass,
-          tint.tileBorderClass
-        )}
-      >
-        <KiloPassIcon size={16} color={colors[tint.hueThemeKey]} />
-      </View>
-      <View className="flex-1">
+    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
+      <IconTile tint={tint} content={<KiloPassIcon size={16} color={colors[tint.hueThemeKey]} />} />
+      <View className="min-w-0 flex-1">
         <Text className="text-sm font-medium text-foreground">{t('kiloPass.title')}</Text>
         {/* `h-4` is the `text-xs` line box (1 rem; native rem is 14), so the row
             keeps its height and this title its place while the status loads; a

@@ -21,6 +21,20 @@ export function isPublicCustomLlm(
   return definition.public !== undefined;
 }
 
+export type PartnerCustomLlmDefinition = CustomLlmDefinition & {
+  partner: NonNullable<CustomLlmDefinition['partner']>;
+  pricing: NonNullable<CustomLlmDefinition['pricing']>;
+};
+
+export type PartnerCustomLlm = Omit<CustomLlm, 'definition'> & {
+  definition: PartnerCustomLlmDefinition;
+};
+
+/** A partner serves a catalog model instead of owning its id; see `CustomLlmPartnerSchema`. */
+export function isPartnerCustomLlm(customLlm: CustomLlm): customLlm is PartnerCustomLlm {
+  return customLlm.definition.partner !== undefined && customLlm.definition.pricing !== undefined;
+}
+
 /**
  * A row that fails the definition schema is dropped from the catalog, which
  * removes an admin-configured model, so it reports through the same channel as a
@@ -39,7 +53,7 @@ function reportUnparseableCustomLlm(publicId: string, error: unknown): void {
   });
 }
 
-export function parseCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
+function parseAllCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   return rows.flatMap(row => {
     const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
     if (!parsed.success) {
@@ -56,6 +70,11 @@ export function parseCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   });
 }
 
+/** The custom LLMs that own their id, without partners. */
+export function parseCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
+  return parseAllCustomLlmRows(rows).filter(customLlm => !isPartnerCustomLlm(customLlm));
+}
+
 export async function fetchCustomLlmsFromDatabase(): Promise<CustomLlm[]> {
   return parseCustomLlmRows(await readDb.select().from(custom_llm2));
 }
@@ -68,27 +87,38 @@ const CACHE_TTL_MS = 60_000;
  * not turn every lookup into a database query and a Sentry event. */
 const FAILURE_RETRY_MS = 5_000;
 
-type CustomLlmCatalog = {
+type CustomLlmMaps = {
   byId: ReadonlyMap<string, CustomLlm>;
+  partnersById: ReadonlyMap<string, PartnerCustomLlm>;
+};
+
+type CustomLlmCatalog = CustomLlmMaps & {
   /** False when the catalog could not be read and nothing was cached before. */
   available: boolean;
 };
 
-const UNAVAILABLE_CATALOG: CustomLlmCatalog = { byId: new Map(), available: false };
+const UNAVAILABLE_CATALOG: CustomLlmCatalog = {
+  byId: new Map(),
+  partnersById: new Map(),
+  available: false,
+};
 
-let cache: { byId: ReadonlyMap<string, CustomLlm>; at: number } | null = null;
-let inFlight: Promise<ReadonlyMap<string, CustomLlm>> | null = null;
+let cache: (CustomLlmMaps & { at: number }) | null = null;
+let inFlight: Promise<CustomLlmMaps> | null = null;
 let lastFailureAt: number | null = null;
 
-async function loadCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
+async function loadCustomLlmsById(): Promise<CustomLlmMaps> {
   try {
     const byId = new Map<string, CustomLlm>();
-    for (const customLlm of await fetchCustomLlmsFromDatabase()) {
-      byId.set(customLlm.public_id.toLowerCase(), customLlm);
+    const partnersById = new Map<string, PartnerCustomLlm>();
+    for (const customLlm of parseAllCustomLlmRows(await readDb.select().from(custom_llm2))) {
+      const key = customLlm.public_id.toLowerCase();
+      if (isPartnerCustomLlm(customLlm)) partnersById.set(key, customLlm);
+      else byId.set(key, customLlm);
     }
-    cache = { byId, at: Date.now() };
+    cache = { byId, partnersById, at: Date.now() };
     lastFailureAt = null;
-    return byId;
+    return { byId, partnersById };
   } catch (error) {
     lastFailureAt = Date.now();
     console.error('Failed to load custom LLMs', error);
@@ -100,10 +130,10 @@ async function loadCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
 /** A failed refresh serves the previous value; with nothing cached the catalog is unavailable. */
 async function getCustomLlmCatalog(): Promise<CustomLlmCatalog> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
-    return { byId: cache.byId, available: true };
+    return { ...cache, available: true };
   }
   if (lastFailureAt !== null && Date.now() - lastFailureAt < FAILURE_RETRY_MS) {
-    return cache ? { byId: cache.byId, available: true } : UNAVAILABLE_CATALOG;
+    return cache ? { ...cache, available: true } : UNAVAILABLE_CATALOG;
   }
   if (!inFlight) {
     const load = loadCustomLlmsById().finally(() => {
@@ -112,16 +142,18 @@ async function getCustomLlmCatalog(): Promise<CustomLlmCatalog> {
     inFlight = load;
   }
   try {
-    return { byId: await inFlight, available: true };
+    return { ...(await inFlight), available: true };
   } catch {
-    return cache ? { byId: cache.byId, available: true } : UNAVAILABLE_CATALOG;
+    return cache ? { ...cache, available: true } : UNAVAILABLE_CATALOG;
   }
 }
 
 /**
- * All valid custom LLMs keyed by lowercased public id. Empty while the catalog
- * is unavailable, which treats every id as a built-in model; code that must not
- * expose a custom LLM by mistake uses `requireCustomLlmsById` instead.
+ * All valid custom LLMs that own their id, keyed by lowercased public id. Partners
+ * are excluded, since their id stays a catalog model (see `findPartnerCustomLlm`).
+ * Empty while the catalog is unavailable, which treats every id as a built-in
+ * model; code that must not expose a custom LLM by mistake uses
+ * `requireCustomLlmsById` instead.
  */
 export async function getCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
   return (await getCustomLlmCatalog()).byId;
@@ -151,6 +183,11 @@ export function resetCustomLlmCacheForTest() {
 /** A custom LLM for the id, or null when there is none or the catalog is unavailable. */
 export async function findCustomLlm(modelId: string): Promise<CustomLlm | null> {
   return (await getCustomLlmsById()).get(modelId.trim().toLowerCase()) ?? null;
+}
+
+/** The partner for the catalog model id, or null when there is none or the catalog is unavailable. */
+export async function findPartnerCustomLlm(modelId: string): Promise<PartnerCustomLlm | null> {
+  return (await getCustomLlmCatalog()).partnersById.get(modelId.trim().toLowerCase()) ?? null;
 }
 
 export async function isCustomLlm(modelId: string): Promise<boolean> {

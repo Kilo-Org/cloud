@@ -447,11 +447,9 @@ describe('entry shape and re-raise', () => {
 
   it('acking a re-raised entry acks the new raise, not the old one', () => {
     ackSessionAttention('s1', 'question', 'R1');
-    // re-raise
     reconcileSessionAttention('s1', 'question', 'R2');
     expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(false);
 
-    // user answers the new raise
     ackSessionAttention('s1', 'question', 'R2');
     expect(isAttentionAcked('s1', { raiseId: 'R2' })).toBe(true);
     expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
@@ -464,7 +462,6 @@ describe('durable persistence', () => {
     ackSessionAttention('s1', 'question', 'R1');
     await __flushSessionAttentionWritesForTests();
 
-    // Simulated restart: clear the in-memory store, then re-hydrate from KV.
     __resetSessionAttentionForTests();
     await __hydrateSessionAttentionForTests();
 

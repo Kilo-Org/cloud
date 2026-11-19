@@ -33,7 +33,7 @@ export function SheetTitleRow({
   return (
     <View
       className={cn(
-        'min-h-11 flex-row items-center gap-x-2 px-5',
+        'min-h-11 flex-row items-center gap-x-2 px-4',
         sheetUnderHandlePaddingClass('row')
       )}
     >

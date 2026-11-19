@@ -32,7 +32,7 @@ const LAYOUT_SOURCE = readFileSync(
   'utf8'
 );
 const LABEL_SOURCE = readFileSync(
-  fileURLToPath(new URL('../components/tab-bar-label.tsx', import.meta.url)),
+  fileURLToPath(new URL('../components/ui/tab-bar-label.tsx', import.meta.url)),
   'utf8'
 );
 
@@ -337,7 +337,7 @@ describe('mirrored tab label metrics', () => {
   // component's style, so the "keep these in step" pointer must name the file
   // that actually owns that style, and the copied tokens must still match it.
   it('points at the component that owns the tab label style', () => {
-    expect(LAYOUT_SOURCE).toContain('apps/mobile/src/components/tab-bar-label.tsx');
+    expect(LAYOUT_SOURCE).toContain('apps/mobile/src/components/ui/tab-bar-label.tsx');
     expect(LABEL_SOURCE).toContain('export function TabBarLabel');
   });
 
@@ -354,26 +354,46 @@ describe('mirrored tab label metrics', () => {
 });
 
 describe('shouldHideTabBar', () => {
-  it('hides tabs for full-screen nested routes', () => {
-    expect(shouldHideTabBar('/security-agent/personal/filter', [])).toBe(true);
-    expect(shouldHideTabBar('/security-agent/org-1/filter', [])).toBe(true);
+  it.each([['(0_home)'], ['(2_agents)'], ['(4_chat)'], ['(3_profile)']] as const)(
+    'keeps the bar on the %s tab root',
+    group => {
+      expect(shouldHideTabBar('/', ['(app)', '(tabs)', group])).toBe(false);
+      expect(shouldHideTabBar('/', ['(app)', '(tabs)', group, 'index'])).toBe(false);
+    }
+  );
+
+  it('hides the bar on a pushed screen inside a tab group', () => {
+    expect(shouldHideTabBar('/history', ['(app)', '(tabs)', '(2_agents)', 'history'])).toBe(true);
+    expect(
+      shouldHideTabBar('/spend-alerts', ['(app)', '(tabs)', '(3_profile)', 'spend-alerts'])
+    ).toBe(true);
   });
 
-  it('keeps tabs on normal tab screens', () => {
-    expect(shouldHideTabBar('/security-agent/personal', [])).toBe(false);
-    expect(shouldHideTabBar('/security-agent/personal/findings', [])).toBe(false);
-  });
-
-  it('hides tabs inside a chat, whose composer sits where the bar would be', () => {
+  it('hides the bar inside a chat, whose composer sits where the bar would be', () => {
     expect(shouldHideTabBar('/abc123', ['(app)', '(tabs)', '(4_chat)', '[id]'])).toBe(true);
   });
 
-  it('keeps tabs on the chat list', () => {
-    expect(shouldHideTabBar('/', ['(app)', '(tabs)', '(4_chat)', 'index'])).toBe(false);
+  it('reads the screen a form sheet covers instead of the sheet', () => {
+    // A sheet is not a screen of its own: over a pushed screen the bar keeps
+    // that screen's hidden state, and over a tab root it keeps the bar, so the
+    // covered root also keeps its bottom inset while the sheet is up.
+    expect(
+      shouldHideTabBar('/organization/invite-member', [
+        '(app)',
+        '(tabs)',
+        '(3_profile)',
+        'organization',
+        'invite-member',
+      ])
+    ).toBe(true);
+    expect(shouldHideTabBar('/share-gate', ['(app)', '(tabs)', '(0_home)', 'share-gate'])).toBe(
+      false
+    );
   });
 
-  it('keeps tabs on a one-segment route outside the chat tab', () => {
-    expect(shouldHideTabBar('/abc123', ['(app)', '(tabs)', '(2_agents)', '[id]'])).toBe(false);
+  it('hides the bar on a root-stack screen', () => {
+    expect(shouldHideTabBar('/usage', ['(app)', 'usage'])).toBe(true);
+    expect(shouldHideTabBar('/credits', ['(app)', 'credits'])).toBe(true);
   });
 });
 

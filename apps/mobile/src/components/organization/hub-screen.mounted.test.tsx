@@ -53,9 +53,11 @@ const membersQuery = vi.hoisted(() => ({
     | undefined,
   isLoading: false,
   isError: false,
-  isPaused: false,
   refetch: vi.fn(),
 }));
+// The membership read settles offline (`SETTLE_WHILE_OFFLINE`), so the screen's
+// offline wording reads the committed connectivity state; the harness carries it.
+const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline' | 'unknown' }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
@@ -85,15 +87,15 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     isResolving: false,
   }),
   useOrgWithMembers: () => membersQuery,
-  // Mirrors the hook's derivation over the same mocked membership payload.
+  // Mirrors the hook's derivation over the same mocked membership payload: no
+  // payload behind a failed fetch is the only unavailable shape now.
   useOrgParentLink: (_organizationId: string | null, listParentLink: string | null | undefined) => {
     const membershipParentLink = membersQuery.data?.parent_organization_id;
     const reportedParentLink = listParentLink ?? membershipParentLink;
     return {
       membership: membersQuery,
       parentLink: reportedParentLink ?? (membershipParentLink === null ? null : undefined),
-      membershipUnavailable:
-        membersQuery.data == null && (membersQuery.isError || membersQuery.isPaused),
+      membershipUnavailable: membersQuery.data == null && membersQuery.isError,
     };
   },
   useOrgKiloPassSummary: (_organizationId: string, enabled: boolean) => {
@@ -264,6 +266,10 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.value,
+}));
+
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },
   FadeIn: { duration: () => ({}) },
@@ -339,7 +345,7 @@ beforeEach(() => {
   kiloPassQuery.enabled = [];
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
-  membersQuery.isPaused = false;
+  connectivity.value = 'online';
   membersQuery.refetch.mockClear();
 });
 
@@ -882,10 +888,12 @@ describe('Organization hub Kilo Pass placeholder', () => {
 });
 
 describe('Organization hub settings availability', () => {
-  it.each(['paused', 'failed'] as const)('retries unavailable settings when %s', async state => {
+  it.each(['offline', 'failed'] as const)('retries unavailable settings when %s', async state => {
+    // Both arms are the same unavailable read (no payload behind a failure);
+    // they differ only in the committed connectivity the offline wording reads.
     membersQuery.data = undefined;
-    membersQuery.isPaused = state === 'paused';
-    membersQuery.isError = state === 'failed';
+    membersQuery.isError = true;
+    connectivity.value = state === 'offline' ? 'offline' : 'online';
     const { renderer, unmount } = await renderHub();
     const row = renderer.root
       .findAllByType('ConfigureRow')
@@ -901,10 +909,26 @@ describe('Organization hub settings availability', () => {
     unmount();
   });
 
-  it('opens configuration with cached settings during a paused refetch failure', async () => {
+  it('names the connection on a confirmed-offline device with no membership payload', async () => {
+    membersQuery.data = undefined;
+    membersQuery.isError = true;
+    connectivity.value = 'offline';
+    const { renderer, unmount } = await renderHub();
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.icon === 'Bell');
+    if (!row) {
+      throw new Error('Low-balance row missing');
+    }
+    // The offline wording reads the committed connectivity state now; the read
+    // itself settles (`SETTLE_WHILE_OFFLINE`), so the failure is the trigger.
+    expect(row.props.subtitle).toBe(i18n.t('queryError.offlineTitle'));
+    unmount();
+  });
+
+  it('opens configuration with cached settings during a failed refetch', async () => {
     membersQuery.data = { parent_organization_id: null, settings: { minimum_balance: 15 } };
     membersQuery.isError = true;
-    membersQuery.isPaused = true;
     const { renderer, unmount } = await renderHub();
     const row = renderer.root
       .findAllByType('ConfigureRow')

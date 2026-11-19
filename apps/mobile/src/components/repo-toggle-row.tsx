@@ -43,7 +43,7 @@ export function RepoToggleRow({
         repo.private ? t('common.privateRepositoryA11y', { name: repo.fullName }) : repo.fullName
       }
     >
-      <View className="flex-1 flex-row items-center gap-2 pr-3">
+      <View className="flex-1 flex-row items-center gap-2">
         {repo.private ? (
           <View
             className="shrink-0"

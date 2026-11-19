@@ -1902,7 +1902,7 @@ describe('turn resubmission', () => {
     expect(frames[0]).toMatchObject({ sessionId: SESSION_ID });
   });
 
-  it('attributes an unknown descendant to the only active turn in a shared runtime', async () => {
+  it('drops a descendant whose parent no route knows', async () => {
     const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
     const h = createHarness();
     h.registerRoute(routeSpec());
@@ -1920,9 +1920,50 @@ describe('turn resubmission', () => {
         DIRECTORY
       )
     );
-    const frames = h.frames.filter(frame => frame.type === 'session.events');
-    expect(frames).toHaveLength(1);
-    expect(frames[0]).toMatchObject({ sessionId: SESSION_ID });
+    // Nothing in the runtime knows that parent, so the announcement is not an
+    // adoption: its events belong to another owner.
+    expect(h.frames.filter(frame => frame.type === 'session.events')).toHaveLength(0);
+    expect(h.logs.some(line => line.includes('child of an unknown parent'))).toBe(true);
+  });
+
+  it('keeps an interaction of an unrelated native session out of the route', async () => {
+    const h = createHarness();
+    const routeA = routeSpec({ sessionId: 'workspace_a', kiloSessionId: 'ses_kilo_a' });
+    const routeB = routeSpec({ sessionId: 'workspace_b', kiloSessionId: 'ses_kilo_b' });
+    h.registerRoute(routeA);
+    h.registerRoute(routeB);
+    h.manager.submit(routeA.sessionId, promptPayload('m1'));
+    await settle();
+    h.frames.length = 0;
+
+    // A native session neither route registered and no `session.created` named.
+    h.manager.observeKiloEvent(
+      kiloEvent(
+        'permission.asked',
+        { sessionID: 'ses_foreign', id: 'perm_foreign', permission: 'bash', metadata: {} },
+        DIRECTORY
+      )
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent(
+        'question.asked',
+        { sessionID: 'ses_foreign', id: 'question_foreign', questions: [] },
+        DIRECTORY
+      )
+    );
+    await settle();
+
+    expect(h.client(routeA).permissionAnswers).toHaveLength(0);
+    expect(h.client(routeB).permissionAnswers).toHaveLength(0);
+    expect(h.client(routeA).questionRejections).toHaveLength(0);
+    expect(h.client(routeB).questionRejections).toHaveLength(0);
+    expect(h.frames.filter(frame => frame.type === 'session.events')).toHaveLength(0);
+    expect(
+      h.logs.filter(line => line.includes('dropped unattributed permission.asked'))
+    ).toHaveLength(1);
+    expect(
+      h.logs.filter(line => line.includes('dropped unattributed question.asked'))
+    ).toHaveLength(1);
   });
 
   it('fails agent_restarted after real tool progress', async () => {
@@ -4386,6 +4427,142 @@ describe('turn route identity', () => {
     await settle();
     expect(h.client(routeSpec()).drains).toHaveLength(1);
     expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+  });
+
+  it('settles a live turn instead of dispatching it to a replaced native session', async () => {
+    const h = createHarness();
+    const first = routeSpec({ runtimeIsolation: 'per-session' });
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const client = h.client(first);
+    expect(client.prompts.map(call => call.sessionId)).toEqual([KILO_SESSION]);
+
+    // The Cloud session moves to another native session mid-turn, so the live turn
+    // settles and the next prompt uses the registration that is current.
+    h.registerRoute({ ...first, kiloSessionId: 'ses_replaced' });
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'agent_restarted' }]);
+
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1', 'm2']);
+    expect(client.prompts.at(-1)?.sessionId).toBe('ses_replaced');
+  });
+
+  it('settles a live turn instead of dispatching it to a replaced checkout', async () => {
+    const h = createHarness();
+    const first = routeSpec();
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const replaced = { ...first, directory: '/workspace/moved' };
+    h.registerRoute(replaced);
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'agent_restarted' }]);
+
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    // The turn that was live stays on its own checkout and takes nothing new; the
+    // next prompt is dispatched through the registration that is current.
+    expect(h.client(first).prompts.map(call => call.messageId)).toEqual(['m1']);
+    expect(h.client(replaced).prompts.map(call => call.messageId)).toEqual(['m2']);
+  });
+
+  it('settles a live turn when the review target it would publish to changes', async () => {
+    const h = createHarness();
+    const first = routeSpec({
+      createdOnPlatform: 'code-review',
+      githubReviewTarget: {
+        repo: 'acme/widgets',
+        pullRequestNumber: 42,
+        appType: 'standard',
+        botUserId: '123',
+      },
+    });
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const target = first.githubReviewTarget;
+    if (target === undefined) throw new Error('Missing review target');
+    h.registerRoute({ ...first, githubReviewTarget: { ...target, pullRequestNumber: 43 } });
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'agent_restarted' }]);
+  });
+
+  it('keeps a live turn through a re-registration of the same binding', async () => {
+    const h = createHarness();
+    const first = routeSpec();
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.registerRoute({ ...first, attemptId: 'attempt-2' });
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+  });
+
+  it('applies the current route policy to a replaced native session after a binding change', async () => {
+    const h = createHarness();
+    const first = routeSpec({ createdOnPlatform: 'code-review' });
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.registerRoute({ ...first, kiloSessionId: 'ses_replaced', createdOnPlatform: 'web' });
+    await settle();
+    h.frames.length = 0;
+    h.manager.observeKiloEvent(
+      kiloEvent('question.asked', { sessionID: 'ses_replaced', id: 'q1', questions: [] })
+    );
+    await settle();
+    // No longer a code-review route, so its question reaches the person instead
+    // of being rejected by the previous route's policy.
+    expect(h.client(first).questionRejections).toHaveLength(0);
+    expect(
+      eventFrames(h.frames).filter(event => event.type === 'question.asked')
+    ).toHaveLength(1);
+  });
+
+  it('stops a running finalization step when the binding moves', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const aborted = Promise.withResolvers<void>();
+    const h = createHarness({
+      runAutoCommit: async options => {
+        started.resolve();
+        const finished = Promise.withResolvers<void>();
+        options.signal?.addEventListener('abort', () => {
+          aborted.resolve();
+          finished.resolve();
+        });
+        void release.promise.then(finished.resolve);
+        await finished.promise;
+        return { success: true } as never;
+      },
+    });
+    const first = routeSpec();
+    h.registerRoute(first);
+    h.manager.submit(SESSION_ID, {
+      ...promptPayload('m1'),
+      finalization: { autoCommit: true },
+    });
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await started.promise;
+
+    // The Cloud session moves to another native session while its finalization
+    // is still running.
+    h.registerRoute({ ...first, kiloSessionId: 'ses_replaced' });
+    await aborted.promise;
+    await settle();
+
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'agent_restarted' }]);
+    release.resolve();
+    await settle();
+    // Nothing more was dispatched into the previous native session.
+    expect(h.client(first).prompts.map(call => call.messageId)).toEqual(['m1']);
   });
 });
 

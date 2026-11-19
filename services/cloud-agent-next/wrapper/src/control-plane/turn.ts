@@ -186,6 +186,47 @@ type TurnRoute = {
 
 type QueueState = 'ready' | 'queue' | 'unavailable';
 
+/** Whether two review targets would publish to the same pull request. */
+function sameReviewTarget(
+  first: ControlPlaneRouteSpec['githubReviewTarget'],
+  second: ControlPlaneRouteSpec['githubReviewTarget']
+): boolean {
+  if (first === undefined || second === undefined) return first === second;
+  return (
+    first.repo === second.repo &&
+    first.pullRequestNumber === second.pullRequestNumber &&
+    first.appType === second.appType &&
+    first.botUserId === second.botUserId
+  );
+}
+
+/**
+ * Whether a re-registration still names the same workspace binding: the native
+ * session turns dispatch to, the checkout they run in, the roots they commit and
+ * the origin their review is published to. The runtime key is deliberately not
+ * part of it: a route that moves to another key is still the same workspace, and
+ * an execution that already started stays owned by the runtime that started it.
+ */
+function sameRegisteredBinding(previous: TurnRoute, next: TurnRoute): boolean {
+  if (
+    previous.kiloSessionId !== next.kiloSessionId ||
+    previous.directory !== next.directory ||
+    previous.createdOnPlatform !== next.createdOnPlatform ||
+    !sameReviewTarget(previous.githubReviewTarget, next.githubReviewTarget) ||
+    previous.roots.length !== next.roots.length
+  )
+    return false;
+  return previous.roots.every((root, index) => {
+    const other = next.roots[index];
+    return (
+      other !== undefined &&
+      root.directory === other.directory &&
+      root.repoFullName === other.repoFullName &&
+      root.requestedBranch === other.requestedBranch
+    );
+  });
+}
+
 type AutomaticPermissionReply =
   | { response: 'always' }
   | { response: 'reject'; message: string; failure: string };
@@ -1070,17 +1111,60 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return childRoots.get(kiloSessionId);
   }
 
-  /** `createdParentId` is the parent a `session.created` event reports. */
+  /** Whether a native session belongs to a route this wrapper serves. */
+  function isAttributedKiloSession(kiloSessionId: string | undefined): boolean {
+    return (
+      kiloSessionId !== undefined &&
+      (turnByKiloSession.has(kiloSessionId) || childRoots.has(kiloSessionId))
+    );
+  }
+
+  /**
+   * Event types whose loss an operator can see. Message and status events from a
+   * live foreign session would flood the log, and their absence is visible in the
+   * session that asked for them.
+   */
+  const UNATTRIBUTED_EVENT_TYPES: Record<string, true> = {
+    'permission.asked': true,
+    'permission.replied': true,
+    'question.asked': true,
+    'question.replied': true,
+    'question.rejected': true,
+    'session.created': true,
+    'session.error': true,
+    'session.turn.close': true,
+  };
+
+  /** A dropped event is a diagnosis, not a failure: name the ones that matter. */
+  function noteUnattributedEvent(
+    eventSessionId: string | undefined,
+    event: KiloFeedEvent | undefined,
+    runtimeKeyValue: string | undefined
+  ): void {
+    if (event === undefined || UNATTRIBUTED_EVENT_TYPES[event.type] !== true) return;
+    log(
+      `turn: dropped unattributed ${event.type} nativeSession=${
+        eventSessionId ?? 'unknown'
+      } runtimeKey=${runtimeKeyValue ?? 'unknown'}`
+    );
+  }
+
+  /**
+   * The route that owns a newly announced child session. `session.created` is the
+   * one event a route may adopt: the child is not tracked yet, and the runtime
+   * that emitted it is authoritative, because its reported parent may name
+   * another route in the same worktree. Every other event is attributed only
+   * through a session that is already tracked. `createdParentId` is the parent
+   * the announcement reports; a child of an unknown parent is not adopted.
+   */
   function emittingRoute(
     key: string | undefined,
-    eventSessionId: string | undefined,
-    createdParentId?: string
+    createdParentId: string
   ): TurnRoute | undefined {
     if (key === undefined) return undefined;
     const direct = routes.get(key);
     if (direct !== undefined) return direct;
-    const knownRoot =
-      resolveRootKiloSession(eventSessionId) ?? resolveRootKiloSession(createdParentId);
+    const knownRoot = resolveRootKiloSession(createdParentId);
     const knownSessionId = knownRoot === undefined ? undefined : turnByKiloSession.get(knownRoot);
     const knownRoute = knownSessionId === undefined ? undefined : routes.get(knownSessionId);
     if (knownRoute?.runtimeKey === key) return knownRoute;
@@ -1149,21 +1233,15 @@ export function createTurnManager(deps: TurnManagerDeps) {
     }
     if (event && SYNTHETIC_KILO_EVENTS.has(event.type)) return;
     if (event?.type === 'session.created') registerChild(event);
-    let root = resolveRootKiloSession(eventSessionId);
-    // A descendant's reported parent may name another route in the same
-    // worktree; the runtime that emitted it is authoritative. Route roots keep
-    // their own identity so a runtime never captures another route's events.
-    const emitting = emittingRoute(
-      source.runtimeKey,
-      eventSessionId,
-      event?.type === 'session.created'
-        ? childFromSessionCreated(event.properties)?.parentId
-        : undefined
-    );
-    const isRouteRoot = eventSessionId !== undefined && turnByKiloSession.has(eventSessionId);
-    if (emitting !== undefined && !isRouteRoot && root !== emitting.kiloSessionId) {
-      root = emitting.kiloSessionId;
+    // A control event is handled only for a native session this wrapper serves: a
+    // registered route root, or a child a `session.created` registered under one.
+    // Every other native session belongs to another owner, so its events are not
+    // handled here.
+    if (!isAttributedKiloSession(eventSessionId)) {
+      noteUnattributedEvent(eventSessionId, event, source.runtimeKey);
+      return;
     }
+    const root = resolveRootKiloSession(eventSessionId);
     if (root === undefined) return;
     const sessionId = turnByKiloSession.get(root);
     if (sessionId === undefined) return;
@@ -1355,11 +1433,48 @@ export function createTurnManager(deps: TurnManagerDeps) {
   function registerChild(event: KiloFeedEvent): void {
     const child = childFromSessionCreated(event.properties);
     if (child === undefined) return;
-    const parentRoot =
-      emittingRoute(event.runtimeKey, eventKiloSessionId(event.properties), child.parentId)
-        ?.kiloSessionId ?? resolveRootKiloSession(child.parentId);
-    if (parentRoot === undefined) return;
-    childRoots.set(child.childId, parentRoot);
+    // The created session names the session that spawned it. A child is tracked
+    // only under a parent this wrapper serves.
+    const parentRoot = resolveRootKiloSession(child.parentId);
+    if (parentRoot === undefined) {
+      log(
+        `turn: ignoring session.created for a child of an unknown parent child=${child.childId} parent=${child.parentId}`
+      );
+      return;
+    }
+    const owner = emittingRoute(event.runtimeKey, child.parentId);
+    childRoots.set(child.childId, owner?.kiloSessionId ?? parentRoot);
+  }
+
+  /**
+   * A live turn keeps the runtime that started its execution, so a route that
+   * moves to another runtime key stays its owner. A re-registration that names
+   * another binding settles the turn as an agent restart, so Cloud receives one
+   * outcome for the prompt it accepted and the next prompt builds its turn from
+   * the current registration. The route's automatic permission and question rules
+   * carry over on the shared sets, and the review publication is rebuilt with the
+   * turn.
+   */
+  function adoptRegisteredRoute(
+    previous: TurnRoute | undefined,
+    route: TurnRoute
+  ): void {
+    if (previous === undefined || sameRegisteredBinding(previous, route)) return;
+    log(
+      `turn: route binding changed session=${route.sessionId} nativeSession=${
+        previous.kiloSessionId
+      }->${route.kiloSessionId}`
+    );
+    interruptedFinalizations
+      .get(route.sessionId)
+      ?.abort.abort(new Error('route binding changed'));
+    const turn = turns.get(route.sessionId);
+    if (turn !== undefined) {
+      // Finalization re-checks the live turn only after its steps return, so a
+      // running auto-commit or condense is stopped through the signal it takes.
+      turn.stepAbort?.abort(new Error('route binding changed'));
+      sendOutcome(turn, 'failed', 'agent_restarted');
+    }
   }
 
   async function answerAutomaticPermission(
@@ -1577,6 +1692,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
       const existing = routes.get(spec.sessionId);
       if (existing !== undefined && existing.kiloSessionId !== spec.kiloSessionId) {
         turnByKiloSession.delete(existing.kiloSessionId);
+        for (const [child, root] of childRoots) {
+          if (root === existing.kiloSessionId) childRoots.delete(child);
+        }
       }
       const route: TurnRoute = {
         sessionId: spec.sessionId,
@@ -1593,6 +1711,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       routes.set(spec.sessionId, route);
       routeSpecs.set(spec.sessionId, spec);
       turnByKiloSession.set(spec.kiloSessionId, spec.sessionId);
+      adoptRegisteredRoute(existing, route);
     },
 
     release(sessionId: string): void {

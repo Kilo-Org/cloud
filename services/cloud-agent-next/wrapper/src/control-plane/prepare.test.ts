@@ -2568,6 +2568,56 @@ describe('createPreparationManager', () => {
     });
   });
 
+  it('prepares again when the re-prepare names another native session', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    expect(harness.ensureCalls()).toBe(1);
+
+    // The prepared route serves the previous native session, so this binding is
+    // prepared in its own right.
+    await harness.manager.prepare({ ...spec, kiloSessionId: 'ses_22222222222222222222222222' });
+
+    expect(harness.ensureCalls()).toBe(2);
+    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+    expect(harness.manager.preparedRoute(spec.sessionId)?.roots).toEqual([
+      { directory: spec.directory, repoFullName: undefined, requestedBranch: undefined },
+    ]);
+  });
+
+  it('prepares again and releases the old runtime when the re-prepare names another directory', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    const prepared = harness.manager.preparedRoute(spec.sessionId);
+    if (prepared === null) throw new Error('The first prepare did not record a route');
+
+    await harness.manager.prepare({ ...spec, directory: '/tmp/prepare-test-other' });
+
+    expect(harness.ensureCalls()).toBe(2);
+    // The previous checkout's runtime is no route's any more.
+    expect(harness.releaseCalls).toEqual([prepared.runtimeKey]);
+    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+    expect(harness.manager.preparedRoute(spec.sessionId)?.directory).toBe(
+      '/tmp/prepare-test-other'
+    );
+  });
+
+  it('prepares again when the re-prepare asks for another runtime isolation', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    const prepared = harness.manager.preparedRoute(spec.sessionId);
+    if (prepared === null) throw new Error('The first prepare did not record a route');
+
+    await harness.manager.prepare({ ...spec, runtimeIsolation: 'per-session' });
+
+    expect(harness.ensureCalls()).toBe(2);
+    expect(harness.releaseCalls).toEqual([prepared.runtimeKey]);
+    expect(harness.manager.preparedRoute(spec.sessionId)?.runtimeKey).toBe(spec.sessionId);
+    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+  });
+
   it('installs refreshed Git and Kilo credentials into the running route and runtime', async () => {
     const harness = createHarness();
     const spec = routeSpec({

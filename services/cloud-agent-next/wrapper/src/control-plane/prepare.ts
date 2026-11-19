@@ -253,6 +253,22 @@ export function runtimeKey(spec: ControlPlaneRouteSpec): string {
   return workspaceConfigRuntimeKey(spec);
 }
 
+/**
+ * Whether a prepared route may answer a later `prepare` with `workspace: 'same'`:
+ * only when the incoming spec names the same workspace binding — the native
+ * session it serves, the checkout it runs in and the runtime that holds it.
+ */
+export function sameRouteBinding(
+  stored: ControlPlaneRouteSpec,
+  incoming: ControlPlaneRouteSpec
+): boolean {
+  return (
+    stored.kiloSessionId === incoming.kiloSessionId &&
+    stored.directory === incoming.directory &&
+    runtimeKey(stored) === runtimeKey(incoming)
+  );
+}
+
 function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): boolean {
   return error instanceof Error && error.message === `${step} timed out`;
 }
@@ -1673,7 +1689,24 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         // fresh (spec §7), not short-circuit to `ready`.
         if (deps.runtimes.isUnavailable(route.key)) {
           prepared.delete(spec.sessionId);
+        } else if (!sameRouteBinding(route.spec, spec)) {
+          // The acknowledgement belongs to the binding that was prepared. A
+          // prepare that names another binding prepares that binding, and the
+          // runtime key the old one held is released when no route holds it.
+          log(
+            `control-plane re-prepare binding changed session=${spec.sessionId} was=${
+              route.directory
+            } now=${spec.directory}`
+          );
+          prepared.delete(spec.sessionId);
+          finishReleasedRoute({
+            key: route.key,
+            sessionId: spec.sessionId,
+            spec: route.spec,
+          });
         } else {
+          // The binding matched, so the fast path serves exactly this runtime.
+          owner.runtimeKey = route.key;
           const running = (async () => {
             if (credentials) {
               try {

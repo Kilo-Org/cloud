@@ -631,7 +631,7 @@ describe('androidPathPatterns', () => {
     // matched literally, so no pattern may carry one.
     const patterns = androidPathPatterns();
     for (const pattern of patterns) {
-      expect(pattern, `pattern ${pattern}`).not.toMatch(/[[\]+(|^]/);
+      expect(pattern, `pattern ${pattern}`).not.toMatch(/[[\]+(|^$]/);
     }
 
     // No simple glob can say "exactly one segment", so the bare organization

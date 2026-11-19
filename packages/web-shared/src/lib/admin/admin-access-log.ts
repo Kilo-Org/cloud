@@ -135,10 +135,11 @@ export type AdminAccessAttribution = {
   route: string | null;
   /**
    * The tRPC operation type (`query`, `mutation`) on `surface:"trpc"`; the HTTP
-   * method on `surface:"rest"`, supplied explicitly by the caller (see
-   * {@link AdminAuditContext.auditMethod}) or forwarded by `proxy.ts` as
-   * `x-http-method`. Null when no reliable value exists (for example a unit
-   * test that invokes a shared helper without the proxy).
+   * method on `surface:"rest"`, taken from the value the caller supplies
+   * explicitly (see {@link AdminAuditContext.auditMethod}) when present,
+   * otherwise from `proxy.ts`'s `x-http-method`. Null when no reliable value
+   * exists (for example a unit test that invokes a shared helper without the
+   * proxy).
    */
   method: string | null;
   ip: string | null;
@@ -413,9 +414,16 @@ export type AdminAuditContext = {
   trpcType?: string;
   /** REST/server-component surface when the caller already knows it. */
   auditSurface?: AdminAccessSurface;
-  /** Route a REST or server-component caller already knows, e.g. from its request headers. */
+  /**
+   * Route a REST or server-component caller already knows, e.g. from its
+   * request headers. Takes precedence over the `x-pathname`/`x-matched-path`
+   * derivation.
+   */
   auditRoute?: string;
-  /** Actual request method for a REST caller. */
+  /**
+   * Actual request method for a REST caller. Takes precedence over the
+   * `x-http-method` derivation.
+   */
   auditMethod?: string;
   delegatedWorkload?: boolean;
 };

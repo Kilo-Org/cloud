@@ -31,6 +31,13 @@ type ReorderableItemActionsProps = Readonly<{
  * the item's end, in that order. The controls sit 17.5pt apart, so the 8pt
  * reach each side of a neighbouring hit slop (16pt together) stays clear of it
  * and a tap between two controls belongs to the gap, never to one of them.
+ *
+ * The line's own bounds hold that reach. React Native delivers a touch only
+ * inside its parent view, and one line of compact boxes is 32pt tall, so the
+ * declared 48pt reach of the boxes would stop at 32pt on device (#11345). The
+ * padding and its cancelling negative margin give the line a 46pt box that
+ * contributes the boxes' height to the item, so the item never grows and the
+ * glyphs keep their place.
  */
 export function ReorderableItemActions({
   moveUp,
@@ -48,7 +55,7 @@ export function ReorderableItemActions({
     return null;
   }
   return (
-    <View className="flex-row items-center justify-end gap-5">
+    <View className="-mx-4 -my-2 flex-row items-center justify-end gap-5 px-4 py-2">
       {moveUp === undefined ? null : (
         <RowIconAction {...moveUp}>
           <ChevronUp size={20} color={colors.mutedForeground} />

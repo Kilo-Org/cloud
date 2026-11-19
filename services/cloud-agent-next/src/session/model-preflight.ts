@@ -83,9 +83,10 @@ export async function preflightPreparedInitialPromptModel(
 ): Promise<void> {
   const metadata = await requireSessionMetadata(input);
   const turn = metadata.initialMessage?.turn;
-  // A command turn dispatches no model, so there is nothing to validate before
-  // admission. The session model is enforced at inference time by the AI gateway
-  // (`resolveProviderAndPolicy` -> `getEffectiveModelDecision`).
+  // Only a model the caller's organization catalogue makes available may serve a
+  // session. A command turn generates nothing at create time, so no model check
+  // applies here; the AI gateway enforces the requirement for the session at
+  // inference time (`resolveProviderAndPolicy` -> `getEffectiveModelDecision`).
   if (turn?.type === 'command') return;
   // Admission retains the existing `No prompt provided` error for incomplete legacy metadata.
   if (turn?.type !== 'prompt' && metadata.initialMessage?.prompt === undefined) return;

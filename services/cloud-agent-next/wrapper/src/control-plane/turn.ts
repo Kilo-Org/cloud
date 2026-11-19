@@ -20,7 +20,7 @@ import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timer
 import { slashCommandCatalogStatus } from '../../../src/shared/slash-commands.js';
 import { runAutoCommit } from '../auto-commit.js';
 import { autoCommitFailure, autoCommitRoots } from './auto-commit-roots.js';
-import { isEnvironmentRoot, routeRoots, type RouteRoot } from './workspace-roots.js';
+import { isEnvironmentRoot, routeRoots, sameRoots, type RouteRoot } from './workspace-roots.js';
 import { DEFAULT_CONDENSE_TIMEOUT_MS, type CondenseResult } from '../condense-on-complete.js';
 import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js';
 import { isDirectoryRewriteActive } from '../control/worktree-operations.js';
@@ -208,23 +208,13 @@ function sameReviewTarget(
  * an execution that already started stays owned by the runtime that started it.
  */
 function sameRegisteredBinding(previous: TurnRoute, next: TurnRoute): boolean {
-  if (
-    previous.kiloSessionId !== next.kiloSessionId ||
-    previous.directory !== next.directory ||
-    previous.createdOnPlatform !== next.createdOnPlatform ||
-    !sameReviewTarget(previous.githubReviewTarget, next.githubReviewTarget) ||
-    previous.roots.length !== next.roots.length
-  )
-    return false;
-  return previous.roots.every((root, index) => {
-    const other = next.roots[index];
-    return (
-      other !== undefined &&
-      root.directory === other.directory &&
-      root.repoFullName === other.repoFullName &&
-      root.requestedBranch === other.requestedBranch
-    );
-  });
+  return (
+    previous.kiloSessionId === next.kiloSessionId &&
+    previous.directory === next.directory &&
+    previous.createdOnPlatform === next.createdOnPlatform &&
+    sameReviewTarget(previous.githubReviewTarget, next.githubReviewTarget) &&
+    sameRoots(previous.roots, next.roots)
+  );
 }
 
 type AutomaticPermissionReply =

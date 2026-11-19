@@ -688,8 +688,10 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   environment's build commands. They run only in the environment build, so the wrapper skips them on
   every session start. The remaining setup commands (request-supplied and profile) run as
   `session_setup`, then `startCommands` run as `start`, on a fresh start and an environment snapshot
-  start. Every list is non-fatal: each failure (kind, index, redacted command text, exit code or
-  timeout, bounded redacted output tail) is collected, the next command still runs, and
+  start. They do not run again on a re-prepare that only adds roots to a workspace already prepared:
+  the commands already ran in that workspace, and a start command would launch a second process
+  beside the first. Every list is non-fatal: each failure (kind, index, redacted command text, exit
+  code or timeout, bounded redacted output tail) is collected, the next command still runs, and
   `session.ready` reports up to 20 as `commandFailures`. The Sandbox DO logs only kind, index, exit
   code, termination reason and elapsed time, and stores a note of at most 2000 characters for the
   route's attempt. The first prompt delivered after that preparation carries the note in its

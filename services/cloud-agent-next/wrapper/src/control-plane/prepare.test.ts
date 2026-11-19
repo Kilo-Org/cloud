@@ -865,6 +865,16 @@ function createHarness(
     | undefined;
   let stamp: WorkspaceStamp | null = null;
   let hasGitState = options.hasGit ?? false;
+  /**
+   * A route's roots each keep their own stamp and repository flag. `setStamp`
+   * hands its value to the first directory inspected or written, so a test that
+   * seeds one stamp reaches the directory it prepares; every other directory
+   * reads no stamp and has no repository until a clone creates one.
+   */
+  let pendingStamp: WorkspaceStamp | null = null;
+  let hasPendingStamp = false;
+  const stampsByDirectory = new Map<string, WorkspaceStamp>();
+  const repositoryDirectories = new Set<string>();
   const unavailableKeys = new Set<string>();
   let activeClones = 0;
   let maxActiveClones = 0;
@@ -1000,9 +1010,17 @@ function createHarness(
     ...(options.releaseCleanupDeadlineMs === undefined
       ? {}
       : { releaseCleanupDeadlineMs: options.releaseCleanupDeadlineMs }),
-    hasGit: async () => hasGitState,
-    readStamp: async () => stamp,
-    writeStamp: async (_directory, value) => {
+    hasGit: async directory => repositoryDirectories.has(directory) || hasGitState,
+    readStamp: async directory => {
+      const recorded = stampsByDirectory.get(directory);
+      if (recorded !== undefined) return recorded;
+      if (!hasPendingStamp) return null;
+      hasPendingStamp = false;
+      if (pendingStamp !== null) stampsByDirectory.set(directory, pendingStamp);
+      return pendingStamp;
+    },
+    writeStamp: async (directory, value) => {
+      stampsByDirectory.set(directory, value);
       stamp = value;
     },
     mkdir: async () => undefined,
@@ -1013,7 +1031,10 @@ function createHarness(
       gitCalls.push(args);
       if (customGit) return customGit(args, options);
       if (args[0] === 'clone') {
-        hasGitState = true;
+        // The last argument is the clone target: that directory is a repository
+        // from now on, and only that directory.
+        const target = args.at(-1);
+        if (target !== undefined) repositoryDirectories.add(target);
         activeClones += 1;
         maxActiveClones = Math.max(maxActiveClones, activeClones);
         try {
@@ -1106,6 +1127,8 @@ function createHarness(
     },
     setStamp: value => {
       stamp = value;
+      pendingStamp = value;
+      hasPendingStamp = true;
     },
     stamp: () => stamp,
     setHasGit: value => {
@@ -2593,15 +2616,24 @@ describe('createPreparationManager', () => {
 
   it('prepares the new roots when the re-prepare adds a repository', async () => {
     const harness = createHarness();
-    const spec = routeSpec();
+    // A launch repository, so the first preparation is a real one and the route
+    // directory holds a prepared workspace when the re-prepare arrives.
+    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git' } });
     await harness.manager.prepare(spec);
     expect(harness.ensureCalls()).toBe(1);
+    harness.frames.length = 0;
     harness.preparedRoutes.length = 0;
+    harness.gitCalls.length = 0;
+    harness.setupCalls.length = 0;
 
     const app = path.join(spec.directory, 'app');
     const lib = path.join(spec.directory, 'lib');
     const incoming: ControlPlaneRouteSpec = {
       ...spec,
+      // Setup and start commands already ran on the prepared workspace; the
+      // picture below proves they do not run a second time.
+      setupCommands: ['npm install'],
+      startCommands: ['serve'],
       roots: [
         {
           directory: app,
@@ -2622,32 +2654,64 @@ describe('createPreparationManager', () => {
 
     await harness.manager.prepare(incoming);
 
-    // A root this route never prepared is not on disk, so the full path runs
-    // and inspects, adopts or clones each root.
-    expect(harness.ensureCalls()).toBeGreaterThan(1);
-    expect(
-      harness.frames.filter(frame => frame.type === 'session.ready' && frame.workspace === 'same')
-    ).toHaveLength(0);
+    // Neither root is on disk, so the full path clones each one at its own
+    // directory and the ready frame reports the clone.
+    expect(harness.gitCalls.filter(args => args[0] === 'clone').map(args => args.at(-1))).toEqual([
+      app,
+      lib,
+    ]);
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: spec.sessionId, workspace: 'cloned' },
+    ]);
+    expect(harness.ensureCalls()).toBe(2);
     expect(harness.logs.some(line => line.includes('re-prepare prepares new roots'))).toBe(true);
     expect(harness.preparedRoutes.at(-1)!.roots).toEqual(incoming.roots);
+    // The workspace was already prepared, so its setup and start commands do not
+    // run again; a start command would launch a second server beside the first.
+    expect(harness.setupCalls).toEqual([]);
+    expect(harness.logs.some(line => line.includes('workspace setup skipped'))).toBe(true);
   });
 
   it('keeps the fast path for a re-prepare that names the same roots', async () => {
     const harness = createHarness();
-    const spec = routeSpec();
-    await harness.manager.prepare(spec);
+    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git' } });
+    const roots: NonNullable<ControlPlaneRouteSpec['roots']> = [
+      {
+        directory: path.join(spec.directory, 'app'),
+        repoFullName: 'acme/app',
+        git: { url: 'https://github.com/acme/app.git', platform: 'github' },
+        branch: 'kilo/generated',
+        branchMode: 'working',
+      },
+      {
+        directory: path.join(spec.directory, 'lib'),
+        repoFullName: 'acme/lib',
+        git: { url: 'https://github.com/acme/lib.git', platform: 'github' },
+        branch: 'kilo/generated',
+        branchMode: 'working',
+      },
+    ];
+    await harness.manager.prepare({ ...spec, roots });
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(2);
+    harness.frames.length = 0;
     harness.preparedRoutes.length = 0;
 
-    await harness.manager.prepare({
+    // An equal root array, not the same objects: the roots match field for field.
+    const incoming: ControlPlaneRouteSpec = {
       ...spec,
-      roots: spec.roots === undefined ? undefined : [...spec.roots],
-    });
+      roots: roots.map(root => ({ ...root })),
+    };
+    await harness.manager.prepare(incoming);
 
+    // Every root is already checked out, so nothing is inspected or cloned and
+    // the acknowledgement stays the prepared route's own.
     expect(harness.ensureCalls()).toBe(1);
-    expect(
-      harness.frames.filter(frame => frame.type === 'session.ready' && frame.workspace === 'same')
-    ).toHaveLength(1);
-    expect(harness.preparedRoutes).toHaveLength(1);
+    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(2);
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' },
+    ]);
+    expect(harness.preparedRoutes).toEqual([incoming]);
   });
 
   it('keeps the fast path and registers the incoming spec when only the attempt changes', async () => {

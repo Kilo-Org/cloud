@@ -1197,6 +1197,27 @@ describe('a second question while the first is being answered', () => {
     expect(asked.map(one => one.text)).toEqual(['first', 'second']);
   });
 
+  it('keeps the line ahead of what Stop lets through when two are waiting', async () => {
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    // Two questions typed while the first answer is still arriving.
+    await say(opened, { text: 'B', images: [] }, { model: 'kilo/one', effort: null });
+    await say(opened, { text: 'C', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    expect(waitingWords(opened)).toEqual(['B', 'C']);
+
+    // Stopping hands the line to ask in the order it was typed.
+    await stopChat(opened);
+    await settled();
+    expect(asked.map(one => one.text)).toEqual(['first', 'B']);
+
+    finish?.();
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['first', 'B', 'C']);
+    expect(snapshotOf(opened).waiting).toEqual([]);
+  });
+
   it('goes with the chat when the chat is closed', async () => {
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
     await settled();

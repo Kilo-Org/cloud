@@ -530,7 +530,8 @@ export function ScreenHeader({
   const titleOverflows = measuresTitleFit && titleOverflowKey === titleFitKey;
   const latchTitleOverflow = () => {
     const { natural, shown } = titleWidths.current;
-    if (!titleOverflows && natural - shown > 0.5) {
+    // A 1dp margin keeps the two Texts' pixel rounding from reading as a cut.
+    if (!titleOverflows && natural - shown > 1) {
       setTitleOverflowKey(titleFitKey);
     }
   };

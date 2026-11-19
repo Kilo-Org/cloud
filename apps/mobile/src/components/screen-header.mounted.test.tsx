@@ -594,25 +594,21 @@ describe('ScreenHeader mounted', () => {
     // German "Unterhaltung" beside the account picker painted "Unterh…" in a
     // 107dp box at the default font size, under a caller that keeps the
     // cluster on the title row.
-    const layoutEvent = (width: number) => ({
-      nativeEvent: { layout: { x: 0, y: 0, width, height: 36 } },
-    });
-    const measure = (
-      renderer: TestRenderer.ReactTestRenderer,
-      natural: number,
-      shown: number
-    ) => {
-      const [twin] = renderer.root.findAll(
+    type LayoutHandler = (event: {
+      nativeEvent: { layout: { width: number; height: number } };
+    }) => void;
+    const layoutEvent = (width: number) => ({ nativeEvent: { layout: { width, height: 36 } } });
+    const measure = (renderer: TestRenderer.ReactTestRenderer, natural: number, shown: number) => {
+      const twin = renderer.root.find(
         node =>
           typeof node.type === 'string' &&
           (node.type as string) === 'Text' &&
           node.props.importantForAccessibility === 'no-hide-descendants'
       );
+      const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       act(() => {
-        twin?.props.onLayout(layoutEvent(natural));
-        renderer.root
-          .findByProps({ accessibilityRole: 'header' })
-          .props.onLayout(layoutEvent(shown));
+        (twin.props.onLayout as LayoutHandler)(layoutEvent(natural));
+        (title.props.onLayout as LayoutHandler)(layoutEvent(shown));
       });
     };
     const props: ScreenHeaderProps = {
@@ -1961,7 +1957,8 @@ describe('header actions row', () => {
 
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-      expect(title.props.numberOfLines).toBe(1);
+      // A large font scale lets the title take a second line before its tail.
+      expect(title.props.numberOfLines).toBe(2);
       expect(title.props.ellipsizeMode).toBe('tail');
       const controls = findHeaderRight(renderer.root);
       expect(controls.children).toEqual(['SHARE REVIEW MERGE']);

@@ -2,8 +2,10 @@ import { SignJWT } from 'jose';
 import { describe, expect, it } from 'vitest';
 import {
   issueRuntimeProxyAttestation,
+  RUNTIME_PROXY_ATTESTATION_ISSUER,
   verifyRuntimeProxyAttestation,
 } from './runtime-proxy-attestation.js';
+import { sha256Hex } from './sha256.js';
 
 const secret = 'runtime-proxy-attestation-secret';
 const now = new Date('2026-01-01T00:00:00.000Z');
@@ -61,5 +63,34 @@ describe('runtime proxy attestation', () => {
         now: new Date(now.getTime() + 31_000),
       })
     ).resolves.toBe(false);
+  });
+
+  it('rejects a proof from another issuer and accepts the runtime proxy issuer', async () => {
+    const issuedAt = Math.floor(now.getTime() / 1000);
+    const signWithIssuer = async (issuer: string): Promise<string> =>
+      new SignJWT({
+        type: 'cloud-agent-next-runtime-proxy',
+        version: 1,
+        userId: input.userId,
+        authorizationId: input.authorizationId,
+        resourceId: input.resourceId,
+        bearerDigest: await sha256Hex(input.bearer),
+      })
+        .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+        .setIssuer(issuer)
+        .setAudience('kilo-api')
+        .setIssuedAt(issuedAt)
+        .setExpirationTime(issuedAt + 30)
+        .sign(new TextEncoder().encode(secret));
+
+    const foreignIssuer = await signWithIssuer('another-issuer');
+    await expect(
+      verifyRuntimeProxyAttestation({ ...input, value: foreignIssuer, now })
+    ).resolves.toBe(false);
+
+    const control = await signWithIssuer(RUNTIME_PROXY_ATTESTATION_ISSUER);
+    await expect(verifyRuntimeProxyAttestation({ ...input, value: control, now })).resolves.toBe(
+      true
+    );
   });
 });

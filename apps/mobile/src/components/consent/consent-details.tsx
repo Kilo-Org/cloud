@@ -58,13 +58,9 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
             what={t('consent.crashReportingWhat')}
             why={t('consent.crashReportingWhy')}
             who={t('consent.crashReportingWho')}
-            footer={
-              <View className="mt-3 gap-3">
-                <View className="rounded-md bg-warn-tile-bg p-3">
-                  <Text className="text-xs text-warn">{t('consent.crashReportingNote')}</Text>
-                </View>
-              </View>
-            }
+            // The notes are reassurance, not warnings, so they are the card's
+            // muted caption rather than an amber tile nested in the card.
+            footer={<Text variant="caption">{t('consent.crashReportingNote')}</Text>}
           />
 
           <Section
@@ -85,39 +81,21 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
             what={t('consent.productAnalyticsWhat')}
             why={t('consent.productAnalyticsWhy')}
             who={t('consent.productAnalyticsWho')}
-            footer={
-              <View className="mt-3">
-                <View className="rounded-md bg-warn-tile-bg p-3">
-                  <Text className="text-xs text-warn">{t('consent.productAnalyticsNote')}</Text>
-                </View>
-              </View>
-            }
+            footer={<Text variant="caption">{t('consent.productAnalyticsNote')}</Text>}
           />
           <Section
             title={t('consent.errorScreenshotsTitle')}
             what={t('consent.errorScreenshotsWhat')}
             why={t('consent.errorScreenshotsWhy')}
             who={t('consent.crashReportingWho')}
-            footer={
-              <View className="mt-3">
-                <View className="rounded-md bg-warn-tile-bg p-3">
-                  <Text className="text-xs text-warn">{t('consent.errorScreenshotsNote')}</Text>
-                </View>
-              </View>
-            }
+            footer={<Text variant="caption">{t('consent.errorScreenshotsNote')}</Text>}
           />
           <Section
             title={t('consent.performanceProfilingTitle')}
             what={t('consent.performanceProfilingWhat')}
             why={t('consent.performanceProfilingWhy')}
             who={t('consent.crashReportingWho')}
-            footer={
-              <View className="mt-3">
-                <View className="rounded-md bg-warn-tile-bg p-3">
-                  <Text className="text-xs text-warn">{t('consent.performanceProfilingNote')}</Text>
-                </View>
-              </View>
-            }
+            footer={<Text variant="caption">{t('consent.performanceProfilingNote')}</Text>}
           />
           <Section
             title={t('consent.installAttributionTitle')}

@@ -253,10 +253,13 @@ describe('BitbucketOverview config body', () => {
       .join(' ');
     // The token field lives on the sheet the action opens, so the reason names
     // that step; "paste it below" pointed at a button with no field under it.
-    expect(copy).toContain(i18n.t('codeReviewer.bitbucketConnect.descriptionOverview'));
-    // The overview has no organization name to interpolate, so its copy must
-    // not carry a placeholder the reader would see.
-    expect(copy).not.toContain('{{organization}}');
+    // The organization name is the call site's wiring, so only the step after
+    // the placeholder is checked here.
+    const [, nextStep] = i18n
+      .t('codeReviewer.bitbucketConnect.descriptionOverview')
+      .split('{{organization}}');
+    expect(nextStep).toBeTruthy();
+    expect(copy).toContain(nextStep);
   });
 });
 

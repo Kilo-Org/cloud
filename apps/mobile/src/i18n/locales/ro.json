@@ -1411,7 +1411,7 @@
       "managedOnWeb": "Conexiunea Bitbucket pentru {{organization}} se gestionează pe web, de pe un computer.",
       "description": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
       "descriptionReconnect": "Creează un nou token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
-      "descriptionOverview": "Creează un token de acces la spațiul de lucru și lipește-l pe ecranul următor.",
+      "descriptionOverview": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l pe ecranul următor.",
       "scopes": "Cont: citire · Depozite: citire/scriere · PR-uri: citire · Webhook-uri: citire/scriere",
       "tokenPlaceholder": "Token de acces la spațiul de lucru",
       "tokenRefused": "Bitbucket nu a acceptat acest token de acces la spațiul de lucru. Verifică dacă are permisiunile de mai sus, apoi încearcă din nou."

@@ -87,6 +87,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
   RefreshControl: 'RefreshControl',
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Platform: platform,
   useWindowDimensions: () => ({ fontScale: 1, height: 844 }),
 }));

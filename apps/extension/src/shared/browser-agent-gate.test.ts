@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- one preflight case per grant, sensitive-step and redirect branch */
 /* eslint-disable require-await -- a fake CDP channel is async by contract */
+import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import {
   createStepTokenStore,
@@ -73,6 +74,8 @@ const createSession = (
     readonly presentFieldFrames?: readonly string[];
     readonly probe?: Record<string, unknown>;
     readonly probeByObject?: Record<string, Record<string, unknown>>;
+    /** Elements of a real DOM the probe function itself runs against, by object id. */
+    readonly probeElements?: Record<string, Element>;
     readonly ambiguousSelectors?: Record<string, number>;
     readonly selectors?: Record<string, { readonly nodeId: number }>;
     /** The node name `DOM.describeNode` reports for a ref target (e.g. `IFRAME`). */
@@ -198,6 +201,18 @@ const createSession = (
         return { result: { value: nodeFrame === objectWorlds.get(String(objectId)) } };
       }
 
+      const probeElement =
+        typeof objectId === 'string' ? options.probeElements?.[objectId] : undefined;
+
+      if (probeElement !== undefined && typeof functionDeclaration === 'string') {
+        // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval, typescript-eslint/no-unsafe-type-assertion -- runs the page-side probe source against a real DOM element
+        const declare = new Function(`return (${functionDeclaration});`) as () => (
+          this: Element
+        ) => unknown;
+
+        return { result: { value: declare().call(probeElement) } };
+      }
+
       const probeForObject =
         typeof objectId === 'string' ? options.probeByObject?.[objectId] : undefined;
 
@@ -297,6 +312,17 @@ const run = (
     tabId: 7,
     toolName: input.toolName,
   });
+
+/** One element of a real DOM, for the page-side probe source to classify. */
+const fixtureElement = (html: string, id: string): Element => {
+  const element = new JSDOM(html).window.document.querySelector(`#${id}`);
+
+  if (element === null) {
+    throw new Error(`no fixture element #${id}`);
+  }
+
+  return element;
+};
 
 describe('origin grants', () => {
   it('refuses a read on an origin the CLI did not approve', async () => {
@@ -531,19 +557,36 @@ describe('origin grants', () => {
 });
 
 describe('origin changed after redirects', () => {
-  it('reports the origin a navigation landed on', async () => {
-    const approved = 'https://other.example.com';
+  const approved = 'https://other.example.com';
+  const landed = 'https://accounts.example.org';
+  const redirected = () => createSession({ mainUrl: `${landed}/login` });
 
+  it('reports the origin a navigation landed on', async () => {
     await expect(
-      postAgentNavigate(createSession({ mainUrl: approved }), approved)
+      postAgentNavigate(createSession({ mainUrl: approved }), approved, [])
     ).resolves.toBeUndefined();
-    await expect(
-      postAgentNavigate(createSession({ mainUrl: 'https://accounts.example.org/login' }), approved)
-    ).resolves.toStrictEqual({
+    await expect(postAgentNavigate(redirected(), approved, [])).resolves.toStrictEqual({
       from: approved,
       kind: 'origin_changed',
-      to: 'https://accounts.example.org',
+      to: landed,
     });
+  });
+
+  it('lets a redirect land on an origin the call may already open or read', async () => {
+    await expect(
+      postAgentNavigate(redirected(), approved, [{ class: 'navigate', origin: landed }])
+    ).resolves.toBeUndefined();
+    await expect(
+      postAgentNavigate(redirected(), approved, [
+        { class: 'read', origin: 'https://*.example.org' },
+      ])
+    ).resolves.toBeUndefined();
+  });
+
+  it('still reports a redirect whose landing origin is granted only to act on', async () => {
+    await expect(
+      postAgentNavigate(redirected(), approved, [{ class: 'act', origin: landed }])
+    ).resolves.toStrictEqual({ from: approved, kind: 'origin_changed', to: landed });
   });
 });
 
@@ -598,6 +641,40 @@ describe('sensitive steps', () => {
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
     });
+  });
+
+  it('refuses typing through a label into the password field it names without a step token', async () => {
+    const label = fixtureElement(
+      '<form><label id="pw-label" for="pw">Password</label><input id="pw" type="password"></form>',
+      'pw-label'
+    );
+
+    const result = await run({
+      args: { target: 'e12', text: 'hunter2' },
+      session: createSession({ probeElements: { 'obj-12': label } }),
+      toolName: 'browser_type',
+    });
+
+    expect(sensitiveOf(result)).toStrictEqual({
+      element: 'e12',
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.password,
+    });
+  });
+
+  it('lets a label for an ordinary field through without a step token', async () => {
+    const label = fixtureElement(
+      '<label id="email-label" for="email">Email</label><input id="email" type="email">',
+      'email-label'
+    );
+
+    const result = await run({
+      args: { target: 'e12', text: 'ada@example.com' },
+      session: createSession({ probeElements: { 'obj-12': label } }),
+      toolName: 'browser_type',
+    });
+
+    expect(result.ok).toBe(true);
   });
 
   it('binds the token to the sensitive element, not the first target', async () => {

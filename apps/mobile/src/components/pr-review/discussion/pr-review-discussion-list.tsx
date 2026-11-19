@@ -7,7 +7,6 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, type RefObject, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
@@ -27,7 +26,7 @@ import {
 import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useStyleSideInsets } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 
 const noopReactionToggle = () => {
@@ -159,7 +158,7 @@ export function PrReviewDiscussionList({
   // housing (rows keep their px-4 gutter, so the insets add to it); portrait
   // insets are zero, so the style carries explicit zeros and nothing else
   // changes.
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
   const contentContainerStyle = useMemo<ViewStyle>(
     () => ({ paddingTop: 12, paddingLeft: insets.left, paddingRight: insets.right }),
     [insets.left, insets.right]

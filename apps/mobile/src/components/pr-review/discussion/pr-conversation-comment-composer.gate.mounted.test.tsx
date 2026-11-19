@@ -1,5 +1,5 @@
-// Mounted coverage for the conversation composer's dismissal gate: the three
-// ways out, the discard clear, and the Terms gate hand-off to Cancel.
+// Mounted coverage for the conversation composer's dismissal gate: the two
+// ways out, the discard clear, and the Terms gate hand-off to Close.
 
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -142,12 +142,6 @@ function pressComment(renderer: ReactTestRenderer): void {
 }
 
 describe('dismissal gate', () => {
-  function pressCancel(renderer: ReactTestRenderer): void {
-    act(() => {
-      (buttonByText(renderer, i18n.t('common.cancel')).props.onPress as () => void)();
-    });
-  }
-
   function pressHeaderBack(renderer: ReactTestRenderer): void {
     act(() => {
       (renderer.root.findByType('PrFormSheetHeader').props.onBack as () => void)();
@@ -161,7 +155,6 @@ describe('dismissal gate', () => {
   }
 
   it.each([
-    ['the footer Cancel', pressCancel],
     ['the header close', pressHeaderBack],
     ['the hardware back', pressHardwareBack],
   ] as const)(
@@ -188,19 +181,19 @@ describe('dismissal gate', () => {
     act(() => {
       pressComment(renderer);
     });
-    pressCancel(renderer);
+    pressHeaderBack(renderer);
     act(() => {
       pressComment(renderer);
     });
 
     // The abandoned attempt's gate resolves: it writes nothing, and the
-    // successor's slot survives so Cancel still reaches the newer attempt.
+    // successor's slot survives so Close still reaches the newer attempt.
     await act(async () => {
       abandoned.resolve({ kind: 'accepted' });
       await Promise.resolve();
     });
     expect(confirmRequests).toHaveLength(1);
-    pressCancel(renderer);
+    pressHeaderBack(renderer);
     expect(confirmRequests).toHaveLength(2);
 
     await act(async () => {
@@ -216,7 +209,7 @@ describe('dismissal gate', () => {
     vi.mocked(clearDraft).mockResolvedValue(false);
     const renderer = await mount(createElement(PrConversationCommentComposer, baseProps));
     typeBody(renderer, 'hello');
-    pressCancel(renderer);
+    pressHeaderBack(renderer);
     confirmRequests.at(-1)?.onConfirm();
     await act(async () => {
       await Promise.resolve();

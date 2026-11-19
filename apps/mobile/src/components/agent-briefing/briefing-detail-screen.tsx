@@ -28,7 +28,11 @@ import {
   useBriefingDismissals,
   useBriefingInvalidation,
 } from '@/lib/agent-briefing';
-import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
+import {
+  briefingAccessDenied,
+  briefingReportMissing,
+  selectBriefingDetailPhase,
+} from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -125,8 +129,14 @@ export function BriefingDetailScreen() {
     marked.current = report.id;
     read.mutate({ reportId: report.id });
   }, [offline, read, report]);
-  const loading = !report && !missing && query.isPending && !offline;
-  const failure = !report && !loading;
+  const phase = selectBriefingDetailPhase({
+    hasReport: report !== undefined,
+    offline,
+    isPending: query.isPending,
+    isError: query.isError,
+    accessDenied: briefingAccessDenied(query.error),
+    missing,
+  });
 
   return (
     <View className="flex-1 bg-background">
@@ -135,23 +145,30 @@ export function BriefingDetailScreen() {
         showBackButton
         backFallback={BRIEFING_PATH as Href}
       />
-      {loading && (
+      {phase === 'loading' && (
         <View className={SCREEN_BODY_CLASS}>
           <Skeleton className="h-48 rounded-xl" />
           <Skeleton className="h-64 rounded-xl" />
         </View>
       )}
-      {failure && missing && <QueryError variant="not-found" />}
-      {failure && !missing && (
+      {/* The report aged out, was deleted, or lost its sources: the copy says so
+          and offers no retry that the server would answer with the same NOT_FOUND. */}
+      {phase === 'missing' && <QueryError variant="not-found" />}
+      {/* Connectivity pauses the first fetch instead of failing it, so the screen
+          says what it is waiting for and leaves recovery to the reconnect. */}
+      {phase === 'offline' && <QueryError variant="offline" title={t('offline.noInternet')} />}
+      {/* The server rejected this account's access, which no retry can change. */}
+      {phase === 'denied' && <QueryError variant="permission" />}
+      {phase === 'failed' && (
         <QueryError
           title={t('agentBriefing.loadError')}
-          variant={briefingAccessDenied(query.error) ? 'permission' : 'neutral'}
+          variant="neutral"
           onRetry={() => {
             void query.refetch();
           }}
         />
       )}
-      {report && (
+      {phase === 'ready' && report && (
         <ScrollView
           automaticallyAdjustKeyboardInsets
           contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-12')}

@@ -18,6 +18,7 @@ import {
   mapError,
   mapErrorKey,
   signupStepUpMessage,
+  type SignupStepUpSurface,
 } from '@/lib/auth/auth-error-messages';
 import { hasStringCode, postAuth, type PostAuthFailure } from '@/lib/auth/auth-fetch';
 import {
@@ -69,10 +70,15 @@ function ensureGoogleConfigured() {
  */
 async function tokenRefusalMessage(
   result: PostAuthFailure,
-  googleConfigured: boolean
+  googleConfigured: boolean,
+  surface: SignupStepUpSurface = 'sign-in'
 ): Promise<string> {
   if (result.errorCode !== 'SIGNUP-STEP-UP') {
     return mapError(result.errorCode);
+  }
+  if (surface === 'code') {
+    // No Apple, Google, or options control is on the code step to name.
+    return signupStepUpMessage(result.signupMethods, { apple: false, google: false }, 'code');
   }
   const apple =
     Platform.OS === 'ios' && (await AppleAuthentication.isAvailableAsync().catch(() => false));
@@ -494,7 +500,10 @@ export function useNativeAuth(binding?: PendingLinkBinding): NativeAuthResult {
           // active language right where the input is. A toast here was the
           // reported dead end — the screen kept its silence while the toast
           // could land behind the keyboard or expire unnoticed.
-          return { ok: false, message: await tokenRefusalMessage(result, googleConfigured) };
+          return {
+            ok: false,
+            message: await tokenRefusalMessage(result, googleConfigured, 'code'),
+          };
         }
         const parsed = parseTokenPair(result.data);
         if (!parsed) {

@@ -172,6 +172,7 @@
     "generating": "Generazione…",
     "working": "In corso",
     "yourOwnRepositories": "I tuoi repository",
+    "organizationRepositories": "Repository dell'organizzazione",
     "dismissed": "Ignorato",
     "agent": "Agente",
     "durationMinuteShort": "min",
@@ -636,7 +637,7 @@
     },
     "instructions": {
       "title": "Istruzioni personalizzate",
-      "deprecation": "È prevista la dismissione delle istruzioni personalizzate. Sposta queste indicazioni in un file REVIEW.md nel tuo repository.",
+      "deprecation": "Le istruzioni personalizzate verranno rimosse. Sposta queste indicazioni in un file REVIEW.md nel tuo repository.",
       "placeholder": "ad esempio: rispetto delle nostre convenzioni per la gestione degli errori…",
       "clearTitle": "Rimuovere le istruzioni personalizzate?",
       "clearMessage": "Se salvi un campo vuoto, elimini le istruzioni personalizzate memorizzate per questo revisore."
@@ -667,6 +668,7 @@
       "managedOnWeb": "La connessione Bitbucket per {{organization}} si gestisce sul web da un computer.",
       "description": "Crea un token di accesso all'area di lavoro per {{organization}} e incollalo qui sotto.",
       "descriptionReconnect": "Crea un nuovo token di accesso all'area di lavoro per {{organization}} e incollalo qui sotto.",
+      "descriptionOverview": "Crea un token di accesso all'area di lavoro per {{organization}} e incollalo nella schermata successiva.",
       "scopes": "Account: lettura · Repository: lettura/scrittura · Pull request: lettura · Webhook: lettura/scrittura",
       "tokenPlaceholder": "Token di accesso all'area di lavoro",
       "tokenRefused": "Bitbucket non ha accettato questo token dell'area di lavoro. Verifica che disponga delle autorizzazioni indicate sopra, quindi riprova."
@@ -2664,6 +2666,8 @@
     "retryHint": "Riprova a caricare lo stato di Kilo Pass.",
     "endedOn": "Terminato il {{date}}",
     "notAvailableInApp": "Kilo Pass non è disponibile nell'app.",
+    "notAvailableTitle": "Kilo Pass non è presente nell'app",
+    "noPassDescription": "Questo account non ha un Kilo Pass.",
     "statusActive": "Attivo",
     "statusTrialing": "In prova",
     "statusPastDue": "Pagamento scaduto",
@@ -3295,6 +3299,10 @@
     },
     "tabs": {
       "discussion": "Discussione",
+      "discussionAccessibility": "{{title}}: {{displayCount}} commenti",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} commenti",
+      "discussionAccessibility_one": "{{title}}: 1 commento",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} commenti",
       "files": "Documenti",
       "overview": "Panoramica"
     },
@@ -3484,8 +3492,7 @@
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Sotto {{amount}}",
-      "organizationSeats": "Posti dell'organizzazione",
-      "plan": "Piano dell'organizzazione",
+      "plan": "Piano",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Terminato",
@@ -3528,7 +3535,7 @@
       "retentionLimit": "Vengono mostrate le fatture più recenti."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Attiva l'avviso di saldo basso",
+      "subtitle": "Invia un avviso via email agli indirizzi indicati quando il saldo di questa organizzazione scende sotto l'importo impostato.",
       "notifyEmailsLabel": "Indirizzi email da avvisare",
       "permissionDenied": "Non hai l'autorizzazione per gestire gli avvisi di fatturazione.",
       "separateEmailsHint": "Separa gli indirizzi email con una virgola.",
@@ -3707,7 +3714,8 @@
     "signupStepUp": "Per completare la creazione del tuo account, usa \"$t(login.moreSignInOptions)\".",
     "signupStepUpApple": "Per completare la creazione del tuo account, usa \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "Per completare la creazione del tuo account, usa \"$t(login.signInWithGoogle)\".",
-    "invalidCode": "Il codice non è corretto. Riprova.",
+    "signupStepUpBack": "Per completare la creazione del tuo account, torna indietro e usa \"$t(login.moreSignInOptions)\".",
+    "invalidCode": "Il codice non è corretto o è scaduto. Riprova o usa \"$t(login.resendCode)\".",
     "codeInProgress": "Il tuo codice è in fase di elaborazione. Attendi un momento e riprova.",
     "tooManyAttempts": "Troppi tentativi. Richiedi un nuovo codice.",
     "invalidToken": "Accesso non riuscito. Riprova.",
@@ -3977,6 +3985,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) invia una breve richiesta di inferenza a questo indirizzo di accesso usando il protocollo e il modello selezionati. Il fornitore potrebbe addebitare un costo.",
       "connectionSucceeded": "Il modello ha completato una richiesta usando questo protocollo.",
       "connectionFailed": "Il modello non è riuscito a completare una richiesta. Controlla l'URL di base dell'API, il protocollo, le credenziali e l'ID del modello.",
+      "requestTimedOut": "L'indirizzo di accesso non ha risposto in tempo. Controlla l'URL di base dell'API e la tua connessione, poi riprova.",
+      "requestUnauthorized": "L'indirizzo di accesso ha rifiutato le credenziali. Controlla la chiave API e le intestazioni personalizzate, poi riprova.",
+      "requestNotFound": "L'indirizzo di accesso o il modello non è stato trovato. Controlla l'URL di base dell'API e l'ID del modello.",
+      "requestRateLimited": "L'indirizzo di accesso sta limitando le richieste. Attendi un momento e riprova.",
+      "requestUnavailable": "L'indirizzo di accesso non è disponibile in questo momento. Riprova tra un momento.",
+      "requestUnreachable": "Impossibile raggiungere l'indirizzo di accesso. Controlla l'URL di base dell'API e la tua connessione.",
+      "requestInvalidResponse": "L'indirizzo di accesso non ha risposto nel formato previsto. Controlla che l'URL di base dell'API e il protocollo corrispondano al server, poi riprova.",
+      "discoveryNoModels": "L'indirizzo di accesso non ha elencato alcun modello. Inserisci i modelli manualmente.",
+      "connectionIncomplete": "Il modello ha risposto ma non ha completato la richiesta. Riprova, oppure controlla l'ID del modello e il protocollo.",
       "invalidInput": "Inserisci un nome per il servizio, intestazioni valide e almeno un modello con ID e nome univoci. I limiti dei token devono essere numeri interi positivi.",
       "invalidUrl": "Inserisci un URL di base dell'API HTTP o HTTPS senza credenziali, parametri di ricerca o un frammento.",
       "publicHttp": "Gli indirizzi di accesso HTTP pubblici non sono consentiti. Usa HTTPS o un indirizzo di accesso locale privato.",
@@ -4115,7 +4132,11 @@
     "reasoningEffort": {
       "modelFlag": "Questo modello supporta il livello di ragionamento"
     },
-    "creditsRequired": "Crediti insufficienti per inviare questo messaggio."
+    "creditsRequired": "Crediti insufficienti per inviare questo messaggio.",
+    "providerKeyRefused": "Il fornitore ha rifiutato le credenziali. Controlla la sua chiave API, poi invia di nuovo.",
+    "providerModelMissing": "Questo servizio non fornisce più questo modello. Scegli un altro.",
+    "providerRateLimited": "Il fornitore sta limitando le richieste. Attendi un momento e invia di nuovo.",
+    "providerUnavailable": "Il fornitore non è disponibile in questo momento. Invia di nuovo a breve."
   },
   "settingsTools": {
     "confirmTitle": "Confermare questa modifica?"
@@ -4496,6 +4517,7 @@
     "pickPackToBuyAgain": "Scegli un pacchetto qui sopra per avviare un nuovo acquisto.",
     "purchasePending": "Lo store sta ancora elaborando questo pagamento. I tuoi crediti arriveranno non appena approverà l'addebito.",
     "buyAgain": "Acquista di nuovo",
+    "checkPurchase": "Verifica l'acquisto",
     "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
     "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."
   },
@@ -4593,7 +4615,9 @@
     },
     "saveSheet": {
       "title": "Salva nell'elenco",
-      "saved": "Salvato in {{list}}"
+      "saved": "Salvato in {{list}}",
+      "saveFailed": "Impossibile salvare l’attività. Controlla la connessione e riprova.",
+      "saveRefused": "Impossibile salvare l’attività in questo elenco. Scegli un altro elenco."
     }
   },
   "agentBriefing": {
@@ -4605,6 +4629,7 @@
     "empty": "Nessuna attività in questa finestra di briefing",
     "emptyHint": "Le tue sessioni di coding cloud e CLI appaiono qui quando un briefing programmato ha attività.",
     "loadError": "Impossibile caricare i briefing",
+    "estimateLoadError": "Impossibile caricare la stima.",
     "view": "Leggi briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5014,7 +5039,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funzionalità aziendale",
-    "enterpriseOnly": "Questa è una funzionalità riservata alle aziende.",
+    "enterpriseOnly": "Fornitori e modelli sono disponibili con il piano Enterprise.",
     "readOnly": "Solo i proprietari e gli amministratori dell'organizzazione possono modificare queste impostazioni.",
     "loadError": "Impossibile caricare fornitori e modelli",
     "tabModels": "Modelli",

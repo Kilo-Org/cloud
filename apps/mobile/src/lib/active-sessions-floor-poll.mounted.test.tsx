@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type CachedActiveSessionsData } from '@/lib/active-sessions-live';
 import { useActiveSessionsFloorPoll } from '@/lib/active-sessions-floor-poll';
+import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 
 const state = vi.hoisted(() => ({
   authEpoch: 0,
@@ -278,6 +279,40 @@ describe('useActiveSessionsFloorPoll', () => {
     expect(events).toHaveLength(0);
     expect(client.getQueryData(QUERY_KEY)).toEqual(payload('a', 'running'));
     unsubscribe();
+  });
+
+  it('hands a refused session credential to the auth handler, as a query 401 does', async () => {
+    client.setQueryData(QUERY_KEY, payload('a', 'running'));
+    const unauthorized = Object.assign(new Error('UNAUTHORIZED'), {
+      data: { code: 'UNAUTHORIZED', httpStatus: 401, authRequired: true },
+    });
+    const queryFn = vi.fn<QueryFn>().mockRejectedValue(unauthorized);
+    const handler = vi.fn<() => void>();
+    const release = setTrpcUnauthorizedHandler(handler);
+    try {
+      await render({ enabled: true, visible: true, connected: true, queryFn });
+      await advanceBy(30_000);
+      expect(queryFn).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(client.getQueryData(QUERY_KEY)).toEqual(payload('a', 'running'));
+    } finally {
+      release();
+    }
+  });
+
+  it('does not hand an ordinary poll failure to the auth handler', async () => {
+    client.setQueryData(QUERY_KEY, payload('a', 'running'));
+    const queryFn = vi.fn<QueryFn>().mockRejectedValue(new Error('offline'));
+    const handler = vi.fn<() => void>();
+    const release = setTrpcUnauthorizedHandler(handler);
+    try {
+      await render({ enabled: true, visible: true, connected: true, queryFn });
+      await advanceBy(30_000);
+      expect(queryFn).toHaveBeenCalledTimes(1);
+      expect(handler).not.toHaveBeenCalled();
+    } finally {
+      release();
+    }
   });
 
   it('never overwrites a payload a writer landed while the poll was in flight', async () => {

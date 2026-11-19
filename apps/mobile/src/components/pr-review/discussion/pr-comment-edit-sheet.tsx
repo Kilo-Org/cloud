@@ -83,7 +83,7 @@ export function PrCommentEditSheet({
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<PrInlineFailure>();
 
   const isSubmitting = feedback.status === 'pending';
-  // Cancel must stay live while only the pre-submit Terms gate is in flight.
+  // Close must stay live while only the pre-submit Terms gate is in flight.
   const [awaitingGate, setAwaitingGate] = useState(false);
   const dismissalLocked = isSubmitting && !awaitingGate;
   // The attempt admitted for a submit whose Terms gate is still running.
@@ -128,7 +128,7 @@ export function PrCommentEditSheet({
     }
     // Confirmed offline: fail the submit at once with the retryable copy
     // instead of starting a write React Query pauses, which leaves an
-    // indefinite spinner with a disabled Cancel and no explanation behind the
+    // indefinite spinner with a locked Close and no explanation behind the
     // full-height sheet (ux1 spot check, e6-offline-hang). The edited body
     // stays intact, nothing is pending, and the same tap retries once the
     // banner clears. A local rejection with no toast owner, so it announces
@@ -272,15 +272,6 @@ export function PrCommentEditSheet({
             accessibilityLabel={t('common.save')}
           >
             <Text>{t('common.save')}</Text>
-          </Button>
-          <Button
-            variant="ghost"
-            onPress={handleCancel}
-            disabled={dismissalLocked}
-            className="mt-2"
-            accessibilityLabel={t('common.cancel')}
-          >
-            <Text>{t('common.cancel')}</Text>
           </Button>
         </PrFormSheetFooter>
       </ScrollView>

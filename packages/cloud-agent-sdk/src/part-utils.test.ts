@@ -259,6 +259,16 @@ describe('partSettledAt', () => {
     expect(partSettledAt({ ...missing, state: [] } as unknown as Part)).toBeUndefined();
   });
 
+  // A replay hands a stored page's rows to this seam with no event schema in
+  // front of them, so a page can carry a null entry where a part belongs. The
+  // per-event replay boundary reports that entry; this read must not throw
+  // before the report can happen.
+  it('returns undefined for a page entry that is not a part at all', () => {
+    expect(partSettledAt(null as unknown as Part)).toBeUndefined();
+    expect(partSettledAt(undefined as unknown as Part)).toBeUndefined();
+    expect(partSettledAt('text' as unknown as Part)).toBeUndefined();
+  });
+
   it('returns undefined when the settle time is not a number', () => {
     const part = settledToolPart('completed') as unknown as { state: { time: unknown } };
     part.state.time = { start: 1, end: 'later' };

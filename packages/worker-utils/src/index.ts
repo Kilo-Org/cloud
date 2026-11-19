@@ -181,6 +181,8 @@ export { normalizeGitUrl } from './normalize-git-url.js';
 
 export { chunkArray } from './chunk-array.js';
 
+export { webUrlHost } from './web-url-host.js';
+
 export { deriveCallbackToken, verifyCallbackToken } from './callback-token.js';
 export type { CallbackTokenParams, VerifyCallbackTokenParams } from './callback-token.js';
 

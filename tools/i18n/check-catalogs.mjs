@@ -19,12 +19,13 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
 import {
+  catalogEntryKind,
   catalogTags,
   countPlaceholderBases,
   flattenCatalog,
@@ -1410,22 +1411,14 @@ function checkCatalogMembership({ catalogName, tags, present, dir }) {
 /**
  * The `.json`-named entries of `dir` that are not regular files, sorted.
  *
- * The same stat-based definition `catalogTags` filters by, so an entry can
- * never fall out of one set without a line in the other: a directory named
- * like a catalog and a symlink the filesystem cannot follow are named here.
+ * Deliberately different from the tag set `catalogTags` builds: this names
+ * 'unreadable' and 'other' entries, while the tag set keeps 'file' and
+ * 'unreadable'. So a directory named like a catalog is reported here instead
+ * of vanishing from `present` without a trace.
  */
 function nonFileCatalogEntries(dir) {
   return readdirSync(dir, { withFileTypes: true })
-    .filter(entry => {
-      if (!entry.name.endsWith('.json')) {
-        return false;
-      }
-      try {
-        return !statSync(join(dir, entry.name)).isFile();
-      } catch {
-        return true;
-      }
-    })
+    .filter(entry => entry.name.endsWith('.json') && catalogEntryKind(dir, entry.name) !== 'file')
     .map(entry => entry.name.replace(/\.json$/, ''))
     .sort();
 }

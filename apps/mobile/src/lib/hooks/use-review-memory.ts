@@ -3,9 +3,20 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { type ProposalDraft } from '@/lib/review-memory-proposals';
-import { knownServerErrorMessage } from '@/lib/server-error-copy';
+import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
+import {
+  type TrialRefusalAction,
+  useBillingAction,
+  useCanManageBilling,
+} from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+
+/** The organization a scope's requests are made against, if any. */
+export function reviewMemoryOrganizationId(scope: string): string | undefined {
+  return scope === PERSONAL_SCOPE ? undefined : scope;
+}
 
 // Review memory only exists for GitHub, so the owner input pins the platform
 // and only varies the scope segment (personal vs. an organization id).
@@ -15,10 +26,30 @@ export function reviewMemoryOwnerInput(scope: string) {
     : { organizationId: scope, platform: 'github' as const };
 }
 
+/**
+ * Reports a rejected review-memory action with the explanation its reader
+ * gets. The organization subscription gate refuses these mutations too, so a
+ * billing role gets copy that offers the plan step and the step itself, while
+ * every other rejection keeps the plain toast.
+ */
+function announceRefusal(
+  error: unknown,
+  canManageBilling: boolean,
+  action: TrialRefusalAction | undefined
+) {
+  announceTrialRefusal(
+    knownServerErrorMessage(error, canManageBilling) ?? i18n.t('common.somethingWentWrong'),
+    action,
+    isTrialExpiredRefusal(error)
+  );
+}
+
 export function useSetReviewMemoryEnabled(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const ownerInput = reviewMemoryOwnerInput(scope);
+  const canManageBilling = useCanManageBilling(reviewMemoryOrganizationId(scope));
+  const billingAction = useBillingAction(reviewMemoryOrganizationId(scope));
 
   return useMutation({
     // Reachability is the switch's outcome, not a precondition: the default
@@ -46,7 +77,7 @@ export function useSetReviewMemoryEnabled(scope: string) {
       });
     },
     onError: error => {
-      announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong'));
+      announceRefusal(error, canManageBilling, billingAction);
     },
   });
 }
@@ -61,6 +92,8 @@ export function useTriggerReviewMemoryAnalysis(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const ownerInput = reviewMemoryOwnerInput(scope);
+  const canManageBilling = useCanManageBilling(reviewMemoryOrganizationId(scope));
+  const billingAction = useBillingAction(reviewMemoryOrganizationId(scope));
 
   return useMutation({
     // Reachability is the run's outcome, not a precondition: the default
@@ -85,7 +118,7 @@ export function useTriggerReviewMemoryAnalysis(scope: string) {
       announcingToast.success(i18n.t(outcomeKey));
     },
     onError: error => {
-      announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong'));
+      announceRefusal(error, canManageBilling, billingAction);
     },
     onSettled: async () => {
       await Promise.all([
@@ -102,8 +135,10 @@ export function useReviewMemoryProposalActions(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const ownerInput = reviewMemoryOwnerInput(scope);
+  const canManageBilling = useCanManageBilling(reviewMemoryOrganizationId(scope));
+  const billingAction = useBillingAction(reviewMemoryOrganizationId(scope));
   const onError = (error: unknown) => {
-    announcingToast.error(knownServerErrorMessage(error) ?? i18n.t('common.somethingWentWrong'));
+    announceRefusal(error, canManageBilling, billingAction);
   };
   const onSettled = async () => {
     await Promise.all([

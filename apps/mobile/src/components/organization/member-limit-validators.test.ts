@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { limitError, saveErrorCopy } from '@/components/organization/member-limit-validators';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 const max = formatNumber(2000, i18n.language);
 const rangeMessage = i18n.t('organization.memberLimit.rangeError', { max });
@@ -68,5 +69,20 @@ describe('saveErrorCopy', () => {
     expect(
       saveErrorCopy(Object.assign(new Error('boom'), { data: { code: 'FORBIDDEN' } }))
     ).toEqual(generic);
+  });
+
+  it('gives a billing role the plan refusal that offers the step', () => {
+    const error = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+    });
+    expect(saveErrorCopy(error, true)).toEqual({
+      field: 'form',
+      message: i18n.t('common.organizationTrialEndedBilling'),
+    });
+    // The reader who cannot change the plan keeps the copy that names the owner.
+    expect(saveErrorCopy(error, false)).toEqual({
+      field: 'form',
+      message: i18n.t('common.organizationTrialEnded'),
+    });
   });
 });

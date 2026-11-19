@@ -122,9 +122,7 @@ export function parseSourceEntry(dir, root, file, text) {
 
 /**
  * Every source file below `dir`, read and parsed once, one file at a time, each
- * as one `parseSourceEntry`: its absolute path `file`, the normalised path
- * `path` a diagnostic names it by, its `text`, its syntax tree `program`, the
- * `lineOf` lookup, and one `problems` line per parse error.
+ * as one `parseSourceEntry`.
  *
  * The walk is a generator, so a caller's `for … of` holds one file's text and
  * one syntax tree at a time and peak memory does not grow with the tree.
@@ -138,10 +136,6 @@ export function parseSourceEntry(dir, root, file, text) {
  * the path and the error, and the walk continues. An audit must report a file
  * it could not read rather than drop it, and one refusal must not discard the
  * findings the walk already collected.
- *
- * Paths are named from `root`. A file outside it — a fixture tree in a
- * temporary directory — is named from `dir`, so it still reads from its own
- * root.
  */
 export function* parseSourceTree(dir, root, skip) {
   for (const file of sourceFiles(dir, skip)) {

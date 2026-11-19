@@ -518,7 +518,7 @@ describe('browser-tool-page-actions', () => {
         }
       );
 
-      // Index 1 of the agent list is tab 3; index 1 of every browser tab is the user's tab 2.
+      // The agent list holds tabs 2 and 3, so its index 1 is tab 3 — not the browser's index 1, which is tab 2.
       expect(tabs.updates).toStrictEqual([{ active: true, tabId: 3 }]);
       expect(result).toStrictEqual({
         ok: true,

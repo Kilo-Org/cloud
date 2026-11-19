@@ -42,11 +42,19 @@ const grant = (origin: string) => [
   { class: 'read', origin },
 ];
 
-/** How many tabs the browser holds, from a `browser_tabs list` answer: the same count is how "no second tab" shows. */
+/**
+ * How many tabs the browser holds, from a `browser_tabs list` answer: the same
+ * count is how "no second tab" shows. An agent reads the text shape Playwright
+ * MCP prints, one `- N: [title](url)` line per tab.
+ */
 const listedTabCount = (answer: LocalAgentToolResponse): number => {
-  const parsed: unknown = JSON.parse(answer.kind === 'result' ? answer.text : '{"tabs":[]}');
+  if (answer.kind !== 'result') {
+    return 0;
+  }
 
-  return z.object({ tabs: z.array(z.record(z.string(), z.unknown())) }).parse(parsed).tabs.length;
+  return answer.text
+    .split('\n')
+    .filter(line => /^- \d+: (?:\(current\) )?\[.*\]\(.*\)$/u.test(line.trim())).length;
 };
 
 const permissionItemSchema = z.object({

@@ -35,9 +35,29 @@ const grant = (origin: string) => [
   { class: 'read', origin },
 ];
 
-const tabRowsSchema = z.object({
-  tabs: z.array(z.object({ index: z.number(), selected: z.boolean(), url: z.string() })),
-});
+/** One line of the list Playwright MCP prints: `- 0: (current) [Title](url)`. */
+const tabLinePattern = /^- (\d+): (?:\(current\) )?\[(?<title>.*)\]\((?<url>.*)\)$/u;
+
+/**
+ * The tabs an agent's `browser_tabs list` reported, as index/selected/url rows.
+ * A CLI agent reads the text shape Playwright MCP prints (one `- N: …` line per
+ * tab); the panel's JSON object is not what the bridge hands the model.
+ */
+const parseTabRows = (text: string) =>
+  text.split('\n').flatMap(line => {
+    const match = tabLinePattern.exec(line.trim());
+
+    return match?.groups === undefined
+      ? []
+      : [
+          {
+            index: Number(match[1]),
+            // The (current) marker is the only select state the text carries.
+            selected: match[0].includes('(current)'),
+            url: match.groups['url'] ?? '',
+          },
+        ];
+  });
 
 const listTabs = async (
   callTool: (
@@ -53,7 +73,7 @@ const listTabs = async (
     throw new Error(`browser_tabs list failed: ${JSON.stringify(listed)}`);
   }
 
-  return tabRowsSchema.parse(JSON.parse(listed.text));
+  return { tabs: parseTabRows(listed.text) };
 };
 
 /** Every open tab with its url and focus state, read from the extension page. */
@@ -189,13 +209,27 @@ test('an agent session drives its tab through the runtime and Stop all ends it',
     expect(unownedTabId).toBeGreaterThan(0);
 
     const before = await listTabs(session.callTool, grants);
-    const outside = before.tabs.find(row => row.url.includes('other=1'));
-    expect(outside).toBeDefined();
-    expect(outside?.selected).toBe(false);
+    // The list reports only the session's own tab: the user's tabs are neither listed nor counted.
+    expect(before.tabs.find(row => row.url.includes('other=1'))).toBeUndefined();
+    expect(before.tabs.map(row => row.index)).toStrictEqual(
+      before.tabs.map((_row, position) => position)
+    );
+    expect(before.tabs.some(row => row.url.includes(hub.pageUrl))).toBe(true);
+
+    // The position the outside tab holds among the browser's inspectable tabs is past the agent's list.
+    const inspectableTabIds = z
+      .array(z.number())
+      .parse(
+        await sidePanel.evaluate(
+          "chrome.tabs.query({}).then(tabs => tabs.filter(tab => /^https?:/.test(tab.url || '')).map(tab => tab.id))"
+        )
+      );
+    const outsideIndex = inspectableTabIds.indexOf(unownedTabId);
+    expect(outsideIndex).toBeGreaterThanOrEqual(before.tabs.length);
 
     const refused = await session.callTool(
       'browser_tabs',
-      { action: 'select', index: outside?.index },
+      { action: 'select', index: outsideIndex },
       grants
     );
     // A D9 refusal is `blocked` (-32011) for the CLI, not a tool error.

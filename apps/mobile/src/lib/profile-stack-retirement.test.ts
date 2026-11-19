@@ -33,12 +33,7 @@ describe('takeRetirableProfileRoutes', () => {
 
     const next = takeRetirableProfileRoutes({ routes, index: 4, stack: STACK, now: NOW });
 
-    expect(next?.routes.map(entry => entry.key)).toEqual([
-      'root',
-      'list',
-      'overview',
-      'rebuilt',
-    ]);
+    expect(next?.routes.map(entry => entry.key)).toEqual(['root', 'list', 'overview', 'rebuilt']);
     expect(next?.index).toBe(3);
   });
 
@@ -66,10 +61,7 @@ describe('takeRetirableProfileRoutes', () => {
     // The focused route is a rebuilt copy of ANOTHER profile screen: the
     // original being tracked must stay until its own rebuilt copy lands.
     notePendingProfileRetirement({ key: 'orig', stack: STACK, selfName: SECTION, now: NOW });
-    const routes = [
-      route('orig', SECTION),
-      route('skills-rebuilt', 'profiles/[profileId]/skills'),
-    ];
+    const routes = [route('orig', SECTION), route('skills-rebuilt', 'profiles/[profileId]/skills')];
 
     expect(takeRetirableProfileRoutes({ routes, index: 1, stack: STACK, now: NOW })).toBeNull();
   });

@@ -196,8 +196,14 @@ export function createAndroidDevice(options: {
     tap: (xPx, yPx) => {
       shell('input', 'tap', String(Math.round(xPx)), String(Math.round(yPx)));
     },
+    // The tree rules judge the accessibility-important tree, so the snapshot has
+    // to be the one a screen reader reads: a plain dump registers UiAutomation
+    // with FLAG_INCLUDE_NOT_IMPORTANT_VIEWS and so lists every subtree the app
+    // hid with `accessibilityElementsHidden`/`no-hide-descendants`, which makes a
+    // correctly covered scene (a formSheet over a screen) look present in the
+    // archive. `--compressed` drops those nodes.
     uiSnapshot: () => {
-      shell('uiautomator', 'dump', REMOTE_UI_XML);
+      shell('uiautomator', 'dump', '--compressed', REMOTE_UI_XML);
       const xml = adb(['exec-out', 'cat', REMOTE_UI_XML]).toString();
       optionalShell('rm', '-f', REMOTE_UI_XML);
       const fontScale = Number(shell('settings', 'get', 'system', 'font_scale'));

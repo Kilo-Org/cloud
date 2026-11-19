@@ -163,6 +163,47 @@ test('recording stop signals only its remote PID, is idempotent, and cleans up a
   assert.ok(cleanup?.includes(video));
 });
 
+test('uiSnapshot dumps the accessibility-important tree, not the raw one', () => {
+  const xml = `<hierarchy rotation="0"><node class="android.widget.TextView" bounds="[0,0][10,10]" /></hierarchy>`;
+  const { exec, commands } = fakeAdb({
+    'shell wm density': 'Physical density: 420\n',
+    'shell wm size': 'Physical size: 1080x2400\n',
+    'shell cmd uimode night': 'Night mode: yes\n',
+    'shell settings get system accelerometer_rotation': '0\n',
+    'shell settings get system user_rotation': '0\n',
+    'exec-out cat /sdcard/design-gate-ui.xml': xml,
+    'shell settings get system font_scale': '1.15\n',
+    'shell getprop persist.sys.locale': 'fa-IR\n',
+    'shell getprop ro.build.version.release': '16\n',
+  });
+  const device = createAndroidDevice({
+    exec,
+    spawn: () => ({ signal: () => undefined, exited: Promise.resolve(0) }),
+    serial: 'emulator-5554',
+    metroPort: 8081,
+  });
+  const setup = commands.length;
+  const snapshot = device.uiSnapshot?.();
+  // A plain dump includes subtrees the app removed from accessibility
+  // (no-hide-descendants), so a scene covered by a sheet would read as present.
+  assert.deepEqual(commands.slice(setup), [
+    'adb -s emulator-5554 shell uiautomator dump --compressed /sdcard/design-gate-ui.xml',
+    'adb -s emulator-5554 exec-out cat /sdcard/design-gate-ui.xml',
+    'adb -s emulator-5554 shell rm -f /sdcard/design-gate-ui.xml',
+    'adb -s emulator-5554 shell settings get system font_scale',
+    'adb -s emulator-5554 shell getprop persist.sys.locale',
+    'adb -s emulator-5554 shell getprop ro.build.version.release',
+  ]);
+  assert.deepEqual(snapshot, {
+    xml,
+    densityDpi: 420,
+    fontScale: 1.15,
+    colorScheme: 'dark',
+    language: 'fa-IR',
+    osVersion: '16',
+  });
+});
+
 test('relaunch restores the reverse tunnel and the dev-client link of its own Metro', () => {
   const { exec, commands } = fakeAdb({
     'shell wm density': 'Physical density: 420\n',

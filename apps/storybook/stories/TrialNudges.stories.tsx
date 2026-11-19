@@ -36,6 +36,7 @@ export const InteractiveTrialExpirationExample: Story = {
                 <FreeTrialWarningBanner
                   organization={{ ...mockOrganization, plan: 'enterprise' }}
                   daysRemaining={daysRemaining}
+                  hasTrialWindow
                   userRole={isOwner ? 'owner' : 'member'}
                   onUpgradeClick={() => setShowUpgradeDialog(true)}
                 />
@@ -45,6 +46,7 @@ export const InteractiveTrialExpirationExample: Story = {
                   <FreeTrialWarningDialog
                     trialStatus={state}
                     daysExpired={Math.abs(daysRemaining)}
+                    hasTrialWindow
                     organization={mockOrganization}
                     onClose={
                       state === 'trial_expired_soft'

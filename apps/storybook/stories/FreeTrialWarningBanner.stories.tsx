@@ -8,6 +8,9 @@ const meta: Meta<typeof FreeTrialWarningBanner> = {
   parameters: {
     layout: 'padded',
   },
+  args: {
+    hasTrialWindow: true,
+  },
 };
 
 export default meta;

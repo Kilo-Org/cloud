@@ -8,6 +8,9 @@ const meta: Meta<typeof FreeTrialWarningDialog> = {
   parameters: {
     layout: 'centered',
   },
+  args: {
+    hasTrialWindow: true,
+  },
 };
 
 export default meta;

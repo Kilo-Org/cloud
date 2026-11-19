@@ -50,7 +50,7 @@ describe('isByokServableCatalogModelId', () => {
   });
 
   test.each([
-    ['an id outside the catalog', 'vendor/retired'],
+    ['a retired id', 'vendor/retired'],
     ['a free model', 'vendor/model:free'],
     ['the auto small free model', AUTO_SMALL_TARGET_MODELS.free],
   ])('never serves %s', async (_name, modelId) => {

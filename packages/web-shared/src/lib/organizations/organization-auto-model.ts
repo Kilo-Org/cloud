@@ -225,15 +225,21 @@ export async function validateOrganizationAutoTarget(
     isEndpointTarget ? getByokEndpointProviders(await loadEnabledKeys()) : undefined
   );
   if (directByokTarget.provider && directByokTarget.model) {
-    const { provider, model } = directByokTarget;
-    const key = (await loadEnabledKeys()).find(candidate => candidate.providerId === provider.id);
+    const key = (await loadEnabledKeys()).find(
+      candidate => candidate.providerId === directByokTarget.provider?.id
+    );
     if (!key) {
       return {
         kind: 'error',
-        message: `Organization Auto route target '${targetModelId}' is unavailable because this organization does not have an enabled BYOK credential for ${provider.id}.`,
+        message: `Organization Auto route target '${targetModelId}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`,
       };
     }
-    if (options.apiKind && !getDirectByokModelChatApis(provider, model).includes(options.apiKind)) {
+    if (
+      options.apiKind &&
+      !getDirectByokModelChatApis(directByokTarget.provider, directByokTarget.model).includes(
+        options.apiKind
+      )
+    ) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
@@ -241,17 +247,20 @@ export async function validateOrganizationAutoTarget(
     }
     // A catalog-mode key serves the model only under its catalog id, which organization model and
     // provider policies cover, so a stored bespoke target resolves to that id.
-    if (key.serveCatalogModels && supportsCatalogMode(provider)) {
-      const catalogModelId = await getDirectByokCatalogModelId(model);
+    if (key.serveCatalogModels && supportsCatalogMode(directByokTarget.provider)) {
+      const catalogModelId = await getDirectByokCatalogModelId(directByokTarget.model);
       if (!catalogModelId) {
         return {
           kind: 'error',
-          message: `Organization Auto route target '${targetModelId}' is unavailable because this organization's ${getDirectByokKeyLabel(provider)} uses Kilo catalog model IDs and this model has no catalog ID.`,
+          message: `Organization Auto route target '${targetModelId}' is unavailable because this organization's ${getDirectByokKeyLabel(directByokTarget.provider)} uses Kilo catalog model IDs and this model has no catalog ID.`,
         };
       }
       return validateOrganizationAutoTarget(organization, catalogModelId, options);
     }
-    return { kind: 'ok', modelId: formatDirectByokModelId(provider, model) };
+    return {
+      kind: 'ok',
+      modelId: formatDirectByokModelId(directByokTarget.provider, directByokTarget.model),
+    };
   }
   if (isEndpointTarget) {
     return {

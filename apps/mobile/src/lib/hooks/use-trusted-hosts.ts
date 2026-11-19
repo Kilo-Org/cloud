@@ -24,8 +24,8 @@ export function parseTrustedHosts(raw: string | null): string[] {
   }
 }
 
-// A JSON string array of host keys (lowercased hostname plus a non-default
-// port). Empty default: nothing is trusted until the user opts in.
+// A JSON string array of host keys. Empty default: nothing is trusted until the
+// user opts in.
 const store = createSecureStorePreference<string[]>({
   key: TRUSTED_HOSTS_KEY,
   defaultValue: [],

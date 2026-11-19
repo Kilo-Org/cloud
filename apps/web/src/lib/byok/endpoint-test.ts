@@ -39,7 +39,9 @@ function testRequest(
   }
 }
 
-export type ByokEndpointTestResult = { success: boolean; message: string };
+export type ByokEndpointTestResult =
+  | { outcome: 'ok'; provider: string; model: string }
+  | { outcome: 'failed'; detail: string };
 
 /**
  * Sends a tiny prompt to one model of the endpoint over the API clients use for it, transformed
@@ -65,13 +67,10 @@ export async function testByokEndpoint({
   const models = await provider.models();
   const model = modelId ? models.find(candidate => candidate.id === modelId) : models[0];
   const name = provider.organization_endpoint?.name ?? provider.id;
-  if (!model) return { success: false, message: `Endpoint ${name} has no model ${modelId}.` };
+  if (!model) return { outcome: 'failed', detail: `Endpoint ${name} has no model ${modelId}.` };
   const credentials = parseByokEndpointCredentials(credential);
   if (!credentials) {
-    return {
-      success: false,
-      message: 'API key test failed: the stored endpoint configuration is invalid.',
-    };
+    return { outcome: 'failed', detail: 'the stored endpoint configuration is invalid.' };
   }
 
   // An endpoint names the API clients use for each model; Chat Completions is the default.
@@ -116,18 +115,12 @@ export async function testByokEndpoint({
       response = await send('max_completion_tokens');
     }
     if (!response.ok) {
-      return {
-        success: false,
-        message: `API key test failed: ${describeByokEndpointError(response)}`,
-      };
+      return { outcome: 'failed', detail: describeByokEndpointError(response) };
     }
-    return {
-      success: true,
-      message: `API key test success. Endpoint: ${name}. Model: ${model.id}.`,
-    };
+    return { outcome: 'ok', provider: name, model: model.id };
   } catch (error) {
     if (error instanceof ByokEndpointRequestError) {
-      return { success: false, message: `API key test failed: ${error.message}` };
+      return { outcome: 'failed', detail: error.message };
     }
     throw error;
   }

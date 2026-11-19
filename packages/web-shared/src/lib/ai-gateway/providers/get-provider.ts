@@ -573,13 +573,9 @@ async function selectProvider(
 
   const resolveKey = async (step: KeyPlanStep): Promise<ProviderRoute> => {
     const credential = await decryptKey(step);
-    switch (step.route) {
-      case 'direct-byok':
-        return directByokRoute(step.provider, step.model, credential, request, true);
-      case 'vercel-byok':
-      case 'gateway-byok':
-        return gatewayRoutedByokRoute(step, credential, requestedModel);
-    }
+    return step.route === 'direct-byok'
+      ? directByokRoute(step.provider, step.model, credential, request, true)
+      : gatewayRoutedByokRoute(step, credential, requestedModel);
   };
 
   /** The serving keys after `planIndex`, then the key the request ignores. */

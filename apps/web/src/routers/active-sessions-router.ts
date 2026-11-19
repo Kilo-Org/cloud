@@ -95,7 +95,8 @@ const listInputSchema = z
  * expiry from the worker body.
  *
  * Only a missing worker URL is PRECONDITION_FAILED. A worker that cannot be
- * reached or does not answer inside the budget is SERVICE_UNAVAILABLE; a
+ * reached, or does not answer inside the budget, is SERVICE_UNAVAILABLE. A
+ * mint response with status 503 or 504 is also SERVICE_UNAVAILABLE. Any other
  * non-2xx or malformed mint response is BAD_GATEWAY.
  */
 async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt: number }> {

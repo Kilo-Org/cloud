@@ -34,10 +34,8 @@ const NOT_RECORDED = Symbol('notificationHistory.notRecorded');
 /** Resolve the settings category that gates one push kind. */
 type PushHistoryRule = (data: PushData) => NotificationHistoryCategory | null;
 
-/** A rule for a recorded kind, or the sentinel for a kind that is not recorded. */
 type PushHistoryDecision = PushHistoryRule | typeof NOT_RECORDED;
 
-/** One decision per push kind, keyed by kind. */
 type PushHistoryDecisions = Record<PushData['type'], PushHistoryDecision>;
 
 /**

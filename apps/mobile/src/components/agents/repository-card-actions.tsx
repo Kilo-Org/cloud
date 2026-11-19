@@ -6,6 +6,7 @@ import { ExternalLink, RefreshCw } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { providerLabelKey } from '@/lib/integrations/provider-catalog';
 import {
   PROVIDER_COPY,
   providerNeedsAttentionCopy,
@@ -54,6 +55,25 @@ export function RepositoryRefreshButton({
 }
 
 /**
+ * The accessible name of a provider's action. The visible label can be a bare
+ * verb ("Connect" under a card title that already names the provider), so the
+ * name adds the provider only when the label does not carry it: a label that
+ * already reads "Open GitHub" must not announce GitHub a second time. Brand
+ * names are not translated, so the comparison is case-insensitive and safe in
+ * every catalog.
+ */
+export function repositoryActionAccessibleLabel(input: {
+  action: string;
+  provider: string;
+  joiner: string;
+}): string {
+  const { action, provider, joiner } = input;
+  return action.toLocaleLowerCase().includes(provider.toLocaleLowerCase())
+    ? action
+    : [action, provider].join(joiner);
+}
+
+/**
  * The provider's open action plus its refresh. `labelKey` overrides the label a
  * provider would show by default; the open label already reads as the action
  * the card asks for.
@@ -68,6 +88,13 @@ export function RepositoryActionRow({
 }: RepositoryCardActionsProps & { labelKey: string }) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  // A screen-reader user swiping controls hears which provider each one opens.
+  // The name repeats the provider only when the visible label leaves it out.
+  const accessibilityLabel = repositoryActionAccessibleLabel({
+    action: t(labelKey),
+    provider: t(providerLabelKey(platform)),
+    joiner: t('common.sentenceJoiner'),
+  });
   // The label takes the row's remaining width and is pinned to one line: a
   // label sized to its own content is measured at its longest word's width and
   // wraps onto a second line the button's min height then clips. The logical
@@ -82,6 +109,7 @@ export function RepositoryActionRow({
         onPress={() => {
           onConnect(platform);
         }}
+        accessibilityLabel={accessibilityLabel}
         // `loading` paints the spinner over the label, so the row keeps exactly
         // its width while the connect flow runs.
         disabled={isConnecting}

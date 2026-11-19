@@ -18,6 +18,7 @@ import {
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
+import { type TrialRefusalAction } from '@/lib/trial-refusal';
 
 /**
  * The New session screen body's contract, extracted beside the component so the
@@ -144,6 +145,13 @@ export type NewSessionConfigureFormProps = {
    * from the fields below it, and Start is disabled while it is shown.
    */
   planRefusal?: string | null;
+  /**
+   * The step the plan refusal offers, or omitted when its reader can only name
+   * the person who can end the state. The caller owns the role read (the body
+   * asks `useTrialRefusalAction`), so this form renders the reader it is handed
+   * and a fixture can paint either one.
+   */
+  planRefusalAction?: TrialRefusalAction;
   /** The remote spawn's settled or timed-out failure, or null before one. */
   remoteSpawnFailure?: RemoteSpawnFailure | null;
   /** Re-runs the remote spawn with the same draft (the retryable recovery). */

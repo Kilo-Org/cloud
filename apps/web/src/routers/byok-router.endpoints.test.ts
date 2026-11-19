@@ -209,7 +209,7 @@ describe('BYOK endpoints', () => {
       ).resolves.toMatchObject({ is_enabled: false });
       await expect(
         caller.byok.testApiKey({ organizationId: organization.id, id: created.id })
-      ).resolves.toMatchObject({ success: true });
+      ).resolves.toMatchObject({ outcome: 'ok' });
       await expect(
         caller.byok.delete({ organizationId: organization.id, id: created.id })
       ).resolves.toEqual({ success: true });
@@ -680,8 +680,11 @@ describe('BYOK endpoints', () => {
       await expect(
         caller.byok.testApiKey({ organizationId: organization.id, id: created.id })
       ).resolves.toEqual({
+        outcome: 'ok',
+        provider: 'Internal gateway',
+        model: 'my-model',
         success: true,
-        message: 'API key test success. Endpoint: Internal gateway. Model: my-model.',
+        message: 'API key test success. Provider: Internal gateway. Model: my-model.',
       });
       expect(upstream.calls[0].url).toBe('https://llm.example.com/v1/chat/completions');
       expect(headersOf(upstream.calls[0]).get('authorization')).toBe('Bearer endpoint-secret');
@@ -729,7 +732,7 @@ describe('BYOK endpoints', () => {
 
       await expect(
         caller.byok.testApiKey({ organizationId: organization.id, id: created.id })
-      ).resolves.toMatchObject({ success: true });
+      ).resolves.toMatchObject({ outcome: 'ok' });
       expect(bodyOf(upstream.calls[1])).toMatchObject({ max_completion_tokens: 256 });
       expect(bodyOf(upstream.calls[1])).not.toHaveProperty('max_tokens');
     });
@@ -747,6 +750,8 @@ describe('BYOK endpoints', () => {
       await expect(
         caller.byok.testApiKey({ organizationId: organization.id, id: created.id })
       ).resolves.toEqual({
+        outcome: 'failed',
+        detail: 'the stored endpoint configuration is invalid.',
         success: false,
         message: 'API key test failed: the stored endpoint configuration is invalid.',
       });
@@ -779,7 +784,7 @@ describe('BYOK endpoints', () => {
           id: created.id,
           modelId: 'claude',
         })
-      ).resolves.toMatchObject({ success: true });
+      ).resolves.toMatchObject({ outcome: 'ok' });
       expect(upstream.calls[0].url).toBe('https://llm.example.com/models/messages');
       expect(headersOf(upstream.calls[0]).get('anthropic-version')).toBe('2023-06-01');
       const body = bodyOf(upstream.calls[0]);
@@ -803,6 +808,8 @@ describe('BYOK endpoints', () => {
       });
 
       expect(result).toEqual({
+        outcome: 'failed',
+        detail: 'HTTP 401: Bad key sk-...[redacted]',
         success: false,
         message: 'API key test failed: HTTP 401: Bad key sk-...[redacted]',
       });
@@ -819,6 +826,8 @@ describe('BYOK endpoints', () => {
       await expect(
         caller.byok.testApiKey({ organizationId: organization.id, id: created.id })
       ).resolves.toEqual({
+        outcome: 'failed',
+        detail: 'HTTP 404: model not found',
         success: false,
         message: 'API key test failed: HTTP 404: model not found',
       });

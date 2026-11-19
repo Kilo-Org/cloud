@@ -1990,6 +1990,74 @@ test('reports a locale file the filesystem refuses through the command', () => {
   assert.doesNotMatch(result.stderr, /Error:|at /);
 });
 
+test('reports an unreadable supported-language list as one problem line', () => {
+  // The path exists but the read refuses it: a directory named like the module.
+  // The membership rule would call every catalog file an unsupported language
+  // once the list is unknown, so it is skipped and the missing key still shows.
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  const root = cliFixture(standardFiles({ translated }));
+  const languages = join(root, 'apps/mobile/src/i18n/languages.ts');
+  rmSync(languages);
+  mkdirSync(languages);
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^mobile: cannot audit the supported-language list: EISDIR/m);
+  assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  assert.doesNotMatch(result.stderr, /is not a supported language/);
+  assert.doesNotMatch(result.stderr, /^\s+at /m);
+});
+
+test('reports a missing supported-language list without inventing unsupported catalogs', () => {
+  // A removed file is the other way the tag set is unknown; the membership rule
+  // stays off for the same reason, and the run still reports the missing key.
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  const root = cliFixture(standardFiles({ translated }));
+  rmSync(join(root, 'apps/mobile/src/i18n/languages.ts'));
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^mobile: no supported-language list at apps\/mobile\/src\/i18n\/languages\.ts/m
+  );
+  assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  assert.doesNotMatch(result.stderr, /is not a supported language/);
+  assert.doesNotMatch(result.stderr, /^\s+at /m);
+});
+
+test('reports an unreadable push locale registry as one problem line', () => {
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  const root = cliFixture(standardFiles({ translated }));
+  const registry = join(root, 'packages/notifications/src/i18n.ts');
+  rmSync(registry);
+  mkdirSync(registry);
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^notifications: cannot audit the push locale registry: EISDIR/m);
+  assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  assert.doesNotMatch(result.stderr, /^\s+at /m);
+});
+
+test('reports an unreadable catalog folder as one problem line', () => {
+  // A listing that throws would end the run. One line names the folder, and
+  // the rules that need its tag set skip rather than repeat it per rule.
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  const root = cliFixture(standardFiles({ translated }));
+  rmSync(join(root, 'packages/notifications/src/locales'), { recursive: true });
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^notifications: cannot audit the catalog folder: ENOENT/m);
+  assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
+  assert.doesNotMatch(result.stderr, /^\s+at /m);
+  const folderLines = result.stderr
+    .split('\n')
+    .filter(line => line.startsWith('notifications: cannot audit the catalog folder:'));
+  assert.equal(folderLines.length, 1, result.stderr);
+});
+
 // The descriptor policy guard keeps a misconfigured catalog from throwing: the
 // copy rules and the base-key reader are used after the catalogs' value
 // problems are collected, so a throw there would hide them. Each case patches

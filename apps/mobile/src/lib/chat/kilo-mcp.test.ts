@@ -159,9 +159,6 @@ describe('discovering the Kilo server', () => {
   });
 
   it('asks again after an answer with no tools, rather than latching it', async () => {
-    /* The empty sheet offers no Retry, so an empty answer kept as the account's
-       answer would leave every chat after it on "No tools available". The next
-       chat reconnects and says what the server offers now. */
     answer = () => Effect.succeed([]);
     await ensureKiloMcp(place);
 

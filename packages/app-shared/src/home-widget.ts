@@ -208,7 +208,9 @@ export function buildHomeWidgetDetails(
             .filter(row => glanceableStatusKind(row.status) === primaryKind)
             .sort(compareSessionInstant(row => row.statusUpdatedAt, 'latest'))[0];
   return {
-    approvalKey: waiting.find(entry => entry.row.approvalKey != null)?.row.approvalKey ?? null,
+    // The sort put the approvable row first, so the key belongs to the same
+    // row the needs-input primary title reads.
+    approvalKey: waiting[0]?.row.approvalKey ?? null,
     primaryKind: primaryKind ?? null,
     primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
     waitingAgents: waiting
@@ -298,13 +300,11 @@ export function buildHomeWidgetPresentation(
 ): HomeWidgetPresentation {
   const { snapshot, details } = data;
   const { terminal, primaryKind, checkedAt, staleAt } = staleness(data);
-  // A title is drawn only beside the kind it describes. A payload stored or
-  // pushed before details carried the kind omits it, which reads as unknown and
-  // keeps the title, so that payload renders as it did.
   const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
+  const status = presentationStatus(snapshot, terminal, primaryKind);
   return {
-    status: presentationStatus(snapshot, terminal, primaryKind),
+    status,
     primaryKind,
     primaryCount: primaryKind === null ? 0 : snapshot[primaryKind],
     secondaryCounts: terminal
@@ -328,7 +328,7 @@ export function buildHomeWidgetPresentation(
         : details.primaryTitle,
     waitingAgents: terminal || snapshot.needsInput === 0 ? [] : details.waitingAgents,
     scheduledAgents: terminal || snapshot.scheduled === 0 ? [] : details.scheduledAgents,
-    canCreate: !terminal && (primaryKind !== null || snapshot.status !== 'waiting'),
+    canCreate: status === 'content' || status === 'empty' || status === 'unavailable',
     // This is visibility, not approval authority. Every action revalidates the exact current request.
     canApprove: !terminal && snapshot.needsApproval > 0 && details.approvalKey !== null,
   };

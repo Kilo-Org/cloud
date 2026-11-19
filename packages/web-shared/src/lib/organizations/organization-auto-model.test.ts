@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { Organization } from '@kilocode/db/schema';
 import type { EnabledByokProvider } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  getByokCredentials,
+  getEnabledByokProviders,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import {
   getDirectByokCatalogModelId,
   getDirectByokModel,
@@ -36,6 +39,7 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  getByokCredentials: jest.fn(),
   getEnabledByokProviders: jest.fn(async () => []),
 }));
 jest.mock(
@@ -113,6 +117,29 @@ describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
     expect(mockedGetEnabledByokProviders).toHaveBeenCalledWith(expect.anything(), {
       type: 'organization',
       id: 'org-1',
+    });
+  });
+
+  test('validates without decrypting any key', async () => {
+    mockedGetEnabledByokProviders.mockResolvedValue([key(false)]);
+
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'synthetic/hf:moonshotai/kimi-k2.6', {
+        apiKind: 'chat_completions',
+      })
+    ).resolves.toEqual({ kind: 'ok', modelId: 'synthetic/hf:moonshotai/kimi-k2.6' });
+    expect(jest.mocked(getByokCredentials)).not.toHaveBeenCalled();
+  });
+
+  test('rejects a target when the organization has no enabled key for its provider', async () => {
+    mockedGetEnabledByokProviders.mockResolvedValue([]);
+
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'synthetic/hf:moonshotai/kimi-k2.6')
+    ).resolves.toEqual({
+      kind: 'error',
+      message:
+        "Organization Auto route target 'synthetic/hf:moonshotai/kimi-k2.6' is unavailable because this organization does not have an enabled BYOK credential for synthetic.",
     });
   });
 

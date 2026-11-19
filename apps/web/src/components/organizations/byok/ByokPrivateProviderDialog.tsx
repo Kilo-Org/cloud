@@ -906,8 +906,8 @@ function ByokPrivateProviderForm({
               ) : (
                 <>
                   <p>
-                    Clients select these models as <code>private-provider-…/&lt;model ID&gt;</code>.
-                    The upstream model ID is what the private provider receives.
+                    Clients select these models as <code>private-…/&lt;model ID&gt;</code>. The
+                    upstream model ID is what the private provider receives.
                   </p>
                   <p>
                     With Kilo catalog model IDs turned on in the key list, each model ID must

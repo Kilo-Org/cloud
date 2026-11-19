@@ -874,20 +874,31 @@ describe('agent browser calls', () => {
   it('keeps the approved file when the human approves thirty seconds later', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
-    let commands = 0;
+    const invoice = `${MAIN_ORIGIN}/invoice.pdf`;
+    let events = 0;
+    let presses = 0;
 
     cdp.setHandlers({
       'Input.dispatchMouseEvent': () => {
-        const click = Math.floor(commands / 2);
+        // A click is a press and a release: only a press is a call that really ran the tool.
+        const press = events % 2 === 0;
 
-        commands += 1;
+        events += 1;
 
-        if (commands % 2 === 0) {
-          downloads.emit({
-            id: click === 0 ? 41 : 42,
-            tabId: TAB_ID,
-            url: `${MAIN_ORIGIN}/invoice.pdf`,
-          });
+        if (press) {
+          presses += 1;
+        }
+
+        // The first press is the refused click: its file is stopped by the guard the call runs.
+        if (press && presses === 1) {
+          downloads.emit({ id: 41, tabId: TAB_ID, url: invoice });
+        }
+
+        // The second press is the approved repeat. Its page starts the approved file — under a regenerated url, as
+        // A page that counts its clicks does — and a second, different file that is nobody's approval.
+        if (press && presses === 2) {
+          downloads.emit({ id: 42, tabId: TAB_ID, url: `${invoice}?click=2` });
+          downloads.emit({ id: 43, tabId: TAB_ID, url: `${MAIN_ORIGIN}/statement.pdf` });
         }
 
         return {};
@@ -912,6 +923,9 @@ describe('agent browser calls', () => {
         throw new Error(`expected a refusal, got ${JSON.stringify(refused)}`);
       }
 
+      // The refused click's own file: stopped, and the only stop until the approval.
+      expect(downloads.cancelled).toStrictEqual([41]);
+
       // A human takes their time, and the model keeps working meanwhile: the next call prunes the reported record,
       // So only the token can still name the file.
       await vi.advanceTimersByTimeAsync(20_000);
@@ -929,8 +943,16 @@ describe('agent browser calls', () => {
 
       const approved = await runTimed(click([expectStepToken(refused)]), 300);
 
-      expect(approved.kind).toBe('result');
-      expect(downloads.cancelled).toStrictEqual([41]);
+      // The token's need is what keeps 42 and stops 43: without it the repeat runs unguarded, keeps both files and
+      // Reports neither, so this pair of assertions is the test.
+      expect(downloads.cancelled).toStrictEqual([41, 43]);
+      expect(downloads.removed).toStrictEqual([]);
+
+      if (approved.kind !== 'needs_permission') {
+        throw new Error(`expected the second file to be reported, got ${JSON.stringify(approved)}`);
+      }
+
+      expect(approved.afterAction).toBe(true);
     } finally {
       vi.useRealTimers();
     }
@@ -1086,6 +1108,19 @@ describe('agent browser calls', () => {
     // The approval completes on the tab it already opened: no vanished step tab, and no second tab.
     expect(approved.kind).toBe('result');
     expect([created.length, downloads.cancelled]).toStrictEqual([1, [71, 73]]);
+
+    // The refusal re-recorded that tab, so the repeat navigated it — the tab the step opened, at the approved url —
+    // Rather than the caller's tab or a fresh one. A `DOWNLOAD_STEP_TAB_GONE_ERROR` would have been a result too, so
+    // The kept-file text is what separates a completed approval from a refused one.
+    expect(cdp.sent().findLast(command => command.method === 'Page.navigate')).toStrictEqual({
+      method: 'Page.navigate',
+      params: { url },
+      tabId: newTab,
+      url,
+    });
+    expect(
+      approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : ''
+    ).toContain('report.txt: The file was downloaded; the page did not change.');
   });
 
   it('refuses a download-capable call when the optional permission is missing', async () => {
@@ -1967,17 +2002,24 @@ describe('agent browser calls', () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
     const invoice = `${MAIN_ORIGIN}/invoice.pdf`;
-    let commands = 0;
+    /** How many times the button was really pressed: the reporting call never runs the tool. */
+    let presses = 0;
+    let events = 0;
 
     cdp.setHandlers({
       'Input.dispatchMouseEvent': () => {
-        const click = Math.floor(commands / 2);
+        // A click is a press and a release; counting presses keeps the mapping independent of that pair.
+        const press = events % 2 === 0;
 
-        commands += 1;
+        events += 1;
 
-        // The approved repeat is the second click: its page starts the file the human approved plus a second one.
+        if (press) {
+          presses += 1;
+        }
+
+        // The second real press is the approved repeat: its page starts the file the human approved plus a second.
         // The approved file's url is regenerated with a fresh query, as a page that counts its clicks does.
-        if (commands % 2 === 0 && click === 1) {
+        if (press && presses === 2) {
           downloads.emit({ id: 102, tabId: TAB_ID, url: `${invoice}?click=2` });
           downloads.emit({ id: 103, tabId: TAB_ID, url: `${MAIN_ORIGIN}/statement.pdf` });
         }
@@ -2005,23 +2047,41 @@ describe('agent browser calls', () => {
       await vi.advanceTimersByTimeAsync(100);
       expect(downloads.cancelled).toStrictEqual([101]);
 
-      // 2. The next call reports it, and its token names the file the approval buys.
+      // 2. The next call reports it and runs nothing: its token names the file the approval buys.
+      const dispatchesBeforeReport = cdp
+        .commands()
+        .filter(method => method === 'Input.dispatchMouseEvent').length;
       const reported = await runTimed(click());
       const stepToken = expectStepToken(reported);
 
       expect(reported).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+      // The reporting call is not a second click: the button was pressed once so far, and this call pressed it never.
+      expect(presses).toBe(1);
+      expect(cdp.commands().filter(method => method === 'Input.dispatchMouseEvent')).toHaveLength(
+        dispatchesBeforeReport
+      );
 
-      // 3. The approved repeat runs guarded: only the second file is stopped, so exactly one file is kept.
+      // 3. The approved repeat runs guarded and is the call that presses the button: only the second file is
+      // Stopped, so exactly one file is kept and the second is reported on this very call.
       const approved = await runTimed(click([stepToken]));
 
       if (approved.kind !== 'needs_permission') {
         throw new Error(`expected the second file to be reported, got ${JSON.stringify(approved)}`);
       }
 
-      expect(approved.afterAction).toBe(true);
-      // 102 is the file the approval bought: it is the only one not stopped, so it is the one left on disk.
-      expect(downloads.cancelled).toStrictEqual([101, 103]);
-      expect(downloads.removed).toStrictEqual([]);
+      // Two presses, one stop of the approved file (102 is untouched), nothing deleted, and a refusal that says the
+      // Earlier call's step is what to repeat.
+      expect({
+        afterAction: approved.afterAction,
+        cancelled: downloads.cancelled,
+        presses,
+        removed: downloads.removed,
+      }).toStrictEqual({
+        afterAction: true,
+        cancelled: [101, 103],
+        presses: 2,
+        removed: [],
+      });
     } finally {
       vi.useRealTimers();
     }

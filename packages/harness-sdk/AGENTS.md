@@ -1821,8 +1821,7 @@ the entry even with the key.
 `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
 against, and every import of either is a type. Nothing of either survives the
 build, so both are dev dependencies and a consumer installs neither: 22.9 MiB
-and 16.5 MiB unpacked at `openai` 7.55.0 and `@anthropic-ai/sdk` 1.8.0,
-against 4 runtime dependencies that are all used.
+and 16.5 MiB unpacked at `openai` 7.55.0 and `@anthropic-ai/sdk` 1.8.0.
 
 That holds only while no published declaration names one. Exporting a type
 built out of one — `ContentBlock`, say, which two wires exported and neither
@@ -2037,7 +2036,7 @@ There are eleven entry points: `@kilocode/harness-sdk`, `/core`,
 and `/testing`.
 The two stores have
 subpaths of their own because each names a platform: exporting them from the
-root would pull `node:sqlite` or `expo-sqlite` into every bundle. `/plugins/fetch`
+root would pull `node:sqlite` into every bundle. `/plugins/fetch`
 and `/testing` have theirs because an entry point is what a consumer bundles and
 neither runs in production — a caller with a `fetch` of their own should not
 carry this one, and the conformance checks belong to a plugin author's test

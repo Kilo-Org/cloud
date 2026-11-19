@@ -333,12 +333,16 @@ function RootLayoutNav({
     // restore in its own state — so it is retried through the same call its
     // own Retry makes.
     onAnswered: () => {
-      const identityPath = trpc.user.getMe.pathKey().flat().join('.');
+      const identityPath = trpc.user.getMe.pathKey()[0];
       void queryClient.invalidateQueries({
         predicate: query => {
           // tRPC stores the procedure path as the key's first element.
           const path = query.queryKey[0];
-          return !(Array.isArray(path) && path.join('.') === identityPath);
+          return !(
+            Array.isArray(path) &&
+            path.length === identityPath.length &&
+            path.every((segment, index) => segment === identityPath[index])
+          );
         },
       });
       retryOrganization();

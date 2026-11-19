@@ -3913,6 +3913,8 @@
       "downloading": "Letöltés: {{written}} / {{total}}",
       "downloadingUnknown": "Letöltés: {{written}}",
       "paused": "Szüneteltetve: {{written}} / {{total}}",
+      "retrying": "Újrapróbálkozás: {{written}} / {{total}}",
+      "retryingUnknown": "Újrapróbálkozás: {{written}}",
       "verifying": "A letöltött fájl ellenőrzése…",
       "downloaded": "Letöltve · {{size}}",
       "url": "Közvetlen letöltési hivatkozás",
@@ -4003,7 +4005,9 @@
         "androidModelUnavailable": "Ez az eszköz nem támogatja a Gemini Nano modellt, vagy az AICore rendszeralkalmazás beállítása még folyamatban van. Próbálja újra később.",
         "aicoreUpdateRequired": "A modell használatához frissítse az AICore alkalmazást és a rendszerszoftvert.",
         "downloadable": "A modell használata előtt egyszeri letöltés szükséges.",
-        "downloading": "A modell letöltése folyamatban van. A letöltés befejeztével használatra kész lesz."
+        "downloading": "A modell letöltése folyamatban van. A letöltés befejeztével használatra kész lesz.",
+        "batteryQuota": "Az eszközön futó modell mostanra kimerítette az akkumulátor-kvótáját. Próbálja újra később.",
+        "checkFailed": "Az alkalmazás nem tudta ellenőrizni ezt a modellt. Próbálja újra."
       },
       "unavailable": "Az eszközön futó modell jelenleg nem érhető el. Ellenőrizze az állapotát itt: $t(modelChat.backends.title).",
       "busy": "Az eszközön futó modell épp egy másik válaszon dolgozik. Próbálja újra, ha végzett.",

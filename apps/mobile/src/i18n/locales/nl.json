@@ -3913,6 +3913,8 @@
       "downloading": "Downloaden: {{written}} van {{total}}",
       "downloadingUnknown": "Downloaden: {{written}}",
       "paused": "Gepauzeerd: {{written}} van {{total}}",
+      "retrying": "Nieuwe poging: {{written}} van {{total}}",
+      "retryingUnknown": "Nieuwe poging: {{written}}",
       "verifying": "Het gedownloade bestand wordt gecontroleerd…",
       "downloaded": "Gedownload · {{size}}",
       "url": "Directe downloadlink",
@@ -4003,7 +4005,9 @@
         "androidModelUnavailable": "Dit apparaat ondersteunt Gemini Nano niet, of de systeemapp AICore wordt nog ingesteld. Probeer het later opnieuw.",
         "aicoreUpdateRequired": "Werk de AICore-app en je systeemsoftware bij om dit model te gebruiken.",
         "downloadable": "Dit model moet eenmalig worden gedownload voordat je het kunt gebruiken.",
-        "downloading": "Het model wordt gedownload. Het is klaar voor gebruik zodra het downloaden is voltooid."
+        "downloading": "Het model wordt gedownload. Het is klaar voor gebruik zodra het downloaden is voltooid.",
+        "batteryQuota": "Het model op het apparaat heeft zijn batterijtoewijzing voorlopig gebruikt. Probeer het later opnieuw.",
+        "checkFailed": "De app kon dit model niet controleren. Probeer het opnieuw."
       },
       "unavailable": "Het model op het apparaat is nu niet beschikbaar. Controleer de status in $t(modelChat.backends.title).",
       "busy": "Het model op het apparaat is bezig met een ander antwoord. Probeer het opnieuw zodra het klaar is.",

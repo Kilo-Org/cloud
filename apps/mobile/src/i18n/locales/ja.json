@@ -3913,6 +3913,8 @@
       "downloading": "ダウンロード中: {{written}} / {{total}}",
       "downloadingUnknown": "ダウンロード中: {{written}}",
       "paused": "一時停止中: {{written}} / {{total}}",
+      "retrying": "再試行中: {{written}} / {{total}}",
+      "retryingUnknown": "再試行中: {{written}}",
       "verifying": "ダウンロードしたファイルを確認しています…",
       "downloaded": "ダウンロード済み · {{size}}",
       "url": "直接ダウンロードリンク",
@@ -4003,7 +4005,9 @@
         "androidModelUnavailable": "このデバイスはGemini Nanoに対応していないか、AICoreシステムアプリがまだセットアップ中です。しばらくしてからもう一度お試しください。",
         "aicoreUpdateRequired": "このモデルを使用するには、AICoreアプリとシステムソフトウェアをアップデートしてください。",
         "downloadable": "このモデルを使用するには、初回のみダウンロードが必要です。",
-        "downloading": "モデルをダウンロード中です。ダウンロードが完了すると使用可能になります。"
+        "downloading": "モデルをダウンロード中です。ダウンロードが完了すると使用可能になります。",
+        "batteryQuota": "オンデバイスモデルは、いま使えるバッテリー枠を使い尽くしました。しばらくしてからもう一度お試しください。",
+        "checkFailed": "アプリがこのモデルを確認できませんでした。もう一度お試しください。"
       },
       "unavailable": "オンデバイスモデルは現在利用できません。$t(modelChat.backends.title)で状態を確認してください。",
       "busy": "オンデバイスモデルは別の返信を処理中です。完了してからもう一度お試しください。",

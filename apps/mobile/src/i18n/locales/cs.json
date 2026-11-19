@@ -4035,6 +4035,8 @@
       "downloading": "Stahování: {{written}} z {{total}}",
       "downloadingUnknown": "Stahování: {{written}}",
       "paused": "Pozastaveno: {{written}} z {{total}}",
+      "retrying": "Nový pokus: {{written}} z {{total}}",
+      "retryingUnknown": "Nový pokus: {{written}}",
       "verifying": "Kontrola staženého souboru…",
       "downloaded": "Staženo · {{size}}",
       "url": "Přímý odkaz ke stažení",
@@ -4125,7 +4127,9 @@
         "androidModelUnavailable": "Toto zařízení nepodporuje Gemini Nano, nebo se systémová aplikace AICore ještě nastavuje. Zkuste to později.",
         "aicoreUpdateRequired": "Pokud chcete tento model používat, aktualizujte aplikaci AICore a systémový software.",
         "downloadable": "Před prvním použitím je potřeba tento model jednorázově stáhnout.",
-        "downloading": "Model se stahuje. Bude připraven, jakmile stahování skončí."
+        "downloading": "Model se stahuje. Bude připraven, jakmile stahování skončí.",
+        "batteryQuota": "Model v zařízení prozatím vyčerpal svůj limit baterie. Zkuste to znovu později.",
+        "checkFailed": "Aplikace tento model nemohla zkontrolovat. Zkuste to znovu."
       },
       "unavailable": "Model v zařízení teď není dostupný. Zkontrolujte jeho stav v sekci $t(modelChat.backends.title).",
       "busy": "Model v zařízení právě generuje jinou odpověď. Zkuste to znovu, až skončí.",

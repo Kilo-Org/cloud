@@ -3913,6 +3913,8 @@
       "downloading": "Mengunduh: {{written}} dari {{total}}",
       "downloadingUnknown": "Mengunduh: {{written}}",
       "paused": "Dijeda: {{written}} dari {{total}}",
+      "retrying": "Mencoba lagi: {{written}} dari {{total}}",
+      "retryingUnknown": "Mencoba lagi: {{written}}",
       "verifying": "Memeriksa file yang diunduh…",
       "downloaded": "Terunduh · {{size}}",
       "url": "Tautan unduhan langsung",
@@ -4003,7 +4005,9 @@
         "androidModelUnavailable": "Perangkat ini tidak mendukung Gemini Nano, atau aplikasi sistem AICore masih disiapkan. Coba lagi nanti.",
         "aicoreUpdateRequired": "Perbarui aplikasi AICore dan perangkat lunak sistem untuk menggunakan model ini.",
         "downloadable": "Model ini perlu diunduh satu kali sebelum dapat digunakan.",
-        "downloading": "Model sedang diunduh dan akan siap digunakan setelah unduhan selesai."
+        "downloading": "Model sedang diunduh dan akan siap digunakan setelah unduhan selesai.",
+        "batteryQuota": "Model di perangkat telah menggunakan jatah baterainya untuk saat ini. Coba lagi nanti.",
+        "checkFailed": "Aplikasi tidak dapat memeriksa model ini. Coba lagi."
       },
       "unavailable": "Model di perangkat sedang tidak tersedia. Periksa statusnya di $t(modelChat.backends.title).",
       "busy": "Model di perangkat sedang menyusun balasan lain. Coba lagi setelah selesai.",

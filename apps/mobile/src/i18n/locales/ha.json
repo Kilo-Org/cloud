@@ -3913,6 +3913,8 @@
       "downloading": "Ana saukewa: {{written}} cikin {{total}}",
       "downloadingUnknown": "Ana saukewa: {{written}}",
       "paused": "An dakata: {{written}} cikin {{total}}",
+      "retrying": "Ana sake gwadawa: {{written}} cikin {{total}}",
+      "retryingUnknown": "Ana sake gwadawa: {{written}}",
       "verifying": "Ana duba fayil ɗin da aka sauke…",
       "downloaded": "An sauke · {{size}}",
       "url": "Hanyar haɗin sauke kai tsaye",
@@ -4003,7 +4005,9 @@
         "androidModelUnavailable": "Wannan na'urar ba ta goyon bayan Gemini Nano, ko kuma manhajar tsarin AICore tana ci gaba da shiryawa. Sake gwadawa daga baya.",
         "aicoreUpdateRequired": "Sabunta manhajar AICore da manhajar tsarin na'urarka don amfani da wannan samfurin.",
         "downloadable": "Wannan samfurin yana buƙatar saukewa sau ɗaya kafin ka iya amfani da shi.",
-        "downloading": "Ana sauke samfurin. Zai kasance a shirye idan saukewar ta kammala."
+        "downloading": "Ana sauke samfurin. Zai kasance a shirye idan saukewar ta kammala.",
+        "batteryQuota": "Samfurin da ke kan na'ura ya yi amfani da rabonsa na baturi a yanzu. Sake gwadawa daga baya.",
+        "checkFailed": "Manhajar ba ta iya duba wannan samfurin ba. Sake gwadawa."
       },
       "unavailable": "Samfurin da ke kan na'ura ba ya samuwa a yanzu. Duba matsayinsa a $t(modelChat.backends.title).",
       "busy": "Samfurin da ke kan na'ura yana aiki da wata amsa. Sake gwadawa idan ya gama.",

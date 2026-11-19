@@ -4035,6 +4035,8 @@
       "downloading": "Atsisiunčiama: {{written}} iš {{total}}",
       "downloadingUnknown": "Atsisiunčiama: {{written}}",
       "paused": "Pristabdyta: {{written}} iš {{total}}",
+      "retrying": "Bandoma dar kartą: {{written}} iš {{total}}",
+      "retryingUnknown": "Bandoma dar kartą: {{written}}",
       "verifying": "Tikrinamas atsisiųstas failas…",
       "downloaded": "Atsisiųsta · {{size}}",
       "url": "Tiesioginė atsisiuntimo nuoroda",
@@ -4125,7 +4127,9 @@
         "androidModelUnavailable": "Šis įrenginys nepalaiko Gemini Nano, arba AICore sistemos programa dar ruošiama. Bandykite vėliau.",
         "aicoreUpdateRequired": "Norėdami naudoti šį modelį, atnaujinkite AICore programą ir sistemos programinę įrangą.",
         "downloadable": "Prieš naudojant šį modelį, jį reikia vieną kartą atsisiųsti.",
-        "downloading": "Modelis atsisiunčiamas. Jis bus paruoštas, kai atsisiuntimas baigsis."
+        "downloading": "Modelis atsisiunčiamas. Jis bus paruoštas, kai atsisiuntimas baigsis.",
+        "batteryQuota": "Įrenginio modelis šiuo metu jau išnaudojo leidžiamą baterijos kiekį. Bandykite vėliau.",
+        "checkFailed": "Programėlė negalėjo patikrinti šio modelio. Bandykite dar kartą."
       },
       "unavailable": "Įrenginio modelis šiuo metu nepasiekiamas. Patikrinkite jo būseną skiltyje $t(modelChat.backends.title).",
       "busy": "Įrenginio modelis užimtas kitu atsakymu. Bandykite dar kartą, kai jis baigs.",

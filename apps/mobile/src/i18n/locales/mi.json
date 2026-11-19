@@ -3913,6 +3913,8 @@
       "downloading": "E tikiake ana: {{written}} o {{total}}",
       "downloadingUnknown": "E tikiake ana: {{written}}",
       "paused": "Kua mōwai: {{written}} o {{total}}",
+      "retrying": "E ngana anō ana: {{written}} o {{total}}",
+      "retryingUnknown": "E ngana anō ana: {{written}}",
       "verifying": "E tirotiro ana i te kōnae kua tikiake…",
       "downloaded": "Kua tikiake · {{size}}",
       "url": "Hononga tikiake tōtika",
@@ -4003,7 +4005,9 @@
         "androidModelUnavailable": "Kāore tēnei pūrere e tautoko ana i a Gemini Nano, kei te whakarite tonu rānei te taupānga pūnaha AICore. Ngana anō ā muri ake.",
         "aicoreUpdateRequired": "Whakahoutia te taupānga AICore me te pūmanawa pūnaha kia whakamahia ai tēnei tauira.",
         "downloadable": "Me tikiake tēnei tauira kotahi te wā i mua i tō whakamahinga.",
-        "downloading": "Kei te tikiake te tauira. Ka rite ina oti te tikiake."
+        "downloading": "Kei te tikiake te tauira. Ka rite ina oti te tikiake.",
+        "batteryQuota": "Kua pau i te tauira i te pūrere tana wāhi pākahiko mō tēnei wā. Ngana anō ā muri ake.",
+        "checkFailed": "Kāore i taea e te taupānga te tirotiro i tēnei tauira. Ngana anō."
       },
       "unavailable": "Kāore te tauira i te pūrere e wātea ana i tēnei wā. Tirohia tōna tūnga i $t(modelChat.backends.title).",
       "busy": "Kei te pukumahi te tauira i te pūrere ki tētahi atu whakautu. Ngana anō ina oti.",

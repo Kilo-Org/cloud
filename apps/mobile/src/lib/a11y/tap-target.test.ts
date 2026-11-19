@@ -8,6 +8,9 @@ import postcss from 'postcss';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 
 import {
+  BALANCE_RETRY_CANCEL_DP,
+  BALANCE_RETRY_TARGET_CLASS,
+  BALANCE_RETRY_TARGET_DP,
   CHIP_FRAME_DP,
   CHIP_HIT_SLOP,
   CHIP_HIT_SLOP_DP,
@@ -498,6 +501,28 @@ describe('code-reviewer line-action geometry', () => {
     // The box's own compiled width and height carry the reach past 44dp.
     expect(await compiledDp('w-[46px]', 'width')).toBe(LINE_ACTION_REACH_DP);
     expect(await compiledDp('h-[46px]', 'height')).toBe(LINE_ACTION_REACH_DP);
+  });
+});
+
+describe('credits balance retry geometry', () => {
+  it('carries the whole touch target on the retry box and keeps the amount line in flow', async () => {
+    // The regression this guards: the retry rendered a 28dp frame and leaned on
+    // a vertical `hitSlop` for the rest of its target, so the slop — not the
+    // control's own node — carried the floor. The box now carries the target
+    // itself, and its negative margin is the half a 28dp line box overflows,
+    // not a slop value.
+    expect(BALANCE_RETRY_TARGET_DP).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(BALANCE_RETRY_TARGET_CLASS).toContain('min-h-[46px]');
+    expect(BALANCE_RETRY_TARGET_CLASS).toContain('-my-[9px]');
+    // The class compiler only sees the literal, so the compiled box is held to
+    // the constant beside it.
+    expect(await compiledDp(BALANCE_RETRY_TARGET_CLASS, 'minHeight')).toBe(BALANCE_RETRY_TARGET_DP);
+    expect(await compiledDp(BALANCE_RETRY_TARGET_CLASS, 'marginBlock')).toBe(
+      -BALANCE_RETRY_CANCEL_DP
+    );
+    // The margin cancels the overflow on both sides, so the box keeps the
+    // amount's own 28dp line box in flow and the card paints one height.
+    expect(BALANCE_RETRY_TARGET_DP - 2 * BALANCE_RETRY_CANCEL_DP).toBe(MIN_TAP_TARGET_DP);
   });
 });
 

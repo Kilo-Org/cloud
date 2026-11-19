@@ -308,22 +308,32 @@ export const CHIP_HIT_SLOP = {
 } as const;
 
 /**
- * The frame the credits screen's failed-balance retry renders: the amount's
- * own line box, so the card keeps its height in every state of the read and
- * the copy below the card never moves. Its 44pt touch minimum comes from the
- * hit slop, not from a taller box (`hitSlop` widens the touch region, not the
- * rect — the trap `attachment-preview-strip.tsx` documents), and the gate's own
- * rule accepts a node at the audit floor.
+ * The box the credits screen's failed-balance retry renders, in dp. The box is
+ * the touch target on its own node, as `DESIGN.md:364` measures: 46dp is past
+ * the 44pt floor even after Android truncates the fractional layout to whole
+ * pixels (46dp is 120.75px at 2.625px/dp, so 120px still measures 45.7dp), the
+ * same reach the command card's controls carry ({@link LINE_ACTION_REACH_DP}).
+ *
+ * A 28dp frame plus a uniform slop does not hold here, which is why this
+ * control breaks from the slop shapes above. The amount slot's 28dp box
+ * measures 27.8dp on Android, and the retry's own bottom side faces the
+ * caption slot, the card's later sibling: touch dispatch hands a point inside
+ * a sibling's box to that sibling, so the slot took back everything below the
+ * 3.5dp gap under the amount. The caption slot paints text only, so it is
+ * touch-transparent and the box's own bottom edge reaches the target.
  */
-export const BALANCE_RETRY_FRAME_DP = 28;
-export const BALANCE_RETRY_FRAME_CLASS = 'h-8';
-export const BALANCE_RETRY_HIT_SLOP_DP = 8;
-export const BALANCE_RETRY_HIT_SLOP = {
-  top: BALANCE_RETRY_HIT_SLOP_DP,
-  bottom: BALANCE_RETRY_HIT_SLOP_DP,
-  left: BALANCE_RETRY_HIT_SLOP_DP,
-  right: BALANCE_RETRY_HIT_SLOP_DP,
-} as const;
+export const BALANCE_RETRY_TARGET_DP = 46;
+
+/**
+ * The negative vertical margin the retry's box carries, per side: the box
+ * overflows its own flex line without adding height to the amount slot, so
+ * `46 - 2 * 9 = 28dp` stays in flow and the credits card keeps one height in
+ * every state of the balance read, with the copy below it never moving. A
+ * literal class string, because NativeWind only compiles the classes it finds
+ * in source.
+ */
+export const BALANCE_RETRY_CANCEL_DP = 9;
+export const BALANCE_RETRY_TARGET_CLASS = 'min-h-[46px] -my-[9px]';
 
 /**
  * The box a text-only action renders so its own node carries the platform's

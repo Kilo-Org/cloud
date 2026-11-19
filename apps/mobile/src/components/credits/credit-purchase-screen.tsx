@@ -14,8 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
-  BALANCE_RETRY_FRAME_CLASS,
-  BALANCE_RETRY_HIT_SLOP,
+  BALANCE_RETRY_TARGET_CLASS,
   LEGAL_LINK_BOX_CLASS,
   LEGAL_LINK_ROW_CLASS,
 } from '@/lib/a11y/tap-target';
@@ -298,8 +297,7 @@ export function CreditPurchaseScreen() {
         <Pressable
           accessibilityLabel={t('profile.failedToLoadBalance')}
           accessibilityRole="button"
-          className={cn(BALANCE_RETRY_FRAME_CLASS, 'justify-center active:opacity-70')}
-          hitSlop={BALANCE_RETRY_HIT_SLOP}
+          className={cn(BALANCE_RETRY_TARGET_CLASS, 'justify-center active:opacity-70')}
           onPress={() => {
             void refetchBalance();
           }}
@@ -390,6 +388,12 @@ export function CreditPurchaseScreen() {
                 sentence grows the floor instead of truncating. */}
             <View
               className="mt-1 justify-center"
+              // The slot paints text only and holds nothing to press, so it
+              // stays out of touch dispatch: it is the card's later sibling
+              // under the amount, and a view that takes a point back would
+              // swallow the failed read's retry target wherever the two
+              // overlap.
+              pointerEvents="none"
               style={{ minHeight: expiryCaptionFloor(fontScale) }}
               testID="credit-expiry-slot"
             >

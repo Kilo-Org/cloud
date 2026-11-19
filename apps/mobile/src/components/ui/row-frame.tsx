@@ -81,7 +81,10 @@ type RowFrameProps = Readonly<{
   /**
    * A line under the whole row, below both columns — a caption that belongs to
    * the row's value but cannot share its line. It spans the row's width, so a
-   * wrapped sentence is never clamped to the value's column.
+   * wrapped sentence is never clamped to the value's column. A footer takes the
+   * column frame, so it paints under the row's own line on every press path;
+   * `stack` is not combined with it, because stacking puts the leading cell
+   * above the text column and a footer belongs under both.
    */
   footer?: ReactNode;
   /** The trailing slot: one of the typed marks, or a node a wrapper built. */

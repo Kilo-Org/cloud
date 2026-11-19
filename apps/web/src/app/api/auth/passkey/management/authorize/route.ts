@@ -10,7 +10,7 @@ import {
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { captureMessage } from '@sentry/nextjs';
 import { findUserBySignInCodeEmail } from '@/lib/user';
-import { consumeSignInTicket } from '@/lib/auth/passkey';
+import { consumeSignInTicket, readSignInTicket } from '@/lib/auth/passkey';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import {
   countAdmissionCondition,
@@ -124,10 +124,12 @@ export const POST = withRestTiming(AUTHORIZE_PATH, async (request: Request) => {
   }
 
   // The proof must resolve to the account the bearer names. The passkey ticket
-  // is redeemed here exactly once; the token exchange redeeming the same
-  // ticket would match no row.
+  // is read here and redeemed only once the request is going to succeed: a
+  // redemption is irreversible and the token exchange redeeming the same
+  // ticket would match no row, so spending it on a refusal or a provider fault
+  // would destroy the client's only proof.
   if (data.proof === 'passkey') {
-    const ticket = await consumeSignInTicket(data.ticket);
+    const ticket = await readSignInTicket(data.ticket);
     if (!ticket || ticket.kilo_user_id !== auth.user.id) {
       return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
     }
@@ -179,7 +181,7 @@ export const POST = withRestTiming(AUTHORIZE_PATH, async (request: Request) => {
       if (!committed) {
         // The reservation lapsed before settlement: the code is spent, so the
         // grant minted from it must not survive.
-        await discardPasskeyManagementAuthorization(minted.id);
+        await discardPasskeyManagementAuthorization(minted.id).catch(() => undefined);
         return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
       }
 
@@ -208,6 +210,15 @@ export const POST = withRestTiming(AUTHORIZE_PATH, async (request: Request) => {
     deviceSessionId: auth.deviceSessionId,
     operation: data.operation,
   });
+
+  // Redeem the ticket the account check above read. A concurrent request can
+  // win the single redemption between the read and here; that request mints
+  // its own grant, so this one is dropped.
+  const redeemed = await consumeSignInTicket(data.ticket);
+  if (!redeemed || redeemed.kilo_user_id !== auth.user.id) {
+    await discardPasskeyManagementAuthorization(minted.id).catch(() => undefined);
+    return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+  }
 
   return NextResponse.json(
     {

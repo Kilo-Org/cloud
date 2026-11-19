@@ -319,14 +319,12 @@ function answer(
  * no reason, so the status picks the same class its own reason would name; an
  * `unavailable` without a reason has nothing more specific to say.
  */
-const REASON_BY_STATUS = {
-  downloadable: 'model_download_required',
-  downloading: 'model_downloading',
-  unavailable: 'model_unavailable',
-} as const satisfies Record<Exclude<NativeAvailability['status'], 'available'>, string>;
-
-const reasonAtSendTime = (availability: NativeAvailability): string =>
-  availability.reason ?? REASON_BY_STATUS[availability.status];
+function reasonAtSendTime(availability: NativeAvailability): string {
+  if (availability.reason !== undefined) return availability.reason;
+  if (availability.status === 'downloadable') return 'model_download_required';
+  if (availability.status === 'downloading') return 'model_downloading';
+  return 'model_unavailable';
+}
 
 export function nativeModelClient(bridge: NativeModelBridge): ModelClientService {
   const provider: Provider = openProvider(bridge);

@@ -3,7 +3,6 @@ import {
   ByokPrivateProviderRequestError,
   describeByokPrivateProviderError,
   fetchByokPrivateProviderModels,
-  redactByokPrivateProviderSecrets,
   type ByokPrivateProviderResponse,
 } from './private-provider-upstream';
 
@@ -74,24 +73,6 @@ describe('describeByokPrivateProviderError', () => {
     expect(describeByokPrivateProviderError(failure('Rate limit exceeded, retry later'))).toBe(
       'HTTP 401: Rate limit exceeded, retry later'
     );
-  });
-});
-
-describe('redactByokPrivateProviderSecrets', () => {
-  test('does not match regular expression characters in a secret', () => {
-    expect(redactByokPrivateProviderSecrets('key a+b.c*d(e) end', ['a+b.c*d(e)'])).toBe(
-      'key [redacted] end'
-    );
-  });
-
-  test('redacts the full secret even when it is too long for partial matching', () => {
-    const privateKey = `-----BEGIN PRIVATE KEY-----\n${'A'.repeat(1700)}\n-----END PRIVATE KEY-----`;
-
-    expect(redactByokPrivateProviderSecrets(`x ${privateKey}`, [privateKey])).toBe('x [redacted]');
-  });
-
-  test('ignores empty secrets', () => {
-    expect(redactByokPrivateProviderSecrets('text', [''])).toBe('text');
   });
 });
 

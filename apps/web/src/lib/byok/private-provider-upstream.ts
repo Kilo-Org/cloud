@@ -2,6 +2,10 @@ import {
   type ByokPrivateProviderCredentials,
   type ByokPrivateModel,
 } from '@kilocode/db/schema-types';
+import {
+  byokPrivateProviderCredentialSecrets,
+  redactByokPrivateProviderSecrets,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/redaction';
 import { resolveByokPrivateProviderUpstreamAuth } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/direct-provider';
 import {
   MAX_LISTED_MODELS,
@@ -54,18 +58,6 @@ export async function findByokPrivateProviderBaseUrlViolation(
   return decision.allowed ? null : URL_POLICY_MESSAGES[decision.violation];
 }
 
-function credentialSecrets(credentials: ByokPrivateProviderCredentials): string[] {
-  switch (credentials.type) {
-    case 'api_key':
-    case 'x-api-key':
-      return [credentials.api_key];
-    case 'aws_bedrock':
-      return [credentials.access_key_id, credentials.secret_access_key];
-    case 'service_account':
-      return [credentials.private_key_id, credentials.private_key];
-  }
-}
-
 /**
  * Headers that authorize the request as gateway requests to the private provider do, and every secret
  * value that went into them.
@@ -86,7 +78,9 @@ async function authorizedHeaders({
   const headers = new Headers({ accept: 'application/json' });
   if (body) headers.set('content-type', 'application/json');
   const auth = await resolveByokPrivateProviderUpstreamAuth(credentials);
-  const secrets = [...credentialSecrets(credentials), auth.apiKey].filter(Boolean);
+  const secrets = [...byokPrivateProviderCredentialSecrets(credentials), auth.apiKey].filter(
+    Boolean
+  );
   if (auth.apiKeyHeader === 'x-api-key') {
     headers.set('x-api-key', auth.apiKey);
     headers.set('anthropic-version', ANTHROPIC_VERSION);
@@ -306,42 +300,7 @@ export async function fetchByokPrivateProviderModels({
   return { models, truncated: truncated || models.length >= MAX_LISTED_MODELS };
 }
 
-const REDACTED = '[redacted]';
 const MAX_ERROR_DETAIL_LENGTH = 300;
-/** Bounds the work of redaction, which scales with the text length. */
-const MAX_REDACTED_TEXT_LENGTH = 4_000;
-const MIN_MASKED_PREFIX_LENGTH = 8;
-const MIN_MASKED_SUFFIX_LENGTH = 4;
-
-/** The values to remove for one secret: all of it, and the ends upstreams show of a masked key. */
-function secretFragments(secret: string): string[] {
-  const fragments = [secret];
-  if (secret.length <= MAX_REDACTED_TEXT_LENGTH / 16) {
-    for (let length = secret.length - 1; length >= MIN_MASKED_PREFIX_LENGTH; length--) {
-      fragments.push(secret.slice(0, length));
-    }
-    for (let length = secret.length - 1; length >= MIN_MASKED_SUFFIX_LENGTH; length--) {
-      fragments.push(secret.slice(-length));
-    }
-  }
-  return fragments;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** `text` without the secrets, or the beginning or end of one, as an upstream may echo them. */
-export function redactByokPrivateProviderSecrets(text: string, secrets: readonly string[]): string {
-  const fragments = [...new Set(secrets.filter(Boolean).flatMap(secretFragments))].sort(
-    (a, b) => b.length - a.length
-  );
-  const bounded = text.slice(0, MAX_REDACTED_TEXT_LENGTH);
-  if (fragments.length === 0) return bounded;
-  // One pass, longest fragment first, so a replacement is never matched again.
-  const pattern = new RegExp(fragments.map(fragment => escapeRegExp(fragment)).join('|'), 'g');
-  return bounded.replace(pattern, REDACTED);
-}
 
 /**
  * A short, human-readable reason from an upstream error body: the `error.message` of a JSON body,

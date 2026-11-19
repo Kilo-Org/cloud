@@ -48,4 +48,20 @@ describe('redactByokPrivateProviderSecrets', () => {
       )
     ).toBe('bad key [redacted], shown as [redacted]...[redacted]');
   });
+
+  test('does not match regular expression characters in a secret', () => {
+    expect(redactByokPrivateProviderSecrets('key a+b.c*d(e) end', ['a+b.c*d(e)'])).toBe(
+      'key [redacted] end'
+    );
+  });
+
+  test('redacts the full secret even when it is too long for partial matching', () => {
+    const privateKey = `-----BEGIN PRIVATE KEY-----\n${'A'.repeat(1700)}\n-----END PRIVATE KEY-----`;
+
+    expect(redactByokPrivateProviderSecrets(`x ${privateKey}`, [privateKey])).toBe('x [redacted]');
+  });
+
+  test('ignores empty secrets', () => {
+    expect(redactByokPrivateProviderSecrets('text', [''])).toBe('text');
+  });
 });

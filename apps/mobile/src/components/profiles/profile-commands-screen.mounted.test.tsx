@@ -339,11 +339,12 @@ describe('ProfileCommandsScreen', () => {
 
     // Each control is the shared 32 dp compact box, and its 8 dp slop is what
     // reaches 48 dp. The box sits in the item's own action line — a host row
-    // laid out after the field — so its parent owns the vertical axis and the
-    // label line above shares none of it. The mounted suite renders no layout
-    // engine, so it holds the contract at the tree's shape; the gate's frame
-    // dumps measure the rendered numbers. The test renderer keeps the wrapper
-    // components in the tree, so the walk climbs to the nearest host node.
+    // laid out after the field — and that line carries the padding its slop
+    // needs, because React Native delivers a touch only inside the parent view
+    // (#11345). The mounted suite renders no layout engine, so it holds the
+    // contract at the tree's shape; the gate's frame dumps measure the rendered
+    // numbers. The test renderer keeps the wrapper components in the tree, so
+    // the walk climbs to the nearest host node.
     for (const control of controls) {
       expect(String(control.props.className)).toContain(COMPACT_CONTROL_BOX_CLASS);
       expect(control.props.hitSlop).toEqual(COMPACT_CONTROL_HIT_SLOP);
@@ -353,6 +354,12 @@ describe('ProfileCommandsScreen', () => {
       }
       expect(ancestor).not.toBeNull();
       expect(String(ancestor?.props.className)).toContain('justify-end gap-5');
+      // The line's padding is the slop's room and its negative margin gives the
+      // height straight back, so the reach fits without growing the item.
+      const lineClasses = String(ancestor?.props.className).split(/\s+/);
+      for (const token of ['-mx-4', 'px-4', '-my-2', 'py-2']) {
+        expect(lineClasses).toContain(token);
+      }
     }
 
     // The controls end their item, under the field, so the label row above

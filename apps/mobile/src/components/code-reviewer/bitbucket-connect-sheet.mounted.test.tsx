@@ -4,6 +4,7 @@
 // it is managed, without offering a form the server would reject. Both suites
 // import the same doubles from `bitbucket-connect-sheet.test-helpers`.
 
+import { type ReactElement } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -127,8 +128,9 @@ describe('BitbucketConnectSheet', () => {
     );
     // The plan is the blocker the reader cannot clear by role, so the denial
     // carries the retry that re-reads the state once the owner updates billing.
-    expect(denied?.props.action).toBeDefined();
-    expect(denied?.props.action?.props?.label).toBe(i18n.t('common.retry'));
+    const action = denied?.props.action as ReactElement<{ label: string }> | undefined;
+    expect(action).toBeDefined();
+    expect(action?.props.label).toBe(i18n.t('common.retry'));
   });
 
   it('offers no action when the plan does not block the connection', async () => {

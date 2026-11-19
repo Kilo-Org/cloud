@@ -109,7 +109,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
   // The denial's way out, offered only where the sheet joins the two refusals
   // below: a retry here re-reads the three answers the page was decided from.
-  let deniedAction: ReactNode;
+  let deniedAction: ReactNode = undefined;
   if (readsSettled) {
     if (managesExisting) {
       deniedDescription = t('integrations.managedByOwner');

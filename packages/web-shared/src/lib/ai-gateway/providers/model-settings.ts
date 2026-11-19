@@ -9,6 +9,7 @@ import type {
 } from '@kilocode/db/schema-types';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import {
   getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsMetadataFromDatabase,
@@ -29,12 +30,23 @@ import {
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
+/** The catalog id a request's model resolves to: the exact id, else its normalized base id. */
+function resolveCatalogModelId(models: GatewayModelMap, model: string): string {
+  return Object.hasOwn(models, model) ? model : normalizeModelId(model);
+}
+
 export async function getOpenRouterReasoningOptions(
   model: string
 ): Promise<ReasoningOption[] | undefined> {
-  const models = await getOpenRouterModelsMetadataFromDatabase();
+  return reasoningOptionsFor(await getOpenRouterModelsMetadataFromDatabase(), model);
+}
+
+function reasoningOptionsFor(
+  models: GatewayModelMap,
+  model: string
+): ReasoningOption[] | undefined {
   // A suffixed id such as `:free` has no metadata of its own and resolves to its base id.
-  const resolvedModelId = Object.hasOwn(models, model) ? model : normalizeModelId(model);
+  const resolvedModelId = resolveCatalogModelId(models, model);
   const reasoning = models[resolvedModelId]?.reasoning;
   if (!reasoning) {
     return undefined;
@@ -59,14 +71,14 @@ export async function getOpenRouterReasoningOptions(
  * it. Undefined for models OpenRouter lists, including those without reasoning metadata.
  */
 async function getVercelOnlyReasoningOptions(
+  models: GatewayModelMap,
   model: string
 ): Promise<ReasoningOption[] | undefined> {
-  const openRouterModels = await getOpenRouterModelsMetadataFromDatabase();
-  const openRouterModelIds = Object.keys(openRouterModels);
+  const openRouterModelIds = Object.keys(models);
   if (
     // Without OpenRouter's models, every Vercel model would look Vercel-only.
     openRouterModelIds.length === 0 ||
-    (openRouterModels[model] ?? openRouterModels[normalizeModelId(model)])
+    Object.hasOwn(models, resolveCatalogModelId(models, model))
   ) {
     return undefined;
   }
@@ -91,9 +103,10 @@ export async function getModelReasoningOptions(
   model: string,
   allowFallback: boolean
 ): Promise<ReasoningOption[] | undefined> {
+  const openRouterModels = await getOpenRouterModelsMetadataFromDatabase();
   return (
-    (await getOpenRouterReasoningOptions(model)) ??
-    (await getVercelOnlyReasoningOptions(model)) ??
+    reasoningOptionsFor(openRouterModels, model) ??
+    (await getVercelOnlyReasoningOptions(openRouterModels, model)) ??
     (allowFallback ? getFallbackReasoningOptions(model) : undefined)
   );
 }

@@ -1,5 +1,6 @@
+import { type ComponentRef, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView } from 'react-native';
+import { I18nManager, Platform, ScrollView } from 'react-native';
 
 import { FilterChip } from '@/components/ui/filter-chip';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -44,6 +45,24 @@ export function BriefingFilterControls({
   onSelectOrganization,
 }: Readonly<BriefingFilterControlsProps>) {
   const { t } = useTranslation();
+  // iOS anchors a horizontal scroller's content to the physical left edge, so a
+  // chip row wider than its box hides its start chip past the box in a
+  // right-to-left interface (measured on iOS 26.5: a 394 pt row in a 374 pt box
+  // put the first chip 20 pt beyond it, cut at the screen edge). Once the
+  // content has a size the row moves itself to the interface's start edge; a
+  // row that fits, and every left-to-right cell, is left untouched.
+  const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
+  const rowWidth = useRef(0);
+  const contentWidth = useRef(0);
+  const alignToStartEdge = useCallback(() => {
+    if (Platform.OS !== 'ios' || !I18nManager.isRTL) {
+      return;
+    }
+    const offset = contentWidth.current - rowWidth.current;
+    if (offset > 0) {
+      scroller.current?.scrollTo({ x: offset, animated: false });
+    }
+  }, []);
   return (
     <>
       <SegmentedControl
@@ -60,11 +79,20 @@ export function BriefingFilterControls({
         accessibilityLabel={t('agentBriefing.title')}
       />
       <ScrollView
+        ref={scroller}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerClassName="gap-2"
         accessibilityRole="tablist"
         accessibilityLabel={t('agentBriefing.filterByContext')}
+        onLayout={event => {
+          rowWidth.current = event.nativeEvent.layout.width;
+          alignToStartEdge();
+        }}
+        onContentSizeChange={width => {
+          contentWidth.current = width;
+          alignToStartEdge();
+        }}
       >
         <FilterChip
           {...tabEntryA11y({ selected: organizationId === undefined })}

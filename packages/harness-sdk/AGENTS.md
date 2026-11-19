@@ -1017,7 +1017,8 @@ cache. Three places may set it, and the nearest one wins:
 1. The question: `session.ask(text, { maxTokens })`.
 2. The session: `openSession({ maxTokens })`.
 3. The `ModelCatalog` plugin's `maxOutputTokens`, when neither names one.
-4. `4096`, when the catalog names none either.
+
+When the catalog names none either, the package uses `4096`.
 
 One session does one thing at a time, because two answers built on one prefix
 means the second one misses the cache. A second question asked while the first

@@ -72,30 +72,29 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
         generation += 1;
         const expectedGeneration = generation;
 
+        const failFromFetch = (error: unknown): void => {
+          if (expectedGeneration !== generation) return;
+          fail(error instanceof Error ? error.message : 'Failed to fetch snapshot');
+        };
+
         if (config.fetchSnapshotPage) {
-          void config.fetchSnapshotPage(config.kiloSessionId, {}).then(
-            page => {
-              if (expectedGeneration !== generation) return;
-              if (page === null) {
-                fail('Session not found');
-                return;
-              }
-              if (page.kind === 'success') {
-                config.onInitialPageLoaded?.(page);
-                replayCompletedPage(page);
-                return;
-              }
-              // Typed failure: surface via onError and mark the session as
-              // stopped with `error` so the UI doesn't appear to load
-              // forever.
-              const failure = sessionSnapshotFailureMessage(page.kind);
-              fail(failure.message, failure);
-            },
-            (error: unknown) => {
-              if (expectedGeneration !== generation) return;
-              fail(error instanceof Error ? error.message : 'Failed to fetch snapshot');
+          void config.fetchSnapshotPage(config.kiloSessionId, {}).then(page => {
+            if (expectedGeneration !== generation) return;
+            if (page === null) {
+              fail('Session not found');
+              return;
             }
-          );
+            if (page.kind === 'success') {
+              config.onInitialPageLoaded?.(page);
+              replayCompletedPage(page);
+              return;
+            }
+            // Typed failure: surface via onError and mark the session as
+            // stopped with `error` so the UI doesn't appear to load
+            // forever.
+            const failure = sessionSnapshotFailureMessage(page.kind);
+            fail(failure.message, failure);
+          }, failFromFetch);
           return;
         }
 
@@ -104,16 +103,10 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
           return;
         }
 
-        void config.fetchSnapshot(config.kiloSessionId).then(
-          snapshot => {
-            if (expectedGeneration !== generation) return;
-            replayCompletedPage(snapshotPageFromSnapshot(snapshot));
-          },
-          (error: unknown) => {
-            if (expectedGeneration !== generation) return;
-            fail(error instanceof Error ? error.message : 'Failed to fetch snapshot');
-          }
-        );
+        void config.fetchSnapshot(config.kiloSessionId).then(snapshot => {
+          if (expectedGeneration !== generation) return;
+          replayCompletedPage(snapshotPageFromSnapshot(snapshot));
+        }, failFromFetch);
       },
 
       disconnect() {

@@ -977,6 +977,11 @@ async function issueSessionRuntimeAuthorization(
       token: created.token,
       seal: await sealRuntimeAuthorization(created.authorization, nextAuthSecret),
     };
+    // Only a model the caller's organization catalogue makes available may serve a
+    // session. This create-time check answers that for a prompt turn, which carries
+    // the model in this request. The AI gateway enforces the same requirement for
+    // the session at inference time (`resolveProviderAndPolicy` ->
+    // `getEffectiveModelDecision`), before any upstream request.
     if (initialTurn?.type === 'prompt') {
       await assertKiloModelAvailable({
         env: ctx.env,

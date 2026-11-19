@@ -66,6 +66,7 @@ vi.mock('@/components/ui/icons', () => ({
   ArrowRight: 'ArrowRight',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowRight: 'DirectionalArrowRight',
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));

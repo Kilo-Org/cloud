@@ -49,6 +49,11 @@ export type Displaced = Question &
      * one the person stopped, says nothing about a cause.
      */
     readonly failureKey?: string | null;
+    /**
+     * The words the answer had reached when it was stopped or failed. Absent
+     * when it ended before any words arrived.
+     */
+    readonly answer?: string;
   };
 
 /** What a chat screen draws. */
@@ -78,6 +83,13 @@ export type ChatState = {
    * and everything said after it stays after it.
    */
   readonly askedFrom: string | null;
+  /**
+   * The words the answer to that question had reached when the person stopped
+   * it or it failed. They stay on screen, with how it ended under them, instead
+   * of going with the answer. Null while the question is being asked, and when
+   * it ended before any words arrived.
+   */
+  readonly askedAnswer: string | null;
   /**
    * The questions asked before that one and never answered, oldest first. A
    * later send takes the one slot, and what it took the place of is kept here.
@@ -192,6 +204,7 @@ export const NOTHING = {
   asked: null,
   askedImages: [] as readonly LocalImage[],
   askedFrom: null,
+  askedAnswer: null,
   displaced: [] as readonly Displaced[],
   askedModel: null,
   askedEffort: null,

@@ -2998,12 +2998,14 @@ export function SessionDetailContent({
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
               layout={reducedMotion ? undefined : LinearTransition.duration(150)}
-              className="px-4 pb-3"
+              style={sideInsetStyle}
             >
-              <ActiveProfileIndicator
-                state={sessionProfileIndicatorState}
-                onPress={openSessionProfileEditor}
-              />
+              <View className="px-4 pb-3">
+                <ActiveProfileIndicator
+                  state={sessionProfileIndicatorState}
+                  onPress={openSessionProfileEditor}
+                />
+              </View>
             </Animated.View>
           ) : null}
           {sessionGoal !== null ? (
@@ -3224,6 +3226,7 @@ export function SessionDetailContent({
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
             className="bg-background"
+            style={sideInsetStyle}
           >
             {sessionFooterItem === 'working' ? (
               /* Raw list on purpose: working-indicator.tsx derives the label
@@ -3254,42 +3257,46 @@ export function SessionDetailContent({
           </Animated.View>
         ) : null}
 
-        {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
+        {/* The blocking cards sit beside the side insets the transcript and
+            the composer clear. */}
+        <View className="shrink" style={sideInsetStyle}>
+          {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
 
-        {blockingInteraction === 'question' && activeQuestion ? (
-          <QuestionCard
-            key={activeQuestion.requestId}
-            questions={activeQuestion.questions}
-            onAnswer={answers => {
-              void handleAnswerQuestion(answers);
-            }}
-            onReject={() => {
-              void handleRejectQuestion();
-            }}
-            isSubmitting={isAnswering}
-            requestId={activeQuestion.requestId}
-            submissionError={questionSubmissionError}
-            pendingCount={blockingRequestCount}
-          />
-        ) : null}
+          {blockingInteraction === 'question' && activeQuestion ? (
+            <QuestionCard
+              key={activeQuestion.requestId}
+              questions={activeQuestion.questions}
+              onAnswer={answers => {
+                void handleAnswerQuestion(answers);
+              }}
+              onReject={() => {
+                void handleRejectQuestion();
+              }}
+              isSubmitting={isAnswering}
+              requestId={activeQuestion.requestId}
+              submissionError={questionSubmissionError}
+              pendingCount={blockingRequestCount}
+            />
+          ) : null}
 
-        {blockingInteraction === 'permission' &&
-        activePermission &&
-        activePermission.requestId !== suppressedRequestId ? (
-          <PermissionCard
-            key={activePermission.requestId}
-            permission={activePermission.permission}
-            patterns={activePermission.patterns}
-            metadata={activePermission.metadata}
-            onRespond={response => {
-              void handleRespondToPermission(response);
-            }}
-            isSubmitting={isRespondingToPermission}
-            requestId={activePermission.requestId}
-            submissionError={permissionSubmissionError}
-            pendingCount={blockingRequestCount}
-          />
-        ) : null}
+          {blockingInteraction === 'permission' &&
+          activePermission &&
+          activePermission.requestId !== suppressedRequestId ? (
+            <PermissionCard
+              key={activePermission.requestId}
+              permission={activePermission.permission}
+              patterns={activePermission.patterns}
+              metadata={activePermission.metadata}
+              onRespond={response => {
+                void handleRespondToPermission(response);
+              }}
+              isSubmitting={isRespondingToPermission}
+              requestId={activePermission.requestId}
+              submissionError={permissionSubmissionError}
+              pendingCount={blockingRequestCount}
+            />
+          ) : null}
+        </View>
 
         {isReadOnlyFooterPlaceholderVisible ? <SessionReadOnlyFooterPlaceholder /> : null}
 

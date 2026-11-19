@@ -413,6 +413,33 @@ describe('browser runtime', () => {
     });
   });
 
+  // The first call is parked in its tool (Runtime.evaluate) or in its setup before the tool (Target.setAutoAttach).
+  it.each(['Runtime.evaluate', 'Target.setAutoAttach'])(
+    'runs two calls the same session sends at once one after the other, ending neither (first parked in %s)',
+    async method => {
+      const { debugger_, runtime } = await createHarness();
+      const agentCaller = agent('session-1');
+
+      debugger_.holdNextCommand(method);
+
+      // A model may send two tool calls in one step; the CLI runs them side by side on the session's tab.
+      const first = evaluateToolCall(runtime, agentCaller);
+
+      await debugger_.whenCommandHeld();
+
+      const second = evaluateToolCall(runtime, agentCaller);
+
+      // The second call is granted the lease its own session holds and waits behind the first.
+      vi.useFakeTimers();
+      await vi.advanceTimersByTimeAsync(0);
+      vi.useRealTimers();
+      debugger_.releaseHeldCommand();
+
+      await expect(first).resolves.toMatchObject({ kind: 'result', result: { ok: true } });
+      await expect(second).resolves.toMatchObject({ kind: 'result', result: { ok: true } });
+    }
+  );
+
   it('stops a taken call from sending the page commands that follow the one in flight', async () => {
     const { debugger_, runtime } = await createHarness();
     const agentCaller = agent('session-1');

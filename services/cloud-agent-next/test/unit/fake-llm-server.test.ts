@@ -19,6 +19,7 @@ import {
   isToolError,
   MAX_REALISTIC_CHARS,
   MAX_REALISTIC_PIECES,
+  MAX_QUESTION_DIRECTIVE_OPTIONS,
   MAX_TOOL_STREAM_BYTES,
   parseDirective,
   parseFileDirective,
@@ -1303,6 +1304,54 @@ describe('fake-llm-server HTTP', () => {
       toolResults: { write: 0, read: 0, edit: 0, question: 1 },
       unsupportedToolSchema: false,
     });
+  });
+
+  it('emits the requested option count via the opt-in question count form', async () => {
+    const h = await start();
+    // 33 options: over the product cap of 32, within the fake's own bound of
+    // 64, so the payload crosses the normalizer boundary that rejects it.
+    const prompt = '__fake__:question:multi:33:Over the cap?';
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const questions = call.arguments.questions as Array<{
+      question: string;
+      options: Array<{ label: string; description: string }>;
+    }>;
+    expect(questions).toHaveLength(1);
+    expect(questions[0]?.question).toBe('Over the cap?');
+    expect(questions[0]?.options).toHaveLength(33);
+    expect(questions[0]?.options?.[0]).toEqual({
+      label: 'Option 1',
+      description: 'Option 1 of 33 emitted by the E2E fake',
+    });
+    expect(questions[0]?.options?.at(-1)).toEqual({
+      label: 'Option 33',
+      description: 'Option 33 of 33 emitted by the E2E fake',
+    });
+  });
+
+  it('rejects a question option count outside the allowed range', async () => {
+    const h = await start();
+    for (const count of [0, MAX_QUESTION_DIRECTIVE_OPTIONS + 1]) {
+      const response = await postToolChat(h.url, `__fake__:question:bad:${count}:Pick one?`);
+      expect(response.status).toBe(402);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { message: `question option count must be between 1 and 64, got ${count}` },
+      });
+    }
+  });
+
+  it('keeps a question text that starts with digits a single-option question', async () => {
+    const h = await start();
+    const prompt = '__fake__:question:asker:2 of 3 disks are failing — proceed?';
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const questions = call.arguments.questions as Array<{
+      question: string;
+      options: Array<{ label: string; description: string }>;
+    }>;
+    expect(questions[0]?.question).toBe('2 of 3 disks are failing — proceed?');
+    expect(questions[0]?.options).toEqual([
+      { label: 'Continue', description: 'Continue the E2E scenario' },
+    ]);
   });
 
   it('issues a task tool call that parks the child on a gate, then finishes after the result', async () => {

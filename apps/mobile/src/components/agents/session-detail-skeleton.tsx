@@ -4,6 +4,7 @@ import { BlurBar } from '@/components/ui/blur-bar';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 /**
@@ -78,13 +79,17 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
  * the placeholder fill matches that surface in the light palette, so
  * default-tone bars on this fill paint nothing and the reserved area read as a
  * blank tinted block. The line is the footer note's `text-sm` line box and the
- * bar its `action` button's 48pt floor.
+ * bar its `action` button's 48pt floor. Its content clears the landscape side
+ * insets inside the full-bleed fill, as the live footer's does.
  */
 export function SessionReadOnlyFooterPlaceholder() {
+  const sideInsetStyle = useSideInsetStyle();
   return (
-    <View className="gap-3 border-t-[0.5px] border-hair-soft bg-secondary px-4 py-3">
-      <Skeleton className="mx-auto h-5 w-40 bg-muted-soft" />
-      <Skeleton className={cn('w-full bg-muted-soft', STATE_ACTION_CLASS)} />
+    <View className="border-t-[0.5px] border-hair-soft bg-secondary" style={sideInsetStyle}>
+      <View className="gap-3 px-4 py-3">
+        <Skeleton className="mx-auto h-5 w-40 bg-muted-soft" />
+        <Skeleton className={cn('w-full bg-muted-soft', STATE_ACTION_CLASS)} />
+      </View>
     </View>
   );
 }
@@ -118,25 +123,28 @@ const COMPOSER_FIELD_BORDER = 2;
  */
 export function SessionComposerSkeleton() {
   const fontScale = useLiveFontScale();
+  const sideInsetStyle = useSideInsetStyle();
   // The voice toggle renders the shared 48dp target box, so the row is 48 tall
   // on either platform; a shorter slot would leave the row short of the
   // composer that replaces it, and the transcript would move on resolve.
   const control = ICON_TARGET_BOX_CLASS;
   return (
     <BlurBar>
-      <View className="p-2.5 px-3">
-        <View className="flex-row items-center">
-          <View
-            className="flex-1 justify-center"
-            style={{
-              height:
-                COMPOSER_FIELD_LINE * fontScale + COMPOSER_FIELD_PADDING + COMPOSER_FIELD_BORDER,
-            }}
-          >
-            <Skeleton className="h-full w-full rounded-md" />
+      <View style={sideInsetStyle}>
+        <View className="p-2.5 px-3">
+          <View className="flex-row items-center">
+            <View
+              className="flex-1 justify-center"
+              style={{
+                height:
+                  COMPOSER_FIELD_LINE * fontScale + COMPOSER_FIELD_PADDING + COMPOSER_FIELD_BORDER,
+              }}
+            >
+              <Skeleton className="h-full w-full rounded-md" />
+            </View>
+            <Skeleton className={cn('ms-3 rounded-full', control)} />
+            <Skeleton className={cn('ms-3 rounded-full', control)} />
           </View>
-          <Skeleton className={cn('ms-3 rounded-full', control)} />
-          <Skeleton className={cn('ms-3 rounded-full', control)} />
         </View>
       </View>
     </BlurBar>

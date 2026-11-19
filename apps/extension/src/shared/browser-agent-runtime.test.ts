@@ -227,6 +227,13 @@ const createFakeCdp = (): FakeCdp => {
         return {};
       }
       case 'Runtime.callFunctionOn': {
+        const declaration = (params ?? {})['functionDeclaration'];
+
+        // `browser_type` focuses and selects the field before it inserts the text.
+        if (typeof declaration === 'string' && declaration.includes("status: 'ready'")) {
+          return { result: { value: { status: 'ready' } } };
+        }
+
         return { result: { value: JSON.stringify(probe) } };
       }
       case 'Runtime.evaluate': {
@@ -5295,6 +5302,7 @@ describe('agent browser calls', () => {
 
     await expect(runtime.shareActiveTab({ sessionHandle: 'session-1' })).resolves.toStrictEqual({
       groupId: 42,
+      kind: 'shared',
       tabId: TAB_ID,
     });
 

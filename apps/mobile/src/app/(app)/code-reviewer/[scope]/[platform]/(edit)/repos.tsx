@@ -25,9 +25,11 @@ import { Text } from '@/components/ui/text';
 import { TAB_SCREEN_TRAILING_GAP, useTabScreenFrame } from '@/components/tab-screen';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { classifyBitbucketConnection, isWebManagedConnection } from '@/lib/code-reviewer-bitbucket';
 import { repositoryModelOverrideHandlers } from '@/lib/code-reviewer-repo-models';
 import {
   isPersonal,
+  useBitbucketIntegrationStatus,
   useBitbucketReadiness,
   useGitHubRepositories,
   useGitLabRepositories,
@@ -66,6 +68,9 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   const githubRepos = useGitHubRepositories(scope, platform === 'github');
   const gitlabRepos = useGitLabRepositories(scope, platform === 'gitlab');
   const bitbucketReadiness = useBitbucketReadiness(scope);
+  // The readiness read describes workspace access tokens only, so the
+  // integration status beside it names a Bitbucket OAuth connection.
+  const bitbucketStatus = useBitbucketIntegrationStatus(scope, platform === 'bitbucket');
   const bitbucketRepos =
     bitbucketReadiness.data?.repositoryCache.status === 'available'
       ? bitbucketReadiness.data.repositoryCache.repositories.map(repo => ({
@@ -106,6 +111,13 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   const allModeBody = allMode && !configDisabled;
   const bitbucketNotReady =
     platform === 'bitbucket' && bitbucketReadiness.data?.repositoryCache.status !== 'available';
+  // A Bitbucket OAuth connection has no token integration to repair, so the
+  // notice naming the web page replaces the recovery card's Connect button.
+  const bitbucketManagedOnWeb =
+    platform === 'bitbucket' &&
+    isWebManagedConnection(
+      classifyBitbucketConnection({ readiness: bitbucketReadiness, status: bitbucketStatus })
+    );
   // The rows body is the only body with rows to narrow; in all mode the summary
   // stands where they would, so a field there would filter nothing.
   const rowsBody = !capabilities.selectionModePicker || mode === 'selected';
@@ -176,14 +188,23 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         isRetrying={reposFetching}
       />
     );
-  } else if (!reposLoading && bitbucketNotReady) {
-    const readiness = bitbucketReadiness.data;
+  } else if (!reposLoading && bitbucketManagedOnWeb) {
+    // An OAuth connection has no token to repair here: the notice names the
+    // web page instead of offering a Connect the server would refuse.
     repoState = (
       <CenteredState>
-        {readiness ? (
+        <Text variant="muted" className="text-center text-xs">
+          {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+        </Text>
+      </CenteredState>
+    );
+  } else if (!reposLoading && bitbucketNotReady) {
+    repoState = (
+      <CenteredState>
+        {bitbucketReadiness.data ? (
           <BitbucketSetupRecovery
             scope={scope}
-            readiness={readiness}
+            readiness={bitbucketReadiness.data}
             message={t('common.couldNotLoadRepositories')}
             className="mx-6"
           />

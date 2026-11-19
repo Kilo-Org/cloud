@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "アクティビティ",
       "checking": "確認中…",
+      "needsAttention": "要対応",
       "platforms": "プラットフォーム",
       "statusUnavailable": "状態を確認できません"
     },

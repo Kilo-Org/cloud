@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "പരിശോധിക്കുന്നു…",
       "statusUnavailable": "നില ലഭ്യമല്ല",
+      "needsAttention": "ശ്രദ്ധ ആവശ്യം",
       "platforms": "പ്ലാറ്റ്ഫോമുകൾ",
       "activity": "പ്രവർത്തനം"
     },

@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Sinusuri…",
       "statusUnavailable": "Hindi makuha ang katayuan",
+      "needsAttention": "Kailangan ng atensyon",
       "platforms": "Mga platform",
       "activity": "Aktibidad"
     },

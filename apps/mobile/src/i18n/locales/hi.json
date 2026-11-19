@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "गतिविधि",
       "checking": "जाँच हो रही है…",
+      "needsAttention": "ध्यान आवश्यक",
       "platforms": "प्लेटफ़ॉर्म",
       "statusUnavailable": "स्थिति अनुपलब्ध"
     },

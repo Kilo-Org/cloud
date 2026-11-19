@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Waa la hubinayaa…",
       "statusUnavailable": "Xaaladda lama heli karo",
+      "needsAttention": "U baahan fiiro",
       "platforms": "Madalaha",
       "activity": "Hawlaha"
     },

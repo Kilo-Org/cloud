@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Duke kontrolluar…",
       "statusUnavailable": "Statusi i padisponueshëm",
+      "needsAttention": "Kërkon vëmendje",
       "platforms": "Platformat",
       "activity": "Aktiviteti"
     },

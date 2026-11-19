@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "لە پشکنیندایە…",
       "statusUnavailable": "دۆخ بەردەست نییە",
+      "needsAttention": "پێویستی بە سەرنج",
       "platforms": "پلاتفۆرمەکان",
       "activity": "چالاکی"
     },

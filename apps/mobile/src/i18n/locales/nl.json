@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "Activiteit",
       "checking": "Controleren…",
+      "needsAttention": "Aandacht vereist",
       "platforms": "Platformen",
       "statusUnavailable": "Status niet beschikbaar"
     },

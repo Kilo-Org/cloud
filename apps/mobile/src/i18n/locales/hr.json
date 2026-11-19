@@ -1430,6 +1430,7 @@
     "platformList": {
       "checking": "Provjera…",
       "statusUnavailable": "Status nedostupan",
+      "needsAttention": "Potrebna pozornost",
       "platforms": "Platforme",
       "activity": "Aktivnost"
     },

@@ -7,6 +7,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { i18n } from '@/i18n';
 import { _resetScopeNamesForTests } from '@/lib/code-reviewer-scope-name';
 import { PlatformListScreen } from './platform-list-screen';
 
@@ -15,18 +16,30 @@ const refetchMocks = vi.hoisted(() => ({
   github: vi.fn<() => void>(),
   gitlab: vi.fn<() => void>(),
   bitbucket: vi.fn<() => void>(),
+  bitbucketStatus: vi.fn<() => void>(),
 }));
 const membership = vi.hoisted(() => ({
   organizations: [] as { organizationId: string; organizationName: string }[],
 }));
 const status = vi.hoisted(() => ({ error: undefined as unknown }));
+/** The connected value the Bitbucket readiness read answers; GitHub and GitLab never read it. */
+const bitbucketReadiness = vi.hoisted(() => ({ connected: false }));
+/** The Bitbucket integration-status read, which only the Bitbucket row reads. */
+const bitbucketStatus = vi.hoisted(() => ({
+  data: undefined as Record<string, unknown> | undefined,
+  isPending: false,
+  isError: false,
+  error: undefined as unknown,
+}));
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 
 const denial = { data: { code: 'UNAUTHORIZED', httpStatus: 401 } };
 
 function statusResult(refetch: () => void) {
   return {
-    data: status.error ? undefined : { connected: false },
+    data: status.error
+      ? undefined
+      : { connected: refetch === refetchMocks.bitbucket ? bitbucketReadiness.connected : false },
     isLoading: false,
     isError: status.error !== undefined,
     isFetching: false,
@@ -40,6 +53,18 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useGitHubStatus: () => statusResult(refetchMocks.github),
   useGitLabStatus: () => statusResult(refetchMocks.gitlab),
   useBitbucketReadiness: () => statusResult(refetchMocks.bitbucket),
+  useBitbucketIntegrationStatus: (_scope: string, enabled = true) => ({
+    // A disabled read (personal scope) keeps `isPending` true with no data and
+    // no error — the shape the classifier must not read as loading on this
+    // screen either, because the row itself is hidden there.
+    isLoading: false,
+    isPending: enabled ? bitbucketStatus.isPending : true,
+    isError: enabled ? bitbucketStatus.isError : false,
+    isFetching: false,
+    data: enabled ? bitbucketStatus.data : undefined,
+    error: enabled ? bitbucketStatus.error : undefined,
+    refetch: refetchMocks.bitbucketStatus,
+  }),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -80,8 +105,12 @@ vi.mock('@/components/screen-header', () => ({
 }));
 
 vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: (props: { title?: string; onPress?: () => void }) =>
-    createElement('ConfigureRowMock', { title: props.title, onPress: props.onPress }),
+  ConfigureRow: (props: { title?: string; subtitle?: string; onPress?: () => void }) =>
+    createElement('ConfigureRowMock', {
+      title: props.title,
+      subtitle: props.subtitle,
+      onPress: props.onPress,
+    }),
 }));
 
 vi.mock('@/components/ui/text', () => ({
@@ -121,6 +150,14 @@ beforeEach(() => {
   // earlier test would title the next one's scope.
   _resetScopeNamesForTests();
   status.error = undefined;
+  // The default readiness answers "no token integration" and the default
+  // status read answers "no integration" the way the server does for an
+  // organization with none, so the Bitbucket row reads Not connected.
+  bitbucketReadiness.connected = false;
+  bitbucketStatus.data = { method: 'workspace_access_token', status: 'not_connected' };
+  bitbucketStatus.isPending = false;
+  bitbucketStatus.isError = false;
+  bitbucketStatus.error = undefined;
   router.push.mockClear();
   membership.organizations = [{ organizationId: 'org-lost', organizationName: 'Drain Labs' }];
   for (const refetch of Object.values(refetchMocks)) {
@@ -251,5 +288,121 @@ describe('PlatformListScreen double tap', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+});
+
+// The Bitbucket row reads both the readiness and the integration status: the
+// readiness alone reports an OAuth connection as "Not connected".
+describe('PlatformListScreen Bitbucket row', () => {
+  function bitbucketRow() {
+    const renderer = mountScreen();
+    const row = findByType(renderer.root, 'ConfigureRowMock').find(
+      candidate => candidate.props.title === 'Bitbucket'
+    );
+    if (!row) {
+      throw new Error('the Bitbucket row did not render');
+    }
+    return {
+      subtitle: row.props.subtitle,
+      unmount: () => {
+        act(() => {
+          renderer.unmount();
+        });
+      },
+    };
+  }
+
+  it('reads a status failure as unavailable, not as not connected', () => {
+    bitbucketStatus.data = undefined;
+    bitbucketStatus.isPending = true;
+    bitbucketStatus.isError = true;
+    bitbucketStatus.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+
+    const row = bitbucketRow();
+
+    expect(row.subtitle).toBe(i18n.t('codeReviewer.platformList.statusUnavailable'));
+    row.unmount();
+  });
+
+  it('re-reads the integration status together with the other reads on Retry', () => {
+    // A denial on the status read denies the scope like the other reads' do.
+    bitbucketStatus.isError = true;
+    bitbucketStatus.error = denial;
+
+    const renderer = mountScreen();
+    const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
+    if (!denied) {
+      throw new Error('the no-access surface did not render');
+    }
+    bitbucketStatus.isError = false;
+    bitbucketStatus.error = undefined;
+
+    act(() => {
+      (denied.props.onRetry as () => void)();
+    });
+
+    expect(refetchMocks.bitbucket).toHaveBeenCalledTimes(1);
+    expect(refetchMocks.bitbucketStatus).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('reports the row per connection state', () => {
+    const cases = [
+      {
+        // The token integration answers from the readiness read alone.
+        tokenConnected: true,
+        integrationStatus: undefined as Record<string, unknown> | undefined,
+        subtitle: i18n.t('common.connected'),
+      },
+      {
+        tokenConnected: false,
+        integrationStatus: {
+          method: 'oauth',
+          status: 'connected',
+          workspace: { uuid: 'ws-uuid', slug: 'acme', displayName: 'Acme' },
+        } as Record<string, unknown>,
+        subtitle: i18n.t('common.connected'),
+      },
+      {
+        tokenConnected: false,
+        integrationStatus: {
+          method: 'oauth',
+          status: 'workspace_selection_required',
+          workspace: null,
+        } as Record<string, unknown>,
+        subtitle: i18n.t('codeReviewer.platformList.needsAttention'),
+      },
+      {
+        tokenConnected: false,
+        integrationStatus: {
+          method: 'oauth',
+          status: 'reconnect_required',
+          workspace: null,
+        } as Record<string, unknown>,
+        subtitle: i18n.t('codeReviewer.platformList.needsAttention'),
+      },
+      {
+        tokenConnected: false,
+        integrationStatus: {
+          method: 'workspace_access_token',
+          status: 'not_connected',
+        } as Record<string, unknown>,
+        subtitle: i18n.t('common.notConnected'),
+      },
+    ];
+    for (const { tokenConnected, integrationStatus, subtitle } of cases) {
+      // Each case sets both reads' answers; errors stay reset.
+      status.error = undefined;
+      bitbucketReadiness.connected = tokenConnected;
+      bitbucketStatus.data = integrationStatus;
+
+      const row = bitbucketRow();
+
+      expect(row.subtitle).toBe(subtitle);
+      row.unmount();
+    }
   });
 });

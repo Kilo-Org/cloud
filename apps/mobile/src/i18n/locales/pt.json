@@ -1430,6 +1430,7 @@
     "platformList": {
       "checking": "A verificar…",
       "statusUnavailable": "Estado indisponível",
+      "needsAttention": "Requer atenção",
       "platforms": "Plataformas",
       "activity": "Atividade"
     },

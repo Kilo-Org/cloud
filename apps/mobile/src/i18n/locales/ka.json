@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "მოწმდება…",
       "statusUnavailable": "სტატუსი ხელმისაწვდომი არ არის",
+      "needsAttention": "ყურადღება სჭირდება",
       "platforms": "პლატფორმები",
       "activity": "აქტივობა"
     },

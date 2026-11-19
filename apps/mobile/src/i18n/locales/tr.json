@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "Etkinlik",
       "checking": "Kontrol ediliyor…",
+      "needsAttention": "İşlem gerekiyor",
       "platforms": "Platformlar",
       "statusUnavailable": "Durum alınamıyor"
     },

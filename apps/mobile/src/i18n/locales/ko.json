@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "활동",
       "checking": "확인 중…",
+      "needsAttention": "조치 필요",
       "platforms": "플랫폼",
       "statusUnavailable": "상태 확인 불가"
     },

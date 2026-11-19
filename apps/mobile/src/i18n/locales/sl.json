@@ -1453,6 +1453,7 @@
     "platformList": {
       "checking": "Preverjanje…",
       "statusUnavailable": "Stanje ni na voljo",
+      "needsAttention": "Potrebno ukrepanje",
       "platforms": "Platforme",
       "activity": "Dejavnost"
     },

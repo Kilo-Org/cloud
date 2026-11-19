@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "சரிபார்க்கிறது…",
       "statusUnavailable": "நிலை கிடைக்கவில்லை",
+      "needsAttention": "கவனம் தேவை",
       "platforms": "தளங்கள்",
       "activity": "செயல்பாடு"
     },

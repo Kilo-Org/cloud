@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "ଯାଞ୍ଚ କରାଯାଉଛି…",
       "statusUnavailable": "ସ୍ଥିତି ଉପଲବ୍ଧ ନାହିଁ",
+      "needsAttention": "ଧ୍ୟାନ ଆବଶ୍ୟକ",
       "platforms": "ପ୍ଲାଟଫର୍ମ",
       "activity": "କାର୍ଯ୍ୟକଳାପ"
     },

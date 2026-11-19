@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Sjekker…",
       "statusUnavailable": "Status utilgjengelig",
+      "needsAttention": "Oppfølging nødvendig",
       "platforms": "Plattformer",
       "activity": "Aktivitet"
     },

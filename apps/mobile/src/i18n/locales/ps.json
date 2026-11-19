@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "کتل کېږي…",
       "statusUnavailable": "حالت نه دی معلوم",
+      "needsAttention": "پاملرنې ته اړتیا",
       "platforms": "پلیټ فارمونه",
       "activity": "فعالیت"
     },

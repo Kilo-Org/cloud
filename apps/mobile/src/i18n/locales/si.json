@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "පරීක්ෂා කරමින්…",
       "statusUnavailable": "තත්ත්වය ලබා ගත නොහැක",
+      "needsAttention": "අවධානය අවශ්‍යයි",
       "platforms": "වේදිකා",
       "activity": "ක්‍රියාකාරකම්"
     },

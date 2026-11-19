@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "در حال بررسی…",
       "statusUnavailable": "وضعیت در دسترس نیست",
+      "needsAttention": "نیازمند رسیدگی",
       "platforms": "پلتفرم‌ها",
       "activity": "فعالیت"
     },

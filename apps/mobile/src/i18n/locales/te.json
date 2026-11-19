@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "తనిఖీ చేస్తోంది…",
       "statusUnavailable": "స్థితి అందుబాటులో లేదు",
+      "needsAttention": "శ్రద్ధ అవసరం",
       "platforms": "ప్లాట్‌ఫారమ్‌లు",
       "activity": "కార్యాచరణ"
     },

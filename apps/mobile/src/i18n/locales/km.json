@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "កំពុងពិនិត្យ…",
       "statusUnavailable": "មិនអាចមើលស្ថានភាពបាន",
+      "needsAttention": "ត្រូវការការយកចិត្តទុកដាក់",
       "platforms": "វេទិកា",
       "activity": "សកម្មភាព"
     },

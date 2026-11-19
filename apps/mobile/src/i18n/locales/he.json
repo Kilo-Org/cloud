@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "פעילות",
       "checking": "בבדיקה…",
+      "needsAttention": "נדרש טיפול",
       "platforms": "פלטפורמות",
       "statusUnavailable": "המצב אינו זמין"
     },

@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Ստուգվում է…",
       "statusUnavailable": "Կարգավիճակը հասանելի չէ",
+      "needsAttention": "Ուշադրության կարիք",
       "platforms": "Հարթակներ",
       "activity": "Գործունեություն"
     },

@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "तपासत आहे…",
       "statusUnavailable": "स्थिती अनुपलब्ध",
+      "needsAttention": "लक्ष आवश्यक",
       "platforms": "प्लॅटफॉर्म",
       "activity": "क्रियाकलाप"
     },

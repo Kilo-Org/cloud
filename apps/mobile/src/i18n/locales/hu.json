@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Ellenőrzés…",
       "statusUnavailable": "Az állapot nem érhető el",
+      "needsAttention": "Beavatkozást igényel",
       "platforms": "Platformok",
       "activity": "Tevékenység"
     },

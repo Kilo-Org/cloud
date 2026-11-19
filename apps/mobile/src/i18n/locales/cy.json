@@ -1499,6 +1499,7 @@
     "platformList": {
       "checking": "Yn gwirio…",
       "statusUnavailable": "Statws ddim ar gael",
+      "needsAttention": "Angen sylw",
       "platforms": "Platfformau",
       "activity": "Gweithgaredd"
     },

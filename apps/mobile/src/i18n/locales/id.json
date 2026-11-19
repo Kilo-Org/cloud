@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "Aktivitas",
       "checking": "Memeriksa…",
+      "needsAttention": "Perlu perhatian",
       "platforms": "Platform",
       "statusUnavailable": "Status tidak tersedia"
     },

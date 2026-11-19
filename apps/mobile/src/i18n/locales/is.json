@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Athuga…",
       "statusUnavailable": "Staða ekki tiltæk",
+      "needsAttention": "Þarfnast athygli",
       "platforms": "Vettvangar",
       "activity": "Virkni"
     },

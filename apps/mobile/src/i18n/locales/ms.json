@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Menyemak…",
       "statusUnavailable": "Status tidak tersedia",
+      "needsAttention": "Perlu perhatian",
       "platforms": "Platform",
       "activity": "Aktiviti"
     },

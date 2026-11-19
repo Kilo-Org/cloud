@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "जाँच गर्दै…",
       "statusUnavailable": "स्थिति उपलब्ध छैन",
+      "needsAttention": "ध्यान आवश्यक",
       "platforms": "प्लेटफर्महरू",
       "activity": "गतिविधि"
     },

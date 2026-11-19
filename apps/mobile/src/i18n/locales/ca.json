@@ -1430,6 +1430,7 @@
     "platformList": {
       "checking": "S'està comprovant…",
       "statusUnavailable": "Estat no disponible",
+      "needsAttention": "Atenció necessària",
       "platforms": "Plataformes",
       "activity": "Activitat"
     },

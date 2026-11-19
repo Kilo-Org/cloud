@@ -1430,6 +1430,7 @@
     "platformList": {
       "checking": "Pārbauda…",
       "statusUnavailable": "Statuss nav pieejams",
+      "needsAttention": "Nepieciešama rīcība",
       "platforms": "Platformas",
       "activity": "Darbības"
     },

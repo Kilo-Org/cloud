@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
       "statusUnavailable": "ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ",
+      "needsAttention": "ਧਿਆਨ ਦੀ ਲੋੜ",
       "platforms": "ਪਲੇਟਫਾਰਮ",
       "activity": "ਗਤੀਵਿਧੀ"
     },

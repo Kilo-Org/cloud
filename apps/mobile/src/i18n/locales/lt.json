@@ -1453,6 +1453,7 @@
     "platformList": {
       "checking": "Tikrinama…",
       "statusUnavailable": "Būsena nepasiekiama",
+      "needsAttention": "Reikia dėmesio",
       "platforms": "Platformos",
       "activity": "Veikla"
     },

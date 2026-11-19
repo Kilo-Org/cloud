@@ -1430,6 +1430,7 @@
     "platformList": {
       "checking": "Provera…",
       "statusUnavailable": "Status nedostupan",
+      "needsAttention": "Potrebna pažnja",
       "platforms": "Platforme",
       "activity": "Aktivnost"
     },

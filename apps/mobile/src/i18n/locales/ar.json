@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "النشاط",
       "checking": "جارٍ التحقق…",
+      "needsAttention": "يتطلب الانتباه",
       "platforms": "المنصات",
       "statusUnavailable": "الحالة غير متاحة"
     },

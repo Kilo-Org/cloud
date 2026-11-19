@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Ap tcheke…",
       "statusUnavailable": "Estati pa disponib",
+      "needsAttention": "Bezwen atansyon",
       "platforms": "Platfòm",
       "activity": "Aktivite"
     },

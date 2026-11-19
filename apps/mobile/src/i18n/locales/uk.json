@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "Активність",
       "checking": "Перевіряємо…",
+      "needsAttention": "Потребує уваги",
       "platforms": "Платформи",
       "statusUnavailable": "Стан недоступний"
     },

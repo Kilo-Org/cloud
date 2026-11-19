@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "Активность",
       "checking": "Проверка…",
+      "needsAttention": "Требует внимания",
       "platforms": "Платформы",
       "statusUnavailable": "Статус недоступен"
     },

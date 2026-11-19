@@ -1453,6 +1453,7 @@
     "platformList": {
       "checking": "Kontroluje se…",
       "statusUnavailable": "Stav nedostupný",
+      "needsAttention": "Vyžaduje pozornost",
       "platforms": "Platformy",
       "activity": "Aktivita"
     },

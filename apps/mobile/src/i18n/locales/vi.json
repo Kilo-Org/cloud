@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "Hoạt động",
       "checking": "Đang kiểm tra…",
+      "needsAttention": "Cần xử lý",
       "platforms": "Nền tảng",
       "statusUnavailable": "Không lấy được trạng thái"
     },

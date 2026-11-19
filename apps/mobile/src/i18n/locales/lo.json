@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "ກຳລັງກວດສອບ…",
       "statusUnavailable": "ບໍ່ສາມາດຮູ້ສະຖານະໄດ້",
+      "needsAttention": "ຕ້ອງການຄວາມສົນໃຈ",
       "platforms": "ແພລດຟອມ",
       "activity": "ກິດຈະກຳ"
     },

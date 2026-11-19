@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Проверка…",
       "statusUnavailable": "Състоянието не е достъпно",
+      "needsAttention": "Изисква намеса",
       "platforms": "Платформи",
       "activity": "Активност"
     },

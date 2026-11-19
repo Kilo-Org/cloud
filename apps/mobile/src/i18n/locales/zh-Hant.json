@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "活動",
       "checking": "正在檢查…",
+      "needsAttention": "需要處理",
       "platforms": "平台",
       "statusUnavailable": "無法取得狀態"
     },

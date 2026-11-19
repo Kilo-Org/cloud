@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "Tekshirilmoqda…",
       "statusUnavailable": "Holatni aniqlab bo'lmadi",
+      "needsAttention": "E’tibor talab qiladi",
       "platforms": "Platformalar",
       "activity": "Faoliyat"
     },

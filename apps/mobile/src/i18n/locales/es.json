@@ -732,6 +732,7 @@
     "platformList": {
       "activity": "Actividad",
       "checking": "Comprobando…",
+      "needsAttention": "Requiere atención",
       "platforms": "Plataformas",
       "statusUnavailable": "Estado no disponible"
     },

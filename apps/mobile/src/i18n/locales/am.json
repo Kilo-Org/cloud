@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "በመፈተሽ ላይ…",
       "statusUnavailable": "ሁኔታ አይገኝም",
+      "needsAttention": "ትኩረት ይፈልጋል",
       "platforms": "መድረኮች",
       "activity": "እንቅስቃሴ"
     },

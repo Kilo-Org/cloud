@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "পরীক্ষা করা হচ্ছে…",
       "statusUnavailable": "অবস্থা জানা যাচ্ছে না",
+      "needsAttention": "মনোযোগ প্রয়োজন",
       "platforms": "প্ল্যাটফর্ম",
       "activity": "কার্যকলাপ"
     },

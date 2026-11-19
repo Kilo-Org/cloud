@@ -20,11 +20,12 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { useBitbucketIntegrationStatus } from '@/lib/hooks/use-bitbucket';
+import { classifyBitbucketConnection } from '@/lib/code-reviewer-bitbucket';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import {
-  classifyProviderState,
   useBitbucketReadiness,
   type useReviewConfig,
   useSaveReviewConfig,
@@ -50,6 +51,10 @@ export function BitbucketOverview({
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const readiness = useBitbucketReadiness(scope);
+  // The readiness read describes workspace access tokens only, so the
+  // integration status beside it is what tells a Bitbucket OAuth connection
+  // apart from a workspace with none.
+  const integrationStatus = useBitbucketIntegrationStatus(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
   const { reducedMotion } = useMotionPolicy();
@@ -57,31 +62,55 @@ export function BitbucketOverview({
   // error with retry, or a loading state -- never the header over an empty
   // scroll area.
   const configBody = useQueryBodyState(config);
-  const providerState = classifyProviderState({
-    isLoading: readiness.isLoading,
-    isError: readiness.isError,
-    isFetching: readiness.isFetching,
-    connected: readiness.data?.connected,
-    hasData: readiness.data !== undefined,
-    refetch: () => void readiness.refetch(),
-  });
+  const connection = classifyBitbucketConnection({ readiness, status: integrationStatus });
 
-  if (providerState.status === 'error') {
+  if (connection.kind === 'error') {
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <QueryError
-          onRetry={() => {
-            providerState.refetch();
-          }}
-          isRetrying={providerState.isRetrying}
+          variant={connection.variant}
+          onRetry={
+            connection.permanent
+              ? undefined
+              : () => {
+                  connection.refetch();
+                }
+          }
+          isRetrying={connection.isRetrying}
         />
       </View>
     );
   }
 
-  const isLoading = providerState.status === 'loading' || permissionLoading;
-  const connected = providerState.status === 'connected';
+  // An organization connected through Bitbucket OAuth reads as one with no
+  // token integration: the connection lives on the web page that ran its
+  // consent, so this surface renders read-only — no connect action, no toggle,
+  // no config rows, and no repositories button.
+  if (connection.kind === 'oauth-connected' || connection.kind === 'oauth-attention') {
+    const workspaceName = connection.kind === 'oauth-connected' ? connection.workspace : null;
+    return (
+      <View className="flex-1 bg-background">
+        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+          <View className="gap-3 rounded-lg bg-secondary p-4">
+            <Text className="text-sm font-medium">{capabilities.label}</Text>
+            {workspaceName?.displayName ? (
+              <Text variant="muted" className="text-xs">
+                {workspaceName.displayName}
+              </Text>
+            ) : null}
+            <Text variant="muted" className="text-sm">
+              {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+            </Text>
+          </View>
+        </TabScreenScrollView>
+      </View>
+    );
+  }
+
+  const isLoading = connection.kind === 'loading' || permissionLoading;
+  const connected = connection.kind === 'token-connected';
 
   // A connected workspace whose config read failed (no cache to fall back on),
   // or whose idle read could not be restarted, has nothing to show: surface a

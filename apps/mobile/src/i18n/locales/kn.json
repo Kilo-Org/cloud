@@ -1407,6 +1407,7 @@
     "platformList": {
       "checking": "ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
       "statusUnavailable": "ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ",
+      "needsAttention": "ಗಮನ ಅಗತ್ಯವಿದೆ",
       "platforms": "ವೇದಿಕೆಗಳು",
       "activity": "ಚಟುವಟಿಕೆ"
     },

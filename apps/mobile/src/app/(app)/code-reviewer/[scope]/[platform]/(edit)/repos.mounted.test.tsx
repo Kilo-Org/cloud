@@ -213,6 +213,16 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: state.readinessRefetch,
     data: state.readiness,
   }),
+  useBitbucketIntegrationStatus: (_scope: string, enabled = true) => ({
+    isLoading: false,
+    isPending: !enabled,
+    isError: false,
+    isFetching: false,
+    // A token-only organization is the only shape this suite exercises; the
+    // disabled read (any other platform) answers nothing.
+    data: enabled ? { method: 'workspace_access_token', status: 'not_connected' } : undefined,
+    refetch: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/hooks/use-bitbucket', () => ({
   // The setup recovery card reads this only when the workspace's token still

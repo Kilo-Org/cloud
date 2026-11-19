@@ -4551,7 +4551,26 @@
     "quietSnapshot": "이 스냅샷에 대해 선택된 세션 활동이 없습니다. AI 요약이 요청되거나 요금이 부과되지 않았습니다.",
     "noEnabledContexts": "예약된 브리핑이 활성화된 컨텍스트 없음",
     "sourceBlocker": "확인이 필요한 세션",
-    "sourceMetadata": "캡처된 세션 메타데이터"
+    "sourceMetadata": "캡처된 세션 메타데이터",
+    "metadataPlan_other": "계획: {{displayTotal}}단계 중 {{displayDone}}단계 완료",
+    "metadataPlan": "계획: {{displayTotal}}단계 중 {{displayDone}}단계 완료",
+    "metadataFiles_other": "{{displayCount}}개 파일 변경됨",
+    "metadataFiles": "{{displayCount}}개 파일 변경됨",
+    "metadataLinesAdded_other": "{{displayCount}}줄 추가됨",
+    "metadataLinesAdded": "{{displayCount}}줄 추가됨",
+    "metadataLinesRemoved_other": "{{displayCount}}줄 삭제됨",
+    "metadataLinesRemoved": "{{displayCount}}줄 삭제됨",
+    "metadataPlanCurrent": "현재 단계: {{current}}",
+    "metadataFailure": "지난 턴 실패: {{kind}}",
+    "sourceActivity": "제목 없는 활동",
+    "metadataFailureProvider": "프로바이더 오류",
+    "metadataFailureTool": "도구 오류",
+    "metadataFailureCancelled": "취소됨",
+    "metadataFailureOther": "기타 오류",
+    "metadataPlan_one": "계획: {{displayTotal}}단계 중 {{displayDone}}단계 완료",
+    "metadataFiles_one": "{{displayCount}}개 파일 변경됨",
+    "metadataLinesAdded_one": "{{displayCount}}줄 추가됨",
+    "metadataLinesRemoved_one": "{{displayCount}}줄 삭제됨"
   },
   "systemSearch": {
     "couldNotOpenResult": "이 검색 결과를 열지 못했습니다"

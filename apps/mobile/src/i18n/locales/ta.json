@@ -4551,7 +4551,26 @@
     "quietSnapshot": "இந்த நிலைப்பதிவுக்காக அமர்வுச் செயல்பாடு எதுவும் தேர்ந்தெடுக்கப்படவில்லை. AI சுருக்கம் கோரப்படவில்லை; கட்டணமும் வசூலிக்கப்படவில்லை.",
     "noEnabledContexts": "திட்டமிடப்பட்ட அறிக்கைகளுக்கு எந்தச் சூழலும் இயக்கப்படவில்லை",
     "sourceBlocker": "அமர்வில் கவனம் தேவை",
-    "sourceMetadata": "பதிவுசெய்யப்பட்ட அமர்வு மெட்டாடேட்டா"
+    "sourceMetadata": "பதிவுசெய்யப்பட்ட அமர்வு மெட்டாடேட்டா",
+    "metadataPlan_one": "திட்டம்: {{displayTotal}} படியில் {{displayDone}} முடிந்தது",
+    "metadataPlan_other": "திட்டம்: {{displayTotal}} படிகளில் {{displayDone}} முடிந்தது",
+    "metadataPlan": "திட்டம்: {{displayTotal}} படிகளில் {{displayDone}} முடிந்தது",
+    "metadataFiles_one": "{{displayCount}} கோப்பு மாற்றப்பட்டது",
+    "metadataFiles_other": "{{displayCount}} கோப்புகள் மாற்றப்பட்டன",
+    "metadataFiles": "{{displayCount}} கோப்புகள் மாற்றப்பட்டன",
+    "metadataLinesAdded_one": "{{displayCount}} வரி சேர்க்கப்பட்டது",
+    "metadataLinesAdded_other": "{{displayCount}} வரிகள் சேர்க்கப்பட்டன",
+    "metadataLinesAdded": "{{displayCount}} வரிகள் சேர்க்கப்பட்டன",
+    "metadataLinesRemoved_one": "{{displayCount}} வரி நீக்கப்பட்டது",
+    "metadataLinesRemoved_other": "{{displayCount}} வரிகள் நீக்கப்பட்டன",
+    "metadataLinesRemoved": "{{displayCount}} வரிகள் நீக்கப்பட்டன",
+    "metadataPlanCurrent": "தற்போதைய படி: {{current}}",
+    "metadataFailure": "கடைசி சுற்று தோல்வியடைந்தது: {{kind}}",
+    "sourceActivity": "தலைப்பில்லா செயல்பாடு",
+    "metadataFailureProvider": "வழங்குநர் பிழை",
+    "metadataFailureTool": "கருவி பிழை",
+    "metadataFailureCancelled": "ரத்து செய்யப்பட்டது",
+    "metadataFailureOther": "குறிப்பிடப்படாத பிழை"
   },
   "systemSearch": {
     "couldNotOpenResult": "இந்தத் தேடல் முடிவைத் திறக்க முடியவில்லை"

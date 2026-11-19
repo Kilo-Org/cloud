@@ -4551,7 +4551,26 @@
     "quietSnapshot": "此快照未選取任何工作階段活動。未要求 AI 摘要，也未收費。",
     "noEnabledContexts": "未為任何情境啟用排定的簡報",
     "sourceBlocker": "工作階段需要留意",
-    "sourceMetadata": "已擷取的工作階段中繼資料"
+    "sourceMetadata": "已擷取的工作階段中繼資料",
+    "metadataPlan_other": "計畫：已完成 {{displayDone}}/{{displayTotal}} 個步驟",
+    "metadataPlan": "計畫：已完成 {{displayDone}}/{{displayTotal}} 個步驟",
+    "metadataFiles_other": "{{displayCount}} 個檔案已變更",
+    "metadataFiles": "{{displayCount}} 個檔案已變更",
+    "metadataLinesAdded_other": "新增 {{displayCount}} 行",
+    "metadataLinesAdded": "新增 {{displayCount}} 行",
+    "metadataLinesRemoved_other": "刪除 {{displayCount}} 行",
+    "metadataLinesRemoved": "刪除 {{displayCount}} 行",
+    "metadataPlanCurrent": "目前步驟：{{current}}",
+    "metadataFailure": "上一輪失敗：{{kind}}",
+    "sourceActivity": "未命名活動",
+    "metadataFailureProvider": "提供者錯誤",
+    "metadataFailureTool": "工具錯誤",
+    "metadataFailureCancelled": "已取消",
+    "metadataFailureOther": "未指定錯誤",
+    "metadataPlan_one": "計畫：已完成 {{displayDone}}/{{displayTotal}} 個步驟",
+    "metadataFiles_one": "{{displayCount}} 個檔案已變更",
+    "metadataLinesAdded_one": "新增 {{displayCount}} 行",
+    "metadataLinesRemoved_one": "刪除 {{displayCount}} 行"
   },
   "systemSearch": {
     "couldNotOpenResult": "無法開啟此搜尋結果"

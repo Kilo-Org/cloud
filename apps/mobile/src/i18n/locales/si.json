@@ -4551,7 +4551,26 @@
     "quietSnapshot": "මෙම තත්ත්ව සටහන සඳහා කිසිදු සැසි ක්‍රියාකාරකමක් තෝරාගෙන නැත. AI සාරාංශයක් ඉල්ලා නැති අතර, ගාස්තු අය කිරීමක් සිදු වී නැත.",
     "noEnabledContexts": "කාලසටහන්ගත වාර්තා සඳහා කිසිදු සන්දර්භයක් සක්‍රිය කර නැත",
     "sourceBlocker": "සැසියට අවධානය අවශ්‍යයි",
-    "sourceMetadata": "සටහන් කළ සැසි පාරදත්ත"
+    "sourceMetadata": "සටහන් කළ සැසි පාරදත්ත",
+    "metadataPlan_one": "සැලසුම: පියවර {{displayTotal}} න් {{displayDone}}ක් සම්පූර්ණයි",
+    "metadataPlan_other": "සැලසුම: පියවර {{displayTotal}} න් {{displayDone}}ක් සම්පූර්ණයි",
+    "metadataPlan": "සැලසුම: පියවර {{displayTotal}} න් {{displayDone}}ක් සම්පූර්ණයි",
+    "metadataFiles_one": "ගොනු {{displayCount}}ක් වෙනස් විය",
+    "metadataFiles_other": "ගොනු {{displayCount}}ක් වෙනස් විය",
+    "metadataFiles": "ගොනු {{displayCount}}ක් වෙනස් විය",
+    "metadataLinesAdded_one": "පේළි {{displayCount}}ක් එකතු විය",
+    "metadataLinesAdded_other": "පේළි {{displayCount}}ක් එකතු විය",
+    "metadataLinesAdded": "පේළි {{displayCount}}ක් එකතු විය",
+    "metadataLinesRemoved_one": "පේළි {{displayCount}}ක් ඉවත් විය",
+    "metadataLinesRemoved_other": "පේළි {{displayCount}}ක් ඉවත් විය",
+    "metadataLinesRemoved": "පේළි {{displayCount}}ක් ඉවත් විය",
+    "metadataPlanCurrent": "වත්මන් පියවර: {{current}}",
+    "metadataFailure": "පසුගිය වටය අසාර්ථක විය: {{kind}}",
+    "sourceActivity": "ශීර්ෂයක් නොමැති ක්‍රියාකාරකම",
+    "metadataFailureProvider": "සැපයුම්කරු දෝෂය",
+    "metadataFailureTool": "මෙවලම් දෝෂය",
+    "metadataFailureCancelled": "අවලංගු කර ඇත",
+    "metadataFailureOther": "නිශ්චිත නොවන දෝෂය"
   },
   "systemSearch": {
     "couldNotOpenResult": "මෙම සෙවුම් ප්‍රතිඵලය විවෘත කිරීමට නොහැකි විය"

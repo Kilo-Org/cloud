@@ -4551,7 +4551,26 @@
     "quietSnapshot": "Sellesse ülevaatesse ei valitud ühtegi seansitegevust. AI kokkuvõtet ei taotletud ega selle eest tasu arvestatud.",
     "noEnabledContexts": "Ajastatud ülevaated pole üheski kontekstis lubatud",
     "sourceBlocker": "Seanss vajab tähelepanu",
-    "sourceMetadata": "Salvestatud seansi metaandmed"
+    "sourceMetadata": "Salvestatud seansi metaandmed",
+    "metadataPlan_one": "Plaan: {{displayDone}}/{{displayTotal}} samm tehtud",
+    "metadataPlan_other": "Plaan: {{displayDone}}/{{displayTotal}} sammu tehtud",
+    "metadataPlan": "Plaan: {{displayDone}}/{{displayTotal}} sammu tehtud",
+    "metadataFiles_one": "{{displayCount}} fail muudetud",
+    "metadataFiles_other": "{{displayCount}} faili muudetud",
+    "metadataFiles": "{{displayCount}} faili muudetud",
+    "metadataLinesAdded_one": "{{displayCount}} rida lisatud",
+    "metadataLinesAdded_other": "{{displayCount}} rida lisatud",
+    "metadataLinesAdded": "{{displayCount}} rida lisatud",
+    "metadataLinesRemoved_one": "{{displayCount}} rida eemaldatud",
+    "metadataLinesRemoved_other": "{{displayCount}} rida eemaldatud",
+    "metadataLinesRemoved": "{{displayCount}} rida eemaldatud",
+    "metadataPlanCurrent": "Praegune samm: {{current}}",
+    "metadataFailure": "Viimane voor ebaõnnestus: {{kind}}",
+    "sourceActivity": "Pealkirjata tegevus",
+    "metadataFailureProvider": "pakkuja viga",
+    "metadataFailureTool": "tööriista viga",
+    "metadataFailureCancelled": "Tühistatud",
+    "metadataFailureOther": "täpsustamata viga"
   },
   "systemSearch": {
     "couldNotOpenResult": "Otsingutulemust ei õnnestunud avada"

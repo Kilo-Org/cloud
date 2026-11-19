@@ -4551,7 +4551,26 @@
     "quietSnapshot": "ለዚህ የሁኔታ ቅጂ ምንም የክፍለ ጊዜ እንቅስቃሴ አልተመረጠም። ለAI ማጠቃለያ ጥያቄ አልቀረበም፣ ክፍያም አልተከፈለም።",
     "noEnabledContexts": "ለመርሃ ግብር ሪፖርቶች የነቁ አውዶች የሉም",
     "sourceBlocker": "ክፍለ ጊዜው ትኩረት ይፈልጋል",
-    "sourceMetadata": "የተቀመጠ የክፍለ ጊዜ ሜታዳታ"
+    "sourceMetadata": "የተቀመጠ የክፍለ ጊዜ ሜታዳታ",
+    "metadataPlan_one": "እቅድ: ከ{{displayTotal}} ደረጃ ውስጥ {{displayDone}} ተጠናቋል",
+    "metadataPlan_other": "እቅድ: ከ{{displayTotal}} ደረጃዎች ውስጥ {{displayDone}} ተጠናቀዋል",
+    "metadataPlan": "እቅድ: ከ{{displayTotal}} ደረጃዎች ውስጥ {{displayDone}} ተጠናቀዋል",
+    "metadataFiles_one": "{{displayCount}} ፋይል ተለውጧል",
+    "metadataFiles_other": "{{displayCount}} ፋይሎች ተለውጠዋል",
+    "metadataFiles": "{{displayCount}} ፋይሎች ተለውጠዋል",
+    "metadataLinesAdded_one": "{{displayCount}} መስመር ተጨምሯል",
+    "metadataLinesAdded_other": "{{displayCount}} መስመሮች ተጨምረዋል",
+    "metadataLinesAdded": "{{displayCount}} መስመሮች ተጨምረዋል",
+    "metadataLinesRemoved_one": "{{displayCount}} መስመር ተወግዷል",
+    "metadataLinesRemoved_other": "{{displayCount}} መስመሮች ተወግደዋል",
+    "metadataLinesRemoved": "{{displayCount}} መስመሮች ተወግደዋል",
+    "metadataPlanCurrent": "የአሁኑ ደረጃ: {{current}}",
+    "metadataFailure": "የመጨረሻው ዙር አልተሳካም: {{kind}}",
+    "sourceActivity": "ርዕስ የሌለው እንቅስቃሴ",
+    "metadataFailureProvider": "የአቅራቢ ስህተት",
+    "metadataFailureTool": "የመሣሪያ ስህተት",
+    "metadataFailureCancelled": "ተሰርዟል",
+    "metadataFailureOther": "ያልተገለጸ ስህተት"
   },
   "systemSearch": {
     "couldNotOpenResult": "ይህን የፍለጋ ውጤት መክፈት አልተቻለም"

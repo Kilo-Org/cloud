@@ -4551,7 +4551,26 @@
     "quietSnapshot": "इस स्नैपशॉट के लिए किसी सत्र की गतिविधि नहीं चुनी गई। AI सारांश का कोई अनुरोध नहीं किया गया और कोई शुल्क नहीं लिया गया।",
     "noEnabledContexts": "निर्धारित ब्रीफ़िंग के लिए कोई संदर्भ चालू नहीं है",
     "sourceBlocker": "सत्र पर ध्यान देने की ज़रूरत है",
-    "sourceMetadata": "कैप्चर किया गया सत्र मेटाडेटा"
+    "sourceMetadata": "कैप्चर किया गया सत्र मेटाडेटा",
+    "metadataPlan_one": "प्लान: {{displayTotal}} में से {{displayDone}} स्टेप पूरा",
+    "metadataPlan_other": "प्लान: {{displayTotal}} में से {{displayDone}} स्टेप पूरे",
+    "metadataPlan": "प्लान: {{displayTotal}} में से {{displayDone}} स्टेप पूरे",
+    "metadataFiles_one": "{{displayCount}} फ़ाइल बदली",
+    "metadataFiles_other": "{{displayCount}} फ़ाइलें बदलीं",
+    "metadataFiles": "{{displayCount}} फ़ाइलें बदलीं",
+    "metadataLinesAdded_one": "{{displayCount}} लाइन जोड़ी गई",
+    "metadataLinesAdded_other": "{{displayCount}} लाइनें जोड़ी गईं",
+    "metadataLinesAdded": "{{displayCount}} लाइनें जोड़ी गईं",
+    "metadataLinesRemoved_one": "{{displayCount}} लाइन हटाई गई",
+    "metadataLinesRemoved_other": "{{displayCount}} लाइनें हटाई गईं",
+    "metadataLinesRemoved": "{{displayCount}} लाइनें हटाई गईं",
+    "metadataPlanCurrent": "वर्तमान स्टेप: {{current}}",
+    "metadataFailure": "पिछला टर्न विफल रहा: {{kind}}",
+    "sourceActivity": "शीर्षकहीन गतिविधि",
+    "metadataFailureProvider": "प्रदाता त्रुटि",
+    "metadataFailureTool": "टूल त्रुटि",
+    "metadataFailureCancelled": "रद्द",
+    "metadataFailureOther": "अनिर्दिष्ट त्रुटि"
   },
   "systemSearch": {
     "couldNotOpenResult": "यह खोज परिणाम खोला नहीं जा सका"

@@ -4551,7 +4551,26 @@
     "quietSnapshot": "មិនមានសកម្មភាពវគ្គណាមួយត្រូវបានជ្រើសរើសសម្រាប់កំណត់ត្រាស្ថានភាពនេះទេ។ មិនបានស្នើសុំសេចក្តីសង្ខេប AI ទេ ហើយក៏មិនបានគិតថ្លៃដែរ។",
     "noEnabledContexts": "មិនមានបរិបទណាមួយត្រូវបានបើកសម្រាប់របាយការណ៍តាមកាលវិភាគទេ",
     "sourceBlocker": "វគ្គត្រូវការការយកចិត្តទុកដាក់",
-    "sourceMetadata": "ទិន្នន័យមេតារបស់វគ្គដែលបានកត់ត្រា"
+    "sourceMetadata": "ទិន្នន័យមេតារបស់វគ្គដែលបានកត់ត្រា",
+    "metadataPlan_other": "ផែនការ៖ បានបញ្ចប់ {{displayDone}} ក្នុងចំណោម {{displayTotal}} ជំហាន",
+    "metadataPlan": "ផែនការ៖ បានបញ្ចប់ {{displayDone}} ក្នុងចំណោម {{displayTotal}} ជំហាន",
+    "metadataFiles_other": "{{displayCount}} ឯកសារបានផ្លាស់ប្ដូរ",
+    "metadataFiles": "{{displayCount}} ឯកសារបានផ្លាស់ប្ដូរ",
+    "metadataLinesAdded_other": "{{displayCount}} បន្ទាត់បានបន្ថែម",
+    "metadataLinesAdded": "{{displayCount}} បន្ទាត់បានបន្ថែម",
+    "metadataLinesRemoved_other": "{{displayCount}} បន្ទាត់បានលុប",
+    "metadataLinesRemoved": "{{displayCount}} បន្ទាត់បានលុប",
+    "metadataPlanCurrent": "ជំហានបច្ចុប្បន្ន៖ {{current}}",
+    "metadataFailure": "វេនចុងក្រោយបានបរាជ័យ៖ {{kind}}",
+    "sourceActivity": "សកម្មភាពគ្មានចំណងជើង",
+    "metadataFailureProvider": "កំហុសអ្នកផ្តល់សេវា",
+    "metadataFailureTool": "កំហុសឧបករណ៍",
+    "metadataFailureCancelled": "បានបោះបង់",
+    "metadataFailureOther": "កំហុសមិនបានបញ្ជាក់",
+    "metadataPlan_one": "ផែនការ៖ បានបញ្ចប់ {{displayDone}} ក្នុងចំណោម {{displayTotal}} ជំហាន",
+    "metadataFiles_one": "{{displayCount}} ឯកសារបានផ្លាស់ប្ដូរ",
+    "metadataLinesAdded_one": "{{displayCount}} បន្ទាត់បានបន្ថែម",
+    "metadataLinesRemoved_one": "{{displayCount}} បន្ទាត់បានលុប"
   },
   "systemSearch": {
     "couldNotOpenResult": "មិនអាចបើកលទ្ធផលស្វែងរកនេះបានទេ"

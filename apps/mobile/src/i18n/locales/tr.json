@@ -4551,7 +4551,26 @@
     "quietSnapshot": "Bu anlık görüntü için hiçbir oturum etkinliği seçilmedi. AI özeti istenmedi ve ücret alınmadı.",
     "noEnabledContexts": "Planlanmış raporlar için etkinleştirilmiş bağlam yok",
     "sourceBlocker": "Oturumla ilgilenilmesi gerekiyor",
-    "sourceMetadata": "Kaydedilen oturum meta verileri"
+    "sourceMetadata": "Kaydedilen oturum meta verileri",
+    "metadataPlan_one": "Plan: {{displayTotal}} adımdan {{displayDone}} tanesi tamamlandı",
+    "metadataPlan_other": "Plan: {{displayTotal}} adımdan {{displayDone}} tanesi tamamlandı",
+    "metadataPlan": "Plan: {{displayTotal}} adımdan {{displayDone}} tanesi tamamlandı",
+    "metadataFiles_one": "{{displayCount}} dosya değişti",
+    "metadataFiles_other": "{{displayCount}} dosya değişti",
+    "metadataFiles": "{{displayCount}} dosya değişti",
+    "metadataLinesAdded_one": "{{displayCount}} satır eklendi",
+    "metadataLinesAdded_other": "{{displayCount}} satır eklendi",
+    "metadataLinesAdded": "{{displayCount}} satır eklendi",
+    "metadataLinesRemoved_one": "{{displayCount}} satır silindi",
+    "metadataLinesRemoved_other": "{{displayCount}} satır silindi",
+    "metadataLinesRemoved": "{{displayCount}} satır silindi",
+    "metadataPlanCurrent": "Mevcut adım: {{current}}",
+    "metadataFailure": "Son tur başarısız: {{kind}}",
+    "sourceActivity": "Adsız etkinlik",
+    "metadataFailureProvider": "sağlayıcı hatası",
+    "metadataFailureTool": "araç hatası",
+    "metadataFailureCancelled": "İptal edildi",
+    "metadataFailureOther": "belirtilmemiş hata"
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu arama sonucu açılamadı"

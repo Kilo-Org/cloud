@@ -4551,7 +4551,26 @@
     "quietSnapshot": "د دې حالت انځور لپاره د ناستو هېڅ فعالیت ونه ټاکل شو. د AI لنډیز غوښتنه ونه شوه او هېڅ لګښت ونه اخیستل شو.",
     "noEnabledContexts": "د مهالویش شوو راپورونو لپاره هېڅ چوکاټ فعال نه دی",
     "sourceBlocker": "ناسته پاملرنې ته اړتیا لري",
-    "sourceMetadata": "د ناستې ثبت شوې مېټاډاټا"
+    "sourceMetadata": "د ناستې ثبت شوې مېټاډاټا",
+    "metadataPlan_one": "پلان: {{displayDone}} له {{displayTotal}} څخه ګام بشپړ شو",
+    "metadataPlan_other": "پلان: {{displayDone}} له {{displayTotal}} څخه ګامونه بشپړ شوي",
+    "metadataPlan": "پلان: {{displayDone}} له {{displayTotal}} څخه ګامونه بشپړ شوي",
+    "metadataFiles_one": "{{displayCount}} فایل بدل شو",
+    "metadataFiles_other": "{{displayCount}} فایلونه بدل شول",
+    "metadataFiles": "{{displayCount}} فایلونه بدل شول",
+    "metadataLinesAdded_one": "{{displayCount}} کرښه اضافه شوه",
+    "metadataLinesAdded_other": "{{displayCount}} کرښې اضافه شوې",
+    "metadataLinesAdded": "{{displayCount}} کرښې اضافه شوې",
+    "metadataLinesRemoved_one": "{{displayCount}} کرښه لرې شوه",
+    "metadataLinesRemoved_other": "{{displayCount}} کرښې لرې شوې",
+    "metadataLinesRemoved": "{{displayCount}} کرښې لرې شوې",
+    "metadataPlanCurrent": "اوسنی ګام: {{current}}",
+    "metadataFailure": "وروستی ځل ناکام شو: {{kind}}",
+    "sourceActivity": "بې سرلیکه فعالیت",
+    "metadataFailureProvider": "د عرضه کوونکي تېروتنه",
+    "metadataFailureTool": "د وسیلې تېروتنه",
+    "metadataFailureCancelled": "لغوه شوی",
+    "metadataFailureOther": "نامعلومه تېروتنه"
   },
   "systemSearch": {
     "couldNotOpenResult": "دا د لټون پایله پرانیستل نه شو"

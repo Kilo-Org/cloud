@@ -4551,7 +4551,26 @@
     "quietSnapshot": "Bu anlıq görüntü üçün heç bir sessiya fəaliyyəti seçilmədi. AI xülasəsi tələb edilmədi və heç bir ödəniş tutulmadı.",
     "noEnabledContexts": "Planlaşdırılmış hesabatlar üçün heç bir kontekst aktiv deyil",
     "sourceBlocker": "Sessiyaya diqqət yetirilməlidir",
-    "sourceMetadata": "Qeydə alınmış sessiya metaməlumatları"
+    "sourceMetadata": "Qeydə alınmış sessiya metaməlumatları",
+    "metadataPlan_one": "Plan: {{displayDone}}/{{displayTotal}} addım tamamlandı",
+    "metadataPlan_other": "Plan: {{displayDone}}/{{displayTotal}} addım tamamlandı",
+    "metadataPlan": "Plan: {{displayDone}}/{{displayTotal}} addım tamamlandı",
+    "metadataFiles_one": "{{displayCount}} fayl dəyişdirildi",
+    "metadataFiles_other": "{{displayCount}} fayl dəyişdirildi",
+    "metadataFiles": "{{displayCount}} fayl dəyişdirildi",
+    "metadataLinesAdded_one": "{{displayCount}} sətir əlavə edildi",
+    "metadataLinesAdded_other": "{{displayCount}} sətir əlavə edildi",
+    "metadataLinesAdded": "{{displayCount}} sətir əlavə edildi",
+    "metadataLinesRemoved_one": "{{displayCount}} sətir silindi",
+    "metadataLinesRemoved_other": "{{displayCount}} sətir silindi",
+    "metadataLinesRemoved": "{{displayCount}} sətir silindi",
+    "metadataPlanCurrent": "Cari addım: {{current}}",
+    "metadataFailure": "Son tur uğursuz oldu: {{kind}}",
+    "sourceActivity": "Adsız fəaliyyət",
+    "metadataFailureProvider": "provayder xətası",
+    "metadataFailureTool": "alət xətası",
+    "metadataFailureCancelled": "Ləğv edildi",
+    "metadataFailureOther": "müəyyən edilməmiş xəta"
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu axtarış nəticəsi açılmadı"

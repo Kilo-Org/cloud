@@ -4551,7 +4551,26 @@
     "quietSnapshot": "यो स्न्यापशटका लागि कुनै सत्र गतिविधि छानिएन। कुनै AI सारांश अनुरोध गरिएन र शुल्क लागेन।",
     "noEnabledContexts": "निर्धारित ब्रिफिङहरूका लागि कुनै सन्दर्भ सक्षम गरिएको छैन",
     "sourceBlocker": "सत्रमा ध्यान दिन आवश्यक छ",
-    "sourceMetadata": "सङ्कलित सत्र मेटाडाटा"
+    "sourceMetadata": "सङ्कलित सत्र मेटाडाटा",
+    "metadataPlan_one": "योजना: {{displayTotal}} मध्ये {{displayDone}} चरण पूरा",
+    "metadataPlan_other": "योजना: {{displayTotal}} मध्ये {{displayDone}} चरणहरू पूरा",
+    "metadataPlan": "योजना: {{displayTotal}} मध्ये {{displayDone}} चरणहरू पूरा",
+    "metadataFiles_one": "{{displayCount}} फाइल परिवर्तन भयो",
+    "metadataFiles_other": "{{displayCount}} फाइलहरू परिवर्तन भए",
+    "metadataFiles": "{{displayCount}} फाइलहरू परिवर्तन भए",
+    "metadataLinesAdded_one": "{{displayCount}} लाइन थपियो",
+    "metadataLinesAdded_other": "{{displayCount}} लाइनहरू थपिए",
+    "metadataLinesAdded": "{{displayCount}} लाइनहरू थपिए",
+    "metadataLinesRemoved_one": "{{displayCount}} लाइन हटाइयो",
+    "metadataLinesRemoved_other": "{{displayCount}} लाइनहरू हटाइए",
+    "metadataLinesRemoved": "{{displayCount}} लाइनहरू हटाइए",
+    "metadataPlanCurrent": "हालको चरण: {{current}}",
+    "metadataFailure": "पछिल्लो टर्न असफल भयो: {{kind}}",
+    "sourceActivity": "शीर्षकविहीन गतिविधि",
+    "metadataFailureProvider": "प्रदायक त्रुटि",
+    "metadataFailureTool": "उपकरण त्रुटि",
+    "metadataFailureCancelled": "रद्द गरियो",
+    "metadataFailureOther": "अनिर्दिष्ट त्रुटि"
   },
   "systemSearch": {
     "couldNotOpenResult": "यो खोज परिणाम खोल्न सकिएन"

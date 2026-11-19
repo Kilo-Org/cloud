@@ -4551,7 +4551,26 @@
     "quietSnapshot": "ამ ანგარიშისთვის სესიის აქტივობა არ შერჩეულა. AI შეჯამება არ მოთხოვნილა და საფასური არ ჩამოჭრილა.",
     "noEnabledContexts": "დაგეგმილი ანგარიშებისთვის არცერთი კონტექსტი არ არის ჩართული",
     "sourceBlocker": "სესია ყურადღებას საჭიროებს",
-    "sourceMetadata": "დაფიქსირებული სესიის მეტამონაცემები"
+    "sourceMetadata": "დაფიქსირებული სესიის მეტამონაცემები",
+    "metadataPlan_one": "გეგმა: {{displayDone}} / {{displayTotal}} ნაბიჯი შესრულებულია",
+    "metadataPlan_other": "გეგმა: {{displayDone}} / {{displayTotal}} ნაბიჯი შესრულებულია",
+    "metadataPlan": "გეგმა: {{displayDone}} / {{displayTotal}} ნაბიჯი შესრულებულია",
+    "metadataFiles_one": "{{displayCount}} ფაილი შეიცვალა",
+    "metadataFiles_other": "{{displayCount}} ფაილი შეიცვალა",
+    "metadataFiles": "{{displayCount}} ფაილი შეიცვალა",
+    "metadataLinesAdded_one": "{{displayCount}} ხაზი დაემატა",
+    "metadataLinesAdded_other": "{{displayCount}} ხაზი დაემატა",
+    "metadataLinesAdded": "{{displayCount}} ხაზი დაემატა",
+    "metadataLinesRemoved_one": "{{displayCount}} ხაზი წაიშალა",
+    "metadataLinesRemoved_other": "{{displayCount}} ხაზი წაიშალა",
+    "metadataLinesRemoved": "{{displayCount}} ხაზი წაიშალა",
+    "metadataPlanCurrent": "მიმდინარე ნაბიჯი: {{current}}",
+    "metadataFailure": "ბოლო ცდა ვერ შესრულდა: {{kind}}",
+    "sourceActivity": "უსათაურო აქტივობა",
+    "metadataFailureProvider": "პროვაიდერის შეცდომა",
+    "metadataFailureTool": "ინსტრუმენტის შეცდომა",
+    "metadataFailureCancelled": "გაუქმებულია",
+    "metadataFailureOther": "გაურკვეველი შეცდომა"
   },
   "systemSearch": {
     "couldNotOpenResult": "ამ ძიების შედეგის გახსნა ვერ მოხერხდა"

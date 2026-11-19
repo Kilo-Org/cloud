@@ -4551,7 +4551,26 @@
     "quietSnapshot": "આ સ્નેપશોટ માટે સત્રોની કોઈ પ્રવૃત્તિ પસંદ થઈ નથી. AI સારાંશ માટે કોઈ વિનંતી કરવામાં આવી નથી અને કોઈ ચાર્જ લાગ્યો નથી.",
     "noEnabledContexts": "શેડ્યૂલ કરેલા રિપોર્ટ માટે કોઈ સંદર્ભ ચાલુ નથી",
     "sourceBlocker": "સત્ર પર ધ્યાન આપવાની જરૂર છે",
-    "sourceMetadata": "સાચવેલ સત્ર મેટાડેટા"
+    "sourceMetadata": "સાચવેલ સત્ર મેટાડેટા",
+    "metadataPlan_one": "પ્લાન: {{displayTotal}}માંથી {{displayDone}} પગલું પૂર્ણ",
+    "metadataPlan_other": "પ્લાન: {{displayTotal}}માંથી {{displayDone}} પગલાં પૂર્ણ",
+    "metadataPlan": "પ્લાન: {{displayTotal}}માંથી {{displayDone}} પગલાં પૂર્ણ",
+    "metadataFiles_one": "{{displayCount}} ફાઇલ બદલાઈ",
+    "metadataFiles_other": "{{displayCount}} ફાઇલો બદલાઈ",
+    "metadataFiles": "{{displayCount}} ફાઇલો બદલાઈ",
+    "metadataLinesAdded_one": "{{displayCount}} લાઇન ઉમેરાઈ",
+    "metadataLinesAdded_other": "{{displayCount}} લાઇનો ઉમેરાઈ",
+    "metadataLinesAdded": "{{displayCount}} લાઇનો ઉમેરાઈ",
+    "metadataLinesRemoved_one": "{{displayCount}} લાઇન દૂર થઈ",
+    "metadataLinesRemoved_other": "{{displayCount}} લાઇનો દૂર થઈ",
+    "metadataLinesRemoved": "{{displayCount}} લાઇનો દૂર થઈ",
+    "metadataPlanCurrent": "વર્તમાન પગલું: {{current}}",
+    "metadataFailure": "છેલ્લો ટર્ન નિષ્ફળ: {{kind}}",
+    "sourceActivity": "શીર્ષક વગરની પ્રવૃત્તિ",
+    "metadataFailureProvider": "પ્રોવાઇડર ભૂલ",
+    "metadataFailureTool": "ટૂલ ભૂલ",
+    "metadataFailureCancelled": "રદ",
+    "metadataFailureOther": "અનિર્દિષ્ટ ભૂલ"
   },
   "systemSearch": {
     "couldNotOpenResult": "આ શોધ પરિણામ ખોલી શકાયું નહીં"

@@ -4551,7 +4551,26 @@
     "quietSnapshot": "Für diese Momentaufnahme wurde keine Sitzungsaktivität ausgewählt. Es wurde keine AI-Zusammenfassung angefordert oder berechnet.",
     "noEnabledContexts": "Keine Kontexte für geplante Briefings aktiviert",
     "sourceBlocker": "Sitzung erfordert Aufmerksamkeit",
-    "sourceMetadata": "Erfasste Sitzungsmetadaten"
+    "sourceMetadata": "Erfasste Sitzungsmetadaten",
+    "metadataPlan_one": "Plan: {{displayDone}} von {{displayTotal}} Schritt erledigt",
+    "metadataPlan_other": "Plan: {{displayDone}} von {{displayTotal}} Schritten erledigt",
+    "metadataPlan": "Plan: {{displayDone}} von {{displayTotal}} Schritten erledigt",
+    "metadataFiles_one": "{{displayCount}} Datei geändert",
+    "metadataFiles_other": "{{displayCount}} Dateien geändert",
+    "metadataFiles": "{{displayCount}} Dateien geändert",
+    "metadataLinesAdded_one": "{{displayCount}} Zeile hinzugefügt",
+    "metadataLinesAdded_other": "{{displayCount}} Zeilen hinzugefügt",
+    "metadataLinesAdded": "{{displayCount}} Zeilen hinzugefügt",
+    "metadataLinesRemoved_one": "{{displayCount}} Zeile entfernt",
+    "metadataLinesRemoved_other": "{{displayCount}} Zeilen entfernt",
+    "metadataLinesRemoved": "{{displayCount}} Zeilen entfernt",
+    "metadataPlanCurrent": "Aktueller Schritt: {{current}}",
+    "metadataFailure": "Letzter Durchlauf fehlgeschlagen: {{kind}}",
+    "sourceActivity": "Unbenannte Aktivität",
+    "metadataFailureProvider": "Anbieterfehler",
+    "metadataFailureTool": "Tool-Fehler",
+    "metadataFailureCancelled": "Abgebrochen",
+    "metadataFailureOther": "Unspezifischer Fehler"
   },
   "systemSearch": {
     "couldNotOpenResult": "Dieses Suchergebnis konnte nicht geöffnet werden"

@@ -4551,7 +4551,26 @@
     "quietSnapshot": "Бұл күй көшірмесіне сеанс белсенділігі таңдалмады. AI қорытындысы сұралмады және ақы алынбады.",
     "noEnabledContexts": "Жоспарланған шолулар үшін қосылған контекстер жоқ",
     "sourceBlocker": "Сеанс назар аударуды қажет етеді",
-    "sourceMetadata": "Сақталған сеанс метадеректері"
+    "sourceMetadata": "Сақталған сеанс метадеректері",
+    "metadataPlan_one": "Жоспар: {{displayDone}}/{{displayTotal}} қадам орындалды",
+    "metadataPlan_other": "Жоспар: {{displayDone}}/{{displayTotal}} қадам орындалды",
+    "metadataPlan": "Жоспар: {{displayDone}}/{{displayTotal}} қадам орындалды",
+    "metadataFiles_one": "{{displayCount}} файл өзгертілді",
+    "metadataFiles_other": "{{displayCount}} файл өзгертілді",
+    "metadataFiles": "{{displayCount}} файл өзгертілді",
+    "metadataLinesAdded_one": "{{displayCount}} жол қосылды",
+    "metadataLinesAdded_other": "{{displayCount}} жол қосылды",
+    "metadataLinesAdded": "{{displayCount}} жол қосылды",
+    "metadataLinesRemoved_one": "{{displayCount}} жол жойылды",
+    "metadataLinesRemoved_other": "{{displayCount}} жол жойылды",
+    "metadataLinesRemoved": "{{displayCount}} жол жойылды",
+    "metadataPlanCurrent": "Ағымдағы қадам: {{current}}",
+    "metadataFailure": "Соңғы әрекет сәтсіз аяқталды: {{kind}}",
+    "sourceActivity": "Атаусыз әрекет",
+    "metadataFailureProvider": "провайдер қатесі",
+    "metadataFailureTool": "құрал қатесі",
+    "metadataFailureCancelled": "Тоқтатылды",
+    "metadataFailureOther": "анықталмаған қате"
   },
   "systemSearch": {
     "couldNotOpenResult": "Бұл іздеу нәтижесі ашылмады"

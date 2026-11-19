@@ -4551,7 +4551,26 @@
     "quietSnapshot": "Δεν επιλέχθηκε δραστηριότητα συνεδριών για αυτό το στιγμιότυπο. Δεν ζητήθηκε σύνοψη AI και δεν υπήρξε χρέωση.",
     "noEnabledContexts": "Δεν υπάρχουν ενεργοποιημένα πλαίσια για προγραμματισμένες αναφορές",
     "sourceBlocker": "Η συνεδρία χρειάζεται προσοχή",
-    "sourceMetadata": "Καταγεγραμμένα μεταδεδομένα συνεδρίας"
+    "sourceMetadata": "Καταγεγραμμένα μεταδεδομένα συνεδρίας",
+    "metadataPlan_one": "Πλάνο: {{displayDone}} από {{displayTotal}} βήμα ολοκληρωμένο",
+    "metadataPlan_other": "Πλάνο: {{displayDone}} από {{displayTotal}} βήματα ολοκληρωμένα",
+    "metadataPlan": "Πλάνο: {{displayDone}} από {{displayTotal}} βήματα ολοκληρωμένα",
+    "metadataFiles_one": "{{displayCount}} αρχείο άλλαξε",
+    "metadataFiles_other": "{{displayCount}} αρχεία άλλαξαν",
+    "metadataFiles": "{{displayCount}} αρχεία άλλαξαν",
+    "metadataLinesAdded_one": "{{displayCount}} γραμμή προστέθηκε",
+    "metadataLinesAdded_other": "{{displayCount}} γραμμές προστέθηκαν",
+    "metadataLinesAdded": "{{displayCount}} γραμμές προστέθηκαν",
+    "metadataLinesRemoved_one": "{{displayCount}} γραμμή αφαιρέθηκε",
+    "metadataLinesRemoved_other": "{{displayCount}} γραμμές αφαιρέθηκαν",
+    "metadataLinesRemoved": "{{displayCount}} γραμμές αφαιρέθηκαν",
+    "metadataPlanCurrent": "Τρέχον βήμα: {{current}}",
+    "metadataFailure": "Ο τελευταίος κύκλος απέτυχε: {{kind}}",
+    "sourceActivity": "Δραστηριότητα χωρίς τίτλο",
+    "metadataFailureProvider": "σφάλμα παρόχου",
+    "metadataFailureTool": "σφάλμα εργαλείου",
+    "metadataFailureCancelled": "Ακυρώθηκε",
+    "metadataFailureOther": "απροσδιόριστο σφάλμα"
   },
   "systemSearch": {
     "couldNotOpenResult": "Δεν ήταν δυνατό το άνοιγμα αυτού του αποτελέσματος αναζήτησης"

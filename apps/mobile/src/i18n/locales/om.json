@@ -4551,7 +4551,26 @@
     "quietSnapshot": "Galmee haalaa kanaaf sochiin taa'umsaa hin filatamne. Cuunfaan AI hin gaafatamne; kaffaltiinis hin jiru.",
     "noEnabledContexts": "Gabaasota saganteeffamaniif haalawwan dandeessifaman hin jiran",
     "sourceBlocker": "Taa'umsi xiyyeeffannoo barbaada",
-    "sourceMetadata": "Meetadaataa taa'umsaa galmaa'e"
+    "sourceMetadata": "Meetadaataa taa'umsaa galmaa'e",
+    "metadataPlan_one": "Karoora: tarkaanfii {{displayTotal}} keessaa {{displayDone}} xumurame",
+    "metadataPlan_other": "Karoora: tarkaanfiiwwan {{displayTotal}} keessaa {{displayDone}} xumuraman",
+    "metadataPlan": "Karoora: tarkaanfiiwwan {{displayTotal}} keessaa {{displayDone}} xumuraman",
+    "metadataFiles_one": "Faayilii {{displayCount}} jijjiirame",
+    "metadataFiles_other": "Faayiliiwwan {{displayCount}} jijjiiraman",
+    "metadataFiles": "Faayiliiwwan {{displayCount}} jijjiiraman",
+    "metadataLinesAdded_one": "Sarara {{displayCount}} dabalame",
+    "metadataLinesAdded_other": "Sararoota {{displayCount}} dabalaman",
+    "metadataLinesAdded": "Sararoota {{displayCount}} dabalaman",
+    "metadataLinesRemoved_one": "Sarara {{displayCount}} haqame",
+    "metadataLinesRemoved_other": "Sararoota {{displayCount}} haqaman",
+    "metadataLinesRemoved": "Sararoota {{displayCount}} haqaman",
+    "metadataPlanCurrent": "Tarkaanfii ammaa: {{current}}",
+    "metadataFailure": "Deebiin dhumaa kufe: {{kind}}",
+    "sourceActivity": "Sochii maqaa hin qabne",
+    "metadataFailureProvider": "dogoggora dhiyeessaa",
+    "metadataFailureTool": "dogoggora meeshaa",
+    "metadataFailureCancelled": "Haqame",
+    "metadataFailureOther": "dogoggora hin ibsamne"
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu'aa barbaachuu kana banuun hin danda'amne"

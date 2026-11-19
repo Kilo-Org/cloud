@@ -4551,7 +4551,26 @@
     "quietSnapshot": "Awukho umsebenzi weseshini okhethelwe lo mbiko wesimo. Akucelwanga isifinyezo se-AI futhi akukho nkokhelo ekhokhisiwe.",
     "noEnabledContexts": "Ayikho imongo evulelwe imibiko ehleliwe",
     "sourceBlocker": "Iseshini idinga ukunakwa",
-    "sourceMetadata": "Imethadatha yeseshini eqoqiwe"
+    "sourceMetadata": "Imethadatha yeseshini eqoqiwe",
+    "metadataPlan_one": "Uhlelo: {{displayDone}}/{{displayTotal}} isinyathelo esenziwe",
+    "metadataPlan_other": "Uhlelo: {{displayDone}}/{{displayTotal}} izinyathelo ezenziwe",
+    "metadataPlan": "Uhlelo: {{displayDone}}/{{displayTotal}} izinyathelo ezenziwe",
+    "metadataFiles_one": "Ifayela elishintshiwe: {{displayCount}}",
+    "metadataFiles_other": "Amafayela ashintshiwe: {{displayCount}}",
+    "metadataFiles": "Amafayela ashintshiwe: {{displayCount}}",
+    "metadataLinesAdded_one": "Umugqa owengeziwe: {{displayCount}}",
+    "metadataLinesAdded_other": "Imigqa engeziwe: {{displayCount}}",
+    "metadataLinesAdded": "Imigqa engeziwe: {{displayCount}}",
+    "metadataLinesRemoved_one": "Umugqa osusiwe: {{displayCount}}",
+    "metadataLinesRemoved_other": "Imigqa esusiwe: {{displayCount}}",
+    "metadataLinesRemoved": "Imigqa esusiwe: {{displayCount}}",
+    "metadataPlanCurrent": "Isinyathelo samanje: {{current}}",
+    "metadataFailure": "Umjikelezo wokugcina uhlulekile: {{kind}}",
+    "sourceActivity": "Umsebenzi ongenasihloko",
+    "metadataFailureProvider": "iphutha lomhlinzeki",
+    "metadataFailureTool": "iphutha lethuluzi",
+    "metadataFailureCancelled": "Kukhanseliwe",
+    "metadataFailureOther": "iphutha elingacacisiwe"
   },
   "systemSearch": {
     "couldNotOpenResult": "Asikwazanga ukuvula leli phumela lokusesha"

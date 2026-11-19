@@ -4551,7 +4551,26 @@
     "quietSnapshot": "هیچ چالاکییەکی دانیشتن بۆ ئەم تۆماری دۆخە هەڵنەبژێردرا. هیچ کورتەیەکی AI داوا نەکرا و هیچ تێچوویەک نەبڕدرا.",
     "noEnabledContexts": "هیچ چوارچێوەیەک بۆ ڕاپۆرتە خشتەکراوەکان چالاک نەکراوە",
     "sourceBlocker": "دانیشتنەکە پێویستی بە سەرنجدان هەیە",
-    "sourceMetadata": "مێتاداتای تۆمارکراوی دانیشتن"
+    "sourceMetadata": "مێتاداتای تۆمارکراوی دانیشتن",
+    "metadataPlan_one": "پلان: {{displayDone}} لە {{displayTotal}} هەنگاو تەواو کراوە",
+    "metadataPlan_other": "پلان: {{displayDone}} لە {{displayTotal}} هەنگاو تەواو کراون",
+    "metadataPlan": "پلان: {{displayDone}} لە {{displayTotal}} هەنگاو تەواو کراون",
+    "metadataFiles_one": "{{displayCount}} فایل گۆڕدرا",
+    "metadataFiles_other": "{{displayCount}} فایل گۆڕدران",
+    "metadataFiles": "{{displayCount}} فایل گۆڕدران",
+    "metadataLinesAdded_one": "{{displayCount}} هێڵ زیادکرا",
+    "metadataLinesAdded_other": "{{displayCount}} هێڵ زیادکران",
+    "metadataLinesAdded": "{{displayCount}} هێڵ زیادکران",
+    "metadataLinesRemoved_one": "{{displayCount}} هێڵ لابردرا",
+    "metadataLinesRemoved_other": "{{displayCount}} هێڵ لابردران",
+    "metadataLinesRemoved": "{{displayCount}} هێڵ لابردران",
+    "metadataPlanCurrent": "هەنگاوی ئێستا: {{current}}",
+    "metadataFailure": "دوایین خول شکست هێنا: {{kind}}",
+    "sourceActivity": "چالاکی بێ ناونیشان",
+    "metadataFailureProvider": "هەڵەی دابینکەر",
+    "metadataFailureTool": "هەڵەی ئامراز",
+    "metadataFailureCancelled": "هەڵوەشاوە",
+    "metadataFailureOther": "هەڵەی نەناسراو"
   },
   "systemSearch": {
     "couldNotOpenResult": "نەتوانرا ئەم ئەنجامی گەڕانە بکرێتەوە"

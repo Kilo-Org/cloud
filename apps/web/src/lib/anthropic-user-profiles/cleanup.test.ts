@@ -54,8 +54,8 @@ function makeProfile(overrides: Partial<UserProfile> & { id: string }): UserProf
     type: 'user_profile',
     access_type: 'passthrough',
     metadata: { kilo_source: 'ai_gateway' },
-    created_at: daysAgo(30).toISOString(),
-    updated_at: daysAgo(30).toISOString(),
+    created_at: daysAgo(60).toISOString(),
+    updated_at: daysAgo(60).toISOString(),
     ...overrides,
   } as UserProfile;
 }
@@ -119,10 +119,10 @@ describe('runAnthropicUserProfileCleanup', () => {
     expect(mockList).not.toHaveBeenCalled();
   });
 
-  it('keeps profiles created or updated within seven days', async () => {
+  it('keeps profiles created or updated within 30 days', async () => {
     listsProfiles(
-      makeProfile({ id: profileId(), created_at: daysAgo(6).toISOString() }),
-      makeProfile({ id: profileId(), updated_at: daysAgo(6).toISOString() })
+      makeProfile({ id: profileId(), created_at: daysAgo(29).toISOString() }),
+      makeProfile({ id: profileId(), updated_at: daysAgo(29).toISOString() })
     );
 
     const counts = await runAnthropicUserProfileCleanup({ now: NOW });
@@ -164,11 +164,11 @@ describe('runAnthropicUserProfileCleanup', () => {
     expect(new Date(logs[0].profile_created_at ?? '').toISOString()).toBe(profile.created_at);
   });
 
-  it('detaches and deletes the profile of a user blocked for seven days', async () => {
+  it('detaches and deletes the profile of a user blocked for 30 days', async () => {
     const id = profileId();
     const user = await insertTestUser({
       anthropic_user_profile_id: id,
-      blocked_at: daysAgo(7).toISOString(),
+      blocked_at: daysAgo(30).toISOString(),
       blocked_reason: 'abuse',
     });
     listsProfiles(makeProfile({ id }));
@@ -182,11 +182,11 @@ describe('runAnthropicUserProfileCleanup', () => {
     ]);
   });
 
-  it('keeps the profile of a user blocked for less than seven days', async () => {
+  it('keeps the profile of a user blocked for less than 30 days', async () => {
     const id = profileId();
     const user = await insertTestUser({
       anthropic_user_profile_id: id,
-      blocked_at: daysAgo(6).toISOString(),
+      blocked_at: daysAgo(29).toISOString(),
       blocked_reason: 'abuse',
     });
     listsProfiles(makeProfile({ id }));
@@ -200,7 +200,7 @@ describe('runAnthropicUserProfileCleanup', () => {
 
   it('keeps a profile when any referencing user is not blocked', async () => {
     const id = profileId();
-    await insertTestUser({ anthropic_user_profile_id: id, blocked_at: daysAgo(30).toISOString() });
+    await insertTestUser({ anthropic_user_profile_id: id, blocked_at: daysAgo(60).toISOString() });
     await insertTestUser({ anthropic_user_profile_id: id });
     listsProfiles(makeProfile({ id }));
 
@@ -214,7 +214,7 @@ describe('runAnthropicUserProfileCleanup', () => {
     const id = profileId();
     const owner = await insertTestUser({
       anthropic_user_profile_id: id,
-      blocked_at: daysAgo(30).toISOString(),
+      blocked_at: daysAgo(60).toISOString(),
     });
     const organization = await createTestOrganization('Cleanup Org', owner.id, 0);
     await db
@@ -267,7 +267,7 @@ describe('runAnthropicUserProfileCleanup', () => {
     const succeeding = profileId();
     const user = await insertTestUser({
       anthropic_user_profile_id: failing,
-      blocked_at: daysAgo(30).toISOString(),
+      blocked_at: daysAgo(60).toISOString(),
     });
     const error = new Error('Anthropic unavailable');
     mockDelete.mockImplementation(async id => {
@@ -367,7 +367,7 @@ describe('runAnthropicUserProfileCleanup', () => {
     await db.insert(anthropic_user_profile_deletions).values([
       { user_profile_id: oldId, reason: 'unlinked', deleted_at: daysAgo(8).toISOString() },
       { user_profile_id: recentId, reason: 'unlinked', deleted_at: daysAgo(6).toISOString() },
-      { user_profile_id: pendingId, reason: 'unlinked', queued_at: daysAgo(30).toISOString() },
+      { user_profile_id: pendingId, reason: 'unlinked', queued_at: daysAgo(60).toISOString() },
     ]);
     listsProfiles();
 

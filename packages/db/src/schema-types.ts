@@ -847,7 +847,7 @@ export type ClaudeBillingConnectionStatus =
 /**
  * Why the daily cleanup deleted an Anthropic user profile:
  * - `unlinked`: no user or live organization references the profile.
- * - `user_blocked`: only users blocked for at least seven days reference it.
+ * - `user_blocked`: only users blocked for at least 30 days reference it.
  */
 export const AnthropicUserProfileDeletionReason = {
   Unlinked: 'unlinked',

@@ -17,7 +17,11 @@ import {
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
-const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** How old a profile, and how long its user's block, must be before it is deleted. */
+const GRACE_PERIOD_MS = 30 * DAY_MS;
+/** How long completed deletions stay in the log. */
+const LOG_RETENTION_MS = 7 * DAY_MS;
 const DEFAULT_MAX_QUEUED = 500;
 /** Leaves headroom under the route's five-minute `maxDuration`. */
 const DEFAULT_BUDGET_MS = 4 * 60 * 1000;
@@ -182,8 +186,8 @@ function reportFailure(message: string, userProfileId: string | null, error: unk
 
 /**
  * Deletes Anthropic user profiles that nothing uses any more: profiles no user or
- * live organization references, and profiles only users blocked for a week
- * reference. Profiles created or updated in the last week and Claude billing
+ * live organization references, and profiles only users blocked for 30 days
+ * reference. Profiles created or updated in the last 30 days and Claude billing
  * profiles are never touched.
  *
  * A profile is detached and queued in one transaction, then deleted at
@@ -207,6 +211,7 @@ export async function runAnthropicUserProfileCleanup({
   const scanDeadline = startedAt + budgetMs / 2;
   const deadline = startedAt + budgetMs;
   const cutoff = new Date(now.getTime() - GRACE_PERIOD_MS);
+  const logCutoff = new Date(now.getTime() - LOG_RETENTION_MS);
   const counts = {
     pages: 0,
     scanned: 0,
@@ -311,7 +316,7 @@ export async function runAnthropicUserProfileCleanup({
     .where(
       and(
         isNotNull(anthropic_user_profile_deletions.deleted_at),
-        lt(anthropic_user_profile_deletions.deleted_at, cutoff.toISOString())
+        lt(anthropic_user_profile_deletions.deleted_at, logCutoff.toISOString())
       )
     )
     .returning({ id: anthropic_user_profile_deletions.id });

@@ -41,9 +41,12 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * has to show. The steps are palette tokens of their own
  * (`--switch-disabled-on`, `--switch-disabled-off` and their grips), measured
  * over the `secondary` row the switch sits on: the two tracks separate at
- * 2.0:1 in light and 1.68:1 in dark, each track clears 1.6:1 over the row, and
- * each grip clears 1.6:1 over its track. A caller's own pair still wins: its
- * props are applied last.
+ * 2.0:1 in light and 3.1:1 in dark, each track clears 1.6:1 over the row, and
+ * each grip clears 1.6:1 over its track. The disabled on pair also steps away
+ * from the live accent pair in the same list — the track by 1.94:1 in light and
+ * 1.67:1 in dark, the grip by a different token — because a row whose title
+ * dims beside a live row must not paint the live accent. A caller's own pair
+ * still wins: its props are applied last.
  *
  * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so the disabled
  * pair there would paint an unavailable control twice. Android is the platform

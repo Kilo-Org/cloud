@@ -8,7 +8,7 @@ import { ModelDenyList, ProviderAllowList } from '@/components/organization/mode
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button } from '@/components/ui/button';
+import { Button, COMPACT_BUTTON_FRAME_CLASS } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import {
@@ -345,7 +345,7 @@ export function ModelAccessForm({
             reader's finger. A dirty draft keeps the live row, because Cancel
             is then the only way to discard what the gate trapped. */}
         {planEnded && !dirty ? (
-          <View className="min-h-[36px]" />
+          <View className={COMPACT_BUTTON_FRAME_CLASS} />
         ) : (
           <View className="flex-row items-center gap-2">
             <View className="min-h-5 flex-1 justify-center">

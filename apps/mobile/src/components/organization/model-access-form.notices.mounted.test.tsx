@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 
 import { i18n as appI18n } from '@/i18n';
+import { COMPACT_BUTTON_FRAME_CLASS } from '@/components/ui/button';
 import { type OrgGatewaySettings } from '@/lib/hooks/use-org-settings-queries';
 import { type ModelAccessDraft } from '@/lib/organization/model-access';
 import { ModelAccessForm } from './model-access-form';
@@ -364,7 +365,7 @@ describe('ModelAccessForm lapsed-plan controls', () => {
       root.findAll(
         node =>
           Object.is(node.type, 'View') &&
-          String(node.props.className ?? '').includes('min-h-[36px]')
+          String(node.props.className ?? '').includes(COMPACT_BUTTON_FRAME_CLASS)
       )
     ).toHaveLength(1);
   });

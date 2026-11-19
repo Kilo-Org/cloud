@@ -23,18 +23,18 @@ export type OrganizationPlanRefusalAction = { label: string; onPress: () => void
 type OrganizationPlanRefusalCopy = { message: string; action?: OrganizationPlanRefusalAction };
 
 /**
- * The sentence and the step for a lapsed plan. A role that can change the plan
- * gets the sentence that stops at the state, because the action beside it is
- * the next step; every other role gets the sentence the rest of the app shows
- * with the explanation, so the member still learns who can end the state.
+ * The sentence and the step for a lapsed plan. The sentence follows the step
+ * this call can paint, so it never leaves a reader without a next step: a role
+ * that gets an action is told the state and stops there, because the action is
+ * the next step; a role that gets none is told who can end the state and where.
  *
  * The step is the web billing page when the storefront rule lets the app link
  * it, which is the page that sells the plan. A surface that has its own step for
  * the storefronts the rule refuses — the in-app billing screen, which names
  * where the plan is bought — passes it as `inAppBilling`, and it is used for
- * exactly the roles the state sentence belongs to. A caller without one leaves
- * that role with the state sentence alone; a reader who cannot change the plan
- * keeps the sentence that names who can, with no step either way.
+ * exactly the roles the state sentence belongs to. A caller that hands in
+ * neither keeps the sentence that carries the step itself; a reader who cannot
+ * change the plan keeps that same sentence, with no step.
  */
 export function organizationPlanRefusalFor({
   role,
@@ -51,18 +51,22 @@ export function organizationPlanRefusalFor({
   t: TFunction;
 }): OrganizationPlanRefusalCopy {
   const canManagePlan = canManageOrganizationBilling(role);
-  const message = canManagePlan
-    ? t('organization.hub.planEnded')
-    : t('common.organizationTrialEnded');
+  // The sentence that stops at the state belongs to a step painted beside it.
+  // Without one it is a dead end, so the reader gets the sentence that carries
+  // the step, exactly as a role that cannot change the plan does.
+  const stepSentence = t('organization.hub.planEnded');
+  const explainedSentence = t('common.organizationTrialEnded');
   if (!canManagePlan) {
-    return { message };
+    return { message: explainedSentence };
   }
   if (!canLinkBilling) {
-    return inAppBilling === undefined ? { message } : { message, action: inAppBilling };
+    return inAppBilling === undefined
+      ? { message: explainedSentence }
+      : { message: stepSentence, action: inAppBilling };
   }
   const label = t('organization.hub.manageBilling');
   return {
-    message,
+    message: stepSentence,
     action: {
       label,
       onPress: () => {

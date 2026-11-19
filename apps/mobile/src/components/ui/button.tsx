@@ -97,6 +97,14 @@ const BUTTON_BUSY_MARK_SIZE = 20;
 const ANDROID_BUSY_TRACK_SIZE = 17;
 
 /**
+ * The frame the compact (`sm`) size renders: the box its label fills, which a
+ * surface reserving the row a compact control leaves behind paints instead of
+ * re-spelling the literal. It carries no horizontal padding, because a reserved
+ * box has no control to pad.
+ */
+export const COMPACT_BUTTON_FRAME_CLASS = 'min-h-[36px]';
+
+/**
  * The visible text of the button's children, for a label a loading button can
  * hand to the accessibility layer when the caller gave none. Text children
  * carry their caption in `props.children`; glyphs contribute nothing, so a

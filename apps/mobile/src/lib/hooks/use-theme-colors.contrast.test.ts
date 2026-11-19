@@ -452,6 +452,32 @@ describe('disabled switch pair contrast (non-text)', () => {
     }
   });
 
+  // A read-only list paints disabled rows beside live ones, so the disabled
+  // on-track must also read as a different state from the live accent track it
+  // replaces. Dark once shipped a disabled on-track under a 1.11:1 step from
+  // the live `selection`, which left a disabled switch looking available.
+  it('every theme: the disabled on track stands apart from the live accent track', () => {
+    for (const [themeName, colors] of themes) {
+      const liveOnTrack = themeName === 'dark' ? colors.selection : colors.primary;
+      expect(
+        contrastRatio(colors.switchDisabledOn, liveOnTrack),
+        `disabled on vs live on (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_PAIR_RATIO);
+    }
+  });
+
+  // The grip is the other half of the same cue: a disabled switch that keeps
+  // the live control's own grip colour differs from it by the track alone.
+  it('every theme: the disabled grip is not the live grip', () => {
+    for (const [themeName, colors] of themes) {
+      const liveOnGrip =
+        themeName === 'dark' ? colors.selectionForeground : colors.primaryForeground;
+      expect(colors.switchDisabledOnForeground, `disabled grip (${themeName})`).not.toBe(
+        liveOnGrip
+      );
+    }
+  });
+
   // Regression: the disabled pair once painted one mid-neutral track under the
   // scheme's ink for both positions. It read as unavailable, but light and dark
   // then could not say whether a switch was on, which is the state a read-only

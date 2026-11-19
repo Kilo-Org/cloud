@@ -39,7 +39,7 @@ describe('organizationPlanRefusalFor', () => {
     });
   });
 
-  it('keeps the state sentence without a step when the storefront rule refuses the link', () => {
+  it('keeps the sentence that carries the step when there is no step to paint', () => {
     const refusal = organizationPlanRefusalFor({
       role: 'billing_manager',
       canLinkBilling: false,
@@ -47,7 +47,10 @@ describe('organizationPlanRefusalFor', () => {
       t,
     });
 
-    expect(refusal.message).toBe(i18n.t('organization.hub.planEnded'));
+    // The state sentence belongs to an action beside it, so a surface with no
+    // step hands the reader the one that names where the plan is changed.
+    expect(refusal.message).toBe(i18n.t('common.organizationTrialEnded'));
+    expect(refusal.message).not.toBe(i18n.t('organization.hub.planEnded'));
     expect(refusal.action).toBeUndefined();
     expect(opened.openExternalUrl).not.toHaveBeenCalled();
   });

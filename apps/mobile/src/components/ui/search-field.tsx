@@ -2,6 +2,7 @@ import { type RefObject, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type TextInput, type TextInputProps, View } from 'react-native';
 
+import { clearComposerInput } from '@/components/agents/composer-input-clear';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Search, X } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
@@ -37,9 +38,11 @@ type SearchFieldProps = Omit<
   /** Runs after the clear control empties the native field; defaults to reporting the empty text. */
   onClear?: () => void;
   inputRef?: RefObject<TextInput | null>;
-  /** A spinner takes the magnifier's slot while a search runs; the slot keeps its size. */
-  busy?: boolean;
-  busyLabel?: string;
+  /**
+   * While a search runs: the name its spinner announces. The spinner takes the
+   * magnifier's slot, which keeps its size. Absent when idle.
+   */
+  busy?: string;
   /** Layout only: the margins or flex share the field takes in its parent. */
   className?: string;
 };
@@ -64,8 +67,7 @@ export function SearchField({
   onChangeText,
   onClear,
   inputRef,
-  busy = false,
-  busyLabel,
+  busy,
   className,
   ...inputProps
 }: Readonly<SearchFieldProps>) {
@@ -77,14 +79,14 @@ export function SearchField({
   return (
     <View className={cn(INPUT_FRAME_CLASS, 'flex-row items-center gap-2 pl-3 pr-3', className)}>
       <View className="size-5 items-center justify-center">
-        {busy ? (
+        {busy === undefined ? (
+          <Search size={SEARCH_ICON_SIZE} color={colors.mutedForeground} />
+        ) : (
           <ActivityIndicator
             size="small"
             color={colors.mutedForeground}
-            accessibilityLabel={busyLabel}
+            accessibilityLabel={busy}
           />
-        ) : (
-          <Search size={SEARCH_ICON_SIZE} color={colors.mutedForeground} />
         )}
       </View>
       <View className="relative min-w-0 flex-1">
@@ -124,7 +126,10 @@ export function SearchField({
       {hasText ? (
         <Pressable
           onPress={() => {
-            ref.current?.clear();
+            // `clear()` alone is dropped on Android once `defaultValue` (a
+            // restored draft) wrote the native text; the helper also writes
+            // the empty text, so the query cannot stay under the hint.
+            clearComposerInput(ref.current);
             if (onClear) {
               onClear();
             } else {

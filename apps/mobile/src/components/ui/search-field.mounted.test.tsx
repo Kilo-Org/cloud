@@ -27,10 +27,12 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 const clear = vi.fn();
+const setNativeProps = vi.fn();
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 afterEach(() => {
   clear.mockReset();
+  setNativeProps.mockReset();
   act(() => {
     renderer?.unmount();
   });
@@ -39,7 +41,7 @@ afterEach(() => {
 
 function mount(props: Partial<ComponentProps<typeof SearchField>> = {}) {
   const onChangeText = vi.fn<(text: string) => void>();
-  const inputRef = { current: { clear } as unknown as TextInput };
+  const inputRef = { current: { clear, setNativeProps } as unknown as TextInput };
   act(() => {
     renderer = TestRenderer.create(
       createElement(SearchField, {
@@ -99,9 +101,12 @@ describe('SearchField', () => {
     expect(hosts(root, 'Pressable')).toHaveLength(1);
   });
 
-  it('clears the native text and reports the empty query', () => {
+  it('clears the native text through both write paths and reports the empty query', () => {
     const { root, onChangeText } = mount({ hasText: true });
     pressClear(root);
+    // Android drops `clear()` once `defaultValue` wrote the text (a restored
+    // draft), so the field also writes the empty text itself.
+    expect(setNativeProps).toHaveBeenCalledWith({ text: '', selection: { start: 0, end: 0 } });
     expect(clear).toHaveBeenCalledTimes(1);
     expect(onChangeText).toHaveBeenCalledWith('');
   });
@@ -116,7 +121,7 @@ describe('SearchField', () => {
   });
 
   it('swaps the magnifier for a spinner in the same slot while busy', () => {
-    const { root } = mount({ busy: true, busyLabel: 'Searching' });
+    const { root } = mount({ busy: 'Searching' });
     expect(hosts(root, 'Search')).toHaveLength(0);
     expect(hosts(root, 'ActivityIndicator')[0]?.props.accessibilityLabel).toBe('Searching');
   });

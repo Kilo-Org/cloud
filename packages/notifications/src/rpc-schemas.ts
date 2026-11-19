@@ -93,9 +93,12 @@ export type InternalDispatchResponse = z.infer<typeof internalDispatchResponseSc
 export const badgeBucketSchema = nonEmptyStringSchema;
 export type BadgeBucket = z.infer<typeof badgeBucketSchema>;
 
+/** The count every badge route reports: a whole, never-negative number. */
+const badgeCountSchema = z.number().int().nonnegative();
+
 export const badgeCountRowSchema = z.object({
   badgeBucket: badgeBucketSchema,
-  badgeCount: z.number().int().nonnegative(),
+  badgeCount: badgeCountSchema,
 });
 export type BadgeCountRow = z.infer<typeof badgeCountRowSchema>;
 
@@ -110,7 +113,7 @@ export const markBadgeReadInputSchema = z.object({
 export type MarkBadgeReadInput = z.infer<typeof markBadgeReadInputSchema>;
 
 export const markBadgeReadResponseSchema = z.object({
-  badgeCount: z.number().int().nonnegative(),
+  badgeCount: badgeCountSchema,
 });
 export type MarkBadgeReadResponse = z.infer<typeof markBadgeReadResponseSchema>;
 
@@ -151,7 +154,13 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 >;
 
 // Aggregate refreshes carry identity only; the server reads current status and scope.
-export const refreshGlanceableSessionsInputSchema = z.object({
+
+/**
+ * The shape both the schema and the subset rule below read, so dropping or
+ * renaming a hint list fails to compile in the rule instead of silently
+ * turning it into a no-op.
+ */
+const refreshGlanceableSessionsInputShape = z.object({
   userId: nonEmptyStringSchema,
   cliSessionIds: z.array(nonEmptyStringSchema).min(1),
   /**
@@ -175,6 +184,38 @@ export const refreshGlanceableSessionsInputSchema = z.object({
    */
   cardFollowSessionIds: z.array(nonEmptyStringSchema).optional(),
 });
+
+/**
+ * Both hint lists name sessions the refresh already carries. An id outside
+ * `cliSessionIds` names no session in this batch, and the server resolves such
+ * an id to the personal scope, so an out-of-batch approval hint would exempt
+ * the wrong scope from the delivery window. Reject it instead of acting on it.
+ * Omitted lists parse as before, and duplicates stay allowed (the server
+ * treats each list as a set).
+ */
+function refineRefreshSessionSubset(
+  data: z.infer<typeof refreshGlanceableSessionsInputShape>,
+  ctx: z.RefinementCtx
+): void {
+  const batch = new Set(data.cliSessionIds);
+  const hintFields = ['approvalChangedSessionIds', 'cardFollowSessionIds'] as const;
+  for (const field of hintFields) {
+    const ids = data[field];
+    if (!ids) continue;
+    ids.forEach((id, index) => {
+      if (batch.has(id)) return;
+      ctx.addIssue({
+        code: 'custom',
+        path: [field, index],
+        message: 'each entry must name a session in cliSessionIds',
+      });
+    });
+  }
+}
+
+export const refreshGlanceableSessionsInputSchema = refreshGlanceableSessionsInputShape.superRefine(
+  refineRefreshSessionSubset
+);
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 
 // ── glanceable scope refresh (POST /internal/v1/glanceable-refresh) ──

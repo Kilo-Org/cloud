@@ -751,10 +751,10 @@ enum ArtifactFileName {
 
   /**
    One safe, single-component filename for a manifest entry: the basename
-   without directory components and control characters, `.` and `..`
-   rejected, falling back to the file id and then a fixed stem, and bounded to
-   `maxBytes`. Mirrors the mirror writer's `sanitizeArtifactName` +
-   `boundArtifactDisplayName`.
+   without directory components, control characters or Unicode bidi formatting
+   characters, `.` and `..` rejected, falling back to the file id and then a
+   fixed stem, and bounded to `maxBytes`. Mirrors the mirror writer's
+   `sanitizeArtifactName` + `boundArtifactDisplayName`.
    */
   static func sanitize(id: String, name: String, mime: String) -> String {
     let fromName = sanitizeName(name)
@@ -811,14 +811,14 @@ enum ArtifactFileName {
     if let lastSlash = scalars.lastIndex(where: { $0 == "/" }) {
       scalars.removeSubrange(...lastSlash)
     }
-    var withoutControls = String.UnicodeScalarView()
+    var withoutUnnameable = String.UnicodeScalarView()
     for scalar in scalars {
-      if scalar == "/" || isControlScalar(scalar.value) {
+      if scalar == "/" || isUnnameableScalar(scalar.value) {
         continue
       }
-      withoutControls.append(scalar)
+      withoutUnnameable.append(scalar)
     }
-    let collapsed = String(withoutControls)
+    let collapsed = String(withoutUnnameable)
       .split(whereSeparator: { $0.isWhitespace })
       .joined(separator: " ")
     if collapsed.isEmpty || collapsed == "." || collapsed == ".." {
@@ -827,8 +827,20 @@ enum ArtifactFileName {
     return bound(collapsed)
   }
 
-  private static func isControlScalar(_ value: UInt32) -> Bool {
-    value <= 31 || value == 127 || (128...159).contains(value)
+  /// The scalars this extension never puts in a filename: C0, DEL and C1
+  /// controls, and the Unicode bidi formatting characters a file browser would
+  /// otherwise use to reorder the painted name. Joiners stay, because they
+  /// shape the letters of a name written in an RTL script. Mirrors the mirror
+  /// writer's `isUnnameableCodePoint`.
+  private static func isUnnameableScalar(_ value: UInt32) -> Bool {
+    value <= 31
+      || value == 127
+      || (128...159).contains(value)
+      || value == 1564  // ARABIC LETTER MARK
+      || value == 8206  // LEFT-TO-RIGHT MARK
+      || value == 8207  // RIGHT-TO-LEFT MARK
+      || (8234...8238).contains(value)  // LEFT-TO-RIGHT EMBEDDING .. RIGHT-TO-LEFT OVERRIDE
+      || (8294...8297).contains(value)  // LEFT-TO-RIGHT ISOLATE .. POP DIRECTIONAL ISOLATE
   }
 
   private static func splitExtension(_ name: String) -> (stem: String, extension_: String) {

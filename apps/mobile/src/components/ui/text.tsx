@@ -169,9 +169,9 @@ function Text({
     className
   );
   // The paragraph's base direction: the interface's for app copy, and the
-  // copy's own first letter's for content (`direction="auto"`), which is what
-  // makes a Latin sentence keep its left edge and the punctuation that ends it
-  // inside a right-to-left interface.
+  // copy's own first letter's for content (`direction="auto"`), named for the
+  // node's layout as well, which is what makes a Latin sentence keep its left
+  // edge and the punctuation that ends it inside a right-to-left interface.
   const interfaceDirection: TextStyle | undefined = isRTL ? RTL_WRITING_DIRECTION : undefined;
   const writingDirection =
     direction === 'auto'

@@ -192,21 +192,24 @@ describe('contentTextDirection', () => {
     i18nManager.isRTL = false;
   });
 
+  const LTR = { direction: 'ltr', writingDirection: 'ltr' };
+  const RTL = { direction: 'rtl', writingDirection: 'rtl' };
+
   // Copy the app did not write takes the direction of its own first letter, so
   // an English sentence keeps its left edge inside an Arabic interface, and an
-  // Arabic one still aligns to the right.
+  // Arabic one still aligns to the right. The node's layout `direction` is
+  // named too: iOS resolves a paragraph's alignment from it, not from
+  // `writingDirection`.
   it.each([false, true])('names English content left to right (isRTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
-    expect(contentTextDirection('1. Prototype pollution: لا')).toEqual({
-      writingDirection: 'ltr',
-    });
+    expect(contentTextDirection('1. Prototype pollution: لا')).toEqual(LTR);
   });
 
   it.each([false, true])('names Arabic content right to left (isRTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
-    expect(contentTextDirection(['  ', createElement('Text', null, 'تلوث Prototype')])).toEqual({
-      writingDirection: 'rtl',
-    });
+    expect(contentTextDirection(['  ', createElement('Text', null, 'تلوث Prototype')])).toEqual(
+      RTL
+    );
   });
 
   // Hebrew, and the right-to-left scripts the app has no glyphs for, still
@@ -214,13 +217,13 @@ describe('contentTextDirection', () => {
   it.each(['שלום', 'ܫܠܡܐ', 'ދިވެހި', 'ߒߞߏ', 'ࠀࠁ', 'ࡀࡁ', '𞤀𞤁'])(
     'names %s content right to left',
     text => {
-      expect(contentTextDirection(`1. ${text}`)).toEqual({ writingDirection: 'rtl' });
+      expect(contentTextDirection(`1. ${text}`)).toEqual(RTL);
     }
   );
 
   it('names Greek and Cyrillic content left to right', () => {
-    expect(contentTextDirection('Ελληνικά')).toEqual({ writingDirection: 'ltr' });
-    expect(contentTextDirection('Русский')).toEqual({ writingDirection: 'ltr' });
+    expect(contentTextDirection('Ελληνικά')).toEqual(LTR);
+    expect(contentTextDirection('Русский')).toEqual(LTR);
   });
 
   it('leaves copy with no letter to the interface', () => {

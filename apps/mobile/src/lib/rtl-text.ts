@@ -173,8 +173,6 @@ function firstLetter(node: ReactNode): string | undefined {
   return undefined;
 }
 
-const CONTENT_LTR_DIRECTION: TextStyle = { writingDirection: 'ltr' };
-
 /**
  * The code point ranges whose letters are right to left (bidi class R or AL):
  * Hebrew through Arabic Extended-A, the Hebrew and Arabic presentation forms,
@@ -188,6 +186,8 @@ const CONTENT_LTR_DIRECTION: TextStyle = { writingDirection: 'ltr' };
 const RTL_LETTER =
   /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
 
+const CONTENT_RTL_DIRECTION: TextStyle = { direction: 'rtl', writingDirection: 'rtl' };
+
 /**
  * Base direction for copy the app did not write — a server's message, a user's
  * own text, an issue body. The paragraph takes the direction of its own first
@@ -196,18 +196,25 @@ const RTL_LETTER =
  * right. `undefined` when the copy has no letter: it then keeps the interface's
  * direction.
  *
- * The direction is named, not left to `writingDirection: 'auto'`: iOS resolves
- * an `auto` paragraph's punctuation from its content but its natural alignment
- * from the interface, so an English block stayed on the right edge of an
- * Arabic screen. A named direction resolves both, and unlike `textAlign` it
- * leaves an explicit `text-center` alone.
+ * The text node's own layout `direction` is named as well as its
+ * `writingDirection`. iOS takes a paragraph's alignment from the node's layout
+ * direction, not from its writing direction: Fabric reads the Yoga node's
+ * resolved direction into `layoutDirection` (`ParagraphShadowNode.cpp`), and
+ * `RCTResolveTextAlignment` (`RCTAttributedTextUtils.mm`) turns natural into
+ * right and swaps left and right whenever that direction is right to left. So
+ * `writingDirection` alone fixed an English description's punctuation but left
+ * it on the right edge of an Arabic screen. Pinning the node's direction to the
+ * copy's own makes the natural alignment resolve to the copy's start edge on
+ * both platforms (Android resolves gravity against the same direction), and
+ * unlike `textAlign` it leaves an explicit `text-center` alone. It is set on
+ * the `Text` itself, so the box still sits where the interface's flexbox puts it.
  */
 export function contentTextDirection(children: ReactNode): TextStyle | undefined {
   const letter = firstLetter(children);
   if (letter === undefined) {
     return undefined;
   }
-  return RTL_LETTER.test(letter) ? RTL_WRITING_DIRECTION : CONTENT_LTR_DIRECTION;
+  return RTL_LETTER.test(letter) ? CONTENT_RTL_DIRECTION : LTR_TEXT_DIRECTION;
 }
 
 /**

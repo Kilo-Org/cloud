@@ -10,7 +10,7 @@ import type {
   KiloGatewayToolCallRequest,
   KiloGatewayToolDefinition,
 } from './kilo-api-client';
-import { runLlmTurn } from './agent-llm-turn-runner-core';
+import { runLlmTurn, TARGET_TAB_UNAVAILABLE_ABORT_REASON } from './agent-llm-turn-runner-core';
 import { buildGatewayMessagesFromEvents } from './agent-llm-harness';
 
 const kiloApiClientMocks = vi.hoisted(() => ({
@@ -1290,6 +1290,128 @@ describe('continue nudge', () => {
     await runLlmTurn(nudgeOptions(fetch, []));
 
     expect(calls).toBe(3);
+  });
+
+  it('does not nudge a final answer that asks the user to act before it can continue', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      if (calls === 2) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"The tab stays with another Kilo session. Please stop that session or choose another tab, and I\'ll read the page."},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"I still cannot read the page."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn(nudgeOptions(fetch, appended));
+
+    // The answer is complete and waiting on the user; a nudge bills a second request for a duplicate paragraph.
+    expect(calls).toBe(2);
+    const appendedTexts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(appendedTexts).toHaveLength(1);
+    expect(appendedTexts[0]).toContain('another Kilo session');
+  });
+
+  it('does not nudge a completing sign-off that offers to keep helping', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"The page heading is CLI-TAKE PAGE. Let me know if you want more detail."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(2);
+  });
+});
+
+describe('target tab closed during a turn', () => {
+  const tabClosedOptions = (signal: AbortSignal, appended: AgentConversationEvent[]) => ({
+    apiBaseUrl: 'https://app.kilo.ai',
+    appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
+    conversationEvents: [createUserMessage('Inspect this page')],
+    executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: 'snap' } }),
+    fetch: (() =>
+      Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      )) satisfies FetchLike,
+    maxToolRounds: 4,
+    model: 'kilo-auto/efficient',
+    noResponseMessage: 'no response',
+    signal,
+    toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+      toolCalls.map(toolCall =>
+        createToolCall({
+          arguments: {},
+          name: 'kilo_browser_snapshot',
+          providerToolCallId: toolCall.id,
+          tabId: 1,
+        })
+      ),
+    token: 'token',
+    tooManyToolRoundsMessage: 'too many rounds',
+    tools: [getPageSnapshotTool],
+    updateAssistantMessage: () => {},
+    updateThinkingBlock: () => {},
+  });
+
+  it('says the target tab went away instead of reporting a Stop the user never pressed', async () => {
+    const abort = new AbortController();
+    const appended: AgentConversationEvent[] = [];
+
+    abort.abort(TARGET_TAB_UNAVAILABLE_ABORT_REASON);
+    await runLlmTurn({
+      ...tabClosedOptions(abort.signal, appended),
+      executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: 'snap' } }),
+    });
+
+    const lastEvent = appended.at(-1);
+    expect(lastEvent).toMatchObject({ role: 'assistant', type: 'message' });
+    expect(lastEvent?.type === 'message' ? lastEvent.text : '').not.toBe('Stopped.');
+  });
+
+  it('keeps the plain Stopped text when the user pressed Stop', async () => {
+    const abort = new AbortController();
+    const appended: AgentConversationEvent[] = [];
+
+    abort.abort();
+    await runLlmTurn(tabClosedOptions(abort.signal, appended));
+
+    expect(appended.at(-1)).toMatchObject({ role: 'assistant', text: 'Stopped.' });
   });
 });
 

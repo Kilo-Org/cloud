@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite covers the save contract, the refusal copy and the two-tab draft rules of one form. */
 // The save contract of the providers-and-models form. An organization with no
 // saved provider allow list allows every provider, including BYOK-only ones the
 // mobile catalog cannot name, so a save that only touched the Models tab must
@@ -10,7 +11,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 
-import '@/i18n';
 import { i18n } from '@/i18n';
 import { ModelAccessForm } from './model-access-form';
 import {

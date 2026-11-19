@@ -79,6 +79,7 @@ import {
 import { getSupportedReasoningEfforts } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import {
   CustomLlmCredentialsSchema,
+  ReasoningDetailsTransform,
   ReasoningEffortSchema,
   type CustomLlmCredentials,
   type CustomPricingTiers,
@@ -389,12 +390,24 @@ function providerSettingsAllowPartner(
 }
 
 /**
- * The reasoning effort the upstream would receive: an explicit disable is `none`, otherwise the
- * effort the request carries for its API kind. Null when the request asks for no effort.
+ * The reasoning effort the upstream receives, following the partner's reasoning transform: an
+ * explicit disable is `none`, otherwise the effort the request carries for its API kind. The
+ * `reasoning-content` and `reasoning` transforms drop the `reasoning` object and forward only its
+ * effort, so `reasoning.enabled: false` does not reach the upstream there. Null when the request
+ * carries no effort, even though `mistral-thinking` then sends `high`: the partner is not skipped
+ * for an effort the client did not choose.
  */
-function getRequestedReasoningEffort(request: GatewayRequest): string | null {
+function getUpstreamReasoningEffort(
+  request: GatewayRequest,
+  transform: ReasoningDetailsTransform | undefined
+): string | null {
+  const objectDisableReachesUpstream =
+    transform !== ReasoningDetailsTransform.ReasoningContent &&
+    transform !== ReasoningDetailsTransform.Reasoning;
   const disabledByReasoningObject =
-    request.kind === 'chat_completions' && request.body.reasoning?.enabled === false;
+    objectDisableReachesUpstream &&
+    request.kind === 'chat_completions' &&
+    request.body.reasoning?.enabled === false;
   if (disabledByReasoningObject || isReasoningExplicitlyDisabled(request)) return 'none';
   return getReasoningEffort(request);
 }
@@ -404,11 +417,12 @@ function requestsUnsupportedReasoningEffort(
   partner: PartnerCustomLlm,
   request: GatewayRequest
 ): boolean {
-  const supported = getSupportedReasoningEfforts(
-    partner.definition.opencode_settings?.reasoning_options
-  );
+  const { definition } = partner;
+  const supported = getSupportedReasoningEfforts(definition.opencode_settings?.reasoning_options);
   if (!supported) return false;
-  const effort = ReasoningEffortSchema.safeParse(getRequestedReasoningEffort(request));
+  const effort = ReasoningEffortSchema.safeParse(
+    getUpstreamReasoningEffort(request, definition.reasoning_details_transform)
+  );
   return effort.success && !supported.has(effort.data);
 }
 

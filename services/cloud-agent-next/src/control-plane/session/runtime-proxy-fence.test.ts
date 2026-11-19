@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DO_RETRY_CONFIG } from '@kilocode/worker-utils';
+import {
+  RuntimeAuthorizationExpiredError,
+  RuntimeAuthorizationRevokedError,
+} from '@kilocode/worker-utils/runtime-authorization';
 import { shouldCaptureCloudAgentException } from '../../sentry.js';
 import {
   classifyRuntimeProxyFenceError,
@@ -175,9 +179,22 @@ describe('classifyRuntimeProxyFenceError', () => {
     ).toBe('retry');
   });
 
-  it('keeps the scope fallback for any other error', () => {
-    expect(classifyRuntimeProxyFenceError(new Error('authorization revoked'))).toBe('fallback');
-    expect(classifyRuntimeProxyFenceError(null)).toBe('fallback');
+  it('falls back only for a revoked or expired local runtime authorization', () => {
+    expect(classifyRuntimeProxyFenceError(new RuntimeAuthorizationRevokedError())).toBe('fallback');
+    expect(classifyRuntimeProxyFenceError(new RuntimeAuthorizationExpiredError())).toBe(
+      'fallback'
+    );
+  });
+
+  it('retries an unrecognized failure', () => {
+    expect(classifyRuntimeProxyFenceError(new Error('storage read failed'))).toBe('retry');
+    expect(classifyRuntimeProxyFenceError(null)).toBe('retry');
+  });
+
+  it('matches the authorization errors by instanceof, not by name', () => {
+    const impostor = new Error('not a real revoked error');
+    impostor.name = 'RuntimeAuthorizationRevokedError';
+    expect(classifyRuntimeProxyFenceError(impostor)).toBe('retry');
   });
 });
 

@@ -291,7 +291,7 @@ function canChangeCatalogMode(organizationRole: OrganizationRole | null) {
 function canReadPrivateProviderDefinition(organizationRole: OrganizationRole | null) {
   return (
     organizationRole === null ||
-    (ORGANIZATION_BILLING_ROLES as OrganizationRole[]).includes(organizationRole)
+    (ORGANIZATION_BILLING_ROLES as readonly OrganizationRole[]).includes(organizationRole)
   );
 }
 

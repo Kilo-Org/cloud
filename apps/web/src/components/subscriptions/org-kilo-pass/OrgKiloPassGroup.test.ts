@@ -194,24 +194,48 @@ describe('OrgKiloPassGroup', () => {
     expect(html).not.toContain('Unable to load');
   });
 
+  test('shows loading while seat status is initially pending', () => {
+    mockSeatQuery = pending<SeatSubscription>();
+
+    const html = render();
+
+    expect(html).toContain('animate-pulse');
+    expect(html).not.toContain('Add Kilo Pass');
+    expect(html).not.toContain('href="/organizations/org-1/subscriptions/kilo-pass/setup"');
+  });
+
   test.each([
-    ['pending', () => pending<SeatSubscription>()],
-    [
-      'fetching with cached active data',
-      () => fetching<SeatSubscription>({ latestSeatPurchaseStatus: 'active' }),
-    ],
-  ])(
-    'shows loading rather than an available action when seat status is %s',
-    (_state, seatQuery) => {
-      mockSeatQuery = seatQuery();
+    ['active', true],
+    ['canceled', false],
+  ] as const)('keeps the card visible while refreshing cached %s seats', (status, canPurchase) => {
+    mockSeatQuery = fetching({ latestSeatPurchaseStatus: status });
 
-      const html = render();
+    const html = render();
 
-      expect(html).toContain('animate-pulse');
-      expect(html).not.toContain('Add Kilo Pass');
-      expect(html).not.toContain('href="/organizations/org-1/subscriptions/kilo-pass/setup"');
+    expect(html).not.toContain('animate-pulse');
+    expect(html).toContain('Add Kilo Pass');
+    if (canPurchase) {
+      expect(actionButton(html, 'Add Kilo Pass')).not.toContain('disabled=""');
+      expect(html).toContain('href="/organizations/org-1/subscriptions/kilo-pass/setup"');
+    } else {
+      expect(actionButton(html, 'Add Kilo Pass')).toContain('disabled=""');
+      expect(html).toContain('Subscribe to seats first');
     }
-  );
+  });
+
+  test('keeps a failed seat check visible while retrying with stale active data', () => {
+    mockSeatQuery = {
+      ...failure<SeatSubscription>('Seat lookup failed', { latestSeatPurchaseStatus: 'active' }),
+      isFetching: true,
+    };
+
+    const html = render();
+
+    expect(html).not.toContain('animate-pulse');
+    expect(html).toContain('Unable to verify your seat subscription');
+    expect(actionButton(html, 'Add Kilo Pass')).toContain('disabled=""');
+    expect(html).not.toContain('href="/organizations/org-1/subscriptions/kilo-pass/setup"');
+  });
 
   test.each([
     ['no cached data', undefined],

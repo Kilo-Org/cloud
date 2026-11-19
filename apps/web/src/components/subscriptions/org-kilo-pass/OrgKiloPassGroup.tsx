@@ -56,8 +56,7 @@ export function OrgKiloPassGroup({
         !hasRequiredQueryError &&
         (summaryQuery.isPending ||
           organizationQuery.isPending ||
-          (!hasVisibleAgreement &&
-            (seatSubscriptionQuery.isPending || seatSubscriptionQuery.isFetching)))
+          (!hasVisibleAgreement && seatSubscriptionQuery.isPending))
       }
       isError={hasRequiredQueryError}
       error={summaryQuery.error ?? organizationQuery.error}

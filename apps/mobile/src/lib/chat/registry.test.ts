@@ -1625,6 +1625,37 @@ describe('a question a later send took the slot from', () => {
     expect(waitingWords(opened)).toEqual(['first']);
   });
 
+  it('asks its Retry ahead of the line when the failure already holds one', async () => {
+    /* The Retry names the attempt it asks again: it is that question, not a
+       newcomer, so it takes the slot back rather than waiting behind what the
+       failed answer is still holding. */
+    await say(opened, { text: 'kept', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    crash?.();
+    await settled();
+    expect(snapshotOf(opened).displaced).toEqual([]);
+
+    // A second exchange runs and fails while another question is held.
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    const endFirst = crash;
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    endFirst?.();
+    await settled();
+
+    const displaced = snapshotOf(opened).displaced;
+    expect(displaced.map(one => one.text)).toEqual(['kept']);
+    expect(waitingWords(opened)).toEqual(['second']);
+
+    asked.length = 0;
+    await retryChat(opened, displaced[0]);
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['kept']);
+    expect(waitingWords(opened)).toEqual(['second']);
+  });
+
   it('keeps a question said after it under its answer once it is asked again', async () => {
     storedHistory = [];
     creditsFailureFor = 's1';

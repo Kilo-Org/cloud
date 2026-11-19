@@ -883,12 +883,13 @@ async function askInTurn(
       throw new Error('the chat is not open');
     }
     const before = snapshotOf(current);
-    if (typed && before.asked !== null && held.waiting.length > 0) {
+    if (typed && from === undefined && before.asked !== null && held.waiting.length > 0) {
       /* A failed attempt keeps its Retry, and the line it holds is what the
          person asked before that failure. A new send joins the line rather
          than overtaking it, so questions reach the model in the order they
-         were typed. */
-      held.waiting.push({ text, images, model, effort, ...(from === undefined ? {} : { from }) });
+         were typed. A Retry names the question it asks again, so it is that
+         attempt, not a newcomer: it takes the slot it already holds. */
+      held.waiting.push({ text, images, model, effort });
       const next = held.waiting.shift();
       if (next !== undefined) {
         ({ text, images, model, effort, from } = next);

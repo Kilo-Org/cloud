@@ -37,10 +37,10 @@ export const ROW_FRAME_STACK_CLASS = 'min-h-[48px] gap-2 px-4 py-3';
  * caption starts its text at the same x and keeps the same rhythm as its
  * siblings.
  */
-export const ROW_FRAME_COLUMN_CLASS = 'min-h-[48px] px-4 py-3';
+const ROW_FRAME_COLUMN_CLASS = 'min-h-[48px] px-4 py-3';
 
 /** The row's own line inside the column frame. */
-export const ROW_FRAME_LINE_CLASS = 'flex-row items-center justify-between gap-3';
+const ROW_FRAME_LINE_CLASS = 'flex-row items-center justify-between gap-3';
 
 /** The row's leading tile frame, at the 30pt `IconTile` size. */
 export const ROW_TILE_CLASS = 'h-[30px] w-[30px] shrink-0 rounded-lg';

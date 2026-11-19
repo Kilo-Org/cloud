@@ -703,6 +703,8 @@ const maskAgentScreenshot = async (
     readonly fullPage: boolean;
     /** Geometry the caller already read for the capture (a device-scale clip), so the mask does not ask again. */
     readonly geometry?: AgentScreenshotGeometry | undefined;
+    /** The image's pixels per CSS pixel: 1 for a css-scale capture, the tab's ratio for a device-pixel one. */
+    readonly imageScale?: number | undefined;
     readonly mediaType: string;
   }
 ): Promise<
@@ -777,8 +779,9 @@ const maskAgentScreenshot = async (
     boxes,
     dataUrl: input.dataUrl,
     mediaType: input.mediaType,
-    // An element capture is clipped at its own scale; a viewport or full-page capture keeps the device pixel ratio the image carries.
-    scale: input.clip === undefined ? geometry.scale : (input.clipScale ?? 1),
+    // An element capture is clipped at its own scale; a viewport capture is the image's own pixels per CSS pixel,
+    // Which a css-scale capture renders at 1 however high the tab's ratio is.
+    scale: input.clip === undefined ? (input.imageScale ?? geometry.scale) : (input.clipScale ?? 1),
   });
 
   // The masker always re-encodes as PNG, whatever the capture's media type was.
@@ -889,7 +892,7 @@ const readElementClip = async (
       throw error instanceof Error ? error : new Error(String(error));
     }
 
-    return { scale: 1, scroll: NO_SCROLL };
+    return { scale: 1, scroll: NO_SCROLL, viewport: undefined };
   });
 
   return {
@@ -943,25 +946,54 @@ const readScreenshotData = async (
     readonly clip: z.infer<typeof elementClipSchema> | undefined;
     readonly clipScale: number;
     readonly fullPage: boolean;
+    /** The measured geometry of the tab: the CSS viewport a css-scale image is cut from. */
+    readonly geometry: AgentScreenshotGeometry | undefined;
+    readonly scale: 'css' | 'device';
     readonly type: 'jpeg' | 'png' | 'webp';
   }
 ): Promise<string | undefined> => {
+  // A css-scale viewport image is the viewport's CSS size at device pixel ratio 2 as well: the frame is rendered at
+  // That size, so the forced frame stays the fast path instead of falling back to a device-pixel capture.
+  const cssSize =
+    input.scale === 'css' && input.geometry?.viewport !== undefined
+      ? input.geometry.viewport
+      : undefined;
+
   // `Page.startScreencast` has only jpeg and png, so a webp request takes the plain capture, which honours the type.
   const fresh =
     input.clip === undefined && !input.fullPage && input.type !== 'webp'
-      ? await deps.session.captureViewportImage(input.type)
+      ? await deps.session.captureViewportImage(
+          input.type,
+          cssSize === undefined ? {} : { size: cssSize }
+        )
       : undefined;
 
   if (fresh !== undefined) {
     return fresh;
   }
 
+  // A viewport capture is clipped to the viewport at the requested scale: `scale: 1` renders CSS pixels however
+  // High the tab's ratio is, and the device scale renders the pixels the fast path would have returned.
+  const viewportClip =
+    input.clip === undefined && !input.fullPage && input.geometry?.viewport !== undefined
+      ? {
+          height: input.geometry.viewport.height,
+          scale: input.scale === 'device' ? input.geometry.scale : 1,
+          width: input.geometry.viewport.width,
+          // CDP clips are document-space, so a scrolled page starts at its scroll position.
+          // eslint-disable-next-line id-length -- CDP `clip` fields are named x and y
+          x: input.geometry.scroll.x,
+          // eslint-disable-next-line id-length -- see above
+          y: input.geometry.scroll.y,
+        }
+      : undefined;
+  const clip = input.clip === undefined ? viewportClip : { ...input.clip, scale: input.clipScale };
   const parsed = screenshotDataSchema.safeParse(
     await deps.session.send('Page.captureScreenshot', {
       format: input.type,
       // The surface is the tab's own compositor output; a viewport capture never extends past it.
       fromSurface: true,
-      ...(input.clip === undefined ? {} : { clip: { ...input.clip, scale: input.clipScale } }),
+      ...(clip === undefined ? {} : { clip }),
       ...(input.fullPage ? { captureBeyondViewport: true } : {}),
     })
   );
@@ -998,11 +1030,16 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
     (deps.agentScope === undefined ? undefined : await readAgentScreenshotGeometry(deps.session));
   // A device-pixel element capture renders the clip at the tab's device pixel ratio; the mask boxes move with it.
   const clipScale = clip !== undefined && scale === 'device' ? (geometry?.scale ?? 1) : 1;
+  // The contract's default is a CSS-pixel image: `css` renders the viewport at 1 pixel per CSS pixel even on a 2x
+  // Tab, and only `device` returns the tab's own pixels.
+  const requestedScale = scale ?? 'css';
 
   const data = await readScreenshotData(deps, {
     clip,
     clipScale,
     fullPage: fullPage === true,
+    geometry,
+    scale: requestedScale,
     type,
   });
 
@@ -1021,6 +1058,7 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
     dataUrl: `data:${mediaType};base64,${data}`,
     fullPage: fullPage === true,
     ...(geometry === undefined ? {} : { geometry }),
+    ...(requestedScale === 'css' && fullPage !== true ? { imageScale: 1 } : {}),
     mediaType,
   });
 

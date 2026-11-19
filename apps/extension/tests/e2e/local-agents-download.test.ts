@@ -241,7 +241,8 @@ test('a download that lands after the click is reported on the next call, and th
       throw new Error(`no delayed download link in the snapshot:\n${snapshot.kind}`);
     }
 
-    // 1. Call N: the click. The response is held for a second and a half, so nothing lands inside the call.
+    // 1. Call N: the click. The route holds its response, so the download cannot exist until the test releases it,
+    // Which is only after this call has answered.
     const clicked = await session.callTool(
       'browser_click',
       { element: 'Download slow report', target },
@@ -249,6 +250,8 @@ test('a download that lands after the click is reported on the next call, and th
     );
 
     expect(clicked).toMatchObject({ isError: false, kind: 'result' });
+
+    fixture.releaseLate();
     // The browser created the download after the call answered, and the guard's late window stopped it.
     await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(1);
     await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toStrictEqual([]);
@@ -260,7 +263,9 @@ test('a download that lands after the click is reported on the next call, and th
     const message = reported.kind === 'error' ? reported.message : '';
 
     expect(message).toContain("The click on 'Download slow report' started a download of");
-    expect(message).toContain('Repeat that click to receive the file.');
+    expect(message).toContain(
+      'Repeat that click after the download is approved to receive the file.'
+    );
 
     const token = reported.kind === 'error' ? (reported.stepToken ?? '') : '';
 
@@ -276,9 +281,10 @@ test('a download that lands after the click is reported on the next call, and th
     );
 
     expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    fixture.releaseLate();
     await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
 
-    // 4. The token is burned: the identical click is guarded again, and the folder keeps its one file. The slow route
+    // 4. The token is burned: the identical click is guarded again, and the folder keeps its one file. The held route
     // Answers only after the click, so this call cannot stop the file itself — the next call reports it, as in step 1.
     const reguarded = await session.callTool(
       'browser_click',
@@ -288,6 +294,7 @@ test('a download that lands after the click is reported on the next call, and th
     );
 
     expect(reguarded).toMatchObject({ isError: false, kind: 'result' });
+    fixture.releaseLate();
     // Each slow click reaches the browser as a download: the third one is cancelled in the late window, so its file
     // Never lands, and the folder keeps the approved file alone.
     await expect.poll(() => downloads.length, { timeout: 20_000 }).toBe(3);
@@ -302,7 +309,9 @@ test('a download that lands after the click is reported on the next call, and th
     const reToken = reReported.kind === 'error' ? (reReported.stepToken ?? '') : '';
 
     expect(reMessage).toContain("The click on 'Download slow report' started a download of");
-    expect(reMessage).toContain('Repeat that click to receive the file.');
+    expect(reMessage).toContain(
+      'Repeat that click after the download is approved to receive the file.'
+    );
     expect(reToken).not.toBe('');
     expect(reToken).not.toBe(token);
     await expect.poll(() => readdir(downloadsPath), { timeout: 20_000 }).toHaveLength(1);

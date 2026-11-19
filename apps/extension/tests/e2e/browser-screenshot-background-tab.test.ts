@@ -174,6 +174,7 @@ const runBackgroundTabScreenshot = async ({
   extraLaunchArgs,
   label,
   realViewport,
+  scale,
 }: {
   readonly cycles: number;
   readonly devicePixelRatio: number;
@@ -182,6 +183,8 @@ const runBackgroundTabScreenshot = async ({
   readonly label: string;
   /** `true` drops Playwright's viewport emulation, so the browser renders at the scale it was launched with. */
   readonly realViewport: boolean;
+  /** The tool's `scale`: `css` images are the viewport in CSS pixels, `device` images in the tab's own pixels. */
+  readonly scale: 'css' | 'device';
 }): Promise<void> => {
   // 127.0.0.2 is a different site from the page's 127.0.0.1, so Chromium renders the frame out of process.
   const inner = await startFixtureServer({
@@ -280,6 +283,9 @@ const runBackgroundTabScreenshot = async ({
       height: window.innerHeight,
       width: window.innerWidth,
     }));
+    // A css-scale image is the viewport in CSS pixels; a device-scale one is the tab's own pixels. Every pixel
+    // Coordinate below is read at the ratio the image really has, so both asserts measure the same page.
+    const imageRatio = scale === 'device' ? devicePixelRatio : 1;
 
     const samples: number[] = [];
     let maskedFramePixel: number[] = [];
@@ -299,7 +305,7 @@ const runBackgroundTabScreenshot = async ({
       // eslint-disable-next-line no-await-in-loop -- the shot is what this test times
       const shot = await session.callTool(
         'browser_take_screenshot',
-        { scale: 'css', type: 'png' },
+        { scale, type: 'png' },
         grants
       );
       const elapsed = Date.now() - started;
@@ -308,25 +314,25 @@ const runBackgroundTabScreenshot = async ({
       samples.push(elapsed);
 
       if (cycle === 0) {
-        // The image is the viewport in device pixels, so its size is the CSS viewport times the ratio.
+        // The image's size is the documentation of its own scale: CSS pixels for `css`, the tab's for `device`.
         // eslint-disable-next-line no-await-in-loop -- one decode of the first image
         const imageSize = await readImageSize(extensionPage, dataUrl);
 
         expect(
           imageSize,
-          `image ${String(imageSize.width)}x${String(imageSize.height)} for a ${String(cssViewport.width)}x${String(cssViewport.height)} viewport at ${String(devicePixelRatio)}x`
+          `image ${String(imageSize.width)}x${String(imageSize.height)} for a ${String(cssViewport.width)}x${String(cssViewport.height)} viewport at ${String(devicePixelRatio)}x and scale "${scale}"`
         ).toEqual({
-          height: cssViewport.height * devicePixelRatio,
-          width: cssViewport.width * devicePixelRatio,
+          height: cssViewport.height * imageRatio,
+          width: cssViewport.width * imageRatio,
         });
-        imageSummary = `image=${String(imageSize.width)}x${String(imageSize.height)} viewport=${String(cssViewport.width)}x${String(cssViewport.height)}`;
+        imageSummary = `image=${String(imageSize.width)}x${String(imageSize.height)} viewport=${String(cssViewport.width)}x${String(cssViewport.height)} scale=${scale}`;
       }
 
       // eslint-disable-next-line no-await-in-loop -- decoding one image at a time
       const pixel = await readPixel(extensionPage, {
         dataUrl,
-        x: BODY_PIXEL.x * devicePixelRatio,
-        y: BODY_PIXEL.y * devicePixelRatio,
+        x: BODY_PIXEL.x * imageRatio,
+        y: BODY_PIXEL.y * imageRatio,
       });
 
       // The image is the page after this click, not the frame that was last presented.
@@ -334,13 +340,13 @@ const runBackgroundTabScreenshot = async ({
         colourIndexOf(pixel.slice(0, 3)),
         `cycle ${String(cycle)} pixel ${JSON.stringify(pixel)} after ${String(elapsed)} ms`
       ).toBe(cycle % COLOURS.length);
-      // The frame's origin was never granted, so the post-click shot still blacks it out — at its own pixel
-      // Size, which is what puts the mask geometry on the right pixels at a ratio other than 1.
+      // The frame's origin was never granted, so the post-click shot still blacks it out — at the image's own
+      // Ratio, which is what puts the mask geometry on the right pixels at a ratio other than 1.
       // eslint-disable-next-line no-await-in-loop -- decoding one image at a time
       maskedFramePixel = await readPixel(extensionPage, {
         dataUrl,
-        x: FRAME_PIXEL.x * devicePixelRatio,
-        y: FRAME_PIXEL.y * devicePixelRatio,
+        x: FRAME_PIXEL.x * imageRatio,
+        y: FRAME_PIXEL.y * imageRatio,
       });
       expect(maskedFramePixel.slice(0, 3)).toEqual([0, 0, 0]);
       // eslint-disable-next-line no-await-in-loop -- one capture at a time
@@ -376,21 +382,37 @@ test('a screenshot of the agent\u2019s own inactive tab is fresh and fast, and n
     extraLaunchArgs: undefined,
     label: 'background tab screenshot',
     realViewport: false,
+    scale: 'css',
   });
 });
 
-test('a screenshot stays fresh, fast and masked at device pixel ratio 2', async () => {
+test('a css-scale screenshot stays fresh, fast and masked at device pixel ratio 2', async () => {
   test.setTimeout(180_000);
 
-  // The renderer really is a high-DPI one here: the frame is the layout viewport in device pixels, and the mask
-  // Geometry is laid over it, so a scale the capture path only gets right at DPR 1 shows up as the wrong pixels.
+  // The renderer really is a high-DPI one here: the image's documented size is still the CSS viewport, and the mask
+  // Geometry is laid over it, so a capture path that only gets the scale right at DPR 1 shows up as the wrong pixels.
   await runBackgroundTabScreenshot({
     cycles: 5,
     devicePixelRatio: 2,
     // With no viewport emulation the window is the page: a pinned 800x520 holds the fixture's 720x380
     // Frame box at ~800x433 css pixels, and keeps the size the same in a headed xvfb run and in headless ci.
     extraLaunchArgs: ['--force-device-scale-factor=2', '--window-size=800,520'],
-    label: 'dpr2 background tab screenshot',
+    label: 'dpr2 css background tab screenshot',
     realViewport: true,
+    scale: 'css',
+  });
+});
+
+test('a device-scale screenshot is the tab\u2019s own pixels at device pixel ratio 2', async () => {
+  test.setTimeout(180_000);
+
+  // The same tab, asked for its device pixels: the image is twice the CSS viewport and the mask covers twice the box.
+  await runBackgroundTabScreenshot({
+    cycles: 5,
+    devicePixelRatio: 2,
+    extraLaunchArgs: ['--force-device-scale-factor=2', '--window-size=800,520'],
+    label: 'dpr2 device background tab screenshot',
+    realViewport: true,
+    scale: 'device',
   });
 });

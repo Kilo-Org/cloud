@@ -423,6 +423,8 @@ export interface BrowserToolSession {
    */
   readonly captureViewportImage: (
     format: 'jpeg' | 'png' | 'webp',
+    /** How the image is sized: `size` is the viewport in CSS pixels; absent keeps the tab's own device pixels. */
+    options?: { readonly size?: { readonly height: number; readonly width: number } | undefined },
     guard?: BrowserToolCallGuard
   ) => Promise<string | undefined>;
   /**
@@ -2232,6 +2234,7 @@ export const createBrowserToolSession = ({
    */
   const readScreencastFrame = async (
     format: 'jpeg' | 'png',
+    size: { readonly height: number; readonly width: number } | undefined,
     guard: BrowserToolCallGuard | undefined
   ): Promise<z.infer<typeof screencastFrameSchema> | undefined> => {
     if (debuggerApi === undefined) {
@@ -2255,6 +2258,9 @@ export const createBrowserToolSession = ({
       await debuggerApi.sendCommand(target, 'Page.startScreencast', {
         everyNthFrame: 1,
         format,
+        // The screencast itself renders the frame at the requested size: a CSS-pixel capture of a 2x tab is
+        // Downscaled by the browser, which keeps the forced frame (and so the latency) the same at any ratio.
+        ...(size === undefined ? {} : { maxHeight: size.height, maxWidth: size.width }),
       });
       started = true;
       screencastOwner = attempt;
@@ -2292,8 +2298,10 @@ export const createBrowserToolSession = ({
 
   const captureViewportImage = async (
     format: 'jpeg' | 'png' | 'webp',
+    options?: { readonly size?: { readonly height: number; readonly width: number } | undefined },
     guard?: BrowserToolCallGuard
   ): Promise<string | undefined> => {
+    const size = options?.size;
     // `Page.startScreencast` has no webp: the plain capture keeps the requested type truthful.
     if (debuggerApi === undefined || format === 'webp') {
       return undefined;
@@ -2321,19 +2329,22 @@ export const createBrowserToolSession = ({
       }
 
       assertCallLive(guard);
-      const frame = await readScreencastFrame(format, guard);
+      const frame = await readScreencastFrame(format, size, guard);
 
       if (frame === undefined) {
         return undefined;
       }
 
-      const size = imagePixelSize(frame.data, format);
+      const frameSize = imagePixelSize(frame.data, format);
+      // The frame must be exactly the image the caller asked for: a CSS-pixel capture downscales the compositor's
+      // Frame to the viewport's CSS size, a device-pixel one is the viewport itself.
+      const wanted = size ?? { height: layout.clientHeight, width: layout.clientWidth };
 
       // The mask geometry is laid over this image: it must be the pixel size a plain capture of this viewport is.
       // The screencast's own metadata is in device-independent pixels, so the encoded frame is what decides.
-      return size !== undefined &&
-        size.width === layout.clientWidth &&
-        size.height === layout.clientHeight
+      return frameSize !== undefined &&
+        frameSize.width === wanted.width &&
+        frameSize.height === wanted.height
         ? frame.data
         : undefined;
     } catch {
@@ -3440,10 +3451,10 @@ export const createBrowserToolSession = ({
         throwIfCancelled();
         return runCallTool(toolName, args ?? {}, refs);
       },
-      captureViewportImage: (format, callGuard) => {
+      captureViewportImage: (format, options, callGuard) => {
         throwIfCancelled();
         // The capture checks the same guard before each command it sends, so a take-over mid-capture stops it.
-        return captureViewportImage(format, callGuard ?? guard);
+        return captureViewportImage(format, options, callGuard ?? guard);
       },
       childFrames: () => new Map(childFrames),
       consoleMessages: () => [...consoleBuffer],

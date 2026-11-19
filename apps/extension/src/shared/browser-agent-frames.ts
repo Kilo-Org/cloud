@@ -1225,11 +1225,15 @@ export const captureAgentSnapshotView = async (
 };
 
 const layoutMetricsSchema = z.object({
-  cssLayoutViewport: z.object({ clientWidth: z.number().optional() }).optional(),
+  cssLayoutViewport: z
+    .object({ clientHeight: z.number().optional(), clientWidth: z.number().optional() })
+    .optional(),
   cssVisualViewport: z
     .object({ pageX: z.number().optional(), pageY: z.number().optional() })
     .optional(),
-  layoutViewport: z.object({ clientWidth: z.number().optional() }).optional(),
+  layoutViewport: z
+    .object({ clientHeight: z.number().optional(), clientWidth: z.number().optional() })
+    .optional(),
 });
 
 export interface AgentScreenshotGeometry {
@@ -1241,6 +1245,8 @@ export interface AgentScreenshotGeometry {
    * translation between the two.
    */
   readonly scroll: { readonly x: number; readonly y: number };
+  /** The viewport in CSS pixels: the clip a CSS-pixel capture cuts, and never a device-pixel one. */
+  readonly viewport: { readonly height: number; readonly width: number } | undefined;
 }
 
 /**
@@ -1254,6 +1260,7 @@ export const readAgentScreenshotGeometry = async (
   const parsed = layoutMetricsSchema.safeParse(await session.send('Page.getLayoutMetrics'));
   const layoutWidth = parsed.success ? parsed.data.layoutViewport?.clientWidth : undefined;
   const cssWidth = parsed.success ? parsed.data.cssLayoutViewport?.clientWidth : undefined;
+  const cssHeight = parsed.success ? parsed.data.cssLayoutViewport?.clientHeight : undefined;
   const visual = parsed.success ? parsed.data.cssVisualViewport : undefined;
   const scale =
     layoutWidth !== undefined && cssWidth !== undefined && cssWidth > 0 && layoutWidth > 0
@@ -1263,6 +1270,10 @@ export const readAgentScreenshotGeometry = async (
   return {
     scale,
     scroll: { x: visual?.pageX ?? 0, y: visual?.pageY ?? 0 },
+    viewport:
+      cssWidth === undefined || cssHeight === undefined || cssWidth <= 0 || cssHeight <= 0
+        ? undefined
+        : { height: cssHeight, width: cssWidth },
   };
 };
 

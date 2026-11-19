@@ -37,6 +37,13 @@ const agent = (sessionHandle = 'session-1'): BrowserCaller => ({
   sessionHandle,
 });
 
+/** The side panel: a caller with no model to report a download to. */
+const panel = (): BrowserCaller => ({
+  conversationId: 'conversation-1',
+  kind: 'panel',
+  panelId: 'panel-1',
+});
+
 type CdpHandler = (
   params: Record<string, unknown> | undefined
 ) => Record<string, unknown> | undefined;
@@ -794,11 +801,14 @@ describe('agent browser calls', () => {
 
   it('runs a download call unguarded once with the approval token, then burns it', async () => {
     const { cdp, runtime } = await createHarness();
+    // Chrome names every download with its own guid, so each click's announcement is a new download.
+    let announced = 0;
 
     cdp.setHandlers({
       'Input.dispatchMouseEvent': () => {
+        announced += 1;
         cdp.emit('Browser.downloadWillBegin', {
-          guid: 'download-9',
+          guid: `download-9-${String(announced)}`,
           suggestedFilename: 'invoice.pdf',
           url: `${MAIN_ORIGIN}/invoice.pdf`,
         });
@@ -1444,7 +1454,7 @@ describe('agent browser calls', () => {
         kind: 'needs_permission',
         result: {
           error:
-            "The click on '#pay' started a download of report.txt, which was stopped. Approved. Repeat that click to receive the file.",
+            "The click on '#pay' started a download of report.txt, which was stopped: downloading a file needs your approval. Repeat that click after the download is approved to receive the file.",
           ok: false,
         },
       });
@@ -1645,7 +1655,7 @@ describe('agent browser calls', () => {
         kind: 'needs_permission',
         result: {
           error:
-            "The click on '#pay' started a download of report.txt, which was stopped. Approved. Repeat that click to receive the file.",
+            "The click on '#pay' started a download of report.txt, which was stopped: downloading a file needs your approval. Repeat that click after the download is approved to receive the file.",
           ok: false,
         },
         stepToken: expectStepToken(reported),
@@ -1656,6 +1666,394 @@ describe('agent browser calls', () => {
       await vi.advanceTimersByTimeAsync(0);
 
       expect([downloads.cancelled, downloads.removed]).toStrictEqual([[121], []]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports a late file it could not delete as kept, not as stopped', async () => {
+    const downloads = createFakeDownloads({ cancelRejects: true, removeRejects: true });
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const click = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      await runTimed(click());
+
+      // The file lands inside the guard's window, but the browser had already written it and will not delete it: the
+      // Report must repeat that outcome instead of claiming the file was stopped and deleted.
+      await vi.advanceTimersByTimeAsync(1500);
+      downloads.emit({
+        filename: '/home/me/Downloads/late.bin',
+        id: 81,
+        state: 'complete',
+        tabId: TAB_ID,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(900);
+
+      const reported = await runTimed(shot(), 0);
+
+      expect(reported).toMatchObject({
+        afterAction: true,
+        kind: 'needs_permission',
+        result: {
+          error:
+            "The click on '#pay' started a download of late.bin, which was stopped: downloading a file needs your approval. Repeat that click after the download is approved to receive the file. The browser had already saved late.bin before the download could be stopped.",
+          ok: false,
+        },
+      });
+      expectStepToken(reported);
+      // Only a delete that never happened leaves the file: the report names it instead of hiding it.
+      expect(downloads.removed).toStrictEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves an earlier linger\u2019s announcement to the step that started it, and reports it once', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const click = (target: string) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      await runTimed(click('#pay'));
+
+      // The tab names a download after that call answered, while the guard it left behind is still watching.
+      await vi.advanceTimersByTimeAsync(1500);
+      cdp.emit('Browser.downloadWillBegin', {
+        guid: 'late-1',
+        suggestedFilename: 'late.txt',
+        url: `${MAIN_ORIGIN}/late.txt`,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The next guarded call started nothing of its own: it reports the earlier download and names that click, so
+      // The repeat it asks for is the one the model already ran and not itself. It answers without advancing the
+      // Clock past the guard's window, which is still what stops the file that lands next.
+      const reported = await runTimed(click('#other'), 0);
+
+      expect(reported).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+
+      if (reported.kind !== 'needs_permission') {
+        throw new Error(`expected a refusal, got ${reported.kind}`);
+      }
+
+      expect(reported.result.ok ? '' : reported.result.error).toContain(
+        "The click on '#pay' started a download of late.txt"
+      );
+      expectStepToken(reported);
+      // Its own download never happened: the call refused before it ran.
+      expect(downloads.cancelled).toStrictEqual([]);
+
+      // The item the announcement promised lands later and is stopped exactly once; the call after is plain, so the
+      // File was not named a second time.
+      downloads.emit({ id: 131, tabId: TAB_ID, url: `${MAIN_ORIGIN}/late.txt` });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(downloads.cancelled).toStrictEqual([131]);
+
+      const plain = await runTimed(shot(), 400);
+
+      expect(plain.kind).toBe('result');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps an agent\u2019s late download for its own session when the panel reads the tab', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: { target: '#pay' },
+          caller: agent(),
+          tabId: TAB_ID,
+          toolName: 'browser_click',
+        })
+      );
+      runtime.releaseTab({ caller: agent(), tabId: TAB_ID });
+      cdp.emit('Browser.downloadWillBegin', {
+        guid: 'late-panel',
+        suggestedFilename: 'late.txt',
+        url: `${MAIN_ORIGIN}/late.txt`,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      // A read from the panel can start nothing, so it must neither end the guard nor take the model's report.
+      const panelRead = await runTimed(
+        runtime.runTool({
+          arguments: {},
+          caller: panel(),
+          tabId: TAB_ID,
+          toolName: 'browser_snapshot',
+        }),
+        0
+      );
+
+      expect(panelRead.kind).toBe('result');
+      runtime.releaseTab({ caller: panel(), tabId: TAB_ID });
+
+      // The file the click started lands after the panel read: the guard the panel left alone still stops it.
+      downloads.emit({ id: 141, tabId: TAB_ID, url: `${MAIN_ORIGIN}/late.txt` });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(downloads.cancelled).toStrictEqual([141]);
+
+      const reported = await runTimed(shot(), 0);
+
+      expect(reported).toMatchObject({
+        afterAction: true,
+        kind: 'needs_permission',
+        result: { ok: false },
+      });
+      expectStepToken(reported);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('says a stopped download needs approval instead of claiming it already had one', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    vi.useFakeTimers();
+
+    try {
+      await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: { target: '#pay' },
+          caller: agent(),
+          tabId: TAB_ID,
+          toolName: 'browser_click',
+        })
+      );
+      await vi.advanceTimersByTimeAsync(1500);
+      cdp.emit('Browser.downloadWillBegin', {
+        guid: 'late-words',
+        suggestedFilename: 'late.txt',
+        url: `${MAIN_ORIGIN}/late.txt`,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const reported = await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: {},
+          caller: agent(),
+          tabId: TAB_ID,
+          toolName: 'browser_snapshot',
+        }),
+        0
+      );
+
+      if (reported.kind !== 'needs_permission') {
+        throw new Error(`expected a refusal, got ${reported.kind}`);
+      }
+
+      const message = reported.result.ok ? '' : reported.result.error;
+
+      // The stop happened before any approval: the text must say so, because the CLI prints "Approved." only after
+      // The human grants, and a contradiction there would tell the model the download was already approved.
+      expect(message).toContain('which was stopped: downloading a file needs your approval.');
+      expect(message).toContain(
+        'Repeat that click after the download is approved to receive the file.'
+      );
+      expect(message).not.toContain('Approved.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('matches an announcement to its own item, never by order', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let announced = true;
+
+    // The click's own command announces a download the browser has not created yet.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (announced) {
+          announced = false;
+          cdp.emit('Browser.downloadWillBegin', {
+            guid: 'late-one',
+            suggestedFilename: 'one.txt',
+            url: `${MAIN_ORIGIN}/one.txt`,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      const clicked = await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: { target: '#pay' },
+          caller: agent(),
+          tabId: TAB_ID,
+          toolName: 'browser_click',
+        }),
+        500
+      );
+
+      // The call reports the announcement itself; the item it promised lands later.
+      expect(clicked).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+
+      // A second file nothing announced lands first: it must not consume the announcement's report.
+      downloads.emit({ id: 151, tabId: TAB_ID, url: `${MAIN_ORIGIN}/two.txt` });
+      downloads.emit({ id: 150, tabId: TAB_ID, url: `${MAIN_ORIGIN}/one.txt` });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const reported = await runTimed(shot(), 400);
+
+      if (reported.kind !== 'needs_permission') {
+        throw new Error(`expected the unannounced file to be reported, got ${reported.kind}`);
+      }
+
+      const message = reported.result.ok ? '' : reported.result.error;
+
+      // The unannounced file is named; the announced one was reported by its own call and is not named twice.
+      expect(message).toContain('two.txt');
+      expect(message).not.toContain('one.txt');
+      // Both files were stopped, each once.
+      expect(downloads.cancelled).toStrictEqual([151, 150]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('settles a closed session\u2019s late download instead of reporting it to the next session', async () => {
+    const { controller } = createGroups();
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      share: false,
+      tabGroups: controller,
+    });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    vi.useFakeTimers();
+
+    try {
+      await runtime.openSession({
+        controllerId: 'controller-1',
+        sessionHandle: 'session-1',
+        title: 'Work',
+      });
+      await runtime.shareActiveTab({ sessionHandle: 'session-1' });
+
+      await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: { target: '#pay' },
+          caller: agent(),
+          tabId: TAB_ID,
+          toolName: 'browser_click',
+        })
+      );
+      cdp.emit('Browser.downloadWillBegin', {
+        guid: 'late-closed',
+        suggestedFilename: 'late.txt',
+        url: `${MAIN_ORIGIN}/late.txt`,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The session ends with a download still owed: there is no model left to tell, and its token died with it.
+      runtime.disposeCaller(agent());
+      await runtime.closeSession({ sessionHandle: 'session-1' });
+
+      // The next session takes the tab: nothing the closed one stopped is its to answer for.
+      await runtime.openSession({
+        controllerId: 'controller-2',
+        sessionHandle: 'session-2',
+        title: 'Next',
+      });
+      await runtime.shareActiveTab({ sessionHandle: 'session-2' });
+
+      const next = await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: {},
+          caller: agent('session-2'),
+          tabId: TAB_ID,
+          toolName: 'browser_snapshot',
+        }),
+        0
+      );
+
+      expect(next).toMatchObject({ kind: 'result', result: { ok: true } });
     } finally {
       vi.useRealTimers();
     }
@@ -1848,6 +2246,8 @@ describe('agent browser calls', () => {
   it('does not let one session\u2019s download token approve another session\u2019s call', async () => {
     const { controller } = createGroups();
     const { cdp, runtime } = await createHarness({ share: false, tabGroups: controller });
+    // Chrome names every download with its own guid, so each click's announcement is a new download.
+    let announced = 0;
 
     for (const sessionHandle of ['session-1', 'session-2']) {
       // eslint-disable-next-line no-await-in-loop -- one session per share, in order
@@ -1858,8 +2258,9 @@ describe('agent browser calls', () => {
 
     cdp.setHandlers({
       'Input.dispatchMouseEvent': () => {
+        announced += 1;
         cdp.emit('Browser.downloadWillBegin', {
-          guid: 'download-7',
+          guid: `download-7-${String(announced)}`,
           suggestedFilename: 'invoice.pdf',
           url: `${MAIN_ORIGIN}/invoice.pdf`,
         });

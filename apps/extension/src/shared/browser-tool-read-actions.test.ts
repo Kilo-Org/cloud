@@ -73,10 +73,13 @@ const createSession = ({
 } = {}): {
   commands: RecordedCommand[];
   freshRequests: string[];
+  /** The pixel size each forced frame asked the screencast for: undefined means the tab's own device pixels. */
+  freshSizes: ({ readonly height: number; readonly width: number } | undefined)[];
   session: BrowserToolPageSession;
 } => {
   const commands: RecordedCommand[] = [];
   const freshRequests: string[] = [];
+  const freshSizes: ({ readonly height: number; readonly width: number } | undefined)[] = [];
 
   const session: BrowserToolPageSession = {
     attach: async () => {
@@ -84,8 +87,9 @@ const createSession = ({
         throw attachError;
       }
     },
-    captureViewportImage: async format => {
+    captureViewportImage: async (format, options) => {
       freshRequests.push(format);
+      freshSizes.push(options?.size);
 
       return freshFrame;
     },
@@ -160,7 +164,7 @@ const createSession = ({
     },
   };
 
-  return { commands, freshRequests, session };
+  return { commands, freshRequests, freshSizes, session };
 };
 
 const consoleMessage = (
@@ -621,6 +625,59 @@ describe('browser_take_screenshot', () => {
 
     // The withheld frame sits at viewport (40,120); the viewport image starts at the scroll position.
     expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 40, top: 120, width: 400 }]);
+  });
+
+  it('takes a css-scale viewport capture at the CSS size on a 2x tab, and masks at that scale', async () => {
+    const { freshSizes, session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      freshFrame: 'RlJFU0g=',
+      layoutMetrics: {
+        cssLayoutViewport: { clientHeight: 400, clientWidth: 800 },
+        cssVisualViewport: { pageX: 0, pageY: 0 },
+        layoutViewport: { clientHeight: 800, clientWidth: 1600 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool('browser_take_screenshot', { scale: 'css', type: 'png' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    // The image is the viewport in CSS pixels: the screencast is asked for that size, not the tab's 2x pixels.
+    expect(freshSizes).toStrictEqual([{ height: 400, width: 800 }]);
+    // The mask boxes are CSS pixels, so they map onto that image one for one.
+    expect(inputs[0]?.scale).toBe(1);
+  });
+
+  it('clips a device-scale viewport capture at the tab\u2019s ratio and masks at the same scale', async () => {
+    const { commands, freshSizes, session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientHeight: 400, clientWidth: 800 },
+        cssVisualViewport: { pageX: 0, pageY: 0 },
+        layoutViewport: { clientHeight: 800, clientWidth: 1600 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool('browser_take_screenshot', { scale: 'device', type: 'png' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    // A device-pixel capture is the viewport rendered at the tab's own ratio: no css size is asked for, and the
+    // Plain capture cuts exactly that region.
+    expect(freshSizes).toStrictEqual([undefined]);
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: {
+        clip: { height: 400, scale: 2, width: 800, x: 0, y: 0 },
+        format: 'png',
+        fromSurface: true,
+      },
+    });
+    expect(inputs[0]?.scale).toBe(2);
   });
 
   it('drops a withheld frame that the element clip does not overlap', async () => {

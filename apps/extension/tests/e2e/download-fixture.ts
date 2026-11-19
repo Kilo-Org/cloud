@@ -11,18 +11,17 @@ import { once } from 'node:events';
  *
  * Two routes serve the same file. `/assets/report.txt` answers at once — the
  * download the call that started it can still stop inside its own window.
- * `/assets/late-report.txt` holds its headers for a second and a half: the
- * browser creates the download only after the click that started it has
- * answered, so the file lands in the guard's late window instead.
+ * `/assets/late-report.txt` holds its headers until the test releases it, which
+ * it does only after the click that started it has answered: the browser
+ * creates the download after the call, so the file lands in the guard's late
+ * window with no race against the click's own wait.
  */
 
 export const DOWNLOAD_PATH = '/assets/report.txt';
 export const DOWNLOAD_FILENAME = 'report.txt';
 export const DOWNLOAD_BODY = 'fixture download body\n';
-/** The delayed route: an attachment whose response lands after the click's own wait. */
+/** The held route: an attachment whose response lands only when the test says so. */
 export const LATE_DOWNLOAD_PATH = '/assets/late-report.txt';
-/** How long the delayed route holds the browser before it answers with the file. */
-export const LATE_DOWNLOAD_DELAY_MS = 1500;
 
 const DOWNLOAD_PAGE_HTML = `<!doctype html>
 <html>
@@ -40,24 +39,22 @@ export interface DownloadFixture {
   readonly close: () => Promise<void>;
   /** How many times the attachment route served a body: a cancelled download still reaches it. */
   readonly hits: () => number;
-  /** How many times the delayed attachment route was asked for the file. */
+  /** How many times the held attachment route was asked for the file. */
   readonly lateHits: () => number;
+  /** Answers every held request: the browser creates the download only now, long after the click answered. */
+  readonly releaseLate: () => void;
   readonly url: string;
 }
 
 export const startDownloadFixture = async (): Promise<DownloadFixture> => {
   let hits = 0;
   let lateHits = 0;
+  /** The routes waiting for the test: answering one makes the browser create its download. */
+  const held: (() => void)[] = [];
   const server: Server = createServer((request, response) => {
     const path = (request.url ?? '/').split('?')[0] ?? '/';
 
     if (path === DOWNLOAD_PATH || path === LATE_DOWNLOAD_PATH) {
-      if (path === LATE_DOWNLOAD_PATH) {
-        lateHits += 1;
-      } else {
-        hits += 1;
-      }
-
       const answer = (): void => {
         response.writeHead(200, {
           'cache-control': 'no-store',
@@ -68,9 +65,11 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
       };
 
       if (path === LATE_DOWNLOAD_PATH) {
-        // The browser creates the download when the headers arrive, which is after the click's own wait.
-        setTimeout(answer, LATE_DOWNLOAD_DELAY_MS);
+        lateHits += 1;
+        // No delay at all: the response is held until the test releases it, so "after the click" is a fact.
+        held.push(answer);
       } else {
+        hits += 1;
         answer();
       }
 
@@ -105,6 +104,11 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
     },
     hits: () => hits,
     lateHits: () => lateHits,
+    releaseLate: () => {
+      for (const answer of held.splice(0)) {
+        answer();
+      }
+    },
     url: `http://127.0.0.1:${String(port)}`,
   };
 };

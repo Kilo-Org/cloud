@@ -251,6 +251,13 @@ const NAVIGATE_DOWNLOAD_POLL_MS = 20;
 const NAVIGATE_DOWNLOAD_POLLS = 15;
 
 /**
+ * How many ended session handles the runtime remembers: enough that a guard
+ * which outlives its session by a moment never opens a record nobody can
+ * report, and bounded so a long-lived browser cannot grow it.
+ */
+const CLOSED_SESSION_LIMIT = 64;
+
+/**
  * How long the guard waits for a download it stopped to reach `complete` or
  * `interrupted`. `cancel` resolves on an item that already finished, so the
  * only proof that no file exists is the item's own terminal state.
@@ -644,8 +651,8 @@ const downloadStepText = (toolName: string, args: Record<string, unknown>) => {
  * started one of these, so it never waits for a file.
  */
 interface DownloadWitness {
-  /** Downloads the tab announced since the last read, drained so each is counted once. */
-  readonly announced: () => number;
+  /** The downloads the tab announced since the last read, drained so each is claimed exactly once. */
+  readonly takeAnnounced: () => readonly BrowserToolDownload[];
   /**
    * Navigations this call started that the browser has not answered yet. Only a
    * document can turn into a download; an ordinary click's `fetch` must not
@@ -667,65 +674,138 @@ interface DownloadWitness {
 /**
  * Where a call's linger goes. A guard that started no download stays armed
  * briefly for a late one, but it outlives its call: the runtime keeps the
- * linger per tab and the next call on that tab ends it first, so an already
- * answered guard never cancels a download a later call — an approved repeat
- * above all — started.
+ * linger per tab and the next download-capable call on that tab ends it first,
+ * so an already answered guard never cancels a download a later call — an
+ * approved repeat above all — started. The linger only stops files: what the
+ * model is told about them belongs to the download ledger, which outlives it.
  */
 interface LingerSink {
-  /** A linger is now armed for this tab; `end` stops it acting on any download that starts later. */
-  readonly armed: (end: () => void) => void;
+  /** A linger is now armed for this tab: `end` stops it acting on any download that starts later, and `since` is the call's own start. */
+  readonly armed: (arm: { readonly end: () => void; readonly since: number }) => void;
   /** The linger ended, by its own window or by the runtime: the tab no longer holds one. */
   readonly ended: () => void;
-  /**
-   * A download the linger stopped after its own call had answered. Nothing else
-   * will report it, so the runtime hands it to the next call on the tab, together
-   * with the step that started it, instead of letting the file vanish unreported.
-   */
-  readonly late: (stop: {
-    readonly filename: string;
-    readonly outcome: Promise<DiscardOutcome> | undefined;
-  }) => void;
 }
 
 /**
- * One download an answered call's linger stopped, kept until a call can tell
- * the model about it. It is queued when the browser announces the download, so
- * the file name is known before the item exists; the report never waits on the
- * stop itself.
+ * One download the runtime still owes a report for, from the browser's
+ * announcement to the call that names it. It is keyed by the browser's own
+ * identity — the announcement's guid, or the url it named, then the item's id
+ * once it exists — so a file is stopped and reported exactly once whatever
+ * order the events arrive in.
  */
-interface LateStop {
-  readonly filename: string;
-  /** Resolves when the guard finished stopping it: nothing the report waits on. */
-  readonly outcome: Promise<DiscardOutcome> | undefined;
-  /** The step that started the file; absent only for a guard without one (a panel or a workflow call). */
+interface DownloadRecord {
+  /** `guid:<guid>`, `url:<url>` for an announcement without one, or `item:<id>` for an item nothing announced. */
+  readonly id: string;
+  /** The session that owns the download: only a call of that session reports it, and only that session can redeem its token. */
+  readonly session: string;
+  /** The guard attempt that started it: a guard counts only the downloads its own attempt owns. */
+  readonly attempt: string;
+  readonly tabId: number;
+  /** The step that started the file, which the report asks the model to repeat. */
   readonly step: DownloadStep | undefined;
+  /** The announced url, which names the item before the browser creates it. */
+  readonly url: string | undefined;
+  /** When the browser named it: the window a later search looks for its item in. */
+  readonly since: number;
+  /** The browser's item once it exists: the same file is never stopped twice. */
+  readonly itemId: number | undefined;
+  readonly filename: string;
+  /**
+   * Where the download stands. `announced`: the browser named it and no item is
+   * linked yet. `stopping`: its item is being cancelled and deleted. `stopped`:
+   * no file survived the cancel. `kept`: the browser had already written the
+   * file and would not delete it. `reported`: the call that started it already
+   * told the model, so no later call may report it again.
+   */
+  readonly kind: 'announced' | 'stopping' | 'stopped' | 'kept' | 'reported';
 }
 
-/** One stopped download as a later call reports it: the file it was, whether it survived, and the step that started it. */
-interface LateDiscard {
+/** One download as a later call reports it: the file it was, whether it survived, and the step that started it. */
+interface DownloadReport {
   readonly filename: string;
   /** The browser would not delete the file, so the human keeps it where it landed. */
   readonly kept: boolean;
   readonly step: DownloadStep | undefined;
 }
 
+/** A download as a guard sees it: what the ledger needs to open or find its one record. */
+interface DownloadSighting {
+  readonly attempt: string;
+  readonly filename: string;
+  readonly guid: string | undefined;
+  readonly session: string;
+  readonly step: DownloadStep | undefined;
+  readonly tabId: number;
+  readonly url: string | undefined;
+}
+
+/** What a guard's item means for its own settlement: count it, and whether the file still needs stopping. */
+type DownloadClaim =
+  /** A record this attempt opened: the call stops the file and reports it. */
+  | 'own'
+  /** This attempt announced it before the item existed: the call still reports it, already counted once. */
+  | 'linked'
+  /** The model was already told, or an earlier attempt owns it: stop the file, count and report nothing here. */
+  | 'silent'
+  /** The item is already being stopped by whoever owns it: nothing left for this guard to do. */
+  | 'handled';
+
+/** What a guard tells the runtime about the downloads it sees, and what the runtime says back. */
+interface DownloadLedger {
+  /** The browser announced a download before creating it: open its record, or leave the one an earlier attempt opened to that attempt. */
+  readonly announced: (sighting: DownloadSighting) => 'own' | 'earlier';
+  /** The browser created the item: link it to its record, or open one, and say who reports it. */
+  readonly stopping: (sighting: DownloadSighting & { readonly itemId: number }) => DownloadClaim;
+  /** The stop settled: the record keeps the file's own outcome, so a later report never invents one. */
+  readonly settled: (session: string, itemId: number, outcome: DiscardOutcome) => void;
+  /** The call that started these downloads reported them itself: no later call may name them again. */
+  readonly answered: (session: string, attempt: string) => void;
+}
+
+/** The window one guarded call left open on a tab: what a later call searches for, and the step a file it finds belongs to. */
+interface OpenWatch {
+  readonly attempt: string;
+  readonly since: number;
+  readonly session: string;
+  readonly step: DownloadStep | undefined;
+  readonly tabId: number;
+}
+
+/** A download's url, or `undefined` when the browser reports none: the identity its announcement is matched by. */
+const downloadUrlOf = (item: { readonly url?: string | undefined }): string | undefined =>
+  item.url === undefined || item.url === '' ? undefined : item.url;
+
+/** Whether the browser created this item at or after `since`; an item with no readable time is taken as new. */
+const startedSince = (item: BrowserDownloadItem, since: number): boolean => {
+  if (item.startTime === undefined) {
+    return true;
+  }
+
+  const created = Date.parse(item.startTime);
+
+  return Number.isNaN(created) || created >= since;
+};
+
 /**
  * What a late report says: the step that started the file, what became of it,
- * and the step to repeat — never the call that happened to carry the news.
+ * and the step to repeat — never the call that happened to carry the news. The
+ * grant that follows adds its own "Approved." line, so this text only says that
+ * the file was stopped for want of approval and that the repeat receives it.
  */
-const lateDownloadError = (files: readonly LateDiscard[]): string => {
+const lateDownloadError = (files: readonly DownloadReport[]): string => {
   const names = [...new Set(files.map(file => file.filename))].join(', ');
   const step = files.findLast(file => file.step !== undefined)?.step;
   const head = step === undefined ? 'A browser action' : `The ${step.description}`;
   const repeat =
     step === undefined
-      ? 'Repeat that step to receive the file.'
-      : `Repeat that ${step.noun} to receive the file.`;
+      ? 'Repeat that step after the download is approved to receive the file.'
+      : `Repeat that ${step.noun} after the download is approved to receive the file.`;
+  // A file the browser had already written was not deleted; the refusal must not read as "nothing was written".
   const saved = files.some(file => file.kept)
     ? ` The browser had already saved ${names} before the download could be stopped.`
     : '';
 
-  return `${head} started a download of ${names}, which was stopped. Approved. ${repeat}${saved}`;
+  return `${head} started a download of ${names}, which was stopped: downloading a file needs your approval. ${repeat}${saved}`;
 };
 
 /**
@@ -852,9 +932,17 @@ const awaitStartedDownload = async ({
 const armDownloadGuard = (
   api: BrowserDownloadsApi,
   attribution: DownloadAttribution,
-  linger?: LingerSink
+  hooks: {
+    /** This guard's own name: a record is counted by the attempt that opened it, never by a later one. */
+    readonly attempt: string;
+    readonly ledger: DownloadLedger;
+    readonly linger: LingerSink | undefined;
+  }
 ): DownloadGuard => {
-  const { navigation, tab, tabIds } = attribution;
+  const { ledger, linger } = hooks;
+  const { attempt } = hooks;
+  const { navigation, step, tab, tabIds } = attribution;
+  const session = step?.session ?? '';
   const startedAt = Date.now();
   /** One stop per download: the stream and the searches name the same item, and it is stopped once. */
   const stops = new Map<number, Promise<DiscardOutcome>>();
@@ -875,50 +963,89 @@ const armDownloadGuard = (
   };
   const owned = (item: BrowserDownloadItem): boolean =>
     (item.tabId === undefined || tabIds().includes(item.tabId)) && !notThisCalls(item);
-  /** Downloads the tab announced that no item has been stopped for yet: the report names them now, the stop follows. */
-  const announcedPending = new Map<string, (outcome: DiscardOutcome) => void>();
-  /** The urls this guard already stopped, so an announcement cannot queue a second report for one file. */
-  const stoppedUrls = new Set<string>();
-  /** The pending announcement subscription: only a linger keeps one, and it ends with the linger. */
+  /** The announcement subscription: only a linger keeps one, and it ends with the linger. */
   let stopWatching: (() => void) | undefined = undefined;
   let created = false;
   let listening = true;
   let lingering = false;
-  /** Downloads this call reported as announced but unnamed: the linger stops them later, already reported. */
-  let announcedUnreported = 0;
+  /** The call answered: a stop from here on belongs to the record alone, and nothing may add to its report. */
+  let closed = false;
+  /** Downloads this attempt announced that no item is linked to yet: this call reports them, the linger stops them. */
+  let announced = 0;
+
+  /** What the ledger needs to open or find this guard's one record for a download. */
+  const sighting = (input: {
+    readonly filename: string;
+    readonly guid?: string | undefined;
+    readonly itemId?: number | undefined;
+    readonly url: string | undefined;
+  }): DownloadSighting & { readonly itemId: number } => ({
+    attempt,
+    filename: input.filename,
+    guid: input.guid,
+    itemId: input.itemId ?? -1,
+    // A guard only exists for an agent call, so its step is always the one a report repeats.
+    session,
+    step,
+    tabId: tab.tabId,
+    url: input.url,
+  });
+
+  /**
+   * Claims an announcement for this attempt. The tab also names downloads an
+   * earlier guard is still watching, and those are that attempt's: counting one
+   * here would refuse a call that started nothing and bury the earlier report.
+   */
+  const noteAnnouncement = (download: BrowserToolDownload): void => {
+    const url = download.url === undefined || download.url === '' ? undefined : download.url;
+    const filename = download.suggestedFilename ?? url?.split('/').pop() ?? 'the downloaded file';
+
+    if (ledger.announced(sighting({ filename, guid: download.guid, url })) === 'own') {
+      announced += 1;
+    }
+  };
+
+  /** The downloads the tab announced since the last read, claimed once each, returning this attempt's new ones. */
+  const takeAnnouncements = (): number => {
+    const seen = attribution.witness?.takeAnnounced() ?? [];
+    const before = announced;
+
+    for (const download of seen) {
+      noteAnnouncement(download);
+    }
+
+    return announced - before;
+  };
 
   const stop = (item: BrowserDownloadItem): void => {
+    if (stops.has(item.id)) {
+      return;
+    }
+
+    const url = item.url === undefined || item.url === '' ? undefined : item.url;
+    const claim = ledger.stopping(sighting({ filename: fileNameOf(item), itemId: item.id, url }));
+
+    if (claim === 'handled') {
+      return;
+    }
+
     created = true;
 
-    if (!stops.has(item.id)) {
-      const discarded = discardDownload(api, item);
+    const discarded = discardDownload(api, item);
 
+    if (!closed && (claim === 'own' || claim === 'linked')) {
       stops.set(item.id, discarded);
-
-      const url = item.url === undefined || item.url === '' ? undefined : item.url;
-
-      if (url !== undefined) {
-        stoppedUrls.add(url);
-      }
-
-      // The announcement already reported this file: this stop only settles the promise behind it.
-      const settle = url === undefined ? undefined : announcedPending.get(url);
-
-      if (settle !== undefined && url !== undefined) {
-        announcedPending.delete(url);
-        void (async (): Promise<void> => {
-          settle(await discarded);
-        })();
-      } else if (lingering) {
-        // The linger outlives this call's result, so its stops are handed over to whoever reports next.
-        if (announcedUnreported > 0) {
-          // This call already told the model about this download; the linger only finishes stopping it.
-          announcedUnreported -= 1;
-        } else {
-          linger?.late({ filename: fileNameOf(item), outcome: discarded });
-        }
-      }
     }
+
+    if (!closed && claim === 'linked') {
+      // The announcement already made this download the call's own: the stop only finishes it.
+      announced -= 1;
+    }
+
+    void (async (): Promise<void> => {
+      // The record keeps the file's own outcome, so a later report never claims a surviving file was deleted.
+      ledger.settled(session, item.id, await discarded);
+    })();
   };
 
   const listener = (item: BrowserDownloadItem): void => {
@@ -980,28 +1107,31 @@ const armDownloadGuard = (
             stop(item);
           }
         }
+
+        // A navigate is announced too, and its item may land after the search gives up: the claim is what the
+        // Call reports, and the linger still stops the file.
+        takeAnnouncements();
       }
 
       // An act call's download is created a moment after its own command returns, so the guard waits for it.
       // The wait follows the navigation it started while that navigation is unanswered, then looks for the item.
       // Without this the linger would delete a file the model was never told about.
-      let announced = 0;
       let signalled = false;
 
       if (navigation === undefined && attribution.witness !== undefined) {
         const waited = await awaitStartedDownload({
-          announced: attribution.witness.announced,
+          announced: takeAnnouncements,
           attachmentResponse: attribution.witness.attachmentResponse,
           pendingNavigation: attribution.witness.pendingNavigation,
           stopped: () => stops.size > 0,
         });
 
-        ({ announced, signalled } = waited);
+        ({ signalled } = waited);
       }
 
       // One search always: the browser can create an item without announcing it, and the model must be told about
       // A file this call started. Only a call that saw a sign of a download waits for it — an ordinary click pays
-      // One round trip, and a file that lands later is the linger's, reported on the next call.
+      // One round trip, and a file that lands later is the next call's to find and report.
       if (!created && navigation === undefined) {
         for (const item of await observeDownloads({
           api,
@@ -1016,10 +1146,9 @@ const armDownloadGuard = (
 
       /** Keeps the guard listening for a late item, and hands the runtime a way to end it at the next guarded call. */
       const lingerOn = (): void => {
-        // Nothing started, so the call does not pay for a window it may never need.
-        // The listener stays armed for a bounded linger, so a download whose headers arrive late is deleted too.
-        // The linger owns only this call's window: downloads that start before the next download-capable call ends it.
-        // That is why an approved repeat's file is never cancelled by the guard that asked for it.
+        // Nothing of this call's was stopped, so the call does not pay for a window it may never need. The listener
+        // Stays armed so a download whose headers arrive late is deleted too; the runtime ends it at the tab's next
+        // Download-capable call, which is why an approved repeat's file is never cancelled by the guard that asked.
         const end = (): void => {
           if (!lingering) {
             return;
@@ -1029,44 +1158,27 @@ const armDownloadGuard = (
           disarm();
           stopWatching?.();
           stopWatching = undefined;
-
-          // An announced download the guard never saw as an item wrote no file: its report already went out.
-          for (const [url, settle] of announcedPending) {
-            settle({ filename: url.split('/').pop() ?? 'the downloaded file', kind: 'removed' });
-          }
-
-          announcedPending.clear();
           linger?.ended();
-          // Whatever the linger already stopped is still deleted, now that nothing else will report it.
-          void report();
         };
 
         lingering = true;
         listen();
-        // The browser names a download before the item exists: queue the report now, so the very next call — whichever
-        // Tool it is — can answer without waiting for the item to appear.
+        // The browser names a download before the item exists: the record opens now, so the very next call —
+        // Whichever tool it is — can report it without waiting for the item to appear.
         stopWatching = attribution.witness?.watchAnnounced?.(download => {
-          if (!lingering || download.url === undefined || download.url === '') {
-            return;
+          if (lingering) {
+            noteAnnouncement(download);
           }
-
-          if (announcedPending.has(download.url) || stoppedUrls.has(download.url)) {
-            return;
-          }
-
-          const { promise, resolve } = Promise.withResolvers<DiscardOutcome>();
-          const filename =
-            download.suggestedFilename ?? download.url.split('/').pop() ?? 'the downloaded file';
-
-          announcedPending.set(download.url, resolve);
-          linger?.late({ filename, outcome: promise });
         });
-        linger?.armed(end);
+        linger?.armed({ end, since: startedAt });
         void (async (): Promise<void> => {
           await after(DOWNLOAD_GUARD_LINGER_MS);
           end();
         })();
       };
+
+      // An announcement that arrived while the guard searched belongs to this call too, before anything is reported.
+      takeAnnouncements();
 
       if (stops.size === 0 && announced === 0) {
         lingerOn();
@@ -1076,11 +1188,14 @@ const armDownloadGuard = (
 
       const settlement = await report();
 
+      // Every file this call reports is the model's now: no later call may name it again, and the record that
+      // Still has to finish stopping an unapproved file stays silent.
+      ledger.answered(session, attempt);
+      closed = true;
+
       if (settlement.stopped === 0) {
-        // The tab announced a download the browser has not named yet: this call reports it now.
-        // The linger still deletes whatever lands, so no file is kept unapproved and none vanishes unreported.
-        // Each of those, when the linger stops it, has already been reported: it must not be reported twice.
-        announcedUnreported += announced;
+        // The tab announced a download the browser has not named yet: this call reports it now, and the linger
+        // Still deletes whatever lands, so no file is kept unapproved and none vanishes unreported.
         lingerOn();
 
         return { kept: settlement.kept, stopped: announced };
@@ -1159,14 +1274,224 @@ export const createBrowserRuntime = ({
   // The abort hook of the call currently running in the tab, keyed by tab.
   const inFlight = new Map<number, () => void>();
   // The linger a finished call left armed on a tab: the next download-capable call on that tab ends it before it
-  // Can act on what that call starts. A read leaves it on duty instead of dropping it.
+  // Can act on what that call starts. A read leaves it on duty, and the records below survive it either way.
   const lingers = new Map<number, () => void>();
-  // Downloads a linger stopped after its own call answered, which no call has reported yet: the next call on the
-  // Tab reports them, because a file that was deleted is never silent. Each carries the step that started it, so
-  // The approval it asks for binds that step and not whichever call happened to carry the news.
-  const lateStops = new Map<number, LateStop[]>();
+  /**
+   * The window a guard left open, per tab: the item it never saw is searched for by the next call of its own
+   * session, so a download that lands after its call answered is stopped and reported even when the browser named
+   * it after the linger had ended.
+   */
+  const openWatches = new Map<number, OpenWatch>();
+  /** One record per download a session still owes a report for: the only bookkeeping a file that outlived its call has. */
+  const downloadRecords = new Map<string, Map<string, DownloadRecord>>();
+  /** Session handles that ended: no call can report for one again, so a lingering guard must not open a record for it. */
+  const closedSessions = new Set<string>();
+  /** Names one guard attempt; a record is counted by the attempt that opened it and by no other. */
+  let attempts = 0;
 
-  /** Ends whatever linger an earlier call left on this tab: a new download-capable call owns the downloads from now on. */
+  /** A session that ends owes no approval, and its stopped files stay unreported: there is no model left to tell. */
+  const closeSessionRecords = (session: string): void => {
+    downloadRecords.delete(session);
+    closedSessions.add(session);
+
+    // Bounded: an old handle that is reused is reopened explicitly, and only the live ones can hold a record.
+    while (closedSessions.size > CLOSED_SESSION_LIMIT) {
+      const oldest = closedSessions.values().next().value;
+
+      if (oldest === undefined) {
+        break;
+      }
+
+      closedSessions.delete(oldest);
+    }
+  };
+
+  const recordsFor = (session: string): Map<string, DownloadRecord> => {
+    const existing = downloadRecords.get(session);
+
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const created = new Map<string, DownloadRecord>();
+
+    downloadRecords.set(session, created);
+
+    return created;
+  };
+
+  /** A download's one record: by the item the browser created, else by the url its announcement named. */
+  const findRecord = (
+    session: string,
+    input: {
+      readonly itemId?: number | undefined;
+      readonly tabId: number;
+      readonly url: string | undefined;
+    }
+  ): DownloadRecord | undefined => {
+    const records = downloadRecords.get(session);
+
+    if (records === undefined) {
+      return undefined;
+    }
+
+    if (input.itemId !== undefined) {
+      for (const record of records.values()) {
+        if (record.itemId === input.itemId) {
+          return record;
+        }
+      }
+
+      return undefined;
+    }
+
+    if (input.url === undefined) {
+      return undefined;
+    }
+
+    // An item already linked is another download of the same url: only an unlinked announcement is this one, and
+    // A repeated url answers with the newest of them, which is the announcement this item belongs to.
+    return [...records.values()]
+      .filter(
+        record =>
+          record.itemId === undefined && record.url === input.url && record.tabId === input.tabId
+      )
+      .toSorted((left, right) => left.since - right.since)
+      .at(-1);
+  };
+
+  /** The browser announced a download: one record, and only the attempt that opened it counts it. */
+  const announceDownload = (sighting: DownloadSighting): 'own' | 'earlier' => {
+    if (closedSessions.has(sighting.session)) {
+      // The session is gone: its guard still stops the file, and no record is opened for a model that cannot read it.
+      return 'earlier';
+    }
+
+    const records = recordsFor(sighting.session);
+    const id =
+      sighting.guid !== undefined && sighting.guid !== ''
+        ? `guid:${sighting.guid}`
+        : `url:${sighting.url ?? sighting.filename}`;
+    // A guid is the download's identity; a url only names one when the browser gave no guid at all.
+    const existing =
+      records.get(id) ??
+      (sighting.guid === undefined || sighting.guid === ''
+        ? findRecord(sighting.session, { tabId: sighting.tabId, url: sighting.url })
+        : undefined);
+
+    if (existing !== undefined && (existing.id === id || existing.kind === 'announced')) {
+      // The same announcement arrived twice — the linger saw it live, a call drained the buffer — or the same
+      // Download was already reported: either way it is not a second download for this call to count.
+      return 'earlier';
+    }
+
+    records.set(id, {
+      attempt: sighting.attempt,
+      filename: sighting.filename,
+      id,
+      itemId: undefined,
+      kind: 'announced',
+      session: sighting.session,
+      since: Date.now(),
+      step: sighting.step,
+      tabId: sighting.tabId,
+      url: sighting.url,
+    });
+
+    return 'own';
+  };
+
+  /** The browser created the item: link it to its record or open one, and say who stops and reports it. */
+  const stopDownload = (
+    sighting: DownloadSighting & { readonly itemId: number }
+  ): DownloadClaim => {
+    const records = recordsFor(sighting.session);
+    const existing =
+      findRecord(sighting.session, {
+        itemId: sighting.itemId,
+        tabId: sighting.tabId,
+        url: undefined,
+      }) ?? findRecord(sighting.session, { tabId: sighting.tabId, url: sighting.url });
+
+    if (existing === undefined) {
+      if (closedSessions.has(sighting.session)) {
+        // The session is gone: the file is still stopped, and there is nobody to report it to.
+        return 'silent';
+      }
+
+      const id = `item:${String(sighting.itemId)}`;
+
+      records.set(id, {
+        attempt: sighting.attempt,
+        filename: sighting.filename,
+        id,
+        itemId: sighting.itemId,
+        kind: 'stopping',
+        session: sighting.session,
+        since: Date.now(),
+        step: sighting.step,
+        tabId: sighting.tabId,
+        url: sighting.url,
+      });
+
+      return 'own';
+    }
+
+    if (existing.itemId !== undefined) {
+      // Whoever linked the item first is stopping it: a second cancel would only report the same file twice.
+      return 'handled';
+    }
+
+    records.set(existing.id, {
+      ...existing,
+      itemId: sighting.itemId,
+      // A reported record stays reported: the model already knows, so this stop must stay silent.
+      kind: existing.kind === 'reported' ? 'reported' : 'stopping',
+    });
+
+    return existing.attempt === sighting.attempt && existing.kind !== 'reported'
+      ? 'linked'
+      : 'silent';
+  };
+
+  /** The stop settled: the record keeps the file's own outcome, so a later report never invents one. */
+  const settleDownload = (session: string, itemId: number, outcome: DiscardOutcome): void => {
+    const records = downloadRecords.get(session);
+
+    if (records === undefined) {
+      return;
+    }
+
+    for (const [key, record] of records) {
+      if (record.itemId === itemId && record.kind !== 'reported') {
+        records.set(key, { ...record, kind: outcome.kind === 'kept' ? 'kept' : 'stopped' });
+      }
+    }
+  };
+
+  /** The call that started these downloads reported them: no later call may name them again. */
+  const answerDownloads = (session: string, attempt: string): void => {
+    const records = downloadRecords.get(session);
+
+    if (records === undefined) {
+      return;
+    }
+
+    for (const [key, record] of records) {
+      if (record.attempt === attempt && record.kind !== 'reported') {
+        records.set(key, { ...record, kind: 'reported' });
+      }
+    }
+  };
+
+  const ledger: DownloadLedger = {
+    announced: announceDownload,
+    answered: answerDownloads,
+    settled: settleDownload,
+    stopping: stopDownload,
+  };
+
+  /** Ends whatever linger an earlier call left on this tab: a download-capable call owns the downloads from now on. */
   const endLinger = (tabId: number): void => {
     const end = lingers.get(tabId);
 
@@ -1175,25 +1500,177 @@ export const createBrowserRuntime = ({
   };
 
   /**
-   * Reports the downloads an earlier call's linger stopped — or announced and
-   * still being stopped — and had nobody to tell. It never waits: the browser
-   * names a download before the item exists, and a call that arrives in between
-   * still has to answer.
+   * Hands a tab's downloads to the call that is starting: the earlier linger ends and its watch goes with it,
+   * because a file this call starts must never be cancelled by the guard that asked for approval. The records
+   * stay: a file already stopped is still reported, and only its own session's next call may report it.
    */
-  const takeLateStops = (tabId: number): readonly LateDiscard[] => {
-    const queued = lateStops.get(tabId);
+  const takeOverDownloads = (tabId: number): void => {
+    endLinger(tabId);
+    openWatches.delete(tabId);
+  };
 
-    if (queued === undefined) {
+  /**
+   * Finds and stops the downloads a guard left behind: the item a record only announced, and the file an armed
+   * watch never saw. One search, never a poll — the call that arrives reports what the browser knows now, and it
+   * never waits on the guard that started the file.
+   */
+  const finishWatchedDownloads = async (session: string): Promise<void> => {
+    const checkedAt = Date.now();
+    const records = [...(downloadRecords.get(session)?.values() ?? [])].filter(
+      record => record.itemId === undefined && record.kind !== 'stopping'
+    );
+    const watches = [...openWatches.values()].filter(
+      watch => watch.session === session && watch.since + DOWNLOAD_GUARD_LINGER_MS > checkedAt
+    );
+    const api = downloadsApi?.();
+
+    // A watch whose window is over is not searched again: nothing would have stopped the file anyway.
+    if (records.length === 0 && watches.length === 0) {
+      return;
+    }
+
+    if (api?.search === undefined) {
+      // No optional permission: nothing can be searched or deleted, and the records still say what is known.
+      return;
+    }
+
+    const since = Math.min(
+      ...records.map(record => record.since),
+      ...watches.map(watch => watch.since)
+    );
+    let found: readonly BrowserDownloadItem[] = [];
+
+    try {
+      found = (await api.search({ startedAfter: new Date(since).toISOString() })) ?? [];
+    } catch {
+      // A search that fails leaves the records to report what the guard already saw.
+      return;
+    }
+
+    for (const item of found) {
+      const owner = startedSince(item, since) ? ownerOf(session, item, watches) : undefined;
+
+      if (owner !== undefined) {
+        // eslint-disable-next-line no-await-in-loop -- one item at a time, and each stop settles its own record
+        await stopLateDownload(owner, item, api);
+      }
+    }
+  };
+
+  /** The record, or the armed watch, that owns a download the search found: `undefined` when it is another call's. */
+  const ownerOf = (
+    session: string,
+    item: BrowserDownloadItem,
+    watches: readonly OpenWatch[]
+  ): (DownloadSighting & { readonly itemId: number }) | undefined => {
+    if (item.tabId === undefined) {
+      return undefined;
+    }
+
+    const { tabId } = item;
+    const record =
+      findRecord(session, { itemId: item.id, tabId, url: undefined }) ??
+      findRecord(session, { tabId, url: downloadUrlOf(item) });
+
+    if (record !== undefined) {
+      if (record.itemId !== undefined) {
+        return undefined;
+      }
+
+      return {
+        attempt: record.attempt,
+        filename: record.filename,
+        guid: undefined,
+        itemId: item.id,
+        session,
+        step: record.step,
+        tabId,
+        url: downloadUrlOf(item),
+      };
+    }
+
+    const watch = watches.find(candidate => candidate.tabId === tabId);
+
+    if (watch === undefined || !startedSince(item, watch.since)) {
+      return undefined;
+    }
+
+    return {
+      attempt: watch.attempt,
+      filename: fileNameOf(item),
+      guid: undefined,
+      itemId: item.id,
+      session,
+      step: watch.step,
+      tabId,
+      url: downloadUrlOf(item),
+    };
+  };
+
+  /** Stops a download a guard left behind and settles its one record: the report reads the true outcome later. */
+  const stopLateDownload = async (
+    owner: DownloadSighting & { readonly itemId: number },
+    item: BrowserDownloadItem,
+    api: BrowserDownloadsApi
+  ): Promise<void> => {
+    if (stopDownload(owner) === 'handled') {
+      return;
+    }
+
+    settleDownload(owner.session, item.id, await discardDownload(api, item));
+  };
+
+  /** The reports this session owes without a search: what the ledger already knows. Each stays as the stop's own memory. */
+  const drainDownloadReports = (session: string): readonly DownloadReport[] => {
+    const records = downloadRecords.get(session);
+
+    if (records === undefined) {
       return [];
     }
 
-    lateStops.delete(tabId);
+    const reports: DownloadReport[] = [];
 
-    return queued.map(entry => ({
-      filename: entry.filename,
-      kept: false,
-      step: entry.step,
-    }));
+    for (const [key, record] of records) {
+      if (record.kind !== 'reported') {
+        // Reported once: the record itself stays, so the same item is never stopped or named a second time.
+        records.set(key, { ...record, kind: 'reported' });
+        reports.push({
+          filename: record.filename,
+          kept: record.kind === 'kept',
+          step: record.step,
+        });
+      }
+    }
+
+    pruneRecords(session, Date.now());
+
+    return reports;
+  };
+
+  /** Forgets reported records once their window is over: nothing can search for their items again, and they are memory. */
+  const pruneRecords = (session: string, at: number): void => {
+    const records = downloadRecords.get(session);
+
+    if (records === undefined) {
+      return;
+    }
+
+    for (const [key, record] of records) {
+      if (record.kind === 'reported' && record.since + DOWNLOAD_GUARD_LINGER_MS < at) {
+        records.delete(key);
+      }
+    }
+
+    if (records.size === 0) {
+      downloadRecords.delete(session);
+    }
+  };
+
+  /** Everything this session owes a report for: one search for the items a guard left behind, then the records. */
+  const collectDownloadReports = async (session: string): Promise<readonly DownloadReport[]> => {
+    await finishWatchedDownloads(session);
+
+    return drainDownloadReports(session);
   };
 
   const sessionFor = (tabId: number): BrowserToolSession => {
@@ -1219,9 +1696,8 @@ export const createBrowserRuntime = ({
   const disposeTab = async (tabId: number): Promise<void> => {
     chains.delete(tabId);
     inFlight.delete(tabId);
-    // A closed tab has no next call, so its linger is over: it must not keep listening for that tab's id.
-    endLinger(tabId);
-    lateStops.delete(tabId);
+    // A closed tab has no next call, so its linger is over and nothing will report what it left: both go with it.
+    takeOverDownloads(tabId);
     autoAttachedTabs.delete(tabId);
     sessionOwnedTabs.delete(tabId);
     groups.noteTabRemoved(tabId);
@@ -1439,25 +1915,31 @@ export const createBrowserRuntime = ({
    * a grant or revoke is seen. `undefined` when the optional permission is
    * missing — the caller then refuses the call rather than run it unguarded.
    */
-  const armGuard = (api: BrowserDownloadsApi, attribution: DownloadAttribution): DownloadGuard =>
-    armDownloadGuard(api, attribution, {
-      armed: end => {
-        // One linger per tab: the previous one was ended when this call began.
-        lingers.set(attribution.tab.tabId, end);
-      },
-      ended: () => {
-        lingers.delete(attribution.tab.tabId);
-      },
-      late: stop => {
-        // The linger outlived its call, so this stop has no result to be reported on: the next call on the tab has.
-        // The step travels with it, so the approval it asks for binds the call that started the file.
-        const { tabId } = attribution.tab;
-        const queued = lateStops.get(tabId) ?? [];
+  const armGuard = (api: BrowserDownloadsApi, attribution: DownloadAttribution): DownloadGuard => {
+    const attempt = `attempt-${String((attempts += 1))}`;
 
-        queued.push({ filename: stop.filename, outcome: stop.outcome, step: attribution.step });
-        lateStops.set(tabId, queued);
+    return armDownloadGuard(api, attribution, {
+      attempt,
+      ledger,
+      linger: {
+        armed: ({ end, since }) => {
+          // One linger per tab: the previous one was ended when this call began. The watch is what a later call of
+          // This same session searches with, so a file that lands after the window is still stopped and reported.
+          lingers.set(attribution.tab.tabId, end);
+          openWatches.set(attribution.tab.tabId, {
+            attempt,
+            session: attribution.step?.session ?? '',
+            since,
+            step: attribution.step,
+            tabId: attribution.tab.tabId,
+          });
+        },
+        ended: () => {
+          lingers.delete(attribution.tab.tabId);
+        },
       },
     });
+  };
 
   /** Whether the tab now sits on the page a navigate asked for; a download never loads it. */
   const navigationLanded = (tabId: number, destination: string) => async (): Promise<boolean> => {
@@ -1528,7 +2010,7 @@ export const createBrowserRuntime = ({
    * only the one that happened to be next.
    */
   const lateDownloadRefusal = (
-    files: readonly LateDiscard[]
+    files: readonly DownloadReport[]
   ): BrowserToolRunOutcome | undefined => {
     if (files.length === 0) {
       return undefined;
@@ -1604,20 +2086,16 @@ export const createBrowserRuntime = ({
     inFlight.get(tabId)?.();
 
     return runExclusive(tabId, async () => {
-      // A download an earlier call's linger stopped has no result of its own to be reported on: this call reports
-      // It before it runs, whatever tool it is, and its token binds the step that started the file. A panel call has
-      // No model to tell, so it drops what is left instead of holding it for the next agent call.
+      // A download an earlier call left for this session — stopped, kept, or only announced — has no result of its
+      // Own to be reported on: this call reports it before it runs, whatever tool it is, and its token binds the step
+      // That started the file. The search here stops a file whose own guard never saw it, so nothing lands silently.
+      // A panel call has no session to report to, so it never consumes a model's report.
       if (caller.kind === 'agent') {
-        const owed = lateDownloadRefusal(takeLateStops(tabId));
+        const owed = lateDownloadRefusal(await collectDownloadReports(caller.sessionHandle));
 
         if (owed !== undefined) {
           return owed;
         }
-      } else {
-        // A call the user drives through the panel owns the tab's downloads from the moment it starts, so an
-        // Earlier agent call's linger must not cancel a file this one starts.
-        endLinger(tabId);
-        lateStops.delete(tabId);
       }
 
       const unreachable = await reachable(tabId);
@@ -1716,20 +2194,23 @@ export const createBrowserRuntime = ({
               )
             : false;
 
-        // A call that can start a download owns the tab's downloads: an earlier call's linger ends before it runs,
-        // So the linger never cancels a file this call starts — an approved repeat above all.
+        // A call that can start a download owns the tab's downloads: an earlier call's linger and window end before
+        // It runs, so neither cancels a file this call starts — an approved repeat, or the panel's own click, above
+        // All. A read never starts one, so it leaves the earlier guard on duty and consumes no report: a file that
+        // Lands while it runs is still stopped and named by this session's next call.
         const downloadCapable =
-          agentContext !== undefined &&
-          preflight !== undefined &&
-          (preflight.class === 'act' || preflight.class === 'navigate') &&
-          canStartDownload(toolName, argsRecord);
+          canStartDownload(toolName, argsRecord) &&
+          (agentContext === undefined ||
+            (preflight !== undefined &&
+              (preflight.class === 'act' || preflight.class === 'navigate')));
 
         if (downloadCapable) {
-          endLinger(tabId);
+          takeOverDownloads(tabId);
         }
 
         // An unapproved act call runs with downloads denied: a download it starts is cancelled, then reported as a sensitive step.
         const guardDownloads =
+          agentContext !== undefined &&
           downloadCapable &&
           preflight !== undefined &&
           preflight.sensitiveToken === undefined &&
@@ -1793,7 +2274,6 @@ export const createBrowserRuntime = ({
                 tab: guardTab,
                 tabIds: guardTabIds,
                 witness: {
-                  announced: () => session.takeDownloads().length,
                   attachmentResponse: () =>
                     session
                       .networkRequests()
@@ -1811,6 +2291,7 @@ export const createBrowserRuntime = ({
                           request.finishedAt === undefined &&
                           request.failure === undefined
                       ).length,
+                  takeAnnounced: () => session.takeDownloads(),
                   watchAnnounced: listener => session.watchDownloads(listener),
                 },
               });
@@ -1902,12 +2383,10 @@ export const createBrowserRuntime = ({
 
         const settled = result ?? { error: 'The browser tool returned no result.', ok: false };
 
-        // A download an earlier call's linger stopped while this one ran had no result to be reported on; this
-        // Call reports it, so a deleted file is never silent. The tab's own target may also have reported one
-        // (`Page.downloadWillBegin`), where that is allowed. A panel call has no model to tell, so it leaves them.
-        const late = agentContext === undefined ? [] : takeLateStops(tabId);
-        const stoppedFiles =
-          settlement.stopped + (guardDownloads ? takeStartedDownloads(session) : 0);
+        // A download an earlier call's guard stopped while this one ran had no result to be reported on; this call
+        // Reports it, so a deleted file is never silent. A panel call has no model to tell, so it leaves them.
+        const late = agentContext === undefined ? [] : drainDownloadReports(sessionKey);
+        const stoppedFiles = settlement.stopped;
         // A file the guard could not delete is named, whichever call stopped it.
         const keptFiles = [
           ...settlement.kept,
@@ -1990,8 +2469,9 @@ export const createBrowserRuntime = ({
     }
 
     return runExclusive(tabId, async () => {
-      // Workflow page code can start a download too, so it owns the tab's downloads from here.
-      endLinger(tabId);
+      // Workflow page code can start a download too, so it owns the tab's downloads from here. The records stay:
+      // Only the session that owns them may report one, and this call is not that session.
+      takeOverDownloads(tabId);
 
       const unreachable = await reachable(tabId);
 
@@ -2008,6 +2488,18 @@ export const createBrowserRuntime = ({
 
     for (const session of sessions.values()) {
       session.disposeCaller(key);
+    }
+
+    if (caller.kind === 'agent') {
+      // The session is over: its downloads are settled with no report, because there is no model left to tell,
+      // And a later session must never be asked to redeem a token bound to this one.
+      closeSessionRecords(caller.sessionHandle);
+
+      for (const [tabId, watch] of openWatches) {
+        if (watch.session === caller.sessionHandle) {
+          openWatches.delete(tabId);
+        }
+      }
     }
 
     return leases.releaseCaller(caller);
@@ -2100,6 +2592,8 @@ export const createBrowserRuntime = ({
     adoptEnded: input => groups.adoptEnded(input),
     claimTab,
     closeSession: async input => {
+      // A closed session owes no approval: whatever it left stopped is settled here, not handed to the next one.
+      closeSessionRecords(input.sessionHandle);
       await groups.closeSession(input);
     },
     disposeCaller,
@@ -2107,7 +2601,12 @@ export const createBrowserRuntime = ({
     evalInTab,
     listSessions: () => groups.listSessions(),
     noteTabCreated,
-    openSession: input => groups.openSession(input),
+    openSession: input => {
+      // A handle that opens again is live again: a record may be opened for it, and a stop is reportable once more.
+      closedSessions.delete(input.sessionHandle);
+
+      return groups.openSession(input);
+    },
     openSessionTab,
     // Turn end: the lease goes, the caller's refs stay. Playwright-like, a ref from an earlier snapshot keeps resolving for as long as the caller and the tab session live.
     releaseCaller: caller => leases.releaseCaller(caller),

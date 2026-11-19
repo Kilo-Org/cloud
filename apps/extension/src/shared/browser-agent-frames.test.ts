@@ -328,6 +328,23 @@ describe('screenshot geometry', () => {
   it('derives the device scale from the layout metrics', async () => {
     const session = createFakeSession({
       'Page.getLayoutMetrics': () => ({
+        cssLayoutViewport: { clientHeight: 400, clientWidth: 800 },
+        cssVisualViewport: { pageX: 12, pageY: 34 },
+        layoutViewport: { clientHeight: 800, clientWidth: 1600 },
+      }),
+    });
+
+    await expect(readAgentScreenshotGeometry(session)).resolves.toStrictEqual({
+      scale: 2,
+      scroll: offsetOf(12, 34),
+      viewport: { height: 400, width: 800 },
+    });
+    expect(screenshotScale({ imageWidth: undefined, layoutWidth: 800 })).toBe(1);
+  });
+
+  it('has no CSS viewport to clip when the metrics carry none', async () => {
+    const session = createFakeSession({
+      'Page.getLayoutMetrics': () => ({
         cssLayoutViewport: { clientWidth: 800 },
         cssVisualViewport: { pageX: 12, pageY: 34 },
         layoutViewport: { clientWidth: 1600 },
@@ -337,8 +354,8 @@ describe('screenshot geometry', () => {
     await expect(readAgentScreenshotGeometry(session)).resolves.toStrictEqual({
       scale: 2,
       scroll: offsetOf(12, 34),
+      viewport: undefined,
     });
-    expect(screenshotScale({ imageWidth: undefined, layoutWidth: 800 })).toBe(1);
   });
 });
 

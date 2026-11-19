@@ -1625,9 +1625,13 @@ describe('background tab viewport capture', () => {
       layoutViewport: LAYOUT,
     });
     const taken = { cancelled: false };
-    const capture = session.captureViewportImage('png', {
-      cancelled: () => taken.cancelled,
-    });
+    const capture = session.captureViewportImage(
+      'png',
+      {},
+      {
+        cancelled: () => taken.cancelled,
+      }
+    );
 
     await vi.waitFor(() => {
       expect(debuggerApi.commands.map(command => command.method)).toContain(
@@ -1651,9 +1655,13 @@ describe('background tab viewport capture', () => {
   it('acks no frame and stops only its own screencast once the tab is taken over', async () => {
     const { debuggerApi, session } = createSession({ layoutViewport: LAYOUT });
     const taken = { cancelled: false };
-    const capture = session.captureViewportImage('png', {
-      cancelled: () => taken.cancelled,
-    });
+    const capture = session.captureViewportImage(
+      'png',
+      {},
+      {
+        cancelled: () => taken.cancelled,
+      }
+    );
 
     await vi.waitFor(() => {
       expect(debuggerApi.commands.map(command => command.method)).toContain('Page.startScreencast');

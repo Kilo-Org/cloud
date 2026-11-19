@@ -2061,7 +2061,7 @@
       "reportAiResponseFailedTerminal": "لا يمكن الإبلاغ عن هذا الرد."
     },
     "modelCost": {
-      "lessThan": "<{{amount}}",
+      "lessThan": "أقل من {{amount}}",
       "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} لكل {{million}} {{tokens}}"
     },
     "partDetail": {

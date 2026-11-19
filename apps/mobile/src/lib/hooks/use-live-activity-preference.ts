@@ -35,15 +35,22 @@ const store = createSecureStorePreference<boolean>({
 // only signal, and it runs only once the read has an answer. A load that reads
 // the default on marks the preference known without a value change, so no
 // running activity ends.
-store.subscribe(() => {
-  if (!store.getHasLoaded()) {
+//
+// It gates on the store knowing what is stored, not on `getHasLoaded`, which
+// also settles for a rejected read: mirroring that would take the default on as
+// consent exactly when the keychain is unreadable. A rejected read leaves the
+// holder unknown until a write lands or the app next starts — the retrying read
+// already spent its budget, so nothing re-reads sooner — and a refused
+// push-to-start token waits for one of those answers.
+const mirrorAnsweredValue = () => {
+  const loaded = store.getAnsweredValue();
+  if (!loaded.answered) {
     return;
   }
-  setLiveActivityEnabledValue(store.get());
-});
-if (store.getHasLoaded()) {
-  setLiveActivityEnabledValue(store.get());
-}
+  setLiveActivityEnabledValue(loaded.value);
+};
+store.subscribe(mirrorAnsweredValue);
+mirrorAnsweredValue();
 
 export function clearLiveActivityPreference() {
   store.clear();

@@ -75,6 +75,9 @@ describe('createSecureStorePreference', () => {
 
       expect(store.get()).toBe(false);
       expect(store.getHasLoaded()).toBe(true);
+      // A rejected read leaves the store without an answer: its default is not
+      // something the disk said, so a consent gate must stay unknown.
+      expect(store.getAnsweredValue()).toEqual({ answered: false });
       expect(events.map(event => event.fingerprint)).toEqual([['secure-store-failure', 'read']]);
       expect(captureException).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
@@ -144,9 +147,27 @@ describe('createSecureStorePreference', () => {
 
       expect(store.get()).toBe(true);
       expect(store.getHasLoaded()).toBe(true);
+      expect(store.getAnsweredValue()).toEqual({ answered: true, value: true });
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('answers with the parsed default when the read resolves empty', async () => {
+    // `null` is an answer, not a failure: the key is absent, so the store knows
+    // the default applies and a consent gate may treat it as the stored value.
+    getItemAsync.mockResolvedValue(null);
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+    expect(store.getAnsweredValue()).toEqual({ answered: false });
+
+    await store.whenLoaded();
+
+    expect(store.getAnsweredValue()).toEqual({ answered: true, value: false });
   });
 
   it('shows a toast and keeps the last stored value when the write fails', async () => {

@@ -110,6 +110,32 @@ describe('live-activity preference store', () => {
     expect(sink.getLiveActivityEnabled()).toBe(false);
   });
 
+  it('keeps the sink unknown when the disk read rejects, then mirrors a later choice', async () => {
+    // A rejected read settles the store on its default on, but that default is
+    // not a stored answer: the holder must stay unknown rather than take it for
+    // consent, or push-to-start registers exactly when the keychain is broken.
+    vi.useFakeTimers();
+    try {
+      getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+      const sink = await import('@/lib/glanceable/live-activity-switch');
+      const { setLiveActivityEnabled } = await import('./use-live-activity-preference');
+
+      // The retry budget rejects every attempt, then the store settles.
+      await vi.runAllTimersAsync();
+      expect(sink.isLiveActivityPreferenceKnown()).toBe(false);
+      expect(sink.getLiveActivityEnabled()).toBe(true);
+      expect(sink.canRegisterActivityTokenKind('ios_push_to_start')).toBe(false);
+
+      // A choice that lands on disk is a real answer and mirrors as before.
+      setLiveActivityEnabled(false);
+      await vi.runAllTimersAsync();
+      expect(sink.isLiveActivityPreferenceKnown()).toBe(true);
+      expect(sink.getLiveActivityEnabled()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('clears back to the default and deletes the key', async () => {
     getItemAsync.mockResolvedValue('false');
     const { clearLiveActivityPreference, getLiveActivityEnabled } =

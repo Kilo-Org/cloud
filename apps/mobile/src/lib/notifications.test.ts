@@ -22,7 +22,12 @@ import {
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
 import { setProtectedDataAvailable } from '@/lib/protected-data';
-import { ACTIVE_USER_ID_KEY, AUTH_TOKEN_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import {
+  ACTIVE_USER_ID_KEY,
+  AUTH_TOKEN_KEY,
+  LIVE_ACTIVITY_KEY,
+  ORGANIZATION_STORAGE_KEY,
+} from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
   applyGlanceablePushData,
@@ -2752,25 +2757,31 @@ describe('cold iOS background delivery', () => {
       error: null;
       executionInfo: { eventId: string; taskName: string };
     }) => Promise<number>;
+    const coldBody = (overrides: Partial<GlanceableAgentsSnapshot>) => ({
+      data: {
+        notification: null,
+        data: {
+          dataString: JSON.stringify(
+            activeGlanceablePush({ updatedAt: '2026-01-02T00:00:00.000Z', ...overrides })
+          ),
+        },
+      },
+      error: null,
+      executionInfo: { eventId: 'cold', taskName: 'active-agents-glanceable-background-task' },
+    });
     return {
       cleanup,
       blank,
       sink,
       deliver: async (overrides: Partial<GlanceableAgentsSnapshot>) => {
-        const result = await executor({
-          data: {
-            notification: null,
-            data: {
-              dataString: JSON.stringify(
-                activeGlanceablePush({ updatedAt: '2026-01-02T00:00:00.000Z', ...overrides })
-              ),
-            },
-          },
-          error: null,
-          executionInfo: { eventId: 'cold', taskName: 'active-agents-glanceable-background-task' },
-        });
+        const result = await executor(coldBody(overrides));
         return result;
       },
+      // The app entry's executor: the same headless body after the shared
+      // preparation a killed process needs. The task defined by the warm app
+      // (`setupNotificationBackgroundHandler`) skips that preparation.
+      deliverPrepared: (overrides: Partial<GlanceableAgentsSnapshot>) =>
+        notifications.runBackgroundNotificationTask(coldBody(overrides)),
     };
   }
 
@@ -2909,6 +2920,92 @@ describe('cold iOS background delivery', () => {
     native.observers.clear();
     vi.clearAllTimers();
     vi.useRealTimers();
+  });
+
+  it('keeps a switched-off Live Activity from registering a headless push-to-start token', async () => {
+    // A headless start never loads the preference mirror, so the preparation
+    // must read the stored switch before the sinks act: otherwise the switch
+    // off reads as unknown, and an unknown switch is not consent.
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    secureStore.set(LIVE_ACTIVITY_KEY, 'false');
+    const background = await loadColdBackground();
+    // Dynamic: `loadColdBackground` resets the module registry, so only this
+    // specifier resolves the switch instance the fresh notifications graph uses.
+    const { getLiveActivityEnabled, isLiveActivityPreferenceKnown } =
+      await import('@/lib/glanceable/live-activity-switch');
+
+    expect(await background.deliverPrepared({})).toBe(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(isLiveActivityPreferenceKnown()).toBe(true);
+    expect(getLiveActivityEnabled()).toBe(false);
+    expect(mocks.registerActivityToken).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'ios_push_to_start' })
+    );
+  });
+
+  it('treats an absent stored switch as the shipped default on', async () => {
+    // Nothing stored is an answer, not an unknown: the shipped parse reads it
+    // as on, and the foreground mirror marks that known too. Reading it as
+    // unknown here would refuse push-to-start for every install that never
+    // touched the switch, which is the shipped behavior.
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    const background = await loadColdBackground();
+    const { getLiveActivityEnabled, isLiveActivityPreferenceKnown } =
+      await import('@/lib/glanceable/live-activity-switch');
+
+    expect(await background.deliverPrepared({})).toBe(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(isLiveActivityPreferenceKnown()).toBe(true);
+    expect(getLiveActivityEnabled()).toBe(true);
+    expect(mocks.registerActivityToken).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'scope-token', kind: 'ios_push_to_start' })
+    );
+  });
+
+  it('leaves the switch unknown when the stored value cannot be read', async () => {
+    // A locked keychain answers nothing, and a default on is not consent, so
+    // the refused push-to-start token waits for the next start that can read.
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    const background = await loadColdBackground();
+    mocks.getItemAsync.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      if (key === LIVE_ACTIVITY_KEY) {
+        throw new Error('User interaction is not allowed');
+      }
+      return secureStore.get(key) ?? null;
+    });
+    const { getLiveActivityEnabled, isLiveActivityPreferenceKnown } =
+      await import('@/lib/glanceable/live-activity-switch');
+
+    expect(await background.deliverPrepared({})).toBe(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(isLiveActivityPreferenceKnown()).toBe(false);
+    expect(getLiveActivityEnabled()).toBe(true);
+    expect(mocks.registerActivityToken).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'ios_push_to_start' })
+    );
+  });
+
+  it('registers the cached push-to-start token once the preparation reads a stored switch on', async () => {
+    // The contrast that proves the read is the gate: with the switch on and the
+    // permission granted, the very same prepared run registers the token.
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    secureStore.set(LIVE_ACTIVITY_KEY, 'true');
+    const background = await loadColdBackground();
+
+    expect(await background.deliverPrepared({})).toBe(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(mocks.registerActivityToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: 'scope-token',
+        kind: 'ios_push_to_start',
+        organizationId: 'org-9',
+      })
+    );
   });
 
   it.each(['dismissed', 'missing'] as const)(

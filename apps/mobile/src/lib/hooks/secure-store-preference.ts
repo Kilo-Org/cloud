@@ -56,6 +56,14 @@ export function createSecureStorePreference<T>(options: {
   let asyncWriteTarget: T | undefined = undefined;
   let writing = false;
   let hasLoaded = false;
+  /**
+   * Whether the store has a real answer for the stored value: the disk read
+   * resolved (a `null` read is an answer — its parse is the shipped default),
+   * or a write landed on disk. `hasLoaded` settles either way, so it cannot
+   * tell that answer from a default a rejected read left behind; a caller that
+   * must not read a default as consent gates on this instead.
+   */
+  let storedValueKnown = false;
   let loadSettled = false;
   // A set() or clear() before the initial load resolves must win over the
   // disk value.
@@ -133,7 +141,9 @@ export function createSecureStorePreference<T>(options: {
       return;
     }
     /* Only the read settles `hasLoaded`: a write landing says what the disk now
-       holds, not that the list it was merged into has been read. */
+       holds, not that the list it was merged into has been read. It does tell
+       the store what is stored, though: the disk answered with this value. */
+    storedValueKnown = true;
     value = next;
     emit();
   };
@@ -194,6 +204,9 @@ export function createSecureStorePreference<T>(options: {
   const load = async () => {
     try {
       const raw = await readStoredValueWithRetry(key);
+      // The read answered, even when it holds nothing: `parse(null)` is the
+      // default the disk itself asked for, not a fallback.
+      storedValueKnown = true;
       if (!dirty) {
         value = parse(raw);
       } else if (mergeOnLoad && !cleared) {
@@ -260,6 +273,15 @@ export function createSecureStorePreference<T>(options: {
     },
     get: () => value,
     getHasLoaded: () => hasLoaded,
+    /**
+     * The applied value only when the store knows what is stored: a resolved
+     * read (a `null` read is an answer, its parse is the default) or a landed
+     * write. A rejected read alone is not an answer, so a caller that must not
+     * read a default as consent stays unknown instead of trusting
+     * `getHasLoaded`, which settles in both cases.
+     */
+    getAnsweredValue: (): { answered: true; value: T } | { answered: false } =>
+      storedValueKnown ? { answered: true, value } : { answered: false },
     /**
      * The value the next relative change starts from: the newest requested
      * target (or the one being written) while a write is pending, otherwise the
@@ -346,6 +368,8 @@ export function createSecureStorePreference<T>(options: {
       value = next;
       dirty = true;
       hasLoaded = true;
+      // The disk accepted this value, so the store knows what is stored.
+      storedValueKnown = true;
       emit();
       return true;
     },

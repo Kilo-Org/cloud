@@ -4823,7 +4823,7 @@
       "new": "Nowy wyzwalacz",
       "create": "Utwórz wyzwalacz",
       "emptyTitle": "Brak wyzwalaczy",
-      "emptyDescription": "Utwórz wyzwalacz, aby uruchomić Cloud Agent przez wywołanie webhooka lub według harmonogramu.",
+      "emptyDescription": "Utwórz swój pierwszy wyzwalacz.",
       "loadFailedTitle": "Nie udało się wczytać wyzwalaczy",
       "loadFailedDescription": "Spróbuj ponownie po nawiązaniu połączenia.",
       "detailLoadFailedTitle": "Nie udało się wczytać tego wyzwalacza",

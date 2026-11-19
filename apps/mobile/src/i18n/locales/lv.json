@@ -4748,7 +4748,7 @@
       "new": "Jauns trigeris",
       "create": "Izveidot trigeri",
       "emptyTitle": "Vēl nav trigeru",
-      "emptyDescription": "Izveidojiet trigeri, lai sāktu Cloud Agent palaišanu ar tīmekļa āķa izsaukumu vai pēc grafika.",
+      "emptyDescription": "Izveidojiet savu pirmo trigeri.",
       "loadFailedTitle": "Neizdevās ielādēt trigerus",
       "loadFailedDescription": "Mēģiniet vēlreiz, kad būs savienojums.",
       "detailLoadFailedTitle": "Neizdevās ielādēt šo trigeri",

@@ -4673,7 +4673,7 @@
       "new": "新規トリガー",
       "create": "トリガーを作成",
       "emptyTitle": "トリガーはまだありません",
-      "emptyDescription": "ウェブフック呼び出しまたはスケジュールでCloud Agentの実行を開始するトリガーを作成します。",
+      "emptyDescription": "最初のトリガーを作成します。",
       "loadFailedTitle": "トリガーを読み込めませんでした",
       "loadFailedDescription": "接続があるときに再試行してください。",
       "detailLoadFailedTitle": "このトリガーを読み込めませんでした",

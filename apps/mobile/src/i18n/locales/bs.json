@@ -4748,7 +4748,7 @@
       "new": "Novi okidač",
       "create": "Kreiraj okidač",
       "emptyTitle": "Još nema okidača",
-      "emptyDescription": "Kreirajte okidač za pokretanje Cloud Agent-a putem webhook poziva ili prema rasporedu.",
+      "emptyDescription": "Kreirajte svoj prvi okidač.",
       "loadFailedTitle": "Nije moguće učitati okidače",
       "loadFailedDescription": "Pokušajte ponovo kada imate vezu.",
       "detailLoadFailedTitle": "Nije moguće učitati ovaj okidač",

@@ -4754,7 +4754,7 @@
       "new": "Novo gatilho",
       "create": "Criar gatilho",
       "emptyTitle": "Ainda não há gatilhos",
-      "emptyDescription": "Crie um gatilho para iniciar uma execução do Cloud Agent a partir de uma chamada de webhook ou em um agendamento.",
+      "emptyDescription": "Crie seu primeiro gatilho.",
       "loadFailedTitle": "Não foi possível carregar os gatilhos",
       "loadFailedDescription": "Tente novamente quando tiver conexão.",
       "detailLoadFailedTitle": "Não foi possível carregar este gatilho",

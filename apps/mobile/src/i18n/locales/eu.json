@@ -4673,7 +4673,7 @@
       "new": "Abiarazle berria",
       "create": "Sortu abiarazlea",
       "emptyTitle": "Oraindik ez dago abiarazlerik",
-      "emptyDescription": "Sortu abiarazle bat Cloud Agent exekuzio bat hasteko webhook dei batetik edo ordutegi baten arabera.",
+      "emptyDescription": "Sortu zure lehen abiarazlea.",
       "loadFailedTitle": "Ezin izan dira abiarazleak kargatu",
       "loadFailedDescription": "Saiatu berriro konexioa duzunean.",
       "detailLoadFailedTitle": "Ezin izan da abiarazle hau kargatu",

@@ -4673,7 +4673,7 @@
       "new": "Uus päästik",
       "create": "Loo päästik",
       "emptyTitle": "Päästikuid veel pole",
-      "emptyDescription": "Loo päästik, et alustada Cloud Agent käivitust veebihaagi kutse või ajakava alusel.",
+      "emptyDescription": "Loo oma esimene päästik.",
       "loadFailedTitle": "Päästikute laadimine ebaõnnestus",
       "loadFailedDescription": "Proovi uuesti, kui ühendus on olemas.",
       "detailLoadFailedTitle": "Selle päästiku laadimine ebaõnnestus",

@@ -4673,7 +4673,7 @@
       "new": "Yeni tətikləyici",
       "create": "Tətikləyici yaradın",
       "emptyTitle": "Hələ tətikləyici yoxdur",
-      "emptyDescription": "Cloud Agent icrasını vebhuk çağırışı və ya cədvəl üzrə başlatmaq üçün tətikləyici yaradın.",
+      "emptyDescription": "İlk tətikləyicinizi yaradın.",
       "loadFailedTitle": "Tətikləyicilər yüklənə bilmədi",
       "loadFailedDescription": "Bağlantı olduqda yenidən cəhd edin.",
       "detailLoadFailedTitle": "Bu tətikləyici yüklənə bilmədi",

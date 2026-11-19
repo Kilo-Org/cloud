@@ -4748,7 +4748,7 @@
       "new": "Declanșator nou",
       "create": "Creează declanșator",
       "emptyTitle": "Nu există declanșatoare încă",
-      "emptyDescription": "Creează un declanșator pentru a porni o rulare Cloud Agent dintr-un apel webhook sau conform unui program.",
+      "emptyDescription": "Creează primul tău declanșator.",
       "loadFailedTitle": "Nu s-au putut încărca declanșatoarele",
       "loadFailedDescription": "Încearcă din nou când ai conexiune.",
       "detailLoadFailedTitle": "Nu s-a putut încărca acest declanșator",

@@ -4673,7 +4673,7 @@
       "new": "نیا ٹرگر",
       "create": "ٹرگر بنائیں",
       "emptyTitle": "ابھی کوئی ٹرگر نہیں",
-      "emptyDescription": "ویب ہک کال یا شیڈول پر Cloud Agent رن شروع کرنے کے لیے ٹرگر بنائیں۔",
+      "emptyDescription": "اپنا پہلا ٹرگر بنائیں۔",
       "loadFailedTitle": "ٹرگرز لوڈ نہیں ہو سکے",
       "loadFailedDescription": "کنکشن ہونے پر دوبارہ کوشش کریں۔",
       "detailLoadFailedTitle": "یہ ٹرگر لوڈ نہیں ہو سکا",

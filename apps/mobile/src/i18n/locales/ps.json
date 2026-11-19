@@ -4673,7 +4673,7 @@
       "new": "نوی ټرېګر",
       "create": "ټرېګر جوړ کړئ",
       "emptyTitle": "تر اوسه هېڅ ټرېګر نشته",
-      "emptyDescription": "یو ټرېګر جوړ کړئ ترڅو د ویب‌هوک غوښتنې یا مهالویش له مخې د Cloud Agent چل پیل کړئ.",
+      "emptyDescription": "خپل لومړی ټرېګر جوړ کړئ.",
       "loadFailedTitle": "ټرېګرونه بار نشول",
       "loadFailedDescription": "کله چې اړیکه ولرئ بیا هڅه وکړئ.",
       "detailLoadFailedTitle": "دا ټرېګر بار نشو",

@@ -4754,7 +4754,7 @@
       "new": "Novo acionador",
       "create": "Criar acionador",
       "emptyTitle": "Ainda não há acionadores",
-      "emptyDescription": "Crie um acionador para iniciar uma execução do Cloud Agent a partir de uma chamada de webhook ou segundo uma programação.",
+      "emptyDescription": "Crie o seu primeiro acionador.",
       "loadFailedTitle": "Não foi possível carregar os acionadores",
       "loadFailedDescription": "Tente novamente quando tiver ligação.",
       "detailLoadFailedTitle": "Não foi possível carregar este acionador",

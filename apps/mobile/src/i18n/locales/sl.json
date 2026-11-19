@@ -4823,7 +4823,7 @@
       "new": "Nov sprožilec",
       "create": "Ustvari sprožilec",
       "emptyTitle": "Ni še nobenega sprožilca",
-      "emptyDescription": "Ustvarite sprožilec za zagon Cloud Agent s klicem spletnega kavlja ali po urniku.",
+      "emptyDescription": "Ustvarite svoj prvi sprožilec.",
       "loadFailedTitle": "Sprožilcev ni bilo mogoče naložiti",
       "loadFailedDescription": "Poskusite znova, ko boste imeli povezavo.",
       "detailLoadFailedTitle": "Tega sprožilca ni bilo mogoče naložiti",

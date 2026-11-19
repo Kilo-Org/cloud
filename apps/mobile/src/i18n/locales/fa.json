@@ -4673,7 +4673,7 @@
       "new": "تریگر جدید",
       "create": "ساخت تریگر",
       "emptyTitle": "هنوز تریگری وجود ندارد",
-      "emptyDescription": "یک تریگر بسازید تا یک اجرای Cloud Agent را با فراخوانی وب‌هوک یا طبق زمان‌بندی شروع کنید.",
+      "emptyDescription": "اولین تریگر خود را بسازید.",
       "loadFailedTitle": "بارگذاری تریگرها ناموفق بود",
       "loadFailedDescription": "وقتی اتصال دارید دوباره تلاش کنید.",
       "detailLoadFailedTitle": "بارگذاری این تریگر ناموفق بود",

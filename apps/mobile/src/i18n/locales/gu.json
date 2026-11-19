@@ -4673,7 +4673,7 @@
       "new": "નવું ટ્રિગર",
       "create": "ટ્રિગર બનાવો",
       "emptyTitle": "હજી કોઈ ટ્રિગર નથી",
-      "emptyDescription": "વેબહૂક કૉલથી અથવા શેડ્યૂલ પર Cloud Agent રન શરૂ કરવા માટે ટ્રિગર બનાવો।",
+      "emptyDescription": "તમારું પ્રથમ ટ્રિગર બનાવો।",
       "loadFailedTitle": "ટ્રિગર્સ લોડ કરી શકાયા નથી",
       "loadFailedDescription": "કનેક્શન હોય ત્યારે ફરી પ્રયાસ કરો।",
       "detailLoadFailedTitle": "આ ટ્રિગર લોડ કરી શકાયો નથી",

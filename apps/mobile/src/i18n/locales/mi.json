@@ -4673,7 +4673,7 @@
       "new": "Kaiwhakaara hou",
       "create": "Waihanga kaiwhakaara",
       "emptyTitle": "Kāore anō he kaiwhakaara",
-      "emptyDescription": "Waihanga i tētahi kaiwhakaara hei tīmata i tētahi rerenga Cloud Agent mai i tētahi karanga hononga tukutuku, i tētahi hōtaka wā rānei.",
+      "emptyDescription": "Waihangatia tō tuatahi kaiwhakaara.",
       "loadFailedTitle": "Kāore i taea te uta i ngā kaiwhakaara",
       "loadFailedDescription": "Whakamātauria anō ina whai hononga koe.",
       "detailLoadFailedTitle": "Kāore i taea te uta i tēnei kaiwhakaara",

@@ -4673,7 +4673,7 @@
       "new": "New trigger",
       "create": "Create trigger",
       "emptyTitle": "No triggers yet",
-      "emptyDescription": "Create a trigger to start a Cloud Agent run from a webhook call or on a schedule.",
+      "emptyDescription": "Create your first trigger.",
       "loadFailedTitle": "Couldn't load triggers",
       "loadFailedDescription": "Try again when you have a connection.",
       "detailLoadFailedTitle": "Couldn't load this trigger",

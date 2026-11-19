@@ -4673,7 +4673,7 @@
       "new": "Yangi ishga tushirgich",
       "create": "Ishga tushirgich yarating",
       "emptyTitle": "Hozircha ishga tushirgichlar yoʻq",
-      "emptyDescription": "Cloud Agent ishga tushirishini vebhook chaqiruvi yoki jadval boʻyicha boshlash uchun ishga tushirgich yarating.",
+      "emptyDescription": "Birinchi ishga tushirgichingizni yarating.",
       "loadFailedTitle": "Ishga tushirgichlarni yuklab boʻlmadi",
       "loadFailedDescription": "Ulanish mavjud boʻlganda qayta urinib koʻring.",
       "detailLoadFailedTitle": "Bu ishga tushirgichni yuklab boʻlmadi",

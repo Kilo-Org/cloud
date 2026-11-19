@@ -4673,7 +4673,7 @@
       "new": "Novo disparador",
       "create": "Crear disparador",
       "emptyTitle": "Aínda non hai disparadores",
-      "emptyDescription": "Crea un disparador para iniciar unha execución de Cloud Agent a partir dunha chamada de webhook ou segundo unha programación.",
+      "emptyDescription": "Crea o teu primeiro disparador.",
       "loadFailedTitle": "Non se puideron cargar os disparadores",
       "loadFailedDescription": "Volve tentalo cando teñas conexión.",
       "detailLoadFailedTitle": "Non se puido cargar este disparador",

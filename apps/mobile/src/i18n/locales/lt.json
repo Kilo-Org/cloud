@@ -4823,7 +4823,7 @@
       "new": "Naujas trigeris",
       "create": "Sukurti trigerį",
       "emptyTitle": "Trigerių dar nėra",
-      "emptyDescription": "Sukurkite trigerį, kad Cloud Agent būtų paleistas pagal žiniatinklio kabliuko iškvietimą arba pagal grafiką.",
+      "emptyDescription": "Sukurkite savo pirmąjį trigerį.",
       "loadFailedTitle": "Nepavyko įkelti trigerių",
       "loadFailedDescription": "Bandykite dar kartą, kai turėsite ryšį.",
       "detailLoadFailedTitle": "Nepavyko įkelti šio trigerio",

@@ -4673,7 +4673,7 @@
       "new": "Ny utlösare",
       "create": "Skapa utlösare",
       "emptyTitle": "Inga utlösare än",
-      "emptyDescription": "Skapa en utlösare för att starta en Cloud Agent-körning från ett webhookanrop eller enligt ett schema.",
+      "emptyDescription": "Skapa din första utlösare.",
       "loadFailedTitle": "Det gick inte att läsa in utlösare",
       "loadFailedDescription": "Försök igen när du har en anslutning.",
       "detailLoadFailedTitle": "Det gick inte att läsa in den här utlösaren",

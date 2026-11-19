@@ -4748,7 +4748,7 @@
       "new": "טריגר חדש",
       "create": "צור טריגר",
       "emptyTitle": "אין טריגרים עדיין",
-      "emptyDescription": "צרו טריגר כדי להתחיל הרצת Cloud Agent מקריאת וובהוק או לפי לוח זמנים.",
+      "emptyDescription": "צרו את הטריגר הראשון שלכם.",
       "loadFailedTitle": "לא ניתן היה לטעון טריגרים",
       "loadFailedDescription": "נסו שוב כשיש חיבור.",
       "detailLoadFailedTitle": "לא ניתן היה לטעון את הטריגר הזה",

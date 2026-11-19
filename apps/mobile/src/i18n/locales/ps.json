@@ -1800,7 +1800,7 @@
       "lowDescription": "ډېر لږ امنیتي اغېز.",
       "invalidDayCount": "د ورځو شمېر باید له ۱ تر ۳۶۵ پورې یو صحیح عدد وي.",
       "remediationDeadlineA11y": "د {{label}} د اصلاح مهلت په ورځو کې",
-      "enterWholeNumber": "له 1 څخه تر 365 پورې یو صحیح عدد ولیکئ",
+      "enterWholeNumber": "له ۱ څخه تر ۳۶۵ پورې یو صحیح عدد ولیکئ",
       "permissionNote": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ترتیبات بدل کړي.",
       "enableTracking": "د SLA تعقیب فعال کړئ",
       "enableTrackingSubtitle": "د موندنې د شدت له مخې د اصلاح مهلتونه وټاکئ.",

@@ -231,7 +231,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   // unsettled) can never finish: the loading gate would hold the skeleton
   // until connectivity returns. Name the connection and offer Retry, like the
   // findings filter sheet's paused branch does.
-  if (isReadPausedBeforeData(config)) {
+  if (isReadPausedBeforeData({ ...config, connectivity })) {
     return (
       <PlatformErrorScreen
         title={t('securityAgent.automation.title')}

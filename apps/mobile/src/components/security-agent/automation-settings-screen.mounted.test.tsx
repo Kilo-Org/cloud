@@ -11,6 +11,7 @@ import {
   approvalRow,
   capability,
   config,
+  connectivity,
   enabledConfig,
   pillGroups,
   platformError,
@@ -36,6 +37,7 @@ describe('AutomationSettingsScreen approval gate', () => {
     config.isPending = false;
     config.fetchStatus = 'idle';
     platformError.props = null;
+    connectivity.committed = 'online';
     capability.canManage = true;
     save.isPending = false;
     save.mutateAsync.mockReset();
@@ -100,11 +102,13 @@ describe('AutomationSettingsScreen approval gate', () => {
   });
 
   it('names the connection and offers Retry for a first read paused offline', () => {
-    // The online manager paused the cold read: pending, no data, no error. The
-    // loading gate would hold the skeleton until connectivity returns.
+    // The online manager paused the cold read on a confirmed-offline device:
+    // pending, no data, no error. The loading gate would hold the skeleton
+    // until connectivity returns.
     config.data = null;
     config.isPending = true;
     config.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
     renderScreen(AutomationSettingsScreen);
 
     const error = platformError.props;
@@ -119,6 +123,21 @@ describe('AutomationSettingsScreen approval gate', () => {
     });
     expect(config.refetch).toHaveBeenCalledOnce();
   });
+
+  it.each(['unknown', 'online'] as const)(
+    'keeps the skeleton for a pause while connectivity is %s',
+    state => {
+      // The online manager also pauses on an unsettled NetInfo report, which is
+      // the normal cold-launch window: that is not a connection failure yet.
+      config.data = null;
+      config.isPending = true;
+      config.fetchStatus = 'paused';
+      connectivity.committed = state;
+      renderScreen(AutomationSettingsScreen);
+
+      expect(platformError.props).toBeNull();
+    }
+  );
 
   it('keeps the skeleton for a first read still in flight', () => {
     config.data = null;

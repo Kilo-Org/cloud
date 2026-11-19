@@ -35,16 +35,25 @@ export function classifyReadFailureVariant({
 }
 
 /**
- * A first load the online manager paused: nothing was sent, so the read is
- * still pending with no data and reaches neither the loading gate nor the
- * error branch. The offline online manager is the only thing that pauses a
- * read, so this state names the connection.
+ * A first load the online manager paused on a connection the app has CONFIRMED
+ * is down: nothing was sent, so the read is still pending with no data and
+ * reaches neither the loading gate nor the error branch, and only a Retry can
+ * retire it.
+ *
+ * Confirmation is part of the test, not decoration. The manager also pauses on
+ * an `unknown` NetInfo report (`installQueryClientNativeLifecycle`), which is
+ * the normal cold-launch window before the reachability probe settles: a pause
+ * there is not yet a connection failure, and naming one would flash a false
+ * error on every cold deep link. The screens that already classify a cold
+ * pause agree — `blocked-people-screen` and `list-body-state` both require
+ * confirmed-offline connectivity and keep the skeleton while it is unsettled.
  */
 export function isReadPausedBeforeData(read: {
   isPending: boolean;
   fetchStatus: 'fetching' | 'paused' | 'idle';
+  connectivity: BannerState;
 }): boolean {
-  return read.isPending && read.fetchStatus === 'paused';
+  return read.isPending && read.fetchStatus === 'paused' && read.connectivity === 'offline';
 }
 
 function servedAnswer(error: unknown): boolean {

@@ -142,6 +142,12 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
 }));
+const connectivity = vi.hoisted(() => ({
+  committed: 'online' as 'online' | 'offline' | 'unknown',
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.committed,
+}));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
   useDismissSecurityFinding: () => dismiss,
@@ -296,6 +302,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     finding.isPending = false;
     finding.fetchStatus = 'idle';
     finding.error = null;
+    connectivity.committed = 'online';
     finding.data = { status: 'open', ...FINDING_IDENTITY };
     finding.refetch.mockReset();
     dismissDraft.draft = null;
@@ -389,6 +396,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       finding.data = undefined;
       query.isPending = true;
       query.fetchStatus = 'paused';
+      connectivity.committed = 'offline';
       const tree = renderScreen();
 
       expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
@@ -402,6 +410,21 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       act(error.props.onRetry as () => void);
       expect(query.refetch).toHaveBeenCalledOnce();
       expect(otherQuery.refetch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['unknown', 'online'] as const)(
+    'keeps the skeleton for a pause while connectivity is %s',
+    state => {
+      // The online manager also pauses on an unsettled NetInfo report, which is
+      // the normal cold-launch window: that is not a connection failure yet.
+      finding.data = undefined;
+      finding.isPending = true;
+      finding.fetchStatus = 'paused';
+      connectivity.committed = state;
+      const tree = renderScreen();
+
+      expect(findAllFailures(tree.root)).toHaveLength(0);
     }
   );
 

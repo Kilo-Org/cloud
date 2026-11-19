@@ -112,15 +112,32 @@ describe('classifyReadFailureVariant', () => {
 });
 
 describe('isReadPausedBeforeData', () => {
-  it('names a pending read the online manager paused', () => {
-    expect(isReadPausedBeforeData({ isPending: true, fetchStatus: 'paused' })).toBe(true);
+  it('names a pending read the online manager paused offline', () => {
+    expect(
+      isReadPausedBeforeData({ isPending: true, fetchStatus: 'paused', connectivity: 'offline' })
+    ).toBe(true);
+  });
+
+  it('keeps the loading gate while connectivity is still unsettled', () => {
+    // The manager also pauses on an `unknown` NetInfo report, which is the
+    // normal cold-launch window: a pause there is not a connection failure.
+    expect(
+      isReadPausedBeforeData({ isPending: true, fetchStatus: 'paused', connectivity: 'unknown' })
+    ).toBe(false);
+    expect(
+      isReadPausedBeforeData({ isPending: true, fetchStatus: 'paused', connectivity: 'online' })
+    ).toBe(false);
   });
 
   it('is false for a pending read still in flight', () => {
-    expect(isReadPausedBeforeData({ isPending: true, fetchStatus: 'fetching' })).toBe(false);
+    expect(
+      isReadPausedBeforeData({ isPending: true, fetchStatus: 'fetching', connectivity: 'offline' })
+    ).toBe(false);
   });
 
   it('is false for a settled read whose refetch is paused', () => {
-    expect(isReadPausedBeforeData({ isPending: false, fetchStatus: 'paused' })).toBe(false);
+    expect(
+      isReadPausedBeforeData({ isPending: false, fetchStatus: 'paused', connectivity: 'offline' })
+    ).toBe(false);
   });
 });

@@ -30,6 +30,7 @@ import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-in
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
@@ -74,6 +75,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   // reader while `useBillingAction` offers the step from the same predicate.
   const canManageBilling = useCanManageBilling(scope);
   const billingAction = useBillingAction(scope);
+  const connectivity = useCommittedConnectivityStatus();
 
   // Restore the reason and comment from the stored draft once, so a retry
   // reopens the form with the user's last intent. The form renders only after
@@ -184,8 +186,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   // A first read the online manager paused (see isReadPausedBeforeData): the
   // loading gate would hold the skeleton until connectivity returns. Name
   // the connection and offer Retry for each read the form waits on.
-  const findingPaused = isReadPausedBeforeData(findingQuery);
-  const capabilityPaused = isReadPausedBeforeData(capability);
+  const findingPaused = isReadPausedBeforeData({ ...findingQuery, connectivity });
+  const capabilityPaused = isReadPausedBeforeData({ ...capability, connectivity });
   if (findingPaused || capabilityPaused) {
     return (
       <DismissFindingLoadFailure

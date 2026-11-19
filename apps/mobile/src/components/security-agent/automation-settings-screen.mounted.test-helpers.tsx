@@ -78,8 +78,11 @@ vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
     dialog: null,
   }),
 }));
+const connectivity = vi.hoisted(() => ({
+  committed: 'online' as 'online' | 'offline' | 'unknown',
+}));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => connectivity.committed,
 }));
 vi.mock('@/components/security-agent/settings-pill-group', () => ({
   PillGroup: (props: { label: string; accessibilityLabel?: string }) => {
@@ -129,6 +132,7 @@ vi.mock('@/components/tab-screen', () => ({
 export {
   capability,
   config,
+  connectivity,
   pillGroups,
   platformError,
   save,

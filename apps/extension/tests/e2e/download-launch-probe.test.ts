@@ -1,10 +1,9 @@
-/* eslint-disable import/no-nodejs-modules, promise/avoid-new, vitest/no-conditional-in-test -- the probe writes an unpacked extension, reads events the browser recorded, and asserts both branches */
+/* eslint-disable import/no-nodejs-modules, max-lines, promise/avoid-new -- the probe writes an unpacked extension and reads the events its worker recorded */
 import { chromium, expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page, Worker } from '@playwright/test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { z } from 'zod';
 import { DOWNLOAD_PATH, startDownloadFixture } from './download-fixture';
 import {
   downloadFiles,
@@ -16,11 +15,13 @@ import {
  * The guard's primitive is `chrome.downloads.onDeterminingFilename`, and this
  * probe proves the harness dispatches it at all.
  *
- * It loads a test-only extension that does nothing but listen: one manifest, one
- * service worker, and a listener that records each item into
- * `chrome.storage.session` and then calls `suggest()` at once, so the download
- * proceeds under its own name. The probe starts a real download and asserts the
- * record exists.
+ * It loads a test-only extension and arms the listener inside the extension's
+ * own running worker, then starts a real download and asserts the item was
+ * recorded. Arming through the worker is what makes the probe deterministic: an
+ * MV3 worker is suspended when idle, so a listener registered only by the
+ * top-level script is not guaranteed to exist when the download is created.
+ * Playwright holds a debugger attachment on the worker, which keeps it running —
+ * so `worker.evaluate` both registers the listener and proves the worker is up.
  *
  * The same probe MUST fail under Playwright's `launchPersistentContext`. That
  * launch sends `Browser.setDownloadBehavior` with `allowAndName`, which installs
@@ -29,9 +30,6 @@ import {
  * premise a test rather than a comment, so a future Playwright change cannot
  * silently turn the download specs into tests of nothing.
  */
-
-/** The storage key the probe extension records items under. */
-const PROBE_STORAGE_KEY = 'determiningFilenameItems';
 
 const PROBE_MANIFEST = {
   action: { default_title: 'Download event probe' },
@@ -44,28 +42,10 @@ const PROBE_MANIFEST = {
 };
 
 /**
- * The listener records the item and answers at once, so the download proceeds
- * under its own name. `onConnect` is what holds the worker open: an MV3 worker
- * is suspended when idle, and Chrome creates the download's event router only
- * when a listener exists at that moment. A connected port keeps it alive
- * between the page's load and the download.
+ * The worker's own script: nothing but the array the probe records into. The
+ * listener is added by the test, once the worker is known to be running.
  */
-const PROBE_SERVICE_WORKER = `
-chrome.runtime.onConnect.addListener(port => {
-  if (port.name === 'probe') {
-    port.postMessage({ registered: true });
-  }
-});
-chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
-  chrome.storage.session.set({
-    ${PROBE_STORAGE_KEY}: { finalUrl: item.finalUrl, id: item.id, url: item.url },
-  });
-  suggest();
-});
-`;
-
-const PROBE_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>Probe</title></head>
-<body><p>Probe extension page.</p></body></html>`;
+const PROBE_SERVICE_WORKER = 'globalThis.__probeDeterminingItems = [];\n';
 
 /** Writes the probe extension into a fresh directory. */
 const writeProbeExtension = async (): Promise<string> => {
@@ -73,55 +53,77 @@ const writeProbeExtension = async (): Promise<string> => {
 
   await writeFile(join(directory, 'manifest.json'), JSON.stringify(PROBE_MANIFEST));
   await writeFile(join(directory, 'sw.js'), PROBE_SERVICE_WORKER);
-  await writeFile(join(directory, 'probe.html'), PROBE_PAGE);
 
   return directory;
 };
 
-/** The recorded item, read from the probe's own page: null means the event never fired. */
-const recordedItem = (page: Page): Promise<Record<string, unknown> | null> =>
-  page.evaluate(
-    storageKey =>
-      new Promise<Record<string, unknown> | null>((resolve, reject) => {
-        const chromeApi = (
-          globalThis as typeof globalThis & {
-            chrome?: {
-              runtime?: { lastError?: { message?: string } };
-              storage?: {
-                session?: {
-                  get: (keys: string[], callback: (items: Record<string, unknown>) => void) => void;
-                };
-              };
-            };
-          }
-        ).chrome;
-        const storage = chromeApi?.storage?.session;
+/** The extension's own worker, once Playwright has attached to it. */
+const waitForProbeWorker = async (
+  context: BrowserContext,
+  extensionId: string
+): Promise<Worker> => {
+  await expect.poll(() => hasProbeWorker(context, extensionId), { timeout: 20_000 }).toBe(true);
 
-        if (chromeApi === undefined || storage === undefined) {
-          reject(new Error('chrome.storage.session is unavailable in the probe page.'));
-          return;
-        }
+  const worker = context
+    .serviceWorkers()
+    .find(candidate => new URL(candidate.url()).host === extensionId);
 
-        storage.get([storageKey], items => {
-          const message = chromeApi.runtime?.lastError?.message;
+  if (worker === undefined) {
+    throw new Error(`the service worker of ${extensionId} disappeared`);
+  }
 
-          if (message !== undefined && message !== '') {
-            reject(new Error(message));
-            return;
-          }
+  return worker;
+};
 
-          const value = items[storageKey];
+const hasProbeWorker = (context: BrowserContext, extensionId: string): boolean =>
+  context.serviceWorkers().some(candidate => new URL(candidate.url()).host === extensionId);
 
-          if (typeof value !== 'object' || value === null) {
-            resolve(null);
-            return;
-          }
+/**
+ * Registers the listener inside the running worker. The download to be observed
+ * is started only after this resolves, so the event router exists before the
+ * download does.
+ */
+const armDownloadProbe = (worker: Worker): Promise<void> =>
+  worker.evaluate(() => {
+    const scope = globalThis as typeof globalThis & {
+      __probeDeterminingItems?: Record<string, unknown>[];
+      chrome?: {
+        downloads?: {
+          onDeterminingFilename?: {
+            addListener: (
+              listener: (item: Record<string, unknown>, suggest: () => void) => void
+            ) => void;
+          };
+        };
+      };
+    };
+    const items: Record<string, unknown>[] = [];
 
-          resolve(z.record(z.string(), z.unknown()).parse(value));
-        });
-      }),
-    PROBE_STORAGE_KEY
-  );
+    scope.__probeDeterminingItems = items;
+    scope.chrome?.downloads?.onDeterminingFilename?.addListener((item, suggest) => {
+      items.push({ finalUrl: item['finalUrl'], id: item['id'], url: item['url'] });
+      // Answering at once keeps Chrome's own filename, so the file lands as the page named it.
+      suggest();
+    });
+  });
+
+/** The items the armed listener recorded. */
+const recordedItems = (worker: Worker): Promise<Record<string, unknown>[]> =>
+  worker.evaluate(() => {
+    const scope = globalThis as typeof globalThis & {
+      __probeDeterminingItems?: Record<string, unknown>[];
+    };
+
+    return scope.__probeDeterminingItems ?? [];
+  });
+
+/** Starts the fixture's attachment from a plain page: a download a user's Chrome would create. */
+const startDownload = async (context: BrowserContext, fixtureUrl: string): Promise<void> => {
+  const page: Page = await context.newPage();
+
+  // A navigation to an attachment never loads a document: the browser answers with a download, so the load error is the download.
+  await page.goto(`${fixtureUrl}${DOWNLOAD_PATH}`).catch(() => null);
+};
 
 test('the real launch dispatches onDeterminingFilename for a download', async () => {
   test.setTimeout(120_000);
@@ -130,33 +132,15 @@ test('the real launch dispatches onDeterminingFilename for a download', async ()
   const launch = await launchRealDownloadBrowser({ extensionPath: probeExtension });
 
   try {
-    const probePage = await launch.context.newPage();
+    const worker = await waitForProbeWorker(launch.context, extensionIdFromPath(probeExtension));
 
-    await probePage.goto(`chrome-extension://${launch.extensionId}/probe.html`);
-
-    // The worker registers the listener at top level and is suspended when idle, so the page holds a
-    // port open across the download. The port answers only once the top-level script ran, which is the
-    // moment the listener exists: the wake and the registration are the same event.
-    await probePage.evaluate(
-      () =>
-        new Promise<void>(resolve => {
-          const port = chrome.runtime.connect({ name: 'probe' });
-
-          port.onMessage.addListener(() => {
-            resolve();
-          });
-        })
-    );
-
-    const page = await launch.context.newPage();
-
-    // A navigation to an attachment never loads a document: the browser answers with a download, so the load error is the download.
-    await page.goto(`${fixture.url}${DOWNLOAD_PATH}`).catch(() => null);
+    await armDownloadProbe(worker);
+    await startDownload(launch.context, fixture.url);
 
     await expect
-      .poll(() => recordedItem(probePage), { timeout: 20_000 })
-      .toMatchObject({ url: expect.stringContaining(DOWNLOAD_PATH) });
-    // The listener answered suggest() at once, so the file lands under its own name.
+      .poll(() => recordedItems(worker), { timeout: 20_000 })
+      .toMatchObject([{ url: expect.stringContaining(DOWNLOAD_PATH) }]);
+    // The listener answered suggest() at once, so the file lands under its own name in the profile's folder.
     await expect
       .poll(() => downloadFiles(launch.downloadsPath), { timeout: 20_000 })
       .toHaveLength(1);
@@ -164,7 +148,7 @@ test('the real launch dispatches onDeterminingFilename for a download', async ()
   } finally {
     await launch.close();
     await fixture.close();
-    await rm(probeExtension, { force: true, recursive: true });
+    await rm(probeExtension, { force: true, maxRetries: 5, recursive: true, retryDelay: 100 });
   }
 });
 
@@ -181,24 +165,21 @@ test('Playwright launchPersistentContext never dispatches onDeterminingFilename'
   });
 
   try {
-    // The probe extension's own path fixes its id, so no worker scan is needed to open its page.
-    const probePage = await context.newPage();
+    const worker = await waitForProbeWorker(context, extensionIdFromPath(probeExtension));
 
-    await probePage.goto(`chrome-extension://${extensionIdFromPath(probeExtension)}/probe.html`);
-
-    const page = await context.newPage();
-
-    await page.goto(`${fixture.url}${DOWNLOAD_PATH}`).catch(() => null);
+    // The same arming path as the positive test: only the launch differs, so the assertion is about the launch.
+    await armDownloadProbe(worker);
+    await startDownload(context, fixture.url);
 
     // The delegate wrote the file, so the download happened…
     await expect.poll(() => downloadFiles(downloadsPath), { timeout: 20_000 }).toHaveLength(1);
     // …and the event never reached the extension, which is why the download specs cannot run on this launch.
-    expect(await recordedItem(probePage)).toBeNull();
+    expect(await recordedItems(worker)).toStrictEqual([]);
   } finally {
     await context.close();
     await fixture.close();
-    await rm(userDataDir, { force: true, recursive: true });
-    await rm(downloadsPath, { force: true, recursive: true });
-    await rm(probeExtension, { force: true, recursive: true });
+    await rm(userDataDir, { force: true, maxRetries: 5, recursive: true, retryDelay: 100 });
+    await rm(downloadsPath, { force: true, maxRetries: 5, recursive: true, retryDelay: 100 });
+    await rm(probeExtension, { force: true, maxRetries: 5, recursive: true, retryDelay: 100 });
   }
 });

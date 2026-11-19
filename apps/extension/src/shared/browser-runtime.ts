@@ -3288,8 +3288,16 @@ export const createBrowserRuntime = ({
 
         // A download is not a document, so a navigate that became one never moved the tab.
         // An opaque or older origin there is the file's answer, not the redirect this check looks for.
-        if (preflight !== undefined && preflight.class === 'navigate' && keptText === undefined) {
-          const changed = await postAgentNavigate(runSession, preflight.origin);
+        if (
+          agentContext !== undefined &&
+          preflight?.class === 'navigate' &&
+          keptText === undefined
+        ) {
+          const changed = await postAgentNavigate(
+            runSession,
+            preflight.origin,
+            agentContext.authorized
+          );
 
           if (changed !== undefined) {
             return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };

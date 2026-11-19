@@ -653,6 +653,30 @@ describe('agent browser calls', () => {
     expect(originChangedResultOf(outcome)).toBeDefined();
   });
 
+  it('completes a redirect that lands on an origin the call was granted', async () => {
+    const { cdp, runtime } = await createHarness();
+    const destination = 'https://other.example.com';
+
+    cdp.setFrameUrl('https://accounts.example.org/login');
+
+    const outcome = await runtime.runTool({
+      agent: {
+        authorized: [
+          readGrant,
+          actGrant,
+          { class: 'navigate', origin: destination },
+          { class: 'read', origin: 'https://accounts.example.org' },
+        ],
+      },
+      arguments: { url: `${destination}/home` },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    expect(outcome.kind).toBe('result');
+  });
+
   it('needs a step token for a password field and accepts the retry that carries it', async () => {
     const { cdp, runtime } = await createHarness();
 

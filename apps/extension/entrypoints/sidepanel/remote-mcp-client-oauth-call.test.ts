@@ -1,5 +1,7 @@
 /* eslint-disable max-classes-per-file */
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
+// Static despite the vi.mock below: vitest applies the mock before these bindings are used.
+import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { describe, expect, it, vi } from 'vitest';
 import type { RemoteMcpServer } from '../../src/shared/remote-mcp';
 import { loadRemoteMcpStore } from '../../src/shared/remote-mcp-storage';
@@ -54,7 +56,18 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => {
   }
   return {
     StreamableHTTPClientTransport,
-    StreamableHTTPError: class StreamableHTTPError extends Error {},
+    StreamableHTTPError: class MockStreamableHTTPError extends Error {
+      readonly code: number | undefined;
+
+      constructor(
+        code: number | undefined,
+        message: string,
+        options?: { readonly cause?: unknown }
+      ) {
+        super(message, options);
+        this.code = code;
+      }
+    },
   };
 });
 
@@ -172,5 +185,27 @@ describe('remote MCP tool call against an OAuth server', () => {
 
     const stored = await loadRemoteMcpStore(storage);
     expect(stored.servers.find(server => server.id === 'srv-1')?.status).toBe('connected');
+  });
+
+  it('records needs_auth when connect rejects with a 401 transport error', async () => {
+    mocks.launchWebAuthFlow.mockReset();
+    mocks.close.mockResolvedValue();
+    mocks.callTool.mockReset();
+    mocks.connect.mockRejectedValueOnce(new StreamableHTTPError(401, 'Unauthorized'));
+    const storage = createStorage([oauthServer]);
+
+    const result = await callRemoteMcpTool({
+      arguments: {},
+      fetch: noopFetch,
+      route,
+      server: oauthServer,
+      storageArea: storage,
+    });
+
+    expect(result).toMatchObject({ isError: true });
+    expect(JSON.stringify(result)).toContain('This server needs credentials.');
+
+    const stored = await loadRemoteMcpStore(storage);
+    expect(stored.servers.find(server => server.id === 'srv-1')?.status).toBe('needs_auth');
   });
 });

@@ -77,6 +77,7 @@ function fakeRuntime(client: Harness): KiloRuntime {
     isSuspected: () => false,
     isRestarting: () => false,
     isUnavailable: () => false,
+    serverPort: () => undefined,
     shutdown: async () => undefined,
   };
 }
@@ -98,6 +99,7 @@ function fakeRuntimes(runtime: KiloRuntime | undefined): KiloRuntimes {
       unavailableCount: 0,
     }),
     runtimesForDirectory: () => (runtime ? [runtime] : []),
+    serverPorts: () => [],
     async retireDirectory() {},
     async shutdown() {},
   };

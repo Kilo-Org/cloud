@@ -122,7 +122,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/detail-screen', () => ({
   DetailScreenScrollView: 'DetailScreenScrollView',
 }));

@@ -46,6 +46,47 @@ export const cloudAgentSessionRaiseShape = {
   prUrl: nonEmptyStringSchema.optional(),
 };
 
+// One followed session's Android ongoing notification
+// (`.specs/mobile-session-live-activity.md` "Android"). A high-priority
+// data-only message to the device that follows the session; the app
+// renders, updates, or cancels the notification from `content`. Only a
+// device that registered an `android_session_ongoing` row receives it, and
+// `schemaVersion` gates a later shape: a client that does not know the
+// version ignores the message.
+const sessionLiveUpdateShape = {
+  type: z.literal('session_live_update'),
+  schemaVersion: z.literal(1),
+  event: z.enum(['update', 'end']),
+  content: sessionLiveActivityContentStateSchema,
+  /**
+   * Only on an end: how long a finished notification stays in the shade.
+   * 0 removes it at once (the session is gone or out of scope).
+   */
+  dismissAfterMs: z.number().int().min(0).optional(),
+};
+
+/** The shape's own type, so the refinement below reads the event vocabulary from the enum. */
+const sessionLiveUpdateSchema = z.object(sessionLiveUpdateShape);
+
+/**
+ * Only an end carries `dismissAfterMs`. An update keeps the ongoing
+ * notification, so a duration on one has nothing to act on; a value there
+ * means a producer built the wrong event and the client would silently drop
+ * the field.
+ */
+function refineSessionLiveUpdate(
+  data: z.infer<typeof sessionLiveUpdateSchema>,
+  ctx: z.RefinementCtx
+): void {
+  if (data.dismissAfterMs !== undefined && data.event !== 'end') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['dismissAfterMs'],
+      message: 'only an end carries dismissAfterMs',
+    });
+  }
+}
+
 /**
  * Schema for the `data` blob attached to Expo push notifications.
  * This crosses the OS boundary as untyped JSON, so it MUST be
@@ -115,24 +156,9 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     type: z.literal('active_agents_glanceable'),
     homeWidgetDetails: homeWidgetDetailsSchema.optional(),
   }),
-  // One followed session's Android ongoing notification
-  // (`.specs/mobile-session-live-activity.md` "Android"). A high-priority
-  // data-only message to the device that follows the session; the app
-  // renders, updates, or cancels the notification from `content`. Only a
-  // device that registered an `android_session_ongoing` row receives it, and
-  // `schemaVersion` gates a later shape: a client that does not know the
-  // version ignores the message.
-  z.object({
-    type: z.literal('session_live_update'),
-    schemaVersion: z.literal(1),
-    event: z.enum(['update', 'end']),
-    content: sessionLiveActivityContentStateSchema,
-    /**
-     * Only on an end: how long a finished notification stays in the shade.
-     * 0 removes it at once (the session is gone or out of scope).
-     */
-    dismissAfterMs: z.number().int().min(0).optional(),
-  }),
+  // One followed session's Android ongoing notification; see
+  // `sessionLiveUpdateShape` above.
+  z.object(sessionLiveUpdateShape).superRefine(refineSessionLiveUpdate),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;

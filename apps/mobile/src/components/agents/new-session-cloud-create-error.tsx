@@ -27,7 +27,7 @@ export function NewSessionCloudCreateError({
 }: Readonly<NewSessionCloudCreateErrorProps>) {
   const { t } = useTranslation();
   return (
-    <View className="mt-5 gap-2">
+    <View className="gap-2">
       <AccessibleStatus
         message={t('agentChat.newSession.failedToCreate')}
         tone="error"

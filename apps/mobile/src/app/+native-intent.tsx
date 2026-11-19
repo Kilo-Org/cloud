@@ -1,5 +1,6 @@
 import { getShareExtensionKey } from 'expo-share-intent';
 
+import { agentChatPickerFixtureRoute } from '@/lib/agent-chat-picker-fixture';
 import { handleAppActionPath } from '@/lib/app-actions/action-url-handler';
 import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
@@ -7,6 +8,7 @@ import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
+import { loginFixtureRoute } from '@/lib/login-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
 import { handleOrganizationInviteMemberFixturePath } from '@/lib/organization-invite-member-fixture';
 import { handlePrReviewCopyFixturePath } from '@/lib/pr-review/pr-review-copy-fixture-route';
@@ -62,6 +64,23 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     const instancePickerRoute = instancePickerFixtureRoute(path);
     if (instancePickerRoute) {
       return instancePickerRoute;
+    }
+    // Dev-only branch, folder, mode and repository sheets, opened with the
+    // bridge the composer writes (`dev/<picker>-picker-fixture/<state>`).
+    const agentChatPickerRoute = agentChatPickerFixtureRoute(path);
+    if (agentChatPickerRoute) {
+      return agentChatPickerRoute;
+    }
+    // Dev-only sign-in states (`dev/login-fixture/<state>`): a screen of its own
+    // that writes the resumed sign-in record before the sign-in screen mounts.
+    const loginFixture = loginFixtureRoute(path);
+    if (loginFixture) {
+      return loginFixture;
+    }
+    // Dev-only chat conversation in a fixed state (`dev/chat-fixture/<state>`).
+    const chatFixture = /(?:^|\/)dev\/chat-fixture\/([a-z]+)\/?(?:[?#].*)?$/.exec(path);
+    if (chatFixture) {
+      return `/(app)/chat-fixture?state=${chatFixture[1]}`;
     }
     // Dev-only: open a Security Agent screen as its group's only route
     // (`kiloapp:///dev/security-agent-single-route-fixture/<scope>/<route…>`).
@@ -205,8 +224,17 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (fixtureRoute) {
       return fixtureRoute;
     }
-    if (/(?:^|\/)dev\/organization-invoices-fixture\/?(?:[?#].*)?$/.test(path)) {
-      return '/(app)/(tabs)/(3_profile)/organization/invoices-fixture';
+    // Dev-only organization invoices screen against fixed Stripe answers
+    // (`dev/organization-invoices-fixture/<listed|empty|error>`): the list is a
+    // Stripe read a local stack cannot serve, so every capture state routes
+    // here. A link without a state opens the listed page.
+    const organizationInvoicesFixture =
+      /(?:^|\/)dev\/organization-invoices-fixture(?:\/(listed|empty|error))?\/?(?:[?#].*)?$/.exec(
+        path
+      );
+    if (organizationInvoicesFixture) {
+      const state = organizationInvoicesFixture[1] ?? 'listed';
+      return `/(app)/(tabs)/(3_profile)/organization/invoices-fixture?state=${state}`;
     }
     // Dev-only personal invoices screen against fixed Stripe answers
     // (`dev/personal-invoices-fixture/<listed|empty|error>`): the personal list

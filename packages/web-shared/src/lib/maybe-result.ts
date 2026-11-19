@@ -50,11 +50,9 @@ export function assertNoTrpcError<TOk>(result: Result<TOk, TRPCError>): SuccessR
 }
 export function assertNoError<TOk, TErr>(result: CustomResult<TOk, TErr>): SuccessResult<TOk> {
   if (result.success) return result;
-  throw result instanceof Error
-    ? result
-    : 'error' in result && result.error instanceof Error
-      ? result.error
-      : new Error('Not OK:' + serializeError(result));
+  throw 'error' in result && result.error instanceof Error
+    ? result.error
+    : new Error('Not OK:' + serializeError(result));
 }
 
 function serializeError(error: unknown) {

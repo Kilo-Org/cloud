@@ -12,6 +12,7 @@ import type { BrowserToolRefEntry, BrowserToolSession } from './browser-tool-ses
 export type BrowserToolPageSession = Pick<
   BrowserToolSession,
   | 'attach'
+  | 'captureViewportImage'
   | 'consoleMessages'
   | 'networkRequestsSinceLoad'
   | 'registerRefs'
@@ -604,7 +605,8 @@ const captureDomAriaSnapshot = async (
   return { lines, refs, truncated: parsed.data.truncated === true };
 };
 
-const resolveTargetBackendNodeId = async (
+/** Resolves a snapshot target to its CDP backend node id (a ref already carries it). */
+export const resolveTargetBackendNodeId = async (
   session: BrowserToolPageSession,
   target: string
 ): Promise<number> => {

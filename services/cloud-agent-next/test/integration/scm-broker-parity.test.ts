@@ -59,7 +59,8 @@ async function harness(
   purpose: 'gitlab' | 'bitbucket',
   provider: 'vercel' | 'cloudflare-containers',
   egressAllowlist?: string[],
-  gitlabOrigin = 'https://gitlab.example'
+  gitlabOrigin = 'https://gitlab.example',
+  gitlabMembers: string[] = []
 ) {
   const binding = `synthetic-${provider}-allocation`;
   const service = new GitTokenRPCEntrypoint(createExecutionContext(), {
@@ -105,31 +106,44 @@ async function harness(
       : { success: false, reason: 'not_connected' }
   );
   const gitlabCodec = new GitLabSessionCapabilityCodec(KEY);
-  const issueGitLab = vi.fn(async (params: { outboundContainerId: string }) => ({
-    success: true,
-    capability: gitlabCodec.issue({
+  // The project of each issued GitLab capability, and of each one presented for redemption.
+  const capabilityProjects = new Map<string, string>();
+  const redeemedProjects: Array<string | undefined> = [];
+  const issueGitLab = vi.fn(async (params: { outboundContainerId: string; gitUrl: string }) => {
+    const projectPath = new URL(params.gitUrl).pathname.slice(1).replace(/\.git$/, '');
+    const capability = gitlabCodec.issue({
       userId: 'synthetic-user',
       orgId: ORG,
       integrationId: INTEGRATION,
       outboundContainerId: params.outboundContainerId,
       instanceOrigin: gitlabOrigin,
-      projectPath: 'acme/widgets',
+      projectPath,
       authType: 'oauth',
       identity,
       source: { type: 'integration', credentialId: CREDENTIAL, credentialVersion: 1 },
-    }),
-    instanceOrigin: gitlabOrigin,
-    instanceHost: new URL(gitlabOrigin).host,
-    projectPath: 'acme/widgets',
-    integrationId: INTEGRATION,
-    authType: 'oauth',
-    identity,
-    glabIsOAuth2: true,
-  }));
+    });
+    capabilityProjects.set(capability, projectPath);
+    return {
+      success: true,
+      capability,
+      instanceOrigin: gitlabOrigin,
+      instanceHost: new URL(gitlabOrigin).host,
+      projectPath,
+      integrationId: INTEGRATION,
+      authType: 'oauth',
+      identity,
+      glabIsOAuth2: true,
+    };
+  });
   const broker = {
     issueGitLabSessionCapability: issueGitLab,
     issueBitbucketSessionCapability: service.issueBitbucketSessionCapability.bind(service),
-    redeemGitLabSessionCapability: service.redeemGitLabSessionCapability.bind(service),
+    redeemGitLabSessionCapability: (
+      params: Parameters<GitTokenRPCEntrypoint['redeemGitLabSessionCapability']>[0]
+    ) => {
+      redeemedProjects.push(capabilityProjects.get(params.capability));
+      return service.redeemGitLabSessionCapability(params);
+    },
     redeemBitbucketSessionCapability: service.redeemBitbucketSessionCapability.bind(service),
   };
   const env = {
@@ -139,9 +153,17 @@ async function harness(
     KILO_OPENROUTER_BASE: 'https://api.kilo.ai',
     KILO_SESSION_INGEST_URL: 'https://ingest.kilosessions.ai',
   } as Env;
+  const memberRepository = (projectPath: string) => ({
+    identity: { platform: 'gitlab' as const, cloneUrl: `${gitlabOrigin}/${projectPath}.git` },
+    repoFullName: projectPath,
+    leaf: projectPath.slice(projectPath.lastIndexOf('/') + 1),
+  });
   const prepared = await prepareCredentialGrant({
     env,
     provider,
+    ...(gitlabMembers.length > 0
+      ? { environment: { repositories: ['acme/widgets', ...gitlabMembers].map(memberRepository) } }
+      : {}),
     sandboxId: SANDBOX,
     outboundContainerId: binding,
     containmentEnabled: true,
@@ -317,7 +339,7 @@ async function harness(
       },
     } as unknown as Env);
   }
-  return { send, upstreamRequests, current };
+  return { send, upstreamRequests, redeemedProjects, current };
 }
 
 describe.each([
@@ -391,6 +413,33 @@ describe.each([
       f.current.identity = { accountId: 'synthetic-account', accountLogin: 'synthetic-login' };
       f.current.version = 2;
       expect((await f.send(`${origin}/api/v4/projects/acme%2Fwidgets/issues`)).status).toBe(502);
+    });
+
+    it('gives each GitLab member its own capability and a non-member none', async () => {
+      const f = await harness('gitlab', provider, egressAllowlist, undefined, ['acme/gadgets']);
+      for (const project of ['acme/widgets', 'acme/gadgets']) {
+        for (const [method, path] of [
+          ['GET', `/${project}.git/info/refs?service=git-upload-pack`],
+          ['POST', `/${project}.git/git-receive-pack`],
+          ['POST', `/${project}.git/info/lfs/objects/batch`],
+          ['POST', `/api/v4/projects/${encodeURIComponent(project)}/merge_requests`],
+        ]) {
+          const upstream = f.upstreamRequests.length;
+          const redeemed = f.redeemedProjects.length;
+          expect((await f.send(`https://gitlab.example${path}`, method)).status).toBe(307);
+          expect(f.upstreamRequests.length).toBe(upstream + 1);
+          // Only the capability of the repository that the path names was presented.
+          expect(f.redeemedProjects.slice(redeemed)).toEqual([project]);
+        }
+      }
+      for (const path of [
+        '/acme/other.git/git-upload-pack',
+        '/api/v4/projects/acme%2Fother/issues',
+      ]) {
+        const upstream = f.upstreamRequests.length;
+        expect((await f.send(`https://gitlab.example${path}`)).status).toBe(502);
+        expect(f.upstreamRequests.length).toBe(upstream);
+      }
     });
 
     if (egressAllowlist) {

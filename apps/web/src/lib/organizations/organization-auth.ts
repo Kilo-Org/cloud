@@ -34,6 +34,18 @@ import z from 'zod';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
 
+/**
+ * The caller-facing surface and the support-allowlist surface share one
+ * vocabulary today, but they are separate declarations. `Record` makes a new
+ * `AdminAccessSurface` member a typecheck error here until it is mapped, so an
+ * audit surface can never reach the allowlist lookup unchecked.
+ */
+const SUPPORT_SURFACE_BY_ADMIN_SURFACE: Record<AdminAccessSurface, SupportSurface> = {
+  rest: 'rest',
+  trpc: 'trpc',
+  'server-component': 'server-component',
+};
+
 type UserWithRole = User & {
   readonly role: OrganizationRole;
 };
@@ -68,9 +80,9 @@ export async function getAuthorizedOrgContext(
     // due to the way next module loading works
     getUserFromAuthOverride?: typeof getUserFromAuth;
     /**
-     * How this helper was reached, for the audit event its admin branch emits.
-     * Defaults to `'rest'`; server-component pages and layouts pass
-     * `'server-component'`.
+     * How this helper was reached. Defaults to `'rest'`; server-component pages
+     * and layouts pass `'server-component'`. It labels the audit event the admin
+     * branch emits and selects the surface the support-allowlist lookup matches.
      */
     surface?: AdminAccessSurface;
     /** The actual Request method when the caller has one. */
@@ -85,6 +97,8 @@ export async function getAuthorizedOrgContext(
   } = {}
 ): Promise<DataOrNextError<AuthorizedOrgData>> {
   const { getUserFromAuthOverride, surface, requestMethod } = options;
+  const auditSurface = surface ?? 'rest';
+  const supportSurface = SUPPORT_SURFACE_BY_ADMIN_SURFACE[auditSurface];
   const getUserFromAuthFn =
     process.env.NODE_ENV === 'test' && getUserFromAuthOverride
       ? getUserFromAuthOverride
@@ -125,7 +139,7 @@ export async function getAuthorizedOrgContext(
         tokenSource,
         internalApiUse,
         delegatedWorkload: cloudAgentAuthority !== undefined,
-        auditSurface: surface ?? 'rest',
+        auditSurface,
         auditMethod: requestMethod,
       },
       {
@@ -187,14 +201,14 @@ export async function getAuthorizedOrgContext(
         tokenSource,
         internalApiUse,
         trpcType: requestMethod,
-        auditSurface: surface ?? 'rest',
+        auditSurface,
         auditMethod: requestMethod,
         delegatedWorkload: cloudAgentAuthority !== undefined,
       },
       organizationId,
       {
         roles,
-        surface: (surface ?? 'rest') as SupportSurface,
+        surface: supportSurface,
         supportKey: options.supportKey ?? null,
         requiredActionClass: options.requiredActionClass,
         auditReason: 'organization_access_rest',
@@ -236,7 +250,7 @@ export async function getAuthorizedOrgContext(
 
   return successResult({
     data: {
-      user: { ...user, role: roleForAccess(access, surface, options.supportKey) },
+      user: { ...user, role: roleForAccess(access, supportSurface, options.supportKey) },
       organization,
       access,
     },
@@ -252,7 +266,7 @@ function supportAccessReasonFromError(error: TRPCError): SupportAccessReason | n
 
 function roleForAccess(
   access: OrganizationAccess,
-  surface: AdminAccessSurface | undefined,
+  surface: SupportSurface,
   supportKey: string | null | undefined
 ): OrganizationRole {
   if (access.kind === 'member' || access.kind === 'legacy_admin') return access.role;
@@ -260,7 +274,7 @@ function roleForAccess(
     supportKey === null || supportKey === undefined
       ? undefined
       : findSupportAllowEntry({
-          surface: (surface ?? 'rest') as SupportSurface,
+          surface,
           key: supportKey,
           actionClass: access.actionClass,
         });

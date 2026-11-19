@@ -24,6 +24,7 @@ import {
   isOrganizationAutoTargetModel,
   isOrganizationCustomRouterTarget,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { modeSlugFromName } from '@kilocode/app-shared/organizations';
 
 const availableGroups = [
   { value: 'read', label: 'Read Files' },
@@ -249,16 +250,19 @@ export function ModeForm({
     editGroupConfig.fileRegex !== initialEditConfig.fileRegex ||
     editGroupConfig.description !== initialEditConfig.description;
 
+  // The modes list can arrive or refetch after the drawer opens, and both the
+  // default `[]` and the caller's list are a fresh array on every render, so the
+  // effect keys on the joined slugs rather than the array identity. Slugs hold
+  // only `a-z`, `0-9` and `-`, so the comma never splits one.
+  const takenSlugsKey = existingModes.map(existing => existing.slug).join(',');
+
   // Auto-generate slug from name for new modes
   useEffect(() => {
     if (!mode && formData.name) {
-      const slug = formData.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      setFormData(prev => ({ ...prev, slug }));
+      const takenSlugs = takenSlugsKey.length > 0 ? takenSlugsKey.split(',') : [];
+      setFormData(prev => ({ ...prev, slug: modeSlugFromName(formData.name, takenSlugs) }));
     }
-  }, [formData.name, mode]);
+  }, [formData.name, mode, takenSlugsKey]);
 
   const handleGroupToggle = (group: string) => {
     setSelectedGroups(prev =>

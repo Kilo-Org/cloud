@@ -27,6 +27,16 @@ export const backgroundResultSchema = z.discriminatedUnion('kind', [
 ]);
 export type BackgroundResult = z.infer<typeof backgroundResultSchema>;
 
+// `satisfies Record<BackgroundResult['kind'], string>` turns a new union kind into a
+// compile error until it names its wire tool; these are the wire values the reader accepts.
+const BACKGROUND_RESULT_TOOL_NAMES = {
+  shell: 'background_shell_result',
+  subagent: 'background_subagent_result',
+  notice: 'agent_notice',
+} satisfies Record<BackgroundResult['kind'], string>;
+
+const BACKGROUND_RESULT_TOOLS = new Set<string>(Object.values(BACKGROUND_RESULT_TOOL_NAMES));
+
 export function backgroundOutcome(
   input:
     | { kind: 'shell'; state: string; exit?: number | undefined }
@@ -50,10 +60,7 @@ export function backgroundResultLabel(result: BackgroundResult): string {
 }
 
 export function readBackgroundResult(part: ToolPart): BackgroundResult | undefined {
-  if (
-    !['background_shell_result', 'background_subagent_result', 'agent_notice'].includes(part.tool)
-  )
-    return;
+  if (!BACKGROUND_RESULT_TOOLS.has(part.tool)) return;
   if (part.state.status === 'pending') return;
   const parsed = backgroundResultSchema.safeParse(part.state.metadata?.['backgroundResult']);
   return parsed.success ? parsed.data : undefined;
@@ -72,7 +79,7 @@ export function projectBackgroundResult(
       {
         type: 'tool',
         id: message.id,
-        name: result.kind === 'notice' ? 'agent_notice' : `background_${result.kind}_result`,
+        name: BACKGROUND_RESULT_TOOL_NAMES[result.kind],
         time: { created: message.time.created, completed: message.time.created },
         state: {
           input: {},

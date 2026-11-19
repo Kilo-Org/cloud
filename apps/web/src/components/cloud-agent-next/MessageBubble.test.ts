@@ -1,6 +1,6 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { AssistantMessage } from '@/types/opencode.gen';
+import type { AssistantMessage } from '@/types/opencode';
 import type { StoredMessage } from './types';
 import { WORKTREE_REVIEW_PROMPT_INTRO, type WorktreeReviewComment } from './worktree-review';
 import {

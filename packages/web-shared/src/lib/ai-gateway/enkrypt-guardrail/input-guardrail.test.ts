@@ -188,6 +188,14 @@ function allowWrites(keys: string[], ttlSeconds = ENKRYPT_VERDICT_CACHE_TTL_SECO
   return keys.map(key => [key, 'allow', { ex: ttlSeconds, nx: true }]);
 }
 
+const noCallOutcomes = { allowed: 0, flagged: 0, blocked: 0, failed: 0, not_sent: 0 };
+
+/** The call breakdown of a part whose one call allowed, and whose verdict is cached. */
+const allowedCall = {
+  calls_cached: 1,
+  call_outcomes: { ...noCallOutcomes, allowed: 1 },
+} satisfies Partial<EnkryptScanReport>;
+
 const scanReport: EnkryptScanReport = {
   scan: 'blocking',
   part: 'conversation',
@@ -248,6 +256,7 @@ function call(overrides: Partial<EnkryptGuardrailCall> = {}): EnkryptGuardrailCa
     creditsCost: 3,
     scannedCharacters: 2_400,
     totalCharacters: 10_000,
+    addedLatencyMs: 120,
     ...overrides,
   };
 }
@@ -362,6 +371,88 @@ describe('startEnkryptInputGuardrail', () => {
     ]);
   });
 
+  it("writes each call's verdict once, as soon as the call finishes", async () => {
+    const writesAtCall: number[] = [];
+    mockedScanRequest.mockImplementation(async resolved => {
+      writesAtCall.push(mockedRedisSet.mock.calls.length);
+      return {
+        verdict: { action: 'allow' },
+        report: { ...scanReport, part: partOf(resolved) },
+        usageRecords: [call()],
+      };
+    });
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(partsScan), signal);
+    await guardrail.report();
+    await runAfterTasks();
+
+    expect(writesAtCall).toEqual([0, 1, 2]);
+    expect(mockedRedisSet.mock.calls).toEqual(
+      allowWrites([
+        ...partKeys(partsScan),
+        ...partKeys(partsScan, 'system'),
+        ...partKeys(partsScan, 'tools'),
+      ])
+    );
+    expect((await guardrail.report())?.scans.map(each => each.verdict_cache_write)).toEqual([
+      'written',
+      'written',
+      'written',
+    ]);
+  });
+
+  it('writes and reports both entries of a tool definition sent twice', async () => {
+    mockedScanRequest.mockImplementation(async resolved => ({
+      verdict: { action: 'allow' },
+      report: { ...scanReport, part: partOf(resolved) },
+      usageRecords: [call()],
+    }));
+    const definition = required(partsScan.parts.tools[0]);
+    const request = {
+      ...partsScan,
+      parts: { ...partsScan.parts, system: [], tools: [definition, definition] },
+    };
+    // The second write of the same key is an NX no-op.
+    const written = new Set<string>();
+    mockedRedisSet.mockImplementation(async key => {
+      if (written.has(key)) return null;
+      written.add(key);
+      return 'OK';
+    });
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(request), signal);
+    const report = await guardrail.report();
+
+    const key = toolKey(request, definition);
+    expect(mockedRedisSet.mock.calls.filter(([setKey]) => setKey === key)).toHaveLength(2);
+    expect(report?.scans.find(each => each.part === 'tools')?.verdict_cache_write).toBe('written');
+  });
+
+  it('keeps the function alive for the writes started before a scan threw', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedScanRequest
+      .mockResolvedValueOnce({
+        verdict: { action: 'allow' },
+        report: scanReport,
+        usageRecords: [call()],
+      })
+      .mockRejectedValue(new Error('unexpected'));
+    const write = Promise.withResolvers<'OK'>();
+    mockedRedisSet.mockReturnValue(write.promise);
+    const settled = jest.fn();
+
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(partsScan), signal);
+    expect(await guardrail.awaitVerdict()).toEqual({ action: 'unavailable', reason: 'failed' });
+    const afterTasks = runAfterTasks().then(settled);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedRedisSet.mock.calls).toEqual(allowWrites(partKeys(partsScan)));
+    expect(settled).not.toHaveBeenCalled();
+    write.resolve('OK');
+    await afterTasks;
+    expect(settled).toHaveBeenCalled();
+  });
+
   it('does not delay an allowed request for its cache write', async () => {
     mockedScanRequest.mockResolvedValue({
       verdict: { action: 'allow' },
@@ -412,7 +503,7 @@ describe('startEnkryptInputGuardrail', () => {
       scans: [{ decision: 'error_fail_open', error: 'http_503', verdict_cache_write: 'written' }],
     });
     expect(mockedRecordUsage.mock.calls).toEqual([
-      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: expect.any(Number) }],
+      [call({ decision: 'error', creditsCost: null })],
     ]);
   });
 
@@ -492,11 +583,14 @@ describe('startEnkryptInputGuardrail', () => {
     }
   );
 
-  it('records the wait for the verdict on the final call of the request only', async () => {
+  it('records every call with its own latency, not the request’s wait for the verdict', async () => {
     const result: EnkryptGuardrailScanResult = {
       verdict: { action: 'allow' },
       report: scanReport,
-      usageRecords: [call({ decision: 'error', creditsCost: null }), call()],
+      usageRecords: [
+        call({ decision: 'error', creditsCost: null, addedLatencyMs: 80 }),
+        call({ addedLatencyMs: 140 }),
+      ],
     };
     mockedScanRequest.mockResolvedValue(result);
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
@@ -506,8 +600,8 @@ describe('startEnkryptInputGuardrail', () => {
     await runAfterTasks();
 
     expect(mockedRecordUsage.mock.calls).toEqual([
-      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: null }],
-      [{ ...call(), addedLatencyMs: 237 }],
+      [call({ decision: 'error', creditsCost: null, addedLatencyMs: 80 })],
+      [call({ addedLatencyMs: 140 })],
     ]);
   });
 
@@ -515,7 +609,7 @@ describe('startEnkryptInputGuardrail', () => {
     ['blocking', scan],
     ['log-only', logOnlyScan],
   ])(
-    'records no added latency when the request never awaited the %s verdict',
+    'records the call unchanged when the request never awaited the %s verdict',
     async (_name, request) => {
       mockedScanRequest.mockResolvedValue({
         verdict: { action: 'allow' },
@@ -526,24 +620,9 @@ describe('startEnkryptInputGuardrail', () => {
       startEnkryptInputGuardrail(Promise.resolve(request), signal);
       await runAfterTasks();
 
-      expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
+      expect(mockedRecordUsage.mock.calls).toEqual([[call()]]);
     }
   );
-
-  it('records no wait for a log-only scan that finished before the request awaited the verdict', async () => {
-    mockedScanRequest.mockResolvedValue({
-      verdict: { action: 'allow' },
-      report: { ...scanReport, scan: 'log_only' },
-      usageRecords: [call()],
-    });
-
-    const guardrail = startEnkryptInputGuardrail(Promise.resolve(logOnlyScan), signal);
-    await guardrail.requestLogs(false);
-    await guardrail.awaitVerdict();
-    await runAfterTasks();
-
-    expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: 0 }]]);
-  });
 
   it('preserves the inference association across a failed blocking scan and a nonblocking log-only scan', async () => {
     const microdollarUsageId = '00000000-0000-4000-8000-000000000003';
@@ -555,7 +634,14 @@ describe('startEnkryptInputGuardrail', () => {
         : {
             verdict: { action: 'fail_open' },
             report: { ...scanReport, decision: 'error_fail_open', error: 'http_503' },
-            usageRecords: [call({ microdollarUsageId, decision: 'error', creditsCost: null })],
+            usageRecords: [
+              call({
+                microdollarUsageId,
+                decision: 'error',
+                creditsCost: null,
+                addedLatencyMs: 90,
+              }),
+            ],
           }
     );
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
@@ -579,23 +665,22 @@ describe('startEnkryptInputGuardrail', () => {
     logOnlyResult.resolve({
       verdict: { action: 'allow' },
       report: { ...scanReport, scan: 'log_only', decision: 'error_logged', error: 'timeout' },
-      usageRecords: [call({ microdollarUsageId, decision: 'error', creditsCost: 1 })],
+      usageRecords: [
+        call({ microdollarUsageId, decision: 'error', creditsCost: 1, addedLatencyMs: 60 }),
+      ],
     });
     await runAfterTasks();
 
     expect(mockedRecordUsage.mock.calls).toEqual([
       [
-        {
-          ...call({ microdollarUsageId, decision: 'error', creditsCost: null }),
-          addedLatencyMs: 237,
-        },
+        call({
+          microdollarUsageId,
+          decision: 'error',
+          creditsCost: null,
+          addedLatencyMs: 90,
+        }),
       ],
-      [
-        {
-          ...call({ microdollarUsageId, decision: 'error', creditsCost: 1 }),
-          addedLatencyMs: null,
-        },
-      ],
+      [call({ microdollarUsageId, decision: 'error', creditsCost: 1, addedLatencyMs: 60 })],
     ]);
   });
 
@@ -639,10 +724,10 @@ describe('startEnkryptInputGuardrail', () => {
       '[enkrypt-guardrail] log-only scan failed unexpectedly',
       expect.any(Object)
     );
-    expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: 0 }]]);
+    expect(mockedRecordUsage.mock.calls).toEqual([[call()]]);
   });
 
-  it('skips the verdict without waiting when every detector only logs, recording the wait it would have added', async () => {
+  it('skips the verdict without waiting when every detector only logs, reporting the wait it would have added', async () => {
     const logOnlyResult = Promise.withResolvers<EnkryptGuardrailScanResult>();
     mockedScanRequest.mockReturnValue(logOnlyResult.promise);
     // The verdict's wait starts and ends at once; the log-only scan finishes 450.6 ms after it started.
@@ -667,12 +752,12 @@ describe('startEnkryptInputGuardrail', () => {
     await runAfterTasks();
 
     expect(mockedRecordUsage.mock.calls).toEqual([
-      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: 451 }],
+      [call({ decision: 'error', creditsCost: null })],
     ]);
     expect(mockedRedisSet.mock.calls).toEqual(
       allowWrites(partKeys(logOnlyScan), ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS)
     );
-    // The report holds the same wait the usage records.
+    // The report holds the log-only scan time; the usage record holds the call's own latency.
     expect((await guardrail.report())?.added_latency_ms).toBe(451);
   });
 
@@ -707,6 +792,7 @@ describe('startEnkryptInputGuardrail', () => {
           ...scanReport,
           chunks: 1,
           failed_calls_cached: 0,
+          ...allowedCall,
           calls_skipped: 0,
           verdict_cache_write: 'written',
         },
@@ -717,6 +803,8 @@ describe('startEnkryptInputGuardrail', () => {
           error: 'timeout',
           chunks: 1,
           failed_calls_cached: 1,
+          calls_cached: 0,
+          call_outcomes: { ...noCallOutcomes, failed: 1 },
           calls_skipped: 0,
           verdict_cache_write: 'written',
         },
@@ -744,6 +832,7 @@ describe('startEnkryptInputGuardrail', () => {
         ...scanReport,
         chunks: 1,
         failed_calls_cached: 0,
+        ...allowedCall,
         calls_skipped: 0,
         verdict_cache_write: 'skipped',
       },
@@ -767,6 +856,7 @@ describe('startEnkryptInputGuardrail', () => {
         ...scanReport,
         chunks: 1,
         failed_calls_cached: 0,
+        ...allowedCall,
         calls_skipped: 0,
         verdict_cache_write: 'failed',
       },
@@ -842,13 +932,14 @@ describe('startEnkryptInputGuardrail', () => {
         scanOf({ ...request, config: logOnlyScan.config }, 'tools'),
       ]);
       await runAfterTasks();
+      // Each call's verdict is written as soon as it finishes, so in call order.
       expect(mockedRedisSet.mock.calls.map(([key]) => key)).toEqual([
-        ...partKeys({ ...request, config: scan.config }, 'tools'),
-        ...partKeys({ ...request, config: scan.config }, 'system'),
         ...partKeys({ ...request, config: scan.config }, 'conversation'),
-        ...partKeys({ ...request, config: logOnlyScan.config }, 'tools'),
-        ...partKeys({ ...request, config: logOnlyScan.config }, 'system'),
+        ...partKeys({ ...request, config: scan.config }, 'system'),
+        ...partKeys({ ...request, config: scan.config }, 'tools'),
         ...partKeys({ ...request, config: logOnlyScan.config }, 'conversation'),
+        ...partKeys({ ...request, config: logOnlyScan.config }, 'system'),
+        ...partKeys({ ...request, config: logOnlyScan.config }, 'tools'),
       ]);
     });
 
@@ -882,12 +973,12 @@ describe('startEnkryptInputGuardrail', () => {
         'system',
       ]);
       expect(mockedRedisSet.mock.calls).toEqual([
+        ...allowWrites(partKeys(partsScan, 'conversation')),
         [
           required(partKeys(partsScan, 'system')[0]),
           { action: 'block', detectors: ['injection_attack'] },
           { ex: ENKRYPT_VERDICT_CACHE_TTL_SECONDS },
         ],
-        ...allowWrites(partKeys(partsScan, 'conversation')),
       ]);
       const report = await guardrail.report();
       expect(report?.verdict).toBe('block');
@@ -899,6 +990,8 @@ describe('startEnkryptInputGuardrail', () => {
             attempts: 0,
             credits_cost: null,
             latency_ms: 0,
+            calls_cached: 0,
+            call_outcomes: noCallOutcomes,
             calls_skipped: 1,
           }),
           verdict_cache_write: 'skipped',
@@ -909,6 +1002,8 @@ describe('startEnkryptInputGuardrail', () => {
           detectors_fired: ['injection_attack'],
           chunks: 1,
           failed_calls_cached: 0,
+          calls_cached: 1,
+          call_outcomes: { ...noCallOutcomes, blocked: 1 },
           calls_skipped: 0,
           verdict_cache_write: 'written',
         },
@@ -916,6 +1011,7 @@ describe('startEnkryptInputGuardrail', () => {
           ...scanReport,
           chunks: 1,
           failed_calls_cached: 0,
+          ...allowedCall,
           calls_skipped: 0,
           verdict_cache_write: 'written',
         },
@@ -948,8 +1044,8 @@ describe('startEnkryptInputGuardrail', () => {
         ['conversation', 'skipped'],
       ]);
       expect(mockedRedisSet.mock.calls.map(([key]) => key)).toEqual([
-        ...partKeys(partsScan, 'tools'),
         ...partKeys(partsScan, 'system'),
+        ...partKeys(partsScan, 'tools'),
       ]);
     });
 
@@ -979,9 +1075,9 @@ describe('startEnkryptInputGuardrail', () => {
         ['conversation', 'written'],
       ]);
       expect(mockedRedisSet.mock.calls).toEqual([
-        ...allowWrites(partKeys(partsScan, 'tools')),
-        ...allowWrites(partKeys(partsScan, 'system')),
         ...allowWrites(partKeys(partsScan, 'conversation'), ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS),
+        ...allowWrites(partKeys(partsScan, 'system')),
+        ...allowWrites(partKeys(partsScan, 'tools')),
       ]);
     });
 
@@ -1050,13 +1146,15 @@ describe('startEnkryptInputGuardrail', () => {
       ]);
     });
 
-    it('records every part’s calls and the wait on the final blocking call', async () => {
+    it('records every part’s calls with their own latency', async () => {
       mockedScanRequest.mockImplementation(async resolved => ({
         verdict: { action: 'allow' },
         report: { ...scanReport, part: partOf(resolved) },
         usageRecords: [
           call({
             scannedCharacters: ['tools', 'system', 'conversation'].indexOf(partOf(resolved)) + 1,
+            addedLatencyMs:
+              (['tools', 'system', 'conversation'].indexOf(partOf(resolved)) + 1) * 10,
           }),
         ],
       }));
@@ -1067,9 +1165,9 @@ describe('startEnkryptInputGuardrail', () => {
       await runAfterTasks();
 
       expect(mockedRecordUsage.mock.calls).toEqual([
-        [{ ...call({ scannedCharacters: 1 }), addedLatencyMs: null }],
-        [{ ...call({ scannedCharacters: 2 }), addedLatencyMs: null }],
-        [{ ...call({ scannedCharacters: 3 }), addedLatencyMs: 237 }],
+        [call({ scannedCharacters: 1, addedLatencyMs: 10 })],
+        [call({ scannedCharacters: 2, addedLatencyMs: 20 })],
+        [call({ scannedCharacters: 3, addedLatencyMs: 30 })],
       ]);
     });
   });
@@ -1487,10 +1585,11 @@ describe('startEnkryptInputGuardrail with many tool definitions', () => {
       // The segments of the allowed chunks are cached for the full lifetime, and those of the
       // failed chunk only briefly, so the next request rescans only the failed one once that expires.
       const keys = conversationKeys(scan.config);
+      // Written as each call finishes, newest chunk first.
       expect(mockedRedisSet.mock.calls).toEqual([
-        ...allowWrites(keys.slice(0, 2)),
+        ...allowWrites(keys.slice(3).toReversed()),
         ...allowWrites(keys.slice(2, 3), ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS),
-        ...allowWrites(keys.slice(3)),
+        ...allowWrites(keys.slice(0, 2).toReversed()),
       ]);
     });
 
@@ -1520,13 +1619,13 @@ describe('startEnkryptInputGuardrail with many tool definitions', () => {
           verdict_cache_write: expected,
         }),
       ]);
-      expect(mockedRedisSet.mock.calls).toEqual(allowWrites(keys));
+      expect(mockedRedisSet.mock.calls).toEqual(allowWrites(keys.toReversed()));
     });
   });
 });
 
 describe('recordEnkryptUsageRecords', () => {
-  const usageRecord = { ...call(), addedLatencyMs: 120 };
+  const usageRecord = call();
   const loggedFields = {
     organization_id: scan.organizationId,
     kilo_user_id: scan.kiloUserId,

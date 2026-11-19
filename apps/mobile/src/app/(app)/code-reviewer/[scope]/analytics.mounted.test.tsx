@@ -136,7 +136,7 @@ vi.mock('@/components/query-error', () => ({
 vi.mock('@/components/organization/scope-access-denied-screen', () => ({
   ScopeAccessDeniedScreen: (props: {
     title?: string;
-    eyebrow?: string;
+    subtitle?: string;
     kind?: string;
     backFallback?: string;
     onRetry?: () => void;
@@ -144,7 +144,7 @@ vi.mock('@/components/organization/scope-access-denied-screen', () => ({
 }));
 
 vi.mock('@/components/code-reviewer/reviewer-header', () => ({
-  ReviewerHeader: (props: { title?: string; eyebrow?: string }) =>
+  ReviewerHeader: (props: { title?: string; subtitle?: string }) =>
     createElement('ReviewerHeaderMock', props),
 }));
 
@@ -233,11 +233,11 @@ describe('CodeReviewerAnalytics denied scope', () => {
 
     const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
     expect(denied?.props.kind).toBe('denied');
-    expect(denied?.props.title).toBe('Drain Labs');
+    expect(denied?.props.title).toBe('Analytics');
     // Header parity with the granted state below: the lost membership keeps the
-    // same eyebrow the dashboard's own header carries, so the denial reads as
-    // this screen rather than as the product in general.
-    expect(denied?.props.eyebrow).toBe('Analytics');
+    // same title and subtitle the screen's own header carries, so the denial
+    // reads as this screen rather than as the product in general.
+    expect(denied?.props.subtitle).toBe('Drain Labs');
     expect(denied?.props.backFallback).toBe('/(app)/(tabs)/(0_home)');
     expect(findByType(renderer.root, 'QueryErrorMock')).toHaveLength(0);
     expect(findByType(renderer.root, 'SegmentedControlMock')).toHaveLength(0);
@@ -256,7 +256,7 @@ describe('CodeReviewerAnalytics denied scope', () => {
     const renderer = mountScreen();
 
     const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
-    expect(denied?.props.title).toBe('Drain Labs');
+    expect(denied?.props.subtitle).toBe('Drain Labs');
 
     act(() => {
       renderer.unmount();
@@ -271,7 +271,7 @@ describe('CodeReviewerAnalytics denied scope', () => {
     const renderer = mountScreen();
 
     const denied = findByType(renderer.root, 'ScopeAccessDeniedScreenMock')[0];
-    expect(denied?.props.title).toBe('Organization');
+    expect(denied?.props.subtitle).toBe('Organization');
 
     act(() => {
       renderer.unmount();
@@ -513,7 +513,9 @@ describe('CodeReviewerAnalytics empty state', () => {
     expect(offEmpty?.props.description).toBe(
       'Organization billing roles can turn analytics on in the settings on the web to record completed reviews.'
     );
-    expect(findByType(offRenderer.root, 'TextMock')).toHaveLength(0);
+    // Only the platform and range pickers' two section labels render as text
+    // beside the state.
+    expect(findByType(offRenderer.root, 'TextMock')).toHaveLength(2);
     expect(findByType(offRenderer.root, 'ConfigureRowMock')).toHaveLength(0);
 
     act(() => {
@@ -592,12 +594,12 @@ describe('CodeReviewerAnalytics empty state', () => {
 });
 
 describe('CodeReviewerAnalytics header', () => {
-  it('titles the screen with the organization and keeps the screen name as the eyebrow', () => {
+  it('titles the screen with its own name and names the organization on the subtitle', () => {
     const renderer = mountScreen();
     const header = findByType(renderer.root, 'ReviewerHeaderMock')[0];
 
-    expect(header?.props.title).toBe('Drain Labs');
-    expect(header?.props.eyebrow).toBe('Analytics');
+    expect(header?.props.title).toBe('Analytics');
+    expect(header?.props.subtitle).toBe('Drain Labs');
     // The screen remembers the name the membership read delivered, which is
     // what titles the denial once that membership is lost.
     expect(rememberedNames.get('org-drain')).toBe('Drain Labs');

@@ -374,9 +374,11 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     finding.error = { data: { code } };
     const tree = renderScreen();
     expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
-    const empty = tree.root.findAllByType(EmptyState);
-    expect(empty).toHaveLength(1);
-    expect(empty[0]?.props.placement).not.toBe('top');
+    const notFound = tree.root.findAllByType(QueryError);
+    expect(notFound).toHaveLength(1);
+    expect(notFound[0]?.props.variant).toBe('not-found');
+    expect(notFound[0]?.props.placement).not.toBe('top');
+    expect(notFound[0]?.props.onRetry).toBeUndefined();
   });
 
   it('keeps the dismissal CTA enabled once a reason is chosen', () => {

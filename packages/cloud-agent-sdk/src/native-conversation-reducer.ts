@@ -670,34 +670,37 @@ export function applyNativeSessionEvent(
   session: NativeSnapshotSession | undefined,
   frame: NativeEvent
 ): NativeSnapshotSession | undefined {
-  if (
-    ![
-      'session.agent.selected',
-      'session.model.selected',
-      'session.renamed',
-      'session.metadata.updated',
-    ].includes(frame.type)
-  )
-    return session;
-  const event = readNativeEvent(frame);
-  const data = event.data;
-  if (!session) return session;
-  if (frame.type === 'session.agent.selected')
-    return nativeSnapshotSessionSchema.parse({
-      ...session,
-      agent: z.string().parse(data['agent']),
-    });
-  if (frame.type === 'session.model.selected')
-    return nativeSnapshotSessionSchema.parse({ ...session, model: data['model'] });
-  if (frame.type === 'session.renamed')
-    return nativeSnapshotSessionSchema.parse({
-      ...session,
-      title: z.string().parse(data['title']),
-    });
-  if (frame.type === 'session.metadata.updated')
-    return nativeSnapshotSessionSchema.parse({
-      ...session,
-      metadata: z.record(z.string(), z.json()).parse(data['metadata']),
-    });
-  return session;
+  switch (frame.type) {
+    case 'session.agent.selected': {
+      const { data } = readNativeEvent(frame);
+      if (!session) return session;
+      return nativeSnapshotSessionSchema.parse({
+        ...session,
+        agent: z.string().parse(data['agent']),
+      });
+    }
+    case 'session.model.selected': {
+      const { data } = readNativeEvent(frame);
+      if (!session) return session;
+      return nativeSnapshotSessionSchema.parse({ ...session, model: data['model'] });
+    }
+    case 'session.renamed': {
+      const { data } = readNativeEvent(frame);
+      if (!session) return session;
+      return nativeSnapshotSessionSchema.parse({
+        ...session,
+        title: z.string().parse(data['title']),
+      });
+    }
+    case 'session.metadata.updated': {
+      const { data } = readNativeEvent(frame);
+      if (!session) return session;
+      return nativeSnapshotSessionSchema.parse({
+        ...session,
+        metadata: z.record(z.string(), z.json()).parse(data['metadata']),
+      });
+    }
+    default:
+      return session;
+  }
 }

@@ -498,6 +498,14 @@ export interface BrowserToolSession {
   readonly takeDialog: () => BrowserToolDialog | undefined;
   /** Returns the downloads seen since the last call and clears them. */
   readonly takeDownloads: () => readonly BrowserToolDownload[];
+  /**
+   * Calls `listener` for every download the tab announces as it arrives, and
+   * returns the function that stops it. A guard that keeps listening for a late
+   * download needs the announcement itself: the browser names a download a
+   * moment before the item exists, and a call that arrives in between must not
+   * have to wait for it.
+   */
+  readonly watchDownloads: (listener: (download: BrowserToolDownload) => void) => () => void;
   /** The tab's viewport identity, shared with every caller view of this tab. */
   readonly viewportState: BrowserToolViewportState;
 }
@@ -1574,6 +1582,8 @@ export const createBrowserToolSession = ({
   const viewportState: BrowserToolViewportState = { tabId };
   const consoleBuffer: BrowserConsoleMessage[] = [];
   const downloadBuffer: BrowserToolDownload[] = [];
+  // Listeners a still-armed guard registered for the announcement itself, not the buffer it drains.
+  const downloadListeners = new Set<(download: BrowserToolDownload) => void>();
   const networkById = new Map<string, MutableNetworkRequest>();
   // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
   const refsByCaller = new Map<string, Map<string, BrowserToolRefEntry>>();
@@ -2561,18 +2571,33 @@ export const createBrowserToolSession = ({
       return;
     }
 
-    downloadBuffer.push({
+    const announced: BrowserToolDownload = {
       ...(parsed.data.guid === undefined ? {} : { guid: parsed.data.guid }),
       ...(parsed.data.suggestedFilename === undefined
         ? {}
         : { suggestedFilename: parsed.data.suggestedFilename }),
       ...(parsed.data.url === undefined ? {} : { url: parsed.data.url }),
       startedAt: Date.now(),
-    });
+    };
+
+    downloadBuffer.push(announced);
 
     if (downloadBuffer.length > MAX_BROWSER_TOOL_CONSOLE_MESSAGES) {
       downloadBuffer.shift();
     }
+
+    // A guard that is still on duty for a late download learns about it now, not when the item exists.
+    for (const listener of downloadListeners) {
+      listener(announced);
+    }
+  };
+
+  const watchDownloads = (listener: (download: BrowserToolDownload) => void): (() => void) => {
+    downloadListeners.add(listener);
+
+    return () => {
+      downloadListeners.delete(listener);
+    };
   };
 
   const takeDownloads = (): readonly BrowserToolDownload[] => {
@@ -3451,6 +3476,7 @@ export const createBrowserToolSession = ({
       },
       takeDialog,
       takeDownloads,
+      watchDownloads,
       viewportState,
     };
   };
@@ -3486,6 +3512,7 @@ export const createBrowserToolSession = ({
     send,
     takeDialog,
     takeDownloads,
+    watchDownloads,
     viewportState,
   };
 };

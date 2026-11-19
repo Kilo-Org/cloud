@@ -36,7 +36,11 @@ import { clearBrowserToolResize } from './browser-tool-page-actions';
 import { runKiloBrowserTool } from './browser-tool-dispatch';
 import type { BrowserToolDispatchOptions } from './browser-tool-dispatch';
 import { createBrowserToolSession } from './browser-tool-session';
-import type { BrowserToolSession, BrowserToolTabsApi } from './browser-tool-session';
+import type {
+  BrowserToolDownload,
+  BrowserToolSession,
+  BrowserToolTabsApi,
+} from './browser-tool-session';
 import type { TabLeaseHolder, TabLeaseRegistry } from './browser-tab-leases';
 import { getInspectableTab, isInspectablePageUrl } from './tab-debugger';
 import type {
@@ -650,6 +654,14 @@ interface DownloadWitness {
   readonly pendingNavigation: () => number;
   /** Whether a response this call received was served as an attachment, which is a download on its way. */
   readonly attachmentResponse: () => boolean;
+  /**
+   * The announcement itself, as it happens: a guard that stays on duty for a
+   * late download has to know the browser named one before the item exists,
+   * because the call that comes next may already be reading the report.
+   */
+  readonly watchAnnounced?:
+    | ((listener: (download: BrowserToolDownload) => void) => () => void)
+    | undefined;
 }
 
 /**
@@ -669,12 +681,22 @@ interface LingerSink {
    * will report it, so the runtime hands it to the next call on the tab, together
    * with the step that started it, instead of letting the file vanish unreported.
    */
-  readonly late: (outcome: Promise<DiscardOutcome>) => void;
+  readonly late: (stop: {
+    readonly filename: string;
+    readonly outcome: Promise<DiscardOutcome> | undefined;
+  }) => void;
 }
 
-/** One download an answered call's linger stopped, kept until a call can tell the model about it. */
+/**
+ * One download an answered call's linger stopped, kept until a call can tell
+ * the model about it. It is queued when the browser announces the download, so
+ * the file name is known before the item exists; the report never waits on the
+ * stop itself.
+ */
 interface LateStop {
-  readonly outcome: Promise<DiscardOutcome>;
+  readonly filename: string;
+  /** Resolves when the guard finished stopping it: nothing the report waits on. */
+  readonly outcome: Promise<DiscardOutcome> | undefined;
   /** The step that started the file; absent only for a guard without one (a panel or a workflow call). */
   readonly step: DownloadStep | undefined;
 }
@@ -853,6 +875,12 @@ const armDownloadGuard = (
   };
   const owned = (item: BrowserDownloadItem): boolean =>
     (item.tabId === undefined || tabIds().includes(item.tabId)) && !notThisCalls(item);
+  /** Downloads the tab announced that no item has been stopped for yet: the report names them now, the stop follows. */
+  const announcedPending = new Map<string, (outcome: DiscardOutcome) => void>();
+  /** The urls this guard already stopped, so an announcement cannot queue a second report for one file. */
+  const stoppedUrls = new Set<string>();
+  /** The pending announcement subscription: only a linger keeps one, and it ends with the linger. */
+  let stopWatching: (() => void) | undefined;
   let created = false;
   let listening = true;
   let lingering = false;
@@ -867,13 +895,25 @@ const armDownloadGuard = (
 
       stops.set(item.id, discarded);
 
-      // The linger outlives this call's result, so its stops are handed over to whoever reports next.
-      if (lingering) {
+      const url = item.url === undefined || item.url === '' ? undefined : item.url;
+
+      if (url !== undefined) {
+        stoppedUrls.add(url);
+      }
+
+      // The announcement already reported this file: this stop only settles the promise behind it.
+      const settle = url === undefined ? undefined : announcedPending.get(url);
+
+      if (settle !== undefined && url !== undefined) {
+        announcedPending.delete(url);
+        void discarded.then(settle);
+      } else if (lingering) {
+        // The linger outlives this call's result, so its stops are handed over to whoever reports next.
         if (announcedUnreported > 0) {
           // This call already told the model about this download; the linger only finishes stopping it.
           announcedUnreported -= 1;
         } else {
-          linger?.late(discarded);
+          linger?.late({ filename: fileNameOf(item), outcome: discarded });
         }
       }
     }
@@ -985,6 +1025,15 @@ const armDownloadGuard = (
 
           lingering = false;
           disarm();
+          stopWatching?.();
+          stopWatching = undefined;
+
+          // An announced download the guard never saw as an item wrote no file: its report already went out.
+          for (const [url, settle] of announcedPending) {
+            settle({ filename: url.split('/').pop() ?? 'the downloaded file', kind: 'removed' });
+          }
+
+          announcedPending.clear();
           linger?.ended();
           // Whatever the linger already stopped is still deleted, now that nothing else will report it.
           void report();
@@ -992,6 +1041,24 @@ const armDownloadGuard = (
 
         lingering = true;
         listen();
+        // The browser names a download before the item exists: queue the report now, so the very next call — whichever
+        // Tool it is — can answer without waiting for the item to appear.
+        stopWatching = attribution.witness?.watchAnnounced?.(download => {
+          if (!lingering || download.url === undefined || download.url === '') {
+            return;
+          }
+
+          if (announcedPending.has(download.url) || stoppedUrls.has(download.url)) {
+            return;
+          }
+
+          const { promise, resolve } = Promise.withResolvers<DiscardOutcome>();
+          const filename =
+            download.suggestedFilename ?? download.url.split('/').pop() ?? 'the downloaded file';
+
+          announcedPending.set(download.url, resolve);
+          linger?.late({ filename, outcome: promise });
+        });
         linger?.armed(end);
         void (async (): Promise<void> => {
           await after(DOWNLOAD_GUARD_LINGER_MS);
@@ -1105,8 +1172,13 @@ export const createBrowserRuntime = ({
     end?.();
   };
 
-  /** Reports the downloads an earlier call's linger stopped, and had nobody to tell: this call tells the model. */
-  const takeLateStops = async (tabId: number): Promise<readonly LateDiscard[]> => {
+  /**
+   * Reports the downloads an earlier call's linger stopped — or announced and
+   * still being stopped — and had nobody to tell. It never waits: the browser
+   * names a download before the item exists, and a call that arrives in between
+   * still has to answer.
+   */
+  const takeLateStops = (tabId: number): readonly LateDiscard[] => {
     const queued = lateStops.get(tabId);
 
     if (queued === undefined) {
@@ -1115,15 +1187,11 @@ export const createBrowserRuntime = ({
 
     lateStops.delete(tabId);
 
-    const outcomes = await Promise.all(
-      queued.map(async entry => {
-        const outcome = await entry.outcome;
-
-        return { filename: outcome.filename, kept: outcome.kind === 'kept', step: entry.step };
-      })
-    );
-
-    return outcomes;
+    return queued.map(entry => ({
+      filename: entry.filename,
+      kept: false,
+      step: entry.step,
+    }));
   };
 
   const sessionFor = (tabId: number): BrowserToolSession => {
@@ -1378,13 +1446,13 @@ export const createBrowserRuntime = ({
       ended: () => {
         lingers.delete(attribution.tab.tabId);
       },
-      late: outcome => {
+      late: stop => {
         // The linger outlived its call, so this stop has no result to be reported on: the next call on the tab has.
         // The step travels with it, so the approval it asks for binds the call that started the file.
         const { tabId } = attribution.tab;
         const queued = lateStops.get(tabId) ?? [];
 
-        queued.push({ outcome, step: attribution.step });
+        queued.push({ filename: stop.filename, outcome: stop.outcome, step: attribution.step });
         lateStops.set(tabId, queued);
       },
     });
@@ -1538,7 +1606,7 @@ export const createBrowserRuntime = ({
       // It before it runs, whatever tool it is, and its token binds the step that started the file. A panel call has
       // No model to tell, so it drops what is left instead of holding it for the next agent call.
       if (caller.kind === 'agent') {
-        const owed = lateDownloadRefusal(await takeLateStops(tabId));
+        const owed = lateDownloadRefusal(takeLateStops(tabId));
 
         if (owed !== undefined) {
           return owed;
@@ -1724,6 +1792,7 @@ export const createBrowserRuntime = ({
                 tabIds: guardTabIds,
                 witness: {
                   announced: () => session.takeDownloads().length,
+                  watchAnnounced: listener => session.watchDownloads(listener),
                   attachmentResponse: () =>
                     session
                       .networkRequests()
@@ -1834,7 +1903,7 @@ export const createBrowserRuntime = ({
         // A download an earlier call's linger stopped while this one ran had no result to be reported on; this
         // Call reports it, so a deleted file is never silent. The tab's own target may also have reported one
         // (`Page.downloadWillBegin`), where that is allowed. A panel call has no model to tell, so it leaves them.
-        const late = agentContext === undefined ? [] : await takeLateStops(tabId);
+        const late = agentContext === undefined ? [] : takeLateStops(tabId);
         const stoppedFiles =
           settlement.stopped + (guardDownloads ? takeStartedDownloads(session) : 0);
         // A file the guard could not delete is named, whichever call stopped it.

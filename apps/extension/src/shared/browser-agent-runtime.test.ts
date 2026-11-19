@@ -1597,6 +1597,67 @@ describe('agent browser calls', () => {
     }
   });
 
+  it('queues a download at its announcement, so the very next call reports it before the item exists', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    // The click starts nothing it can see; the tab announces the download a second and a half later, and the item
+    // Exists only after that.
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    vi.useFakeTimers();
+
+    try {
+      await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: { target: '#pay' },
+          caller: agent(),
+          tabId: TAB_ID,
+          toolName: 'browser_click',
+        })
+      );
+
+      await vi.advanceTimersByTimeAsync(1500);
+      cdp.emit('Browser.downloadWillBegin', {
+        guid: 'download-late',
+        suggestedFilename: 'report.txt',
+        url: `${MAIN_ORIGIN}/report.txt`,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      // A call in between answers without waiting: the announcement alone already names the step and the file.
+      const reported = await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: {},
+          caller: agent(),
+          tabId: TAB_ID,
+          toolName: 'browser_snapshot',
+        })
+      );
+
+      expect(reported).toMatchObject({
+        afterAction: true,
+        kind: 'needs_permission',
+        result: {
+          error:
+            "The click on '#pay' started a download of report.txt, which was stopped. Approved. Repeat that click to receive the file.",
+          ok: false,
+        },
+        stepToken: expectStepToken(reported),
+      });
+
+      // The item the announcement promised appears later, and the guard stops it: the file is never kept.
+      downloads.emit({ id: 121, tabId: TAB_ID, url: `${MAIN_ORIGIN}/report.txt` });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect([downloads.cancelled, downloads.removed]).toStrictEqual([[121], []]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('pays the announce grace, not the whole poll bound, for a download the browser does not name', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });

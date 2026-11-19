@@ -171,6 +171,8 @@ test('uiSnapshot dumps the accessibility-important tree, not the raw one', () =>
     'shell cmd uimode night': 'Night mode: yes\n',
     'shell settings get system accelerometer_rotation': '0\n',
     'shell settings get system user_rotation': '0\n',
+    'shell uiautomator dump --compressed /sdcard/design-gate-ui.xml':
+      'UI hierchary dumped to: /sdcard/design-gate-ui.xml\n',
     'exec-out cat /sdcard/design-gate-ui.xml': xml,
     'shell settings get system font_scale': '1.15\n',
     'shell getprop persist.sys.locale': 'fa-IR\n',
@@ -187,6 +189,7 @@ test('uiSnapshot dumps the accessibility-important tree, not the raw one', () =>
   // A plain dump includes subtrees the app removed from accessibility
   // (no-hide-descendants), so a scene covered by a sheet would read as present.
   assert.deepEqual(commands.slice(setup), [
+    'adb -s emulator-5554 shell rm -f /sdcard/design-gate-ui.xml',
     'adb -s emulator-5554 shell uiautomator dump --compressed /sdcard/design-gate-ui.xml',
     'adb -s emulator-5554 exec-out cat /sdcard/design-gate-ui.xml',
     'adb -s emulator-5554 shell rm -f /sdcard/design-gate-ui.xml',
@@ -202,6 +205,35 @@ test('uiSnapshot dumps the accessibility-important tree, not the raw one', () =>
     language: 'fa-IR',
     osVersion: '16',
   });
+});
+
+test('a failed dump is an infrastructure error, never the tree of the previous read', () => {
+  // `uiautomator dump` exits 0 on this failure and prints its error to stderr, so
+  // the file of the previous read is still on the device: reading it back would
+  // archive another screen's tree as the current one.
+  const stale = `<hierarchy rotation="0"><node class="android.widget.TextView" text="Account" bounds="[0,0][10,10]" /></hierarchy>`;
+  const { exec, commands } = fakeAdb({
+    'shell wm density': 'Physical density: 420\n',
+    'shell wm size': 'Physical size: 1080x2400\n',
+    'shell cmd uimode night': 'Night mode: no\n',
+    'shell settings get system accelerometer_rotation': '0\n',
+    'shell settings get system user_rotation': '0\n',
+    'shell uiautomator dump --compressed /sdcard/design-gate-ui.xml': '',
+    'exec-out cat /sdcard/design-gate-ui.xml': stale,
+  });
+  const device = createAndroidDevice({
+    exec,
+    spawn: () => ({ signal: () => undefined, exited: Promise.resolve(0) }),
+    serial: 'emulator-5554',
+    metroPort: 8081,
+  });
+  const setup = commands.length;
+  assert.throws(() => device.uiSnapshot?.(), /wrote no tree for emulator-5554/);
+  // The stale file is removed before the dump and never read back after it fails.
+  assert.deepEqual(commands.slice(setup), [
+    'adb -s emulator-5554 shell rm -f /sdcard/design-gate-ui.xml',
+    'adb -s emulator-5554 shell uiautomator dump --compressed /sdcard/design-gate-ui.xml',
+  ]);
 });
 
 test('relaunch restores the reverse tunnel and the dev-client link of its own Metro', () => {

@@ -550,10 +550,8 @@ describe('ScreenHeader mounted', () => {
     const inline = findInlineActionsWrapper(pinned.root);
     expect(inline.children).toEqual(['ACTIONS']);
     expect(inline.parent?.props.className).toContain('flex-row');
-    // Turning the reflow off must cap the slot instead: the heading sits on a
-    // zero flex basis, so an unbounded cluster would keep all negative free
-    // space and leave the heading at zero width, with a fixed-size mark
-    // painting under the cluster.
+    // Turning the reflow off must cap the slot instead, so a fixed-size mark
+    // always keeps the other half of the row.
     expect(inline.props.className).toContain('max-w-[50%]');
 
     // A caller that keeps the reflow keeps the uncapped slot.
@@ -565,6 +563,42 @@ describe('ScreenHeader mounted', () => {
       inlineActions: 'ACTIONS',
     });
     expect(findInlineActionsWrapper(uncapped.root).props.className).not.toContain('max-w-[50%]');
+  });
+
+  it('lets a pinned picker give way before the title it sits beside', () => {
+    // Compact Chat: the BETA pill, the backend control and a long account name
+    // shared the row, and the heading's zero basis gave the picker its full
+    // width first, so the large title read "Ch…". The heading now sits on its
+    // content's basis and the slot takes a 100x shrink factor, so the picker
+    // truncates first and the title keeps its width.
+    Object.assign(layout, { width: 360, fontScale: 1 });
+    const renderer = renderHeader({
+      title: 'Chat',
+      titleAccessory: 'BETA',
+      size: 'large',
+      showBackButton: false,
+      headerRight: 'BACKEND',
+      inlineActions: 'ACTIONS',
+      allowInlineActionsStacking: false,
+    });
+
+    const inline = findInlineActionsWrapper(renderer.root);
+    expect(inline.props.className).toContain('shrink-[100]');
+    expect(inline.props.className).toContain('max-w-[50%]');
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    // Text → accessory row → title column → title band → heading block.
+    const titleColumn = title.parent?.parent;
+    expect(titleColumn?.props.className).toBe('min-w-0 shrink');
+    const headingBlock = titleColumn?.parent?.parent;
+    expect(headingBlock?.props.className).toContain('grow shrink');
+    expect(headingBlock?.props.className).not.toContain('flex-1');
+
+    // A header that keeps the reflow keeps the zero-basis heading.
+    const reflowing = renderHeader({ title: 'Chat', size: 'large', inlineActions: 'ACTIONS' });
+    expect(findInlineActionsWrapper(reflowing.root).props.className).not.toContain('shrink-[100]');
+    expect(
+      reflowing.root.findByProps({ accessibilityRole: 'header' }).parent?.props.className
+    ).toBe('min-w-0 flex-1');
   });
 
   it('keeps the title touch area out of the row gap beside it', () => {

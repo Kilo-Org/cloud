@@ -14,6 +14,7 @@ import type {
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
   DOWNLOAD_PERMISSION_MISSING_ERROR,
+  hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
   SENSITIVE_REASON,
@@ -1918,6 +1919,60 @@ describe('agent browser calls', () => {
         'Repeat that click after the download is approved to receive the file.'
       );
       expect(message).not.toContain('Approved.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('binds a late refusal to the click that started the file, not the call carrying it', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    vi.useFakeTimers();
+
+    try {
+      await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: { target: '#pay' },
+          caller: agent(),
+          tabId: TAB_ID,
+          toolName: 'browser_click',
+        })
+      );
+      await vi.advanceTimersByTimeAsync(1500);
+      cdp.emit('Browser.downloadWillBegin', {
+        guid: 'late-step',
+        suggestedFilename: 'late.txt',
+        url: `${MAIN_ORIGIN}/late.txt`,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      // A read carries the news. The CLI stores a step token under the call it read it from, so the need has to
+      // Name the click itself, or the repeated click would be refused for a token it never bound.
+      const reported = await runTimed(
+        runtime.runTool({
+          agent: { authorized: [readGrant, actGrant] },
+          arguments: {},
+          caller: agent(),
+          tabId: TAB_ID,
+          toolName: 'browser_snapshot',
+        }),
+        0
+      );
+
+      if (reported.kind !== 'needs_permission') {
+        throw new Error(`expected a refusal, got ${reported.kind}`);
+      }
+
+      expect(reported.step).toStrictEqual({
+        argumentsHash: hashBrowserToolArguments({ target: '#pay' }),
+        tool: 'browser_click',
+      });
+      // Never the carrying call's own name: a token bound to it approves a step that started nothing.
+      expect(reported.step?.argumentsHash).not.toBe(hashBrowserToolArguments({}));
     } finally {
       vi.useRealTimers();
     }

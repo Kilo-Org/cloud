@@ -121,6 +121,36 @@ describe('grant matching', () => {
 });
 
 describe('argument hashing', () => {
+  it('matches the fixed vectors the CLI pins', () => {
+    // The same three vectors are written to /tmp/browser-bridge/hash-vectors.json: the CLI hashes a call's
+    // Arguments with this exact form, so a change here must fail this test and that file together.
+    const vectors = [
+      { args: { scale: 'css', url: 'https://example.com/report.txt' }, hash: '19ea8d50:54' },
+      {
+        args: {
+          nested: { items: [{ count: 2, rank: 1 }], zeta: 1 },
+          options: { button: 'left', doubleClick: true },
+          target: 'e12',
+        },
+        hash: 'a243193a:114',
+      },
+      // The same arguments with every top-level key set in another order: the hash must not change.
+      {
+        // eslint-disable-next-line sort-keys -- the fixture's key order is the point: the hash must ignore it
+        args: {
+          options: { button: 'left', doubleClick: true },
+          target: 'e12',
+          nested: { items: [{ count: 2, rank: 1 }], zeta: 1 },
+        },
+        hash: 'a243193a:114',
+      },
+    ];
+
+    for (const vector of vectors) {
+      expect(hashBrowserToolArguments(vector.args)).toBe(vector.hash);
+    }
+  });
+
   it('ignores key order and names the length', () => {
     expect(hashBrowserToolArguments({ first: 1, second: [2] })).toBe(
       hashBrowserToolArguments(reversedArgumentKeys())

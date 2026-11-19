@@ -583,6 +583,7 @@ describe('local agent browser bridge', () => {
         ],
         kind: 'needs_permission',
         result: { error: 'needs permission', ok: false },
+        step: { argumentsHash: 'hash:12', tool: 'browser_click' },
         stepToken: 'step-1',
       }),
     });
@@ -598,6 +599,8 @@ describe('local agent browser bridge', () => {
         items: [
           { class: 'sensitive', origin: 'https://app.example.com', reason: 'typing a password' },
         ],
+        // The step the approval is for travels with the need, so the CLI binds its token to that call.
+        step: { argumentsHash: 'hash:12', tool: 'browser_click' },
         stepToken: 'step-1',
       },
     });

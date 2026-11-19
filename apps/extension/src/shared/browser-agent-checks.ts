@@ -200,6 +200,12 @@ export interface BrowserPermissionItem {
 export interface BrowserNeedsPermission {
   readonly items: readonly BrowserPermissionItem[];
   readonly kind: 'needs_permission';
+  /**
+   * The step whose repeat needs the approval, when it is not simply this call:
+   * a late download is reported by the next call, so the CLI must bind the
+   * token to the click that started it, not to the call carrying the news.
+   */
+  readonly step?: { readonly argumentsHash: string; readonly tool: string };
   /** Present for sensitive steps: the token the CLI retries with once a human approves. */
   readonly stepToken?: string;
 }
@@ -426,6 +432,23 @@ export const parseToolArguments = (args: unknown): Record<string, unknown> => {
   return parsed.success ? parsed.data : {};
 };
 
+/**
+ * The canonical text of a call's arguments, hashed to the name a step token
+ * binds. The form, which a CLI must reproduce to read `step.argumentsHash`:
+ *
+ * - An array is `[` + its items in order, each canonical, joined by `,` + `]`.
+ * - A plain object is `{` + its keys sorted by UTF-16 code unit (`toSorted()`)
+ *   written as `"key":value` joined by `,` + `}` — key order never matters.
+ * - Every other value is `JSON.stringify(value) ?? 'null'`, so a string keeps
+ *   its JSON quotes, `undefined` becomes `null`, and absent arguments hash as
+ *   `null`.
+ *
+ * The hash is 32-bit FNV-1a over the canonical text's UTF-16 code units, one
+ * per index (`codePointAt`), starting from `2_166_136_261` and multiplying by
+ * `16_777_619` each step. The result is `hex:length`: the hash in unpadded
+ * lowercase hexadecimal, a colon, and the canonical text's length in UTF-16
+ * code units.
+ */
 export const hashBrowserToolArguments = (args: unknown): string => {
   const canonical = (value: unknown): string => {
     if (Array.isArray(value)) {

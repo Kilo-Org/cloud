@@ -89,6 +89,8 @@ export type BrowserToolRunOutcome =
       readonly items: readonly BrowserPermissionItem[];
       readonly kind: 'needs_permission';
       readonly result: EvalTabResult;
+      /** The step the approval is for, when this call is not the step that started the download. */
+      readonly step?: { readonly argumentsHash: string; readonly tool: string } | undefined;
       readonly stepToken?: string | undefined;
     }
   | {
@@ -1993,10 +1995,12 @@ export const createBrowserRuntime = ({
       /** The model-visible text, when the refusal has to name a step or a file. */
       readonly error?: string;
       readonly keptFiles?: readonly string[];
+      /** The step whose repeat needs the approval, when a later call is the one asking. */
+      readonly step?: { readonly argumentsHash: string; readonly tool: string };
       readonly stepToken?: string;
     } = {}
   ): BrowserToolRunOutcome => {
-    const { afterAction, error, keptFiles = [], stepToken } = answer;
+    const { afterAction, error, keptFiles = [], step, stepToken } = answer;
 
     return {
       items,
@@ -2010,6 +2014,7 @@ export const createBrowserRuntime = ({
             : `The browser action needs permission for this origin. The browser had already saved ${keptFiles.join(', ')} in the downloads folder before the download could be stopped.`),
         ok: false,
       },
+      ...(step === undefined ? {} : { step }),
       ...(stepToken === undefined ? {} : { stepToken }),
       ...(afterAction === true ? { afterAction: true } : {}),
     };
@@ -2047,6 +2052,10 @@ export const createBrowserRuntime = ({
       {
         afterAction: true,
         error: lateDownloadError(files),
+        // The carrying call did not start the file: the CLI has to bind the token to the step that did.
+        ...(step === undefined
+          ? {}
+          : { step: { argumentsHash: step.argumentHash, tool: step.toolName } }),
         ...(stepToken === undefined ? {} : { stepToken }),
       }
     );
@@ -2184,12 +2193,13 @@ export const createBrowserRuntime = ({
             };
           }
 
-          return needsPermissionOutcome(
-            preflight.failure.items,
-            preflight.sensitive === undefined
+          return needsPermissionOutcome(preflight.failure.items, {
+            // This call is the step: the same shape everywhere, so the CLI has one rule.
+            step: { argumentsHash: hashBrowserToolArguments(argsRecord), tool: toolName },
+            ...(preflight.sensitive === undefined
               ? {}
-              : { stepToken: issueSensitiveToken(preflight.sensitive) }
-          );
+              : { stepToken: issueSensitiveToken(preflight.sensitive) }),
+          });
         }
 
         // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this session, tab, tool and argument set disables the guard once.
@@ -2422,6 +2432,14 @@ export const createBrowserRuntime = ({
           return needsPermissionOutcome([{ class: 'sensitive', origin, reason }], {
             afterAction: true,
             keptFiles,
+            ...(downloadStep === undefined
+              ? {}
+              : {
+                  step: {
+                    argumentsHash: downloadStep.argumentHash,
+                    tool: downloadStep.toolName,
+                  },
+                }),
             ...(stepToken === undefined ? {} : { stepToken }),
           });
         }

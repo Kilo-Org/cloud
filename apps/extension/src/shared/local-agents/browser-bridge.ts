@@ -353,6 +353,8 @@ export const createRuntimeBrowserBridge = ({
         outcome.result.ok ? NEEDS_PERMISSION_ERROR : outcome.result.error,
         {
           items: outcome.items,
+          // The step the approval is for: the call itself, or the click that started a file a later call reports.
+          ...(outcome.step === undefined ? {} : { step: outcome.step }),
           ...(outcome.stepToken === undefined ? {} : { stepToken: outcome.stepToken }),
           // The page already ran: the CLI asks a human and must not replay the call.
           ...(outcome.afterAction === true ? { afterAction: true } : {}),

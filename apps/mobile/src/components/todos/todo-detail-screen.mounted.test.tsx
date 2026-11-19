@@ -1,9 +1,8 @@
-// The to-do detail screen's shell draws the loading and error states around one
-// header. The loaded body paints the to-do's list on the eyebrow line, so that
-// line stays reserved while the read runs and after it fails: the title holds
-// the position the payload gives it instead of dropping up when an error lands
-// and back down when a retry starts. Only the running read paints the
-// placeholder bar; the failure keeps the line blank.
+// The to-do detail screen's loading and error states wear the stock
+// pushed-screen header, named with the to-do surface's title until the read
+// brings the to-do's own. They reserve no eyebrow line for the list label the
+// loaded body paints, so the heading and its back control sit on the header's
+// first line like every other pushed screen's.
 
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,9 +21,11 @@ const query = vi.hoisted(() => ({
 }));
 
 type HeaderProps = {
-  eyebrow?: string;
+  title?: string;
+  titleNumberOfLines?: number;
+  reserveTitleSpace?: boolean;
   reserveEyebrow?: boolean;
-  eyebrowPlaceholder?: unknown;
+  backFallback?: unknown;
 };
 
 const headers = vi.hoisted(() => ({
@@ -98,29 +99,31 @@ beforeEach(() => {
   headers.rendered = [];
 });
 
-describe('todo detail header eyebrow', () => {
-  it('reserves the list line with the placeholder bar while the to-do loads', () => {
+describe('todo detail header', () => {
+  it('names the states with the to-do surface on the stock header', () => {
     query.isFetching = true;
     const renderer = renderScreen();
 
     expect(headers.rendered).toHaveLength(1);
-    expect(headers.rendered[0]?.eyebrow).toBeUndefined();
-    expect(headers.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(headers.rendered[0]?.eyebrowPlaceholder).toBeTruthy();
+    expect(headers.rendered[0]?.title).toBe('To-dos');
+    expect(headers.rendered[0]?.titleNumberOfLines).toBe(2);
+    expect(headers.rendered[0]?.reserveTitleSpace).toBe(true);
+    // No eyebrow line: the heading and its back control stay on the header's
+    // first line, where every other pushed screen puts them.
+    expect(headers.rendered[0]?.reserveEyebrow).toBeUndefined();
+    expect(headers.rendered[0]?.backFallback).toBe('/(app)/(tabs)/(2_agents)');
     renderer.unmount();
   });
 
-  it('keeps the reserved line blank when the read fails', () => {
+  it('keeps that header when the read fails', () => {
     query.isError = true;
     query.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     const renderer = renderScreen();
 
-    // The title keeps the position the payload gives it, and no bar pulses on a
-    // header whose label can only come back through a retry.
     expect(headers.rendered).toHaveLength(1);
-    expect(headers.rendered[0]?.eyebrow).toBeUndefined();
-    expect(headers.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(headers.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    expect(headers.rendered[0]?.title).toBe('To-dos');
+    expect(headers.rendered[0]?.reserveEyebrow).toBeUndefined();
+    expect(headers.rendered[0]?.backFallback).toBe('/(app)/(tabs)/(2_agents)');
     renderer.unmount();
   });
 });

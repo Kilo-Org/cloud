@@ -9,11 +9,10 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SectionHeader } from '@/components/ui/section-header';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
-import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
+import { ScreenHeader } from '@/components/screen-header';
 import { TodoNotesSection } from '@/components/todos/todo-notes-section';
 import { TodoSessionRow } from '@/components/todos/todo-session-row';
 import { TodoStartActions } from '@/components/todos/todo-start-actions';
-import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
 import { Circle, CircleCheck } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -156,6 +155,7 @@ function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
 
 /** One to-do: its title over its list, Markdown notes, linked sessions, and the ways to reach or start one. */
 export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
+  const { t } = useTranslation();
   const query = useTodoItem(itemId);
   const todo = query.data;
   const errorView = selectTodoItemQueryErrorView(query.error);
@@ -164,20 +164,17 @@ export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
     return <TodoDetailBody key={todo.id} todo={todo} />;
   }
 
-  // The loaded screen draws the to-do's list on the eyebrow line. A to-do that
-  // loads always carries its list, so this shell keeps the line reserved: while
-  // the read runs it carries the placeholder bar, and after the read fails the
-  // same line stays blank, so the title holds the position the payload gives it
-  // without an animation that the failure cannot finish.
-  const eyebrow: HeaderEyebrow =
-    query.isFetching && !query.isError ? { kind: 'loading' } : { kind: 'held' };
+  // The to-do's title and list come from the read, so the states name the
+  // surface. The header keeps the loaded body's shape — a two-line reserved
+  // title band and the lists fallback behind Back — without its eyebrow line,
+  // which would push the heading and its back control below every other pushed
+  // screen's.
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title=""
+        title={t('todos.segment.todos')}
         titleNumberOfLines={2}
         reserveTitleSpace
-        {...eyebrowHeaderProps(eyebrow)}
         backFallback={LISTS_HREF}
       />
       {query.isError ? (

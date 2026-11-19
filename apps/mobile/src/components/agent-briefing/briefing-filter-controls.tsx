@@ -58,14 +58,18 @@ export function BriefingFilterControls({
           }}
         />
       </View>
+      {/* The group role only announces the group name; the chips inside keep
+          their own button role and selected state. */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerClassName="gap-2"
+        accessibilityRole="radiogroup"
+        accessibilityLabel={t('agentBriefing.filterByContext')}
       >
         <FilterChip
           selected={organizationId === undefined}
-          label={t('common.all')}
+          label={t('agentBriefing.contextAll')}
           onPress={() => {
             onSelectOrganization(undefined);
           }}

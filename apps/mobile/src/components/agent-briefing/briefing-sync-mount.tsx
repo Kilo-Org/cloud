@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
@@ -42,13 +42,11 @@ export function BriefingSyncMount() {
   const memberships = useOrganizationsList();
   const { feedback: drainPhase, begin: beginDrain } = useSurfaceFeedback<DrainFailure>();
   const [failures, setFailures] = useState(0);
-  const { mutateAsync: dismiss } = useMutation(
-    trpc.agentBriefing.dismiss.mutationOptions({
-      onError: () => {
-        toast.error(i18n.t('common.couldNotSaveSetting'));
-      },
-    })
-  );
+  // Hidden briefs whose failed dismissal the user already heard about. The
+  // background retry ladder owns the recovery, so each report gets one
+  // announcement, not one per attempt.
+  const announcedDismissFailures = useRef<Set<string>>(new Set());
+  const { mutateAsync: dismiss } = useMutation(trpc.agentBriefing.dismiss.mutationOptions({}));
 
   useEffect(() => {
     if (!memberships.isSuccess || !userId || isSigningOut) {
@@ -59,7 +57,8 @@ export function BriefingSyncMount() {
       try {
         await purgeInaccessibleBriefingCache(client, { userId, authEpoch }, organizationIds);
       } catch {
-        toast.error(i18n.t('common.couldNotSaveSetting'));
+        // Best-effort cleanup; the preferences refetch already shows its own
+        // error state, so a failed purge adds nothing the user can act on.
       }
     })();
   }, [authEpoch, client, isSigningOut, memberships.data, memberships.isSuccess, userId]);
@@ -85,12 +84,15 @@ export function BriefingSyncMount() {
       return undefined;
     }
     /**
-     * Post the next pending dismissal and the journal entry it settles. `retry`
-     * is every unsuccessful server attempt — a rejected dismissal and a failed
-     * journal write both advance the ladder — while a denial or a report that
-     * is gone is dropped locally, as it always was.
+     * Post the next pending dismissal and the journal entry it settles.
+     * `retry` is every unsuccessful server attempt — a rejected dismissal and a
+     * failed journal write both advance the ladder — while a denial or a report
+     * that is gone is dropped locally, as it always was. The failed report id
+     * keys the once-per-report announcement below.
      */
-    async function drainOnce(): Promise<'posted' | 'retry' | 'neutral'> {
+    async function drainOnce(): Promise<
+      'posted' | { kind: 'retry'; reportId: string } | 'neutral'
+    > {
       const latest =
         client.getQueryData<BriefingDismissal[]>(['agent-briefing-dismissals', userId]) ?? [];
       const item = latest.find(entry => !entry.synced && Date.parse(entry.expiresAt) > Date.now());
@@ -101,7 +103,7 @@ export function BriefingSyncMount() {
         await dismiss({ reportId: item.reportId });
       } catch (error) {
         if (!briefingAccessDenied(error) && !briefingReportMissing(error)) {
-          return 'retry';
+          return { kind: 'retry', reportId: item.reportId };
         }
       }
       if (!isCurrentAuthEpoch(authEpoch)) {
@@ -122,7 +124,7 @@ export function BriefingSyncMount() {
       try {
         await saveJournal(settled);
       } catch {
-        return 'retry';
+        return { kind: 'retry', reportId: item.reportId };
       }
       return 'posted';
     }
@@ -136,9 +138,13 @@ export function BriefingSyncMount() {
         if (outcome === 'posted') {
           setFailures(0);
           attempt.succeed();
-        } else if (outcome === 'retry') {
+        } else if (outcome !== 'neutral') {
           setFailures(count => count + 1);
           attempt.fail({ kind: 'sync-failed' });
+          if (!announcedDismissFailures.current.has(outcome.reportId)) {
+            announcedDismissFailures.current.add(outcome.reportId);
+            toast.error(i18n.t('agentBriefing.dismissFailed'));
+          }
           return;
         } else {
           attempt.abandon();

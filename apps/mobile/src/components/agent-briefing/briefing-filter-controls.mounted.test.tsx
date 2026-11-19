@@ -3,6 +3,8 @@ import { expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import { FilterChip } from '@/components/ui/filter-chip';
+
 import { BriefingFilterControls } from './briefing-filter-controls';
 
 vi.mock('react-native', () => ({
@@ -75,6 +77,35 @@ function selectedOf(root: TestRenderer.ReactTestInstance, label: string): unknow
     : undefined;
 }
 
+it('names the context chip row as a filter group', () => {
+  const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
+  act(() => {
+    holder.renderer = TestRenderer.create(
+      renderFilters({ history: false, organizationId: undefined })
+    );
+  });
+  const root = holder.renderer;
+  if (!root) {
+    throw new Error('Controls are not mounted');
+  }
+  const groups = root.root.findAll(node => node.props.accessibilityRole === 'radiogroup');
+  expect(groups).toHaveLength(1);
+  const [group] = groups;
+  if (!group) {
+    throw new Error('The context chip row is not announced as a group');
+  }
+  expect(group.props.accessibilityLabel).toBe('agentBriefing.filterByContext');
+  // The all-contexts chip speaks its own copy, not the shared "All". The chip
+  // passes `label` to `Button`, which builds the pressable's name from it.
+  const allChip = root.root
+    .findAllByType(FilterChip)
+    .find(chip => chip.props.label === 'agentBriefing.contextAll');
+  expect(allChip?.props.selected).toBe(true);
+  act(() => {
+    holder.renderer?.unmount();
+  });
+});
+
 it('announces the active briefing tab and context filter as selected', () => {
   const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
   act(() => {
@@ -94,7 +125,7 @@ it('announces the active briefing tab and context filter as selected', () => {
   }
   expect(selectedOf(root.root, 'agentBriefing.available')).toBe(true);
   expect(selectedOf(root.root, 'agentBriefing.history')).toBe(false);
-  expect(selectedOf(root.root, 'common.all')).toBe(true);
+  expect(selectedOf(root.root, 'agentBriefing.contextAll')).toBe(true);
   expect(selectedOf(root.root, 'common.personal')).toBe(false);
   expect(selectedOf(root.root, 'Labs')).toBe(false);
 
@@ -103,14 +134,14 @@ it('announces the active briefing tab and context filter as selected', () => {
   });
   expect(selectedOf(root.root, 'agentBriefing.available')).toBe(false);
   expect(selectedOf(root.root, 'agentBriefing.history')).toBe(true);
-  expect(selectedOf(root.root, 'common.all')).toBe(false);
+  expect(selectedOf(root.root, 'agentBriefing.contextAll')).toBe(false);
   expect(selectedOf(root.root, 'common.personal')).toBe(true);
   expect(selectedOf(root.root, 'Labs')).toBe(false);
 
   act(() => {
     holder.renderer?.update(renderFilters({ history: true, organizationId: 'org_labs' }));
   });
-  expect(selectedOf(root.root, 'common.all')).toBe(false);
+  expect(selectedOf(root.root, 'agentBriefing.contextAll')).toBe(false);
   expect(selectedOf(root.root, 'common.personal')).toBe(false);
   expect(selectedOf(root.root, 'Labs')).toBe(true);
 });

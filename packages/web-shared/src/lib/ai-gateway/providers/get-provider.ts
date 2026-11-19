@@ -10,7 +10,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   byokOwner,
-  getByokCredentials,
   getByokKeyStates,
   getStoredByokKeys,
   type ByokOwner,
@@ -237,14 +236,16 @@ function rejectPrivateModel(
 async function resolveDirectByokModel(
   directByok: DirectByokProvider,
   directByokModel: DirectByokModel,
-  { user, organizationId, request }: GetProviderInput,
+  request: GatewayRequest,
+  /** The owner's keys, from the read that classified the id, or null when the caller cannot own keys. */
+  storedKeys: StoredByokKeys | null,
   decision: RoutingDecisionRecorder
 ): Promise<GetProviderResult | null> {
   const providerId = directByok.id;
-  const [credential] = await getByokCredentials(readDb, byokOwner(user.id, organizationId), [
-    providerId,
-  ]);
-  if (!credential) {
+  // The key comes from the read that produced `directByok`, so a private provider's URL and
+  // credential always belong to the same saved definition, even while it is being updated.
+  const key = storedKeys?.keys.find(candidate => candidate.providerId === providerId);
+  if (!storedKeys || !key?.isEnabled) {
     if (directByok.private_provider) return rejectPrivateModel(providerId, 'no-key', decision);
     decision.step({
       step: 'direct-byok-model',
@@ -254,7 +255,7 @@ async function resolveDirectByokModel(
     });
     return null;
   }
-  if (credential.serveCatalogModels && supportsCatalogMode(directByok)) {
+  if (key.serveCatalogModels && supportsCatalogMode(directByok)) {
     const catalogModelId = await getDirectByokCatalogModelId(directByokModel);
     decision.step({
       step: 'direct-byok-model',
@@ -269,6 +270,7 @@ async function resolveDirectByokModel(
       catalogModelId,
     };
   }
+  const credential = await storedKeys.decrypt(providerId);
   let route: ProviderRoute;
   try {
     route = await directByokRoute(directByok, directByokModel, credential, request, false);
@@ -593,7 +595,13 @@ async function selectProvider(
     return rejectPrivateModel(model.providerId, reason, decision);
   }
   if (model.kind === 'direct-byok-model') {
-    const result = await resolveDirectByokModel(model.provider, model.model, input, decision);
+    const result = await resolveDirectByokModel(
+      model.provider,
+      model.model,
+      request,
+      isAnonymousContext(user) ? null : await loadStoredKeys(),
+      decision
+    );
     if (result) return result;
   } else {
     decision.step({ step: 'direct-byok-model', outcome: 'skipped', reason: 'no-match' });

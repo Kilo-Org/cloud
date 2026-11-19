@@ -10,7 +10,10 @@ import {
   onlyRoute,
 } from '@kilocode/web-shared/tests/helpers/get-provider-result.helper';
 import type { ProviderRoutingDecision } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
-import { findDirectByokCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  findDirectByokCatalogModels,
+  getDirectByokModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type * as directByokModule from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   getModelGatewayUserByokProviders,
@@ -26,6 +29,7 @@ import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detec
 import type { ByokPrivateProviderDefinition } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys, type User } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
 import {
   testByokEnvelope,
   useFakeByokKms,
@@ -38,6 +42,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
     '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
   ),
   findDirectByokCatalogModels: jest.fn(),
+  getDirectByokModel: jest.fn(
+    jest.requireActual<typeof directByokModule>(
+      '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
+    ).getDirectByokModel
+  ),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   ...jest.requireActual<typeof byokModule>('@kilocode/web-shared/lib/ai-gateway/byok'),
@@ -307,6 +316,40 @@ describe('getProvider for a private provider model id', () => {
       },
     ]);
     expect(decision.result).toEqual({ kind: 'byok-private-provider-unavailable' });
+  });
+
+  test('serves the credential and URL of one saved definition while an update is in flight', async () => {
+    const user = await insertTestUser();
+    const organizationId = await organizationWithKeys(user, [
+      { providerId: PRIVATE_PROVIDER_ID, privateProvider: privateProvider() },
+    ]);
+    const rotated = JSON.stringify({ type: 'api_key', api_key: 'rotated-secret' });
+    // The update commits after routing read the definition, before it decrypts the credential.
+    jest.mocked(getDirectByokModel).mockImplementationOnce(async (...args) => {
+      await db
+        .update(byok_api_keys)
+        .set({
+          encrypted_api_key_envelope: testByokEnvelope(rotated),
+          settings: {
+            serve_catalog_models: false,
+            private_provider: privateProvider({ base_url: 'https://llm.moved.example/v1' }),
+          },
+        })
+        .where(
+          and(
+            eq(byok_api_keys.organization_id, organizationId),
+            eq(byok_api_keys.provider_id, PRIVATE_PROVIDER_ID)
+          )
+        );
+      return actualDirectByok.getDirectByokModel(...args);
+    });
+
+    const { result } = await route(user, organizationId, `${PRIVATE_PROVIDER_ID}/acme/coder`);
+
+    expect(await onlyRoute(result)).toMatchObject({
+      provider: { apiUrl: 'https://llm.acme.example/v1', apiKey: 'private-provider-secret' },
+      userByok: [{ decryptedAPIKey: CREDENTIALS }],
+    });
   });
 
   test('refuses a bespoke id of a catalog-mode private provider, naming the catalog id', async () => {

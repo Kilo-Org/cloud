@@ -121,7 +121,7 @@ describe('native live summary', () => {
     });
   });
 
-  it('clears the step and plan of a finished turn in storage but keeps its failure', () => {
+  it('ends a turn on the root idle status and only reads the summary for a snapshot', () => {
     const values = new Map<string, unknown>();
     const storage = {
       kv: {
@@ -134,39 +134,62 @@ describe('native live summary', () => {
     } as Pick<DurableObjectStorage, 'kv'>;
     const summary = createNativeLiveSummary(storage);
     const root = 'ses_root';
-    const session = (id: string) => ({
-      version: 'v2',
-      session: { id, location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+    const updated = (sessionID: string, message: Kilo2Message) => ({
+      type: 'conversation.message.updated',
+      properties: {
+        sessionID,
+        source: {
+          version: 'v2',
+          session: {
+            id: sessionID,
+            location: { directory: '/workspace' },
+            time: { created: 1, updated: 2 },
+          },
+        },
+        message,
+      },
     });
+    const status = (sessionID: string, type: string) => ({
+      type: 'session.status',
+      properties: { sessionID, status: { type } },
+    });
+    // Kilo v1 has no native transcript, so its idle status starts no summary.
+    summary.observe(status(root, 'idle'), root);
     expect(summary.settled('busy')).toBeUndefined();
     summary.observe(
-      {
-        sessionID: root,
-        source: session(root),
-        message: assistant(
+      updated(
+        root,
+        assistant(
           [tool('todowrite', 'completed', todos), tool('edit', 'running', { filePath: 'a.ts' })],
           { error: { type: 'aborted', message: 'stopped' } }
-        ),
-      },
+        )
+      ),
       root
     );
     // A subagent's message is not the root's summary.
     summary.observe(
-      {
-        sessionID: 'ses_child',
-        source: session('ses_child'),
-        message: assistant([tool('read', 'running', { filePath: 'b.ts' })]),
-      },
+      updated('ses_child', assistant([tool('read', 'running', { filePath: 'b.ts' })])),
       root
     );
-    expect(summary.settled('busy')).toEqual({
+    const working = {
       step: { verb: 'editing', target: 'a.ts' },
       plan: { done: 1, total: 2, current: 'Write the tests' },
       changes: null,
       failure: { kind: 'cancelled' },
-    });
+    };
     const finished = { step: null, plan: null, changes: null, failure: { kind: 'cancelled' } };
+    expect(summary.settled('busy')).toEqual(working);
+    // An idle or failed snapshot shows no step or plan without changing the stored summary.
     expect(summary.settled('idle')).toEqual(finished);
+    expect(summary.settled('failed')).toEqual(finished);
+    expect(summary.settled('busy')).toEqual(working);
+    // A subagent going idle does not end the root's turn.
+    summary.observe(status('ses_child', 'idle'), root);
+    expect(summary.settled('busy')).toEqual(working);
+    // The root going idle ends the turn, so the next one opens without its step and plan even
+    // when no root user message opens it.
+    summary.observe(status(root, 'idle'), root);
+    summary.observe(status(root, 'busy'), root);
     expect(summary.settled('busy')).toEqual(finished);
   });
 });

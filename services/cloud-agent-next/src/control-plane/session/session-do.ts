@@ -2461,16 +2461,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               queries: this.eventQueries,
               partText: this.partText,
             });
-            if (
-              persisted !== null &&
-              persisted.id !== 0 &&
-              event.type === 'conversation.message.updated' &&
-              this.registration !== null
-            )
-              this.nativeLiveSummary.observe(
-                event.properties,
-                this.registration.spec.kiloSessionId
-              );
+            if (persisted !== null && persisted.id !== 0 && this.registration !== null)
+              this.nativeLiveSummary.observe(event, this.registration.spec.kiloSessionId);
             if (receiptKey !== undefined) this.ctx.storage.kv.put(receiptKey, index + 1);
             return persisted;
           })

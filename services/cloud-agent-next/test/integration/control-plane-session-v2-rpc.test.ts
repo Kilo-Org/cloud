@@ -661,6 +661,126 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     });
   });
 
+  it('opens a Kilo v2 turn without a user message without the step and plan of the last one', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    const readPublished = () =>
+      runInDurableObject(
+        stub,
+        async (_instance, state) =>
+          (await state.storage.get<PublishCloudAgentSessionStatusParams[]>(
+            LIST_STATUS_PUBLISHES_KEY
+          )) ?? []
+      );
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const native = (message: Record<string, unknown>) => ({
+      type: 'conversation.message.updated',
+      properties: { sessionID: kiloId, source, message },
+    });
+    const status = (type: string, details: Record<string, unknown> = {}) => ({
+      type: 'session.status',
+      properties: { sessionID: kiloId, status: { type, ...details } },
+    });
+    const working = (id: string, created: number, tool: Record<string, unknown>) =>
+      native({
+        id,
+        type: 'assistant',
+        time: { created },
+        content: [
+          {
+            type: 'tool',
+            id: `call_plan_${created}`,
+            name: 'todowrite',
+            state: {
+              status: 'completed',
+              input: {
+                todos: [
+                  { content: 'Read the code', status: 'completed' },
+                  { content: 'Write the tests', status: 'in_progress' },
+                ],
+              },
+            },
+          },
+          tool,
+        ],
+      });
+    const firstMessage = messageId();
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(firstMessage),
+    });
+    peer.prepareView = peer.view('ready');
+    await stub.onRoute(peer.view('ready'));
+    await stub.onEvents({
+      events: [
+        status('busy'),
+        native({ id: 'msg_v2_prompt', type: 'user', time: { created: 1 }, text: 'hello' }),
+        working('msg_v2_answer', 2, {
+          type: 'tool',
+          id: 'call_edit',
+          name: 'edit',
+          state: { status: 'running', input: { filePath: '/workspace/app/src/index.ts' } },
+        }),
+      ],
+    });
+    await stub.onEvents({ events: [status('idle')] });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: firstMessage });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'idle',
+        liveSummary: { step: null, plan: null },
+      });
+    });
+
+    // A background command's completion opens the next turn with a synthetic notice.
+    const notice = (id: string, created: number) =>
+      native({ id, type: 'synthetic', time: { created }, text: 'Command completed' });
+    await stub.onEvents({
+      events: [
+        notice('msg_v2_first_notice', 3),
+        status('busy'),
+        working('msg_v2_first_notice_answer', 4, {
+          type: 'tool',
+          id: 'call_grep',
+          name: 'grep',
+          state: { status: 'running', input: { pattern: 'TODO' } },
+        }),
+      ],
+    });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'busy',
+        liveSummary: {
+          step: { verb: 'searching', target: 'TODO' },
+          plan: { done: 1, total: 2, current: 'Write the tests' },
+        },
+      });
+    });
+
+    // That turn ends and another completion opens the next one in the same delivery, so no
+    // snapshot sees the root idle; the next snapshot must not carry the finished turn's work.
+    await stub.onEvents({
+      events: [status('idle'), notice('msg_v2_second_notice', 5), status('busy')],
+    });
+    await stub.onEvents({
+      events: [status('retry', { attempt: 1, message: 'overloaded', next: 6 })],
+    });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'retry',
+        liveSummary: { step: null, plan: null, changes: null, failure: null },
+      });
+    });
+  });
+
   it('leaves the Kilo v1 session card summary and cost to its ingest client', async () => {
     const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
       await setupGeneratedTitleSession();

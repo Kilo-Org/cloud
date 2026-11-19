@@ -32,6 +32,11 @@ export const EMPTY_NATIVE_LIVE_SUMMARY_STATE: NativeLiveSummaryState = {
   summary: { step: null, plan: null, changes: null, failure: null },
 };
 
+const nativeStatusSchema = z.object({
+  sessionID: z.string(),
+  status: z.object({ type: z.string() }),
+});
+
 /** The failure kind of a native assistant error, by its type family. */
 function nativeFailureKind(type: string): SessionLiveFailureKind {
   if (type === 'aborted') return 'cancelled';
@@ -99,30 +104,49 @@ export function createNativeLiveSummary(storage: Pick<DurableObjectStorage, 'kv'
   return {
     /**
      * The root's summary for a list status snapshot, or undefined when the root has no native
-     * transcript (Kilo v1). A finished turn (idle or failed) clears the step and plan in storage,
-     * as the Kilo v1 idle transition does, so the next turn does not open with the last one's
-     * step; the failure stays until a new turn starts.
+     * transcript (Kilo v1). An idle or failed snapshot shows no step or plan without clearing
+     * them in storage: only the root's own events change the stored summary.
      */
     settled(
       status: PublishCloudAgentSessionStatusParams['status']
     ): SessionLiveSummary | undefined {
       const state = current();
       if (state === undefined) return undefined;
-      if (
-        (status !== 'idle' && status !== 'failed') ||
-        (state.summary.step === null && state.summary.plan === null)
-      )
-        return state.summary;
-      const summary = { ...state.summary, step: null, plan: null };
-      storage.kv.put(NATIVE_LIVE_SUMMARY_KEY, { turn: state.turn, summary });
-      return summary;
+      return status === 'idle' || status === 'failed'
+        ? { ...state.summary, step: null, plan: null }
+        : state.summary;
     },
     /**
-     * Fold a stored `conversation.message.updated` event of the root. Runs in the transaction
-     * that stores the event, so the summary never misses or repeats a committed row.
+     * Fold a stored event of the root. Runs in the transaction that stores the event, so the
+     * summary never misses or repeats a committed row. A `conversation.message.updated` updates
+     * the summary. An idle `session.status` ends the turn: it clears the step and plan, as the
+     * Kilo v1 idle transition does, so a turn that opens without a root user message (a
+     * background command's completion) does not start with the last turn's step. The failure
+     * stays until a new turn starts.
      */
-    observe(properties: Record<string, unknown>, rootKiloSessionId: string): void {
-      const parsed = kilo2ConversationMessageSchema.safeParse(properties);
+    observe(
+      event: { type: string; properties: Record<string, unknown> },
+      rootKiloSessionId: string
+    ): void {
+      if (event.type === 'session.status') {
+        const parsed = nativeStatusSchema.safeParse(event.properties);
+        if (
+          !parsed.success ||
+          parsed.data.sessionID !== rootKiloSessionId ||
+          parsed.data.status.type !== 'idle'
+        )
+          return;
+        const state = current();
+        if (state === undefined || (state.summary.step === null && state.summary.plan === null))
+          return;
+        storage.kv.put(NATIVE_LIVE_SUMMARY_KEY, {
+          turn: state.turn,
+          summary: { ...state.summary, step: null, plan: null },
+        });
+        return;
+      }
+      if (event.type !== 'conversation.message.updated') return;
+      const parsed = kilo2ConversationMessageSchema.safeParse(event.properties);
       if (!parsed.success || parsed.data.sessionID !== rootKiloSessionId) return;
       const previous = current();
       const next = foldNativeLiveSummary(

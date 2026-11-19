@@ -192,6 +192,18 @@ describe('ProfileMcpScreen', () => {
       i18n.t('profiles.organizationRoleRequired')
     );
 
+    // With nothing to open the row renders static, so the count and the command
+    // it paints stay text stops instead of being hidden for a press that does
+    // not exist.
+    const factLines = findAll(renderer.root, 'Text').filter(
+      node => node.props.children === 1 || node.props.children === 'npx @example/mcp'
+    );
+    expect(factLines).toHaveLength(2);
+    for (const line of factLines) {
+      expect(line.props.accessible).toBeUndefined();
+      expect(line.props.importantForAccessibility).toBeUndefined();
+    }
+
     unmount();
   });
 

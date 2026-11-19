@@ -37,10 +37,13 @@ type McpServerRowProps = Readonly<{
  * The name owns its line, so it is ellipsized only when it alone is wider than
  * the row; the type and the count are metadata and never take the room a short
  * name needs. The summary is a value, so it keeps both of its ends and ellipsizes
- * in the middle — a URL or a command is told apart by its tail. The painted lines
- * are hidden from assistive technology, and the content press and the switch are
- * what a reader reaches: the press is one element, so the type, the count and the
- * summary ride its spoken name.
+ * in the middle — a URL or a command is told apart by its tail. While the row can
+ * open its form, the content press and the switch are what a reader reaches: the
+ * press is one element, so the type, the count and the summary ride its spoken
+ * name. A row without an edit handler has no press at all (`pressTarget` `row`
+ * with nothing to open renders the frame's static row), so there its painted
+ * facts become text stops of their own instead of being hidden for a control
+ * that does not exist.
  */
 export function McpServerRowView({
   server,
@@ -61,6 +64,7 @@ export function McpServerRowView({
   // its name is announced by itself. The facts that tell two servers apart ride
   // the name after the action, the way the members row appends the email it
   // shows under its manage action.
+  const canEdit = onEdit !== undefined;
   const contentFacts = [
     showType ? typeLabel : null,
     secretLabel,
@@ -68,12 +72,13 @@ export function McpServerRowView({
   ]
     .filter((fact): fact is string => fact !== null)
     .join(', ');
-  const contentAccessibilityLabel =
-    onEdit === undefined
-      ? undefined
-      : [t('profiles.mcp.edit', { name: server.name }), contentFacts]
-          .filter(fact => fact.length > 0)
-          .join(', ');
+  const contentAccessibilityLabel = canEdit
+    ? [t('profiles.mcp.edit', { name: server.name }), contentFacts]
+        .filter(fact => fact.length > 0)
+        .join(', ')
+    : undefined;
+  // Only a row whose press names the facts hides them; a static row keeps them.
+  const factLineA11y = canEdit ? HIDDEN_LABEL_PROPS : {};
 
   const trailing: ReactNode[] = [
     <Fragment key="enable">
@@ -103,10 +108,9 @@ export function McpServerRowView({
   return (
     <RowFrame
       leading={<IconTile icon={Server} tint={NEUTRAL_TINT} />}
-      pressTarget="content"
+      pressTarget={canEdit ? 'content' : 'row'}
       onPress={onEdit}
       contentAccessibilityLabel={contentAccessibilityLabel}
-      disabled={onEdit === undefined}
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
       <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS} className="min-w-0 shrink">
@@ -115,7 +119,7 @@ export function McpServerRowView({
       {showType || secretLabel !== null ? (
         <View className="mt-0.5 flex-row items-center gap-2">
           {showType ? (
-            <Text variant="caption" {...HIDDEN_LABEL_PROPS}>
+            <Text variant="caption" {...factLineA11y}>
               {typeLabel}
             </Text>
           ) : null}
@@ -125,7 +129,7 @@ export function McpServerRowView({
               {/* The count sits beside a lock glyph, so the plural wording
                   (not the bare digit) is what the content press announces for
                   it, while the row keeps the compact digit on screen. */}
-              <Text variant="caption" {...HIDDEN_LABEL_PROPS}>
+              <Text variant="caption" {...factLineA11y}>
                 {secretCount}
               </Text>
             </View>
@@ -138,7 +142,7 @@ export function McpServerRowView({
           className="mt-0.5 text-xs text-muted-foreground"
           numberOfLines={1}
           ellipsizeMode="middle"
-          {...HIDDEN_LABEL_PROPS}
+          {...factLineA11y}
         >
           {summary}
         </Text>

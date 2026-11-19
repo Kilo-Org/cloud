@@ -73,8 +73,11 @@ function hasUsableMessage(error: unknown): boolean {
  * enabled switch and delete. The content is the edit action — the form sheet has
  * no delete of its own — so the row carries two trailing controls instead of
  * three; a skills.sh reference has no edit surface here, so its content is inert.
- * The painted lines are hidden from assistive technology, and the content press
- * and the switch are what a reader reaches.
+ * While the content opens the form, its press and the switch are what a reader
+ * reaches. A row with no content to open (a read-only profile, or a skills.sh
+ * reference) renders the frame's static row instead, where the source stays a
+ * text stop of its own rather than being hidden for a control that does not
+ * exist.
  */
 function SkillRow({ skill, showSource, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
@@ -83,6 +86,9 @@ function SkillRow({ skill, showSource, onToggle, onEdit, onDelete }: Readonly<Sk
   const subtitle = subtitleKey === null ? skill.sourceType : t(subtitleKey);
   const canEdit = skill.sourceType !== 'skills-sh';
   const edit = canEdit ? onEdit : undefined;
+  const contentIsPress = edit !== undefined;
+  // Only a row whose press names the source hides it; a static row keeps it.
+  const factLineA11y = contentIsPress ? HIDDEN_LABEL_PROPS : {};
   const trailing: ReactNode[] = [
     <Fragment key="enable">
       {renderRowTrailing({
@@ -110,19 +116,18 @@ function SkillRow({ skill, showSource, onToggle, onEdit, onDelete }: Readonly<Sk
   return (
     <RowFrame
       leading={<IconTile icon={Sparkles} tint={NEUTRAL_TINT} />}
-      pressTarget="content"
+      pressTarget={contentIsPress ? 'content' : 'row'}
       onPress={edit}
       contentAccessibilityLabel={
-        edit === undefined ? undefined : t('profiles.skillEdit', { name: skill.name })
+        contentIsPress ? t('profiles.skillEdit', { name: skill.name }) : undefined
       }
-      disabled={edit === undefined}
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
       <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
         {skill.name}
       </Text>
       {showSource ? (
-        <Text variant="caption" className="mt-0.5" {...HIDDEN_LABEL_PROPS}>
+        <Text variant="caption" className="mt-0.5" {...factLineA11y}>
           {subtitle}
         </Text>
       ) : null}

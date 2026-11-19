@@ -67,9 +67,12 @@ function hasUsableMessage(error: unknown): boolean {
 /**
  * One instruction row: the rules file name in mono, the path it is applied as,
  * the enabled switch and delete. The content is the edit action, so the row
- * carries two trailing controls instead of three; both painted lines are hidden
- * from assistive technology — the path repeats the name — and the content press
- * and the switch are what a reader reaches.
+ * carries two trailing controls instead of three; while the content opens the
+ * form, both painted lines are hidden from assistive technology — the path
+ * repeats the name — and the content press and the switch are what a reader
+ * reaches. A row without an edit handler has no content to open: it renders
+ * the frame's static row, where the path stays a text stop of its own instead
+ * of being hidden for a control that does not exist.
  */
 function InstructionRow({
   instruction,
@@ -79,6 +82,9 @@ function InstructionRow({
 }: Readonly<InstructionRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const contentIsPress = onEdit !== undefined;
+  // Only a row whose press names the path hides it; a static row keeps it.
+  const pathLineA11y = contentIsPress ? HIDDEN_LABEL_PROPS : {};
   const trailing: ReactNode[] = [
     <Fragment key="enable">
       {renderRowTrailing({
@@ -106,12 +112,11 @@ function InstructionRow({
   return (
     <RowFrame
       leading={<IconTile icon={FileText} tint={NEUTRAL_TINT} />}
-      pressTarget="content"
+      pressTarget={contentIsPress ? 'content' : 'row'}
       onPress={onEdit}
       contentAccessibilityLabel={
-        onEdit === undefined ? undefined : t('profiles.instructionEdit', { name: instruction.name })
+        contentIsPress ? t('profiles.instructionEdit', { name: instruction.name }) : undefined
       }
-      disabled={onEdit === undefined}
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
       <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
@@ -124,7 +129,7 @@ function InstructionRow({
         className="mt-0.5"
         numberOfLines={1}
         ellipsizeMode="middle"
-        {...HIDDEN_LABEL_PROPS}
+        {...pathLineA11y}
       >
         {`.kilocode/rules/${instruction.name}.md`}
       </Text>

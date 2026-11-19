@@ -30,8 +30,13 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+/** The manage permission the mocked profile hook reports; read-only drops every control. */
+const permission = vi.hoisted(() => ({
+  value: 'allowed' as 'allowed' | 'read-only' | 'resolving',
+}));
+
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useOrganizationProfilePermission: () => 'allowed',
+  useOrganizationProfilePermission: () => permission.value,
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileInstructions: () => h.query,
@@ -190,6 +195,7 @@ function rowControls(root: ReactTestInstance): string[] {
 describe('ProfileInstructionsScreen delete confirmation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    permission.value = 'allowed';
     h.query.data = [testInstruction()];
     h.query.isError = false;
     h.query.isPending = false;
@@ -297,6 +303,7 @@ describe('ProfileInstructionsScreen delete confirmation', () => {
 describe('ProfileInstructionsScreen instruction cap', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    permission.value = 'allowed';
     h.query.isError = false;
     h.query.isPending = false;
     h.query.isRefetching = false;
@@ -326,5 +333,35 @@ describe('ProfileInstructionsScreen instruction cap', () => {
     expect(findAll(belowCap.renderer.root, 'AccessibleStatus')).toHaveLength(0);
     expect(findAll(belowCap.renderer.root, 'Button')[0]?.props.disabled).toBe(false);
     belowCap.unmount();
+  });
+});
+
+describe('ProfileInstructionsScreen read-only row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    permission.value = 'read-only';
+    h.query.data = [testInstruction()];
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+  });
+
+  it('drops the edit control and keeps the rules path readable', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    // The content is the edit action, so a read-only profile renders no row
+    // control at all — and, because there is no press to name the row, the path
+    // it paints stays a text stop instead of being hidden for that control.
+    expect(rowControls(renderer.root)).not.toContain(
+      i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME })
+    );
+    const pathLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === `.kilocode/rules/${INSTRUCTION_NAME}.md`
+    );
+    expect(pathLine?.props.accessible).toBeUndefined();
+    expect(pathLine?.props.importantForAccessibility).toBeUndefined();
+    expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe(INSTRUCTION_NAME);
+
+    unmount();
   });
 });

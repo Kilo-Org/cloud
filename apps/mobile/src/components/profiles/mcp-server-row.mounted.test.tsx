@@ -175,4 +175,25 @@ describe('<McpServerRowView>', () => {
     root = renderRow(row({ readOnly: true }));
     expect(root.findAllByType(SWITCH)[0]?.props.disabled).toBe(true);
   });
+
+  it('renders a read-only row static, so the facts it paints stay text stops', () => {
+    const root = renderRow(row({ readOnly: true }));
+
+    // No edit handler means no content press to name, so the row is the frame's
+    // static row: nothing is hidden behind a control that does not exist.
+    expect(root.findAllByType(PRESSABLE)).toHaveLength(0);
+    const factLines = root
+      .findAllByType(TEXT)
+      .filter(
+        node =>
+          node.props.children === 'Remote' ||
+          node.props.children === 'https://mcp.example.com/docs'
+      );
+    expect(factLines).toHaveLength(2);
+    for (const line of factLines) {
+      expect(line.props.accessible).toBeUndefined();
+      expect(line.props.importantForAccessibility).toBeUndefined();
+    }
+    expect(root.findAllByType(SWITCH)[0]?.props.accessibilityLabel).toBe(server.name);
+  });
 });

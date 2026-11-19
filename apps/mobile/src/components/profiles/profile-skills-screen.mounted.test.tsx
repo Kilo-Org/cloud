@@ -185,12 +185,16 @@ describe('ProfileSkillsScreen', () => {
 
   it('read-only: a loaded list keeps its rows, drops its controls and names who may act', async () => {
     permissionState.permission = 'read-only';
-    h.query.data = testSkills([testSkill()]);
+    // Two source kinds, so each row paints the source under its name.
+    h.query.data = testSkills([
+      testSkill(),
+      testSkill({ id: 'skill-2', name: 'frontend-rules', sourceType: 'imported' }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
 
-    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
+    expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe('code-review');
     // The row content is the edit action, so without the manage role it renders
     // no labelled control at all.
     expect(
@@ -202,6 +206,14 @@ describe('ProfileSkillsScreen', () => {
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
       i18n.t('profiles.organizationRoleRequired')
     );
+
+    // With nothing to open the row renders static, so the source it paints stays
+    // a text stop instead of being hidden for a press that does not exist.
+    const sourceLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === i18n.t('profiles.skillSourceCustom')
+    );
+    expect(sourceLine?.props.accessible).toBeUndefined();
+    expect(sourceLine?.props.importantForAccessibility).toBeUndefined();
 
     unmount();
   });

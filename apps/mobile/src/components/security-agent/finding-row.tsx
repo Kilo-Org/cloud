@@ -14,6 +14,8 @@ import {
   findingToneColor,
 } from '@/components/security-agent/finding-tone';
 import { Button } from '@/components/ui/button';
+import { Eyebrow } from '@/components/ui/eyebrow';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -35,11 +37,14 @@ import { type SecurityAnalysisCapacityState } from '@/lib/security-analysis-capa
 import { cn } from '@/lib/utils';
 
 /**
- * A finding card's own frame: the padding and the line rhythm the loading
- * placeholder in `finding-row-skeleton.tsx` repeats, so the cards replace the
- * placeholders in place.
+ * A finding is a flat list row (`apps/mobile/AGENTS.md`, "Flat list rows"):
+ * full-bleed, content from the 14pt gutter, a 0.5pt hairline under every row
+ * but the last, and the disclosure mark at the row's trailing edge. It is the
+ * one row the primitives cannot express — a severity eyebrow, a two-line title,
+ * a repository caption, a state line and its own inline action — so it keeps
+ * the contract's geometry rather than a card of its own.
  */
-export const FINDING_ROW_FRAME_CLASS = 'gap-1.5 rounded-lg bg-secondary p-3';
+const FINDING_ROW_CLASS = 'gap-1 px-4 py-3 border-b-[0.5px] border-hair-soft';
 
 const SEVERITY_KEYS = {
   critical: 'common.critical',
@@ -190,6 +195,8 @@ type FindingRowProps = {
   slaEnabled: boolean;
   /** From useSecurityAnalysisCapacity(scope) — disables (not hides) the row's quick Analyze action. */
   capacityState: SecurityAnalysisCapacityState;
+  /** Last row of the list, which drops the hairline under it. */
+  last?: boolean;
 };
 
 export function FindingRow({
@@ -197,6 +204,7 @@ export function FindingRow({
   scope,
   slaEnabled,
   capacityState,
+  last = false,
 }: Readonly<FindingRowProps>) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
@@ -237,56 +245,57 @@ export function FindingRow({
       });
 
   return (
-    <View className={FINDING_ROW_FRAME_CLASS}>
+    <View className={cn(FINDING_ROW_CLASS, last && 'border-b-0')}>
       <Pressable
-        className="gap-1.5 active:opacity-70"
+        className="flex-row items-start gap-3 active:opacity-70"
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         onPress={() => {
           pushOnce(getSecurityAgentPath(scope, `findings/${finding.id}`));
         }}
       >
-        <Text
-          className={cn(
-            'font-mono-medium text-[11px] uppercase tracking-[0.6px]',
-            lookup(SEVERITY_TEXT_CLASS, finding.severity) ?? 'text-muted-foreground'
-          )}
-        >
-          {severityLabel}
-        </Text>
-        <Text className="text-sm font-medium" numberOfLines={2}>
-          {finding.title}
-        </Text>
-        <Text variant="muted" className="text-xs" numberOfLines={1}>
-          {finding.repo_full_name}
-        </Text>
-        <View className="flex-row flex-wrap items-center gap-3 pt-0.5">
-          <View className="flex-row items-center gap-1">
-            <SpinningIcon
-              icon={AnalysisIcon}
-              size={13}
-              color={findingToneColor(colors, analysis.tone)}
-              spinning={Boolean(analysis.spinning)}
-            />
-            <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
-              {analysisLabel}
-            </Text>
-          </View>
-          {deadline && DeadlineIcon && (
+        <View className="min-w-0 flex-1 gap-1">
+          <Eyebrow className={lookup(SEVERITY_TEXT_CLASS, finding.severity) ?? undefined}>
+            {severityLabel}
+          </Eyebrow>
+          <Text className="text-sm font-medium" numberOfLines={2}>
+            {finding.title}
+          </Text>
+          <Text variant="caption" numberOfLines={1}>
+            {finding.repo_full_name}
+          </Text>
+          <View className="flex-row flex-wrap items-center gap-3 pt-0.5">
             <View className="flex-row items-center gap-1">
               <SpinningIcon
-                icon={DeadlineIcon}
+                icon={AnalysisIcon}
                 size={13}
-                color={findingToneColor(colors, deadline.tone)}
-                spinning={Boolean(deadline.spinning)}
+                color={findingToneColor(colors, analysis.tone)}
+                spinning={Boolean(analysis.spinning)}
               />
-              <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
-                {deadlineLabel}
+              <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
+                {analysisLabel}
               </Text>
             </View>
-          )}
+            {deadline && DeadlineIcon && (
+              <View className="flex-row items-center gap-1">
+                <SpinningIcon
+                  icon={DeadlineIcon}
+                  size={13}
+                  color={findingToneColor(colors, deadline.tone)}
+                  spinning={Boolean(deadline.spinning)}
+                />
+                <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
+                  {deadlineLabel}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
+        <RowChevron />
       </Pressable>
+      {/* The quick action sits beside the row's control, never inside it: a
+          nested button is unreachable for assistive technology and a disabled
+          Analyze would otherwise fall through to the row's own press. */}
       <FindingRowQuickAction
         finding={finding}
         scope={scope}

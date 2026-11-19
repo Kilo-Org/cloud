@@ -61,6 +61,17 @@ export const GLANCEABLE_SNAPSHOT_STATUSES = [
 
 export type GlanceableAgentsSnapshotStatus = (typeof GLANCEABLE_SNAPSHOT_STATUSES)[number];
 
+/**
+ * The statuses a caller may force on a built snapshot. `happy` and `empty` are
+ * not among them: those two come from the counts alone, so a forced value
+ * could only contradict the counts and details built beside it. A caller that
+ * wants one of them omits the override.
+ */
+export type GlanceableSnapshotStatusOverride = Exclude<
+  GlanceableAgentsSnapshotStatus,
+  'happy' | 'empty'
+>;
+
 /** The one kind vocabulary every surface reads (membership only; consumers own presentation order). */
 export const GLANCEABLE_STATUS_KINDS = ['needsInput', 'running', 'idle', 'scheduled'] as const;
 
@@ -221,11 +232,27 @@ export function glanceableNeedsInputKind(status: string): GlanceableNeedsInputKi
 
 /**
  * The snapshot statuses that end the surface: a signed-out or privacy-cleared
- * scope. Every terminal-status decision reads this one predicate, so the data
- * payload, presentation, refresh cadence and timeline cannot disagree.
+ * scope. The one terminal vocabulary: a consumer that maps a terminal status to
+ * its own value reads the narrowed status this predicate returns instead of
+ * restating the set.
  */
-export function isTerminalGlanceableStatus(status: GlanceableAgentsSnapshotStatus): boolean {
-  return status === 'signed_out' || status === 'privacy';
+export const GLANCEABLE_TERMINAL_STATUSES = [
+  'signed_out',
+  'privacy',
+] as const satisfies readonly GlanceableAgentsSnapshotStatus[];
+
+export type GlanceableTerminalStatus = (typeof GLANCEABLE_TERMINAL_STATUSES)[number];
+
+/**
+ * The snapshot statuses that end the surface. Every terminal-status decision
+ * reads this one predicate, so the data payload, presentation, refresh cadence
+ * and timeline cannot disagree, and it narrows its caller to the terminal
+ * vocabulary so a presentation cannot label one terminal member as another.
+ */
+export function isTerminalGlanceableStatus(
+  status: GlanceableAgentsSnapshotStatus
+): status is GlanceableTerminalStatus {
+  return (GLANCEABLE_TERMINAL_STATUSES as readonly string[]).includes(status);
 }
 
 /**
@@ -442,7 +469,7 @@ export type BuildGlanceableSnapshotInput = {
   previousRevision?: number;
   accountEpoch?: number;
   /** Overrides the happy/empty derivation for waiting, stale, expired, signed_out, privacy. */
-  status?: GlanceableAgentsSnapshotStatus;
+  status?: GlanceableSnapshotStatusOverride;
 };
 
 /**

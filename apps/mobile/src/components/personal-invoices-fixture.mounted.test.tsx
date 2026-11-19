@@ -71,6 +71,8 @@ vi.mock('@/components/empty-state', () => ({
     emptyStates.rendered.push(props);
     return null;
   },
+  // The retryable state's action; the suite asserts the captured state, not it.
+  StateAction: () => null,
 }));
 
 vi.mock('@/components/screen-header', () => ({
@@ -95,6 +97,7 @@ vi.mock('@/components/ui/icons', () => ({
   Download: 'Download',
   FileText: 'FileText',
   Lock: 'Lock',
+  RotateCcw: 'RotateCcw',
   SearchX: 'SearchX',
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',

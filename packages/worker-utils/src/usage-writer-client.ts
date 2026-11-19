@@ -2,6 +2,7 @@ import {
   EnkryptUsageWriteResponseSchema,
   ExaUsageWriteResponseSchema,
   UsageRecordResponseSchema,
+  USAGE_CLASS_LIMIT_HEADER,
   type EnkryptUsageWrite,
   type EnkryptUsageWriteResponse,
   type ExaUsageRecord,
@@ -36,6 +37,7 @@ type UnavailableWrite = {
     | 'request_failed';
   status?: number;
   admissionReason?: AdmissionReason;
+  classOnly?: true;
 };
 
 type WriteSettlement<Result, Status extends string> = { kind: Status; result: Result };
@@ -146,7 +148,14 @@ async function sendUsageWrite<Result, Status extends WriterStatus>(
         // A partial, slow or malformed rejection remains generic HTTP 429 overload.
         bodyError = errorName(error);
       }
-      return unavailable('http_error', 429, admissionReason, bodyError);
+      const rejection = unavailable('http_error', 429, admissionReason, bodyError);
+      if (
+        request.usageKind !== undefined &&
+        admissionReason === 'queue_limit' &&
+        response.headers.get(USAGE_CLASS_LIMIT_HEADER) === 'non_llm'
+      )
+        return { ...rejection, classOnly: true };
+      return rejection;
     }
     if (!response.ok) return unavailable('http_error', response.status);
     if (!response.body) return unavailable('invalid_response');

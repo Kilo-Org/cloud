@@ -30,6 +30,7 @@ import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 
 // The tour row pushes through the press-burst guard, and these assertions read
 // the router mock, so the guarded push is that same function.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/hooks/use-single-push-route', () => ({
   useSinglePushRoute: () => routerPush,
 }));
@@ -156,16 +157,19 @@ describe('ProfileScreen deferred queries', () => {
     expectRowHue('GitHub', 'moss');
 
     const actionTiles = root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'ActionTile'
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'ConfigureRow' &&
+        node.props.variant === 'action'
     );
     expect(actionTiles).toHaveLength(4);
-    const hueByLabel = new Map(actionTiles.map(tile => [tile.props.label as string, tile]));
+    const hueByLabel = new Map(actionTiles.map(tile => [tile.props.title as string, tile]));
     expect(hueByLabel.get(i18n.t('profile.feedback'))?.props.hue).toBe('fern');
     expect(hueByLabel.get(i18n.t('profile.privacyChoices'))?.props.hue).toBe('fern');
     expect(hueByLabel.get(i18n.t('common.signOut'))?.props.hue).toBe('fern');
 
     // Delete account takes the same family step, and the danger tone still wins
-    // inside ActionTile.
+    // inside the row primitive.
     const deleteAccount = hueByLabel.get(i18n.t('profile.deleteAccount'));
     expect(deleteAccount?.props.hue).toBe('fern');
     expect(deleteAccount?.props.destructive).toBe(true);

@@ -7786,7 +7786,13 @@ describe('Enkrypt input guardrail', () => {
 
       expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
         [expect.objectContaining({ decision: 'allowed', addedLatencyMs: expect.any(Number) })],
-        [expect.objectContaining({ decision: 'error', creditsCost: 3, addedLatencyMs: null })],
+        [
+          expect.objectContaining({
+            decision: 'error',
+            creditsCost: 3,
+            addedLatencyMs: expect.any(Number),
+          }),
+        ],
       ]);
     });
 
@@ -7818,7 +7824,7 @@ describe('Enkrypt input guardrail', () => {
         await runAfterTasks();
         expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
           [expect.objectContaining({ decision, addedLatencyMs: expect.any(Number) })],
-          [expect.objectContaining({ decision: 'allowed', addedLatencyMs: null })],
+          [expect.objectContaining({ decision: 'allowed', addedLatencyMs: expect.any(Number) })],
         ]);
       }
     );

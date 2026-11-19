@@ -90,6 +90,18 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (sessionRowFixture) {
       return `/(auth)/session-row-fixture${sessionRowFixture[1] ?? ''}`;
     }
+    // Dev-only chat failure copy for every stable on-device refusal reason. The
+    // state is the link's last segment, so it is forwarded as the route's
+    // `state` param; the fixture falls back to `all` for a name it does not know.
+    const localFailureCopyFixture =
+      /(?:^|\/)dev\/local-failure-copy-fixture\/([a-z][a-z-]*)\/?$/.exec(path);
+    if (localFailureCopyFixture) {
+      return `/(app)/local-failure-copy-fixture?state=${localFailureCopyFixture[1]}`;
+    }
+    // Dev-only GGUF row: the retrying line and the plain downloading line together.
+    if (/(?:^|\/)dev\/gguf-retry-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/gguf-retry-fixture';
+    }
     if (/(?:^|\/)dev\/system-search-unresolved-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/system-search-unresolved-fixture';
     }
@@ -177,6 +189,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     }
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';
+    }
+    // Dev-only destructive settings confirmation: the screen that runs the
+    // agent's `settings_set` call, so the confirm can be driven without a chat.
+    if (/(?:^|\/)dev\/settings-confirm-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(auth)/settings-confirm-fixture';
     }
     const reauthorizeFixtureMatch =
       /(?:^|\/)dev\/security-agent-reauthorize-fixture\/?(\?.*)?$/.exec(path);

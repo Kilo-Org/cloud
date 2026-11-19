@@ -78,6 +78,11 @@ export type NativeSessionState = {
   events: NativeEvent[];
   commands: Record<string, 'queued' | 'delivered' | 'expired'>;
   error?: string | undefined;
+  /**
+   * Set when automatic transcript reads stopped after repeated failures. The transport does
+   * not reconnect until `refresh()` asks for one read cycle again.
+   */
+  snapshotFailure?: { error: string } | undefined;
 };
 export type NativeInstanceReply = {
   commandID: string;
@@ -110,6 +115,8 @@ export type NativeSessionConnection = {
   sendCommand(command: string, args?: string): Promise<string>;
   getCommandStatus(commandID: string): Promise<'queued' | 'delivered' | 'expired'>;
   clear(): void;
+  /** Retry the transcript after a latched snapshot failure with one fresh read cycle. */
+  refresh(): void;
   close(): void;
 };
 export type NativeSocket = {
@@ -148,15 +155,23 @@ const reason = (error: unknown) =>
 /**
  * Authorization failures and deleted sessions cannot recover by reconnecting. A 404 stays
  * retryable: a just-created session is briefly unknown until its runner registers it.
+ * `snapshot_unavailable` is the latched transcript failure: only an explicit refresh retries.
  */
 const isPermanent = (error: unknown) =>
   (error instanceof NativeSyncError && (error.status === 401 || error.status === 403)) ||
-  (error instanceof Error && 'code' in error && error.code === 'session_deleted');
+  (error instanceof Error &&
+    'code' in error &&
+    (error.code === 'session_deleted' || error.code === 'snapshot_unavailable'));
 
 // Count UTF-16 storage conservatively for raw frames and retained parsed replay.
 const liveFrameBytes = 512 * 1024;
 const liveBacklogBytes = 4 * 1024 * 1024;
 const liveBacklogCount = 1024;
+const SNAPSHOT_FAILURE_LIMIT = 3;
+// Bounds for a connect that never reaches hello: a failing ticket mint, an offline fetch, or an
+// immediate close.
+const connectBackoffFloorMs = 1000;
+const connectBackoffCeilMs = 60_000;
 type SocketEpoch = {
   signal: AbortSignal;
   current: () => boolean;
@@ -471,6 +486,8 @@ export class NativeSyncClient {
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let renewalTimer: ReturnType<typeof setTimeout> | undefined;
     let reconnectAfterMs = 1000;
+    let connectBackoffMs = connectBackoffFloorMs;
+    let greeted = false;
     let generation = 0;
     let retire: (() => void) | undefined;
     const send = (value: unknown) => {
@@ -528,11 +545,14 @@ export class NativeSyncClient {
       }
       clearTimeout(reconnectTimer);
       const retry = error instanceof NativeSyncError ? error['retryAfterMs'] : 0;
+      const delay = Math.max(retry, reconnectAfterMs, connectBackoffMs);
+      // Without hello there is no server retry budget to honour, so each miss doubles the wait.
+      if (!greeted) connectBackoffMs = Math.min(connectBackoffCeilMs, connectBackoffMs * 2);
       reconnectTimer = setTimeout(
         () => {
           void connect();
         },
-        Math.max(retry, reconnectAfterMs) + Math.random() * reconnectAfterMs
+        delay + Math.random() * reconnectAfterMs
       );
     };
     const connect = async () => {
@@ -570,6 +590,7 @@ export class NativeSyncClient {
         queue.length = 0;
         controller.abort();
       };
+      greeted = false;
       onConnection('connecting');
       try {
         const ticket = await mint();
@@ -594,6 +615,8 @@ export class NativeSyncClient {
                 if (frame.type === 'hello') {
                   if (typeof body['reconnectAfterMs'] === 'number')
                     reconnectAfterMs = Math.min(60_000, Math.max(1000, body['reconnectAfterMs']));
+                  greeted = true;
+                  connectBackoffMs = connectBackoffFloorMs;
                   onConnection('connected');
                   scheduleRenewal(body);
                 }
@@ -638,6 +661,18 @@ export class NativeSyncClient {
     void connect();
     return {
       send,
+      restart: () => {
+        stopped = false;
+        generation++;
+        connectBackoffMs = connectBackoffFloorMs;
+        retire?.();
+        retire = undefined;
+        clearTimeout(reconnectTimer);
+        clearTimeout(renewalTimer);
+        socket?.close();
+        socket = undefined;
+        void connect();
+      },
       close: () => {
         stopped = true;
         generation++;
@@ -782,6 +817,8 @@ export class NativeSyncClient {
     let recovery: Recovery | undefined;
     let integrityError: string | undefined;
     let failureError: string | undefined;
+    let snapshotFailures = 0;
+    let snapshotFailure: string | undefined;
     let integrityGap = false;
     let quarantined: { seq: number; position: number }[] = [];
     let remoteState: NativeEvent | undefined;
@@ -835,12 +872,56 @@ export class NativeSyncClient {
       });
     };
     const markGap = () => {
+      if (snapshotFailure) return;
       integrityGap = true;
       integrityError = 'Native transcript may be incomplete because live replay is unavailable.';
       publish({});
     };
+    /**
+     * One failed snapshot cycle. At the limit this returns the permanent error that settles
+     * the connection, and `refresh()` starts the streak again.
+     */
+    const noteSnapshotFailure = (error: unknown) => {
+      if (isPermanent(error)) return undefined;
+      if (error instanceof NativeSyncError && error.status === 404) return undefined;
+      // A canceled read says nothing about the transcript, whichever signal canceled it.
+      if (
+        (error instanceof NativeSyncError && error.code === 'request_canceled') ||
+        (error instanceof Error && error.name === 'AbortError')
+      )
+        return undefined;
+      snapshotFailures =
+        error instanceof Error && 'code' in error && error.code === 'native_asset_not_found'
+          ? SNAPSHOT_FAILURE_LIMIT
+          : snapshotFailures + 1;
+      if (snapshotFailures < SNAPSHOT_FAILURE_LIMIT) return undefined;
+      const cause = reason(error);
+      const message = `Native transcript is unavailable: ${/[.!?]$/.test(cause) ? cause : `${cause}.`} Open the session again to retry.`;
+      snapshotFailure = message;
+      integrityError = undefined;
+      publish({ snapshotFailure: { error: message }, error: message });
+      return Object.assign(new Error(message), { code: 'snapshot_unavailable' });
+    };
     const pruneQuarantined = (position: number) => {
       quarantined = quarantined.filter(entry => entry.position > position);
+    };
+    /**
+     * A snapshot cycle is successful only when nothing it could not certify remains: a read
+     * that returns, yet still leaves a gap, is a failure cycle.
+     */
+    const transcriptSettled = () =>
+      state.session !== undefined &&
+      quarantined.length === 0 &&
+      !state.pendingSnapshotMessageIDs?.length &&
+      !state.messages.some(
+        message => message.incomplete || hasUnresolvedKilo2Assets(message.message, state.assetURLs)
+      );
+    /** A settled transcript owns no terminal failure, so the published marker goes with it. */
+    const settleSnapshotStreak = () => {
+      snapshotFailures = 0;
+      if (snapshotFailure === undefined) return;
+      snapshotFailure = undefined;
+      publish({ snapshotFailure: undefined, error: undefined });
     };
     const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
       if (
@@ -895,6 +976,11 @@ export class NativeSyncClient {
               return;
             }
             if (current.attempt >= 4) {
+              const stop = noteSnapshotFailure(error);
+              if (stop) {
+                epoch.fail(stop);
+                return;
+              }
               integrityError = `Native transcript recovery is incomplete: ${reason(error)}`;
               publish({});
               return;
@@ -979,9 +1065,17 @@ export class NativeSyncClient {
               publish({ error: undefined });
             }
             current.completed = true;
+            if (transcriptSettled()) settleSnapshotStreak();
             return;
           }
           if (current.attempt >= 4) {
+            const stop = noteSnapshotFailure(
+              new Error('Native transcript recovery is incomplete.')
+            );
+            if (stop) {
+              epoch.fail(stop);
+              return;
+            }
             integrityError = 'Native transcript recovery is incomplete.';
             publish({});
             return;
@@ -1007,8 +1101,16 @@ export class NativeSyncClient {
           if (frame.type === 'hello') {
             publish({ runnerConnected: body['runnerConnected'] === true });
             if (lastSeq === undefined) {
-              await snapshot(epoch);
+              try {
+                await snapshot(epoch);
+              } catch (error) {
+                // A read the retiring socket canceled never described the transcript.
+                if (!epoch.current()) throw error;
+                throw noteSnapshotFailure(error) ?? error;
+              }
               if (!epoch.current()) return;
+              // A read that still leaves an uncertified gap has not settled the transcript.
+              if (transcriptSettled()) settleSnapshotStreak();
               lastSeq = frame.seq;
             }
             send({ type: 'subscribe', afterSeq: lastSeq });
@@ -1017,8 +1119,14 @@ export class NativeSyncClient {
           if (frame.type === 'reset_required') {
             markGap();
             recovery?.cancel();
-            await snapshot(epoch);
+            try {
+              await snapshot(epoch);
+            } catch (error) {
+              if (!epoch.current()) throw error;
+              throw noteSnapshotFailure(error) ?? error;
+            }
             if (!epoch.current()) return;
+            if (transcriptSettled()) settleSnapshotStreak();
             lastSeq = typeof body['seq'] === 'number' ? body['seq'] : frame.seq;
             send({ type: 'subscribe', afterSeq: lastSeq });
             recoverIncomplete(epoch);
@@ -1270,6 +1378,24 @@ export class NativeSyncClient {
         for (const item of state.messages) clearedIDs.add(item.message.id);
         publish({ messages: [] });
       },
+      refresh: () => {
+        if (closed) return;
+        // Retire any in-flight recovery first: its cancel path publishes the replay-loss notice,
+        // which this reset then supersedes instead of leaving it set behind the retry.
+        recovery?.cancel();
+        snapshotFailures = 0;
+        snapshotFailure = undefined;
+        lastSeq = undefined;
+        snapshotPosition = -1;
+        integrityGap = false;
+        // A frame the client could not project keeps its warning until a snapshot read covers it.
+        integrityError ??= quarantined.length === 0 ? undefined : projectedFrameGap;
+        publish({ snapshotFailure: undefined, error: undefined });
+        // A retry is a clean read of the authoritative transcript: the next hello reads it
+        // again instead of resuming from the cursor that preceded the failure, and a reset
+        // transcript at a lower position is accepted.
+        connection.restart();
+      },
       close: () => {
         closed = true;
         connection.close();
@@ -1284,6 +1410,7 @@ export class NativeSyncClient {
           pending: { permissions: [], questions: [], unreadablePermissions: [] },
           events: [],
           commands: {},
+          snapshotFailure: undefined,
         };
         clearedIDs.clear();
         remoteState = undefined;

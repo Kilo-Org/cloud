@@ -21,7 +21,7 @@ vi.mock('expo-router', () => ({
   useNavigation: () => ({ addListener: () => () => undefined }),
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));
+vi.mock('@/components/ui/icons', () => ({ Share: 'Share', X: 'X' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111827' }),
 }));

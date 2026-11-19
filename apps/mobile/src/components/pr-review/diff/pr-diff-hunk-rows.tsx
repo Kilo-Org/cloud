@@ -9,6 +9,7 @@ import { Check, ChevronDown, File, GitCommit, X } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type ScrollViewProps, View } from 'react-native';
 
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -27,11 +28,11 @@ export function HunkHeaderRow({ header }: { header: string }) {
   const { t } = useTranslation();
   return (
     <View
-      className="border-b border-hair-soft bg-secondary px-4 py-1"
+      className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-1"
       accessibilityLabel={t('prReview.hunkRows.hunkHeader', { header })}
     >
       <Text
-        className="font-mono-medium text-[11px]"
+        className="font-mono-medium text-xs"
         // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color + the header's code base direction
         style={{ color: colors.mutedForeground, ...LTR_TEXT_DIRECTION }}
         numberOfLines={1}
@@ -59,7 +60,7 @@ export function ExpandSeparatorRow({
 
   if (item.state === 'unavailable') {
     return (
-      <View className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2">
+      <View className="flex-row items-center justify-center gap-2 border-y-[0.5px] border-hair-soft bg-secondary px-4 py-2">
         <X size={12} color={colors.mutedForeground} />
         <Text variant="muted" className="text-xs">
           {t('prReview.hunkRows.contextUnavailable')}
@@ -76,7 +77,7 @@ export function ExpandSeparatorRow({
         }}
         className={cn(
           STATE_ACTION_CLASS,
-          'flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2 active:opacity-70'
+          'flex-row items-center justify-center gap-2 border-y-[0.5px] border-hair-soft bg-secondary px-4 py-2 active:opacity-70'
         )}
         accessibilityRole="button"
         accessibilityLabel={t('prReview.hunkRows.retryLoadingContext')}
@@ -90,7 +91,7 @@ export function ExpandSeparatorRow({
 
   if (item.state === 'loading') {
     return (
-      <View className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2">
+      <View className="flex-row items-center justify-center gap-2 border-y-[0.5px] border-hair-soft bg-secondary px-4 py-2">
         <GitCommit size={12} color={colors.mutedForeground} />
         <Text variant="muted" className="text-xs">
           {isUnknownEnd
@@ -141,7 +142,7 @@ export function ExpandSeparatorRow({
         });
 
   return (
-    <View className="flex-row items-center justify-center gap-2 border-y border-hair-soft bg-secondary px-4 py-2">
+    <View className="flex-row items-center justify-center gap-2 border-y-[0.5px] border-hair-soft bg-secondary px-4 py-2">
       <Pressable
         onPress={() => {
           onLoad(DEFAULT_EXPAND_WINDOW);
@@ -250,14 +251,14 @@ export function PaginationRow({
             total: totalFiles == null ? '?' : formatNumber(totalFiles, i18n.language),
           })}
         </Text>
-        <Pressable
+        <Button
+          variant="outline"
+          size="sm"
           onPress={onFetchAll}
-          className="rounded-md border border-border bg-card px-3 py-1 active:opacity-70"
-          accessibilityRole="button"
           accessibilityLabel={t('prReview.hunkRows.loadAllFiles')}
         >
-          <Text className="text-xs font-medium">{t('prReview.hunkRows.loadAll')}</Text>
-        </Pressable>
+          <Text>{t('prReview.hunkRows.loadAll')}</Text>
+        </Button>
       </View>
     );
   }
@@ -298,7 +299,7 @@ export function EmptyFilesView({
   const { t } = useTranslation();
   return (
     <CenteredState refreshControl={refreshControl}>
-      <View className="items-center gap-3 px-6">
+      <View className="items-center gap-3 px-4">
         <File size={28} color={colors.mutedForeground} />
         <Text className="text-lg font-semibold text-foreground">
           {t('prReview.noFilesChanged')}
@@ -309,14 +310,14 @@ export function EmptyFilesView({
             : t('prReview.hunkRows.filesStillLoading')}
         </Text>
         {onRequestOverview ? (
-          <Pressable
+          <Button
+            variant="outline"
+            size="sm"
             onPress={onRequestOverview}
-            className="mt-2 rounded-md border border-border bg-card px-3 py-2 active:opacity-70"
-            accessibilityRole="button"
             accessibilityLabel={t('prReview.hunkRows.goToOverviewTab')}
           >
-            <Text className="text-sm font-medium">{t('prReview.hunkRows.goToOverview')}</Text>
-          </Pressable>
+            <Text>{t('prReview.hunkRows.goToOverview')}</Text>
+          </Button>
         ) : null}
       </View>
     </CenteredState>

@@ -5,6 +5,7 @@ import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -181,11 +182,9 @@ export function KiloPassManagementSections({
       )}
 
       {scheduledChange != null && (
-        <View className="gap-2 rounded-lg bg-secondary p-3">
-          <Text className="text-sm font-medium text-foreground">
-            {t('kiloPass.manage.scheduledChange')}
-          </Text>
-          <Text className="text-xs text-muted-foreground">
+        <Card>
+          <Text variant="small">{t('kiloPass.manage.scheduledChange')}</Text>
+          <Text variant="caption">
             {t('kiloPass.manage.scheduledChangeSummary', {
               plan: kiloPassPlanLabel(scheduledChange.toTier, scheduledChange.toCadence),
               date: formatDate(parseTimestamp(scheduledChange.effectiveAt), i18n.language, {
@@ -198,12 +197,13 @@ export function KiloPassManagementSections({
           <Button
             variant="outline"
             size="sm"
+            className="self-start"
             loading={cancelScheduledChange.isPending}
             onPress={confirmCancelScheduledChange}
           >
             <Text>{t('kiloPass.manage.cancelScheduledChange')}</Text>
           </Button>
-        </View>
+        </Card>
       )}
 
       {dialog}

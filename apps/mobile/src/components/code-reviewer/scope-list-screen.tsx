@@ -8,9 +8,11 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useTRPC } from '@/lib/trpc';
 
 export function ScopeListScreen() {
@@ -32,7 +34,7 @@ export function ScopeListScreen() {
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader title={t('common.codeReviewer')} />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         {isError && (
           <QueryError
             variant="server"
@@ -44,31 +46,31 @@ export function ScopeListScreen() {
             isRetrying={isFetching}
           />
         )}
-        <ConfigureRow
-          icon={User}
-          title={t('common.personal')}
-          subtitle={t('common.yourOwnRepositories')}
-          onPress={() => {
-            openScope(PERSONAL_SCOPE);
-          }}
-          last={!isLoading && (orgs?.length ?? 0) === 0}
-        />
-        {isLoading ? (
-          <Skeleton className="mt-3 h-[54px] w-full rounded-lg" />
-        ) : (
-          orgs?.map((org, index) => (
-            <ConfigureRow
-              key={org.organizationId}
-              icon={Building2}
-              title={org.organizationName}
-              subtitle={org.role === 'member' ? t('codeReviewer.scopeList.viewOnly') : undefined}
-              onPress={() => {
-                openScope(org.organizationId);
-              }}
-              last={index === orgs.length - 1}
-            />
-          ))
-        )}
+        <RowGroup leadingTile>
+          <ConfigureRow
+            icon={User}
+            title={t('common.personal')}
+            subtitle={t('common.yourOwnRepositories')}
+            onPress={() => {
+              openScope(PERSONAL_SCOPE);
+            }}
+          />
+          {isLoading ? (
+            <RowSkeleton tile subtitle />
+          ) : (
+            orgs?.map(org => (
+              <ConfigureRow
+                key={org.organizationId}
+                icon={Building2}
+                title={org.organizationName}
+                subtitle={org.role === 'member' ? t('codeReviewer.scopeList.viewOnly') : undefined}
+                onPress={() => {
+                  openScope(org.organizationId);
+                }}
+              />
+            ))
+          )}
+        </RowGroup>
       </TabScreenScrollView>
     </View>
   );

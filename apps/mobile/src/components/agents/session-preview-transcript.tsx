@@ -64,6 +64,7 @@ export function SessionPreviewTranscript({
       <QueryError
         variant={trpcErrorVariant(error)}
         placement="static"
+        inset="gutter"
         className="w-full"
         onRetry={retryable ? onRetry : undefined}
       />
@@ -75,6 +76,7 @@ export function SessionPreviewTranscript({
         icon={MessageCircle}
         title={t('agentChat.session.emptyTitle')}
         placement="static"
+        inset="gutter"
         className="w-full"
       />
     );

@@ -13,6 +13,7 @@ import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -33,21 +34,17 @@ import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
-// FlashList takes `contentContainerStyle` (no className), so the FlatList's
-// `grow gap-3 px-6 pt-4` content classes map to their pixel values: NativeWind's
-// native rem is 14, so px-6 is 21 dp and pt-4 is 14 dp (24/16 is the web rem and
-// sits 3 dp inside the skeleton it replaces). FlashList v2 positions every cell
-// absolutely and has no `gap` handling (2.3.2 ships zero `gap` references), so
-// the 12px inter-row gap rides on the measured item separator instead of
-// `contentContainerStyle.gap`. The old container `gap` also sat between the last
-// row and the pagination footer; FlashList's separator only spans items, so that
-// boundary carries the same 12px as `pt-3` on the footer.
+// The cards carry the page gutter themselves. FlashList v2 positions every
+// cell absolutely and has no `gap` handling (2.3.2 ships zero `gap`
+// references), so the inter-row gap rides on the measured item separator
+// instead of a container `gap`. The former container `gap` also sat between the
+// last row and the pagination footer; FlashList's separator only spans items,
+// so that boundary carries the same gap as `pt-3` on the footer. The body's top
+// pad sits on a header component: FlashList takes no class on its content
+// container.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  flexGrow: 1,
-  paddingHorizontal: 21,
-  paddingTop: 14,
-} satisfies ViewStyle;
+
+const ListTopPad = () => <View className="pt-3" />;
 
 const CreditRowSeparator = () => <View className="h-3" />;
 
@@ -74,10 +71,10 @@ function categoryLabel(category: string): string {
 
 function CreditRowSkeleton() {
   return (
-    <View className="gap-1.5 rounded-lg bg-secondary p-3">
+    <Card className="mx-4">
       <Skeleton className="h-4 w-40 rounded" />
       <Skeleton className="h-3 w-24 rounded" />
-    </View>
+    </Card>
   );
 }
 
@@ -94,7 +91,7 @@ const CreditRow = memo(function CreditRow({
   );
 
   return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
+    <Card className="mx-4">
       <View className="flex-row items-center justify-between gap-3">
         <Text className="flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
           {title}
@@ -109,11 +106,11 @@ const CreditRow = memo(function CreditRow({
         </Text>
       </View>
       <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <Text className="text-xs text-muted-foreground">
+        <Text variant="caption">
           {formatDate(parseTimestamp(transaction.created_at), i18n.language)}
         </Text>
         {transaction.expiry_date != null && (
-          <Text className="text-xs text-muted-foreground">
+          <Text variant="caption">
             {keepZoneWithDate(
               t('organization.creditActivity.expiresUtc', {
                 date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language, {
@@ -124,7 +121,7 @@ const CreditRow = memo(function CreditRow({
           </Text>
         )}
       </View>
-    </View>
+    </Card>
   );
 });
 
@@ -153,6 +150,7 @@ export function OrganizationCreditActivityScreen() {
     query,
     entries: transactions,
     hasMore,
+    isRetentionLimited,
   } = useOrgCreditTransactionsPage(reconcile.queryOrganizationId);
   const paddingBottom = useTabBarBottomPadding();
   useRouteForegroundRefresh([[['organizations']]]);
@@ -210,7 +208,7 @@ export function OrganizationCreditActivityScreen() {
   let body: ReactNode = null;
   if (isLoading) {
     body = (
-      <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-6 pt-4">
+      <Animated.View exiting={FadeOut.duration(150)} className="gap-3 pt-3">
         <CreditRowSkeleton />
         <CreditRowSkeleton />
         <CreditRowSkeleton />
@@ -239,9 +237,16 @@ export function OrganizationCreditActivityScreen() {
       // The former container gap also separated the last row from this footer
       // block, which the item separator does not cover.
       <View className="pt-3">
+        {isRetentionLimited && !isLaterPageError && !hasMore && (
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
+              {t('organization.creditActivity.retentionLimit')}
+            </Text>
+          </View>
+        )}
         {hasMore && !isLaterPageError && (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('organization.creditActivity.truncated')}
             </Text>
             <Button
@@ -256,8 +261,8 @@ export function OrganizationCreditActivityScreen() {
           </View>
         )}
         {isLaterPageError && (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('common.couldnTLoadMore')}
             </Text>
             <Button
@@ -285,10 +290,11 @@ export function OrganizationCreditActivityScreen() {
           renderItem={renderItem}
           getItemType={() => 'transaction'}
           ItemSeparatorComponent={CreditRowSeparator}
-          contentContainerStyle={listContentContainerStyle}
+          ListHeaderComponent={<ListTopPad />}
           ListEmptyComponent={
             <EmptyState
               placement="top"
+              inset="gutter"
               icon={Receipt}
               title={t('organization.creditActivity.emptyTitle')}
               description={t('organization.creditActivity.emptyDescription')}

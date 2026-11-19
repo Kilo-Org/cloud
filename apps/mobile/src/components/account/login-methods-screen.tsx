@@ -12,16 +12,17 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound, Plus } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -82,34 +83,20 @@ function ProviderRow({
   const label = providerLabel(provider);
 
   return (
-    <View className="gap-3 rounded-lg bg-secondary p-3">
-      <View className="flex-row items-center gap-3">
-        <View className="min-w-0 flex-1 gap-1">
-          <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-            {label}
-          </Text>
-          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-            {email}
-          </Text>
-        </View>
-        <Button
-          variant="outline"
-          size="sm"
-          className={STATE_ACTION_CLASS}
-          disabled={disabled || !canUnlink}
-          accessibilityLabel={t('profile.signInMethods.unlinkProvider', { provider: label })}
-          accessibilityHint={canUnlink ? undefined : t('profile.signInMethods.lastMethod')}
-          onPress={onUnlink}
-        >
-          <Text>{t('profile.signInMethods.unlink')}</Text>
-        </Button>
-      </View>
-      {canUnlink ? null : (
-        <Text className="text-xs text-muted-foreground">
-          {t('profile.signInMethods.lastMethod')}
-        </Text>
-      )}
-    </View>
+    <ConfigureRow
+      icon={KeyRound}
+      title={label}
+      subtitle={email}
+      subtitleNumberOfLines={1}
+      trailing={renderRowTrailing({
+        kind: 'action',
+        label: t('profile.signInMethods.unlink'),
+        accessibilityLabel: t('profile.signInMethods.unlinkProvider', { provider: label }),
+        accessibilityHint: canUnlink ? undefined : t('profile.signInMethods.lastMethod'),
+        disabled: disabled || !canUnlink,
+        onPress: onUnlink,
+      })}
+    />
   );
 }
 
@@ -196,11 +183,11 @@ export function LoginMethodsScreen() {
   let body: ReactNode = null;
   if (providers.isPending) {
     body = (
-      <View className="gap-3">
+      <RowGroup>
         {SKELETON_ROWS.map(row => (
-          <Skeleton key={row} className="h-[62px] rounded-lg" />
+          <RowSkeleton key={row} tile subtitle />
         ))}
-      </View>
+      </RowGroup>
     );
   } else if (providers.isError) {
     body = (
@@ -216,20 +203,25 @@ export function LoginMethodsScreen() {
     );
   } else {
     body = (
-      <View className="gap-3">
-        {providers.data.providers.map(provider => (
-          <ProviderRow
-            key={provider.provider}
-            provider={provider.provider}
-            email={provider.email}
-            disabled={unlink.isPending}
-            canUnlink={methodCount >= 2}
-            onUnlink={() => {
-              confirmUnlink(provider.provider);
-            }}
-          />
-        ))}
-      </View>
+      <>
+        <RowGroup leadingTile>
+          {providers.data.providers.map(provider => (
+            <ProviderRow
+              key={provider.provider}
+              provider={provider.provider}
+              email={provider.email}
+              disabled={unlink.isPending}
+              canUnlink={methodCount >= 2}
+              onUnlink={() => {
+                confirmUnlink(provider.provider);
+              }}
+            />
+          ))}
+        </RowGroup>
+        {methodCount < 2 ? (
+          <Text variant="caption">{t('profile.signInMethods.lastMethod')}</Text>
+        ) : null}
+      </>
     );
   }
 
@@ -238,27 +230,27 @@ export function LoginMethodsScreen() {
       <ScreenHeader title={t('profile.signInMethods.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-3 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         {body}
-        <AccessibleStatus message={statusMessage} className="text-sm" />
-        <ConfigureRow
-          icon={Plus}
-          title={t('profile.signInMethods.linkAnother')}
-          subtitle={t('profile.signInMethods.linkAnotherSubtitle')}
-          className="mt-3 rounded-lg bg-secondary px-3"
-          last
-          onPress={() => {
-            void openAppShellHandoff(
-              { page: 'connected-accounts' },
-              {
-                label: t('profile.signInMethods.title'),
-                retryOnError: true,
-              }
-            );
-          }}
-        />
+        <AccessibleStatus message={statusMessage} />
+        <RowGroup>
+          <ConfigureRow
+            icon={Plus}
+            title={t('profile.signInMethods.linkAnother')}
+            subtitle={t('profile.signInMethods.linkAnotherSubtitle')}
+            onPress={() => {
+              void openAppShellHandoff(
+                { page: 'connected-accounts' },
+                {
+                  label: t('profile.signInMethods.title'),
+                  retryOnError: true,
+                }
+              );
+            }}
+          />
+        </RowGroup>
       </TabScreenScrollView>
       {dialog}
     </View>

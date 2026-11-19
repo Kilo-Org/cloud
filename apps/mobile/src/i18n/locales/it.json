@@ -662,8 +662,9 @@
       "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "La connessione Bitbucket di questa organizzazione si gestisce sul web da un computer.",
-      "description": "Crea un token di accesso all'area di lavoro con le autorizzazioni richieste e incollalo qui sotto.",
+      "managedOnWeb": "La connessione Bitbucket per {{organization}} si gestisce sul web da un computer.",
+      "description": "Crea un token di accesso all'area di lavoro per {{organization}} e incollalo qui sotto.",
+      "descriptionReconnect": "Crea un nuovo token di accesso all'area di lavoro per {{organization}} e incollalo qui sotto.",
       "scopes": "Account: lettura · Repository: lettura/scrittura · Pull request: lettura · Webhook: lettura/scrittura",
       "tokenPlaceholder": "Token di accesso all'area di lavoro",
       "tokenRefused": "Bitbucket non ha accettato questo token dell'area di lavoro. Verifica che disponga delle autorizzazioni indicate sopra, quindi riprova."
@@ -1593,6 +1594,8 @@
       "renameAccessibility": "Rinomina la sessione: {{title}}",
       "cloningSession": "Clonazione in corso…",
       "couldNotLoadThisSession": "Impossibile caricare questa sessione.",
+      "historyTooLarge": "La trascrizione di questa sessione è troppo grande da caricare.",
+      "historyUnavailable": "Impossibile leggere la trascrizione di questa sessione.",
       "cloneFailedRetry": "Impossibile clonare questa sessione. Riprova.",
       "notEnoughCredits": "Crediti insufficienti per questa richiesta. Aggiungi crediti e riprova.",
       "previousTaskFinishing": "L'attività precedente non è ancora terminata. Attendi un momento.",
@@ -1669,6 +1672,7 @@
       "branchDefault": "Predefinito",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Caricamento dei branch",
+      "branchInactive": "Seleziona un repository per caricare i suoi branch.",
       "branchLoadError": "Impossibile caricare i branch",
       "branchUnavailable": "Nessun branch disponibile per questo repository. Verifica i tuoi accessi con il provider, poi scegli un altro repository.",
       "branchEmpty": "Nessun branch disponibile",
@@ -2516,7 +2520,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Impossibile caricare le sessioni.",
-    "couldNotLoadActiveSessions": "Impossibile caricare le sessioni attive.",
     "agentSessions": "In corso",
     "newCodingTask": "Nuova attività di programmazione",
     "newTaskFromPicture": "Nuova attività da un'immagine",
@@ -2839,7 +2842,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Questo account non ha ancora nessuna organizzazione. Le pull request Bitbucket possono essere revisionate una volta che crei un'organizzazione o ne entri a far parte.",
       "gitlabReconnectAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di riconnetterla.",
       "bitbucketNotConnectedTitle": "Bitbucket non è connesso",
-      "bitbucketAdminOnlyDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
+      "adminOnlyConnectDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
       "contextLine": "Per {{organization}}",
       "contextLinePersonal": "Per il tuo account personale"
     },
@@ -3467,7 +3470,8 @@
         "accounting_adjustment": "Rettifica contabile",
         "credits_expired": "Crediti scaduti"
       },
-      "truncated": "Sono disponibili movimenti dei crediti precedenti."
+      "truncated": "Sono disponibili movimenti dei crediti precedenti.",
+      "retentionLimit": "Vengono mostrati i movimenti dei crediti più recenti."
     },
     "hub": {
       "balance": "Saldo",
@@ -3512,7 +3516,8 @@
         "void": "Annullata",
         "uncollectible": "Inesigibile"
       },
-      "truncated": "Sono disponibili fatture precedenti."
+      "truncated": "Sono disponibili fatture precedenti.",
+      "retentionLimit": "Vengono mostrate le fatture più recenti."
     },
     "lowBalanceAlert": {
       "enableA11y": "Attiva l'avviso di saldo basso",
@@ -3743,8 +3748,7 @@
     "imagesSectionEmpty": "Nessun sito attendibile delle immagini",
     "revoke": "Revoca l'attendibilità di {{host}}",
     "revokeMessage": "I link a questo sito chiederanno di nuovo conferma.",
-    "revokeImageMessage": "Le immagini da questo sito chiederanno di nuovo conferma.",
-    "backToPreferences": "Torna alle preferenze"
+    "revokeImageMessage": "Le immagini da questo sito chiederanno di nuovo conferma."
   },
   "glanceable": {
     "waiting": "Aggiornamento degli agenti",
@@ -3992,6 +3996,8 @@
       "downloading": "Download in corso: {{written}} di {{total}}",
       "downloadingUnknown": "Download in corso: {{written}}",
       "paused": "In pausa: {{written}} di {{total}}",
+      "retrying": "Nuovo tentativo: {{written}} di {{total}}",
+      "retryingUnknown": "Nuovo tentativo: {{written}}",
       "verifying": "Verifica del file scaricato…",
       "downloaded": "Scaricato · {{size}}",
       "url": "Link di download diretto",
@@ -4082,7 +4088,9 @@
         "androidModelUnavailable": "Questo dispositivo non supporta Gemini Nano, oppure l'app di sistema AICore è ancora in fase di configurazione. Riprova più tardi.",
         "aicoreUpdateRequired": "Aggiorna l'app AICore e il software di sistema per usare questo modello.",
         "downloadable": "Questo modello richiede un download una tantum prima di poterlo usare.",
-        "downloading": "Il download del modello è in corso. Sarà pronto al termine del download."
+        "downloading": "Il download del modello è in corso. Sarà pronto al termine del download.",
+        "batteryQuota": "Il modello sul dispositivo ha esaurito la sua quota di batteria per ora. Riprova più tardi.",
+        "checkFailed": "L'app non è riuscita a verificare questo modello. Riprova."
       },
       "unavailable": "Il modello sul dispositivo non è disponibile al momento. Controllane lo stato in $t(modelChat.backends.title).",
       "busy": "Il modello sul dispositivo è occupato con un'altra risposta. Riprova quando avrà finito.",
@@ -4449,7 +4457,8 @@
       "purchaseFallback": "Acquisto crediti",
       "receipt": "Ricevuta",
       "receiptA11y": "Apri la ricevuta di {{description}}, {{amount}}, del {{date}}",
-      "receiptUnavailable": "Nessuna ricevuta disponibile per questo acquisto."
+      "receiptUnavailable": "Nessuna ricevuta disponibile per questo acquisto.",
+      "retentionLimit": "Viene mostrata la cronologia crediti più recente."
     },
     "title": "Acquista crediti",
     "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",
@@ -4704,6 +4713,9 @@
     "couldNotLoad": "Impossibile caricare le integrazioni",
     "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
     "managedByOwner": "Chiedi a un proprietario dell'organizzazione di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerOrAdmin": "Chiedi a un proprietario dell'organizzazione o a un amministratore di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerOrBilling": "Chiedi a un proprietario dell'organizzazione o a un responsabile della fatturazione di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerAdminOrBilling": "Chiedi a un proprietario dell'organizzazione, a un amministratore o a un responsabile della fatturazione di modificare un collegamento che non puoi modificare.",
     "connectFailed": "Impossibile aprire la pagina di collegamento"
   },
   "invoices": {
@@ -4740,7 +4752,7 @@
       "new": "Nuovo attivatore",
       "create": "Crea attivatore",
       "emptyTitle": "Nessun attivatore per ora",
-      "emptyDescription": "Crea un attivatore per avviare un'esecuzione di Cloud Agent da una chiamata webhook o in base a una pianificazione.",
+      "emptyDescription": "Crea il tuo primo attivatore.",
       "loadFailedTitle": "Impossibile caricare gli attivatori",
       "loadFailedDescription": "Riprova quando hai una connessione.",
       "detailLoadFailedTitle": "Impossibile caricare questo attivatore",

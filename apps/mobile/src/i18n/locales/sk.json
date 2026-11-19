@@ -978,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
       "gitlabReconnectAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
       "bitbucketNotConnectedTitle": "Bitbucket nie je pripojený",
-      "bitbucketAdminOnlyDescription": "Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
+      "adminOnlyConnectDescription": "Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
       "contextLine": "Pre {{organization}}",
       "contextLinePersonal": "Pre osobný účet"
     },
@@ -1431,8 +1431,9 @@
       "notConnectedReadOnly": "Bitbucket nie je pripojený. Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Pripojenie tejto organizácie k Bitbucketu sa spravuje na webe z počítača.",
-      "description": "Vytvorte prístupový token pracovného priestoru s požadovanými oprávneniami a vložte ho nižšie.",
+      "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
+      "description": "Vytvorte prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
+      "descriptionReconnect": "Vytvorte nový prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
       "scopes": "Účet: čítanie · Repozitáre: čítanie/zápis · PR: čítanie · Webhooky: čítanie/zápis",
       "tokenPlaceholder": "Prístupový token pracovného priestoru",
       "tokenRefused": "Bitbucket neprijal tento token pracovného priestoru. Skontrolujte, či má oprávnenia uvedené vyššie, a potom to skúste znova."
@@ -2248,6 +2249,8 @@
       "renameAccessibility": "Premenovať reláciu: {{title}}",
       "cloningSession": "Klonuje sa relácia",
       "couldNotLoadThisSession": "Túto reláciu sa nepodarilo načítať.",
+      "historyTooLarge": "Pepis tejto relácie je na načítanie príliš veľký.",
+      "historyUnavailable": "Pepis tejto relácie nie je možné prečítať.",
       "cloneFailedRetry": "Túto reláciu sa nepodarilo naklonovať. Skús to znova.",
       "notEnoughCredits": "Na túto požiadavku nemáš dosť kreditov. Doplň kredity a skús to znova.",
       "previousTaskFinishing": "Predchádzajúca úloha sa ešte dokončuje. Chvíľu počkaj.",
@@ -2324,6 +2327,7 @@
       "branchDefault": "Predvolená",
       "branchAccessibility": "Vetva: {{label}}",
       "branchLoading": "Načítavajú sa vetvy",
+      "branchInactive": "Vyberte repozitár, aby sa načítali jeho vetvy.",
       "branchLoadError": "Vetvy sa nepodarilo načítať",
       "branchUnavailable": "Pre tento repozitár nie sú vetvy dostupné. Skontroluj svoj prístup u poskytovateľa a vyber iný repozitár.",
       "branchEmpty": "Žiadne dostupné vetvy",
@@ -3150,7 +3154,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Relácie sa nepodarilo načítať.",
-    "couldNotLoadActiveSessions": "Aktívne relácie sa nepodarilo načítať.",
     "agentSessions": "Práve prebieha",
     "newCodingTask": "Nová programovacia úloha",
     "newTaskFromPicture": "Nová úloha z obrázka",
@@ -3533,7 +3536,8 @@
         "accounting_adjustment": "Účtovná úprava",
         "credits_expired": "Platnosť kreditov sa skončila"
       },
-      "truncated": "K dispozícii sú aj staršie pohyby kreditov."
+      "truncated": "K dispozícii sú aj staršie pohyby kreditov.",
+      "retentionLimit": "Zobrazujú sa najnovšie pohyby kreditov."
     },
     "inviteMember": {
       "emailError": "Zadaj platnú e-mailovú adresu.",
@@ -3565,7 +3569,8 @@
         "void": "Stornovaná",
         "uncollectible": "Nevymožiteľná"
       },
-      "truncated": "Staršie faktúry sú k dispozícii."
+      "truncated": "Staršie faktúry sú k dispozícii.",
+      "retentionLimit": "Zobrazujú sa najnovšie faktúry."
     },
     "lowBalanceAlert": {
       "enableA11y": "Zapnúť upozornenie na nízky zostatok",
@@ -3803,8 +3808,7 @@
     "imagesSectionEmpty": "Žiadne dôveryhodné servery obrázkov",
     "revoke": "Zrušiť dôveru serveru {{host}}",
     "revokeMessage": "Odkazy na tento server budú opäť vyžadovať potvrdenie.",
-    "revokeImageMessage": "Obrázky z tohto servera budú opäť vyžadovať potvrdenie.",
-    "backToPreferences": "Späť na predvoľby"
+    "revokeImageMessage": "Obrázky z tohto servera budú opäť vyžadovať potvrdenie."
   },
   "glanceable": {
     "waiting": "Aktualizujú sa údaje o agentoch",
@@ -4053,6 +4057,8 @@
       "downloading": "Sťahovanie: {{written}} z {{total}}",
       "downloadingUnknown": "Sťahovanie: {{written}}",
       "paused": "Pozastavené: {{written}} z {{total}}",
+      "retrying": "Opakovanie: {{written}} z {{total}}",
+      "retryingUnknown": "Opakovanie: {{written}}",
       "verifying": "Kontrola stiahnutého súboru…",
       "downloaded": "Stiahnuté · {{size}}",
       "url": "Priamy odkaz na stiahnutie",
@@ -4143,7 +4149,9 @@
         "androidModelUnavailable": "Toto zariadenie nepodporuje Gemini Nano alebo sa systémová aplikácia AICore ešte nastavuje. Skúste to neskôr.",
         "aicoreUpdateRequired": "Ak chcete použiť tento model, aktualizujte aplikáciu AICore a systémový softvér.",
         "downloadable": "Pred prvým použitím je potrebné tento model jednorazovo stiahnuť.",
-        "downloading": "Model sa sťahuje. Bude pripravený po dokončení sťahovania."
+        "downloading": "Model sa sťahuje. Bude pripravený po dokončení sťahovania.",
+        "batteryQuota": "Model v zariadení vyčerpal povolený limit batérie. Skúste to neskôr.",
+        "checkFailed": "Aplikácia nemohla skontrolovať tento model. Skúste to znova."
       },
       "unavailable": "Model v zariadení momentálne nie je dostupný. Skontrolujte jeho stav v sekcii $t(modelChat.backends.title).",
       "busy": "Model v zariadení práve generuje inú odpoveď. Skúste to znova, keď skončí.",
@@ -4516,7 +4524,8 @@
       "purchaseFallback": "Nákup kreditov",
       "receipt": "Doklad",
       "receiptA11y": "Otvoriť doklad za {{description}}, {{amount}}, z {{date}}",
-      "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad."
+      "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad.",
+      "retentionLimit": "Zobrazuje sa najnovšia história kreditov."
     },
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
@@ -4779,6 +4788,9 @@
     "couldNotLoad": "Integrácie sa nepodarilo načítať",
     "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
     "managedByOwner": "Požiadajte vlastníka organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+    "managedByOwnerOrAdmin": "Požiadajte vlastníka alebo správcu organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+    "managedByOwnerOrBilling": "Požiadajte vlastníka alebo správcu fakturácie organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+    "managedByOwnerAdminOrBilling": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
     "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť"
   },
   "invoices": {
@@ -4815,7 +4827,7 @@
       "new": "Nový spúšťač",
       "create": "Vytvorte spúšťač",
       "emptyTitle": "Zatiaľ žiadne spúšťače",
-      "emptyDescription": "Vytvorte spúšťač na spustenie Cloud Agent z volania webhooku alebo podľa plánu.",
+      "emptyDescription": "Vytvorte svoj prvý spúšťač.",
       "loadFailedTitle": "Nepodarilo sa načítať spúšťače",
       "loadFailedDescription": "Skúste to znova, keď budete mať pripojenie.",
       "detailLoadFailedTitle": "Nepodarilo sa načítať tento spúšťač",

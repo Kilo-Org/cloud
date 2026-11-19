@@ -15,13 +15,15 @@ import {
   SEVERITY_LABEL_KEYS,
 } from '@/components/security-agent/audit-report-copy';
 import { ReportSummary } from '@/components/security-agent/audit-report-summary';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatCalendarDate, formatDate } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useTRPC } from '@/lib/trpc';
-import { parseTimestamp } from '@/lib/utils';
+import { cn, parseTimestamp } from '@/lib/utils';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type AuditReportResponse = RouterOutputs['securityAgent']['getAuditReport'];
@@ -119,12 +121,12 @@ function useSecurityAgentAuditReport(scope: string) {
 
 function AuditReportSkeleton() {
   return (
-    <View className="flex-1 gap-3 px-6 pt-4">
+    <View className={cn('flex-1', SCREEN_BODY_CLASS)}>
       <Skeleton className="h-4 w-2/3 rounded" />
       <Skeleton className="h-4 w-1/3 rounded" />
-      <Skeleton className="h-24 w-full rounded-lg" />
-      <Skeleton className="h-16 w-full rounded-lg" />
-      <Skeleton className="h-16 w-full rounded-lg" />
+      <Skeleton className="h-24 w-full rounded-xl" />
+      <Skeleton className="h-16 w-full rounded-xl" />
+      <Skeleton className="h-16 w-full rounded-xl" />
     </View>
   );
 }
@@ -171,7 +173,7 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
       {/* The body formats one timestamp and one actor label per event, so it is
           built only while the section is expanded. */}
       {() => (
-        <>
+        <Card>
           <Text variant="muted" className="text-xs">
             {meta}
           </Text>
@@ -190,7 +192,7 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
               </View>
             ))}
           </View>
-        </>
+        </Card>
       )}
     </CollapsibleSection>
   );
@@ -210,15 +212,15 @@ function AuditReportView({
     // empty state has is the window, so `periodUtc` states it once, with the
     // invariant UTC marker, at the same size the non-empty header uses. A
     // second sentence saying the same thing in words was removed: it restated
-    // the heading and pointed at this line. The owner line is the header's
-    // first line, so an empty report identifies whose window it covers instead
-    // of leaving that to the screen the reader came from.
+    // the heading and pointed at this line. The owner is the screen header's
+    // subtitle, so an empty report identifies whose window it covers without a
+    // stray line between the header and the centered state.
     return (
       <TabScreenScrollView className="flex-1" contentContainerClassName="grow">
-        <Text className="px-6 pt-4 text-sm font-medium">{report.owner.displayName}</Text>
         <View className="grow justify-center">
           <EmptyState
             placement="static"
+            inset="gutter"
             icon={FileText}
             title={t('securityAgent.auditReport.noActivity')}
             description={
@@ -233,7 +235,7 @@ function AuditReportView({
   }
 
   return (
-    <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
+    <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
       {onRetry ? (
         <QueryError
           placement="top"
@@ -255,6 +257,11 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
   const query = useSecurityAgentAuditReport(scope);
   const errorCode = query.error?.data?.code;
   const hasReport = query.data?.status === 'ok' && query.data.report.findings.length > 0;
+  // An empty report has nowhere else to name its owner: the header carries the
+  // name, and the findings view names it in its own first line.
+  const report = query.data?.status === 'ok' ? query.data.report : undefined;
+  const ownerSubtitle =
+    !query.isError && report?.findings.length === 0 ? report.owner.displayName : undefined;
   // The org procedure is `organizationBillingProcedure`, which rejects
   // viewers without the owner/billing_manager role. That denial is
   // non-retryable: retrying cannot change the viewer's role.
@@ -265,7 +272,11 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t('securityAgent.auditReport.title')} showBackButton />
+      <ScreenHeader
+        title={t('securityAgent.auditReport.title')}
+        showBackButton
+        subtitle={ownerSubtitle}
+      />
 
       {query.isLoading && <AuditReportSkeleton />}
 
@@ -273,6 +284,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
         <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
           <EmptyState
             placement="static"
+            inset="gutter"
             icon={ShieldOff}
             title={t('securityAgent.auditReport.unavailable')}
             description={t('securityAgent.auditReport.unavailableDescription')}

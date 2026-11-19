@@ -74,7 +74,7 @@ export function NewSessionRunTarget({
   const targetLabel = runOnInstance !== null ? formatInstanceTarget(runOnInstance) : null;
   if (showRunOnSelector) {
     return (
-      <View className="mt-5">
+      <View>
         <Text className="mb-2 text-sm font-medium text-muted-foreground">
           {t('agentChat.instancePicker.runOn')}
         </Text>
@@ -118,7 +118,7 @@ export function NewSessionRunTarget({
     return null;
   }
   return (
-    <View className="mt-2">
+    <View>
       <Text className="text-sm text-muted-foreground">
         {t('agentChat.newSession.runOnWithTarget', { target: targetLabel })}
       </Text>

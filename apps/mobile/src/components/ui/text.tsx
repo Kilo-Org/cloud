@@ -19,17 +19,17 @@ const textVariants = cva('text-foreground text-base font-medium', {
   variants: {
     variant: {
       default: '',
-      h1: 'text-center text-4xl font-bold tracking-tight',
       h2: 'border-border border-b pb-2 text-3xl font-semibold tracking-tight',
       h3: 'text-2xl font-semibold tracking-tight',
-      h4: 'text-xl font-semibold tracking-tight',
-      p: 'mt-3 leading-[1.75rem]',
-      blockquote: 'mt-4 border-l-2 pl-3 italic',
-      code: 'bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono-semibold text-sm',
-      lead: 'text-muted-foreground text-xl',
       large: 'text-lg font-semibold',
+      heading: 'text-base font-semibold',
       small: 'text-sm font-medium leading-none',
+      figure: 'text-2xl font-bold tabular-nums',
+      // A half-width stat tile's number: one step under `figure`, and still
+      // tabular so two tiles' digits line up down the row.
+      stat: 'text-lg font-bold tabular-nums',
       muted: 'text-muted-foreground text-sm',
+      caption: 'text-xs text-muted-foreground',
       mono: 'font-mono-medium text-sm',
       eyebrow: 'font-mono-medium text-[10px] text-muted-foreground',
     },
@@ -51,10 +51,9 @@ type TextVariant = NonNullable<TextVariantProps['variant']>;
  * non-heading variant reads `undefined` without an unchecked key cast.
  */
 const HEADING_A11Y = new Map<TextVariant, { role: Role; level: string }>([
-  ['h1', { role: 'heading', level: '1' }],
   ['h2', { role: 'heading', level: '2' }],
   ['h3', { role: 'heading', level: '3' }],
-  ['h4', { role: 'heading', level: '4' }],
+  ['heading', { role: 'heading', level: '2' }],
 ]);
 
 /**

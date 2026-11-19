@@ -35,6 +35,7 @@ async function renderRow(purchase: CreditPurchaseEntry) {
       createElement(PurchaseHistoryRow, {
         entry: purchase,
         isOpeningReceipt: false,
+        last: false,
         onOpenReceipt: () => undefined,
       })
     );

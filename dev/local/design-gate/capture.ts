@@ -12,6 +12,7 @@ import {
 import type { ProbeClient, ProbeSample } from './cdp';
 import type { ElementRef, Finding, RuleId } from './findings';
 import { enterTouchMode } from './input-mode';
+import { checkDevLogOverlay } from './logbox';
 import { envMismatches, isRtlLanguage, mirrorReference, type CellConfig } from './matrix';
 import type { Rgba } from './pixels';
 import { checkMirror, checkScreen, checkShift, normalize } from './rules';
@@ -287,11 +288,28 @@ export async function waitForApp(
   const deadline = clock.now() + timeoutMs;
   let last: ProbeDump | undefined;
   let lastError: unknown;
+  let logBoxDisabled = false;
   for (;;) {
     try {
       // A probe that has just lost its page waits for it; this wait's own
       // budget caps that, so an absent app still fails within the declared time.
       if (await probe.ready(Math.max(0, deadline - clock.now()))) {
+        // Every readiness wait is a fresh app runtime after a reload and the same
+        // runtime after a cell's Activity recreation. Disabling LogBox's UI is
+        // idempotent per runtime, so doing it here covers both without the caller
+        // tracking reloads. A runtime that cannot disable it leaves the app
+        // running; the raw dump still reports any toast that then paints. The
+        // wait's own budget caps this probe call too, so a target that stops
+        // answering still fails within the declared time.
+        const disable = probe.disableLogBox;
+        if (!logBoxDisabled && disable !== undefined) {
+          try {
+            await disable(Math.max(0, deadline - clock.now()));
+            logBoxDisabled = true;
+          } catch {
+            // Retried on the next pass, inside this wait's own budget.
+          }
+        }
         last = await probe.dump(Math.max(0, deadline - clock.now()));
         if (accept(last)) return last;
       }
@@ -306,6 +324,36 @@ export async function waitForApp(
   if (lastError instanceof InfraError) throw lastError;
   const reason = lastError === undefined ? 'ready() stayed false' : String(lastError);
   throw new InfraError(`Design gate probe not ready within ${timeoutMs} ms: ${reason}`);
+}
+
+/**
+ * States in the run log what the readiness waits did to the dev overlay: the
+ * gate disables LogBox's UI so no toast or inspector paints over a capture, and
+ * a run whose runtime offered no such module says so here instead of leaving a
+ * clean matrix unexplained.
+ */
+async function reportLogBox(probe: ProbeClient, log: (line: string) => void): Promise<void> {
+  try {
+    const result = await probe.disableLogBox?.();
+    if (result === undefined) return;
+    if (result.disabled > 0) {
+      log(
+        `design-gate: disabled the LogBox UI in the app runtime (${result.disabled} of ${result.exposing} module(s) exposing setDisabled)`
+      );
+      return;
+    }
+    if (result.exposing === 0) {
+      log(
+        'design-gate: no module of the app runtime exposed LogBox setDisabled; a dev toast still painting is reported as a dev-overlay warning'
+      );
+      return;
+    }
+    log(
+      `design-gate: ${result.exposing} module(s) exposed LogBox setDisabled but none accepted the switch; a dev toast still painting is reported as a dev-overlay warning`
+    );
+  } catch (error) {
+    log(`design-gate: LogBox disable unavailable: ${String(error)}`);
+  }
 }
 
 export function rootRef(dump: ProbeDump): ElementRef {
@@ -331,6 +379,7 @@ export function screenFindings(args: {
     alignment === undefined || alignment.status === 'bracketed' ? args.image : undefined;
   const findings: Finding[] = [];
   if (args.sampled?.settled !== false) findings.push(...checkScreen(args.tree, image));
+  findings.push(...checkDevLogOverlay(args.dump));
   if (alignment !== undefined && alignment.status !== 'bracketed') {
     findings.push({
       rule: 'capture-alignment',
@@ -1090,6 +1139,7 @@ export async function runMatrix(
       }
     }
     beforeRestore(outcome);
+    await reportLogBox(ctx.probe, ctx.log);
   } finally {
     unregisterCleanup?.();
     restoreErrors = await restoreState();

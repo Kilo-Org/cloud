@@ -6,7 +6,12 @@
  */
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { CloudAgentSessionId, KiloSessionId, SessionSnapshot } from './types';
+import type {
+  CloudAgentSessionId,
+  KiloSessionId,
+  SendMessagePayload,
+  SessionSnapshot,
+} from './types';
 import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
 
 /**
@@ -111,22 +116,10 @@ type SendCommandPayload = {
 };
 type TransportSendPayload = SendPromptPayload | SendCommandPayload;
 
-type CloudAgentPromptPayload = {
-  type: 'prompt';
-  prompt: string;
-  mode: string;
-  model: string;
-  variant?: string;
-};
-type CloudAgentCommandPayload = {
-  type: 'command';
-  command: string;
-  arguments: string;
-  mode?: string;
-  model?: string;
-  variant?: string;
-};
-type CloudAgentSendPayload = CloudAgentPromptPayload | CloudAgentCommandPayload;
+type CloudAgentPromptPayload = Extract<SendMessagePayload, { type: 'prompt' }>;
+type CloudAgentCommandPayload = Extract<SendMessagePayload, { type: 'command' }>;
+/** The wire name for `types.ts`'s `SendMessagePayload`. */
+type CloudAgentSendPayload = SendMessagePayload;
 
 type TransportSendInput = {
   payload: TransportSendPayload;

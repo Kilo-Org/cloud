@@ -11,7 +11,7 @@ import {
   isLocalFakeTranscriptionModel,
   LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 
 function replaceEnv(overrides: {
   NODE_ENV?: NodeJS.ProcessEnv['NODE_ENV'];

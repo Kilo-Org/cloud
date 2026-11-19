@@ -36,16 +36,19 @@ vi.mock('react-native', () => ({
   View: 'View',
   Switch: 'Switch',
   Pressable: 'Pressable',
+  ActivityIndicator: 'ActivityIndicator',
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: () => ({}) },
   FadeOut: { duration: () => ({}) },
+  useReducedMotion: () => false,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 47, right: 0, bottom: 34, left: 0 }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   Bell: 'Bell',
   Clock: 'Clock',
@@ -54,11 +57,13 @@ vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   SearchX: 'SearchX',
   ServerCrash: 'ServerCrash',
+  ShieldCheck: 'ShieldCheck',
   WifiOff: 'WifiOff',
   Zap: 'Zap',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#FFFFFF',
   useThemeColors: () => ({ warnSolidForeground: '#FFFFFF' }),
 }));
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y }));
@@ -303,7 +308,9 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
       act(onRetry);
       await advanceBy(10);
       expect(harness.queryClient.isFetching()).toBe(activeQueries.length);
-      expect(findHost(screen.root, 'Button')[0]?.props.loading).toBe(true);
+      expect(
+        findHost(screen.root, 'Button')[0]?.props.accessibilityState as { busy?: boolean }
+      ).toMatchObject({ busy: true });
       await act(() => {
         response.resolve(undefined);
       });

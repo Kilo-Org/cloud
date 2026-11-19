@@ -2,10 +2,8 @@ import { type Href, useRouter } from 'expo-router';
 import { SearchX } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 
 /**
  * Terminal state for a route whose params fail runtime validation (bad
@@ -28,15 +26,13 @@ export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
       title={t('invalidRoute.title')}
       description={t('invalidRoute.description')}
       action={
-        <Button
-          className={STATE_ACTION_CLASS}
-          variant="outline"
+        <StateAction
+          label={t('common.goBack')}
+          icon={DirectionalArrowLeft}
           onPress={() => {
             router.replace(backTo);
           }}
-        >
-          <Text>{t('common.goBack')}</Text>
-        </Button>
+        />
       }
     />
   );

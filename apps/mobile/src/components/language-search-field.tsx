@@ -5,10 +5,8 @@ import { type TextInput, View } from 'react-native';
 import { Search } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 type LanguageSearchFieldProps = {
-  searchInList: boolean;
   editable: boolean;
   inputRef: RefObject<TextInput | null>;
   draftRef: RefObject<string>;
@@ -27,7 +25,6 @@ type LanguageSearchFieldProps = {
  * size.
  */
 export function LanguageSearchField({
-  searchInList,
   editable,
   inputRef,
   draftRef,
@@ -38,13 +35,10 @@ export function LanguageSearchField({
 
   return (
     <View
-      className={cn(
-        'mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2',
-        // As the list header the list's own content padding stands in for the
-        // pinned side margin, so the field keeps its width and aligns with the
-        // rows.
-        searchInList ? 'mx-0' : 'mx-4'
-      )}
+      // The field keeps the page gutter in both places: pinned under the title
+      // row and as the list header, where the rows carry the same gutter
+      // themselves, so a short window no longer moves it to the edge.
+      className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2"
     >
       <Search size={18} color={colors.mutedForeground} />
       <Input

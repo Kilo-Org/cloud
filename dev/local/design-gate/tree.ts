@@ -25,6 +25,12 @@ const ProbeNodeSchema = z.object({
   label: z.string().optional(),
   role: z.string().optional(),
   pressable: z.literal(true).optional(),
+  /**
+   * Read-only text a `TextInput` still renders: the platform lets the reader
+   * select it, which is why the field carries a press handler, but nothing
+   * acts on a press. The touch-target rule leaves it to the text rules.
+   */
+  readOnly: z.literal(true).optional(),
   hitSlop: InsetsSchema.optional(),
   lines: z.number().optional(),
   screenState: z.number().optional(),
@@ -483,7 +489,7 @@ export function normalize(dump: ProbeDump): LayoutTree {
     clipOf[index] = clips ? intersection(inheritedClip, rect) : inheritedClip;
     const isText = tags.isText(probe.tag);
     const isTextInput = tags.isTextInput(probe.tag);
-    const pressable = probe.pressable === true;
+    const pressable = probe.pressable === true && probe.readOnly !== true;
     const node: LayoutNode = {
       index,
       tag: probe.tag,

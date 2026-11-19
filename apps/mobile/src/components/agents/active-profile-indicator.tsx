@@ -49,7 +49,7 @@ export function ActiveProfileIndicator({
   return (
     <Pressable
       className={cn(
-        'min-h-8 flex-row items-center gap-1.5 rounded-full border px-2.5 py-1 active:opacity-70',
+        'min-h-8 flex-row items-center gap-1.5 self-start rounded-full border px-2.5 py-1 active:opacity-70',
         state.needsAttention
           ? 'border-warn-tile-border bg-warn-tile-bg'
           : 'border-border bg-secondary',

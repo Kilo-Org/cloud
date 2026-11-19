@@ -26,7 +26,6 @@ import {
 } from '@/lib/integrations/oauth/app-shell-flow';
 import { APP_SHELL_PREFIX, buildAppShellIntegrationPath } from '@/lib/app-shell/shell-paths';
 import { appShellRedirect } from '@/lib/app-shell/redirect';
-import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import type { Owner } from '@/lib/integrations/core/types';
 
@@ -318,13 +317,10 @@ async function resolveGitLabOAuthOwner(
     return { type: 'user', id: user.id };
   }
 
-  // Replacing an existing org GitLab integration is a billing-scoped action;
-  // a first-time connect keeps member-level access.
-  const existingIntegration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
-  await ensureOrganizationAccess(
-    { user },
-    organizationId,
-    existingIntegration ? ORGANIZATION_BILLING_ROLES : undefined
-  );
+  // The stored credential is the organization's shared GitLab authorisation, so
+  // binding it is a billing-scoped action whether or not a connection already
+  // exists. Asking for the same role set on every start keeps the decision
+  // independent of the current row state.
+  await ensureOrganizationAccess({ user }, organizationId, ORGANIZATION_BILLING_ROLES);
   return { type: 'org', id: organizationId };
 }

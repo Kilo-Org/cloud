@@ -3,6 +3,7 @@ import {
   type HomeWidgetData,
   type HomeWidgetSessionRow,
 } from '@kilocode/app-shared/home-widget';
+import { type GlanceableSnapshotStatusOverride } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetHomeWidgetDataForTests } from '@/lib/glanceable/home-widget-data';
@@ -46,7 +47,7 @@ const COPY: Record<string, string> = {
 };
 const translate = (key: string) => COPY[key] ?? key;
 const clock = (at: string) => `clock:${at}`;
-function dataFor(sessions: HomeWidgetSessionRow[], status?: HomeWidgetData['snapshot']['status']) {
+function dataFor(sessions: HomeWidgetSessionRow[], status?: GlanceableSnapshotStatusOverride) {
   return buildHomeWidgetData({
     sessions,
     userId: 'user-private-id',

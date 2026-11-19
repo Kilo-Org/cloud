@@ -10,6 +10,12 @@ import { renderWithProviders, type RenderWithProvidersResult } from '@/test/rend
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The title's typography lives on the header module; its own suite covers it,
+// and the header's dependency graph (router, icons, safe area) stays out of
+// this measurement test.
+vi.mock('@/components/screen-header', () => ({
+  SCREEN_HEADER_TITLE_CLASS: 'shrink text-lg font-semibold text-foreground',
+}));
 vi.mock('@/components/chat/beta-pill', () => ({ BetaPill: 'BetaPill' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
 

@@ -3,11 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { Clipboard } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import {
-  SECTION_ACTION_BOX_CLASS,
-  SECTION_ACTION_HIT_SLOP,
-  SECTION_HEADER_ROW_PADDING_CLASS,
-} from '@/lib/a11y/tap-target';
+import { CAPTION_ACTION_BOX_CLASS, SECTION_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 import { CodeBlock } from './code-block';
@@ -55,14 +51,9 @@ export function MarkdownCodeFence({
       // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the card color is the markdown variant's runtime palette
       style={{ backgroundColor: palette.codeBackground }}
     >
-      <View
-        className={cn(
-          'mb-1 flex-row items-center justify-between',
-          SECTION_HEADER_ROW_PADDING_CLASS
-        )}
-      >
+      <View className="mb-1 flex-row items-center justify-between py-2">
         <Text
-          className="text-[11px] font-medium"
+          variant="caption"
           // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- the label tracks the markdown variant's palette
           style={{ color: palette.mutedTextColor }}
           numberOfLines={1}
@@ -70,13 +61,12 @@ export function MarkdownCodeFence({
         >
           {language ?? ''}
         </Text>
-        {/* The copy control keeps the section header's compact box, and the row
-            reserves its hit slop as padding, so the whole touch target lies
-            inside the row that delivers it: the row is 28 + 9 + 9 dp tall
-            instead of the 48 dp icon box's, and the box itself is never larger
-            than one text line (apps/mobile/AGENTS.md:211). */}
+        {/* The copy control keeps a compact box cancelling to the caption
+            line's own height, so the fence header is one line tall and the box
+            never sets the row's height (the same rule as a section header,
+            apps/mobile/AGENTS.md). */}
         <Pressable
-          className={cn(SECTION_ACTION_BOX_CLASS, 'items-center justify-center active:opacity-70')}
+          className={cn(CAPTION_ACTION_BOX_CLASS, 'items-center justify-center active:opacity-70')}
           hitSlop={SECTION_ACTION_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel={t('common.copy')}

@@ -1,4 +1,4 @@
-import { type GlanceableAgentsSnapshotStatus } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type GlanceableSnapshotStatusOverride } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type SessionLiveOutcomeKind } from '@kilocode/notifications/schemas';
 
 import { APPROVAL_ROWS, combinationRows, many, mixedRows, roundWake } from './fixture-rows';
@@ -48,7 +48,7 @@ export type GlanceableFixtureRow = {
 export type GlanceableFixture = {
   description: string;
   /** Overrides the happy/empty derivation, exactly as the publisher does. */
-  status?: Exclude<GlanceableAgentsSnapshotStatus, 'happy' | 'empty'>;
+  status?: GlanceableSnapshotStatusOverride;
   /** Minutes since the last successful confirmation. */
   checkedAgo?: number;
   rows?: (now: number) => GlanceableFixtureRow[];

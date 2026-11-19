@@ -961,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Acest cont nu are încă nicio organizație. PR-urile Bitbucket pot fi revizuite după ce creezi o organizație sau te alături uneia.",
       "gitlabReconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
       "bitbucketNotConnectedTitle": "Bitbucket nu este conectat",
-      "bitbucketAdminOnlyDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
+      "adminOnlyConnectDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "contextLine": "Pentru {{organization}}",
       "contextLinePersonal": "Pentru contul personal"
     },
@@ -1408,8 +1408,9 @@
       "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Conexiunea Bitbucket a acestei organizații se gestionează pe web, de pe un computer.",
-      "description": "Creează un token de acces pentru spațiul de lucru, cu permisiunile necesare, și lipește-l mai jos.",
+      "managedOnWeb": "Conexiunea Bitbucket pentru {{organization}} se gestionează pe web, de pe un computer.",
+      "description": "Creează un token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
+      "descriptionReconnect": "Creează un nou token de acces la spațiul de lucru pentru {{organization}} și lipește-l mai jos.",
       "scopes": "Cont: citire · Depozite: citire/scriere · PR-uri: citire · Webhook-uri: citire/scriere",
       "tokenPlaceholder": "Token de acces la spațiul de lucru",
       "tokenRefused": "Bitbucket nu a acceptat acest token de acces la spațiul de lucru. Verifică dacă are permisiunile de mai sus, apoi încearcă din nou."
@@ -2204,6 +2205,8 @@
       "renameAccessibility": "Redenumește sesiunea: {{title}}",
       "cloningSession": "Se clonează sesiunea",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
+      "historyTooLarge": "Transcrierea acestei sesiuni este prea mare pentru a fi încărcată.",
+      "historyUnavailable": "Transcrierea acestei sesiuni nu poate fi citită.",
       "cloneFailedRetry": "Nu s-a putut clona această sesiune. Încearcă din nou.",
       "notEnoughCredits": "Nu ai suficiente credite pentru această solicitare. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară este în curs de finalizare. Așteaptă puțin.",
@@ -2280,6 +2283,7 @@
       "branchDefault": "Implicit",
       "branchAccessibility": "Ramură: {{label}}",
       "branchLoading": "Se încarcă ramurile",
+      "branchInactive": "Selectează un depozit pentru a-i încărca ramurile.",
       "branchLoadError": "Nu s-au putut încărca ramurile",
       "branchUnavailable": "Nu există ramuri disponibile pentru acest depozit. Verifică-ți accesul la furnizor, apoi alege alt depozit.",
       "branchEmpty": "Nicio ramură disponibilă",
@@ -3094,7 +3098,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nu s-au putut încărca sesiunile.",
-    "couldNotLoadActiveSessions": "Nu s-au putut încărca sesiunile active.",
     "agentSessions": "În curs acum",
     "newCodingTask": "Sarcină nouă de programare",
     "newTaskFromPicture": "Sarcină nouă dintr-o imagine",
@@ -3475,7 +3478,8 @@
         "accounting_adjustment": "Ajustare contabilă",
         "credits_expired": "Credite expirate"
       },
-      "truncated": "Sunt disponibile operațiuni mai vechi cu credite."
+      "truncated": "Sunt disponibile operațiuni mai vechi cu credite.",
+      "retentionLimit": "Se afișează cele mai recente operațiuni cu credite."
     },
     "inviteMember": {
       "emailError": "Introdu o adresă de e-mail validă.",
@@ -3507,7 +3511,8 @@
         "void": "Anulată",
         "uncollectible": "Neîncasabilă"
       },
-      "truncated": "Sunt disponibile facturi mai vechi."
+      "truncated": "Sunt disponibile facturi mai vechi.",
+      "retentionLimit": "Se afișează cele mai recente facturi."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activează alerta de sold scăzut",
@@ -3743,8 +3748,7 @@
     "imagesSectionEmpty": "Nicio gazdă de imagini de încredere",
     "revoke": "Retrage încrederea acordată gazdei {{host}}",
     "revokeMessage": "Linkurile către această gazdă vor cere din nou confirmare.",
-    "revokeImageMessage": "Imaginile de la această gazdă vor cere din nou confirmare.",
-    "backToPreferences": "Înapoi la preferințe"
+    "revokeImageMessage": "Imaginile de la această gazdă vor cere din nou confirmare."
   },
   "glanceable": {
     "waiting": "Se actualizează agenții",
@@ -3992,6 +3996,8 @@
       "downloading": "Se descarcă: {{written}} din {{total}}",
       "downloadingUnknown": "Se descarcă: {{written}}",
       "paused": "În pauză: {{written}} din {{total}}",
+      "retrying": "Se încearcă din nou: {{written}} din {{total}}",
+      "retryingUnknown": "Se încearcă din nou: {{written}}",
       "verifying": "Se verifică fișierul descărcat…",
       "downloaded": "Descărcat · {{size}}",
       "url": "Link de descărcare directă",
@@ -4082,7 +4088,9 @@
         "androidModelUnavailable": "Acest dispozitiv nu acceptă Gemini Nano sau aplicația de sistem AICore încă se configurează. Încearcă din nou mai târziu.",
         "aicoreUpdateRequired": "Actualizează aplicația AICore și software-ul sistemului pentru a folosi acest model.",
         "downloadable": "Acest model trebuie descărcat o singură dată înainte de a-l putea folosi.",
-        "downloading": "Modelul se descarcă. Va fi gata când se termină descărcarea."
+        "downloading": "Modelul se descarcă. Va fi gata când se termină descărcarea.",
+        "batteryQuota": "Modelul pe dispozitiv și-a folosit alocația de baterie pentru moment. Încearcă din nou mai târziu.",
+        "checkFailed": "Aplicația nu a putut verifica acest model. Încearcă din nou."
       },
       "unavailable": "Modelul pe dispozitiv nu este disponibil momentan. Verifică-i starea în $t(modelChat.backends.title).",
       "busy": "Modelul pe dispozitiv este ocupat cu un alt răspuns. Încearcă din nou după ce termină.",
@@ -4449,7 +4457,8 @@
       "purchaseFallback": "Achiziție de credite",
       "receipt": "Chitanță",
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
-      "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție."
+      "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
+      "retentionLimit": "Se afișează cel mai recent istoric de credite."
     },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
@@ -4704,6 +4713,9 @@
     "couldNotLoad": "Integrările nu au putut fi încărcate",
     "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
     "managedByOwner": "Cere unui proprietar al organizației să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerOrAdmin": "Cere unui proprietar al organizației sau unui administrator să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerOrBilling": "Cere unui proprietar al organizației sau unui manager de facturare să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerAdminOrBilling": "Cere unui proprietar al organizației, unui administrator sau unui manager de facturare să modifice o conexiune pe care nu o poți modifica.",
     "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {
@@ -4740,7 +4752,7 @@
       "new": "Declanșator nou",
       "create": "Creează declanșator",
       "emptyTitle": "Nu există declanșatoare încă",
-      "emptyDescription": "Creează un declanșator pentru a porni o rulare Cloud Agent dintr-un apel webhook sau conform unui program.",
+      "emptyDescription": "Creează primul tău declanșator.",
       "loadFailedTitle": "Nu s-au putut încărca declanșatoarele",
       "loadFailedDescription": "Încearcă din nou când ai conexiune.",
       "detailLoadFailedTitle": "Nu s-a putut încărca acest declanșator",

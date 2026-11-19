@@ -18,6 +18,7 @@ vi.mock('react-native', () => ({
   FlatList: 'FlatList',
   I18nManager: { isRTL: false },
   Keyboard: { dismiss: vi.fn() },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
@@ -190,8 +191,14 @@ describe('repository picker row layout', () => {
     );
 
     await search(renderer, 'kubernetes');
+    // The row control is the host Pressable: `ChoiceRow` hands the name and the
+    // press to `RowFrame`, so a bare prop match would also count the frame
+    // component above the control.
     const results = renderer.root.findAll(
-      node => typeof node.props.accessibilityLabel === 'string' && node.props.onPress
+      node =>
+        String(node.type) === 'Pressable' &&
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.onPress
     );
     expect(results).toHaveLength(2);
     for (const result of results) {
@@ -219,6 +226,7 @@ describe('repository picker row layout', () => {
     const renderer = await mount();
     const row = rowFor(renderer, SIBLING_NAME);
     expect(row.props.accessibilityLabel).toBe(`GitHub ${SIBLING_NAME}`);
-    expect(row.props.accessibilityState).toEqual({ selected: false });
+    // The shared choice row states selection and enablement together.
+    expect(row.props.accessibilityState).toMatchObject({ selected: false, disabled: false });
   });
 });

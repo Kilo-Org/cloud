@@ -31,7 +31,7 @@ import {
   textPricingRates,
   type TextPricingRates,
 } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   BRIEFING_SETTLEMENT_HEADER,
   briefingChargeAccountingSchema,

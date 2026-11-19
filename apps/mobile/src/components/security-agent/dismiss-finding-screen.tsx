@@ -1,18 +1,18 @@
 import { useRouter } from 'expo-router';
 import { ShieldOff } from '@/components/ui/icons';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, TextInput, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { ScrollView, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { RefusalStatus } from '@/components/refusal-status';
-import { ScreenHeader } from '@/components/screen-header';
+import { SheetHeader } from '@/components/sheet-header';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { DismissFindingSkeleton } from '@/components/security-agent/dismiss-finding-skeleton';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import {
   type DismissFailure,
@@ -20,16 +20,17 @@ import {
   resolveDismissFailure,
 } from '@/components/security-agent/dismiss-finding-failure';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import {
   isSecurityTrialRefusal,
   isSecurityTrialRefusalCopyKey,
   securityMutationCopyKey,
 } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
-import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
-import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
+import { cn } from '@/lib/utils';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
 // (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
@@ -53,14 +54,36 @@ type DismissFindingScreenProps = {
   findingId: string;
 };
 
+/**
+ * The chrome the states without a form share: the sheet's title and its close
+ * button, over one of the body states below.
+ */
+function DismissSheetFrame({ children }: Readonly<{ children: ReactNode }>) {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const headerTopInset = useFormSheetHeaderTopInset();
+  return (
+    <View className="flex-1 bg-background">
+      <SheetHeader
+        title={t('securityAgent.dismiss.title')}
+        variant="close"
+        topInset={headerTopInset}
+        onDone={() => {
+          router.back();
+        }}
+      />
+      {children}
+    </View>
+  );
+}
+
 export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindingScreenProps>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const colors = useThemeColors();
-  const mutedDisabledInk = useMutedDisabledInk();
-  // This header is inside a formSheet route: the sheet edge owns the top
-  // clearance unless the sheet is the stack's first screen.
-  const modalTopInset = useFormSheetHeaderTopInset();
+  // The route is a formSheet pushed over the scope dashboard, so the sheet
+  // settles a status-bar inset below the window top and the header reserves no
+  // clearance of its own (`useFormSheetHeaderTopInset`).
+  const headerTopInset = useFormSheetHeaderTopInset();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
   const [reason, setReason] = useState<DismissReason | null>(null);
@@ -146,51 +169,37 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const errorCode = findingQuery.error?.data?.code;
   const notFound = findingQuery.isError && (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN');
 
-  // Every state of this sheet carries one header: the title, the sheet chrome,
-  // and the top clearance the formSheet route owns.
-  const sheetHeader = (
-    <ScreenHeader
-      className="px-6"
-      title={t('securityAgent.dismiss.title')}
-      modal
-      modalTopInset={modalTopInset}
-    />
-  );
-
   if (notFound) {
     return (
-      <View className="flex-1 bg-background">
-        {sheetHeader}
+      <DismissSheetFrame>
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.notFoundTitle')}
           description={t('securityAgent.dismiss.notFoundDescription')}
         />
-      </View>
+      </DismissSheetFrame>
     );
   }
 
   if (findingQuery.isError && !findingQuery.data) {
     return (
-      <View className="flex-1 bg-background">
-        {sheetHeader}
+      <DismissSheetFrame>
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
-      </View>
+      </DismissSheetFrame>
     );
   }
 
   if (capability.status === 'error') {
     return (
-      <View className="flex-1 bg-background">
-        {sheetHeader}
+      <DismissSheetFrame>
         <QueryError
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
         />
-      </View>
+      </DismissSheetFrame>
     );
   }
 
@@ -207,27 +216,25 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   if (!capability.canManage) {
     return (
-      <View className="flex-1 bg-background">
-        {sheetHeader}
+      <DismissSheetFrame>
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
           description={t('securityAgent.dismiss.cannotDismissDescription')}
         />
-      </View>
+      </DismissSheetFrame>
     );
   }
 
   if (finding.status !== 'open') {
     return (
-      <View className="flex-1 bg-background">
-        {sheetHeader}
+      <DismissSheetFrame>
         <EmptyState
           icon={ShieldOff}
           title={t('securityAgent.dismiss.cannotDismissTitle')}
           description={t('securityAgent.dismiss.alreadyResolvedDescription')}
         />
-      </View>
+      </DismissSheetFrame>
     );
   }
 
@@ -251,10 +258,21 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   return (
     <View className="flex-1 bg-background">
-      {sheetHeader}
+      <SheetHeader
+        title={t('securityAgent.dismiss.title')}
+        topInset={headerTopInset}
+        onCancel={() => {
+          router.back();
+        }}
+        onDone={onSubmit}
+        // The commit waits for the reason the backend requires, and for a
+        // terminal rejection it stays down: the inline copy explains why.
+        doneDisabled={!reason || dismissBlocked}
+        doneBusy={dismissFinding.isPending}
+      />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
@@ -263,7 +281,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             repository, then the package. Every line wraps instead of
             truncating — a long title must stay readable to confirm the
             finding. */}
-        <View className="gap-1 rounded-lg bg-secondary p-3">
+        <Card>
           <Text className="text-base font-medium">{finding.title}</Text>
           <Text variant="muted" className="text-xs">
             {finding.repo_full_name}
@@ -271,7 +289,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           <Text variant="muted" className="text-xs">
             {finding.package_name} ({finding.package_ecosystem})
           </Text>
-        </View>
+        </Card>
         {findingQuery.isError ? (
           <SettingsRecoveryStatus
             message={t('securityAgent.dismiss.couldNotLoad')}
@@ -300,24 +318,18 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           }}
         />
 
-        <View className="gap-1.5">
-          <Text className="text-sm font-medium text-muted-foreground">
-            {t('securityAgent.dismiss.commentLabel')}
-          </Text>
-          <TextInput
-            accessibilityLabel={t('securityAgent.dismiss.commentLabel')}
-            className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
-            multiline
-            textAlignVertical="top"
-            placeholder={t('securityAgent.dismiss.commentPlaceholder')}
-            placeholderTextColor={colors.mutedForeground}
-            defaultValue={dismissDraft.draft?.comment ?? ''}
-            onChangeText={value => {
-              commentRef.current = value;
-              persistOnType(reason, value);
-            }}
-          />
-        </View>
+        <FormField
+          label={t('securityAgent.dismiss.commentLabel')}
+          multiline
+          textAlignVertical="top"
+          placeholder={t('securityAgent.dismiss.commentPlaceholder')}
+          defaultValue={dismissDraft.draft?.comment ?? ''}
+          className="h-24 leading-[1.25rem]"
+          onChangeText={value => {
+            commentRef.current = value;
+            persistOnType(reason, value);
+          }}
+        />
 
         {dismissFailure !== null &&
           (dismissRefusalAction === undefined ? (
@@ -329,13 +341,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
               className="text-sm"
             />
           ))}
-
-        <Button disabled={!reason || dismissFinding.isPending || dismissBlocked} onPress={onSubmit}>
-          {dismissFinding.isPending ? (
-            <ActivityIndicator size="small" color={mutedDisabledInk} />
-          ) : null}
-          <Text>{t('securityAgent.dismiss.title')}</Text>
-        </Button>
       </ScrollView>
     </View>
   );

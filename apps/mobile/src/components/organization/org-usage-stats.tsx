@@ -3,21 +3,24 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatNumber, formatPrefixedMoney } from '@/lib/format';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrgUsageStats } from '@/lib/hooks/use-organization-queries';
 
 /**
  * One stat card. The value slot keeps its height when the number resolves —
- * `text-lg` measures 24.8 dp and the loading block is 24 dp — so the label
- * under it cannot move when the query answers.
+ * the `stat` variant's `text-lg` measures 24.8 dp and the loading block is
+ * 24 dp — so the label under it cannot move when the query answers.
  */
 function StatTile({ label, value }: Readonly<{ label: string; value: string | null }>) {
   return (
-    <View className="flex-1 gap-1 rounded-lg bg-secondary px-3 py-3">
+    <Card className="flex-1">
       {value === null ? (
         // `bg-muted-soft`, not the default `bg-skeleton-fill`: in light mode the
         // placeholder fill equals the card's own `bg-secondary`, so a default
@@ -25,10 +28,10 @@ function StatTile({ label, value }: Readonly<{ label: string; value: string | nu
         // line the same way.
         <Skeleton className="h-7 w-16 rounded-md bg-muted-soft" />
       ) : (
-        <Text className="text-lg font-bold text-foreground">{value}</Text>
+        <Text variant="stat">{value}</Text>
       )}
-      <Text className="text-xs text-muted-foreground">{label}</Text>
-    </View>
+      <Text variant="caption">{label}</Text>
+    </Card>
   );
 }
 
@@ -59,18 +62,19 @@ type OrgUsageStatsProps = {
  */
 export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();
-  const { data, isError, isPaused, isFetching, refetch } = useOrgUsageStats(organizationId);
-  const unavailable = data == null && (isError || isPaused);
+  const { data, isError, isFetching, refetch } = useOrgUsageStats(organizationId);
+  // The read settles offline too (`SETTLE_WHILE_OFFLINE`), so `isPaused` can
+  // no longer name the connection; the committed connectivity state does, the
+  // same source the offline banner paints.
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const unavailable = data == null && (isError || committedConnectivity === 'offline');
   // A tile with no totals yet shows a loading block while the first request is
   // outstanding, the dash when the section cannot load at all, and the cached
   // totals through a refetch error.
   const missingValue = unavailable ? '—' : null;
 
   const body = (
-    <View className="gap-3">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('organization.usageStats.orgLast30Days')}
-      </Text>
+    <Section label={t('organization.usageStats.orgLast30Days')}>
       <View className="gap-3">
         <View className="flex-row gap-3">
           <StatTile
@@ -103,15 +107,19 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
       </View>
       {unavailable && (
         <View className="gap-2">
-          <Text accessibilityRole="alert" className="text-sm text-muted-foreground">
-            {t(isPaused ? 'queryError.offlineTitle' : 'common.somethingWentWrong')}
+          <Text accessibilityRole="alert" variant="muted">
+            {t(
+              committedConnectivity === 'offline'
+                ? 'queryError.offlineTitle'
+                : 'common.somethingWentWrong'
+            )}
           </Text>
           <Button variant="outline" loading={isFetching} onPress={() => void refetch()}>
             <Text>{t('common.retry')}</Text>
           </Button>
         </View>
       )}
-    </View>
+    </Section>
   );
 
   if (onPress === undefined || unavailable) {

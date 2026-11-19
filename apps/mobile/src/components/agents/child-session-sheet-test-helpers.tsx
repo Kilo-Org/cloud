@@ -62,6 +62,7 @@ vi.mock('@/components/ui/text', async () => {
   };
 });
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   Bot: 'Bot',
   ChevronRight: 'ChevronRight',
   ChevronDown: 'ChevronDown',
@@ -77,6 +78,7 @@ vi.mock('@/components/ui/spinning-icon', () => ({
   SpinningIcon: 'SpinningIcon',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#999999',
   useThemeColors: () => ({}),
 }));
 vi.mock('@shopify/flash-list', async () => {

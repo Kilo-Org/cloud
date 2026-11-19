@@ -22,13 +22,11 @@ export function CreditExpiryNote({
   const { t, i18n } = useTranslation();
   const nextExpiry = getNextCreditExpiry(creditBlocks);
   if (!nextExpiry) {
-    return emptyMessage ? (
-      <Text className="text-xs text-muted-foreground">{emptyMessage}</Text>
-    ) : null;
+    return emptyMessage ? <Text variant="caption">{emptyMessage}</Text> : null;
   }
 
   return (
-    <Text className="text-xs text-muted-foreground">
+    <Text variant="caption">
       {keepZoneWithDate(
         t('credits.nextExpiry', {
           amount:

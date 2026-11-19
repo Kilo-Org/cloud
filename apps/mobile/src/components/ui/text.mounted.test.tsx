@@ -297,10 +297,9 @@ describe('Text eyebrow line box', () => {
 // other, and a non-heading variant announces neither.
 describe('Text heading accessibility', () => {
   it.each([
-    ['h1', '1'],
     ['h2', '2'],
     ['h3', '3'],
-    ['h4', '4'],
+    ['heading', '2'],
   ] as const)('announces %s as a heading with level %s', (variant, level) => {
     const node = hostText(mountTextTree(createElement(Text, { variant }, 'Section')));
 
@@ -336,5 +335,16 @@ describe('Text mono variant in either interface', () => {
     );
 
     expect(classes).toContain('font-mono-medium');
+  });
+});
+
+// A half-width stat tile pairs with the big `figure` on the other half of the
+// row: one step smaller, and tabular so the two numbers' digits line up.
+describe('Text stat variant', () => {
+  it('draws the tile size with tabular digits', () => {
+    const classes = hostClasses(mountTextTree(createElement(Text, { variant: 'stat' }, '1,204')));
+
+    expect(classes).toEqual(expect.arrayContaining(['text-lg', 'font-bold', 'tabular-nums']));
+    expect(classes).not.toContain('text-2xl');
   });
 });

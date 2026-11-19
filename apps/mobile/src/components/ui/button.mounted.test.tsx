@@ -281,22 +281,19 @@ describe('Button native target contract', () => {
     const button = renderButton({ disabled: true });
     const classes = (button.props.className as string).split(' ');
     // The muted pair must win over the variant's brand fill and its ink: the
-    // fill is the disabled action's own token in both themes, and the dark
-    // label takes the light ink that reads on that plate while light keeps the
-    // palette pair.
-    expect(classes).toContain('bg-primary-disabled-action');
+    // fill and the ink are the palette's muted pair in both themes.
+    expect(classes).toContain('bg-muted');
     expect(classes).not.toContain('bg-primary');
     expect(classes).not.toContain('bg-primary-disabled');
     expect(classes).not.toContain('opacity-50');
     const labelClasses = (button.findByType(NativeText).props.className as string).split(' ');
-    expect(labelClasses).toContain('text-primary-foreground');
-    expect(labelClasses).toContain('dark:text-foreground');
-    expect(labelClasses).not.toContain('text-muted-foreground');
+    expect(labelClasses).toContain('text-muted-foreground');
+    expect(labelClasses).not.toContain('text-primary-foreground');
 
     const busy = renderButton({ disabled: true, loading: true });
-    expect((busy.props.className as string).split(' ')).not.toContain('bg-primary-disabled-action');
+    expect((busy.props.className as string).split(' ')).not.toContain('bg-muted');
     expect((busy.findByType(NativeText).props.className as string).split(' ')).not.toContain(
-      'dark:text-foreground'
+      'text-muted-foreground'
     );
   });
 

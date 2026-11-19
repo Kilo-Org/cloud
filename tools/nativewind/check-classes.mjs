@@ -11,6 +11,13 @@
  * writing direction only, so they stay invisible until the app is read in an
  * RTL locale.
  *
+ * A surface the contract builds from parts is read as one expression: a card
+ * fill and a card radius split over a `cn()` argument, a ternary branch or a
+ * template chunk are still one hand-built card, and a row divider is judged
+ * together with its colour. Two rules read composition instead of classes — a
+ * `Sheet` without its `SheetHeader`, and a `ScreenHeader` `titleContent` in a
+ * file that does not own one.
+ *
  * Formatting built by hand instead of through `@/lib/intl-cache` skips the tag
  * normalisation every other surface shares, and pins or ignores the locale.
  *
@@ -20,14 +27,28 @@
  * string, a type annotation, a nested template — is a node of its own, so it
  * can no longer desynchronise a rule or hide the call sites after it.
  *
- * Usage: node tools/nativewind/check-classes.mjs
+ * The mobile layout contract's rules are the table below: `LAYOUT_RULES` holds
+ * each rule's id (the id a diagnostic and the baseline key carry), what it
+ * bans, and the primitive that replaces it; `LAYOUT_ALLOWLIST` names the
+ * modules that own the scale and may write those values. Those two constants
+ * are the only description of the layout rules — retarget, rename or relax a
+ * rule there, not in the checks that read it.
+ *
+ * A violation that already existed when the rules landed stays admitted by
+ * `tools/nativewind/layout-baseline.json` (file path → count per rule). A file
+ * may never exceed its baseline count, and an entry the file is now below is
+ * reported with the line to lower or delete, so the baseline only shrinks and
+ * at the end of the migration it is empty. Regenerate it with
+ * `--write-layout-baseline` only after the violations themselves are gone.
+ *
+ * Usage: node tools/nativewind/check-classes.mjs [--write-layout-baseline]
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { walk } from '../lib/ast.mjs';
+import { propertyName, unwrap, walk } from '../lib/ast.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
@@ -42,6 +63,137 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
  */
 const APP_SRC = join(ROOT, 'apps/mobile/src');
 const SOURCE_DIRS = [APP_SRC, join(ROOT, 'packages/app-shared/src')];
+
+/**
+ * The modules that own the layout scale, relative to `apps/mobile`: the UI
+ * primitives, the two headers, and the two constant modules a screen reads its
+ * geometry from. Everything else states layout with the scale.
+ */
+const LAYOUT_ALLOWLIST = [
+  'src/components/ui/',
+  'src/components/screen-header.tsx',
+  'src/components/sheet-header.tsx',
+  'src/lib/layout.ts',
+  'src/lib/a11y/tap-target.ts',
+];
+
+/**
+ * Trees the layout rules never read: the glanceable widgets and Live Activities
+ * are stringified into the home-screen and lock-screen renderers, not React
+ * Native views, so a layout class or a UI primitive has no meaning there.
+ */
+const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
+
+/**
+ * The layout contract's rules. `patterns` read one class string (a `className`,
+ * a `cn()` argument, a `*_CLASS` constant) and carry the offending class in the
+ * diagnostic; a rule without `patterns` reads markup and names what it found.
+ * `advice` is the primitive the contract names for the concern, so every
+ * diagnostic points at the replacement instead of restating the ban.
+ */
+const LAYOUT_RULES = [
+  {
+    id: 'L1',
+    patterns: [
+      // A spacing, type-size, line-height, tracking or radius value written as
+      // an arbitrary value re-decides one contract decision at one call site.
+      /(?<![\w-])-?(?:p|px|py|pt|pb|ps|pe|pl|pr|m|mx|my|mt|mb|ms|me|ml|mr|gap|gap-x|gap-y|space-x|space-y)-\[[^\]\s]+\]/g,
+      // A numeric inner value is a size; a colour (`text-[#fff]`) or a variable
+      // (`text-[var(--x)]`) is a different decision this rule does not own.
+      /(?<![\w-])text-\[\d[^\]\s]*\]/g,
+      /(?<![\w-])leading-\[[^\]\s]*px\]/g,
+      /(?<![\w-])tracking-\[[^\]\s]+\]/g,
+      /(?<![\w-])rounded-\[[^\]\s]+\]/g,
+    ],
+    advice:
+      'use the spacing scale (px-4 gutter, gap-6 section gap), a Text variant, or the constants in @/lib/layout',
+  },
+  {
+    id: 'L2',
+    advice:
+      'use SCREEN_BODY_CLASS from @/lib/layout (gutter px-4) for the scroll body, and leave ScreenHeader/SheetHeader their own gutter',
+  },
+  {
+    id: 'L3',
+    patterns: [/(?<![\w-])uppercase(?![\w-])/g, /(?<![\w-])tracking-(?:[a-z0-9-]+|\[[^\]\s]+\])/g],
+    advice: 'use SectionHeader or Eyebrow for a section label',
+  },
+  {
+    id: 'L4',
+    advice: 'use Card, RowGroup or a row primitive for the surface',
+  },
+  {
+    id: 'L5',
+    patterns: [/(?<![\w-])text-(?:xl|2xl|3xl|4xl|5xl|6xl)(?![\w-])/g],
+    advice: 'use ScreenHeader for page titles or a Text variant',
+  },
+  {
+    id: 'L6',
+    advice: 'use the layout classes or the constants in @/lib/layout',
+  },
+  {
+    id: 'L7',
+    advice: 'use RowChevron or a row primitive',
+  },
+  {
+    id: 'L8',
+    patterns: [
+      // An arbitrary length pins one element's box instead of using the scale.
+      // A percentage is a share of a measured frame (the only way to fill one),
+      // and 0.5px/1px are the hairlines the contract names, so those pass;
+      // calc()/var()/theme() re-implement the spacing scale, so they do not.
+      /(?<![\w-])(?:min-h|min-w|max-h|max-w|size|h|w)-\[(?!0\.5px\]|1px\])(?:\d+(?:\.\d+)?(?:px|rem|pt)?|(?:calc|var|theme)\([^\]]*)\]/g,
+    ],
+    advice:
+      "use the spacing scale (h-12, w-8…) or a constant from @/lib/a11y/tap-target (touch targets) / the row primitive's exported skeleton size",
+  },
+  {
+    id: 'L9',
+    advice:
+      'a row divider is border-hair-soft at 0.5pt; use RowGroup/RowGroupItem/RowFrame, or border-hair-soft directly',
+  },
+  {
+    id: 'L10',
+    advice:
+      'use title with titleAccessory; titleContent replaces the title node and re-spells its typography',
+  },
+  {
+    id: 'L11',
+    advice: 'render SheetHeader as the first child of every Sheet, so the sheet has its title row',
+  },
+  {
+    id: 'L12',
+    patterns: [
+      // A horizontal padding or margin wider than the page gutter. The page
+      // inset is one number; a call site that writes a wider one puts its
+      // content on a column the rest of the app does not share — the 21pt
+      // sheet-header label and 28pt empty-state paragraph the design gate read
+      // as double insets both started as a class wider than the gutter.
+      /(?<![\w-])-?(?:px|ps|pe|pl|pr|mx|ms|me)-(?:[5-9]|\d{2,})(?![\w.\-/])/g,
+    ],
+    advice:
+      'a page inset is the 14pt gutter: use SCREEN_GUTTER_CLASS, or the primitive that owns its own inset (SheetHeader, ScreenHeader, the state and row primitives)',
+  },
+  {
+    id: 'L13',
+    advice:
+      'fill a state\u2019s action slot with StateAction from @/components/empty-state; a Button there re-decides the state action\u2019s frame, icon spacing and 48pt floor',
+  },
+];
+
+/** One rule from the table above, by id. */
+function layoutRule(id) {
+  const rule = LAYOUT_RULES.find(candidate => candidate.id === id);
+  if (rule === undefined) {
+    throw new Error(`check-classes: layout rule ${id} is missing from LAYOUT_RULES`);
+  }
+  return rule;
+}
+
+/** One diagnostic for one rule, naming the class or prop it read. */
+function layoutProblem(relative, line, id, offending) {
+  return `${relative}:${line}: [${id}] "${offending}": ${layoutRule(id).advice}`;
+}
 
 /** Utilities that take a colour, so `<utility>-black/<alpha>` can appear. */
 const COLOR_UTILITIES = [
@@ -105,17 +257,15 @@ function rules() {
         'the /opacity modifier is dropped on CSS-variable theme colours; use the paired *-tile-bg / *-tile-border token or a concrete colour',
     },
     {
-      // `text-align` only accepts auto/left/right/center/justify, so the
-      // logical keywords are dropped and the text keeps its default alignment.
-      pattern: /\btext-(?:start|end)\b/g,
-      advice: 'text-align: start/end is dropped; the shared Text handles RTL alignment already',
+      // `text-align` only accepts auto/left/right/center/justify, so this
+      // logical keyword is dropped and the text keeps its default alignment.
+      // `start` and `end` are separate rules so each lifts on its own keyword.
+      pattern: /\btext-start\b/g,
+      advice: 'text-align: start is dropped; the shared Text handles RTL alignment already',
     },
     {
-      // react-native-css resolves a `dir` media condition as
-      // `(I18nManager.isRTL && value === 'rtl') || value === 'ltr'`, so an
-      // `ltr:` class matches in both directions and silently applies in RTL.
-      pattern: /\bltr:/g,
-      advice: 'the ltr: variant also matches in RTL; express the rule with rtl: instead',
+      pattern: /\btext-end\b/g,
+      advice: 'text-align: end is dropped; the shared Text handles RTL alignment already',
     },
     {
       // A numeric `leading-N` compiles to `calc(var(--spacing) * N)`, and the
@@ -366,6 +516,573 @@ export function checkDirectIntl(relative, absolute, program, lineOf) {
   return problems;
 }
 
+/** The string a class name can be written in on a JSX element. */
+const CLASS_ATTRIBUTES = new Set(['className', 'contentContainerClassName']);
+
+/** `SCREEN_BODY_CLASS`, `LINE_ACTION_BOX_CLASS`: a module constant of classes. */
+function isClassConstant(node) {
+  return node.type === 'Identifier' && /(?:^|_)CLASS$/.test(node.name);
+}
+
+/**
+ * Every class string the layout rules read, grouped the way one surface is
+ * written. A `className`/`contentContainerClassName` value and each `*_CLASS`
+ * constant is one surface: the literals beside a `${…}`, the branches of a
+ * ternary and the arguments of any `cn()` it calls all describe the same
+ * element, so a card fill and a card radius split across them are still one
+ * hand-built card. A `cn()` call outside those props is a surface of its own,
+ * and one nested inside another surface is already part of it.
+ */
+function layoutGroups(program, text) {
+  const groups = [];
+  const covered = new Set();
+  const add = (start, chunks) => {
+    const fresh = chunks.filter(chunk => !covered.has(chunk.start));
+    if (fresh.length === 0) {
+      return;
+    }
+    for (const chunk of fresh) {
+      covered.add(chunk.start);
+    }
+    groups.push({ start, chunks: fresh });
+  };
+  const argumentChunks = node => node.arguments.flatMap(argument => stringChunks(argument, text));
+
+  walk(program, node => {
+    if (
+      node.type === 'JSXAttribute' &&
+      node.name.type === 'JSXIdentifier' &&
+      CLASS_ATTRIBUTES.has(node.name.name) &&
+      node.value !== null
+    ) {
+      add(node.start, stringChunks(node.value, text));
+    } else if (
+      node.type === 'VariableDeclarator' &&
+      isClassConstant(node.id) &&
+      node.init !== null
+    ) {
+      add(node.start, stringChunks(node.init, text));
+    }
+  });
+  walk(program, node => {
+    if (
+      node.type === 'CallExpression' &&
+      node.callee.type === 'Identifier' &&
+      node.callee.name === 'cn'
+    ) {
+      add(node.start, argumentChunks(node));
+    }
+  });
+  return groups;
+}
+
+/**
+ * A page gutter written on a scroll body other than `px-4` — or horizontal
+ * padding on a `CenteredState` content container, which is the same page inset
+ * inside the centered band — and any horizontal padding on a
+ * `ScreenHeader`/`SheetHeader` `className`: both move the page inset the
+ * contract fixed, and the header's own gutter is what the next screen lines up
+ * against.
+ */
+const SCROLL_BODIES = new Set([
+  'ScrollView',
+  'TabScreenScrollView',
+  'DetailScreenScrollView',
+  'SheetScrollView',
+  'FlashList',
+  'KeyboardAwareScrollView',
+]);
+const CENTERED_BODIES = new Set(['CenteredState']);
+const HEADER_TAGS = new Set(['ScreenHeader', 'SheetHeader']);
+
+/**
+ * The utility part of one class token, with any variant prefix removed. A
+ * variant (`md:`, `landscape:`, `ios:`) selects when the utility applies, not
+ * what it does, so the inset rules read the same padding a bare token writes —
+ * the same way L12's lookbehind sees a variant-prefixed `px-6`.
+ */
+function utilityOf(token) {
+  const segments = token.split(':');
+  return segments[segments.length - 1].replace(/^!/, '');
+}
+
+/** True when one class token writes a horizontal page inset other than `px-4`. */
+function wrongGutter(token) {
+  const match = /^-?(p|px|ps|pe|pl|pr)-(.+)$/.exec(utilityOf(token));
+  if (match === null) {
+    return false;
+  }
+  return !((match[1] === 'px' || match[1] === 'p') && match[2] === '4');
+}
+
+/** True when a class token writes an all-side or horizontal padding at all. */
+function anyPadding(token) {
+  return /^-?(?:p|px|ps|pe|pl|pr)-/.test(utilityOf(token));
+}
+
+function checkScrollGutters(relative, program, text, lineOf) {
+  const problems = [];
+  walk(program, node => {
+    if (node.type !== 'JSXOpeningElement') {
+      return;
+    }
+    const name = tagName(node, text).replace(/^Animated\./, '');
+    const gutter =
+      SCROLL_BODIES.has(name) || CENTERED_BODIES.has(name)
+        ? 'contentContainerClassName'
+        : HEADER_TAGS.has(name)
+          ? 'className'
+          : null;
+    if (gutter === null) {
+      return;
+    }
+    const attribute = node.attributes.find(
+      candidate =>
+        candidate.type === 'JSXAttribute' &&
+        candidate.name.type === 'JSXIdentifier' &&
+        candidate.name.name === gutter
+    );
+    const tokens = [
+      ...new Set(
+        stringChunks(attribute?.value, text)
+          .map(chunk => chunk.value)
+          .flatMap(classes => classes.split(/\s+/))
+          .filter(classes => (gutter === 'className' ? anyPadding(classes) : wrongGutter(classes)))
+      ),
+    ].sort();
+    for (const token of tokens) {
+      problems.push(
+        layoutProblem(
+          relative,
+          lineOf(attribute.start),
+          'L2',
+          `${token} on <${tagName(node, text)}> ${gutter}`
+        )
+      );
+    }
+  });
+  return problems;
+}
+
+/**
+ * A card surface built by hand: one class expression that pairs a card fill
+ * with a card radius. The row and card primitives own that pairing, so every
+ * surface they replace can only drift from it. A directional radius counts — a
+ * grouped list cell is the same hand-built card when only its ends round.
+ */
+const CARD_SURFACE = /(?<![\w-])bg-(?:secondary|card)(?![\w-])/;
+const CARD_RADIUS = /(?<![\w-])rounded-(?:(?:t|b|l|r|tl|tr|bl|br)-)?(?:md|lg|xl|2xl|3xl)(?![\w-])/;
+
+function cardSurfaceProblem(relative, group, lineOf) {
+  const classes = group.chunks.map(chunk => chunk.value).join(' ');
+  const surface = CARD_SURFACE.exec(classes);
+  const radius = CARD_RADIUS.exec(classes);
+  if (surface === null || radius === null) {
+    return null;
+  }
+  return layoutProblem(relative, lineOf(group.start), 'L4', `${surface[0]} ${radius[0]}`);
+}
+
+/**
+ * A row separator drawn as a side border in the full-strength border colour:
+ * `border-b border-border` paints a divider at the wrong weight and hue, and it
+ * is what a hand-built row looks like before it moves onto a row primitive.
+ */
+const DIVIDER_SIDE = /(?<![\w-])border-(?:b|t)(?:-(?:\d+|\[[^\]\s]+\]))?(?![\w-])/;
+const DIVIDER_COLOUR = /(?<![\w-])border-border(?![\w-])/;
+
+function dividerProblem(relative, group, lineOf) {
+  const classes = group.chunks.map(chunk => chunk.value).join(' ');
+  const side = DIVIDER_SIDE.exec(classes);
+  if (side === null || !DIVIDER_COLOUR.test(classes)) {
+    return null;
+  }
+  return layoutProblem(relative, lineOf(group.start), 'L9', `${side[0]} border-border`);
+}
+
+/**
+ * Layout written as numbers in a `style` object — the `style` prop or any
+ * `*Style` prop a list takes: the spacing, type, tracking and radius decisions
+ * the classes own, re-decided per element. A value read from an inset, the
+ * keyboard or a measurement (an identifier or a call, with no numeric literal
+ * but `0`) is measured geometry, not a decision, and passes.
+ */
+const LAYOUT_STYLE_PROPERTY =
+  /^(?:(?:padding|margin)(?:Top|Bottom|Left|Right|Start|End|Horizontal|Vertical)?|gap|rowGap|columnGap|fontSize|lineHeight|letterSpacing|border(?:Top|Bottom|Start|End)?(?:Left|Right|Start|End)?Radius)$/;
+
+/** True when the expression holds a numeric literal other than `0`. */
+function hasNumericLiteral(node) {
+  let found = false;
+  walk(node, child => {
+    if (
+      !found &&
+      child.type === 'Literal' &&
+      typeof child.value === 'number' &&
+      child.value !== 0
+    ) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+/** The object literals a `style` prop holds: the value, or the array entries. */
+function styleObjects(value) {
+  const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
+  const target = unwrap(expression);
+  if (target.type === 'ObjectExpression') {
+    return [target];
+  }
+  if (target.type !== 'ArrayExpression') {
+    return [];
+  }
+  return target.elements
+    .filter(element => element !== null)
+    .map(element => unwrap(element))
+    .filter(element => element.type === 'ObjectExpression');
+}
+
+function checkInlineStyles(relative, program, text, lineOf) {
+  const problems = [];
+  walk(program, node => {
+    if (node.type !== 'JSXOpeningElement') {
+      return;
+    }
+    // `style` and every `*Style` prop (`contentContainerStyle`,
+    // `columnWrapperStyle`, `ListHeaderComponentStyle`…) reach the same native
+    // style object, so they are read the same way, and one element may carry
+    // several of them.
+    for (const attribute of node.attributes) {
+      if (
+        attribute.type !== 'JSXAttribute' ||
+        attribute.name.type !== 'JSXIdentifier' ||
+        (attribute.name.name !== 'style' && !attribute.name.name.endsWith('Style'))
+      ) {
+        continue;
+      }
+      if (attribute.value === undefined || attribute.value === null) {
+        continue;
+      }
+      for (const object of styleObjects(attribute.value)) {
+        for (const property of object.properties) {
+          const name = propertyName(property);
+          if (name === null || !LAYOUT_STYLE_PROPERTY.test(name)) {
+            continue;
+          }
+          if (!hasNumericLiteral(unwrap(property.value))) {
+            continue;
+          }
+          const written = text.slice(property.key.start, property.value.end).replace(/\s+/g, ' ');
+          problems.push(layoutProblem(relative, lineOf(property.start), 'L6', written));
+        }
+      }
+    }
+  });
+  return problems;
+}
+
+/**
+ * A chevron placed straight from the icon modules instead of through
+ * `RowChevron`, which is what mirrors it in RTL and keeps it to the row's
+ * trailing size. The row primitives and `RowChevron` own that placement.
+ */
+const ROW_CHEVRON_MODULES = new Set(['@/components/ui/directional-icons', '@/components/ui/icons']);
+const ROW_CHEVRON_NAMES = new Set(['ChevronRight', 'DirectionalChevronRight']);
+
+function checkRowChevrons(relative, program, lineOf) {
+  const problems = [];
+  walk(program, node => {
+    if (node.type !== 'ImportDeclaration' || node.importKind === 'type') {
+      return;
+    }
+    if (!ROW_CHEVRON_MODULES.has(node.source.value)) {
+      return;
+    }
+    for (const specifier of node.specifiers) {
+      if (specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type') {
+        continue;
+      }
+      const name = importedName(specifier.imported);
+      if (ROW_CHEVRON_NAMES.has(name)) {
+        problems.push(layoutProblem(relative, lineOf(specifier.start), 'L7', name));
+      }
+    }
+  });
+  return problems;
+}
+
+/**
+ * `titleContent` replaces the title node `ScreenHeader` paints, so the caller
+ * then re-spells the title's typography and line height. Only the screens whose
+ * title line is not a plain string keep it; everything else passes a `title`
+ * and, for a badge beside it, `titleAccessory`.
+ */
+const TITLE_CONTENT_ALLOWLIST = new Set([
+  'apps/mobile/src/components/chat/chat-screen.tsx',
+  'apps/mobile/src/components/home/home-screen.tsx',
+  'apps/mobile/src/components/profiles/profile-overview-screen.tsx',
+]);
+
+function checkTitleContent(relative, program, lineOf) {
+  if (TITLE_CONTENT_ALLOWLIST.has(relative)) {
+    return [];
+  }
+  const problems = [];
+  walk(program, node => {
+    if (
+      node.type === 'JSXAttribute' &&
+      node.name.type === 'JSXIdentifier' &&
+      node.name.name === 'titleContent'
+    ) {
+      problems.push(layoutProblem(relative, lineOf(node.start), 'L10', 'titleContent'));
+    }
+  });
+  return problems;
+}
+
+/**
+ * A sheet opened imperatively renders its own body, so nothing outside it adds
+ * the title row: without `SheetHeader` it starts under the drag handle with no
+ * title and no close control. The files below are the ones that own their first
+ * row instead.
+ */
+const SHEET_MODULE = '@/components/ui/sheet';
+const SHEET_ALLOWLIST = new Set([
+  // A confirmation dialog with its own title and message, not a titled sheet.
+  'apps/mobile/src/components/destructive-confirm-dialog.tsx',
+  // The generic sheet shell: the caller supplies the child surface and its header.
+  'apps/mobile/src/components/agents/session-page-sheet.tsx',
+  // These three draw the todo sheets' title with `SheetTitleRow`.
+  'apps/mobile/src/components/todos/save-draft-as-todo-sheet.tsx',
+  'apps/mobile/src/components/todos/session-todo-link.tsx',
+  'apps/mobile/src/components/todos/todo-link-session-sheet.tsx',
+]);
+
+/**
+ * The components one file defines, by name, so the sheet rule can follow a
+ * sheet that renders a local component owning its title row: `<Sheet><Body /></Sheet>`
+ * where `Body` draws the `SheetHeader` reads as a header even though the tag is
+ * outside the sheet's own JSX.
+ */
+function localComponents(program) {
+  const components = new Map();
+  walk(program, node => {
+    if (node.type === 'FunctionDeclaration' && node.id !== null) {
+      components.set(node.id.name, node);
+    } else if (
+      node.type === 'VariableDeclarator' &&
+      node.id.type === 'Identifier' &&
+      node.init !== null &&
+      (node.init.type === 'ArrowFunctionExpression' || node.init.type === 'FunctionExpression')
+    ) {
+      components.set(node.id.name, node.init);
+    }
+  });
+  return components;
+}
+
+/** Whether one local component — or a local component it renders — draws a header. */
+function localComponentDrawsHeader(name, text, components, visited) {
+  const body = components.get(name);
+  if (body === undefined || visited.has(name)) {
+    return false;
+  }
+  visited.add(name);
+  let header = false;
+  const children = [];
+  walk(body, node => {
+    if (node.type !== 'JSXOpeningElement') {
+      return;
+    }
+    const tag = tagName(node, text);
+    if (tag === 'SheetHeader') {
+      header = true;
+    } else if (components.has(tag)) {
+      children.push(tag);
+    }
+  });
+  return (
+    header || children.some(child => localComponentDrawsHeader(child, text, components, visited))
+  );
+}
+
+function checkSheetHeader(relative, program, text, lineOf) {
+  if (SHEET_ALLOWLIST.has(relative)) {
+    return [];
+  }
+  const sheetNames = new Set();
+  walk(program, node => {
+    if (node.type !== 'ImportDeclaration' || node.importKind === 'type') {
+      return;
+    }
+    if (node.source.value !== SHEET_MODULE) {
+      return;
+    }
+    for (const specifier of node.specifiers) {
+      if (
+        specifier.type === 'ImportSpecifier' &&
+        specifier.importKind !== 'type' &&
+        importedName(specifier.imported) === 'Sheet'
+      ) {
+        sheetNames.add(specifier.local?.name ?? importedName(specifier.imported));
+      }
+    }
+  });
+  if (sheetNames.size === 0) {
+    return [];
+  }
+  const problems = [];
+  const components = localComponents(program);
+  walk(program, node => {
+    if (node.type !== 'JSXElement') {
+      return;
+    }
+    const name = tagName(node.openingElement, text);
+    if (!sheetNames.has(name)) {
+      return;
+    }
+    // The header belongs to this sheet's own subtree. A file-level flag would
+    // let a second, headerless sheet pass on the first one's header; a nested
+    // sheet's header must not count for the sheet that contains it either.
+    const headers = [];
+    const nested = [];
+    const candidates = [];
+    walk(node, descendant => {
+      if (descendant === node) {
+        return;
+      }
+      if (
+        descendant.type === 'JSXElement' &&
+        sheetNames.has(tagName(descendant.openingElement, text))
+      ) {
+        nested.push(descendant);
+      } else if (descendant.type === 'JSXOpeningElement') {
+        const tag = tagName(descendant, text);
+        if (tag === 'SheetHeader') {
+          headers.push(descendant.start);
+        } else if (components.has(tag)) {
+          candidates.push(tag);
+        }
+      }
+    });
+    const header =
+      headers.some(start => !nested.some(child => start > child.start && start < child.end)) ||
+      // A sheet whose body is a local component (`<SessionFilterContent />`)
+      // can draw its header there; follow the component it renders.
+      candidates.some(candidate =>
+        localComponentDrawsHeader(candidate, text, components, new Set())
+      );
+    if (!header) {
+      problems.push(layoutProblem(relative, lineOf(node.start), 'L11', `<${name}>`));
+    }
+  });
+  return problems;
+}
+
+/**
+ * A state's `action` slot is one shared control: `StateAction` owns the frame,
+ * the icon spacing and the 48pt state-action floor, so a plain `Button` there
+ * is the second convention the contract removed. The rule reads the `action`
+ * expression, so a Button inside a caller's own wrapper counts too.
+ */
+const STATE_ACTION_TAGS = new Set(['EmptyState', 'QueryError']);
+
+/** The first `Button` element inside one JSX expression, nested wrappers included. */
+function stateActionButton(expression, text) {
+  let found = null;
+  walk(expression, node => {
+    if (found !== null || node.type !== 'JSXOpeningElement') {
+      return;
+    }
+    if (tagName(node, text) === 'Button') {
+      found = node;
+    }
+  });
+  return found;
+}
+
+function checkStateActionButtons(relative, program, text, lineOf) {
+  const problems = [];
+  walk(program, node => {
+    if (node.type !== 'JSXOpeningElement' || !STATE_ACTION_TAGS.has(tagName(node, text))) {
+      return;
+    }
+    for (const attribute of node.attributes) {
+      if (
+        attribute.type !== 'JSXAttribute' ||
+        attribute.name.type !== 'JSXIdentifier' ||
+        attribute.name.name !== 'action'
+      ) {
+        continue;
+      }
+      if (attribute.value === null || attribute.value.type !== 'JSXExpressionContainer') {
+        continue;
+      }
+      const button = stateActionButton(attribute.value.expression, text);
+      if (button !== null) {
+        problems.push(layoutProblem(relative, lineOf(button.start), 'L13', '<Button>'));
+      }
+    }
+  });
+  return problems;
+}
+
+/** Whether a file is one the layout contract exempts. */
+function layoutExempt(path) {
+  if (!path.startsWith('apps/mobile/src/')) {
+    return true;
+  }
+  // The allowlist is written relative to `apps/mobile`, so it reads `src/…`.
+  const appPath = path.slice('apps/mobile/'.length);
+  if (LAYOUT_EXEMPT_TREES.some(tree => appPath.startsWith(tree))) {
+    return true;
+  }
+  return LAYOUT_ALLOWLIST.some(
+    entry => appPath === entry || (entry.endsWith('/') && appPath.startsWith(entry))
+  );
+}
+
+/** Every layout problem one file has, from the table's rules. */
+export function checkLayout(relative, program, text, lineOf) {
+  if (layoutExempt(relative)) {
+    return [];
+  }
+  const problems = [];
+  const seen = new Set();
+  for (const group of layoutGroups(program, text)) {
+    for (const chunk of group.chunks) {
+      if (seen.has(chunk.start)) {
+        continue;
+      }
+      seen.add(chunk.start);
+      for (const rule of LAYOUT_RULES) {
+        for (const pattern of rule.patterns ?? []) {
+          for (const match of chunk.value.matchAll(pattern)) {
+            problems.push(
+              layoutProblem(relative, lineOf(chunk.start + match.index), rule.id, match[0])
+            );
+          }
+        }
+      }
+    }
+    const surface = cardSurfaceProblem(relative, group, lineOf);
+    if (surface !== null) {
+      problems.push(surface);
+    }
+    const divider = dividerProblem(relative, group, lineOf);
+    if (divider !== null) {
+      problems.push(divider);
+    }
+  }
+  problems.push(...checkScrollGutters(relative, program, text, lineOf));
+  problems.push(...checkInlineStyles(relative, program, text, lineOf));
+  problems.push(...checkRowChevrons(relative, program, lineOf));
+  problems.push(...checkTitleContent(relative, program, lineOf));
+  problems.push(...checkSheetHeader(relative, program, text, lineOf));
+  problems.push(...checkStateActionButtons(relative, program, text, lineOf));
+  return problems;
+}
+
 /** The ban list over one file: every match of every rule, in source order. */
 export function checkRules(relative, program, text, lineOf) {
   const problems = [];
@@ -412,11 +1129,32 @@ export function checkCompilerStillDropsThese() {
   }
 
   /**
-   * The value the compiled stylesheet emits for `property` in the fixture rule.
+   * Run one pin. Its check returns the problem the compiler now shows, or
+   * nothing while the ban still holds. A throw belongs to this fixture alone:
+   * the compiler is loaded and the fixtures share nothing, so the next one
+   * still runs.
+   */
+  function pin(fixture, check) {
+    try {
+      const problem = check();
+      if (problem !== undefined) {
+        problems.push(problem);
+      }
+    } catch (error) {
+      problems.push(compilerPinFailure(fixture, error));
+    }
+  }
+
+  /**
+   * The value the compiled stylesheet emits for `property` in the fixture rule,
+   * and whether it emits that declaration at all.
    *
    * Selecting by the property name the runtime receives keeps the pin on the
    * declaration the Metro transformer ships, not on one position in the
-   * compiler's private stylesheet tree.
+   * compiler's private stylesheet tree. `present` is reported separately
+   * because an absent declaration is an outcome of its own: the compiler
+   * stopped shipping what the ban warns about, so the runtime still paints
+   * nothing and the ban still applies.
    */
   function emittedValue(css, options, property) {
     const sheet = compile(css, options).stylesheet();
@@ -424,12 +1162,12 @@ export function checkCompilerStillDropsThese() {
       for (const rule of entry?.[1] ?? []) {
         for (const declaration of rule?.d ?? []) {
           if (declaration?.[1] === property) {
-            return declaration[0];
+            return { present: true, value: declaration[0] };
           }
         }
       }
     }
-    return undefined;
+    return { present: false, value: undefined };
   }
 
   /**
@@ -444,64 +1182,74 @@ export function checkCompilerStillDropsThese() {
     );
   }
 
-  let alignment;
-  try {
-    alignment = compile('.x { text-align: start; }').warnings();
-  } catch (error) {
-    problems.push(compilerPinFailure('the text-align: start fixture', error));
-    return problems;
+  /**
+   * One pin over a declaration the compiler must keep deferring to `call`.
+   * Only a present value that resolved at build time retires the ban; an
+   * absent declaration reports that and keeps the rule.
+   */
+  function declarationPin({ subject, css, options, property, call, rule }) {
+    return () => {
+      const { present, value } = emittedValue(css, options, property);
+      if (!present) {
+        return `check-classes: ${subject} emits no ${property} declaration — the ban still applies, so keep the ${rule} rule`;
+      }
+      if (defersTo(value, call)) {
+        return undefined;
+      }
+      return `check-classes: ${subject} now compiles to ${JSON.stringify(value ?? null)} instead of a deferred ${call} — drop the ${rule} rule`;
+    };
   }
-  if (!JSON.stringify(alignment ?? null).includes('text-align')) {
-    problems.push(
-      'check-classes: text-align: start is no longer dropped — drop the text-start/end rule'
-    );
+
+  // `start` and `end` are separate rules, so each keyword is pinned on its
+  // own: the compiler handling one keyword retires only that keyword's rule.
+  // The check reads the warning report as text, so a change to the report's
+  // shape leaves the pin holding instead of retiring the rule. The keyword is
+  // matched quoted, which cannot land inside a warning sentence.
+  for (const keyword of ['start', 'end']) {
+    pin(`the text-align: ${keyword} fixture`, () => {
+      const report = JSON.stringify(compile(`.x { text-align: ${keyword}; }`).warnings() ?? null);
+      if (report.includes('text-align') && report.includes(JSON.stringify(keyword))) {
+        return undefined;
+      }
+      return `check-classes: text-align: ${keyword} is no longer dropped — drop the text-${keyword} rule`;
+    });
   }
 
   // A `/opacity` modifier on an `@theme inline` variable is emitted as a
   // deferred colorMix over the variable; the runtime cannot decompose it and
   // drops the declaration. When the compiler resolves it instead, this stops
   // matching and the rule above can go.
-  let themeOpacity;
-  try {
-    themeOpacity = emittedValue(
-      '@theme inline { --color-destructive: var(--destructive); }\n' +
+  pin(
+    'the color-mix over an @theme inline variable fixture',
+    declarationPin({
+      subject: 'color-mix over an @theme inline variable',
+      css:
+        '@theme inline { --color-destructive: var(--destructive); }\n' +
         ':root { --destructive: #b0483a; }\n' +
         '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }',
-      undefined,
-      'backgroundColor'
-    );
-  } catch (error) {
-    problems.push(
-      compilerPinFailure('the color-mix over an @theme inline variable fixture', error)
-    );
-    return problems;
-  }
-  if (!defersTo(themeOpacity, 'colorMix')) {
-    problems.push(
-      `check-classes: color-mix over an @theme inline variable now compiles to ${JSON.stringify(themeOpacity ?? null)} instead of a deferred colorMix — drop the theme-token opacity rule`
-    );
-  }
+      options: undefined,
+      property: 'backgroundColor',
+      call: 'colorMix',
+      rule: 'theme-token opacity',
+    })
+  );
 
   // With `inlineVariables: false` (apps/mobile/metro.config.js) the spacing
   // scale reaches the runtime as a deferred calc inside the line-height
   // function, which multiplies the result by the font size. When the compiler
   // folds it to a length instead, this stops matching and the rule can go.
-  let spacingLeading;
-  try {
-    spacingLeading = emittedValue(
-      ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
-      { inlineVariables: false },
-      'lineHeight'
-    );
-  } catch (error) {
-    problems.push(compilerPinFailure('the spacing-scale line-height fixture', error));
-    return problems;
-  }
-  if (!defersTo(spacingLeading, 'calc')) {
-    problems.push(
-      `check-classes: a spacing-scale line height now compiles to ${JSON.stringify(spacingLeading ?? null)} instead of a deferred calc — drop the numeric leading rule`
-    );
-  }
+  pin(
+    'the spacing-scale line-height fixture',
+    declarationPin({
+      subject: 'a spacing-scale line height',
+      css: ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
+      options: { inlineVariables: false },
+      property: 'lineHeight',
+      call: 'calc',
+      rule: 'numeric leading',
+    })
+  );
+
   return problems;
 }
 
@@ -525,7 +1273,116 @@ export function checkParsedFile({ file, path, text, program, lineOf, problems })
     ...checkRawText(path, program, lineOf),
     ...checkDirectIntl(path, file, program, lineOf),
     ...checkRules(path, program, text, lineOf),
+    ...checkLayout(path, program, text, lineOf),
   ];
+}
+
+/**
+ * The checked-in baseline: `apps/mobile/src/…` file → the number of layout
+ * violations of each rule the migration has not reached yet. It is written one
+ * file per line so two independent deletions edit different lines.
+ */
+const LAYOUT_BASELINE_PATH = 'tools/nativewind/layout-baseline.json';
+const LAYOUT_PROBLEM = /^(\S+):\d+: \[(L\d+)\] /;
+
+/** The layout problems of one run, grouped by file and then by rule. */
+function layoutFindings(problems) {
+  const byFile = new Map();
+  for (const problem of problems) {
+    const match = LAYOUT_PROBLEM.exec(problem);
+    if (match === null) {
+      continue;
+    }
+    const [, path, id] = match;
+    const byRule = byFile.get(path) ?? new Map();
+    byFile.set(path, byRule);
+    const findings = byRule.get(id) ?? [];
+    byRule.set(id, findings);
+    findings.push(problem);
+  }
+  return byFile;
+}
+
+/** The baseline as written, or an empty one when the file is absent. */
+function readLayoutBaseline() {
+  try {
+    return JSON.parse(readFileSync(join(ROOT, LAYOUT_BASELINE_PATH), 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return {};
+    }
+    throw error;
+  }
+}
+
+/** Rewrite the baseline from this run's own counts: the migration's new floor. */
+function writeLayoutBaseline(findings) {
+  const entries = [...findings]
+    .map(([path, byRule]) => [
+      path,
+      [...byRule]
+        .map(([id, problems]) => [id, problems.length])
+        .sort(([left], [right]) => (left < right ? -1 : 1)),
+    ])
+    .filter(([, rules]) => rules.length > 0)
+    .sort(([left], [right]) => (left < right ? -1 : 1));
+  const body = entries
+    .map(
+      ([path, rules]) =>
+        `  ${JSON.stringify(path)}: { ${rules.map(([id, count]) => `${JSON.stringify(id)}: ${count}`).join(', ')} }`
+    )
+    .join(',\n');
+  writeFileSync(
+    join(ROOT, LAYOUT_BASELINE_PATH),
+    entries.length === 0 ? '{}\n' : `{\n${body}\n}\n`
+  );
+  console.log(`check-classes: wrote ${entries.length} file(s) to ${LAYOUT_BASELINE_PATH}`);
+}
+
+/**
+ * Split the layout findings into the ones the baseline admits and the lines
+ * that fail this run. A file may not exceed its count for a rule, and a file
+ * below its count is a stale entry: printing the line to lower or delete keeps
+ * the baseline shrinking instead of outliving the migration.
+ */
+function compareLayoutBaseline(findings, baseline) {
+  const exceeded = new Set();
+  const stale = [];
+  for (const [path, byRule] of findings) {
+    for (const [id, problems] of byRule) {
+      const admitted = baseline[path]?.[id] ?? 0;
+      if (problems.length > admitted) {
+        exceeded.add(`${path} ${id}`);
+      }
+    }
+  }
+  for (const [path, rules] of Object.entries(baseline)) {
+    for (const [id, admitted] of Object.entries(rules)) {
+      const actual = findings.get(path)?.get(id)?.length ?? 0;
+      if (actual > admitted) {
+        continue;
+      }
+      if (actual < admitted) {
+        stale.push(
+          `${LAYOUT_BASELINE_PATH}: ${path} ${id} baseline is ${admitted} but the file now has ${actual}; ${actual === 0 ? 'delete the entry' : `lower it to ${actual}`}`
+        );
+      }
+    }
+  }
+
+  const reported = [];
+  const overCount = [];
+  for (const [path, byRule] of findings) {
+    for (const [id, problems] of byRule) {
+      if (exceeded.has(`${path} ${id}`)) {
+        reported.push(...problems);
+        overCount.push(
+          `${path}: ${id} now has ${problems.length} violation(s) and the baseline admits ${baseline[path]?.[id] ?? 0}; remove the new one(s)`
+        );
+      }
+    }
+  }
+  return [...reported, ...overCount, ...stale];
 }
 
 /** The whole audit: every source file, then the compiler pins, then the report. */
@@ -536,17 +1393,36 @@ function run() {
       problems.push(...checkParsedFile(entry));
     }
   }
+  const findings = layoutFindings(problems);
+
+  if (process.argv.includes('--write-layout-baseline')) {
+    writeLayoutBaseline(findings);
+    return;
+  }
+
   problems.push(...checkCompilerStillDropsThese());
 
-  if (problems.length > 0) {
-    for (const problem of problems) {
+  const layoutProblems = compareLayoutBaseline(findings, readLayoutBaseline());
+  const others = problems.filter(problem => !LAYOUT_PROBLEM.test(problem));
+
+  if (others.length > 0 || layoutProblems.length > 0) {
+    for (const problem of others) {
       console.error(problem);
     }
-    console.error(`\ncheck-classes: ${problems.length} problem(s)`);
+    for (const problem of layoutProblems) {
+      console.error(problem);
+    }
+    console.error(`\ncheck-classes: ${others.length + layoutProblems.length} problem(s)`);
     process.exit(1);
   }
 
-  console.log('check-classes: no dropped classes, stray raw Text or hand-built formatters');
+  const admitted = [...findings.values()].reduce(
+    (total, byRule) => total + [...byRule.values()].reduce((sum, group) => sum + group.length, 0),
+    0
+  );
+  console.log(
+    `check-classes: no dropped classes, stray raw Text or hand-built formatters; ${admitted} layout violation(s) admitted by ${LAYOUT_BASELINE_PATH}`
+  );
 }
 
 runIfMain(run, import.meta.url);

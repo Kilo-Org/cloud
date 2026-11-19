@@ -132,6 +132,25 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: ({
+    label,
+    icon: Icon,
+    onPress,
+    disabled,
+    loading,
+  }: {
+    label: string;
+    icon: React.ElementType;
+    onPress: () => void;
+    disabled?: boolean;
+    loading?: boolean;
+  }) =>
+    React.createElement(
+      'StateAction',
+      { label, onPress, disabled, loading },
+      loading === true ? React.createElement('ActivityIndicator') : React.createElement(Icon, {}),
+      React.createElement('Text', null, label)
+    ),
   EmptyState: (props: { description?: React.ReactNode; action?: React.ReactNode }) =>
     React.createElement('EmptyState', props, props.description, props.action),
 }));
@@ -142,7 +161,6 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/pr-review/pr-review-context-line', () => ({
   PrReviewContextLine: 'PrReviewContextLine',
 }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 // The gate's pending body is the detail screen's frame: the real skeleton over a
@@ -205,7 +223,7 @@ function failLaunch(error: Error) {
 
 /** Presses the gate's Connect button and lets the launch promise settle one tick. */
 async function pressConnect(renderer: TestRenderer.ReactTestRenderer) {
-  const button = renderer.root.findByType('Button');
+  const button = renderer.root.findByType('StateAction');
   await act(async () => {
     (button.props.onPress as () => void)();
     await Promise.resolve();
@@ -349,7 +367,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
         renderer.update(gate(provider));
       });
       expect(renderer.root.findAllByType('ReviewContent')).toHaveLength(1);
-      expect(renderer.root.findAllByType('Button')).toHaveLength(0);
+      expect(renderer.root.findAllByType('StateAction')).toHaveLength(0);
     }
   );
 
@@ -432,7 +450,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
 
   it('opens the app connect sheet once for a double press', () => {
     const renderer = mount('bitbucket');
-    const button = renderer.root.findByType('Button');
+    const button = renderer.root.findByType('StateAction');
 
     act(() => {
       (button.props.onPress as () => void)();
@@ -445,7 +463,7 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
   it('explains the personal Bitbucket restriction without a Connect CTA', () => {
     const renderer = mount('bitbucket', null);
     expect(renderer.root.findByType('EmptyState').props.description).toBeTruthy();
-    expect(renderer.root.findAllByType('Button')).toHaveLength(0);
+    expect(renderer.root.findAllByType('StateAction')).toHaveLength(0);
     expect(WebBrowser.openAuthSessionAsync).not.toHaveBeenCalled();
   });
 
@@ -574,7 +592,7 @@ describe('PR-review connect gate item line', () => {
   it('names the Bitbucket pull request in the organization-only explanation', () => {
     const renderer = mount('bitbucket', null, BITBUCKET);
     expect(itemLine(renderer)?.props.children).toBe('acme-design/atlas-redesign#42');
-    expect(renderer.root.findAllByType('Button')).toHaveLength(0);
+    expect(renderer.root.findAllByType('StateAction')).toHaveLength(0);
   });
 
   it('keeps the generic gate when the mount knows no item', () => {
@@ -632,7 +650,7 @@ describe('PR-review connect gate — GitLab instance mismatch', () => {
     // state cannot be reached. The one action is the integration-page CTA.
     expect(renderer.root.findAllByType('ReviewContent')).toHaveLength(0);
     expect(textValues(renderer)).toContain('Connect GitLab');
-    expect(renderer.root.findAllByType('Button')).toHaveLength(1);
+    expect(renderer.root.findAllByType('StateAction')).toHaveLength(1);
     // The description already names the requested host.
     expect(textValues(renderer)).not.toContain('https://gitlab.example.com');
   });

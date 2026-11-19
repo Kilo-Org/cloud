@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { type LanguagePickerItem } from '@/i18n/language-rows';
 import { type LanguagePreference } from '@/lib/hooks/use-language-preference';
@@ -54,14 +55,17 @@ export const LanguagePickerRow = memo(function LanguagePickerRow({
   const alignClass = isRtl ? undefined : 'text-left';
 
   if (item.kind === 'section') {
+    const sectionLabel = t(
+      item.section === 'current' ? 'language.current' : 'language.allLanguages'
+    );
     return (
-      <Text
-        variant="small"
-        accessibilityRole="header"
-        className={`uppercase tracking-wide text-muted-foreground ${first ? 'pb-2 pt-1' : 'pb-2 pt-6'}`}
-      >
-        {t(item.section === 'current' ? 'language.current' : 'language.allLanguages')}
-      </Text>
+      // A picker group's title is a heading: the rows below are independent
+      // radio choices with no grouping container, so that role is how a screen
+      // reader reaches the group. `SectionHeader` puts the role on its label
+      // itself; this row keeps only the group's leading gap.
+      <View className={first ? undefined : 'pt-4'}>
+        <SectionHeader inset label={sectionLabel} />
+      </View>
     );
   }
 

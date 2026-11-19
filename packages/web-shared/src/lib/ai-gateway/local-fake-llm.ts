@@ -1,7 +1,7 @@
 import { buildDirectProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 
 export const LOCAL_FAKE_DETERMINISTIC_MODEL_ID = 'fake-deterministic';
 

@@ -115,6 +115,7 @@ export function createConversationSourceReader() {
     const parsed = kilo2ConversationEventSchema.safeParse(properties);
     if (!parsed.success) return [];
     const event = parsed.data.event;
+    if (event.type === 'rpc.kilocode.board.changed') return [{ type: 'agent-board.invalidated' }];
     if (
       /^session\.(shell\.|synthetic$|execution\.|tool\.(called|started|ended|success|failed)$)|^(form\.|permission\.)/.test(
         event.type

@@ -109,7 +109,9 @@ vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
-  classifyProviderState: () => ({ status: 'connected' }),
+  classifyProviderState: () => ({
+    status: readiness.connected ? 'connected' : 'disconnected',
+  }),
   useBitbucketReadiness: () => ({
     isLoading: false,
     isError: false,
@@ -138,6 +140,12 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({
   useReviewerModels: () => ({ models: [], isLoading: false }),
+}));
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: () => ({
+    org: { organizationId: 'org_1', organizationName: 'Acme Robotics', role: 'owner' },
+    isResolving: false,
+  }),
 }));
 
 function makeConfig(over: Record<string, unknown> = {}) {
@@ -188,6 +196,7 @@ beforeEach(() => {
   config.refetch.mockReset();
   readiness.connected = true;
   readiness.ready = true;
+  readiness.integrationId = 'bitbucket-1';
   readiness.workspaceSlug = 'ws';
   readiness.fetchStatus = 'idle';
   connectivity.known = true;
@@ -298,5 +307,18 @@ describe('BitbucketOverview rows entrance', () => {
     const renderer = await renderScreen();
 
     expect(rowsContainer(renderer)?.props.entering).toBeDefined();
+  });
+});
+
+describe('BitbucketOverview not-connected state', () => {
+  it('names the organization in the connect description', async () => {
+    readiness.connected = false;
+    readiness.integrationId = null;
+
+    const root = await renderScreen();
+    const text = JSON.stringify(root.toJSON());
+
+    expect(text).toContain('Acme Robotics');
+    expect(text).not.toContain('{{');
   });
 });

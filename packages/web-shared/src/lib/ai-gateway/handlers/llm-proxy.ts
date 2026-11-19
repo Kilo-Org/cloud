@@ -13,6 +13,8 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isByokPrivateModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   findCustomLlm,
   isPublicCustomLlm,
@@ -75,6 +77,11 @@ import {
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { createAiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+
+/** Private provider and bespoke direct BYOK ids, which the key's owner pays for whatever their name. */
+async function isOwnerByokModelId(modelId: string): Promise<boolean> {
+  return isByokPrivateModelId(modelId) || (await getDirectByokModel(modelId)).provider !== null;
+}
 
 function llmProxyPath(url: URL): LlmProxyPath | null {
   switch (url.pathname) {
@@ -250,8 +257,12 @@ export async function handleLlmProxyRequest(
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
-  // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
-  const isPubliclyFreeModel = !isPrivateCustomLlm && isFreeModel(effectiveModelIdLowerCased);
+  // Anonymous callers cannot use private custom LLMs, so those are never publicly free, and
+  // neither are ids a BYOK key's owner pays for.
+  const isPubliclyFreeModel =
+    !isPrivateCustomLlm &&
+    isFreeModel(effectiveModelIdLowerCased) &&
+    !(await isOwnerByokModelId(effectiveModelIdLowerCased));
 
   // Bouncer takes a bare IP literal. Normalize once here and reuse the value for
   // the report-only decide call and the usage event, which share this request.

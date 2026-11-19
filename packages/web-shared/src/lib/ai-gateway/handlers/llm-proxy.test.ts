@@ -2791,6 +2791,47 @@ describe('POST /api/v1/chat/completions request handling', () => {
     }
   );
 
+  it.each([
+    { name: 'a private provider', model: 'private-a1b2c3d4e5/acme/coder-free', direct: false },
+    { name: 'a bespoke direct BYOK', model: 'synthetic/acme/coder:free', direct: true },
+  ])(
+    'keeps $name id with a free name out of the free-model rate limit',
+    async ({ model, direct }) => {
+      if (direct) {
+        mockedGetDirectByokModel.mockImplementation(async modelId =>
+          modelId === model
+            ? { provider: { id: 'synthetic' } as never, model: {} as never }
+            : { provider: null, model: null }
+        );
+      }
+      mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+      try {
+        const { handleLlmProxyRequest } = await import('./llm-proxy');
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
+
+        expect(response.status).toBe(200);
+        expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+      } finally {
+        mockedGetDirectByokModel.mockReset().mockResolvedValue({ provider: null, model: null });
+      }
+    }
+  );
+
+  it('asks anonymous callers of a private provider id with a free name to sign in', async () => {
+    setAnonymousAuth();
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('private-a1b2c3d4e5/acme/coder-free')) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+  });
+
   it('applies free-model rate limiting to a public custom LLM with a free id', async () => {
     mockedIsCustomLlm.mockResolvedValue(true);
     mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm('acme/public-model-free', true));

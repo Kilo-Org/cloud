@@ -36,6 +36,7 @@ export function modelPickerFixtureRoute(path: string): string | null {
   ];
   const options: SessionModelOption[] = [
     ...autoOptions,
+    ...pricedOptions,
     ...providers.flatMap(({ id: providerID, name: providerName }, providerIndex) =>
       Array.from({ length: 40 }, (_, index) => {
         const modelID = `${providerID}-model-${String(index).padStart(2, '0')}`;
@@ -51,6 +52,33 @@ export function modelPickerFixtureRoute(path: string): string | null {
         };
       })
     ),
+  ];
+  // One priced shape per cost line the picker paints, so a catalog change to
+  // `agentChat.modelCost.*` renders without a live gateway: a sub-cent side
+  // shows the `lessThan` label, the others show the two-decimal shape.
+  const pricedOptions: SessionModelOption[] = [
+    {
+      id: 'fixture-priced-sub-cent',
+      name: 'Fixture Priced Sub-cent',
+      displayId: 'fixture/sub-cent',
+      modelRef: { providerID: 'fixture', modelID: 'sub-cent' },
+      provider: { id: 'fixture', name: 'Fixture' },
+      variants: [],
+      isPreferred: false,
+      showGatewayMetadata: false,
+      pricing: { prompt: '0.000000005', completion: '0.000000014' },
+    },
+    {
+      id: 'fixture-priced-ordinary',
+      name: 'Fixture Priced Ordinary',
+      displayId: 'fixture/ordinary',
+      modelRef: { providerID: 'fixture', modelID: 'ordinary' },
+      provider: { id: 'fixture', name: 'Fixture' },
+      variants: [],
+      isPreferred: false,
+      showGatewayMetadata: false,
+      pricing: { prompt: '0.000003', completion: '0.000014' },
+    },
   ];
   const selectionScope: ModelPickerBridge['selectionScope'] = {
     sessionId: routeKey,

@@ -1941,8 +1941,8 @@
       "accessibility": "מצב: {{label}}"
     },
     "modelCost": {
-      "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "lessThan": "מתחת ל-{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} ל{{million}} {{tokens}}"
     },
     "modeOptions": {
       "code": "כתיבת קוד",

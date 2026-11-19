@@ -513,14 +513,16 @@ const VISIBILITY_KEYS = [
 ];
 
 /**
- * Agent-editor labels that read the same in every catalog, aside from the
- * separator shape above: `profiles.agents.topP` is the sampling parameter's
- * published name, so a translated word would hide which parameter the field
- * sets. This list is the only registration such a key needs: `checkVerbatimLabels`
- * requires the key to read English everywhere, and the untranslated check
- * exempts the same key from the "equals English everywhere" failure.
+ * Catalog values that read the same in every language. `profiles.agents.topP`
+ * is the sampling parameter's published name, so a translated word would hide
+ * which parameter the field sets; `profiles.mcp.jsonPlaceholder` is the JSON
+ * sample the multiline field shows the reader, and a translated one stops
+ * demonstrating the shape. This list is the only registration such a key
+ * needs: `checkVerbatimLabels` requires the key to read English everywhere,
+ * and the untranslated check exempts the same key from the "equals English
+ * everywhere" failure.
  */
-const VERBATIM_KEYS = ['profiles.agents.topP'];
+const VERBATIM_KEYS = ['profiles.agents.topP', 'profiles.mcp.jsonPlaceholder'];
 
 function checkVerbatimLabels(values, english, label) {
   const problems = [];
@@ -1491,6 +1493,38 @@ function checkEnglishCopies({ catalogName, english }) {
   return problems;
 }
 
+/**
+ * Whether a value is serialized JSON rather than the copy it should read:
+ * JSON.parse accepts the trimmed text. A scalar ("42", "true", "null") parses
+ * too, and a label one of those encodes is a storage slip all the same. A
+ * `{{placeholder}}` carries braces but never parses, so copy keeps it.
+ */
+function isSerializedJson(value) {
+  try {
+    JSON.parse(value.trim());
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Catalog values whose text is literally a JSON sample the reader types
+ * beside: the MCP form's multiline config placeholder shows the shape the
+ * stored value takes, so its braces and quoted key are the content, not a
+ * storage slip. The key's value also must read as English everywhere
+ * (VERBATIM_KEYS), which the sample's unverifiable translation would break.
+ */
+const JSON_SAMPLE_EXEMPT_KEYS = new Set(['profiles.mcp.jsonPlaceholder']);
+
+/** Reject a catalog value that a JSON encoder wrote instead of a label. */
+function checkSerializedJson(label, key, value) {
+  if (JSON_SAMPLE_EXEMPT_KEYS.has(key) || !isSerializedJson(value)) {
+    return [];
+  }
+  return [`${label}: "${key}" is serialized JSON; write the label text`];
+}
+
 /** The value rules English itself must pass. */
 function checkEnglishValues({ catalogName, english, englishValues }) {
   const problems = [];
@@ -1498,6 +1532,7 @@ function checkEnglishValues({ catalogName, english, englishValues }) {
     if (value.trim() === '') {
       problems.push(`${catalogName}/en: "${key}" is empty`);
     }
+    problems.push(...checkSerializedJson(`${catalogName}/en`, key, value));
     for (const ref of nestingRefs(value)) {
       if (!english.has(ref)) {
         problems.push(
@@ -1700,6 +1735,7 @@ function checkTranslatedValue({
   }
   problems.push(...checkValuePlaceholders({ label, tag, english, key, value, englishValue }));
   problems.push(...checkValueEdges({ label, key, value, englishValue }));
+  problems.push(...checkSerializedJson(label, key, value));
   // A quoted English label. The copy must name the label's key with
   // `$t(key)`, or the message points at a button this user never sees.
   for (const run of quotedRuns(value)) {

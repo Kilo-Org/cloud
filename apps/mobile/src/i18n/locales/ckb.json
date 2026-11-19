@@ -2504,8 +2504,8 @@
       "reportAiResponseFailedTerminal": "ناتوانرێت ئەم وەڵامە ڕاپۆرت بکرێت."
     },
     "modelCost": {
-      "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "lessThan": "کەمتر لە {{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} بۆ هەر {{million}} {{tokens}}"
     },
     "partDetail": {
       "detailsUnavailable": "وردەکارییەکان بەردەست نین.",

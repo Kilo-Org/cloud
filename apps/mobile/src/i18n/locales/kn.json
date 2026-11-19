@@ -2413,7 +2413,7 @@
       "toolRepoOverview": "ರೆಪೊಸಿಟರಿ ಅವಲೋಕನ",
       "toolSemanticSearch": "ಅರ್ಥ ಆಧಾರಿತ ಹುಡುಕಾಟ",
       "toolSendFile": "ಫೈಲ್ ಕಳುಹಿಸಲಾಗಿದೆ",
-      "toolSendFileAction": "{\"value\": \"ಫೈಲ್ ಕಳುಹಿಸಿ\"}",
+      "toolSendFileAction": "ಫೈಲ್ ಕಳುಹಿಸಿ",
       "readTodos": "ಯೋಜನೆಯನ್ನು ಓದಿ",
       "updateTodos": "ಯೋಜನೆಯನ್ನು ನವೀಕರಿಸಿ",
       "linesBadge": "{{displayCount}} ಸಾಲುಗಳು",

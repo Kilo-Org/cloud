@@ -535,6 +535,56 @@ test('rejects an empty sentence joiner in the markless Thai catalog', () => {
   assert.match(found.join('\n'), /mobile\/th: "common\.sentenceJoiner" is empty/);
 });
 
+test('rejects a locale value that is a serialized JSON object', () => {
+  // A translation store once shipped an action label wrapped in a JSON
+  // object; the reader would see the braces and quotes instead of the words.
+  const found = run({
+    translated: { agents: { ...TRANSLATED.agents, title: '{"value": "Localized agents"}' } },
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.title" is serialized JSON/);
+});
+
+test('rejects scalar JSON copied into a catalog', () => {
+  const found = run({
+    english: { agents: { ...ENGLISH.agents } },
+    translated: {
+      agents: {
+        ...TRANSLATED.agents,
+        title: '9',
+        liveCount_one: 'true',
+        liveCount_other: 'null',
+      },
+    },
+    source: SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.title" is serialized JSON/);
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.liveCount_one" is serialized JSON/);
+  assert.match(found.join('\n'), /mobile\/ru: "agents\.liveCount_other" is serialized JSON/);
+});
+
+test('accepts prose copy that only starts with a bracket', () => {
+  // A bracket that opens prose copy does not make it a serialized object:
+  // `[{{provider}}] агенты` never parses as JSON. English keeps the same
+  // placeholder, so the two catalogs agree on it.
+  const found = run({
+    english: { agents: { title: '[{{provider}}] agents' } },
+    translated: { agents: { title: '[{{provider}}] агенты' } },
+    source: "t('agents.title');",
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects an English value that is a serialized JSON object', () => {
+  const found = run({
+    english: { agents: { ...ENGLISH.agents, title: '{"value": "Agents"}' } },
+    source: "t('agents.title');\nt('agents.liveCount', { count: 2 });",
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(found.join('\n'), /mobile\/en: "agents\.title" is serialized JSON/);
+});
+
 test('rejects a trailing space that English does not carry', () => {
   const found = run({
     translated: { agents: { ...TRANSLATED.agents, title: 'Localized agents ' } },

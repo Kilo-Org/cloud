@@ -2504,8 +2504,8 @@
       "reportAiResponseFailedTerminal": "گزارش این پاسخ ممکن نیست."
     },
     "modelCost": {
-      "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "lessThan": "زیر {{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} در هر {{million}} {{tokens}}"
     },
     "partDetail": {
       "detailsUnavailable": "جزئیات در دسترس نیست.",

@@ -2504,8 +2504,8 @@
       "reportAiResponseFailedTerminal": "د دې ځواب راپور نه شي ورکول کېدای."
     },
     "modelCost": {
-      "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "lessThan": "له {{amount}} څخه کم",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} په {{million}} {{tokens}} کې"
     },
     "partDetail": {
       "detailsUnavailable": "جزیات د لاسرسي وړ نه دي.",

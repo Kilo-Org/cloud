@@ -2504,8 +2504,8 @@
       "reportAiResponseFailedTerminal": "یہ جواب رپورٹ نہیں کیا جا سکتا۔"
     },
     "modelCost": {
-      "lessThan": "<{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+      "lessThan": "{{amount}} سے کم",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} فی {{million}} {{tokens}}"
     },
     "partDetail": {
       "detailsUnavailable": "تفصیلات دستیاب نہیں ہیں۔",

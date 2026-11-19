@@ -845,6 +845,71 @@ it('preserves saved snapshot readability while disabling future paid generation'
   expect((await caller.get({ reportId: row.id })).summary.error).toBe('permission_unavailable');
 });
 
+// A context whose preference is disabled (or removed) after the row was captured
+// is re-refused after the slot is claimed: the run releases the claim in the same
+// failure write, so the row is stored refused without cost and without holding
+// one of two pool slots for the rest of the morning.
+it('releases the claimed slot when the context is gone by the post-claim re-check', async () => {
+  const { user, now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  await agentBriefingRouter.createCaller({ user }).updateContextPreferences({ enabled: false });
+  const fetcher = jest.spyOn(globalThis, 'fetch');
+  await runBriefingSummary(row.id);
+  expect(fetcher).not.toHaveBeenCalled();
+  const [refused] = await db.select().from(agent_briefing_snapshots);
+  expect(refused?.summary.status).toBe('failed');
+  expect(refused?.summary.error).toBe('permission_unavailable');
+  expect(refused?.generation_id).toBeNull();
+  expect(refused?.summary.startedAt).toBeNull();
+  expect(refused?.generation_started_at).toBeNull();
+  expect(refused?.generation_deadline_at).toBeNull();
+  expect(refused?.summary.chargeAccounting).toBeUndefined();
+  expect(refused?.summary.costMicrodollars).toBe(0);
+  expect(refused?.job_due_at).toBeNull();
+  expect(refused?.facts).toEqual(row.facts);
+});
+
+// While both pool slots are busy, a due row must not pay for the admission work
+// it cannot use: the run stops after the cheap eligibility checks, before the
+// pricing lookup and its balance read, and the row stays pending untouched.
+it('skips pricing and balance work for a due row while the pool is full', async () => {
+  const { user, now } = await scheduled();
+  const otherUser = await insertTestUser();
+  await db.insert(agent_briefing_snapshots).values(
+    ['first', 'second'].map(slot => ({
+      ...maintenanceSnapshot(otherUser.id, `busy-${slot}`),
+      summary: { ...emptySummary, status: 'running' },
+      generation_id: `agent-briefing:${slot}`,
+      generation_started_at: new Date(now.getTime() - 60_000).toISOString(),
+      generation_deadline_at: new Date(now.getTime() + 600_000).toISOString(),
+    }))
+  );
+  await sweepAgentBriefings(now);
+  const [row] = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.kilo_user_id, user.id));
+  if (!row) throw new Error('No captured snapshot');
+  expect(row.summary.status).toBe('pending');
+  const fetcher = jest.spyOn(globalThis, 'fetch');
+  const balance = jest.mocked(getBalanceAndOrgSettings);
+  const balanceCalls = balance.mock.calls.length;
+  await runBriefingSummary(row.id);
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(balance.mock.calls.length).toBe(balanceCalls);
+  const [skipped] = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.id, row.id));
+  expect(skipped?.summary.status).toBe('pending');
+  expect(skipped?.generation_id).toBeNull();
+  expect(skipped?.job_due_at).toBe(row.job_due_at);
+  expect(skipped?.summary.admissionAttempts).toBeUndefined();
+  expect(skipped?.summary.error).toBeNull();
+});
+
 it('fails rows their disabled context refuses without holding a generation slot', async () => {
   // A refusal must be recorded without claiming a generation slot, so the due row
   // behind it is still admitted in the same run.

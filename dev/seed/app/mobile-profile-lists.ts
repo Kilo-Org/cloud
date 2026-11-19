@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 
 import {
   byok_api_keys,
@@ -27,32 +27,40 @@ export const usage = '<email>';
  *   with a body that runs past three lines.
  * - provider keys: an Anthropic key and an OpenAI key, both wrapped by the
  *   local `byok-kms` service with a placeholder secret upstream rejects.
- * - credit history: two paid purchases, a free grant, and one usage deduction,
- *   so both the purchase list and the ledger have rows.
+ * - credit history: two paid purchases, a grant, that grant's expiry, and one
+ *   usage deduction, so the purchase list and the ledger both have rows.
  *
- * Two screens need no seed for their empty state, and two cannot be seeded:
- * a fresh account already shows the empty blocked-people list and the empty
+ * Two screens need no seed for their empty state, and two cannot be seeded: a
+ * fresh account already shows the empty blocked-people list and the empty
  * passkey list (only the "Add" control is offered). A data export request needs
  * the `cloud-data-export-ui` PostHog release toggle, which a local stack does
  * not answer, so the screen stays on its unavailable state whatever rows exist.
- * Trusted hosts live in the device's own SQLCipher store, so there is no
- * backend row to write.
+ * Trusted hosts live in the device's own SQLCipher store, so there is no backend
+ * row to write.
+ *
+ * The credit ledger renders purchases and negative rows only
+ * (`buildCreditHistoryItems`), so a positive grant appears through the expiry
+ * row that closes it: the grant is seeded with a past expiry date and an
+ * expiry row that names it, which is the shape `computeExpiration` writes.
  *
  * The passkey rows carry generated credential ids and a placeholder COSE key:
  * they render in the list, and the device cannot sign in with them, because
- * nothing on the device holds their private key. The provider keys need the
- * local `byok-kms` service (`pnpm dev:start core`, or `pnpm dev:byok-kms` with
- * its `local-kms` dependency); the seed fails with that service's own message
- * when it is absent. Neither secret is printed.
+ * nothing on the device holds their private key. Every id is derived from the
+ * account, so two seeded accounts keep their own rows and a rerun replaces the
+ * same ones; the passkey credential id is globally unique, so a fixed id could
+ * only ever belong to one account.
  *
- * A rerun deletes the rows this topic owns — the two passkey credential ids,
- * the four moderation logins, the five idempotency keys, the two provider ids
- * and the four credit transaction ids — then inserts them again.
+ * The provider keys need the local `byok-kms` service (`pnpm dev:start core`, or
+ * `pnpm dev:byok-kms` with its `local-kms` dependency). Both envelopes are
+ * wrapped before anything is deleted, so a missing service leaves the database
+ * untouched. Neither secret is printed.
+ *
+ * A rerun deletes the rows this topic owns — the two derived passkey credential
+ * ids, the four moderation logins, the five idempotency keys, the two derived
+ * provider ids and the five credit transaction ids — then inserts them again.
  */
-const PASSKEY_CREDENTIAL_IDS = [
-  'ZGV2LXNlZWQtcGFzc2tleS1sYXB0b3AtMjAyNg',
-  'ZGV2LXNlZWQtcGFzc2tleS1zZWN1cml0eS1rZXktMjAyNg',
-] as const;
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 
 const BLOCKED_LOGINS = ['spam-bot-2026', 'a-blocked-participant-with-a-long-handle'] as const;
 const MUTED_LOGINS = ['noisy-reviewer', 'a-muted-participant-with-a-long-handle'] as const;
@@ -67,15 +75,30 @@ const NOTIFICATION_KEYS = [
 
 const BYOK_PROVIDERS = ['anthropic', 'openai'] as const;
 
-const CREDIT_TRANSACTION_IDS = [
-  '6e4c2b10-0000-4000-8000-9f1a2b3c4d01',
-  '6e4c2b10-0000-4000-8000-9f1a2b3c4d02',
-  '6e4c2b10-0000-4000-8000-9f1a2b3c4d03',
-  '6e4c2b10-0000-4000-8000-9f1a2b3c4d04',
-] as const;
+const CREDIT_KEYS = ['purchase-1', 'purchase-2', 'grant', 'grant-expiry', 'usage'] as const;
 
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
+/** Stable UUID for one account's fixture key: a rerun replaces the same rows. */
+function seedUuid(userId: string, key: string): string {
+  const hex = createHash('md5').update(`app:mobile-profile-lists:${userId}:${key}`).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/**
+ * A base64url credential id, the form the table stores, derived from the
+ * account so two accounts never claim the same globally unique value.
+ */
+function seedCredentialId(userId: string, index: number): string {
+  return createHash('shake256', { outputLength: 24 })
+    .update(`app:mobile-profile-lists:${userId}:passkey:${index}`)
+    .digest('base64url');
+}
+
+function seedPaymentId(userId: string, key: string): string {
+  return `pi_dev_seed_${createHash('md5')
+    .update(`app:mobile-profile-lists:${userId}:${key}`)
+    .digest('hex')
+    .slice(0, 20)}`;
+}
 
 function iso(offsetMs: number): string {
   return new Date(Date.now() + offsetMs).toISOString();
@@ -111,14 +134,29 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const userId = await resolveSeedUserId(normalizedEmail);
   const db = getSeedDb();
 
-  // Reset only this topic's rows, before any write: each owner column plus the
-  // fixture's own marker is narrow enough that a real row is never deleted.
+  const credentialIds = [seedCredentialId(userId, 1), seedCredentialId(userId, 2)];
+  const byokKeyIds = BYOK_PROVIDERS.map(provider => seedUuid(userId, `byok:${provider}`));
+  const creditIds = CREDIT_KEYS.map(key => seedUuid(userId, `credit:${key}`));
+
+  // Wrap both envelopes before the first delete: the KMS call is the only step
+  // that can fail, and it must fail on a database that still holds the old rows.
+  const envelopes = await Promise.all(
+    BYOK_PROVIDERS.map((provider, index) => {
+      const keyId = byokKeyIds[index];
+      return createByokEnvelope(
+        { key_id: keyId, owner_type: 'user', owner_id: userId, provider_id: provider },
+        `dev-seed-purpose:${provider}`
+      );
+    })
+  );
+
+  // Reset only this topic's rows, each by a value it derives from the account.
   await db
     .delete(passkey_credentials)
     .where(
       and(
         eq(passkey_credentials.kilo_user_id, userId),
-        inArray(passkey_credentials.credential_id, [...PASSKEY_CREDENTIAL_IDS])
+        inArray(passkey_credentials.credential_id, credentialIds)
       )
     );
   await db
@@ -145,24 +183,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         like(user_notification_history.idempotency_key, 'dev-seed-notification-%')
       )
     );
-  await db
-    .delete(byok_api_keys)
-    .where(
-      and(
-        eq(byok_api_keys.kilo_user_id, userId),
-        inArray(byok_api_keys.provider_id, [...BYOK_PROVIDERS])
-      )
-    );
-  await db
-    .delete(credit_transactions)
-    .where(inArray(credit_transactions.id, [...CREDIT_TRANSACTION_IDS]));
+  await db.delete(byok_api_keys).where(inArray(byok_api_keys.id, byokKeyIds));
+  await db.delete(credit_transactions).where(inArray(credit_transactions.id, creditIds));
 
   // The placeholder COSE key is a well-formed base64url string, not a key any
   // device holds: the rows list, and nothing signs in with them.
   await db.insert(passkey_credentials).values([
     {
       kilo_user_id: userId,
-      credential_id: PASSKEY_CREDENTIAL_IDS[0],
+      credential_id: credentialIds[0],
       public_key: 'pQECAyYgASFYIGRldi1zZWVkLXBsYWNlaG9sZGVyLXB1YmxpYy1rZXk',
       sign_count: 3,
       transports: ['internal', 'hybrid'],
@@ -175,7 +204,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     },
     {
       kilo_user_id: userId,
-      credential_id: PASSKEY_CREDENTIAL_IDS[1],
+      credential_id: credentialIds[1],
       public_key: 'pQECAyYgASFYIGRldi1zZWVkLXBsYWNlaG9sZGVyLXNlY29uZC1rZXk',
       sign_count: 0,
       transports: ['usb', 'nfc'],
@@ -286,71 +315,82 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     },
   ]);
 
-  for (const provider of BYOK_PROVIDERS) {
-    const keyId = randomUUID();
-    const envelope = await createByokEnvelope(
-      { key_id: keyId, owner_type: 'user', owner_id: userId, provider_id: provider },
-      `dev-seed-purpose:${provider}`
-    );
-    await db.insert(byok_api_keys).values({
-      id: keyId,
+  await db.insert(byok_api_keys).values(
+    BYOK_PROVIDERS.map((provider, index) => ({
+      id: byokKeyIds[index],
       organization_id: null,
       kilo_user_id: userId,
       provider_id: provider,
-      encrypted_api_key_envelope: envelope,
-      management_source: 'user',
+      encrypted_api_key_envelope: envelopes[index],
+      management_source: 'user' as const,
       created_by: userId,
       is_enabled: true,
-    });
-  }
+    }))
+  );
 
+  // Column values as the producers write them: a Stripe top-up carries
+  // `paid_credit_policy: 'one_year'` with `credit_source: 'stripe'`
+  // (`getPaidCreditTerms('stripe')`, `stripe/index.ts`); a promotional grant is
+  // `credit_source: 'promotion'`; an expiry copies its grant's terms and names
+  // it through `original_transaction_id` (`packages/db/src/credit-expiration.ts`);
+  // a legacy usage deduction has no source.
   await db.insert(credit_transactions).values([
     {
-      id: CREDIT_TRANSACTION_IDS[0],
+      id: creditIds[0],
       kilo_user_id: userId,
       amount_microdollars: 10_000_000,
       is_free: false,
       description: 'Top-up via stripe',
       credit_source: 'stripe',
-      stripe_payment_id: 'pi_dev_seed_profile_lists_1',
-      paid_credit_policy: 'standard',
+      stripe_payment_id: seedPaymentId(userId, 'purchase-1'),
+      paid_credit_policy: 'one_year',
       created_at: iso(-40 * DAY_MS),
     },
     {
-      id: CREDIT_TRANSACTION_IDS[1],
+      id: creditIds[1],
       kilo_user_id: userId,
       amount_microdollars: 25_000_000,
       is_free: false,
       description: 'Top-up via stripe',
       credit_source: 'stripe',
-      stripe_payment_id: 'pi_dev_seed_profile_lists_2',
-      paid_credit_policy: 'standard',
+      stripe_payment_id: seedPaymentId(userId, 'purchase-2'),
+      paid_credit_policy: 'one_year',
       created_at: iso(-12 * DAY_MS),
     },
     {
-      id: CREDIT_TRANSACTION_IDS[2],
+      id: creditIds[2],
       kilo_user_id: userId,
       amount_microdollars: 5_000_000,
       is_free: true,
-      description: 'Welcome credit',
-      credit_source: 'campaign',
-      expiry_date: iso(30 * DAY_MS),
+      description: 'Promotional credit',
+      credit_source: 'promotion',
+      expiry_date: iso(-10 * DAY_MS),
       created_at: iso(-90 * DAY_MS),
     },
     {
-      id: CREDIT_TRANSACTION_IDS[3],
+      id: creditIds[3],
+      kilo_user_id: userId,
+      amount_microdollars: -5_000_000,
+      is_free: true,
+      description: 'Expired: Promotional credit',
+      credit_category: 'credits_expired',
+      original_transaction_id: creditIds[2],
+      credit_source: 'promotion',
+      created_at: iso(-10 * DAY_MS),
+    },
+    {
+      id: creditIds[4],
       kilo_user_id: userId,
       amount_microdollars: -1_250_000,
       is_free: false,
       description: 'Usage',
-      credit_source: 'usage',
       created_at: iso(-6 * DAY_MS),
     },
   ]);
 
   console.log('This fixture represents:');
   console.log('  Passkeys, blocked and muted people, recorded notifications, two provider keys');
-  console.log('  and a credit ledger with purchases, a grant and a deduction.');
+  console.log('  and a credit ledger with purchases, an expired grant and a deduction.');
   console.log('  The passkey rows list but cannot sign in: no device holds their private key.');
   console.log('The empty states of the blocked-people and passkey lists need no seed: a fresh');
   console.log('account already shows them. Data export needs the cloud-data-export-ui release');
@@ -360,12 +400,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   return {
     userId,
     email: normalizedEmail,
-    passkeyCount: PASSKEY_CREDENTIAL_IDS.length,
+    passkeyCount: credentialIds.length,
     blockedCount: BLOCKED_LOGINS.length,
     mutedCount: MUTED_LOGINS.length,
     notificationCount: NOTIFICATION_KEYS.length,
     providerKeyCount: BYOK_PROVIDERS.length,
-    creditTransactionCount: CREDIT_TRANSACTION_IDS.length,
+    creditTransactionCount: CREDIT_KEYS.length,
     passkeysDeepLink: 'kiloapp:///(app)/(tabs)/(3_profile)/passkeys',
     blockedPeopleDeepLink: 'kiloapp:///(app)/(tabs)/(3_profile)/blocked-people',
     notificationHistoryDeepLink: 'kiloapp:///(app)/(tabs)/(3_profile)/notification-history',

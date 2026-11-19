@@ -73,7 +73,13 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import * as z from 'zod';
 import {
+  getReasoningEffort,
+  isReasoningExplicitlyDisabled,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { getSupportedReasoningEfforts } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import {
   CustomLlmCredentialsSchema,
+  ReasoningEffortSchema,
   type CustomLlmCredentials,
   type CustomPricingTiers,
 } from '@kilocode/db/schema-types';
@@ -383,6 +389,30 @@ function providerSettingsAllowPartner(
 }
 
 /**
+ * The reasoning effort the upstream would receive: an explicit disable is `none`, otherwise the
+ * effort the request carries for its API kind. Null when the request asks for no effort.
+ */
+function getRequestedReasoningEffort(request: GatewayRequest): string | null {
+  const disabledByReasoningObject =
+    request.kind === 'chat_completions' && request.body.reasoning?.enabled === false;
+  if (disabledByReasoningObject || isReasoningExplicitlyDisabled(request)) return 'none';
+  return getReasoningEffort(request);
+}
+
+/** Whether the partner declares its supported efforts and the request asks for one it lacks. */
+function requestsUnsupportedReasoningEffort(
+  partner: PartnerCustomLlm,
+  request: GatewayRequest
+): boolean {
+  const supported = getSupportedReasoningEfforts(
+    partner.definition.opencode_settings?.reasoning_options
+  );
+  if (!supported) return false;
+  const effort = ReasoningEffortSchema.safeParse(getRequestedReasoningEffort(request));
+  return effort.success && !supported.has(effort.data);
+}
+
+/**
  * A partner serves the catalog model ahead of Kilo's gateway route, which stays behind it as the
  * failover; see `CustomLlmPartnerSchema`. Returns the skip reason when the partner may not serve.
  */
@@ -405,6 +435,10 @@ async function resolvePartnerRoute(
   );
   if (!providerSettingsAllowPartner(partner, providerConfig, await input.getAllowedProviders())) {
     return 'provider-settings';
+  }
+  // The partner would answer 400, and the failover would cost a wasted round trip.
+  if (requestsUnsupportedReasoningEffort(partner, input.request)) {
+    return 'unsupported-reasoning-effort';
   }
   // Unlike a custom LLM that owns its id, a partner has a fallback, so unusable
   // credentials skip it instead of failing the request.

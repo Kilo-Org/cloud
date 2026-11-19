@@ -17,6 +17,7 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
@@ -88,8 +89,8 @@ it('names the context chip row as a filter group', () => {
   if (!root) {
     throw new Error('Controls are not mounted');
   }
-  // Both rows are tablists now, so the context row is the one whose name says
-  // what it filters.
+  // The view switch is a radio group, so the context row is the tablist and the
+  // one whose name says what it filters.
   const groups = root.root
     .findAll(node => node.props.accessibilityRole === 'tablist')
     .filter(node => node.props.accessibilityLabel === 'agentBriefing.filterByContext');
@@ -113,7 +114,7 @@ it('names the context chip row as a filter group', () => {
   });
 });
 
-it('announces the active briefing tab and context filter as selected', () => {
+it('announces the active briefing view and context filter as selected', () => {
   const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
   act(() => {
     holder.renderer = TestRenderer.create(
@@ -124,11 +125,11 @@ it('announces the active briefing tab and context filter as selected', () => {
   if (!root) {
     throw new Error('Controls are not mounted');
   }
-  expect(root.root.findAll(node => node.props.accessibilityRole === 'tablist')).toHaveLength(2);
-  // The mocked platform is iOS, where a strip entry is typed as a button so
-  // VoiceOver gives it a control trait (see lib/a11y/tab-entry).
+  expect(root.root.findAll(node => node.props.accessibilityRole === 'radiogroup')).toHaveLength(1);
+  // The mocked platform is iOS, where a radio entry is typed as a button so
+  // VoiceOver gives it a control trait (see lib/a11y/selectable-row).
   for (const label of ['agentBriefing.available', 'agentBriefing.history']) {
-    expect(optionByText(root.root, label).props.role).toBe('button');
+    expect(optionByText(root.root, label).props.accessibilityRole).toBe('button');
   }
   expect(selectedOf(root.root, 'agentBriefing.available')).toBe(true);
   expect(selectedOf(root.root, 'agentBriefing.history')).toBe(false);

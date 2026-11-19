@@ -4,10 +4,16 @@ import path from 'node:path';
 import { rootRouter } from './root-router';
 import {
   ADMIN_AREA_POLICIES,
+  ADMIN_STEP_UP_SELF_GUARDED_ROUTES,
+  TARGET_ID_FIELD_BY_ADMIN_PROCEDURE,
   actionClassForEntry,
   findPrivilegedInventoryEntry,
   internalElevationSites,
   privilegedGuardTiers,
+  resolvesOwnStepUp,
+  targetIdFieldForAdminProcedure,
+  targetIdFromInput,
+  targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
   SUPPORT_NEVER_KEYS,
@@ -474,6 +480,57 @@ describe('privileged inventory covers branch-level admin reads', () => {
   });
 });
 
+describe('admin procedures that resolve their own step-up', () => {
+  const ROUTERS_ROOT = path.join(REPO_ROOT, 'apps/web/src/routers');
+
+  function filesCallingSupportStepUp(): string[] {
+    return walkFiles(ROUTERS_ROOT)
+      .filter(file => file.endsWith('.ts') && !file.endsWith('.test.ts'))
+      .filter(file => fs.readFileSync(file, 'utf8').includes('supportStepUpPort.requireFresh('));
+  }
+
+  test('every listed route is a mounted mutation with an inventory entry', () => {
+    const problems: string[] = [];
+
+    for (const route of ADMIN_STEP_UP_SELF_GUARDED_ROUTES) {
+      const procedure = procedures[route];
+      if (!procedure) {
+        problems.push(`${route} (no procedure)`);
+        continue;
+      }
+      if ((procedure._def?.type ?? 'query') !== 'mutation') {
+        problems.push(`${route} (not a mutation)`);
+      }
+      const entry = findPrivilegedInventoryEntry({ surface: 'trpc', route, access: 'write' });
+      if (!entry) problems.push(`${route} (no inventory entry)`);
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test('the exemption list covers the resolvers that guard themselves', () => {
+    // A resolver that calls the support step-up port is skipped by the admin
+    // middleware, so it must be listed. The count of those call sites and the
+    // length of the list must agree, so a new self-guard forces a list update.
+    const files = filesCallingSupportStepUp();
+    expect(files.length).toBeGreaterThan(0);
+
+    const callSites = files
+      .map(file => fs.readFileSync(file, 'utf8'))
+      .join('\n')
+      .match(/supportStepUpPort\.requireFresh\(/g);
+
+    expect(callSites).toHaveLength(ADMIN_STEP_UP_SELF_GUARDED_ROUTES.length);
+  });
+
+  test('a listed route is not skipped when the switch is off', () => {
+    // The exemption only removes the middleware read. The resolver's own port
+    // keeps the write classes fail-closed, which its own suite proves.
+    expect(resolvesOwnStepUp(ADMIN_STEP_UP_SELF_GUARDED_ROUTES[0]!)).toBe(true);
+    expect(resolvesOwnStepUp('admin.users.update')).toBe(false);
+  });
+});
+
 describe('support access allowlists agree with the privileged inventory', () => {
   const allowlist = [...SUPPORT_READ_ALLOWLIST, ...SUPPORT_WRITE_ALLOWLIST];
 
@@ -546,5 +603,102 @@ describe('support never-list keys resolve to real surfaces', () => {
       key => key.startsWith('/') && !routes.has(`${key}/page.tsx`) && !routes.has(`${key}/route.ts`)
     );
     expect(missing).toEqual([]);
+  });
+});
+
+describe('targetIdFromInput', () => {
+  test('reads userId for admin.users.resetAPIKey', () => {
+    const field = targetIdFieldForAdminProcedure('admin.users.resetAPIKey');
+    expect(field).toBe('userId');
+    expect(targetIdFromInput(field, { userId: 'user-1' })).toBe('user-1');
+  });
+
+  test('reads kilo_user_id for admin.users.addNote', () => {
+    const field = targetIdFieldForAdminProcedure('admin.users.addNote');
+    expect(field).toBe('kilo_user_id');
+    expect(targetIdFromInput(field, { kilo_user_id: 'user-2' })).toBe('user-2');
+  });
+
+  test('reads organizationId for admin.salesDemo.reset', () => {
+    const field = targetIdFieldForAdminProcedure('admin.salesDemo.reset');
+    expect(field).toBe('organizationId');
+    expect(targetIdFromInput(field, { organizationId: 'org-1' })).toBe('org-1');
+  });
+
+  test('reads userId for an account-area procedure that is not listed', () => {
+    const field = targetIdFieldForAdminProcedure('admin.users.updateBlockStatus');
+    expect(field).toBe('userId');
+    expect(targetIdFromInput(field, { userId: 'user-4' })).toBe('user-4');
+  });
+
+  test('records the kind the field names', () => {
+    expect(targetKindForInputField('userId')).toBe('user');
+    expect(targetKindForInputField('kilo_user_id')).toBe('user');
+    expect(targetKindForInputField('organizationId')).toBe('organization');
+  });
+
+  test('names no field for procedures without a single target', () => {
+    expect(targetIdFieldForAdminProcedure('admin.supportAccess.deny')).toBeNull();
+    expect(targetIdFieldForAdminProcedure('admin.users.deleteNote')).toBeNull();
+    expect(targetIdFieldForAdminProcedure('admin.unknown.procedure')).toBeNull();
+  });
+
+  test('binds kilo_user_id when a body also carries userId', () => {
+    const field = targetIdFieldForAdminProcedure('admin.users.addNote');
+    expect(targetIdFromInput(field, { kilo_user_id: 'user-2', userId: 'user-9' })).toBe('user-2');
+  });
+
+  test('names no target for a body that carries an extra organizationId', () => {
+    const field = targetIdFieldForAdminProcedure('admin.supportAccess.deny');
+    expect(targetIdFromInput(field, { grantId: 'grant-1', organizationId: 'org-1' })).toBeNull();
+  });
+
+  test('returns null for a null field', () => {
+    expect(targetIdFromInput(null, { organizationId: 'org-1' })).toBeNull();
+  });
+
+  test('returns null when the input names no such field', () => {
+    expect(targetIdFromInput('userId', { organizationId: 'org-1' })).toBeNull();
+  });
+
+  test('returns null for an empty id', () => {
+    expect(targetIdFromInput('userId', { userId: '' })).toBeNull();
+  });
+
+  test('returns null for an id longer than the client schema allows', () => {
+    expect(targetIdFromInput('userId', { userId: 'u'.repeat(201) })).toBeNull();
+    expect(targetIdFromInput('userId', { userId: 'u'.repeat(200) })).toBe('u'.repeat(200));
+  });
+
+  test('returns null for input that is not an object', () => {
+    expect(targetIdFromInput('userId', 'user-1')).toBeNull();
+    expect(targetIdFromInput('userId', null)).toBeNull();
+    expect(targetIdFromInput('userId', undefined)).toBeNull();
+  });
+
+  test('reads a FormData body', () => {
+    const body = new FormData();
+    body.set('userId', 'user-3');
+    expect(targetIdFromInput('userId', body)).toBe('user-3');
+  });
+});
+
+describe('admin target id fields name mounted mutations', () => {
+  test('every key of the map is a mounted mutation', () => {
+    const problems: string[] = [];
+
+    for (const [route, field] of Object.entries(TARGET_ID_FIELD_BY_ADMIN_PROCEDURE)) {
+      const procedure = procedures[route];
+      if (!procedure) {
+        problems.push(`${route} (no procedure)`);
+        continue;
+      }
+      if ((procedure._def?.type ?? 'query') !== 'mutation') {
+        problems.push(`${route}: ${procedure._def?.type ?? 'query'}, expected mutation`);
+      }
+      if (field !== null && field.trim().length === 0) problems.push(`${route} (empty field)`);
+    }
+
+    expect(problems).toEqual([]);
   });
 });

@@ -91,6 +91,7 @@ vi.mock('@/components/query-error', () => ({
   },
 }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; action?: ReactNode; className?: string }) => {
     state.emptyStateClassNames.push(props.className);
     return createElement('EmptyState', { title: props.title }, props.action);
@@ -125,6 +126,7 @@ vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   SearchX: 'SearchX',
   X: 'X',
+  ShieldCheck: 'ShieldCheck',
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
 vi.mock('@/components/tab-screen', () => ({
@@ -260,6 +262,20 @@ vi.mock('@/lib/hooks/use-reviewer-models', () => ({
 vi.mock('@/components/code-reviewer/repository-model-overrides', () => ({
   RepositoryModelOverrides: 'RepositoryModelOverrides',
 }));
+// The screen's busy states draw the shared ActivityIndicator, whose
+// reduced-motion read loads `expo-battery` and the Expo runtime with it; Node
+// has no `__DEV__` for that module.
+vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
+// Row skeletons draw the shared row frame, whose trailing primitives fire a
+// selection tick. `expo-haptics` loads the Expo runtime too, so the tick is a
+// no-op here.
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+  selectionAsync: vi.fn(),
+  ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' },
+  NotificationFeedbackType: { Success: 'Success', Warning: 'Warning', Error: 'Error' },
+}));
 
 const REPOSITORIES = [
   { id: 7000001, fullName: 'acme/acme-repo-1', private: false },
@@ -270,13 +286,15 @@ type Mounted = RenderWithProvidersResult;
 
 function buttons(renderer: Mounted['renderer']) {
   return renderer.root
-    .findAll(node => String(node.type) === 'Button')
+    .findAll(node => String(node.type) === 'Button' || String(node.type) === 'StateAction')
     .map(node => {
+      // A state action keeps its copy in `label`; a plain button renders it as text.
+      const props = node.props as ButtonPressProps & { label?: unknown };
       const [text] = node.findAll(child => String(child.type) === 'Text');
-      const label = text?.props.children;
+      const label = text?.props.children ?? props.label;
       return {
         label: typeof label === 'string' ? label : '',
-        props: node.props as ButtonPressProps,
+        props,
       };
     });
 }

@@ -594,9 +594,6 @@ describe('androidPathPatterns', () => {
       '/organizations/.*/usage-details',
       '/organizations/new',
       '/organizations/create',
-      // The only row that departs from the `.*` compile: it must match one
-      // segment, or the Android filter swallows every web-only org page.
-      '/organizations/[^/]+',
       '/pr-review/gitlab/.*',
       '/pr-review/bitbucket/.*',
       '/pr-review/.*/.*/.*',
@@ -627,25 +624,22 @@ describe('androidPathPatterns', () => {
     }
   });
 
-  it('departs from the `.*` compile on the bare organization row only', () => {
-    // Every other row keeps the pattern it shipped with; a global `[^/]+`
-    // would strangle rows that legitimately cross segments (GitLab project
-    // paths, session ids) and stop links that open the app today.
-    const overrides = UNIVERSAL_LINK_ROUTES.filter(route => route.androidPathPattern != null);
-    expect(overrides.map(route => route.webPath)).toEqual(['/organizations/*']);
-
+  it('compiles to simple globs, so the bare organization row emits no filter', () => {
+    // Android matches `pathPattern` as PATTERN_SIMPLE_GLOB: `.` is any one
+    // character and `*` is zero or more of the character before it. A
+    // character class, a `+`, a group, an alternation or an anchor would be
+    // matched literally, so no pattern may carry one.
     const patterns = androidPathPatterns();
-    expect(patterns).not.toContain('/organizations/.*');
-    expect(patterns).toContain('/organizations/[^/]+');
-    for (const [index, route] of UNIVERSAL_LINK_ROUTES.entries()) {
-      if (route.androidPathPattern != null) {
-        continue;
-      }
-      const legacy = route.webPath
-        .split('/')
-        .map(seg => (seg === '*' || seg === '**' ? '.*' : seg))
-        .join('/');
-      expect(patterns[index]).toBe(legacy);
+    for (const pattern of patterns) {
+      expect(pattern, `pattern ${pattern}`).not.toMatch(/[[\]+(|^$]/);
     }
+
+    // No simple glob can say "exactly one segment", so the bare organization
+    // row declares no Android filter: `/organizations/<id>` stays in the
+    // browser on Android. iOS and the runtime matcher keep the row.
+    const omitted = UNIVERSAL_LINK_ROUTES.filter(route => route.omitAndroidPathPattern);
+    expect(omitted.map(route => route.webPath)).toEqual(['/organizations/*']);
+    expect(patterns).not.toContain('/organizations/.*');
+    expect(aasaComponents().map(component => component['/'])).toContain('/organizations/*');
   });
 });

@@ -145,6 +145,23 @@ function adminEntry(id: string, route: string, policy: AdminAreaPolicy): Privile
 
 export const ADMIN_AREA_POLICIES = adminAreaPolicies;
 
+/**
+ * Admin procedures that resolve their own step-up inside the resolver, because
+ * the guard middleware cannot see the organization the operation acts on. Each
+ * one must call `supportStepUpPort.requireFresh` with a concrete organization.
+ * The inventory coverage test asserts this list is exactly the set of
+ * procedures whose source does that, and that each still has an entry.
+ */
+export const ADMIN_STEP_UP_SELF_GUARDED_ROUTES: readonly string[] = [
+  'admin.supportAccess.request',
+  'admin.supportAccess.approve',
+  'admin.supportAccess.emergencyIssue',
+];
+
+export function resolvesOwnStepUp(path: string): boolean {
+  return ADMIN_STEP_UP_SELF_GUARDED_ROUTES.includes(path);
+}
+
 const trpcEntries: PrivilegedInventoryEntry[] = [
   ...Object.entries(adminRootPolicies).map(([area, policy]) =>
     adminEntry(`trpc.admin.${area}`, `admin.${area}`, policy)
@@ -865,7 +882,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/lib/admin/support-access-service.ts',
     actionClass: 'support_write',
     surface: 'trpc',
-    occurrences: 3,
+    occurrences: 2,
   },
   {
     id: 'internal.organizations.organizationAuth',
@@ -929,20 +946,107 @@ export function actionClassForEntry(
   );
 }
 
+/**
+ * The target kind the inventory expects for this entry. A generic guard reads
+ * no row, so it binds the kind the route policy names and leaves the id null.
+ */
+export function targetKindForEntry(
+  entry: PrivilegedInventoryEntry | undefined
+): PrivilegedTargetKind {
+  return entry?.target ?? 'none';
+}
+
+/**
+ * The one input field the resolver of each account-area admin procedure reads
+ * to name the account it acts on. Every procedure in the area takes `userId`
+ * except the two listed here, so the binding always names the value the
+ * resolver acts on and no other key in the body can name a target.
+ */
+const ACCOUNT_AREA_ID_FIELD = 'userId';
+
+/**
+ * Per-procedure overrides: the field the resolver reads, or `null` for a
+ * procedure in an account area that acts on another record and so names no
+ * target. A procedure absent from this map and outside the account area names
+ * no target either.
+ */
+export const TARGET_ID_FIELD_BY_ADMIN_PROCEDURE: Record<string, string | null> = {
+  'admin.users.addNote': 'kilo_user_id',
+  'admin.users.deleteNote': null,
+  'admin.internalBotUsers.create': 'organizationId',
+  'admin.salesDemo.reset': 'organizationId',
+  'admin.ossSponsorship.addExistingOrgToOss': 'organizationId',
+  'admin.supportAccess.request': 'organizationId',
+  'admin.supportAccess.emergencyIssue': 'organizationId',
+};
+
+/** The input field that procedure's resolver reads, or null when it has none. */
+export function targetIdFieldForAdminProcedure(path: string): string | null {
+  if (Object.hasOwn(TARGET_ID_FIELD_BY_ADMIN_PROCEDURE, path)) {
+    return TARGET_ID_FIELD_BY_ADMIN_PROCEDURE[path] ?? null;
+  }
+  return path.startsWith('admin.users.') ? ACCOUNT_AREA_ID_FIELD : null;
+}
+
+/**
+ * The target kind an input field names. The binding records the kind of the
+ * value it holds, so a field that names an organization is not reported as an
+ * account.
+ */
+export function targetKindForInputField(field: string): PrivilegedTargetKind {
+  return field === 'organizationId' ? 'organization' : 'user';
+}
+
+function readInputField(input: object, field: string): unknown {
+  if (typeof FormData !== 'undefined' && input instanceof FormData) return input.get(field);
+  return (input as Record<string, unknown>)[field];
+}
+
+/**
+ * The target id the request input names. The admin guard binds an operation
+ * proof to it, so the confirmation names the record the request acts on. It
+ * reads only `field`, the one the procedure's resolver reads. Returns null when
+ * `field` is null, the input names no such field, is not a plain object or
+ * `FormData`, or names it as anything but a non-empty string. Never throws.
+ */
+export function targetIdFromInput(field: string | null, input: unknown): string | null {
+  if (field === null) return null;
+  const isFormData = typeof FormData !== 'undefined' && input instanceof FormData;
+  if (!isFormData && (typeof input !== 'object' || input === null || Array.isArray(input))) {
+    return null;
+  }
+  const value = readInputField(input, field);
+  // The client schema that echoes a binding back bounds the id at 200
+  // characters, so an id outside that bound names no target here.
+  return typeof value === 'string' && value.length > 0 && value.length <= 200 ? value : null;
+}
+
 export function actionClassForAdminProcedure(
   path: string,
   type: string
-): { actionClass: PrivilegedActionClass; inventoryId: string | null } {
+): {
+  actionClass: PrivilegedActionClass;
+  inventoryId: string | null;
+  targetKind: PrivilegedTargetKind;
+} {
   const access: PrivilegedAccessKind = type === 'mutation' ? 'write' : 'read';
   const entry = findPrivilegedInventoryEntry({ surface: 'trpc', route: path, access });
-  return { actionClass: actionClassForEntry(entry, access), inventoryId: entry?.id ?? null };
+  return {
+    actionClass: actionClassForEntry(entry, access),
+    inventoryId: entry?.id ?? null,
+    targetKind: targetKindForEntry(entry),
+  };
 }
 
 export function actionClassForRoute(params: {
   surface: Exclude<PrivilegedSurface, 'trpc' | 'worker'>;
   route: string;
   method: string | null;
-}): { actionClass: PrivilegedActionClass; inventoryId: string | null } {
+}): {
+  actionClass: PrivilegedActionClass;
+  inventoryId: string | null;
+  targetKind: PrivilegedTargetKind;
+} {
   const access: PrivilegedAccessKind =
     params.method === 'GET' || params.method === 'HEAD' ? 'read' : 'write';
   const entry = findPrivilegedInventoryEntry({
@@ -950,5 +1054,9 @@ export function actionClassForRoute(params: {
     route: params.route,
     access,
   });
-  return { actionClass: actionClassForEntry(entry, access), inventoryId: entry?.id ?? null };
+  return {
+    actionClass: actionClassForEntry(entry, access),
+    inventoryId: entry?.id ?? null,
+    targetKind: targetKindForEntry(entry),
+  };
 }

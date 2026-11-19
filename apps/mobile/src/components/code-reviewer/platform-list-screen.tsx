@@ -15,11 +15,16 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Text } from '@/components/ui/text';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { bitbucketRowStatus, classifyBitbucketConnection } from '@/lib/code-reviewer-bitbucket';
+import {
+  bitbucketRowStatus,
+  type BitbucketRowStatus,
+  classifyBitbucketConnection,
+} from '@/lib/code-reviewer-bitbucket';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
 import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import {
@@ -31,6 +36,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useTRPC } from '@/lib/trpc';
 
 const PLATFORM_ICONS = {
@@ -146,18 +152,16 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
 
   // The Bitbucket row answers from both reads — the readiness alone reports a
   // Bitbucket OAuth connection as "Not connected".
-  const bitbucketConnection = classifyBitbucketConnection({
-    readiness: bitbucketReadiness,
-    status: bitbucketStatus,
-  });
-  const rowStatus = bitbucketRowStatus(bitbucketConnection);
+  const rowStatus = bitbucketRowStatus(
+    classifyBitbucketConnection({ readiness: bitbucketReadiness, status: bitbucketStatus })
+  );
   const ROW_SUBTITLE_BY_STATUS = {
     checking: i18n.t('codeReviewer.platformList.checking'),
     'status-unavailable': i18n.t('codeReviewer.platformList.statusUnavailable'),
     connected: i18n.t('common.connected'),
     'needs-attention': i18n.t('codeReviewer.platformList.needsAttention'),
     'not-connected': i18n.t('common.notConnected'),
-  } as const satisfies Record<typeof rowStatus, string>;
+  } as const satisfies Record<BitbucketRowStatus, string>;
 
   const platforms = ALL_PLATFORMS.filter(
     platform => PLATFORM_CAPABILITIES[platform].scopes === 'all' || !isPersonal
@@ -174,13 +178,10 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
         titleNumberOfLines={1}
         eyebrow={t('common.codeReviewer')}
       />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.platformList.platforms')}
-          </Text>
-          <View>
-            {platforms.map((platform, index) => {
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+        <Section label={t('codeReviewer.platformList.platforms')}>
+          <RowGroup leadingTile>
+            {platforms.map(platform => {
               const status = statusFor(platform);
               return (
                 <ConfigureRow
@@ -192,21 +193,17 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
                       ? ROW_SUBTITLE_BY_STATUS[rowStatus]
                       : connectionSubtitle(status)
                   }
-                  last={index === platforms.length - 1}
                   onPress={() => {
                     pushOnce(`/(app)/code-reviewer/${scope}/${platform}` as Href);
                   }}
                 />
               );
             })}
-          </View>
-        </View>
+          </RowGroup>
+        </Section>
 
-        <View className="mt-6 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.platformList.activity')}
-          </Text>
-          <View>
+        <Section label={t('codeReviewer.platformList.activity')}>
+          <RowGroup leadingTile>
             <ConfigureRow
               icon={History}
               title={t('codeReviewer.reviewList.title')}
@@ -217,7 +214,6 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
             <ConfigureRow
               icon={CirclePlus}
               title={t('codeReviewer.manualReview.title')}
-              last={isPersonal}
               onPress={() => {
                 pushOnce(`/(app)/code-reviewer/${scope}/manual-review` as Href);
               }}
@@ -228,14 +224,13 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
               <ConfigureRow
                 icon={LineChart}
                 title={t('codeReviewer.analytics.title')}
-                last
                 onPress={() => {
                   pushOnce(`/(app)/code-reviewer/${scope}/analytics` as Href);
                 }}
               />
             )}
-          </View>
-        </View>
+          </RowGroup>
+        </Section>
       </TabScreenScrollView>
     </View>
   );

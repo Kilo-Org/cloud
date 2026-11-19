@@ -41,6 +41,11 @@ const h = vi.hoisted(() => {
   };
 });
 
+// The migrated proposal rows draw through `RowSkeleton`, whose row primitive
+// reaches the haptics module; that import loads the expo runtime, which needs
+// `__DEV__` in this harness. The haptic is the primitive's own contract.
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn(), notificationAsync: vi.fn() }));
+
 vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',
@@ -48,6 +53,8 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   Platform: { OS: 'android' },
   useColorScheme: () => 'light',
+  // The migrated list rows draw their chevron through the directional icon.
+  I18nManager: { isRTL: false },
 }));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({
@@ -90,9 +97,16 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ Brain: 'Brain' }));
+vi.mock('@/components/ui/icons', () => ({
+  Brain: 'Brain',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));

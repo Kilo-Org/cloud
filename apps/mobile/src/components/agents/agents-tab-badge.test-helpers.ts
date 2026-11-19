@@ -110,16 +110,22 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+vi.mock('@/components/ui/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/agents/session-preview-overlay', () => ({
   SessionPreviewOverlay: () => null,
 }));
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
-vi.mock('@/components/agents/session-list-content', () => ({ FAB_MARGIN: 0, FAB_SIZE: 0 }));
+vi.mock('@/components/ui/fab', async () => {
+  const actual = (await vi.importActual('@/components/ui/fab')) as Record<string, unknown>;
+  return { ...actual, FAB_MARGIN: 0, FAB_SIZE: 0 };
+});
 // `agent-sessions-section` (drawn by the live list screen) animates the card
 // switch with Reanimated and reads the motion policy, whose real module reaches
 // `expo-battery` -> `expo-modules-core`; neither native module loads in the

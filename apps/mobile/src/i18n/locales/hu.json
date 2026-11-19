@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ez a fiók még nem tagja egyetlen szervezetnek sem. A Bitbucket-módosítási kérelmek kódellenőrzéséhez hozz létre egy szervezetet, vagy csatlakozz egyhez.",
       "gitlabReconnectAdminOnlyDescription": "Kérd meg egy szervezet tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy újracsatlakoztassa.",
       "bitbucketNotConnectedTitle": "A Bitbucket nincs csatlakoztatva",
-      "bitbucketAdminOnlyDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
+      "adminOnlyConnectDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "contextLine": "{{organization}} számára",
       "contextLinePersonal": "Személyes fiókodhoz"
     },
@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nem sikerült betölteni a munkameneteket.",
-    "couldNotLoadActiveSessions": "Nem sikerült betölteni az aktív munkameneteket.",
     "agentSessions": "Most fut",
     "newCodingTask": "Új kódolási feladat",
     "newTaskFromPicture": "Új feladat képből",
@@ -3418,7 +3417,8 @@
         "accounting_adjustment": "Számviteli kiigazítás",
         "credits_expired": "Lejárt kreditek"
       },
-      "truncated": "Korábbi kreditműveletek is elérhetők."
+      "truncated": "Korábbi kreditműveletek is elérhetők.",
+      "retentionLimit": "A legutóbbi kreditműveletek láthatók."
     },
     "inviteMember": {
       "emailError": "Adj meg egy érvényes e-mail-címet.",
@@ -3450,7 +3450,8 @@
         "void": "Érvénytelen",
         "uncollectible": "Behajthatatlan"
       },
-      "truncated": "Korábbi számlák érhetők el."
+      "truncated": "Korábbi számlák érhetők el.",
+      "retentionLimit": "A legutóbbi számlák láthatók."
     },
     "lowBalanceAlert": {
       "enableA11y": "Figyelmeztetés bekapcsolása alacsony egyenleg esetén",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Nincsenek megbízható képwebhelyek",
     "revoke": "A megbízható jelölés visszavonása: {{host}}",
     "revokeMessage": "A webhelyre mutató hivatkozások ismét jóváhagyást kérnek majd.",
-    "revokeImageMessage": "A webhelyről származó képek ismét jóváhagyást kérnek majd.",
-    "backToPreferences": "Vissza a beállításokhoz"
+    "revokeImageMessage": "A webhelyről származó képek ismét jóváhagyást kérnek majd."
   },
   "glanceable": {
     "waiting": "Ügynökök frissítése",
@@ -3932,6 +3932,8 @@
       "downloading": "Letöltés: {{written}} / {{total}}",
       "downloadingUnknown": "Letöltés: {{written}}",
       "paused": "Szüneteltetve: {{written}} / {{total}}",
+      "retrying": "Újrapróbálkozás: {{written}} / {{total}}",
+      "retryingUnknown": "Újrapróbálkozás: {{written}}",
       "verifying": "A letöltött fájl ellenőrzése…",
       "downloaded": "Letöltve · {{size}}",
       "url": "Közvetlen letöltési hivatkozás",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Ez az eszköz nem támogatja a Gemini Nano modellt, vagy az AICore rendszeralkalmazás beállítása még folyamatban van. Próbálja újra később.",
         "aicoreUpdateRequired": "A modell használatához frissítse az AICore alkalmazást és a rendszerszoftvert.",
         "downloadable": "A modell használata előtt egyszeri letöltés szükséges.",
-        "downloading": "A modell letöltése folyamatban van. A letöltés befejeztével használatra kész lesz."
+        "downloading": "A modell letöltése folyamatban van. A letöltés befejeztével használatra kész lesz.",
+        "batteryQuota": "Az eszközön futó modell mostanra kimerítette az akkumulátor-kvótáját. Próbálja újra később.",
+        "checkFailed": "Az alkalmazás nem tudta ellenőrizni ezt a modellt. Próbálja újra."
       },
       "unavailable": "Az eszközön futó modell jelenleg nem érhető el. Ellenőrizze az állapotát itt: $t(modelChat.backends.title).",
       "busy": "Az eszközön futó modell épp egy másik válaszon dolgozik. Próbálja újra, ha végzett.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Kreditvásárlás",
       "receipt": "Nyugta",
       "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta."
+      "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta.",
+      "retentionLimit": "A legutóbbi kreditelőzmények láthatók."
     },
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
@@ -4630,6 +4635,9 @@
     "couldNotLoad": "Nem sikerült betölteni az integrációkat",
     "permissionDenied": "Nincs jogosultságod ezeknek az integrációknak a kezeléséhez.",
     "managedByOwner": "Kérd meg a szervezet egyik tulajdonosát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+    "managedByOwnerOrAdmin": "Kérd meg egy szervezet tulajdonosát vagy adminisztrátorát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+    "managedByOwnerOrBilling": "Kérd meg egy szervezet tulajdonosát vagy számlázási felelősét, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+    "managedByOwnerAdminOrBilling": "Kérd meg egy szervezet tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
     "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt"
   },
   "invoices": {

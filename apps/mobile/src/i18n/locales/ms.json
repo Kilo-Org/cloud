@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
       "gitlabReconnectAdminOnlyDescription": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menyambungkannya.",
       "bitbucketNotConnectedTitle": "Bitbucket tidak disambungkan",
-      "bitbucketAdminOnlyDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
+      "adminOnlyConnectDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akaun peribadi anda"
     },
@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Tidak dapat memuatkan sesi.",
-    "couldNotLoadActiveSessions": "Tidak dapat memuatkan sesi aktif.",
     "agentSessions": "Sedang aktif",
     "newCodingTask": "Tugas pengekodan baharu",
     "newTaskFromPicture": "Tugas baharu daripada gambar",
@@ -3418,7 +3417,8 @@
         "accounting_adjustment": "Pelarasan perakaunan",
         "credits_expired": "Kredit tamat tempoh"
       },
-      "truncated": "Aktiviti kredit terdahulu tersedia."
+      "truncated": "Aktiviti kredit terdahulu tersedia.",
+      "retentionLimit": "Memaparkan aktiviti kredit terkini."
     },
     "inviteMember": {
       "emailError": "Masukkan alamat e-mel yang sah.",
@@ -3450,7 +3450,8 @@
         "void": "Dibatalkan",
         "uncollectible": "Tidak dapat dikutip"
       },
-      "truncated": "Invois terdahulu tersedia."
+      "truncated": "Invois terdahulu tersedia.",
+      "retentionLimit": "Memaparkan invois terkini."
     },
     "lowBalanceAlert": {
       "enableA11y": "Dayakan amaran baki rendah",
@@ -3684,8 +3685,7 @@
     "imagesSectionEmpty": "Tiada hos imej yang dipercayai",
     "revoke": "Tarik balik kepercayaan terhadap {{host}}",
     "revokeMessage": "Pautan ke hos ini akan meminta pengesahan lagi.",
-    "revokeImageMessage": "Imej daripada hos ini akan meminta pengesahan lagi.",
-    "backToPreferences": "Kembali ke keutamaan"
+    "revokeImageMessage": "Imej daripada hos ini akan meminta pengesahan lagi."
   },
   "glanceable": {
     "waiting": "Mengemas kini ejen",
@@ -3932,6 +3932,8 @@
       "downloading": "Memuat turun: {{written}} daripada {{total}}",
       "downloadingUnknown": "Memuat turun: {{written}}",
       "paused": "Dijeda: {{written}} daripada {{total}}",
+      "retrying": "Mencuba semula: {{written}} daripada {{total}}",
+      "retryingUnknown": "Mencuba semula: {{written}}",
       "verifying": "Menyemak fail yang dimuat turun…",
       "downloaded": "Dimuat turun · {{size}}",
       "url": "Pautan muat turun terus",
@@ -4022,7 +4024,9 @@
         "androidModelUnavailable": "Peranti ini tidak menyokong Gemini Nano, atau apl sistem AICore masih sedang disediakan. Cuba lagi kemudian.",
         "aicoreUpdateRequired": "Kemas kini apl AICore dan perisian sistem anda untuk menggunakan model ini.",
         "downloadable": "Model ini perlu dimuat turun sekali sebelum anda boleh menggunakannya.",
-        "downloading": "Model sedang dimuat turun. Ia akan sedia apabila muat turun selesai."
+        "downloading": "Model sedang dimuat turun. Ia akan sedia apabila muat turun selesai.",
+        "batteryQuota": "Model pada peranti telah menggunakan kuota baterinya buat masa ini. Cuba lagi kemudian.",
+        "checkFailed": "Apl tidak dapat menyemak model ini. Cuba lagi."
       },
       "unavailable": "Model pada peranti tidak tersedia buat masa ini. Semak statusnya dalam $t(modelChat.backends.title).",
       "busy": "Model pada peranti sedang sibuk dengan balasan lain. Cuba lagi apabila ia selesai.",
@@ -4383,7 +4387,8 @@
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Resit",
       "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
-      "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini."
+      "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini.",
+      "retentionLimit": "Memaparkan sejarah kredit terkini."
     },
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
@@ -4630,6 +4635,9 @@
     "couldNotLoad": "Tidak dapat memuatkan integrasi",
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerOrAdmin": "Minta pemilik organisasi atau pentadbir untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerOrBilling": "Minta pemilik organisasi atau pengurus pengebilan untuk menukar sambungan yang anda tidak boleh tukar.",
+    "managedByOwnerAdminOrBilling": "Minta pemilik organisasi, pentadbir atau pengurus pengebilan untuk menukar sambungan yang anda tidak boleh tukar.",
     "connectFailed": "Tidak dapat membuka halaman sambungan"
   },
   "invoices": {

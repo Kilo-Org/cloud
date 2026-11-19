@@ -72,6 +72,16 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useFocusEffect: () => undefined,
 }));
+// The overview's rows and cards draw shared icons, whose Lucide modules ship
+// untranspiled types the Node test transform cannot parse. The screen is
+// asserted through host elements, so any icon answer is enough.
+vi.mock('@/components/ui/icons', () => {
+  const icons: Record<string, string> = {};
+  return new Proxy(icons, {
+    get: (_target, name) => (typeof name === 'string' ? name : undefined),
+    has: () => true,
+  });
+});
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/agents/model-selector', () => ({ openModelPicker: vi.fn() }));
 vi.mock('@/components/code-reviewer/bitbucket-setup-recovery', () => ({

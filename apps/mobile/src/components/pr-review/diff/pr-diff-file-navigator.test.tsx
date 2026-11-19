@@ -66,11 +66,23 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ canGoBack: () => false, back: vi.fn() }),
 }));
 
-vi.mock('@/components/ui/icons', () => ({ Search: 'Search' }));
+vi.mock('@/components/ui/icons', () => ({
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  Search: 'Search',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// `Button` (the later-page retry CTA) wraps its label in this provider, so the
+// text mock must export the same context the real module does.
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
@@ -355,10 +367,19 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
       expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
       expect(flashListProps.current).toBeNull();
       expect(findSearchInput(renderer)).toBeDefined();
-      const retries = renderer.root.findAllByProps({ accessibilityLabel: 'Retry loading files' });
+      // The retry CTA is the shared `Button`, which forwards this label to the
+      // pressable it renders; count the host node so the composite and its
+      // element are not read as two controls.
+      const retries = renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' && node.props.accessibilityLabel === 'Retry loading files'
+      );
       if (kind === 'retryable' || kind === 'reconnect') {
         expect(retries).toHaveLength(1);
-        const retry = renderer.root.findByProps({ accessibilityLabel: 'Retry loading files' });
+        const retry = retries[0];
+        if (!retry) {
+          throw new Error('missing retry');
+        }
         act(() => {
           (retry.props.onPress as () => void)();
         });

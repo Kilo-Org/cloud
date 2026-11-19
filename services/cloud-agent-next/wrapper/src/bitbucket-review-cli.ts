@@ -71,6 +71,13 @@ const MAX_COMMENT_BODY_BYTES = 64 * 1024;
 const MAX_BATCH_COMMENTS = 100;
 const MAX_REQUEST_BODY_BYTES = 128 * 1024;
 const MAX_STDIN_BYTES = 128 * 1024;
+/**
+ * The Bitbucket `user.kind` value of the account a workspace access token acts
+ * as. It is the only authorship a workspace access token exposes, because
+ * `/2.0/user` answers 403 for that credential type.
+ */
+const WORKSPACE_ACCESS_TOKEN_AUTHOR_KIND = 'workspace_access_token';
+
 const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const PROVIDER_UUID_PATTERN = new RegExp(`^(?:\\{(${UUID_PATTERN})\\}|(${UUID_PATTERN}))$`, 'i');
 const textDecoder = new TextDecoder('utf-8', { fatal: true });
@@ -81,7 +88,7 @@ const CREATE_BATCH_COMMENT_INPUT_HINT =
   'expected batch create input JSON: {"comments":[{"body":"...","inline":{"path":"src/widget.ts","to":42}}]}';
 const UPDATE_COMMENT_INPUT_HINT = 'expected update input JSON: {"body":"..."}';
 const UPDATE_COMMENT_TARGET_HINT =
-  'only the existing Code Review Summary comment can be updated; create a new comment instead';
+  "only this CLI's own Code Review Summary comment can be updated; re-run comments list and update your own summary, or create one when none exists";
 const UPDATE_COMMENT_BODY_HINT = 'the updated body must start with the Code Review Summary heading';
 const BITBUCKET_ENVIRONMENT_HINT =
   'expected Bitbucket cloud-agent environment: BITBUCKET_TOKEN, KILO_BITBUCKET_WORKSPACE_SLUG, KILO_BITBUCKET_WORKSPACE_UUID, KILO_BITBUCKET_REPOSITORY_SLUG, KILO_BITBUCKET_REPOSITORY_UUID';
@@ -96,7 +103,7 @@ const COMMENTS_CREATE_COMMAND_HINT = `expected comments create syntax: bb commen
 const COMMENTS_CREATE_BATCH_COMMAND_HINT = `expected comments create-batch syntax: bb comments create-batch <pull-request-id> --input -; ${CREATE_BATCH_COMMENT_INPUT_HINT}`;
 const COMMENTS_UPDATE_COMMAND_HINT = `expected comments update syntax: bb comments update <pull-request-id> <comment-id> --input -; ${UPDATE_COMMENT_INPUT_HINT}`;
 const SUMMARY_ALREADY_EXISTS_HINT =
-  'existing Code Review Summary found; use bb comments update <pull-request-id> <comment-id> --input -';
+  'an existing Code Review Summary comment exists; update it with bb comments update <pull-request-id> <comment-id> --input -';
 const TOP_LEVEL_COMMAND_HINT = [
   'expected command: bb help',
   'bb pr current',
@@ -139,7 +146,9 @@ Comment input:
   Update input must be {"body": "..."} only, and the body must start with the Code Review Summary heading.
 
 Update target:
-  An update applies only to an existing Code Review Summary comment.
+  An update applies only to the existing Code Review Summary comment this tool
+  published. A comment by another author is never a target: ignore it and create
+  the summary with bb comments create when no summary of this tool's own exists.
 
 Environment:
   Provider-backed commands require BITBUCKET_TOKEN, KILO_BITBUCKET_WORKSPACE_SLUG,
@@ -1055,16 +1064,30 @@ function isCodeReviewSummaryBody(value: string): boolean {
 }
 
 /**
- * The durable Code Review Summary is always a top-level, non-inline comment:
- * findings carry an `inline` anchor, and only summary bodies use the heading.
- * Both the duplicate-create fence and the update scope rely on this shape.
+ * The durable Code Review Summary is always a top-level, non-inline comment
+ * authored by the reviewing account: findings carry an `inline` anchor, only
+ * summary bodies use the heading, and the summary is the comment this CLI
+ * published. Both the duplicate-create fence and the update scope rely on this.
+ *
+ * Bitbucket reports the account behind a workspace access token as an `app_user`
+ * whose `kind` is `workspace_access_token`, and that object is the only
+ * authorship the credential exposes: `/2.0/user` answers 403 for a workspace
+ * access token. A comment whose author is not that account is not this CLI's
+ * summary, so it is neither counted as the existing summary nor accepted as an
+ * update target.
+ *
+ * The check keys on the credential type the review runs as. Comparing the exact
+ * account uuid would need that uuid stored per integration, because no read-only
+ * endpoint returns it, so the check stays on the credential type alone.
  */
 function isExistingCodeReviewSummaryComment(value: unknown): boolean {
   if (
     !isRecord(value) ||
     value.deleted === true ||
     !isTopLevelComment(value) ||
-    (value.inline !== undefined && value.inline !== null)
+    (value.inline !== undefined && value.inline !== null) ||
+    !isRecord(value.user) ||
+    value.user.kind !== WORKSPACE_ACCESS_TOKEN_AUTHOR_KIND
   ) {
     return false;
   }
@@ -1084,12 +1107,12 @@ async function assertNoExistingSummaryComment(
 }
 
 /**
- * The write scope of an update is the durable Code Review Summary comment.
- * A workspace access token cannot resolve the account it acts as, so author
- * identity is not readable from the credential; the update instead re-reads the
- * target comment and accepts only the shape this publisher writes: a
- * non-deleted, non-inline, top-level comment whose body carries the summary
- * heading or the legacy marker. Any other target fails before the request.
+ * The write scope of an update is the durable Code Review Summary comment. The
+ * update re-reads the target comment and accepts only the comment this publisher
+ * writes: a non-deleted, non-inline, top-level comment authored by the workspace
+ * access token, whose body carries the summary heading or the legacy marker. Any
+ * other target, including another author's heading comment, fails before the
+ * request.
  */
 async function assertUpdatableSummaryComment(
   fetchFunction: FetchFunction,

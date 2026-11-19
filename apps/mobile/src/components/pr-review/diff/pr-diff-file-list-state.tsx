@@ -11,6 +11,7 @@ import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconn
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { QueryError } from '@/components/query-error';
 import { type PrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 
 type PrDiffFileListStateProps = {
   readonly state: PrReviewQueryState;
@@ -51,7 +52,7 @@ export function PrDiffFileListState({
   }
   if (state.kind === 'reconnect') {
     return (
-      <CenteredState contentContainerClassName="px-6">
+      <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
         <PrReviewReconnectNotice />
       </CenteredState>
     );

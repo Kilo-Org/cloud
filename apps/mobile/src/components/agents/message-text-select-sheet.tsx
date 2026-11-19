@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 
 type MessageTextSelectSheetProps = {
   text: string;
@@ -29,7 +31,7 @@ export function MessageTextSelectSheet({ text, onClose }: Readonly<MessageTextSe
       />
 
       {text.length > 0 ? (
-        <ScrollView contentContainerClassName="px-6 pb-6 pt-3">
+        <ScrollView contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}>
           <SelectableText className="text-base leading-[1.5rem] text-foreground">
             {text}
           </SelectableText>

@@ -33,6 +33,7 @@ vi.mock('react-native', async () => {
   return {
     Platform: { OS: 'ios' },
     useColorScheme: () => 'light',
+    Pressable: 'Pressable',
     View: 'View',
     Switch: 'Switch',
     ScrollView: forwardRef(function ScrollViewStub(
@@ -50,7 +51,19 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The subtask row is the shared `PreferenceRow`: its spinner reaches the icon
+// barrel (whose lucide modules this project cannot parse in the mounted
+// environment) and its flip calls the haptics wrapper, which reaches `expo`.
+vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
+});
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({
     confirm: (request: unknown) => {
@@ -406,10 +419,16 @@ describe('KiloCommandFormSheet subtask row', () => {
     const label = i18n.t('profiles.slashCommands.subtask');
     const labels = findAll(renderer.root, 'Text').filter(node => node.props.children === label);
     expect(labels).toHaveLength(1);
-    expect(labels[0]?.props).toMatchObject({
-      accessible: false,
-      importantForAccessibility: 'no',
-    });
+    // The row's text column is the switch's label, not a second stop: the
+    // control that wraps it hides its descendants from the reader.
+    let labelColumnHidden = false;
+    for (let node = labels[0]?.parent; node; node = node.parent) {
+      if (node.props.importantForAccessibility === 'no-hide-descendants') {
+        labelColumnHidden = true;
+        break;
+      }
+    }
+    expect(labelColumnHidden).toBe(true);
 
     const toggles = findAll(renderer.root, 'Switch');
     expect(toggles.map(node => node.props.accessibilityLabel)).toEqual([label]);

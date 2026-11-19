@@ -27,17 +27,20 @@ vi.mock('@/lib/auth/token-owner', () => ({
 describe('toModelOptions', () => {
   it('passes pricing through to the ModelOption', () => {
     const pricing = { prompt: '0.00000175', completion: '0.000014' };
-    const result = toModelOptions({
-      data: [
-        {
-          id: 'priced/model',
-          name: 'Display: Priced Model',
-          pricing,
-          preferredIndex: 0,
-          opencode: { variants: { high: {} } },
-        },
-      ],
-    });
+    const result = toModelOptions(
+      {
+        data: [
+          {
+            id: 'priced/model',
+            name: 'Display: Priced Model',
+            pricing,
+            preferredIndex: 0,
+            opencode: { variants: { high: {} } },
+          },
+        ],
+      },
+      'en'
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0]?.pricing).toEqual(pricing);
@@ -46,7 +49,28 @@ describe('toModelOptions', () => {
   });
 
   it('returns empty array for undefined data', () => {
-    expect(toModelOptions(undefined)).toEqual([]);
+    expect(toModelOptions(undefined, 'en')).toEqual([]);
+  });
+
+  it('re-sorts the non-preferred tail with the handed language', () => {
+    // Czech collation makes the "ch" in Schematron a letter after h, so it
+    // drops behind Seed; English keeps the plain S-t-i order. The call site
+    // hands `i18n.language` (the source the memo keys on), so the same rows
+    // sort differently per language with no other input.
+    const catalog = {
+      data: [
+        { id: 'c/seed', name: 'Seed 2.1 Turbo' },
+        { id: 'c/schematron', name: 'Schematron V2 Turbo' },
+      ],
+    };
+    expect(toModelOptions(catalog, 'en').map(option => option.id)).toEqual([
+      'c/schematron',
+      'c/seed',
+    ]);
+    expect(toModelOptions(catalog, 'cs').map(option => option.id)).toEqual([
+      'c/seed',
+      'c/schematron',
+    ]);
   });
 });
 

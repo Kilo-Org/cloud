@@ -16,7 +16,7 @@ export function TabStateMessage({
 }) {
   return (
     <CenteredState>
-      <View className="items-center gap-2 px-6">
+      <View className="items-center gap-2 px-4">
         <Text className="text-center text-lg font-semibold text-foreground">{title}</Text>
         <Text variant="muted" className="text-center">
           {message}

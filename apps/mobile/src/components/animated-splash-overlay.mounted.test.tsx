@@ -96,7 +96,20 @@ describe.each(['ios', 'android'])('AnimatedSplashOverlay on %s', os => {
     const logoImages = findByType(renderer.root, 'Image');
     expect(logoImages).toHaveLength(1);
     expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
-    expect(logoImages[0]?.props.className).toBe('h-[100px] w-[100px]');
+    // The mark's box is the size the branded splash plugin paints it at
+    // (`imageWidth` in app.config.ts), so hiding the native splash never
+    // resizes it.
+    expect(logoImages[0]?.props.style).toEqual({ width: 100, height: 100 });
+    // The reveal disc is the mark plus its ring.
+    const discStyle = (
+      findByType(renderer.root, 'Animated.View')[1]?.props as
+        | { style?: [unknown, unknown] }
+        | undefined
+    )?.style;
+    expect(discStyle?.[0]).toEqual({
+      width: 120,
+      height: 120,
+    });
     expect(findByType(renderer.root, 'Animated.View')[0]?.props.className).toBe(
       'absolute inset-0 items-center justify-center bg-[#FFDD00]'
     );

@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { ScrollView } from 'react-native';
 
 import { FilterChip } from '@/components/ui/filter-chip';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 
 type BriefingOrganizationFilter = {
@@ -22,11 +23,18 @@ type BriefingFilterControlsProps = {
   onSelectOrganization: (organizationId: string | null | undefined) => void;
 };
 
+const VIEW_OPTIONS = [
+  { value: 'available' as const, labelKey: 'agentBriefing.available' },
+  { value: 'history' as const, labelKey: 'agentBriefing.history' },
+];
+
 /**
- * Available/History tabs and the context filter chips above the briefing list.
- * Both rows pick one option at a time, so every row announces as a tablist
- * whose entries carry `accessibilityState.selected` for the active one, and
- * each row carries the name that says what its options narrow.
+ * The available/History switch and the context filter chips above the briefing
+ * list. The switch is a `SegmentedControl`, the control every other view switch
+ * in the app uses; chips stay for the filters, so the two rows keep their
+ * hierarchy. Both rows pick one option at a time, so every option carries
+ * `accessibilityState.selected` for the active one; the chips row announces as
+ * a tablist, and each row carries the name that says what its options narrow.
  */
 export function BriefingFilterControls({
   history,
@@ -38,26 +46,19 @@ export function BriefingFilterControls({
   const { t } = useTranslation();
   return (
     <>
-      {/* `Button` pins role="button" and `role` takes precedence over
-          `accessibilityRole`, so the tabs pass the entry's own role. */}
-      <View accessibilityRole="tablist" className="flex-row flex-wrap gap-2">
-        <FilterChip
-          {...tabEntryA11y({ selected: !history })}
-          selected={!history}
-          label={t('agentBriefing.available')}
-          onPress={() => {
-            onSelectHistory(false);
-          }}
-        />
-        <FilterChip
-          {...tabEntryA11y({ selected: history })}
-          selected={history}
-          label={t('agentBriefing.history')}
-          onPress={() => {
-            onSelectHistory(true);
-          }}
-        />
-      </View>
+      <SegmentedControl
+        options={VIEW_OPTIONS.map(option => ({
+          value: option.value,
+          label: t(option.labelKey),
+        }))}
+        value={history ? 'history' : 'available'}
+        onChange={value => {
+          onSelectHistory(value === 'history');
+        }}
+        // The switch has no visible group name of its own; the screen title
+        // names it without adding copy.
+        accessibilityLabel={t('agentBriefing.title')}
+      />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

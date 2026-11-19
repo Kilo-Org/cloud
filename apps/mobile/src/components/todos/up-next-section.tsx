@@ -3,13 +3,16 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
-import { SectionHeader } from '@/components/home/section-header';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
+import { IconTile } from '@/components/ui/icon-tile';
 import { ListTodo, Play } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { useTodoLists, useUpNextTodos } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { todoItemPath } from '@/lib/todos/todo-routes';
@@ -45,85 +48,88 @@ export function UpNextSection({
     return null;
   }
   return (
-    <View>
-      <SectionHeader label={t('todos.upNext')} reserveLabelAir />
-      {items.map(item => {
-        const list = lists.data?.find(candidate => candidate.id === item.listId);
-        const newestSession = item.sessions[0] ?? null;
-        const canPress = !isStarting(item.id) && (newestSession !== null || list !== undefined);
-        const actionLabel = newestSession
-          ? t('notifications.action.openSession')
-          : t('agentChat.newSession.startSession');
-        const actionHint = newestSession
-          ? t('todos.item.startNewSessionHint')
-          : t('todos.item.startNowHint');
-        return (
-          <View key={item.id} className="mx-4 min-h-14 flex-row items-center gap-3">
-            <Pressable
-              onPress={() => {
-                router.push(todoItemPath(item.id));
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={item.title}
-              className="min-w-0 flex-1 flex-row items-center gap-3 py-2 active:opacity-70"
-            >
-              <View className="size-8 items-center justify-center rounded-lg bg-secondary">
-                {item.listEmoji ? (
-                  <Text className="text-base">{item.listEmoji}</Text>
-                ) : (
-                  <ListTodo size={16} color={colors.mutedForeground} />
-                )}
-              </View>
-              <View className="min-w-0 flex-1">
-                <Text className="text-base text-foreground" numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                  {item.listName}
-                </Text>
-              </View>
-            </Pressable>
-            <Pressable
-              disabled={!canPress}
-              onPress={() => {
-                if (newestSession) {
-                  navigateToSession(newestSession.sessionId, organizationId);
-                  return;
-                }
-                if (list) {
-                  review(item, list);
-                }
-              }}
-              onLongPress={() => {
-                if (list) {
-                  void startNow(item, list);
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={actionLabel}
-              accessibilityHint={actionHint}
-              accessibilityActions={[{ name: 'longpress', label: t('todos.item.startNewSession') }]}
-              onAccessibilityAction={event => {
-                if (event.nativeEvent.actionName === 'longpress' && list) {
-                  void startNow(item, list);
-                }
-              }}
-              accessibilityState={{ disabled: !canPress }}
-              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-            >
-              {/* The visible circle keeps its 35pt size inside the frame:
+    <Section label={t('todos.upNext')}>
+      <RowGroup leadingTile>
+        {items.map(item => {
+          const list = lists.data?.find(candidate => candidate.id === item.listId);
+          const newestSession = item.sessions[0] ?? null;
+          const canPress = !isStarting(item.id) && (newestSession !== null || list !== undefined);
+          const actionLabel = newestSession
+            ? t('notifications.action.openSession')
+            : t('agentChat.newSession.startSession');
+          const actionHint = newestSession
+            ? t('todos.item.startNewSessionHint')
+            : t('todos.item.startNowHint');
+          return (
+            <View key={item.id} className="min-h-14 flex-row items-center gap-3 px-4">
+              <Pressable
+                onPress={() => {
+                  router.push(todoItemPath(item.id));
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+                className="min-w-0 flex-1 flex-row items-center gap-3 py-2 active:opacity-70"
+              >
+                <IconTile
+                  tint={NEUTRAL_TINT}
+                  icon={item.listEmoji ? undefined : ListTodo}
+                  content={
+                    item.listEmoji ? <Text className="text-base">{item.listEmoji}</Text> : undefined
+                  }
+                />
+                <View className="min-w-0 flex-1">
+                  <Text className="text-base text-foreground" numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                    {item.listName}
+                  </Text>
+                </View>
+              </Pressable>
+              <Pressable
+                disabled={!canPress}
+                onPress={() => {
+                  if (newestSession) {
+                    navigateToSession(newestSession.sessionId, organizationId);
+                    return;
+                  }
+                  if (list) {
+                    review(item, list);
+                  }
+                }}
+                onLongPress={() => {
+                  if (list) {
+                    void startNow(item, list);
+                  }
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={actionLabel}
+                accessibilityHint={actionHint}
+                accessibilityActions={[
+                  { name: 'longpress', label: t('todos.item.startNewSession') },
+                ]}
+                onAccessibilityAction={event => {
+                  if (event.nativeEvent.actionName === 'longpress' && list) {
+                    void startNow(item, list);
+                  }
+                }}
+                accessibilityState={{ disabled: !canPress }}
+                className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              >
+                {/* The visible circle keeps its 35pt size inside the frame:
                   DESIGN.md keeps the target, not the visual, at 44pt. */}
-              <View className="size-10 items-center justify-center rounded-full bg-secondary">
-                {isStarting(item.id) ? (
-                  <ActivityIndicator color={colors.foreground} />
-                ) : (
-                  <UpNextGlyph hasSession={newestSession !== null} color={colors.foreground} />
-                )}
-              </View>
-            </Pressable>
-          </View>
-        );
-      })}
-    </View>
+                <View className="size-10 items-center justify-center rounded-full bg-background">
+                  {isStarting(item.id) ? (
+                    <ActivityIndicator color={colors.foreground} />
+                  ) : (
+                    <UpNextGlyph hasSession={newestSession !== null} color={colors.foreground} />
+                  )}
+                </View>
+              </Pressable>
+            </View>
+          );
+        })}
+      </RowGroup>
+    </Section>
   );
 }

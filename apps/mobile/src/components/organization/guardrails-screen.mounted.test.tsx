@@ -107,12 +107,15 @@ vi.mock('@/components/ui/button', () => ({
   Button: (props: { onPress?: () => void; children?: ReactNode }) =>
     createElement('ButtonMock', { onPress: props.onPress }, props.children),
 }));
-vi.mock('@/components/ui/icons', () => ({ Lock: 'Lock' }));
+vi.mock('@/components/ui/icons', () => ({ Lock: 'Lock', Mail: 'Mail' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: (props: { title?: string; description?: ReactNode; action?: ReactNode }) =>
     createElement('EmptyStateMock', null, props.title, props.description, props.action),
+  // The state's one action renders as the same button the suite presses.
+  StateAction: (props: { label: string; onPress?: () => void }) =>
+    createElement('ButtonMock', { onPress: props.onPress }, props.label),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEAD_LETTER_QUEUE_NAME,
   DEAD_LETTER_QUEUE_SEVERITY,
+  ENKRYPT_DEAD_LETTER_QUEUE_NAME,
 } from '../src/alerting/dead-letter-queue';
 import { queryDeadLetterQueue } from '../src/alerting/dead-letter-queue-query';
 import { evaluateDeadLetterQueueAlert } from '../src/alerting/dead-letter-queue-evaluate';
@@ -59,6 +60,10 @@ describe('dead-letter queue config', () => {
   it('raises a ticket for the production usage-ingest DLQ', () => {
     expect(DEAD_LETTER_QUEUE_NAME).toBe('usage-ingest-processing-dlq-eu');
     expect(DEAD_LETTER_QUEUE_SEVERITY).toBe('ticket');
+  });
+
+  it('also watches the production DLQ of the dedicated Enkrypt queue', () => {
+    expect(ENKRYPT_DEAD_LETTER_QUEUE_NAME).toBe('usage-ingest-enkrypt-dlq-eu');
   });
 });
 
@@ -128,6 +133,25 @@ describe('queryDeadLetterQueue', () => {
     expect(metricsCalls).toBe(0);
   });
 
+  it('looks up the Enkrypt DLQ by its own exact name', async () => {
+    const urls: string[] = [];
+    const fetchFn = async (url: string) => {
+      urls.push(url);
+      if (url.includes('/metrics')) return metrics(2);
+      return queuePage([
+        { queue_name: DEAD_LETTER_QUEUE_NAME, queue_id: 'b'.repeat(32) },
+        { queue_name: ENKRYPT_DEAD_LETTER_QUEUE_NAME, queue_id: DLQ_ID },
+      ]);
+    };
+    await expect(
+      queryDeadLetterQueue(makeEnv(), fetchFn, ENKRYPT_DEAD_LETTER_QUEUE_NAME)
+    ).resolves.toMatchObject({ queueId: DLQ_ID, backlogCount: 2 });
+    expect(urls).toEqual([
+      `${BASE}?name=${ENKRYPT_DEAD_LETTER_QUEUE_NAME}&page=1`,
+      `${BASE}/${DLQ_ID}/metrics`,
+    ]);
+  });
+
   it('fails before any request when the token is missing', async () => {
     let calls = 0;
     const fetchFn = async () => {
@@ -157,7 +181,7 @@ describe('evaluateDeadLetterQueueAlert', () => {
     };
     const tick = async (count: number) => {
       backlog = count;
-      await evaluateDeadLetterQueueAlert(makeEnv(kv), query, notify);
+      await evaluateDeadLetterQueueAlert(makeEnv(kv), DEAD_LETTER_QUEUE_NAME, query, notify);
     };
     const expireCooldown = () => kv.store.delete(COOLDOWN_KEY);
     return { kv, sent, tick, expireCooldown };
@@ -240,10 +264,45 @@ describe('evaluateDeadLetterQueueAlert', () => {
     const failing = async () => {
       throw new Error('Slack webhook failed (500)');
     };
-    await expect(evaluateDeadLetterQueueAlert(makeEnv(kv), query, failing)).rejects.toThrow(
-      'Slack webhook failed (500)'
-    );
+    await expect(
+      evaluateDeadLetterQueueAlert(makeEnv(kv), DEAD_LETTER_QUEUE_NAME, query, failing)
+    ).rejects.toThrow('Slack webhook failed (500)');
     expect(kv.store.size).toBe(0);
+  });
+});
+
+describe('evaluateDeadLetterQueueAlert for the Enkrypt DLQ', () => {
+  it('alerts with its own queue name, mark and cooldown, leaving the main DLQ state alone', async () => {
+    const kv = makeKv();
+    kv.store.set(MARK_KEY, '9');
+    const sent: AlertPayload[] = [];
+    const queried: string[] = [];
+    const query = async (_env: unknown, queueName: string): Promise<QueueBacklogMetrics> => {
+      queried.push(queueName);
+      return { queueId: DLQ_ID, backlogCount: 3, backlogBytes: 300 };
+    };
+    const notify = async (alert: AlertPayload) => {
+      sent.push(alert);
+    };
+    await evaluateDeadLetterQueueAlert(makeEnv(kv), ENKRYPT_DEAD_LETTER_QUEUE_NAME, query, notify);
+    await evaluateDeadLetterQueueAlert(makeEnv(kv), ENKRYPT_DEAD_LETTER_QUEUE_NAME, query, notify);
+    expect(queried).toEqual([ENKRYPT_DEAD_LETTER_QUEUE_NAME, ENKRYPT_DEAD_LETTER_QUEUE_NAME]);
+    expect(sent).toEqual([
+      expect.objectContaining({
+        alertType: 'dead_letter_queue',
+        model: ENKRYPT_DEAD_LETTER_QUEUE_NAME,
+        backlogCount: 3,
+        newMessages: 3,
+      }),
+    ]);
+    expect(kv.store.get(`o11y:dead_letter_queue:${ENKRYPT_DEAD_LETTER_QUEUE_NAME}`)).toBe('3');
+    expect(
+      kv.store.has(
+        `o11y:alert:ticket:dead_letter_queue:cloudflare:${ENKRYPT_DEAD_LETTER_QUEUE_NAME}:queues`
+      )
+    ).toBe(true);
+    expect(kv.store.get(MARK_KEY)).toBe('9');
+    expect(kv.store.has(COOLDOWN_KEY)).toBe(false);
   });
 });
 

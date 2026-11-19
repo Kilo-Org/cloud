@@ -30,6 +30,7 @@ const ORGANIZATION_ID = 'org-1';
 type Mounted = RenderWithProvidersResult;
 
 vi.mock('react-native', () => ({
+  AccessibilityInfo: { announceForAccessibility: vi.fn() },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -178,6 +179,16 @@ async function tapList(mounted: Mounted): Promise<void> {
 const sessionEnded = Object.assign(new Error('User not authenticated'), {
   data: { code: 'UNAUTHORIZED', httpStatus: 401, authRequired: true },
 });
+// What the device showed for an offline save before the fix: the platform
+// fetch's transport error, carried through the tRPC client as its message.
+const OFFLINE_ERROR =
+  'fetch failed: java.net.ConnectException: Failed to connect to /10.0.2.2:3000';
+
+function rowEnabled(mounted: Mounted): boolean {
+  return (
+    controls(mounted).find(control => control.accessibilityLabel === 'Errands')?.disabled === false
+  );
+}
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -242,12 +253,13 @@ describe('SaveDraftAsTodoSheet', () => {
       await Promise.resolve();
     });
     expect(handler).toHaveBeenCalledTimes(1);
-    // The session-ended toast is the report; no raw server message over login.
+    // The session-ended toast is the report; the sheet adds no failure of its own.
     expect(toast.error).not.toHaveBeenCalled();
+    expect(text(mounted)).not.toContain(i18n.t('todos.saveSheet.saveFailed'));
     expect(onSaved).not.toHaveBeenCalled();
   });
 
-  it('reports the failed save when the auth handler renewed the token', async () => {
+  it('shows a retryable failure in the sheet when the auth handler renewed the token', async () => {
     createTodo.mockRejectedValue(sessionEnded);
     const handler = vi.fn<() => void>();
     onTestFinished(setTrpcUnauthorizedHandler(handler));
@@ -256,22 +268,28 @@ describe('SaveDraftAsTodoSheet', () => {
 
     await tapList(mounted);
 
-    await waitFor(() => vi.mocked(toast.error).mock.calls.length > 0);
+    await waitFor(() => text(mounted).includes(i18n.t('todos.saveSheet.saveFailed')));
     expect(handler).toHaveBeenCalledTimes(1);
-    expect(toast.error).toHaveBeenCalledWith('User not authenticated');
+    expect(text(mounted)).not.toContain('User not authenticated');
+    expect(toast.error).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
   });
 
-  it('shows the failure and keeps the draft when the save fails', async () => {
-    createTodo.mockRejectedValue(new Error('Server unavailable'));
+  it('tells the user to pick another list when the server refuses this one', async () => {
+    createTodo.mockRejectedValue(
+      Object.assign(new Error('List not found'), { data: { code: 'NOT_FOUND', httpStatus: 404 } })
+    );
     const onSaved = vi.fn<() => void>();
     const mounted = await mountSheet(onSaved);
 
     await tapList(mounted);
 
-    await waitFor(() => vi.mocked(toast.error).mock.calls.length > 0);
-    expect(toast.error).toHaveBeenCalledWith('Server unavailable');
+    await waitFor(() => text(mounted).includes(i18n.t('todos.saveSheet.saveRefused')));
+    expect(text(mounted)).not.toContain('List not found');
+    expect(text(mounted)).not.toContain(i18n.t('todos.saveSheet.saveFailed'));
+    expect(toast.error).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
+    expect(rowEnabled(mounted)).toBe(true);
   });
 
   it('saves the draft into the list and lets the screen discard it', async () => {
@@ -288,8 +306,10 @@ describe('SaveDraftAsTodoSheet', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it('settles an offline save with its failure instead of pausing it', async () => {
-    createTodo.mockRejectedValue(new Error('Network request failed'));
+  // The device proof: the toast drew behind the native sheet window, so the
+  // user saw nothing until the sheet closed, and then the raw transport error.
+  it('shows an offline save failure inside the sheet without the raw error', async () => {
+    createTodo.mockRejectedValue(new Error(OFFLINE_ERROR));
     const onSaved = vi.fn<() => void>();
     const mounted = await mountSheet(onSaved);
     await waitFor(() =>
@@ -304,12 +324,19 @@ describe('SaveDraftAsTodoSheet', () => {
 
     await tapList(mounted);
 
-    await waitFor(() => vi.mocked(toast.error).mock.calls.length > 0);
-    expect(toast.error).toHaveBeenCalledWith('Network request failed');
+    await waitFor(() => text(mounted).includes(i18n.t('todos.saveSheet.saveFailed')));
+    expect(sheetVisible(mounted)).toBe(true);
+    expect(text(mounted)).not.toContain('ConnectException');
+    expect(text(mounted)).not.toContain('fetch failed');
+    expect(toast.error).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
-    expect(
-      controls(mounted).find(control => control.accessibilityLabel === 'Errands')?.disabled
-    ).toBe(false);
+    // The rows stay usable, and the retry that succeeds closes the sheet.
+    expect(rowEnabled(mounted)).toBe(true);
+    createTodo.mockResolvedValue({});
+    onlineManager.setOnline(true);
+    await tapList(mounted);
+    await waitFor(() => onSaved.mock.calls.length > 0);
+    expect(text(mounted)).not.toContain(i18n.t('todos.saveSheet.saveFailed'));
   });
 
   it('keeps the rows locked until the failed attempt is reported', async () => {
@@ -323,7 +350,7 @@ describe('SaveDraftAsTodoSheet', () => {
     await waitFor(() => handler.mock.calls.length > 0);
 
     // The token refresh is still running: a second tap must not start a save
-    // whose success this attempt's failure toast would then follow.
+    // whose success this attempt's failure line would then follow.
     expect(
       controls(mounted).find(control => control.accessibilityLabel === 'Errands')?.disabled
     ).toBe(true);
@@ -332,7 +359,7 @@ describe('SaveDraftAsTodoSheet', () => {
       refresh.resolve(undefined);
       await Promise.resolve();
     });
-    await waitFor(() => vi.mocked(toast.error).mock.calls.length > 0);
+    await waitFor(() => text(mounted).includes(i18n.t('todos.saveSheet.saveFailed')));
     expect(
       controls(mounted).find(control => control.accessibilityLabel === 'Errands')?.disabled
     ).toBe(false);

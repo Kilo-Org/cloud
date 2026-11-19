@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Spara i lista",
-      "saved": "Sparat i {{list}}"
+      "saved": "Sparat i {{list}}",
+      "saveFailed": "Det gick inte att spara uppgiften. Kontrollera din anslutning och försök igen.",
+      "saveRefused": "Det gick inte att spara uppgiften i den här listan. Välj en annan lista."
     }
   },
   "agentBriefing": {

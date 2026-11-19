@@ -4653,7 +4653,9 @@
     },
     "saveSheet": {
       "title": "Uložiť do zoznamu",
-      "saved": "Uložené do zoznamu {{list}}"
+      "saved": "Uložené do zoznamu {{list}}",
+      "saveFailed": "Úlohu sa nepodarilo uložiť. Skontrolujte pripojenie a skúste to znova.",
+      "saveRefused": "Úlohu sa nepodarilo uložiť do tohto zoznamu. Vyberte iný zoznam."
     }
   },
   "agentBriefing": {

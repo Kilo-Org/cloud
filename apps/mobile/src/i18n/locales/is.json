@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Vista á lista",
-      "saved": "Vistað á {{list}}"
+      "saved": "Vistað á {{list}}",
+      "saveFailed": "Gat ekki vistað verkefnið. Athugaðu nettenginguna þína og reyndu aftur.",
+      "saveRefused": "Gat ekki vistað verkefnið á þennan lista. Veldu annan lista."
     }
   },
   "agentBriefing": {

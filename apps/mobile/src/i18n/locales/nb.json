@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Lagre i liste",
-      "saved": "Lagret i {{list}}"
+      "saved": "Lagret i {{list}}",
+      "saveFailed": "Kunne ikke lagre gjøremålet. Sjekk tilkoblingen og prøv igjen.",
+      "saveRefused": "Kunne ikke lagre gjøremålet i denne listen. Velg en annen liste."
     }
   },
   "agentBriefing": {

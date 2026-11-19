@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Tehirizo ao amin'ny lisitra",
-      "saved": "Voatahiry ao amin'ny {{list}}"
+      "saved": "Voatahiry ao amin'ny {{list}}",
+      "saveFailed": "Tsy azo notahirizina ny asa hatao. Jereo ny fifandraisanao ary andramo indray.",
+      "saveRefused": "Tsy azo notahirizina ao amin'ity lisitra ity ny asa hatao. Misafidiana lisitra hafa."
     }
   },
   "agentBriefing": {

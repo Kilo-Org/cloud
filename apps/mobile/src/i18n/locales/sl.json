@@ -4653,7 +4653,9 @@
     },
     "saveSheet": {
       "title": "Shrani na seznam",
-      "saved": "Shranjeno na seznam {{list}}"
+      "saved": "Shranjeno na seznam {{list}}",
+      "saveFailed": "Naloge ni bilo mogoče shraniti. Preverite povezavo in poskusite znova.",
+      "saveRefused": "Naloge ni bilo mogoče shraniti na ta seznam. Izberite drug seznam."
     }
   },
   "agentBriefing": {

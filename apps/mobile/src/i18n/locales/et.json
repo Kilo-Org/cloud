@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Salvesta loendisse",
-      "saved": "Salvestatud loendisse {{list}}"
+      "saved": "Salvestatud loendisse {{list}}",
+      "saveFailed": "Ülesande salvestamine ei õnnestunud. Kontrolli oma ühendust ja proovi uuesti.",
+      "saveRefused": "Ülesande salvestamine sellesse loendisse ei õnnestunud. Vali mõni teine loend."
     }
   },
   "agentBriefing": {

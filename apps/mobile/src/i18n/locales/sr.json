@@ -4582,7 +4582,9 @@
     },
     "saveSheet": {
       "title": "Sačuvaj u spisak",
-      "saved": "Sačuvano u {{list}}"
+      "saved": "Sačuvano u {{list}}",
+      "saveFailed": "Nije bilo moguće sačuvati zadatak. Proverite internet vezu i pokušajte ponovo.",
+      "saveRefused": "Nije bilo moguće sačuvati zadatak u ovaj spisak. Izaberite drugi spisak."
     }
   },
   "agentBriefing": {

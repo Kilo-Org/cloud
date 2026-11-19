@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Siyahıya yadda saxla",
-      "saved": "{{list}} siyahısına yadda saxlanıldı"
+      "saved": "{{list}} siyahısına yadda saxlanıldı",
+      "saveFailed": "Tapşırığı yadda saxlamaq alınmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+      "saveRefused": "Tapşırığı bu siyahıya yadda saxlamaq alınmadı. Başqa siyahı seçin."
     }
   },
   "agentBriefing": {

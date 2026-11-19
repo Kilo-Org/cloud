@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Ruaj në listë",
-      "saved": "U ruajt në {{list}}"
+      "saved": "U ruajt në {{list}}",
+      "saveFailed": "Nuk u ruajt detyra. Kontrollo lidhjen dhe provo përsëri.",
+      "saveRefused": "Nuk u ruajt detyra në këtë listë. Zgjidh një listë tjetër."
     }
   },
   "agentBriefing": {

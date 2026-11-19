@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "I-save sa listahan",
-      "saved": "Na-save sa {{list}}"
+      "saved": "Na-save sa {{list}}",
+      "saveFailed": "Hindi ma-save ang gagawin. I-check ang iyong koneksyon at subukang muli.",
+      "saveRefused": "Hindi ma-save ang gagawin sa listahang ito. Pumili ng ibang listahan."
     }
   },
   "agentBriefing": {

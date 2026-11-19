@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Chekwaa na ndepụta",
-      "saved": "Echekwara na {{list}}"
+      "saved": "Echekwara na {{list}}",
+      "saveFailed": "Enweghị ike ịchekwa ọrụ ahụ. Lelee njikọ gị wee nwalee ọzọ.",
+      "saveRefused": "Enweghị ike ịchekwa ọrụ ahụ na ndepụta a. Họrọ ndepụta ọzọ."
     }
   },
   "agentBriefing": {

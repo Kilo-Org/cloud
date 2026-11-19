@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "목록에 저장",
-      "saved": "{{list}}에 저장됨"
+      "saved": "{{list}}에 저장됨",
+      "saveFailed": "할 일을 저장할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요.",
+      "saveRefused": "할 일을 이 목록에 저장할 수 없습니다. 다른 목록을 선택해 주세요."
     }
   },
   "agentBriefing": {

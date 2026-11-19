@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Ro‘yxatga saqlash",
-      "saved": "{{list}} ro‘yxatiga saqlandi"
+      "saved": "{{list}} ro‘yxatiga saqlandi",
+      "saveFailed": "Vazifani saqlab bo‘lmadi. Internetingizni tekshirib, qayta urinib ko‘ring.",
+      "saveRefused": "Vazifani bu ro‘yxatga saqlab bo‘lmadi. Boshqa ro‘yxatni tanlang."
     }
   },
   "agentBriefing": {

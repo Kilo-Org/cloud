@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Gardar na lista",
-      "saved": "Gardada en {{list}}"
+      "saved": "Gardada en {{list}}",
+      "saveFailed": "Non se puido gardar a tarefa. Comproba a conexión e téntao de novo.",
+      "saveRefused": "Non se puido gardar a tarefa nesta lista. Escolle outra lista."
     }
   },
   "agentBriefing": {

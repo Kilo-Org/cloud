@@ -4588,7 +4588,9 @@
     },
     "saveSheet": {
       "title": "Salvar em uma lista",
-      "saved": "Salvo em {{list}}"
+      "saved": "Salvo em {{list}}",
+      "saveFailed": "Não foi possível salvar a tarefa. Verifique sua conexão e tente novamente.",
+      "saveRefused": "Não foi possível salvar a tarefa nesta lista. Escolha outra lista."
     }
   },
   "agentBriefing": {

@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Mentés listába",
-      "saved": "Elmentve a listába: {{list}}"
+      "saved": "Elmentve a listába: {{list}}",
+      "saveFailed": "Nem sikerült menteni a teendőt. Ellenőrizd a kapcsolatot, és próbáld újra.",
+      "saveRefused": "Nem sikerült menteni a teendőt ebbe a listába. Válassz egy másik listát."
     }
   },
   "agentBriefing": {

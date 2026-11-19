@@ -4582,7 +4582,9 @@
     },
     "saveSheet": {
       "title": "Salvează în listă",
-      "saved": "Salvat în {{list}}"
+      "saved": "Salvat în {{list}}",
+      "saveFailed": "Nu s-a putut salva sarcina. Verifică conexiunea și încearcă din nou.",
+      "saveRefused": "Nu s-a putut salva sarcina în această listă. Alege altă listă."
     }
   },
   "agentBriefing": {

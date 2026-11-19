@@ -8,6 +8,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SheetTitleRow } from '@/components/sheet-title-row';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
@@ -24,12 +25,16 @@ import {
   settledTrpcUnauthorizedHandling,
 } from '@/lib/auth/trpc-unauthorized';
 import { invalidateTodoQueries, useTodoLists } from '@/lib/hooks/use-todos';
+import { useKeyedSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 import { todoFromDraft } from '@/lib/todos/todo-model';
 import { todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
+import { isRetryableTrpcError } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 import { TODO_SHEET_STATE_BODY_CLASS } from './todo-sheet-body';
@@ -44,22 +49,54 @@ type SaveDraftAsTodoSheetProps = {
 };
 
 /**
- * Reports a save that failed. The draft stays in the composer either way: only
- * a saved to-do lets the screen discard it. A refused session credential
- * reaches the auth handler through the mutation cache. When that handler ends
- * the session, its own toast is the report, and the draft waits for the same
- * account's next sign-in; when it renews the token, the save still failed and
- * says so.
+ * A failed save, shown under the row it was for. The sheet is its own native
+ * window, so a toast would draw behind it until it closed; the line keeps the
+ * report beside the rows the retry needs. `retryable` covers a request that got
+ * no answer (offline, timed out) and a server that may answer next time;
+ * `refused` is a list the server will not take the to-do into.
  */
-async function reportSaveFailure(error: unknown, epoch: number): Promise<void> {
+type SaveFailure =
+  | { readonly kind: 'retryable'; readonly message: string }
+  | { readonly kind: 'refused'; readonly message: string };
+
+/**
+ * The failure a rejected save reports, or `null` when the sheet has nothing to
+ * say. The draft stays in the composer either way: only a saved to-do lets the
+ * screen discard it. A refused session credential reaches the auth handler
+ * through the mutation cache. When that handler ends the session, its own toast
+ * is the report, and the draft waits for the same account's next sign-in; when
+ * it renews the token, the same tap can now succeed.
+ */
+async function saveFailure(error: unknown, epoch: number): Promise<SaveFailure | null> {
   if (isExpectedAuthFailure(error)) {
     // Waits for the handler run the mutation cache started for this error.
     await settledTrpcUnauthorizedHandling();
     if (!isCurrentAuthEpoch(epoch) || isSignOutActive()) {
-      return;
+      return null;
+    }
+    return { kind: 'retryable', message: i18n.t('todos.saveSheet.saveFailed') };
+  }
+  if (isRetryableTrpcError(error)) {
+    return { kind: 'retryable', message: i18n.t('todos.saveSheet.saveFailed') };
+  }
+  return { kind: 'refused', message: i18n.t('todos.saveSheet.saveRefused') };
+}
+
+function SaveFailureLine({ failure }: Readonly<{ failure: SaveFailure }>) {
+  switch (failure.kind) {
+    case 'retryable':
+    case 'refused': {
+      return (
+        <AccessibleStatus
+          message={failure.message}
+          className={cn(SCREEN_GUTTER_CLASS, 'pb-3 text-sm')}
+        />
+      );
+    }
+    default: {
+      return assertSurfaceFailureHandled(failure);
     }
   }
-  toast.error(error instanceof Error ? error.message : i18n.t('common.somethingWentWrong'));
 }
 
 /**
@@ -80,7 +117,10 @@ export function SaveDraftAsTodoSheet({
   const colors = useThemeColors();
   const bottomClearance = useDetailScreenBottomPadding();
   const lists = useTodoLists(organizationId, visible);
-  const [savingListId, setSavingListId] = useState<string | null>(null);
+  // One save at a time, keyed by its list: the pending key names the row that
+  // spins, and a failure stays under the row it was for until the next save.
+  const { snapshot, begin, clearWhere } = useKeyedSurfaceFeedback<string, SaveFailure>();
+  const savingListId = snapshot.pendingKeys[0] ?? null;
   // Through the query client, so the mutation cache sees a failure: a 401
   // there goes to the auth handler, as it does for every other mutation.
   // `networkMode: 'always'` keeps an offline save settling with its network
@@ -112,18 +152,30 @@ export function SaveDraftAsTodoSheet({
     if (!todo || savingListId !== null) {
       return;
     }
+    const attempt = begin(list.id);
+    if (attempt === null) {
+      return;
+    }
     const epoch = currentAuthEpoch();
-    setSavingListId(list.id);
+    // The sheet reports one failure: a new attempt retires another row's line.
+    for (const key of snapshot.states.keys()) {
+      clearWhere(key, () => true);
+    }
     try {
       await createTodo.mutateAsync({ listId: list.id, ...todo });
     } catch (error) {
-      // The rows stay locked until the failure is reported, so a second tap
-      // cannot succeed first and then be followed by this attempt's toast.
-      await reportSaveFailure(error, epoch);
-      setSavingListId(null);
+      // The rows stay locked until the failure is classified, so a second tap
+      // cannot succeed first and then be followed by this attempt's failure.
+      const failure = await saveFailure(error, epoch);
+      if (failure === null) {
+        attempt.abandon();
+      } else {
+        attempt.fail(failure);
+      }
       return;
     }
-    setSavingListId(null);
+    // A saved to-do closes the sheet, so the success has no line of its own.
+    attempt.abandon();
     // A save that settles after the account changed must not discard the
     // draft or announce itself to the next account.
     if (!isCurrentAuthEpoch(epoch)) {
@@ -165,27 +217,32 @@ export function SaveDraftAsTodoSheet({
       </View>
     );
   } else {
-    body = activeLists.map(list => (
-      <Pressable
-        key={list.id}
-        disabled={savingListId !== null}
-        onPress={() => void save(list)}
-        accessibilityRole="button"
-        accessibilityLabel={list.name}
-        accessibilityState={{ disabled: savingListId !== null }}
-        className="min-h-14 flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3 active:opacity-70"
-      >
-        <IconTile
-          tint={NEUTRAL_TINT}
-          icon={list.emoji ? undefined : ListTodo}
-          content={list.emoji ? <Text className="text-base">{list.emoji}</Text> : undefined}
-        />
-        <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
-          {list.name}
-        </Text>
-        {savingListId === list.id ? <ActivityIndicator color={colors.mutedForeground} /> : null}
-      </Pressable>
-    ));
+    body = activeLists.map(list => {
+      const feedback = snapshot.states.get(list.id);
+      return (
+        <View key={list.id} className="border-b-[0.5px] border-hair-soft">
+          <Pressable
+            disabled={savingListId !== null}
+            onPress={() => void save(list)}
+            accessibilityRole="button"
+            accessibilityLabel={list.name}
+            accessibilityState={{ disabled: savingListId !== null }}
+            className="min-h-14 flex-row items-center gap-3 px-4 py-3 active:opacity-70"
+          >
+            <IconTile
+              tint={NEUTRAL_TINT}
+              icon={list.emoji ? undefined : ListTodo}
+              content={list.emoji ? <Text className="text-base">{list.emoji}</Text> : undefined}
+            />
+            <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
+              {list.name}
+            </Text>
+            {savingListId === list.id ? <ActivityIndicator color={colors.mutedForeground} /> : null}
+          </Pressable>
+          {feedback?.status === 'failed' ? <SaveFailureLine failure={feedback.failure} /> : null}
+        </View>
+      );
+    });
   }
 
   return (

@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Simpan ke daftar",
-      "saved": "Disimpan ke {{list}}"
+      "saved": "Disimpan ke {{list}}",
+      "saveFailed": "Tidak dapat menyimpan tugas. Periksa koneksi Anda dan coba lagi.",
+      "saveRefused": "Tidak dapat menyimpan tugas ke daftar ini. Pilih daftar lain."
     }
   },
   "agentBriefing": {

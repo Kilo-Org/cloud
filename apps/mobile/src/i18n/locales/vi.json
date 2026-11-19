@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Lưu vào danh sách",
-      "saved": "Đã lưu vào {{list}}"
+      "saved": "Đã lưu vào {{list}}",
+      "saveFailed": "Không thể lưu việc cần làm. Kiểm tra kết nối của bạn và thử lại.",
+      "saveRefused": "Không thể lưu việc cần làm vào danh sách này. Hãy chọn danh sách khác."
     }
   },
   "agentBriefing": {

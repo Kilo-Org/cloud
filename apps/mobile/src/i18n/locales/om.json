@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Tarree keessatti kuusi",
-      "saved": "{{list}} keessatti kuusame"
+      "saved": "{{list}} keessatti kuusame",
+      "saveFailed": "Hojii kuusuun hin danda’amne. Walitti qabsiisa kee mirkaneessiis irra deebiin yaali.",
+      "saveRefused": "Hojii tarree kana keessatti kuusuun hin danda’amne. Tarree biraa filadhu."
     }
   },
   "agentBriefing": {

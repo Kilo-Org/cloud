@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Tiaki ki te rārangi",
-      "saved": "Kua tiakina ki {{list}}"
+      "saved": "Kua tiakina ki {{list}}",
+      "saveFailed": "Kāore i taea te tiaki i te mahi. Tirohia tō hononga, ka ngana anō.",
+      "saveRefused": "Kāore i taea te tiaki i te mahi ki tēnei rārangi. Kōwhiria tētahi atu rārangi."
     }
   },
   "agentBriefing": {

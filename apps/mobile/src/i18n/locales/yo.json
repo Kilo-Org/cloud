@@ -4511,7 +4511,9 @@
     },
     "saveSheet": {
       "title": "Fi pamọ́ sínú àkójọ",
-      "saved": "A ti fi pamọ́ sínú {{list}}"
+      "saved": "A ti fi pamọ́ sínú {{list}}",
+      "saveFailed": "A kò lè fi iṣẹ́ náà pamọ́. Ṣàyẹ̀wò ìdarapọ̀ rẹ kí o sì tún gbiyanjú.",
+      "saveRefused": "A kò lè fi iṣẹ́ náà pamọ́ sínú àkójọ yìí. Yan àkójọ mìíràn."
     }
   },
   "agentBriefing": {

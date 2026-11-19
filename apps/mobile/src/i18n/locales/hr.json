@@ -4582,7 +4582,9 @@
     },
     "saveSheet": {
       "title": "Spremi na popis",
-      "saved": "Spremljeno na popis {{list}}"
+      "saved": "Spremljeno na popis {{list}}",
+      "saveFailed": "Nije bilo moguće spremiti zadatak. Provjerite vezu i pokušajte ponovno.",
+      "saveRefused": "Nije bilo moguće spremiti zadatak na ovaj popis. Odaberite drugi popis."
     }
   },
   "agentBriefing": {

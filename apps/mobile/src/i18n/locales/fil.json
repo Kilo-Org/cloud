@@ -3413,6 +3413,7 @@
       "sendInvite": "Ipadala ang imbitasyon",
       "title": "Mag-imbita ng miyembro",
       "alreadyInvited": "Imbitado na sila o miyembro na.",
+      "organizationUnavailable": "Hindi na available ang organisasyong ito.",
       "sendError": "Hindi naipadala ang imbitasyon.",
       "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
       "alreadyMember": "Miembro na ng organisasyong ito ang taong ito.",

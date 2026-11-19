@@ -3418,6 +3418,7 @@
       "sendInvite": "초대 보내기",
       "title": "멤버 초대",
       "alreadyInvited": "이미 초대되었거나 이미 멤버입니다.",
+      "organizationUnavailable": "이 조직은 더 이상 사용할 수 없습니다.",
       "sendError": "초대를 보내지 못했습니다.",
       "pendingInvitation": "이 이메일에는 이미 보류 중인 초대가 있습니다.",
       "alreadyMember": "이 사용자는 이미 이 조직의 멤버입니다.",

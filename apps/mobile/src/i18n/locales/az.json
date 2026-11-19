@@ -3413,6 +3413,7 @@
       "sendInvite": "Dəvət göndər",
       "title": "Üzv dəvət et",
       "alreadyInvited": "Bu e-poçt ünvanı artıq dəvət olunub və ya artıq üzvdür.",
+      "organizationUnavailable": "Bu təşkilat artıq mövcud deyil.",
       "sendError": "Dəvət göndərilmədi.",
       "pendingInvitation": "Bu e-poçt ünvanının artıq gözləyən dəvəti var.",
       "alreadyMember": "Bu şəxs artıq bu təşkilatın üzvüdür.",

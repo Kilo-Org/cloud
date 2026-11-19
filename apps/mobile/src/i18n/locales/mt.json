@@ -3587,6 +3587,7 @@
       "sendInvite": "Ibgħat stedina",
       "title": "Stieden membru",
       "alreadyInvited": "Din il-persuna diġà hija mistiedna jew diġà membru.",
+      "organizationUnavailable": "Din l-organizzazzjoni m'għadhiex disponibbli.",
       "sendError": "L-istedina ma setgħetx tintbagħat.",
       "pendingInvitation": "Dan l-indirizz tal-posta elettronika diġà għandu stedina pendenti.",
       "alreadyMember": "Din il-persuna diġà hija membru ta' din l-organizzazzjoni.",

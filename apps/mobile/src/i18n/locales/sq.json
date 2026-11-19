@@ -3413,6 +3413,7 @@
       "sendInvite": "Dërgo ftesën",
       "title": "Fto anëtar",
       "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
+      "organizationUnavailable": "Kjo organizatë nuk është më e disponueshme.",
       "sendError": "Ftesa nuk u dërgua.",
       "pendingInvitation": "Ky email ka tashmë një ftesë në pritje.",
       "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate.",

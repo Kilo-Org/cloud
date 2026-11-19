@@ -3529,6 +3529,7 @@
       "sendInvite": "Odoslať pozvánku",
       "title": "Pozvať člena",
       "alreadyInvited": "Táto osoba už bola pozvaná alebo už je členom.",
+      "organizationUnavailable": "Táto organizácia už nie je dostupná.",
       "sendError": "Pozvánku sa nepodarilo odoslať.",
       "pendingInvitation": "Táto e-mailová adresa už má čakajúcu pozvánku.",
       "alreadyMember": "Táto osoba je už členom tejto organizácie.",

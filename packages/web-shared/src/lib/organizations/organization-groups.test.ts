@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
+  kilocode_users,
   organization_audit_logs,
   organization_group_memberships,
   organization_groups,
@@ -10,6 +11,8 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { AuditLogAction } from '@kilocode/web-shared/lib/organizations/audit-log-actions';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   OrganizationGroupInputSchema,
   OrganizationGroupPoliciesSchema,
@@ -19,6 +22,9 @@ import {
   deleteOrganizationGroup,
   listOrganizationGroupsForManager,
   normalizeOrganizationGroupPolicy,
+  setOrganizationGroupMembers,
+  setOrganizationMemberGroups,
+  updateOrganizationGroupDetails,
 } from './organization-groups';
 
 describe('organization group policies', () => {
@@ -331,5 +337,150 @@ describe('organization group deletion with an input guardrail', () => {
       kilo_encrypt: true,
       enkrypt: { input_guardrail: { enabled: true } },
     });
+  });
+});
+
+describe('organization group audit messages', () => {
+  const createdOrganizationIds: string[] = [];
+  const createdUserIds: string[] = [];
+  const actor = { id: 'group-audit-admin', email: 'admin@example.com', name: 'Admin' };
+
+  afterEach(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+    }
+    for (const kiloUserId of createdUserIds) {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, kiloUserId));
+    }
+    createdOrganizationIds.length = 0;
+    createdUserIds.length = 0;
+  });
+
+  async function createOrganization() {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: 'Audit Message Organization', plan: 'enterprise' })
+      .returning();
+    createdOrganizationIds.push(organization.id);
+    return organization;
+  }
+
+  async function createMember(organizationId: string) {
+    const user = await insertTestUser();
+    createdUserIds.push(user.id);
+    await db
+      .insert(organization_memberships)
+      .values({ organization_id: organizationId, kilo_user_id: user.id, role: 'member' });
+    return user;
+  }
+
+  async function auditMessages(organizationId: string, action: AuditLogAction) {
+    // The `action` column rejects a plain `eq` against the zod-enum type under
+    // tsgo, so this filter runs in JS like the harness above does.
+    const rows = await db
+      .select({
+        action: organization_audit_logs.action,
+        message: organization_audit_logs.message,
+      })
+      .from(organization_audit_logs)
+      .where(eq(organization_audit_logs.organization_id, organizationId));
+    return rows.filter(row => row.action === action).map(row => row.message);
+  }
+
+  it('singularizes the member count when updating group details for one member', async () => {
+    const organization = await createOrganization();
+    const [group] = await db
+      .insert(organization_groups)
+      .values({ organization_id: organization.id, name: 'One Member' })
+      .returning();
+    const user = await createMember(organization.id);
+
+    await updateOrganizationGroupDetails({
+      organizationId: organization.id,
+      groupId: group.id,
+      name: 'One Member Renamed',
+      description: null,
+      userIds: [user.id],
+      actor,
+    });
+
+    const messages = await auditMessages(organization.id, 'organization.group.update');
+    // The audit sentence names the group as it was before the rename.
+    expect(messages).toEqual([`Updated group "One Member" (${group.id}) with 1 member`]);
+    expect(messages.join(' ')).not.toContain('members');
+  });
+
+  it('uses the plural member count when updating group details for two members', async () => {
+    const organization = await createOrganization();
+    const [group] = await db
+      .insert(organization_groups)
+      .values({ organization_id: organization.id, name: 'Two Members' })
+      .returning();
+    const firstUser = await createMember(organization.id);
+    const secondUser = await createMember(organization.id);
+
+    await updateOrganizationGroupDetails({
+      organizationId: organization.id,
+      groupId: group.id,
+      name: 'Two Members Renamed',
+      description: null,
+      userIds: [firstUser.id, secondUser.id],
+      actor,
+    });
+
+    const messages = await auditMessages(organization.id, 'organization.group.update');
+    expect(messages).toEqual([`Updated group "Two Members" (${group.id}) with 2 members`]);
+  });
+
+  it('singularizes the member count when setting group members to one member', async () => {
+    const organization = await createOrganization();
+    const [group] = await db
+      .insert(organization_groups)
+      .values({ organization_id: organization.id, name: 'Solo Group' })
+      .returning();
+    const user = await createMember(organization.id);
+
+    await setOrganizationGroupMembers({
+      organizationId: organization.id,
+      groupId: group.id,
+      userIds: [user.id],
+      actor,
+    });
+
+    const messages = await auditMessages(organization.id, 'organization.group.members.set');
+    expect(messages).toEqual([`Set 1 member for group "${group.name}" (${group.id})`]);
+    expect(messages.join(' ')).not.toContain('members');
+  });
+
+  it('identifies the member by email when setting member groups', async () => {
+    const organization = await createOrganization();
+    const [group] = await db
+      .insert(organization_groups)
+      .values({ organization_id: organization.id, name: 'Email Identity Group' })
+      .returning();
+    const user = await createMember(organization.id);
+
+    await setOrganizationMemberGroups({
+      organizationId: organization.id,
+      userId: user.id,
+      groupIds: [group.id],
+      actor,
+    });
+
+    const messages = await auditMessages(organization.id, 'organization.group.member_groups.set');
+    expect(messages).toEqual([
+      `Set 1 group for organization member ${user.google_user_email} (${user.id})`,
+    ]);
+    expect(messages[0]).toMatch(
+      new RegExp(
+        `^Set 1 group for organization member ${user.google_user_email.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          '\\$&'
+        )} \\(${user.id}\\)$`
+      )
+    );
   });
 });

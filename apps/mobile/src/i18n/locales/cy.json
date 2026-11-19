@@ -3645,6 +3645,7 @@
       "sendInvite": "Anfon gwahoddiad",
       "title": "Gwahodd aelod",
       "alreadyInvited": "Mae'r cyfeiriad e-bost hwn eisoes wedi cael gwahoddiad neu'n eisoes yn perthyn i aelod.",
+      "organizationUnavailable": "Nid yw'r sefydliad hwn ar gael mwyach.",
       "sendError": "Ni lwyddwyd i anfon y gwahoddiad.",
       "pendingInvitation": "Mae gwahoddiad ar y gweill eisoes ar gyfer yr e-bost hwn.",
       "alreadyMember": "Mae'r person hwn eisoes yn aelod o'r sefydliad hwn.",

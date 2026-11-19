@@ -3471,6 +3471,7 @@
       "sendInvite": "Nosūtīt uzaicinājumu",
       "title": "Uzaicināt dalībnieku",
       "alreadyInvited": "Šī e-pasta adrese jau ir uzaicināta vai jau pieder dalībniekam.",
+      "organizationUnavailable": "Šī organizācija vairs nav pieejama.",
       "sendError": "Neizdevās nosūtīt uzaicinājumu.",
       "pendingInvitation": "Šai e-pasta adresei jau ir gaidošs uzaicinājums.",
       "alreadyMember": "Šis cilvēks jau ir šīs organizācijas dalībnieks.",

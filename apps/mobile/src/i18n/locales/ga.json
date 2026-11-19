@@ -3587,6 +3587,7 @@
       "sendInvite": "Seol cuireadh",
       "title": "Tabhair cuireadh do bhall",
       "alreadyInvited": "Tá cuireadh acu cheana féin nó is ball den eagraíocht iad cheana féin.",
+      "organizationUnavailable": "Níl an eagraíocht seo ar fáil a thuilleadh.",
       "sendError": "Níorbh fhéidir an cuireadh a sheoladh.",
       "pendingInvitation": "Tá cuireadh ar feitheamh ag an seoladh ríomhphoist seo cheana féin.",
       "alreadyMember": "Tá an duine seo ina bhall den eagraíocht seo cheana féin.",

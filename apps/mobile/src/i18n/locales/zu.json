@@ -3413,6 +3413,7 @@
       "sendInvite": "Thumela isimemo",
       "title": "Mema ilungu",
       "alreadyInvited": "Isimemo sabo sesivele sikhona noma bese belilungu leqembu.",
+      "organizationUnavailable": "Le nhlangano ayisatholakali.",
       "sendError": "Asikwazanga ukuthumela isimemo.",
       "pendingInvitation": "Le imeyili isivele inesimemo esilindile.",
       "alreadyMember": "Lo muntu usevele eyilungu lale nhlangano.",

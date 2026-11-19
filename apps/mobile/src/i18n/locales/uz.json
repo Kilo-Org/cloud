@@ -3413,6 +3413,7 @@
       "sendInvite": "Taklifnomani yuborish",
       "title": "A’zo taklif qilish",
       "alreadyInvited": "Bu elektron pochta manzili allaqachon taklif qilingan yoki allaqachon a'zo.",
+      "organizationUnavailable": "Bu tashkilot endi mavjud emas.",
       "sendError": "Taklifnomani yuborib bo'lmadi.",
       "pendingInvitation": "Bu elektron pochta uchun allaqachon kutilayotgan taklifnoma mavjud.",
       "alreadyMember": "Bu shaxs allaqachon ushbu tashkilotning a'zosi.",

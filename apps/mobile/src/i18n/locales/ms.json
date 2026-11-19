@@ -3413,6 +3413,7 @@
       "sendInvite": "Hantar jemputan",
       "title": "Jemput ahli",
       "alreadyInvited": "E-mel itu sudah dijemput atau sudah menjadi ahli.",
+      "organizationUnavailable": "Organisasi ini tidak lagi tersedia.",
       "sendError": "Tidak dapat menghantar jemputan.",
       "pendingInvitation": "E-mel ini sudah mempunyai jemputan yang belum selesai.",
       "alreadyMember": "Orang ini sudah menjadi ahli organisasi ini.",

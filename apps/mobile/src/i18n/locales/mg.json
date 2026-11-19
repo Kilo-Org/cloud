@@ -3413,6 +3413,7 @@
       "sendInvite": "Alefaso ny fanasana",
       "title": "Manasà mpikambana",
       "alreadyInvited": "Efa voasa na efa mpikambana izy.",
+      "organizationUnavailable": "Tsy misy intsony ity fikambanana ity.",
       "sendError": "Tsy azo nalefa ny fanasana.",
       "pendingInvitation": "Efa manana fanasana miandry ity mailaka ity.",
       "alreadyMember": "Efa mpikambana ao amin'ity fikambanana ity ity olona ity.",

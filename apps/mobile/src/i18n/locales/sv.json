@@ -3413,6 +3413,7 @@
       "sendInvite": "Skicka inbjudan",
       "title": "Bjud in medlem",
       "alreadyInvited": "Personen är redan inbjuden eller redan medlem.",
+      "organizationUnavailable": "Den här organisationen är inte längre tillgänglig.",
       "sendError": "Inbjudan kunde inte skickas.",
       "pendingInvitation": "Den här e-postadressen har redan en väntande inbjudan.",
       "alreadyMember": "Den här personen är redan medlem i den här organisationen.",

@@ -3413,6 +3413,7 @@
       "sendInvite": "Meghívó küldése",
       "title": "Tag meghívása",
       "alreadyInvited": "Már meg van hívva, vagy már tag.",
+      "organizationUnavailable": "Ez a szervezet már nem érhető el.",
       "sendError": "Nem sikerült elküldeni a meghívót.",
       "pendingInvitation": "Erre az e-mail-címre már van egy függőben lévő meghívó.",
       "alreadyMember": "Ez a személy már tagja ennek a szervezetnek.",

@@ -3476,6 +3476,7 @@
       "sendInvite": "Enviar invitación",
       "title": "Invitar a un miembro",
       "alreadyInvited": "Ya está invitado o ya es miembro.",
+      "organizationUnavailable": "Esta organización ya no está disponible.",
       "sendError": "No se pudo enviar la invitación.",
       "pendingInvitation": "Este correo electrónico ya tiene una invitación pendiente.",
       "alreadyMember": "Esta persona ya es miembro de esta organización.",

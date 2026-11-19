@@ -19,6 +19,8 @@ import {
   type Todo,
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 import { logToFile } from './utils.js';
 import { kiloClientConfig, kiloServerHeaders, type KiloServer } from './kilo-server-auth.js';
 import {
@@ -244,6 +246,24 @@ export type WrapperPtySize = {
   cols: number;
   rows: number;
 };
+
+/**
+ * Whether two directory strings name the same place. The native server stores
+ * realpath-canonical paths, so a route reached through a symlink or a trailing
+ * slash would otherwise never match its own record. A path that no longer
+ * resolves falls back to the resolved form of the string itself.
+ */
+export async function sameDirectory(left: string, right: string): Promise<boolean> {
+  const canonical = async (value: string): Promise<string> => {
+    try {
+      return await fsp.realpath(value);
+    } catch {
+      return path.resolve(value);
+    }
+  };
+  const [a, b] = await Promise.all([canonical(left), canonical(right)]);
+  return a === b;
+}
 
 export type KiloSessionMetadata = { id: string; directory: string; parentID?: string };
 export const KILO_ACTIVITY_MESSAGE_LIMIT = 32;
@@ -611,12 +631,22 @@ export function createWrapperKiloClient(
         { sessionID: sessionId, directory },
         { signal: lookupSignal }
       );
+      // A record outside this directory is not this route's session. The
+      // native import re-points an existing record only when it is forced, so
+      // the mismatch case imports as-is; the absent case stays unforced.
+      let rebind = false;
       if (existing.response?.status !== 404) {
         const data = requireSdkData(existing, `Session get for ${sessionId}`);
         if (data.id !== sessionId) {
           throw new Error(`Session get for ${sessionId} returned an invalid session`);
         }
-        return;
+        if (
+          typeof data.directory === 'string' &&
+          (await sameDirectory(data.directory, directory))
+        ) {
+          return;
+        }
+        rebind = true;
       }
       const currentProject = await v2Client.project.current(
         { directory },
@@ -637,6 +667,7 @@ export function createWrapperKiloClient(
           slug: sessionId.slice(0, 24),
           title: 'New session - ' + new Date(now).toISOString(),
           version: KILO_CLI_VERSION,
+          ...(rebind ? { force: true } : {}),
           timeCreated: now,
           timeUpdated: now,
         },

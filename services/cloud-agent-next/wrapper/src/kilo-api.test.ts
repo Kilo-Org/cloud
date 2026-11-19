@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -860,6 +860,128 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       }
     }
   );
+
+  describe('ensureSession rebinding', () => {
+    const temporaryDirectories: string[] = [];
+
+    afterEach(() => {
+      for (const directory of temporaryDirectories.splice(0)) {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    function temporaryDirectory(prefix: string): string {
+      const directory = mkdtempSync(join(tmpdir(), prefix));
+      temporaryDirectories.push(directory);
+      return directory;
+    }
+
+    // The SDK maps `query_directory` onto the `directory` query parameter and
+    // `body_directory` onto the `directory` body field, so the wire request is
+    // what the wrapper's argument turns into.
+    type EnsureSessionImport = {
+      queryDirectory: string | null;
+      body: {
+        id?: string;
+        force?: boolean;
+        directory?: string;
+        projectID?: string;
+      };
+    };
+
+    function startEnsureSessionStub(
+      sessionId: string,
+      record?: { id: string; directory: string }
+    ): { url: string; imports: EnsureSessionImport[] } {
+      const imports: EnsureSessionImport[] = [];
+      const server = Bun.serve({
+        port: 0,
+        async fetch(request) {
+          const url = new URL(request.url);
+          if (url.pathname === '/project/current') {
+            return Response.json({
+              id: 'proj',
+              worktree: url.searchParams.get('directory'),
+              vcs: 'git',
+              time: { created: 1, updated: 1 },
+              sandboxes: [],
+            });
+          }
+          if (request.method === 'GET' && url.pathname === `/session/${sessionId}`) {
+            return record
+              ? Response.json(record)
+              : Response.json(
+                  { name: 'NotFoundError', data: { message: `Session not found: ${sessionId}` } },
+                  { status: 404 }
+                );
+          }
+          if (request.method === 'POST' && url.pathname === '/kilocode/session-import/session') {
+            const body = (await request.json()) as EnsureSessionImport['body'];
+            imports.push({ queryDirectory: url.searchParams.get('directory'), body });
+            return Response.json({ ok: true, id: body.id });
+          }
+          return new Response(null, { status: 404 });
+        },
+      });
+      startedServers.push(server);
+      return { url: server.url.toString(), imports };
+    }
+
+    it('returns without importing when the record already belongs to this directory', async () => {
+      const sessionId = 'ses_record_same_directory';
+      const directory = temporaryDirectory('kilo-api-same-directory-');
+      const stub = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(0);
+    });
+
+    it('rebinds a record held by another directory with a forced import', async () => {
+      const sessionId = 'ses_record_other_directory';
+      const directory = temporaryDirectory('kilo-api-rebind-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-rebind-other-');
+      const stub = startEnsureSessionStub(sessionId, { id: sessionId, directory: otherDirectory });
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      const parameters = stub.imports[0];
+      if (!parameters) throw new Error('Expected a session import');
+      expect(parameters.body.force).toBe(true);
+      expect(parameters.body.id).toBe(sessionId);
+      expect(parameters.queryDirectory).toBe(directory);
+      expect(parameters.body.directory).toBe(directory);
+    });
+
+    it('imports an absent record without a force flag', async () => {
+      const sessionId = 'ses_record_absent';
+      const directory = temporaryDirectory('kilo-api-absent-directory-');
+      const stub = startEnsureSessionStub(sessionId);
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.imports).toHaveLength(1);
+      const parameters = stub.imports[0];
+      if (!parameters) throw new Error('Expected a session import');
+      expect('force' in parameters.body).toBe(false);
+      expect(parameters.body.id).toBe(sessionId);
+      expect(parameters.queryDirectory).toBe(directory);
+      expect(parameters.body.directory).toBe(directory);
+    });
+
+    it('treats a symlinked route directory as the record directory', async () => {
+      const sessionId = 'ses_record_symlink_directory';
+      const realDirectory = temporaryDirectory('kilo-api-real-directory-');
+      const linkPath = join(temporaryDirectory('kilo-api-link-parent-'), 'route');
+      symlinkSync(realDirectory, linkPath);
+      const stub = startEnsureSessionStub(sessionId, { id: sessionId, directory: realDirectory });
+
+      await createClient(stub.url).ensureSession(sessionId, linkPath);
+
+      expect(stub.imports).toHaveLength(0);
+    });
+  });
 
   it.each(
     [null, [], '', { ses_1: null }, { ses_1: {} }, { ses_1: { type: 1 } }].map(body => ({ body }))

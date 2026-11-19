@@ -1,5 +1,3 @@
-import fsp from 'node:fs/promises';
-import path from 'node:path';
 import { z } from 'zod';
 import { createKiloClient } from '@kilocode/sdk';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
@@ -8,6 +6,7 @@ import { summarizeWithTimeout } from '../condense-on-complete.js';
 import {
   createWrapperKiloClient,
   isKiloServerUnreachableError,
+  sameDirectory,
   type WrapperKiloClient,
 } from '../kilo-api.js';
 import { fetchKiloServer, kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
@@ -37,20 +36,8 @@ export type KiloHarnessOptions = {
   log?: (message: string) => void;
 };
 
-/**
- * The fields a session read returns that a reuse decision depends on: its
- * identity and the directory it is recorded under.
- */
+/** The fields a session read returns that a reuse decision depends on. */
 const sessionProbeSchema = z.object({ id: z.string(), directory: z.string() });
-
-/** The native server stores realpath-canonical paths; compare in the same form. */
-async function canonicalDirectory(directory: string): Promise<string> {
-  try {
-    return await fsp.realpath(directory);
-  } catch {
-    return path.resolve(directory);
-  }
-}
 
 async function sessionExists(
   client: WrapperKiloClient,
@@ -70,11 +57,7 @@ async function sessionExists(
   // Reuse requires the session to be recorded under this route's directory.
   // Otherwise it is treated as absent, so the caller restores or creates its
   // own session, as the v2 opener does.
-  const [sessionDirectory, routeDirectory] = await Promise.all([
-    canonicalDirectory(parsed.data.directory),
-    canonicalDirectory(directory),
-  ]);
-  return sessionDirectory === routeDirectory;
+  return sameDirectory(parsed.data.directory, directory);
 }
 
 export function createKiloHarness(options: KiloHarnessOptions): Harness {

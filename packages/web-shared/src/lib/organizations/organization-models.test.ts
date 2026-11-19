@@ -227,6 +227,7 @@ function organization(): Organization {
     parent_organization_id: null,
     plan: 'enterprise',
     free_trial_end_at: null,
+    trial_granted: true,
     company_domain: null,
     directory_id: null,
     directory_group_id: null,

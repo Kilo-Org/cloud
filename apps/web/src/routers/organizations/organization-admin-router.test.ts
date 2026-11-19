@@ -2206,6 +2206,42 @@ describe('organization admin router', () => {
           );
       }
     });
+
+    it('leaves organizations created without a trial out of the filter', async () => {
+      const searchPrefix = `Admin No Trial ${crypto.randomUUID()}`;
+      const grantedOrg = await createTestOrganization(`${searchPrefix} granted`, adminUser.id, 0);
+      const noTrialOrg = await createTestOrganization(`${searchPrefix} no trial`, adminUser.id, 0);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ free_trial_end_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString() })
+          .where(inArray(organizations.id, [grantedOrg.id, noTrialOrg.id]));
+        await db
+          .update(organizations)
+          .set({ trial_granted: false })
+          .where(eq(organizations.id, noTrialOrg.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.organizations.admin.list({
+          page: 1,
+          limit: 25,
+          sortBy: 'name',
+          sortOrder: 'asc',
+          search: searchPrefix,
+          mode: 'trial',
+          include_deleted: false,
+          trial_ending_in_future: true,
+        });
+
+        expect(result.organizations.map(organization => organization.id)).toEqual([grantedOrg.id]);
+        expect(result.pagination.total).toBe(1);
+      } finally {
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [grantedOrg.id, noTrialOrg.id]));
+      }
+    });
   });
 
   describe('list — organization Kilo Pass tier sorting', () => {

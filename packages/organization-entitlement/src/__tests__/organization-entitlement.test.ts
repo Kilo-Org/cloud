@@ -94,6 +94,63 @@ describe('classifyOrganizationEntitlement', () => {
     });
   });
 
+  it('treats an organization created without a trial as hard-expired', () => {
+    const futureTrialEnd = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString();
+
+    expect(classify({ free_trial_end_at: futureTrialEnd, trial_granted: false })).toMatchObject({
+      bypassReason: null,
+      displayStatus: 'trial_expired_hard',
+      daysRemaining: -4,
+      hasEntitlement: false,
+      hasPaidSeatEntitlement: false,
+      isTrialExpiredForEnforcement: true,
+      trialStatus: 'trial_expired_hard',
+    });
+    expect(
+      classify({ free_trial_end_at: softExpiredTrialEnd, trial_granted: false })
+    ).toMatchObject({
+      displayStatus: 'trial_expired_hard',
+      daysRemaining: -4,
+      hasEntitlement: false,
+      isTrialExpiredForEnforcement: true,
+      trialStatus: 'trial_expired_hard',
+    });
+  });
+
+  it('keeps the previous classification when the trial grant is unspecified', () => {
+    const futureTrialEnd = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString();
+
+    expect(classify({ free_trial_end_at: futureTrialEnd, trial_granted: undefined })).toMatchObject(
+      {
+        bypassReason: null,
+        displayStatus: 'trial_active',
+        daysRemaining: 10,
+        hasEntitlement: true,
+        isTrialExpiredForEnforcement: false,
+        trialStatus: 'trial_active',
+      }
+    );
+    expect(
+      classify({ free_trial_end_at: softExpiredTrialEnd, trial_granted: undefined })
+    ).toMatchObject({
+      displayStatus: 'trial_expired_soft',
+      hasEntitlement: true,
+      isTrialExpiredForEnforcement: false,
+      trialStatus: 'trial_expired_soft',
+    });
+  });
+
+  it('treats an active seat purchase as paid entitlement without a trial', () => {
+    expect(classify({ trial_granted: false }, 'active')).toMatchObject({
+      bypassReason: 'paid_seat_purchase',
+      displayStatus: 'subscribed',
+      hasEntitlement: true,
+      hasPaidSeatEntitlement: true,
+      isTrialExpiredForEnforcement: false,
+      trialStatus: 'trial_expired_hard',
+    });
+  });
+
   it.each(PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES)(
     'treats %s seat purchases as paid entitlement',
     subscriptionStatus => {

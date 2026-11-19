@@ -119,6 +119,7 @@ const mockOrganization = {
   parent_organization_id: null,
   plan: 'teams',
   free_trial_end_at: null,
+  trial_granted: true,
   company_domain: null,
   callerRole: 'owner',
   members: [mockMember],

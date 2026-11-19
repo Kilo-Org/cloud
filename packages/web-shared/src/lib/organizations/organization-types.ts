@@ -84,6 +84,12 @@ export const OrganizationSchema = z.object({
   parent_organization_id: z.string().nullable(),
   plan: OrganizationPlanSchema,
   free_trial_end_at: z.string().nullable(),
+  /**
+   * False when the organization was created without a trial window. Clients
+   * pass it into the entitlement classifier so a no-trial organization reads
+   * as enforced exactly as it does on the server.
+   */
+  trial_granted: z.boolean(),
   company_domain: z.string().nullable(),
 });
 

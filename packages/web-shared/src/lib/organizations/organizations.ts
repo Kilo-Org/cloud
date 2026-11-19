@@ -101,6 +101,7 @@ export async function getUserOrganizationsWithSeats(
       plan: organizations.plan,
       createdAt: organizations.created_at,
       freeTrialEndAt: organizations.free_trial_end_at,
+      trialGranted: organizations.trial_granted,
       settings: organizations.settings,
       latestSeatPurchaseStatus,
       seatCountTotal: organizations.seat_count,
@@ -148,6 +149,7 @@ export async function getUserOrganizationsWithSeats(
         free_trial_end_at: result.freeTrialEndAt,
         require_seats: result.requireSeats,
         settings: result.settings,
+        trial_granted: result.trialGranted,
       },
       latestSeatPurchaseStatus: result.latestSeatPurchaseStatus,
       now,
@@ -300,6 +302,24 @@ export async function createOrganization(
     if (userId) {
       await enforceOrganizationCreationLimit(tx, userId);
     }
+    // Only the first organization a user creates receives a trial window. The
+    // lookup intentionally ignores soft deletion: removing an organization
+    // must not restore the offer.
+    const hasPriorTrialOrganization =
+      userId != null &&
+      (
+        await tx
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(
+            and(
+              eq(organizations.created_by_kilo_user_id, userId),
+              eq(organizations.trial_granted, true)
+            )
+          )
+          .limit(1)
+      ).length > 0;
+    const grantsTrial = !hasPriorTrialOrganization;
     const now = new Date();
     const trialEndDate = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
 
@@ -309,7 +329,9 @@ export async function createOrganization(
         name,
         require_seats: true,
         created_by_kilo_user_id: userId,
-        free_trial_end_at: trialEndDate.toISOString(),
+        free_trial_end_at: grantsTrial ? trialEndDate.toISOString() : null,
+        // Admin, SCIM, and helper creates pass no user and keep the default.
+        ...(userId != null ? { trial_granted: grantsTrial } : {}),
         settings: {
           enable_usage_limits: false,
           code_indexing_enabled: true,

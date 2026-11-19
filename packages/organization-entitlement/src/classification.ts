@@ -1,4 +1,8 @@
-import { getDaysRemainingInTrial, getOrgTrialStatusFromDays } from './trial';
+import {
+  getDaysRemainingInTrial,
+  getOrgTrialStatusFromDays,
+  ORGANIZATION_TRIAL_SOFT_EXPIRY_GRACE_DAYS,
+} from './trial';
 import {
   isPaidOrganizationSeatSubscriptionStatus,
   type OrganizationEntitlementBypassReason,
@@ -11,11 +15,17 @@ export function classifyOrganizationEntitlement({
   latestSeatPurchaseStatus,
   now,
 }: OrganizationEntitlementInput): OrganizationEntitlementClassification {
-  const daysRemaining = getDaysRemainingInTrial(
+  const measuredDaysRemaining = getDaysRemainingInTrial(
     organization.free_trial_end_at,
     organization.created_at,
     now
   );
+  // An organization created without a trial has no window to run out: hold the
+  // count past the soft-expiry grace so the stage and its display stay stable.
+  const daysRemaining =
+    organization.trial_granted === false
+      ? Math.min(measuredDaysRemaining, -ORGANIZATION_TRIAL_SOFT_EXPIRY_GRACE_DAYS - 1)
+      : measuredDaysRemaining;
   const trialStatus = getOrgTrialStatusFromDays(daysRemaining);
   const hasPaidSeatEntitlement =
     latestSeatPurchaseStatus != null &&

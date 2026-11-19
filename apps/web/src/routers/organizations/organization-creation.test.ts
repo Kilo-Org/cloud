@@ -2,6 +2,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organization_audit_logs,
   organization_memberships,
+  organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
 import { and, eq, isNull, or } from 'drizzle-orm';
@@ -13,6 +14,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 import { MAX_ORGANIZATIONS_PER_USER } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { createCallerForUser } from '@/routers/test-utils';
 
@@ -340,6 +342,63 @@ describe('organization creation limit', () => {
       ),
     });
     expect(active).toHaveLength(1);
+  });
+});
+
+describe('organization trial eligibility', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('grants a trial window to the first organization a user creates', async () => {
+    const user = await insertTestUser();
+
+    const organization = await createOrganization('First Organization', user.id);
+
+    expect(organization.trial_granted).toBe(true);
+    expect(organization.free_trial_end_at).not.toBeNull();
+    expect(new Date(organization.free_trial_end_at ?? 0).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  test('creates later organizations without a trial until a seat is purchased', async () => {
+    const user = await insertTestUser();
+    await createOrganization('First Organization', user.id);
+
+    const second = await createOrganization('Second Organization', user.id);
+
+    expect(second.trial_granted).toBe(false);
+    expect(second.free_trial_end_at).toBeNull();
+    await expect(requireActiveSubscriptionOrTrial(second.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+
+    await db.insert(organization_seats_purchases).values({
+      organization_id: second.id,
+      subscription_stripe_id: `sub_${crypto.randomUUID()}`,
+      seat_count: 1,
+      amount_usd: 30,
+      starts_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      subscription_status: 'active',
+    });
+
+    await expect(requireActiveSubscriptionOrTrial(second.id)).resolves.toMatchObject({
+      isReadOnly: false,
+    });
+  });
+
+  test('does not restore the trial after the earlier organization is deleted', async () => {
+    const user = await insertTestUser();
+    const first = await createOrganization('First Organization', user.id);
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, first.id));
+
+    const replacement = await createOrganization('Replacement Organization', user.id);
+
+    expect(replacement.trial_granted).toBe(false);
+    expect(replacement.free_trial_end_at).toBeNull();
   });
 });
 

@@ -131,6 +131,39 @@ describe('classifyOrganizationEntitlement', () => {
     });
   });
 
+  it('enforces an organization created without a trial whatever its stored deadline', () => {
+    const futureTrialEnd = new Date(NOW.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    for (const freeTrialEndAt of [futureTrialEnd, softExpiredTrialEnd, null]) {
+      expect(classify({ free_trial_end_at: freeTrialEndAt, trial_granted: false })).toMatchObject({
+        bypassReason: null,
+        daysRemaining: -4,
+        displayStatus: 'trial_expired_hard',
+        hasEntitlement: false,
+        isTrialExpiredForEnforcement: true,
+        trialStatus: 'trial_expired_hard',
+      });
+    }
+  });
+
+  it('leaves an unspecified trial grant on the previous behavior', () => {
+    expect(classify({ free_trial_end_at: softExpiredTrialEnd })).toMatchObject({
+      displayStatus: 'trial_expired_soft',
+      isTrialExpiredForEnforcement: false,
+      trialStatus: 'trial_expired_soft',
+    });
+  });
+
+  it('reads an active seat purchase as paid entitlement without a trial', () => {
+    expect(classify({ trial_granted: false }, 'active')).toMatchObject({
+      bypassReason: 'paid_seat_purchase',
+      displayStatus: 'subscribed',
+      hasEntitlement: true,
+      hasPaidSeatEntitlement: true,
+      isTrialExpiredForEnforcement: false,
+    });
+  });
+
   it.each(PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES)(
     'treats %s seat purchases as paid entitlement',
     subscriptionStatus => {

@@ -1,0 +1,1 @@
+ALTER TABLE "organizations" ADD COLUMN "trial_granted" boolean DEFAULT true NOT NULL;

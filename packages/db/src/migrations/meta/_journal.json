@@ -2584,6 +2584,13 @@
       "when": 1795013963877,
       "tag": "0368_blacklisted_domains_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 369,
+      "version": "7",
+      "when": 1795052569427,
+      "tag": "0369_daffy_violations",
+      "breakpoints": true
     }
   ]
 }

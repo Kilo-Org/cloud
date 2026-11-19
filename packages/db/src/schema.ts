@@ -3415,6 +3415,12 @@ export const organizations = pgTable(
     }),
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
+    // Whether creating this organization granted its creator a free trial. A
+    // creator receives a trial only for the first organization they create;
+    // later organizations, including ones created after an earlier one was
+    // deleted, start with no trial window and need seats or another bypass.
+    // Defaults to true so existing organizations keep the trial they received.
+    trial_granted: boolean().notNull().default(true),
     company_domain: text(),
     // WorkOS Directory Sync bindings. `directory_group_id` is the primary binding;
     // `directory_idp_id` is the identity-provider group ID, which survives a directory

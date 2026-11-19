@@ -42,6 +42,7 @@ async function queryIsNonTrialEnterpriseOrganization(
         free_trial_end_at: organizations.free_trial_end_at,
         require_seats: organizations.require_seats,
         settings: organizations.settings,
+        trial_granted: organizations.trial_granted,
       })
       .from(organizations)
       .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))

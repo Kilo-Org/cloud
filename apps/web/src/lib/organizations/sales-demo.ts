@@ -193,6 +193,9 @@ export async function createSalesDemoOrganization(args: {
       require_seats: false,
       created_by_kilo_user_id: targetUser.id,
       free_trial_end_at: oneYearFromNow.toISOString(),
+      // Creating the demo uses up the target user's self-serve trial, so a
+      // later organization they create starts without a trial window.
+      trial_granted: false,
       settings: demoOrganizationSettings(now),
     })
     .onConflictDoNothing({

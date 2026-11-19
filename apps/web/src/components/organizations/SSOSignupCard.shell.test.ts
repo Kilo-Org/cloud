@@ -52,6 +52,7 @@ const organization = {
   parent_organization_id: null,
   plan: 'enterprise',
   free_trial_end_at: '2099-01-01T00:00:00.000Z',
+  trial_granted: true,
   company_domain: null,
   callerRole: 'owner',
   members: [],

@@ -73,6 +73,12 @@ export type OrganizationEntitlementOrganization = {
   free_trial_end_at: string | null;
   require_seats: boolean;
   settings: OrganizationEntitlementSettings;
+  /**
+   * When false, the organization was created without a trial window, so it has
+   * no active or grace period to classify. Undefined keeps the previous
+   * behavior, which reads a missing value as granted.
+   */
+  trial_granted?: boolean;
 };
 
 export type OrganizationEntitlementInput = {

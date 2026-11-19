@@ -1343,6 +1343,9 @@ export const organizationAdminRouter = createTRPCRouter({
       // trial_active entitlement stage. Match the entitlement fallback for orgs
       // that never had free_trial_end_at persisted.
       if (trial_ending_in_future) {
+        // An organization created without a trial has no future trial window
+        // even when a stored date would otherwise match.
+        conditions.push(eq(organizations.trial_granted, true));
         conditions.push(
           sql`COALESCE(${organizations.free_trial_end_at}, ${organizations.created_at} + ${ORGANIZATION_TRIAL_DURATION_DAYS} * INTERVAL '1 day') >= NOW() + ${ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING} * INTERVAL '1 day'`
         );
@@ -1430,6 +1433,7 @@ export const organizationAdminRouter = createTRPCRouter({
         parent_organization_id: organizations.parent_organization_id,
         plan: organizations.plan,
         free_trial_end_at: organizations.free_trial_end_at,
+        trial_granted: organizations.trial_granted,
         company_domain: organizations.company_domain,
         // Null out subscription_amount_usd for non-billable statuses so the
         // "Subscription" column doesn't display the dollar amount of a churned

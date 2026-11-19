@@ -1195,6 +1195,20 @@ function normalizePersistedKiloSdkParts(value: unknown): {
   return { parts, omittedItemCount };
 }
 
+/**
+ * Repair the three user-message `summary` shapes so one message cannot degrade
+ * the WHOLE history page to `invalid_data` and leave the transcript blank:
+ *
+ * - no `summary`, or a `summary` that is not a record: returned unchanged.
+ *   That is invalid data the caller must not silently paper over.
+ * - a record `summary` that carries `diffs`: only the diff list is normalized,
+ *   as before.
+ * - a record `summary` without `diffs`: returned as a copy with `diffs: []`.
+ *   `kiloSdkUserMessageSchema` requires `diffs` whenever `summary` is present,
+ *   and a compaction summary is persisted without one, so the strict page
+ *   would reject every message of the page. The SDK's wire normalizer
+ *   (`cloudMessageInfoSchema`) fills the same field for the same reason.
+ */
 function normalizePersistedKiloSdkStoredMessage(value: unknown): NormalizedPersistedStoredMessage {
   if (!isRecord(value)) {
     return { message: value, omittedItemCount: 0 };
@@ -1205,7 +1219,7 @@ function normalizePersistedKiloSdkStoredMessage(value: unknown): NormalizedPersi
     return { message, omittedItemCount: normalizedParts.omittedItemCount };
   }
   const summary = value['info']['summary'];
-  if (!isRecord(summary) || !('diffs' in summary)) {
+  if (!isRecord(summary)) {
     return { message, omittedItemCount: normalizedParts.omittedItemCount };
   }
   return {
@@ -1215,7 +1229,7 @@ function normalizePersistedKiloSdkStoredMessage(value: unknown): NormalizedPersi
         ...value['info'],
         summary: {
           ...summary,
-          diffs: normalizePersistedSnapshotFileDiffs(summary['diffs']),
+          diffs: 'diffs' in summary ? normalizePersistedSnapshotFileDiffs(summary['diffs']) : [],
         },
       },
     },

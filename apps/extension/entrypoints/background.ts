@@ -5,6 +5,9 @@ import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
 import { savePendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
 import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
 import type { BrowserToolDispatchOptions } from '@/src/shared/browser-tool-dispatch';
+import { startDownloadHold } from '@/src/shared/browser-download-hold-host';
+import type { DownloadHold } from '@/src/shared/browser-download-hold';
+import type { DownloadHoldPermissionsApi } from '@/src/shared/browser-download-hold-listener';
 import { createBrowserRuntime } from '@/src/shared/browser-runtime';
 import type { BrowserDownloadsApi, BrowserRuntime } from '@/src/shared/browser-runtime';
 import { createBrowserTabGroupController } from '@/src/shared/browser-tab-groups';
@@ -74,6 +77,27 @@ interface ChromeRuntimeApi {
 }
 
 /*
+ * The download hold, built while this worker's module is evaluated: `onDeterminingFilename`
+ * only reaches an extension that was listening when the browser created the download, so the
+ * listener cannot wait for `defineBackground` to run or for the first message.
+ */
+const readChrome = (
+  globalThis as typeof globalThis & {
+    chrome?: {
+      downloads?: BrowserDownloadsApi;
+      permissions?: DownloadHoldPermissionsApi;
+    };
+  }
+).chrome;
+
+const profileDownloadHold = startDownloadHold({
+  downloads: () => readChrome?.downloads,
+  permissions: () => readChrome?.permissions,
+  // `storage` is the whole area multiplexer; the record's key selects `session:`.
+  sessionStorage: () => storage,
+});
+
+/*
  * Trust boundary for the eval/debugger message path. Today only the extension's own pages (the
  * side panel) can reach this listener — there is no externally_connectable and no content script.
  * Accept only same-extension senders whose origin is an extension page, so adding a content script
@@ -128,12 +152,15 @@ type NativeTabsApi = BrowserTabsApi & Pick<BrowserTabGroupsApi, 'group'>;
 
 export const getBrowserRuntime = ({
   debuggerApi,
+  downloadHold: hold,
   downloadsApi,
   scriptingApi,
   tabGroupsApi,
   tabsApi,
 }: {
   readonly debuggerApi: ChromeDebuggerApi | undefined;
+  /** The hold that decides a download before its file exists; absent on Firefox, which has no such event. */
+  readonly downloadHold?: DownloadHold | undefined;
   /** `chrome.downloads`, resolved per call: the optional permission can change while the worker lives. */
   readonly downloadsApi?: (() => BrowserDownloadsApi | undefined) | undefined;
   readonly scriptingApi: BrowserScriptingApi | undefined;
@@ -149,6 +176,7 @@ export const getBrowserRuntime = ({
 
   const runtime = createBrowserRuntime({
     debuggerApi,
+    ...(hold === undefined ? {} : { downloadHold: hold }),
     ...(downloadsApi === undefined ? {} : { downloadsApi }),
     leases: createTabLeaseRegistry({
       persistence: createStorageSessionLeasePersistence(storage),
@@ -566,6 +594,9 @@ export default defineBackground(() => {
   const debuggerApi = chromeApi?.debugger;
   const scriptingApi = chromeApi?.scripting;
   const tabGroupsApi = chromeApi?.tabGroups;
+
+  // The hold decides every download of the profile; its listener was installed when this module was
+  // Evaluated, so the first download of this worker already has an answer.
   startLocalAgentsHost({
     ...readLocalAgentsHostApis(),
     ...(tabsApi === undefined
@@ -580,6 +611,7 @@ export default defineBackground(() => {
             runtime: () =>
               getBrowserRuntime({
                 debuggerApi,
+                downloadHold: profileDownloadHold,
                 downloadsApi: () => chromeApi?.downloads,
                 scriptingApi,
                 tabGroupsApi,

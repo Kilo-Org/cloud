@@ -33,7 +33,7 @@ import {
   sensitiveTargetsOf,
 } from './browser-agent-probes';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
-import type { BrowserToolSession } from './browser-tool-session';
+import type { BrowserToolDownload, BrowserToolSession } from './browser-tool-session';
 
 /**
  * The agent check module (SPEC "Permission flow", D3, D4, D11): before a CLI
@@ -721,9 +721,10 @@ export const postAgentNavigate = async (
 };
 
 /**
- * Downloads the tab started since the last check. An act call that started one
- * without a sensitive token had it cancelled by the download guard and is
- * refused as a sensitive step.
+ * Downloads the tab started since the last check, drained so each is claimed
+ * once. An act call that started one without a sensitive token is refused as a
+ * sensitive step, and the announcement is the hold's only tab-exact attribution.
  */
-export const takeStartedDownloads = (session: Pick<BrowserToolSession, 'takeDownloads'>): number =>
-  session.takeDownloads().length;
+export const takeStartedDownloads = (
+  session: Pick<BrowserToolSession, 'takeDownloads'>
+): readonly BrowserToolDownload[] => session.takeDownloads();

@@ -119,10 +119,10 @@ export const DOWNLOAD_STEP_TAB_GONE_ERROR =
   'The tab that step opened is gone. Take a fresh snapshot and try again (blocked).';
 
 /**
- * A refusal for a download-capable call when neither guard can run: the
- * optional `downloads` permission is missing and the tab's target cannot
- * intercept responses either. The switch re-requests the permission, so the
- * message names the one action that fixes it.
+ * A refusal for a download-capable call when the guard cannot run: the optional
+ * `downloads` permission is missing, so `chrome.downloads.onDeterminingFilename`
+ * does not exist for this extension and no download can be held or cancelled.
+ * The switch re-requests the permission, so the message names that one action.
  */
 export const DOWNLOAD_PERMISSION_MISSING_ERROR =
   'The browser cannot cancel downloads for this agent call: the optional Downloads permission is not granted (blocked). Turn "Allow local agents" off and on again to grant it, then retry.';
@@ -398,7 +398,8 @@ export const sensitiveReasonForField = (kind: BrowserSensitiveField['kind']): st
   }
 };
 
-const STEP_TOKEN_TTL_MS = 60_000;
+/** How long a step token, and the one file its need names, lives. */
+export const STEP_TOKEN_TTL_MS = 60_000;
 
 /** What a step token binds: the tab, the element, the tool, and the exact arguments. */
 export interface StepTokenBinding {

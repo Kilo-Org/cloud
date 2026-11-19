@@ -11,6 +11,7 @@ import {
   ORIGIN_CHANGED_ERROR,
   parseToolArguments,
   SENSITIVE_REASON,
+  STEP_TOKEN_TTL_MS,
 } from './browser-agent-checks';
 import type {
   BrowserGrant,
@@ -21,6 +22,8 @@ import type {
 } from './browser-agent-checks';
 import { postAgentNavigate, preflightAgentCall, takeStartedDownloads } from './browser-agent-gate';
 import type { BrowserSensitiveStep } from './browser-agent-gate';
+import { targetOf } from './browser-download-hold';
+import type { DownloadHold, DownloadStep } from './browser-download-hold';
 import {
   createAgentFrameReader,
   enableAgentFrameAutoAttach,
@@ -175,6 +178,12 @@ export interface BrowserRuntimeDeps {
    * rather than captured when the runtime was built.
    */
   readonly downloadsApi?: (() => BrowserDownloadsApi | undefined) | undefined;
+  /**
+   * The hold that decides a download before its file exists, where the browser
+   * has `onDeterminingFilename`. Absent on Firefox, which has no event that
+   * holds a download: there the legacy guard cancels a file after it starts.
+   */
+  readonly downloadHold?: DownloadHold | undefined;
   readonly leases: TabLeaseRegistry;
   /** The clock sensitive step tokens expire against; defaults to `Date.now`. */
   readonly now?: (() => number) | undefined;
@@ -253,14 +262,16 @@ const TAB_COMMIT_POLL_MS = 50;
  * How long the guard keeps listening after a call that started no download.
  * A click or a page load whose response headers arrive a moment later still
  * gets its file deleted, but the call itself does not wait for a download it
- * never started.
+ * never started. Only a browser without `onDeterminingFilename` runs this
+ * guard: where the hold exists it decides every item before its file exists.
  */
 const DOWNLOAD_GUARD_LINGER_MS = 2000;
 
 /**
- * How many calls may find an overdue stop still unknowable — the optional permission gone, or a search that throws —
- * before its record names the file as kept: a browser that cannot answer must not leave the record waiting forever,
- * and a file nobody could look for is reported, never passed off as stopped.
+ * How many calls may find an overdue stop still unknowable before its record
+ * names the file as kept: a browser that cannot answer must not leave the
+ * record waiting forever, and a file nobody could look for is reported, never
+ * passed off as stopped.
  */
 const OVERDUE_STOP_ATTEMPTS = 3;
 
@@ -316,6 +327,13 @@ const DOWNLOAD_START_GRACE_MS = 40;
 const DOWNLOAD_ANNOUNCE_GRACE_MS = 250;
 const DOWNLOAD_ANNOUNCE_POLL_MS = 10;
 const DOWNLOAD_ANNOUNCE_POLLS = 120;
+
+/**
+ * How long a call waits for the hold's decision on its own download. The item is
+ * created a moment after the command returns, and its decision is a cancel and
+ * one read: this covers both, and stays far inside Chrome's 15 s hold release.
+ */
+const DOWNLOAD_HOLD_SETTLE_MS = 2000;
 
 /**
  * One download this call stopped: its file is gone, still being written, or
@@ -674,22 +692,6 @@ interface DownloadAttribution {
   readonly tabIds: () => readonly number[];
   /** What the tab says about the download this call started; absent when there is nothing to watch. */
   readonly witness?: DownloadWitness | undefined;
-}
-
-/**
- * The step a download belongs to, captured before the guard runs: the exact
- * binding a step token is issued against, and the words a report repeats back.
- */
-interface DownloadStep {
-  readonly argumentHash: string;
-  /** How a report names the step: `click on 'Download report'`, `navigation to https://…`. */
-  readonly description: string;
-  /** The noun a report tells the model to repeat: `click`, `navigation`. */
-  readonly noun: string;
-  readonly origin: string;
-  readonly session: string;
-  readonly tabId: number;
-  readonly toolName: string;
 }
 
 /**
@@ -1374,6 +1376,7 @@ const disposeBrowserToolSession = async (
  */
 export const createBrowserRuntime = ({
   debuggerApi,
+  downloadHold,
   downloadsApi,
   leases,
   now,
@@ -1587,6 +1590,13 @@ export const createBrowserRuntime = ({
 
       closedSessions.delete(oldest);
     }
+  };
+
+  /** Ends a session's downloads with it: a closed session owes no approval and has no model to report to. */
+  const closeDownloads = (session: string): void => {
+    closeSessionRecords(session);
+    // The hold's approval dies with the session, and its reports have nobody to read them.
+    downloadHold?.closeSession(session);
   };
 
   const recordsFor = (session: string): Map<string, DownloadRecord> => {
@@ -2191,6 +2201,8 @@ export const createBrowserRuntime = ({
     inFlight.delete(tabId);
     // A closed tab has no next call, so its linger is over and nothing will report what it left: both go with it.
     takeOverDownloads(tabId);
+    // A tab the browser closed cannot start a download, and its announcements belong to no page any more.
+    downloadHold?.tab({ detach: tabId });
     autoAttachedTabs.delete(tabId);
     sessionOwnedTabs.delete(tabId);
     groups.noteTabRemoved(tabId);
@@ -2509,6 +2521,52 @@ export const createBrowserRuntime = ({
   };
 
   /**
+   * The refusal for a download the hold decided during this call: the step the
+   * model repeats, and the one file its token then buys. The text says what
+   * became of the file, so a browser that may have saved it is never reported
+   * as "nothing was written".
+   */
+  const downloadRefusal = (
+    file: DownloadReport,
+    context: { readonly keptFiles: readonly string[]; readonly origin: string },
+    runTabId: number
+  ): BrowserToolRunOutcome => {
+    const { step } = file;
+    const { keptFiles, origin } = context;
+    const reason = SENSITIVE_REASON.download;
+    const stepToken =
+      step === undefined
+        ? undefined
+        : tokens.issue({
+            argumentHash: step.argumentHash,
+            ...(file.url === undefined ? {} : { need: { tabId: file.tabId, url: file.url } }),
+            origin: step.origin,
+            reason,
+            session: step.session,
+            tabId: step.tabId,
+            toolName: step.toolName,
+          });
+
+    // The tab this step opened, for the one repeat its token buys: sending `browser_tabs new` again would open
+    // A second tab and download the file twice instead of receiving the one the human approved.
+    if (step !== undefined) {
+      rememberStepTab(step, runTabId);
+    }
+
+    return needsPermissionOutcome([{ class: 'sensitive', origin, reason }], {
+      afterAction: true,
+      error: file.kept
+        ? `${file.filename} may have been saved: the browser had written it before the download could be stopped. Downloading a file needs your approval.`
+        : `The download of ${file.filename} was stopped before it was saved: downloading a file needs your approval. Repeat that ${step?.noun ?? 'step'} after the download is approved to receive the file.`,
+      keptFiles,
+      ...(step === undefined
+        ? {}
+        : { step: { argumentsHash: step.argumentHash, tool: step.toolName } }),
+      ...(stepToken === undefined ? {} : { stepToken }),
+    });
+  };
+
+  /**
    * The refusal that carries a download an already answered call's linger
    * stopped. Its step token binds the step that started the file — that is the
    * call the model has to repeat — and the text says so, because this call is
@@ -2688,7 +2746,16 @@ export const createBrowserRuntime = ({
 
         if (agentContext !== undefined) {
           // Only downloads this call starts may be reported: events left by an earlier call are stale.
-          takeStartedDownloads(session);
+          const stale = takeStartedDownloads(session);
+
+          if (downloadHold !== undefined) {
+            // An announcement names the file before its item exists, and it is the only tab-exact attribution
+            // A download has: the hold claims it, and reports a file none of them claimed as possibly saved.
+            for (const download of stale) {
+              downloadHold.announce({ ...download, tabId });
+            }
+          }
+
           await ensureFrameAutoAttach(session, tabId);
         }
 
@@ -2798,6 +2865,11 @@ export const createBrowserRuntime = ({
         }
 
         const downloadApproved = approval.ok;
+        /** The approval's one file, armed on the hold once this call's step is known. */
+        let approvedFile: {
+          readonly need: StepTokenNeed;
+          readonly session: string;
+        } | null = null;
 
         // The approval buys exactly one file: the one the refused step started, the same tab and url. Any other
         // Download during this call — another url, another tab — is guarded as usual and reported with its own token.
@@ -2808,6 +2880,7 @@ export const createBrowserRuntime = ({
 
           if (need !== undefined) {
             approvedNeeds.set(sessionKey, { itemId: undefined, ...need });
+            approvedFile = { need, session: sessionKey };
           }
         }
 
@@ -2825,12 +2898,25 @@ export const createBrowserRuntime = ({
         // Stops every download but the file its approval bought, so a second file is neither kept nor silent.
         // An approved call guards nothing when its approval names no file: without a url there is nothing to exempt,
         // And a guard that cannot tell the approved file from the rest would cancel it.
+        // Where the browser holds a download before its file exists, the hold already decides every item: the
+        // Legacy cancel-after-start guard would then only stop files the hold had already refused.
         const guardDownloads =
+          downloadHold === undefined &&
           agentContext !== undefined &&
           downloadCapable &&
           preflight !== undefined &&
           preflight.sensitiveToken === undefined &&
           (!downloadApproved || approvedNeeds.get(sessionKey) !== undefined);
+
+        // The hold decides every download of the profile, so a call has nothing to arm for it — but the tab
+        // Its step runs on has to be known before the step runs, or a download it starts is nobody's and passes.
+        const holdGuards =
+          downloadHold !== undefined &&
+          agentContext !== undefined &&
+          downloadCapable &&
+          preflight !== undefined &&
+          preflight.sensitiveToken === undefined;
+        const guarded = guardDownloads || holdGuards;
 
         // An approved repeat of a `browser_tabs new` download owns the tab that step opened: sending the tool again
         // Would open a second tab and download the file twice, and the kept file would go unreported. The repeat
@@ -2854,7 +2940,7 @@ export const createBrowserRuntime = ({
         // The file is then kept with no approval. This is the one path that must not reach the tool as written.
         // An approved repeat already owns the tab its step opened: opening a second one would download the file twice.
         const opensGuardedTab =
-          guardDownloads && !downloadApproved && toolName === 'browser_tabs' && stepOpensTab;
+          guarded && !downloadApproved && toolName === 'browser_tabs' && stepOpensTab;
         // The permission is read before any tab exists: a refusal must not leave a blank tab in the session's
         // Group, where it would become the next call's target.
         if (opensGuardedTab && downloadsApi?.() === undefined) {
@@ -2995,13 +3081,21 @@ export const createBrowserRuntime = ({
         // A file is about to start in the tab the step opened: that tab's earlier linger has to end too.
         if (runTabId !== tabId) {
           takeOverDownloads(runTabId);
-          takeStartedDownloads(runSession);
+
+          for (const download of takeStartedDownloads(runSession)) {
+            downloadHold?.announce({ ...download, tabId: runTabId });
+          }
+
           await ensureFrameAutoAttach(runSession, runTabId);
         }
 
         // Read the optional permission at call time: it can be granted or revoked while this worker lives.
         const guardApi = downloadsApi?.();
         const guardTab = guardDownloads ? await guardTabOf(tabsApi, runTabId) : undefined;
+        // The hold attributes a download to a tab by the page it is on, read for the same reason and at the same moment.
+        const holdTab = holdGuards ? await guardTabOf(tabsApi, runTabId) : undefined;
+        const holdPage = holdTab?.url;
+
         // The tabs this call owns: its own plus any it opens (`browser_tabs new`, a link with a target).
         // The session's other tabs belong to the user or to another call, so a download there is not this call's.
         const callTabs = new Set<number>([runTabId]);
@@ -3016,6 +3110,17 @@ export const createBrowserRuntime = ({
         }): void => {
           if (opened.id !== undefined) {
             noteOwnedTab(opened.id, opened.openerTabId);
+
+            if (downloadHold !== undefined && holdGuards && sessionKey !== '') {
+              // A tab this call opened is this call's: a download it starts is announced on this tab,
+              // And the hold has to know the tab to attribute it.
+              downloadHold.tab({
+                page: '',
+                session: sessionKey,
+                step: downloadStep,
+                tabId: opened.id,
+              });
+            }
           }
         };
 
@@ -3031,7 +3136,7 @@ export const createBrowserRuntime = ({
         );
         // The step this call is: what a download it starts is reported against, and what the token then binds.
         const downloadStep: DownloadStep | undefined =
-          guardDownloads && preflight?.ok
+          (guardDownloads || holdGuards) && preflight?.ok
             ? {
                 argumentHash: stepHash,
                 ...downloadStepText(stepToolName, stepArgumentsRecord),
@@ -3042,6 +3147,30 @@ export const createBrowserRuntime = ({
                 toolName: stepToolName,
               }
             : undefined;
+
+        if (downloadHold !== undefined && downloadStep !== undefined) {
+          // The tab's page and step go with the call, before the tool runs: a download it starts is
+          // Attributed to this tab by its announcement, and the refusal names the step the model repeats.
+          downloadHold.tab({
+            page: holdPage ?? '',
+            session: sessionKey,
+            step: downloadStep,
+            tabId: runTabId,
+          });
+
+          if (approvedFile !== null) {
+            // The approval the repeat just redeemed is the one file the hold lets through.
+            downloadHold.arm({
+              expiresAt: Date.now() + STEP_TOKEN_TTL_MS,
+              kind: 'armed',
+              session: approvedFile.session,
+              step: downloadStep,
+              tabId: approvedFile.need.tabId,
+              target: targetOf(approvedFile.need.url),
+            });
+          }
+        }
+
         const downloadGuard =
           guardTab === undefined || guardApi === undefined
             ? undefined
@@ -3182,6 +3311,16 @@ export const createBrowserRuntime = ({
             settlement = await downloadGuard.settle();
             tabsApi.onCreated?.removeListener?.(noteBrowserOpenedTab);
           }
+
+          if (holdGuards) {
+            // The call waits only for its own decision: an ordinary click pays the start grace, and a download
+            // The hold is still deciding is read before the call answers, so its refusal is this call's answer.
+            await downloadHold?.settle(sessionKey, {
+              graceMs: DOWNLOAD_START_GRACE_MS,
+              since: callStartedAt,
+              timeoutMs: DOWNLOAD_HOLD_SETTLE_MS,
+            });
+          }
         }
 
         // A taken-over call drops its late result: the page belongs to the panel now.
@@ -3193,15 +3332,45 @@ export const createBrowserRuntime = ({
 
         // A download an earlier call's guard stopped while this one ran had no result to be reported on; this call
         // Reports it, so a deleted file is never silent. A panel call has no model to tell, so it leaves them.
-        const late = agentContext === undefined ? [] : drainDownloadReports(sessionKey);
-        const stoppedFiles = settlement.stopped;
+        // Where the hold decides downloads, its own reports are the account of what became of each file, and each
+        // Carries the moment of its decision: that is how this call tells its own refusal from an earlier one's.
+        let late: readonly (DownloadReport & { readonly since?: number })[] = [];
+
+        if (agentContext !== undefined) {
+          late =
+            downloadHold === undefined
+              ? drainDownloadReports(sessionKey)
+              : downloadHold.drain(sessionKey);
+        }
+        const ownLate = late.filter(file => (file.since ?? callStartedAt) >= callStartedAt);
+        const earlierLate = late.filter(file => (file.since ?? callStartedAt) < callStartedAt);
+        const stoppedFiles = downloadHold === undefined ? settlement.stopped : ownLate.length;
         // A file the guard could not delete is named, whichever call stopped it.
         const keptFiles = [
           ...settlement.kept,
           ...late.filter(file => file.kept).map(file => file.filename),
         ];
 
-        if (agentContext !== undefined && stoppedFiles + settlement.kept.length === 0) {
+        if (downloadHold !== undefined && agentContext !== undefined) {
+          if (earlierLate.length > 0) {
+            // A file an earlier call started: its token binds that call's step, and the text names it.
+            const owed = lateDownloadRefusal(earlierLate);
+
+            if (owed !== undefined) {
+              return owed;
+            }
+          }
+
+          const [ownRefusal] = ownLate;
+
+          if (ownRefusal !== undefined) {
+            return downloadRefusal(
+              ownRefusal,
+              { keptFiles, origin: preflight?.ok ? preflight.origin : '' },
+              runTabId
+            );
+          }
+        } else if (agentContext !== undefined && stoppedFiles + settlement.kept.length === 0) {
           // Nothing of this call's own was stopped: the report is about an earlier call's download, so its token
           // Binds that call's step and the text names it.
           const owed = lateDownloadRefusal(late);
@@ -3377,7 +3546,7 @@ export const createBrowserRuntime = ({
     if (caller.kind === 'agent') {
       // The session is over: its downloads are settled with no report, because there is no model left to tell,
       // And a later session must never be asked to redeem a token bound to this one.
-      closeSessionRecords(caller.sessionHandle);
+      closeDownloads(caller.sessionHandle);
 
       for (const [tabId, watch] of openWatches) {
         if (watch.session === caller.sessionHandle) {
@@ -3477,7 +3646,7 @@ export const createBrowserRuntime = ({
     claimTab,
     closeSession: async input => {
       // A closed session owes no approval: whatever it left stopped is settled here, not handed to the next one.
-      closeSessionRecords(input.sessionHandle);
+      closeDownloads(input.sessionHandle);
       await groups.closeSession(input);
     },
     disposeCaller,

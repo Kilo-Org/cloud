@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
+      "managedOnWebTitle": "Vebdə idarə olunur",
+      "managedOnWebShort": "Bu bağlantı kompüterdən vebdə idarə olunur.",
       "description": "{{organization}} üçün iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "descriptionReconnect": "{{organization}} üçün yeni iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",

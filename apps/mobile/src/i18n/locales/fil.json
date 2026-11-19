@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng {{organization}}.",
+      "managedOnWebTitle": "Pinamamahalaan sa web",
+      "managedOnWebShort": "Ang koneksyong ito ay pinamamahalaan sa web gamit ang computer.",
       "description": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
       "descriptionReconnect": "Gumawa ng bagong token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
       "scopes": "Account: pagbasa · Mga repository: pagbasa/pagsulat · Mga pull request: pagbasa · Mga webhook: pagbasa/pagsulat",

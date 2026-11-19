@@ -1410,6 +1410,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računala.",
+      "managedOnWebTitle": "Upravlja se na webu",
+      "managedOnWebShort": "Ova veza se upravlja na webu s računala.",
       "description": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
       "descriptionReconnect": "Stvori novi token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",

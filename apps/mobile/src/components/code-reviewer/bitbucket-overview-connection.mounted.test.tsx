@@ -250,10 +250,14 @@ describe('BitbucketOverview OAuth connection', () => {
 
     const renderer = await renderScreen();
 
-    const expected = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb', {
-      organization: 'Acme Robotics',
-    });
+    // The header already names the platform and the organization, so the card's
+    // line only says where the connection lives: no organization interpolation
+    // and no repeated platform name.
+    const expected = i18n.t('codeReviewer.bitbucketConnect.managedOnWebShort');
     expect(texts(renderer)).toContain(expected);
+    expect(texts(renderer)).not.toContain(
+      i18n.t('codeReviewer.bitbucketConnect.managedOnWeb', { organization: 'Acme Robotics' })
+    );
     expect(texts(renderer).some(text => text.includes('{{'))).toBe(false);
     expect(texts(renderer)).toContain('Acme Ltd');
     expect(renderer.root.findAllByType('Switch')).toHaveLength(0);
@@ -268,9 +272,7 @@ describe('BitbucketOverview OAuth connection', () => {
 
     const renderer = await renderScreen();
 
-    const expected = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb', {
-      organization: 'Acme Robotics',
-    });
+    const expected = i18n.t('codeReviewer.bitbucketConnect.managedOnWebShort');
     expect(texts(renderer)).toContain(expected);
     expect(texts(renderer).some(text => text.includes('{{'))).toBe(false);
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);

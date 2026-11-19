@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o {{organization}} i runga ipurangi, mā tētahi rorohiko.",
+      "managedOnWebTitle": "Whakahaerehia i runga ipurangi",
+      "managedOnWebShort": "Ka whakahaerehia tēnei hononga i runga ipurangi, mā tētahi rorohiko.",
       "description": "Hangaia he tohu uru mokowāmahi mō {{organization}}, kātahi ka whakapiri ki raro nei.",
       "descriptionReconnect": "Hangaia he tohu uru mokowāmahi hōu mō {{organization}}, kātahi ka whakapiri ki raro nei.",
       "scopes": "Pūkete: pānui · Pūranga: pānui/tuhi · Tono kume: pānui · Matau tukutuku: pānui/tuhi",

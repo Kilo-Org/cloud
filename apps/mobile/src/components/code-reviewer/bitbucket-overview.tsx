@@ -99,8 +99,10 @@ export function BitbucketOverview({
   // An organization connected through Bitbucket OAuth reads as one with no
   // token integration: the connection lives on the web page that ran its
   // consent, so this surface renders read-only — no connect action, no toggle,
-  // no config rows, and no repositories button. The notice names the
-  // organization, so it waits for the membership read that supplies the name.
+  // no config rows, and no repositories button. The header above already names
+  // the platform and the organization, so the card's line only says where the
+  // connection is managed. It waits for the membership read that decides
+  // whether the header can paint at all.
   if (connection.kind === 'oauth-connected' || connection.kind === 'oauth-attention') {
     const workspaceName = connection.kind === 'oauth-connected' ? connection.workspace : null;
     return (
@@ -115,7 +117,7 @@ export function BitbucketOverview({
                 <Text className="text-sm font-medium">{workspaceName.displayName}</Text>
               ) : null}
               <Text variant="muted" className="text-xs">
-                {t('codeReviewer.bitbucketConnect.managedOnWeb', { organization: scopeTitle })}
+                {t('codeReviewer.bitbucketConnect.managedOnWebShort')}
               </Text>
             </Card>
           )}

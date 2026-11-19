@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
+      "managedOnWebTitle": "Hanteras på webben",
+      "managedOnWebShort": "Den här anslutningen hanteras på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "descriptionReconnect": "Skapa en ny åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",

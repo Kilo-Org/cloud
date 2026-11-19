@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "managedOnWebTitle": "Inasimamiwa kwenye wavuti",
+      "managedOnWebShort": "Muunganisho huu unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "descriptionReconnect": "Unda tokeni mpya ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",

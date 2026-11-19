@@ -698,6 +698,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "De Bitbucket-verbinding voor {{organization}} wordt via het web op een computer beheerd.",
+      "managedOnWebTitle": "Via het web beheerd",
+      "managedOnWebShort": "Deze verbinding wordt via het web op een computer beheerd.",
       "description": "Maak voor {{organization}} een toegangstoken voor de werkruimte en plak het hieronder.",
       "descriptionReconnect": "Maak voor {{organization}} een nieuw toegangstoken voor de werkruimte en plak het hieronder.",
       "scopes": "Vereiste rechten: account lezen, repositories lezen en schrijven, PR's lezen en webhooks lezen en schrijven.",

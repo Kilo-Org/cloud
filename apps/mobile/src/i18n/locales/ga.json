@@ -1456,6 +1456,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
+      "managedOnWebTitle": "Bainistithe ar an ngréasán",
+      "managedOnWebShort": "Bainistítear an nasc seo ar an ngréasán ó ríomhaire.",
       "description": "Cruthaigh comhartha rochtana don spás oibre do {{organization}} agus greamaigh thíos é.",
       "descriptionReconnect": "Cruthaigh comhartha rochtana nua don spás oibre do {{organization}} agus greamaigh thíos é.",
       "scopes": "Cuntas: léamh · Stórtha: léamh/scríobh · Iarratais tarraingthe: léamh · Crúcaí gréasáin: léamh/scríobh",

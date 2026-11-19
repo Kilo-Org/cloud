@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Sambungan Bitbucket untuk {{organization}} diurus di web melalui komputer.",
+      "managedOnWebTitle": "Diurus di web",
+      "managedOnWebShort": "Sambungan ini diurus di web melalui komputer.",
       "description": "Cipta token akses ruang kerja untuk {{organization}} dan tampalkannya di bawah.",
       "descriptionReconnect": "Cipta token akses ruang kerja baharu untuk {{organization}} dan tampalkannya di bawah.",
       "scopes": "Akaun: baca · Repositori: baca/tulis · Permintaan penarikan: baca · Webhook: baca/tulis",

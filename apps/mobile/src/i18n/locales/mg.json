@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ny fifandraisana Bitbucket amin'ny {{organization}} dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
+      "managedOnWebTitle": "Tantanana amin'ny tranonkala",
+      "managedOnWebShort": "Ity fifandraisana ity dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
       "description": "Mamoròna mari-pidirana ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho eto ambany.",
       "descriptionReconnect": "Mamoròna mari-pidirana vaovao ho an'ny sehatra fiasana ho an'ny {{organization}} ary apetaho eto ambany.",
       "scopes": "Kaonty: mamaky · Tahirin-kaody: mamaky/manoratra · PR: mamaky · Rohy fampandrenesana: mamaky/manoratra",

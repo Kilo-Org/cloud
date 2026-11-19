@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",
+      "managedOnWebTitle": "Administreres på nettet",
+      "managedOnWebShort": "Denne forbindelse administreres på nettet fra en computer.",
       "description": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "descriptionReconnect": "Opret et nyt adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "scopes": "Konto: læse · Kodelagre: læse/skrive · Pull requests: læse · Webhooks: læse/skrive",

@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",
+      "managedOnWebTitle": "Op die web bestuur",
+      "managedOnWebShort": "Hierdie verbinding word op die web vanaf 'n rekenaar bestuur.",
       "description": "Skep vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
       "descriptionReconnect": "Skep weer vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
       "scopes": "Rekening: lees · Bewaarplekke: lees/skryf · Trekversoeke: lees · Webhake: lees/skryf",

@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket ti {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
+      "managedOnWebTitle": "A ń ṣàkóso lórí wẹ́ẹ̀bù",
+      "managedOnWebShort": "A ń ṣàkóso ìsopọ̀ yìí lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútá.",
       "description": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "descriptionReconnect": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ tuntun fún {{organization}}, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "scopes": "Àkọọ́lẹ̀: kíkà · Àwọn ibi ìpamọ́: kíkà/kíkọ · Àwọn ìbéèrè àkópọ̀: kíkà · Àwọn ìfitónilétí wẹ́bù: kíkà/kíkọ",

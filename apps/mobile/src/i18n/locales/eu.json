@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
+      "managedOnWebTitle": "Webean kudeatzen da",
+      "managedOnWebShort": "Konexio hau webean kudeatzen da, ordenagailu batetik.",
       "description": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi behean.",
       "descriptionReconnect": "Sortu lan-eremurako sarbide-token berri bat {{organization}}-rako eta itsatsi behean.",
       "scopes": "Kontua: irakurtzea · Biltegiak: irakurtzea/idaztea · Bateratze-eskaerak: irakurtzea · Webhook-ak: irakurtzea/idaztea",

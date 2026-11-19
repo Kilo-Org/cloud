@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket da {{organization}} a yanar gizo daga kwamfuta.",
+      "managedOnWebTitle": "Ana sarrafa a yanar gizo",
+      "managedOnWebShort": "Ana sarrafa wannan haɗin a yanar gizo daga kwamfuta.",
       "description": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "descriptionReconnect": "Ƙirƙiri sabuwar lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "scopes": "Asusu: karantawa · Ma'ajiyoyi: karantawa/rubutawa · Buƙatun haɗa canje-canje: karantawa · Hanyoyin sanarwa ta yanar gizo: karantawa/rubutawa",

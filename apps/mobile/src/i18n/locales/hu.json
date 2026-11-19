@@ -1387,6 +1387,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
+      "managedOnWebTitle": "A weben kezelve",
+      "managedOnWebShort": "Ezt a kapcsolatot a weben, számítógépről kezelheti.",
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionReconnect": "Hozz létre egy új hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "scopes": "Fiók: olvasás · Kódtárak: olvasás/írás · PR-ek: olvasás · Webhookok: olvasás/írás.",

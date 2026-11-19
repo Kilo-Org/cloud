@@ -3,10 +3,11 @@ import { View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { BitbucketSetupRecovery } from '@/components/code-reviewer/bitbucket-setup-recovery';
+import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { GitMerge } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { type BitbucketConnection, isWebManagedConnection } from '@/lib/code-reviewer-bitbucket';
-import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
 /**
  * The body the repositories screen paints for a Bitbucket connection that holds
@@ -27,9 +28,6 @@ export function BitbucketRepositoriesState({
   onRetry: () => void;
 }>) {
   const { t } = useTranslation();
-  // The notice names the organization, so it reads that name from the same
-  // membership list the rest of the reviewer surfaces use.
-  const orgBoundary = useOrgBoundary(scope);
 
   if (connection.kind === 'error') {
     return (
@@ -50,14 +48,17 @@ export function BitbucketRepositoriesState({
   }
 
   if (isWebManagedConnection(connection)) {
+    // The connection is read-only here, so the state says where it lives rather
+    // than offering a token form the server would refuse. It draws through the
+    // shared state so the glyph, the heading and the muted body keep the same
+    // metrics and contrast as the screen's other states.
     return (
-      <CenteredState contentContainerClassName="px-4">
-        <Text variant="muted" className="text-center text-xs">
-          {t('codeReviewer.bitbucketConnect.managedOnWeb', {
-            organization: orgBoundary.org?.organizationName ?? t('common.organization'),
-          })}
-        </Text>
-      </CenteredState>
+      <EmptyState
+        icon={GitMerge}
+        iconSize={28}
+        title={t('codeReviewer.bitbucketConnect.managedOnWebTitle')}
+        description={t('codeReviewer.bitbucketConnect.managedOnWebShort')}
+      />
     );
   }
 

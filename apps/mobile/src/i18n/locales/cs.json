@@ -1433,6 +1433,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
+      "managedOnWebTitle": "Spravuje se na webu",
+      "managedOnWebShort": "Toto připojení se spravuje na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "descriptionReconnect": "Vytvořte nový přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",

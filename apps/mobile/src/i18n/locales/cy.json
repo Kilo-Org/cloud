@@ -1479,6 +1479,8 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
+      "managedOnWebTitle": "Yn cael ei reoli ar y we",
+      "managedOnWebShort": "Mae'r cysylltiad hwn yn cael ei reoli ar y we o gyfrifiadur.",
       "description": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo isod.",
       "descriptionReconnect": "Crëwch docyn mynediad gweithle newydd ar gyfer {{organization}} a'i ludo isod.",
       "scopes": "Cyfrif: darllen · Ystorfeydd: darllen/ysgrifennu · Ceisiadau tynnu: darllen · Bachau gwe: darllen/ysgrifennu",

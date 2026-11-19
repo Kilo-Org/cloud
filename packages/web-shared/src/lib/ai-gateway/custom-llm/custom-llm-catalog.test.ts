@@ -3,9 +3,13 @@ import { custom_llm2 } from '@kilocode/db/schema';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
 import {
+  fetchCustomLlmsFromDatabase,
   findCustomLlm,
+  findPartnerCustomLlm,
+  getCustomLlmsById,
   getPublicCustomLlmInferenceProviders,
   isCustomLlm,
+  parseCustomLlmRows,
   requireCustomLlmsById,
   resetCustomLlmCacheForTest,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -14,6 +18,7 @@ import {
   customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  partnerCustomLlmDefinition,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
@@ -25,11 +30,13 @@ describe('custom LLM catalog', () => {
   beforeAll(async () => {
     await insertCustomLlmForTest('Acme/Public-Model', publicCustomLlmDefinition(['acme']));
     await insertCustomLlmForTest('acme/private-model');
+    await insertCustomLlmForTest('Acme/Partner-Model', partnerCustomLlmDefinition('acme'));
   });
 
   afterAll(async () => {
     await deleteCustomLlmForTest('Acme/Public-Model');
     await deleteCustomLlmForTest('acme/private-model');
+    await deleteCustomLlmForTest('Acme/Partner-Model');
   });
 
   afterEach(() => {
@@ -117,5 +124,61 @@ describe('custom LLM catalog', () => {
     } finally {
       await deleteCustomLlmForTest('acme/malformed-model');
     }
+  });
+
+  describe('partners', () => {
+    test('finds a partner by id regardless of case', async () => {
+      await expect(findPartnerCustomLlm('acme/partner-model')).resolves.toMatchObject({
+        public_id: 'Acme/Partner-Model',
+        definition: { partner: { inference_provider: 'acme' } },
+      });
+      await expect(findPartnerCustomLlm(' ACME/PARTNER-MODEL ')).resolves.toMatchObject({
+        public_id: 'Acme/Partner-Model',
+      });
+    });
+
+    test('does not return custom LLMs that own their id as partners', async () => {
+      await expect(findPartnerCustomLlm('acme/public-model')).resolves.toBeNull();
+      await expect(findPartnerCustomLlm('acme/private-model')).resolves.toBeNull();
+      await expect(findPartnerCustomLlm('openai/gpt-4o')).resolves.toBeNull();
+    });
+
+    test('does not treat a partner as a custom LLM that owns its id', async () => {
+      await expect(findCustomLlm('acme/partner-model')).resolves.toBeNull();
+      await expect(isCustomLlm('acme/partner-model')).resolves.toBe(false);
+      expect((await getCustomLlmsById()).has('acme/partner-model')).toBe(false);
+      expect((await requireCustomLlmsById()).has('acme/partner-model')).toBe(false);
+      await expect(getPublicCustomLlmInferenceProviders('acme/partner-model')).resolves.toBeNull();
+    });
+
+    test('keeps partners out of the parsed rows and the database fetch', async () => {
+      const rows = await readDb.select().from(custom_llm2);
+      expect(rows.map(row => row.public_id)).toContain('Acme/Partner-Model');
+
+      expect(parseCustomLlmRows(rows).map(customLlm => customLlm.public_id)).toEqual(
+        expect.not.arrayContaining(['Acme/Partner-Model'])
+      );
+      expect(parseCustomLlmRows(rows).map(customLlm => customLlm.public_id)).toEqual(
+        expect.arrayContaining(['Acme/Public-Model', 'acme/private-model'])
+      );
+      const fetched = await fetchCustomLlmsFromDatabase();
+      expect(fetched.map(customLlm => customLlm.public_id)).toEqual(
+        expect.not.arrayContaining(['Acme/Partner-Model'])
+      );
+    });
+
+    test('drops a partner row without pricing as malformed', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      await insertCustomLlmForTest(
+        'acme/unpriced-partner',
+        partnerCustomLlmDefinition('acme', { pricing: undefined })
+      );
+      try {
+        await expect(findPartnerCustomLlm('acme/unpriced-partner')).resolves.toBeNull();
+        await expect(findCustomLlm('acme/unpriced-partner')).resolves.toBeNull();
+      } finally {
+        await deleteCustomLlmForTest('acme/unpriced-partner');
+      }
+    });
   });
 });

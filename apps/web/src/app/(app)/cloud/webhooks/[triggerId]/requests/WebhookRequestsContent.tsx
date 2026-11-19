@@ -220,6 +220,7 @@ export function WebhookRequestsContent({
         triggerId,
         organizationId: organizationId ?? undefined,
         limit: 50,
+        includeLegacySessionIds: true,
       },
       { enabled: !adminScope }
     ),

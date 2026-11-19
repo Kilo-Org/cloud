@@ -988,12 +988,28 @@ const TRANSCRIPTION_MODELS = [
   {
     id: 'fake-transcribe',
     name: 'Fake Transcribe',
+    created: 0,
+    description: 'Deterministic fake speech-to-text model for cloud-agent E2E harness.',
+    architecture: {
+      input_modalities: ['audio'],
+      output_modalities: ['text'],
+      tokenizer: 'fake',
+    },
+    top_provider: { is_moderated: false, context_length: 128000 },
     context_length: 128000,
     pricing: { prompt: '0', completion: '0' },
   },
   {
     id: 'fake-transcribe-broken',
     name: 'Broken Transcriber',
+    created: 0,
+    description: 'Fake speech-to-text model whose transcription request 404s.',
+    architecture: {
+      input_modalities: ['audio'],
+      output_modalities: ['text'],
+      tokenizer: 'fake',
+    },
+    top_provider: { is_moderated: false, context_length: 128000 },
     context_length: 128000,
     pricing: { prompt: '0', completion: '0' },
   },

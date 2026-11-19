@@ -40,11 +40,6 @@ export function createAppStateStore(
     subscribe: listener => {
       listeners.add(listener);
       if (listeners.size === 1) {
-        // Re-read the live seed before listening. The store is constructed at
-        // module evaluation, so `active` mirrors the value at launch; the app
-        // may have reached `active` since, and nothing observed that edge
-        // because no source listener was registered yet. Without this the
-        // first consumer reads a stale `false` for the whole session.
         active = readInitialActive();
         subscription = source.addEventListener('change', nextState => {
           const next = nextState === 'active';

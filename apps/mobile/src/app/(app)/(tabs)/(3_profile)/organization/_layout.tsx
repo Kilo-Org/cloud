@@ -6,6 +6,8 @@ import { appScreenLayout } from '@/components/app-screen-layout';
 import { organizationSheetDetents } from '@/lib/form-sheet-detents';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ORGANIZATION_ROUTE_NAMES } from '@/lib/hooks/use-repair-organization-route-stack';
+import { profileStackRepairScreenOptions } from '@/lib/profile-route-stack';
 
 export default function OrganizationLayout() {
   const sheetOptions = useFormSheetScreenOptions();
@@ -49,6 +51,13 @@ export default function OrganizationLayout() {
       />
       <Stack.Screen name="member-limit" options={organizationSheetOptions} />
       <Stack.Screen name="low-balance-alert" options={organizationSheetOptions} />
+      {/* The organization screens land without a transition when the stack
+          repair pushes them (`use-repair-organization-route-stack.ts`), so a
+          link opened without the hub does not slide the rebuilt screens past
+          the reader. */}
+      {ORGANIZATION_ROUTE_NAMES.map(name => (
+        <Stack.Screen key={name} name={name} options={profileStackRepairScreenOptions} />
+      ))}
     </Stack>
   );
 }

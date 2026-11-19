@@ -47,7 +47,3 @@ export function modelNameStatesFree(name: string, displayId?: string): boolean {
       name.toLocaleLowerCase(locale).includes(freeLabel.toLocaleLowerCase(locale)))
   );
 }
-
-export function getFreeModelDataAccessibilityLabel(label: string) {
-  return `${label}, ${freeModelDataLabel()}`;
-}

@@ -149,6 +149,8 @@ export type ServiceEvent =
   | {
       type: 'stopped';
       reason: 'complete' | 'interrupted' | 'disconnected' | 'transport-disconnected' | 'error';
+      /** The transport spent its reconnect budget; only `transport-disconnected` sets it. */
+      exhausted?: boolean | undefined;
       branch?: string | undefined;
     }
   | { type: 'warning' }

@@ -3,7 +3,7 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Вашата агентна сесия има актуализация",
-      "lowBalance": "Вашият баланс изисква внимание",
+      "lowBalance": "Вашата наличност изисква внимание",
       "spendAlert": "Разходите ви изискват внимание",
       "securityFinding": "Открит проблем със сигурността изисква внимание",
       "securityUpdate": "Проверка за сигурност има актуализация",
@@ -17,8 +17,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Предупреждение за нисък баланс",
-      "body": "Балансът на {{organizationName}} падна под ${{minimumBalanceUsd}}"
+      "title": "Предупреждение за ниска наличност",
+      "body": "Наличността на {{organizationName}} падна под ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Предупреждение за разходи",

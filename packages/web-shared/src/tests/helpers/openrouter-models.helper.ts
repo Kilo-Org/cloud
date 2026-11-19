@@ -2,6 +2,8 @@
  * Mock data for OpenRouter models API tests
  */
 
+import { OPENROUTER_CATALOGUE_MINIMUM_COUNTS } from '../../lib/ai-gateway/providers/openrouter';
+
 /**
  * Creates a mock Response object for testing
  */
@@ -34,6 +36,34 @@ export function createMockResponse({
     formData: () => Promise.resolve(new FormData()),
     text: () => Promise.resolve(''),
   } as Response;
+}
+
+/** Prefix of the filler entries that pad a fixture catalogue to the live-read floor. */
+export const FILLER_MODEL_ID_PREFIX = 'fixture/filler/';
+
+/** Pad a fixture catalogue to the live-read floor with neutral, schema-valid filler models. */
+export function cataloguePayload(models: readonly unknown[]): { data: unknown[] } {
+  const fillerCount = Math.max(0, OPENROUTER_CATALOGUE_MINIMUM_COUNTS.models - models.length);
+  const filler = Array.from({ length: fillerCount }, (_, index) => ({
+    id: `${FILLER_MODEL_ID_PREFIX}${index}`,
+    name: `Filler ${index}`,
+    created: 0,
+    description: `Neutral filler model ${index}.`,
+    architecture: {
+      input_modalities: ['text'],
+      output_modalities: ['text'],
+      tokenizer: 'other',
+    },
+    top_provider: { is_moderated: false },
+    pricing: { prompt: '0', completion: '0' },
+    context_length: 32000,
+  }));
+  return { data: [...models, ...filler] };
+}
+
+/** Drop the filler entries from a catalogue the code returned. */
+export function withoutFillerModels<T extends { id: string }>(models: readonly T[]): T[] {
+  return models.filter(model => !model.id.startsWith(FILLER_MODEL_ID_PREFIX));
 }
 
 export const mockOpenRouterModels = {

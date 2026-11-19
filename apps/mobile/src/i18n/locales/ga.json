@@ -137,6 +137,7 @@
     "keepRunning": "Fág ag rith é",
     "newSession": "Seisiún nua",
     "noModelsAvailable": "Níl aon samhail ar fáil",
+    "modelRetires": "Dáta scoir: {{date}}",
     "notFound": "Níor aimsíodh é.",
     "online": "Ar líne",
     "open": "Oscail {{name}}",

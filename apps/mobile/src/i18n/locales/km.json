@@ -137,6 +137,7 @@
     "keepRunning": "បន្តដំណើរការ",
     "newSession": "វគ្គថ្មី",
     "noModelsAvailable": "គ្មានម៉ូដែលសម្រាប់ប្រើ",
+    "modelRetires": "ឈប់ដំណើរការនៅ {{date}}",
     "notFound": "រកមិនឃើញទេ",
     "online": "អនឡាញ",
     "open": "បើក {{name}}",

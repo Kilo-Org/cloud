@@ -137,6 +137,7 @@
     "keepRunning": "Continua l'esecuzione",
     "newSession": "Nuova sessione",
     "noModelsAvailable": "Nessun modello disponibile",
+    "modelRetires": "Ritirato il {{date}}",
     "notFound": "Elemento non trovato.",
     "online": "In linea",
     "open": "Apri {{name}}",

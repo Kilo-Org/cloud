@@ -137,6 +137,7 @@
     "keepRunning": "Tiếp tục chạy",
     "newSession": "Phiên mới",
     "noModelsAvailable": "Không có mô hình khả dụng",
+    "modelRetires": "Ngừng hoạt động vào {{date}}",
     "notFound": "Không tìm thấy.",
     "online": "Trực tuyến",
     "open": "Mở {{name}}",

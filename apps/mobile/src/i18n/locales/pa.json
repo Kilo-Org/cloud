@@ -137,6 +137,7 @@
     "keepRunning": "ਚੱਲਣ ਦਿਓ",
     "newSession": "ਨਵਾਂ ਸੈਸ਼ਨ",
     "noModelsAvailable": "ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ",
+    "modelRetires": "{{date}} ਨੂੰ ਰਿਟਾਇਰ ਹੋਵੇਗਾ",
     "notFound": "ਨਹੀਂ ਮਿਲਿਆ।",
     "online": "ਔਨਲਾਈਨ",
     "open": "{{name}} ਖੋਲ੍ਹੋ",

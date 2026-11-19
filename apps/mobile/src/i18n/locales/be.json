@@ -137,6 +137,7 @@
     "keepRunning": "Працягнуць працу",
     "newSession": "Новы сеанс",
     "noModelsAvailable": "Няма даступных мадэляў",
+    "modelRetires": "Здымаецца {{date}}",
     "notFound": "Нічога не знойдзена.",
     "online": "У сетцы",
     "open": "Адкрыць {{name}}",

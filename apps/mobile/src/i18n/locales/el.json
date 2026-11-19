@@ -137,6 +137,7 @@
     "keepRunning": "Συνέχιση εκτέλεσης",
     "newSession": "Νέα συνεδρία",
     "noModelsAvailable": "Δεν υπάρχουν διαθέσιμα μοντέλα",
+    "modelRetires": "Αποσύρεται στις {{date}}",
     "notFound": "Δεν βρέθηκε.",
     "online": "Σε σύνδεση",
     "open": "Άνοιγμα {{name}}",

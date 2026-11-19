@@ -137,6 +137,7 @@
     "keepRunning": "అమలు కొనసాగించండి",
     "newSession": "కొత్త సెషన్",
     "noModelsAvailable": "మోడళ్లు అందుబాటులో లేవు",
+    "modelRetires": "{{date}}న రిటైర్ అవుతుంది",
     "notFound": "దొరకలేదు.",
     "online": "ఆన్‌లైన్",
     "open": "{{name}}ను తెరవండి",

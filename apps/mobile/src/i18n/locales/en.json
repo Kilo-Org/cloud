@@ -204,6 +204,7 @@
     "keepRunning": "Keep running",
     "newSession": "New session",
     "noModelsAvailable": "No models available",
+    "modelRetires": "Retires {{date}}",
     "notFound": "Not found",
     "online": "Online",
     "open": "Open {{name}}",

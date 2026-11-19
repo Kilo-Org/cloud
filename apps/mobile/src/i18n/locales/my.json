@@ -137,6 +137,7 @@
     "keepRunning": "ဆက်လက်လုပ်ဆောင်ပါ",
     "newSession": "ဆက်ရှင်အသစ်",
     "noModelsAvailable": "အသုံးပြုနိုင်သော မော်ဒယ် မရှိပါ",
+    "modelRetires": "{{date}} တွင် ရုပ်သိမ်းမည်",
     "notFound": "မတွေ့ရပါ။",
     "online": "အွန်လိုင်း",
     "open": "{{name}} ကို ဖွင့်ပါ",

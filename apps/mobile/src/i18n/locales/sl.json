@@ -137,6 +137,7 @@
     "keepRunning": "Nadaljuj izvajanje",
     "newSession": "Nova seja",
     "noModelsAvailable": "Ni razpoložljivih modelov",
+    "modelRetires": "Umakne se {{date}}",
     "notFound": "Vsebine ni mogoče najti.",
     "online": "Na spletu",
     "open": "Odpri {{name}}",

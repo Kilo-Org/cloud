@@ -137,6 +137,7 @@
     "keepRunning": "המשך הרצה",
     "newSession": "סשן חדש",
     "noModelsAvailable": "אין מודלים זמינים",
+    "modelRetires": "יוצא משימוש ב-{{date}}",
     "notFound": "לא נמצא.",
     "online": "מקוון",
     "open": "פתיחת {{name}}",

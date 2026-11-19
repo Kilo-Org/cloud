@@ -137,6 +137,7 @@
     "keepRunning": "実行を続ける",
     "newSession": "新しいセッション",
     "noModelsAvailable": "利用可能なモデルはありません",
+    "modelRetires": "{{date}}に廃止",
     "notFound": "見つかりません。",
     "online": "オンライン",
     "open": "{{name}}を開く",

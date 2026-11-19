@@ -137,6 +137,7 @@
     "keepRunning": "მუშაობის გაგრძელება",
     "newSession": "ახალი სესია",
     "noModelsAvailable": "მოდელები ხელმისაწვდომი არ არის",
+    "modelRetires": "გაუქმდება {{date}}",
     "notFound": "ვერ მოიძებნა.",
     "online": "ქსელშია",
     "open": "{{name}}-ის გახსნა",

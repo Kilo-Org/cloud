@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { CHIP_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { autoModelLabel } from '@/lib/auto-model-name';
-import { formatList } from '@/lib/format';
+import { formatDate, formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
@@ -314,7 +314,24 @@ export function ModelPickerOptionRow({
   const { t } = useTranslation();
   const { free, byok, collectsData, tools, images } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
+  // The retirement note rides the picker row's name (the way the web's composed
+  // English suffix did), worded in the app language from `retires_on`, and is
+  // absent when the entry carries no date. The chip's selected-model label
+  // stays without it: the picker row is where the fact matters.
   const name = autoModelLabel(option.displayId, option.name);
+  const rowName =
+    name +
+    (option.retires_on
+      ? ' (' +
+        t('common.modelRetires', {
+          date: formatDate(new Date(option.retires_on + 'T00:00:00Z'), i18n.language, {
+            month: 'short',
+            day: 'numeric',
+            timeZone: 'UTC',
+          }),
+        }) +
+        ')'
+      : '');
   // The name may already state the fact ("… (free)", "Auto Free" in every
   // locale), so the badge and its accessibility phrase only render when it
   // does not. The free Auto model is decided by id too: nine catalogs name it
@@ -323,7 +340,7 @@ export function ModelPickerOptionRow({
   const accessibilityLabel = formatList(
     [
       option.provider?.name,
-      name,
+      rowName,
       option.displayId,
       byok ? BYOK_MODEL_LABEL : undefined,
       showFreeBadge ? freeModelFreeLabel() : undefined,
@@ -369,7 +386,7 @@ export function ModelPickerOptionRow({
                 option.unavailable ? 'text-muted-foreground' : 'text-foreground'
               )}
             >
-              {name}
+              {rowName}
             </Text>
             {option.modelRef && showProvider ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">

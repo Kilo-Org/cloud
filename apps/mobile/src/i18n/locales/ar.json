@@ -137,6 +137,7 @@
     "keepRunning": "متابعة التشغيل",
     "newSession": "جلسة جديدة",
     "noModelsAvailable": "لا توجد نماذج متاحة",
+    "modelRetires": "يتوقف في {{date}}",
     "notFound": "لم نعثر على العنصر المطلوب.",
     "online": "متصل",
     "open": "فتح {{name}}",

@@ -137,6 +137,7 @@
     "keepRunning": "ચાલુ રાખો",
     "newSession": "નવું સત્ર",
     "noModelsAvailable": "કોઈ મોડેલ ઉપલબ્ધ નથી",
+    "modelRetires": "{{date}}ના રોજ નિવૃત્ત થશે",
     "notFound": "મળ્યું નથી.",
     "online": "ઑનલાઇન",
     "open": "{{name}} ખોલો",

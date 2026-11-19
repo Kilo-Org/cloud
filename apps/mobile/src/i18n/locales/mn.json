@@ -137,6 +137,7 @@
     "keepRunning": "Үргэлжлүүлэн ажиллуулах",
     "newSession": "Шинэ сесс",
     "noModelsAvailable": "Ашиглах боломжтой загвар алга",
+    "modelRetires": "{{date}}-нд хүчингүй болно",
     "notFound": "Олдсонгүй.",
     "online": "Онлайн",
     "open": "{{name}}-г нээх",

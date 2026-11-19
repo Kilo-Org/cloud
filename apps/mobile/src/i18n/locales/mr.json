@@ -137,6 +137,7 @@
     "keepRunning": "चालू ठेवा",
     "newSession": "नवीन सत्र",
     "noModelsAvailable": "कोणतेही मॉडेल उपलब्ध नाही",
+    "modelRetires": "समाप्त होते {{date}}",
     "notFound": "सापडले नाही",
     "online": "ऑनलाइन",
     "open": "{{name}} उघडा",

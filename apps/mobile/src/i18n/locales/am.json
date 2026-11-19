@@ -137,6 +137,7 @@
     "keepRunning": "እንዲሠራ ተወው",
     "newSession": "አዲስ ክፍለ ጊዜ",
     "noModelsAvailable": "ምንም ሞዴሎች የሉም",
+    "modelRetires": "በ{{date}} ጡረታ ይወጣል",
     "notFound": "አልተገኘም።",
     "online": "በመስመር ላይ",
     "open": "{{name}}ን ክፈት",

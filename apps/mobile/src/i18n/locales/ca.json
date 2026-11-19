@@ -137,6 +137,7 @@
     "keepRunning": "Mantén l'execució en curs",
     "newSession": "Nova sessió",
     "noModelsAvailable": "Cap model disponible",
+    "modelRetires": "Es retira el {{date}}",
     "notFound": "No s'ha trobat l'element.",
     "online": "En línia",
     "open": "Obre {{name}}",

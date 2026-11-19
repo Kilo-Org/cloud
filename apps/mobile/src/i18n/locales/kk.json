@@ -137,6 +137,7 @@
     "keepRunning": "Жұмысты жалғастыру",
     "newSession": "Жаңа сессия",
     "noModelsAvailable": "Қолжетімді модельдер жоқ",
+    "modelRetires": "Тоқтатылады: {{date}}",
     "notFound": "Табылмады.",
     "online": "Желіде",
     "open": "{{name}} ашу",

@@ -137,6 +137,7 @@
     "keepRunning": "Продължи изпълнението",
     "newSession": "Нова сесия",
     "noModelsAvailable": "Няма налични модели",
+    "modelRetires": "Оттегля се на {{date}}",
     "notFound": "Не е намерено.",
     "online": "Онлайн",
     "open": "Отвори {{name}}",

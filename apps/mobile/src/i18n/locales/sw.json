@@ -137,6 +137,7 @@
     "keepRunning": "Acha iendelee",
     "newSession": "Kikao kipya",
     "noModelsAvailable": "Hakuna modeli zinazopatikana",
+    "modelRetires": "Itastaafu {{date}}",
     "notFound": "Haikupatikana.",
     "online": "Mtandaoni",
     "open": "Fungua {{name}}",

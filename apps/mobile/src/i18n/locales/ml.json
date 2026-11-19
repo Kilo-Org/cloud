@@ -137,6 +137,7 @@
     "keepRunning": "പ്രവർത്തനം തുടരുക",
     "newSession": "പുതിയ സെഷൻ",
     "noModelsAvailable": "മോഡലുകൾ ലഭ്യമല്ല",
+    "modelRetires": "{{date}}-ന് നിർത്തലാക്കുന്നു",
     "notFound": "കണ്ടെത്താനായില്ല.",
     "online": "ഓൺലൈൻ",
     "open": "{{name}} തുറക്കുക",

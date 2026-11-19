@@ -137,6 +137,7 @@
     "keepRunning": "Continuar em execução",
     "newSession": "Nova sessão",
     "noModelsAvailable": "Sem modelos disponíveis",
+    "modelRetires": "Descontinuado em {{date}}",
     "notFound": "Conteúdo não encontrado.",
     "online": "Em linha",
     "open": "Abrir {{name}}",

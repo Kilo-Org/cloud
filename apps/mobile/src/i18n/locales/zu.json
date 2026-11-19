@@ -137,6 +137,7 @@
     "keepRunning": "Yeka kuqhubeke",
     "newSession": "Iseshini entsha",
     "noModelsAvailable": "Awekho amamodeli atholakalayo",
+    "modelRetires": "Iyeka ngomhla ka-{{date}}",
     "notFound": "Akutholakali.",
     "online": "Ku-inthanethi",
     "open": "Vula {{name}}",

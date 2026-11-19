@@ -137,6 +137,7 @@
     "keepRunning": "Ħallih għaddej",
     "newSession": "Sessjoni ġdida",
     "noModelsAvailable": "L-ebda mudell disponibbli",
+    "modelRetires": "Jirtira {{date}}",
     "notFound": "Ma nstabx.",
     "online": "Onlajn",
     "open": "Iftaħ {{name}}",

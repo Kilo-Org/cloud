@@ -58,6 +58,8 @@ export type ModelOption = {
   pricing?: ModelPricing;
   /** The catalog lists image input for this model. */
   supportsImages?: boolean;
+  /** The `yyyy-MM-dd` the model retires, when the catalog entry dates it. */
+  retires_on?: string;
 };
 
 type ModelResponse = {
@@ -74,6 +76,7 @@ type ModelResponse = {
     opencode?: {
       variants?: Record<string, unknown>;
     };
+    retires_on?: string;
   }[];
 };
 
@@ -96,6 +99,7 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
     preferredIndex: model.preferredIndex,
     context_length: model.context_length ?? null,
     supportsImages: model.architecture?.input_modalities?.includes('image') === true,
+    retires_on: model.retires_on,
   }));
 
   items.sort((a, b) => {
@@ -126,6 +130,7 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
     pricing: item.pricing,
     context_length: item.context_length,
     supportsImages: item.supportsImages,
+    retires_on: item.retires_on,
   }));
 }
 
@@ -160,6 +165,7 @@ export const OpenRouterModelsResponseSchema = z.object({
         .optional(),
       opencode: z.object({ variants: z.record(z.string(), z.unknown()).optional() }).optional(),
       architecture: z.object({ input_modalities: z.array(z.string()).optional() }).optional(),
+      retires_on: z.string().optional(),
     })
   ),
 });

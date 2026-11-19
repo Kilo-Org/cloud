@@ -137,6 +137,7 @@
     "keepRunning": "继续运行",
     "newSession": "新建会话",
     "noModelsAvailable": "暂无可用模型",
+    "modelRetires": "{{date}} 退役",
     "notFound": "未找到此内容",
     "online": "在线",
     "open": "打开 {{name}}",

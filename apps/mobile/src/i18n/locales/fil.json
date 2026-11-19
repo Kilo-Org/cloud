@@ -137,6 +137,7 @@
     "keepRunning": "Hayaang tumakbo",
     "newSession": "Bagong sesyon",
     "noModelsAvailable": "Walang magagamit na modelo",
+    "modelRetires": "Magreretiro sa {{date}}",
     "notFound": "Hindi mahanap.",
     "online": "Nakakonekta",
     "open": "Buksan ang {{name}}",

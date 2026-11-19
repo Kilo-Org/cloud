@@ -1,6 +1,7 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { type TFunction } from 'i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { SettingsSwitchRow } from '@/components/organization/settings-form-sections';
@@ -11,6 +12,8 @@ import { Input } from '@/components/ui/input';
 import { SearchX } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { formatDate } from '@/lib/format';
+import { i18n } from '@/i18n';
 import {
   type DenyListModel,
   matchesSearch,
@@ -24,6 +27,23 @@ import {
 const listStyle = { flex: 1 } satisfies ViewStyle;
 
 const ItemSeparator = () => <View className="h-2" />;
+
+/**
+ * The row label with the localized retirement note the old composed English
+ * suffix carried: `Retires Nov 20` after the name, worded in the app language
+ * from `retires_on`, and absent when the entry carries no date.
+ */
+function denyListRowLabel(item: DenyListModel, t: TFunction): string {
+  if (!item.retiresOn) {
+    return item.name;
+  }
+  const date = formatDate(new Date(item.retiresOn + 'T00:00:00Z'), i18n.language, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  return `${item.name} (${t('common.modelRetires', { date })})`;
+}
 
 /** The search field and filter row both lists carry above their rows. */
 function ListHeader({
@@ -179,7 +199,7 @@ export function ModelDenyList({
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<DenyListModel>) => (
       <SettingsSwitchRow
-        label={item.name}
+        label={denyListRowLabel(item, t)}
         description={item.id}
         value={!draft.modelDenyList.includes(item.id)}
         disabled={disabled}

@@ -137,6 +137,7 @@
     "keepRunning": "Turpināt izpildi",
     "newSession": "Jauna sesija",
     "noModelsAvailable": "Nav pieejamu modeļu",
+    "modelRetires": "Tiks pārtraukts {{date}}",
     "notFound": "Neizdevās atrast meklēto.",
     "online": "Tiešsaistē",
     "open": "Atvērt {{name}}",

@@ -137,6 +137,7 @@
     "keepRunning": "روان یې پرېږدئ",
     "newSession": "نوې ناسته",
     "noModelsAvailable": "هېڅ ماډل نشته",
+    "modelRetires": "په {{date}} له کاره وځي",
     "notFound": "ونه موندل شو",
     "online": "آنلاین",
     "open": "{{name}} پرانیزئ",

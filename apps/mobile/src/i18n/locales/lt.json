@@ -137,6 +137,7 @@
     "keepRunning": "Tęsti vykdymą",
     "newSession": "Nauja sesija",
     "noModelsAvailable": "Nėra modelių",
+    "modelRetires": "Išimamas {{date}}",
     "notFound": "Nerasta",
     "online": "Prisijungęs",
     "open": "Atidaryti {{name}}",

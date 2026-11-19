@@ -137,6 +137,7 @@
     "keepRunning": "Continuă rularea",
     "newSession": "Sesiune nouă",
     "noModelsAvailable": "Niciun model disponibil",
+    "modelRetires": "Se retrage la {{date}}",
     "notFound": "Elementul nu a fost găsit.",
     "online": "Conectat",
     "open": "Deschide {{name}}",

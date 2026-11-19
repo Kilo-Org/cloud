@@ -137,6 +137,7 @@
     "keepRunning": "ເຮັດວຽກຕໍ່",
     "newSession": "ເຊສຊັນໃໝ່",
     "noModelsAvailable": "ບໍ່ມີໂມເດວໃຫ້ໃຊ້",
+    "modelRetires": "ຢຸດໃຊ້ວັນທີ {{date}}",
     "notFound": "ບໍ່ພົບລາຍການນີ້.",
     "online": "ອອນໄລນ໌",
     "open": "ເປີດ {{name}}",

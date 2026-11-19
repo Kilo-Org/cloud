@@ -137,6 +137,7 @@
     "keepRunning": "Parhau i redeg",
     "newSession": "Sesiwn newydd",
     "noModelsAvailable": "Dim modelau ar gael",
+    "modelRetires": "Yn ymddeol {{date}}",
     "notFound": "Ni ddaethpwyd o hyd i'r eitem.",
     "online": "Ar-lein",
     "open": "Agor {{name}}",

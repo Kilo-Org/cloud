@@ -137,6 +137,7 @@
     "keepRunning": "Whakahaere tonu",
     "newSession": "Wātū hōu",
     "noModelsAvailable": "Kāore he tauira e wātea ana",
+    "modelRetires": "Ka whakamutua ā te {{date}}",
     "notFound": "Kāore i kitea",
     "online": "Tuihono",
     "open": "Whakatuwheratia a {{name}}",

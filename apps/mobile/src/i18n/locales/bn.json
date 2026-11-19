@@ -137,6 +137,7 @@
     "keepRunning": "চালিয়ে রাখুন",
     "newSession": "নতুন সেশন",
     "noModelsAvailable": "কোনো মডেল পাওয়া যাচ্ছে না",
+    "modelRetires": "অবসর হবে {{date}}",
     "notFound": "পাওয়া যায়নি।",
     "online": "অনলাইন",
     "open": "{{name}} খুলুন",

@@ -137,6 +137,7 @@
     "keepRunning": "Nechat běžet",
     "newSession": "Nová relace",
     "noModelsAvailable": "Žádné dostupné modely",
+    "modelRetires": "Vyřazuje se {{date}}",
     "notFound": "Položka nebyla nalezena.",
     "online": "Připojeno",
     "open": "Otevřít {{name}}",

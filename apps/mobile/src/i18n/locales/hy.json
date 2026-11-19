@@ -137,6 +137,7 @@
     "keepRunning": "Շարունակել կատարումը",
     "newSession": "Նոր նստաշրջան",
     "noModelsAvailable": "Հասանելի մոդելներ չկան",
+    "modelRetires": "Դադարեցվում է {{date}}-ին",
     "notFound": "Չի գտնվել",
     "online": "Առցանց",
     "open": "Բացել {{name}}-ը",

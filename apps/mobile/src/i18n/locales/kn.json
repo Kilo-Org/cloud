@@ -137,6 +137,7 @@
     "keepRunning": "ಚಾಲನೆಯಲ್ಲಿರಲಿ",
     "newSession": "ಹೊಸ ಸೆಷನ್",
     "noModelsAvailable": "ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
+    "modelRetires": "{{date}} ರಂದು ನಿವೃತ್ತಿಯಾಗುತ್ತದೆ",
     "notFound": "ಕಂಡುಬಂದಿಲ್ಲ.",
     "online": "ಆನ್‌ಲೈನ್",
     "open": "{{name}} ತೆರೆಯಿರಿ",

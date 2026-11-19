@@ -137,6 +137,7 @@
     "keepRunning": "Futtatás folytatása",
     "newSession": "Új munkamenet",
     "noModelsAvailable": "Nem érhetők el modellek",
+    "modelRetires": "Kivezetés: {{date}}",
     "notFound": "Nem található",
     "online": "Elérhető",
     "open": "{{name}} megnyitása",

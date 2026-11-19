@@ -137,6 +137,7 @@
     "keepRunning": "Hapụ ka ọ na-arụ ọrụ",
     "newSession": "Nnọkọ ọhụrụ",
     "noModelsAvailable": "Enweghị ihe nlereanya dị",
+    "modelRetires": "Ga-ezumike na {{date}}",
     "notFound": "Ahụghị ya",
     "online": "Dị n'ịntanetị",
     "open": "Mepee {{name}}",

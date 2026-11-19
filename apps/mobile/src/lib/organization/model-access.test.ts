@@ -95,6 +95,24 @@ describe('denyListModels', () => {
       { id: 'openai/gpt', name: 'GPT' },
     ]);
   });
+
+  it('carries a retirement date from the first catalog entry naming one', () => {
+    const rows = denyListModels({
+      catalog: [{ id: 'openai/gpt', name: 'GPT', retires_on: '2026-11-20' }],
+      available: [],
+      denyList: [],
+    });
+    expect(rows).toEqual([{ id: 'openai/gpt', name: 'GPT', retiresOn: '2026-11-20' }]);
+  });
+
+  it('leaves retiresOn absent when no entry dates the model', () => {
+    const rows = denyListModels({
+      catalog: [{ id: 'openai/gpt', name: 'GPT' }],
+      available: [{ id: 'openai/gpt:free', name: 'GPT (free)' }],
+      denyList: [],
+    });
+    expect(rows).toEqual([{ id: 'openai/gpt', name: 'GPT' }]);
+  });
 });
 
 describe('initialDraft', () => {

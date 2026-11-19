@@ -137,6 +137,7 @@
     "keepRunning": "İcranı davam etdir",
     "newSession": "Yeni sessiya",
     "noModelsAvailable": "Mövcud model yoxdur",
+    "modelRetires": "{{date}} tarixində dayandırılır",
     "notFound": "Tapılmadı.",
     "online": "Onlayn",
     "open": "{{name}} aç",

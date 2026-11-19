@@ -137,6 +137,7 @@
     "keepRunning": "جاری رہنے دیں",
     "newSession": "نیا سیشن",
     "noModelsAvailable": "کوئی ماڈل دستیاب نہیں",
+    "modelRetires": "{{date}} کو ریٹائر ہوگا",
     "notFound": "نہیں ملا۔",
     "online": "آن لائن",
     "open": "{{name}} کھولیں",

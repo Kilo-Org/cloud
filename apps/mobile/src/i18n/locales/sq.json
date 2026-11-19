@@ -137,6 +137,7 @@
     "keepRunning": "Vazhdo ekzekutimin",
     "newSession": "Sesion i ri",
     "noModelsAvailable": "Nuk ka modele të disponueshme",
+    "modelRetires": "Tërhiqet më {{date}}",
     "notFound": "Nuk u gjet.",
     "online": "Në linjë",
     "open": "Hap {{name}}",

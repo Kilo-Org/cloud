@@ -137,6 +137,7 @@
     "keepRunning": "繼續執行",
     "newSession": "新增工作階段",
     "noModelsAvailable": "沒有可用的模型",
+    "modelRetires": "於 {{date}} 退役",
     "notFound": "找不到項目。",
     "online": "在線上",
     "open": "開啟 {{name}}",

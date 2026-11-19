@@ -137,6 +137,7 @@
     "keepRunning": "Laat voortgaan",
     "newSession": "Nuwe sessie",
     "noModelsAvailable": "Geen modelle beskikbaar nie",
+    "modelRetires": "Tree af op {{date}}",
     "notFound": "Die item is nie gevind nie.",
     "online": "Aanlyn",
     "open": "Maak {{name}} oop",

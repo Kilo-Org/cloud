@@ -137,6 +137,7 @@
     "keepRunning": "بەردەوامبوونی جێبەجێکردن",
     "newSession": "دانیشتنی نوێ",
     "noModelsAvailable": "هیچ مۆدێلێک بەردەست نییە",
+    "modelRetires": "لە {{date}} خانەنشین دەبێت",
     "notFound": "نەدۆزرایەوە.",
     "online": "سەرهێڵ",
     "open": "کردنەوەی {{name}}",

@@ -137,6 +137,7 @@
     "keepRunning": "ادامه اجرا",
     "newSession": "نشست جدید",
     "noModelsAvailable": "مدلی در دسترس نیست",
+    "modelRetires": "بازنشستگی در {{date}}",
     "notFound": "پیدا نشد.",
     "online": "آنلاین",
     "open": "باز کردن {{name}}",

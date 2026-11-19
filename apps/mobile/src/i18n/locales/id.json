@@ -137,6 +137,7 @@
     "keepRunning": "Biarkan berjalan",
     "newSession": "Sesi baru",
     "noModelsAvailable": "Tidak ada model yang tersedia",
+    "modelRetires": "Dihentikan pada {{date}}",
     "notFound": "Tidak ditemukan.",
     "online": "Daring",
     "open": "Buka {{name}}",

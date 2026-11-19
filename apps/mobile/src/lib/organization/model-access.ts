@@ -15,6 +15,8 @@ export type CatalogModel = Readonly<{
   id: string;
   name: string;
   inference_provider_ids?: readonly string[];
+  /** The `yyyy-MM-dd` the model retires, when the catalog entry dates it. */
+  retires_on?: string;
 }>;
 
 export type ModelAccessDraft = {
@@ -71,7 +73,23 @@ export function providerRows(params: {
 }
 
 /** One row of the deny list: a model an admin may allow or deny, by its bare id. */
-export type DenyListModel = Readonly<{ id: string; name: string }>;
+export type DenyListModel = Readonly<{ id: string; name: string; retiresOn?: string }>;
+
+/**
+ * The two entry shapes the lists read: a `CatalogModel` (whose date is
+ * `retires_on`) and a built row.
+ */
+type DenyListEntry = Pick<CatalogModel, 'id' | 'name'> &
+  Partial<Pick<CatalogModel, 'retires_on' | 'inference_provider_ids'>>;
+
+/** The row a deny list renders from a catalog or available entry. */
+function denyRow(model: DenyListEntry): DenyListModel {
+  return {
+    id: normalizeModelId(model.id),
+    name: model.name,
+    ...(model.retires_on ? { retiresOn: model.retires_on } : {}),
+  };
+}
 
 /**
  * Every model the deny list can show, one row per bare id — the same list the
@@ -82,23 +100,23 @@ export type DenyListModel = Readonly<{ id: string; name: string }>;
  * gets a row, so a stale entry can be allowed again.
  */
 export function denyListModels(params: {
-  catalog: readonly DenyListModel[];
-  available: readonly DenyListModel[];
+  catalog: readonly DenyListEntry[];
+  available: readonly DenyListEntry[] | undefined;
   denyList: readonly string[];
 }): DenyListModel[] {
-  const nameById = new Map<string, string>();
-  for (const model of [...params.catalog, ...params.available]) {
-    const id = normalizeModelId(model.id);
-    if (!nameById.has(id)) {
-      nameById.set(id, model.name);
+  const rowById = new Map<string, DenyListModel>();
+  for (const model of [...params.catalog, ...(params.available ?? [])]) {
+    const row = denyRow(model);
+    if (!rowById.has(row.id)) {
+      rowById.set(row.id, row);
     }
   }
   for (const id of params.denyList) {
-    if (!nameById.has(id)) {
-      nameById.set(id, id);
+    if (!rowById.has(normalizeModelId(id))) {
+      rowById.set(normalizeModelId(id), { id: normalizeModelId(id), name: id });
     }
   }
-  return [...nameById].map(([id, name]) => ({ id, name })).sort((a, b) => a.id.localeCompare(b.id));
+  return [...rowById.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /**

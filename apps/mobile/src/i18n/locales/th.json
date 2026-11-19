@@ -137,6 +137,7 @@
     "keepRunning": "ให้ทำงานต่อ",
     "newSession": "เซสชันใหม่",
     "noModelsAvailable": "ไม่มีโมเดลที่ใช้งานได้",
+    "modelRetires": "เลิกใช้ {{date}}",
     "notFound": "ไม่พบข้อมูล",
     "online": "ออนไลน์",
     "open": "เปิด {{name}}",

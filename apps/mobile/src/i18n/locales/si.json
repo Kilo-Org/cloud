@@ -137,6 +137,7 @@
     "keepRunning": "දිගටම ක්‍රියාත්මක කරන්න",
     "newSession": "නව සැසියක්",
     "noModelsAvailable": "ආකෘති නොමැත",
+    "modelRetires": "{{date}} දින ඉවත් වේ",
     "notFound": "හමු නොවීය.",
     "online": "මාර්ගගත",
     "open": "{{name}} විවෘත කරන්න",

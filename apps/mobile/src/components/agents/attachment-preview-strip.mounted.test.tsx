@@ -16,6 +16,13 @@ import { describeAttachmentChip } from '@/components/agents/attachment-chip-desc
 import { READ_CODE_CHARACTER_CAP } from '@/components/agents/mono-scroll-block-model';
 import { AttachmentPreviewStrip, dragTargetIndex } from './attachment-preview-strip';
 
+/**
+ * The byte budget the bounded read uses: four bytes per character cap, the
+ * worst-case UTF-8 expansion, so the decoded prefix always reaches the
+ * character cap. Mirrors the component's module-local constant.
+ */
+const PREVIEW_READ_MAX_BYTES = READ_CODE_CHARACTER_CAP * 4;
+
 const expoFileSystemMock = vi.hoisted(() => {
   const fileText = vi.fn(async () => {
     await Promise.resolve();
@@ -662,14 +669,14 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
   it('reads an over-budget file as a bounded prefix and shows the Truncated marker', async () => {
     // The chip's stored size drives the gate before anything decodes.
     expoFileSystemMock.readBytes.mockResolvedValue(new TextEncoder().encode('# Head'));
-    const renderer = await mount([markdownAttachment({ size: 60_000 })]);
+    const renderer = await mount([markdownAttachment({ size: 400_000 })]);
 
     await pressBody(renderer.root);
 
     // The bounded path never runs the whole-file read.
     expect(fileText).not.toHaveBeenCalled();
     expect(expoFileSystemMock.readBytes).toHaveBeenCalledTimes(1);
-    expect(expoFileSystemMock.readBytes).toHaveBeenCalledWith(READ_CODE_CHARACTER_CAP);
+    expect(expoFileSystemMock.readBytes).toHaveBeenCalledWith(PREVIEW_READ_MAX_BYTES);
 
     const markdown = nodesByType(renderer.root, 'MarkdownText');
     expect(markdown).toHaveLength(1);
@@ -692,8 +699,27 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     renderer.unmount();
   });
 
+  it('previews a multi-byte file whole while its bytes stay under the read budget', async () => {
+    // 40k CJK characters are 120k UTF-8 bytes: more bytes than the character
+    // cap, fewer characters, so the file reads whole and nothing is marked.
+    const text = '文'.repeat(40_000);
+    fileText.mockResolvedValueOnce(text);
+    const renderer = await mount([markdownAttachment({ size: 120_000 })]);
+
+    await pressBody(renderer.root);
+
+    expect(expoFileSystemMock.readBytes).not.toHaveBeenCalled();
+    const markdown = nodesByType(renderer.root, 'MarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe(text);
+    const texts = nodesByType(renderer.root, 'Text');
+    expect(texts.some(node => node.props.accessibilityLabel === 'Content truncated')).toBe(false);
+
+    renderer.unmount();
+  });
+
   it('falls back to the file size for a restored chip whose stored size is 0', async () => {
-    expoFileSystemMock.previewBehavior.size = 60_000;
+    expoFileSystemMock.previewBehavior.size = 400_000;
     expoFileSystemMock.readBytes.mockResolvedValue(new TextEncoder().encode('# Head'));
     const renderer = await mount([markdownAttachment({ size: 0 })]);
 
@@ -701,7 +727,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
 
     expect(fileText).not.toHaveBeenCalled();
     expect(expoFileSystemMock.readBytes).toHaveBeenCalledTimes(1);
-    expect(expoFileSystemMock.readBytes).toHaveBeenCalledWith(READ_CODE_CHARACTER_CAP);
+    expect(expoFileSystemMock.readBytes).toHaveBeenCalledWith(PREVIEW_READ_MAX_BYTES);
 
     renderer.unmount();
   });

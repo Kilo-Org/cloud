@@ -140,13 +140,25 @@ type TextPreviewState = {
 };
 
 /**
+ * Byte budget for one bounded preview read. UTF-8 encodes a character in at
+ * most four bytes, so this many bytes always carry at least
+ * `READ_CODE_CHARACTER_CAP` characters when the file is long enough. The
+ * budget is bytes because that is what a read can be bounded to; the character
+ * cap is applied after the decode.
+ */
+const PREVIEW_READ_MAX_BYTES = READ_CODE_CHARACTER_CAP * 4;
+
+/**
  * Read an attachment's preview text, bounded by the shared
  * `READ_CODE_CHARACTER_CAP` — a preview is an at-a-glance read, not a file
  * viewer. The known/stored byte size decides the path before anything decodes:
- * under the budget the file reads whole; over it a bounded prefix is read
- * through a file handle, so a 20 MB text attachment never decodes whole on this
- * path. `File.text()` has no bounded form — it always reads the whole file — so
- * the prefix path is the only way to keep the decode bounded.
+ * at or under the byte budget the file reads whole, so a multi-byte document
+ * with fewer characters than the cap still previews in full; over it a bounded
+ * prefix is read through a file handle, so a 20 MB text attachment never
+ * decodes whole on this path. `File.text()` has no bounded form — it always
+ * reads the whole file — so the prefix path is the only way to keep the decode
+ * bounded. Whether the decoded text overshoots the character cap, and whether
+ * the read stopped at the byte budget, are reported separately.
  */
 async function readAttachmentTextPreview(attachment: AgentAttachment): Promise<TextPreviewState> {
   const mode = isMarkdownPath(attachment.filename) ? 'markdown' : 'text';
@@ -154,14 +166,14 @@ async function readAttachmentTextPreview(attachment: AgentAttachment): Promise<T
   // Restored chips report size 0; fall back to the file's own size so the
   // over-budget path still fires for them.
   const size = attachment.size > 0 ? attachment.size : file.size;
-  if (size > READ_CODE_CHARACTER_CAP) {
+  if (size > PREVIEW_READ_MAX_BYTES) {
     let handle: FileHandle | null = null;
     try {
       handle = file.open(FileMode.ReadOnly);
-      // One bounded read at offset 0; the budget is bytes here and characters
-      // in the sheet, and UTF-8 never expands, so one read cannot overshoot
-      // the character budget.
-      const bytes = await handle.readBytes(READ_CODE_CHARACTER_CAP);
+      // One bounded read at offset 0, in bytes. The decoded prefix can hold
+      // more characters than the cap only when every character is multi-byte,
+      // and the character cap then trims it below.
+      const bytes = await handle.readBytes(PREVIEW_READ_MAX_BYTES);
       return {
         mode,
         text: new TextDecoder('utf-8', { fatal: false }).decode(bytes),
@@ -511,8 +523,13 @@ const AttachmentChip = memo(function AttachmentChip({
   );
 
   // The sheet renders this, not the raw read: the body is always capped and the
-  // marker reflects either reason the shown text stops short.
-  const boundedPreview = textPreview === null ? null : boundPreviewText(textPreview);
+  // marker reflects either reason the shown text stops short. Memoized on the
+  // read's own value, because a fresh 50k-character slice each render would
+  // make the markdown body re-parse when an unrelated chip re-renders.
+  const boundedPreview = useMemo(
+    () => (textPreview === null ? null : boundPreviewText(textPreview)),
+    [textPreview]
+  );
 
   return (
     <>

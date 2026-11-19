@@ -281,6 +281,10 @@ function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): bo
 type InflightCleanup = {
   promise: Promise<void>;
   controller: AbortController;
+  /** The binding this walk releases: the runtime key, directory and native session. */
+  key: string;
+  directory: string;
+  kiloSessionId: string;
 };
 
 export function createPreparationManager(deps: PrepareDeps): PreparationManager {
@@ -1153,6 +1157,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const entry: InflightCleanup = {
       controller: new AbortController(),
       promise: Promise.resolve(),
+      key: input.key,
+      directory: input.spec.directory,
+      kiloSessionId: input.spec.kiloSessionId,
     };
     entry.promise = client
       .release({
@@ -1186,12 +1193,26 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   /**
-   * Stop any release cleanup still walking `sessionId` before a re-prepare
-   * resolves the same Kilo session. Bounded by the cleanup's own deadline.
+   * Stop any release cleanup still walking the binding being prepared before it
+   * resolves the same Kilo session. A cleanup for another binding (a superseded
+   * native session on a shared runtime) is left to finish on its own. Bounded by
+   * the cleanup's own deadline.
    */
-  async function settleReleaseCleanup(sessionId: string): Promise<void> {
-    const entry = releaseCleanups.get(sessionId);
+  async function settleReleaseCleanup(binding: {
+    sessionId: string;
+    key: string;
+    directory: string;
+    kiloSessionId: string;
+  }): Promise<void> {
+    const entry = releaseCleanups.get(binding.sessionId);
     if (!entry) return;
+    if (
+      entry.key !== binding.key ||
+      entry.directory !== binding.directory ||
+      entry.kiloSessionId !== binding.kiloSessionId
+    ) {
+      return;
+    }
     entry.controller.abort();
     await entry.promise;
   }
@@ -1343,7 +1364,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         if (owner.released) return;
         currentStep = 'kilo_session';
         emitProgress(sessionId, 'kilo_session');
-        await settleReleaseCleanup(sessionId);
+        await settleReleaseCleanup({
+          sessionId,
+          key,
+          directory,
+          kiloSessionId: spec.kiloSessionId,
+        });
         await withOneRetry(
           async attempt => {
             const snapshotRestore: NonNullable<Parameters<Harness['open']>[0]['snapshotRestore']> =
@@ -1715,6 +1741,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         } else {
           // The binding matched, so the fast path serves exactly this runtime.
           owner.runtimeKey = route.key;
+          // The identity fields matched, but any other field of the incoming
+          // spec (roots, review target, …) is the binding the turn now runs.
+          route.spec = spec;
           const running = (async () => {
             if (credentials) {
               try {
@@ -1728,7 +1757,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               }
             }
             if (!owner.released) {
-              deps.onPreparedRoute?.(route.spec);
+              deps.onPreparedRoute?.(spec);
               emitSessionReadyNative(spec.sessionId);
               deps.emit({ type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' });
             }

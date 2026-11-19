@@ -765,9 +765,11 @@ type Harness = {
   abortCalls: string[];
   stopProcessCalls: string[];
   childrenCalls: string[];
+  preparedRoutes: ControlPlaneRouteSpec[];
   setChildren: (sessionId: string, children: Array<{ id: string; directory: string }>) => void;
   setChildrenHung: (sessionId: string) => void;
   setAbortHung: (sessionId: string) => void;
+  setCleanupGate: (sessionId: string, gate: Promise<void>) => void;
   setCleanupFailure: (value: boolean) => void;
   setEnsureSessionError: (value: unknown) => void;
   ensureSessionCalls: () => number;
@@ -831,8 +833,10 @@ function createHarness(
   const abortCalls: string[] = [];
   const stopProcessCalls: string[] = [];
   const childrenCalls: string[] = [];
+  const preparedRoutes: ControlPlaneRouteSpec[] = [];
   const childrenBySession = new Map<string, Array<{ id: string; directory: string }>>();
   const childrenHung = new Set<string>();
+  const cleanupGates = new Map<string, Promise<void>>();
   const abortHung = new Set<string>();
   let cleanupFailure = false;
   let ensureSessionError: unknown;
@@ -889,6 +893,20 @@ function createHarness(
           signal?: AbortSignal;
         }) => {
           abortCalls.push(opts.sessionId);
+          const gate = cleanupGates.get(opts.sessionId);
+          if (gate) {
+            const waiting = Promise.withResolvers<void>();
+            const aborted = (): void => waiting.reject(new Error('aborted'));
+            if (opts.signal?.aborted) aborted();
+            else {
+              opts.signal?.addEventListener('abort', aborted, { once: true });
+              void gate.then(() => {
+                opts.signal?.removeEventListener('abort', aborted);
+                waiting.resolve();
+              });
+            }
+            await waiting.promise;
+          }
           if (cleanupFailure) throw new Error('abort failed');
           if (abortHung.has(opts.sessionId)) {
             await new Promise<void>((_resolve, reject) => {
@@ -970,6 +988,7 @@ function createHarness(
     emit: frame => frames.push(frame),
     log: message => logs.push(message),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
+    onPreparedRoute: spec => preparedRoutes.push(spec),
     runtimes,
     runSkillInstall: options.runSkillInstall,
     spawnSetup: options.spawnSetup,
@@ -1030,6 +1049,7 @@ function createHarness(
     abortCalls,
     stopProcessCalls,
     childrenCalls,
+    preparedRoutes,
     setChildren: (sessionId, children) => {
       childrenBySession.set(sessionId, children);
     },
@@ -1038,6 +1058,9 @@ function createHarness(
     },
     setAbortHung: sessionId => {
       abortHung.add(sessionId);
+    },
+    setCleanupGate: (sessionId, gate) => {
+      cleanupGates.set(sessionId, gate);
     },
     setCleanupFailure: value => {
       cleanupFailure = value;
@@ -2566,6 +2589,104 @@ describe('createPreparationManager', () => {
       sessionId: spec.sessionId,
       workspace: 'same',
     });
+  });
+
+  it('registers the incoming spec when the fast path re-prepares the same binding', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    expect(harness.ensureCalls()).toBe(1);
+    harness.preparedRoutes.length = 0;
+
+    const app = path.join(spec.directory, 'app');
+    const lib = path.join(spec.directory, 'lib');
+    const githubReviewTarget = {
+      repo: 'acme/widgets',
+      pullRequestNumber: 42,
+      appType: 'standard' as const,
+      botUserId: 'bot-1',
+    };
+    const incoming: ControlPlaneRouteSpec = {
+      ...spec,
+      roots: [
+        {
+          directory: app,
+          repoFullName: 'acme/app',
+          git: { url: 'https://github.com/acme/app.git', platform: 'github' },
+          branch: 'kilo/generated',
+          branchMode: 'working',
+        },
+        {
+          directory: lib,
+          repoFullName: 'acme/lib',
+          git: { url: 'https://github.com/acme/lib.git', platform: 'github' },
+          branch: 'kilo/generated',
+          branchMode: 'working',
+        },
+      ],
+      createdOnPlatform: 'code-review',
+      githubReviewTarget,
+    };
+
+    await harness.manager.prepare(incoming);
+
+    expect(harness.ensureCalls()).toBe(1);
+    expect(
+      harness.frames.filter(frame => frame.type === 'session.ready' && frame.workspace === 'same')
+    ).toHaveLength(1);
+    expect(harness.preparedRoutes).toHaveLength(1);
+    expect(harness.preparedRoutes[0]!.roots).toEqual(incoming.roots);
+    expect(harness.preparedRoutes[0]!.githubReviewTarget).toEqual(githubReviewTarget);
+  });
+
+  it('reports the incoming roots of a fast-path re-prepare on the prepared route', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+
+    const app = path.join(spec.directory, 'app');
+    await harness.manager.prepare({
+      ...spec,
+      roots: [
+        {
+          directory: app,
+          repoFullName: 'acme/app',
+          git: { url: 'https://github.com/acme/app.git', platform: 'github' },
+          branch: 'kilo/generated',
+          branchMode: 'working',
+        },
+      ],
+    });
+
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.manager.preparedRoute(spec.sessionId)?.roots).toEqual([
+      { directory: app, repoFullName: 'acme/app', requestedBranch: undefined },
+    ]);
+  });
+
+  it('keeps the fast path and registers the incoming spec when only the attempt changes', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    harness.preparedRoutes.length = 0;
+
+    const incoming: ControlPlaneRouteSpec = {
+      ...spec,
+      attemptId: 'attempt-2',
+      githubReviewTarget: {
+        repo: 'acme/widgets',
+        pullRequestNumber: 43,
+        appType: 'lite',
+        botUserId: 'bot-2',
+      },
+    };
+    await harness.manager.prepare(incoming);
+
+    expect(harness.ensureCalls()).toBe(1);
+    expect(
+      harness.frames.filter(frame => frame.type === 'session.ready' && frame.workspace === 'same')
+    ).toHaveLength(1);
+    expect(harness.preparedRoutes).toEqual([incoming]);
   });
 
   it('prepares again when the re-prepare names another native session', async () => {
@@ -4665,6 +4786,82 @@ describe('release cleanup and last-route accounting', () => {
     const started = harness.abortCalls.length + harness.stopProcessCalls.length;
     await new Promise(resolve => setTimeout(resolve, 20));
     expect(harness.abortCalls.length + harness.stopProcessCalls.length).toBe(started);
+  });
+
+  it('settles a same-binding cleanup when that binding is prepared again', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    // The walk parks on this gate until the abort reaches its signal.
+    harness.setCleanupGate(rootA, Promise.withResolvers<void>().promise);
+
+    harness.manager.release(specA.sessionId);
+    await waitFor(() => harness.abortCalls.includes(rootA));
+
+    // The incoming binding is the one the walk releases (same runtime key,
+    // directory and native session), so the prepare aborts and awaits it rather
+    // than resolving the same native session underneath it. The aborted walk
+    // reports its incomplete result.
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await waitFor(() =>
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.sessionId === specA.sessionId
+      )
+    );
+    expect(
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.sessionId === specA.sessionId &&
+          diagnostic.fields.ok === false
+      )
+    ).toBe(true);
+  });
+
+  it('leaves a superseded binding cleanup running when another binding is prepared', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    const gate = Promise.withResolvers<void>();
+    harness.setCleanupGate(rootA, gate.promise);
+
+    // Naming another native session supersedes the prepared binding and queues
+    // a walk for the old native session on the still-shared runtime.
+    const superseding = sharedSpec('ses_a', 'ses_dddddddddddddddddddddddddd');
+    await harness.manager.prepare(superseding, credentialsFor(superseding, proxyHandle(exp)));
+    expect(harness.abortCalls).toContain(rootA);
+
+    // The new prepare names a different native session, so it must not abort the
+    // walk: the old native session is released only by its own cleanup.
+    gate.resolve();
+    await waitFor(() =>
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.sessionId === specA.sessionId
+      )
+    );
+    expect(
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.sessionId === specA.sessionId &&
+          diagnostic.fields.ok === true
+      )
+    ).toBe(true);
+    expect(harness.logs.some(log => log.includes('control-plane release cleanup incomplete'))).toBe(
+      false
+    );
   });
 
   it('releases a legacy shared key so a later modern route gets a fresh runtime', async () => {

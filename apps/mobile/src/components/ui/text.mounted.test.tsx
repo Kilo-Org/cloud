@@ -153,6 +153,34 @@ describe('Text mounted letter spacing', () => {
   });
 });
 
+// Content copy (`direction="auto"`) names its own direction; app copy names
+// the interface's.
+describe('Text content direction', () => {
+  it('lays content copy out by its own direction in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(
+      mountTextTree(createElement(Text, { direction: 'auto' }, 'Prototype pollution.'))
+    );
+
+    expect(ownStyles(text)).toContainEqual({ writingDirection: 'auto' });
+    expect(ownStyles(text)).not.toContainEqual({ writingDirection: 'rtl' });
+  });
+
+  it('keeps app copy on the interface direction in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(mountTextTree(createElement(Text, {}, 'Prototype pollution.')));
+
+    expect(ownStyles(text)).toContainEqual({ writingDirection: 'rtl' });
+    expect(ownStyles(text)).not.toContainEqual({ writingDirection: 'auto' });
+  });
+
+  it('lays content copy out by its own direction in an LTR interface', () => {
+    const text = hostText(mountTextTree(createElement(Text, { direction: 'auto' }, 'نص')));
+
+    expect(ownStyles(text)).toContainEqual({ writingDirection: 'auto' });
+  });
+});
+
 describe('Text eyebrow letterspacing', () => {
   // Finding home-ar-loading: an Arabic section label carried the Latin
   // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت'). The

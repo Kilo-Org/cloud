@@ -197,7 +197,7 @@ function createUserWebConnection(
   let connectPromise: Promise<void> | null = null;
   let retainCount = 0;
   let commandRetainCount = 0;
-  let legacyRetained = false;
+  let legacyRelease: (() => void) | null = null;
   // True once the current base connection's socket has opened (i.e. the one-use
   // ingest ticket was consumed at the upgrade). Drives the pre-connect auth
   // refresh so only reconnects mint a fresh ticket, not the initial connect.
@@ -614,9 +614,8 @@ function createUserWebConnection(
   }
 
   function connect(): void {
-    if (destroyed || legacyRetained) return;
-    legacyRetained = true;
-    retainConnection();
+    if (destroyed || legacyRelease) return;
+    legacyRelease = retainConnection();
   }
 
   type RawCommandWire = {
@@ -699,15 +698,15 @@ function createUserWebConnection(
     retain: retainConnection,
     connect,
     disconnect() {
-      if (!legacyRetained || destroyed) return;
-      legacyRetained = false;
-      retainCount -= 1;
-      if (retainCount === 0) stopConnection('Connection disconnected');
+      if (!legacyRelease) return;
+      const release = legacyRelease;
+      legacyRelease = null;
+      release();
     },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      legacyRetained = false;
+      legacyRelease = null;
       retainCount = 0;
       commandRetainCount = 0;
       stopConnection('Connection destroyed');

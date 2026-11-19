@@ -4,17 +4,18 @@ import {
   agent_environment_profiles,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
-import { isValidEmail } from '../lib/users';
+import { findSeedUserId, isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
 
 export const usage = '<email>';
 
 const PROFILE_NAME = 'Design gate agents';
-const USER_ID = 'user_design_gate_agents';
+/** The row an account with no sign-in yet gets; a signed-in one keeps its id. */
+const SEED_USER_ID = 'user_design_gate_agents';
 /** Stable, so the deep link a previous run printed keeps opening the screen. */
 const PROFILE_ID = 'a9ad137f-bad3-4d1a-9565-0cb862c7f81d';
 const STRIPE_CUSTOMER_ID = 'cus_local_design_gate_agents';
@@ -78,7 +79,7 @@ function printUsage(): void {
   console.log('cover the profile Agents list: two whose slug only repeats the name, and one');
   console.log('long row whose name and slug both need truncating. The profile also carries two');
   console.log('remote MCP servers, one enabled and one not, for the MCP servers list. Re-running');
-  console.log('replaces the profile, its agents, its MCP servers, and the user row.');
+  console.log('replaces the profile and its rows, and joins the account that already signed in.');
   console.log('');
   console.log('The deep links it prints open the profile screens in a dev build:');
   console.log('  kiloapp:///(app)/profile-management/<profileId>/agents');
@@ -110,6 +111,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const normalizedEmail = normalizeSeedEmail(trimmedEmail);
   assertLocalSeedDatabase('app:agent-profile-fixture');
   const db = getSeedDb();
+  // A fake account that already signed in keeps its own row: the fixture joins
+  // it, so the seed runs before or after the device-code sign-in.
+  const userId = (await findSeedUserId(trimmedEmail)) ?? SEED_USER_ID;
 
   // Direct insert, no Stripe customer: the profile screens never call Stripe,
   // and dev/seed/lib/stripe.ts refuses the example file's placeholder key.
@@ -119,7 +123,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   await db
     .insert(kilocode_users)
     .values({
-      id: USER_ID,
+      id: userId,
       google_user_email: trimmedEmail,
       google_user_name: 'Design Gate',
       google_user_image_url: 'https://example.com/design-gate.png',
@@ -138,16 +142,28 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       },
     });
 
+  // Replace this fixture's own profile; its agents and MCP servers cascade with
+  // it. The account's other profiles stay, so another topic's links keep
+  // opening after this one runs.
+  await db.delete(agent_environment_profiles).where(eq(agent_environment_profiles.id, PROFILE_ID));
+  // One personal profile per account is the default, and this fixture's takes
+  // the slot: another topic's default is demoted rather than removed.
   await db
-    .delete(agent_environment_profiles)
-    .where(eq(agent_environment_profiles.owned_by_user_id, USER_ID));
+    .update(agent_environment_profiles)
+    .set({ is_default: false })
+    .where(
+      and(
+        eq(agent_environment_profiles.owned_by_user_id, userId),
+        eq(agent_environment_profiles.is_default, true)
+      )
+    );
 
   const [profile] = await db
     .insert(agent_environment_profiles)
     .values({
       id: PROFILE_ID,
-      owned_by_user_id: USER_ID,
-      created_by_user_id: USER_ID,
+      owned_by_user_id: userId,
+      created_by_user_id: userId,
       name: PROFILE_NAME,
       description: 'Agents the design gate opens on the profile Agents screen.',
       is_default: true,
@@ -185,7 +201,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log(`Deep link: ${mcpLink}`);
 
   return {
-    userId: USER_ID,
+    userId,
     email: trimmedEmail,
     profileId: profile.id,
     agentCount: AGENTS.length,

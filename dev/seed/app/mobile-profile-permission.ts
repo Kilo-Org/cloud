@@ -5,11 +5,12 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { findSeedUserId } from '../lib/users';
 
 export const usage = '<fake-email>';
 
@@ -101,14 +102,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const db = getSeedDb();
   const normalizedEmail = normalizeSeedEmail(email);
-  const userId = `dev-seed:mobile-profile-permission:${normalizedEmail}`;
-  const [existing] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, normalizedEmail));
-  if (existing && existing.id !== userId) {
-    throw new Error('The requested email belongs to a different account; choose a new fake email.');
-  }
+  // A fake account that already signed in keeps its own row: the fixture joins
+  // it, so the seed runs before or after the device-code sign-in.
+  const userId =
+    (await findSeedUserId(normalizedEmail)) ??
+    `dev-seed:mobile-profile-permission:${normalizedEmail}`;
 
   // Direct insert, no Stripe customer: the profile screens never call Stripe,
   // and dev/seed/lib/stripe.ts refuses a non-test key. The onboarding flags
@@ -157,8 +155,26 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         created_by_kilo_user_id: organization.createdByKiloUserId,
         require_seats: false,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: organizations.id,
+        set: { created_by_kilo_user_id: organization.createdByKiloUserId },
+      });
   }
+
+  // The roles below are the whole fixture, so both organizations belong to one
+  // account at a time: a run for another email takes them over instead of adding
+  // that email beside the previous owner.
+  await db
+    .delete(organization_memberships)
+    .where(
+      and(
+        inArray(organization_memberships.organization_id, [
+          OWNER_ORGANIZATION_ID,
+          MEMBER_ORGANIZATION_ID,
+        ]),
+        ne(organization_memberships.kilo_user_id, userId)
+      )
+    );
 
   // The membership roles are the whole fixture: the owner may manage profiles,
   // the plain member may only read them.

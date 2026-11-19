@@ -920,9 +920,14 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       const firstRefresh = new Promise<void>(resolve => {
         releaseFirstRefresh = resolve;
       });
+      let releaseSecondRefresh!: () => void;
+      const secondRefresh = new Promise<void>(resolve => {
+        releaseSecondRefresh = resolve;
+      });
       const refreshAuth = jest
         .fn()
         .mockImplementationOnce(() => firstRefresh)
+        .mockImplementationOnce(() => secondRefresh)
         .mockImplementation(() => Promise.resolve());
       const onReplacingConnection = jest.fn();
       const { connection } = createTestConnection({
@@ -933,7 +938,7 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.connect();
 
       // Complete the first pre-connect refresh so a socket exists, then start
-      // a second one whose completion is still pending.
+      // a second one whose completion stays pending for the whole window.
       releaseFirstRefresh();
       await Promise.resolve();
       await Promise.resolve();
@@ -955,6 +960,7 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       expect(sockets).toHaveLength(1);
 
       // The refresh completes and opens exactly one socket with the new ticket.
+      releaseSecondRefresh();
       await Promise.resolve();
       await Promise.resolve();
       expect(sockets).toHaveLength(2);

@@ -4956,6 +4956,7 @@
     "providersDescription": "Turn a provider off to stop Kilo routing to it for this organization.",
     "providersNeedCatalog": "Provider switches stay read-only until the full model catalog loads. Retry above to edit them.",
     "providersEmpty": "No providers match this search.",
+    "providersNone": "No providers are available for this organization.",
     "allowAllShown": "Allow all shown",
     "denyAllShown": "Deny all shown",
     "emptyProviderList": "Allow at least one provider. An empty list blocks every Kilo model route.",

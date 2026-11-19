@@ -83,6 +83,9 @@ export function ProviderAllowList({
   const paddingBottom = useTabBarBottomPadding();
   const contentContainerStyle = { paddingBottom };
   const shown = providers.filter(provider => matchesSearch([provider], search));
+  const emptyLabel = search.trim()
+    ? t('organizationModelAccess.providersEmpty')
+    : t('organizationModelAccess.providersNone');
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<string>) => (
@@ -143,7 +146,7 @@ export function ProviderAllowList({
           }
         />
       }
-      ListEmptyComponent={<NoMatch label={t('organizationModelAccess.providersEmpty')} />}
+      ListEmptyComponent={<NoMatch label={emptyLabel} />}
     />
   );
 }

@@ -5108,6 +5108,7 @@
     "providersDescription": "Wyłącz dostawcę, aby Kilo przestało kierować do niego żądania w tej organizacji.",
     "providersNeedCatalog": "Przełączniki dostawców pozostają tylko do odczytu, dopóki nie wczyta się pełny katalog modeli. Aby je edytować, dotknij przycisku Spróbuj ponownie powyżej.",
     "providersEmpty": "Żaden dostawca nie pasuje do tego wyszukiwania.",
+    "providersNone": "Żaden dostawca nie jest dostępny dla tej organizacji.",
     "allowAllShown": "Zezwól na wszystkie widoczne",
     "denyAllShown": "Zablokuj wszystkie widoczne",
     "gatewaysDescription": "Kilo kieruje żądania modeli przez Vercel AI Gateway lub OpenRouter. Wyłączona brama powoduje niepowodzenie tych żądań.",

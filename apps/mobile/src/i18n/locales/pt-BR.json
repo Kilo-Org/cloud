@@ -5108,6 +5108,7 @@
     "providersDescription": "Desative um provedor para impedir que o Kilo encaminhe solicitações para ele nesta organização.",
     "providersNeedCatalog": "Os interruptores dos provedores ficam somente leitura até que o catálogo completo de modelos seja carregado. Toque em Tentar novamente acima para editá-los.",
     "providersEmpty": "Nenhum provedor corresponde a esta pesquisa.",
+    "providersNone": "Nenhum provedor está disponível para esta organização.",
     "allowAllShown": "Permitir todos os exibidos",
     "denyAllShown": "Negar todos os exibidos",
     "gatewaysDescription": "O Kilo encaminha solicitações de modelos por meio do Vercel AI Gateway ou do OpenRouter. Um portal de acesso desativado faz essas solicitações falharem.",

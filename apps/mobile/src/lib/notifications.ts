@@ -823,6 +823,11 @@ const CHANNEL_NAME_KEYS = {
 // value's translation-key literal, which i18n.t requires.
 const channelNameKeys = CHANNEL_NAME_KEYS satisfies Record<AndroidNotificationChannelId, string>;
 
+// The typechecked half of the created-channel contract: the JSDoc type in the
+// plain-JS list is only a cast, so this binding is what fails if it goes away.
+const createdAndroidChannelIds: readonly AndroidNotificationChannelId[] =
+  CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS;
+
 /**
  * The channels this app creates: the ones `CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS`
  * names. Membership comes from that list, so the channel writer and the
@@ -832,7 +837,7 @@ const channelNameKeys = CHANNEL_NAME_KEYS satisfies Record<AndroidNotificationCh
  * system settings list for a notification the app can never post.
  */
 const MOBILE_ANDROID_NOTIFICATION_CHANNELS = ANDROID_NOTIFICATION_CHANNELS.filter(channel =>
-  CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(channel.id)
+  createdAndroidChannelIds.includes(channel.id)
 );
 
 /**

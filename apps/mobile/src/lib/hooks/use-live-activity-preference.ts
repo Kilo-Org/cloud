@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
+import { parseLiveActivityEnabled } from '@/lib/glanceable/live-activity-preference-store';
 import { setLiveActivityEnabledValue } from '@/lib/glanceable/live-activity-switch';
 import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
 import { LIVE_ACTIVITY_KEY } from '@/lib/storage-keys';
@@ -11,13 +12,10 @@ import { LIVE_ACTIVITY_KEY } from '@/lib/storage-keys';
  * one lets someone keep Live Activities for every other app and stop only
  * Kilo's. Both must allow it for the activity to start — see `ios-sink`.
  *
- * Default-on: only the exact stored string 'false' turns it off, so a missing
- * or unreadable value keeps the behavior the app ships with.
+ * The parse rule and the headless read live in
+ * `live-activity-preference-store`, so the settings path and the headless read
+ * share one rule and one retry budget.
  */
-function parseLiveActivityEnabled(raw: string | null): boolean {
-  return raw !== 'false';
-}
-
 const store = createSecureStorePreference<boolean>({
   key: LIVE_ACTIVITY_KEY,
   defaultValue: true,

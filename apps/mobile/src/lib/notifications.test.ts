@@ -2979,9 +2979,16 @@ describe('cold iOS background delivery', () => {
     const { getLiveActivityEnabled, isLiveActivityPreferenceKnown } =
       await import('@/lib/glanceable/live-activity-switch');
 
-    expect(await background.deliverPrepared({})).toBe(0);
+    expect(
+      await (async () => {
+        // The shared read retries a rejected keychain read on 250/500/1000 ms
+        // backoff; fake timers must fire that schedule while the delivery runs.
+        const pending = background.deliverPrepared({});
+        await vi.advanceTimersByTimeAsync(2000);
+        return pending;
+      })()
+    ).toBe(0);
     await vi.advanceTimersByTimeAsync(0);
-
     expect(isLiveActivityPreferenceKnown()).toBe(false);
     expect(getLiveActivityEnabled()).toBe(true);
     expect(mocks.registerActivityToken).not.toHaveBeenCalledWith(

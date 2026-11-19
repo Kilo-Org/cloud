@@ -30,7 +30,6 @@ import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
 import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '@/lib/android-notification-channels';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { releaseAndroidSessionToken } from '@/lib/glanceable/session-activity-tokens-android';
 import {
@@ -50,6 +49,7 @@ import {
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
+import { readStoredLiveActivityEnabled } from '@/lib/glanceable/live-activity-preference-store';
 import {
   setLiveActivityEnabledValue,
   setNotificationPermissionGrantedValue,
@@ -63,7 +63,6 @@ import {
 import { publishTrayOnce } from '@/lib/glanceable/tray-refresh';
 import { readWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { chainSave } from '@/lib/hooks/save-chain';
-import { LIVE_ACTIVITY_KEY } from '@/lib/storage-keys';
 import { getDndAccessGranted } from '@/glanceable-android/live-update';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
@@ -533,27 +532,15 @@ async function handleBackgroundNotificationTask(
 }
 
 /**
- * The stored Live Activity switch, read straight from SecureStore the way
- * `use-live-activity-preference` parses it: only the exact string 'false'
- * turns it off, so an absent key or any other value keeps the shipped default
- * on.
- *
- * `null` is this read's own "no answer" marker and means the read threw (a
- * locked or failing keychain); an absent key is an answer, not this null.
- */
-async function readStoredLiveActivityEnabled(): Promise<boolean | null> {
-  try {
-    return (await readStoredValue(LIVE_ACTIVITY_KEY)) !== 'false';
-  } catch {
-    return null;
-  }
-}
-
-/**
  * The setup every headless glanceable run needs before it touches a sink:
  * the stored language, the glanceable sinks — a fresh headless process has none
  * registered — the Android channels, the notification permission read, and the
  * stored Live Activity switch.
+ *
+ * The switch read goes through `live-activity-preference-store`, so the
+ * settings path and this path share one parse rule and one retry budget.
+ * `null` there means the read threw (a locked or failing keychain); an absent
+ * key is an answer, not this null.
  */
 async function prepareHeadlessGlanceableRun(): Promise<void> {
   // A killed process starts on the bundled English catalog, and nothing else on

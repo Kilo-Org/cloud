@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { Clipboard } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { SECTION_ACTION_BOX_CLASS, SECTION_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import { CAPTION_ACTION_BOX_CLASS, SECTION_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 import { CodeBlock } from './code-block';
@@ -61,12 +61,15 @@ export function MarkdownCodeFence({
         >
           {language ?? ''}
         </Text>
-        {/* The copy control keeps the section header's compact box, whose
-            negative margins hold it to the label's line, so the fence header is
-            one line tall and the box never sets the row's height (the same rule
-            as a section header, apps/mobile/AGENTS.md). */}
+        {/* The copy control keeps a compact box cancelling to the caption
+            line's own height, so the fence header is one line tall and the box
+            never sets the row's height (the same rule as a section header,
+            apps/mobile/AGENTS.md). */}
         <Pressable
-          className={cn(SECTION_ACTION_BOX_CLASS, 'items-center justify-center active:opacity-70')}
+          className={cn(
+            CAPTION_ACTION_BOX_CLASS,
+            'items-center justify-center active:opacity-70'
+          )}
           hitSlop={SECTION_ACTION_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel={t('common.copy')}

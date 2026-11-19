@@ -44,11 +44,11 @@ function hasUsableMessage(error: unknown): boolean {
 function RepoPinsSkeleton() {
   return (
     <View className="gap-3">
-      <View className="flex-row items-center justify-between gap-2">
+      <View className="flex-row items-center justify-between gap-2 py-2">
         <Skeleton className="h-2 w-32 rounded bg-muted-soft" />
-        {/* The placeholder reserves the box the loaded action renders, not a
-            rem-scaled height, so the section keeps one header line and cannot
-            grow when the bindings land. */}
+        {/* The placeholder reserves the loaded action's box over the same one
+            text line and the header's own `py-2`, so the section keeps one
+            header line and cannot grow when the bindings land. */}
         <Skeleton className={cn(SECTION_ACTION_BOX_CLASS, 'w-24 rounded-md bg-muted-soft')} />
       </View>
       <Skeleton className="h-3 w-56 rounded bg-muted-soft" />

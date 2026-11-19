@@ -3,8 +3,8 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  CAPTION_ACTION_BOX_CLASS,
   MIN_TAP_TARGET_DP,
-  SECTION_ACTION_BOX_CLASS,
   SECTION_ACTION_FRAME_DP,
   SECTION_ACTION_HIT_SLOP,
   SECTION_ACTION_HIT_SLOP_DP,
@@ -131,10 +131,10 @@ describe('MarkdownCodeFence', () => {
   it('reaches the copy target through the shared compact box', async () => {
     const renderer = await mount(fence());
 
-    // The control keeps the section header's compact box: the box is never
-    // larger than one text line, and the fence header stays one line tall.
+    // The control keeps a compact box cancelling to the caption line: the box
+    // is never larger than that line, and the fence header stays one line tall.
     const button = hostProps(renderer, 'Pressable');
-    for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
+    for (const token of CAPTION_ACTION_BOX_CLASS.split(' ')) {
       expect(String(button.className)).toContain(token);
     }
     expect(String(button.className)).toContain('items-center');

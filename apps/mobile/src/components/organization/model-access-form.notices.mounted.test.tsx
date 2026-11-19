@@ -1,0 +1,206 @@
+// What the providers-and-models form offers and says, which the save contract
+// does not cover: the Gateways segment exists only while the settings read
+// reports gateways available, like the web page's Advanced policies tab, so an
+// unavailable organization loses the tab instead of landing on an empty one;
+// and a lapsed plan names itself in the read-only notice instead of the role
+// rule. The sibling suite owns the save contract and keeps this harness small.
+
+import { createElement } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
+
+import { i18n as appI18n } from '@/i18n';
+import { type OrgGatewaySettings } from '@/lib/hooks/use-org-settings-queries';
+import { ModelAccessForm } from './model-access-form';
+
+const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise<void>>() }));
+
+vi.mock('@/lib/hooks/use-org-settings-queries', () => ({
+  useSaveOrgModelAccess: () => ({ mutateAsync: saved.mutateAsync, isPending: false }),
+}));
+
+vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/button', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    Button: (props: Record<string, unknown> & { children?: unknown }) =>
+      h('Button', props, props.children as never),
+  };
+});
+vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
+vi.mock('@/components/ui/text', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    Text: (props: Record<string, unknown> & { children?: unknown }) =>
+      h('Text', props, props.children as never),
+  };
+});
+vi.mock('@/components/organization/model-access-lists', () => ({
+  ModelDenyList: 'ModelDenyList',
+  ProviderAllowList: 'ProviderAllowList',
+}));
+vi.mock('@/components/organization/providers-gateways-section', () => ({
+  GatewaySettingsSection: 'GatewaySettingsSection',
+}));
+
+/** The gateway settings read's payload, as the router answers it. */
+const GATEWAY_AVAILABLE = {
+  available: true,
+  disable_openrouter: false,
+  data_region: null,
+} satisfies OrgGatewaySettings;
+const GATEWAY_UNAVAILABLE = { ...GATEWAY_AVAILABLE, available: false };
+
+let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+
+type FormOverrides = {
+  gateway?: OrgGatewaySettings;
+  planEnded?: boolean;
+  canEdit?: boolean;
+};
+
+function element(overrides: FormOverrides = {}) {
+  return createElement(ModelAccessForm, {
+    organizationId: 'org-1',
+    canEdit: overrides.canEdit ?? true,
+    planEnded: overrides.planEnded ?? false,
+    models: [],
+    catalog: [],
+    catalogUnavailable: false,
+    catalogIsFetching: false,
+    onRetryCatalog: () => undefined,
+    providerAllowList: undefined,
+    modelDenyList: [],
+    gateway: overrides.gateway,
+    gatewayIsError: false,
+    gatewayIsFetching: false,
+    onRetryGateway: () => undefined,
+  });
+}
+
+function render(overrides: FormOverrides = {}) {
+  saved.mutateAsync.mockResolvedValue(undefined);
+  act(() => {
+    renderer = TestRenderer.create(element(overrides));
+  });
+  if (!renderer) {
+    throw new Error('Missing form renderer');
+  }
+  return renderer.root;
+}
+
+/** Render the same form again, as the settings read answering would. */
+function rerender(overrides: FormOverrides = {}) {
+  if (!renderer) {
+    throw new Error('Missing form renderer');
+  }
+  act(() => {
+    renderer?.update(element(overrides));
+  });
+  return renderer.root;
+}
+
+/** The segment values the control offers, in order. */
+function segmentValues(root: ReactTestInstance): string[] {
+  const options = root.findByType('SegmentedControl' as never).props.options as readonly {
+    value: string;
+  }[];
+  return options.map(option => option.value);
+}
+
+/** Every string a `Text` node renders. */
+function renderedCopy(root: ReactTestInstance): string[] {
+  return root
+    .findAllByType('Text' as never)
+    .map(node => node.props.children)
+    .filter((value): value is string => typeof value === 'string');
+}
+
+function selectTab(root: ReactTestInstance, tab: 'models' | 'providers' | 'gateways') {
+  act(() => {
+    (root.findByType('SegmentedControl' as never).props.onChange as (next: string) => void)(tab);
+  });
+}
+
+function gatewaySections(root: ReactTestInstance) {
+  return root.findAllByType('GatewaySettingsSection' as never);
+}
+
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+  saved.mutateAsync.mockReset();
+});
+
+describe('ModelAccessForm gateways tab', () => {
+  it('offers the gateways segment when the settings read reports it available', () => {
+    const root = render({ gateway: GATEWAY_AVAILABLE });
+
+    expect(segmentValues(root)).toEqual(['models', 'providers', 'gateways']);
+    selectTab(root, 'gateways');
+
+    expect(root.findByType('SegmentedControl' as never).props.value).toBe('gateways');
+    expect(gatewaySections(root)).toHaveLength(1);
+  });
+
+  it('leaves the gateways segment out while the settings read has not answered', () => {
+    const root = render();
+
+    expect(segmentValues(root)).toEqual(['models', 'providers']);
+    expect(gatewaySections(root)).toHaveLength(0);
+  });
+
+  it('leaves the gateways segment out when the plan does not offer gateways', () => {
+    const root = render({ gateway: GATEWAY_UNAVAILABLE });
+
+    expect(segmentValues(root)).toEqual(['models', 'providers']);
+    expect(gatewaySections(root)).toHaveLength(0);
+  });
+
+  it('falls back to the models tab when the gateways segment disappears', () => {
+    const root = render({ gateway: GATEWAY_AVAILABLE });
+    selectTab(root, 'gateways');
+    expect(gatewaySections(root)).toHaveLength(1);
+
+    // The read lands again without gateways while the tab is still selected:
+    // the control and the rendered list both fall back, instead of the control
+    // painting models while the gateways settings stay on screen.
+    const next = rerender({ gateway: GATEWAY_UNAVAILABLE });
+
+    expect(next.findByType('SegmentedControl' as never).props.value).toBe('models');
+    expect(segmentValues(next)).toEqual(['models', 'providers']);
+    expect(gatewaySections(next)).toHaveLength(0);
+  });
+});
+
+describe('ModelAccessForm read-only notice', () => {
+  it('names the lapsed plan instead of the role for a member', () => {
+    const copy = renderedCopy(render({ canEdit: false, planEnded: true }));
+
+    expect(copy).toContain(appI18n.t('common.organizationTrialEnded'));
+    expect(copy).not.toContain(appI18n.t('organizationModelAccess.readOnly'));
+  });
+
+  it('keeps the role sentence for a member on an active plan', () => {
+    const copy = renderedCopy(render({ canEdit: false, planEnded: false }));
+
+    expect(copy).toContain(appI18n.t('organizationModelAccess.readOnly'));
+    expect(copy).not.toContain(appI18n.t('common.organizationTrialEnded'));
+  });
+
+  it('shows the lapsed plan to an admin too', () => {
+    const copy = renderedCopy(render({ canEdit: true, planEnded: true }));
+
+    expect(copy).toContain(appI18n.t('common.organizationTrialEnded'));
+    expect(copy).not.toContain(appI18n.t('organizationModelAccess.readOnly'));
+  });
+
+  it('shows no notice to an admin on an active plan', () => {
+    const copy = renderedCopy(render({ canEdit: true, planEnded: false }));
+
+    expect(copy).not.toContain(appI18n.t('common.organizationTrialEnded'));
+    expect(copy).not.toContain(appI18n.t('organizationModelAccess.readOnly'));
+  });
+});

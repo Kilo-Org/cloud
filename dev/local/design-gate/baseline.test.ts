@@ -1539,14 +1539,11 @@ test('a manifest above the document bound is still refused', t => {
 
 test('a wrapped native-intent signature still receives the diagnostic branch', async t => {
   const wrapped =
-    'export function redirectSystemPath({\n  path,\n  initial,\n}: {\n  path: string | null;\n  initial: boolean;\n}) {\n  return initial ? path : null;\n}\n';
+    'export function redirectSystemPath({\n  path,\n  initial,\n}: {\n  path: string | null;\n  initial: boolean;\n}): string | null {\n  return initial ? path : null;\n}\n';
   const fixture = syntheticRepo(t, manifest, wrapped);
   const preparation = await prepareProof(fixture);
   for (const revision of ['base', 'head'] as const) {
-    const intent = fs.readFileSync(
-      path.join(preparation[revision].directory, INTENT),
-      'utf8'
-    );
+    const intent = fs.readFileSync(path.join(preparation[revision].directory, INTENT), 'utf8');
     assert.match(
       intent,
       /return "\/\(auth\)\/design-proof-card";/,

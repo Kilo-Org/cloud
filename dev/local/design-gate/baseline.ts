@@ -197,6 +197,39 @@ const INSTRUMENT_FILES = [
   'apps/mobile/src/lib/design-gate/sampler.ts',
 ] as const;
 
+/**
+ * The offset just after the body brace of `redirectSystemPath`, where a diagnostic branch may be
+ * inserted. The signature may wrap across lines and may declare a return type, so the parameter
+ * list is closed by counting parentheses at brace depth zero rather than by matching one line.
+ */
+function diagnosticInsertionPoint(source: string): number {
+  const unsupported = new Error('Unsupported native-intent diagnostic insertion point');
+  const start = source.indexOf('export function redirectSystemPath(');
+  if (start < 0 || source.includes('export function redirectSystemPath(', start + 1)) {
+    throw unsupported;
+  }
+  let parentheses = 0;
+  let braces = 0;
+  let close = -1;
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '{') braces += 1;
+    else if (char === '}') braces -= 1;
+    else if (braces === 0 && char === '(') parentheses += 1;
+    else if (braces === 0 && char === ')') {
+      parentheses -= 1;
+      if (parentheses === 0) {
+        close = index;
+        break;
+      }
+    }
+  }
+  if (close < 0) throw unsupported;
+  const body = source.indexOf('{', close);
+  if (body < 0) throw unsupported;
+  return body + 1;
+}
+
 function generatedFiles(
   repo: string,
   commit: string,
@@ -266,14 +299,11 @@ function generatedFiles(
       `  if (__DEV__ && !initial && ${JSON.stringify([target.link, target.route, target.route.slice(1)])}.includes(path)) return ${JSON.stringify(`/${target.screen}`)};`
     );
   }
-  // The signature wraps differently across prettier runs, so match its shape rather than one line.
+  // The signature wraps differently across formatter runs and may declare a return type, so find
+  // the closing parenthesis of the parameter list by counting, then take the body brace after it.
   if (branches.length > 0) {
-    const declarations = intent.match(
-      /export function redirectSystemPath\([\s\S]*?\)\s*\{/gu
-    );
-    if (declarations?.length !== 1)
-      throw new Error('Unsupported native-intent diagnostic insertion point');
-    intent = intent.replace(declarations[0], `${declarations[0]}\n${branches.join('\n')}`);
+    const at = diagnosticInsertionPoint(intent);
+    intent = `${intent.slice(0, at)}\n${branches.join('\n')}${intent.slice(at)}`;
   }
   intent += `\n// Temporary diagnostic source receipt; forces stale Metro bundles to fail closed.\nif (__DEV__) (globalThis as typeof globalThis & { ${MARKER}?: string }).${MARKER} = ${JSON.stringify(marker)};\n`;
   files.set(INTENT, intent);

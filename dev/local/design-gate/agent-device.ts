@@ -168,8 +168,34 @@ function iosAppNodes(nodes: readonly AgentNode[]): AgentNode[] {
     hosted.add(node.index);
     if (role !== 'RCTAccessibilityElement') kept.push(node);
   }
-  const all = data.nodes.filter(isAgentNode);
-  const safeArea = snapshotInsets(all, width, height, density);
+  return kept;
+}
+
+const IOS_TAGS: Record<string, string> = {
+  StaticText: 'Paragraph',
+  TextField: 'TextInput',
+  TextView: 'TextInput',
+  Other: 'View',
+};
+const IOS_PRESSABLE_KINDS = new Set(['button', 'link', 'switch', 'text-field', 'text-view']);
+
+/** Where one snapshot's frames live, and how its nodes read. */
+type Conversion = {
+  platform: 'android' | 'ios';
+  window: { width: number; height: number };
+  density: number;
+  safeArea: SnapshotInsets;
+  tag: (node: AgentNode) => string;
+  pressable: (node: AgentNode) => boolean;
+  testID: (identifier: string) => boolean;
+};
+
+function convert(
+  all: readonly AgentNode[],
+  kept: readonly AgentNode[],
+  how: Conversion
+): ProbeDump {
+  const { density, window } = how;
   const byIndex = new Map(all.map(node => [node.index, node]));
   const newIndex = new Map(kept.map((node, position) => [node.index, position + 1]));
   const nodes: Writable<ProbeNode>[] = [

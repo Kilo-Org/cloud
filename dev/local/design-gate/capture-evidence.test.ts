@@ -112,6 +112,24 @@ test('the gaps around the screenshot decide the bracket, not the span', () => {
     paintSignature,
     observation
   );
-  assert.equal(cheap.status, 'bracketed');
-  assert.equal(cheap.budgetMs, CAPTURE_ALIGNMENT_BUDGET_MS);
+  assert.equal(slowShot.status, 'bracketed');
+  assert.equal(slowShot.gapMs, 152);
+  const late = (beforeGap: number, afterGap: number) =>
+    captureAlignment(
+      { startedMs: 0, completedMs: 100, dump: tree },
+      { startedMs: 100 + beforeGap, completedMs: 200 + beforeGap },
+      {
+        startedMs: 200 + beforeGap + afterGap,
+        completedMs: 300 + beforeGap + afterGap,
+        dump: tree,
+      },
+      paintSignature,
+      observation
+    );
+  assert.equal(late(CAPTURE_GAP_BUDGET_MS, CAPTURE_GAP_BUDGET_MS).status, 'bracketed');
+  for (const evidence of [late(CAPTURE_GAP_BUDGET_MS + 1, 0), late(0, CAPTURE_GAP_BUDGET_MS + 1)]) {
+    assert.equal(evidence.status, 'inconclusive');
+    assert.equal(evidence.gapMs, CAPTURE_GAP_BUDGET_MS + 1);
+    assert.match(evidence.reason, /more than 250 ms apart from the screenshot/);
+  }
 });

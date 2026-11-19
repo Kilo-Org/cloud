@@ -65,9 +65,7 @@ export function GatewayModelListContent({
 
   const catalogNames = useMemo(
     () =>
-      new Map(
-        (catalogQuery.data ?? []).map(model => [model.id, modelNameWithRetirement(model)])
-      ),
+      new Map((catalogQuery.data ?? []).map(model => [model.id, modelNameWithRetirement(model)])),
     [catalogQuery.data]
   );
 

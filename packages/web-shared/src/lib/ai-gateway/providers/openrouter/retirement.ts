@@ -18,7 +18,11 @@ export function isExpensiveModel(model: RetirementNoteModel): boolean {
 }
 
 /** A preferred model created within the last week. */
-export function isNewModel(model: RetirementNoteModel, preferredIndex: number, now = Date.now()): boolean {
+export function isNewModel(
+  model: RetirementNoteModel,
+  preferredIndex: number,
+  now = Date.now()
+): boolean {
   const ageDays = (now / 1_000 - model.created) / (24 * 3600);
   return preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
 }

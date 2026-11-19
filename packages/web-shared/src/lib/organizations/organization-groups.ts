@@ -96,7 +96,8 @@ export async function lockOrganizationGroupPolicy(tx: DrizzleTransaction, organi
   `);
 }
 
-type OrganizationGroupPolicySettingsRow = typeof organization_group_policy_settings.$inferSelect;
+export type OrganizationGroupPolicySettingsRow =
+  typeof organization_group_policy_settings.$inferSelect;
 
 async function getSettingsRow(
   organizationId: string,
@@ -159,7 +160,7 @@ export async function bumpOrganizationGroupPolicyRevision(
  * read path and the mutation wrapper share it so they cannot disagree about
  * the defaults or the parse options.
  */
-function canonicalSettingsFrom(
+export function canonicalSettingsFrom(
   settings: OrganizationGroupPolicySettingsRow | undefined,
   organizationId: string
 ): CanonicalOrganizationGroupPolicySettings {

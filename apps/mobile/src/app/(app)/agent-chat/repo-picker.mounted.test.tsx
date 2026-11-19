@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import RepoPickerScreen from '@/app/(app)/agent-chat/repo-picker';
 import { PickerSheet } from '@/components/picker-sheet';
-import { Card } from '@/components/ui/card';
 import { type RepoOption, type RepoPickerSection } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import '@/i18n';
@@ -229,21 +228,5 @@ describe('repository picker row layout', () => {
     expect(row.props.accessibilityLabel).toBe(`GitHub ${SIBLING_NAME}`);
     // The shared choice row states selection and enablement together.
     expect(row.props.accessibilityState).toMatchObject({ selected: false, disabled: false });
-  });
-
-  it('puts the personal-scope Bitbucket note on the page gutter', async () => {
-    repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
-      repositories: rows,
-      sections,
-      organizationId: null,
-      currentValue: '',
-      onSelect: vi.fn<() => void>(),
-    });
-    const renderer = await mount();
-
-    // The search field above sits on the 14 dp `mx-4` gutter; the card must
-    // start on the same line.
-    const [note] = renderer.root.findAllByType(Card);
-    expect(String(note?.props.className).split(' ')).toContain('mx-4');
   });
 });

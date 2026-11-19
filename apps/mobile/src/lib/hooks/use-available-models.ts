@@ -126,7 +126,10 @@ export function toModelOptions(data: ModelResponse | undefined, language: string
 
   // `sortModelOptions` orders preferred rows first and the rest by `name`;
   // the projection carries every field the option exposes, so the sorted
-  // array is the answer.
+  // array is the answer. `preferredIndex` stays on the rows past the declared
+  // `ModelOption` shape on purpose: the declared interface is what callers
+  // read, and the index is the comparator's private ordering input — adding
+  // it to the interface would invite re-sorting by it outside this helper.
   return sortModelOptions(projected, language);
 }
 

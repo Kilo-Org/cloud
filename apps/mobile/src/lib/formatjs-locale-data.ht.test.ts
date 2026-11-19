@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Haitian Creole's plural selection must stay Haitian, not follow whichever
@@ -31,6 +31,28 @@ afterAll(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * The polyfill and its locale-data files are externalized: their `require`
+ * cache survives `vi.resetModules()`, so a fresh import of `intl-cache` would
+ * still see every module the earlier cases registered. Clearing the cache
+ * entries makes each case's registration order the only one that exists.
+ *
+ * `require` here is the CJS loader the transform exposes to this module (it is
+ * NOT `globalThis.require`, which the ESM runtime omits); `require.cache` is
+ * the only handle on the externalized package's registration state, and the
+ * entry must be deleted, not nulled, so a later `require` re-evaluates the
+ * data file instead of returning the cleared slot.
+ */
+beforeEach(() => {
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete, unicorn/prefer-module -- the CJS loader cache is the only seam to the externalized package's registration state; deleting by path re-evaluates the data file for the next case.
+  for (const key of Object.keys(require.cache)) {
+    if (key.includes('@formatjs/intl-pluralrules')) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete, unicorn/prefer-module -- same seam: deleting (not nulling) makes the next require re-run the data file.
+      delete require.cache[key];
+    }
+  }
+});
+
 describe('ht plural-data pin', () => {
   it('pins ht when its data registers before the French data', async () => {
     // The module must load inside the stubbed window, so the dynamic import
@@ -58,14 +80,20 @@ describe('ht plural-data pin', () => {
   });
 
   it('keeps ht pinned when the French data registers first', async () => {
-    // Fresh `intl-cache` module state so the loader's own bookkeeping restarts;
-    // the polyfill itself persists (see the file comment above).
+    // The drift order: a user lands in French (its data registers first), the
+    // pinned `ht` loader runs after, and later French rewarming re-registers.
+    // On the previous code `ht` best-fit to the French categories from then
+    // on; with the pin it stays the root rule through every step.
+    //
+    // This host's native ICU serves `fr` itself, so `prewarmIntl('fr')` would
+    // install nothing here; the test registers the French data the way the
+    // device runtime does — through the polyfill the app force-installs.
+    await import('@formatjs/intl-pluralrules/polyfill-force.js');
+    await import('@formatjs/intl-pluralrules/locale-data/fr.js');
     const { prewarmIntl } = await import('./intl-cache');
 
     prewarmIntl('fr');
     prewarmIntl('ht');
-    // Re-registering the French data is what a runtime process order does when
-    // a user lands in French and switches later; the pin must survive it.
     prewarmIntl('fr');
 
     expect(new Intl.PluralRules('ht').resolvedOptions().locale).toBe('ht');
@@ -74,5 +102,7 @@ describe('ht plural-data pin', () => {
     expect(new Intl.PluralRules('ht').select(0.5)).toBe('other');
     expect(new Intl.PluralRules('ht').select(1)).toBe('one');
     expect(new Intl.PluralRules('ht').select(1_000_000)).toBe('other');
+    // French itself is unchanged by the pin.
+    expect(new Intl.PluralRules('fr').select(1_000_000)).toBe('many');
   });
 });

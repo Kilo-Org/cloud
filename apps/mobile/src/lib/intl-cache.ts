@@ -101,7 +101,14 @@ function ensureLocale(): void {
  * `many` form no ht catalog family carries. CLDR gives `ht` no rule block, so
  * the root selection IS Haitian; the pin keeps it so regardless of order.
  */
+let haitianPluralRulesPinned = false;
 function pinHaitianPluralRules(): void {
+  // One registration is the whole contract: the dataset it publishes under
+  // `ht` is frozen at pin time, so re-running it on every formatter call
+  // would only re-add the identical entry.
+  if (haitianPluralRulesPinned) {
+    return;
+  }
   // Polyfill internals the ambient globals omit; the shape is the package's
   // own `polyfill-force.js` (`localeData` entries, the raw `__addLocaleData`
   // entry), read through one named `unknown` widening.
@@ -120,6 +127,7 @@ function pinHaitianPluralRules(): void {
   // Present whenever the data file registered through the polyfill.
   if (processed && internals.__addLocaleData) {
     internals.__addLocaleData({ locale: 'ht', data: processed });
+    haitianPluralRulesPinned = true;
   }
   // Without the polyfill (a runtime whose native `Intl.PluralRules` answers
   // for `ht`, or the plain Node projects) there is nothing to pin: the native

@@ -5,7 +5,6 @@ import type {
   UserProfile,
   UserProfileCreateParams,
 } from '@anthropic-ai/sdk/resources/user-profiles/user-profiles';
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { getClaudeOperatorClient } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 
 /**
@@ -37,16 +36,17 @@ export type AnthropicUserProfileDetails =
     };
 
 /**
- * Keyed with a secret pepper, so Anthropic can match profiles that share an
- * email address without being able to recover the address from a guess.
+ * Anthropic only matches hashes computed with the same pepper, so it must never
+ * change once profiles carry it.
  */
-export function anthropicUserProfileEmailHash(email: string, pepper: string): string {
-  return createHmac('sha256', pepper).update(email.trim().toLowerCase()).digest('hex');
+const EMAIL_HASH_PEPPER = 'kilo-anthropic-user-profile-702b0503d7b03c50efb2fe8d4bc5a2df';
+
+export function anthropicUserProfileEmailHash(email: string): string {
+  return createHmac('sha256', EMAIL_HASH_PEPPER).update(email.trim().toLowerCase()).digest('hex');
 }
 
 export function anthropicUserProfileCreateParams(
-  details: AnthropicUserProfileDetails,
-  hashPepper: string | null = getEnvVariable('ANTHROPIC_USER_PROFILE_HASH_PEPPER') || null
+  details: AnthropicUserProfileDetails
 ): UserProfileCreateParams {
   const metadata = {
     [ANTHROPIC_USER_PROFILE_SOURCE_KEY]: ANTHROPIC_USER_PROFILE_SOURCE,
@@ -62,10 +62,7 @@ export function anthropicUserProfileCreateParams(
         entity_type: 'individual',
         account_status: 'active',
         onboarded_at,
-        // Without the pepper, send no hash rather than an unkeyed one.
-        ...(hashPepper
-          ? { email_hash: anthropicUserProfileEmailHash(details.email, hashPepper) }
-          : {}),
+        email_hash: anthropicUserProfileEmailHash(details.email),
       },
     };
   }

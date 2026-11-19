@@ -3,15 +3,12 @@ import { anthropicUserProfileCreateParams, anthropicUserProfileEmailHash } from 
 
 describe('anthropicUserProfileCreateParams', () => {
   it('registers a user as a passthrough individual without a name', () => {
-    const params = anthropicUserProfileCreateParams(
-      {
-        kind: 'user',
-        userId: 'oauth/github:1',
-        email: ' Person@Example.com ',
-        createdAt: '2026-04-29 01:16:12.945+00',
-      },
-      'pepper'
-    );
+    const params = anthropicUserProfileCreateParams({
+      kind: 'user',
+      userId: 'oauth/github:1',
+      email: ' Person@Example.com ',
+      createdAt: '2026-04-29 01:16:12.945+00',
+    });
     expect(params).toEqual({
       access_type: 'passthrough',
       metadata: { kilo_source: 'ai_gateway', kilo_entity: 'user' },
@@ -20,26 +17,17 @@ describe('anthropicUserProfileCreateParams', () => {
         entity_type: 'individual',
         account_status: 'active',
         onboarded_at: '2026-04-29T01:16:12.945Z',
-        email_hash: anthropicUserProfileEmailHash('person@example.com', 'pepper'),
+        email_hash: anthropicUserProfileEmailHash('person@example.com'),
       },
     });
     expect(params.name).toBeUndefined();
   });
 
-  it('keys the email hash with the pepper and omits it without one', () => {
-    const hash = anthropicUserProfileEmailHash(' Person@Example.com ', 'pepper');
+  it('normalizes the email before hashing it', () => {
+    const hash = anthropicUserProfileEmailHash(' Person@Example.com ');
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(hash).toBe(anthropicUserProfileEmailHash('person@example.com', 'pepper'));
-    expect(hash).not.toBe(anthropicUserProfileEmailHash('person@example.com', 'other'));
-    const details = {
-      kind: 'user',
-      userId: 'u',
-      email: 'person@example.com',
-      createdAt: '2026-04-29T01:16:12.945Z',
-    } as const;
-    expect(
-      anthropicUserProfileCreateParams(details, null).external_user_details
-    ).not.toHaveProperty('email_hash');
+    expect(hash).toBe(anthropicUserProfileEmailHash('person@example.com'));
+    expect(hash).not.toBe(anthropicUserProfileEmailHash('other@example.com'));
   });
 
   it('registers an organization as a named passthrough business', () => {

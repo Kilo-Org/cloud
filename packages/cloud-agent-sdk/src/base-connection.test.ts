@@ -457,6 +457,84 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       connection.destroy();
     });
+
+    it('leaves a stuck refresh so a later trigger can recover, and an explicit retry always can', async () => {
+      // The first refresh never settles: a mobile auth call on a dead link.
+      let releaseFirstRefresh!: () => void;
+      const stuckRefresh = new Promise<void>(resolve => {
+        releaseFirstRefresh = resolve;
+      });
+      const refreshAuth = jest
+        .fn()
+        .mockImplementationOnce(() => stuckRefresh)
+        .mockImplementation(() => Promise.resolve());
+      const { connection } = createTestConnection({ refreshAuth });
+      connection.connect();
+
+      sockets[0].readyState = 0; // WebSocket.CONNECTING
+      simulateVisibilityChange('hidden');
+      simulateVisibilityChange('visible');
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+
+      // Past the join window a later trigger starts a fresh attempt instead of
+      // waiting forever on the one that never settled.
+      jest.advanceTimersByTime(20_000);
+      mockWindow.dispatchEvent(new Event('online'));
+      expect(refreshAuth).toHaveBeenCalledTimes(2);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(sockets).toHaveLength(2);
+
+      // An explicit retry is the immediate escape, with no wait at all.
+      connection.retryReconnect();
+      expect(refreshAuth).toHaveBeenCalledTimes(3);
+
+      releaseFirstRefresh();
+      connection.destroy();
+    });
+
+    it('does not let an abandoned refresh release the gate a newer attempt owns', async () => {
+      let releaseFirstRefresh!: () => void;
+      const stuckRefresh = new Promise<void>(resolve => {
+        releaseFirstRefresh = resolve;
+      });
+      let releaseSecondRefresh!: () => void;
+      const secondRefresh = new Promise<void>(resolve => {
+        releaseSecondRefresh = resolve;
+      });
+      const refreshAuth = jest.fn(() => stuckRefresh);
+      const { connection } = createTestConnection({ refreshAuth });
+      connection.connect();
+
+      // The initial connect opened a socket that stays CONNECTING.
+      sockets[0].readyState = 0;
+      simulateVisibilityChange('hidden');
+      simulateVisibilityChange('visible');
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+
+      // Abandon the first attempt and start a second that is still in flight.
+      refreshAuth.mockImplementationOnce(() => secondRefresh);
+      jest.advanceTimersByTime(20_000);
+      mockWindow.dispatchEvent(new Event('online'));
+      expect(refreshAuth).toHaveBeenCalledTimes(2);
+
+      // The abandoned attempt settling must not open the gate: a reconnect
+      // timer firing now would open a socket with the ticket attempt 2 is
+      // still replacing.
+      releaseFirstRefresh();
+      await Promise.resolve();
+      await Promise.resolve();
+      closeSocket(0);
+      jest.advanceTimersByTime(500);
+      expect(sockets).toHaveLength(1);
+
+      releaseSecondRefresh();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(sockets).toHaveLength(2);
+
+      connection.destroy();
+    });
   });
 
   describe('reconnect attempts reset after exhaustion', () => {

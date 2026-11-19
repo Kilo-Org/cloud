@@ -16,11 +16,12 @@ import {
   recordBriefingUsage,
 } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { sweepAgentBriefings, generatePendingAgentBriefings } from './sweep';
 import { reconcileBriefingCharge, runBriefingSummary, SUMMARY_MAX_ATTEMPTS } from './summary';
 import { briefingFactsSchema, buildBriefingSnapshot, collectBriefingSnapshot } from './evidence';
 import { agentBriefingRouter } from '@/routers/agent-briefing-router';
-import { emptySummary } from './store';
+import * as briefingStore from './store';
 
 jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
   dispatchAgentBriefingPush: jest.fn().mockResolvedValue(false),
@@ -41,6 +42,35 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn().mockResolvedValue({ payer: {}, balance: 10 }),
 }));
+// The `./store` override below exists because jest.spyOn cannot redefine the
+// module's export binding under this project's SWC transform. `briefingContextSettings`
+// runs pre-claim for eligibility and again post-claim; the recorded error is
+// armed for exactly one call, so setting it between the pre-claim read and the
+// post-claim re-check (via the balance mock, which runs in that gap) leaves
+// phase 1 on the real function and refuses only the post-claim re-check. The
+// test body clears the error right after the run, and Jest runs each test file
+// in its own module registry, so no sibling ever sees the override.
+jest.mock('./store', () => {
+  const actual = jest.requireActual('./store');
+  const state = {
+    transientPostClaimError: null as Error | null,
+    transientArmed: false,
+  };
+  (globalThis as unknown as { __briefingStoreMock: typeof state }).__briefingStoreMock = state;
+  return {
+    ...actual,
+    briefingContextSettings: (userId: string, organizationId?: string | null) => {
+      const { transientPostClaimError: error, transientArmed: armed } = (
+        globalThis as unknown as { __briefingStoreMock: typeof state }
+      ).__briefingStoreMock;
+      if (error && armed) {
+        state.transientArmed = false;
+        return Promise.reject(error);
+      }
+      return actual.briefingContextSettings(userId, organizationId);
+    },
+  };
+});
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),
   getRawOpenRouterModels: jest.fn().mockResolvedValue({
@@ -318,6 +348,95 @@ it('fails a terminal decline without a second request', async () => {
   expect(failed?.summary.error).toBe('gateway_declined');
 });
 
+// A transient admission failure leaves the row pending; the retry budget has
+// pushed its due time out, and the next due run succeeds and generates it.
+it('retries a row whose admission hit a transient failure and later generates it', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const balance = jest.mocked(getBalanceAndOrgSettings);
+  balance.mockRejectedValueOnce(new Error('_transient'));
+  const fetcher = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
+  await expect(runBriefingSummary(row.id)).rejects.toThrow('_transient');
+  expect(fetcher).not.toHaveBeenCalled();
+  const [stalled] = await db.select().from(agent_briefing_snapshots);
+  expect(stalled?.summary.status).toBe('pending');
+  expect(stalled?.generation_id).toBeNull();
+  expect(Date.parse(stalled?.job_due_at ?? '')).toBeGreaterThan(Date.parse(row.job_due_at ?? ''));
+  fetcher.mockResolvedValue(
+    Response.json({ choices: [{ message: { content: 'Recovered summary.' } }] })
+  );
+  await runBriefingSummary(row.id);
+  const [finished] = await db.select().from(agent_briefing_snapshots);
+  expect(finished?.summary.status).toBe('ready');
+  expect(finished?.summary.text).toBe('Recovered summary.');
+});
+
+// A captured source row that is deleted afterwards is a deterministic refusal of
+// the stored snapshot: the mapped code is recorded without holding a slot, and
+// the row does not stay due to be selected ahead of newer reports every tick.
+it('records a failed refusal when a captured source row is gone', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const facts = briefingFactsSchema.parse(row.facts);
+  const sourceIds = facts.sessions.flatMap(session =>
+    session.sources.map(source => source.sessionId)
+  );
+  await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sourceIds[0]!));
+  const fetcher = jest.spyOn(globalThis, 'fetch');
+  await runBriefingSummary(row.id);
+  const [refused] = await db.select().from(agent_briefing_snapshots);
+  expect(refused?.summary.status).toBe('failed');
+  expect(refused?.summary.error).toBe('permission_unavailable');
+  expect(refused?.generation_id).toBeNull();
+  expect(refused?.job_due_at).toBeNull();
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+// A lookup that stays down while the row is due must not keep a selection slot:
+// each rejection is retried on a later due run, and the budget then records the
+// cause instead of rethrowing.
+it('records the mapped refusal after the admission rethrow budget', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const balance = jest.mocked(getBalanceAndOrgSettings);
+  // One-shot rejections: one for each rethrow under the budget and one for the
+  // call that records the refusal, leaving the module default for later tests.
+  balance
+    .mockRejectedValueOnce(new Error('_persistent'))
+    .mockRejectedValueOnce(new Error('_persistent'))
+    .mockRejectedValueOnce(new Error('_persistent'))
+    .mockRejectedValueOnce(new Error('_persistent'));
+  const fetcher = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
+  const dueAt = row.job_due_at;
+  if (!dueAt) throw new Error('No due time');
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await expect(runBriefingSummary(row.id)).rejects.toThrow('_persistent');
+    const [pending] = await db.select().from(agent_briefing_snapshots);
+    expect(pending?.summary.status).toBe('pending');
+    expect(pending?.generation_id).toBeNull();
+    if (attempt === 0) {
+      expect(Date.parse(pending?.job_due_at ?? '')).toBeGreaterThan(Date.parse(dueAt));
+      await db
+        .update(agent_briefing_snapshots)
+        .set({ job_due_at: dueAt })
+        .where(eq(agent_briefing_snapshots.id, row.id));
+    }
+  }
+  await runBriefingSummary(row.id);
+  const [refused] = await db.select().from(agent_briefing_snapshots);
+  expect(refused?.summary.status).toBe('failed');
+  expect(refused?.summary.error).toBe('generation_failed');
+  expect(refused?.generation_id).toBeNull();
+  expect(refused?.summary.admissionAttempts).toBe(3);
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
 it('does not repeat a successful answer whose body cannot be read', async () => {
   const { now } = await scheduled();
   await sweepAgentBriefings(now);
@@ -333,6 +452,21 @@ it('does not repeat a successful answer whose body cannot be read', async () => 
       { status: 200 }
     )
   );
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const [failed] = await db.select().from(agent_briefing_snapshots);
+  expect(failed?.summary.status).toBe('failed');
+  expect(failed?.summary.error).toBe('generation_failed');
+});
+
+it('records a provider answer that does not match the response shape as a generation failure', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(Response.json({ error: { message: 'provider envelope' } }));
   await runBriefingSummary(row.id);
   expect(fetcher).toHaveBeenCalledTimes(1);
   const [failed] = await db.select().from(agent_briefing_snapshots);
@@ -400,6 +534,7 @@ it('retries an aborted request and records the failure at the bound', async () =
   expect(fetcher).toHaveBeenCalledTimes(SUMMARY_MAX_ATTEMPTS);
   const [failed] = await db.select().from(agent_briefing_snapshots);
   expect(failed?.summary.status).toBe('failed');
+  expect(failed?.summary.error).toBe('time_limit');
 }, 20_000);
 it('settles a delayed usage delivery against its immutable occurrence generation', async () => {
   const { now, user } = await scheduled();
@@ -739,6 +874,205 @@ it('preserves saved snapshot readability while disabling future paid generation'
   expect((await caller.get({ reportId: row.id })).summary.error).toBe('permission_unavailable');
 });
 
+// A context whose preference is disabled (or removed) after the row was captured
+// is re-refused after the slot is claimed: the run releases the claim in the same
+// failure write, so the row is stored refused without cost and without holding
+// one of two pool slots for the rest of the morning. The context flips between
+// the preflight and the claim, so phase 1 admits the row and the post-claim
+// re-check is what refuses it.
+it('releases the claimed slot when the context is gone by the post-claim re-check', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const balance = jest.mocked(getBalanceAndOrgSettings);
+  // One-shot: the single preflight call flips the context off and then falls
+  // through to the balance lookup the module default provides, so this mock
+  // leaves later tests untouched.
+  const defaults = jest.requireActual('@kilocode/web-shared/lib/organizations/organization-usage');
+  balance.mockImplementationOnce(async (organizationId, user) => {
+    await agentBriefingRouter.createCaller({ user }).updateContextPreferences({ enabled: false });
+    return defaults.getBalanceAndOrgSettings(organizationId, user);
+  });
+  const fetcher = jest.spyOn(globalThis, 'fetch');
+  await runBriefingSummary(row.id);
+  expect(balance).toHaveBeenCalled();
+  expect(fetcher).not.toHaveBeenCalled();
+  const [refused] = await db.select().from(agent_briefing_snapshots);
+  expect(refused?.summary.status).toBe('failed');
+  expect(refused?.summary.error).toBe('permission_unavailable');
+  expect(refused?.generation_id).toBeNull();
+  expect(refused?.summary.startedAt).toBeNull();
+  expect(refused?.generation_started_at).toBeNull();
+  expect(refused?.generation_deadline_at).toBeNull();
+  expect(refused?.summary.chargeAccounting).toBeUndefined();
+  expect(refused?.summary.costMicrodollars).toBe(0);
+  expect(refused?.job_due_at).toBeNull();
+  expect(refused?.facts).toEqual(row.facts);
+});
+
+// A post-claim check whose failure could not decide the row (a transient lookup
+// error) releases the claim and rethrows instead of recording a refusal: the row
+// stays pending with its due time pushed out, and the next due run generates it.
+it('releases a claimed slot and retries when the post-claim check fails transiently', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const dueAt = row.job_due_at;
+  if (!dueAt) throw new Error('No due time');
+  // jest.spyOn cannot redefine this export binding under the project's SWC
+  // transform, so the transient failure rides the `./store` mock factory's
+  // one-shot flag; arming it inside the preflight mock leaves phase 1 on the
+  // real function and refuses only the post-claim re-check.
+  const mockGlobals = (
+    globalThis as typeof globalThis & {
+      __briefingStoreMock?: { transientPostClaimError: Error | null; transientArmed: boolean };
+    }
+  ).__briefingStoreMock;
+  if (!mockGlobals) throw new Error('Missing store mock state');
+  const balance = jest.mocked(getBalanceAndOrgSettings);
+  // One-shot: the single preflight call arms the store override and then falls
+  // through to the balance lookup the module default provides, keeping this mock
+  // from leaking into sibling tests.
+  const defaults = jest.requireActual('@kilocode/web-shared/lib/organizations/organization-usage');
+  balance.mockImplementationOnce(async (organizationId, user) => {
+    mockGlobals.transientPostClaimError = new Error('_transient');
+    mockGlobals.transientArmed = true;
+    return defaults.getBalanceAndOrgSettings(organizationId, user);
+  });
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(
+      Response.json({ choices: [{ message: { content: 'Recovered summary.' } }] })
+    );
+  await expect(runBriefingSummary(row.id)).rejects.toThrow('_transient');
+  mockGlobals.transientArmed = false;
+  mockGlobals.transientPostClaimError = null;
+  expect(fetcher).not.toHaveBeenCalled();
+  const [stalled] = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.id, row.id));
+  expect(stalled?.summary.status).toBe('pending');
+  expect(stalled?.summary.error).toBeNull();
+  expect(stalled?.generation_id).toBeNull();
+  expect(stalled?.generation_started_at).toBeNull();
+  expect(stalled?.generation_deadline_at).toBeNull();
+  expect(stalled?.generation_max_cost).toBeNull();
+  expect(stalled?.summary.startedAt).toBeNull();
+  // The claim itself writes only the running status, so a release leaves no
+  // per-generation accounting residue for a generation nothing was paid for.
+  expect(stalled?.summary.chargeAccounting).toBeUndefined();
+  expect(stalled?.summary.chargeStatus).toBe('settled');
+  expect(stalled?.summary.costMicrodollars).toBe(0);
+  expect(Date.parse(stalled?.job_due_at ?? '')).toBeGreaterThan(Date.parse(dueAt));
+  await runBriefingSummary(row.id);
+  const [finished] = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.id, row.id));
+  expect(finished?.summary.status).toBe('ready');
+  expect(finished?.summary.text).toBe('Recovered summary.');
+  expect(finished?.generation_id).not.toBeNull();
+});
+
+// While both pool slots are busy, a due row must not pay for the admission work
+// it cannot use: the run stops after the cheap eligibility checks, before the
+// pricing lookup and its balance read, and the row stays pending untouched.
+it('skips pricing and balance work for a due row while the pool is full', async () => {
+  const { user, now } = await scheduled();
+  const otherUser = await insertTestUser();
+  await db.insert(agent_briefing_snapshots).values(
+    ['first', 'second'].map(slot => ({
+      ...maintenanceSnapshot(otherUser.id, `busy-${slot}`),
+      summary: { ...briefingStore.emptySummary, status: 'running' },
+      generation_id: `agent-briefing:${slot}`,
+      generation_started_at: new Date(now.getTime() - 60_000).toISOString(),
+      generation_deadline_at: new Date(now.getTime() + 600_000).toISOString(),
+    }))
+  );
+  await sweepAgentBriefings(now);
+  const [row] = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.kilo_user_id, user.id));
+  if (!row) throw new Error('No captured snapshot');
+  expect(row.summary.status).toBe('pending');
+  const fetcher = jest.spyOn(globalThis, 'fetch');
+  const balance = jest.mocked(getBalanceAndOrgSettings);
+  const balanceCalls = balance.mock.calls.length;
+  await runBriefingSummary(row.id);
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(balance.mock.calls.length).toBe(balanceCalls);
+  const [skipped] = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.id, row.id));
+  expect(skipped?.summary.status).toBe('pending');
+  expect(skipped?.generation_id).toBeNull();
+  expect(skipped?.job_due_at).toBe(row.job_due_at);
+  expect(skipped?.summary.admissionAttempts).toBeUndefined();
+  expect(skipped?.summary.error).toBeNull();
+});
+
+it('fails rows their disabled context refuses without holding a generation slot', async () => {
+  // A refusal must be recorded without claiming a generation slot, so the due row
+  // behind it is still admitted in the same run.
+  const first = await scheduled();
+  const second = await scheduled();
+  const third = await scheduled();
+  await sweepAgentBriefings(first.now);
+  const rows = await db.select().from(agent_briefing_snapshots);
+  expect(rows).toHaveLength(3);
+  const [refusedFirst, refusedSecond] = [first.user.id, second.user.id].map(userId =>
+    rows.find(row => row.kilo_user_id === userId)
+  );
+  const valid = rows.find(row => row.kilo_user_id === third.user.id);
+  if (!refusedFirst || !refusedSecond || !valid) throw new Error('Missing captured snapshot');
+  await agentBriefingRouter
+    .createCaller({ user: first.user })
+    .updateContextPreferences({ enabled: false });
+  await agentBriefingRouter
+    .createCaller({ user: second.user })
+    .updateContextPreferences({ enabled: false });
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(Response.json({ choices: [{ message: { content: 'Summary' } }] }));
+  await Promise.all([
+    runBriefingSummary(refusedFirst.id),
+    runBriefingSummary(refusedSecond.id),
+    runBriefingSummary(valid.id),
+  ]);
+  const finished = await db.select().from(agent_briefing_snapshots);
+  for (const id of [refusedFirst.id, refusedSecond.id]) {
+    const refused = finished.find(entry => entry.id === id);
+    expect(refused?.summary.status).toBe('failed');
+    expect(refused?.summary.error).toBe('permission_unavailable');
+    expect(refused?.generation_id).toBeNull();
+  }
+  const admitted = finished.find(entry => entry.id === valid.id);
+  expect(admitted?.summary.status).toBe('ready');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+it('records a pending row whose window closed as not admitted', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const past = new Date(now.getTime() - 60_000).toISOString();
+  await db
+    .update(agent_briefing_snapshots)
+    .set({ job_due_at: past, morning_end_at: past })
+    .where(eq(agent_briefing_snapshots.id, row.id));
+  await sweepAgentBriefings(new Date(now.getTime() + 60_000));
+  const [expired] = await db.select().from(agent_briefing_snapshots);
+  expect(expired?.summary.status).toBe('unavailable');
+  expect(expired?.summary.error).toBe('not_admitted');
+  expect(expired?.job_due_at).toBeNull();
+});
+
 it('keeps declined notification delivery due until a later accepted morning dispatch', async () => {
   const { user, now } = await scheduled();
   await db
@@ -864,7 +1198,7 @@ function maintenanceSnapshot(
     published_at: '2026-10-28T08:00:00.000Z',
     expires_at: '2026-11-27T08:00:00.000Z',
     facts: buildBriefingSnapshot([]),
-    summary: emptySummary,
+    summary: briefingStore.emptySummary,
   };
 }
 
@@ -933,7 +1267,7 @@ it('repairs an expired running job behind an entire batch of still-open pending 
     Array.from({ length: 100 }, (_, index) => ({
       ...maintenanceSnapshot(user.id, `pending-${index}`),
       job_due_at: '2026-10-28T08:00:00.000Z',
-      summary: { ...emptySummary, status: 'pending' },
+      summary: { ...briefingStore.emptySummary, status: 'pending' },
     }))
   );
   const [running] = await db
@@ -944,7 +1278,7 @@ it('repairs an expired running job behind an entire batch of still-open pending 
       generation_id: 'agent-briefing:expired',
       generation_started_at: '2026-10-28T08:00:00.000Z',
       generation_deadline_at: '2026-10-28T08:05:00.000Z',
-      summary: { ...emptySummary, status: 'running' },
+      summary: { ...briefingStore.emptySummary, status: 'running' },
     })
     .returning();
   if (!running) throw new Error('Missing running report');
@@ -965,7 +1299,7 @@ it('leaves a running job within the expiry grace for its in-flight success write
       generation_id: 'agent-briefing:finishing',
       generation_started_at: '2026-10-28T08:00:00.000Z',
       generation_deadline_at: '2026-10-28T08:09:00.000Z',
-      summary: { ...emptySummary, status: 'running' },
+      summary: { ...briefingStore.emptySummary, status: 'running' },
     })
     .returning();
   if (!running) throw new Error('Missing running report');

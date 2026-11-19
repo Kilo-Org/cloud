@@ -5,11 +5,12 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { findSeedUserId } from '../lib/users';
 
 export const usage = '<fake-email>';
 
@@ -101,19 +102,17 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const db = getSeedDb();
   const normalizedEmail = normalizeSeedEmail(email);
-  const userId = `dev-seed:mobile-profile-permission:${normalizedEmail}`;
-  const [existing] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, normalizedEmail));
-  if (existing && existing.id !== userId) {
-    throw new Error('The requested email belongs to a different account; choose a new fake email.');
-  }
+  // A fake account that already signed in keeps its own row and its own
+  // sign-in address: the fixture joins it. A row this fixture left under an
+  // earlier email is its own fixture, so it takes the requested address.
+  const adoptedUserId = await findSeedUserId(normalizedEmail);
+  const userId = adoptedUserId ?? `dev-seed:mobile-profile-permission:${normalizedEmail}`;
 
   // Direct insert, no Stripe customer: the profile screens never call Stripe,
   // and dev/seed/lib/stripe.ts refuses a non-test key. The onboarding flags
   // below match dev/seed/app/create-user.ts so the seeded account reaches
-  // product surfaces instead of the survey and verification gates.
+  // product surfaces instead of the survey and verification gates. The address
+  // is written only for the fixture's own row.
   await db
     .insert(kilocode_users)
     .values({
@@ -128,12 +127,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     })
     .onConflictDoUpdate({
       target: kilocode_users.id,
-      set: {
-        google_user_email: email,
-        normalized_email: normalizedEmail,
-        has_validation_stytch: true,
-        customer_source: 'dev-seed',
-      },
+      set:
+        adoptedUserId === null
+          ? {
+              google_user_email: email,
+              normalized_email: normalizedEmail,
+              has_validation_stytch: true,
+              customer_source: 'dev-seed',
+            }
+          : { has_validation_stytch: true, customer_source: 'dev-seed' },
     });
 
   for (const organization of [
@@ -157,8 +159,26 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         created_by_kilo_user_id: organization.createdByKiloUserId,
         require_seats: false,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: organizations.id,
+        set: { created_by_kilo_user_id: organization.createdByKiloUserId },
+      });
   }
+
+  // The roles below are the whole fixture, so both organizations belong to one
+  // account at a time: a run for another email takes them over instead of adding
+  // that email beside the previous owner.
+  await db
+    .delete(organization_memberships)
+    .where(
+      and(
+        inArray(organization_memberships.organization_id, [
+          OWNER_ORGANIZATION_ID,
+          MEMBER_ORGANIZATION_ID,
+        ]),
+        ne(organization_memberships.kilo_user_id, userId)
+      )
+    );
 
   // The membership roles are the whole fixture: the owner may manage profiles,
   // the plain member may only read them.

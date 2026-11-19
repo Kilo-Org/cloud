@@ -19,20 +19,36 @@ export interface TabLeaseHolder {
 }
 
 /**
+ * The live agent session whose tab group holds a tab. The tab is that session's
+ * between its calls too (D10): a panel needs the confirmation before it acts on
+ * it, lease or no lease. An ended session's group holds nothing.
+ */
+export interface TabSessionOwner {
+  readonly sessionHandle: string;
+  readonly title?: string;
+}
+
+/**
  * - `granted`: the caller owns the tab now. `takeover` names the agent it took
  *   the tab from, whose in-flight call the runtime ends with `tab_taken`.
  * - `busy`: the wait ran out (`tab_busy`). Agents time out after
  *   `AGENT_TAB_WAIT_MS`; a dropped queue slot for a disposed caller also lands
  *   here.
- * - `needs_take_over`: a panel asked for a tab an agent holds. The panel must
- *   show its confirmation and ask again with `takeOver`.
+ * - `needs_take_over`: a panel asked for a tab an agent holds or a live
+ *   session owns. The panel must show its confirmation and ask again with
+ *   `takeOver`.
+ * - `taken`: a panel took this agent's tab between its calls. The agent's
+ *   first call after that gets `tab_taken` once, so it re-reads the page.
  */
 export type TabLeaseResult =
   | { readonly kind: 'granted'; readonly takeover?: TabLeaseHolder }
   | { readonly kind: 'busy' }
-  | { readonly kind: 'needs_take_over'; readonly holder: TabLeaseHolder };
+  | { readonly kind: 'needs_take_over'; readonly owner: TabSessionOwner }
+  | { readonly kind: 'taken' };
 
 export interface TabLeaseAcquireOptions {
+  /** The live agent session whose group holds the tab, if any. */
+  readonly owner?: TabSessionOwner | undefined;
   readonly signal?: AbortSignal | undefined;
   /** A panel passes this only after its take-over confirmation. */
   readonly takeOver?: boolean;
@@ -42,8 +58,8 @@ export interface TabLeaseAcquireOptions {
 
 export interface TabLeasePersistence {
   /** `undefined` when storage held nothing usable: the tab is free. */
-  readonly read: () => Promise<PersistedTabLease[] | undefined>;
-  readonly write: (leases: readonly PersistedTabLease[]) => Promise<void>;
+  readonly read: () => Promise<PersistedTabLeases | undefined>;
+  readonly write: (leases: PersistedTabLeases) => Promise<void>;
 }
 
 export interface TabLeaseRegistry {
@@ -67,9 +83,14 @@ const persistedTabLeaseSchema = z.object({
   tabId: z.number(),
   title: z.string().optional(),
 });
-const persistedTabLeasesSchema = z.array(persistedTabLeaseSchema);
+const persistedTabLeasesSchema = z.object({
+  leases: z.array(persistedTabLeaseSchema),
+  /** The sessions whose next call on a tab owes `tab_taken` (a take-over between their calls). */
+  owedTaken: z.array(z.object({ sessionHandle: z.string(), tabId: z.number() })),
+});
 
 export type PersistedTabLease = z.infer<typeof persistedTabLeaseSchema>;
+export type PersistedTabLeases = z.infer<typeof persistedTabLeasesSchema>;
 
 interface QueuedWaiter {
   readonly caller: BrowserCaller;
@@ -92,7 +113,7 @@ const settleWaiter = (waiter: QueuedWaiter): void => {
  * the one asymmetry the design fixes (D10) — a panel may take a tab from an
  * agent after a confirmation, and an agent never takes a tab from anyone.
  *
- * Only holders persist. Waiters belong to live message calls and cannot outlive
+ * Holders and owed `tab_taken` errors persist. Waiters belong to live message calls and cannot outlive
  * the service worker that received them.
  */
 export const createTabLeaseRegistry = ({
@@ -107,34 +128,50 @@ export const createTabLeaseRegistry = ({
    * Releases that land before the initial storage read finishes. They can see an
    * empty holders map — the read has not started yet, or is in flight — so the
    * stored copy must not be re-inserted afterwards: a closed tab or a disposed
-   * caller would come back as a phantom owner.
+   * caller would come back as a phantom owner, or a disposed session as owing
+   * `tab_taken`.
    */
-  const releasedWhileLoading = { callers: new Set<string>(), tabs: new Set<number>() };
+  const releasedWhileLoading = {
+    callers: new Set<string>(),
+    sessions: new Set<string>(),
+    tabs: new Set<number>(),
+  };
   let leasesLoaded = false;
   // The newest snapshot not yet written; a burst of lease changes writes only the last one.
-  let pendingSnapshot: PersistedTabLease[] | undefined = undefined;
+  let pendingSnapshot: PersistedTabLeases | undefined = undefined;
   let writeChain: Promise<void> = Promise.resolve();
   let draining = false;
+  /*
+   * Tabs a panel took from a live session between its calls, and the session
+   * whose next call owes `tab_taken`. Persisted with the leases: an idle worker
+   * is evicted well inside a model's gap between calls.
+   */
+  const takenBetweenCalls = new Map<number, string>();
 
-  const snapshotLeases = (): PersistedTabLease[] => {
-    const snapshot: PersistedTabLease[] = [];
+  const snapshotLeases = (): PersistedTabLeases => {
+    const leases: PersistedTabLease[] = [];
 
     for (const [tabId, holder] of holders) {
-      snapshot.push({
+      leases.push({
         caller: holder.caller,
         tabId,
         ...(holder.title === undefined ? {} : { title: holder.title }),
       });
     }
 
-    return snapshot;
+    return {
+      leases,
+      owedTaken: [...takenBetweenCalls].map(([tabId, sessionHandle]) => ({ sessionHandle, tabId })),
+    };
   };
 
   const writePending = async (store: TabLeasePersistence): Promise<void> => {
     const snapshot = pendingSnapshot;
     pendingSnapshot = undefined;
 
+    // Cleared in the same turn as the empty check: a change landing after it starts its own write instead of being dropped.
     if (snapshot === undefined) {
+      draining = false;
       return;
     }
 
@@ -148,14 +185,10 @@ export const createTabLeaseRegistry = ({
     await writePending(store);
   };
 
-  const startWrite = async (store: TabLeasePersistence): Promise<void> => {
+  const startWrite = (store: TabLeasePersistence): Promise<void> => {
     draining = true;
 
-    try {
-      await writePending(store);
-    } finally {
-      draining = false;
-    }
+    return writePending(store);
   };
 
   const persist = (): void => {
@@ -172,7 +205,7 @@ export const createTabLeaseRegistry = ({
 
   const readStored = async (
     store: TabLeasePersistence
-  ): Promise<PersistedTabLease[] | undefined> => {
+  ): Promise<PersistedTabLeases | undefined> => {
     try {
       return await store.read();
     } catch (error) {
@@ -188,7 +221,7 @@ export const createTabLeaseRegistry = ({
       return;
     }
 
-    for (const lease of stored) {
+    for (const lease of stored.leases) {
       const releasedWhileReading =
         releasedWhileLoading.tabs.has(lease.tabId) ||
         releasedWhileLoading.callers.has(browserCallerKey(lease.caller));
@@ -201,6 +234,15 @@ export const createTabLeaseRegistry = ({
           key: browserCallerKey(lease.caller),
           ...(lease.title === undefined ? {} : { title: lease.title }),
         });
+      }
+    }
+
+    for (const { sessionHandle, tabId } of stored.owedTaken) {
+      if (
+        !releasedWhileLoading.tabs.has(tabId) &&
+        !releasedWhileLoading.sessions.has(sessionHandle)
+      ) {
+        takenBetweenCalls.set(tabId, sessionHandle);
       }
     }
   };
@@ -217,6 +259,7 @@ export const createTabLeaseRegistry = ({
       } finally {
         leasesLoaded = true;
         releasedWhileLoading.callers.clear();
+        releasedWhileLoading.sessions.clear();
         releasedWhileLoading.tabs.clear();
       }
     })();
@@ -226,17 +269,29 @@ export const createTabLeaseRegistry = ({
 
   /**
    * Remembers a release that arrived before the persisted leases were read (see
-   * `releasedWhileLoading`). Both the caller key and the tab are remembered until
-   * the read finishes, so a release that is a fresh worker's first lease operation
-   * is not undone by the stored copy.
+   * `releasedWhileLoading`). The caller key, a disposed agent session and the tab
+   * are remembered until the read finishes, so a release that is a fresh worker's
+   * first lease operation is not undone by the stored copy.
    */
-  const noteReleased = ({ key, tabId }: { key?: string; tabId?: number }): void => {
+  const noteReleased = ({
+    key,
+    sessionHandle,
+    tabId,
+  }: {
+    key?: string;
+    sessionHandle?: string;
+    tabId?: number;
+  }): void => {
     if (leasesLoaded || persistence === undefined) {
       return;
     }
 
     if (key !== undefined) {
       releasedWhileLoading.callers.add(key);
+    }
+
+    if (sessionHandle !== undefined) {
+      releasedWhileLoading.sessions.add(sessionHandle);
     }
 
     if (tabId !== undefined) {
@@ -271,22 +326,22 @@ export const createTabLeaseRegistry = ({
     }
 
     settleWaiter(waiter);
-
-    holders.set(tabId, {
-      caller: waiter.caller,
-      key: waiter.key,
-      ...(waiter.title === undefined ? {} : { title: waiter.title }),
-    });
-    persist();
+    grant(tabId, waiter.caller, waiter.title);
     waiter.resolve({ kind: 'granted' });
   };
 
+  /** A session that holds the tab owes no `tab_taken` for it: whichever of its calls got the tab drives it from here. */
   const grant = (tabId: number, caller: BrowserCaller, title?: string): void => {
     holders.set(tabId, {
       caller,
       key: browserCallerKey(caller),
       ...(title === undefined ? {} : { title }),
     });
+
+    if (caller.kind === 'agent' && takenBetweenCalls.get(tabId) === caller.sessionHandle) {
+      takenBetweenCalls.delete(tabId);
+    }
+
     persist();
   };
 
@@ -370,9 +425,31 @@ export const createTabLeaseRegistry = ({
     }
 
     const key = browserCallerKey(caller);
+    const owner = options?.owner;
+
+    // Only a call that names its own session as the owner is the session's next call; a step's inner acquire is not.
+    if (
+      caller.kind === 'agent' &&
+      owner?.sessionHandle === caller.sessionHandle &&
+      takenBetweenCalls.get(tabId) === caller.sessionHandle
+    ) {
+      takenBetweenCalls.delete(tabId);
+      persist();
+      return { kind: 'taken' };
+    }
+
     const holder = holders.get(tabId);
 
     if (holder === undefined) {
+      if (caller.kind === 'panel' && owner !== undefined) {
+        if (options?.takeOver !== true) {
+          return { kind: 'needs_take_over', owner };
+        }
+
+        // No call of the session is in flight to end, so its next call is the one that learns the page moved on.
+        takenBetweenCalls.set(tabId, owner.sessionHandle);
+      }
+
       grant(tabId, caller, options?.title);
       return { kind: 'granted' };
     }
@@ -383,8 +460,18 @@ export const createTabLeaseRegistry = ({
     }
 
     if (caller.kind === 'panel' && holder.caller.kind === 'agent') {
+      // The session holding the lease is the one the card asks about, whichever group the tab sits in now.
       if (options?.takeOver !== true) {
-        return { holder, kind: 'needs_take_over' };
+        return {
+          kind: 'needs_take_over',
+          owner:
+            owner?.sessionHandle === holder.caller.sessionHandle
+              ? owner
+              : {
+                  sessionHandle: holder.caller.sessionHandle,
+                  ...(holder.title === undefined ? {} : { title: holder.title }),
+                },
+        };
       }
 
       grant(tabId, caller, options.title);
@@ -425,7 +512,19 @@ export const createTabLeaseRegistry = ({
     const key = browserCallerKey(caller);
     let released = 0;
 
-    noteReleased({ key });
+    noteReleased({
+      key,
+      ...(caller.kind === 'agent' ? { sessionHandle: caller.sessionHandle } : {}),
+    });
+
+    if (caller.kind === 'agent') {
+      for (const [tabId, sessionHandle] of takenBetweenCalls) {
+        if (sessionHandle === caller.sessionHandle) {
+          takenBetweenCalls.delete(tabId);
+          persist();
+        }
+      }
+    }
 
     for (const [tabId, holder] of holders) {
       if (holder.key === key) {
@@ -448,8 +547,13 @@ export const createTabLeaseRegistry = ({
 
     noteReleased({ tabId });
 
+    const owedDropped = takenBetweenCalls.delete(tabId);
+
     if (holder !== undefined) {
       holders.delete(tabId);
+    }
+
+    if (holder !== undefined || owedDropped) {
       persist();
     }
 
@@ -468,15 +572,16 @@ export const createTabLeaseRegistry = ({
 
 /**
  * Leases survive a service-worker restart in `storage.session`: a restart must
- * not hand an agent's tab to the side panel without the confirmation, and must
- * not let two owners believe they hold the same tab.
+ * not hand an agent's tab to the side panel without the confirmation, must not
+ * let two owners believe they hold the same tab, and must not forget a
+ * session's owed `tab_taken`.
  */
 export const createStorageSessionLeasePersistence = (storageArea: {
   // oxlint-disable-next-line anti-slop/no-unknown-returns -- storage hands back whatever an earlier write left; `read` parses it with the lease schema.
   readonly getItem: (key: typeof TAB_LEASES_STORAGE_KEY) => unknown;
   readonly setItem: (
     key: typeof TAB_LEASES_STORAGE_KEY,
-    value: PersistedTabLease[]
+    value: PersistedTabLeases
   ) => Promise<void> | void;
 }): TabLeasePersistence => ({
   read: async () => {
@@ -486,7 +591,7 @@ export const createStorageSessionLeasePersistence = (storageArea: {
 
     return parsed.success ? parsed.data : undefined;
   },
-  write: async leases => {
-    await storageArea.setItem(TAB_LEASES_STORAGE_KEY, [...leases]);
+  write: async snapshot => {
+    await storageArea.setItem(TAB_LEASES_STORAGE_KEY, snapshot);
   },
 });

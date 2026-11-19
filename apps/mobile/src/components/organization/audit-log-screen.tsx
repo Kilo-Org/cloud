@@ -70,26 +70,34 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   // trailing box carries no text — and the collapsed clamp becomes that count,
   // capped at two: one- and two-line details size to their content, and only a
   // detail that really runs past two lines keeps the full clamp and the
-  // press-to-expand affordance. `expanded` rows measure unclamped and could
-  // report a longer count, so their reports never move the collapsed clamp.
-  const [collapsedLines, setCollapsedLines] = useState<number | null>(null);
+  // press-to-expand affordance. The stored count is keyed to the sentence it
+  // measured: FlashList recycles row instances across entries, so a cell that
+  // held a short detail must not clamp the longer sentence it renders next —
+  // a count from another text reads as unknown and the clamp starts at two.
+  // `expanded` rows measure unclamped and could report a longer count, so
+  // their reports never move the collapsed clamp.
+  const [measured, setMeasured] = useState<{ text: string; lines: number } | null>(null);
   // The callback reads the expanded flag through a ref: a state read would
   // need the callback in the dependency array, and a re-created callback makes
   // the memoized row re-render on every toggle for nothing. The flag flips
   // synchronously with the press, so no report from the expanded layout can
-  // land after the collapse begins.
+  // land after the collapse begins. The sentence rides a ref too: the callback
+  // stores the text its measurement belongs to, so a recycled cell never
+  // applies a count measured for another entry.
   const expandedRef = useRef(false);
+  const measuredTextRef = useRef('');
   const onDetailLayout = useCallback((e: TextLayoutEvent) => {
     if (expandedRef.current) {
       return;
     }
-    const painted = Math.max(
+    const lines = Math.max(
       1,
       e.nativeEvent.lines.filter(line => line.text.trim().length > 0).length
     );
-    setCollapsedLines(current => (current === painted ? current : painted));
+    setMeasured(current =>
+      current?.lines === lines ? current : { text: measuredTextRef.current, lines }
+    );
   }, []);
-  const clamp = expanded ? undefined : (collapsedLines ?? 2);
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);
   const eventName = auditActionLabel(t, entry.action);
@@ -100,6 +108,14 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   // sentence, not the app's. The creation action's detail only restates the
   // event name, so — as before — no row shows it.
   const detail = auditLogDetailFor(t, entry.details);
+  // The clamp reads this ref from the layout callback, which fires after the
+  // render that changed the sentence; keeping it in sync here makes every
+  // stored count name the sentence on screen when it was measured.
+  measuredTextRef.current = detail ?? '';
+  const clamp =
+    expanded || detail == null
+      ? undefined
+      : (measured?.text === detail && measured.lines) || 2;
   const showsDetail = entry.action !== 'organization.created' && detail != null;
   // The actor and the time render as two elements in one row, never one
   // interpolated string: the row shrinks the actor, not the time, and each

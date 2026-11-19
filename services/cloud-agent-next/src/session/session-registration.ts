@@ -2018,7 +2018,7 @@ async function withLedgerSavedAllocation(
   freshAdmission: boolean
 ): Promise<SessionRegistrationInput> {
   const pinned = row.canonical_result?.[SESSION_CREATE_SAVED_ALLOCATION_KEY];
-  if (typeof pinned === 'string' && isSelectableSandboxAllocation(pinned as SandboxAllocation)) {
+  if (typeof pinned === 'string' && isSelectableSandboxAllocation(pinned)) {
     return { ...input, savedSandboxAllocation: pinned as SandboxAllocation };
   }
   // Admission always writes a canonical result, so its presence no longer means

@@ -3804,6 +3804,8 @@
       "fieldName": "የሚታይ ስም",
       "fieldUrl": "የአገልጋይ URL",
       "fieldUrlInvalid": "ትክክለኛ የአገልጋይ URL ያስገቡ።",
+      "duplicateUrl": "ይህ URL አስቀድሞ ተቀምጧል።",
+      "serverNotFound": "ይህ አገልጋይ ከእንግዲህ አልተቀመጠም።",
       "enableServer": "ይህን አገልጋይ አንቃ: {{name}}",
       "editServer": "አገልጋይ አርትዕ",
       "deleteServer": "አገልጋይ ሰርዝ",

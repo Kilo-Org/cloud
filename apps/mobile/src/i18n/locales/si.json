@@ -3804,6 +3804,8 @@
       "fieldName": "පෙන්වන නම",
       "fieldUrl": "සේවාදායක URL",
       "fieldUrlInvalid": "වලංගු සේවාදායක URL එකක් ඇතුළත් කරන්න.",
+      "duplicateUrl": "එම URL එක දැනටමත් සුරැකී ඇත.",
+      "serverNotFound": "මෙම සේවාදායකය තවදුරටත් සුරැකී නැත.",
       "enableServer": "මෙම සේවාදායකය සක්‍රීය කරන්න: {{name}}",
       "editServer": "සේවාදායකය සංස්කරණය කරන්න",
       "deleteServer": "සේවාදායකය මකන්න",

@@ -3924,6 +3924,8 @@
       "fieldName": "Prikazano ime",
       "fieldUrl": "URL strežnika",
       "fieldUrlInvalid": "Vnesi veljaven URL strežnika.",
+      "duplicateUrl": "Ta URL je že shranjen.",
+      "serverNotFound": "Ta strežnik ni več shranjen.",
       "enableServer": "Omogoči ta strežnik: {{name}}",
       "editServer": "Uredi strežnik",
       "deleteServer": "Izbriši strežnik",

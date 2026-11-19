@@ -3804,6 +3804,8 @@
       "fieldName": "Tên hiển thị",
       "fieldUrl": "URL máy chủ",
       "fieldUrlInvalid": "Nhập URL máy chủ hợp lệ.",
+      "duplicateUrl": "URL này đã được lưu.",
+      "serverNotFound": "Máy chủ này không còn được lưu nữa.",
       "enableServer": "Bật máy chủ này: {{name}}",
       "editServer": "Sửa máy chủ",
       "deleteServer": "Xóa máy chủ",

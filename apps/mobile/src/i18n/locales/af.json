@@ -3804,6 +3804,8 @@
       "fieldName": "Vertoonnaam",
       "fieldUrl": "Bediener-URL",
       "fieldUrlInvalid": "Voer 'n geldige bediener-URL in.",
+      "duplicateUrl": "Daardie URL is reeds gestoor.",
+      "serverNotFound": "Hierdie bediener is nie meer gestoor nie.",
       "enableServer": "Aktiveer hierdie bediener: {{name}}",
       "editServer": "Wysig bediener",
       "deleteServer": "Skrap bediener",

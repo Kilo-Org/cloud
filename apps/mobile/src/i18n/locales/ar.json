@@ -4044,6 +4044,8 @@
       "fieldName": "الاسم المعروض",
       "fieldUrl": "عنوان URL للخادم",
       "fieldUrlInvalid": "أدخل عنوان URL صالحًا للخادم.",
+      "duplicateUrl": "عنوان URL هذا محفوظ بالفعل.",
+      "serverNotFound": "لم يعد هذا الخادم محفوظًا.",
       "enableServer": "تفعيل هذا الخادم: {{name}}",
       "editServer": "تعديل الخادم",
       "deleteServer": "حذف الخادم",

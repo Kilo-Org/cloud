@@ -187,10 +187,10 @@ const lostConnection =
  *
  * A server that named tools keeps them for the account and the epoch, so the
  * next chat does not open a second connection for the same list. A server that
- * answered with none is the one answer that must be asked again: the empty
- * sheet offers no Retry, so a catalog that was mid-deploy when the first chat
- * asked would leave every chat after it on "No tools available" until the app
- * was restarted. The next ask reconnects and says what the server offers now.
+ * answered with none is the one answer that must not stand in for later asks: it
+ * is not cached, so the next ask reconnects and reports what the server offers
+ * now — the same ask the sheet's Retry makes — and a catalog that was mid-deploy
+ * when the first chat asked does not leave every chat after it stuck.
  */
 const reusable = (state: KiloMcpState): boolean =>
   state.status !== 'ready' || state.tools.length > 0;

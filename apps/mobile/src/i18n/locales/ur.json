@@ -3804,6 +3804,8 @@
       "fieldName": "دکھایا جانے والا نام",
       "fieldUrl": "سرور URL",
       "fieldUrlInvalid": "درست سرور URL درج کریں۔",
+      "duplicateUrl": "یہ URL پہلے ہی محفوظ ہے۔",
+      "serverNotFound": "یہ سرور اب مزید محفوظ نہیں ہے۔",
       "enableServer": "اس سرور کو فعال کریں: {{name}}",
       "editServer": "سرور میں ترمیم کریں",
       "deleteServer": "سرور حذف کریں",

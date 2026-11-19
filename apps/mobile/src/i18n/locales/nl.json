@@ -3804,6 +3804,8 @@
       "fieldName": "Weergavenaam",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Voer een geldige server-URL in.",
+      "duplicateUrl": "Die URL is al opgeslagen.",
+      "serverNotFound": "Deze server is niet meer opgeslagen.",
       "enableServer": "Deze server inschakelen: {{name}}",
       "editServer": "Server bewerken",
       "deleteServer": "Server verwijderen",

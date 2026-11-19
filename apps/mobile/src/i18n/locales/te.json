@@ -3804,6 +3804,8 @@
       "fieldName": "ప్రదర్శించే పేరు",
       "fieldUrl": "సర్వర్ URL",
       "fieldUrlInvalid": "చెల్లుబాటు అయ్యే సర్వర్ URL నమోదు చేయండి.",
+      "duplicateUrl": "ఆ URL ఇప్పటికే సేవ్ చేయబడింది.",
+      "serverNotFound": "ఈ సర్వర్ ఇకపై సేవ్ చేయబడలేదు.",
       "enableServer": "ఈ సర్వర్‌ను ప్రారంభించండి: {{name}}",
       "editServer": "సర్వర్‌ను సవరించండి",
       "deleteServer": "సర్వర్‌ను తొలగించండి",

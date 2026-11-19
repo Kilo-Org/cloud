@@ -3864,6 +3864,8 @@
       "fieldName": "שם תצוגה",
       "fieldUrl": "כתובת URL של השרת",
       "fieldUrlInvalid": "הזינו כתובת URL חוקית של שרת.",
+      "duplicateUrl": "כתובת URL זו כבר שמורה.",
+      "serverNotFound": "השרת הזה כבר לא שמור.",
       "enableServer": "הפעלת השרת הזה: {{name}}",
       "editServer": "עריכת השרת",
       "deleteServer": "מחיקת השרת",

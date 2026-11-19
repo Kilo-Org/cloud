@@ -3924,6 +3924,8 @@
       "fieldName": "Rodomas pavadinimas",
       "fieldUrl": "Serverio URL",
       "fieldUrlInvalid": "Įveskite galiojantį serverio URL.",
+      "duplicateUrl": "Šis URL jau išsaugotas.",
+      "serverNotFound": "Šis serveris nebėra išsaugotas.",
       "enableServer": "Įjungti šį serverį: {{name}}",
       "editServer": "Redaguoti serverį",
       "deleteServer": "Ištrinti serverį",

@@ -3804,6 +3804,8 @@
       "fieldName": "प्रदर्शित नाम",
       "fieldUrl": "सर्वर URL",
       "fieldUrlInvalid": "मान्य सर्वर URL दर्ज करें।",
+      "duplicateUrl": "यह URL पहले से सहेजा गया है।",
+      "serverNotFound": "यह सर्वर अब सहेजा हुआ नहीं है।",
       "enableServer": "इस सर्वर को सक्षम करें: {{name}}",
       "editServer": "सर्वर संपादित करें",
       "deleteServer": "सर्वर हटाएँ",

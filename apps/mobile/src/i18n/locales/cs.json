@@ -3924,6 +3924,8 @@
       "fieldName": "Zobrazovaný název",
       "fieldUrl": "URL serveru",
       "fieldUrlInvalid": "Zadejte platnou URL serveru.",
+      "duplicateUrl": "Tato URL je již uložena.",
+      "serverNotFound": "Tento server již není uložen.",
       "enableServer": "Povolit tento server: {{name}}",
       "editServer": "Upravit server",
       "deleteServer": "Smazat server",

@@ -3804,6 +3804,8 @@
       "fieldName": "Nama paparan",
       "fieldUrl": "URL pelayan",
       "fieldUrlInvalid": "Masukkan URL pelayan yang sah.",
+      "duplicateUrl": "URL pelayan itu sudah disimpan.",
+      "serverNotFound": "Pelayan ini tidak lagi disimpan.",
       "enableServer": "Dayakan pelayan ini: {{name}}",
       "editServer": "Edit pelayan",
       "deleteServer": "Padam pelayan",

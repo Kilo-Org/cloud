@@ -3924,6 +3924,8 @@
       "fieldName": "Отображаемое имя",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Введите действительный URL сервера.",
+      "duplicateUrl": "Этот URL уже сохранён.",
+      "serverNotFound": "Этот сервер больше не сохранён.",
       "enableServer": "Включить этот сервер: {{name}}",
       "editServer": "Редактировать сервер",
       "deleteServer": "Удалить сервер",

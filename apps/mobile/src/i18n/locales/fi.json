@@ -3804,6 +3804,8 @@
       "fieldName": "Näyttönimi",
       "fieldUrl": "Palvelimen URL",
       "fieldUrlInvalid": "Anna kelvollinen palvelimen URL.",
+      "duplicateUrl": "Tämä URL on jo tallennettu.",
+      "serverNotFound": "Tätä palvelinta ei ole enää tallennettu.",
       "enableServer": "Ota tämä palvelin käyttöön: {{name}}",
       "editServer": "Muokkaa palvelinta",
       "deleteServer": "Poista palvelin",

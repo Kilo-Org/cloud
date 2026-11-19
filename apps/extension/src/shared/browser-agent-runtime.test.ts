@@ -89,9 +89,10 @@ const originChangedResultOf = (outcome: BrowserToolRunOutcome): EvalTabResult | 
 interface FakeCdp {
   /** Records the ordered CDP method names. */
   readonly commands: () => readonly string[];
-  /** Every command with the tab it went to and the url it named. */
+  /** Every command with the tab it went to, its params and the url it named, in dispatch order. */
   readonly sent: () => readonly {
     readonly method: string;
+    readonly params: Record<string, unknown> | undefined;
     readonly tabId: number;
     readonly url: string | undefined;
   }[];
@@ -150,8 +151,13 @@ const frameTreePayload = (mainUrl: string): Record<string, unknown> => ({
 
 const createFakeCdp = (): FakeCdp => {
   const commands: string[] = [];
-  /** Every command with the tab it went to and the url it named, so a test can tell one tab's call from another's. */
-  const sent: { method: string; tabId: number; url: string | undefined }[] = [];
+  /** Every command with the tab it went to, its params and the url it named, so a test can tell one tab's call from another's. */
+  const sent: {
+    method: string;
+    params: Record<string, unknown> | undefined;
+    tabId: number;
+    url: string | undefined;
+  }[] = [];
   const eventListeners: ChromeDebuggerEventListener[] = [];
   let denied = 0;
   let restored = 0;
@@ -160,17 +166,11 @@ const createFakeCdp = (): FakeCdp => {
   let emitDownloadOnClick = false;
   const handlers: Record<string, CdpHandler> = {};
 
-  const sendMailbox = (
+  /** The fake's own answer for a method no test handler claims. */
+  const answerDefault = (
     method: string,
-    params: Record<string, unknown> | undefined,
-    target?: { readonly tabId: number }
-  ): Promise<Record<string, unknown>> | Record<string, unknown> | undefined => {
-    const handler = handlers[method];
-
-    if (handler !== undefined) {
-      return handler(params, target);
-    }
-
+    params: Record<string, unknown> | undefined
+  ): Record<string, unknown> => {
     switch (method) {
       case 'Accessibility.getFullAXTree': {
         const { frameId } = params ?? {};
@@ -262,6 +262,28 @@ const createFakeCdp = (): FakeCdp => {
     }
   };
 
+  /**
+   * A test handler answers first; one that answers `undefined` declines, so the call falls through to the fake's own
+   * answer for that method and a handler can claim only the commands it is about.
+   */
+  const sendMailbox = async (
+    method: string,
+    params: Record<string, unknown> | undefined,
+    target?: { readonly tabId: number }
+  ): Promise<Record<string, unknown>> => {
+    const handler = handlers[method];
+
+    if (handler !== undefined) {
+      const answered = await handler(params, target);
+
+      if (answered !== undefined) {
+        return answered;
+      }
+    }
+
+    return answerDefault(method, params);
+  };
+
   const api: ChromeDebuggerApi = {
     attach: async () => {},
     detach: async () => {},
@@ -283,6 +305,7 @@ const createFakeCdp = (): FakeCdp => {
       commands.push(method);
       sent.push({
         method,
+        params,
         tabId: target.tabId,
         url: typeof params?.['url'] === 'string' ? params['url'] : undefined,
       });
@@ -2103,6 +2126,7 @@ describe('agent browser calls', () => {
     // The last navigate is the repeat's: the guarded call's own navigate came first.
     expect(cdp.sent().findLast(command => command.method === 'Page.navigate')).toStrictEqual({
       method: 'Page.navigate',
+      params: { url },
       tabId: newTab,
       url,
     });
@@ -2396,14 +2420,20 @@ describe('agent browser calls', () => {
   /** A tabs-new harness whose opened tab can be closed, with the download and frame fakes of the group. */
   const tabsNewFixture = async (
     options: {
+      /** The opened tab stays `about:blank`, so a navigate it drives never lands and the guard has to search for the file. */
+      readonly blankTab?: boolean;
       readonly deferredCreate?: boolean;
       readonly deferredNavigate?: boolean;
       /** A frame read the test answers by hand, so a call can be parked before it opens its tab. */
       readonly deferredPreflight?: boolean;
+      /** The guard's url search parks: the test decides when the call's settle runs on. */
+      readonly gatedSearch?: boolean;
       readonly granted?: boolean;
       readonly leases?: TabLeaseRegistry;
       /** A navigate that loads a page instead of becoming the download the guard stops. */
       readonly plain?: boolean;
+      /** The Downloads permission is gone by the time the guard is armed: revoked after the pre-open check. */
+      readonly revokeAfterOpen?: boolean;
     } = {}
   ) => {
     const downloads = createFakeDownloads();
@@ -2417,9 +2447,13 @@ describe('agent browser calls', () => {
     const removed: number[] = [];
     const createGate = Promise.withResolvers<void>();
     const createReached = Promise.withResolvers<void>();
-    const navigateReached = Promise.withResolvers<void>();
+    /** What happened on the two tabs, in order: the guard's search returning, and the panel driving the tab. */
+    const events: string[] = [];
     const preflightGate = Promise.withResolvers<void>();
     const preflightReached = Promise.withResolvers<void>();
+    const searchGate = Promise.withResolvers<void>();
+    const searchReached = Promise.withResolvers<void>();
+    let parkedSearches = 0;
 
     const tabsApi: BrowserTabsApi & {
       readonly create: (properties: { readonly url?: string }) => Promise<BrowserTabInfo>;
@@ -2441,8 +2475,13 @@ describe('agent browser calls', () => {
         }
 
         // A closed step tab is one the browser no longer has: no id is how the runtime reads that.
-        return closed
-          ? { title: '', url: '' }
+        if (closed) {
+          return { title: '', url: '' };
+        }
+
+        // A blank tab is one whose navigate never committed a document: the guard cannot see the page move.
+        return options.blankTab === true
+          ? { id: newTab, title: '', url: 'about:blank' }
           : { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt` };
       },
       onCreated: {
@@ -2460,11 +2499,32 @@ describe('agent browser calls', () => {
         removed.push(tabId);
       },
     };
+    // The guard looks the file up by the url it navigated to: that search is the one a test can park, and it answers
+    // With nothing rather than the seeded history, so the call stays parked instead of finding the kept file at once.
+    const stepDownloads: BrowserDownloadsApi = {
+      ...downloads.api,
+      search: async query => {
+        if (options.gatedSearch === true && query.url !== undefined) {
+          if (parkedSearches === 0) {
+            parkedSearches += 1;
+            searchReached.resolve();
+            await searchGate.promise;
+            events.push('search-returned');
+          }
+
+          return [];
+        }
+
+        return (await downloads.api.search?.(query)) ?? [];
+      },
+    };
     const { controller } = createGroups();
+    const downloadsDependency =
+      options.granted === false ? { downloadsGranted: false } : { downloadsApi: stepDownloads };
     const harness = await createHarness({
-      ...(options.granted === false
-        ? { downloadsGranted: false }
-        : { downloadsApi: downloads.api }),
+      ...(options.revokeAfterOpen === true
+        ? { downloadsResolver: () => (created.length === 0 ? stepDownloads : undefined) }
+        : downloadsDependency),
       ...(options.leases === undefined ? {} : { leases: options.leases }),
       tabGroups: controller,
       tabsApi,
@@ -2472,8 +2532,44 @@ describe('agent browser calls', () => {
 
     // The file the approved repeat keeps, as the browser reports it once it is written.
     downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 72 });
-    // A navigate the test answers by hand, so two calls can be interleaved on purpose.
-    const navigateGate = Promise.withResolvers<void>();
+
+    /**
+     * A navigate the test answers by hand, so two calls can be interleaved on purpose. One waiter per navigate, in
+     * dispatch order: a test that drives the tab twice parks the second navigate without touching the first.
+     */
+    interface NavigateWait {
+      readonly gate: Promise<void>;
+      readonly markReached: () => void;
+      readonly reached: Promise<void>;
+      readonly release: () => void;
+    }
+
+    const navigateWaits = new Map<number, NavigateWait>();
+    const navigateWaitFor = (index: number): NavigateWait => {
+      const existing = navigateWaits.get(index);
+
+      if (existing !== undefined) {
+        return existing;
+      }
+
+      const reached = Promise.withResolvers<void>();
+      const gate = Promise.withResolvers<void>();
+      const wait: NavigateWait = {
+        gate: gate.promise,
+        markReached: () => {
+          reached.resolve();
+        },
+        reached: reached.promise,
+        release: () => {
+          gate.resolve();
+        },
+      };
+
+      navigateWaits.set(index, wait);
+
+      return wait;
+    };
+    let navigateCalls = 0;
 
     harness.cdp.setHandlers({
       ...(options.deferredPreflight === true
@@ -2497,8 +2593,16 @@ describe('agent browser calls', () => {
           }
         : {}),
       'Page.navigate': async () => {
-        navigateReached.resolve();
-        await (options.deferredNavigate === true ? navigateGate.promise : Promise.resolve());
+        const index = navigateCalls;
+
+        navigateCalls += 1;
+
+        if (options.deferredNavigate === true) {
+          const wait = navigateWaitFor(index);
+
+          wait.markReached();
+          await wait.gate;
+        }
 
         if (options.plain === true) {
           return { frameId: 'main' };
@@ -2530,18 +2634,24 @@ describe('agent browser calls', () => {
         closed = next;
       },
       created,
+      downloads,
+      events,
       newTab,
       reachedCreate: () => createReached.promise,
-      reachedNavigate: () => navigateReached.promise,
+      reachedNavigate: (index = 0) => navigateWaitFor(index).reached,
       reachedPreflight: () => preflightReached.promise,
+      reachedSearch: () => searchReached.promise,
       releaseCreate: () => {
         createGate.resolve();
       },
-      releaseNavigate: () => {
-        navigateGate.resolve();
+      releaseNavigate: (index = 0) => {
+        navigateWaitFor(index).release();
       },
       releasePreflight: () => {
         preflightGate.resolve();
+      },
+      releaseSearch: () => {
+        searchGate.resolve();
       },
       removed,
       run,
@@ -2794,6 +2904,284 @@ describe('agent browser calls', () => {
       // The take-over that landed during the acquire is not ignored: the call is over and the tab is closed.
       expect(outcome).toMatchObject({ kind: 'result', result: { error: TAB_TAKEN_ERROR } });
       expect(fixture.removed).toStrictEqual([fixture.newTab]);
+      // The lease it took while the take-over landed went back with the tab, so nothing is left holding it.
+      expect(fixture.leases.holder(fixture.newTab)).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('closes the tab it opened when the downloads permission is revoked before the guard', async () => {
+    // The pre-open check sees the permission; the guard, armed after the tab exists, does not.
+    const fixture = await tabsNewFixture({ revokeAfterOpen: true });
+
+    const outcome = await fixture.run(agent());
+
+    if (outcome.kind !== 'result' || outcome.result.ok) {
+      throw new Error(`expected the permission refusal, got ${JSON.stringify(outcome)}`);
+    }
+
+    // The opened tab is not left in the session's group for the next call to inherit.
+    expect([outcome.result.error, fixture.removed]).toStrictEqual([
+      DOWNLOAD_PERMISSION_MISSING_ERROR,
+      [fixture.newTab],
+    ]);
+  });
+
+  it('holds the driven tab until its guard has settled, so the panel download survives', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const fixture = await tabsNewFixture({
+        blankTab: true,
+        deferredNavigate: true,
+        gatedSearch: true,
+        plain: true,
+      });
+      const marker = 'MARKER_OF_THE_PANEL_CALL';
+
+      // The panel's own call on the driven tab: its marker command is what a guard left listening would react to.
+      fixture.cdp.setHandlers({
+        'Runtime.evaluate': (params, target) => {
+          const carriesMarker =
+            target?.tabId === fixture.newTab && JSON.stringify(params ?? {}).includes(marker);
+
+          if (!carriesMarker) {
+            return;
+          }
+
+          fixture.events.push('panel-cdp');
+          fixture.downloads.emit({ id: 90, tabId: fixture.newTab });
+
+          return { result: { value: marker } };
+        },
+      });
+
+      const pending = fixture.run(agent());
+
+      await fixture.reachedNavigate();
+
+      // The panel takes the tab the agent opened, while the agent is still parked in its navigate.
+      const panelCall = fixture.runtime.runTool({
+        arguments: { function: `() => "${marker}"` },
+        caller: panel(),
+        tabId: fixture.newTab,
+        takeOver: true,
+        toolName: 'browser_evaluate',
+      });
+
+      // The tab reports itself still blank, so the guard never sees its page land and searches for the file instead.
+      fixture.releaseNavigate();
+      await fixture.reachedSearch();
+      await vi.advanceTimersByTimeAsync(50);
+
+      // The panel waits outside the tab until this call's guard has settled: it sent nothing yet.
+      expect(
+        fixture.cdp
+          .sent()
+          .filter(
+            command =>
+              command.tabId === fixture.newTab &&
+              JSON.stringify(command.params ?? {}).includes(marker)
+          )
+          .map(command => command.method)
+      ).toStrictEqual([]);
+
+      fixture.releaseSearch();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      const [outcome, panelOutcome] = await Promise.all([pending, panelCall]);
+      const refused =
+        outcome.kind === 'result' && !outcome.result.ok ? outcome.result.error : outcome.kind;
+      // The guard's search returned before the panel's command went out — and that command really went out — so the
+      // Guard the taken call left listening never saw the file the panel's own call started.
+      expect([
+        refused,
+        panelOutcome.kind,
+        fixture.events,
+        fixture.cdp
+          .sent()
+          .filter(
+            command =>
+              command.tabId === fixture.newTab &&
+              JSON.stringify(command.params ?? {}).includes(marker)
+          )
+          .map(command => command.method),
+        fixture.downloads.cancelled.includes(90),
+      ]).toStrictEqual([
+        TAB_TAKEN_ERROR,
+        'result',
+        ['search-returned', 'panel-cdp'],
+        ['Runtime.evaluate'],
+        false,
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('grants a panel the tab a call is still acquiring, without ending that call', async () => {
+    const real = createTabLeaseRegistry({});
+    const acquireGate = Promise.withResolvers<void>();
+    const acquireReached = Promise.withResolvers<void>();
+    let parked = false;
+    const parkedLeases: TabLeaseRegistry = {
+      ...real,
+      acquire: async (tabId, caller, options) => {
+        if (parked && tabId !== TAB_ID && caller.kind === 'agent') {
+          acquireReached.resolve();
+          await acquireGate.promise;
+        }
+
+        return real.acquire(tabId, caller, options);
+      },
+    };
+    const fixture = await tabsNewFixture({ leases: parkedLeases });
+    // The approval this repeat carries, from the call that stopped the file.
+    const token = expectStepToken(await fixture.run(agent()));
+
+    parked = true;
+
+    const pending = fixture.run(agent(), [token]);
+
+    // Parked in the acquire: the precheck passed, the token is spent, and this call holds no lease on that tab yet.
+    await acquireReached.promise;
+
+    const panelOutcome = await fixture.runtime.runTool({
+      arguments: { function: '() => 1' },
+      caller: panel(),
+      tabId: fixture.newTab,
+      toolName: 'browser_evaluate',
+    });
+
+    // The panel's call is granted the tab and fires nothing: no hook of the acquiring call is installed yet.
+    expect(panelOutcome.kind).toBe('result');
+
+    real.release(fixture.newTab, panel());
+    acquireGate.resolve();
+
+    const outcome = await pending;
+
+    // The call survives the panel's call, and its approval still buys the file the browser kept.
+    expect(outcome).toMatchObject({ kind: 'result', result: { ok: true } });
+    expect(
+      outcome.kind === 'result' && outcome.result.ok ? String(outcome.result.value) : ''
+    ).toContain('The file was downloaded; the page did not change.');
+  });
+
+  it('ends a call parked in its navigate when a panel takes the driven tab over', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const fixture = await tabsNewFixture({ deferredNavigate: true });
+      const guarded = fixture.run(agent());
+
+      await fixture.reachedNavigate();
+      fixture.releaseNavigate();
+
+      const token = expectStepToken(await guarded);
+      const pending = fixture.run(agent(), [token]);
+
+      // The approved repeat drives the tab the step opened, and is parked in its navigate there.
+      await fixture.reachedNavigate(1);
+
+      const takeover = fixture.runtime.runTool({
+        arguments: {},
+        caller: panel(),
+        tabId: fixture.newTab,
+        takeOver: true,
+        toolName: 'browser_snapshot',
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      const outcome = await pending;
+
+      await takeover;
+
+      // The hook this call installed on the tab it leased ends it, even though the caller's tab was never taken.
+      expect(outcome).toMatchObject({ kind: 'result', result: { error: TAB_TAKEN_ERROR } });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps its in-flight hook when an earlier call on the driven tab finishes', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const fixture = await tabsNewFixture({ deferredNavigate: true });
+      const guarded = fixture.run(agent());
+
+      await fixture.reachedNavigate();
+      fixture.releaseNavigate();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      const token = expectStepToken(await guarded);
+
+      // An earlier call on the tab the step opened is still running: the panel is parked inside its snapshot there.
+      const snapshotGate = Promise.withResolvers<void>();
+      const snapshotReached = Promise.withResolvers<void>();
+      let parkedSnapshots = 0;
+
+      fixture.cdp.setHandlers({
+        'Accessibility.getFullAXTree': async (
+          params: Record<string, unknown> | undefined,
+          target?: { readonly tabId: number }
+        ): Promise<Record<string, unknown>> => {
+          if (parkedSnapshots === 0 && target?.tabId === fixture.newTab) {
+            parkedSnapshots += 1;
+            snapshotReached.resolve();
+            await snapshotGate.promise;
+
+            // The parked read is the main frame's tree, which is the fake's own answer for it.
+            return MAIN_TREE;
+          }
+
+          const { frameId } = params ?? {};
+
+          return frameId === undefined || frameId === 'main' ? MAIN_TREE : FRAME_TREE;
+        },
+      });
+
+      const earlier = fixture.runtime.runTool({
+        arguments: {},
+        caller: panel(),
+        tabId: fixture.newTab,
+        toolName: 'browser_snapshot',
+      });
+
+      await snapshotReached.promise;
+
+      // Its lease is given back while its body is still running, so the next call may take the tab over.
+      fixture.leases.release(fixture.newTab, panel());
+
+      const pending = fixture.run(agent(), [token]);
+
+      await fixture.reachedNavigate(1);
+
+      // The earlier call's cleanup must not remove the hook this call installed on that tab.
+      snapshotGate.resolve();
+      await earlier;
+
+      const takeover = fixture.runtime.runTool({
+        arguments: {},
+        caller: panel(),
+        tabId: fixture.newTab,
+        takeOver: true,
+        toolName: 'browser_snapshot',
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      // Nothing would end this call on its own: let the navigate answer so a lost hook shows up as a kept file.
+      fixture.releaseNavigate(1);
+
+      const outcome = await pending;
+
+      await takeover;
+
+      // A later take-over of that tab still ends the call, because its hook survived the earlier call's cleanup.
+      expect(outcome).toMatchObject({ kind: 'result', result: { error: TAB_TAKEN_ERROR } });
     } finally {
       vi.useRealTimers();
     }

@@ -9,13 +9,17 @@
  * that succeeded leaves without asking about the draft it just saved.
  */
 
-import { type Context, createElement, useEffect, useMemo, useState } from 'react';
+import { type Context, createElement, useContext, useMemo, useState } from 'react';
 
 import {
-  NavigationPendingContext,
-  type RoutingQueueApi,
+  PendingIntentsContext,
   RoutingQueueApiContext,
+  RoutingQueueProvider,
 } from 'expo-router/build/global-state/routingQueueContext';
+import {
+  type QueuedRoutingIntent,
+  type RoutingIntent,
+} from 'expo-router/build/global-state/routingQueue';
 import { NavigationContext as VendoredNavigationContext } from 'expo-router/build/react-navigation/core/NavigationContext';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -44,7 +48,9 @@ const h = vi.hoisted(() => ({
   },
   createMutation: { mutateAsync: vi.fn(), isPending: false },
   queue: {
-    setPending: (_pending: boolean): void => undefined,
+    enqueue: (_intent: RoutingIntent): void => undefined,
+    dequeue: (_processed: QueuedRoutingIntent[]): void => undefined,
+    queued: [] as QueuedRoutingIntent[],
     setFocused: (_focused: boolean): void => undefined,
   },
 }));
@@ -73,19 +79,18 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
 }));
 
-// `route-focus.ts` reads the vendored contexts directly, so these mocks put the
-// guard's focus and queue reads under this suite's own providers. Mocking the
-// concrete modules keeps a Node test off the navigation stack's build output.
+// `route-focus.ts` reads the vendored focus context directly, so this mock puts
+// the guard's focus read under this suite's own provider. Mocking the concrete
+// module keeps a Node test off the navigation stack's build output.
+//
+// The routing queue is NOT mocked: expo-router's own `RoutingQueueProvider` is
+// plain React state over an intent array, it imports no navigator, and it is
+// what computes `NavigationPendingContext` as `isPending || queue.length > 0`.
+// Mounting it means the pending value every case reads is produced by
+// expo-router code from the queue the case itself drives.
 vi.mock('expo-router/build/react-navigation/core/NavigationContext', async () => {
   const { createContext } = await import('react');
   return { NavigationContext: createContext<unknown>(undefined) };
-});
-vi.mock('expo-router/build/global-state/routingQueueContext', async () => {
-  const { createContext } = await import('react');
-  return {
-    NavigationPendingContext: createContext(false),
-    RoutingQueueApiContext: createContext<unknown>(undefined),
-  };
 });
 
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
@@ -150,48 +155,58 @@ function pressBack() {
       repeat: () => {
         h.repeatSawEnabled.push(h.guard.enabled);
         // The replay's `repeat` dispatches the action, and a dispatch only
-        // enqueues an intent: the harness queue reports pending until a case
-        // has its drain apply the intent.
-        h.queue.setPending(true);
+        // enqueues an intent: this enters expo-router's own routing queue,
+        // whose pending value is `isPending || queue.length > 0`, so the guard
+        // reads pending from the provider's computation until a case drains it.
+        h.queue.enqueue({ type: 'ACTION', payload: { action: { type: 'GO_BACK' } } });
         h.repeat();
       },
     });
   });
 }
 
-/** The routing-queue API the guard only tests for presence. */
-const QUEUE_API = {
-  enqueue: () => undefined,
-  dequeue: () => undefined,
-  startTransition: () => undefined,
-  transitionMode: 'never',
-  setTransitionMode: () => undefined,
-} satisfies RoutingQueueApi;
+/** Apply the intents the queue holds, the way the root drainer does once a commit lands. */
+function drainQueue() {
+  act(() => {
+    h.queue.dequeue(h.queue.queued);
+  });
+}
 
 /**
- * The screen inside the contexts the guard reads directly: a routing queue whose
- * pending flag and a navigation object whose focus the case drives through
- * `h.queue`, so a drain and a granted pop can be replayed one commit at a time.
+ * The screen inside expo-router's own routing queue. `RoutingQueueProvider`
+ * computes `NavigationPendingContext` as `isPending || queue.length > 0`, so the
+ * pending transition every case reads is produced by expo-router code from the
+ * queue the case itself drives: the replay enqueues, the case drains with a
+ * `dequeue` of the intents it saw in `PendingIntentsContext`, and the focus read
+ * answers from the navigation object's own `isFocused`. No case sets a flag.
  */
 function GuardHarness() {
-  const [pending, setPending] = useState(false);
+  return (
+    <RoutingQueueProvider>
+      <QueueDrivenScreen />
+    </RoutingQueueProvider>
+  );
+}
+
+function QueueDrivenScreen() {
+  const api = useContext(RoutingQueueApiContext);
+  const queued = useContext(PendingIntentsContext);
   const [focused, setFocused] = useState(true);
-  useEffect(() => {
-    h.queue.setPending = setPending;
-    h.queue.setFocused = setFocused;
-  }, []);
+  if (api === undefined) {
+    throw new Error('the routing queue provider did not supply its API');
+  }
+  h.queue.enqueue = api.enqueue;
+  h.queue.dequeue = api.dequeue;
+  h.queue.queued = queued;
+  h.queue.setFocused = setFocused;
   const navigation = useMemo(
     () => ({ isFocused: () => focused, addListener: () => () => undefined }),
     [focused]
   );
   return (
-    <RoutingQueueApiContext.Provider value={QUEUE_API}>
-      <NavigationPendingContext.Provider value={pending}>
-        <NavigationContext.Provider value={navigation}>
-          <TriggerCreateScreen />
-        </NavigationContext.Provider>
-      </NavigationPendingContext.Provider>
-    </RoutingQueueApiContext.Provider>
+    <NavigationContext.Provider value={navigation}>
+      <TriggerCreateScreen />
+    </NavigationContext.Provider>
   );
 }
 
@@ -255,6 +270,12 @@ describe('TriggerCreateScreen leave guard', () => {
     h.guard.enabled = false;
     h.guard.handler = undefined;
     h.repeatSawEnabled = [];
+    // The harness cases hand these to the unmounted provider's API; a case that
+    // mounts the screen without the queue must not dispatch into that stale one.
+    h.queue.enqueue = () => undefined;
+    h.queue.dequeue = () => undefined;
+    h.queue.queued = [];
+    h.queue.setFocused = () => undefined;
   });
 
   it('leaves a clean form without asking', async () => {
@@ -334,16 +355,20 @@ describe('TriggerCreateScreen leave guard', () => {
     // The replay went out disarmed, and its dispatch only queued the intent:
     // this pass cannot tell the pop was granted, so the latch holds while the
     // queue still carries the intent and the focus read still answers from the
-    // state the dispatch was queued against.
+    // state the dispatch was queued against. The queue is expo-router's own, and
+    // its pending value is `isPending || queue.length > 0` — the intent the
+    // replay enqueued is what keeps it pending here.
     expect(h.repeat).toHaveBeenCalledTimes(1);
+    expect(h.queue.queued).toHaveLength(1);
     expect(h.guard.enabled).toBe(false);
 
     // The pop committed: the drained read sees this route unfocused, and a
     // granted pop never re-arms prevention on the route it carries away.
     act(() => {
-      h.queue.setPending(false);
       h.queue.setFocused(false);
     });
+    drainQueue();
+    expect(h.queue.queued).toHaveLength(0);
     expect(h.guard.enabled).toBe(false);
   });
 
@@ -356,13 +381,14 @@ describe('TriggerCreateScreen leave guard', () => {
       discardRequest().onConfirm?.();
       await Promise.resolve();
     });
+    expect(h.repeat).toHaveBeenCalledTimes(1);
+    expect(h.queue.queued).toHaveLength(1);
     expect(h.guard.enabled).toBe(false);
 
     // The navigator refused the removal, so the screen survives the drain as
     // the focused route: the drained read is truthful and the guard re-arms.
-    act(() => {
-      h.queue.setPending(false);
-    });
+    drainQueue();
+    expect(h.queue.queued).toHaveLength(0);
     await waitFor(() => h.guard.enabled);
     expect(h.guard.enabled).toBe(true);
 

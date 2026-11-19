@@ -194,14 +194,17 @@ function controlOnGutter(node: LayoutNode, page: Page, touch: number): boolean {
 }
 
 /**
- * Whether the content starts beside an element that already sits on the gutter
- * in the same row: a session row's hue strip, an `IconTile`, an avatar, or the
- * header's leading back control. The title after it starts past the gutter by
- * design, and only the leading element is the row's column. A sibling above the
- * box (a stacked section label) does not count: content under it is a column of
- * its own and must still start at the gutter.
+ * Whether the content starts beside an element its row already placed before it
+ * in the same row: a session row's hue strip, an `IconTile`, an avatar, the
+ * header's leading back control, or a composer's input frame that the bar insets
+ * inside its own padding. The box after it starts past the page gutter by design:
+ * a row places its content from its own start edge, so only its first painted
+ * element is that row's column, and a control at a row's end is never the column
+ * the page gutter describes. A sibling above the box (a stacked section label)
+ * does not count: content under it is a column of its own and must still start at
+ * the gutter.
  */
-function followsGutterSibling(
+function followsRowContent(
   node: LayoutNode,
   page: Page,
   nodes: readonly LayoutNode[],
@@ -213,13 +216,7 @@ function followsGutterSibling(
     for (const sibling of parent.children) {
       if (sibling === current) break;
       if (sibling.absolute || !verticallyOverlaps(sibling, node)) continue;
-      if (leadingControl(sibling, page, touch)) return true;
-      if (
-        Math.abs(startOffset(layoutRect(sibling), page.box, page) - SCREEN_GUTTER_DP) >
-        GUTTER_TOLERANCE_DP
-      )
-        continue;
-      if (subtreePaints(sibling)) return true;
+      if (leadingControl(sibling, page, touch) || subtreePaints(sibling)) return true;
     }
   }
   return false;
@@ -432,7 +429,7 @@ export function checkGutter(tree: LayoutTree): Finding[] {
         continue;
       }
     }
-    if (followsGutterSibling(node, page, nodes, env.tapTarget.touch)) continue;
+    if (followsRowContent(node, page, nodes, env.tapTarget.touch)) continue;
 
     const scroller = nodes.find(candidate => candidate.scroll.y && !candidate.scroll.x);
     const key = `${root?.index ?? 'window'}:${scroller?.index ?? 'page'}`;

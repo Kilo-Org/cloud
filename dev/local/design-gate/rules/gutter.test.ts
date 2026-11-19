@@ -344,6 +344,88 @@ test('gutter: content after a leading element of the row starts past the gutter'
   );
 });
 
+test('gutter: a composer row places its own controls, so its send button is not a column', () => {
+  // The device's composer: a full-bleed bar pads its row by 10.5 dp, the input
+  // frame sits inside that padding (a 10.5 dp leading gap with no paperclip
+  // beside it), and the send control ends the row 341 dp in. The row's own
+  // placement is the bar's, and the control after its content is not the page's
+  // column.
+  assert.deepEqual(
+    run([
+      { parent: 0, tag: 'RNSScreen', rect: [0, 0, WIDTH, 800] },
+      {
+        parent: 1,
+        tag: 'View',
+        rect: [0, 700, WIDTH, 66],
+        style: { backgroundColor: '#fbfaf5' },
+      },
+      {
+        parent: 2,
+        tag: 'View',
+        rect: [0, 700, WIDTH, 66],
+        style: { alignItems: 'center', flexDirection: 'row', padding: 8.75, paddingInline: 10.5 },
+      },
+      {
+        parent: 3,
+        tag: 'View',
+        rect: [21.33, 709, 262, 47],
+        style: { backgroundColor: '#ffffff', borderWidth: 1 },
+      },
+      { parent: 4, tag: 'TextInput', rect: [22.1, 710, 260, 45], pressable: true },
+      {
+        parent: 3,
+        tag: 'View',
+        rect: [288, 709, 48, 48],
+        pressable: true,
+        role: 'button',
+        label: 'Voice input',
+        style: { backgroundColor: '#f0eee6' },
+      },
+      { parent: 3, tag: 'View', rect: [341, 709, 48, 48] },
+      {
+        parent: 7,
+        tag: 'View',
+        rect: [341, 709, 48, 48],
+        pressable: true,
+        role: 'button',
+        label: 'Send message',
+        style: { backgroundColor: '#f0eee6' },
+      },
+    ]),
+    []
+  );
+});
+
+test('gutter: a row that starts off the gutter still fails at its leading content', () => {
+  // The row's padding places its first box at 30 dp; the control at the row's
+  // end follows that box and is not a second finding.
+  const nodes: ProbeNode[] = [
+    { parent: 0, tag: 'RNSScreen', rect: [0, 0, WIDTH, 800] },
+    { parent: 1, tag: 'View', rect: [0, 88, WIDTH, 700] },
+    {
+      parent: 2,
+      tag: 'View',
+      rect: [0, 100, WIDTH, 48],
+      style: { backgroundColor: '#ffffff', paddingInline: 30 },
+    },
+    { parent: 3, tag: 'View', rect: [30, 104, 60, 40], style: { backgroundColor: '#e2e8f0' } },
+    { parent: 3, tag: 'View', rect: [200, 104, 48, 40] },
+    {
+      parent: 5,
+      tag: 'View',
+      rect: [200, 104, 48, 40],
+      pressable: true,
+      role: 'button',
+      label: 'Send message',
+      style: { backgroundColor: '#f0eee6' },
+    },
+  ];
+  const [finding, ...rest] = run(nodes);
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.measured, 30);
+  assert.equal(finding?.element.index, 3);
+});
+
 test('gutter: a sibling stacked above the box does not exempt its column', () => {
   // The label sits on the gutter above the content; the body below it is still
   // the screen's column and must start at the gutter too.

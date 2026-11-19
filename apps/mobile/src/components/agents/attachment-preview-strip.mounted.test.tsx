@@ -195,7 +195,6 @@ vi.mock('@expo/react-native-action-sheet', () => ({
 const { fileText } = expoFileSystemMock;
 const { showActionSheetWithOptions } = actionSheetMock;
 
-
 function makeAttachment(overrides: Partial<AgentAttachment>): AgentAttachment {
   return {
     id: 'a1',

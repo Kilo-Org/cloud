@@ -109,7 +109,8 @@ const scanOutcomeShape = {
   /**
    * Calls of an input part whose verdicts are cached for the usual TTL: a clean allow, a log-only
    * detection, or a genuine block. Counts eligibility like `failed_calls_cached`, which counts the
-   * failed ones. Absent where `call_outcomes` is.
+   * failed ones. Absent from reports written before it was counted, and from per-call and output
+   * scan reports.
    */
   calls_cached: z.number().optional(),
   /**

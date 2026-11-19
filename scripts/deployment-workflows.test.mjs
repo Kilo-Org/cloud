@@ -634,8 +634,9 @@ test('web promotion waits for a completed or deliberately skipped gateway rollou
     ['skipped', 'skipped', 'success', 'skipped', false, false],
     ['success', 'success', 'success', 'success', true, false],
   ]) {
-    // Every entry in `needs` must appear here: a dependency added to the job
-    // without a fixture value must fail a case, not default to success.
+    // Every entry in `needs` must appear in `results`: a dependency added to
+    // the job without a fixture value fails here with its name, even when the
+    // job's condition never reads it.
     const results = {
       'verify-main': 'success',
       'stage-app': app,
@@ -643,7 +644,12 @@ test('web promotion waits for a completed or deliberately skipped gateway rollou
       'stage-ai-gateway': stage,
       'promote-ai-gateway': promotion,
     };
-    const needs = Object.fromEntries(job.needs.map(name => [name, { result: results[name] }]));
+    const needs = Object.fromEntries(
+      job.needs.map(name => {
+        assert.ok(name in results, `the promotion case must list the ${name} dependency`);
+        return [name, { result: results[name] }];
+      })
+    );
     assert.equal(
       runInNewContext(expression, {
         needs,

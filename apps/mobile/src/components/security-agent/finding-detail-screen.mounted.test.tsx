@@ -585,7 +585,9 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
       tree.root.findAllByProps({ children: 'securityAgent.dismiss.notFoundDescription' })
     ).toHaveLength(1);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
-    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    const notFound = tree.root.findByType(QueryError);
+    expect(notFound.props.variant).toBe('not-found');
+    expect(notFound.props.onRetry).toBeUndefined();
     // The first frame of every open is the loading one, so the not-found answer
     // keeps the line it reserved then instead of pulling the title up — held
     // blank, because no read is running to fill it.

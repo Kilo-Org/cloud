@@ -16,7 +16,9 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
     <Card>
       <Text variant="heading">{t('agentBriefing.summary')}</Text>
       {report.summary.status !== 'ready' ? (
-        <Text variant="muted">{t(briefingSummaryStatusKey(report.summary.status))}</Text>
+        <Text variant="muted">
+          {t(briefingSummaryStatusKey(report.summary.status, report.summary.error))}
+        </Text>
       ) : null}
       {report.summary.text ? <Text selectable>{report.summary.text}</Text> : null}
       {report.summary.model ? (

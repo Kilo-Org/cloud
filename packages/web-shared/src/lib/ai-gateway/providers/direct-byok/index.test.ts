@@ -33,9 +33,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options', () 
   getFallbackReasoningOptions: jest.fn(),
 }));
 
-jest.mock('./direct-byok-definitions', () => ({
-  __esModule: true,
-  default: [
+jest.mock('./direct-byok-definitions', () => {
+  const providers = [
     {
       id: 'chutes-byok',
       ...jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
@@ -79,8 +78,9 @@ jest.mock('./direct-byok-definitions', () => ({
       ]),
       transformRequest: jest.fn(),
     },
-  ],
-}));
+  ];
+  return { __esModule: true, default: providers, directByokProviderList: providers };
+});
 
 describe('createAiSdkProvider session headers', () => {
   afterEach(() => {
@@ -269,12 +269,18 @@ describe('getDirectByokModel', () => {
   test('skips loading model lists when the provider prefix is not direct BYOK', async () => {
     const { directByokProviders, getDirectByokModel } = await loadDirectByokModule();
 
-    await expect(getDirectByokModel('openrouter/supported-model')).resolves.toEqual({
-      provider: null,
-      model: null,
-    });
+    await expect(getDirectByokModel('openrouter/supported-model')).resolves.toBeNull();
 
     expect(directByokProviders[0].models).not.toHaveBeenCalled();
+    expect(directByokProviders[1].models).not.toHaveBeenCalled();
+  });
+
+  test('returns null for a model the matching provider does not serve', async () => {
+    const { directByokProviders, getDirectByokModel } = await loadDirectByokModule();
+
+    await expect(getDirectByokModel('chutes-byok/absent-model')).resolves.toBeNull();
+
+    expect(directByokProviders[0].models).toHaveBeenCalledTimes(1);
     expect(directByokProviders[1].models).not.toHaveBeenCalled();
   });
 
@@ -283,8 +289,8 @@ describe('getDirectByokModel', () => {
 
     const result = await getDirectByokModel('chutes-byok/supported-model');
 
-    expect(result.model?.id).toBe('supported-model');
-    expect(result.provider?.id).toBe('chutes-byok');
+    expect(result?.model?.id).toBe('supported-model');
+    expect(result?.provider?.id).toBe('chutes-byok');
     expect(directByokProviders[0].models).toHaveBeenCalledTimes(1);
     expect(directByokProviders[1].models).not.toHaveBeenCalled();
   });

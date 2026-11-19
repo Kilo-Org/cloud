@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 
 import { OrganizationGroupFormScreen } from '@/components/organization/group-form-screen';
 import { useRepairOrganizationRouteStack } from '@/lib/hooks/use-repair-organization-route-stack';
@@ -16,7 +16,7 @@ export default function OrganizationGroupFormRoute() {
   // (`profile-route-stack.ts`), and a rebuilt edit form without its group
   // would open as an empty create form.
   const groupIdParam = parseParam(groupId);
-  const self =
+  const self: Href =
     groupIdParam !== null
       ? `${GROUP_FORM_PATH}?groupId=${encodeURIComponent(groupIdParam)}`
       : GROUP_FORM_PATH;

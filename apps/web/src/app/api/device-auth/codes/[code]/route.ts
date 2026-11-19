@@ -21,8 +21,8 @@ type RouteContext = {
 
 export const GET = withRestTiming(
   '/api/device-auth/codes/[code]',
-  async (_request: Request, context: RouteContext) => {
-    const { code } = await context.params;
+  async (_request: Request, context?: RouteContext) => {
+    const code = (await context?.params)?.code;
 
     if (!code) {
       return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });
@@ -115,8 +115,8 @@ async function cancelFromDevice(code: string, request: Request): Promise<Respons
 
 export const DELETE = withRestTiming(
   '/api/device-auth/codes/[code]',
-  async (request: Request, context: RouteContext) => {
-    const { code } = await context.params;
+  async (request: Request, context?: RouteContext) => {
+    const code = (await context?.params)?.code;
 
     if (!code) {
       return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });

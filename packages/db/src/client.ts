@@ -67,26 +67,135 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
 }
 
 /**
- * Settings `getWorkerDb` fixes for every pool it creates: the connection string, `max: 1` because
- * Hyperdrive owns pooling, and `types` because the pool is created with the module's int8 parser.
- * The type reserves all three. Structural typing still accepts a value that a caller widened to
- * `pg.PoolConfig`, so this reservation is a type-level guard rather than a runtime one.
+ * Bounds for every transaction that a Worker DB client starts. Hyperdrive pools in transaction
+ * mode and resets `SET` state when it returns a connection to its pool, and it does not apply
+ * settings sent at connection startup. So the bounds are `SET LOCAL`
+ * statements in the same message as `BEGIN`, and a Worker that stops right after `BEGIN` still
+ * leaves a transaction that PostgreSQL ends. `lock_timeout` bounds row-lock and advisory-lock
+ * waits. The git-token-service disconnect flow holds the GitHub identity and grant advisory locks
+ * across two consecutive 10 s GitHub requests, so a Worker that waits for those locks can fail
+ * with `55P03` after 10 s. The idle bound stays above those two requests, the longest awaited
+ * non-database step inside a Worker transaction.
  */
-export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max' | 'types'>;
+export const workerTransactionBoundsSql =
+  "SET LOCAL lock_timeout = '10s'; SET LOCAL idle_in_transaction_session_timeout = '30s'";
+
+const transactionStart = /^begin\b/i;
+
+function isTextQueryConfig(config: unknown): config is pg.QueryConfig {
+  return (
+    typeof config === 'object' &&
+    config !== null &&
+    'text' in config &&
+    typeof config.text === 'string' &&
+    !('submit' in config)
+  );
+}
+
+function withTransactionBounds(config: unknown): unknown {
+  if (typeof config === 'string') {
+    return transactionStart.test(config) ? `${config}; ${workerTransactionBoundsSql}` : config;
+  }
+  if (isTextQueryConfig(config) && transactionStart.test(config.text)) {
+    return { ...config, text: `${config.text}; ${workerTransactionBoundsSql}` };
+  }
+  return config;
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'then' in value &&
+    typeof value.then === 'function'
+  );
+}
+
+/**
+ * drizzle sends `BEGIN` before the `try` block that releases the connection, so a failed `BEGIN`
+ * leaves the pool's only connection checked out and every later query on the client waits for
+ * it. The forwarder releases the connection with the error, and the pool closes it.
+ */
+function boundTransactionStarts(client: pg.PoolClient): void {
+  // pg types `query` as overloads. This forwarder changes only the text of a transaction start.
+  const query = client.query.bind(client) as (config: unknown, ...rest: unknown[]) => unknown;
+  client.query = ((config: unknown, ...rest: unknown[]) => {
+    const boundedConfig = withTransactionBounds(config);
+    const result = query(boundedConfig, ...rest);
+    if (boundedConfig === config || !isThenable(result)) return result;
+    return result.then(undefined, (error: unknown) => {
+      client.release(error instanceof Error ? error : true);
+      throw error;
+    });
+  }) as typeof client.query;
+}
+
+/**
+ * pg emits `error` on a checked-out connection that fails between statements, for example when
+ * PostgreSQL ends an idle transaction. pg still rejects the queries that use the failed
+ * connection. Only this failure is reported.
+ *
+ * pg-pool forwards errors of connections that are not checked out to the pool. With `maxUses: 1`
+ * no connection waits idle in the pool. So these are connections that the pool released and
+ * closes, where the Workers socket emits `error`, or connections that failed to connect, whose
+ * error the caller already received. Without listeners each of these events is an uncaught
+ * exception.
+ */
+function reportConnectionErrors(pool: pg.Pool): void {
+  const released = new WeakSet<pg.PoolClient>();
+  pool.on('release', (_error, client) => released.add(client));
+  pool.on('connect', client => {
+    client.on('error', error => {
+      if (released.has(client)) return;
+      console.warn('Worker database connection failed', { error: error.message });
+    });
+  });
+  pool.on('error', () => undefined);
+}
+
+/**
+ * Settings `getWorkerDb` fixes for every pool it creates: the connection string, `max: 1` because
+ * Hyperdrive owns pooling, `maxUses: 1` so a released connection closes at once instead of
+ * staying open for the pool's idle timeout, which in a Durable Object can outlive the request,
+ * and `types` because the pool is created with the module's int8 parser. The transaction bounds in `workerTransactionBoundsSql` replace the startup settings for
+ * lock and idle-in-transaction timeouts. The type reserves all of these, and `getWorkerDb` applies
+ * its values after the caller's options.
+ */
+export type GetWorkerDbOptions = Omit<
+  pg.PoolConfig,
+  | 'connectionString'
+  | 'max'
+  | 'maxUses'
+  | 'types'
+  | 'lock_timeout'
+  | 'idle_in_transaction_session_timeout'
+>;
+
+/**
+ * Default bound on the wait for the pool's only connection, including connection setup. It
+ * matches Hyperdrive's initial connection timeout. Without it a query that waits behind a
+ * connection that is never released waits forever. Callers can set a shorter bound.
+ */
+const workerConnectionTimeoutMillis = 15_000;
 
 /**
  * Convenience wrapper for Cloudflare Workers using Hyperdrive.
  * Hyperdrive handles connection pooling at the infrastructure level,
  * so we use max: 1 here. Pass env.HYPERDRIVE.connectionString directly.
  * Return a fresh wrapper per call so request/DO-bound I/O state never crosses contexts.
+ * Each query or transaction uses its own connection, which closes when the pool releases it.
  */
 export function getWorkerDb(connectionString: string, options: GetWorkerDbOptions = {}) {
   const pool = new pg.Pool({
+    connectionTimeoutMillis: workerConnectionTimeoutMillis,
+    ...options,
     connectionString,
     max: 1,
+    maxUses: 1,
     types: databaseTypeParsers,
-    ...options,
   });
+  pool.on('connect', boundTransactionStarts);
+  reportConnectionErrors(pool);
   return drizzle(pool, { schema });
 }
 

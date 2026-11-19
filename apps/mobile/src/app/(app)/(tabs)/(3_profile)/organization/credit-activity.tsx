@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 
 import { OrganizationCreditActivityScreen } from '@/components/organization/credit-activity-screen';
 import { useRepairOrganizationRouteStack } from '@/lib/hooks/use-repair-organization-route-stack';
@@ -23,7 +23,7 @@ export default function OrganizationCreditActivityRoute() {
   // push is a query string, because the object form drops params
   // (`profile-route-stack.ts`), and a rebuilt link screen without its org
   // would re-scope to the persisted selection.
-  const self =
+  const self: Href =
     orgParam !== undefined
       ? `${CREDIT_ACTIVITY_PATH}?org=${encodeURIComponent(orgParam)}`
       : CREDIT_ACTIVITY_PATH;

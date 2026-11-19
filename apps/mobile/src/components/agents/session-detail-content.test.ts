@@ -316,6 +316,7 @@ vi.mock('@/components/ui/icons', () => ({
   RotateCcw: 'RotateCcw',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'ArrowLeft',
   DirectionalChevronLeft: 'ChevronLeft',
   DirectionalChevronRight: 'ChevronRight',
 }));

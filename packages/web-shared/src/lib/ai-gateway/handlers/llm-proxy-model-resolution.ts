@@ -339,8 +339,8 @@ async function catalogModeModelForRoutedModel(
   model: string,
   callerPromise: ModelResolutionContext['callerPromise']
 ): Promise<string | null> {
-  const { provider } = await getDirectByokModel(model.toLowerCase());
-  if (!provider || !supportsCatalogMode(provider.id)) return null;
+  const directByok = await getDirectByokModel(model.toLowerCase());
+  if (!directByok || !supportsCatalogMode(directByok.provider.id)) return null;
   const caller = await callerPromise;
   if (caller.kind !== 'signed-in') return null;
   const resolveReference = await createDirectByokReferenceResolver(

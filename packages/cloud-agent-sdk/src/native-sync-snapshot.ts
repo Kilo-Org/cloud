@@ -6,6 +6,7 @@ import {
   type Kilo2Session,
 } from '@kilocode/session-ingest-contracts';
 import {
+  hasUndisplayableKilo2Assets,
   kilo2AssetKey,
   readKilo2FileReferences,
   readKilo2Messages,
@@ -165,7 +166,10 @@ export function projectNativeSnapshot(snapshot: NativeSnapshot): NativeSnapshotP
   const incompleteMessageIDs: string[] = [];
   for (const item of snapshot.messages) {
     if (item.incomplete) incompleteMessageIDs.push(item.message.id);
-    else messages.push(item.message);
+    // A message with no possible display is dropped, not reported as missing data.
+    else if (!hasUndisplayableKilo2Assets(item.message, snapshot.assetURLs)) {
+      messages.push(item.message);
+    }
   }
   return {
     session,
@@ -267,7 +271,9 @@ async function resolveSnapshotAssets(
   for (const item of snapshot.messages) {
     if (item.incomplete) continue;
     for (const file of readKilo2FileReferences(item.message)) {
-      if (/^(data:|https?:\/\/)/.test(file.uri)) continue;
+      // Inline bytes need no mapping; an absolute remote reference can never be bound to a stored
+      // asset.
+      if (file.uri.startsWith('data:') || /^https?:\/\//.test(file.uri)) continue;
       const split =
         file.contentIndex === undefined ? undefined : item.partOrdinals?.[file.contentIndex];
       const owner =

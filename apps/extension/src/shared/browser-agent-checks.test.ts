@@ -5,6 +5,7 @@ import {
   canStartDownload,
   classifyFormField,
   createStepTokenStore,
+  downloadTierOf,
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
@@ -99,6 +100,49 @@ describe('download-capable tools', () => {
   it('leaves a tool that only reads the page alone', () => {
     expect(canStartDownload('browser_snapshot')).toBe(false);
     expect(canStartDownload('browser_take_screenshot')).toBe(false);
+  });
+});
+
+describe('download tier choice', () => {
+  const base = {
+    approved: false,
+    canDownload: true,
+    hasHold: true,
+    hasPermission: true,
+    needsTheFile: false,
+    sensitiveToken: false,
+  } as const;
+
+  it('holds on a browser with the event and the permission', () => {
+    expect(downloadTierOf(base)).toBe('hold');
+  });
+
+  it('intercepts only when the event exists and the permission is withheld, so the hold is never armed alone', () => {
+    expect(downloadTierOf({ ...base, hasPermission: false })).toBe('intercept');
+  });
+
+  it('keeps the legacy cancel-after-start guard on a browser with the permission but no event', () => {
+    expect(downloadTierOf({ ...base, hasHold: false })).toBe('legacy');
+  });
+
+  it('names one tier per permission and browser combination, never two', () => {
+    const tiers = [true, false].flatMap(hasHold =>
+      [true, false].map(hasPermission => downloadTierOf({ ...base, hasHold, hasPermission }))
+    );
+
+    expect(tiers).toStrictEqual(['hold', 'intercept', 'legacy', 'none']);
+  });
+
+  it('chooses no guard for a call that cannot start a download or already spent its token', () => {
+    expect(downloadTierOf({ ...base, canDownload: false })).toBe('none');
+    expect(downloadTierOf({ ...base, sensitiveToken: true })).toBe('none');
+  });
+
+  it('guards nothing on a browser whose only guard is the legacy one, when the approval names no file', () => {
+    expect(downloadTierOf({ ...base, approved: true, hasHold: false })).toBe('none');
+    expect(downloadTierOf({ ...base, approved: true, hasHold: false, needsTheFile: true })).toBe(
+      'legacy'
+    );
   });
 });
 

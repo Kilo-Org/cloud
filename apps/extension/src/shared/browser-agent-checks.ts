@@ -111,6 +111,66 @@ export const canStartDownload = (toolName: string, args: Record<string, unknown>
 };
 
 /**
+ * The one guard a call runs, chosen once from the browser and the optional
+ * `downloads` permission — never two at a time, because each one decides the
+ * same item and the later one would only overrule the earlier.
+ * - `hold`: `chrome.downloads.onDeterminingFilename` exists, so the item is held before its file exists.
+ * - `intercept`: Chrome without the permission, so the response that would become a file is failed.
+ * - `legacy`: neither the event nor a permission to hold with (`downloadsApi` is `undefined` only on a browser
+ *   whose `chrome.downloads` cannot be read), so the item is cancelled after it starts.
+ * - `none`: this call cannot start a download, or its approval already names the one file it buys.
+ *
+ * `holdsDownloads` is whether this browser has the event at all, which is what the hold object exists for; a hold
+ * without the permission cannot answer it, so the permission picks `intercept` there and never `hold`.
+ */
+export type DownloadTier =
+  /** `onDeterminingFilename` holds the item before its file exists. */
+  | 'hold'
+  /** The response that would become a file is failed, because the permission to hold it is not granted. */
+  | 'intercept'
+  /** The item is cancelled after it starts: a browser with neither the event nor the permission. */
+  | 'legacy'
+  /** This call cannot start a download, or its approval already names the one file it buys. */
+  | 'none';
+
+export const downloadTierOf = ({
+  approved,
+  canDownload,
+  hasHold,
+  hasPermission,
+  needsTheFile,
+  sensitiveToken,
+}: {
+  /** Whether this call redeemed a download approval. */
+  readonly approved: boolean;
+  /** Whether this call is an agent call that can start a download at all. */
+  readonly canDownload: boolean;
+  /** Whether the browser raises `onDeterminingFilename`, so a hold can decide an item. */
+  readonly hasHold: boolean;
+  /** Whether the optional `downloads` permission is granted right now. */
+  readonly hasPermission: boolean;
+  /** Whether the approval still names the one file it buys: without it nothing could be exempt from the guard. */
+  readonly needsTheFile: boolean;
+  /** Set when the gate already refused this step for a sensitive target: the guard would only repeat that. */
+  readonly sensitiveToken: boolean;
+}): DownloadTier => {
+  if (!canDownload || sensitiveToken) {
+    return 'none';
+  }
+
+  if (!hasPermission) {
+    // Chrome keeps its response interceptor; a browser without the permission API to grant it has no guard at all.
+    return hasHold ? 'intercept' : 'none';
+  }
+
+  if (!hasHold) {
+    return approved && !needsTheFile ? 'none' : 'legacy';
+  }
+
+  return 'hold';
+};
+
+/**
  * The tab an approved download step opened is gone, so there is no tab to
  * repeat that step on. Opening a fresh one would download the file again
  * without the approval the human gave.

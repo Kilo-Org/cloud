@@ -223,6 +223,13 @@ export interface DownloadHold {
   readonly settle: (session: string, window: SettleWindow) => Promise<void>;
   /** Registers an agent tab, or refreshes its page and step; `undefined` forgets it. */
   readonly tab: (input: DownloadHoldTab | { readonly detach: number }) => void;
+  /**
+   * Records the navigation a call is about to send on its tab, before it is sent:
+   * an item that arrives with no referrer and no announcement is that call's
+   * file only while its expectation is live. Every other empty-referrer item
+   * stays foreign, so a user's own download is never claimed.
+   */
+  readonly navigate: (navigation: DownloadHoldNavigation) => void;
   /** One item's decision, for a test or a diagnostic that holds nothing else. */
   readonly tracked: (itemId: number) => TrackedDownload | undefined;
 }
@@ -335,6 +342,25 @@ type Attribution =
 /** One announcement waiting for the item that claims it: `claimed` flips once an item takes it. */
 type OpenAnnouncement = DownloadHoldAnnouncement & { claimed: boolean };
 
+/**
+ * A navigation the runtime itself sent on an agent tab, registered before it is
+ * sent: the one tie an item needs when the browser reports no referrer and
+ * announces nothing. A browser-initiated navigation of a top-level document —
+ * `browser_navigate`, `browser_navigate_back`, a `browser_tabs new` — issues no
+ * `Referer` and, on real Chrome, no `Page.downloadWillBegin` either, so an
+ * attachment it loads is otherwise indistinguishable from a user's own file.
+ */
+export interface DownloadHoldNavigation {
+  /** The call that sent it: what a report inside its window belongs to. */
+  readonly attempt: string;
+  readonly session: string;
+  readonly tabId: number;
+  /** The url the runtime asked for, before any redirect: compared by page identity. */
+  readonly url: string;
+  /** When the expectation ends: the call's own settle window plus the attribution bound. */
+  readonly until: number;
+}
+
 const waitFor = (milliseconds: number): Promise<void> => {
   const { promise, resolve } = Promise.withResolvers<void>();
 
@@ -364,6 +390,8 @@ export const createDownloadHold = ({
   const tabs = new Map<number, DownloadHoldTab>();
   /** Announcements no item has claimed yet, per tab: what a held download is matched against. */
   const announcements = new Map<number, OpenAnnouncement[]>();
+  /** The navigation each tab's live call is sending, by tab id: the tie an unreferred item needs. */
+  const navigations = new Map<number, DownloadHoldNavigation>();
   /** The announcements a tripwire watches, so one announcement is reported at most once. */
   const watched = new Set<string>();
 
@@ -467,6 +495,30 @@ export const createDownloadHold = ({
     return undefined;
   };
 
+  /**
+   * The tab whose call is navigating to this item's file: the item's url (or its
+   * final url, after redirects) names the page the runtime asked for, or the
+   * expectation is live on that tab and the item carries no referrer at all.
+   * Only a live expectation can claim an unreferred item, so a user's typed-URL
+   * download — no expectation on its tab — still passes as foreign.
+   */
+  const tabByNavigation = (item: DownloadHoldItem, at: number): number | undefined => {
+    const named = pageOf(item.url) ?? pageOf(item.finalUrl);
+    const unreferred = pageOf(item.referrer) === undefined;
+
+    for (const [tabId, navigation] of navigations) {
+      if (navigation.until < at || !tabs.has(tabId)) {
+        continue;
+      }
+
+      if (unreferred || named === undefined || pageOf(navigation.url) === named) {
+        return tabId;
+      }
+    }
+
+    return undefined;
+  };
+
   const classify = (item: DownloadHoldItem): Attribution => {
     if (item.byExtensionId !== undefined) {
       return { kind: 'foreign' };
@@ -479,7 +531,15 @@ export const createDownloadHold = ({
 
     if (pageOf(item.referrer) === undefined) {
       // No referrer at all: a page with `no-referrer`, or one the browser withheld. The
-      // announcement, which Chrome sends a millisecond before the item, is the only tie left.
+      // announcement, which Chrome sends a millisecond before the item, is the only tie left —
+      // And a navigation this runtime itself sent is the other: the browser reports neither a
+      // referrer nor an announcement for it, so the call's own expectation is the only record.
+      const navigating = tabByNavigation(item, now());
+
+      if (navigating !== undefined) {
+        return { kind: 'owned', tabId: navigating };
+      }
+
       return { kind: 'wait' };
     }
 
@@ -847,6 +907,7 @@ export const createDownloadHold = ({
         if (tab.session === session) {
           tabs.delete(tabId);
           announcements.delete(tabId);
+          navigations.delete(tabId);
         }
       }
 
@@ -926,11 +987,15 @@ export const createDownloadHold = ({
       if ('detach' in input) {
         announcements.delete(input.detach);
         tabs.delete(input.detach);
+        navigations.delete(input.detach);
 
         return;
       }
 
       tabs.set(input.tabId, input);
+    },
+    navigate: navigation => {
+      navigations.set(navigation.tabId, navigation);
     },
     tracked: itemId => tracked.get(itemId),
   };

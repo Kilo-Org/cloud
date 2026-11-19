@@ -8,6 +8,7 @@ import {
   DOWNLOAD_BLOCKED_BY_BROWSER_ERROR,
   DOWNLOAD_STEP_TAB_GONE_ERROR,
   downloadStoppedWithoutPermissionError,
+  downloadTierOf,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
@@ -18,13 +19,14 @@ import {
 import type {
   BrowserGrant,
   BrowserPermissionItem,
+  DownloadTier,
   StepTokenNeed,
   StepTokenStore,
   StepTokenTake,
 } from './browser-agent-checks';
 import { postAgentNavigate, preflightAgentCall, takeStartedDownloads } from './browser-agent-gate';
 import type { BrowserSensitiveStep } from './browser-agent-gate';
-import { targetOf } from './browser-download-hold';
+import { ATTRIBUTION_WAIT_MS, targetOf } from './browser-download-hold';
 import type { DownloadHold, DownloadStep } from './browser-download-hold';
 import {
   DOWNLOAD_FAIL_REASON,
@@ -2921,9 +2923,10 @@ export const createBrowserRuntime = ({
           // Only downloads this call starts may be reported: events left by an earlier call are stale.
           const stale = takeStartedDownloads(session);
 
-          if (downloadHold !== undefined) {
+          if (downloadHold !== undefined && downloadsApi?.() !== undefined) {
             // An announcement names the file before its item exists, and it is the only tab-exact attribution
             // A download has: the hold claims it, and reports a file none of them claimed as possibly saved.
+            // Without the permission the hold's event does not exist, so nothing would ever claim it.
             for (const download of stale) {
               downloadHold.announce({ ...download, tabId });
             }
@@ -3079,40 +3082,32 @@ export const createBrowserRuntime = ({
         // Worker lives, so every guard decision below reads the same answer once.
         const downloadsPermission = downloadsApi?.();
 
+        // Which guard decides this call's downloads, chosen once from the live permission and the browser:
+        // A hold needs the permission to answer its event, an interceptor needs Chrome without it, and a browser
+        // With neither falls back to the legacy cancel-after-start guard. Never two at a time.
+        const downloadTier: DownloadTier = downloadTierOf({
+          approved: downloadApproved,
+          canDownload: agentContext !== undefined && downloadCapable && preflight !== undefined,
+          hasHold: downloadHold !== undefined,
+          hasPermission: downloadsPermission !== undefined,
+          needsTheFile: approvedNeeds.get(sessionKey) !== undefined,
+          sensitiveToken: preflight === undefined || preflight.sensitiveToken !== undefined,
+        });
+
         // An act call runs guarded: an unapproved one denies downloads outright, and an approved one listens and
         // Stops every download but the file its approval bought, so a second file is neither kept nor silent.
         // An approved call guards nothing when its approval names no file: without a url there is nothing to exempt,
         // And a guard that cannot tell the approved file from the rest would cancel it.
-        // Where the browser holds a download before its file exists, the hold already decides every item: the
-        // Legacy cancel-after-start guard would then only stop files the hold had already refused.
-        const guardDownloads =
-          downloadHold === undefined &&
-          agentContext !== undefined &&
-          downloadCapable &&
-          preflight !== undefined &&
-          preflight.sensitiveToken === undefined &&
-          (!downloadApproved || approvedNeeds.get(sessionKey) !== undefined);
+        const guardDownloads = downloadTier === 'legacy';
 
         // The hold decides every download of the profile, so a call has nothing to arm for it — but the tab
         // Its step runs on has to be known before the step runs, or a download it starts is nobody's and passes.
-        const holdGuards =
-          downloadHold !== undefined &&
-          agentContext !== undefined &&
-          downloadCapable &&
-          preflight !== undefined &&
-          preflight.sensitiveToken === undefined;
+        const holdGuards = downloadTier === 'hold';
 
         // Without the optional `downloads` permission nothing can hold or cancel an item, but the response that
-        // Would become a file can still be failed. Which guard this call has is decided once the permission is
-        // Read again at arming time, because it can be revoked while the tab is opened.
-        const interceptGuards =
-          downloadHold === undefined &&
-          agentContext !== undefined &&
-          downloadCapable &&
-          preflight !== undefined &&
-          preflight.sensitiveToken === undefined &&
-          !downloadApproved;
-        const guarded = guardDownloads || holdGuards || interceptGuards;
+        // Would become a file can still be failed.
+        const interceptGuards = downloadTier === 'intercept';
+        const guarded = downloadTier !== 'none';
 
         // An approved repeat of a `browser_tabs new` download owns the tab that step opened: sending the tool again
         // Would open a second tab and download the file twice, and the kept file would go unreported. The repeat
@@ -3273,7 +3268,7 @@ export const createBrowserRuntime = ({
           takeOverDownloads(runTabId);
 
           for (const download of takeStartedDownloads(runSession)) {
-            if (downloadHold !== undefined) {
+            if (downloadHold !== undefined && downloadsPermission !== undefined) {
               downloadHold.announce({ ...download, tabId: runTabId });
             } else if (downloadsPermission === undefined) {
               noteUnguardedDownload(sessionKey, { ...download, tabId: runTabId });
@@ -3329,6 +3324,8 @@ export const createBrowserRuntime = ({
           guardDownloads ? runSession.networkRequests().map(request => request.requestId) : []
         );
         // The step this call is: what a download it starts is reported against, and what the token then binds.
+        // The moment the guard is armed, which its settle window is measured from and a navigate expectation covers.
+        const guardArmedAt = Date.now();
         const downloadStep: DownloadStep | undefined =
           (guardDownloads || holdGuards) && preflight?.ok
             ? {
@@ -3351,6 +3348,24 @@ export const createBrowserRuntime = ({
             step: downloadStep,
             tabId: runTabId,
           });
+
+          // A navigation this runtime sends is the one call whose download Chrome reports with no referrer and,
+          // On real Chrome, no announcement either: the call's own expectation is then the only tie to the tab.
+          // It covers exactly its own settle window, so a download after it stays the user's.
+          if (
+            stepToolName === 'browser_navigate' ||
+            stepToolName === 'browser_navigate_back' ||
+            stepToolName === 'browser_reload' ||
+            (stepToolName === 'browser_tabs' && stepArgumentsRecord['action'] === 'new')
+          ) {
+            downloadHold.navigate({
+              attempt: `call-${String(guardArmedAt)}-${String(runTabId)}`,
+              session: sessionKey,
+              tabId: runTabId,
+              until: guardArmedAt + DOWNLOAD_HOLD_SETTLE_MS + ATTRIBUTION_WAIT_MS,
+              url: destination ?? '',
+            });
+          }
 
           if (approvedFile !== null) {
             // The approval the repeat just redeemed is the one file the hold lets through.
@@ -3422,12 +3437,10 @@ export const createBrowserRuntime = ({
             : undefined;
 
         // A download no network response carries — a `blob:`, a `data:`, an `<a download>` — is announced and
-        // Saved before anything can stop it. Where nothing holds items and no permission could cancel one, the
-        // Announcement is the only thing that names the file: it is queued as possibly saved, never silently kept.
+        // Saved before anything can stop it. Without the optional permission no item can be held or cancelled, so
+        // The announcement is the only thing that names the file: it is queued as possibly saved, never silently kept.
         const stopUnguardedWatch =
-          downloadHold === undefined &&
-          downloadsPermission === undefined &&
-          agentContext !== undefined
+          downloadTier === 'intercept'
             ? runSession.watchDownloads(download => {
                 noteUnguardedDownload(sessionKey, { ...download, tabId: runTabId });
               })

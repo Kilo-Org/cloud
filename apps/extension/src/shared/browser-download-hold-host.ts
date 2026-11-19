@@ -276,6 +276,9 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold =>
       hold.escape(download, session);
     },
     handle: (item: DownloadHoldItem, suggest: SuggestFilename) => hold.handle(item, suggest),
+    navigate: navigation => {
+      hold.navigate(navigation);
+    },
     needOf: session => hold.needOf(session),
     settle: (session, window) => hold.settle(session, window),
     tab: input => {

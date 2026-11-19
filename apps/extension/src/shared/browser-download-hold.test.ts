@@ -294,6 +294,75 @@ describe('the listener', () => {
   });
 });
 
+describe('navigate expectations', () => {
+  const attachment = 'https://app.example/reports/q4.pdf';
+  const unreferred = { id: 1, url: attachment };
+
+  it('owns and blocks an unreferred, unannounced item during a live navigate expectation', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+    hold.navigate({
+      attempt: 'attempt-1',
+      session: 'session-1',
+      tabId: 7,
+      until: Date.now() + 5_000,
+      url: attachment,
+    });
+
+    // `block` cancels before `suggest`, so its answer is owed: the emission defers and the stop settles on the microtask.
+    expect(
+      hold.handle(unreferred, () => {
+        downloads.order.push('suggest');
+      })
+    ).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(downloads.order).toContain('cancel');
+    expect(reports).toStrictEqual(['stopped:q4.pdf']);
+  });
+
+  it('passes the same item through as foreign when no expectation is live on its tab', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+
+    // No tie at all: the hold waits the attribution bound for an announcement, then leaves the file to its owner.
+    hold.handle(unreferred, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(ATTRIBUTION_WAIT_MS + 1);
+
+    expect(downloads.order).toStrictEqual(['suggest']);
+    expect(reports).toStrictEqual([]);
+  });
+
+  it('lets an expired expectation fall away, so a later file is the user’s', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+
+    hold.tab(agentTab());
+    hold.navigate({
+      attempt: 'attempt-1',
+      session: 'session-1',
+      tabId: 7,
+      until: Date.now() + 10,
+      url: attachment,
+    });
+    await vi.advanceTimersByTimeAsync(50);
+
+    hold.handle({ id: 2, url: attachment }, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(ATTRIBUTION_WAIT_MS + 1);
+
+    expect(downloads.order).toStrictEqual(['suggest']);
+    expect(reports).toStrictEqual([]);
+  });
+});
+
 describe('foreign downloads', () => {
   it('passes another extension’s download through at once', () => {
     const downloads = makeDownloads();

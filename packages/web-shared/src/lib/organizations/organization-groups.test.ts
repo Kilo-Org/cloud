@@ -347,6 +347,11 @@ describe('organization group audit messages', () => {
 
   afterEach(async () => {
     for (const organizationId of createdOrganizationIds) {
+      // `organization_memberships` carries no foreign key, so deleting the
+      // organization leaves its membership rows behind unless this deletes them.
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.organization_id, organizationId));
       await db.delete(organizations).where(eq(organizations.id, organizationId));
       await db
         .delete(organization_audit_logs)

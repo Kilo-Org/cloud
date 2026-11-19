@@ -69,11 +69,16 @@ export function OrganizationGroupsScreen() {
   const memberGroups = data?.access === 'member' ? data.groups : null;
   const errorView = groupsQuery.isError ? selectOrgListErrorView(groupsQuery.error) : null;
   // A plan gate, a failed read, or an empty list is the whole surface; a member
-  // view, a list, or the loading skeleton keeps the scroller.
+  // view, a list, or the loading skeleton keeps the scroller. The skeleton is
+  // pending with no data, so it is excluded from the empty-list test explicitly:
+  // outside the scroller it would paint without the page gutter and the list
+  // would then shift when it landed.
   const wholeSurface =
     !enterprise ||
     errorView !== null ||
-    (memberGroups === null && (managerGroups === null || managerGroups.length === 0));
+    (!groupsQuery.isPending &&
+      memberGroups === null &&
+      (managerGroups === null || managerGroups.length === 0));
 
   let body: ReactNode = null;
   if (!enterprise) {

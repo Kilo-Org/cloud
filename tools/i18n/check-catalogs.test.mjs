@@ -2564,12 +2564,24 @@ test('reads the supported tags from the array literal, not from a comment inside
   assert.deepEqual(found, []);
 });
 
+/**
+ * The translated catalog with one mobile key removed, so a case that loses the
+ * tag list can show the audit still reports a finding of the catalog's own.
+ */
+function translatedWithGap() {
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  return translated;
+}
+
 test('reports a SUPPORTED_LANGUAGES element that is not a string literal', () => {
   const found = run({
     extraFiles: {
       'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru', ...EXTRA_TAGS];`,
     },
   });
+  // One line: an unreadable element leaves the tag list unknown, and the
+  // membership rule stays off instead of calling every catalog unsupported.
   assert.deepEqual(found, [
     'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES has an element this check cannot read',
   ]);
@@ -2581,7 +2593,79 @@ test('reports a missing SUPPORTED_LANGUAGES declaration', () => {
       'apps/mobile/src/i18n/languages.ts': `export const OTHER_TAGS = ['en', 'ru'];`,
     },
   });
-  assert.ok(
-    found.includes('apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared')
-  );
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared',
+  ]);
+});
+
+test('reports an undeclared SUPPORTED_LANGUAGES once and still audits the catalogs', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const OTHER_TAGS = ['en', 'ru'];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared',
+    'mobile/ru: missing key "agents.title"',
+  ]);
+});
+
+test('reports a SUPPORTED_LANGUAGES initializer that is not an array literal once', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': [
+        `const TAGS = ['en', 'ru'];`,
+        `export const SUPPORTED_LANGUAGES = TAGS;`,
+      ].join('\n'),
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not an array literal',
+    'mobile/ru: missing key "agents.title"',
+  ]);
+});
+
+test('reports an unreadable SUPPORTED_LANGUAGES element once and still audits the catalogs', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru', ...EXTRA_TAGS];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES has an element this check cannot read',
+    'mobile/ru: missing key "agents.title"',
+  ]);
+});
+
+test('reports an unparseable SUPPORTED_LANGUAGES file as its parse error only', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru'\n`,
+    },
+  });
+  // The parse error already names the cause, so "not declared" would repeat it,
+  // and the unknown tag list keeps the membership rule off. The tag-list reader
+  // and the mobile catalog's own source scan both parse this file, so the line
+  // is not counted here.
+  const text = found.join('\n');
+  assert.match(text, /apps\/mobile\/src\/i18n\/languages\.ts:2: cannot parse: /);
+  assert.doesNotMatch(text, /is not declared/);
+  assert.doesNotMatch(text, /is not a supported language/);
+  assert.match(text, /mobile\/ru: missing key "agents\.title"/);
+});
+
+test('reports a catalog file no supported language names in both catalogs', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en'];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'mobile: catalog "ru.json" is not a supported language',
+    'notifications: catalog "ru.json" is not a supported language',
+  ]);
 });

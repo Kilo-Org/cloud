@@ -686,11 +686,15 @@ const PER_LINE_BUCKET_PHRASES = new Set([
 ]);
 
 /**
- * The supported tags, read from the one source of truth. A `null` tag list
- * means the list could not be read, which is not the same as an empty list.
+ * The supported tags, read from the one source of truth.
+ *
+ * A `null` tag list means the list could not be read, which is not the same as
+ * an empty list: the rule that compares catalog files against the list then has
+ * nothing to compare, so it reports nothing instead of one line per file. Its
+ * caller reads `null` as "skip that rule" and still runs every other rule. Each
+ * early return below reports the one cause it stopped at.
  */
 function supportedLanguages(root) {
-  const problems = [];
   const file = join(root, 'apps/mobile/src/i18n/languages.ts');
   if (!existsSync(file)) {
     return {
@@ -703,38 +707,47 @@ function supportedLanguages(root) {
     return { tags: null, problems: read.problems };
   }
   const entry = parseSourceEntry(root, root, file, read.text);
-  for (const problem of entry.problems) {
-    problems.push(problem);
+  if (entry.problems.length > 0) {
+    // The tree a failed parse yields is not the one the walk below reads, so
+    // "not declared" would repeat the cause the parse error already names.
+    return { tags: null, problems: entry.problems };
   }
-  const tags = [];
-  let declared = false;
+  const declarations = [];
   walk(entry.program, node => {
     if (
-      node.type !== 'VariableDeclarator' ||
-      node.id.type !== 'Identifier' ||
-      node.id.name !== 'SUPPORTED_LANGUAGES'
+      node.type === 'VariableDeclarator' &&
+      node.id.type === 'Identifier' &&
+      node.id.name === 'SUPPORTED_LANGUAGES'
     ) {
-      return;
+      declarations.push(node);
     }
-    declared = true;
+  });
+  if (declarations.length === 0) {
+    return { tags: null, problems: [`${entry.path}: SUPPORTED_LANGUAGES is not declared`] };
+  }
+  const tags = [];
+  for (const node of declarations) {
     const init = node.init === null ? null : unwrap(node.init);
     if (init?.type !== 'ArrayExpression') {
-      problems.push(`${entry.path}: SUPPORTED_LANGUAGES is not an array literal`);
-      return;
+      return {
+        tags: null,
+        problems: [`${entry.path}: SUPPORTED_LANGUAGES is not an array literal`],
+      };
     }
     for (const element of init.elements) {
       const value = element === null ? null : unwrap(element);
+      // An element the walker cannot decode leaves the list incomplete, so
+      // every tag it may hold would read as an unsupported language.
       if (value?.type !== 'Literal' || typeof value.value !== 'string') {
-        problems.push(`${entry.path}: SUPPORTED_LANGUAGES has an element this check cannot read`);
-        continue;
+        return {
+          tags: null,
+          problems: [`${entry.path}: SUPPORTED_LANGUAGES has an element this check cannot read`],
+        };
       }
       tags.push(value.value);
     }
-  });
-  if (!declared) {
-    problems.push(`${entry.path}: SUPPORTED_LANGUAGES is not declared`);
   }
-  return { tags, problems };
+  return { tags, problems: [] };
 }
 
 /**
@@ -1344,6 +1357,20 @@ function pushCalledKeyOf(call) {
 }
 
 /**
+ * The key node of a `translatePush(locale, key, …)` call, unwrapped from its
+ * TypeScript-only wrappers, or null when the call is not one or passes no key.
+ * One reader decides what a translatePush call is, so the two key shapes below
+ * cannot drift apart; each narrows the node it accepts.
+ */
+function translatePushKey(call) {
+  if (call.callee.type !== 'Identifier' || call.callee.name !== 'translatePush') {
+    return null;
+  }
+  const key = call.arguments[1];
+  return key === undefined ? null : unwrap(key);
+}
+
+/**
  * The key one `translatePush(locale, key, …)` call names, or null when the call
  * is not one or its key is not a plain string.
  *
@@ -1354,14 +1381,10 @@ function pushCalledKeyOf(call) {
  * same tree.
  */
 function pushCalledKey(call) {
-  if (call.callee.type !== 'Identifier' || call.callee.name !== 'translatePush') {
+  const value = translatePushKey(call);
+  if (value === null) {
     return null;
   }
-  const key = call.arguments[1];
-  if (key === undefined) {
-    return null;
-  }
-  const value = unwrap(key);
   return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
     ? value.value
     : null;
@@ -1376,14 +1399,10 @@ function pushCalledKey(call) {
  * empty — names no parent and returns null.
  */
 function pushKeyPrefix(call) {
-  if (call.callee.type !== 'Identifier' || call.callee.name !== 'translatePush') {
+  const value = translatePushKey(call);
+  if (value === null) {
     return null;
   }
-  const key = call.arguments[1];
-  if (key === undefined) {
-    return null;
-  }
-  const value = unwrap(key);
   if (value.type !== 'TemplateLiteral' || value.expressions.length === 0) {
     return null;
   }
@@ -1515,11 +1534,13 @@ const SCRIPT_PATTERNS = {
   Ethiopic: /\p{Script=Ethiopic}/u,
 };
 
+const SCRIPT_ENTRIES = Object.entries(SCRIPT_PATTERNS);
+
 /** Languages whose own orthography needs more than one script. */
 const MULTI_SCRIPT_LANGUAGES = { ja: ['Hiragana', 'Katakana', 'Han'] };
 
 function scriptOf(char) {
-  for (const [name, pattern] of Object.entries(SCRIPT_PATTERNS)) {
+  for (const [name, pattern] of SCRIPT_ENTRIES) {
     if (pattern.test(char)) {
       return name;
     }

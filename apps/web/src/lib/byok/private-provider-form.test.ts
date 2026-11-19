@@ -191,6 +191,25 @@ describe('mergeImportedModels', () => {
     ]);
   });
 
+  test.each([
+    ['a name', { name: 'Draft' }],
+    ['a context window', { context_length: '1000' }],
+    ['max output tokens', { max_completion_tokens: '100' }],
+    ['a flag', { flags: ['vision' as const] }],
+    ['an API override', { api_kinds: ['messages' as const] }],
+    ['a client API override', { client_provider: 'anthropic' as const }],
+    ['a reasoning format override', { reasoning_format: 'reasoning' as const }],
+    ['a prompt cache key override', { send_prompt_cache_key: false }],
+  ])('keeps a draft row without an id that has %s', (_label, change) => {
+    const draft = { ...toPrivateModelRow(), ...change };
+
+    const merged = mergeImportedModels([draft, toPrivateModelRow()], [{ ...MODEL }]);
+
+    expect(merged.map(row => row.id)).toEqual(['', 'my-model']);
+    expect(merged[0]).toBe(draft);
+    expect(getImportCapacity([draft])).toBe(BYOK_PRIVATE_PROVIDER_MAX_MODELS - 1);
+  });
+
   test('keeps renamed ids within the length limit', () => {
     const longId = 'a'.repeat(200);
     const existing = [toPrivateModelRow({ ...MODEL, id: longId, internal_id: 'first' })];

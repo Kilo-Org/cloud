@@ -273,13 +273,26 @@ export function buildPrivateProviderCredentials(
   };
 }
 
-function hasModelContent(row: PrivateModelRow) {
-  return row.id.trim() !== '' || row.internal_id.trim() !== '';
+/** A row still as `toPrivateModelRow()` creates it: nothing the user would lose by dropping it. */
+function isUntouchedRow(row: PrivateModelRow): boolean {
+  return (
+    [row.id, row.internal_id, row.name, row.context_length, row.max_completion_tokens].every(
+      value => value.trim() === ''
+    ) &&
+    row.flags.length === 0 &&
+    row.api_kinds === null &&
+    row.client_provider === null &&
+    row.reasoning_format === null &&
+    row.send_prompt_cache_key === null
+  );
 }
 
 /** How many more models the private provider can take, as `mergeImportedModels` counts the rows. */
 export function getImportCapacity(rows: PrivateModelRow[]): number {
-  return Math.max(0, BYOK_PRIVATE_PROVIDER_MAX_MODELS - rows.filter(hasModelContent).length);
+  return Math.max(
+    0,
+    BYOK_PRIVATE_PROVIDER_MAX_MODELS - rows.filter(row => !isUntouchedRow(row)).length
+  );
 }
 
 /** Adds upstream ids to a selection, in order, without exceeding `capacity` selected. */
@@ -304,7 +317,7 @@ export function mergeImportedModels(
   rows: PrivateModelRow[],
   imported: ByokPrivateModel[]
 ): PrivateModelRow[] {
-  const kept = rows.filter(hasModelContent);
+  const kept = rows.filter(row => !isUntouchedRow(row));
   const internalIds = new Set(kept.map(row => row.internal_id.trim()));
   const ids = new Set(kept.map(row => row.id.trim()));
   const added: PrivateModelRow[] = [];

@@ -2635,9 +2635,11 @@ export const createBrowserToolSession = ({
 
   /**
    * Starts a navigation and answers with the tab's title and url once the
-   * browser reports the new document complete, like the debugger path does.
-   * The wait is bounded: a page that never finishes loading answers with what
-   * the tab shows then.
+   * browser reports the new document complete, like the debugger path does. A
+   * same-document navigation (a hash change) reports only its new url while
+   * the tab stays complete, so that url change ends the wait too. The wait is
+   * bounded: a page that never finishes loading answers with what the tab
+   * shows then.
    */
   const loadInTab = async (
     start: () => Promise<{ readonly error?: string }>
@@ -2651,7 +2653,22 @@ export const createBrowserToolSession = ({
 
     const loaded = Promise.withResolvers<void>();
     let loading = false;
-    const listener = (updatedTabId: number, changeInfo: { readonly status?: string }): void => {
+    // A url-only update while the tab stays complete is a same-document navigation; a loading tab is not done yet.
+    const settleIfSameDocument = async (): Promise<void> => {
+      try {
+        const tab = await getTab(tabId);
+
+        if (!loading && tab.status === 'complete') {
+          loaded.resolve();
+        }
+      } catch {
+        // The tab is gone: the bounded wait ends the call.
+      }
+    };
+    const listener = (
+      updatedTabId: number,
+      changeInfo: { readonly status?: string; readonly url?: string }
+    ): void => {
       if (updatedTabId !== tabId) {
         return;
       }
@@ -2660,6 +2677,11 @@ export const createBrowserToolSession = ({
 
       if (loading && changeInfo.status === 'complete') {
         loaded.resolve();
+        return;
+      }
+
+      if (!loading && changeInfo.url !== undefined && changeInfo.status === undefined) {
+        void settleIfSameDocument();
       }
     };
     const timer = setTimeout(loaded.resolve, SCRIPTING_NAVIGATION_TIMEOUT_MS);

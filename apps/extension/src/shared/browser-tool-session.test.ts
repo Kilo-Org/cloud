@@ -1340,6 +1340,62 @@ describe('browser tool session scripting backend', () => {
     expect(listeners).toHaveLength(0);
   });
 
+  it('answers a same-document navigation once its url changes, without a load', async () => {
+    type Updated = (
+      tabId: number,
+      changeInfo: { readonly status?: string; readonly url?: string }
+    ) => void;
+    const listeners: Updated[] = [];
+    let shown = { status: 'complete', title: 'Tab', url: 'https://example.com/page' };
+    const emitUrl = (status: string, url: string) => {
+      shown = { status, title: 'Tab', url };
+      for (const listener of listeners) {
+        listener(7, { url });
+      }
+    };
+    const tabsApi: BrowserTabsApi = {
+      get: tabId => ({ id: tabId, ...shown }),
+      onUpdated: {
+        addListener: listener => {
+          listeners.push(listener);
+        },
+        removeListener: () => {
+          listeners.length = 0;
+        },
+      },
+      query: () => [],
+      update: tabId => ({ id: tabId }),
+    };
+    const session = createBrowserToolSession({
+      scriptingApi: createScriptingApi().api,
+      tabId: 7,
+      tabsApi,
+    });
+    let settled = false;
+    const navigated = (async () => {
+      const result = await session.callTool('browser_navigate', { url: '#next' });
+
+      settled = true;
+
+      return result;
+    })();
+
+    await vi.waitFor(() => {
+      expect(listeners).toHaveLength(1);
+    });
+    // A cross-document navigation can report its url while the tab is still loading: that is not the end.
+    emitUrl('loading', 'https://example.com/other');
+    await flushPendingWork();
+    expect(settled).toBe(false);
+
+    emitUrl('complete', 'https://example.com/page#next');
+
+    await expect(navigated).resolves.toStrictEqual({
+      ok: true,
+      value: { title: 'Tab', url: 'https://example.com/page#next' },
+    });
+  });
+
   it('refuses a data: navigation without touching the tab', async () => {
     const updates: unknown[] = [];
     const tabsApi: BrowserTabsApi = {

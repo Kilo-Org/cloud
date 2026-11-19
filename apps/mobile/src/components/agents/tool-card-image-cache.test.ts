@@ -530,7 +530,7 @@ describe('cacheToolAttachment write lifetime', () => {
     // final name: only the temp instance and its delete exist.
     expect(tempInstanceFor('part-partial.png')?.delete).toHaveBeenCalledTimes(1);
     expect(finalInstanceFor('part-partial.png')).toBeDefined();
-    expect(finalInstanceFor('part-partial.png')?.move).not.toHaveBeenCalled();
+    expect(tempInstanceFor('part-partial.png')?.move).not.toHaveBeenCalled();
     expect(finalInstanceFor('part-partial.png')?.written).toBeUndefined();
     expect(getToolCardImageUri('part-partial')).toBeUndefined();
 
@@ -631,7 +631,7 @@ describe('cacheToolAttachment write lifetime', () => {
     expect(temp).toBeDefined();
     expect(temp?.written).toEqual({ content: 'QUJDRA==', encoding: 'base64' });
     expect(temp?.move).toHaveBeenCalledTimes(1);
-    expect(finalInstanceFor('part-truncated.png')?.move).not.toHaveBeenCalled();
+    expect(finalInstanceFor('part-truncated.png')?.written).toBeUndefined();
     expect(finalInstances()).toHaveLength(1);
     expect(isToolCardImagePending('part-truncated')).toBe(false);
   });
@@ -660,7 +660,7 @@ describe('cacheToolAttachment write lifetime', () => {
       'file:///cache/tool-card-images/part-complete.png'
     );
     expect(tempInstanceFor('part-complete.png')).toBeUndefined();
-    expect(finalInstanceFor('part-complete.png')?.move).not.toHaveBeenCalled();
+    expect(finalInstanceFor('part-complete.png')?.written).toBeUndefined();
     expect(finalInstances()).toHaveLength(1);
     expect(isToolCardImagePending('part-complete')).toBe(false);
   });

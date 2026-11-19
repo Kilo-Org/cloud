@@ -166,7 +166,9 @@ function tempFilenameFor(finalName: string): string {
  * name) is rewritten rather than served. A failed attempt latches the part id:
  * no further writes run for it until `clearToolCardImageCache` (sign-out) or a
  * test reset, so a corrupt environment does not turn a long transcript into a
- * retry storm. The URI is recorded when the move resolves.
+ * retry storm; a stale attempt still deletes its own temp sibling before
+ * withdrawing, so no leftover `<final>.tmp-<n>` file outlives a reset. The URI
+ * is recorded when the move resolves.
  *
  * When `filename` is provided (non-image attachments), the cache filename is
  * derived via `getSafeCacheFilename`. When absent (images), the legacy
@@ -231,13 +233,17 @@ export function cacheToolAttachment(
     } catch {
       // A failed attempt latches the part id: the next pass performs no
       // file-system work for it until a reset clears the latch. The temp
-      // sibling is deleted best-effort so no partial file survives under any
-      // name.
-      if (generation !== cacheGeneration) {
-        return;
-      }
+      // sibling is deleted best-effort in every generation: it belongs to this
+      // attempt alone (its name carries a per-attempt counter), and a reset may
+      // already have deleted the directory that held it, which the helper
+      // swallows.
       if (tempFile) {
         bestEffortDelete(tempFile);
+      }
+      if (generation !== cacheGeneration) {
+        // The cache was reset while the write ran; this attempt publishes
+        // nothing into the new generation — no latch, no pending mark, no URI.
+        return;
       }
       pendingPartIds.delete(partId);
       failedPartIds.add(partId);

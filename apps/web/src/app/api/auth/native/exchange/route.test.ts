@@ -286,6 +286,20 @@ describe('POST /api/auth/native/exchange', () => {
     expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
     expect(mockCreateDeviceSession).not.toHaveBeenCalled();
     expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    // The collision is counted and reported once per interval, so the
+    // per-event report survives a window this instance never closes.
+    expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+    // The refusal lands in the pinned window; the next counted condition
+    // closes it with this refusal as one count on the metric's line.
+    now.mockReturnValue(6_121_000);
+    countAdmissionCondition('native_admission_missing');
+    const collisionLine = aggregateLines().find(
+      line => line.metric === 'native_attested_key_cross_user_collision'
+    );
+    expect(collisionLine).toMatchObject({ count: 1 });
+    expect(
+      aggregateLines().filter(line => line.metric === 'native_admission_refused')
+    ).toHaveLength(1);
   });
 
   it('reports a key persistence failure instead of issuing an unbound credential', async () => {

@@ -13,7 +13,11 @@ import {
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 import { checkFirewallRateLimit } from './firewall-rate-limit';
-import { countAdmissionCondition, rollAdmissionWindowIfNeeded } from './native-admission-telemetry';
+import {
+  countAdmissionCondition,
+  reportAdmissionRefusalOnce,
+  rollAdmissionWindowIfNeeded,
+} from './native-admission-telemetry';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────
 
@@ -22,6 +26,18 @@ export {
   resetAdmissionCountersForTests,
   rollAdmissionWindowIfNeeded,
 } from './native-admission-telemetry';
+
+/**
+ * Counts one cross-user attested-key collision and sends the throttled
+ * per-event report. Every route that catches `KeyCollisionError` calls this:
+ * the count keeps the per-window volume, while the throttled report survives
+ * an aggregate window this instance never closes.
+ */
+export function reportAttestedKeyCollision(): void {
+  countAdmissionCondition('native_attested_key_cross_user_collision');
+  countAdmissionCondition('native_admission_refused');
+  reportAdmissionRefusalOnce('native_attested_key_cross_user_collision');
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -436,9 +452,9 @@ export async function persistAttestedKey(
     });
 
     if (!inserted || inserted.kilo_user_id !== userId) {
-      // The caller reports the refusal: every route that persists a key counts
-      // native_attested_key_cross_user_collision when it catches this error, so
-      // reporting here as well would emit both a count and a per-event message.
+      // The caller is the single reporting point: the route that catches this
+      // error counts the refusal and sends one throttled per-event report
+      // through reportAttestedKeyCollision, so reporting here would duplicate it.
       throw new KeyCollisionError();
     }
   } else if (verification.signCount !== undefined) {

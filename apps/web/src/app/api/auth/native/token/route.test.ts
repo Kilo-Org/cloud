@@ -1527,7 +1527,6 @@ describe('POST /api/auth/native/token', () => {
       expect(
         aggregateLines().filter(line => line.metric === 'native_admission_refused')
       ).toHaveLength(1);
-      mockReleaseSignInCode.mockClear();
     });
 
     // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
@@ -1569,7 +1568,6 @@ describe('POST /api/auth/native/token', () => {
       expect(
         aggregateLines().filter(line => line.metric === 'native_admission_refused')
       ).toHaveLength(1);
-      mockReleaseSignInCode.mockClear();
     });
 
     // ── Fix 3: KeyCollisionError during persistence does not burn the code ─
@@ -1609,8 +1607,10 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       // Code must be released so it remains usable.
       expect(mockReleaseSignInCode).toHaveBeenCalled();
-      // The collision is an expected refusal: it is counted, not reported.
-      expect(mockCaptureMessage).not.toHaveBeenCalled();
+      // The collision is counted and reported once per interval, so the
+      // per-event report survives a window this instance never closes.
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
       now.mockReturnValue(6_061_000);
       countAdmissionCondition('native_admission_missing');
       expect(
@@ -1620,7 +1620,6 @@ describe('POST /api/auth/native/token', () => {
       expect(
         aggregateLines().filter(line => line.metric === 'native_admission_refused')
       ).toHaveLength(1);
-      mockReleaseSignInCode.mockClear();
     });
 
     it('refuses key collision during persistence without burning the sign-in code (email, no supportsRefresh)', async () => {
@@ -1653,8 +1652,10 @@ describe('POST /api/auth/native/token', () => {
       expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
-      // The collision is an expected refusal: it is counted, not reported.
-      expect(mockCaptureMessage).not.toHaveBeenCalled();
+      // The collision is counted and reported once per interval, so the
+      // per-event report survives a window this instance never closes.
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
       // The refusal lands in the pinned window; the next counted condition
       // closes it with this refusal as one count on the metric's line.
       now.mockReturnValue(6_121_000);

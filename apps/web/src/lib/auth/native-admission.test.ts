@@ -30,6 +30,7 @@ import {
   issueAdmissionChallenge,
   verifyAdmissionAsync,
   persistAttestedKey,
+  reportAttestedKeyCollision,
   DEV_SENTINEL_PAYLOAD,
   MAX_ADMISSION_PAYLOAD_CHARS,
   ChallengeRateLimitError,
@@ -1156,7 +1157,7 @@ describe('persistAttestedKey', () => {
         publicKey: 'base64pubkey',
       })
     ).rejects.toThrow(KeyCollisionError);
-    // The route that catches the collision is the single reporting point.
+    // The caller that catches the collision is the single reporting point.
     expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 
@@ -1287,6 +1288,94 @@ describe('countAdmissionCondition', () => {
         at: new Date(2_061_000).toISOString(),
       },
     ]);
+  });
+});
+
+// ── Cross-user collision reporting ─────────────────────────────────────────
+
+describe('reportAttestedKeyCollision', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetAdmissionCountersForTests();
+  });
+
+  afterEach(() => {
+    resetAdmissionCountersForTests();
+    jestGlobal.restoreAllMocks();
+  });
+
+  test('emits one message and counts the refusal in the open window', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(7_000_000);
+
+    reportAttestedKeyCollision();
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
+    // Counts stay in the window until later traffic closes it.
+    expect(aggregateLines()).toStrictEqual([]);
+
+    now.mockReturnValue(7_061_000);
+    countAdmissionCondition('native_admission_missing');
+
+    const lines = aggregateLines();
+    expect(
+      lines.filter(line => line.metric === 'native_attested_key_cross_user_collision')
+    ).toStrictEqual([
+      {
+        event: 'native_admission_aggregate',
+        metric: 'native_attested_key_cross_user_collision',
+        count: 1,
+        intervalMs: 60_000,
+        windowStart: new Date(7_000_000).toISOString(),
+        at: new Date(7_061_000).toISOString(),
+      },
+    ]);
+    expect(lines.filter(line => line.metric === 'native_admission_refused')).toStrictEqual([
+      {
+        event: 'native_admission_aggregate',
+        metric: 'native_admission_refused',
+        count: 1,
+        intervalMs: 60_000,
+        windowStart: new Date(7_000_000).toISOString(),
+        at: new Date(7_061_000).toISOString(),
+      },
+    ]);
+  });
+
+  test('stays silent for a repeat inside the interval but still counts it', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(8_000_000);
+
+    reportAttestedKeyCollision();
+    now.mockReturnValue(8_030_000);
+    reportAttestedKeyCollision();
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(8_061_000);
+    countAdmissionCondition('native_admission_missing');
+
+    const lines = aggregateLines().filter(
+      line => line.metric === 'native_attested_key_cross_user_collision'
+    );
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ count: 2 });
+  });
+
+  test('reports again once the interval has elapsed', () => {
+    const now = jestGlobal.spyOn(Date, 'now');
+    now.mockReturnValue(9_000_000);
+
+    reportAttestedKeyCollision();
+    now.mockReturnValue(9_060_000);
+    reportAttestedKeyCollision();
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(2);
+    expect(mockCaptureMessage).toHaveBeenNthCalledWith(
+      2,
+      'native_attested_key_cross_user_collision'
+    );
   });
 });
 

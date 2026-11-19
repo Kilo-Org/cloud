@@ -1,4 +1,5 @@
 import 'server-only';
+import { captureMessage } from '@sentry/nextjs';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 // ── Expected-condition telemetry ───────────────────────────────────────────
@@ -57,8 +58,27 @@ export function countAdmissionCondition(metric: string): void {
   admissionCounters.set(metric, (admissionCounters.get(metric) ?? 0) + 1);
 }
 
+/**
+ * The aggregate window is closed only by later native-auth traffic on the same
+ * instance, so a rare refusal counted by an instance that serves nothing
+ * further would otherwise leave no trace. One report per class per interval
+ * keeps such a refusal visible while bounding the volume a repeated one can
+ * produce.
+ */
+const RARE_REFUSAL_REPORT_INTERVAL_MS = 60_000;
+const lastRareRefusalReportAt = new Map<string, number>();
+
+/** Emits at most one per-event report per class per interval per instance. */
+export function reportAdmissionRefusalOnce(metric: string): void {
+  const now = Date.now();
+  if (now - (lastRareRefusalReportAt.get(metric) ?? 0) < RARE_REFUSAL_REPORT_INTERVAL_MS) return;
+  lastRareRefusalReportAt.set(metric, now);
+  captureMessage(metric);
+}
+
 /** Exported for tests: flush any pending counters and reset the interval. */
 export function resetAdmissionCountersForTests(): void {
   admissionCounters.clear();
   admissionCountersWindowStart = 0;
+  lastRareRefusalReportAt.clear();
 }

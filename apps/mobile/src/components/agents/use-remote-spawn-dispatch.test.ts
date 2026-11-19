@@ -167,6 +167,9 @@ const INSTANCE: InstancePickerInstance = {
 /** Stub spawned session id for the watchdog's late-success case. */
 const SESSION_ID = 'ses_12345678901234567890123456' as KiloSessionId;
 
+/** Stub session id for the newest attempt after a retry. */
+const SECOND_SESSION_ID = 'ses_22345678901234567890123456' as KiloSessionId;
+
 /**
  * A spawn promise the test resolves by hand, for the watchdog's
  * still-in-flight-at-deadline case.
@@ -1290,5 +1293,47 @@ describe('useRemoteSpawnDispatch stall watchdog', () => {
       retryable: true,
       message: remoteSpawnRetryableToast(),
     });
+  });
+
+  it('a superseded attempt late success cannot navigate or publish the success callbacks', async () => {
+    const stale = withDeferredOutcome();
+    // eslint-disable-next-line promise-function-async -- passthrough of an existing deferred promise, not a new async procedure
+    spawnMock.mockImplementationOnce(() => stale.promise);
+    const onSpawnReady = vi.fn();
+    const onSpawnSucceeded = vi.fn();
+    const { onStart } = runHook({ organizationId: 'org-xyz', onSpawnReady, onSpawnSucceeded });
+
+    // The stall overruns the budget: the form flips to the retryable failure
+    // while this attempt's spawn promise is still pending.
+    onStart();
+    expect(rerenderLastHook().isSpawningRemote).toBe(true);
+    await vi.advanceTimersByTimeAsync(REMOTE_SPAWN_START_DEADLINE_MS);
+    expect(rerenderLastHook().isSpawningRemote).toBe(false);
+
+    // Retry while the first attempt is still hanging.
+    const retried = withDeferredOutcome();
+    // eslint-disable-next-line promise-function-async -- passthrough of an existing deferred promise, not a new async procedure
+    spawnMock.mockImplementationOnce(() => retried.promise);
+    onStart();
+
+    // The stale attempt settles ready afterward: its outcome must publish
+    // nothing — no navigation to its session, no success callbacks.
+    stale.resolve({ status: 'ready', sessionID: SESSION_ID });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(onSpawnReady).not.toHaveBeenCalled();
+    expect(onSpawnSucceeded).not.toHaveBeenCalled();
+
+    // The newest attempt owns the terminal state: it navigates once and
+    // fires both success callbacks.
+    retried.resolve({ status: 'ready', sessionID: SECOND_SESSION_ID });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
+    expect(typeof calledWith).toBe('string');
+    expect(calledWith).toContain('ses_22345678901234567890123456');
+    expect(calledWith).not.toContain('ses_12345678901234567890123456');
+    expect(onSpawnReady).toHaveBeenCalledTimes(1);
+    expect(onSpawnSucceeded).toHaveBeenCalledExactlyOnceWith(SECOND_SESSION_ID);
   });
 });

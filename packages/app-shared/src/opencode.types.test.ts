@@ -11,7 +11,10 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { UserMessage as GeneratedUserMessage } from './opencode.gen';
+import type {
+  FilePart as GeneratedFilePart,
+  UserMessage as GeneratedUserMessage,
+} from './opencode.gen';
 import type {
   EventMessageUpdated,
   FilePart,
@@ -106,7 +109,12 @@ describe('Kilo extension types', () => {
       // @ts-expect-error the generated UserMessage carries no Kilo extension
       row.editorContext,
     ];
+    const readGeneratedFilePart = (part: GeneratedFilePart) => [
+      // @ts-expect-error the generated FilePart carries no Kilo extension
+      part.synthetic,
+    ];
 
     expect(readGenerated).toBeTypeOf('function');
+    expect(readGeneratedFilePart).toBeTypeOf('function');
   });
 });

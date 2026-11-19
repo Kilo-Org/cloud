@@ -298,16 +298,18 @@ describe.each(['aws', 'aws-ecs'] as const)('%s owner and persistence contracts',
   });
   it('ready revalidation keeps runtime keys written during the AWS check', async () => {
     const caller = personalCaller({ user });
-    await caller.prepare({ accountId });
-    await caller.validate({ roleArn });
+    await caller.prepare({ accountId, provider });
+    await caller.validate({ roleArn, provider });
     beforeReply = async input => {
       if (input.action === 'revalidate')
         await db
           .update(byoc_connections)
           .set({ runtime: { last_verified_at: '2000-01-01T00:00:00.000Z', concurrent: 'kept' } })
-          .where(eq(byoc_connections.user_id, user.id));
+          .where(
+            and(eq(byoc_connections.provider, provider), eq(byoc_connections.user_id, user.id))
+          );
     };
-    await caller.validate({ roleArn });
+    await caller.validate({ roleArn, provider });
     const runtime = (await row()).runtime;
     expect(runtime.concurrent).toBe('kept');
     expect(runtime.last_verified_at).not.toBe('2000-01-01T00:00:00.000Z');

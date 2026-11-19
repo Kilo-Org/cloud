@@ -2,6 +2,7 @@ import { describe, it, expect, jest } from '@jest/globals';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 
 jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 jest.spyOn(console, 'debug').mockImplementation(() => undefined);
@@ -40,7 +41,7 @@ async function applyToVercel(
     request,
     {},
     userByok,
-    {},
+    EmptyFraudDetectionHeaders,
     'user-1',
     null,
     null,

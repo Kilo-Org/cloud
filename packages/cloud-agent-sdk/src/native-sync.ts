@@ -871,6 +871,12 @@ export class NativeSyncClient {
     const noteSnapshotFailure = (error: unknown) => {
       if (isPermanent(error)) return undefined;
       if (error instanceof NativeSyncError && error.status === 404) return undefined;
+      // A canceled read says nothing about the transcript, whichever signal canceled it.
+      if (
+        (error instanceof NativeSyncError && error.code === 'request_canceled') ||
+        (error instanceof Error && error.name === 'AbortError')
+      )
+        return undefined;
       snapshotFailures =
         error instanceof Error && 'code' in error && error.code === 'native_asset_not_found'
           ? SNAPSHOT_FAILURE_LIMIT
@@ -1361,10 +1367,7 @@ export class NativeSyncClient {
       },
       refresh: () => {
         if (closed) return;
-        // A retry is a clean read of the authoritative transcript: the next hello reads it
-        // again instead of resuming from the cursor that preceded the failure, and a reset
-        // transcript at a lower position is accepted.
-        connection.restart();
+        // Reset before the restart: the new connection's first frame may arrive synchronously.
         snapshotFailures = 0;
         snapshotFailure = undefined;
         lastSeq = undefined;
@@ -1373,6 +1376,10 @@ export class NativeSyncClient {
         // A frame the client could not project keeps its warning until a snapshot read covers it.
         integrityError ??= quarantined.length === 0 ? undefined : projectedFrameGap;
         publish({ snapshotFailure: undefined, error: undefined });
+        // A retry is a clean read of the authoritative transcript: the next hello reads it
+        // again instead of resuming from the cursor that preceded the failure, and a reset
+        // transcript at a lower position is accepted.
+        connection.restart();
       },
       close: () => {
         closed = true;

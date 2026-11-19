@@ -3168,9 +3168,12 @@ export const BYOK_PRIVATE_PROVIDER_MAX_MODELS = 500;
 // Refinements still run after Zod records a URL error, so an unparsable value passes here and is
 // reported by the URL check alone.
 function hasNoUserInfo(url: string): boolean {
-  if (!URL.canParse(url)) return true;
-  const { username, password } = new URL(url);
-  return username === '' && password === '';
+  try {
+    const { username, password } = new URL(url);
+    return username === '' && password === '';
+  } catch {
+    return true;
+  }
 }
 
 export const ByokPrivateProviderDefinitionSchema = z

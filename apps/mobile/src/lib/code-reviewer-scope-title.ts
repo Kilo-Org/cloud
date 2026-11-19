@@ -22,14 +22,14 @@ export function reviewerScopeMembershipName(
 }
 
 /**
- * The scope a Code Reviewer screen acts on, as its header title: the
+ * The scope a Code Reviewer screen acts on, as its header subtitle: the
  * organization's name for an organization scope, `Personal` for the personal
  * one. A reader who belongs to several organizations can then tell whose
  * reviews, platform status, or settings the screen acts on.
  *
- * Until the membership list names the scope the title keeps a stand-in instead
- * of disappearing: the header holds its line, so the body below never moves
- * when the name arrives.
+ * Until the membership list names the scope the subtitle keeps a stand-in
+ * instead of disappearing: the header holds its line, so the body below never
+ * moves when the name arrives.
  *
  * The remembered name sits in the middle of the order: the membership list is
  * the live truth while the reader can open the scope, and once access is lost

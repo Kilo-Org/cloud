@@ -107,11 +107,11 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   if (access !== 'granted') {
     return (
       <ScopeAccessDeniedScreen
-        title={scopeTitle}
+        title={t('codeReviewer.analytics.title')}
         // The denied header carries the granted header's identity: this
         // screen's own name over the organization, so a lost membership still
         // reads as the analytics screen the reader tried to open.
-        eyebrow={t('codeReviewer.analytics.title')}
+        subtitle={scopeTitle}
         backFallback={CODE_REVIEWER_HOME_PATH}
         kind={access}
         onRetry={() => {
@@ -267,13 +267,11 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
-        title={scopeTitle}
-        // One line, like the review list this scope also opens: the name arrives
-        // with the membership read and a longer one tail-truncates inside the
-        // same line instead of growing the header. The eyebrow keeps the
-        // screen's own name there, since the organization name is user prose.
-        titleNumberOfLines={1}
-        eyebrow={t('codeReviewer.analytics.title')}
+        title={t('codeReviewer.analytics.title')}
+        // The scope sits on the subtitle line: the name arrives with the
+        // membership read and a longer one tail-truncates inside that line
+        // instead of growing the header.
+        subtitle={scopeTitle}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         {/* Two segmented controls of the same face, one under the other, read

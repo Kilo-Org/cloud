@@ -19,8 +19,8 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string }) =>
-    createElement('ScreenHeaderMock', { title: props.title, eyebrow: props.eyebrow }),
+  ScreenHeader: (props: { title?: string; subtitle?: string }) =>
+    createElement('ScreenHeaderMock', { title: props.title, subtitle: props.subtitle }),
 }));
 
 vi.mock('@/components/query-error', () => ({
@@ -73,7 +73,7 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 const Denied = ScopeAccessDeniedScreen as ComponentType<{
   title: string;
-  eyebrow?: string;
+  subtitle?: string;
   kind: 'denied' | 'not-found';
   onRetry: () => void;
   isRetrying?: boolean;
@@ -81,7 +81,7 @@ const Denied = ScopeAccessDeniedScreen as ComponentType<{
 
 function mountScreen(props: {
   title?: string;
-  eyebrow?: string;
+  subtitle?: string;
   kind?: 'denied' | 'not-found';
   isRetrying?: boolean;
 }): TestRenderer.ReactTestRenderer {
@@ -90,7 +90,7 @@ function mountScreen(props: {
     ref.current = TestRenderer.create(
       createElement(Denied, {
         title: props.title ?? 'Security Agent',
-        eyebrow: props.eyebrow,
+        subtitle: props.subtitle,
         kind: props.kind ?? 'denied',
         onRetry: () => {
           retryMock();
@@ -182,7 +182,7 @@ describe('ScopeAccessDeniedScreen', () => {
   });
 
   it('uses the unavailable copy for an organization that no longer exists', () => {
-    const renderer = mountScreen({ kind: 'not-found', eyebrow: 'Code Reviewer' });
+    const renderer = mountScreen({ kind: 'not-found', subtitle: 'Drain Labs' });
     const error = findByType(renderer.root, 'QueryErrorMock')[0];
 
     expect(error?.props.variant).toBe('not-found');
@@ -190,7 +190,7 @@ describe('ScopeAccessDeniedScreen', () => {
     expect(description?.props.message).toBe(
       'This organization is no longer available. Choose another account from the account picker to continue.'
     );
-    expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.eyebrow).toBe('Code Reviewer');
+    expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.subtitle).toBe('Drain Labs');
     // A deleted organization does not come back by retrying, so the shared
     // not-found state keeps one way out: Back to profile.
     const actions = findByType(renderer.root, 'ButtonMock');

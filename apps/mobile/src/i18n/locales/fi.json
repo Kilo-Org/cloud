@@ -1373,8 +1373,8 @@
       "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Tämän organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
-      "description": "Luo työtilan käyttöoikeustunnus vaadituilla oikeuksilla ja liitä se alla olevaan kenttään.",
+      "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
+      "description": "Yhdistä Bitbucket-tili {{organization}}-organisaatiolle. Luo työtilan käyttöoikeustunnus vaadituilla oikeuksilla ja liitä se alla olevaan kenttään.",
       "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
       "tokenPlaceholder": "Työtilan käyttöoikeustunnus",
       "tokenRefused": "Bitbucket ei hyväksynyt tätä työtilan käyttöoikeustunnusta. Tarkista, että siinä on yllä olevat oikeudet, ja yritä sitten uudelleen."

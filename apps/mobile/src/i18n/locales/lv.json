@@ -1396,8 +1396,8 @@
       "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Šīs organizācijas Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
-      "description": "Izveido darbvietas piekļuves pilnvaru ar vajadzīgajām atļaujām un ielīmē to zemāk.",
+      "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
+      "description": "Pievieno Bitbucket {{organization}}. Izveido darbvietas piekļuves pilnvaru ar vajadzīgajām atļaujām un ielīmē to zemāk.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
       "tokenPlaceholder": "Darbvietas piekļuves pilnvara",
       "tokenRefused": "Bitbucket nepieņēma šo darbvietas piekļuves pilnvaru. Pārbaudi, vai tai ir iepriekš norādītās atļaujas, un pēc tam mēģini vēlreiz."

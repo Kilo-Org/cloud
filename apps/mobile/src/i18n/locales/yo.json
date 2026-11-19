@@ -1373,8 +1373,8 @@
       "notConnectedReadOnly": "A kò tíì so Bitbucket pọ̀. Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket àjọ yìí lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
-      "description": "Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ pẹ̀lú àwọn àṣẹ tó yẹ, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
+      "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket ti {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
+      "description": "Sopọ̀ Bitbucket mọ́ {{organization}}. Ṣẹ̀dá àmi ìwọlé àyè iṣẹ́ pẹ̀lú àwọn àṣẹ tó yẹ, kí o sì lẹ̀ ẹ́ mọ́ nísàlẹ̀.",
       "scopes": "Àkọọ́lẹ̀: kíkà · Àwọn ibi ìpamọ́: kíkà/kíkọ · Àwọn ìbéèrè àkópọ̀: kíkà · Àwọn ìfitónilétí wẹ́bù: kíkà/kíkọ",
       "tokenPlaceholder": "Àmi ìwọlé àyè iṣẹ́",
       "tokenRefused": "Bitbucket kò gba àmi ìwọlé àyè iṣẹ́ yìí. Ṣàyẹ̀wò pé ó ní àwọn àkọọ́lẹ̀ tó wà lókè, kí o sì tún gbìyànjú lẹ́ẹ̀kan sí i."

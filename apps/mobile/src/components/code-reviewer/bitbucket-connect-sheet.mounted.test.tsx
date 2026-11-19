@@ -87,7 +87,9 @@ const PERMISSION_DENIED = 'PermissionDenied' as ElementType;
 const QUERY_ERROR = 'QueryError' as ElementType;
 const SKELETON = 'Skeleton' as ElementType;
 /** The sentence that names where a connection the app cannot change is managed. */
-const MANAGED_ON_WEB = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb');
+const MANAGED_ON_WEB = i18n.t('codeReviewer.bitbucketConnect.managedOnWeb', {
+  organization: 'Acme',
+});
 
 async function mount(): Promise<ReactTestRenderer['root']> {
   const view = await renderWithProviders(createElement(BitbucketConnectSheet, { scope: 'org-1' }));
@@ -117,6 +119,10 @@ describe('BitbucketConnectSheet', () => {
 
     expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
     expect(rendersText(root, MANAGED_ON_WEB)).toBe(true);
+    // The note names the organization whose connection the reader has to change
+    // elsewhere, because a person in several organizations cannot tell which one
+    // the sheet is about.
+    expect(MANAGED_ON_WEB).toContain('Acme');
     // The connection page is not a place this sheet sends the reader: the note
     // is text, and the sheet offers nothing to press.
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
@@ -129,6 +135,7 @@ describe('BitbucketConnectSheet', () => {
     expect(rendersText(root, MANAGED_ON_WEB)).toBe(false);
     const [form] = root.findAll(node => Object.is(node.type, FORM));
     expect(form?.props.integrationId).toBeNull();
+    expect(form?.props.organizationName).toBe('Acme');
   });
 
   it('replaces the token of the integration the readiness read names', async () => {

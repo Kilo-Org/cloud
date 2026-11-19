@@ -1373,8 +1373,8 @@
       "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "የዚህ ድርጅት የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
-      "description": "አስፈላጊ ፈቃዶች ያሉት የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
+      "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
+      "description": "Bitbucketን ለ{{organization}} አገናኝ። አስፈላጊ ፈቃዶች ያሉት የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
       "scopes": "መለያ፦ ማንበብ · ማከማቻዎች፦ ማንበብ/መጻፍ · የኮድ ውህደት ጥያቄዎች፦ ማንበብ · ዌብሁኮች፦ ማንበብ/መጻፍ",
       "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን",
       "tokenRefused": "Bitbucket ይህን የሥራ ቦታ ቶከን አልተቀበለውም። ከላይ ያሉት አስፈላጊ ፈቃዶች እንዳሉት ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"

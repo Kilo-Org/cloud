@@ -695,8 +695,8 @@
       "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "この組織のBitbucket接続は、パソコンからWebで管理されています。",
-      "description": "必要なスコープを指定してワークスペースアクセストークンを作成し、下に貼り付けてください。",
+      "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
+      "description": "{{organization}}とBitbucketを連携してください。必要なスコープを指定してワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
       "tokenPlaceholder": "ワークスペースアクセストークン",
       "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"

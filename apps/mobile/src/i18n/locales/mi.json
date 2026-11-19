@@ -1373,8 +1373,8 @@
       "notConnectedReadOnly": "Kāore anō kia honoa a Bitbucket. Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o tēnei rōpū i runga ipurangi, mā tētahi rorohiko.",
-      "description": "Hangaia he tohu uru mokowāmahi me ngā whakaaetanga e hiahiatia ana, kātahi ka whakapiri ki raro nei.",
+      "managedOnWeb": "Ka whakahaerehia te hononga Bitbucket o {{organization}} i runga ipurangi, mā tētahi rorohiko.",
+      "description": "Honoa a Bitbucket ki {{organization}}. Hangaia he tohu uru mokowāmahi me ngā whakaaetanga e hiahiatia ana, kātahi ka whakapiri ki raro nei.",
       "scopes": "Pūkete: pānui · Pūranga: pānui/tuhi · Tono kume: pānui · Matau tukutuku: pānui/tuhi",
       "tokenPlaceholder": "Tohu uru mokowāmahi",
       "tokenRefused": "Kāore a Bitbucket i whakaae ki tēnei tohu uru mokowāmahi. Tirohia kei a ia ngā whakaaetanga kei runga ake nei, kātahi ka whakamātau anō."

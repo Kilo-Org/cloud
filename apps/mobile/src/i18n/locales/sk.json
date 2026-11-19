@@ -1419,8 +1419,8 @@
       "notConnectedReadOnly": "Bitbucket nie je pripojený. Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Pripojenie tejto organizácie k Bitbucketu sa spravuje na webe z počítača.",
-      "description": "Vytvorte prístupový token pracovného priestoru s požadovanými oprávneniami a vložte ho nižšie.",
+      "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
+      "description": "Pripojte Bitbucket k {{organization}}. Vytvorte prístupový token pracovného priestoru s požadovanými oprávneniami a vložte ho nižšie.",
       "scopes": "Účet: čítanie · Repozitáre: čítanie/zápis · PR: čítanie · Webhooky: čítanie/zápis",
       "tokenPlaceholder": "Prístupový token pracovného priestoru",
       "tokenRefused": "Bitbucket neprijal tento token pracovného priestoru. Skontrolujte, či má oprávnenia uvedené vyššie, a potom to skúste znova."

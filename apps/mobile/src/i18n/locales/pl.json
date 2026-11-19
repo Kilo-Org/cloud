@@ -695,8 +695,8 @@
       "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Połączeniem tej organizacji z Bitbucket zarządza się w przeglądarce na komputerze.",
-      "description": "Utwórz token dostępu do obszaru roboczego z wymaganymi uprawnieniami i wklej go poniżej.",
+      "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
+      "description": "Połącz konto Bitbucket z {{organization}}. Utwórz token dostępu do obszaru roboczego z wymaganymi uprawnieniami i wklej go poniżej.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
       "tokenPlaceholder": "Token dostępu do obszaru roboczego",
       "tokenRefused": "Bitbucket nie zaakceptował tego tokenu dostępu do obszaru roboczego. Sprawdź, czy ma powyższe uprawnienia, a następnie spróbuj ponownie."

@@ -1373,8 +1373,8 @@
       "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bitbucket-tengingu þessarar stofnunar er stjórnað á vefnum í tölvu.",
-      "description": "Búðu til aðgangstóka fyrir vinnusvæðið með tilskildum heimildum og límdu hann hér fyrir neðan.",
+      "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
+      "description": "Tengdu Bitbucket við {{organization}}. Búðu til aðgangstóka fyrir vinnusvæðið með tilskildum heimildum og límdu hann hér fyrir neðan.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
       "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
       "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."

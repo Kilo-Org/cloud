@@ -1373,8 +1373,8 @@
       "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Xiriirka Bitbucket ee ururkan waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
-      "description": "Abuur summad gelitaan oo goobta shaqada ah oo leh oggolaanshaha loo baahan yahay, ka dibna hoos ku dheji.",
+      "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
+      "description": "Bitbucket ku xir {{organization}}. Abuur summad gelitaan oo goobta shaqada ah oo leh oggolaanshaha loo baahan yahay, ka dibna hoos ku dheji.",
       "scopes": "Akoonka: akhrin · Kaydadka: akhrin/qorid · Codsiyada isku darka: akhrin · Ogeysiisyada shabakadda: akhrin/qorid",
       "tokenPlaceholder": "Summadda gelitaanka goobta shaqada",
       "tokenRefused": "Bitbucket ma aqbalin summaddan gelitaanka goobta shaqada. Hubi inay leedahay oggolaanshaha sare, ka dibna isku day mar kale."

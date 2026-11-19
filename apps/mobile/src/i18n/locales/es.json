@@ -695,8 +695,8 @@
       "notConnectedReadOnly": "Bitbucket no está conectado. Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "La conexión de Bitbucket de esta organización se gestiona en la web desde un ordenador.",
-      "description": "Crea un token de acceso del espacio de trabajo con los permisos necesarios y pégalo abajo.",
+      "managedOnWeb": "La conexión de Bitbucket con {{organization}} se gestiona en la web desde un ordenador.",
+      "description": "Conecta Bitbucket con {{organization}}. Crea un token de acceso del espacio de trabajo con los permisos necesarios y pégalo abajo.",
       "scopes": "Cuenta: lectura · Repositorios: lectura/escritura · PR: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso del espacio de trabajo",
       "tokenRefused": "Bitbucket no ha aceptado este token de acceso del espacio de trabajo. Comprueba que tiene los permisos indicados arriba y vuelve a intentarlo."

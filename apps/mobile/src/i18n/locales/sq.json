@@ -1373,8 +1373,8 @@
       "notConnectedReadOnly": "Bitbucket nuk është i lidhur. Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Lidhja me Bitbucket e kësaj organizate menaxhohet në ueb nga një kompjuter.",
-      "description": "Krijo një token qasjeje për hapësirën e punës me lejet e nevojshme dhe ngjite më poshtë.",
+      "managedOnWeb": "Lidhja me Bitbucket e {{organization}} menaxhohet në ueb nga një kompjuter.",
+      "description": "Lidh Bitbucket me {{organization}}. Krijo një token qasjeje për hapësirën e punës me lejet e nevojshme dhe ngjite më poshtë.",
       "scopes": "Llogaria: lexim · Depot: lexim/shkrim · PR: lexim · Webhook-et: lexim/shkrim",
       "tokenPlaceholder": "Token qasjeje për hapësirën e punës",
       "tokenRefused": "Bitbucket nuk e pranoi këtë token qasjeje për hapësirën e punës. Kontrollo që ai t'i ketë lejet më sipër, pastaj provo përsëri."

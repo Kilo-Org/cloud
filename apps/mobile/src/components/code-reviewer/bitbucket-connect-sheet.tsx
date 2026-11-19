@@ -143,7 +143,9 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
         <SheetTitle title={title} />
         <View className="px-6 pt-2 pb-8">
           <Text variant="muted" className="text-sm">
-            {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+            {t('codeReviewer.bitbucketConnect.managedOnWeb', {
+              organization: org.organizationName,
+            })}
           </Text>
         </View>
       </>
@@ -161,6 +163,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       <BitbucketConnectForm
         scope={scope}
         integrationId={integrationId}
+        organizationName={org.organizationName}
         onConnected={() => {
           notificationHaptic(Haptics.NotificationFeedbackType.Success);
           announcingToast.success(t('common.bitbucketConnected'));

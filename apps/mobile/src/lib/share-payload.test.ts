@@ -12,8 +12,10 @@ import {
   composeShareText,
   discardUnstoredSharePayload,
   isSharePayloadStagedUnder,
+  loadPendingShareIdDraft,
   normalizeShareIntent,
   peekSharePayload,
+  persistPendingShareIdDraft,
   persistSharePayloadsNow,
   putSharePayload,
   restoreSharePayload,
@@ -848,6 +850,47 @@ describe('share payload account boundary', () => {
     await restore;
 
     expect(peekSharePayload('a-id')).toBeNull();
+  });
+});
+
+describe('pending share id draft helpers', () => {
+  beforeEach(() => {
+    __resetSharePayloadStoreForTests();
+    vi.clearAllMocks();
+    kvStore.clear();
+    nextUpdatedAt = 1;
+    kvMock.getItem.mockImplementation(
+      async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
+    );
+    kvMock.setItem.mockImplementation(async (scope, k, v) => {
+      kvStore.set(storageKey(scope, k), { scope, k, v, updatedAt: nextUpdatedAt });
+      nextUpdatedAt += 1;
+    });
+    kvMock.removeItem.mockImplementation(async (scope, k) => {
+      kvStore.delete(storageKey(scope, k));
+    });
+    kvMock.listEntries.mockImplementation(async scope =>
+      [...kvStore.values()]
+        .filter(entry => entry.scope === scope)
+        .toSorted((a, b) => a.updatedAt - b.updatedAt)
+        .map(entry => ({ k: entry.k, updatedAt: entry.updatedAt }))
+    );
+  });
+
+  it('persist then load returns the id', async () => {
+    await persistPendingShareIdDraft('draft-u1', 'share-1');
+    expect(await loadPendingShareIdDraft('draft-u1')).toBe('share-1');
+  });
+
+  it('a persisted id is still cleared by clearPendingShareIdDraft', async () => {
+    await persistPendingShareIdDraft('draft-u2', 'share-2');
+    setSharePersistUserId('draft-u2');
+    await clearPendingShareIdDraft('share-2');
+    expect(await loadPendingShareIdDraft('draft-u2')).toBeNull();
+  });
+
+  it('load returns null when nothing was written', async () => {
+    expect(await loadPendingShareIdDraft('draft-u3')).toBeNull();
   });
 });
 

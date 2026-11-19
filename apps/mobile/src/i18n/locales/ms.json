@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Gambaran keseluruhan",
       "files": "Fail",
-      "discussion": "Perbincangan"
+      "discussion": "Perbincangan",
+      "discussionAccessibility_one": "{{title}}: 1 komen",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komen",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komen"
     },
     "fileStatus": {
       "modified": "Diubah suai",
@@ -4534,6 +4537,7 @@
     "empty": "Tiada aktiviti dalam tempoh laporan ini",
     "emptyHint": "Sesi pengekodan awan dan CLI anda muncul di sini apabila laporan berjadual mempunyai aktiviti.",
     "loadError": "Tidak dapat memuatkan laporan",
+    "estimateLoadError": "Tidak dapat memuatkan anggaran.",
     "view": "Baca laporan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

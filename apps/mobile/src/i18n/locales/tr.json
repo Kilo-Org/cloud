@@ -3238,6 +3238,9 @@
     },
     "tabs": {
       "discussion": "Tartışma",
+      "discussionAccessibility": "{{title}}: {{displayCount}} yorum",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} yorum",
+      "discussionAccessibility_one": "{{title}}: 1 yorum",
       "files": "Dosyalar",
       "overview": "Genel bakış"
     },
@@ -4534,6 +4537,7 @@
     "empty": "Bu rapor aralığında etkinlik yok",
     "emptyHint": "Bulut ve CLI kodlama oturumlarınız, planlanmış bir raporda etkinlik olduğunda burada görünür.",
     "loadError": "Raporlar yüklenemedi",
+    "estimateLoadError": "Tahmin yüklenemedi.",
     "view": "Raporu oku",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

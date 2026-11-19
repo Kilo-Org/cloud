@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "अवलोकन",
       "files": "फाइलहरू",
-      "discussion": "छलफल"
+      "discussion": "छलफल",
+      "discussionAccessibility_one": "{{title}}: १ टिप्पणी",
+      "discussionAccessibility": "{{title}}: {{displayCount}} टिप्पणी",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} टिप्पणी"
     },
     "fileStatus": {
       "modified": "परिमार्जित",
@@ -4534,6 +4537,7 @@
     "empty": "यो ब्रिफिङ अवधिमा कुनै गतिविधि भएन",
     "emptyHint": "निर्धारित ब्रिफिङमा गतिविधि हुँदा तपाईंका क्लाउड र CLI कोडिङ सत्रहरू यहाँ देखिनेछन्।",
     "loadError": "ब्रिफिङहरू लोड गर्न सकिएन",
+    "estimateLoadError": "अनुमान लोड गर्न सकिएन।",
     "view": "ब्रिफिङ पढ्नुहोस्",
     "viewWithPreview": "$t(agentBriefing.view)। {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

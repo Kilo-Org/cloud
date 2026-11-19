@@ -22,6 +22,7 @@ import { ChoiceRow } from '@/components/ui/choice-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 
@@ -34,6 +35,7 @@ const listStyle = { flex: 1 } satisfies ViewStyle;
 export default function ModePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { t } = useTranslation();
   const { routeKey: rawRouteKey } = useLocalSearchParams<{ routeKey?: string }>();
   const routeKey = parseParam(rawRouteKey) ?? UNFENCED_ROUTE_KEY;
@@ -123,13 +125,17 @@ export default function ModePickerScreen() {
       {custom.length === 0 ? (
         <FlashList
           nestedScrollEnabled
-          style={[listStyle, { backgroundColor: colors.background }]}
+          style={[listStyle, { backgroundColor: colors.background }, sideInsetMarginStyle]}
           data={MODE_OPTIONS}
           keyExtractor={item => item.value}
           renderItem={renderItem}
         />
       ) : (
-        <ScrollView nestedScrollEnabled className="flex-1 bg-background">
+        <ScrollView
+          nestedScrollEnabled
+          className="flex-1 bg-background"
+          style={sideInsetMarginStyle}
+        >
           {MODE_OPTIONS.map(item => (
             <View key={item.value}>{renderItem({ item })}</View>
           ))}

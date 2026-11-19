@@ -78,7 +78,7 @@ describe('PrMergeSheet provider behavior', () => {
     });
   });
 
-  it('replaces a blocked form with restrictions and keeps Cancel available', async () => {
+  it('replaces a blocked form with restrictions and keeps Discard available', async () => {
     const renderer = await mount({
       prRef: gitlab,
       mergeState: {
@@ -96,7 +96,7 @@ describe('PrMergeSheet provider behavior', () => {
     });
     expect(hosts(renderer, 'TextInput')).toHaveLength(0);
     expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual([
-      'Cancel',
+      'Discard',
     ]);
     const text = visibleText(renderer);
     expect(text).toContain('2 approvals required');
@@ -106,7 +106,7 @@ describe('PrMergeSheet provider behavior', () => {
       2
     );
     expect(text).not.toContain('The pipeline must succeed before merging.');
-    await press(renderer, 'Cancel');
+    await press(renderer, 'Discard');
     expect(baseProps.onDismiss).toHaveBeenCalledOnce();
     expect(state.merge.mutateAsync).not.toHaveBeenCalled();
   });
@@ -158,7 +158,7 @@ describe('PrMergeSheet provider behavior', () => {
     expect(visibleText(renderer)).toContain(reason);
     expect(hosts(renderer, 'TextInput')).toHaveLength(0);
     expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual([
-      'Cancel',
+      'Discard',
     ]);
     expect(state.autoMerge.mutateAsync).not.toHaveBeenCalled();
   });

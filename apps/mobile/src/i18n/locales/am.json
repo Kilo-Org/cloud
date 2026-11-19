@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "አጠቃላይ እይታ",
       "files": "ፋይሎች",
-      "discussion": "ውይይት"
+      "discussion": "ውይይት",
+      "discussionAccessibility_one": "{{title}}: 1 አስተያየት",
+      "discussionAccessibility": "{{title}}: {{displayCount}} አስተያየቶች",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} አስተያየቶች"
     },
     "fileStatus": {
       "modified": "ተቀይሯል",
@@ -4534,6 +4537,7 @@
     "empty": "በዚህ የሪፖርት ጊዜ ውስጥ እንቅስቃሴ የለም",
     "emptyHint": "የክላውድ እና CLI ኮዲንግ ክፍለ ጊዜዎችዎ የመርሃ ግብር ሪፖርት እንቅስቃሴ ሲኖረው እዚህ ይታያሉ።",
     "loadError": "ሪፖርቶችን መጫን አልተቻለም",
+    "estimateLoadError": "ግምቱን መጫን አልተቻለም።",
     "view": "ሪፖርቱን አንብብ",
     "viewWithPreview": "$t(agentBriefing.view)። {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}፣ $t(agentBriefing.snapshotPullRequests) {{pullRequests}}፣ $t(agentBriefing.snapshotBlockers) {{blockers}}",

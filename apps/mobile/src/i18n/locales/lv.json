@@ -1048,7 +1048,11 @@
     "tabs": {
       "overview": "Pārskats",
       "files": "Faili",
-      "discussion": "Diskusija"
+      "discussion": "Diskusija",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentārs",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentāri",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentāri",
+      "discussionAccessibility_zero": "{{title}}: {{displayCount}} komentāru"
     },
     "fileStatus": {
       "modified": "Mainīts",
@@ -4605,6 +4609,7 @@
     "empty": "Nav aktivitātes šajā atskaites periodā",
     "emptyHint": "Jūsu mākoņa un CLI kodēšanas sesijas parādīsies šeit, kad plānotajā atskaitē būs aktivitāte.",
     "loadError": "Neizdevās ielādēt atskaites",
+    "estimateLoadError": "Neizdevās ielādēt novērtējumu.",
     "view": "Lasīt atskaiti",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

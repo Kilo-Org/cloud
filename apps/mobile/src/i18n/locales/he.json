@@ -3295,6 +3295,10 @@
     },
     "tabs": {
       "discussion": "דיון",
+      "discussionAccessibility": "{{title}}: {{displayCount}} תגובות",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} תגובות",
+      "discussionAccessibility_one": "{{title}}: תגובה אחת",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} תגובות",
       "files": "קבצים",
       "overview": "סקירה כללית"
     },
@@ -4605,6 +4609,7 @@
     "empty": "אין פעילות בחלון הדוח הזה",
     "emptyHint": "סשנים שלך לקידוד בענן וב-CLI יופיעו כאן כשיש פעילות בדוח מתוזמן.",
     "loadError": "לא ניתן לטעון דוחות",
+    "estimateLoadError": "לא ניתן לטעון את הערכת העלות.",
     "view": "קריאת הדוח",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

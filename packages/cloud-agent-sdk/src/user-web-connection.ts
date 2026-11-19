@@ -197,7 +197,15 @@ function createUserWebConnection(
   let connectPromise: Promise<void> | null = null;
   let retainCount = 0;
   let commandRetainCount = 0;
-  let legacyRetained = false;
+  // The deprecated connect()/disconnect() pair owns one legacy lifetime. Its
+  // phase is explicit because a `disconnect()` can run synchronously inside
+  // `retainConnection()` (an `onError` or connection-signal listener), before
+  // the release closure that call returns exists.
+  type LegacyLifetime =
+    | { status: 'idle' }
+    | { status: 'retaining' }
+    | { status: 'held'; release: () => void };
+  let legacyLifetime: LegacyLifetime = { status: 'idle' };
   // True once the current base connection's socket has opened (i.e. the one-use
   // ingest ticket was consumed at the upgrade). Drives the pre-connect auth
   // refresh so only reconnects mint a fresh ticket, not the initial connect.
@@ -385,8 +393,15 @@ function createUserWebConnection(
     if (destroyed) return () => {};
     retainCount += 1;
     if (retainCount === 1) {
-      addPreSocketLifecycleListeners();
-      startConnection();
+      try {
+        addPreSocketLifecycleListeners();
+        startConnection();
+      } catch (error) {
+        // A caller-supplied hook or auth callback threw during the start; roll
+        // the count back so a failed start does not hold a lifetime forever.
+        retainCount -= 1;
+        throw error;
+      }
     }
 
     let released = false;
@@ -614,9 +629,23 @@ function createUserWebConnection(
   }
 
   function connect(): void {
-    if (destroyed || legacyRetained) return;
-    legacyRetained = true;
-    retainConnection();
+    if (destroyed || legacyLifetime.status !== 'idle') return;
+    legacyLifetime = { status: 'retaining' };
+    let release: () => void;
+    try {
+      release = retainConnection();
+    } catch (error) {
+      legacyLifetime = { status: 'idle' };
+      throw error;
+    }
+    // A `disconnect()` that ran synchronously inside `retainConnection()` has
+    // already cleared the intent, so release this retain now instead of
+    // holding a lifetime nobody owns.
+    if (legacyLifetime.status !== 'retaining') {
+      release();
+      return;
+    }
+    legacyLifetime = { status: 'held', release };
   }
 
   type RawCommandWire = {
@@ -699,15 +728,19 @@ function createUserWebConnection(
     retain: retainConnection,
     connect,
     disconnect() {
-      if (!legacyRetained || destroyed) return;
-      legacyRetained = false;
-      retainCount -= 1;
-      if (retainCount === 0) stopConnection('Connection disconnected');
+      if (legacyLifetime.status === 'idle') return;
+      if (legacyLifetime.status === 'retaining') {
+        legacyLifetime = { status: 'idle' };
+        return;
+      }
+      const { release } = legacyLifetime;
+      legacyLifetime = { status: 'idle' };
+      release();
     },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      legacyRetained = false;
+      legacyLifetime = { status: 'idle' };
       retainCount = 0;
       commandRetainCount = 0;
       stopConnection('Connection destroyed');

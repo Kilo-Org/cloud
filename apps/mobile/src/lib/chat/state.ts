@@ -50,8 +50,8 @@ export type Displaced = Question &
      */
     readonly failureKey?: string | null;
     /**
-     * The words the answer had reached when the person stopped it. Absent when
-     * it failed, or was stopped before any words arrived.
+     * The words the answer had reached when it was stopped or failed. Absent
+     * when it ended before any words arrived.
      */
     readonly answer?: string;
   };
@@ -85,9 +85,9 @@ export type ChatState = {
   readonly askedFrom: string | null;
   /**
    * The words the answer to that question had reached when the person stopped
-   * it. They stay on screen, marked as stopped, instead of going with the
-   * Stop. Null while the question is being asked, and when it failed or was
-   * stopped before any words arrived.
+   * it or it failed. They stay on screen, with how it ended under them, instead
+   * of going with the answer. Null while the question is being asked, and when
+   * it ended before any words arrived.
    */
   readonly askedAnswer: string | null;
   /**

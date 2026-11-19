@@ -3238,6 +3238,9 @@
     },
     "tabs": {
       "discussion": "ディスカッション",
+      "discussionAccessibility": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}}件のコメント",
+      "discussionAccessibility_one": "{{title}}：1件のコメント",
       "files": "ファイル",
       "overview": "概要"
     },
@@ -4534,6 +4537,7 @@
     "empty": "このブリーフ期間中のアクティビティはありません",
     "emptyHint": "スケジュールされたブリーフにアクティビティがあると、クラウドとCLIのコーディングセッションがここに表示されます。",
     "loadError": "ブリーフィングを読み込めませんでした",
+    "estimateLoadError": "推定を読み込めませんでした。",
     "view": "ブリーフィングを読む",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}、$t(agentBriefing.snapshotPullRequests) {{pullRequests}}、$t(agentBriefing.snapshotBlockers) {{blockers}}",

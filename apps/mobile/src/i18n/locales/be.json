@@ -1070,7 +1070,12 @@
     "tabs": {
       "overview": "Агляд",
       "files": "Файлы",
-      "discussion": "Абмеркаванне"
+      "discussion": "Абмеркаванне",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} каментар",
+      "discussionAccessibility": "{{title}}: {{displayCount}} каментара",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} каментара",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} каментары",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} каментароў"
     },
     "fileStatus": {
       "modified": "Зменены",
@@ -4676,6 +4681,7 @@
     "empty": "Няма актыўнасці ў гэтым акне зводкі",
     "emptyHint": "Вашы воблачныя і CLI-сеансы кадавання з'явяцца тут, калі ў запланаванай зводцы ёсць актыўнасць.",
     "loadError": "Не ўдалося загрузіць зводкі",
+    "estimateLoadError": "Не ўдалося загрузіць ацэнку.",
     "view": "Чытаць зводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

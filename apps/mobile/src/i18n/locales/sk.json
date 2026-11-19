@@ -1070,7 +1070,12 @@
     "tabs": {
       "overview": "Prehľad",
       "files": "Súbory",
-      "discussion": "Diskusia"
+      "discussion": "Diskusia",
+      "discussionAccessibility_one": "{{title}}: 1 komentár",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentárov",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentárov",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentáre",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentára"
     },
     "fileStatus": {
       "modified": "Upravené",
@@ -4676,6 +4681,7 @@
     "empty": "Žiadna aktivita v tomto okne prehľadu",
     "emptyHint": "Vaše cloudové a CLI relácie programovania sa tu zobrazia, keď má naplánovaný prehľad aktivitu.",
     "loadError": "Prehľady sa nepodarilo načítať",
+    "estimateLoadError": "Odhad sa nepodarilo načítať.",
     "view": "Čítať prehľad",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Muhtasari",
       "files": "Faili",
-      "discussion": "Mazungumzo"
+      "discussion": "Mazungumzo",
+      "discussionAccessibility_one": "{{title}}: maoni 1",
+      "discussionAccessibility": "{{title}}: Maoni {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: Maoni {{displayCount}}"
     },
     "fileStatus": {
       "modified": "Imebadilishwa",
@@ -4534,6 +4537,7 @@
     "empty": "Hakuna shughuli katika kipindi hiki cha ripoti",
     "emptyHint": "Vipindi vyako vya uandishi wa msimbo vya wingu na CLI huonekana hapa wakati ripoti iliyoratibiwa ina shughuli.",
     "loadError": "Imeshindwa kupakia ripoti",
+    "estimateLoadError": "Imeshindwa kupakia makadirio.",
     "view": "Soma ripoti",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

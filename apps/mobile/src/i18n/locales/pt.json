@@ -1070,7 +1070,12 @@
     "tabs": {
       "overview": "Visão geral",
       "files": "Ficheiros",
-      "discussion": "Discussão"
+      "discussion": "Discussão",
+      "discussionAccessibility_one": "{{title}}: 1 comentário",
+      "discussionAccessibility": "{{title}}: {{displayCount}} comentários",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} comentários",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} comentários",
+      "discussionAccessibility_zero": "{{title}}: {{displayCount}} comentários"
     },
     "fileStatus": {
       "modified": "Modificado",
@@ -4676,6 +4681,7 @@
     "empty": "Sem atividade neste período do relatório",
     "emptyHint": "As suas sessões de programação na cloud e na CLI aparecem aqui quando um relatório agendado tem atividade.",
     "loadError": "Não foi possível carregar os relatórios",
+    "estimateLoadError": "Não foi possível carregar a estimativa.",
     "view": "Ler relatório",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

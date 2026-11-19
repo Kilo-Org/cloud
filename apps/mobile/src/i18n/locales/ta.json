@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "மேலோட்டம்",
       "files": "கோப்புகள்",
-      "discussion": "விவாதம்"
+      "discussion": "விவாதம்",
+      "discussionAccessibility_one": "{{title}}: 1 கருத்து",
+      "discussionAccessibility": "{{title}}: {{displayCount}} கருத்துகள்",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} கருத்துகள்"
     },
     "fileStatus": {
       "modified": "மாற்றப்பட்டது",
@@ -4534,6 +4537,7 @@
     "empty": "இந்த அறிக்கைக் காலத்தில் செயல்பாடு இல்லை",
     "emptyHint": "திட்டமிடப்பட்ட அறிக்கையில் செயல்பாடு இருக்கும்போது உங்கள் கிளவுட் மற்றும் CLI கோடிங் அமர்வுகள் இங்கே தோன்றும்.",
     "loadError": "அறிக்கைகளை ஏற்ற முடியவில்லை",
+    "estimateLoadError": "மதிப்பீட்டை ஏற்ற முடியவில்லை.",
     "view": "அறிக்கையைப் படிக்கவும்",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

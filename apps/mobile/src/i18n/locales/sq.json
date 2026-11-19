@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Përmbledhja",
       "files": "Skedarë",
-      "discussion": "Diskutimi"
+      "discussion": "Diskutimi",
+      "discussionAccessibility_one": "{{title}}: 1 koment",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komente",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komente"
     },
     "fileStatus": {
       "modified": "I modifikuar",
@@ -4534,6 +4537,7 @@
     "empty": "Asnjë aktivitet në këtë dritare kohore të raportit",
     "emptyHint": "Seancat e kodimit në cloud dhe CLI shfaqen këtu kur një raport i planifikuar ka aktivitet.",
     "loadError": "Raportet nuk u ngarkuan",
+    "estimateLoadError": "Vlerësimi nuk mund të ngarkohej.",
     "view": "Lexo raportin",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

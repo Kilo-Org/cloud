@@ -3352,6 +3352,11 @@
     },
     "tabs": {
       "discussion": "Dyskusja",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentarza",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentarza",
+      "discussionAccessibility_one": "{{title}}: 1 komentarz",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentarze",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentarzy",
       "files": "Pliki",
       "overview": "Podsumowanie"
     },
@@ -4676,6 +4681,7 @@
     "empty": "Brak aktywności w tym oknie raportu",
     "emptyHint": "Twoje sesje kodowania w chmurze i CLI pojawią się tutaj, gdy zaplanowany raport ma aktywność.",
     "loadError": "Nie udało się wczytać raportów",
+    "estimateLoadError": "Nie udało się wczytać szacunku.",
     "view": "Przeczytaj raport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

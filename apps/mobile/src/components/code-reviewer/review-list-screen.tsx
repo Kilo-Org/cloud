@@ -6,7 +6,7 @@ import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { EmptyState, StateAction } from '@/components/empty-state';
@@ -44,7 +44,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   // it is the same instant the review's detail screen reads.
   const now = useRelativeTimeNow();
   const paddingBottom = useTabBarBottomPadding();
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
   // One style for the whole content container: every row keeps the screen's own
   // side insets, and the rows draw the page gutter themselves.
   const listContentContainerStyle = useMemo<ViewStyle>(

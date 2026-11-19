@@ -1048,7 +1048,11 @@
     "tabs": {
       "overview": "Prezentare generală",
       "files": "Fișiere",
-      "discussion": "Discuție"
+      "discussion": "Discuție",
+      "discussionAccessibility_one": "{{title}}: 1 comentariu",
+      "discussionAccessibility": "{{title}}: {{displayCount}} de comentarii",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} de comentarii",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} comentarii"
     },
     "fileStatus": {
       "modified": "Modificat",
@@ -4605,6 +4609,7 @@
     "empty": "Nicio activitate în acest interval de raport",
     "emptyHint": "Sesiunile tale de programare din cloud și CLI apar aici când un raport programat are activitate.",
     "loadError": "Rapoartele nu au putut fi încărcate",
+    "estimateLoadError": "Estimarea nu a putut fi încărcată.",
     "view": "Citește raportul",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

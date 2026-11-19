@@ -245,6 +245,7 @@ jest.mock('./assistant-ui/CloudThread', () => ({
 }));
 jest.mock('./OlderMessagesHeader', () => ({ OlderMessagesHeader: () => null }));
 jest.mock('./ChildSessionDrawer', () => ({ ChildSessionDrawer: () => null }));
+jest.mock('./AgentBoardDrawer', () => ({ SessionAgentBoard: () => null }));
 jest.mock('./PreparationDrawer', () => ({ PreparationDrawer: () => null }));
 jest.mock('./SessionContinuationPanel', () => ({ SessionContinuationPanel: () => null }));
 jest.mock('@/components/SetPageTitle', () => ({ SetPageTitle: () => null }));

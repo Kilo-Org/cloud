@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "ภาพรวม",
       "files": "ไฟล์",
-      "discussion": "การสนทนา"
+      "discussion": "การสนทนา",
+      "discussionAccessibility_one": "{{title}}: ความคิดเห็น 1 รายการ",
+      "discussionAccessibility": "{{title}}: ความคิดเห็น {{displayCount}} รายการ",
+      "discussionAccessibility_other": "{{title}}: ความคิดเห็น {{displayCount}} รายการ"
     },
     "fileStatus": {
       "modified": "แก้ไขแล้ว",
@@ -4534,6 +4537,7 @@
     "empty": "ไม่มีกิจกรรมในช่วงเวลาของรายงานนี้",
     "emptyHint": "เซสชันเขียนโค้ดบนคลาวด์และ CLI ของคุณจะแสดงที่นี่เมื่อรายงานตามกำหนดการมีกิจกรรม",
     "loadError": "ไม่สามารถโหลดรายงานได้",
+    "estimateLoadError": "ไม่สามารถโหลดประมาณการได้",
     "view": "อ่านรายงาน",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

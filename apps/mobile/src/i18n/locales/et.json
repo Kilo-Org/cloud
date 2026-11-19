@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Ülevaade",
       "files": "Failid",
-      "discussion": "Arutelu"
+      "discussion": "Arutelu",
+      "discussionAccessibility_one": "{{title}}: 1 kommentaar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentaari",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentaari"
     },
     "fileStatus": {
       "modified": "Muudetud",
@@ -4534,6 +4537,7 @@
     "empty": "Selles ülevaatevahemikus tegevust pole",
     "emptyHint": "Sinu pilve- ja CLI-koodimisseansid ilmuvad siia, kui ajastatud ülevaates on tegevust.",
     "loadError": "Ülevaateid ei õnnestunud laadida",
+    "estimateLoadError": "Hinnangut ei õnnestunud laadida.",
     "view": "Loe ülevaadet",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

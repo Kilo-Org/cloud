@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry error-boundary wrap are kept together */
+/* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, the reveal render, and the Sentry error-boundary wrap are kept together */
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 // Enter the local Android Live Update module's JS in the main process on both
@@ -35,7 +35,7 @@ import {
   useUnstableGlobalHref,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
+import { ShareIntentProvider } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
@@ -43,7 +43,6 @@ import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
-import { toast } from 'sonner-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
@@ -104,6 +103,7 @@ import {
   wasLaunchLinkHandled,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
+import { usePendingShareIntake } from '@/lib/hooks/use-pending-share-intake';
 import { registerNeedsInputCategories } from '@/lib/notification-actions';
 import { useOrganization } from '@/lib/organization-context';
 import {
@@ -122,9 +122,8 @@ import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
   resolvePendingShareNavigation,
-  resolveSupersededPendingShareId,
   SHARE_INTENT_OPTIONS,
-  shouldIngestShareIntent,
+  type ShellReadyForShareInput,
 } from '@/lib/pending-share-navigation';
 import {
   consumeLastRouteForRepair,
@@ -137,29 +136,8 @@ import {
 import { shouldRepairRestoredRoute } from '@/lib/last-route-repair';
 import { lastRouteHrefFrom } from '@/lib/last-route-recordable';
 import { useRecordLastRoute } from '@/lib/hooks/use-record-last-route';
-import {
-  clearSharePayload,
-  discardUnstoredSharePayload,
-  isSharePayloadStagedUnder,
-  normalizeShareIntent,
-  peekSharePayload,
-  persistSharePayloadsNow,
-  putSharePayload,
-  restoreSharePayloads,
-  setSharePersistUserId,
-  type ShareId,
-  type SharePayload,
-  subscribeAccountStagedShareClear,
-} from '@/lib/share-payload';
-import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
+import { setSharePersistUserId } from '@/lib/share-payload';
 import { captureSystemSearchLaunch } from '@/lib/system-search-route';
-import {
-  flushDraft,
-  isStringDraft,
-  loadDraft,
-  PENDING_SHARE_ID_DRAFT_KEY,
-  saveDraft,
-} from '@/lib/persist/drafts';
 import { setSentryContext } from '@/lib/sentry-context';
 import { initSentry } from '@/lib/sentry-init';
 import { installErrorReporting } from '@/lib/telemetry/install-error-reporting';
@@ -439,124 +417,41 @@ function RootLayoutNav({
   const onLegalRoute = pathname.startsWith('/legal/');
   const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
   const onGateRoute = (segments as readonly string[]).includes('share-gate');
-  const {
-    hasShareIntent,
-    shareIntent,
-    resetShareIntent,
-    error: shareIntentError,
-  } = useShareIntentContext();
-  // expo-share-intent rebuilds resetShareIntent every render; keep it out of
-  // the ingest/error effect deps via ref (same pattern as share-prefill.ts).
-  const resetShareIntentRef = useRef(resetShareIntent);
-  resetShareIntentRef.current = resetShareIntent;
-  const [pendingShareId, setPendingShareId] = useState<ShareId | null>(null);
-  // Mirror pendingShareId so the ingest effect can release a superseded share
-  // without reading stale state or adding the id to effect deps.
-  const pendingShareIdRef = useRef(pendingShareId);
-  pendingShareIdRef.current = pendingShareId;
-  // Bumped by the ingest arm and the gate consume so the cold-start restore can
-  // detect any live arm/consume during its async reads and skip the fill.
-  const pendingShareIdEpochRef = useRef(0);
 
-  // Staged share deliveries belong to the account that staged them. The shared
-  // account boundary drops them, and this subscription resets the pending slot
-  // in step, so the slot always describes a staged share that exists. The
-  // epoch bump also abandons a cold-start restore that is in flight. The
-  // notification fires only when a stamped entry was dropped, so a share staged
-  // before an account resolves keeps its slot for a same-process sign-in
-  // (DEC-01).
-  useEffect(
-    () =>
-      subscribeAccountStagedShareClear(() => {
-        pendingShareIdEpochRef.current += 1;
-        setPendingShareId(null);
-      }),
-    []
+  // One memoised gate object feeds both the shell-readiness check and the
+  // bootstrap decision, so the two never restate the guards differently.
+  const shellGate = useMemo<ShellReadyForShareInput>(
+    () => ({
+      hasToken: token != null,
+      isLoading,
+      updateRequired,
+      inAuthGroup,
+      inForceUpdate,
+      userIdLoading: identityLoading,
+      userIdError: identityError,
+      consentCheckError: consentCheckError != null,
+      consentChecked,
+      needsConsent,
+      onConsentRoute,
+      onConsentReviewRoute,
+    }),
+    [
+      token,
+      isLoading,
+      updateRequired,
+      inAuthGroup,
+      inForceUpdate,
+      identityLoading,
+      identityError,
+      consentCheckError,
+      consentChecked,
+      needsConsent,
+      onConsentRoute,
+      onConsentReviewRoute,
+    ]
   );
-
-  // Flush a share staged while the account id was still loading: the ingest
-  // effect persisted nothing (userId was falsy), so once userId resolves the
-  // staged payload map, navigation queue, and pending id are written to durable
-  // drafts. Each draft write holds only the entries staged under this account,
-  // and the pending-id hint is written only when this account staged the
-  // pending share: a capture from before an account resolved stays in memory
-  // (DEC-01) instead of reaching the account's draft. Declared after
-  // `pendingShareIdRef` so the closure references an already-declared const.
-  useEffect(() => {
-    const pendingId = pendingShareIdRef.current;
-    if (!userId || pendingId === null) {
-      return;
-    }
-    void persistSharePayloadsNow();
-    void persistShareNavigationNow();
-    if (!isSharePayloadStagedUnder(pendingId, userId)) {
-      return;
-    }
-    saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, pendingId);
-    void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
-  }, [userId]);
-
-  // Cold-start share restore. Order matters: payloads first, then the
-  // navigation queue (deliveries point at restored payloads), then the pending
-  // id — and only when its payload still exists. A restored id with an empty
-  // map is the existing stale-share empty path, so it must not re-arm the gate.
-  useEffect(() => {
-    let cancelled = false;
-
-    async function restoreShare() {
-      const startEpoch = pendingShareIdEpochRef.current;
-      if (!userId) {
-        return;
-      }
-      await restoreSharePayloads(userId);
-      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
-        return;
-      }
-      await restoreShareNavigation(userId);
-      // `cancelled` is set by the cleanup below; the previous check narrows the
-      // fall-through path, but the variable is genuinely mutable.
-      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
-      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
-        return;
-      }
-      const pendingId = await loadDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, isStringDraft);
-      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
-      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
-        return;
-      }
-      if (
-        pendingId !== null &&
-        peekSharePayload(pendingId) !== null &&
-        pendingShareIdRef.current === null
-      ) {
-        // Fill only an empty slot: a live ingest that armed a newer pending id
-        // during this restore must win, so never overwrite a non-null slot.
-        setPendingShareId(pendingId);
-      }
-    }
-
-    void restoreShare();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
-  const isShellReady = isShellReadyForShare({
-    hasToken: token != null,
-    isLoading,
-    updateRequired,
-    inAuthGroup,
-    inForceUpdate,
-    userIdLoading: identityLoading,
-    userIdError: identityError,
-    consentCheckError: consentCheckError != null,
-    consentChecked,
-    needsConsent,
-    onConsentRoute,
-    onConsentReviewRoute,
-  });
+  const isShellReady = isShellReadyForShare(shellGate);
+  const { pendingShareId, releasePendingShare } = usePendingShareIntake({ userId, isShellReady });
 
   useEffect(() => {
     let cancelled = false;
@@ -645,115 +540,17 @@ function RootLayoutNav({
   const bootstrapSettled = token != null && consentChecked && !needsConsent && !consentCheckError;
   useScreenTracking(bootstrapSettled);
 
-  useEffect(() => {
-    if (shareIntentError) {
-      Sentry.captureException(new Error('Share intent provider error'), {
-        tags: {
-          'error.subsystem': 'share-intent',
-          'error.operation': 'read_native_payload',
-        },
-        fingerprint: ['share-intent-provider-error'],
-      });
-      toast.error(i18n.t('share.couldNotReadContent'));
-      resetShareIntentRef.current();
-    }
-  }, [shareIntentError]);
-
-  // Keyed per shareIntent identity so a newer intent cancels and supersedes
-  // an in-flight ingest. Success/failure reset for the happy path lives here
-  // (gate must never reset); the shareIntentError effect also resets on the
-  // error path. Calls go through resetShareIntentRef so the unstable context
-  // function stays out of the deps.
-  useEffect(() => {
-    // Copy the shared files only once the shell can open the gate. The
-    // provider keeps the intent across a backgrounding (SHARE_INTENT_OPTIONS)
-    // so a sign-in that leaves the app cannot drop the deferred payload.
-    if (!shouldIngestShareIntent({ hasShareIntent, isShellReady })) {
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    const ingestShareIntent = async () => {
-      try {
-        const payload: SharePayload = await normalizeShareIntent(shareIntent);
-        if (cancelled) {
-          // Superseded mid-copy: never stored, so no lifecycle path can clean it.
-          discardUnstoredSharePayload(payload);
-          return;
-        }
-        const shareId = putSharePayload(payload);
-        resetShareIntentRef.current();
-        // Latest-wins: a superseded pending share is released — never silently orphaned.
-        const superseded = resolveSupersededPendingShareId(pendingShareIdRef.current, shareId);
-        if (superseded !== null) {
-          clearSharePayload(superseded);
-        }
-        pendingShareIdEpochRef.current += 1;
-        setPendingShareId(shareId);
-        // Persist the pending id so a process death before the gate opens still
-        // restores it; skipped while the account has not resolved (signed out).
-        if (userId) {
-          saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, shareId);
-          void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
-        }
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-        Sentry.captureException(error, {
-          tags: { 'error.subsystem': 'share-intent', 'error.operation': 'normalize_payload' },
-        });
-        toast.error(i18n.t('share.couldNotReadContent'));
-        resetShareIntentRef.current();
-      }
-    };
-
-    void ingestShareIntent();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [hasShareIntent, shareIntent, isShellReady, userId]);
-
   // Memoized because the repair effect below keys on it: a plain call would
   // hand the effect a new object identity every render and re-run it each time.
   const decision = useMemo(
     () =>
       resolveBootstrapDecision({
-        isLoading,
-        updateRequired,
-        inForceUpdate,
-        inAuthGroup,
-        hasToken: token != null,
-        userIdLoading: identityLoading,
-        userIdError: identityError,
-        consentCheckError: consentCheckError != null,
-        consentChecked,
-        needsConsent,
-        onConsentRoute,
-        onConsentReviewRoute,
+        ...shellGate,
         onLegalRoute,
         languageReloadFailed,
         restoreFailed,
       }),
-    [
-      isLoading,
-      updateRequired,
-      inForceUpdate,
-      inAuthGroup,
-      token,
-      identityLoading,
-      identityError,
-      consentCheckError,
-      consentChecked,
-      needsConsent,
-      onConsentRoute,
-      onConsentReviewRoute,
-      onLegalRoute,
-      languageReloadFailed,
-      restoreFailed,
-    ]
+    [shellGate, onLegalRoute, languageReloadFailed, restoreFailed]
   );
 
   useEffect(() => {
@@ -846,8 +643,10 @@ function RootLayoutNav({
         // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
         break;
       }
-      default:
-      // Unreachable: BootstrapDecisionTag is a closed union.
+      default: {
+        const exhaustiveCheck: never = decision.tag;
+        throw new Error(`Unhandled bootstrap decision: ${String(exhaustiveCheck)}`);
+      }
     }
   }, [decision, navigationReady, router, setStartupFinished, lastRouteHydratedVersion]);
 
@@ -982,9 +781,8 @@ function RootLayoutNav({
     } else {
       router.push(navigation.href as Href);
     }
-    pendingShareIdEpochRef.current += 1;
-    setPendingShareId(null);
-  }, [pendingShareId, isShellReady, navigationReady, onGateRoute, router]);
+    releasePendingShare();
+  }, [pendingShareId, isShellReady, navigationReady, onGateRoute, releasePendingShare, router]);
 
   // One `app_startup` event per launch, delegated to a drain helper so
   // tests can drive the real guard logic without mounting the full layout.

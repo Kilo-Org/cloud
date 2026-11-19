@@ -3295,6 +3295,10 @@
     },
     "tabs": {
       "discussion": "Échanges",
+      "discussionAccessibility": "{{title}}: {{displayCount}} commentaires",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} commentaires",
+      "discussionAccessibility_one": "{{title}}: 1 commentaire",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} commentaires",
       "files": "Fichiers",
       "overview": "Aperçu"
     },
@@ -4605,6 +4609,7 @@
     "empty": "Aucune activité dans cette fenêtre de briefing",
     "emptyHint": "Vos sessions de code cloud et CLI apparaissent ici lorsqu’un briefing planifié a de l’activité.",
     "loadError": "Impossible de charger les briefings",
+    "estimateLoadError": "Impossible de charger l’estimation.",
     "view": "Lire le briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view) : $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

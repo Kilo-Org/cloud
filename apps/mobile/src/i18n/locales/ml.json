@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "ഒറ്റനോട്ടം",
       "files": "ഫയലുകൾ",
-      "discussion": "ചർച്ച"
+      "discussion": "ചർച്ച",
+      "discussionAccessibility_one": "{{title}}: 1 അഭിപ്രായം",
+      "discussionAccessibility": "{{title}}: {{displayCount}} അഭിപ്രായങ്ങൾ",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} അഭിപ്രായങ്ങൾ"
     },
     "fileStatus": {
       "modified": "പരിഷ്കരിച്ചു",
@@ -4534,6 +4537,7 @@
     "empty": "ഈ ബ്രീഫിംഗ് കാലയളവിൽ പ്രവർത്തനങ്ങളൊന്നുമില്ല",
     "emptyHint": "ഷെഡ്യൂൾ ചെയ്ത ഒരു ബ്രീഫിംഗിൽ പ്രവർത്തനമുള്ളപ്പോൾ നിങ്ങളുടെ ക്ലൗഡ്, CLI കോഡിംഗ് സെഷനുകൾ ഇവിടെ കാണാം.",
     "loadError": "ബ്രീഫിംഗുകൾ ലോഡ് ചെയ്യാനായില്ല",
+    "estimateLoadError": "ഏകദേശ ചെലവ് ലോഡ് ചെയ്യാനായില്ല.",
     "view": "ബ്രീഫിംഗ് വായിക്കുക",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

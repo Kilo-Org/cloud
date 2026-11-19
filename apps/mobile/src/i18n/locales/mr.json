@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "आढावा",
       "files": "फाइल्स",
-      "discussion": "चर्चा"
+      "discussion": "चर्चा",
+      "discussionAccessibility_one": "{{title}}: 1 टिप्पणी",
+      "discussionAccessibility": "{{title}}: {{displayCount}} टिप्पण्या",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} टिप्पण्या"
     },
     "fileStatus": {
       "modified": "बदल केलेली",
@@ -4534,6 +4537,7 @@
     "empty": "या आढावा कालावधीत कोणताही क्रियाकलाप नाही",
     "emptyHint": "नियोजित आढाव्यात क्रियाकलाप असल्यास तुमची क्लाउड आणि CLI कोडिंग सत्रे येथे दिसतील.",
     "loadError": "आढावे लोड करता आले नाहीत",
+    "estimateLoadError": "अंदाज लोड करता आला नाही.",
     "view": "आढावा वाचा",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",

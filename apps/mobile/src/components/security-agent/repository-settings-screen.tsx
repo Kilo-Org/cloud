@@ -7,7 +7,7 @@ import { ExternalLink, FolderGit2 } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
@@ -137,7 +137,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   }, []);
 
   const paddingBottom = useTabBarBottomPadding();
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
   // One content-container style for the whole list, so every row — recycled or
   // not — starts at the same offset and a rotation re-derives it once.
   const listContentContainerStyle = useMemo(

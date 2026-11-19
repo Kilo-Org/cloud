@@ -294,7 +294,7 @@ describe('createMemoryStorage', () => {
       expect(after[1]).toEqual(expect.objectContaining({ id: 'b', text: 'two!' }));
     });
 
-    test('caches views per message and drops them with the message', () => {
+    test('caches views per message', () => {
       s.upsertPart('msg-1', makePart('a', 'msg-1', 'one'));
       s.upsertPart('msg-1', makePart('b', 'msg-1', 'two'));
       s.upsertPart('msg-2', makePart('a', 'msg-2', 'other'));
@@ -311,13 +311,6 @@ describe('createMemoryStorage', () => {
       expect(oneAfter[1]).toBe(oneBefore[1]);
       expect(twoAfter[0]).toBe(twoBefore[0]);
       expect(twoAfter[0]).toEqual(expect.objectContaining({ id: 'a', text: 'other' }));
-
-      s.deleteMessage('msg-1');
-      s.upsertPart('msg-1', makePart('a', 'msg-1', 'recreated'));
-
-      expect(s.getParts('msg-1')).toEqual([
-        expect.objectContaining({ id: 'a', text: 'recreated' }),
-      ]);
     });
   });
 

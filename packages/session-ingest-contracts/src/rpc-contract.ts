@@ -822,12 +822,9 @@ export const persistedSnapshotFileDiffsSchema = z
  * are stripped (not rejected) so a newer Kilo field cannot fail the read, and
  * an unknown status degrades to "no status" instead of an invalid file.
  */
-export const sessionDiffFileSchema = z.object({
-  file: z.string(),
+export const sessionDiffFileSchema = sdkSnapshotFileDiffBaseSchema.extend({
   patch: z.string(),
-  additions: z.number(),
-  deletions: z.number(),
-  status: z.enum(['added', 'deleted', 'modified']).optional().catch(undefined),
+  status: sdkSnapshotFileDiffBaseSchema.shape.status.catch(undefined),
 });
 export type SessionDiffFile = z.infer<typeof sessionDiffFileSchema>;
 

@@ -788,7 +788,9 @@ keep environment snapshots and existing history/worktree recovery.
   The snapshot
   holds only the disk: like an environment snapshot, restore applies the current credentials,
   env, secrets and MCP configuration from the route before accepting work.
-  Existing native sessions are reused; missing native sessions use history-only recovery.
+  Existing native sessions are reused when their record names this workspace directory; a record
+  that names another directory takes history-only recovery, as Kilo v2 already requires.
+  Missing native sessions use history-only recovery.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads

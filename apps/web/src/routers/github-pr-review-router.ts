@@ -1087,15 +1087,13 @@ type PrLedgerMutationArgs<T> = {
   parseCanonical: (raw: unknown) => T;
 };
 
-/** The canonical result replayed under the same key carries `replayed: true`. */
 type ReplayedResult<T> = T & { replayed: true };
 
 /**
  * UGC gate: a user must have accepted the current Terms before a
- * comment-creating mutation (`createReviewComment`, `replyToComment`,
- * `submitReview`). Runs before `admitOperation` so a missing acceptance never
- * creates a ledger row. Throws PRECONDITION_FAILED `terms_required` when
- * absent.
+ * comment-publishing mutation. Runs before `admitOperation` so a missing
+ * acceptance never creates a ledger row. Throws PRECONDITION_FAILED
+ * `terms_required` when absent.
  */
 export async function assertTermsAccepted(userId: string): Promise<void> {
   const [row] = await db
@@ -1344,7 +1342,7 @@ async function reconcileCommentPrRow<T extends Record<string, unknown>>(args: {
 }
 
 /**
- * The shared shape of the three non-idempotent comment/review writes. Without
+ * The shared shape of the non-idempotent comment/review writes. Without
  * an `operationKey` the write runs exactly as before, unledgered. With one it
  * admits a `pr` row, settles the canonical result at the committed-effect
  * boundary, and reconciles a same-key retry by re-reading the recorded GitHub

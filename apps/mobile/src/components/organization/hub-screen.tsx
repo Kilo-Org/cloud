@@ -220,13 +220,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       ? t('organization.hub.planEnterprise')
       : t('organization.hub.planTeams');
   const planBillingUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
-  // A role that gets the billing action below the block needs only the state,
-  // because the action is the next step. A role that cannot change the plan
-  // gets the sentence the rest of the app shows with the same explanation, so
-  // the member still learns who can end the state.
-  const planMessage = showMoney
-    ? t('organization.hub.planEnded')
-    : t('common.organizationTrialEnded');
+  // A money role whose platform may open the billing page gets the state
+  // alone, because the banner's action is the next step. A money role the
+  // storefront rule keeps from linking gets the sentence the rest of the app
+  // shows, which names where billing is changed, exactly as a role that cannot
+  // change the plan does: with no action, the sentence has to carry the step.
+  const planMessage =
+    showMoney && canLinkBilling
+      ? t('organization.hub.planEnded')
+      : t('common.organizationTrialEnded');
 
   // The rename control's two states. `organizations.update` runs on the
   // organization billing mutation procedure, which refuses every mutation once
@@ -280,7 +282,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         headerRight={
           showMoney ? (
             <IconButton {...renameControlProps(renameControl, t('organization.hub.renameTitle'))}>
-              <Pencil size={16} color={colors.mutedForeground} />
+              <Pencil size={16} color={colors.foreground} />
             </IconButton>
           ) : undefined
         }
@@ -326,9 +328,13 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               valueDirection="ltr"
               // An empty balance offers the top-up on the amount's own line: a
               // row of its own would hold nothing but this control, and
-              // `lineAction` keeps that line one text line tall.
+              // `lineAction` keeps that line one text line tall. Only painted
+              // where the platform may open the page (`canLinkBilling`), because
+              // the control's label alone beside the amount reads as part of it,
+              // and the Billing row below carries the destination on a platform
+              // that cannot link.
               trailing={
-                org.balance === 0 ? (
+                org.balance === 0 && canLinkBilling ? (
                   <AddCreditsRow inline lineAction url={organizationBillingUrl(organizationId)} />
                 ) : undefined
               }

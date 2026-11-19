@@ -376,6 +376,7 @@ describe('Organization hub card', () => {
 
   it('offers the top-up on the balance line of an empty balance', async () => {
     boundary.balance = 0;
+    storefrontRule.linkAllowed = true;
 
     const { renderer, unmount } = await renderHub();
 
@@ -402,6 +403,23 @@ describe('Organization hub card', () => {
       .findAllByType('KvRow')
       .find(node => node.props.label === i18n.t('organization.hub.balance'));
     expect(balance?.props.value).toBe('$5');
+    expect(balance?.props.trailing).toBeUndefined();
+    unmount();
+  });
+
+  it('leaves an empty balance alone where the platform may not open the top-up', async () => {
+    // The storefront rule refuses the link on every Android build, where the
+    // shared row paints its label as plain text: a bare caption pinned to the
+    // amount would read as a unit of it. The Billing row carries the
+    // destination instead.
+    boundary.balance = 0;
+    storefrontRule.linkAllowed = false;
+
+    const { renderer, unmount } = await renderHub();
+
+    const balance = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
     expect(balance?.props.trailing).toBeUndefined();
     unmount();
   });
@@ -486,6 +504,9 @@ describe('Organization hub plan', () => {
 
     const [refusal] = refusals(renderer);
     expect(refusal?.props.action).toBeUndefined();
+    // With no action, the sentence has to carry the step.
+    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEnded'));
+    expect(refusal?.props.message).not.toBe(i18n.t('organization.hub.planEnded'));
     expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();
   });
@@ -576,6 +597,15 @@ describe('OrganizationHubScreen rename control', () => {
     expect(width + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
 
     expect(control.props.accessibilityRole).toBe('button');
+    unmount();
+  });
+
+  it('keeps the rename glyph on the header ink', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    // `colors.foreground` is the token the shared ScreenHeader paints its own
+    // chevron with, so the control beside the title carries the same ink.
+    expect(renderer.root.findAllByType('Pencil')[0]?.props.color).toBe('black');
     unmount();
   });
 

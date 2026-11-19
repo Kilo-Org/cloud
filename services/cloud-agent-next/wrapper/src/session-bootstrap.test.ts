@@ -3509,9 +3509,8 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 describe('runtime credential proxy ready request validation', () => {
   it('accepts only a stable handle and Worker proxy targets', () => {
     const request = makeRequest(fs.mkdtempSync(path.join(os.tmpdir(), 'wrapper-proxy-request-')));
-    // The platform sets HOME and the pnpm store, so a ready request that names
-    // them is refused; the proxy contract is checked on the remaining env.
-    delete request.materialized.env.HOME;
+    // The platform sets the pnpm store, so a ready request that names it is
+    // refused; the proxy contract is checked on the remaining env.
     delete request.materialized.env[PNPM_STORE_ENV_VAR];
     request.runtimeCredentialProxy = {
       handle: 'stable-proxy-handle',

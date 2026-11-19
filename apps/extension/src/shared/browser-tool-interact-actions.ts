@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import {
   ambiguousSelectorError,
+  FRESH_SNAPSHOT_HINT,
   looksLikeBrowserRef,
   STALE_REF_ERROR,
 } from './browser-agent-checks';

@@ -243,9 +243,11 @@ export const isScriptTool = (toolName: string): boolean =>
 export const ambiguousSelectorError = (matches: number): string =>
   `The selector matches ${String(matches)} elements. Use a snapshot ref or a selector that matches one element.`;
 
+export const FRESH_SNAPSHOT_HINT =
+  'Take a fresh kilo_browser_snapshot and use a ref from that snapshot, or pass a unique CSS selector.';
+
 /** A ref no snapshot registered, or one whose element is gone: every backend answers it with this one error. */
-export const STALE_REF_ERROR =
-  'The element reference is stale or unknown. Take a fresh kilo_browser_snapshot and use a ref from that snapshot, or pass a unique CSS selector.';
+export const STALE_REF_ERROR = `The element reference is stale or unknown. ${FRESH_SNAPSHOT_HINT}`;
 
 const BROWSER_REF_PATTERN = /^(?:ref=)?(?:f\d+)?e\d+$/u;
 

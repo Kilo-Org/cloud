@@ -1078,6 +1078,52 @@ describe('subscription center procedures', () => {
     );
   });
 
+  it('Stripe guard cancels a final Commit row whose provider subscription already ended', async () => {
+    const { subscription } = await insertFinalCommitFixture({
+      stripeSubscriptionId: 'sub_ended_commit_guard',
+      cancelAtPeriodEnd: false,
+    });
+    const endedSubscription = makeStripeSubscription({
+      id: 'sub_ended_commit_guard',
+      metadata: { type: 'kiloclaw', plan: 'commit', kiloUserId: user.id },
+      status: 'canceled',
+      priceId: 'price_commit',
+    });
+    stripeMock.subscriptions.retrieve.mockResolvedValueOnce(endedSubscription);
+    const { enforceKiloClawCommitRetirementGuard } =
+      await import('@/lib/kiloclaw/commit-retirement');
+
+    await expect(
+      enforceKiloClawCommitRetirementGuard({
+        subscriptionId: subscription.id,
+        expectedFinalBoundary: FINAL_COMMIT_END,
+      })
+    ).resolves.toEqual({ guarded: true });
+
+    expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    expect(row).toEqual(
+      expect.objectContaining({
+        status: 'canceled',
+        stripe_subscription_id: 'sub_ended_commit_guard',
+        cancel_at_period_end: false,
+      })
+    );
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+    expect(logs).toEqual([
+      expect.objectContaining({
+        action: 'canceled',
+        reason: 'commit_retirement_provider_subscription_ended',
+      }),
+    ]);
+  });
+
   it.each(['legacy', 'per-instance'] as const)(
     '%s reactivation schedules Standard for a final Commit term without reopening renewal',
     async mutationPath => {

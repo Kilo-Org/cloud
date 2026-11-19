@@ -142,8 +142,12 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
           </View>
 
           <View className="mt-8">
+            {/* Leaving a document is navigation, not the surface's commit: the
+                filled brand action belongs to the consent screen this returns
+                to, so this one paints the palette's outlined control. */}
             <Button
               size="lg"
+              variant="outline"
               onPress={() => {
                 router.back();
               }}

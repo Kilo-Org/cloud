@@ -399,6 +399,23 @@ describe('Organization hub card', () => {
     unmount();
   });
 
+  it('offers no top-up on the balance line where the storefront rule refuses the link', async () => {
+    boundary.balance = 0;
+    storefrontRule.linkAllowed = false;
+
+    const { renderer, unmount } = await renderHub();
+
+    const balance = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+    // The other branch of the rule prints the label as muted text with nothing
+    // to press, which reads as a control that refuses every tap: the row offers
+    // no action at all, as the Profile credits block does.
+    expect(balance?.props.trailing).toBeUndefined();
+    unmount();
+    storefrontRule.linkAllowed = true;
+  });
+
   it('keeps a funded organization on its balance line alone', async () => {
     const { renderer, unmount } = await renderHub();
 

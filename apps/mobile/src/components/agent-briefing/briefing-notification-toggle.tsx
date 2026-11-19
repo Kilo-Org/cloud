@@ -1,15 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Newspaper } from '@/components/ui/icons';
+import { Bell, Newspaper } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
-import { renderRowTrailing } from '@/components/ui/row-trailing';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
@@ -76,18 +74,27 @@ export function BriefingNotificationToggle() {
   const { t } = useTranslation();
   const { preferences, value, unavailable, setEnabled } = useBriefingNotificationSwitch();
   return (
-    <Card>
-      <View className="flex-row items-center gap-3">
-        <Text className="min-w-0 flex-1">{t('agentBriefing.title')}</Text>
-        {renderRowTrailing({
-          kind: 'switch',
-          accessibilityLabel: t('agentBriefing.title'),
-          value,
-          disabled: unavailable,
-          onValueChange: setEnabled,
-        })}
-      </View>
-      <Text variant="caption">{t('agentBriefing.notificationsHint')}</Text>
+    <>
+      <RowGroup>
+        <PreferenceRow
+          title={t('agentBriefing.title')}
+          subtitle={t('agentBriefing.notificationsHint')}
+          value={value}
+          disabled={unavailable}
+          onValueChange={setEnabled}
+        />
+        {/* The permission sentence is a notice, so it is the row's subtitle
+            under a title that names where it leads. As the last button's label
+            it was prose drawn bold and centered, which read as a heading. */}
+        <ConfigureRow
+          icon={Bell}
+          title={t('common.notifications')}
+          subtitle={t('agentBriefing.notificationPermission')}
+          onPress={() => {
+            router.push('/(app)/notifications' as Href);
+          }}
+        />
+      </RowGroup>
       {preferences.isError ? (
         <Button
           variant="ghost"
@@ -98,16 +105,7 @@ export function BriefingNotificationToggle() {
           <Text>{t('common.retry')}</Text>
         </Button>
       ) : null}
-      <Button
-        variant="ghost"
-        size="sm"
-        onPress={() => {
-          router.push('/(app)/notifications' as Href);
-        }}
-      >
-        <Text>{t('agentBriefing.notificationPermission')}</Text>
-      </Button>
-    </Card>
+    </>
   );
 }
 

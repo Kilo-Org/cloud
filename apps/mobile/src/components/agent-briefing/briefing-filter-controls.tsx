@@ -59,10 +59,17 @@ export function BriefingFilterControls({
         // names it without adding copy.
         accessibilityLabel={t('agentBriefing.title')}
       />
+      {/* One row that scrolls sideways. The row bleeds past the block's own
+          gutter through the negative margin and paints that gutter inside its
+          content instead, so the first chip starts on the gutter and the last
+          one can reach the screen edge — inside a padded parent the row clipped
+          its trailing chip at the padding edge, and in RTL that cut the last
+          chip's label ("lab org" for a longer name). */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerClassName="gap-2"
+        className="-mx-4 grow-0"
+        contentContainerClassName="items-center gap-2 px-4"
         accessibilityRole="tablist"
         accessibilityLabel={t('agentBriefing.filterByContext')}
       >

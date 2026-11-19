@@ -10,9 +10,10 @@ import {
 
 const mutate = vi.hoisted(() => vi.fn());
 const preferencesRead = vi.hoisted(() => ({ isError: false, refetch: vi.fn() }));
+const push = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({ View: 'View', ActivityIndicator: 'ActivityIndicator' }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push }) }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -26,8 +27,10 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
-vi.mock('@/components/ui/icons', () => ({ Newspaper: 'Newspaper' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
+vi.mock('@/components/ui/icons', () => ({ Bell: 'Bell', Newspaper: 'Newspaper' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/agent-briefing', () => ({
@@ -75,9 +78,19 @@ function categoryRowOf(mounted: TestRenderer.ReactTestRenderer) {
 }
 
 it('shows the device-notifications link from Briefing settings', () => {
+  push.mockClear();
   const mounted = mount(BriefingNotificationToggle, {});
 
-  expect(mounted.root.findAll(node => (node.type as string) === 'Button')).toHaveLength(1);
+  // The permission sentence is the row's subtitle, not a bold centered label:
+  // the row names where it leads and carries the chevron every destination row
+  // has.
+  const link = mounted.root.find(node => (node.type as string) === 'ConfigureRow');
+  expect(link.props.title).toBe('common.notifications');
+  expect(link.props.subtitle).toBe('agentBriefing.notificationPermission');
+  act(() => {
+    (link.props.onPress as () => void)();
+  });
+  expect(push).toHaveBeenCalledWith('/(app)/notifications');
 
   act(() => {
     mounted.unmount();

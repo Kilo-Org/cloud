@@ -62,10 +62,11 @@ export function AddCreditsButton({
       size="sm"
       variant={primary ? 'default' : 'outline'}
       className={cn(
-        // The theme's `--primary` is olive in light, which reads as one more
-        // secondary action in a transcript, so the primary emphasis fills with
-        // the surface the person's own bubble uses instead.
-        primary ? 'bg-accent-soft' : 'dark:bg-secondary-fill',
+        // The primary emphasis takes the palette's own action fill: light stays
+        // olive and dark turns Kilo yellow. The accent surface it used before is
+        // yellow in both schemes, so in light mode the one action that settles a
+        // refused send painted an off-palette yellow button.
+        primary ? undefined : 'dark:bg-secondary-fill',
         className,
         // A line action fills the box `AddCreditsRow` wraps around it: the frame
         // is the box's floor with no vertical margin, so the box alone cancels
@@ -79,7 +80,7 @@ export function AddCreditsButton({
       accessibilityRole="button"
       accessibilityLabel={t('addCredits.cta')}
     >
-      <Text className={primary ? 'text-accent-soft-foreground' : 'text-xs font-semibold'}>
+      <Text className={primary ? 'text-primary-foreground' : 'text-xs font-semibold'}>
         {t('addCredits.cta')}
       </Text>
     </Button>

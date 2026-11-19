@@ -2,9 +2,26 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { EventEmitter } from 'node:events';
 import { sql } from 'drizzle-orm';
 import type pg from 'pg';
-import { getWorkerDb, workerTransactionBoundsSql } from './client';
+import { getWorkerDb, workerTransactionBoundsSql, type GetWorkerDbOptions } from './client';
 
 type QueryCallback = (error: Error | null, result: unknown) => void;
+
+/** A promise implementation that is not the native `Promise`, which `pg.PoolConfig` accepts. */
+class ForeignPromise<T> implements PromiseLike<T> {
+  readonly #inner: Promise<T>;
+
+  constructor(
+    executor: (
+      resolve: (value: T | PromiseLike<T>) => void,
+      reject: (reason?: unknown) => void
+    ) => void
+  ) {
+    this.#inner = new Promise(executor);
+  }
+
+  then: Promise<T>['then'] = (onFulfilled, onRejected) => this.#inner.then(onFulfilled, onRejected);
+  catch: Promise<T>['catch'] = onRejected => this.#inner.catch(onRejected);
+}
 
 /**
  * Stands in for the connection that pg-pool creates, so these tests run the real pool and
@@ -17,12 +34,14 @@ class RecordingClient extends EventEmitter {
   /** Rejects statements that start with this text, as Hyperdrive does when its pool is full. */
   static failingStatement: { prefix: string; error: Error } | undefined;
   readonly queries: string[] = [];
+  readonly PromiseImpl: PromiseConstructorLike;
   ended = false;
   _queryable = true;
   _ending = false;
 
-  constructor() {
+  constructor(config?: { Promise?: PromiseConstructorLike }) {
     super();
+    this.PromiseImpl = config?.Promise ?? Promise;
     RecordingClient.created.push(this);
   }
 
@@ -34,14 +53,16 @@ class RecordingClient extends EventEmitter {
     config: string | { text: string },
     values?: unknown,
     callback?: QueryCallback
-  ): Promise<unknown> | undefined {
+  ): PromiseLike<unknown> | undefined {
     const text = typeof config === 'string' ? config : config.text;
     this.queries.push(text);
     const result = { command: 'SELECT', rowCount: 0, rows: [], fields: [] };
     const failing = RecordingClient.failingStatement;
     const error = failing && text.startsWith(failing.prefix) ? failing.error : null;
     const done = typeof values === 'function' ? (values as QueryCallback) : callback;
-    if (!done) return error ? Promise.reject(error) : Promise.resolve(result);
+    if (!done) {
+      return new this.PromiseImpl((resolve, reject) => (error ? reject(error) : resolve(result)));
+    }
     queueMicrotask(() => done(error, result));
     return undefined;
   }
@@ -55,8 +76,9 @@ class RecordingClient extends EventEmitter {
   }
 }
 
-function recordingWorkerDb() {
+function recordingWorkerDb(options: GetWorkerDbOptions = {}) {
   return getWorkerDb('postgres://worker.example/db', {
+    ...options,
     Client: RecordingClient as unknown as new () => pg.ClientBase,
   });
 }
@@ -167,27 +189,33 @@ describe('getWorkerDb connection lifetime', () => {
     warn.mockRestore();
   });
 
-  it('releases the connection when BEGIN fails, so later queries on the client run', async () => {
-    const db = recordingWorkerDb();
-    const failure = new Error('Failed to acquire a connection from the pool.');
-    RecordingClient.failingStatement = { prefix: 'begin', error: failure };
+  it.each([
+    { name: 'the native Promise', PromiseImpl: Promise },
+    { name: 'a non-native Promise constructor', PromiseImpl: ForeignPromise },
+  ])(
+    'releases the connection when BEGIN fails with $name, so later queries on the client run',
+    async ({ PromiseImpl }) => {
+      const db = recordingWorkerDb({ Promise: PromiseImpl });
+      const failure = new Error('Failed to acquire a connection from the pool.');
+      RecordingClient.failingStatement = { prefix: 'begin', error: failure };
 
-    await expect(db.transaction(async tx => tx.execute(sql`select 1`))).rejects.toMatchObject({
-      cause: failure,
-    });
+      await expect(db.transaction(async tx => tx.execute(sql`select 1`))).rejects.toMatchObject({
+        cause: failure,
+      });
 
-    expect(RecordingClient.created.map(client => client.ended)).toEqual([true]);
-    expect(db.$client.totalCount).toBe(0);
+      expect(RecordingClient.created.map(client => client.ended)).toEqual([true]);
+      expect(db.$client.totalCount).toBe(0);
 
-    RecordingClient.failingStatement = undefined;
-    await db.execute(sql`select 2`);
+      RecordingClient.failingStatement = undefined;
+      await db.execute(sql`select 2`);
 
-    expect(RecordingClient.created.map(client => client.queries)).toEqual([
-      [`begin; ${workerTransactionBoundsSql}`],
-      ['select 2'],
-    ]);
-    expect(db.$client.totalCount).toBe(0);
-  });
+      expect(RecordingClient.created.map(client => client.queries)).toEqual([
+        [`begin; ${workerTransactionBoundsSql}`],
+        ['select 2'],
+      ]);
+      expect(db.$client.totalCount).toBe(0);
+    }
+  );
 
   it('bounds the wait for a connection by default and lets the caller shorten it', () => {
     expect(recordingWorkerDb().$client.options.connectionTimeoutMillis).toBe(15_000);

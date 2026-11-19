@@ -94,8 +94,13 @@ function withTransactionBounds(config: unknown): unknown {
   return config;
 }
 
-function isPromise(value: unknown): value is Promise<unknown> {
-  return value instanceof Promise;
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'then' in value &&
+    typeof value.then === 'function'
+  );
 }
 
 /**
@@ -109,8 +114,8 @@ function boundTransactionStarts(client: pg.PoolClient): void {
   client.query = ((config: unknown, ...rest: unknown[]) => {
     const boundedConfig = withTransactionBounds(config);
     const result = query(boundedConfig, ...rest);
-    if (boundedConfig === config || !isPromise(result)) return result;
-    return result.catch((error: unknown) => {
+    if (boundedConfig === config || !isThenable(result)) return result;
+    return result.then(undefined, (error: unknown) => {
       client.release(error instanceof Error ? error : true);
       throw error;
     });

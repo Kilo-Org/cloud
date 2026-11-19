@@ -113,9 +113,7 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   // stored count name the sentence on screen when it was measured.
   measuredTextRef.current = detail ?? '';
   const clamp =
-    expanded || detail == null
-      ? undefined
-      : (measured?.text === detail && measured.lines) || 2;
+    expanded || detail == null ? undefined : (measured?.text === detail && measured.lines) || 2;
   const showsDetail = entry.action !== 'organization.created' && detail != null;
   // The actor and the time render as two elements in one row, never one
   // interpolated string: the row shrinks the actor, not the time, and each

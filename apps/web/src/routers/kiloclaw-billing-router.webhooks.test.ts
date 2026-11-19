@@ -461,6 +461,56 @@ describe('handleKiloClawSubscriptionDeleted', () => {
     );
   });
 
+  it('cancels a final Commit row whose pending conversion lacks Standard continuation consent', async () => {
+    const { instance, subscription: existing } = await insertFinalCommitFixture({
+      stripeSubscriptionId: 'sub_deleted_without_consent',
+    });
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({ payment_source: 'credits', pending_conversion: true })
+      .where(eq(kiloclaw_subscriptions.id, existing.id));
+    const subscription = makeStripeSubscription({
+      id: 'sub_deleted_without_consent',
+      metadata: {
+        type: 'kiloclaw',
+        plan: 'commit',
+        kiloUserId: user.id,
+        instanceId: instance.id,
+      },
+      status: 'canceled',
+      cancel_at_period_end: true,
+      priceId: 'price_commit',
+    });
+
+    await handleKiloClawSubscriptionDeleted({
+      eventId: 'evt_deleted_without_consent',
+      subscription,
+    });
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, existing.id));
+    expect(row).toEqual(
+      expect.objectContaining({
+        status: 'canceled',
+        plan: 'commit',
+        payment_source: 'credits',
+        stripe_subscription_id: 'sub_deleted_without_consent',
+        pending_conversion: false,
+        cancel_at_period_end: false,
+        scheduled_plan: null,
+      })
+    );
+    const changeLogs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, existing.id));
+    expect(changeLogs).toEqual([
+      expect.objectContaining({ action: 'canceled', reason: 'stripe_subscription_deleted' }),
+    ]);
+  });
+
   it('converts a transferred Stripe predecessor on the current successor and preserves successor price version', async () => {
     const oldInstance = await createKiloclawInstance(user.id, '2026-04-01T00:00:00.000Z');
     const newInstance = await createKiloclawInstance(user.id);

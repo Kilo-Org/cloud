@@ -200,11 +200,17 @@ it('keeps each card mounted when a saved value changes', () => {
   rerender();
 
   const [schedule] = mounted.root.findAllByType('ScheduleSettings');
-  expect(schedule?.props.preferences.timezone).toBe('Europe/Berlin');
-  expect(schedule?.props.firstTimezone).toBe('Asia/Kolkata');
+  const scheduleProps = schedule?.props as
+    | { preferences: { timezone: string }; firstTimezone: string }
+    | undefined;
+  expect(scheduleProps?.preferences.timezone).toBe('Europe/Berlin');
+  expect(scheduleProps?.firstTimezone).toBe('Asia/Kolkata');
   const [context] = mounted.root.findAllByType('BriefingContextSettings');
-  expect(context?.props.preference.maxSpendMicrodollars).toBe(2_000_000);
-  expect(context?.props.firstSpend).toBe(1_000_000);
+  const contextProps = context?.props as
+    | { preference: { maxSpendMicrodollars: number }; firstSpend: number }
+    | undefined;
+  expect(contextProps?.preference.maxSpendMicrodollars).toBe(2_000_000);
+  expect(contextProps?.firstSpend).toBe(1_000_000);
 });
 
 it('names the offline note from inside the ready settings body', () => {

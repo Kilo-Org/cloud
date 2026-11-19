@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { ModelSelector } from '@/components/agents/model-selector';
@@ -10,6 +10,7 @@ import {
   type BriefingEstimateLineQuote,
   parseBriefingEstimateLineQuote,
 } from '@/components/agent-briefing/briefing-estimate-line';
+import { useBriefingEnableFlow } from '@/components/agent-briefing/use-briefing-enable-flow';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
@@ -17,26 +18,13 @@ import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
-import { briefingMoney } from '@/lib/agent-briefing-format';
-import {
-  briefingEstimateUnavailableKey,
-  parseBriefingSafeguardInput,
-} from '@/lib/agent-briefing-state';
+import { parseBriefingSafeguardInput } from '@/lib/agent-briefing-state';
 import { formatNumber } from '@/lib/format';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
-import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
-import { type SurfaceAttempt } from '@/lib/surface-feedback';
 import { useTRPC } from '@/lib/trpc';
 
 type ContextPreference = BriefingPreferences['contexts'][number];
-
-/**
- * The enable flow reports every outcome as a toast or the platform dialog, so
- * its surface never holds a failure: the type exists only to instantiate the
- * store whose pending phase is the admission guard.
- */
-type EnableSurfaceFailure = { readonly kind: 'reported-as-a-toast' };
 
 /**
  * Six decimals cover a whole second (1/60 min) and a single microdollar. No
@@ -47,13 +35,6 @@ const SAFEGUARD_INPUT_FORMAT: Intl.NumberFormatOptions = {
   maximumFractionDigits: 6,
   useGrouping: false,
 };
-
-/**
- * A disclosure names the limit to the nearest hundredth of a minute, so a
- * duration that is not a whole number of minutes reads as `0.13`, not as the
- * full quotient. Locale formatting supplies the decimal separator.
- */
-const SAFEGUARD_DISCLOSURE_FORMAT: Intl.NumberFormatOptions = { maximumFractionDigits: 2 };
 
 export function BriefingContextSettings({
   preference,
@@ -68,10 +49,7 @@ export function BriefingContextSettings({
   const trpc = useTRPC();
   const client = useQueryClient();
   const offline = useOfflineBannerState();
-  const { feedback: enabling, begin: beginEnable } = useSurfaceFeedback<EnableSurfaceFailure>();
-  // One admission guard covers the switch and the primary button: both start the
-  // same confirm-and-enable flow, so a tap on either while one runs does nothing.
-  const enablingEnabled = enabling.status === 'pending';
+  const enableFlow = useBriefingEnableFlow();
   const locale = i18n.resolvedLanguage ?? i18n.language;
   const organizationId = preference.context.organizationId ?? undefined;
   const catalog = useAvailableModels(organizationId);
@@ -106,7 +84,15 @@ export function BriefingContextSettings({
   // read has produced nothing to describe, and the retry button below owns
   // recovery, so "cannot quote" copy never claims a quote that does not exist.
   const quote = estimate.data;
-  const limitQuote: BriefingEstimateLineQuote = parseBriefingEstimateLineQuote(valid, quote);
+  const limitQuote: BriefingEstimateLineQuote = parseBriefingEstimateLineQuote(
+    valid,
+    {
+      offline,
+      isError: estimate.isError,
+      isFetching: estimate.isFetching,
+    },
+    quote
+  );
   const update = useMutation(
     trpc.agentBriefing.updateContextPreferences.mutationOptions({
       onMutate: async input => {
@@ -158,71 +144,31 @@ export function BriefingContextSettings({
       setLimits(next);
     }
   };
-  /**
-   * The whole enable flow behind one admitted attempt. The toast and Alert
-   * outcomes are the copy this flow owns, so nothing persists on the surface:
-   * every exit settles with `abandon()`, and a second tap is refused by the
-   * attempt that is still running.
-   */
-  const runEnable = async (attempt: SurfaceAttempt<EnableSurfaceFailure>): Promise<void> => {
-    try {
-      if (!valid) {
-        toast.error(t('agentBriefing.invalidSafeguards'));
-        return;
-      }
-      const result = await estimate.refetch();
-      const confirmed = result.data;
-      if (!confirmed?.canGenerate) {
-        toast.error(t(briefingEstimateUnavailableKey(confirmed?.unavailableReason)));
-        return;
-      }
-      Alert.alert(
-        t('agentBriefing.confirmPaid', { context: contextName }),
-        t('agentBriefing.paidDisclosure', {
-          estimate: briefingMoney(confirmed.estimatedCostMicrodollars, i18n.language),
-          maximum: briefingMoney(confirmed.maximumCostMicrodollars, i18n.language),
-          minutes: formatNumber(
-            confirmed.maxDurationSeconds / 60,
-            locale,
-            SAFEGUARD_DISCLOSURE_FORMAT
-          ),
-        }),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('agentBriefing.enable'),
-            onPress: () => {
-              update.mutate({
-                organizationId,
-                enabled: true,
-                timezone,
-                language: locale,
-                model,
-                ...limits,
-                estimateToken: confirmed.estimateToken,
-              });
-            },
-          },
-        ],
-        // Android back dismisses, which equals Cancel: nothing is enabled.
-        { cancelable: true }
-      );
-    } finally {
-      attempt.abandon();
-    }
-  };
-  /** Admission before the first await; a tap while one is running does nothing. */
   const startEnable = (): void => {
-    const attempt = beginEnable();
-    if (attempt === null) {
-      return;
-    }
-    void runEnable(attempt);
+    enableFlow.start({
+      valid,
+      refetch: () => estimate.refetch(),
+      contextName,
+      locale,
+      language: i18n.language,
+      confirm: estimateToken => {
+        update.mutate({
+          organizationId,
+          enabled: true,
+          timezone,
+          language: locale,
+          model,
+          ...limits,
+          estimateToken,
+        });
+      },
+    });
   };
   // The estimate's first load is a wait this card owns: the primary action shows
-  // the same spinner the switch does while the quote is on its way.
-  const estimateLoading =
-    estimate.data === undefined && (estimate.isPending || estimate.isFetching);
+  // A disabled (offline) or failed read never produces a quote, so only a real
+  // in-flight fetch is a wait this button can name; `estimate.isPending` alone
+  // would hold the spinner forever for the disabled read.
+  const estimateLoading = estimate.data === undefined && estimate.isFetching;
   /** Exactly one line per quote phase, rendered by the line's own component. */
   return (
     <View className="gap-4 rounded-2xl border border-border bg-card p-4">
@@ -236,14 +182,14 @@ export function BriefingContextSettings({
         <Text className="min-w-0 flex-1 text-sm">{t('agentBriefing.scheduledContextEnabled')}</Text>
         <Switch
           value={preference.enabled}
-          disabled={offline || update.isPending || enablingEnabled}
+          disabled={offline || update.isPending || enableFlow.pending}
           accessibilityLabel={t('agentBriefing.scheduledContextEnabled')}
           accessibilityState={{
             checked: preference.enabled,
-            disabled: offline || update.isPending || enablingEnabled,
+            disabled: offline || update.isPending || enableFlow.pending,
             // Both paths are busy while a quote is in flight: the estimate's own
             // fetch, and the confirm-and-enable flow that refetches it.
-            busy: enablingEnabled || estimate.isFetching,
+            busy: enableFlow.pending || estimate.isFetching,
           }}
           onValueChange={next => {
             if (next) {
@@ -330,7 +276,7 @@ export function BriefingContextSettings({
         // The spinner replaces the hand-rolled disabled-while-fetching boolean:
         // it keeps the label's width and says the quote is on its way, on the
         // switch's refetch and on a first load alike.
-        loading={enablingEnabled || (valid && estimateLoading)}
+        loading={enableFlow.pending || (valid && estimateLoading)}
         disabled={offline || !valid || update.isPending || !estimate.data?.canGenerate}
         onPress={startEnable}
       >

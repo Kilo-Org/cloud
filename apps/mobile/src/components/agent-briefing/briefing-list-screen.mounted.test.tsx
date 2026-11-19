@@ -281,9 +281,9 @@ it('says it is offline, not empty, while the first fetch is paused', () => {
   // A paused read keeps `isPending` true forever, so the empty state and the
   // retry would both be claims about a list nothing has answered yet.
   network.offline = true;
-  requests.list.mockImplementation(
-    () => new Promise<{ reports: unknown[]; nextCursor: null }>(() => {})
-  );
+  // The read a paused fetch represents: it never settles while offline.
+  const { promise } = Promise.withResolvers<{ reports: unknown[]; nextCursor: null }>();
+  requests.list.mockImplementation(() => promise);
   const mounted = mountBriefingsLive();
 
   const errors = mounted.root.findAllByType('QueryError' as ElementType);

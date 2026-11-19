@@ -112,11 +112,11 @@ export function briefingReportMissing(error: unknown): boolean {
  *
  * `offline` is its own phase because an offline-paused first fetch stays
  * pending forever: `isPending` alone cannot tell a slow network from a fetch
- * that will not start, so connectivity is the discriminator.
+ * that will not start, so connectivity is the discriminator. The detail screen
+ * renders this whole union; the list screen's settled-no-data state is `empty`
+ * instead of `failed` ({@link BriefingListPhase}).
  */
-export type BriefingReadPhase = 'loading' | 'offline' | 'denied' | 'missing' | 'failed' | 'ready';
-
-export type BriefingDetailPhase = BriefingReadPhase;
+export type BriefingDetailPhase = 'loading' | 'offline' | 'denied' | 'missing' | 'failed' | 'ready';
 
 export type BriefingListPhase = 'loading' | 'offline' | 'denied' | 'failed' | 'empty' | 'ready';
 
@@ -143,7 +143,7 @@ type BriefingReadSignals = {
  * 5. anything else without data is `failed` — a settled read that answered
  *    neither data nor a denial offers the retry the screen can start.
  */
-function briefingReadPhase(signals: BriefingReadSignals): Exclude<BriefingReadPhase, 'missing'> {
+function briefingReadPhase(signals: BriefingReadSignals): Exclude<BriefingDetailPhase, 'missing'> {
   if (signals.hasData) {
     return 'ready';
   }
@@ -200,7 +200,8 @@ export function selectBriefingDetailPhase(input: {
 
 /**
  * The settings screen's phase: the same precedence over the preferences read,
- * which has no empty state — settled without data is a failure to retry.
+ * which has no empty state — settled without data is a failure to retry, and a
+ * report cannot be missing here.
  */
 export function selectBriefingSettingsPhase(input: {
   readonly hasPreferences: boolean;
@@ -208,7 +209,7 @@ export function selectBriefingSettingsPhase(input: {
   readonly isPending: boolean;
   readonly isError: boolean;
   readonly accessDenied: boolean;
-}): BriefingDetailPhase {
+}): Exclude<BriefingDetailPhase, 'missing'> {
   return briefingReadPhase({ ...input, hasData: input.hasPreferences });
 }
 

@@ -12,36 +12,63 @@ import { briefingMoney } from '@/lib/agent-briefing-format';
  * The quote line's one phase per settled state of the estimate read. The
  * payload is the estimate wire type, so a screen passes its query's `data`
  * straight in; the phase narrows what each branch may read.
+ *
+ * `offline` and `failed` exist because a disabled read (offline) and a settled
+ * failure with no cached quote never produce data: rendering `estimating` for
+ * either would hold a "loading" claim forever next to nothing in flight.
  */
 export type BriefingEstimateLineQuote =
   | { readonly kind: 'invalid' }
   | { readonly kind: 'estimating' }
+  | { readonly kind: 'offline' }
+  | { readonly kind: 'failed' }
   | { readonly kind: 'unavailable'; readonly quote: UnavailableEstimate }
   | { readonly kind: 'quoted'; readonly quote: BriefingEstimate };
 
 /** A resolved estimate the server will not honour (`canGenerate: false` at runtime). */
 type UnavailableEstimate = Omit<BriefingEstimate, 'canGenerate'> & { readonly canGenerate: false };
 
+/** The state of the estimate read the phase parser reads beside its data. */
+type EstimateReadState = {
+  /** Confirmed offline, so the query is disabled and will not start. */
+  readonly offline: boolean;
+  readonly isError: boolean;
+  /** True while the query is actually in flight (`fetchStatus === 'fetching'`). */
+  readonly isFetching: boolean;
+};
+
 /**
  * The quote line's phase from the fields' validity and the estimate read.
  */
 export function parseBriefingEstimateLineQuote(
   valid: boolean,
+  read: EstimateReadState,
   estimate: BriefingEstimate | undefined
 ): BriefingEstimateLineQuote {
   if (!valid) {
     return { kind: 'invalid' };
   }
-  if (estimate === undefined) {
+  if (read.offline) {
+    return { kind: 'offline' };
+  }
+  if (estimate !== undefined) {
+    if (estimate.canGenerate) {
+      return { kind: 'quoted', quote: estimate };
+    }
+    // The wire type's `canGenerate` is a plain boolean, so TS cannot
+    // discriminate on it alone: the runtime fact `canGenerate === false` here
+    // is re-asserted into the phase's payload shape.
+    return { kind: 'unavailable', quote: { ...estimate, canGenerate: false } };
+  }
+  if (read.isError) {
+    return { kind: 'failed' };
+  }
+  if (read.isFetching) {
     return { kind: 'estimating' };
   }
-  if (estimate.canGenerate) {
-    return { kind: 'quoted', quote: estimate };
-  }
-  // The wire type's `canGenerate` is a plain boolean, so TS cannot discriminate
-  // on it alone: the runtime fact `canGenerate === false` here is re-asserted
-  // into the phase's payload shape.
-  return { kind: 'unavailable', quote: { ...estimate, canGenerate: false } };
+  // Not offline, not failed, no data, and nothing in flight: the read has not
+  // started yet, which is the same wait the placeholder describes.
+  return { kind: 'estimating' };
 }
 
 /**
@@ -73,6 +100,17 @@ export function BriefingEstimateLine({ quote }: { readonly quote: BriefingEstima
           </Text>
         </View>
       );
+    }
+    case 'offline': {
+      // A disabled read will not start while the device is offline; the card's
+      // other controls are disabled for the same reason, so the line says what
+      // the whole card is waiting for instead of posing as a wait in progress.
+      return <Text className="text-xs text-muted-foreground">{t('offline.noInternet')}</Text>;
+    }
+    case 'failed': {
+      // The read settled as an error with no cached quote; the retry button
+      // beside the line owns recovery, so the line only names the miss.
+      return <Text className="text-xs text-muted-foreground">{t('agentBriefing.loadError')}</Text>;
     }
     case 'unavailable': {
       return (

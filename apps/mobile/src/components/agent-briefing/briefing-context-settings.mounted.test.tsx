@@ -26,10 +26,12 @@ const paid = vi.hoisted(() => ({
   refetch: vi.fn(),
   alert: vi.fn(),
   estimate: { value: undefined as unknown },
+  read: { offline: false, isError: false, isFetching: false },
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  paid.read = { offline: false, isError: false, isFetching: false };
   paid.refetch.mockResolvedValue({
     data: {
       canGenerate: true,
@@ -62,8 +64,8 @@ vi.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutate: paid.mutate, isPending: false }),
   useQuery: () => ({
     data: paid.estimate.value,
-    isError: false,
-    isFetching: false,
+    isError: paid.read.isError,
+    isFetching: paid.read.isFetching,
     refetch: paid.refetch,
   }),
   useQueryClient: () => ({}),
@@ -84,7 +86,9 @@ vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSele
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({ models: [], isLoading: false, isError: false, refetch: vi.fn() }),
 }));
-vi.mock('@/lib/hooks/use-offline-banner-state', () => ({ useOfflineBannerState: () => false }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useOfflineBannerState: () => paid.read.offline,
+}));
 
 const preference = {
   context: { id: 'personal', organizationId: null, name: 'Personal' },
@@ -191,6 +195,57 @@ it('requires a fresh cost confirmation before explicitly enabling scheduled capt
     maxSpendMicrodollars: 2_000_000,
     estimateToken: 'confirmed-estimate',
   });
+  act(() => {
+    mounted.unmount();
+  });
+});
+
+it('declines a confirm press whose attempt no longer owns the card', async () => {
+  const mounted = mount(false);
+  const switchNode = mounted.root.find(node => (node.type as string) === 'Switch');
+  const { onValueChange } = switchNode.props as { onValueChange: (next: boolean) => void };
+  act(() => {
+    onValueChange(true);
+  });
+  await waitFor(() => paid.alert.mock.calls.length === 1);
+  // The card unmounted: the surface store's invalidateAll killed the attempt,
+  // so the dialog's Enable press must not fire the paid write.
+  act(() => {
+    mounted.unmount();
+  });
+  const buttons = paid.alert.mock.calls[0]?.[2] as { onPress?: () => void }[];
+  act(() => {
+    buttons[1]?.onPress?.();
+  });
+  expect(paid.mutate).not.toHaveBeenCalled();
+});
+
+it('names connectivity instead of a wait when the estimate read is disabled offline', () => {
+  // No data, no error, nothing in flight: a disabled read never settles, so
+  // the loading placeholder would claim a wait that never ends.
+  paid.estimate.value = undefined;
+  paid.read = { offline: true, isError: false, isFetching: false };
+  const mounted = mount(true);
+
+  const tree = JSON.stringify(mounted.toJSON());
+  expect(tree).toContain('offline.noInternet');
+  expect(tree).not.toContain('common.loading');
+  expect(tree).not.toContain('agentBriefing.estimateUnavailable');
+
+  act(() => {
+    mounted.unmount();
+  });
+});
+
+it('names the failed read instead of a wait when the quote errors with no cache', () => {
+  paid.estimate.value = undefined;
+  paid.read = { offline: false, isError: true, isFetching: false };
+  const mounted = mount(true);
+
+  const tree = JSON.stringify(mounted.toJSON());
+  expect(tree).toContain('agentBriefing.loadError');
+  expect(tree).not.toContain('common.loading');
+
   act(() => {
     mounted.unmount();
   });

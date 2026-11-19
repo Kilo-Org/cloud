@@ -1027,29 +1027,42 @@ describe('disconnecting one CLI', () => {
     host.stop();
   });
 
-  it('says so when Stop all cannot run', async () => {
-    const harness = createHarness();
-    seedEnabledWithEndpoint(harness.storage);
-    harness.bridge.endSessions.mockRejectedValueOnce(new Error('the runtime is gone'));
-    const host = startHost(harness);
-    await host.ready;
-    const socket = await connectSocketIfNeeded(harness);
+  it.each([
+    ['stop_all', 'user_stop'],
+    ['disconnect', 'disconnect'],
+  ] as const)(
+    'still tells the CLI when %s cannot end the sessions, and answers that it failed',
+    async (kind, reason) => {
+      const harness = createHarness();
+      seedEnabledWithEndpoint(harness.storage);
+      harness.bridge.endSessions.mockRejectedValueOnce(new Error('the runtime is gone'));
+      const host = startHost(harness);
+      await host.ready;
+      const socket = await connectSocketIfNeeded(harness);
 
-    await completeHandshake(socket);
-    await openSession(socket, { cliVersion: '1', cwd: '/tmp', title: 't' });
-    const sendResponse = vi.fn();
+      await completeHandshake(socket);
+      const sessionHandle = sessionHandleOf(
+        await openSession(socket, { cliVersion: '1', cwd: '/tmp', title: 't' })
+      );
+      const sendResponse = vi.fn();
 
-    harness.listeners.message?.(
-      { kind: 'stop_all', type: LOCAL_AGENTS_COMMAND_MESSAGE },
-      PANEL_SENDER,
-      sendResponse
-    );
+      harness.listeners.message?.(
+        kind === 'stop_all'
+          ? { kind, type: LOCAL_AGENTS_COMMAND_MESSAGE }
+          : { controllerId: CONTROLLER_ID, kind, type: LOCAL_AGENTS_COMMAND_MESSAGE },
+        PANEL_SENDER,
+        sendResponse
+      );
 
-    await vi.waitFor(() => {
-      expect(sendResponse).toHaveBeenCalledWith({ ok: false });
-    });
-    host.stop();
-  });
+      await vi.waitFor(() => {
+        expect(sendResponse).toHaveBeenCalledWith({ ok: false });
+      });
+      expect(
+        messageOf(rpcWith(socket.sent, 'method', 'session.revoked'))?.['params']
+      ).toStrictEqual({ reason, sessionHandle });
+      host.stop();
+    }
+  );
 });
 
 describe('paired CLI state', () => {

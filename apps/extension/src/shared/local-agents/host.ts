@@ -489,15 +489,19 @@ export const startLocalAgentsHost = (
 
     // Every stopped session ends in the runtime too: its group turns grey (D12) and its leases are released.
     rememberStopped(revoked);
-    await bridge.endSessions(revoked);
 
-    for (const { controllerId, sessionHandle } of revoked) {
-      controllerConnections
-        .get(controllerId)
-        ?.send(controllerId, buildNotification('session.revoked', { reason, sessionHandle }));
+    try {
+      await bridge.endSessions(revoked);
+    } finally {
+      // The rows are already gone, so a CLI that is not told now never learns its session stopped.
+      for (const { controllerId, sessionHandle } of revoked) {
+        controllerConnections
+          .get(controllerId)
+          ?.send(controllerId, buildNotification('session.revoked', { reason, sessionHandle }));
+      }
+
+      controllerConnections.clear();
     }
-
-    controllerConnections.clear();
   };
 
   const disconnectController = async (controllerId: string): Promise<void> => {
@@ -506,23 +510,24 @@ export const startLocalAgentsHost = (
     // Unmapped before the registry write: a call racing the click asks the registry, which refuses it.
     controllerConnections.delete(controllerId);
     const removed = await registry.revokeController(controllerId);
+    const sessions = removed?.sessions ?? [];
 
-    rememberStopped(removed?.sessions ?? []);
-    await bridge.endSessions(
-      (removed?.sessions ?? []).map(session => ({
-        controllerId,
-        sessionHandle: session.sessionHandle,
-      }))
-    );
+    rememberStopped(sessions);
 
-    for (const session of removed?.sessions ?? []) {
-      connection?.send(
-        controllerId,
-        buildNotification('session.revoked', {
-          reason: 'disconnect',
-          sessionHandle: session.sessionHandle,
-        })
+    try {
+      await bridge.endSessions(
+        sessions.map(session => ({ controllerId, sessionHandle: session.sessionHandle }))
       );
+    } finally {
+      for (const session of sessions) {
+        connection?.send(
+          controllerId,
+          buildNotification('session.revoked', {
+            reason: 'disconnect',
+            sessionHandle: session.sessionHandle,
+          })
+        );
+      }
     }
   };
 

@@ -1,10 +1,3 @@
-/**
- * Render a git URL as the `owner/repo` path its labels and filter keys show.
- * One normalizer serves every surface that names a repository, so an https URL,
- * an ssh URL and an already-short `owner/repo` value compare the same way on
- * the web todo list and in the mobile session list.
- */
-
 /** Drop one trailing `.git`, the suffix a clone URL carries and a name does not. */
 function stripGitSuffix(value: string): string {
   return value.endsWith('.git') ? value.slice(0, -4) : value;
@@ -32,6 +25,10 @@ function decodePathSegments(path: string): string {
 
 /**
  * Render a git URL as the `owner/repo` path its labels and filter keys show.
+ * One normalizer serves every surface that names a repository, so an https URL,
+ * an ssh URL and an already-short `owner/repo` value compare the same way on
+ * the web todo list and in the mobile session list.
+ *
  * Segments are percent-decoded because a session stores the encoded URL while
  * the repository's own name is the decoded one, and each segment is decoded
  * once: a name holding a literal `%` stays intact. A value that is already an

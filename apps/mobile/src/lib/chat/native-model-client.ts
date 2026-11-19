@@ -327,9 +327,20 @@ export function nativeModelClient(bridge: NativeModelBridge): ModelClientService
         }).pipe(
           Effect.filterOrFail(
             availability => availability.status === 'available',
-            // The reason the model gave at send time carries its own next step; a
-            // status without one still reads as unavailable.
-            availability => nativeModelFailure(availability.reason ?? 'model_unavailable', false)
+            // The reason the model gave at send time carries its own next step. A
+            // restricted status can answer with none — Android's normal
+            // downloadable/downloading answer carries no reason — so the status
+            // picks the same class its own reason would.
+            availability =>
+              nativeModelFailure(
+                availability.reason ??
+                  (availability.status === 'downloadable'
+                    ? 'model_download_required'
+                    : availability.status === 'downloading'
+                      ? 'model_downloading'
+                      : 'model_unavailable'),
+                false
+              )
           ),
           Effect.map(availability => answer(provider, availability, request))
         )

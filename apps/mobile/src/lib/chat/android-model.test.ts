@@ -122,8 +122,8 @@ describe('Android Gemini Nano', () => {
   });
 
   it.each([
-    ['downloadable', undefined, 'modelChat.localModels.unavailable'],
-    ['downloading', undefined, 'modelChat.localModels.unavailable'],
+    ['downloadable', undefined, 'modelChat.localModels.reasons.downloadable'],
+    ['downloading', undefined, 'modelChat.localModels.reasons.downloading'],
     ['downloadable', 'model_download_required', 'modelChat.localModels.reasons.downloadable'],
     ['downloading', 'model_downloading', 'modelChat.localModels.reasons.downloading'],
   ] as const)(

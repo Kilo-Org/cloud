@@ -211,6 +211,15 @@ describe('ChatComposerInputRow mounted — framework suggestions', () => {
   // draft, clear-on-send), which throws on the main thread. The composer is
   // rewritten this way, so Android must ask for no suggestions; iOS keeps the
   // framework's suggestions because it has no such popup.
+  //
+  // Both cases mount after a platform change, so the flag is read from a
+  // module graph resolved in the platform under test. The module bound at file
+  // load was resolved once, for whichever platform a previous suite left, and
+  // asserting against it would pass without testing the resolution.
+  beforeEach(() => {
+    platformOS.os = 'ios';
+  });
+
   it('asks Android for no suggestions on the rewritten composer', async () => {
     platformOS.os = 'android';
 
@@ -222,7 +231,7 @@ describe('ChatComposerInputRow mounted — framework suggestions', () => {
   });
 
   it('keeps the framework suggestions on iOS', async () => {
-    const renderer = await renderRow({ inputEditable: true });
+    const renderer = await renderRowAfterPlatformFlip({ inputEditable: true }, reactNativeMock);
 
     expect(findTextInput(renderer.root).props.autoCorrect).toBe(true);
 

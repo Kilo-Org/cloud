@@ -170,9 +170,11 @@ async function readAttachmentTextPreview(attachment: AgentAttachment): Promise<T
     let handle: FileHandle | null = null;
     try {
       handle = file.open(FileMode.ReadOnly);
-      // One bounded read at offset 0, in bytes. The decoded prefix can hold
-      // more characters than the cap only when every character is multi-byte,
-      // and the character cap then trims it below.
+      // One bounded read at offset 0, in bytes. The decoded prefix holds at
+      // most `PREVIEW_READ_MAX_BYTES` characters (single-byte text) and at
+      // least `READ_CODE_CHARACTER_CAP` (four-byte text), so the character cap
+      // trims the ASCII case and the read already meets it for the widest
+      // encoding.
       const bytes = await handle.readBytes(PREVIEW_READ_MAX_BYTES);
       return {
         mode,

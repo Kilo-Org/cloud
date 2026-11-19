@@ -256,6 +256,7 @@ function call(overrides: Partial<EnkryptGuardrailCall> = {}): EnkryptGuardrailCa
     creditsCost: 3,
     scannedCharacters: 2_400,
     totalCharacters: 10_000,
+    addedLatencyMs: 120,
     ...overrides,
   };
 }
@@ -420,7 +421,7 @@ describe('startEnkryptInputGuardrail', () => {
       scans: [{ decision: 'error_fail_open', error: 'http_503', verdict_cache_write: 'written' }],
     });
     expect(mockedRecordUsage.mock.calls).toEqual([
-      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: expect.any(Number) }],
+      [call({ decision: 'error', creditsCost: null })],
     ]);
   });
 
@@ -500,11 +501,14 @@ describe('startEnkryptInputGuardrail', () => {
     }
   );
 
-  it('records the wait for the verdict on the final call of the request only', async () => {
+  it('records every call with its own latency, not the request’s wait for the verdict', async () => {
     const result: EnkryptGuardrailScanResult = {
       verdict: { action: 'allow' },
       report: scanReport,
-      usageRecords: [call({ decision: 'error', creditsCost: null }), call()],
+      usageRecords: [
+        call({ decision: 'error', creditsCost: null, addedLatencyMs: 80 }),
+        call({ addedLatencyMs: 140 }),
+      ],
     };
     mockedScanRequest.mockResolvedValue(result);
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
@@ -514,8 +518,8 @@ describe('startEnkryptInputGuardrail', () => {
     await runAfterTasks();
 
     expect(mockedRecordUsage.mock.calls).toEqual([
-      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: null }],
-      [{ ...call(), addedLatencyMs: 237 }],
+      [call({ decision: 'error', creditsCost: null, addedLatencyMs: 80 })],
+      [call({ addedLatencyMs: 140 })],
     ]);
   });
 
@@ -523,7 +527,7 @@ describe('startEnkryptInputGuardrail', () => {
     ['blocking', scan],
     ['log-only', logOnlyScan],
   ])(
-    'records no added latency when the request never awaited the %s verdict',
+    'records the call unchanged when the request never awaited the %s verdict',
     async (_name, request) => {
       mockedScanRequest.mockResolvedValue({
         verdict: { action: 'allow' },
@@ -534,24 +538,9 @@ describe('startEnkryptInputGuardrail', () => {
       startEnkryptInputGuardrail(Promise.resolve(request), signal);
       await runAfterTasks();
 
-      expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
+      expect(mockedRecordUsage.mock.calls).toEqual([[call()]]);
     }
   );
-
-  it('records no wait for a log-only scan that finished before the request awaited the verdict', async () => {
-    mockedScanRequest.mockResolvedValue({
-      verdict: { action: 'allow' },
-      report: { ...scanReport, scan: 'log_only' },
-      usageRecords: [call()],
-    });
-
-    const guardrail = startEnkryptInputGuardrail(Promise.resolve(logOnlyScan), signal);
-    await guardrail.requestLogs(false);
-    await guardrail.awaitVerdict();
-    await runAfterTasks();
-
-    expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: 0 }]]);
-  });
 
   it('preserves the inference association across a failed blocking scan and a nonblocking log-only scan', async () => {
     const microdollarUsageId = '00000000-0000-4000-8000-000000000003';
@@ -563,7 +552,14 @@ describe('startEnkryptInputGuardrail', () => {
         : {
             verdict: { action: 'fail_open' },
             report: { ...scanReport, decision: 'error_fail_open', error: 'http_503' },
-            usageRecords: [call({ microdollarUsageId, decision: 'error', creditsCost: null })],
+            usageRecords: [
+              call({
+                microdollarUsageId,
+                decision: 'error',
+                creditsCost: null,
+                addedLatencyMs: 90,
+              }),
+            ],
           }
     );
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
@@ -587,23 +583,22 @@ describe('startEnkryptInputGuardrail', () => {
     logOnlyResult.resolve({
       verdict: { action: 'allow' },
       report: { ...scanReport, scan: 'log_only', decision: 'error_logged', error: 'timeout' },
-      usageRecords: [call({ microdollarUsageId, decision: 'error', creditsCost: 1 })],
+      usageRecords: [
+        call({ microdollarUsageId, decision: 'error', creditsCost: 1, addedLatencyMs: 60 }),
+      ],
     });
     await runAfterTasks();
 
     expect(mockedRecordUsage.mock.calls).toEqual([
       [
-        {
-          ...call({ microdollarUsageId, decision: 'error', creditsCost: null }),
-          addedLatencyMs: 237,
-        },
+        call({
+          microdollarUsageId,
+          decision: 'error',
+          creditsCost: null,
+          addedLatencyMs: 90,
+        }),
       ],
-      [
-        {
-          ...call({ microdollarUsageId, decision: 'error', creditsCost: 1 }),
-          addedLatencyMs: null,
-        },
-      ],
+      [call({ microdollarUsageId, decision: 'error', creditsCost: 1, addedLatencyMs: 60 })],
     ]);
   });
 
@@ -647,10 +642,10 @@ describe('startEnkryptInputGuardrail', () => {
       '[enkrypt-guardrail] log-only scan failed unexpectedly',
       expect.any(Object)
     );
-    expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: 0 }]]);
+    expect(mockedRecordUsage.mock.calls).toEqual([[call()]]);
   });
 
-  it('skips the verdict without waiting when every detector only logs, recording the wait it would have added', async () => {
+  it('skips the verdict without waiting when every detector only logs, reporting the wait it would have added', async () => {
     const logOnlyResult = Promise.withResolvers<EnkryptGuardrailScanResult>();
     mockedScanRequest.mockReturnValue(logOnlyResult.promise);
     // The verdict's wait starts and ends at once; the log-only scan finishes 450.6 ms after it started.
@@ -675,12 +670,12 @@ describe('startEnkryptInputGuardrail', () => {
     await runAfterTasks();
 
     expect(mockedRecordUsage.mock.calls).toEqual([
-      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: 451 }],
+      [call({ decision: 'error', creditsCost: null })],
     ]);
     expect(mockedRedisSet.mock.calls).toEqual(
       allowWrites(partKeys(logOnlyScan), ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS)
     );
-    // The report holds the same wait the usage records.
+    // The report holds the log-only scan time; the usage record holds the call's own latency.
     expect((await guardrail.report())?.added_latency_ms).toBe(451);
   });
 
@@ -1068,13 +1063,15 @@ describe('startEnkryptInputGuardrail', () => {
       ]);
     });
 
-    it('records every part’s calls and the wait on the final blocking call', async () => {
+    it('records every part’s calls with their own latency', async () => {
       mockedScanRequest.mockImplementation(async resolved => ({
         verdict: { action: 'allow' },
         report: { ...scanReport, part: partOf(resolved) },
         usageRecords: [
           call({
             scannedCharacters: ['tools', 'system', 'conversation'].indexOf(partOf(resolved)) + 1,
+            addedLatencyMs:
+              (['tools', 'system', 'conversation'].indexOf(partOf(resolved)) + 1) * 10,
           }),
         ],
       }));
@@ -1085,9 +1082,9 @@ describe('startEnkryptInputGuardrail', () => {
       await runAfterTasks();
 
       expect(mockedRecordUsage.mock.calls).toEqual([
-        [{ ...call({ scannedCharacters: 1 }), addedLatencyMs: null }],
-        [{ ...call({ scannedCharacters: 2 }), addedLatencyMs: null }],
-        [{ ...call({ scannedCharacters: 3 }), addedLatencyMs: 237 }],
+        [call({ scannedCharacters: 1, addedLatencyMs: 10 })],
+        [call({ scannedCharacters: 2, addedLatencyMs: 20 })],
+        [call({ scannedCharacters: 3, addedLatencyMs: 30 })],
       ]);
     });
   });
@@ -1544,7 +1541,7 @@ describe('startEnkryptInputGuardrail with many tool definitions', () => {
 });
 
 describe('recordEnkryptUsageRecords', () => {
-  const usageRecord = { ...call(), addedLatencyMs: 120 };
+  const usageRecord = call();
   const loggedFields = {
     organization_id: scan.organizationId,
     kilo_user_id: scan.kiloUserId,

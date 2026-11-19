@@ -880,15 +880,13 @@ if any scenario failed, else `0`. A child that exceeds its watchdog deadline (it
 scenario budget plus ten minutes) is killed and reported as a failure. When
 `GITHUB_STEP_SUMMARY` is set the runner appends its `Summary:` line to that file.
 
-A scenario whose failure output names a transient infrastructure fault
-(`Failed query:`, `fetch failed`, a connection reset or timeout, or a 502/503/504
-response) is retried once in a fresh child and fake-LLM scope after a 60 s
-delay, and listed on a `retried:` line. The delay lets a short database or
-network blip clear, because an immediate retry can race the same fault. The
-nightly depends on the production database and backend, so one blip must not be
-reported as several scenario regressions. The retry is bounded to one; a
-persistent defect still fails, and assertion, validation and 4xx failures are
-never retried.
+The matrix retries a scenario once if its failure result line names a known
+transient infrastructure fault, such as `Failed query:`, `fetch failed`,
+`Stream did not connect`, or a tRPC 502/503/504 response. Earlier logs and
+event summaries do not affect retry eligibility. The runner does not retry
+children killed by a signal or the watchdog. The retry starts after 60 s in a
+fresh child and fake-LLM scope and appears on a `retried:` line. If the second
+attempt fails, the matrix reports a failure.
 
 The `cloud-agent-e2e-tests` GitHub workflow
 (`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`

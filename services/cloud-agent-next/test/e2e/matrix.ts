@@ -121,7 +121,6 @@ type JobResult = {
   outcome: Outcome;
   exitCode: number;
   durationMs: number;
-  /** True when the failure looks like a transient infrastructure fault, not a scenario defect. */
   transient: boolean;
 };
 
@@ -142,8 +141,8 @@ const TRANSIENT_FAILURE_MARKERS = [
   'Stream did not connect',
 ] as const;
 
-/** Only gateway/unavailable statuses are transient; a 500 without a marker can be a real defect. */
-const TRANSIENT_HTTP_STATUS = /\b5(?:02|03|04)\b/;
+const SCENARIO_FAILURE_LINE = /^❌ .+? \(\d+ms\): (.*)$/;
+const TRPC_ERROR_STATUS = /(?:^|: )tRPC \w+ failed: ([45]\d{2})\b/;
 
 /**
  * Wait before the one retry. A short database or network blip often lasts tens
@@ -151,10 +150,16 @@ const TRANSIENT_HTTP_STATUS = /\b5(?:02|03|04)\b/;
  */
 const TRANSIENT_RETRY_DELAY_MS = 60_000;
 
-export function isTransientScenarioFailure(output: string): boolean {
+export function isTransientScenarioFailure(resultLine: string): boolean {
+  const detail = SCENARIO_FAILURE_LINE.exec(resultLine)?.[1];
+  if (detail === undefined) return false;
+  const status = TRPC_ERROR_STATUS.exec(detail)?.[1];
+  if (status?.startsWith('4')) return false;
   return (
-    TRANSIENT_FAILURE_MARKERS.some(marker => output.includes(marker)) ||
-    TRANSIENT_HTTP_STATUS.test(output)
+    status === '502' ||
+    status === '503' ||
+    status === '504' ||
+    TRANSIENT_FAILURE_MARKERS.some(marker => detail.includes(marker))
   );
 }
 
@@ -348,7 +353,7 @@ async function scenarioEnvironment(profile: Profile): Promise<ScenarioEnvironmen
   });
 }
 
-function runScenario(
+export function runScenario(
   job: Job,
   profile: Profile,
   scope: string,
@@ -378,55 +383,49 @@ function runScenario(
     });
 
     const prefix = `[${job.label}] `;
-    // Keep a bounded tail of the child's output for failure classification. The
-    // scenario result line is printed last, so a tail is enough.
-    const OUTPUT_TAIL_LIMIT = 64 * 1024;
-    let outputTail = '';
-    const record = (text: string): void => {
-      outputTail += text;
-      if (outputTail.length > OUTPUT_TAIL_LIMIT) {
-        outputTail = outputTail.slice(outputTail.length - OUTPUT_TAIL_LIMIT);
-      }
-    };
-    const forward = (stream: NodeJS.ReadableStream): void => {
+    let failureLine = '';
+    const forward = (stream: NodeJS.ReadableStream, onLine?: (line: string) => void): void => {
       stream.setEncoding('utf8');
       let buffered = '';
+      const emit = (line: string): void => {
+        console.log(`${prefix}${line}`);
+        onLine?.(line);
+      };
       stream.on('data', (chunk: string) => {
         buffered += chunk;
         const lines = buffered.split('\n');
         buffered = lines.pop() ?? '';
-        for (const line of lines) {
-          console.log(`${prefix}${line}`);
-          record(`${line}\n`);
-        }
+        for (const line of lines) emit(line);
       });
       stream.on('end', () => {
-        if (buffered.length > 0) {
-          console.log(`${prefix}${buffered}`);
-          record(buffered);
-        }
+        if (buffered.length > 0) emit(buffered);
       });
     };
-    forward(child.stdout);
+    forward(child.stdout, line => {
+      if (SCENARIO_FAILURE_LINE.test(line)) failureLine = line;
+    });
     forward(child.stderr);
 
     let settled = false;
+    let watchdogFired = false;
     const watchdogMs = (job.timeoutMs ?? DEFAULT_CHILD_TIMEOUT_MS) + CHILD_WATCHDOG_SLACK_MS;
     const watchdog = setTimeout(() => {
+      watchdogFired = true;
       console.error(
-        `${prefix}watchdog: no exit after ${Math.round(watchdogMs / 1000)}s; killing child`
+        `${prefix}watchdog: no exit after ${Math.round(watchdogMs / 1000)}s; killing child without retry`
       );
       killTree(child);
     }, watchdogMs);
     watchdog.unref();
 
-    const settle = (exitCode: number): void => {
+    const settle = (code: number | null): void => {
       if (settled) return;
       settled = true;
       clearTimeout(watchdog);
       const durationMs = Date.now() - startedAt;
+      const exitCode = watchdogFired ? 1 : (code ?? 1);
       const outcome: Outcome = exitCode === 0 ? 'pass' : 'failure';
-      const transient = outcome === 'failure' && isTransientScenarioFailure(outputTail);
+      const transient = !watchdogFired && code === 1 && isTransientScenarioFailure(failureLine);
       console.log(
         `--- ${job.label} ${outcome} (exit=${exitCode}, ${Math.round(durationMs / 1000)}s) ---`
       );
@@ -435,9 +434,9 @@ function runScenario(
 
     child.on('error', error => {
       console.error(`${prefix}spawn failed: ${error.message}`);
-      settle(1);
+      settle(null);
     });
-    child.on('close', code => settle(code ?? 1));
+    child.on('close', settle);
   });
 }
 

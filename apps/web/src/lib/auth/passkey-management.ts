@@ -95,8 +95,6 @@ function authorizationMatches(params: {
     ...(params.challengeId === undefined
       ? []
       : [eq(passkey_management_authorizations.passkey_challenge_id, params.challengeId)]),
-    // Account recovery rotates the pepper on the user row. A grant minted
-    // under the previous one authorizes nothing afterwards.
     pepperMatchesAccount(params.userId),
     sql`EXISTS (
       SELECT 1 FROM ${device_sessions}

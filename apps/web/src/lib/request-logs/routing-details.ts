@@ -119,6 +119,7 @@ export function requestNotSentReason(
     case 'unavailable':
       return 'enkrypt-unavailable';
     case 'allow':
+    case 'fail_open':
     case 'skip':
       return null;
   }

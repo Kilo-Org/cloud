@@ -660,9 +660,6 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       if (!applySnapshotRead(read, () => {}, expectedGeneration)) {
         scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);
       }
-      // Even on a failed read the websocket is still useful — connect without
-      // a snapshot replay. The manager surfaces the error and a retry fills the
-      // transcript when the read recovers.
       return { ticket };
     }
 

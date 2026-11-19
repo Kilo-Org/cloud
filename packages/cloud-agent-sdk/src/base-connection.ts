@@ -70,7 +70,6 @@ const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
 export const DEFAULT_STALENESS_TIMEOUT_MS = 30_000;
 
-// min(cap, base * 2^attempt) * (0.5 + random jitter)
 function calculateBackoffDelay(attempt: number): number {
   const exponentialDelay = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * Math.pow(2, attempt));
   const jitter = 0.5 + Math.random();

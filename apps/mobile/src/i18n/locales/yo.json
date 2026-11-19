@@ -3414,6 +3414,7 @@
       "sendInvite": "Fi ìkésíni ránṣẹ́",
       "title": "Pe ọmọ ẹgbẹ́",
       "alreadyInvited": "A ti pe wọ́n tẹ́lẹ̀ tàbí wọ́n ti jẹ́ ọmọ ẹgbẹ́ tẹ́lẹ̀.",
+      "organizationUnavailable": "Àjọ yìí kò sí mọ́.",
       "sendError": "A kò lè fi ìkésíni ránṣẹ́.",
       "pendingInvitation": "Àdírẹ́sì ímeèlì yìí ti ní ìkésíni tí ń dúró.",
       "alreadyMember": "Ẹnìkan yìí ti jẹ́ ọmọ ẹgbẹ́ àjọ yìí tẹ́lẹ̀.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Tí a mọ̀ kẹ́yìn",
     "awaitingUpdate": "Ń dúró de ìmúdójúìwọ̀n",
     "nextRun": "Ìṣiṣẹ́ tó kàn",
+    "wasDue": "A retí",
     "waitingForYou": "Ń dúró dè ọ́",
     "nextScheduled": "Àwọn ètò tó kàn",
     "answerNeeded": "Nílò èsì",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀"
   },
   "invoices": {
-    "personalEmptyDescription": "Àwọn ìwé owó fún àwọn ìrajà tìrẹ yóò hàn níbí nígbà tí a bá ti gba owó lọ́wọ́ rẹ."
+    "personalEmptyDescription": "Àwọn ìwé owó fún àwọn ìrajà tìrẹ yóò hàn níbí nígbà tí a bá ti gba owó lọ́wọ́ rẹ. Ìwé ẹ̀rí ìsanwó láti App Store àti ìwé ẹ̀rí ìsanwó láti Google Play wà nínú Ìtàn kírẹ́dítì.",
+    "personalPeriod": "Oṣù 12 tó kọjá"
   },
   "cloudAgent": {
     "compute": {

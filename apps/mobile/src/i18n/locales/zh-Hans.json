@@ -3419,6 +3419,7 @@
       "sendInvite": "发送邀请",
       "title": "邀请成员",
       "alreadyInvited": "该邮箱已被邀请或已是成员。",
+      "organizationUnavailable": "该组织已不可用。",
       "sendError": "无法发送邀请。",
       "pendingInvitation": "该邮箱已有待处理的邀请。",
       "alreadyMember": "此人已是该组织的成员。",
@@ -3695,6 +3696,7 @@
     "lastKnown": "上次已知状态",
     "awaitingUpdate": "等待更新",
     "nextRun": "下次运行",
+    "wasDue": "原定",
     "waitingForYou": "等待你处理",
     "nextScheduled": "下次计划",
     "answerNeeded": "等待回答",
@@ -4616,7 +4618,8 @@
     "connectFailed": "无法打开连接页面"
   },
   "invoices": {
-    "personalEmptyDescription": "产生扣费后，你个人购买的发票将显示在这里。"
+    "personalEmptyDescription": "产生扣费后，你个人购买的发票显示在这里。App Store 和 Google Play 的收据位于积分记录。",
+    "personalPeriod": "最近 12 个月"
   },
   "cloudAgent": {
     "compute": {

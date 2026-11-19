@@ -3414,6 +3414,7 @@
       "sendInvite": "Meghívó küldése",
       "title": "Tag meghívása",
       "alreadyInvited": "Már meg van hívva, vagy már tag.",
+      "organizationUnavailable": "Ez a szervezet már nem érhető el.",
       "sendError": "Nem sikerült elküldeni a meghívót.",
       "pendingInvitation": "Erre az e-mail-címre már van egy függőben lévő meghívó.",
       "alreadyMember": "Ez a személy már tagja ennek a szervezetnek.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Utolsó ismert",
     "awaitingUpdate": "Frissítésre vár",
     "nextRun": "Következő futás",
+    "wasDue": "Esedékes volt",
     "waitingForYou": "Rád vár",
     "nextScheduled": "Következő ütemezések",
     "answerNeeded": "Válaszra vár",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt"
   },
   "invoices": {
-    "personalEmptyDescription": "A saját vásárlásaid számlái itt jelennek meg, amint kiállítjuk őket."
+    "personalEmptyDescription": "A saját vásárlásaid számlái itt jelennek meg, amint kiállítjuk őket. Az App Store és a Google Play nyugtái a Kreditelőzményekben érhetők el.",
+    "personalPeriod": "Elmúlt 12 hónap"
   },
   "cloudAgent": {
     "compute": {

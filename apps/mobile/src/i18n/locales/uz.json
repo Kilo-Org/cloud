@@ -3414,6 +3414,7 @@
       "sendInvite": "Taklifnomani yuborish",
       "title": "A’zo taklif qilish",
       "alreadyInvited": "Bu elektron pochta manzili allaqachon taklif qilingan yoki allaqachon a'zo.",
+      "organizationUnavailable": "Bu tashkilot endi mavjud emas.",
       "sendError": "Taklifnomani yuborib bo'lmadi.",
       "pendingInvitation": "Bu elektron pochta uchun allaqachon kutilayotgan taklifnoma mavjud.",
       "alreadyMember": "Bu shaxs allaqachon ushbu tashkilotning a'zosi.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "So‘nggi ma’lum holat",
     "awaitingUpdate": "Yangilanish kutilmoqda",
     "nextRun": "Keyingi ishga tushish",
+    "wasDue": "Kutilgan edi",
     "waitingForYou": "Sizni kutmoqda",
     "nextScheduled": "Keyingi rejalashtirilganlar",
     "answerNeeded": "Javob kutilmoqda",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Ulanish sahifasini ochib boʻlmadi"
   },
   "invoices": {
-    "personalEmptyDescription": "To‘lov amalga oshirilgach, shaxsiy xaridlaringiz uchun hisob-fakturalar shu yerda ko‘rinadi."
+    "personalEmptyDescription": "To‘lov amalga oshirilgach, shaxsiy xaridlaringiz uchun hisob-fakturalar shu yerda ko‘rinadi. App Store va Google Play cheklari Kreditlar tarixida.",
+    "personalPeriod": "So‘nggi 12 oy"
   },
   "cloudAgent": {
     "compute": {

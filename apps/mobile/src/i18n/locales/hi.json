@@ -3419,6 +3419,7 @@
       "sendInvite": "आमंत्रण भेजें",
       "title": "सदस्य को आमंत्रित करें",
       "alreadyInvited": "वे पहले से आमंत्रित हैं या पहले से ही सदस्य हैं।",
+      "organizationUnavailable": "यह संगठन अब उपलब्ध नहीं है।",
       "sendError": "आमंत्रण नहीं भेजा जा सका।",
       "pendingInvitation": "इस ईमेल के लिए पहले से ही एक आमंत्रण लंबित है।",
       "alreadyMember": "यह व्यक्ति पहले से ही इस संगठन का सदस्य है।",
@@ -3695,6 +3696,7 @@
     "lastKnown": "अंतिम ज्ञात",
     "awaitingUpdate": "अपडेट का इंतज़ार",
     "nextRun": "अगला रन",
+    "wasDue": "अपेक्षित था",
     "waitingForYou": "आपका इंतज़ार",
     "nextScheduled": "अगले निर्धारित",
     "answerNeeded": "जवाब चाहिए",
@@ -4616,7 +4618,8 @@
     "connectFailed": "कनेक्शन पेज नहीं खोला जा सका"
   },
   "invoices": {
-    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखेंगे।"
+    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखते हैं। App Store और Google Play की रसीदें क्रेडिट इतिहास में हैं।",
+    "personalPeriod": "पिछले 12 महीने"
   },
   "cloudAgent": {
     "compute": {

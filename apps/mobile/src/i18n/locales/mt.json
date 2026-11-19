@@ -3588,6 +3588,7 @@
       "sendInvite": "Ibgħat stedina",
       "title": "Stieden membru",
       "alreadyInvited": "Din il-persuna diġà hija mistiedna jew diġà membru.",
+      "organizationUnavailable": "Din l-organizzazzjoni m'għadhiex disponibbli.",
       "sendError": "L-istedina ma setgħetx tintbagħat.",
       "pendingInvitation": "Dan l-indirizz tal-posta elettronika diġà għandu stedina pendenti.",
       "alreadyMember": "Din il-persuna diġà hija membru ta' din l-organizzazzjoni.",
@@ -3875,6 +3876,7 @@
     "lastKnown": "L-aħħar magħruf",
     "awaitingUpdate": "Jistenna aġġornament",
     "nextRun": "Tħaddim li jmiss",
+    "wasDue": "Kien mistenni",
     "waitingForYou": "Jistenna lilek",
     "nextScheduled": "Ipprogrammati li jmiss",
     "answerNeeded": "Tweġiba meħtieġa",
@@ -4841,7 +4843,8 @@
     "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ"
   },
   "invoices": {
-    "personalEmptyDescription": "Il-fatturi għax-xiri tiegħek stess se jidhru hawn ladarba tiġi ddebitat."
+    "personalEmptyDescription": "Il-fatturi għax-xiri tiegħek stess jidhru hawn ladarba tiġi ddebitat. L-irċevuti mill-App Store u minn Google Play jinsabu f'Storja tal-krediti.",
+    "personalPeriod": "L-aħħar 12 xahar"
   },
   "cloudAgent": {
     "compute": {

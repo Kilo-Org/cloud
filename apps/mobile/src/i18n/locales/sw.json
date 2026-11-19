@@ -3414,6 +3414,7 @@
       "sendInvite": "Tuma mwaliko",
       "title": "Alika mwanachama",
       "alreadyInvited": "Wamekwishaalikwa au ni wanachama tayari.",
+      "organizationUnavailable": "Shirika hili halipatikani tena.",
       "sendError": "Imeshindikana kutuma mwaliko.",
       "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
       "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Hali ya mwisho iliyojulikana",
     "awaitingUpdate": "Inasubiri sasisho",
     "nextRun": "Utekelezaji unaofuata",
+    "wasDue": "Ilitarajiwa",
     "waitingForYou": "Inakusubiri",
     "nextScheduled": "Zilizopangwa zinazofuata",
     "answerNeeded": "Inasubiri jibu",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha"
   },
   "invoices": {
-    "personalEmptyDescription": "Ankara za ununuzi wako binafsi zitaonekana hapa baada ya kutozwa."
+    "personalEmptyDescription": "Ankara za ununuzi wako binafsi zinaonekana hapa baada ya kutozwa. Risiti kutoka App Store na Google Play ziko katika Historia ya salio.",
+    "personalPeriod": "Miezi 12 iliyopita"
   },
   "cloudAgent": {
     "compute": {

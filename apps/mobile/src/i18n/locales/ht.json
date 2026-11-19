@@ -3414,6 +3414,7 @@
       "sendInvite": "Voye envitasyon an",
       "title": "Envite yon manm",
       "alreadyInvited": "Yo deja gen yon envitasyon oswa yo deja se yon manm.",
+      "organizationUnavailable": "Òganizasyon sa a pa disponib ankò.",
       "sendError": "Pa t ka voye envitasyon an.",
       "pendingInvitation": "Imel sa a deja gen yon envitasyon ki an atant.",
       "alreadyMember": "Moun sa a deja yon manm nan òganizasyon sa a.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Dènye eta koni",
     "awaitingUpdate": "Ap tann mizajou",
     "nextRun": "Pwochen ekzekisyon",
+    "wasDue": "Te dwe",
     "waitingForYou": "Ap tann ou",
     "nextScheduled": "Pwochen ki pwograme",
     "answerNeeded": "Bezwen repons",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Pa t ka louvri paj koneksyon an"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakti pou pwòp acha ou yo ap parèt isit la yon fwa yo faktire w."
+    "personalEmptyDescription": "Fakti pou pwòp acha ou yo ap parèt isit la yon fwa yo faktire w. Resi ki nan App Store ak Resi ki nan Google Play yo nan Istorik kredi.",
+    "personalPeriod": "Dènye 12 mwa yo"
   },
   "cloudAgent": {
     "compute": {

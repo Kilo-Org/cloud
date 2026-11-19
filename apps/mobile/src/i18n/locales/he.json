@@ -3477,6 +3477,7 @@
       "sendInvite": "שליחת הזמנה",
       "title": "הזמנת חבר לארגון",
       "alreadyInvited": "כתובת זו כבר הוזמנה או שהיא שייכת לחבר קיים בארגון.",
+      "organizationUnavailable": "הארגון הזה כבר אינו זמין.",
       "sendError": "שליחת ההזמנה נכשלה.",
       "pendingInvitation": "לכתובת דוא״ל זו כבר יש הזמנה ממתינה.",
       "alreadyMember": "אדם זה כבר חבר בארגון הזה.",
@@ -3755,6 +3756,7 @@
     "lastKnown": "מצב אחרון ידוע",
     "awaitingUpdate": "ממתין לעדכון",
     "nextRun": "ההפעלה הבאה",
+    "wasDue": "היה אמור",
     "waitingForYou": "ממתין לך",
     "nextScheduled": "התזמונים הבאים",
     "answerNeeded": "נדרשת תשובה",
@@ -4691,7 +4693,8 @@
     "connectFailed": "לא ניתן לפתוח את דף החיבור"
   },
   "invoices": {
-    "personalEmptyDescription": "חשבוניות על הרכישות האישיות שלך יופיעו כאן לאחר החיוב."
+    "personalEmptyDescription": "חשבוניות על הרכישות האישיות שלך יופיעו כאן לאחר החיוב. קבלות מ-App Store ומ-Google Play נמצאות בהיסטוריית קרדיטים.",
+    "personalPeriod": "12 החודשים האחרונים"
   },
   "cloudAgent": {
     "compute": {

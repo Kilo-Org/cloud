@@ -3419,6 +3419,7 @@
       "sendInvite": "초대 보내기",
       "title": "멤버 초대",
       "alreadyInvited": "이미 초대되었거나 이미 멤버입니다.",
+      "organizationUnavailable": "이 조직은 더 이상 사용할 수 없습니다.",
       "sendError": "초대를 보내지 못했습니다.",
       "pendingInvitation": "이 이메일에는 이미 보류 중인 초대가 있습니다.",
       "alreadyMember": "이 사용자는 이미 이 조직의 멤버입니다.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "마지막 알려진 상태",
     "awaitingUpdate": "업데이트 대기",
     "nextRun": "다음 실행",
+    "wasDue": "예정이었음",
     "waitingForYou": "사용자 응답 대기",
     "nextScheduled": "다음 예약",
     "answerNeeded": "답변 필요",
@@ -4616,7 +4618,8 @@
     "connectFailed": "연결 페이지를 열지 못했습니다"
   },
   "invoices": {
-    "personalEmptyDescription": "결제가 청구되면 본인 구매에 대한 인보이스가 여기에 표시됩니다."
+    "personalEmptyDescription": "결제가 청구되면 본인 구매에 대한 인보이스가 여기에 표시됩니다. App Store 및 Google Play 영수증은 크레딧 내역에서 확인할 수 있습니다.",
+    "personalPeriod": "최근 12개월"
   },
   "cloudAgent": {
     "compute": {

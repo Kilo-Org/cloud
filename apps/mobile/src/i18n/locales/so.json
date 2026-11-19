@@ -3414,6 +3414,7 @@
       "sendInvite": "Dir casuumaad",
       "title": "Casuum xubin",
       "alreadyInvited": "Isaga ama iyadu horeba waa la casuumay ama horeba waa xubin.",
+      "organizationUnavailable": "Ururkan hadda lama heli karo.",
       "sendError": "Casuumaadda lama diri karin.",
       "pendingInvitation": "Iimaylkani horeyba wuxuu leeyahay casuumaad sugaysa.",
       "alreadyMember": "Qofkani horeyba waa xubin ka mid ah ururkan.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Ugu dambayn la ogaa",
     "awaitingUpdate": "Cusboonaysiin sugaya",
     "nextRun": "Hawlgalka xiga",
+    "wasDue": "La filayay",
     "waitingForYou": "Adiga ku sugaya",
     "nextScheduled": "Qorshaha xiga",
     "answerNeeded": "Jawaab loo baahan yahay",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Bogga isku-xidhka lama furi karo"
   },
   "invoices": {
-    "personalEmptyDescription": "Qaansheegyada iibsiyadaada gaarka ah halkan ayay ka muuqan doonaan marka lacag lagaa qaado."
+    "personalEmptyDescription": "Qaansheegyada iibsiyadaada gaarka ah halkan ayay ka muuqdaan marka lacag lagaa qaado. Rasiidada ka yimid App Store iyo Google Play waxay ku jiraan Taariikhda kiredit-ka.",
+    "personalPeriod": "12 bilood ee ugu dambeeyay"
   },
   "cloudAgent": {
     "compute": {

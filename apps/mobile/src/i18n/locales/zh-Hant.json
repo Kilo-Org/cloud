@@ -3419,6 +3419,7 @@
       "sendInvite": "傳送邀請",
       "title": "邀請成員",
       "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
+      "organizationUnavailable": "此組織已無法使用。",
       "sendError": "無法傳送邀請。",
       "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
       "alreadyMember": "這個人已經是此組織的成員。",
@@ -3695,6 +3696,7 @@
     "lastKnown": "最後已知",
     "awaitingUpdate": "等待更新",
     "nextRun": "下次執行",
+    "wasDue": "原定",
     "waitingForYou": "等待你回應",
     "nextScheduled": "下次排程",
     "answerNeeded": "等待回答",
@@ -4616,7 +4618,8 @@
     "connectFailed": "無法開啟連結頁面"
   },
   "invoices": {
-    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。"
+    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。App Store 收據與 Google Play 收據都在點數紀錄中。",
+    "personalPeriod": "最近 12 個月"
   },
   "cloudAgent": {
     "compute": {

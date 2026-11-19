@@ -3414,6 +3414,7 @@
       "sendInvite": "ਸੱਦਾ ਭੇਜੋ",
       "title": "ਮੈਂਬਰ ਨੂੰ ਸੱਦਾ ਦਿਓ",
       "alreadyInvited": "ਉਹ ਪਹਿਲਾਂ ਹੀ ਸੱਦਿਆ ਹੋਇਆ ਹੈ ਜਾਂ ਪਹਿਲਾਂ ਹੀ ਮੈਂਬਰ ਹੈ।",
+      "organizationUnavailable": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "sendError": "ਸੱਦਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
       "pendingInvitation": "ਇਸ ਈਮੇਲ ਲਈ ਪਹਿਲਾਂ ਹੀ ਇੱਕ ਸੱਦਾ ਬਕਾਇਆ ਹੈ।",
       "alreadyMember": "ਇਹ ਵਿਅਕਤੀ ਪਹਿਲਾਂ ਹੀ ਇਸ ਸੰਸਥਾ ਦਾ ਮੈਂਬਰ ਹੈ।",
@@ -3695,6 +3696,7 @@
     "lastKnown": "ਆਖਰੀ ਜਾਣੀ ਸਥਿਤੀ",
     "awaitingUpdate": "ਅੱਪਡੇਟ ਦੀ ਉਡੀਕ",
     "nextRun": "ਅਗਲੀ ਵਾਰ ਚੱਲੇਗਾ",
+    "wasDue": "ਉਮੀਦ ਸੀ",
     "waitingForYou": "ਤੁਹਾਡੀ ਉਡੀਕ",
     "nextScheduled": "ਅਗਲਾ ਨਿਰਧਾਰਿਤ",
     "answerNeeded": "ਜਵਾਬ ਚਾਹੀਦਾ ਹੈ",
@@ -4616,7 +4618,8 @@
     "connectFailed": "ਕਨੈਕਸ਼ਨ ਪੰਨਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
   },
   "invoices": {
-    "personalEmptyDescription": "ਤੁਹਾਡੇ ਤੋਂ ਬਿੱਲ ਲਏ ਜਾਣ ਤੋਂ ਬਾਅਦ ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਖਰੀਦਾਂ ਦੇ ਇਨਵੌਇਸ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।"
+    "personalEmptyDescription": "ਤੁਹਾਡੇ ਤੋਂ ਬਿੱਲ ਲਏ ਜਾਣ ਤੋਂ ਬਾਅਦ ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਖਰੀਦਾਂ ਦੇ ਇਨਵੌਇਸ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੇ ਹਨ। App Store ਅਤੇ Google Play ਤੋਂ ਰਸੀਦਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਵਿੱਚ ਹਨ।",
+    "personalPeriod": "ਪਿਛਲੇ 12 ਮਹੀਨੇ"
   },
   "cloudAgent": {
     "compute": {

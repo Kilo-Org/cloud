@@ -3530,6 +3530,7 @@
       "sendInvite": "Siųsti kvietimą",
       "title": "Pakviesti narį",
       "alreadyInvited": "Vartotojas jau pakviestas arba jau yra narys.",
+      "organizationUnavailable": "Ši organizacija nebeprieinama.",
       "sendError": "Nepavyko išsiųsti kvietimo.",
       "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
       "alreadyMember": "Šis asmuo jau yra šios organizacijos narys.",
@@ -3815,6 +3816,7 @@
     "lastKnown": "Paskutinė žinoma",
     "awaitingUpdate": "Laukiama atnaujinimo",
     "nextRun": "Kitas vykdymas",
+    "wasDue": "Buvo numatyta",
     "waitingForYou": "Laukia jūsų",
     "nextScheduled": "Artimiausi suplanuoti",
     "answerNeeded": "Laukia atsakymo",
@@ -4766,7 +4768,8 @@
     "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
   },
   "invoices": {
-    "personalEmptyDescription": "Jūsų asmeninių pirkimų sąskaitos faktūros bus rodomos čia, kai jums bus išrašyta sąskaita."
+    "personalEmptyDescription": "Jūsų asmeninių pirkimų sąskaitos faktūros rodomos čia, kai jums bus išrašyta sąskaita. Kvitai iš App Store ir Google Play yra Kreditų istorijoje.",
+    "personalPeriod": "Paskutiniai 12 mėnesių"
   },
   "cloudAgent": {
     "compute": {

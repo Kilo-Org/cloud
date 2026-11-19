@@ -3414,6 +3414,7 @@
       "sendInvite": "Ziga òkù",
       "title": "Kpọ onye otu",
       "alreadyInvited": "E tinyela ya òkù ma ọ bụ ọ abụrụla onye otu.",
+      "organizationUnavailable": "Òtù a adịkwaghịzi.",
       "sendError": "Enweghị ike iziga òkù.",
       "pendingInvitation": "Adreesị ozi ịntanetị a enwetala òkù na-echere.",
       "alreadyMember": "Onye a abụrụla onye otu nke òtù a.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Nke ikpeazụ a maara",
     "awaitingUpdate": "Na-eche mmelite",
     "nextRun": "Oge ọrụ ọzọ",
+    "wasDue": "A tụrụ anya",
     "waitingForYou": "Na-eche gị",
     "nextScheduled": "Ihe ahaziri na-esote",
     "answerNeeded": "Achọrọ azịza",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Enweghị ike imepe ibe njikọ"
   },
   "invoices": {
-    "personalEmptyDescription": "Akwụkwọ ụgwọ maka ihe gị onwe gị zụrụ ga-apụta ebe a ozugbo a nara gị ụgwọ."
+    "personalEmptyDescription": "Akwụkwọ ụgwọ maka ihe gị onwe gị zụrụ na-apụta ebe a ozugbo a nara gị ụgwọ. Rịsịt sitere na App Store na Rịsịt sitere na Google Play dị na Akụkọ kredit.",
+    "personalPeriod": "Ọnwa 12 gara aga"
   },
   "cloudAgent": {
     "compute": {

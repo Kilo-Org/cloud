@@ -3477,6 +3477,7 @@
       "sendInvite": "Invia l'invito",
       "title": "Invita un membro",
       "alreadyInvited": "Questo indirizzo ha già un invito in sospeso o appartiene già a un membro.",
+      "organizationUnavailable": "Questa organizzazione non è più disponibile.",
       "sendError": "Impossibile inviare l'invito.",
       "pendingInvitation": "Questo indirizzo email ha già un invito in sospeso.",
       "alreadyMember": "Questa persona è già un membro di questa organizzazione.",
@@ -3755,6 +3756,7 @@
     "lastKnown": "Ultimo stato noto",
     "awaitingUpdate": "In attesa di aggiornamento",
     "nextRun": "Prossima esecuzione",
+    "wasDue": "Era previsto",
     "waitingForYou": "In attesa di te",
     "nextScheduled": "Prossime pianificate",
     "answerNeeded": "In attesa di risposta",
@@ -4691,7 +4693,8 @@
     "connectFailed": "Impossibile aprire la pagina di collegamento"
   },
   "invoices": {
-    "personalEmptyDescription": "Le fatture dei tuoi acquisti personali appariranno qui dopo il primo addebito."
+    "personalEmptyDescription": "Le fatture dei tuoi acquisti personali appaiono qui dopo il primo addebito. Le ricevute dall'App Store e da Google Play sono in Cronologia crediti.",
+    "personalPeriod": "Ultimi 12 mesi"
   },
   "cloudAgent": {
     "compute": {

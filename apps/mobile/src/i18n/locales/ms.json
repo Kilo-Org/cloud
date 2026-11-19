@@ -3414,6 +3414,7 @@
       "sendInvite": "Hantar jemputan",
       "title": "Jemput ahli",
       "alreadyInvited": "E-mel itu sudah dijemput atau sudah menjadi ahli.",
+      "organizationUnavailable": "Organisasi ini tidak lagi tersedia.",
       "sendError": "Tidak dapat menghantar jemputan.",
       "pendingInvitation": "E-mel ini sudah mempunyai jemputan yang belum selesai.",
       "alreadyMember": "Orang ini sudah menjadi ahli organisasi ini.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Terakhir diketahui",
     "awaitingUpdate": "Menunggu kemas kini",
     "nextRun": "Pelaksanaan seterusnya",
+    "wasDue": "Sepatutnya",
     "waitingForYou": "Menunggu anda",
     "nextScheduled": "Jadual seterusnya",
     "answerNeeded": "Perlu jawapan",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Tidak dapat membuka halaman sambungan"
   },
   "invoices": {
-    "personalEmptyDescription": "Invois untuk pembelian anda sendiri akan dipaparkan di sini setelah anda dibilkan."
+    "personalEmptyDescription": "Invois untuk pembelian anda sendiri dipaparkan di sini setelah anda dibilkan. Resit daripada App Store dan Google Play terdapat dalam Sejarah kredit.",
+    "personalPeriod": "12 Bulan Terakhir"
   },
   "cloudAgent": {
     "compute": {

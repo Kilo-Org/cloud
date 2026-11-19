@@ -3414,6 +3414,7 @@
       "sendInvite": "ارسال دعوت‌نامه",
       "title": "دعوت از عضو",
       "alreadyInvited": "این آدرس ایمیل قبلاً دعوت شده است یا از قبل عضو است.",
+      "organizationUnavailable": "این سازمان دیگر در دسترس نیست.",
       "sendError": "ارسال دعوت‌نامه ممکن نشد.",
       "pendingInvitation": "این ایمیل از قبل یک دعوت‌نامه در انتظار دارد.",
       "alreadyMember": "این شخص از قبل عضو این سازمان است.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "آخرین وضعیت شناخته‌شده",
     "awaitingUpdate": "در انتظار به‌روزرسانی",
     "nextRun": "اجرای بعدی",
+    "wasDue": "قرار بود",
     "waitingForYou": "در انتظار شما",
     "nextScheduled": "زمانبندی‌های بعدی",
     "answerNeeded": "نیازمند پاسخ",
@@ -4616,7 +4618,8 @@
     "connectFailed": "باز کردن صفحهٔ اتصال ممکن نشد"
   },
   "invoices": {
-    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند."
+    "personalEmptyDescription": "فاکتورهای خریدهای شخصی‌تان پس از صدور صورتحساب در اینجا نمایش داده می‌شوند. رسید از App Store و رسید از Google Play در تاریخچهٔ اعتبار هستند.",
+    "personalPeriod": "12 ماه اخیر"
   },
   "cloudAgent": {
     "compute": {

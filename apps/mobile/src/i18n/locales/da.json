@@ -3414,6 +3414,7 @@
       "sendInvite": "Send invitation",
       "title": "Invitér medlem",
       "alreadyInvited": "Personen er allerede inviteret eller allerede medlem.",
+      "organizationUnavailable": "Denne organisation er ikke længere tilgængelig.",
       "sendError": "Invitationen kunne ikke sendes.",
       "pendingInvitation": "Denne e-mailadresse har allerede en afventende invitation.",
       "alreadyMember": "Denne person er allerede medlem af denne organisation.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Sidst kendt",
     "awaitingUpdate": "Afventer opdatering",
     "nextRun": "Næste kørsel",
+    "wasDue": "Forventedes",
     "waitingForYou": "Afventer dig",
     "nextScheduled": "Næste planlagte",
     "answerNeeded": "Afventer svar",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakturaer for dine egne køb vises her, når du er blevet faktureret."
+    "personalEmptyDescription": "Fakturaer for dine egne køb vises her, når du er blevet faktureret. Kvitteringer fra App Store og Google Play findes i Kredithistorik.",
+    "personalPeriod": "Seneste 12 måneder"
   },
   "cloudAgent": {
     "compute": {

@@ -3419,6 +3419,7 @@
       "sendInvite": "Uitnodiging verzenden",
       "title": "Lid uitnodigen",
       "alreadyInvited": "Dit e-mailadres is al uitgenodigd of is al lid.",
+      "organizationUnavailable": "Deze organisatie is niet meer beschikbaar.",
       "sendError": "De uitnodiging kon niet worden verzonden.",
       "pendingInvitation": "Dit e-mailadres heeft al een openstaande uitnodiging.",
       "alreadyMember": "Deze persoon is al lid van deze organisatie.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Laatst bekend",
     "awaitingUpdate": "Wacht op update",
     "nextRun": "Volgende uitvoering",
+    "wasDue": "Was verwacht",
     "waitingForYou": "Wacht op jou",
     "nextScheduled": "Hierna gepland",
     "answerNeeded": "Antwoord nodig",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Kan de koppelingspagina niet openen"
   },
   "invoices": {
-    "personalEmptyDescription": "Facturen voor je eigen aankopen verschijnen hier zodra je wordt gefactureerd."
+    "personalEmptyDescription": "Facturen voor je eigen aankopen verschijnen hier zodra je wordt gefactureerd. Bonnen in de App Store en Google Play staan in Tegoedgeschiedenis.",
+    "personalPeriod": "Laatste 12 maanden"
   },
   "cloudAgent": {
     "compute": {

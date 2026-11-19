@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { RowGroup } from '@/components/ui/row-group';
+import { CREDIT_HISTORY_HREF } from '@/lib/profile-navigation';
 
 /**
  * The rows under the personal Credits section: the person's own credit history
@@ -25,7 +26,7 @@ export function PersonalCreditsLinks() {
         subtitle={t('profile.creditHistorySubtitle')}
         hue="moss"
         onPress={() => {
-          router.push('/(app)/(tabs)/(3_profile)/credit-history' as Href);
+          router.push(CREDIT_HISTORY_HREF);
         }}
       />
       <ConfigureRow

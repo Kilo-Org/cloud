@@ -3414,6 +3414,7 @@
       "sendInvite": "Dəvət göndər",
       "title": "Üzv dəvət et",
       "alreadyInvited": "Bu e-poçt ünvanı artıq dəvət olunub və ya artıq üzvdür.",
+      "organizationUnavailable": "Bu təşkilat artıq mövcud deyil.",
       "sendError": "Dəvət göndərilmədi.",
       "pendingInvitation": "Bu e-poçt ünvanının artıq gözləyən dəvəti var.",
       "alreadyMember": "Bu şəxs artıq bu təşkilatın üzvüdür.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Son məlum vəziyyət",
     "awaitingUpdate": "Yenilənmə gözlənilir",
     "nextRun": "Növbəti işə düşmə",
+    "wasDue": "Gözlənilirdi",
     "waitingForYou": "Sizi gözləyir",
     "nextScheduled": "Növbəti planlaşdırılanlar",
     "answerNeeded": "Cavab gözləyir",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı"
   },
   "invoices": {
-    "personalEmptyDescription": "Ödəniş tutulduqdan sonra şəxsi alışlarınızın fakturaları burada görünəcək."
+    "personalEmptyDescription": "Ödəniş tutulduqdan sonra şəxsi alışlarınızın fakturaları burada görünür. App Store və Google Play qəbzləri Kredit tarixçəsindədir.",
+    "personalPeriod": "Son 12 ay"
   },
   "cloudAgent": {
     "compute": {

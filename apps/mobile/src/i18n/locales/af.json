@@ -3414,6 +3414,7 @@
       "sendInvite": "Stuur uitnodiging",
       "title": "Nooi lid uit",
       "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
+      "organizationUnavailable": "Hierdie organisasie is nie meer beskikbaar nie.",
       "sendError": "Kon nie die uitnodiging stuur nie.",
       "pendingInvitation": "Hierdie e-posadres het reeds 'n hangende uitnodiging.",
       "alreadyMember": "Hierdie persoon is reeds 'n lid van hierdie organisasie.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Laas bekend",
     "awaitingUpdate": "Wag op opdatering",
     "nextRun": "Volgende uitvoering",
+    "wasDue": "Was verwag",
     "waitingForYou": "Wag vir jou",
     "nextScheduled": "Volgende geskeduleerde",
     "answerNeeded": "Antwoord nodig",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Kon nie die koppelbladsy oopmaak nie"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakture vir jou eie aankope sal hier verskyn sodra jy gefaktureer is."
+    "personalEmptyDescription": "Fakture vir jou eie aankope verskyn hier sodra jy gefaktureer is. Kwitansies van die App Store en Google Play is in Kredietgeskiedenis.",
+    "personalPeriod": "Afgelope 12 maande"
   },
   "cloudAgent": {
     "compute": {

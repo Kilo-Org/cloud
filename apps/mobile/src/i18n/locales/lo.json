@@ -3414,6 +3414,7 @@
       "sendInvite": "ສົ່ງຄຳເຊີນ",
       "title": "ເຊີນສະມາຊິກ",
       "alreadyInvited": "ພວກເຂົາຖືກເຊີນແລ້ວ ຫຼື ເປັນສະມາຊິກແລ້ວ.",
+      "organizationUnavailable": "ອົງກອນນີ້ບໍ່ມີຢູ່ແລ້ວ.",
       "sendError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນໄດ້.",
       "pendingInvitation": "ອີເມວນີ້ມີຄຳເຊີນທີ່ລໍຖ້າຢູ່ແລ້ວ.",
       "alreadyMember": "ບຸກຄົນນີ້ເປັນສະມາຊິກຂອງອົງກອນນີ້ແລ້ວ.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "ສະຖານະຫຼ້າສຸດທີ່ຮູ້",
     "awaitingUpdate": "ລໍການອັບເດດ",
     "nextRun": "ເຮັດວຽກຄັ້ງຕໍ່ໄປ",
+    "wasDue": "ຄາດໄວ້",
     "waitingForYou": "ລໍທ່ານ",
     "nextScheduled": "ກຳນົດເວລາຖັດໄປ",
     "answerNeeded": "ລໍຄຳຕອບ",
@@ -4616,7 +4618,8 @@
     "connectFailed": "ບໍ່ສາມາດເປີດໜ້າການເຊື່ອມຕໍ່ໄດ້"
   },
   "invoices": {
-    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງຈະສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ."
+    "personalEmptyDescription": "ໃບແຈ້ງໜີ້ສຳລັບການຊື້ຂອງທ່ານເອງສະແດງຢູ່ບ່ອນນີ້ເມື່ອມີການຮຽກເກັບເງິນ. ໃບຮັບເງິນຈາກ App Store ແລະ Google Play ຢູ່ໃນປະຫວັດເຄຣດິດ.",
+    "personalPeriod": "12 ເດືອນຜ່ານມາ"
   },
   "cloudAgent": {
     "compute": {

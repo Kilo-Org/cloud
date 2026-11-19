@@ -3414,6 +3414,7 @@
       "sendInvite": "بلنه واستوئ",
       "title": "غړي ته بلنه ورکړئ",
       "alreadyInvited": "هغوی ته دمخه بلنه ورکړل شوې یا دمخه غړی دی.",
+      "organizationUnavailable": "دا سازمان نور شتون نه لري.",
       "sendError": "بلنه ونه لېږل شوه.",
       "pendingInvitation": "دا برېښنالیک لا دمخه یوه په تمه بلنه لري.",
       "alreadyMember": "دا کس لا دمخه د دې سازمان غړی دی.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "وروستی معلوم حالت",
     "awaitingUpdate": "د تازه کېدو په تمه",
     "nextRun": "راتلونکی چلول",
+    "wasDue": "تمه کېده",
     "waitingForYou": "ستاسو په تمه",
     "nextScheduled": "راتلونکی مهال ویش",
     "answerNeeded": "ځواب ته اړتیا لري",
@@ -4616,7 +4618,8 @@
     "connectFailed": "د نښلولو پاڼه پرانیستل نه شوه"
   },
   "invoices": {
-    "personalEmptyDescription": "کله چې درڅخه پیسې واخیستل شي، ستاسو د شخصي پېرودنو بلونه به دلته ښکاره شي."
+    "personalEmptyDescription": "کله چې درڅخه پیسې واخیستل شي، ستاسو د شخصي پېرودنو بلونه دلته ښکاره شي. له App Store او Google Play څخه رسیدونه د کریډیټ تاریخچه کې دي.",
+    "personalPeriod": "وروستۍ 12 میاشتې"
   },
   "cloudAgent": {
     "compute": {

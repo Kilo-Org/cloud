@@ -3414,6 +3414,7 @@
       "sendInvite": "Saada kutse",
       "title": "Kutsu liige",
       "alreadyInvited": "Ta on juba kutsutud või juba liige.",
+      "organizationUnavailable": "See organisatsioon ei ole enam saadaval.",
       "sendError": "Kutset ei õnnestunud saata.",
       "pendingInvitation": "Sellele e-posti aadressile on juba saadetud kutse, mis on ootel.",
       "alreadyMember": "See isik on juba selle organisatsiooni liige.",
@@ -3695,6 +3696,7 @@
     "lastKnown": "Viimane teadaolev",
     "awaitingUpdate": "Ootab uuendust",
     "nextRun": "Järgmine käivitus",
+    "wasDue": "Pidi toimuma",
     "waitingForYou": "Ootab sind",
     "nextScheduled": "Järgmisena ajastatud",
     "answerNeeded": "Vajab vastust",
@@ -4616,7 +4618,8 @@
     "connectFailed": "Ühendamise lehte ei õnnestunud avada"
   },
   "invoices": {
-    "personalEmptyDescription": "Sinu enda ostude arved kuvatakse siin pärast arve esitamist."
+    "personalEmptyDescription": "Sinu enda ostude arved kuvatakse siin pärast arve esitamist. Kviitungid App Store'ist ja Google Playst on Krediitide ajaloos.",
+    "personalPeriod": "Viimased 12 kuud"
   },
   "cloudAgent": {
     "compute": {

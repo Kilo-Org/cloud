@@ -45,6 +45,8 @@ export type GgufDownload = {
   readonly written: number;
   /** Zero until the server states a length. */
   readonly total: number;
+  /** The current transfer was started from zero again after it stopped short. */
+  readonly retrying: boolean;
 };
 
 export type GgufDownloadProblem = 'space' | 'network' | 'invalidFile' | 'checksum';

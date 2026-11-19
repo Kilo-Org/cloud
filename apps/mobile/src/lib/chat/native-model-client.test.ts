@@ -67,11 +67,33 @@ describe('native on-device model client', () => {
   });
 
   it.each([
-    ['unavailable', { ...AVAILABLE, status: 'unavailable', reason: 'apple_intelligence_disabled' }],
-    ['downloadable', { ...AVAILABLE, status: 'downloadable' }],
-  ] as const)('fails explicitly when the model is %s at send time', async (_label, answer) => {
+    [
+      'unavailable',
+      { ...AVAILABLE, status: 'unavailable', reason: 'apple_intelligence_disabled' },
+      'modelChat.localModels.reasons.appleIntelligenceDisabled',
+    ],
+    ['downloadable', { ...AVAILABLE, status: 'downloadable' }, 'modelChat.localModels.unavailable'],
+  ] as const)('fails explicitly when the model is %s at send time', async (_label, answer, key) => {
     const { bridge } = fakeBridge(() => undefined);
     bridge.availability.mockResolvedValue(answer);
+    expect(await failureKey(bridge)).toBe(key);
+    expect(bridge.generate).not.toHaveBeenCalled();
+  });
+
+  it('shows the reason the model gave at send time', async () => {
+    const { bridge } = fakeBridge(() => undefined);
+    bridge.availability.mockResolvedValue({
+      ...AVAILABLE,
+      status: 'unavailable',
+      reason: 'battery_quota_exceeded',
+    });
+    expect(await failureKey(bridge)).toBe('modelChat.localModels.reasons.batteryQuota');
+    expect(bridge.generate).not.toHaveBeenCalled();
+  });
+
+  it('reads a refusal without a reason as unavailable', async () => {
+    const { bridge } = fakeBridge(() => undefined);
+    bridge.availability.mockResolvedValue({ ...AVAILABLE, status: 'unavailable' });
     expect(await failureKey(bridge)).toBe('modelChat.localModels.unavailable');
     expect(bridge.generate).not.toHaveBeenCalled();
   });
@@ -79,7 +101,7 @@ describe('native on-device model client', () => {
   it('fails explicitly when the availability check itself fails', async () => {
     const { bridge } = fakeBridge(() => undefined);
     bridge.availability.mockRejectedValue(new Error('native failure'));
-    expect(await failureKey(bridge)).toBe('modelChat.localModels.unavailable');
+    expect(await failureKey(bridge)).toBe('modelChat.localModels.reasons.checkFailed');
     expect(bridge.generate).not.toHaveBeenCalled();
   });
 
@@ -100,13 +122,17 @@ describe('native on-device model client', () => {
 
   // Android rejects or errors with these stable codes; none of them routes elsewhere.
   it.each([
-    ['model_download_required', 'modelChat.localModels.unavailable'],
-    ['model_downloading', 'modelChat.localModels.unavailable'],
+    ['model_download_required', 'modelChat.localModels.reasons.downloadable'],
+    ['model_downloading', 'modelChat.localModels.reasons.downloading'],
+    ['model_not_ready', 'modelChat.localModels.reasons.modelNotReady'],
     ['model_unavailable', 'modelChat.localModels.unavailable'],
     ['unsupported_os', 'modelChat.localModels.unavailable'],
-    ['aicore_incompatible', 'modelChat.localModels.unavailable'],
-    ['system_update_required', 'modelChat.localModels.unavailable'],
-    ['battery_quota_exceeded', 'modelChat.localModels.unavailable'],
+    ['aicore_incompatible', 'modelChat.localModels.reasons.aicoreUpdateRequired'],
+    ['system_update_required', 'modelChat.localModels.reasons.aicoreUpdateRequired'],
+    ['apple_intelligence_disabled', 'modelChat.localModels.reasons.appleIntelligenceDisabled'],
+    ['device_not_eligible', 'modelChat.localModels.reasons.deviceNotEligible'],
+    ['battery_quota_exceeded', 'modelChat.localModels.reasons.batteryQuota'],
+    ['check_failed', 'modelChat.localModels.reasons.checkFailed'],
     ['background_use_blocked', 'modelChat.localModels.background'],
     ['busy', 'modelChat.localModels.busy'],
     ['context_exceeded', 'modelChat.localModels.failed'],

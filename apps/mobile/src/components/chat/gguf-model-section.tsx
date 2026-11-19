@@ -37,6 +37,11 @@ function progressKey(download: GgufDownload): string {
   if (download.phase === 'paused') {
     return 'modelChat.gguf.paused';
   }
+  // A retried transfer explains the counter that went back to zero. The paused
+  // line above keeps the row's own state when the retried transfer is paused.
+  if (download.retrying) {
+    return download.total > 0 ? 'modelChat.gguf.retrying' : 'modelChat.gguf.retryingUnknown';
+  }
   if (download.total <= 0) {
     return 'modelChat.gguf.downloadingUnknown';
   }

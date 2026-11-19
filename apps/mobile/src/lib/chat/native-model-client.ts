@@ -323,11 +323,13 @@ export function nativeModelClient(bridge: NativeModelBridge): ModelClientService
             const availability = await bridge.availability();
             return availability;
           },
-          catch: () => nativeModelFailure('model_unavailable', false),
+          catch: () => nativeModelFailure('check_failed', false),
         }).pipe(
           Effect.filterOrFail(
             availability => availability.status === 'available',
-            () => nativeModelFailure('model_unavailable', false)
+            // The reason the model gave at send time carries its own next step; a
+            // status without one still reads as unavailable.
+            availability => nativeModelFailure(availability.reason ?? 'model_unavailable', false)
           ),
           Effect.map(availability => answer(provider, availability, request))
         )

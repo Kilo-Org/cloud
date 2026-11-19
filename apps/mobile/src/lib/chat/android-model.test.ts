@@ -121,17 +121,20 @@ describe('Android Gemini Nano', () => {
     expect(localModelProvider('android')?.supportsTools('system')).toBe(false);
   });
 
-  it.each(['downloadable', 'downloading'] as const)(
-    'fails explicitly without Kilo or a download while the model is %s',
-    async status => {
-      android.availability.mockResolvedValue({ ...android.available, status });
+  it.each([
+    ['downloadable', undefined, 'modelChat.localModels.unavailable'],
+    ['downloading', undefined, 'modelChat.localModels.unavailable'],
+    ['downloadable', 'model_download_required', 'modelChat.localModels.reasons.downloadable'],
+    ['downloading', 'model_downloading', 'modelChat.localModels.reasons.downloading'],
+  ] as const)(
+    'fails explicitly without Kilo or a download while the model is %s (%s)',
+    async (status, reason, key) => {
+      android.availability.mockResolvedValue({ ...android.available, status, reason });
       const { client, kilo } = router();
       const result = await Effect.runPromise(
         Effect.result(Stream.runCollect(client.stream(question)))
       );
-      expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(
-        'modelChat.localModels.unavailable'
-      );
+      expect(Result.isFailure(result) && backendFailureKey(result.failure)).toBe(key);
       expect(android.generate).not.toHaveBeenCalled();
       expect(android.download).not.toHaveBeenCalled();
       expect(kilo).not.toHaveBeenCalled();

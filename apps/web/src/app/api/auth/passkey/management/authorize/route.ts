@@ -205,27 +205,38 @@ export const POST = withRestTiming(AUTHORIZE_PATH, async (request: Request) => {
     }
   }
 
-  const minted = await mintPasskeyManagementAuthorization({
-    userId: auth.user.id,
-    deviceSessionId: auth.deviceSessionId,
-    operation: data.operation,
-  });
+  let minted: MintedPasskeyManagementAuthorization | undefined;
+  try {
+    minted = await mintPasskeyManagementAuthorization({
+      userId: auth.user.id,
+      deviceSessionId: auth.deviceSessionId,
+      operation: data.operation,
+    });
 
-  // Redeem the ticket the account check above read. A concurrent request can
-  // win the single redemption between the read and here; that request mints
-  // its own grant, so this one is dropped.
-  const redeemed = await consumeSignInTicket(data.ticket);
-  if (!redeemed || redeemed.kilo_user_id !== auth.user.id) {
-    await discardPasskeyManagementAuthorization(minted.id).catch(() => undefined);
-    return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+    // Redeem the ticket the account check above read. A concurrent request can
+    // win the single redemption between the read and here; that request mints
+    // its own grant, so this one is dropped.
+    const redeemed = await consumeSignInTicket(data.ticket);
+    if (!redeemed || redeemed.kilo_user_id !== auth.user.id) {
+      await discardPasskeyManagementAuthorization(minted.id).catch(() => undefined);
+      return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+    }
+
+    return NextResponse.json(
+      {
+        authorization: minted.token,
+        operation: minted.operation,
+        expiresIn: minted.expiresIn,
+      },
+      { status: 200, headers: { 'Cache-Control': 'no-store' } }
+    );
+  } catch (error) {
+    // A redemption that throws instead of refusing leaves the proof unspent and
+    // the request unanswered, so the grant minted for it must not survive. The
+    // email branch above keeps the same symmetry.
+    if (minted) {
+      await discardPasskeyManagementAuthorization(minted.id).catch(() => undefined);
+    }
+    throw error;
   }
-
-  return NextResponse.json(
-    {
-      authorization: minted.token,
-      operation: minted.operation,
-      expiresIn: minted.expiresIn,
-    },
-    { status: 200, headers: { 'Cache-Control': 'no-store' } }
-  );
 });

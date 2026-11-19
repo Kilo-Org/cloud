@@ -148,8 +148,14 @@ async function refuseManagementGrantInserts() {
   );
   return {
     async drop() {
-      await db.execute(sql.raw(`DROP TRIGGER ${name} ON passkey_management_authorizations`));
-      await db.execute(sql.raw(`DROP FUNCTION ${name}()`));
+      // Each drop is independent and best-effort. The function and trigger
+      // commit immediately, so anything that survives this helper refuses every
+      // later grant insert in this worker database; and a failing DROP must not
+      // mask the assertion failure already propagating through `finally`.
+      await db
+        .execute(sql.raw(`DROP TRIGGER IF EXISTS ${name} ON passkey_management_authorizations`))
+        .catch(() => undefined);
+      await db.execute(sql.raw(`DROP FUNCTION IF EXISTS ${name}()`)).catch(() => undefined);
     },
   };
 }
@@ -645,6 +651,22 @@ describe('POST /api/auth/passkey/management/authorize', () => {
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'INVALID_TICKET' });
     expect(mockDiscardPasskeyManagementAuthorization).toHaveBeenCalledTimes(1);
+    await expect(grantCount(user.id)).resolves.toBe(0);
+  });
+
+  it('drops the grant when redeeming the ticket throws', async () => {
+    const user = await insertTestUser();
+    const deviceSessionId = await insertNativeSession(user.id);
+    authenticate(user, deviceSessionId);
+    const ticket = await createSignInTicket(user.id);
+    // The mint commits before the redemption, so a redemption that throws would
+    // leave a usable grant behind unless the handler discards it first.
+    mockConsumeSignInTicket.mockRejectedValueOnce(new Error('ticket store down'));
+
+    await expect(
+      POST(createRequest({ proof: 'passkey', operation: 'remove', ticket, admission }))
+    ).rejects.toThrow('ticket store down');
+
     await expect(grantCount(user.id)).resolves.toBe(0);
   });
 });

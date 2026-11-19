@@ -1433,6 +1433,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
       "description": "Prijunk Bitbucket prie {{organization}}. Sukurk darbo srities prieigos raktą su reikiamomis teisėmis ir įklijuok jį žemiau.",
+      "descriptionReconnect": "Prijunk Bitbucket prie {{organization}} iš naujo. Sukurk darbo srities prieigos raktą su reikiamomis teisėmis ir įklijuok jį žemiau.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
       "tokenPlaceholder": "Darbo srities prieigos raktas",
       "tokenRefused": "Bitbucket nepriėmė šio darbo srities prieigos rakto. Patikrink, ar jis turi aukščiau nurodytas teises, tada bandyk dar kartą."

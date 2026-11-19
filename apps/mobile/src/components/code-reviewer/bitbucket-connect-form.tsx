@@ -116,7 +116,11 @@ export function BitbucketConnectForm({
     <View className="gap-5">
       <View className="gap-2">
         <Text variant="muted" className="text-sm">
-          {t('codeReviewer.bitbucketConnect.description', { organization: organizationName })}
+          {integrationId === null
+            ? t('codeReviewer.bitbucketConnect.description', { organization: organizationName })
+            : t('codeReviewer.bitbucketConnect.descriptionReconnect', {
+                organization: organizationName,
+              })}
         </Text>
         <Text variant="muted" className="text-sm">
           {t('codeReviewer.bitbucketConnect.scopes')}

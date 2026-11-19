@@ -1387,6 +1387,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket da {{organization}} a yanar gizo daga kwamfuta.",
       "description": "Haɗa Bitbucket da {{organization}}. Ƙirƙiri lambar izinin shiga muhallin aiki da take da izinin da ake buƙata, sannan ka manna ta a ƙasa.",
+      "descriptionReconnect": "Sake haɗa Bitbucket da {{organization}}. Ƙirƙiri lambar izinin shiga muhallin aiki da take da izinin da ake buƙata, sannan ka manna ta a ƙasa.",
       "scopes": "Asusu: karantawa · Ma'ajiyoyi: karantawa/rubutawa · Buƙatun haɗa canje-canje: karantawa · Hanyoyin sanarwa ta yanar gizo: karantawa/rubutawa",
       "tokenPlaceholder": "Lambar izinin shiga muhallin aiki",
       "tokenRefused": "Bitbucket bai karɓi wannan lambar izinin shiga muhallin aikin ba. Ka duba cewa tana da izinin da ke sama, sannan ka sake gwadawa."

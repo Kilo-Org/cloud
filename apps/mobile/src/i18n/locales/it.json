@@ -664,6 +664,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "La connessione Bitbucket per {{organization}} si gestisce sul web da un computer.",
       "description": "Collega Bitbucket a {{organization}}. Crea un token di accesso all'area di lavoro con le autorizzazioni richieste e incollalo qui sotto.",
+      "descriptionReconnect": "Riconnetti Bitbucket a {{organization}}. Crea un token di accesso all'area di lavoro con le autorizzazioni richieste e incollalo qui sotto.",
       "scopes": "Account: lettura · Repository: lettura/scrittura · Pull request: lettura · Webhook: lettura/scrittura",
       "tokenPlaceholder": "Token di accesso all'area di lavoro",
       "tokenRefused": "Bitbucket non ha accettato questo token dell'area di lavoro. Verifica che disponga delle autorizzazioni indicate sopra, quindi riprova."

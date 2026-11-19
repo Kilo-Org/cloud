@@ -1387,6 +1387,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "Koneksyon Bitbucket pou {{organization}} jere sou entènèt la, apati yon òdinatè.",
       "description": "Konekte Bitbucket ak {{organization}}. Kreye yon jeton aksè pou espas travay la ak pèmisyon ki nesesè yo, epi kole li anba a.",
+      "descriptionReconnect": "Rekonekte Bitbucket ak {{organization}}. Kreye yon jeton aksè pou espas travay la ak pèmisyon ki nesesè yo, epi kole li anba a.",
       "scopes": "Kont: lekti · Depo: lekti/ekriti · Demann fizyon: lekti · Webhook: lekti/ekriti",
       "tokenPlaceholder": "Jeton aksè pou espas travay la",
       "tokenRefused": "Bitbucket pa aksepte jeton aksè pou espas travay sa a. Verifye ke li gen pèmisyon ki anwo a, epi eseye ankò."

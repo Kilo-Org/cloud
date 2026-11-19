@@ -1387,6 +1387,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",
       "description": "Koppel Bitbucket aan {{organization}}. Skep 'n toegangstoken vir die werkruimte met die vereiste toestemmings en plak dit hieronder.",
+      "descriptionReconnect": "Koppel Bitbucket weer aan {{organization}}. Skep 'n toegangstoken vir die werkruimte met die vereiste toestemmings en plak dit hieronder.",
       "scopes": "Rekening: lees · Bewaarplekke: lees/skryf · Trekversoeke: lees · Webhake: lees/skryf",
       "tokenPlaceholder": "Toegangstoken vir die werkruimte",
       "tokenRefused": "Bitbucket het nie hierdie toegangstoken vir die werkruimte aanvaar nie. Kontroleer dat dit die toestemmings hierbo het en probeer dan weer."

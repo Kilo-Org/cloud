@@ -697,6 +697,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
       "description": "將 Bitbucket 連結到 {{organization}}。請建立具有所需權限範圍的工作區存取權杖，並貼到下方。",
+      "descriptionReconnect": "將 Bitbucket 重新連結到 {{organization}}。請建立具有所需權限範圍的工作區存取權杖，並貼到下方。",
       "scopes": "帳戶：讀取 · 存放庫：讀取／寫入 · PR：讀取 · Webhook：讀取／寫入",
       "tokenPlaceholder": "工作區存取權杖",
       "tokenRefused": "Bitbucket 未接受此工作區存取權杖。請確認其具有上方列出的權限範圍，然後再試一次。"

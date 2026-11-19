@@ -1433,6 +1433,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
       "description": "Pripojte Bitbucket k {{organization}}. Vytvorte prístupový token pracovného priestoru s požadovanými oprávneniami a vložte ho nižšie.",
+      "descriptionReconnect": "Znovu pripojte Bitbucket k {{organization}}. Vytvorte prístupový token pracovného priestoru s požadovanými oprávneniami a vložte ho nižšie.",
       "scopes": "Účet: čítanie · Repozitáre: čítanie/zápis · PR: čítanie · Webhooky: čítanie/zápis",
       "tokenPlaceholder": "Prístupový token pracovného priestoru",
       "tokenRefused": "Bitbucket neprijal tento token pracovného priestoru. Skontrolujte, či má oprávnenia uvedené vyššie, a potom to skúste znova."

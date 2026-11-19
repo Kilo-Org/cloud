@@ -1456,6 +1456,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
       "description": "Ceangail Bitbucket le {{organization}}. Cruthaigh comhartha rochtana don spás oibre leis na scóip riachtanacha agus greamaigh thíos é.",
+      "descriptionReconnect": "Ceangail Bitbucket arís le {{organization}}. Cruthaigh comhartha rochtana don spás oibre leis na scóip riachtanacha agus greamaigh thíos é.",
       "scopes": "Cuntas: léamh · Stórtha: léamh/scríobh · Iarratais tarraingthe: léamh · Crúcaí gréasáin: léamh/scríobh",
       "tokenPlaceholder": "Comhartha rochtana don spás oibre",
       "tokenRefused": "Níor ghlac Bitbucket leis an gcomhartha rochtana spáis oibre seo. Seiceáil go bhfuil na scóip thuas aige, ansin triail arís."

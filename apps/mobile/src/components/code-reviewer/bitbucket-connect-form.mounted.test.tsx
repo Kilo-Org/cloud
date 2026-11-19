@@ -109,6 +109,20 @@ describe('BitbucketConnectForm', () => {
     expect(rendersText(root, description)).toBe(true);
   });
 
+  it('describes a token replacement as reconnecting, not as a new connection', async () => {
+    const { root } = await mount('bitbucket-2');
+    const descriptionReconnect = i18n.t('codeReviewer.bitbucketConnect.descriptionReconnect', {
+      organization: 'Acme',
+    });
+    const firstConnectDescription = i18n.t('codeReviewer.bitbucketConnect.description', {
+      organization: 'Acme',
+    });
+
+    expect(descriptionReconnect).not.toBe(firstConnectDescription);
+    expect(rendersText(root, descriptionReconnect)).toBe(true);
+    expect(rendersText(root, firstConnectDescription)).toBe(false);
+  });
+
   it('connects the pasted token and hands the sheet its dismissal', async () => {
     mutations.connect.mockResolvedValue({ integrationId: 'bitbucket-1' });
     const { root, onConnected } = await mount(null);

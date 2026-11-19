@@ -1387,6 +1387,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
       "description": "Csatlakoztasd a Bitbucketet {{organization}}-hoz. Hozz létre egy hozzáférési tokent a munkaterülethez a szükséges jogosultságokkal, és illeszd be alább.",
+      "descriptionReconnect": "Csatlakoztasd újra a Bitbucketet {{organization}}-hoz. Hozz létre egy hozzáférési tokent a munkaterülethez a szükséges jogosultságokkal, és illeszd be alább.",
       "scopes": "Fiók: olvasás · Kódtárak: olvasás/írás · PR-ek: olvasás · Webhookok: olvasás/írás.",
       "tokenPlaceholder": "Munkaterület-hozzáférési token",
       "tokenRefused": "A Bitbucket nem fogadta el ezt a munkaterület-hozzáférési tokent. Ellenőrizd, hogy rendelkezik-e a fenti jogosultságokkal, majd próbáld újra."

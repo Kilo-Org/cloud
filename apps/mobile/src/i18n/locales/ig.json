@@ -1387,6 +1387,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "A na-elekọta njikọ Bitbucket nke {{organization}} na weebụ site na kọmputa.",
       "description": "Jikọọ Bitbucket na {{organization}}. Mepụta akara ikike ịnweta oghere ọrụ nwere ikike ndị achọrọ, wee mado ya n'okpuru.",
+      "descriptionReconnect": "Jikọtaghachi Bitbucket na {{organization}}. Mepụta akara ikike ịnweta oghere ọrụ nwere ikike ndị achọrọ, wee mado ya n'okpuru.",
       "scopes": "Akaụntụ: ịgụ · Ebe nchekwa: ịgụ/ide · Arịrịọ ijikọ koodu: ịgụ · Njikọ ngosi: ịgụ/ide",
       "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ",
       "tokenRefused": "Bitbucket anabataghị akara ikike ịnweta oghere ọrụ a. Lelee na o nwere ikike ndị dị n'elu, wee gbalịa ọzọ."

@@ -351,9 +351,9 @@ export async function extractAndUploadAttachments(
 
       // Reserve before the retrieval. The ledger owns the per-account ceiling
       // and the reaper's lease, so a file the account cannot take is declined
-      // without downloading it. The reservation carries the stated size, or the
-      // cap when the platform states none, so the per-account bound reflects
-      // the most the file can occupy before its body is read.
+      // without downloading it. The reservation records the size the platform
+      // stated, or the cap when it states none, so the row states the most the
+      // file can be before its body is read.
       const declaredSize =
         typeof attachment.size === 'number' && Number.isFinite(attachment.size)
           ? attachment.size

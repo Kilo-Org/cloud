@@ -7231,6 +7231,7 @@ export const cloud_agent_pending_uploads = pgTable(
     // composite index above cannot serve.
     index('IDX_cloud_agent_pending_uploads_expired')
       .on(table.expires_at)
+      .concurrently()
       .where(sql`${table.status} IN ('pending', 'released')`),
     check(
       'cloud_agent_pending_uploads_status_check',

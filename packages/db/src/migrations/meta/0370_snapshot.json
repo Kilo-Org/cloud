@@ -1,5 +1,5 @@
 {
-  "id": "2e67f6fe-5272-42ed-9eae-544a3415f460",
+  "id": "fee5843c-8a48-4a60-af41-2f0dcbe4183e",
   "prevId": "c6373dd1-7a9f-41a2-80b1-1285215e64e3",
   "version": "7",
   "dialect": "postgresql",
@@ -7260,7 +7260,7 @@
           ],
           "isUnique": false,
           "where": "\"cloud_agent_pending_uploads\".\"status\" IN ('pending', 'released')",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }

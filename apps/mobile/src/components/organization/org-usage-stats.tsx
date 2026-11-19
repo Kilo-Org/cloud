@@ -114,7 +114,6 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
                 : 'common.somethingWentWrong'
             )}
           </Text>
-          </Text>
           <Button variant="outline" loading={isFetching} onPress={() => void refetch()}>
             <Text>{t('common.retry')}</Text>
           </Button>

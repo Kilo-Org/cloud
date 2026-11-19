@@ -238,8 +238,8 @@ export function OrganizationCreditActivityScreen() {
       // block, which the item separator does not cover.
       <View className="pt-3">
         {isRetentionLimited && !isLaterPageError && !hasMore && (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('organization.creditActivity.retentionLimit')}
             </Text>
           </View>

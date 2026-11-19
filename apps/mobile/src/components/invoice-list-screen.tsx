@@ -198,7 +198,7 @@ export function InvoiceListScreen({
       // the footer owns the gap above it.
       <View className="pt-3">
         {isRetentionLimited && !isLaterPageError && !hasMore && (
-          <View className="items-center gap-3 px-6 py-4">
+          <View className="items-center gap-3 px-4 py-4">
             <Text variant="muted" className="text-center text-xs">
               {t('organization.invoices.retentionLimit')}
             </Text>

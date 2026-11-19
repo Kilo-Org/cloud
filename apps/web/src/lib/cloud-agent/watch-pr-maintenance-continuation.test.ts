@@ -21,9 +21,6 @@ import { maintenanceChatStatus } from './watch-pr-maintenance-client';
 import { liveAttemptCondition } from './watch-pr-maintenance-store';
 import { emptyWatchPrProjection } from './watch-pr-events';
 
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
-  isReleaseToggleEnabled: jest.fn(async () => true),
-}));
 jest.mock('./watch-pr-maintenance-authorization', () => ({
   MaintenanceSettingsError: class extends Error {},
   MaintenanceBalanceError: class extends Error {},
@@ -58,9 +55,15 @@ const policy = watchPrMaintenancePolicySchema.parse({
   categories: { reviews: true, failedChecks: true, conflicts: true },
 });
 
+afterEach(() => jest.restoreAllMocks());
+
 beforeEach(async () => {
   jest.clearAllMocks();
   const user = await insertTestUser();
+  jest.replaceProperty(process, 'env', {
+    ...process.env,
+    CLOUD_AGENT_PR_AUTO_FIX_USER_ID: user.id,
+  });
   const worktreeId = `worktree_${randomUUID()}`;
   const cloudSessionId = `workspace_${randomUUID()}`;
   const sessionId = `ses_${randomUUID().replaceAll('-', '').slice(0, 26)}`;

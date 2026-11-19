@@ -967,8 +967,8 @@ export const cliSessionsV2Router = createTRPCRouter({
     .input(watchPrQuerySchema)
     .mutation(({ ctx, input }) => enablePullRequestAutoFix(ctx, input)),
 
-  getPrWatchOptions: baseProcedure.input(watchPrQuerySchema).query(async ({ ctx, input }) => {
-    await requirePullRequestAutoFix(ctx.user.id);
+  getPrWatchOptions: baseProcedure.input(watchPrQuerySchema).query(({ ctx, input }) => {
+    requirePullRequestAutoFix(ctx.user.id);
     return getPrWatchOptions(ctx, input);
   }),
   enableWatchPr: baseProcedure

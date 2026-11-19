@@ -17,7 +17,6 @@ import {
 } from '@kilocode/db/cloud-agent-pr-maintenance';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { emptyWatchPrProjection, type WatchPrProjection } from './watch-pr-events';
 import { assessAndScheduleWatchPr, dispatchWatchPrMaintenance } from './watch-pr-maintenance';
 import { assessWatchPr } from './watch-pr-assessment';
@@ -36,9 +35,6 @@ import {
   stopMaintenanceChat,
 } from './watch-pr-maintenance-client';
 
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
-  isReleaseToggleEnabled: jest.fn(),
-}));
 jest.mock('./watch-pr-maintenance-authorization', () => ({
   MaintenanceSettingsError: class extends Error {},
   MaintenanceBalanceError: class extends Error {},
@@ -198,9 +194,12 @@ async function finishWithResult(
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  jest.mocked(isReleaseToggleEnabled).mockResolvedValue(true);
   jest.mocked(maintenanceChatStatus).mockResolvedValue(null);
   const user = await insertTestUser();
+  jest.replaceProperty(process, 'env', {
+    ...process.env,
+    CLOUD_AGENT_PR_AUTO_FIX_USER_ID: user.id,
+  });
   const worktreeId = `worktree_${randomUUID()}`;
   sourceSessionId = `ses_${randomUUID().replaceAll('-', '').slice(0, 26)}`;
   await db.insert(cloud_agent_worktrees).values({ worktree_id: worktreeId, kilo_user_id: user.id });
@@ -277,8 +276,10 @@ beforeEach(async () => {
   });
 });
 
+afterEach(() => jest.restoreAllMocks());
+
 it('pauses a due watch without starting a repair when access was removed', async () => {
-  jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
+  delete process.env.CLOUD_AGENT_PR_AUTO_FIX_USER_ID;
 
   await dispatchDue();
 

@@ -2,11 +2,11 @@
 
 ## Per-user rollout
 
-Create the PostHog release toggle `cloud-agent-pr-auto-fix`. Target `distinct_id` equal to the intended user's Kilo account ID at 100%. Remove any condition that includes everyone.
+For production, run `pnpm web:env set CLOUD_AGENT_PR_AUTO_FIX_USER_ID --only production`. Enter the intended user's Kilo account ID, then redeploy `kilocode-app`.
 
-The flag defaults to off. It hides Auto-fix controls and prevents enrollment and new runs for other accounts. Existing watches pause before starting a new run if the owner no longer has access. Runs already in progress can finish. Saved settings and chats are retained. Users can resume paused watches after access returns. Legacy observation watches do not require the flag.
+If the setting is empty or unset, Auto-fix is off for everyone. Other accounts do not see the controls and cannot enroll or start new runs. Existing watches pause before starting a new run if the owner no longer has access. Runs already in progress can finish. Saved settings and chats are retained. Users can resume paused watches after access returns. Legacy observation watches do not require this setting.
 
-For local development, set `CLOUD_AGENT_PR_AUTO_FIX_DEV_USER_ID` to one local account ID before starting the web app. This setting has no effect in production.
+For local development, set `CLOUD_AGENT_PR_AUTO_FIX_USER_ID` to one local account ID before starting the web app.
 
 ## GitHub App subscriptions
 

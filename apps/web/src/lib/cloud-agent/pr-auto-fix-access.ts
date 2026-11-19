@@ -1,12 +1,12 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 
-export async function canUsePullRequestAutoFix(userId: string): Promise<boolean> {
-  if (process.env.NODE_ENV === 'development') {
-    return process.env.CLOUD_AGENT_PR_AUTO_FIX_DEV_USER_ID === userId;
-  }
-  return isReleaseToggleEnabled('cloud-agent-pr-auto-fix', userId);
+export function getPullRequestAutoFixUserId(): string | null {
+  return process.env.CLOUD_AGENT_PR_AUTO_FIX_USER_ID?.trim() || null;
+}
+
+export function canUsePullRequestAutoFix(userId: string): boolean {
+  return getPullRequestAutoFixUserId() === userId;
 }
 
 export class PullRequestAutoFixUnavailableError extends TRPCError {
@@ -20,6 +20,6 @@ export class PullRequestAutoFixUnavailableError extends TRPCError {
   }
 }
 
-export async function requirePullRequestAutoFix(userId: string): Promise<void> {
-  if (!(await canUsePullRequestAutoFix(userId))) throw new PullRequestAutoFixUnavailableError();
+export function requirePullRequestAutoFix(userId: string): void {
+  if (!canUsePullRequestAutoFix(userId)) throw new PullRequestAutoFixUnavailableError();
 }

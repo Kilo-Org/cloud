@@ -14,16 +14,12 @@ import {
 } from '@kilocode/db/cloud-agent-pr-maintenance';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { enableWatchPr, getPrWatchOptions } from './watch-pr';
 import { enablePullRequestAutoFix, enablePullRequestAutoFixWorkspaces } from './pr-auto-fix';
 
 jest.mock('./watch-pr', () => ({
   getPrWatchOptions: jest.fn(),
   enableWatchPr: jest.fn(async () => ({ id: 'synthetic-watch' })),
-}));
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
-  isReleaseToggleEnabled: jest.fn(),
 }));
 
 const settings = pullRequestAutoFixSettingsSchema.parse({
@@ -39,9 +35,15 @@ const profileId = '10000000-0000-4000-8000-000000000001';
 const environmentId = '10000000-0000-4000-8000-000000000002';
 const integrationId = '10000000-0000-4000-8000-000000000003';
 
-beforeEach(() => {
+let allowedUser: Awaited<ReturnType<typeof insertTestUser>>;
+
+beforeEach(async () => {
   jest.clearAllMocks();
-  jest.mocked(isReleaseToggleEnabled).mockResolvedValue(true);
+  allowedUser = await createUser();
+  jest.replaceProperty(process, 'env', {
+    ...process.env,
+    CLOUD_AGENT_PR_AUTO_FIX_USER_ID: allowedUser.id,
+  });
   jest.mocked(getPrWatchOptions).mockResolvedValue({
     canEnable: true,
     defaultIntegrationId: integrationId,
@@ -52,6 +54,7 @@ beforeEach(() => {
 
 const users: string[] = [];
 afterEach(async () => {
+  jest.restoreAllMocks();
   for (const id of users.splice(0)) {
     await db.delete(cloud_agent_pr_watches).where(eq(cloud_agent_pr_watches.kilo_user_id, id));
     await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, id));
@@ -63,22 +66,28 @@ afterEach(async () => {
   }
 });
 
-async function fixture() {
+async function createUser() {
   const user = await insertTestUser({
     google_user_email: `auto-fix-${crypto.randomUUID()}@example.com`,
   });
   users.push(user.id);
+  return user;
+}
+
+async function fixture(user = allowedUser, prNumber = 42) {
+  const branch = `feature/auto-fix-${prNumber}`;
   const worktreeId = `worktree_${crypto.randomUUID()}`;
   const sessionId = `ses_${crypto.randomUUID()}`;
   const repoUrl = 'https://github.com/example/repository';
   await db
     .insert(cloud_agent_user_settings)
-    .values({ kilo_user_id: user.id, pull_request_auto_fix: settings });
+    .values({ kilo_user_id: user.id, pull_request_auto_fix: settings })
+    .onConflictDoNothing();
   await db.insert(cloud_agent_worktrees).values({
     worktree_id: worktreeId,
     kilo_user_id: user.id,
     git_url: repoUrl,
-    git_branch: 'feature/auto-fix',
+    git_branch: branch,
   });
   await db.insert(cli_sessions_v2).values({
     session_id: sessionId,
@@ -87,17 +96,22 @@ async function fixture() {
     cloud_agent_worktree_id: worktreeId,
     title: 'Synthetic PR task',
     git_url: repoUrl,
-    git_branch: 'feature/auto-fix',
+    git_branch: branch,
   });
   await db.insert(github_branch_pull_requests).values({
     owned_by_user_id: user.id,
     git_url: repoUrl,
-    git_branch: 'feature/auto-fix',
-    pr_url: `${repoUrl}/pull/42`,
-    pr_number: 42,
+    git_branch: branch,
+    pr_url: `${repoUrl}/pull/${prNumber}`,
+    pr_number: prNumber,
     pr_state: 'open',
   });
-  return { user, worktreeId, input: { sessionId, expectedRepoUrl: repoUrl, expectedPrNumber: 42 } };
+  return {
+    user,
+    worktreeId,
+    branch,
+    input: { sessionId, expectedRepoUrl: repoUrl, expectedPrNumber: prNumber },
+  };
 }
 
 it('uses personal defaults and the current workspace environment and profile', async () => {
@@ -131,26 +145,26 @@ it('requires saved consent before manual enablement', async () => {
   expect(enableWatchPr).not.toHaveBeenCalled();
 });
 
-it('rejects manual enrollment without the flag, even with saved consent', async () => {
+it('rejects enrollment when no user is configured, even with saved consent', async () => {
   const { user, input } = await fixture();
-  jest.mocked(isReleaseToggleEnabled).mockResolvedValue(false);
+  delete process.env.CLOUD_AGENT_PR_AUTO_FIX_USER_ID;
 
   await expect(enablePullRequestAutoFix({ user }, input)).rejects.toMatchObject({
     code: 'FORBIDDEN',
   });
+  expect(await enablePullRequestAutoFixWorkspaces()).toEqual({ enabled: 0, unavailable: 0 });
   expect(getPrWatchOptions).not.toHaveBeenCalled();
   expect(enableWatchPr).not.toHaveBeenCalled();
 });
 
-it('only auto-enrolls the flagged owner when both users opted in', async () => {
+it('only enrolls the configured owner when both users opted in', async () => {
   const flagged = await fixture();
-  const unflagged = await fixture();
-  jest
-    .mocked(isReleaseToggleEnabled)
-    .mockImplementation(async (_, userId) => userId === flagged.user.id);
+  const unflagged = await fixture(await createUser());
 
+  await expect(
+    enablePullRequestAutoFix({ user: unflagged.user }, unflagged.input)
+  ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   expect(await enablePullRequestAutoFixWorkspaces()).toEqual({ enabled: 1, unavailable: 0 });
-  expect(isReleaseToggleEnabled).toHaveBeenCalledWith('cloud-agent-pr-auto-fix', unflagged.user.id);
   expect(enableWatchPr).toHaveBeenCalledTimes(1);
   expect(enableWatchPr).toHaveBeenCalledWith(
     { user: flagged.user },
@@ -240,7 +254,7 @@ it('does not enroll a session PR from a different workspace branch', async () =>
 it.each(['watching', 'paused', 'finished'] as const)(
   'preserves an existing %s watch instead of enabling it again',
   async status => {
-    const { user, worktreeId, input } = await fixture();
+    const { user, worktreeId, branch, input } = await fixture();
     const [integration] = await db
       .insert(platform_integrations)
       .values({
@@ -262,7 +276,7 @@ it.each(['watching', 'paused', 'finished'] as const)(
       source_session_id: input.sessionId,
       source_cloud_agent_session_id: 'workspace_synthetic',
       worktree_id: worktreeId,
-      head_ref: 'feature/auto-fix',
+      head_ref: branch,
       base_ref: 'main',
       head_sha: 'a'.repeat(40),
       base_sha: 'b'.repeat(40),
@@ -285,7 +299,7 @@ it.each(['watching', 'paused', 'finished'] as const)(
 );
 
 it('bounds each enrollment pass to five workspaces', async () => {
-  for (let index = 0; index < 7; index += 1) await fixture();
+  for (let index = 0; index < 7; index += 1) await fixture(allowedUser, 42 + index);
   expect(await enablePullRequestAutoFixWorkspaces()).toEqual({ enabled: 5, unavailable: 0 });
   expect(enableWatchPr).toHaveBeenCalledTimes(5);
 });

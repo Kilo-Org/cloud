@@ -88,7 +88,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
   getPullRequestAutoFix: baseProcedure
     .output(pullRequestAutoFixSettingsSchema.nullable())
     .query(async ({ ctx }) => {
-      await requirePullRequestAutoFix(ctx.user.id);
+      requirePullRequestAutoFix(ctx.user.id);
       const settings = await db.query.cloud_agent_user_settings.findFirst({
         where: eq(cloud_agent_user_settings.kilo_user_id, ctx.user.id),
         columns: { pull_request_auto_fix: true },
@@ -102,7 +102,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
     .input(pullRequestAutoFixSettingsSchema)
     .output(pullRequestAutoFixSettingsSchema)
     .mutation(async ({ ctx, input }) => {
-      await requirePullRequestAutoFix(ctx.user.id);
+      requirePullRequestAutoFix(ctx.user.id);
       await db
         .insert(cloud_agent_user_settings)
         .values({ kilo_user_id: ctx.user.id, pull_request_auto_fix: input })

@@ -585,14 +585,14 @@ async function dispatchWatch(
       watch.status === 'watching' &&
       watch.generation === active.generation
     ) {
-      await requirePullRequestAutoFix(watch.kilo_user_id);
+      requirePullRequestAutoFix(watch.kilo_user_id);
     }
     return reconcileAttempt(watch, active);
   }
   const policy = watchPrPolicySchema.parse(watch.policy);
   if (watch.status !== 'watching' || !hasWatchPrAutomaticWriteConsent(policy)) return;
   if (watch.next_run_at && Date.parse(watch.next_run_at) > Date.now()) return;
-  await requirePullRequestAutoFix(watch.kilo_user_id);
+  requirePullRequestAutoFix(watch.kilo_user_id);
   if (watch.last_attempt_id) {
     await authorizeMaintenanceWatch(watch);
     if (!(await settleReplies(watch, watch.last_attempt_id))) return;

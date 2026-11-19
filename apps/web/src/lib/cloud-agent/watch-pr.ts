@@ -520,7 +520,7 @@ export async function getPrWatchOptions(
 }
 
 export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof watchPrEnableSchema>) {
-  if (hasWatchPrAutomaticWriteConsent(input.policy)) await requirePullRequestAutoFix(ctx.user.id);
+  if (hasWatchPrAutomaticWriteConsent(input.policy)) requirePullRequestAutoFix(ctx.user.id);
   const expiresAt = watchPrConsentExpiry(input.policy, input.expiresAt);
   const session = await ownedWatchSource(ctx, input.sessionId);
   assertExpectedPr(session, input);
@@ -839,7 +839,7 @@ export async function changeWatchPr(
     });
   let canonicalRepoUrl: string | undefined;
   if (action === 'resume') {
-    if (hasWatchPrAutomaticWriteConsent(watch.policy)) await requirePullRequestAutoFix(ctx.user.id);
+    if (hasWatchPrAutomaticWriteConsent(watch.policy)) requirePullRequestAutoFix(ctx.user.id);
     if (watch.status !== 'paused')
       throw new TRPCError({
         code: 'PRECONDITION_FAILED',
@@ -922,7 +922,7 @@ export async function recheckWatchPr(
       message: 'Finished watches cannot be rechecked',
     });
   if (hasWatchPrAutomaticWriteConsent(watch.policy)) {
-    await requirePullRequestAutoFix(ctx.user.id);
+    requirePullRequestAutoFix(ctx.user.id);
     return serializeWatchPr(await assessAndScheduleWatchPr(watch, 'recheck'));
   }
   const session = await ownedWatchSourceFor(ctx, watch);

@@ -409,6 +409,7 @@ admission responses within the same slot and deadline.
 - `CODE_REVIEW_WORKER_AUTH_TOKEN` - Auth token for the code review worker. `[SECRET]`
 - `KILOCLAW_API_URL` - Base URL for KiloClaw API; used heavily by `apps/web/src/routers/kiloclaw-router.ts` and tests. [SERVER]
 - `CLOUD_AGENT_NEXT_API_URL` - URL for the Cloud Agent Next API. [SERVER]
+- `CLOUD_AGENT_PR_AUTO_FIX_USER_ID` - Kilo account ID of the only user who can use PR Auto-fix. Unset or empty disables access for everyone. Set it for `kilocode-app`; changes take effect on redeploy. [SERVER]
 - `NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL` - WebSocket URL for Cloud Agent Next from the browser. [PUBLIC]
 - `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` - R2 bucket for cloud agent file attachments. [SERVER]
 - `O11Y_SERVICE_URL` - URL for the observability (O11Y) service. [SERVER]

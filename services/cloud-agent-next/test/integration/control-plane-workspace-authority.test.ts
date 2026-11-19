@@ -112,6 +112,21 @@ function workspaceStub(sessionId: string): DurableObjectStub<CloudAgentWorkspace
   return workspaces.getByName(sessionDoName(USER_ID, sessionId));
 }
 
+/**
+ * Settles a Durable Object call and returns its rejection, or undefined when it
+ * succeeded. The handler is attached in the same turn as the call, so the
+ * Durable Object reply is never reported as an unhandled rejection.
+ */
+async function delegationOutcome(call: Promise<unknown>): Promise<Error | undefined> {
+  try {
+    await call;
+  } catch (error) {
+    if (error instanceof Error) return error;
+    throw error;
+  }
+  return undefined;
+}
+
 async function legacyChildRows(stub: DurableObjectStub<SandboxSessionV2>, children: string[]) {
   await runInDurableObject(stub, (_instance, state) => {
     const db = drizzle(state.storage, { logger: false });
@@ -375,5 +390,43 @@ describe('workspace authority lifecycle', () => {
         organizationId: null,
       })
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('workspace authority delegation', () => {
+  it('delegates only to a session id this Worker allocated', async () => {
+    const root = workspaceSessionId();
+    const stored = authorization(root);
+    await registerChat({
+      sessionId: root,
+      allowSubagentSessions: true,
+      worktreeId: worktreeFor(root),
+      authorization: stored,
+    });
+    const workspace = workspaceStub(root);
+    await expect(workspace.describe()).resolves.toMatchObject({ state: 'active' });
+
+    const authority = {
+      version: 1 as const,
+      ownerId: USER_ID,
+      parentSessionId: root,
+      organizationId: null,
+      authorizationId: stored.id,
+      expiresAt: Math.floor(Date.parse(stored.delegationExpiresAt) / 1000),
+    };
+
+    const rejectedChild = await delegationOutcome(
+      workspace.authorizeChild({ authority, childSessionId: 'workspace_not-a-uuid' })
+    );
+    expect(rejectedChild?.message).toContain('server-allocated');
+    const rejectedChat = await delegationOutcome(
+      workspace.authorizeChat({ chatSessionId: 'workspace_not-a-uuid' })
+    );
+    expect(rejectedChat?.message).toContain('server-allocated');
+
+    const acceptedFormat = await delegationOutcome(
+      workspace.authorizeChild({ authority, childSessionId: workspaceSessionId() })
+    );
+    expect(acceptedFormat?.message ?? '').not.toContain('server-allocated');
   });
 });

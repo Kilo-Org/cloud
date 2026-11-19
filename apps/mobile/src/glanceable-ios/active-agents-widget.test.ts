@@ -50,6 +50,7 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   }),
   buttonStyle: mockModifier('buttonStyle'),
   cornerRadius: mockModifier('cornerRadius'),
+  dynamicTypeSize: mockModifier('dynamicTypeSize'),
   containerBackground: (style: unknown) => ({ $type: 'containerBackground', args: style }),
   environment: mockModifier('environment'),
   fixedSize: mockModifier('fixedSize'),
@@ -209,8 +210,24 @@ const SIZE: Record<string, [number, number]> = {
 
 type Baseline = { text: string; baseline: number };
 
+// Apple's default sizes of the Dynamic Type text styles the layout uses.
+const TEXT_STYLE_SIZE: Record<string, number> = {
+  caption2: 11,
+  caption: 12,
+  footnote: 13,
+  subheadline: 15,
+  body: 17,
+  title3: 20,
+  title2: 22,
+};
+
 function fontSize(node: Rendered | undefined): number {
-  return (modifier(node, 'font')?.size as number | undefined) ?? 17;
+  const font = modifier(node, 'font');
+  const style = font?.textStyle;
+  if (typeof style === 'string') {
+    return TEXT_STYLE_SIZE[style] ?? 17;
+  }
+  return (font?.size as number | undefined) ?? 17;
 }
 
 function fixedHeight(node: Rendered): number | undefined {
@@ -381,6 +398,25 @@ describe('Home header', () => {
       });
     }
   });
+
+  it.each(HOME_FAMILIES)(
+    'grows every text run but the big count with Dynamic Type, capped at xLarge, in %s',
+    family => {
+      for (const props of [...STATES, propsFor([PERMISSION, QUESTION, BUSY, IDLE])]) {
+        const tree = render(props, family);
+        expect(modifier(tree, 'dynamicTypeSize')).toEqual({ max: 'xLarge' });
+        for (const node of collect(tree).filter(entry => entry.kind === 'Text')) {
+          const font = modifier(node, 'font');
+          if (font?.textStyle === undefined) {
+            // Only the count keeps a fixed size, and it is never smaller than 44pt.
+            expect(font?.size, String(node.props.children)).toBeGreaterThanOrEqual(44);
+          } else {
+            expect(font.size, String(node.props.children)).toBeUndefined();
+          }
+        }
+      }
+    }
+  );
 
   it.each(['accented', 'vibrant'] as const)(
     'draws the glyph template and see-through action fills when %s',

@@ -1,4 +1,7 @@
-import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganizationBilling,
+  type OrganizationRole,
+} from '@kilocode/app-shared/organizations';
 
 import { type RepositoryPlatform } from './new-session-repository-state';
 
@@ -92,7 +95,7 @@ export type ConnectCardOffer = {
  */
 export function connectCardOffer(
   platform: RepositoryPlatform,
-  role: string | undefined,
+  role: OrganizationRole | undefined,
   needsReconnect = false
 ): ConnectCardOffer {
   if (platform !== 'bitbucket') {

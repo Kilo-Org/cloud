@@ -309,7 +309,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       // acting on every payload would drive a teardown/refetch loop.
       const evidence = {
         status: row.status,
-        connectionId: typeof row.connectionId === 'string' ? row.connectionId : undefined,
+        connectionId: typeof row['connectionId'] === 'string' ? row['connectionId'] : undefined,
       };
       const unchanged =
         lastUpgradeEvidence !== null &&

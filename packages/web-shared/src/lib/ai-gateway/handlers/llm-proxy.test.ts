@@ -3638,15 +3638,15 @@ describe('kilo-auto/efficient classifier billing', () => {
       plan: 'enterprise',
     });
     mockedApplyResolvedAutoModel.mockImplementation(async (_params, request) => {
-      request.body.model = 'martian/moonshotai/kimi-k2.6';
+      request.body.model = 'kimi-coding/kimi-for-coding';
       return {
         kind: 'ok',
-        resolved: { model: 'martian/moonshotai/kimi-k2.6' },
-        routingTarget: 'martian/moonshotai/kimi-k2.6',
+        resolved: { model: 'kimi-coding/kimi-for-coding' },
+        routingTarget: 'kimi-coding/kimi-for-coding',
       };
     });
     mockedGetDirectByokModel.mockResolvedValue({
-      provider: { id: 'martian' } as never,
+      provider: { id: 'kimi-coding' } as never,
       model: {} as never,
     });
 
@@ -3656,7 +3656,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({
       error_type: 'organization_auto_configuration',
-      message: expect.stringContaining('does not have an enabled BYOK credential for martian'),
+      message: expect.stringContaining('does not have an enabled BYOK credential for kimi-coding'),
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });

@@ -54,14 +54,15 @@ export type OrgKiloPassRowState = {
   /**
    * What pressing the row does. `retry` refetches the payload that could not
    * load (the summary, or the membership payload that decides whether this
-   * organization has one), `none` renders an inert row. The row opens nothing
-   * else: Kilo Pass is no longer sold in either store, so it has no setup or
-   * management page to send the reader to.
+   * organization has one). `none` opens the organization's billing page, the
+   * surface that reads the pass's plan, seats and scheduled change; Kilo Pass
+   * is no longer sold in either store, so that page states the pass and sells
+   * nothing.
    */
   action: 'none' | 'retry';
   /** Trailing action label (only for `retry`). */
   actionLabel: string | null;
-  /** Accessibility hint for the press action; null for inert rows. */
+  /** Accessibility hint for the `retry` press; null on the billing destination. */
   accessibilityHint: string | null;
   /** True only while the summary loads — drives `accessibilityState.busy`. */
   loading: boolean;
@@ -211,6 +212,6 @@ export function getOrgKiloPassRowState(params: {
     return settled(i18n.t('organization.kiloPass.creditProcessingDelayed'), true);
   }
   // Remainder with an agreement row: no commercial state is reported, so the
-  // row states that and stays inert.
+  // row states that; pressing it opens billing like every other settled state.
   return settled(i18n.t('organization.kiloPass.notSubscribed'));
 }

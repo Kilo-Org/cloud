@@ -552,7 +552,9 @@ describe('createWrapperKiloClient session initialization', () => {
   it('preserves an existing custom-titled session in its attached directory without importing', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(Response.json({ id: 'kilo_sess', title: 'My chosen title' }));
+      .mockResolvedValue(
+        Response.json({ id: 'kilo_sess', title: 'My chosen title', directory: workspacePath })
+      );
     vi.stubGlobal('fetch', fetchMock);
     const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
 
@@ -620,8 +622,29 @@ describe('createWrapperKiloClient session initialization', () => {
     expect(error.message).toBe('Session import for kilo_sess failed: HTTP 500');
   });
 
+  it('re-points a record held by another directory with a forced import', async () => {
+    const otherDirectory = `${workspacePath}-other`;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ id: 'kilo_sess', directory: otherDirectory }))
+      .mockResolvedValueOnce(Response.json({ id: nativeProjectId }))
+      .mockResolvedValueOnce(Response.json({ ok: true, id: 'kilo_sess' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
+
+    await client.ensureSession('kilo_sess', workspacePath);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const imported = fetchMock.mock.calls[2]?.[0] as Request;
+    expect(new URL(imported.url).pathname).toBe('/kilocode/session-import/session');
+    const body = await imported.json();
+    expect(body).toMatchObject({ id: 'kilo_sess', directory: workspacePath, force: true });
+  });
+
   it('requires the lookup to return the requested session', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 'another_session' }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ id: 'another_session', directory: workspacePath }));
     vi.stubGlobal('fetch', fetchMock);
     const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
 

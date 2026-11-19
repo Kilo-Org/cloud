@@ -44,10 +44,16 @@ function IndicatorContent({ indicator }: Readonly<SessionStatusIndicatorProps>) 
     case 'warning': {
       // Warning is the agent's own retry after a transient provider failure.
       // Its message is that failure's raw text, so the reader gets fixed copy.
+      // A transport drop the SDK codes renders its own copy instead: that
+      // warning is a reconnect, not a provider retry.
       return (
         <View className="flex-row items-center gap-2">
           <ActivityIndicator size="small" color={colors.warn} />
-          <Text className="shrink text-sm text-warn">{t('agentChat.permissionCard.retrying')}</Text>
+          <Text className="shrink text-sm text-warn">
+            {indicator.code === 'agent-connection-reconnecting'
+              ? t('agentChat.sessionConnection.reconnecting')
+              : t('agentChat.permissionCard.retrying')}
+          </Text>
         </View>
       );
     }

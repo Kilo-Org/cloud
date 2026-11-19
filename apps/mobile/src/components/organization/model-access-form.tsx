@@ -209,11 +209,10 @@ export function ModelAccessForm({
   // A hard-expired trial refuses every organization mutation on the server, so
   // the form states the blocker on its own controls instead of letting an
   // owner or admin build a draft only to collect the refusal — the same shape
-  // as the hub's blocked rename control. The plan-ended sentence replaces the
-  // transient status while the gate holds.
+  // as the hub's blocked rename control. The notice above the segments is the
+  // one place the reason is painted; the status line stays clear because no
+  // edit is possible while the gate holds.
   const cannotSave = planEnded || !dirty || saving || savePayload.kind !== 'ready';
-  const statusOverride =
-    planEnded && feedback.status !== 'failed' ? t('common.organizationTrialEnded') : null;
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
     setForm(previous => ({ ...previous, draft: next }));
@@ -252,14 +251,12 @@ export function ModelAccessForm({
     }
   };
 
-  const statusMessage =
-    statusOverride ??
-    settingsSaveStatus({
-      t,
-      feedback,
-      draftIsDirty: dirty,
-      blockingIssue,
-    });
+  const statusMessage = settingsSaveStatus({
+    t,
+    feedback,
+    draftIsDirty: dirty,
+    blockingIssue,
+  });
 
   // The organization's own catalog omits the models it denies, so the rows come
   // from the whole gateway catalog with its entries added: a denied model has

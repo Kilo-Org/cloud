@@ -221,11 +221,14 @@ describe('ModelAccessForm read-only notice', () => {
 });
 
 describe('ModelAccessForm lapsed-plan controls', () => {
-  it('holds the status line on the plan-ended sentence while the plan lapsed', () => {
+  it('paints the plan-ended sentence once, in the notice above the segments', () => {
     const root = render({ canEdit: true, planEnded: true });
+    const copy = renderedCopy(root);
 
-    const status = root.findByType('AccessibleStatus' as never).props.message;
-    expect(status).toBe(appI18n.t('common.organizationTrialEnded'));
+    expect(copy.filter(text => text === appI18n.t('common.organizationTrialEnded'))).toHaveLength(
+      1
+    );
+    expect(root.findByType('AccessibleStatus' as never).props.message).toBeNull();
   });
 
   it('disables the save button while the plan lapsed, even with edits', () => {

@@ -7,7 +7,8 @@
  *
  * Preparation diagnostics use the PREPARATION_MAX_* history budgets in schemas.ts:
  * setup messages follow arrival order, attempts follow startedAt, and steps follow
- * causal start order. Each list retains its newest entries. Output tails use the
+ * causal start order. Each list retains its newest entries. The autocommit list
+ * keeps only its newest SESSION_MAX_COMMITS entries. Output tails use the
  * UTF-8 byte budget in limits.ts.
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
@@ -19,6 +20,7 @@ import {
   PREPARATION_MAX_ATTEMPTS,
   PREPARATION_MAX_SETUP_LOG_ENTRIES,
   PREPARATION_MAX_STEPS,
+  SESSION_MAX_COMMITS,
   knownSessionStatus,
   sessionCommitDataSchema,
   type KnownSessionStatus,
@@ -800,7 +802,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       const identity = JSON.stringify([parsedCommit.data.repository, parsedCommit.data.commitHash]);
       if (seenCommits.has(identity)) return;
       seenCommits.add(identity);
-      commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }];
+      commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }].slice(
+        -SESSION_MAX_COMMITS
+      );
     }
     if (event.success || commitHash) {
       const parts = [event.commitHash, event.commitMessage].filter(Boolean);

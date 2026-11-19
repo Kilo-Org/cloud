@@ -78,16 +78,16 @@ export function isRouteSurface(surface: string | undefined): surface is PrReview
 const SURFACES: readonly string[] = [...COPY_SURFACES, ...ROUTE_SURFACES];
 
 /** The GitHub route shape's triple: `pr-review/[owner]/[repo]/[number]`. */
-const GITHUB_TRIPLE = 'owner=sample&repo=review-copy&number=1';
+const GITHUB_TRIPLE = ['owner=sample', 'repo=review-copy', 'number=1'];
 /**
  * The provider route shape's segments: `[platform]/[...identity]`, project
  * path first and the number last. Repeated keys arrive as the array the
  * catch-all segment would give the route.
  */
-const GITLAB_SEGMENTS = 'platform=gitlab&identity=acme&identity=review-copy&identity=7';
+const GITLAB_SEGMENTS = ['platform=gitlab', 'identity=acme', 'identity=review-copy', 'identity=7'];
 
 /** The diff position the comment-composer screen insists on. */
-const COMPOSER_POSITION = 'path=src/greeting.ts&side=RIGHT&line=2';
+const COMPOSER_POSITION = ['path=src/greeting.ts', 'side=RIGHT', 'line=2'];
 
 /**
  * The long body the route screens open with under `state=long`: the edit
@@ -111,23 +111,28 @@ const MARKDOWN_BODY =
   'Nit: keep the helper name `greeting` so the call sites read the same as before.';
 
 /**
- * The params one screen surface's route parses. `query` is the link's own
- * query, so `shape` and `state` are read from it and everything else rides
- * along untouched.
+ * The params one screen surface's route parses, as `key=value` pairs in the
+ * link's own encoding. `query` is the link's own query, so `shape` and `state`
+ * are read from it.
  */
-function screenParams(surface: PrReviewRouteSurface, query: string): string {
+function screenParams(surface: PrReviewRouteSurface, query: string): string[] {
   const provider = /(?:^|&)shape=gitlab(?:&|$)/.test(query);
   const shape = provider ? GITLAB_SEGMENTS : GITHUB_TRIPLE;
   if (surface === 'screen-comment-composer') {
-    return `${shape}&${COMPOSER_POSITION}`;
+    return [...shape, ...COMPOSER_POSITION];
   }
   if (surface === 'screen-comment-edit') {
     // The provider route shape has no comment-edit sheet: its own-comment edit
     // lives in the discussion list. The GitHub route carries the body.
     const body = /(?:^|&)state=long(?:&|$)/.test(query) ? LONG_BODY : MARKDOWN_BODY;
-    return `${GITHUB_TRIPLE}&commentId=1&kind=review&body=${encodeURIComponent(body)}`;
+    return [...GITHUB_TRIPLE, 'commentId=1', 'kind=review', `body=${encodeURIComponent(body)}`];
   }
-  return shape;
+  return [...shape];
+}
+
+/** A query string as `key=value` pairs, values left in their own encoding. */
+function queryPairs(query: string): string[] {
+  return query.split('&').filter(pair => pair.length > 0);
 }
 
 /**
@@ -144,10 +149,20 @@ export function handlePrReviewCopyFixturePath(path: string): boolean {
   if (surface === undefined || !SURFACES.some(candidate => candidate === surface)) {
     return false;
   }
-  const extras = match[2] ? `&${match[2]}` : '';
-  const routeParams = isRouteSurface(surface) ? `&${screenParams(surface, match[2] ?? '')}` : '';
+  const extras = queryPairs(match[2] ?? '');
+  // A screen surface's route params ride along with the link's own query, and
+  // the link may override one of them (`?side=LEFT`). Expo Router hands a
+  // repeated key back as an ARRAY, which every route param parser rejects, so
+  // an overridden key appears once: the link's value replaces the default.
+  const routeParams = isRouteSurface(surface) ? screenParams(surface, match[2] ?? '') : [];
+  const linkKeys = new Set(extras.map(pair => pair.split('=')[0] ?? pair));
+  const merged = [
+    ...routeParams.filter(pair => !linkKeys.has(pair.split('=')[0] ?? pair)),
+    ...extras,
+  ];
+  const query = merged.length > 0 ? `&${merged.join('&')}` : '';
   // `router` queues the navigation when the router is not mounted yet, so a
   // cold delivery still lands.
-  router.replace(`/(auth)/pr-review-copy-fixture?surface=${surface}${routeParams}${extras}`);
+  router.replace(`/(auth)/pr-review-copy-fixture?surface=${surface}${query}`);
   return true;
 }

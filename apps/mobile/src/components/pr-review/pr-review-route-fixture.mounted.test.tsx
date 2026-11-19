@@ -169,6 +169,15 @@ describe('PR-review screen links', () => {
     expect(replace.mock.calls[0]?.[0]).toContain('&path=src/greeting.ts&side=RIGHT&line=2');
   });
 
+  it('lets the link override a generated param instead of repeating the key', () => {
+    handlePrReviewCopyFixturePath('dev/pr-review-copy-fixture/screen-comment-composer?side=LEFT');
+    const href = replace.mock.calls[0]?.[0] ?? '';
+    // The override lands once: a repeated key would arrive as an array, which
+    // every route param parser rejects (InvalidRouteState).
+    expect(href.split('side=')).toHaveLength(2);
+    expect(href).toContain('side=LEFT');
+  });
+
   it('carries the edit sheet’s comment id and its long body', () => {
     handlePrReviewCopyFixturePath('dev/pr-review-copy-fixture/screen-comment-edit?state=long');
     const href = replace.mock.calls[0]?.[0] ?? '';

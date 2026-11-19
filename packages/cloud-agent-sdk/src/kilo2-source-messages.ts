@@ -6,7 +6,7 @@ import {
   type Kilo2Message,
   type Kilo2Session,
 } from '@kilocode/session-ingest-contracts';
-type ProjectedKilo2Message = SessionSnapshot['messages'][number];
+export type ProjectedKilo2Message = SessionSnapshot['messages'][number];
 
 export function isCompactionSummaryPart(
   part: Part
@@ -48,6 +48,14 @@ export type Kilo2FileReference = {
   contentIndex?: number;
 };
 
+/**
+ * A compaction message reserves content position 0 for its marker, so its native
+ * content starts at 1. Every id and layout derived from native content reads this.
+ */
+export function nativeContentOffset(message: Kilo2Message): 0 | 1 {
+  return message.type === 'compaction' ? 1 : 0;
+}
+
 /** Authoritative native attachment positions, never lookalike tool input/metadata. */
 export function readKilo2FileReferences(message: Kilo2Message): Kilo2FileReference[] {
   const result: Kilo2FileReference[] = [];
@@ -62,7 +70,7 @@ export function readKilo2FileReferences(message: Kilo2Message): Kilo2FileReferen
       });
     }
   }
-  const offset = message.type === 'compaction' ? 1 : 0;
+  const offset = nativeContentOffset(message);
   for (const [contentIndex, part] of (message.content ?? []).entries()) {
     if (
       part.type !== 'tool' ||
@@ -123,7 +131,7 @@ export function hasUndisplayableKilo2Assets(
  * events report a per-kind ordinal; the position orders the part in the message.
  */
 export function readKilo2ContentLayout(message: Kilo2Message): Kilo2ContentLayout {
-  const offset = message.type === 'compaction' ? 1 : 0;
+  const offset = nativeContentOffset(message);
   const ordinals = new Map<string, number>();
   const positions = new Map<string, number>();
   for (const [index, item] of (message.content ?? []).entries()) {
@@ -258,7 +266,7 @@ export function readKilo2Messages(
           metadata: { compactionSummary: true },
         });
     }
-    const offset = compaction ? 1 : 0;
+    const offset = nativeContentOffset(message);
     for (const [index, item] of (message.content ?? []).entries()) {
       const identity = {
         id: kilo2PartId(message.id, index + offset),
@@ -361,4 +369,28 @@ export function readKilo2Messages(
     result.push({ info, parts });
   }
   return result;
+}
+
+/**
+ * Project one native message for display, with the guard both the live reader and the
+ * history page need: a message that can never display returns nothing, and a projection
+ * failure degrades this message instead of failing the surrounding batch or page.
+ */
+export function projectKilo2Message(
+  session: Kilo2Session,
+  message: Kilo2Message,
+  parentID?: string
+): ProjectedKilo2Message | undefined {
+  // No authorized URL exists for an attachment that can never have one, so this
+  // message can never be displayed.
+  if (hasUndisplayableKilo2Assets(message)) return undefined;
+  let display: ProjectedKilo2Message | undefined;
+  try {
+    display = readKilo2Messages(session, [message])[0];
+  } catch (error) {
+    console.error(`[ConversationSource] Native message ${message.id} projection failed:`, error);
+  }
+  if (display?.info.role === 'assistant' && parentID !== undefined)
+    display.info.parentID = parentID;
+  return display;
 }

@@ -70,6 +70,34 @@ export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
 ] as const;
 
 /**
+ * Session-identity names the platform sets itself.
+ */
+export const SESSION_RESERVED_ENV_VARS = [
+  'HOME',
+  'SESSION_ID',
+  'SESSION_HOME',
+  PNPM_STORE_ENV_VAR,
+] as const;
+
+/**
+ * Every name the platform sets: the session-identity names above and the
+ * control-runtime names.
+ */
+export const RESERVED_ENV_VARS = [
+  ...SESSION_RESERVED_ENV_VARS,
+  ...CONTROL_RUNTIME_RESERVED_ENV_VARS,
+] as const;
+
+export const RESERVED_ENV_VARS_MESSAGE = `Cannot set reserved environment variables: ${RESERVED_ENV_VARS.join(', ')}. These are managed by the system.`;
+
+/** The first reserved name among `names`, or `undefined` when none is reserved. */
+export function findReservedEnvVarName(names: Iterable<string>): string | undefined {
+  const reserved = new Set<string>(RESERVED_ENV_VARS);
+  for (const name of names) if (reserved.has(name)) return name;
+  return undefined;
+}
+
+/**
  * Prefixes the sandbox runtime owns. `buildWorktreeKiloEnvironment` drops them
  * from what reaches the Kilo process, and the profile package mirrors them for
  * write-time rejection because it cannot import from this service.

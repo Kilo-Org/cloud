@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { isReservedEnvironmentKey } from '@kilocode/cloud-agent-profile';
-import { RESERVED_ENV_VARS } from './types.js';
 import {
   CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  RESERVED_ENV_VARS,
   RESERVED_ENV_VAR_PREFIXES,
 } from './shared/runtime-environment.js';
 

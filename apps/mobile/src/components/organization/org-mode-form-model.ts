@@ -82,16 +82,40 @@ function isValidRegExp(source: string): boolean {
   }
 }
 
+/** The fallback a name with no letters or digits at all derives. */
+const FALLBACK_SLUG = 'mode';
+
 /**
  * The slug the create form derives from a name, as the web form derives it:
  * lowercase, every run of other characters folded to one hyphen, no leading or
- * trailing hyphen. A derived slug is a suggestion the person can replace.
+ * trailing hyphen. A name that folds away completely — Arabic, Hebrew, `###` —
+ * suggests `mode`, then `mode-2`, `mode-3`, … past the ones the organization
+ * already holds, so the suggestion is never taken. An empty or whitespace-only
+ * name suggests nothing (`''`): the fallback covers a name that folds away, not
+ * a field the person has not filled. A derived slug is a suggestion the person
+ * can replace.
  */
-export function modeSlugFromName(name: string): string {
-  return name
+export function modeSlugFromName(name: string, takenSlugs: readonly string[] = []): string {
+  // Nothing typed derives nothing; only a name whose characters fold away
+  // reaches the fallback counter below.
+  if (name.trim().length === 0) {
+    return '';
+  }
+  const folded = name
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, '-')
     .replaceAll(/^-+|-+$/g, '');
+  if (folded.length > 0) {
+    return folded;
+  }
+  // The candidates outrun any set of taken slugs, so the loop below stops.
+  const taken = new Set(takenSlugs);
+  let attempt = 1;
+  const candidate = () => (attempt === 1 ? FALLBACK_SLUG : `${FALLBACK_SLUG}-${attempt}`);
+  while (taken.has(candidate())) {
+    attempt += 1;
+  }
+  return candidate();
 }
 
 /**
@@ -134,18 +158,20 @@ export function validateOrgModeForm(
 
 /**
  * The values a save reads. A create whose identifier the person left empty
- * follows the name, as the web form derives one; an update derives nothing, so
- * clearing the identifier is reported as missing instead of silently renaming a
- * mode whose slug overrides a built-in or carries an Organization Auto route.
+ * follows the name, as the web form derives one — counting past the slugs the
+ * organization's other modes hold; an update derives nothing, so clearing the
+ * identifier is reported as missing instead of silently renaming a mode whose
+ * slug overrides a built-in or carries an Organization Auto route.
  */
 export function orgModeFormSaveValues(
   values: OrgModeFormValues,
-  mode: 'create' | 'update'
+  mode: 'create' | 'update',
+  takenSlugs: readonly string[]
 ): OrgModeFormValues {
   if (mode === 'update' || values.slug.trim().length > 0) {
     return values;
   }
-  return { ...values, slug: modeSlugFromName(values.name) };
+  return { ...values, slug: modeSlugFromName(values.name, takenSlugs) };
 }
 
 /**

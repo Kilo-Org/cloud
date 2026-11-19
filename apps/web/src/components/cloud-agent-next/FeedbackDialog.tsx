@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useId } from 'react';
+import { useState, useCallback, useId, type ComponentProps } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
-import { MessageSquareWarning, Loader2, Check, History } from 'lucide-react';
+import { Loader2, Check, History } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,7 +13,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { useManager } from './CloudAgentProvider';
 import type { ResolvedSession } from '@kilocode/cloud-agent-sdk';
@@ -25,12 +24,20 @@ import { formatFeedbackTimestamp } from './feedback-history';
 const FEEDBACK_HISTORY_LIMIT = 5;
 
 type FeedbackDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
   organizationId?: string;
   kiloSessionId?: string;
 };
 
-export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialogProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function FeedbackDialog({
+  open,
+  onOpenChange,
+  onCloseAutoFocus,
+  organizationId,
+  kiloSessionId,
+}: FeedbackDialogProps) {
   const [feedbackText, setFeedbackText] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -50,7 +57,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
   // the dialog is open.
   const historyQuery = useQuery({
     ...trpc.cloudAgentNextFeedback.list.queryOptions({ limit: FEEDBACK_HISTORY_LIMIT }),
-    enabled: isOpen,
+    enabled: open,
   });
   const history = historyQuery.data ?? [];
   const historyError = historyQuery.isError;
@@ -74,12 +81,12 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      setIsOpen(open);
+      onOpenChange(open);
       setFeedbackText('');
       setShowSuccess(false);
       resetMutation();
     },
-    [resetMutation]
+    [onOpenChange, resetMutation]
   );
 
   const handleSubmit = useCallback(() => {
@@ -111,19 +118,11 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
   ]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="text-muted-foreground"
-          title="Send feedback"
-          aria-label="Send feedback"
-        >
-          <MessageSquareWarning className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-md">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className="flex max-h-[85vh] flex-col sm:max-w-md"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle>Send Feedback</DialogTitle>
           <DialogDescription>

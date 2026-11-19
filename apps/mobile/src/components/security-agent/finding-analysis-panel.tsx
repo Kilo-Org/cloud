@@ -52,6 +52,18 @@ type FindingAnalysisPanelProps = {
   onRetry: () => void;
 };
 
+// Admission mirrors SecurityFindingRow.tsx's showAnalysisAction/canRestartAnalysis
+// — server owns eligibility, this just reads the already-fetched state. It reads
+// the response without requiring it, so the capacity read below can ask whether
+// a start action is offered before the panel's early returns.
+function offersAnalysisStart(analysis: SecurityAnalysis | undefined): boolean {
+  if (analysis?.findingState.status !== 'open') {
+    return false;
+  }
+  const state = getSecurityFindingAnalysisState(analysis.status, analysis.analysis);
+  return state === 'not-analyzed' || state === 'failed';
+}
+
 // Ported from FindingDetailDialog.tsx:985; this panel keeps the raw technical report.
 export function FindingAnalysisPanel({
   scope,
@@ -66,7 +78,11 @@ export function FindingAnalysisPanel({
   const mutedDisabledInk = useMutedDisabledInk();
   const { i18n, t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const capacity = useSecurityAnalysisCapacity(scope);
+  // Only a start action reads the admission counters, and that read polls while
+  // the owner is at the limit — so it stays disabled where no start is offered.
+  // The flag is computed from props before this hook, and the same value is the
+  // render's `canStartAnalysis` below, so the two cannot disagree.
+  const capacity = useSecurityAnalysisCapacity(scope, offersAnalysisStart(analysis));
   const startAnalysis = useStartSecurityAnalysis(scope);
   const now = useRelativeTimeNow();
 
@@ -148,8 +164,7 @@ export function FindingAnalysisPanel({
     analysisState === 'safe-to-dismiss' ||
     analysisState === 'manual-review' ||
     analysisState === 'analysis-required';
-  const canStartAnalysis =
-    findingOpen && (analysisState === 'not-analyzed' || analysisState === 'failed');
+  const canStartAnalysis = offersAnalysisStart(analysis);
   const canRestartAnalysis = findingOpen && analysis.status === 'running';
   // A completed analysis whose finding changed since offers no start or restart
   // action above, so the stale blocker would read as unfixable on this tab too.

@@ -6,6 +6,7 @@ import {
 } from '@/components/organization/invite-member-validators';
 import { ORGANIZATION_INVITE_SEAT_LIMIT_REACHED } from '@kilocode/app-shared/organizations';
 import { i18n } from '@/i18n';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 const invalidCopy = i18n.t('organization.inviteMember.emailError');
 
@@ -111,5 +112,20 @@ describe('inviteErrorCopy', () => {
         Object.assign(new Error('This user must join through SSO'), { code: 'FORBIDDEN' })
       )
     ).toEqual(generic);
+  });
+
+  it('gives a billing role the plan refusal that offers the step', () => {
+    const error = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+    });
+    expect(inviteErrorCopy(error, true)).toEqual({
+      field: 'form',
+      message: i18n.t('common.organizationTrialEndedBilling'),
+    });
+    // The reader who cannot change the plan keeps the copy that names the owner.
+    expect(inviteErrorCopy(error, false)).toEqual({
+      field: 'form',
+      message: i18n.t('common.organizationTrialEnded'),
+    });
   });
 });

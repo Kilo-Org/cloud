@@ -14,7 +14,7 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
-import { canStepOlderTo, OrganizationRequestLogsScreen } from './request-logs-screen';
+import { canStepOlderTo, HISTORY_DAYS, OrganizationRequestLogsScreen } from './request-logs-screen';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -92,11 +92,12 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black' }),
 }));
 
-vi.mock('@/components/ui/icons', () => ({ FileText: 'FileText' }));
+vi.mock('@/components/ui/icons', () => ({ Logs: 'Logs' }));
 
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronLeft: 'DirectionalChevronLeft',
   DirectionalChevronRight: 'DirectionalChevronRight',
+  DirectionalLogs: 'DirectionalLogs',
 }));
 
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -261,8 +262,48 @@ describe('OrganizationRequestLogsScreen', () => {
     const { renderer, unmount } = await mount();
 
     const [empty] = renderer.root.findAllByType('EmptyState');
-    expect(empty?.props.title).toBe('No requests');
-    expect(empty?.props.description).toBe('This hour has no gateway requests.');
+    expect(empty?.props.title).toBe('No requests in this hour');
+    // The window header names the hour; the description points at the paging
+    // control, so it is here while an older hour still exists.
+    expect(empty?.props.description).toBe('Use Older hour to see earlier requests.');
+    unmount();
+  });
+
+  it('drops the Older-hour pointer once the history bound stops the step', async () => {
+    logsQuery.data = [];
+    const { renderer, unmount } = await mount();
+
+    const buttons = renderer.root.findAllByType('Button');
+    const older = buttons.find(node => node.props.accessibilityLabel === 'Older hour');
+    expect(older).toBeDefined();
+    // Drive the window to the bound one step at a time: the oldest reachable
+    // window end is one hour inside the age bound, so the loop needs the
+    // full history of hours. Each act flushes one batch of updates through
+    // React's scheduler.
+    const BATCH = 1000;
+    const maxSteps = HISTORY_DAYS * 24;
+    for (let steps = 0; steps < maxSteps; steps += BATCH) {
+      if (older?.props.disabled) {
+        break;
+      }
+      for (let step = 0; step < BATCH && steps + step < maxSteps; step += 1) {
+        if (older?.props.disabled) {
+          break;
+        }
+        act(() => {
+          if (older) {
+            handlerOf(older, 'onPress')?.();
+          }
+        });
+      }
+    }
+    expect(older?.props.disabled).toBe(true);
+
+    const [empty] = renderer.root.findAllByType('EmptyState');
+    expect(empty?.props.title).toBe('No requests in this hour');
+    // A pointer at a disabled control would be a dead end; the scoped title
+    // alone is the truth here.
+    expect(empty?.props.description).toBeUndefined();
     unmount();
   });
 
@@ -277,6 +318,14 @@ describe('OrganizationRequestLogsScreen', () => {
     expect(painted).toContain('$1.00');
     expect(painted.some(text => text.includes('1,234 in'))).toBe(true);
     expect(painted.some(text => text.includes('567 out'))).toBe(true);
+    // One row line carries the time and the token pair, so the catalog's own
+    // ` · ` spaces both dots. The time is a first-strong isolate, so its AM/PM
+    // marker stays beside the clock in either direction.
+    const meta = painted.find(text => text.includes('1,234 in') && text.includes('·'));
+    expect(meta).toBeDefined();
+    expect(meta?.startsWith('\u2068')).toBe(true);
+    expect(meta).toContain('\u2069 · ');
+    expect(meta?.split('·')).toHaveLength(3);
     expect(painted).toContain('BYOK');
     unmount();
   });
@@ -319,8 +368,13 @@ describe('OrganizationRequestLogsScreen', () => {
     });
     const previous = Date.parse(logsQuery.startTimes.at(-1) ?? '');
     expect(anchor - previous).toBe(HOUR_MS);
-    // The header names the window the rows belong to.
-    expect(texts(renderer).some(text => text.includes('–'))).toBe(true);
+    // The header names the window the rows belong to. Each clock is a
+    // first-strong isolate, so the AM/PM marker stays beside its own clock and
+    // the catalog's join keeps the pair in the language's order.
+    const range = texts(renderer).find(text => text.includes('–'));
+    expect(range).toBeDefined();
+    expect(range?.split('\u2068')).toHaveLength(3);
+    expect(range).not.toContain('\u2066');
 
     const stepBack = renderer.root
       .findAllByType('Button')

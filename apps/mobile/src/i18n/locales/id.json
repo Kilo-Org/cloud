@@ -26,6 +26,7 @@
     "creditHistory": "Riwayat kredit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Batal",
     "done": "Selesai",
     "retry": "Coba lagi",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "Perubahan",
     "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
-    "privateRepositoryA11y": "{{name}}, repositori pribadi"
+    "privateRepositoryA11y": "{{name}}, repositori pribadi",
+    "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggris.",
+    "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi."
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Nilai yang tersimpan tidak dapat ditampilkan. Masukkan nilai baru untuk menggantinya.",
       "editKeyMappingsWarning": "Mengganti kunci juga akan mengganti pemetaan model yang tersimpan: masukkan kembali setiap pemetaan yang masih Anda perlukan.",
       "saveFailed": "Tidak dapat menyimpan kunci.",
-      "invalidCredentials": "Periksa kredensial lalu coba lagi.",
       "fieldRequired": "{{field}} wajib diisi.",
+      "keyIncomplete": "Nilai wajib pada kunci belum diisi.",
       "incompleteMapping": "Pemetaan {{number}} memerlukan slug model gateway dan nama deployment.",
       "apiKeyLabel": "Kunci API",
       "apiKeyPlaceholder": "Tempel kunci",
       "apiKeyRequired": "Masukkan kunci.",
+      "keyAlreadyExists": "Kamu sudah memiliki kunci untuk penyedia ini. Hapus kunci itu sebelum menambahkan yang lain.",
+      "keyStoreFailed": "Kunci tidak dapat disimpan.",
+      "invalidCredentials": "Kunci ini tidak sesuai format yang diharapkan penyedia ini. Periksa kunci ini dan coba lagi.",
+      "testSucceeded": "Kunci berfungsi. Penyedia: {{provider}}. Model: {{model}}.",
+      "testRejected": "Penyedia menolak kunci ini. Pastikan kunci itu benar dan belum dicabut.",
+      "testIncomplete": "Penyedia mengakhiri pengujian sebelum selesai. Coba lagi.",
+      "testUnsupportedProvider": "Penyedia ini tidak lagi didukung. Hapus kunci.",
+      "testUnreadableKey": "Kunci yang tersimpan tidak dapat dibaca. Coba lagi nanti.",
+      "testDeprecatedProvider": "Penyedia ini sudah usang, sehingga kuncinya tidak dapat diuji.",
+      "keyManagedByCodingPlan": "Paket coding mengelola kunci penyedia ini, dan kunci tersebut bersifat hanya-baca. Batalkan paket coding untuk menambahkan kunci milikmu sendiri.",
+      "providerUnavailable": "Penyedia ini belum tersedia, jadi kamu belum dapat menambahkan kunci untuknya.",
+      "testFailed": "Pengujian kunci gagal. Coba lagi.",
       "authMethod": "Metode autentikasi",
       "authMethodAccessKeys": "Kunci akses",
       "resourceName": "Nama sumber daya Azure",
@@ -481,7 +496,14 @@
       "viewReceipt": "Lihat tanda terima"
     },
     "changelog": "Yang baru",
-    "changelogVersionPending": "Catatan versi ini hadir di pembaruan aplikasi berikutnya."
+    "changelogVersionPending": "Catatan versi {{version}} hadir di pembaruan aplikasi berikutnya.",
+    "changelogGroupNew": "Baru",
+    "changelogFixesIn": "Perbaikan dan peningkatan pada {{areas}}.",
+    "changelogFixesPolish": "Perbaikan dan peningkatan di seluruh aplikasi.",
+    "changelogAreas": {
+      "signIn": "Masuk",
+      "profileOrganizations": "Profil dan organisasi"
+    }
   },
   "preferences": {
     "general": "Umum",
@@ -923,13 +945,25 @@
       "repositoryLine": "Tinjauan: {{reviews}} · Temuan: {{findings}}",
       "empty": "Belum ada tinjauan dengan analitik",
       "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
-      "off": "Analitik nonaktif untuk organisasi ini.",
-      "couldNotLoad": "Tidak dapat memuat analitik"
+      "offTitle": "Analitik nonaktif untuk {{platform}}",
+      "offDescription": "Peran penagihan organisasi (pemilik, admin, dan pengelola penagihan) dapat mengaktifkan analitik di pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
+      "couldNotLoad": "Tidak dapat memuat analitik",
+      "trackedReviewsCaption": "Tinjauan yang selesai selama periode ini dengan analitik aktif. Tinjauan yang sedang berjalan dan gagal tidak pernah dihitung.",
+      "trackedReviewsUncounted": "Tidak dihitung: {{displayCount}} dari {{displayTotal}} tinjauan yang selesai milik organisasi, hasilnya tidak terekam.",
+      "trackedReviewsUncounted_one": "Tidak dihitung: {{displayCount}} dari {{displayTotal}} tinjauan yang selesai milik organisasi, hasilnya tidak terekam.",
+      "trackedReviewsUncounted_other": "Tidak dihitung: {{displayCount}} dari {{displayTotal}} tinjauan yang selesai milik organisasi, hasilnya tidak terekam."
     },
     "council": {
       "title": "Tinjauan dewan",
       "subtitle": "Beberapa spesialis meninjau setiap PR, dan suara mereka digabungkan menjadi satu keputusan.",
-      "unavailable": "Tinjauan dewan tidak tersedia untuk organisasi ini.",
+      "unavailablePersonallyTitle": "Memerlukan organisasi Enterprise",
+      "unavailablePersonally": "Tinjauan dewan bukan bagian dari akun pribadi.",
+      "unavailablePersonallyAction": "Buat organisasi",
+      "unavailablePersonallySwitchAction": "Ganti organisasi",
+      "unavailableOrganizationTitle": "Tinjauan dewan tidak tersedia",
+      "unavailableForOrganization": "Tinjauan dewan membutuhkan paket Enterprise dengan langganan aktif atau masa uji coba. Organisasi ini tidak memilikinya saat ini.",
+      "unavailableForOrganizationNeutral": "Tinjauan dewan tidak tersedia untuk organisasi ini saat ini. Coba lagi nanti.",
+      "unavailableOnBitbucket": "Tinjauan dewan tidak tersedia untuk repositori Bitbucket.",
       "noRepositories": "Belum ada repositori yang dipilih. Pilih repositori di setelan repositori terlebih dahulu.",
       "specialists": "Spesialis",
       "labels": "Label yang memicu tinjauan dewan",
@@ -2580,7 +2614,6 @@
     "completingPurchase": "Menyelesaikan pembelian",
     "subscriptionLoading": "Memuat langganan Kilo Pass",
     "retryHint": "Mencoba memuat ulang status Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia di aplikasi.",
     "statusActive": "Aktif",
@@ -3318,6 +3351,7 @@
       "manageOnWeb": "Pengaturan penagihan di web",
       "changePlan": "Ubah paket",
       "buySeats": "Beli lisensi",
+      "managedOnWeb": "Paket, lisensi pengguna, dan isi ulang otomatis dikelola di web.",
       "setupAutoTopUp": "Atur isi ulang otomatis",
       "manageAutoTopUp": "Kelola isi ulang otomatis",
       "opensOnWeb": "Dibuka di web"
@@ -3479,12 +3513,11 @@
       "requestLogs": "Log permintaan"
     },
     "requestLogs": {
-      "hint": "Permintaan dalam satu jam sebelum akhir rentang waktu, terbaru di atas.",
       "older": "Jam sebelumnya",
       "newer": "Jam berikutnya",
       "truncated": "Jam ini memiliki lebih banyak permintaan daripada yang ditampilkan.",
-      "emptyTitle": "Tidak ada permintaan",
-      "emptyDescription": "Tidak ada permintaan gateway dalam jam ini.",
+      "emptyTitle": "Tidak ada permintaan di jam ini",
+      "emptyDescription": "Gunakan Jam sebelumnya untuk melihat permintaan yang lebih awal.",
       "loadError": "Tidak dapat memuat log permintaan.",
       "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
       "tokens": "{{input}} masuk · {{output}} keluar",
@@ -4283,8 +4316,7 @@
       "repoValue": "Repositori: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Profil ini tidak lagi tersedia. Pilih profil lain.",
-      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Pemilik atau admin organisasi dapat membuat profil organisasi."
+      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi."
     },
     "variablesDeleteFailed": "Tidak dapat menghapus variabel",
     "deleteVariable": "Hapus variabel {{key}}",
@@ -4470,7 +4502,6 @@
     "dismiss": "Abaikan laporan",
     "offline": "Offline · laporan tersimpan",
     "cached": "Laporan tersimpan · tidak dapat diperbarui",
-    "window": "{{start}} – {{end}}",
     "summary": "Ringkasan AI",
     "summaryPending": "Ringkasan AI sedang diproses. Ringkasan akan muncul di sini setelah siap.",
     "summaryUnavailable": "Ringkasan AI tidak tersedia. Laporan terstruktur Anda tetap tersedia.",
@@ -4592,6 +4623,7 @@
       "title": "Pemicu & webhook",
       "subtitle": "Otomatiskan eksekusi Cloud Agent dari panggilan webhook atau jadwal.",
       "new": "Pemicu baru",
+      "create": "Buat pemicu",
       "emptyTitle": "Belum ada pemicu",
       "emptyDescription": "Buat pemicu untuk memulai eksekusi Cloud Agent dari panggilan webhook atau sesuai jadwal.",
       "loadFailedTitle": "Tidak dapat memuat pemicu",
@@ -4645,6 +4677,8 @@
       "created": "Pemicu dibuat",
       "saved": "Pemicu disimpan",
       "statusArrived": "Tiba",
+      "defaultPromptWebhook": "Jelaskan isi permintaan webhook ini:\n\n{{body}}",
+      "defaultPromptScheduled": "Jalankan tugas terjadwal. Eksekusi dimulai pada {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Masukkan nama.",
         "nameTooShort": "Gunakan setidaknya 8 karakter.",
@@ -4693,6 +4727,7 @@
     "superseded": "Tautan ini telah diganti dari perangkat lain, sehingga tidak lagi berfungsi."
   },
   "sharedSession": {
+    "startedAt": "Dimulai pukul {{time}}",
     "title": "Sesi yang dibagikan",
     "someone": "Seseorang",
     "sharedBy": "Dibagikan oleh {{owner}}",
@@ -4848,6 +4883,8 @@
     "modelsDescription": "Nonaktifkan model untuk memblokirnya bagi setiap anggota. Model dari penyedia yang diizinkan aktif secara bawaan.",
     "modelsDeniedOnly": "Hanya yang ditolak",
     "modelsEmpty": "Tidak ada model yang cocok dengan pencarian ini.",
+    "modelsDeniedEmpty": "Tidak ada model yang ditolak.",
+    "modelsDeniedSearchEmpty": "Tidak ada model yang ditolak yang cocok dengan pencarian ini.",
     "providersDescription": "Nonaktifkan penyedia untuk menghentikan Kilo merutekan ke penyedia itu untuk organisasi ini.",
     "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",

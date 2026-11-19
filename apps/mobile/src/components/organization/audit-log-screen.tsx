@@ -13,21 +13,25 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, ScrollText } from '@/components/ui/icons';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatClockTime, formatDate } from '@/lib/format';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { type OrgAuditLogEntry, useOrgAuditLogPage } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { parseTimestamp } from '@/lib/utils';
 
-// FlashList takes `contentContainerStyle` (no className), so the `px-6 pt-4`
-// inset maps to its pixel values; the tab bar's own bottom padding rides on the
-// footer, which `gap` would not cover.
+// FlashList takes `contentContainerStyle` (no className), so the skeleton's and
+// the empty and footer blocks' `px-6 pt-4` inset is spelled in pixels here.
+// NativeWind's native rem is 14, which makes px-6 21 dp and pt-4 14 dp; 24/16 is
+// the web rem and leaves the rows 3 dp inside those blocks. The tab
+// bar's own bottom padding rides on the footer, which `gap` would not cover.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
+const listContentContainerStyle = { paddingHorizontal: 21, paddingTop: 14 } satisfies ViewStyle;
 
 const AUDIT_DATE = { year: 'numeric', month: 'short', day: 'numeric' } as const;
 
@@ -58,19 +62,36 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
   const [expanded, setExpanded] = useState(false);
   const actor = entry.actor_email ?? entry.actor_name;
   const time = formatAuditTime(entry.created_at);
-  const meta = actor ? `${actor} · ${time}` : time;
   const eventName = auditActionLabel(t, entry.action);
   // The server's message for the creation action is "Organization <name>
   // created", which only restates the event name already shown above it. Every
   // row of this log belongs to this organization, so the row shows neither that
   // English sentence nor a name a later rename would change.
   const showsDetail = entry.action !== 'organization.created';
+  // The actor and the time render as two elements in one row, never one
+  // interpolated string: the row shrinks the actor, not the time, and each
+  // keeps its own reading order. One string put the localized date inside the
+  // left-to-right email run, so under Arabic its parts read out of order, and
+  // the single-line clamp put the ellipsis on the time — the part that tells
+  // the entries apart — while the repeated email stayed whole.
   const metaLine =
-    meta.length === 0 ? null : (
-      <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-        {meta}
-      </Text>
-    );
+    actor || time ? (
+      <View className="flex-row items-center gap-2">
+        {actor ? (
+          // RN defaults `flexShrink` to 0; `min-w-0 shrink` lets the long
+          // repeated email give up width and truncate instead of pushing the
+          // time off the line.
+          <Text className="min-w-0 shrink text-xs text-muted-foreground" numberOfLines={1}>
+            {actor}
+          </Text>
+        ) : null}
+        {time ? (
+          <Text className="shrink-0 text-xs text-muted-foreground" numberOfLines={1}>
+            {time}
+          </Text>
+        ) : null}
+      </View>
+    ) : null;
   if (!showsDetail) {
     return (
       <View className="gap-1 rounded-lg bg-secondary p-3">
@@ -93,7 +114,9 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
       accessibilityRole="button"
       // The clamp is visual only: a reader hears the whole event whether or not
       // the row is open.
-      accessibilityLabel={[eventName, entry.message, meta].filter(Boolean).join('. ')}
+      accessibilityLabel={[eventName, entry.message, [actor, time].filter(Boolean).join(', ')]
+        .filter(Boolean)
+        .join('. ')}
       accessibilityState={{ expanded }}
       className="gap-1 rounded-lg bg-secondary p-3 active:opacity-70"
     >
@@ -127,6 +150,12 @@ export function OrganizationAuditLogScreen() {
   const allowed = org != null && canViewOrgAuditLog(role, org.plan);
   const { query, entries, hasMore } = useOrgAuditLogPage(organizationId, allowed);
   const paddingBottom = useTabBarBottomPadding();
+
+  // An audit entry can be written while this screen is open (another admin
+  // changes settings on the web), so the pull is the reader's way to ask for
+  // the new events without leaving the list.
+  const [refreshing, onRefresh] = useManualRefresh(query.refetch, t('common.couldNotRefresh'));
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
 
   // `AuditLogRow` is memoized at module scope, so one identity across data
   // updates keeps every unchanged row from re-rendering. The row reads `t`
@@ -181,6 +210,7 @@ export function OrganizationAuditLogScreen() {
         icon={ScrollText}
         title={t('organization.auditLog.emptyTitle')}
         description={t('organization.auditLog.emptyDescription')}
+        refreshControl={refreshControl}
       />
     );
   } else {
@@ -231,6 +261,7 @@ export function OrganizationAuditLogScreen() {
         getItemType={() => 'auditLog'}
         ItemSeparatorComponent={RowSeparator}
         contentContainerStyle={listContentContainerStyle}
+        refreshControl={refreshControl}
         ListFooterComponent={footer}
       />
     );

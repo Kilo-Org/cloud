@@ -9,28 +9,32 @@ import {
   type SecurityRemediationAdmissionRejectionReason,
 } from '@kilocode/worker-utils/security-remediation-policy';
 import { z } from 'zod';
-import { postSecurityWorkerJson } from './security-worker-request';
-
-type RemediationOwner =
-  | { organizationId: string; userId?: never }
-  | { userId: string; organizationId?: never };
+import {
+  SECURITY_REMEDIATION_REJECTED_MESSAGE,
+  SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+} from '@kilocode/app-shared/security-agent';
+import {
+  isDefinitiveSecurityWorkerRejection,
+  postSecurityWorkerJson,
+} from './security-worker-request';
+import type { SecurityReviewOwner } from '../core/types';
 
 type ManualRemediationStartParams = {
   findingId: string;
-  owner: RemediationOwner;
+  owner: SecurityReviewOwner;
   actorUserId: string;
   retry?: boolean;
 };
 
 type RemediationCancellationParams = {
   attemptId: string;
-  owner: RemediationOwner;
+  owner: SecurityReviewOwner;
   actorUserId: string;
 };
 
 type ApplyAutoRemediationParams = {
   commandId: string;
-  owner: RemediationOwner;
+  owner: SecurityReviewOwner;
   actorUserId: string;
 };
 
@@ -50,8 +54,6 @@ const ManualRemediationStartResponseSchema = z.discriminatedUnion('admitted', [
     reason: z.enum(SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS),
   }),
 ]);
-
-const WorkerErrorResponseSchema = z.object({ error: z.string() });
 
 export type ManualRemediationStartResult =
   | {
@@ -78,12 +80,56 @@ type ApplyAutoRemediationResponse = {
   error?: string;
 };
 
-function requireWorkerConfig() {
-  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL) {
-    throw new Error('SECURITY_AUTO_ANALYSIS_WORKER_URL is not configured');
+/**
+ * Logs a definitive non-5xx Worker rejection before it becomes the stable
+ * client error: the status is what separates an internal-secret mismatch (401)
+ * or a request-schema drift (400) from a policy rejection (409) once the body
+ * is no longer echoed. The Worker's `error` body is notes-only and length-capped.
+ *
+ * Rejection classes at the throw sites: an auth/config rejection (401/403)
+ * means the deployment is misconfigured, so the client gets the
+ * service-not-configured sentence (`SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE`).
+ * Any other rejection keeps the remediation-rejection sentence. Both go out as
+ * `PRECONDITION_FAILED`; the sentences are shared with the mobile ledger
+ * (stable-error-messages).
+ */
+function logDefinitiveRejection(route: string, status: number, body: unknown): void {
+  let notes: string | null = null;
+  if (body !== null && typeof body === 'object' && 'error' in body) {
+    const raw = body.error;
+    if (typeof raw === 'string') {
+      notes = raw.slice(0, 200);
+    }
   }
-  if (!INTERNAL_API_SECRET) {
-    throw new Error('INTERNAL_API_SECRET is not configured');
+  console.error('Security remediation Worker rejected the request', {
+    route,
+    status,
+    ...(notes !== null ? { notes } : {}),
+  });
+}
+
+/**
+ * The stable error for a definitive non-5xx Worker rejection: a 401/403 is the
+ * Worker refusing the server's own credentials, i.e. the same misconfiguration
+ * as an unset URL or secret, so it reuses the not-configured sentence. Every
+ * other rejection keeps the remediation-rejection sentence.
+ */
+function definitiveRejectionError(status: number): TRPCError {
+  const authRejection = status === 401 || status === 403;
+  return new TRPCError({
+    code: 'PRECONDITION_FAILED',
+    message: authRejection
+      ? SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE
+      : SECURITY_REMEDIATION_REJECTED_MESSAGE,
+  });
+}
+
+function requireWorkerConfig() {
+  if (!SECURITY_AUTO_ANALYSIS_WORKER_URL || !INTERNAL_API_SECRET) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
+    });
   }
 }
 
@@ -121,15 +167,11 @@ export async function submitManualRemediationStart(
         return { queued: false, reason: parsedBody.data.reason };
       }
     }
-    if (response.status >= 500) {
+    if (!isDefinitiveSecurityWorkerRejection({ status: response.status, body })) {
       throw ambiguousTransportError(`Remediation request failed with ${response.status}`);
     }
-    const parsedError = WorkerErrorResponseSchema.safeParse(body);
-    throw new Error(
-      parsedError.success
-        ? parsedError.data.error
-        : `Remediation request failed with ${response.status}`
-    );
+    logDefinitiveRejection('remediation/start', response.status, body);
+    throw definitiveRejectionError(response.status);
   }
   if (!parsedBody.success || !parsedBody.data.admitted) {
     // Admitted, but without a readable attempt the outcome cannot be recorded,
@@ -161,10 +203,11 @@ export async function submitRemediationCancellation(
   });
   const workerBody = body as RemediationCancellationResponse | undefined;
   if (!response.ok) {
-    if (response.status >= 500) {
+    if (!isDefinitiveSecurityWorkerRejection({ status: response.status, body })) {
       throw ambiguousTransportError(`Remediation cancellation failed with ${response.status}`);
     }
-    throw new Error(workerBody?.error ?? `Remediation cancellation failed with ${response.status}`);
+    logDefinitiveRejection('remediation/cancel', response.status, body);
+    throw definitiveRejectionError(response.status);
   }
   if (workerBody?.success !== true || !workerBody.status) {
     throw ambiguousTransportError('Security remediation Worker returned an unexpected response');
@@ -189,10 +232,11 @@ export async function submitApplyAutoRemediation(
   });
   const workerBody = body as ApplyAutoRemediationResponse | undefined;
   if (!response.ok) {
-    if (response.status >= 500) {
+    if (!isDefinitiveSecurityWorkerRejection({ status: response.status, body })) {
       throw ambiguousTransportError(`Apply auto-remediation failed with ${response.status}`);
     }
-    throw new Error(workerBody?.error ?? `Apply auto-remediation failed with ${response.status}`);
+    logDefinitiveRejection('apply-auto-remediation', response.status, body);
+    throw definitiveRejectionError(response.status);
   }
   if (
     workerBody?.success !== true ||

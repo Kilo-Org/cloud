@@ -383,6 +383,18 @@ describe('IntegrationsScreen', () => {
     });
   });
 
+  it('opens the Bitbucket connect sheet once for a double press', () => {
+    state.role = 'owner';
+    state.statuses.data = [{ platform: 'bitbucket', installed: false, installation: null }];
+    const renderer = mount('org-1');
+    const connect = actionOf(rowTitled(renderer.root, 'Bitbucket'));
+
+    press(connect);
+    press(connect);
+
+    expect(calls.push).toHaveBeenCalledTimes(1);
+  });
+
   it('disconnects the Bitbucket integration the status read names', () => {
     state.role = 'owner';
     state.statuses.data = [
@@ -626,6 +638,7 @@ const routeParams = vi.hoisted(() => ({ org: undefined as string | string[] | un
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ org: routeParams.org }),
   useRouter: () => ({ push: calls.push }),
+  useFocusEffect: () => undefined,
 }));
 
 let mountedRoute: TestRenderer.ReactTestRenderer | undefined = undefined;

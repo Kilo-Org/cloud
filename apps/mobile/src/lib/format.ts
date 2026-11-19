@@ -215,7 +215,7 @@ export function foldDecimalDigits(value: string): string {
 }
 
 /** The separators and group sizes one locale's number formatter writes. */
-type NumberGrammar = Readonly<{
+type NumberFields = Readonly<{
   /** The group character, or `null` when the reading refuses grouping. */
   group: string | null;
   decimal: string;
@@ -224,45 +224,103 @@ type NumberGrammar = Readonly<{
   lastSize: number;
 }>;
 
-/** The grammar of the numbers `locale` writes, read from its own formatter. */
+/** A locale's fields with the shape `readNumberText` tests input against. */
+type NumberGrammar = NumberFields & Readonly<{ shape: RegExp }>;
+
+/**
+ * One grammar per locale. `Intl.NumberFormat` output is deterministic per
+ * locale and options, so a process-lifetime cache reads the same grammar every
+ * call would rebuild.
+ */
+const numberGrammars = new Map<string, NumberGrammar>();
+
+/** One device-decimal reading: the variant grammar and its compiled shape. */
+type DeviceReading = Readonly<{ grammar: NumberGrammar; shape: RegExp }>;
+
+/** One cached device-decimal reading per (locale, device separator) pair. */
+const deviceReadings = new Map<string, DeviceReading>();
+
+/** The integer part of a shape pattern: plain digits, or grouped positions. */
+function integerPattern(grammar: NumberFields): string {
+  if (grammar.group === null) {
+    return String.raw`\d+`;
+  }
+  const groupChar = escapeForRegExp(grammar.group);
+  return String.raw`(?:\d+|\d{1,${grammar.firstSize}}(?:${groupChar}\d{${grammar.firstSize}})*${groupChar}\d{${grammar.lastSize}})`;
+}
+
+/** The shape `readNumberText` tests input against, compiled from a grammar. */
+function numberShape(grammar: NumberFields): RegExp {
+  return new RegExp(
+    `^[+-]?(?:${integerPattern(grammar)}(?:${escapeForRegExp(grammar.decimal)}\\d*)?|${escapeForRegExp(grammar.decimal)}\\d+)$`
+  );
+}
+
+/** The grammar of the numbers `locale` writes, read once from its own formatter. */
 function numberGrammar(locale: string): NumberGrammar {
-  const format = numberFormat(locale, { useGrouping: true });
-  const parts = format.formatToParts(-12_345.6);
-  const part = (type: Intl.NumberFormatPartTypes, fallback: string) =>
-    parts.find(item => item.type === type)?.value.replaceAll(BIDI_MARK, '') ?? fallback;
-  // The integer group sizes this locale writes: `[3]` for most, `[3, 2]` for
-  // the Indian numbering system (hi, bn, gu, …), read from the formatter so the
-  // grammar follows the same data that writes the numbers.
-  const groupSizes = format
-    .formatToParts(1_234_567_890)
-    .filter(item => item.type === 'integer')
-    .map(item => item.value.replaceAll(BIDI_MARK, '').length);
-  const lastSize = groupSizes.at(-1) ?? 1;
-  return {
-    group: part('group', ','),
-    decimal: part('decimal', '.'),
-    minus: part('minusSign', '-'),
-    firstSize: groupSizes.at(-2) ?? lastSize,
-    lastSize,
-  };
+  let grammar = numberGrammars.get(locale);
+  if (grammar === undefined) {
+    const format = numberFormat(locale, { useGrouping: true });
+    const parts = format.formatToParts(-12_345.6);
+    const part = (type: Intl.NumberFormatPartTypes, fallback: string) =>
+      parts.find(item => item.type === type)?.value.replaceAll(BIDI_MARK, '') ?? fallback;
+    // The integer group sizes this locale writes: `[3]` for most, `[3, 2]` for
+    // the Indian numbering system (hi, bn, gu, …), read from the formatter so
+    // the grammar follows the same data that writes the numbers.
+    const groupSizes = format
+      .formatToParts(1_234_567_890)
+      .filter(item => item.type === 'integer')
+      .map(item => item.value.replaceAll(BIDI_MARK, '').length);
+    const lastSize = groupSizes.at(-1) ?? 1;
+    const fields: NumberFields = {
+      group: part('group', ','),
+      decimal: part('decimal', '.'),
+      minus: part('minusSign', '-'),
+      firstSize: groupSizes.at(-2) ?? lastSize,
+      lastSize,
+    };
+    grammar = { ...fields, shape: numberShape(fields) };
+    numberGrammars.set(locale, grammar);
+  }
+  return grammar;
+}
+
+/**
+ * The device-decimal reading of `locale`'s grammar, built once per
+ * (locale, device separator) pair. The variant grammar is cached with its
+ * shape, so neither is rebuilt for a call that repeats the same pair.
+ */
+function deviceReading(
+  locale: string,
+  deviceDecimal: string,
+  grammar: NumberGrammar
+): DeviceReading {
+  const key = `${locale}\u0000${deviceDecimal}`;
+  let reading = deviceReadings.get(key);
+  if (reading === undefined) {
+    const variant: NumberFields = {
+      ...grammar,
+      // One character cannot be both, so a device separator that is also the
+      // language's group character leaves that reading with no grouping.
+      group: grammar.group === deviceDecimal ? null : grammar.group,
+      decimal: deviceDecimal,
+    };
+    const shape = numberShape(variant);
+    reading = { grammar: { ...variant, shape }, shape };
+    deviceReadings.set(key, reading);
+  }
+  return reading;
 }
 
 const escapeForRegExp = (value: string): string =>
   value.replaceAll(REGEXP_SPECIAL_CHARACTERS, String.raw`\$&`);
 
 /**
- * The value `text` reads as under one grammar, or `null` when its separators do
- * not sit where that grammar writes them. The returned literal is ASCII so
- * callers can compare magnitudes.
+ * The value `text` reads as under one grammar's compiled shape, or `null` when
+ * its separators do not sit where that grammar writes them. The returned
+ * literal is ASCII so callers can compare magnitudes.
  */
-function readNumberText(text: string, grammar: NumberGrammar): string | null {
-  const decimalChar = escapeForRegExp(grammar.decimal);
-  let integerPart = String.raw`\d+`;
-  if (grammar.group !== null) {
-    const groupChar = escapeForRegExp(grammar.group);
-    integerPart = `(?:\\d+|\\d{1,${grammar.firstSize}}(?:${groupChar}\\d{${grammar.firstSize}})*${groupChar}\\d{${grammar.lastSize}})`;
-  }
-  const shape = new RegExp(`^[+-]?(?:${integerPart}(?:${decimalChar}\\d*)?|${decimalChar}\\d+)$`);
+function readNumberText(text: string, grammar: NumberFields, shape: RegExp): string | null {
   if (!shape.test(text)) {
     return null;
   }
@@ -306,21 +364,16 @@ export function normalizeLocalizedNumber(
   if (grammar.minus !== '-') {
     text = text.split(grammar.minus).join('-');
   }
-  const languageReading = readNumberText(text, grammar);
-  const deviceReading =
-    deviceDecimal === null || deviceDecimal === grammar.decimal
-      ? null
-      : readNumberText(text, {
-          ...grammar,
-          // One character cannot be both, so a device separator that is also the
-          // language's group character leaves that reading with no grouping.
-          group: grammar.group === deviceDecimal ? null : grammar.group,
-          decimal: deviceDecimal,
-        });
-  if (languageReading === null) {
-    return deviceReading;
+  const languageReading = readNumberText(text, grammar, grammar.shape);
+  let deviceValue: string | null = null;
+  if (deviceDecimal !== null && deviceDecimal !== grammar.decimal) {
+    const reading = deviceReading(locale, deviceDecimal, grammar);
+    deviceValue = readNumberText(text, reading.grammar, reading.shape);
   }
-  if (deviceReading === null || deviceReading === languageReading) {
+  if (languageReading === null) {
+    return deviceValue;
+  }
+  if (deviceValue === null || deviceValue === languageReading) {
     return languageReading;
   }
   return null;

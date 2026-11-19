@@ -7,16 +7,23 @@
 // event name for an action this build does not know; the created-organization
 // row drops its detail line, because the server's message there only restates
 // that event name in English.
+// A pull refreshes the read in place through the shared `useManualRefresh`.
+// One control serves the empty state and the paged list; the first-page error
+// branch carries none.
 // The query layer is mocked so each state is driven directly through the screen
 // JSX, the same way the credit-activity suite does it.
 
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
+// The side-effect registration of the i18n module rides on the named import
+// above; the screen reaches this adapter through `use-manual-refresh`, and
+// importing the mocked module here is how the test reads its spy.
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { OrganizationAuditLogScreen } from './audit-log-screen';
 
 const pageQuery = {
@@ -66,10 +73,19 @@ vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
   }),
 }));
 
+// The pull control reaches the reduced-motion policy, which loads expo-battery;
+// the list's states are what this suite drives, not the gesture's indicator.
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+
+// The failed refresh announces through this adapter, and the real module pulls
+// native deps; the spy records the screen's announcement instead.
+vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn() } }));
+
 // `vi.mock` factories are hoisted above this file's imports, so they import
 // `createElement` themselves rather than closing over the top-level import.
-// The list is a native FlatList in production; here it renders the rows and the
-// footer element it was given, so the suite can read and press them.
+// The list is a native FlatList in production; here it forwards every prop to
+// the host element — the suite reads the list's own `refreshControl` — and it
+// renders the rows and the footer element it was given.
 vi.mock('@shopify/flash-list', async () => {
   const { createElement: h, Fragment: fragment } = await import('react');
   return {
@@ -80,7 +96,7 @@ vi.mock('@shopify/flash-list', async () => {
     }) =>
       h(
         'FlashList',
-        null,
+        props as Record<string, unknown>,
         props.data.map((item, index) =>
           h(fragment, { key: index }, props.renderItem({ item, index }) as never)
         ),
@@ -102,6 +118,7 @@ vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
   Lock: 'Lock',
+  Logs: 'Logs',
   Mail: 'Mail',
   Plug: 'Plug',
   ScrollText: 'ScrollText',
@@ -109,6 +126,7 @@ vi.mock('@/components/ui/icons', () => ({
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
+  UsersRound: 'UsersRound',
   Wallet: 'Wallet',
 }));
 
@@ -172,17 +190,21 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 
-function entries(count: number, action = 'organization.settings.change') {
+function entries(count: number, action = 'organization.settings.change', actorEmail?: string) {
   return Array.from({ length: count }, (_, index) => ({
     id: `audit-${index}`,
     action,
     actor_id: 'user-1',
-    actor_email: 'owner@example.com',
+    actor_email: actorEmail ?? 'owner@example.com',
     actor_name: 'Owner',
     message: `Audit event ${index}`,
     created_at: '2026-01-01T00:00:00.000Z',
   }));
 }
+
+// The long actor address the truncation case needs: wide enough that the row
+// can only hold the whole time when the actor text is the one that shrinks.
+const LONG_ACTOR_EMAIL = 'kilokwf1763399999_with_a_really_long_local_part@example.com';
 
 // A message that runs well past the clamped two lines: the sentence a role
 // change writes, long enough that the collapsed row must clip it.
@@ -206,6 +228,24 @@ function mount() {
   return renderWithProviders(createElement(OrganizationAuditLogScreen));
 }
 
+// The row formats the entry with the device-local clock, so the expected meta
+// string is derived through the same formatter instead of a hardcoded
+// wall-clock that breaks in a CI timezone east or west of UTC.
+const FIXED_INSTANT = new Date('2026-01-01T00:00:00.000Z');
+function expectedMetaTime(locale: string): string {
+  const day = new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(FIXED_INSTANT);
+  const clock = new Intl.DateTimeFormat(locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(FIXED_INSTANT);
+  return `${day} · ${clock}`;
+}
+
 beforeEach(() => {
   pageQuery.isPending = false;
   pageQuery.isError = false;
@@ -214,6 +254,8 @@ beforeEach(() => {
   pageQuery.isFetchingNextPage = false;
   pageQuery.data = { pages: [], pageParams: [] };
   pageQuery.refetch.mockClear();
+  // The pull reads the settled result, so the spy resolves one by default.
+  pageQuery.refetch.mockResolvedValue({ isError: false });
   pageQuery.fetchNextPage.mockClear();
   pageHook.entries = [];
   pageHook.hasMore = false;
@@ -224,6 +266,18 @@ beforeEach(() => {
 });
 
 type Handler = () => void;
+
+/** Props a pull-to-refresh control carries. */
+type PullControl = ReactElement<{ refreshing: boolean; onRefresh: () => void }>;
+
+/** The pull gesture a pull-to-refresh surface carries; a missing one fails the test. */
+function pullControl(host: ReactTestInstance): PullControl {
+  const control = host.props.refreshControl as PullControl | undefined;
+  if (!control) {
+    throw new Error(`${String(host.type)} rendered no pull control`);
+  }
+  return control;
+}
 
 /** The element's callback, narrowed out of the renderer's untyped props. */
 function handlerOf(node: ReactTestInstance, name: 'onPress' | 'onRetry'): Handler | undefined {
@@ -327,8 +381,9 @@ describe('OrganizationAuditLogScreen', () => {
     // The row names the event in the reader's language, never the wire action.
     expect(messages).toContain('Settings changed');
     expect(messages.some(text => text.includes('organization.settings.change'))).toBe(false);
-    // The actor's meta line follows the event name, with the time after it.
-    expect(messages.some(text => text.startsWith('owner@example.com · '))).toBe(true);
+    // The actor and the time are separate texts now; the actor comes first.
+    expect(messages).toContain('owner@example.com');
+    expect(messages.some(text => text.startsWith(expectedMetaTime('en')))).toBe(true);
 
     const loadMore = renderer.root
       .findAllByType('Button')
@@ -341,6 +396,67 @@ describe('OrganizationAuditLogScreen', () => {
     });
     expect(pageQuery.fetchNextPage).toHaveBeenCalledTimes(1);
     unmount();
+  });
+
+  it('lets the actor truncate in its own text and keeps the whole time', async () => {
+    // The wire address an actual long actor email fills the row with: the time
+    // must survive it, because the time is what tells the entries apart.
+    pageHook.entries = entries(1, 'organization.settings.change', LONG_ACTOR_EMAIL);
+    const { renderer, unmount } = await mount();
+
+    const texts = renderer.root.findAllByType('Text');
+    const actorText = texts.find(node => node.props.children === LONG_ACTOR_EMAIL);
+    const expectedTime = expectedMetaTime('en');
+    const timeText = texts.find(
+      node => typeof node.props.children === 'string' && node.props.children === expectedTime
+    );
+    expect(actorText).toBeDefined();
+    expect(timeText).toBeDefined();
+    // RN defaults flexShrink to 0; the actor must opt in to shrinking, or the
+    // long address paints the time off the row's end instead of truncating.
+    expect(actorText?.props.className).toContain('min-w-0');
+    expect(actorText?.props.className).toContain('shrink');
+    expect(actorText?.props.className).not.toContain('shrink-0');
+    expect(actorText?.props.numberOfLines).toBe(1);
+    // The time never yields its width, so the whole reading stays on screen
+    // whatever the actor does.
+    expect(timeText?.props.className).toContain('shrink-0');
+    expect(timeText?.props.children).toBe(expectedTime);
+    unmount();
+  });
+
+  it('reads the Arabic time in its own order next to the left-to-right email', async () => {
+    pageHook.entries = entries(1, 'organization.settings.change');
+    await act(async () => {
+      await i18n.changeLanguage('ar');
+    });
+    try {
+      const { renderer, unmount } = await mount();
+
+      const texts = renderer.root.findAllByType('Text');
+      const actorText = texts.find(node => node.props.children === 'owner@example.com');
+      // The meta time is the row's only text that keeps the catalog's ` · `
+      // separator shape.
+      const timeText = texts.find(
+        node => typeof node.props.children === 'string' && node.props.children.includes(' · ')
+      );
+      expect(actorText).toBeDefined();
+      expect(timeText).toBeDefined();
+      // The date carries the Arabic month in its own element, so its parts
+      // keep the language's reading order instead of running inside the email
+      // line's direction; the email stays beside it as plain Latin text.
+      expect(timeText?.props.children).toBe(expectedMetaTime('ar'));
+      expect(actorText?.props.children).toBe('owner@example.com');
+      // The reader hears actor and time in one sentence, with the date parts
+      // in the order the catalog writes them.
+      const pressable = renderer.root.findByType('Pressable');
+      expect(pressable.props.accessibilityLabel).toContain('owner@example.com, ');
+      unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
   });
 
   it('omits the restating server message on the created organization row', async () => {
@@ -362,8 +478,9 @@ describe('OrganizationAuditLogScreen', () => {
       .map(node => node.props.children)
       .filter(child => typeof child === 'string');
     expect(messages).toContain('Organization created');
-    // The actor's meta line carries the time after the actor.
-    expect(messages.some(text => text.startsWith('owner@example.com · '))).toBe(true);
+    // The actor and the time are separate texts; the actor comes first.
+    expect(messages).toContain('owner@example.com');
+    expect(messages.some(text => text.startsWith(expectedMetaTime('en')))).toBe(true);
     // The row keeps the translated event name and drops the server sentence,
     // which only restates that name and would age into a stale one.
     expect(messages).not.toContain('Organization Acme created');
@@ -452,6 +569,89 @@ describe('OrganizationAuditLogScreen', () => {
       }
     });
     expect(pageQuery.fetchNextPage).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+});
+
+describe('OrganizationAuditLogScreen pull to refresh', () => {
+  it('puts the pull on the empty state and refetches from it', async () => {
+    // The read settled with no rows, so the empty state is the only surface to
+    // pull; the refetch spy resolves the settled result beforeEach set up.
+    const { renderer, unmount } = await mount();
+
+    const [empty] = renderer.root.findAllByType('EmptyState');
+    if (!empty) {
+      throw new Error('the empty state did not render');
+    }
+    const control = pullControl(empty);
+    expect(control.type).toBe('RefreshControl');
+    expect(control.props.refreshing).toBe(false);
+    // The gesture is not in flight, so nothing spins until the pull starts.
+    expect(pageQuery.refetch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(pageQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('hands the same control to the list when rows are present', async () => {
+    pageHook.entries = entries(2);
+    pageHook.hasMore = true;
+    const { renderer, unmount } = await mount();
+
+    const [list] = renderer.root.findAllByType('FlashList');
+    if (!list) {
+      throw new Error('the rows were not handed to the list');
+    }
+    const control = pullControl(list);
+    expect(control.type).toBe('RefreshControl');
+
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(pageQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('keeps the rows and announces the failure when the pull fails', async () => {
+    // The settled result keeps the rows on screen; only the refetch's own
+    // verdict fails, so the pull announces instead of replacing the list.
+    pageHook.entries = entries(2);
+    pageHook.hasMore = true;
+    pageQuery.isError = false;
+    pageQuery.refetch.mockResolvedValue({ isError: true });
+    const { renderer, unmount } = await mount();
+
+    const [list] = renderer.root.findAllByType('FlashList');
+    if (!list) {
+      throw new Error('the rows were not handed to the list');
+    }
+    expect(renderer.root.findAllByType('QueryError')).toHaveLength(0);
+    const control = pullControl(list);
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+
+    expect(renderer.root.findAllByType('FlashList')).toHaveLength(1);
+    expect(renderer.root.findAllByType('QueryError')).toHaveLength(0);
+    expect(announcingToast.error).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('offers no pull while the first page has failed', async () => {
+    // The list never painted, so the branch renders the retry alone; the
+    // gesture element must not exist anywhere in the tree.
+    pageQuery.isError = true;
+    pageQuery.data = { pages: [], pageParams: [] };
+    const { renderer, unmount } = await mount();
+
+    expect(renderer.root.findAllByType('QueryError')).toHaveLength(1);
+    expect(renderer.root.findAllByType('RefreshControl')).toHaveLength(0);
     unmount();
   });
 });

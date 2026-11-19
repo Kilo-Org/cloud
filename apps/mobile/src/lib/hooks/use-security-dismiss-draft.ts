@@ -12,6 +12,8 @@ import {
 } from '@/lib/persist/drafts';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
+import { isSecurityTrialRefusalCopyKey } from '@/lib/security-agent-ledger';
+import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
 
 /**
  * Durable dismiss-intent draft for one finding (P1-B-19b). The draft records
@@ -22,9 +24,12 @@ import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
  * observer will ever reconcile it — the retry card must.
  *
  * `lastErrorKey` names the catalog key the failure sentence was translated
- * from (null for a message the mapper does not recognise). The retry card
- * re-translates the key at render, so a failure that survives an app-language
- * change reads the reader's language instead of the language that recorded it.
+ * from (null for a message the mapper does not recognise). It is the failure's
+ * identity, not its copy: the retry card re-translates the key at render, so a
+ * failure that survives an app-language change reads the reader's language
+ * instead of the language that recorded it. The one role-dependent sentence,
+ * the organization trial refusal, is also re-read for the role of the reader
+ * rendering the draft — see `securityDismissFailureCopy`.
  */
 const SecurityDismissDraftSchema = z.object({
   reason: z.string(),
@@ -133,18 +138,35 @@ export type SecurityDismissFailure = {
 };
 
 /**
- * The failure copy a stored draft renders: the stored sentence re-translated
- * through its catalog key, so a failure that survives an app-language change
- * reads the reader's language. Drafts recorded before the key existed, or with
- * a message the mapper does not recognise, keep their stored sentence verbatim.
+ * The failure copy a stored draft renders. The draft keeps the catalog key its
+ * sentence was translated from; that key names *which* refusal the failure was,
+ * never which reader it was recorded for — the trial refusal stores one key
+ * whichever phrasing the reader of the day saw. So the trial sentence is
+ * re-translated here for the reader rendering the draft, and `canManageBilling`
+ * is the caller's own role answer, the same value that decides whether the
+ * step is offered under this sentence. Both therefore always describe one
+ * reader, even when the role changed since the draft was written.
+ *
+ * Every other key re-translates through itself, so a failure that survives an
+ * app-language change reads the reader's language. A draft recorded before the
+ * key existed keeps its stored sentence verbatim.
  */
-export function securityDismissFailureCopy(draft: {
-  lastError: string | null;
-  lastErrorKey: string | null | undefined;
-}): string {
+export function securityDismissFailureCopy(
+  draft: {
+    lastError: string | null;
+    lastErrorKey: string | null | undefined;
+  },
+  canManageBilling: boolean
+): string {
   // A draft recorded before the key existed reads back without the field.
   const key = draft.lastErrorKey ?? null;
-  return key === null ? (draft.lastError ?? '') : i18n.t(key);
+  if (key === null) {
+    return draft.lastError ?? '';
+  }
+  if (isSecurityTrialRefusalCopyKey(key)) {
+    return i18n.t(trialRefusalCopyKey(canManageBilling));
+  }
+  return i18n.t(key);
 }
 
 /**

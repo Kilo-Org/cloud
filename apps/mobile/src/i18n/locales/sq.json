@@ -26,6 +26,7 @@
     "creditHistory": "Historiku i kredive",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anulo",
     "done": "U krye",
     "retry": "Riprovo",
@@ -175,7 +176,9 @@
     "durationHourShort": "orë",
     "changes": "Ndryshimet",
     "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri.",
-    "privateRepositoryA11y": "{{name}}, repozitor privat"
+    "privateRepositoryA11y": "{{name}}, repozitor privat",
+    "legalDocumentEnglishOnly": "Ky dokument është në dispozicion vetëm në anglisht.",
+    "organizationTrialEndedBilling": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin dhe më pas të provoni përsëri."
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Vlera e ruajtur nuk mund të shfaqet. Fut një të re për ta zëvendësuar.",
       "editKeyMappingsWarning": "Zëvendësimi i çelësit zëvendëson gjithashtu hartëzimet e ruajtura të modeleve: rifut çdo hartëzim që të nevojitet ende.",
       "saveFailed": "Çelësi nuk u ruajt dot.",
-      "invalidCredentials": "Kontrollo kredencialet dhe provo përsëri.",
       "fieldRequired": "Fusha {{field}} është e detyrueshme.",
+      "keyIncomplete": "Çelësit i mungon një vlerë e detyrueshme.",
       "incompleteMapping": "Hartëzimi {{number}} duhet të ketë edhe slug-un e modelit të gateway-t, edhe emrin e deployment-it.",
       "apiKeyLabel": "Çelësi API",
       "apiKeyPlaceholder": "Ngjit çelësin",
       "apiKeyRequired": "Fut çelësin.",
+      "keyAlreadyExists": "Ke tashmë një çelës për këtë ofrues. Hiqe përpara se të shtosh një tjetër.",
+      "keyStoreFailed": "Çelësi nuk u ruajt dot.",
+      "invalidCredentials": "Ky çelës nuk është në formatin që pret ky ofrues. Kontrolloje dhe provo përsëri.",
+      "testSucceeded": "Çelësi funksionon. Ofruesi: {{provider}}. Modeli: {{model}}.",
+      "testRejected": "Ofruesi e refuzoi këtë çelës. Kontrollo që është i saktë dhe nuk është revokuar.",
+      "testIncomplete": "Ofruesi e mbylli testin përpara se të përfundonte. Provo përsëri.",
+      "testUnsupportedProvider": "Ky ofrues nuk mbështetet më. Hiq çelësin.",
+      "testUnreadableKey": "Çelësi i ruajtur nuk u lexua dot. Provo përsëri më vonë.",
+      "testDeprecatedProvider": "Ky ofrues është i vjetëruar, kështu që çelësi i tij nuk mund të testohet.",
+      "keyManagedByCodingPlan": "Plani yt i kodimit menaxhon çelësin e këtij ofruesi dhe çelësi është vetëm për lexim. Anulo planin e kodimit për të shtuar çelësin tënd.",
+      "providerUnavailable": "Ky ofrues nuk është ende i disponueshëm, prandaj nuk mund të shtosh një çelës për të.",
+      "testFailed": "Testimi i çelësit dështoi. Provo përsëri.",
       "authMethod": "Metoda e vërtetimit",
       "authMethodAccessKeys": "Çelësat e qasjes",
       "resourceName": "Emri i burimit Azure",
@@ -481,7 +496,14 @@
       "viewReceipt": "Shiko dëftesën"
     },
     "changelog": "Çfarë ka të re",
-    "changelogVersionPending": "Shënimet e këtij versioni vijnë me përditësimin e ardhshëm."
+    "changelogVersionPending": "Shënimet për versionin {{version}} vijnë me përditësimin e ardhshëm të aplikacionit.",
+    "changelogGroupNew": "Të reja",
+    "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
+    "changelogFixesPolish": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
+    "changelogAreas": {
+      "signIn": "Hyrja",
+      "profileOrganizations": "Profili dhe organizatat"
+    }
   },
   "preferences": {
     "general": "Të përgjithshme",
@@ -1466,13 +1488,25 @@
       "repositoryLine": "Shqyrtime: {{reviews}} · Gjetje: {{findings}}",
       "empty": "Ende nuk ka shqyrtime me statistika",
       "emptyDescription": "Statistikat regjistrojnë shqyrtimet e përfunduara sa kohë që janë aktive për organizatën.",
-      "off": "Statistikat janë çaktivizuar për këtë organizatë.",
-      "couldNotLoad": "Statistikat nuk mund të ngarkoheshin"
+      "offTitle": "Statistikat janë çaktivizuar për {{platform}}",
+      "offDescription": "Pronarët, administratorët dhe menaxherët e faturimit të organizatës mund t'i aktivizojnë statistikat te cilësimet e organizatës në web për të regjistruar shqyrtimet e përfunduara.",
+      "couldNotLoad": "Statistikat nuk mund të ngarkoheshin",
+      "trackedReviewsCaption": "Shqyrtimet e përfunduara gjatë kësaj periudhe me statistikat aktive. Shqyrtimet në zhvillim dhe të dështuarat nuk numërohen kurrë.",
+      "trackedReviewsUncounted": "Nuk numërohen: {{displayCount}} nga {{displayTotal}} shqyrtimet e përfunduara të organizatës, rezultati i tyre nuk u regjistrua.",
+      "trackedReviewsUncounted_one": "Nuk numërohen: {{displayCount}} nga {{displayTotal}} shqyrtimet e përfunduara të organizatës, rezultati i tyre nuk u regjistrua.",
+      "trackedReviewsUncounted_other": "Nuk numërohen: {{displayCount}} nga {{displayTotal}} shqyrtimet e përfunduara të organizatës, rezultati i tyre nuk u regjistrua."
     },
     "council": {
       "title": "Shqyrtimi nga këshilli",
       "subtitle": "Disa ekspertë shqyrtojnë çdo PR dhe votat e tyre bashkohen në një vendim të vetëm.",
-      "unavailable": "Shqyrtimi nga këshilli nuk është i disponueshëm për këtë organizatë.",
+      "unavailablePersonallyTitle": "Kërkon një organizatë Enterprise",
+      "unavailablePersonally": "Shqyrtimi nga këshilli nuk është pjesë e një llogarie personale.",
+      "unavailablePersonallyAction": "Krijo një organizatë",
+      "unavailablePersonallySwitchAction": "Ndërro organizatën",
+      "unavailableOrganizationTitle": "Shqyrtimi nga këshilli nuk është i disponueshëm tani",
+      "unavailableForOrganization": "Shqyrtimi nga këshilli kërkon planin Enterprise me një pajtim ose një periudhë provë aktive. Kjo organizatë nuk e ka atë tani.",
+      "unavailableForOrganizationNeutral": "Shqyrtimi nga këshilli nuk është i disponueshëm për këtë organizatë tani. Provoni përsëri më vonë.",
+      "unavailableOnBitbucket": "Shqyrtimi nga këshilli nuk është i disponueshëm për depot e Bitbucket.",
       "noRepositories": "Ende nuk është zgjedhur asnjë depo. Zgjidh fillimisht depot te cilësimet e depove.",
       "specialists": "Ekspertë",
       "labels": "Etiketa që aktivizojnë shqyrtimin nga këshilli",
@@ -3123,7 +3157,6 @@
     "completingPurchase": "Po përfundon blerja",
     "subscriptionLoading": "Po ngarkohet abonimi Kilo Pass",
     "retryHint": "Riprovohet ngarkimi i gjendjes së Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Përfundoi më {{date}}",
     "notAvailableInApp": "Kilo Pass nuk është i disponueshëm në aplikacion.",
     "statusActive": "Aktiv",
@@ -3326,6 +3359,7 @@
       "manageOnWeb": "Cilësimet e faturimit në ueb",
       "changePlan": "Ndrysho planin",
       "buySeats": "Bli vende",
+      "managedOnWeb": "Plani, vendet dhe rimbushja automatike menaxhohen në ueb.",
       "setupAutoTopUp": "Konfiguro rimbushjen automatike",
       "manageAutoTopUp": "Menaxho rimbushjen automatike",
       "opensOnWeb": "Hapet në ueb"
@@ -3474,12 +3508,11 @@
       "requestLogs": "Regjistrat e kërkesave"
     },
     "requestLogs": {
-      "hint": "Kërkesat e orës para fundit të dritares, më të rejat në krye.",
       "older": "Ora e mëparshme",
       "newer": "Ora pasardhëse",
       "truncated": "Kjo orë ka më shumë kërkesa nga sa shfaq lista.",
-      "emptyTitle": "Nuk ka kërkesa",
-      "emptyDescription": "Në këtë orë nuk ka kërkesa në gateway.",
+      "emptyTitle": "Nuk ka kërkesa në këtë orë",
+      "emptyDescription": "Përdorni Ora e mëparshme për të parë kërkesat e mëparshme.",
       "loadError": "Regjistrat e kërkesave nuk u ngarkuan.",
       "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave.",
       "tokens": "{{input}} hyrëse · {{output}} dalëse",
@@ -4283,8 +4316,7 @@
       "repoValue": "Depoja: {{name}}",
       "profileValue": "Profili: {{name}}",
       "profileUnavailable": "Ky profil nuk është më i disponueshëm. Zgjidh një tjetër.",
-      "pickerEmptyDescriptionOrganization": "Krijo një profil organizate për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Pronari i organizatës ose një administrator mund të krijojë një profil organizate."
+      "pickerEmptyDescriptionOrganization": "Krijo një profil organizate për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione."
     },
     "variablesDeleteFailed": "Variabla nuk mund të fshihej",
     "deleteVariable": "Fshi variablin {{key}}",
@@ -4470,7 +4502,6 @@
     "dismiss": "Hidh poshtë raportin",
     "offline": "Jashtë linje · raport i ruajtur",
     "cached": "Raport i ruajtur · rifreskimi i padisponueshëm",
-    "window": "{{start}} – {{end}}",
     "summary": "Përmbledhje AI",
     "summaryPending": "Përmbledhja AI është në proces. Do të shtohet këtu kur të jetë gati.",
     "summaryUnavailable": "Përmbledhja AI nuk është e disponueshme. Raporti i strukturuar mbetet i disponueshëm.",
@@ -4592,6 +4623,7 @@
       "title": "Shkaktarët dhe webhook-et",
       "subtitle": "Automatizo ekzekutimet e Cloud Agent nga një thirrje webhook ose një planifikim.",
       "new": "Shkaktar i ri",
+      "create": "Krijo shkaktar",
       "emptyTitle": "Nuk ka shkaktarë ende",
       "emptyDescription": "Krijo një shkaktar për të nisur një ekzekutim të Cloud Agent nga një thirrje webhook ose sipas një planifikimi.",
       "loadFailedTitle": "Shkaktarët nuk mund të ngarkoheshin",
@@ -4645,6 +4677,8 @@
       "created": "Shkaktari u krijua",
       "saved": "Shkaktari u ruajt",
       "statusArrived": "Mbërriti",
+      "defaultPromptWebhook": "Përshkruaj trupin e kërkesës së kësaj thirrjeje webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Ekzekuto detyrën e planifikuar. Nisur në {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Vendos një emër.",
         "nameTooShort": "Përdor të paktën 8 karaktere.",
@@ -4693,6 +4727,7 @@
     "superseded": "Kjo lidhje u zëvendësua nga një pajisje tjetër, ndaj nuk funksionon më."
   },
   "sharedSession": {
+    "startedAt": "Filloi në {{time}}",
     "title": "Seancë e ndarë",
     "someone": "Dikush",
     "sharedBy": "Ndarë nga {{owner}}",
@@ -4848,6 +4883,8 @@
     "modelsDescription": "Fikni një model për ta bllokuar për çdo anëtar. Modelet nga ofruesit e lejuar nisin të aktivizuara.",
     "modelsDeniedOnly": "Vetëm të ndaluarat",
     "modelsEmpty": "Nuk ka modele që përputhen me këtë kërkim.",
+    "modelsDeniedEmpty": "Nuk ka asnjë model të ndaluar.",
+    "modelsDeniedSearchEmpty": "Nuk ka asnjë model të ndaluar që përputhet me këtë kërkim.",
     "providersDescription": "Fikni një ofrues për të ndaluar Kilo që të rrugëzojë drejt tij për këtë organizatë.",
     "providersNeedCatalog": "Çelësat e ofruesve mbeten vetëm për lexim derisa të ngarkohet i gjithë katalogu i modeleve. Për t'i ndryshuar, prekni Riprovo më lart.",
     "providersEmpty": "Nuk ka ofrues që përputhen me këtë kërkim.",

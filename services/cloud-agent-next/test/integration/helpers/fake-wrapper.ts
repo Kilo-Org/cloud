@@ -2,6 +2,8 @@ import {
   RUNTIME_HARNESS_HEADER,
   RUNTIME_INSTRUCTIONS_HEADER,
   RUNTIME_INSTRUCTIONS_VERSION,
+  RUNTIME_WEB_SEARCH_HEADER,
+  RUNTIME_WEB_SEARCH_VERSION,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
   WORKTREE_RUNTIME_HEADER,
@@ -25,6 +27,7 @@ export type FakeWrapperConnectInput = {
   runtimeContract?: 'legacy' | 'worktree';
   workspaceConfiguration?: boolean;
   runtimeInstructions?: boolean;
+  runtimeWebSearch?: boolean;
   /** Raw `x-kilo-runtime-harness` value, so a test can also send an unknown one. */
   runtimeHarness?: string;
   kiloCliVersion?: string;
@@ -105,6 +108,9 @@ export class FakeWrapper {
           : {}),
         ...(input.runtimeInstructions
           ? { [RUNTIME_INSTRUCTIONS_HEADER]: RUNTIME_INSTRUCTIONS_VERSION }
+          : {}),
+        ...(input.runtimeWebSearch
+          ? { [RUNTIME_WEB_SEARCH_HEADER]: RUNTIME_WEB_SEARCH_VERSION }
           : {}),
         ...(input.runtimeHarness === undefined
           ? {}

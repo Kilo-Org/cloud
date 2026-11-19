@@ -56,6 +56,13 @@ vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   router: { back: vi.fn() },
 }));
+// The refusal hooks read the reader's role through the organization query
+// chain, which pulls the Expo runtime this node project cannot load. These
+// suites assert the transport and the optimistic rollback, not the role copy.
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  isMoneyRole: () => false,
+  useOrgBoundary: () => ({ role: undefined }),
+}));
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',

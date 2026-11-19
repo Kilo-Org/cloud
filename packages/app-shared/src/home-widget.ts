@@ -14,10 +14,12 @@ import {
   glanceableNeedsInputKind,
   GLANCEABLE_NEEDS_INPUT_STATUSES,
   GLANCEABLE_STATUS_KINDS,
+  GLANCEABLE_TITLE_LIMIT,
   glanceableStatusKind,
   isStartableGlanceableWork,
   isTerminalGlanceableStatus,
   type BuildGlanceableSnapshotInput,
+  type GlanceableNeedsInputKind,
   type GlanceableSessionRow,
   type GlanceableStatusKind,
   compareSessionInstant,
@@ -25,8 +27,7 @@ import {
 import { timestampMs, timestampToIso } from './utils';
 
 export const HOME_WIDGET_DETAIL_LIMIT = 3;
-export const HOME_WIDGET_TITLE_LIMIT = 120;
-const titleSchema = z.string().max(HOME_WIDGET_TITLE_LIMIT);
+const titleSchema = z.string().max(GLANCEABLE_TITLE_LIMIT);
 const kindSchema = z.enum(GLANCEABLE_STATUS_KINDS);
 
 /** Private Home-only data. Never include this in Live Activity content-state. */
@@ -62,9 +63,10 @@ export type HomeWidgetDetails = z.infer<typeof homeWidgetDetailsSchema>;
 /**
  * Details with no private work to describe, as a record the caller owns. A
  * payload that shared one instance's arrays would let a caller's write change
- * what every later empty payload reports.
+ * what every later empty payload reports. A caller that needs to change a field
+ * spreads this record into a new one.
  */
-function emptyHomeWidgetDetails(): HomeWidgetDetails {
+export function emptyHomeWidgetDetails(): HomeWidgetDetails {
   return {
     approvalKey: null,
     primaryKind: null,
@@ -73,8 +75,6 @@ function emptyHomeWidgetDetails(): HomeWidgetDetails {
     scheduledAgents: [],
   };
 }
-
-export const EMPTY_HOME_WIDGET_DETAILS: HomeWidgetDetails = emptyHomeWidgetDetails();
 
 export const homeWidgetDataSchema = z.object({
   snapshot: glanceableAgentsSnapshotSchema,
@@ -153,13 +153,13 @@ function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
 
 /**
  * The one display-title cut every glanceable surface draws: the text as one
- * line of what it draws, trimmed, then capped at `HOME_WIDGET_TITLE_LIMIT` on a
+ * line of what it draws, trimmed, then capped at `GLANCEABLE_TITLE_LIMIT` on a
  * character boundary. A surface adds only its own empty or placeholder rule on
  * top, so the cap cannot drift between the Home widget and the session card.
  */
 export function glanceableTitle(value: string | null | undefined): string {
   const title = sessionDisplayLine(value ?? '').trim();
-  return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
+  return sessionLiveCut(title, GLANCEABLE_TITLE_LIMIT);
 }
 
 /**
@@ -183,35 +183,39 @@ export function buildHomeWidgetDetails(
   sessions: readonly HomeWidgetSessionRow[]
 ): HomeWidgetDetails {
   const byStatusUpdatedAt = compareSessionInstant(row => row.statusUpdatedAt, 'earliest');
-  const waiting = sessions
-    .filter(row => glanceableStatusKind(row.status) === 'needsInput')
-    .sort(
-      (a, b) =>
-        Number(b.approvalKey != null) - Number(a.approvalKey != null) || byStatusUpdatedAt(a, b)
-    );
+  // One status predicate owns both membership and the kind, so a needs-input
+  // row and the label drawn for it cannot disagree.
+  const waiting: { row: HomeWidgetSessionRow; kind: GlanceableNeedsInputKind }[] = [];
+  for (const row of sessions) {
+    const kind = glanceableNeedsInputKind(row.status);
+    if (kind !== null) waiting.push({ row, kind });
+  }
+  waiting.sort(
+    (a, b) =>
+      Number(b.row.approvalKey != null) - Number(a.row.approvalKey != null) ||
+      byStatusUpdatedAt(a.row, b.row)
+  );
   const scheduled = sessions
     .filter(row => glanceableStatusKind(row.status) === 'scheduled')
     .sort(compareSessionInstant(row => row.scheduledAt, 'earliest'));
   const primaryKind = primaryKindOf(countGlanceableSessions(sessions));
   const primary =
     primaryKind === 'needsInput'
-      ? waiting[0]
+      ? waiting[0]?.row
       : primaryKind === 'scheduled'
         ? scheduled[0]
         : sessions
             .filter(row => glanceableStatusKind(row.status) === primaryKind)
             .sort(compareSessionInstant(row => row.statusUpdatedAt, 'latest'))[0];
   return {
-    approvalKey: waiting.find(row => row.approvalKey != null)?.approvalKey ?? null,
+    // The sort put the approvable row first, so the key belongs to the same
+    // row the needs-input primary title reads.
+    approvalKey: waiting[0]?.row.approvalKey ?? null,
     primaryKind: primaryKind ?? null,
     primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
-    waitingAgents: waiting.slice(0, HOME_WIDGET_DETAIL_LIMIT).flatMap(row => {
-      // The status fold above admits only needs-input statuses; a status that
-      // is not one of them has no kind here and the row is dropped rather
-      // than mislabelled.
-      const kind = glanceableNeedsInputKind(row.status);
-      return kind === null ? [] : [{ title: glanceableTitle(row.title), kind }];
-    }),
+    waitingAgents: waiting
+      .slice(0, HOME_WIDGET_DETAIL_LIMIT)
+      .map(entry => ({ title: glanceableTitle(entry.row.title), kind: entry.kind })),
     scheduledAgents: scheduled.slice(0, HOME_WIDGET_DETAIL_LIMIT).map(row => ({
       title: glanceableTitle(row.title),
       scheduledAt: timestampToIso(row.scheduledAt),
@@ -301,8 +305,9 @@ export function buildHomeWidgetPresentation(
   // keeps the title, so that payload renders as it did.
   const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
+  const status = presentationStatus(snapshot, terminal, primaryKind);
   return {
-    status: presentationStatus(snapshot, terminal, primaryKind),
+    status,
     primaryKind,
     primaryCount: primaryKind === null ? 0 : snapshot[primaryKind],
     secondaryCounts: terminal
@@ -326,7 +331,7 @@ export function buildHomeWidgetPresentation(
         : details.primaryTitle,
     waitingAgents: terminal || snapshot.needsInput === 0 ? [] : details.waitingAgents,
     scheduledAgents: terminal || snapshot.scheduled === 0 ? [] : details.scheduledAgents,
-    canCreate: !terminal && (primaryKind !== null || snapshot.status !== 'waiting'),
+    canCreate: status === 'content' || status === 'empty' || status === 'unavailable',
     // This is visibility, not approval authority. Every action revalidates the exact current request.
     canApprove: !terminal && snapshot.needsApproval > 0 && details.approvalKey !== null,
   };

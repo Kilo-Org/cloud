@@ -1,6 +1,10 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
-import { CONTROL_PLANE_UPSTREAM_BUDGET_MS } from '@/lib/bounded-service-fetch';
+import {
+  CONTROL_PLANE_UPSTREAM_BUDGET_MS,
+  fetchWithinBudget,
+  readJsonWithinBudget,
+} from '@/lib/bounded-service-fetch';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 /** Security Worker called through this module; used in the client-facing message. */
@@ -60,23 +64,57 @@ function failedBeforeDelivery(error: unknown): boolean {
 }
 
 /**
+ * Shared classification of a non-OK Worker response for the operation ledger:
+ * `true` is a definitive pre-acceptance rejection (nothing was enqueued, the
+ * caller may record `failed` and re-submit as a fresh intent); `false` is
+ * ambiguous transport (the Worker may still have accepted, so the caller
+ * surfaces a retryable error and lets a same-key retry reconcile).
+ *
+ * Every security Worker route shares the rule: any 4xx is definitive. A 5xx is
+ * ambiguous — including a gateway 503 that may have arrived after the Worker
+ * accepted — unless the caller names the route's known disabled-routing body,
+ * which the Worker returns before it creates the command row. Only that 503 is
+ * definitive, and only when the parsed body matches. `requireSuccessFalse`
+ * keeps the sync/dismissal bodies as they were accepted: there the
+ * disabled-routing body must also carry `success: false`. `body` is read only
+ * for a named disabled-routing 503; a route without one (the remediation
+ * routes) stays all-5xx-ambiguous whatever the body says.
+ */
+export function isDefinitiveSecurityWorkerRejection(params: {
+  status: number;
+  body: unknown;
+  /** The route's known pre-enqueue disabled-routing error body, if it has one. */
+  disabledRoutingError?: string;
+  /** Require `success === false` beside the disabled-routing error. */
+  requireSuccessFalse?: boolean;
+}): boolean {
+  if (params.status < 500) return true;
+  if (params.disabledRoutingError === undefined) return false;
+  if (params.status !== 503) return false;
+  if (params.body === null || typeof params.body !== 'object') return false;
+  const { error, success } = params.body as { error?: unknown; success?: unknown };
+  if (error !== params.disabledRoutingError) return false;
+  if (params.requireSuccessFalse === true && success !== false) return false;
+  return true;
+}
+
+/**
  * Posts a JSON command to a security Worker under the shared internal-service
  * time budget (`CONTROL_PLANE_UPSTREAM_BUDGET_MS`) and parses the response
  * defensively.
  *
- * The budget covers the whole call, body read included: one controller armed
- * for `CONTROL_PLANE_UPSTREAM_BUDGET_MS` is passed to the fetch and stays live
- * while the body is read, so aborting it also errors a body that stalls
- * mid-stream. `fetchWithinBudget` cannot serve here: it clears its timer and
- * drops the caller's abort listener as soon as the response resolves, i.e. when
- * the headers arrive.
+ * The budget covers the whole call, body read included: `fetchWithinBudget`
+ * bounds the request up to the response headers, and `readJsonWithinBudget`
+ * bounds the body read by what is left of the same
+ * `CONTROL_PLANE_UPSTREAM_BUDGET_MS`, so an upstream that stalls mid-body is
+ * abandoned inside the same total budget instead of holding the request open.
  *
- * A Worker that never answers, and a body that is not JSON (a gateway HTML
- * 502/504), leave the Worker's acceptance unknown. Both are the ambiguity class
- * `postSecurityWorkerCommand` classifies transport failures with, so both
- * surface as a retryable `BAD_GATEWAY` `TRPCError` instead of an unbounded
- * request or a raw `SyntaxError` the operation ledger would settle as a
- * definitive pre-acceptance rejection.
+ * A Worker that never answers, a stalled body, and a body that is not JSON (a
+ * gateway HTML 502/504) leave the Worker's acceptance unknown. All are the
+ * ambiguity class `postSecurityWorkerCommand` classifies transport failures
+ * with, so all surface as a retryable `BAD_GATEWAY` `TRPCError` instead of an
+ * unbounded request or a raw `SyntaxError` the operation ledger would settle
+ * as a definitive pre-acceptance rejection.
  *
  * A connection that was never established is the one failure that is not
  * ambiguous (`failedBeforeDelivery`): nothing was delivered, so it is a
@@ -92,19 +130,23 @@ export async function postSecurityWorkerJson(params: {
   service: SecurityWorkerService;
   body: Record<string, unknown>;
 }): Promise<{ response: Response; body: unknown }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+  const startedAt = Date.now();
   try {
-    const response = await fetch(params.url, {
+    // The shared internal-service budget, one implementation for every caller
+    // (`fetchWithinBudget` defaults to `CONTROL_PLANE_UPSTREAM_BUDGET_MS`).
+    const response = await fetchWithinBudget(params.url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'x-internal-api-key': INTERNAL_API_SECRET,
       },
       body: JSON.stringify(params.body),
-      signal: controller.signal,
     });
-    const body: unknown = await response.json();
+    const body: unknown = await readJsonWithinBudget(
+      response,
+      CONTROL_PLANE_UPSTREAM_BUDGET_MS - (Date.now() - startedAt),
+      CONTROL_PLANE_UPSTREAM_BUDGET_MS
+    );
     return { response, body };
   } catch (error) {
     if (failedBeforeDelivery(error)) {
@@ -117,7 +159,5 @@ export async function postSecurityWorkerJson(params: {
       code: 'BAD_GATEWAY',
       message: `Could not reach the security ${params.service} service. Try again.`,
     });
-  } finally {
-    clearTimeout(timer);
   }
 }

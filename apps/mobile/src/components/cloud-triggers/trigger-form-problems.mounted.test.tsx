@@ -10,7 +10,7 @@
  */
 
 import { createElement, type ElementType } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { createTriggerDraft } from '@/lib/cloud-triggers/trigger-draft';
@@ -23,17 +23,17 @@ import { TriggerFormBasics } from './trigger-form-basics';
 import { TriggerFormBehaviour } from './trigger-form-behaviour';
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   Switch: 'Switch',
   TextInput: 'TextInput',
   View: 'View',
 }));
 // The harness stays a facade: real row/field components keep their contracts
-// while the test host reads the props they carry.
+// while the test host reads the props they carry (`vi.mock` factories hoist
+// above this file's imports, so the form-field factory loads React itself).
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/form-field', async () => {
-  // `vi.mock` factories hoist above this file's imports, so the factory loads
-  // React itself instead of closing over the top-level import.
   const { createElement: h } = await import('react');
   return {
     FormField: (props: Record<string, unknown>) => h('FormField', props),
@@ -46,32 +46,38 @@ vi.mock('./trigger-form-rows', () => ({
   TriggerSwitchRow: 'TriggerSwitchRow',
 }));
 vi.mock('@/lib/cloud-triggers/use-trigger-options', () => ({
-  useTriggerRepositories: () => ({
-    repositories: [],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
-  useTriggerEnvironments: () => ({
-    environments: [],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
-  useTriggerProfiles: () => ({
-    profiles: [],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useTriggerRepositories: () => emptyOptions(),
+  useTriggerEnvironments: () => emptyOptions(),
+  useTriggerProfiles: () => emptyOptions(),
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+// The catalogue read each test describes; the mock reads the object live, so a
+// test sets the state it renders instead of remocking the hook.
+const availableModels = vi.hoisted(() => ({
+  models: [] as { id: string; name: string; variants: string[]; isPreferred: boolean }[],
+  isLoading: false,
+  isError: false,
+  isFetching: false,
+  isFetched: false,
+  refetch: vi.fn<() => Promise<unknown>>(),
+}));
 vi.mock('@/lib/hooks/use-available-models', () => ({
-  useAvailableModels: () => ({ models: [], isLoading: false, isError: false }),
+  useAvailableModels: () => availableModels,
 }));
 vi.mock('./trigger-choice-sheet', () => ({
   TriggerChoiceSheet: 'TriggerChoiceSheet',
 }));
+
+/** An idle options read every trigger form test starts from. */
+const emptyOptions = () => ({
+  repositories: [],
+  environments: [],
+  profiles: [],
+  isLoading: false,
+  isError: false,
+  refetch: vi.fn(),
+});
 vi.mock('@/components/agents/mode-options', () => ({
   getBuiltinModeLabelKey: (mode: string) => (mode.length === 0 ? null : `mode:${mode}`),
   getBuiltinModeDescriptionKey: () => null,
@@ -81,6 +87,20 @@ vi.mock('@/components/agents/mode-normalize', () => ({ BUILTIN_AGENT_MODES: ['co
 const FIELD = 'FormField' as ElementType;
 const SELECT_ROW = 'TriggerSelectRow' as ElementType;
 const MODEL_SELECTOR = 'ModelSelector' as ElementType;
+
+/** A draft change the suite under test never makes. */
+const noop = () => {
+  // not changed by this suite
+};
+
+beforeEach(() => {
+  availableModels.models = [];
+  availableModels.isLoading = false;
+  availableModels.isError = false;
+  availableModels.isFetching = false;
+  availableModels.isFetched = false;
+  availableModels.refetch.mockClear();
+});
 
 const HELPER_KEY_MAP = {
   set: 'cloudAgent.triggers.authSecretSet',
@@ -118,9 +138,7 @@ describe('trigger secret helper copy', () => {
           problems: {},
           authConfigured: key === HELPER_KEY_MAP.keep,
           secretResetKey: 0,
-          onDraftChange: () => {
-            // not changed by this suite
-          },
+          onDraftChange: noop,
         })
       );
       try {
@@ -141,9 +159,7 @@ describe('trigger secret helper copy', () => {
         problems: {},
         authConfigured: false,
         secretResetKey: 0,
-        onDraftChange: () => {
-          // not changed by this suite
-        },
+        onDraftChange: noop,
       })
     );
     try {
@@ -163,13 +179,9 @@ describe('trigger form gated problems', () => {
         mode: 'create',
         draft: createTriggerDraft('UTC'),
         problems: { name: 'required', repository: 'repositoryRequired' },
-        onDraftChange: () => {
-          // not changed by this suite
-        },
+        onDraftChange: noop,
         repositoryPickerOpen: false,
-        onRepositoryPickerOpenChange: () => {
-          // not changed by this suite
-        },
+        onRepositoryPickerOpenChange: noop,
       })
     );
     const root = view.renderer.root;
@@ -214,13 +226,9 @@ describe('trigger form gated problems', () => {
       createElement(TriggerFormAgent, {
         draft: createTriggerDraft('UTC'),
         problems: { model: 'modelRequired' },
-        onDraftChange: () => {
-          // not changed by this suite
-        },
+        onDraftChange: noop,
         openSheet: null,
-        onOpenSheetChange: () => {
-          // not changed by this suite
-        },
+        onOpenSheetChange: noop,
       })
     );
     const root = view.renderer.root;
@@ -236,7 +244,6 @@ describe('trigger form gated problems', () => {
           .findAll(node => Object.is(node.type, 'Text'))
           .map(node => node.props.children)
           .filter(children => children === i18n.t('cloudAgent.triggers.problems.modelRequired'));
-
       expect(shownModelProblem()).toStrictEqual([]);
 
       act(() => {

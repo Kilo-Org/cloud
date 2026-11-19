@@ -26,6 +26,7 @@
     "creditHistory": "Historial de créditos",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancelar",
     "done": "Feito",
     "retry": "Tentar de novo",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "Cambios",
     "organizationTrialEnded": "O período de proba da organización rematou e non ten ningún plan activo. Un propietario da organización pode actualizar a facturación en kilo.ai e despois tentalo de novo.",
-    "privateRepositoryA11y": "{{name}}, repositorio privado"
+    "privateRepositoryA11y": "{{name}}, repositorio privado",
+    "legalDocumentEnglishOnly": "Este documento só está dispoñible en inglés.",
+    "organizationTrialEndedBilling": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación e despois tentalo de novo."
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -385,12 +388,24 @@
       "editKeyDescription": "O valor gardado non se pode amosar. Introduce un novo para substituílo.",
       "editKeyMappingsWarning": "Substituír a clave tamén substitúe as correspondencias de modelos gardadas: introduce de novo todas as correspondencias que aínda necesites.",
       "saveFailed": "Non se puido gardar a clave.",
-      "invalidCredentials": "Comproba as credenciais e téntao de novo.",
       "fieldRequired": "O campo {{field}} é obrigatorio.",
+      "keyIncomplete": "Á clave fáltalle un valor obrigatorio.",
       "incompleteMapping": "A correspondencia {{number}} necesita tanto un slug do modelo da pasarela como un nome do despregamento.",
       "apiKeyLabel": "Clave de API",
       "apiKeyPlaceholder": "Pega a clave",
       "apiKeyRequired": "Introduce a clave.",
+      "keyAlreadyExists": "Xa tes unha clave para este provedor. Elimínaa antes de engadir outra.",
+      "keyStoreFailed": "Non se puido gardar a clave.",
+      "invalidCredentials": "Esta clave non ten o formato que espera este provedor. Comproba a clave e téntao de novo.",
+      "testSucceeded": "A clave funciona. Provedor: {{provider}}. Modelo: {{model}}.",
+      "testRejected": "O provedor rexeitou esta clave. Comproba que é correcta e que non foi revogada.",
+      "testIncomplete": "O provedor rematou a proba antes de que esta finalizase. Téntao de novo.",
+      "testUnsupportedProvider": "Este provedor xa non é compatible. Elimina a clave.",
+      "testUnreadableKey": "A clave gardada non se puido ler. Téntao de novo máis tarde.",
+      "testDeprecatedProvider": "Este provedor está obsoleto, polo que a súa clave non se pode probar.",
+      "keyManagedByCodingPlan": "O plan de programación xestiona a clave deste provedor, que é de só lectura. Cancela o plan de programación para engadir a túa propia clave.",
+      "providerUnavailable": "Este provedor aínda non está dispoñible, polo que non podes engadir unha clave para el.",
+      "testFailed": "A proba da clave fallou. Téntao de novo.",
       "authMethod": "Método de autenticación",
       "authMethodAccessKeys": "Claves de acceso",
       "resourceName": "Nome do recurso de Azure",
@@ -481,7 +496,14 @@
       "viewReceipt": "Ver xustificante"
     },
     "changelog": "Novidades",
-    "changelogVersionPending": "As notas desta versión chegarán coa próxima actualización."
+    "changelogVersionPending": "As notas da versión {{version}} chegarán coa próxima actualización da aplicación.",
+    "changelogGroupNew": "Novidades",
+    "changelogFixesIn": "Correccións e melloras en {{areas}}.",
+    "changelogFixesPolish": "Correccións e melloras en toda a aplicación.",
+    "changelogAreas": {
+      "signIn": "Inicio de sesión",
+      "profileOrganizations": "Perfil e organizacións"
+    }
   },
   "preferences": {
     "general": "Xeral",
@@ -1466,13 +1488,25 @@
       "repositoryLine": "Revisións: {{reviews}} · Achados: {{findings}}",
       "empty": "Aínda non hai revisións con analítica",
       "emptyDescription": "A analítica rexistra as revisións completadas mentres estea activada para a organización.",
-      "off": "A analítica está desactivada para esta organización.",
-      "couldNotLoad": "Non se puido cargar a analítica"
+      "offTitle": "A analítica está desactivada para {{platform}}",
+      "offDescription": "Os roles de facturación da organización poden activar a analítica nos axustes da organización na web para rexistrar as revisións completadas.",
+      "couldNotLoad": "Non se puido cargar a analítica",
+      "trackedReviewsCaption": "Revisións completadas que remataron neste período coa analítica activada. As revisións en execución e as falladas nunca se contan.",
+      "trackedReviewsUncounted": "Sen contar: {{displayCount}} das {{displayTotal}} revisións rematadas da organización sen resultado gardado.",
+      "trackedReviewsUncounted_one": "Sen contar: {{displayCount}} das {{displayTotal}} revisións rematadas da organización sen resultado gardado.",
+      "trackedReviewsUncounted_other": "Sen contar: {{displayCount}} das {{displayTotal}} revisións rematadas da organización sen resultado gardado."
     },
     "council": {
       "title": "Revisión en consello",
       "subtitle": "Varios especialistas revisan cada pull request e os seus votos combínanse nunha única decisión.",
-      "unavailable": "A revisión en consello non está dispoñible para esta organización.",
+      "unavailablePersonallyTitle": "Precisa unha organización Enterprise",
+      "unavailablePersonally": "A revisión en consello non forma parte dunha conta persoal.",
+      "unavailablePersonallyAction": "Crear unha organización",
+      "unavailablePersonallySwitchAction": "Cambiar de organización",
+      "unavailableOrganizationTitle": "Revisión en consello non está dispoñible",
+      "unavailableForOrganization": "A revisión en consello precisa do plan Enterprise cunha subscrición ou un período de proba activos. Esta organización non o ten neste momento.",
+      "unavailableForOrganizationNeutral": "A revisión en consello non está dispoñible para esta organización neste momento. Téntao de novo máis tarde.",
+      "unavailableOnBitbucket": "A revisión en consello non está dispoñible para repositorios de Bitbucket.",
       "noRepositories": "Aínda non hai repositorios seleccionados. Primeiro escolle repositorios na configuración de repositorios.",
       "specialists": "Especialistas",
       "labels": "Etiquetas que activan a revisión en consello",
@@ -3123,7 +3157,6 @@
     "completingPurchase": "Completando a compra",
     "subscriptionLoading": "Cargando a subscrición de Kilo Pass",
     "retryHint": "Volve consultar o estado de Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Rematado o {{date}}",
     "notAvailableInApp": "Kilo Pass non está dispoñible na aplicación.",
     "statusActive": "Activo",
@@ -3326,6 +3359,7 @@
       "manageOnWeb": "Configuración da facturación na web",
       "changePlan": "Cambiar plan",
       "buySeats": "Mercar prazas",
+      "managedOnWeb": "O plan, as prazas e a recarga automática xestiónanse na web.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Xestionar a recarga automática",
       "opensOnWeb": "Ábrese na web"
@@ -3474,12 +3508,11 @@
       "requestLogs": "Rexistros de solicitudes"
     },
     "requestLogs": {
-      "hint": "Solicitudes da hora previa ao fin do intervalo, primeiro as máis recentes.",
       "older": "Hora anterior",
       "newer": "Hora seguinte",
       "truncated": "Esta hora ten máis solicitudes das que mostra a lista.",
-      "emptyTitle": "Non hai solicitudes",
-      "emptyDescription": "Nesta hora non hai solicitudes á pasarela.",
+      "emptyTitle": "Non hai solicitudes nesta hora",
+      "emptyDescription": "Usa Hora anterior para ver solicitudes anteriores.",
       "loadError": "Non se puideron cargar os rexistros de solicitudes.",
       "permissionDenied": "Só un propietario, administrador ou xestor de facturación da organización pode ler os seus rexistros de solicitudes.",
       "tokens": "{{input}} de entrada · {{output}} de saída",
@@ -4283,8 +4316,7 @@
       "repoValue": "Repositorio: {{name}}",
       "profileValue": "Perfil: {{name}}",
       "profileUnavailable": "Este perfil xa non está dispoñible. Escolle outro.",
-      "pickerEmptyDescriptionOrganization": "Crea un perfil de organización para reutilizar as variables de ambiente, os comandos de configuración e as habilidades nas sesións.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Un propietario ou administrador da organización pode crear un perfil de organización."
+      "pickerEmptyDescriptionOrganization": "Crea un perfil de organización para reutilizar as variables de ambiente, os comandos de configuración e as habilidades nas sesións."
     },
     "variablesDeleteFailed": "Non se puido eliminar a variable",
     "deleteVariable": "Eliminar a variable {{key}}",
@@ -4470,7 +4502,6 @@
     "dismiss": "Descartar o informe",
     "offline": "Sen conexión · informe gardado",
     "cached": "Informe gardado · non se pode actualizar",
-    "window": "{{start}} – {{end}}",
     "summary": "Resumo con IA",
     "summaryPending": "O resumo con IA está en curso. Engadirase aquí cando estea listo.",
     "summaryUnavailable": "Resumo con IA non dispoñible. O teu informe estruturado segue dispoñible.",
@@ -4592,6 +4623,7 @@
       "title": "Disparadores e webhooks",
       "subtitle": "Automatiza execucións de Cloud Agent a partir dunha chamada de webhook ou dunha programación.",
       "new": "Novo disparador",
+      "create": "Crear disparador",
       "emptyTitle": "Aínda non hai disparadores",
       "emptyDescription": "Crea un disparador para iniciar unha execución de Cloud Agent a partir dunha chamada de webhook ou segundo unha programación.",
       "loadFailedTitle": "Non se puideron cargar os disparadores",
@@ -4645,6 +4677,8 @@
       "created": "Disparador creado",
       "saved": "Disparador gardado",
       "statusArrived": "Chegou",
+      "defaultPromptWebhook": "Describe o corpo desta solicitude de webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Executa a tarefa programada. Activado en {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introduce un nome.",
         "nameTooShort": "Usa polo menos 8 caracteres.",
@@ -4693,6 +4727,7 @@
     "superseded": "Esta ligazón foi substituída desde outro dispositivo, polo que xa non funciona."
   },
   "sharedSession": {
+    "startedAt": "Iniciada ás {{time}}",
     "title": "Sesión compartida",
     "someone": "Alguén",
     "sharedBy": "Compartida por {{owner}}",
@@ -4848,6 +4883,8 @@
     "modelsDescription": "Desactiva un modelo para bloquealo para todos os membros. Os modelos dos provedores permitidos comezan activados.",
     "modelsDeniedOnly": "Só denegados",
     "modelsEmpty": "Ningún modelo coincide con esta busca.",
+    "modelsDeniedEmpty": "Ningún modelo está denegado.",
+    "modelsDeniedSearchEmpty": "Ningún modelo denegado coincide con esta busca.",
     "providersDescription": "Desactiva un provedor para impedir que Kilo encamiñe solicitudes cara a el para esta organización.",
     "providersNeedCatalog": "Os interruptores dos provedores permanecen en modo só lectura ata que se cargue o catálogo completo de modelos. Toca en Tentar de novo arriba para editalos.",
     "providersEmpty": "Ningún provedor coincide con esta busca.",

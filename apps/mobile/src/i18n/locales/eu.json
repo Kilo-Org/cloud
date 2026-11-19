@@ -26,6 +26,7 @@
     "creditHistory": "Kredituen historia",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Utzi",
     "done": "Eginda",
     "retry": "Saiatu berriro",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "Aldaketak",
     "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu.",
-    "privateRepositoryA11y": "{{name}}, biltegi pribatua"
+    "privateRepositoryA11y": "{{name}}, biltegi pribatua",
+    "legalDocumentEnglishOnly": "Dokumentu hau ingelesez bakarrik dago eskuragarri.",
+    "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu."
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Gordetako balioa ezin da erakutsi. Idatzi berri bat hura ordezteko.",
       "editKeyMappingsWarning": "Gakoa ordezteak gordetako eredu-esleipenak ere ordezten ditu: sartu berriro oraindik behar dituzun esleipen guztiak.",
       "saveFailed": "Ezin izan da gakoa gorde.",
-      "invalidCredentials": "Egiaztatu kredentzialak eta saiatu berriro.",
       "fieldRequired": "{{field}} derrigorrezkoa da.",
+      "keyIncomplete": "Gakoari derrigorrezko balio bat falta zaio.",
       "incompleteMapping": "{{number}}. esleipenak bai atebideko ereduaren slug-a bai inplementazio-izena behar ditu.",
       "apiKeyLabel": "API gakoa",
       "apiKeyPlaceholder": "Itsatsi gakoa",
       "apiKeyRequired": "Idatzi gakoa.",
+      "keyAlreadyExists": "Dagoeneko badaukazu hornitzaile honen gako bat. Kendu ezazu beste bat gehitu aurretik.",
+      "keyStoreFailed": "Ezin izan da gakoa gorde.",
+      "invalidCredentials": "Gako hau ez dago hornitzaile honek espero duen formatuan. Egiaztatu eta saiatu berriro.",
+      "testSucceeded": "Gakoak funtzionatzen du. Hornitzailea: {{provider}}. Modeloa: {{model}}.",
+      "testRejected": "Hornitzaileak gako hau baztertu du. Egiaztatu zuzena dela eta ez dela baliogabetu.",
+      "testIncomplete": "Hornitzaileak proba amaitu aurretik eten zuen. Saiatu berriro.",
+      "testUnsupportedProvider": "Hornitzaile hau jada ez da onartzen. Kendu gakoa.",
+      "testUnreadableKey": "Ezin izan da gordetako gakoa irakurri. Saiatu geroago.",
+      "testDeprecatedProvider": "Hornitzaile hau zaharkituta dago, beraz ezin da haren gakoa probatu.",
+      "keyManagedByCodingPlan": "Kodetze-plan batek hornitzaile honen gakoa kudeatzen du, eta gakoa irakurtzeko soilik da. Zure gakoa gehitzeko, kodetze-plana bertan behera utzi behar duzu.",
+      "providerUnavailable": "Hornitzaile hau oraindik ez dago erabilgarri, beraz, ezin duzu gako bat gehitu.",
+      "testFailed": "Gakoaren proba huts egin du. Saiatu berriro.",
       "authMethod": "Autentifikazio-metodoa",
       "authMethodAccessKeys": "Sarbide-gakoak",
       "resourceName": "Azure baliabidearen izena",
@@ -481,7 +496,14 @@
       "viewReceipt": "Ikusi agiria"
     },
     "changelog": "Berritasunak",
-    "changelogVersionPending": "Bertsio honen oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira."
+    "changelogVersionPending": "{{version}} bertsioaren oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira.",
+    "changelogGroupNew": "Berrikuntzak",
+    "changelogFixesIn": "Zuzenketak eta hobekuntzak atal hauetan: {{areas}}.",
+    "changelogFixesPolish": "Zuzenketak eta hobekuntzak aplikazio osoan.",
+    "changelogAreas": {
+      "signIn": "Saioa hastea",
+      "profileOrganizations": "Profila eta erakundeak"
+    }
   },
   "preferences": {
     "general": "Orokorra",
@@ -1466,13 +1488,25 @@
       "repositoryLine": "Berrikuspenak: {{reviews}} · Aurkikuntzak: {{findings}}",
       "empty": "Oraindik ez dago analitikadun berrikuspenik",
       "emptyDescription": "Analitikak amaitutako berrikuspenak erregistratzen ditu erakundean gaituta dagoen bitartean.",
-      "off": "Analitika desgaituta dago erakunde honetan.",
-      "couldNotLoad": "Ezin izan da analitika kargatu"
+      "offTitle": "{{platform}} plataformarako analitika desgaituta dago",
+      "offDescription": "Erakundeko fakturazio-rolek analitika gaitu dezakete erakundearen webean dauden ezarpenetan, amaitutako berrikuspenak erregistratzeko.",
+      "couldNotLoad": "Ezin izan da analitika kargatu",
+      "trackedReviewsCaption": "Aldi honetan analitika gaituta amaitu diren berrikuspenak. Martxan dauden eta huts egin duten berrikuspenak inoiz ez dira zenbatzen.",
+      "trackedReviewsUncounted": "Zenbatu gabe: {{displayCount}} / {{displayTotal}} berrikuspenetatik beren emaitza jaso gabe.",
+      "trackedReviewsUncounted_one": "Zenbatu gabe: {{displayCount}} / {{displayTotal}} berrikuspenetatik beren emaitza jaso gabe.",
+      "trackedReviewsUncounted_other": "Zenbatu gabe: {{displayCount}} / {{displayTotal}} berrikuspenetatik beren emaitza jaso gabe."
     },
     "council": {
       "title": "Kontseilu-berrikuspena",
       "subtitle": "Hainbat espezialistak berrikusten dute bateratze-eskaera bakoitza, eta haien botoak erabaki bakarrean batzen dira.",
-      "unavailable": "Kontseilu-berrikuspena ez dago erabilgarri erakunde honetan.",
+      "unavailablePersonallyTitle": "Enterprise erakundea behar du",
+      "unavailablePersonally": "Kontseilu-berrikuspena ez da kontu pertsonal baten parte.",
+      "unavailablePersonallyAction": "Sortu erakundea",
+      "unavailablePersonallySwitchAction": "Aldatu erakundea",
+      "unavailableOrganizationTitle": "Kontseilu-berrikuspena ez dago erabilgarri",
+      "unavailableForOrganization": "Kontseilu-berrikuspenak Enterprise plana behar du, harpidetza edo probaldi aktibo batekin. Erakunde honek ez du hura orain.",
+      "unavailableForOrganizationNeutral": "Kontseilu-berrikuspena ez dago erabilgarri erakunde honentzat orain. Saiatu berriro geroago.",
+      "unavailableOnBitbucket": "Kontseilu-berrikuspena ez dago erabilgarri Bitbucket biltegietarako.",
       "noRepositories": "Oraindik ez da biltegirik hautatu. Lehenik, aukeratu biltegiak biltegien ezarpenetan.",
       "specialists": "Espezialistak",
       "labels": "Kontseilu-berrikuspena abiarazten duten etiketak",
@@ -3123,7 +3157,6 @@
     "completingPurchase": "Erosketa amaitzen",
     "subscriptionLoading": "Kilo Pass-en harpidetza kargatzen",
     "retryHint": "Kilo Pass-en egoera berriro kargatzen saiatzen da.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Amaituta {{date}}",
     "notAvailableInApp": "Kilo Pass ez dago aplikazioan erabilgarri.",
     "statusActive": "Aktibo",
@@ -3326,6 +3359,7 @@
       "manageOnWeb": "Fakturazio-ezarpenak webean",
       "changePlan": "Aldatu plana",
       "buySeats": "Erosi lizentziak",
+      "managedOnWeb": "Plana, lizentziak eta birkarga automatikoa webean kudeatzen dira.",
       "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
       "manageAutoTopUp": "Kudeatu birkarga automatikoa",
       "opensOnWeb": "Webean irekitzen da"
@@ -3474,12 +3508,11 @@
       "requestLogs": "Eskaeren erregistroak"
     },
     "requestLogs": {
-      "hint": "Leihoa amaitu aurreko orduko eskaerak, berrienak lehenik.",
       "older": "Aurreko ordua",
       "newer": "Hurrengo ordua",
       "truncated": "Ordu honetan zerrendak erakusten dituenak baino eskaera gehiago daude.",
-      "emptyTitle": "Ez dago eskaerarik",
-      "emptyDescription": "Ordu honetan ez dago atebideko eskaerarik.",
+      "emptyTitle": "Ordu honetan ez dago eskaerarik",
+      "emptyDescription": "Erabili «Aurreko ordua» aurreko eskaerak ikusteko.",
       "loadError": "Ezin izan dira eskaeren erregistroak kargatu.",
       "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak.",
       "tokens": "{{input}} sarrera · {{output}} irteera",
@@ -4283,8 +4316,7 @@
       "repoValue": "Biltegia: {{name}}",
       "profileValue": "Profila: {{name}}",
       "profileUnavailable": "Profil hau jada ez dago erabilgarri. Aukeratu beste bat.",
-      "pickerEmptyDescriptionOrganization": "Sortu erakunde-profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Erakundearen jabe batek edo administratzaile batek sor dezake erakunde-profil bat."
+      "pickerEmptyDescriptionOrganization": "Sortu erakunde-profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko."
     },
     "variablesDeleteFailed": "Ezin izan da aldagaia ezabatu",
     "deleteVariable": "Ezabatu aldagaia {{key}}",
@@ -4470,7 +4502,6 @@
     "dismiss": "Baztertu txostena",
     "offline": "Lineaz kanpo · gordetako txostena",
     "cached": "Gordetako txostena · ezin da freskatu",
-    "window": "{{start}} – {{end}}",
     "summary": "AI laburpena",
     "summaryPending": "AI laburpena prestatzen ari da. Prest dagoenean hemen erantsiko da.",
     "summaryUnavailable": "AI laburpena ez dago erabilgarri. Txosten egituratua erabilgarri dago oraindik.",
@@ -4592,6 +4623,7 @@
       "title": "Abiarazleak eta webhookak",
       "subtitle": "Automatizatu Cloud Agent exekuzioak webhook dei batetik edo ordutegi baten arabera.",
       "new": "Abiarazle berria",
+      "create": "Sortu abiarazlea",
       "emptyTitle": "Oraindik ez dago abiarazlerik",
       "emptyDescription": "Sortu abiarazle bat Cloud Agent exekuzio bat hasteko webhook dei batetik edo ordutegi baten arabera.",
       "loadFailedTitle": "Ezin izan dira abiarazleak kargatu",
@@ -4645,6 +4677,8 @@
       "created": "Abiarazlea sortu da",
       "saved": "Abiarazlea gorde da",
       "statusArrived": "Iritsi da",
+      "defaultPromptWebhook": "Deskribatu webhook eskaera honen gorputza:\n\n{{body}}",
+      "defaultPromptScheduled": "Exekutatu programatutako zeregina. Abiarazita: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Sartu izen bat.",
         "nameTooShort": "Erabili gutxienez 8 karaktere.",
@@ -4693,6 +4727,7 @@
     "superseded": "Esteka hau beste nonbait ordeztu da, beraz, jada ez du funtzionatzen."
   },
   "sharedSession": {
+    "startedAt": "Hasiera: {{time}}",
     "title": "Partekatutako saioa",
     "someone": "Norbait",
     "sharedBy": "Partekatzailea: {{owner}}",
@@ -4848,6 +4883,8 @@
     "modelsDescription": "Desaktibatu eredu bat kide guztientzat blokeatzeko. Baimendutako hornitzaileen ereduak aktibatuta daude hasieran.",
     "modelsDeniedOnly": "Ukatutakoak soilik",
     "modelsEmpty": "Ez dago bilaketa honekin bat datorren eredurik.",
+    "modelsDeniedEmpty": "Ez dago ukatutako eredurik.",
+    "modelsDeniedSearchEmpty": "Ez dago bilaketa honekin bat datorren ukatutako eredurik.",
     "providersDescription": "Desaktibatu hornitzaile bat, Kilok erakunde honen eskaerak harengana bidera ez ditzan.",
     "providersNeedCatalog": "Hornitzaileen etengailuak irakurtzeko soilik egongo dira ereduen katalogo osoa kargatu arte. Editatzeko, sakatu goiko Saiatu berriro.",
     "providersEmpty": "Ez dago bilaketa honekin bat datorren hornitzailerik.",

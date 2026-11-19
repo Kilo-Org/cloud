@@ -63,6 +63,8 @@ export async function getDeviceAuthPendingLink(
 
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
+/** The whole life of a device authorization code, in seconds. */
+export const DEVICE_AUTH_CODE_LIFETIME_SECONDS = CODE_EXPIRATION_MINUTES * 60;
 const MAX_PENDING_REQUESTS_PER_IP = 5;
 const MAX_USER_CODE_ATTEMPTS = 5;
 /** Advisory-lock namespace for the per-address pending count and insert. */
@@ -79,15 +81,42 @@ export const DEVICE_AUTH_PENDING_LOCK_WAIT_MS = 5_000;
 /** SQLSTATE of a statement cancelled because it waited for a lock too long. */
 const LOCK_NOT_AVAILABLE = '55P03';
 
+/**
+ * The stable machine-readable codes the clients match on the device-auth
+ * refusals. A code never changes meaning; copy is carried separately.
+ */
+export const DEVICE_AUTH_REFUSAL_CODES = {
+  invalidRequestingClient: 'INVALID_REQUESTING_CLIENT',
+  pendingLinkExpired: 'PENDING_LINK_EXPIRED',
+  rateLimited: 'RATE_LIMITED',
+} as const;
+
 export const DEVICE_AUTH_PENDING_LIMIT_MESSAGE =
-  'Too many sign-in attempts from this network. Wait a few minutes and try again.';
+  'Too many sign-in attempts from this network. Try again later.';
 
 /** Rate-limit error thrown when an IP has too many live pending requests. */
 export class DeviceAuthPendingLimitError extends Error {
-  constructor() {
+  /** Seconds until the address's oldest live pending row expires. */
+  readonly retryAfterSeconds: number;
+
+  constructor(retryAfterSeconds: number = DEVICE_AUTH_CODE_LIFETIME_SECONDS) {
     super(DEVICE_AUTH_PENDING_LIMIT_MESSAGE);
     this.name = 'DeviceAuthPendingLimitError';
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+/**
+ * The retry advisory a pending-limit refusal reports, in seconds. A count that
+ * cannot report the address's oldest live row (so the block's real end is not
+ * known) falls back to the full code lifetime, so the copy never promises a
+ * shorter wait than the block lasts. A known remaining life is clamped to
+ * `1..DEVICE_AUTH_CODE_LIFETIME_SECONDS`, rounded up, for the same reason: a
+ * second-long remainder is still a wait the client must respect.
+ */
+function pendingRetryAfterSeconds(remaining: number | null): number {
+  if (remaining === null || !Number.isFinite(remaining)) return DEVICE_AUTH_CODE_LIFETIME_SECONDS;
+  return Math.min(Math.max(Math.ceil(remaining), 1), DEVICE_AUTH_CODE_LIFETIME_SECONDS);
 }
 
 /**
@@ -132,9 +161,11 @@ export function hashDeviceSecret(secret: string): string {
  * device-code flow.
  *
  * A request that already has `MAX_PENDING_REQUESTS_PER_IP` live pending rows from
- * the same address is refused before any row is written. The count and the insert
- * run inside one transaction that holds a per-address advisory lock, so the limit
- * is evaluated against the rows committed by the requests that came before.
+ * the same address is refused before any row is written, with a
+ * `retryAfterSeconds` advisory read from its oldest live row. The count and the
+ * insert run inside one transaction that holds a per-address advisory lock, so
+ * the limit is evaluated against the rows committed by the requests that came
+ * before.
  * `pg_advisory_xact_lock` releases on commit or rollback, so the lock never
  * outlives the transaction. The wait for that lock is bounded by
  * {@link DEVICE_AUTH_PENDING_LOCK_WAIT_MS}; a request that cannot take the lock
@@ -176,19 +207,33 @@ export async function createDeviceAuthRequest(params: {
           sql`SELECT pg_advisory_xact_lock(hashtext(${PENDING_LIMIT_LOCK_NAMESPACE}), hashtext(${ipAddress}))`
         );
 
+        // One instant for both the live-row predicate and the retry advisory,
+        // captured after the lock: taking the lock can wait up to
+        // DEVICE_AUTH_PENDING_LOCK_WAIT_MS, and rows that expire during that
+        // wait must not count as live, nor the advisory promise their time.
+        const now = new Date().toISOString();
+
         const [result] = await tx
-          .select({ count: sql<number>`count(*)::int` })
+          .select({
+            count: sql<number>`count(*)::int`,
+            // Remaining seconds of the OLDEST live counted row, by the same clock
+            // as the count: when the count is at the limit, this is when the
+            // block ends.
+            retryAfterSeconds: sql<
+              number | null
+            >`ceil(extract(epoch from min(${device_auth_requests.expires_at}) - ${now}::timestamptz))::int`,
+          })
           .from(device_auth_requests)
           .where(
             and(
               eq(device_auth_requests.ip_address, ipAddress),
               eq(device_auth_requests.status, 'pending'),
-              requestIsLiveAt(new Date().toISOString())
+              requestIsLiveAt(now)
             )
           );
 
         if (result && result.count >= MAX_PENDING_REQUESTS_PER_IP) {
-          throw new DeviceAuthPendingLimitError();
+          throw new DeviceAuthPendingLimitError(pendingRetryAfterSeconds(result.retryAfterSeconds));
         }
       }
 

@@ -22,7 +22,10 @@ import type {
   OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { EffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
-import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import {
+  composeProviderPreferences,
+  getEffectiveProviderPrivacy,
+} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import {
   isDataCollectionExplicitlyDisallowed,
   type OpenRouterProviderConfig,
@@ -237,14 +240,14 @@ export function paidUsageRejection(params: {
 
 /**
  * The provider preferences the organization requires: its data collection
- * policy and the member decision's provider routes, with the request's own
- * privacy merged in. `provider` is undefined when the organization requires
+ * policy and the member decision's provider routes, applied over the request's
+ * own provider object. `provider` is undefined when the organization requires
  * neither, so the request's provider preferences stand.
  */
 export function organizationProviderPreferences(params: {
   decision: EffectiveModelDecision | undefined;
   settings: OrganizationSettings | undefined;
-  requestProvider: Pick<OpenRouterProviderConfig, 'data_collection' | 'zdr'> | undefined;
+  requestProvider: OpenRouterProviderConfig | undefined;
 }):
   | { kind: 'rejected'; response: NextResponse }
   | { kind: 'allowed'; provider: OpenRouterProviderConfig | undefined } {
@@ -258,14 +261,13 @@ export function organizationProviderPreferences(params: {
   if (only?.length === 0) return { kind: 'rejected', response: modelNotAllowedResponse() };
   const organizationPrivacy = getOrganizationProviderPrivacy(settings);
   if (!organizationPrivacy && !only) return { kind: 'allowed', provider: undefined };
-  return {
-    kind: 'allowed',
-    provider: {
-      ...organizationPrivacy,
-      ...getEffectiveProviderPrivacy(requestProvider, settings?.data_collection),
-      ...(only && { only }),
-    },
-  };
+  const composed = composeProviderPreferences({
+    requestProvider,
+    organizationOnly: only,
+    effectivePrivacy: getEffectiveProviderPrivacy(requestProvider, settings?.data_collection),
+  });
+  if (composed.kind === 'none') return { kind: 'rejected', response: modelNotAllowedResponse() };
+  return { kind: 'allowed', provider: composed.provider };
 }
 
 /** Rejects a model that requires data collection under the effective provider privacy policy. */

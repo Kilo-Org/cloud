@@ -26,6 +26,7 @@
     "creditHistory": "Kasaysayan ng credit",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Kanselahin",
     "done": "Tapos",
     "retry": "Subukan muli",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "Mga pagbabago",
     "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli.",
-    "privateRepositoryA11y": "{{name}}, pribadong repositoryo"
+    "privateRepositoryA11y": "{{name}}, pribadong repositoryo",
+    "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles.",
+    "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli."
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Hindi maipapakita ang nakaimbak na value. Maglagay ng bago para palitan ito.",
       "editKeyMappingsWarning": "Ang pagpapalit ng key ay pinapalitan din ang mga nakaimbak na model mapping: ilagay muli ang bawat mapping na kailangan mo pa.",
       "saveFailed": "Hindi ma-save ang key.",
-      "invalidCredentials": "Suriin ang mga credential at subukang muli.",
       "fieldRequired": "Kailangan ang {{field}}.",
+      "keyIncomplete": "Kulang ang key ng kinakailangang value.",
       "incompleteMapping": "Kailangan ng Mapping {{number}} ang parehong gateway model slug at deployment name.",
       "apiKeyLabel": "API key",
       "apiKeyPlaceholder": "I-paste ang key",
       "apiKeyRequired": "Ilagay ang key.",
+      "keyAlreadyExists": "Mayroon ka nang key para sa provider na ito. Alisin ito bago ka magdagdag ng isa pa.",
+      "keyStoreFailed": "Hindi naimbak ang key.",
+      "invalidCredentials": "Hindi ayon ang key na ito sa pormat na inaasahan ng provider na ito. Suriin ito at subukan muli.",
+      "testSucceeded": "Gumagana ang key. Provider: {{provider}}. Model: {{model}}.",
+      "testRejected": "Tinanggihan ng provider ang key na ito. Suriin na tama ito at hindi pa binawi.",
+      "testIncomplete": "Inihinto ng provider ang pagsubok bago ito matapos. Subukan muli.",
+      "testUnsupportedProvider": "Hindi na sinusuportahan ang provider na ito. Alisin ang key.",
+      "testUnreadableKey": "Hindi mabasa ang nakaimbak na key. Subukan muli mamaya.",
+      "testDeprecatedProvider": "Lipas na ang provider na ito, kaya hindi na masusubukan ang key nito.",
+      "keyManagedByCodingPlan": "Pinamamahalaan ng coding plan ang key ng provider na ito, at ang key ay hindi mababago. Kanselahin ang coding plan para makapagdagdag ka ng sarili mong key.",
+      "providerUnavailable": "Hindi pa available ang provider na ito, kaya hindi ka pa makakapagdagdag ng key para dito.",
+      "testFailed": "Bigo ang pagsubok ng key. Subukan muli.",
       "authMethod": "Paraan ng authentication",
       "authMethodAccessKeys": "Mga access key",
       "resourceName": "Pangalan ng Azure resource",
@@ -481,7 +496,14 @@
       "viewReceipt": "Tingnan ang resibo"
     },
     "changelog": "Mga bago",
-    "changelogVersionPending": "Nasa susunod na update ng app ang mga tala ng bersyong ito."
+    "changelogVersionPending": "Nasa susunod na update ng app ang mga tala ng bersyong {{version}}.",
+    "changelogGroupNew": "Bago",
+    "changelogFixesIn": "Mga pag-aayos at pagpapahusay sa {{areas}}.",
+    "changelogFixesPolish": "Mga pag-aayos at pagpapahusay sa buong aplikasyon.",
+    "changelogAreas": {
+      "signIn": "Pagpasok",
+      "profileOrganizations": "Propayl at mga organisasyon"
+    }
   },
   "preferences": {
     "general": "Pangkalahatan",
@@ -1466,13 +1488,25 @@
       "repositoryLine": "Mga pagsusuri: {{reviews}} · Mga natuklasan: {{findings}}",
       "empty": "Wala pang pagsusuring may analitika",
       "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
-      "off": "Naka-off ang analitika para sa organisasyong ito.",
-      "couldNotLoad": "Hindi ma-load ang analitika"
+      "offTitle": "Naka-off ang analitika para sa {{platform}}",
+      "offDescription": "Maaaring paganahin ng mga role sa pagbabayad ng organisasyon ang analitika sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
+      "couldNotLoad": "Hindi ma-load ang analitika",
+      "trackedReviewsCaption": "Mga natapos na pagsusuri sa panahong ito habang naka-on ang analitika. Hindi kailanman binibilang ang mga pagsusuring tumatakbo o nabigo.",
+      "trackedReviewsUncounted": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta.",
+      "trackedReviewsUncounted_one": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta.",
+      "trackedReviewsUncounted_other": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta."
     },
     "council": {
       "title": "Pagsusuri ng konseho",
       "subtitle": "Sinusuri ng ilang espesyalista ang bawat pull request, at pinagsasama ang kanilang mga boto sa iisang desisyon.",
-      "unavailable": "Hindi magagamit ang pagsusuri ng konseho sa organisasyong ito.",
+      "unavailablePersonallyTitle": "Kailangan ng Enterprise na organisasyon",
+      "unavailablePersonally": "Hindi bahagi ng personal na account ang pagsusuri ng konseho.",
+      "unavailablePersonallyAction": "Gumawa ng organisasyon",
+      "unavailablePersonallySwitchAction": "Lumipat ng organisasyon",
+      "unavailableOrganizationTitle": "Hindi magagamit ang pagsusuri ng konseho",
+      "unavailableForOrganization": "Ang pagsusuri ng konseho ay nangangailangan ng Enterprise plan na may aktibong subscription o trial. Wala ito sa organisasyong ito sa ngayon.",
+      "unavailableForOrganizationNeutral": "Ang pagsusuri ng konseho ay hindi magagamit para sa organisasyong ito sa ngayon. Subukan muli mamaya.",
+      "unavailableOnBitbucket": "Hindi available ang pagsusuri ng konseho para sa mga Bitbucket repositoryo.",
       "noRepositories": "Wala pang napiling repositoryo. Pumili muna ng mga repositoryo sa mga setting ng repositoryo.",
       "specialists": "Mga espesyalista",
       "labels": "Mga label na nagpapasimula ng pagsusuri ng konseho",
@@ -3123,7 +3157,6 @@
     "completingPurchase": "Kinukumpleto ang pagbili",
     "subscriptionLoading": "Nilo-load ang subscription sa Kilo Pass",
     "retryHint": "Sinusubukang kunin muli ang katayuan ng Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Natapos {{date}}",
     "notAvailableInApp": "Hindi magagamit ang Kilo Pass sa app.",
     "statusActive": "Aktibo",
@@ -3326,6 +3359,7 @@
       "manageOnWeb": "Mga setting ng pagsingil sa web",
       "changePlan": "Palitan ang plano",
       "buySeats": "Bumili ng mga puwesto",
+      "managedOnWeb": "Ang plano, ang mga puwesto at ang auto top-up ay pinamamahalaan sa web.",
       "setupAutoTopUp": "I-set up ang auto top-up",
       "manageAutoTopUp": "Pamahalaan ang auto top-up",
       "opensOnWeb": "Bubuksan sa web"
@@ -3474,12 +3508,11 @@
       "requestLogs": "Mga request log"
     },
     "requestLogs": {
-      "hint": "Mga request sa loob ng isang oras bago magtapos ang window, pinakabago muna.",
       "older": "Mas lumang oras",
       "newer": "Mas bagong oras",
       "truncated": "Mas marami ang request sa oras na ito kaysa sa ipinapakita ng listahan.",
-      "emptyTitle": "Walang request",
-      "emptyDescription": "Walang gateway request sa oras na ito.",
+      "emptyTitle": "Walang request sa oras na ito",
+      "emptyDescription": "Gamitin ang \"Mas lumang oras\" para makita ang mga naunang request.",
       "loadError": "Hindi ma-load ang mga request log.",
       "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
       "tokens": "{{input}} input · {{output}} output",
@@ -4283,8 +4316,7 @@
       "repoValue": "Repositoryo: {{name}}",
       "profileValue": "Profile: {{name}}",
       "profileUnavailable": "Hindi na available ang profile na ito. Pumili ng iba.",
-      "pickerEmptyDescriptionOrganization": "Gumawa ng profile ng organisasyon para magamit muli ang mga variable ng kapaligiran, mga utos sa pag-setup, at mga kasanayan sa mga session.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ang may-ari ng organisasyon o admin ang makakagawa ng profile ng organisasyon."
+      "pickerEmptyDescriptionOrganization": "Gumawa ng profile ng organisasyon para magamit muli ang mga variable ng kapaligiran, mga utos sa pag-setup, at mga kasanayan sa mga session."
     },
     "variablesDeleteFailed": "Hindi ma-delete ang variable",
     "deleteVariable": "Burahin ang variable {{key}}",
@@ -4470,7 +4502,6 @@
     "dismiss": "Balewalain ang briefing",
     "offline": "Offline · naka-save na briefing",
     "cached": "Naka-save na ulat · hindi ma-refresh",
-    "window": "{{start}} – {{end}}",
     "summary": "Buod ng AI",
     "summaryPending": "Ginagawa pa ang buod ng AI. Ilalakip ito rito kapag handa na.",
     "summaryUnavailable": "Hindi available ang buod ng AI. Available pa rin ang iyong nakaayos na ulat.",
@@ -4592,6 +4623,7 @@
       "title": "Mga pampapagana at webhook",
       "subtitle": "Gawing awtomatiko ang mga pagtakbo ng Cloud Agent mula sa tawag na webhook o iskedyul.",
       "new": "Bagong pampapagana",
+      "create": "Gumawa ng pampapagana",
       "emptyTitle": "Wala pang pampapagana",
       "emptyDescription": "Gumawa ng pampapagana para magsimula ng pagtakbo ng Cloud Agent mula sa tawag na webhook o sa isang iskedyul.",
       "loadFailedTitle": "Hindi makuha ang mga pampapagana",
@@ -4645,6 +4677,8 @@
       "created": "Nagawa ang pampapagana",
       "saved": "Naimbak ang pampapagana",
       "statusArrived": "Dumating",
+      "defaultPromptWebhook": "Ilarawan ang katawan ng kahilingang webhook na ito:\n\n{{body}}",
+      "defaultPromptScheduled": "Patakbuhin ang naka-iskedyul na gawain. Sinimulan noong {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Maglagay ng pangalan.",
         "nameTooShort": "Gumamit ng hindi bababa sa 8 karakter.",
@@ -4693,6 +4727,7 @@
     "superseded": "Pinalitan ang link na ito sa ibang device, kaya hindi na ito gumagana."
   },
   "sharedSession": {
+    "startedAt": "Sinimulan noong {{time}}",
     "title": "Ibinahaging session",
     "someone": "Isang user",
     "sharedBy": "Ibinahagi ng {{owner}}",
@@ -4848,6 +4883,8 @@
     "modelsDescription": "I-off ang isang modelo para harangin ito para sa bawat miyembro. Naka-on sa simula ang mga modelo mula sa mga pinapayagang provider.",
     "modelsDeniedOnly": "Mga tinanggihan lang",
     "modelsEmpty": "Walang modelong tumutugma sa paghahanap na ito.",
+    "modelsDeniedEmpty": "Walang modelong tinanggihan.",
+    "modelsDeniedSearchEmpty": "Walang tinanggihang modelo na tumutugma sa paghahanap na ito.",
     "providersDescription": "I-off ang isang provider para itigil ng Kilo ang pag-route dito para sa organisasyong ito.",
     "providersNeedCatalog": "Read-only ang mga switch ng provider hangga't hindi pa nalo-load ang buong catalog ng model. I-tap ang Subukan muli sa itaas para ma-edit ang mga ito.",
     "providersEmpty": "Walang provider na tumutugma sa paghahanap na ito.",

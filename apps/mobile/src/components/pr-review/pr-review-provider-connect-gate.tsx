@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- The gate renders the connect, wrong-instance and org-only states, each with its own copy, for two providers with different browser hand-offs. */
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +22,7 @@ import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrganization } from '@/lib/organization-context';
@@ -80,7 +80,7 @@ export function ProviderConnectGate({
   children: ReactNode;
 }>) {
   const trpc = useTRPC();
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   const iconColor = usePrReviewGateIconColor();
@@ -208,7 +208,7 @@ export function ProviderConnectGate({
     }
     // The connect sheet changes the same status this gate reads, so its
     // invalidation is what closes the gate; nothing else has to run on return.
-    router.push(bitbucketConnectHref(organizationId));
+    pushOnce(bitbucketConnectHref(organizationId));
   };
 
   // A GitLab connection serves exactly one instance, and the status read names

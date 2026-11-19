@@ -92,7 +92,6 @@ import { resolveTranscriptPhase, transcriptReadyForEffects } from './transcript-
 import { billingPayerPresentation } from './billing-payer-presentation';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
-import { PreviewPortDialog } from './PreviewPortDialog';
 import { WorktreeChangesView } from './WorktreeChanges';
 import { WorkspaceArtifactsView } from './WorkspaceArtifacts';
 import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
@@ -635,16 +634,6 @@ export default function CloudChatPage({
   const [modelCatalogRequested, setModelCatalogRequested] = useState(false);
   const requestModelCatalog = useCallback(() => setModelCatalogRequested(true), []);
 
-  const previousArtifactsViewOpenRef = useRef(false);
-  useEffect(() => {
-    const wasOpen = previousArtifactsViewOpenRef.current;
-    previousArtifactsViewOpenRef.current = artifactsViewOpen;
-    if (!wasOpen || artifactsViewOpen) return;
-    const target = artifactsViewFocusTargetRef.current;
-    artifactsViewFocusTargetRef.current = null;
-    if (target?.isConnected) target.focus({ preventScroll: true });
-  }, [artifactsViewOpen]);
-
   const sessionModels = useSessionModels({
     activeSessionType,
     remoteModelState,
@@ -686,7 +675,7 @@ export default function CloudChatPage({
   );
   const { availableCommands } = useSlashCommandSets();
 
-  const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
+  const { play: playCelebrationSound } = useCelebrationSound();
   const { collapseTools } = useCollapseToolsPreference();
 
   const prevActivityRef = useRef<string | null>(null);
@@ -891,10 +880,6 @@ export default function CloudChatPage({
   const handleStopExecution = useCallback(() => {
     void manager.interrupt();
   }, [manager]);
-
-  const handleToggleSound = useCallback(() => {
-    setSoundEnabled(prev => !prev);
-  }, [setSoundEnabled]);
 
   const fetchRouteReady = useCallback(
     async (kiloSessionId: string): Promise<boolean | undefined> => {
@@ -1315,6 +1300,20 @@ export default function CloudChatPage({
     [activeWorkspaceTabId, artifactsViewOpen, closeChangesView, fileScope]
   );
 
+  const handleArtifactsDrawerOpenChange = useCallback((open: boolean) => {
+    if (open) return;
+    artifactsViewOpenedTabRef.current = null;
+    setArtifactsViewScope(null);
+  }, []);
+
+  const handleArtifactsDrawerCloseAutoFocus = useCallback((event: Event) => {
+    const focusTarget = artifactsViewFocusTargetRef.current;
+    artifactsViewFocusTargetRef.current = null;
+    if (!focusTarget?.isConnected) return;
+    event.preventDefault();
+    focusTarget.focus();
+  }, []);
+
   const runtimeCustomOptions: CustomModeOption[] = (composerSettings?.runtimeAgents ?? []).map(
     a => ({
       value: a.slug,
@@ -1625,8 +1624,7 @@ export default function CloudChatPage({
       sessionInfoOpen={sessionInfoOpen}
       onSessionInfoOpenChange={setSessionInfoOpen}
       sessionInfoTriggerRef={sessionInfoTriggerRef}
-      soundEnabled={soundEnabled}
-      onToggleSound={handleToggleSound}
+      preview={preview}
       changesOpen={changesViewOpen}
       onToggleChanges={canOpenChanges ? handleToggleChanges : undefined}
       artifactsOpen={artifactsViewOpen}
@@ -1794,16 +1792,14 @@ export default function CloudChatPage({
                             terminals={workspaceTabs.terminals}
                             terminalStatuses={terminalStatuses}
                             canCreateTerminal={canOpenTerminal}
-                            canOpenPreview={preview.links !== null}
                             onSelectTab={handleSelectWorkspaceTab}
                             onCreateTerminal={handleCreateTerminalTab}
-                            onOpenPreview={preview.openDialog}
                             onCloseTerminal={handleCloseTerminalTab}
                             onActivateTab={() => {
                               closeChangesView();
                               closeArtifactsView();
                             }}
-                            selectionSuppressed={changesViewOpen || artifactsViewOpen}
+                            selectionSuppressed={changesViewOpen}
                           />
                         )}
                       </div>
@@ -1811,17 +1807,8 @@ export default function CloudChatPage({
                         review={review}
                         onOpenComment={handleOpenReviewComment}
                       />
-                      {preview.dialog !== null && <PreviewPortDialog {...preview.dialog} />}
-                      {(sessionIdFromParams || workspaceControlSession) && (
-                        <div
-                          className={cn(
-                            // Reserve the late-loading Changes, Artifacts, and sandbox controls,
-                            // which are touch-sized below `sm`, so they do not resize the header row.
-                            'ml-auto flex min-h-11 shrink-0 items-center justify-end sm:min-h-8',
-                            (sessionIdFromParams || selectedWorktreeId) &&
-                              'min-w-[240px] sm:min-w-0'
-                          )}
-                        >
+                      {(sessionIdFromParams || workspaceControlSession || preview.dialog) && (
+                        <div className="ml-auto flex min-h-8 shrink-0 items-center justify-end pointer-coarse:min-h-11">
                           {sessionActions}
                         </div>
                       )}
@@ -1832,12 +1819,12 @@ export default function CloudChatPage({
                       className="relative flex min-h-0 flex-1 flex-col"
                     >
                       <div
-                        inert={childSessionStack.length > 0 || preparationDrawerAttemptId !== null}
-                        className={
-                          changesViewOpen || artifactsViewOpen
-                            ? 'hidden'
-                            : 'flex min-h-0 flex-1 flex-col'
+                        inert={
+                          childSessionStack.length > 0 ||
+                          preparationDrawerAttemptId !== null ||
+                          artifactsViewOpen
                         }
+                        className={changesViewOpen ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
                       >
                         <TabsContent
                           value={chatTabValue}
@@ -2208,7 +2195,7 @@ export default function CloudChatPage({
                             const active = activeWorkspaceTabId === tabId;
                             return (
                               <TabsContent key={tabId} value={tabId} className="m-0 min-h-0 flex-1">
-                                {active && !changesViewOpen && !artifactsViewOpen && (
+                                {active && !changesViewOpen && (
                                   <WorktreeFilePane
                                     userId={currentUserId}
                                     cloudAgentSessionId={changesCloudSessionId}
@@ -2243,16 +2230,6 @@ export default function CloudChatPage({
                           reviewScope={review.scope ?? undefined}
                         />
                       )}
-                      {canOpenArtifacts && changesCloudSessionId && (
-                        <WorkspaceArtifactsView
-                          key={`workspace-artifacts:${fileScope}`}
-                          userId={currentUserId}
-                          cloudAgentSessionId={changesCloudSessionId}
-                          organizationId={organizationId}
-                          open={artifactsViewOpen}
-                          readOnly={isReadOnly}
-                        />
-                      )}
                     </div>
                   </Tabs>
                 </CloudChatRuntimeProvider>
@@ -2277,6 +2254,19 @@ export default function CloudChatPage({
                 onCloseAutoFocus={handlePreparationDrawerCloseAutoFocus}
                 portalContainer={childSessionDrawerContainer}
               />
+              {canOpenArtifacts && changesCloudSessionId && (
+                <WorkspaceArtifactsView
+                  key={`workspace-artifacts:${fileScope}`}
+                  userId={currentUserId}
+                  cloudAgentSessionId={changesCloudSessionId}
+                  organizationId={organizationId}
+                  open={artifactsViewOpen}
+                  readOnly={isReadOnly}
+                  onOpenChange={handleArtifactsDrawerOpenChange}
+                  onCloseAutoFocus={handleArtifactsDrawerCloseAutoFocus}
+                  portalContainer={childSessionDrawerContainer}
+                />
+              )}
             </div>
           </ToolDetailScopeProvider>
         </SuggestionContextProvider>

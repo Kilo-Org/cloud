@@ -7,6 +7,10 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   LINEAR_WEBHOOK_SECRET: 'test-webhook-secret',
 }));
 
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+}));
+
 jest.mock('@/lib/bot-identity', () => ({
   unlinkTeamKiloUsers: jest.fn(async () => 0),
 }));
@@ -15,13 +19,11 @@ jest.mock('@/lib/integrations/linear-service', () => ({
   deleteInstallationByOrganizationId: jest.fn(async () => ({ success: true, deleted: true })),
 }));
 
-jest.mock('@sentry/nextjs', () => ({
-  captureException: jest.fn(),
-}));
-
+import { captureException } from '@sentry/nextjs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByOrganizationId } from '@/lib/integrations/linear-service';
 import { createLinearWebhookHandler } from './linear-webhook';
+import { MAX_WEBHOOK_BODY_BYTES } from './webhook-body';
 
 const WEBHOOK_SECRET = 'test-webhook-secret';
 
@@ -122,6 +124,67 @@ describe('createLinearWebhookHandler signature verification', () => {
     const response = await handler(request);
 
     expect(response.status).toBe(401);
+  });
+});
+
+describe('createLinearWebhookHandler body size limit', () => {
+  let chat: Chat;
+  let linearAdapter: LinearAdapter;
+  let handler: (request: Request) => Promise<Response>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    chat = makeChatStub();
+    linearAdapter = makeLinearAdapterStub();
+    handler = createLinearWebhookHandler(chat, linearAdapter);
+  });
+
+  /** A POST whose body arrives as a stream, so it carries no content-length. */
+  function makeStreamedRequest(chunks: string[]): Request {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+        controller.close();
+      },
+    });
+    return new Request('http://localhost/api/webhooks/linear', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+      // @ts-expect-error duplex is required by the stream body type in Node's fetch
+      duplex: 'half',
+    });
+  }
+
+  test('rejects a declared content-length over the size limit with 413 before reading the body', async () => {
+    const overLimitLength = MAX_WEBHOOK_BODY_BYTES + 1;
+    const request = makeRequest('', {
+      'content-length': String(overLimitLength),
+      'linear-signature': signLinearBody(''),
+      'linear-timestamp': Date.now().toString(),
+    });
+
+    const response = await handler(request);
+
+    expect(response.status).toBe(413);
+    expect(linearAdapter.handleWebhook).not.toHaveBeenCalled();
+    expect(linearAdapter.deleteInstallation).not.toHaveBeenCalled();
+    expect(chat.initialize).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  test('rejects a streamed body over the size limit with 413', async () => {
+    const half = 'a'.repeat(MAX_WEBHOOK_BODY_BYTES / 2 + 1);
+    const request = makeStreamedRequest([half, half]);
+
+    const response = await handler(request);
+
+    expect(response.status).toBe(413);
+    expect(linearAdapter.handleWebhook).not.toHaveBeenCalled();
+    expect(linearAdapter.deleteInstallation).not.toHaveBeenCalled();
+    expect(chat.initialize).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
   });
 });
 

@@ -79,7 +79,9 @@ jest.mock('./direct-byok-definitions', () => ({
       [mockModel('glm-5.2', 'z-ai/glm-5.2'), mockModel('kimi-k2.6', 'moonshotai/kimi-k2.6')],
       'z-ai'
     ),
-    mockProvider('kimi-coding', undefined, [mockModel('moonshotai/kimi-k2.6', 'moonshotai/kimi-k2.6')]),
+    mockProvider('kimi-coding', undefined, [
+      mockModel('moonshotai/kimi-k2.6', 'moonshotai/kimi-k2.6'),
+    ]),
     mockProvider('morph-byok', 'morph', [mockModel('morph-v3-fast')]),
     mockProvider('chutes-byok', 'chutes', [mockModel('moonshotai/retired', 'moonshotai/retired')]),
   ],
@@ -169,7 +171,9 @@ describe('free models in catalog mode', () => {
 
 describe('direct BYOK model lists in catalog mode', () => {
   test('omits bespoke entries of catalog-mode keys', async () => {
-    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': false, 'kimi-coding': true }));
+    mockedKeys.mockResolvedValueOnce(
+      keys({ synthetic: true, 'zai-coding': false, 'kimi-coding': true })
+    );
 
     const models = await getDirectByokModelsForUser('user-id');
 
@@ -181,7 +185,9 @@ describe('direct BYOK model lists in catalog mode', () => {
   });
 
   test('lists current catalog ids served by catalog-mode keys only', async () => {
-    mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': false, 'kimi-coding': true }));
+    mockedKeys.mockResolvedValueOnce(
+      keys({ synthetic: true, 'zai-coding': false, 'kimi-coding': true })
+    );
 
     const catalogIds = await getDirectByokCatalogModelIds({ type: 'user', id: 'user-id' });
 

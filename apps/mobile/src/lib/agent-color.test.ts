@@ -41,9 +41,10 @@ describe('stateTint', () => {
   it('pins idle to its own muted-cool step, distinct from live', () => {
     // The state contract: idle and live are opposite states on a real
     // session, so each must pin its own ramp entry — never the entry another
-    // state already took, and never an agent hash.
+    // state already took, and never an agent hash. (The English word's own
+    // hash is not the pin: both words hash to sky, the shared value this
+    // change unwinds.)
     const idle = stateTint('idle');
-    expect(idle).toBe(agentColor('IDLE'));
     expect(idle.hueTextClass).toBe('text-agent-cloud');
     expect(idle.hueClass).toBe('bg-agent-cloud');
     expect(idle.hueThemeKey).toBe('agentCloud');

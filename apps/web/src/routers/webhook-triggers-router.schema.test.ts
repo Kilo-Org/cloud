@@ -1822,12 +1822,12 @@ describe('webhook trigger request listing', () => {
   it('resolves legacy v1 session ids when includeLegacySessionIds is set', async () => {
     const bothId = crypto.randomUUID();
     const v1OnlyId = crypto.randomUUID();
-    const v2OnlyId = crypto.randomUUID();
+    const unresolvedId = crypto.randomUUID();
     const v1SessionIdForBoth = crypto.randomUUID();
     const v1SessionIdOnly = crypto.randomUUID();
     mockListWorkerRequests.mockResolvedValueOnce({
       success: true,
-      requests: [capturedRequest(bothId), capturedRequest(v1OnlyId), capturedRequest(v2OnlyId)],
+      requests: [capturedRequest(bothId), capturedRequest(v1OnlyId), capturedRequest(unresolvedId)],
     });
     mockSelectV1Sessions.mockResolvedValueOnce([
       { cloudAgentSessionId: bothId, sessionId: v1SessionIdForBoth },
@@ -1840,11 +1840,7 @@ describe('webhook trigger request listing', () => {
       includeLegacySessionIds: true,
     });
 
-    expect(requests.map(r => r.kiloSessionId)).toEqual([
-      v1SessionIdForBoth,
-      v1SessionIdOnly,
-      null,
-    ]);
+    expect(requests.map(r => r.kiloSessionId)).toEqual([v1SessionIdForBoth, v1SessionIdOnly, null]);
     expect(mockSelectV1Sessions).toHaveBeenCalledTimes(1);
     expect(mockSelectV2Sessions).toHaveBeenCalledTimes(1);
   });

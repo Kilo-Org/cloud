@@ -962,6 +962,7 @@
       "reconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
       "bitbucketNotConnectedTitle": "Bitbucket nu este conectat",
       "bitbucketAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să îl conecteze.",
+      "adminOnlyConnectDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "contextLine": "Pentru {{organization}}",
       "contextLinePersonal": "Pentru contul personal"
     },
@@ -3475,7 +3476,8 @@
         "accounting_adjustment": "Ajustare contabilă",
         "credits_expired": "Credite expirate"
       },
-      "truncated": "Sunt disponibile operațiuni mai vechi cu credite."
+      "truncated": "Sunt disponibile operațiuni mai vechi cu credite.",
+      "retentionLimit": "Se afișează cele mai recente operațiuni cu credite."
     },
     "inviteMember": {
       "emailError": "Introdu o adresă de e-mail validă.",
@@ -3507,7 +3509,8 @@
         "void": "Anulată",
         "uncollectible": "Neîncasabilă"
       },
-      "truncated": "Sunt disponibile facturi mai vechi."
+      "truncated": "Sunt disponibile facturi mai vechi.",
+      "retentionLimit": "Se afișează cele mai recente facturi."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activează alerta de sold scăzut",
@@ -3992,6 +3995,8 @@
       "downloading": "Se descarcă: {{written}} din {{total}}",
       "downloadingUnknown": "Se descarcă: {{written}}",
       "paused": "În pauză: {{written}} din {{total}}",
+      "retrying": "Se încearcă din nou: {{written}} din {{total}}",
+      "retryingUnknown": "Se încearcă din nou: {{written}}",
       "verifying": "Se verifică fișierul descărcat…",
       "downloaded": "Descărcat · {{size}}",
       "url": "Link de descărcare directă",
@@ -4082,7 +4087,9 @@
         "androidModelUnavailable": "Acest dispozitiv nu acceptă Gemini Nano sau aplicația de sistem AICore încă se configurează. Încearcă din nou mai târziu.",
         "aicoreUpdateRequired": "Actualizează aplicația AICore și software-ul sistemului pentru a folosi acest model.",
         "downloadable": "Acest model trebuie descărcat o singură dată înainte de a-l putea folosi.",
-        "downloading": "Modelul se descarcă. Va fi gata când se termină descărcarea."
+        "downloading": "Modelul se descarcă. Va fi gata când se termină descărcarea.",
+        "batteryQuota": "Modelul pe dispozitiv și-a folosit alocația de baterie pentru moment. Încearcă din nou mai târziu.",
+        "checkFailed": "Aplicația nu a putut verifica acest model. Încearcă din nou."
       },
       "unavailable": "Modelul pe dispozitiv nu este disponibil momentan. Verifică-i starea în $t(modelChat.backends.title).",
       "busy": "Modelul pe dispozitiv este ocupat cu un alt răspuns. Încearcă din nou după ce termină.",
@@ -4449,7 +4456,8 @@
       "purchaseFallback": "Achiziție de credite",
       "receipt": "Chitanță",
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
-      "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție."
+      "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
+      "retentionLimit": "Se afișează cel mai recent istoric de credite."
     },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
@@ -4704,6 +4712,9 @@
     "couldNotLoad": "Integrările nu au putut fi încărcate",
     "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
     "managedByOwner": "Cere unui proprietar al organizației să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerOrAdmin": "Cere unui proprietar al organizației sau unui administrator să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerOrBilling": "Cere unui proprietar al organizației sau unui manager de facturare să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerAdminOrBilling": "Cere unui proprietar al organizației, unui administrator sau unui manager de facturare să modifice o conexiune pe care nu o poți modifica.",
     "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {

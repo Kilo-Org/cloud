@@ -2840,6 +2840,7 @@
       "reconnectAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que la vuelva a conectar.",
       "bitbucketNotConnectedTitle": "Bitbucket no está conectado",
       "bitbucketAdminOnlyDescription": "Pídele a un Propietario, un Administrador o un Gestor de facturación de la organización que lo conecte.",
+      "adminOnlyConnectDescription": "Solo los propietarios de la organización, los administradores y los gestores de facturación pueden conectarlo.",
       "contextLine": "Para {{organization}}",
       "contextLinePersonal": "Para tu cuenta personal"
     },
@@ -3467,7 +3468,8 @@
         "accounting_adjustment": "Ajuste contable",
         "credits_expired": "Créditos caducados"
       },
-      "truncated": "Hay movimientos de créditos anteriores disponibles."
+      "truncated": "Hay movimientos de créditos anteriores disponibles.",
+      "retentionLimit": "Mostrando los movimientos de créditos más recientes."
     },
     "hub": {
       "balance": "Saldo",
@@ -3512,7 +3514,8 @@
         "void": "Anulada",
         "uncollectible": "Incobrable"
       },
-      "truncated": "Hay facturas más antiguas disponibles."
+      "truncated": "Hay facturas más antiguas disponibles.",
+      "retentionLimit": "Mostrando las facturas más recientes."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activar la alerta de saldo bajo",
@@ -3992,6 +3995,8 @@
       "downloading": "Descargando: {{written}} de {{total}}",
       "downloadingUnknown": "Descargando: {{written}}",
       "paused": "En pausa: {{written}} de {{total}}",
+      "retrying": "Reintentando: {{written}} de {{total}}",
+      "retryingUnknown": "Reintentando: {{written}}",
       "verifying": "Comprobando el archivo descargado…",
       "downloaded": "Descargado · {{size}}",
       "url": "Enlace de descarga directa",
@@ -4082,7 +4087,9 @@
         "androidModelUnavailable": "Este dispositivo no es compatible con Gemini Nano o la app del sistema AICore aún se está configurando. Inténtalo más tarde.",
         "aicoreUpdateRequired": "Actualiza la app AICore y el software del sistema para usar este modelo.",
         "downloadable": "Este modelo requiere una descarga única antes de poder usarlo.",
-        "downloading": "El modelo se está descargando. Estará listo cuando termine la descarga."
+        "downloading": "El modelo se está descargando. Estará listo cuando termine la descarga.",
+        "batteryQuota": "El modelo en el dispositivo ha agotado su cuota de batería por ahora. Inténtalo de nuevo más tarde.",
+        "checkFailed": "La app no ha podido comprobar este modelo. Inténtalo de nuevo."
       },
       "unavailable": "El modelo en el dispositivo no está disponible ahora. Consulta su estado en $t(modelChat.backends.title).",
       "busy": "El modelo en el dispositivo está ocupado con otra respuesta. Inténtalo de nuevo cuando termine.",
@@ -4449,7 +4456,8 @@
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir el recibo de {{description}}, {{amount}}, de {{date}}",
-      "receiptUnavailable": "No hay ningún recibo disponible para esta compra."
+      "receiptUnavailable": "No hay ningún recibo disponible para esta compra.",
+      "retentionLimit": "Mostrando el historial de créditos más reciente."
     },
     "title": "Comprar créditos",
     "description": "Los créditos son una compra única que se añade a tu saldo de Kilo para ejecutar sesiones de codificación con IA en Kilo App. La tienda cobra en tu cuenta y los créditos se añaden cuando la tienda confirma el pago.",
@@ -4704,6 +4712,9 @@
     "couldNotLoad": "No se pudieron cargar las integraciones",
     "permissionDenied": "No tienes permiso para gestionar estas integraciones.",
     "managedByOwner": "Pide a un propietario de la organización que cambie una conexión que no puedas cambiar.",
+    "managedByOwnerOrAdmin": "Pide a un propietario o un administrador de la organización que cambie una conexión que no puedas cambiar.",
+    "managedByOwnerOrBilling": "Pide a un propietario o un gestor de facturación de la organización que cambie una conexión que no puedas cambiar.",
+    "managedByOwnerAdminOrBilling": "Pide a un propietario, un administrador o un gestor de facturación de la organización que cambie una conexión que no puedas cambiar.",
     "connectFailed": "No se pudo abrir la página de conexión"
   },
   "invoices": {

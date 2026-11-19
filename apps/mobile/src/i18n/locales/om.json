@@ -945,6 +945,7 @@
       "reconnectAdminOnlyDescription": "Isa irra deebi'ii akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
       "bitbucketNotConnectedTitle": "Bitbucket hin walqabsiifamne",
       "bitbucketAdminOnlyDescription": "Isa akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
+      "adminOnlyConnectDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
       "contextLine": "{{organization}}iif",
       "contextLinePersonal": "Dhuunfaa'iif"
     },
@@ -3417,7 +3418,8 @@
         "accounting_adjustment": "Sirreeffama herregaa",
         "credits_expired": "Kiriiditiin yeroon isaa darbe"
       },
-      "truncated": "Sochiin kiriiditii duraanii ni argama."
+      "truncated": "Sochiin kiriiditii duraanii ni argama.",
+      "retentionLimit": "Sochiin kiriiditii haaraan agarsiifamaa jira."
     },
     "inviteMember": {
       "emailError": "Teessoo imeelii sirrii galchi.",
@@ -3449,7 +3451,8 @@
         "void": "Haqame",
         "uncollectible": "Sassaabamuu hin danda'u"
       },
-      "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu."
+      "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu.",
+      "retentionLimit": "Gaaffiiwwan kaffaltii haaraan agarsiifamaa jiran."
     },
     "lowBalanceAlert": {
       "enableA11y": "Akeekkachiisa haftee xiqqaa bani",
@@ -3931,6 +3934,8 @@
       "downloading": "Buufamaa jira: {{total}} keessaa {{written}}",
       "downloadingUnknown": "Buufamaa jira: {{written}}",
       "paused": "Dhaabbate: {{total}} keessaa {{written}}",
+      "retrying": "Irra deebi'ee yaalaa jira: {{total}} keessaa {{written}}",
+      "retryingUnknown": "Irra deebi'ee yaalaa jira: {{written}}",
       "verifying": "Faayilii buufame sakatta'amaa jira…",
       "downloaded": "Buufameera · {{size}}",
       "url": "Liinkii buufinsa kallattii",
@@ -4021,7 +4026,9 @@
         "androidModelUnavailable": "Meeshaan kun Gemini Nano hin deeggaru, ykn appiin sirnaa AICore ammallee qophaa'aa jira. Booda irra deebi'ii yaali.",
         "aicoreUpdateRequired": "Moodeela kana fayyadamuuf appii AICore fi sooftiweerii sirnaa kee haaromsi.",
         "downloadable": "Moodeelli kun osoo hin fayyadamin dura al tokko buufamuu qaba.",
-        "downloading": "Moodeelli buufamaa jira. Yeroo buufachuun xumuramu qophaa'a."
+        "downloading": "Moodeelli buufamaa jira. Yeroo buufachuun xumuramu qophaa'a.",
+        "batteryQuota": "Moodeelli meeshaa irratti qoonnaa baatirii isaa ammaaf fayyadameera. Booda irra deebi'ii yaali.",
+        "checkFailed": "Moodeela kana sakatta'uun hin danda'ame. Irra deebi'ii yaali."
       },
       "unavailable": "Moodeelli meeshaa irratti amma hin argamu. Haala isaa $t(modelChat.backends.title) keessatti ilaali.",
       "busy": "Moodeelli meeshaa irratti deebii biraatiin qabameera. Yeroo xumuru irra deebi'ii yaali.",
@@ -4382,7 +4389,8 @@
       "purchaseFallback": "Bittaa kireeditii",
       "receipt": "Nagahee",
       "receiptA11y": "Nagahee {{description}}, {{amount}}, {{date}} bani",
-      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru."
+      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru.",
+      "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira."
     },
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
@@ -4629,6 +4637,9 @@
     "couldNotLoad": "Walitti hidhamiinsota fe'uun hin danda'amne",
     "permissionDenied": "Walitti hidhamiinsota kana bulchuuf hayyama hin qabdu.",
     "managedByOwner": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa gaafadhu.",
+    "managedByOwnerOrAdmin": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa ykn bulchaa gaafadhu.",
+    "managedByOwnerOrBilling": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa ykn bulchaa kaffaltii gaafadhu.",
+    "managedByOwnerAdminOrBilling": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii gaafadhu.",
     "connectFailed": "Fuula walitti hidhamiinsaa banuun hin danda'amne"
   },
   "invoices": {

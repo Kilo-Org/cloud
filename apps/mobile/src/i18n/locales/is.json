@@ -945,6 +945,7 @@
       "reconnectAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það aftur.",
       "bitbucketNotConnectedTitle": "Bitbucket er ekki tengt",
       "bitbucketAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það.",
+      "adminOnlyConnectDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
       "contextLine": "Fyrir {{organization}}",
       "contextLinePersonal": "Fyrir persónulegan reikning"
     },
@@ -3417,7 +3418,8 @@
         "accounting_adjustment": "Bókhaldsleiðrétting",
         "credits_expired": "Inneign rann út"
       },
-      "truncated": "Hægt er að skoða eldri inneignarfærslur."
+      "truncated": "Hægt er að skoða eldri inneignarfærslur.",
+      "retentionLimit": "Nýjustu inneignarfærslurnar eru sýndar."
     },
     "inviteMember": {
       "emailError": "Sláðu inn gilt tölvupóstfang.",
@@ -3449,7 +3451,8 @@
         "void": "Ógildur",
         "uncollectible": "Óinnheimtanlegur"
       },
-      "truncated": "Hægt er að skoða eldri reikninga."
+      "truncated": "Hægt er að skoða eldri reikninga.",
+      "retentionLimit": "Nýjustu reikningarnir eru sýndir."
     },
     "lowBalanceAlert": {
       "enableA11y": "Virkja viðvörun um lága inneign",
@@ -3931,6 +3934,8 @@
       "downloading": "Hleður niður: {{written}} af {{total}}",
       "downloadingUnknown": "Hleður niður: {{written}}",
       "paused": "Í hléi: {{written}} af {{total}}",
+      "retrying": "Reynt er aftur: {{written}} af {{total}}",
+      "retryingUnknown": "Reynt er aftur: {{written}}",
       "verifying": "Athuga niðurhalaða skrána…",
       "downloaded": "Niðurhalað · {{size}}",
       "url": "Beinn niðurhalstengill",
@@ -4021,7 +4026,9 @@
         "androidModelUnavailable": "Þetta tæki styður ekki Gemini Nano, eða AICore-kerfisforritið er enn í uppsetningu. Reyndu aftur síðar.",
         "aicoreUpdateRequired": "Uppfærðu AICore-forritið og kerfishugbúnaðinn til að nota þetta líkan.",
         "downloadable": "Það þarf að sækja þetta líkan einu sinni áður en hægt er að nota það.",
-        "downloading": "Verið er að sækja líkanið. Það verður tilbúið þegar niðurhalinu lýkur."
+        "downloading": "Verið er að sækja líkanið. Það verður tilbúið þegar niðurhalinu lýkur.",
+        "batteryQuota": "Líkanið í tækinu hefur notað rafhlöðukvótann sinn í bili. Reyndu aftur síðar.",
+        "checkFailed": "Forritið gat ekki athugað þetta líkan. Reyndu aftur."
       },
       "unavailable": "Líkanið í tækinu er ekki í boði eins og er. Athugaðu stöðu þess í $t(modelChat.backends.title).",
       "busy": "Líkanið í tækinu er upptekið við annað svar. Reyndu aftur þegar því lýkur.",
@@ -4382,7 +4389,8 @@
       "purchaseFallback": "Kaup á inneign",
       "receipt": "Kvittun",
       "receiptA11y": "Opna kvittun fyrir {{description}}, {{amount}}, frá {{date}}",
-      "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup."
+      "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup.",
+      "retentionLimit": "Nýjasti inneignarferillinn er sýndur."
     },
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
@@ -4629,6 +4637,9 @@
     "couldNotLoad": "Ekki tókst að hlaða inn samþættingum",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna þessum samþættingum.",
     "managedByOwner": "Biddu eiganda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerOrAdmin": "Biddu eiganda eða stjórnanda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerOrBilling": "Biddu eiganda eða innheimtustjóra stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
+    "managedByOwnerAdminOrBilling": "Biddu eiganda, stjórnanda eða innheimtustjóra stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",
     "connectFailed": "Ekki tókst að opna tengingarsíðuna"
   },
   "invoices": {

@@ -19,11 +19,27 @@ import {
 import { runStepUpCeremony, type StepUpOptions } from './step-up-ceremony';
 import { StepUpSignInAgainButton } from './StepUpSignInAgainButton';
 
-async function requestOptions(): Promise<StepUpOptions> {
+function requestBody(
+  action: 'options' | 'verify',
+  requirement: StepUpRequirement | null,
+  extra?: Record<string, unknown>
+): string {
+  // The dialog echoes exactly the operation the refusal named. It never invents
+  // one: a refusal without a binding is the plain session step-up.
+  const binding = requirement?.binding;
+  return JSON.stringify({
+    action,
+    ...(requirement?.actionClass ? { actionClass: requirement.actionClass } : {}),
+    ...(binding ? { binding } : {}),
+    ...extra,
+  });
+}
+
+async function requestOptions(requirement: StepUpRequirement | null): Promise<StepUpOptions> {
   const response = await fetch('/api/auth/step-up', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'options' }),
+    body: requestBody('options', requirement),
   });
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
@@ -39,11 +55,15 @@ async function requestOptions(): Promise<StepUpOptions> {
   };
 }
 
-async function submitAssertion(challengeId: string, response: unknown): Promise<boolean> {
+async function submitAssertion(
+  requirement: StepUpRequirement | null,
+  challengeId: string,
+  response: unknown
+): Promise<boolean> {
   const verify = await fetch('/api/auth/step-up', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'verify', challengeId, response }),
+    body: requestBody('verify', requirement, { challengeId, response }),
   });
   return verify.ok;
 }
@@ -59,6 +79,8 @@ function errorMessage(code?: string): string {
     case 'CHALLENGE_ALREADY_USED':
     case 'CHALLENGE_EXPIRED':
       return 'That verification expired. Try again.';
+    case 'INVALID_BINDING':
+      return 'That verification was for a different action. Retry the action to verify again.';
     case 'STEP_UP_UNAVAILABLE':
       return 'Verification is temporarily unavailable. Try again shortly.';
     default:
@@ -115,9 +137,10 @@ export function StepUpCeremonyContent({
 
     try {
       const result = await runStepUpCeremony({
-        requestOptions,
+        requestOptions: () => requestOptions(requirement),
         startAuthentication: options => startAuthentication({ optionsJSON: options }),
-        submitAssertion,
+        submitAssertion: (challengeId, response) =>
+          submitAssertion(requirement, challengeId, response),
         enroll: registerNewPasskey,
       });
       if (result.ok) {

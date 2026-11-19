@@ -1013,6 +1013,7 @@
       "reconnectAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei ailgysylltu.",
       "bitbucketNotConnectedTitle": "Nid yw Bitbucket wedi'i gysylltu",
       "bitbucketAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei gysylltu.",
+      "adminOnlyConnectDescription": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
       "contextLine": "Ar gyfer {{organization}}",
       "contextLinePersonal": "Ar gyfer eich cyfrif personol"
     },
@@ -3649,7 +3650,8 @@
         "accounting_adjustment": "Addasiad cyfrifyddu",
         "credits_expired": "Credydau wedi dod i ben"
       },
-      "truncated": "Mae gweithgaredd credyd cynharach ar gael."
+      "truncated": "Mae gweithgaredd credyd cynharach ar gael.",
+      "retentionLimit": "Yn dangos gweithgaredd credyd diweddaraf."
     },
     "inviteMember": {
       "emailError": "Nodwch gyfeiriad e-bost dilys.",
@@ -3681,7 +3683,8 @@
         "void": "Wedi'i dirymu",
         "uncollectible": "Anghasgladwy"
       },
-      "truncated": "Mae anfonebau cynharach ar gael."
+      "truncated": "Mae anfonebau cynharach ar gael.",
+      "retentionLimit": "Yn dangos yr anfonebau diweddaraf."
     },
     "lowBalanceAlert": {
       "enableA11y": "Galluogi rhybudd balans isel",
@@ -4175,6 +4178,8 @@
       "downloading": "Yn lawrlwytho: {{written}} o {{total}}",
       "downloadingUnknown": "Yn lawrlwytho: {{written}}",
       "paused": "Wedi'i seibio: {{written}} o {{total}}",
+      "retrying": "Yn ceisio eto: {{written}} o {{total}}",
+      "retryingUnknown": "Yn ceisio eto: {{written}}",
       "verifying": "Wrthi'n gwirio'r ffeil a lawrlwythwyd…",
       "downloaded": "Wedi'i lawrlwytho · {{size}}",
       "url": "Dolen lawrlwytho uniongyrchol",
@@ -4265,7 +4270,9 @@
         "androidModelUnavailable": "Nid yw'r ddyfais hon yn cefnogi Gemini Nano, neu mae ap system AICore yn dal i baratoi. Rhowch gynnig arall arni nes ymlaen.",
         "aicoreUpdateRequired": "Diweddarwch yr ap AICore a meddalwedd eich system i ddefnyddio'r model hwn.",
         "downloadable": "Mae angen llwytho'r model hwn i lawr unwaith cyn y gallwch ei ddefnyddio.",
-        "downloading": "Mae'r model yn llwytho i lawr. Bydd yn barod pan fydd y llwytho i lawr wedi gorffen."
+        "downloading": "Mae'r model yn llwytho i lawr. Bydd yn barod pan fydd y llwytho i lawr wedi gorffen.",
+        "batteryQuota": "Mae'r model ar y ddyfais wedi defnyddio ei lwfans batri am y tro. Rhowch gynnig arall arni yn nes ymlaen.",
+        "checkFailed": "Ni allai'r ap wirio'r model hwn. Rhowch gynnig arall arni."
       },
       "unavailable": "Nid yw'r model ar y ddyfais ar gael ar hyn o bryd. Gwiriwch ei statws yn $t(modelChat.backends.title).",
       "busy": "Mae'r model ar y ddyfais yn brysur gydag ateb arall. Rhowch gynnig arall arni pan fydd wedi gorffen.",
@@ -4650,7 +4657,8 @@
       "purchaseFallback": "Pryniant credyd",
       "receipt": "Derbynneb",
       "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
-      "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn."
+      "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn.",
+      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf."
     },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
@@ -4929,6 +4937,9 @@
     "couldNotLoad": "Methu llwytho'r integreiddiadau",
     "permissionDenied": "Does gennych chi ddim caniatâd i reoli'r integreiddiadau hyn.",
     "managedByOwner": "Gofynnwch i berchennog y sefydliad newid cysylltiad na allwch ei newid.",
+    "managedByOwnerOrAdmin": "Gofynnwch i berchennog y sefydliad neu weinyddwr newid cysylltiad na allwch ei newid.",
+    "managedByOwnerOrBilling": "Gofynnwch i berchennog y sefydliad neu reolwr bilio newid cysylltiad na allwch ei newid.",
+    "managedByOwnerAdminOrBilling": "Gofynnwch i berchennog y sefydliad, gweinyddwr neu reolwr bilio newid cysylltiad na allwch ei newid.",
     "connectFailed": "Methu agor y dudalen gysylltu"
   },
   "invoices": {

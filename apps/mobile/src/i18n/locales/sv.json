@@ -945,6 +945,7 @@
       "reconnectAdminOnlyDescription": "Be en organisationsägare, administratör eller faktureringsansvarig att ansluta den på nytt.",
       "bitbucketNotConnectedTitle": "Bitbucket är inte anslutet",
       "bitbucketAdminOnlyDescription": "Be en organisationsägare, administratör eller faktureringsansvarig att ansluta Bitbucket.",
+      "adminOnlyConnectDescription": "Endast organisationsägare, administratörer och faktureringsansvariga kan ansluta Bitbucket.",
       "contextLine": "För {{organization}}",
       "contextLinePersonal": "För ditt personliga konto"
     },
@@ -3417,7 +3418,8 @@
         "accounting_adjustment": "Redovisningsjustering",
         "credits_expired": "Utgångna krediter"
       },
-      "truncated": "Det finns äldre kreditaktivitet att visa."
+      "truncated": "Det finns äldre kreditaktivitet att visa.",
+      "retentionLimit": "Visar den senaste kreditaktiviteten."
     },
     "inviteMember": {
       "emailError": "Ange en giltig e-postadress",
@@ -3449,7 +3451,8 @@
         "void": "Makulerad",
         "uncollectible": "Oindrivbar"
       },
-      "truncated": "Äldre fakturor finns tillgängliga."
+      "truncated": "Äldre fakturor finns tillgängliga.",
+      "retentionLimit": "Visar de senaste fakturorna."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktivera varning för lågt saldo",
@@ -3931,6 +3934,8 @@
       "downloading": "Laddar ner: {{written}} av {{total}}",
       "downloadingUnknown": "Laddar ner: {{written}}",
       "paused": "Pausad: {{written}} av {{total}}",
+      "retrying": "Försöker igen: {{written}} av {{total}}",
+      "retryingUnknown": "Försöker igen: {{written}}",
       "verifying": "Kontrollerar den nedladdade filen…",
       "downloaded": "Nedladdad · {{size}}",
       "url": "Direkt nedladdningslänk",
@@ -4021,7 +4026,9 @@
         "androidModelUnavailable": "Enheten har inte stöd för Gemini Nano, eller så håller systemappen AICore fortfarande på att konfigureras. Försök igen senare.",
         "aicoreUpdateRequired": "Uppdatera AICore-appen och systemprogramvaran för att använda den här modellen.",
         "downloadable": "Modellen måste laddas ned en gång innan du kan använda den.",
-        "downloading": "Modellen laddas ned. Den är redo när nedladdningen är klar."
+        "downloading": "Modellen laddas ned. Den är redo när nedladdningen är klar.",
+        "batteryQuota": "Modellen på enheten har använt sin batterikvot för tillfället. Försök igen senare.",
+        "checkFailed": "Appen kunde inte kontrollera den här modellen. Försök igen."
       },
       "unavailable": "Modellen på enheten är inte tillgänglig just nu. Kontrollera dess status i $t(modelChat.backends.title).",
       "busy": "Modellen på enheten är upptagen med ett annat svar. Försök igen när den är klar.",
@@ -4382,7 +4389,8 @@
       "purchaseFallback": "Kreditköp",
       "receipt": "Kvitto",
       "receiptA11y": "Öppna kvittot för {{description}}, {{amount}}, från {{date}}",
-      "receiptUnavailable": "Det finns inget kvitto för det här köpet."
+      "receiptUnavailable": "Det finns inget kvitto för det här köpet.",
+      "retentionLimit": "Visar den senaste kredithistoriken."
     },
     "title": "Köp krediter",
     "description": "Krediter är ett engångsköp som läggs till på ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen. Butiken debiterar ditt konto och krediterna läggs till efter att butiken bekräftar betalningen.",
@@ -4629,6 +4637,9 @@
     "couldNotLoad": "Det gick inte att läsa in integrationerna",
     "permissionDenied": "Du har inte behörighet att hantera de här integrationerna.",
     "managedByOwner": "Be en ägare i organisationen att ändra en anslutning som du inte kan ändra.",
+    "managedByOwnerOrAdmin": "Be en ägare eller administratör att ändra en anslutning som du inte kan ändra.",
+    "managedByOwnerOrBilling": "Be en ägare eller faktureringsansvarig att ändra en anslutning som du inte kan ändra.",
+    "managedByOwnerAdminOrBilling": "Be en ägare, administratör eller faktureringsansvarig att ändra en anslutning som du inte kan ändra.",
     "connectFailed": "Det gick inte att öppna anslutningssidan"
   },
   "invoices": {

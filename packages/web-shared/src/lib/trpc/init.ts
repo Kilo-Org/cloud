@@ -20,15 +20,23 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   deriveCredentialKind,
+  type AdminStepUpDecision,
   type AdminStepUpState,
   type PrivilegedActionClass,
   type PrivilegedCredentialKind,
+  type PrivilegedTarget,
+  type PrivilegedTargetKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import {
   actionClassForAdminProcedure,
   markPrivilegedGuard,
+  resolvesOwnStepUp,
+  targetIdFieldForAdminProcedure,
+  targetIdFromInput,
+  targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { isOperationStepUpClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { captureMessage, setTag, trpcMiddleware } from '@sentry/nextjs';
 import { AuthContextError, trpcErrorFormatter } from '@kilocode/web-shared/lib/trpc/transport';
@@ -85,6 +93,13 @@ export type TRPCContext = {
    */
   adminStepUpState?: AdminStepUpState;
   /**
+   * What the admin step-up middleware authorized for this request: the action
+   * class and target its guard measured. A specialized guard chained on it
+   * reads this to refuse reusing a decision that does not cover its own
+   * request.
+   */
+  adminStepUpDecision?: AdminStepUpDecision;
+  /**
    * Credential and privileged-inventory entry resolved once by the admin guard,
    * so the step-up enforcement chained after it and specialized guards cannot
    * name a different credential or action for the same request.
@@ -103,6 +118,8 @@ export type TRPCContext = {
    * `support` apart without re-querying.
    */
   organizationAccess?: OrganizationAccess;
+  /** Per-request step-up state. Each request gets its own set. */
+  stepUpClaims?: Set<string>;
   // Populated by `createTRPCContext` and read by the min-version middleware.
   headersList?: Headers;
   // `performance.now()` when the mobile control-plane budget started, set by
@@ -110,9 +127,10 @@ export type TRPCContext = {
   // as the shared auth read. Absent for web/CLI callers and test constructors.
   controlPlaneStartedAt?: number;
   /**
-   * Read client for model-stats snapshot loads. The gateway's REST facet sets
-   * `readDb` because its handlers run in `sfo1`; the web app leaves it unset and
-   * loads through the primary, which it must after a write invalidation.
+   * Read client for model-stats snapshot loads and the organization member gate's
+   * membership read. The gateway's REST facet sets `readDb` because its handlers
+   * run in `sfo1`; the web app leaves it unset and loads through the primary,
+   * which it must after a write invalidation.
    */
   fromDb?: ModelStatsLoadClient;
 };
@@ -191,6 +209,7 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     webSessionPepper: webSessionPepper ?? null,
     ip: clientIpFromHeaders(headersList),
     headersList,
+    stepUpClaims: new Set<string>(),
     controlPlaneStartedAt: isMobileClient(headersList?.get(APP_CLIENT_HEADER))
       ? startedAt
       : undefined,
@@ -347,6 +366,7 @@ export type AdminAttribution = {
   credential: PrivilegedCredentialKind;
   actionClass: PrivilegedActionClass;
   inventoryId: string | null;
+  targetKind: PrivilegedTargetKind;
 };
 
 // Derives the credential and the privileged-inventory entry once per admin
@@ -432,26 +452,47 @@ const adminGuardMiddleware = t.middleware(adminGuardFn);
 // Enforcement for every admin procedure when the switch is on. When it is off
 // this performs no reads. `stepUp.*` is exempt so the dialog can read status and
 // the user can lock a session; both still require an admin browser session.
-// Specialized guards chained on adminProcedure reuse `adminStepUpState`.
-const adminStepUpEnforcementMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
-  const enabled = isAdminStepUpEnabled();
-  if (!enabled || path.startsWith('stepUp.')) return next();
+// A procedure listed in `ADMIN_STEP_UP_SELF_GUARDED_ROUTES` is exempt because
+// its resolver binds the proof to the organization it acts on; the inventory
+// test keeps that list and those resolvers in step.
+// Specialized guards chained on adminProcedure reuse `adminStepUpState` and
+// check `adminStepUpDecision` before trusting it for their own request.
+const adminStepUpEnforcementMiddleware = t.middleware(
+  async ({ ctx, path, type, getRawInput, next }) => {
+    const enabled = isAdminStepUpEnabled();
+    if (!enabled || path.startsWith('stepUp.') || resolvesOwnStepUp(path)) return next();
 
-  const { credential, actionClass } = resolveAdminAttribution(ctx, path, type);
+    // The attribution lookup already resolved the inventory entry, which names
+    // the target kind; re-deriving it would be a second lookup for the same
+    // value.
+    const { credential, actionClass, targetKind } = resolveAdminAttribution(ctx, path, type);
+    // An operation proof is bound to the account or organization the request
+    // input names. A session-class decision ignores the target, so it stays
+    // unbound.
+    let target: PrivilegedTarget = { kind: targetKind, id: null };
+    if (isOperationStepUpClass(actionClass)) {
+      const field = targetIdFieldForAdminProcedure(path);
+      if (field !== null) {
+        const id = targetIdFromInput(field, await getRawInput());
+        if (id !== null) target = { kind: targetKindForInputField(field), id };
+      }
+    }
 
-  const adminStepUpState = await runStepUpGuard({
-    userId: ctx.user.id,
-    credential,
-    webSessionId: ctx.webSessionId,
-    actionClass,
-    enabled,
-    route: path,
-    method: type,
-    surface: 'trpc',
-  });
+    const adminStepUpState = await runStepUpGuard({
+      userId: ctx.user.id,
+      credential,
+      webSessionId: ctx.webSessionId,
+      actionClass,
+      target,
+      enabled,
+      route: path,
+      method: type,
+      surface: 'trpc',
+    });
 
-  return next({ ctx: { adminStepUpState } });
-});
+    return next({ ctx: { adminStepUpState, adminStepUpDecision: { actionClass, target } } });
+  }
+);
 
 export const adminProcedure = baseProcedure
   .use(adminGuardMiddleware)

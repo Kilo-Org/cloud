@@ -945,6 +945,7 @@
       "reconnectAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
       "bitbucketNotConnectedTitle": "Bitbucket pole ühendatud",
       "bitbucketAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see ühendada.",
+      "adminOnlyConnectDescription": "Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "contextLine": "{{organization}} jaoks",
       "contextLinePersonal": "Sinu isikliku konto jaoks"
     },
@@ -3417,7 +3418,8 @@
         "accounting_adjustment": "Raamatupidamislik korrigeerimine",
         "credits_expired": "Krediit aegus"
       },
-      "truncated": "Saadaval on ka varasemad krediiditehingud."
+      "truncated": "Saadaval on ka varasemad krediiditehingud.",
+      "retentionLimit": "Kuvatakse kõige hiljutisemad krediiditehingud."
     },
     "inviteMember": {
       "emailError": "Sisesta kehtiv e-posti aadress.",
@@ -3449,7 +3451,8 @@
         "void": "Tühistatud",
         "uncollectible": "Sissenõudmatu"
       },
-      "truncated": "Varasemad arved on saadaval."
+      "truncated": "Varasemad arved on saadaval.",
+      "retentionLimit": "Kuvatakse kõige hiljutisemad arved."
     },
     "lowBalanceAlert": {
       "enableA11y": "Luba madala saldo hoiatus",
@@ -3931,6 +3934,8 @@
       "downloading": "Allalaadimine: {{written}} / {{total}}",
       "downloadingUnknown": "Allalaadimine: {{written}}",
       "paused": "Peatatud: {{written}} / {{total}}",
+      "retrying": "Uus katse: {{written}} / {{total}}",
+      "retryingUnknown": "Uus katse: {{written}}",
       "verifying": "Allalaaditud faili kontrollimine…",
       "downloaded": "Allalaaditud · {{size}}",
       "url": "Otsene allalaadimislink",
@@ -4021,7 +4026,9 @@
         "androidModelUnavailable": "See seade ei toeta Gemini Nanot või on AICore'i süsteemirakendus alles seadistamisel. Proovi hiljem uuesti.",
         "aicoreUpdateRequired": "Selle mudeli kasutamiseks värskenda AICore'i rakendust ja süsteemitarkvara.",
         "downloadable": "Enne kasutamist tuleb see mudel ühekordselt alla laadida.",
-        "downloading": "Mudelit laaditakse alla. See on kasutusvalmis, kui allalaadimine lõpeb."
+        "downloading": "Mudelit laaditakse alla. See on kasutusvalmis, kui allalaadimine lõpeb.",
+        "batteryQuota": "Seadmesisene mudel on praeguseks oma akukvoodi ära kasutanud. Proovi hiljem uuesti.",
+        "checkFailed": "Rakendus ei saanud seda mudelit kontrollida. Proovi uuesti."
       },
       "unavailable": "Seadmesisene mudel pole praegu saadaval. Kontrolli selle olekut jaotises $t(modelChat.backends.title).",
       "busy": "Seadmesisene mudel koostab praegu teist vastust. Proovi uuesti, kui see on lõpetanud.",
@@ -4382,7 +4389,8 @@
       "purchaseFallback": "Krediidiost",
       "receipt": "Kviitung",
       "receiptA11y": "Ava kviitung: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Selle ostu kohta kviitung puudub."
+      "receiptUnavailable": "Selle ostu kohta kviitung puudub.",
+      "retentionLimit": "Kuvatakse kõige hiljutisem krediitide ajalugu."
     },
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",
@@ -4629,6 +4637,9 @@
     "couldNotLoad": "Integratsioone ei õnnestunud laadida",
     "permissionDenied": "Sul pole õigust neid integratsioone hallata.",
     "managedByOwner": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku poole.",
+    "managedByOwnerOrAdmin": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku või administraatori poole.",
+    "managedByOwnerOrBilling": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku või arveldushalduri poole.",
+    "managedByOwnerAdminOrBilling": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku, administraatori või arveldushalduri poole.",
     "connectFailed": "Ühendamise lehte ei õnnestunud avada"
   },
   "invoices": {

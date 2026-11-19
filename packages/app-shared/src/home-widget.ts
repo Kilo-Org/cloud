@@ -22,6 +22,7 @@ import {
   type GlanceableNeedsInputKind,
   type GlanceableSessionRow,
   type GlanceableStatusKind,
+  type GlanceableTerminalStatus,
   compareSessionInstant,
 } from './glanceable-agents-snapshot';
 import { timestampMs, timestampToIso } from './utils';
@@ -264,16 +265,23 @@ export function buildHomeWidgetData(
  * boundary both read `staleAt`, so native aging cannot disagree with the flag.
  */
 function staleness(data: HomeWidgetData): {
-  terminal: boolean;
+  /**
+   * The narrowed terminal status, or null when the snapshot is not terminal.
+   * One value, so no caller keeps a boolean beside a status a later branch can
+   * contradict.
+   */
+  terminal: GlanceableTerminalStatus | null;
   primaryKind: GlanceableStatusKind | null;
   checkedAt: string | null;
   staleAt: number | null;
 } {
   const { snapshot } = data;
-  const terminal = isTerminalGlanceableStatus(snapshot.status);
-  const primaryKind = terminal ? null : primaryKindOf(snapshot);
+  const terminal = isTerminalGlanceableStatus(snapshot.status) ? snapshot.status : null;
+  const primaryKind = terminal === null ? primaryKindOf(snapshot) : null;
   const checkedAt =
-    terminal || (primaryKind === null && snapshot.status !== 'empty') ? null : snapshot.updatedAt;
+    terminal !== null || (primaryKind === null && snapshot.status !== 'empty')
+      ? null
+      : snapshot.updatedAt;
   const confirmedAt = timestampMs(checkedAt);
   return {
     terminal,
@@ -291,14 +299,17 @@ function staleness(data: HomeWidgetData): {
  */
 function scheduledWake(
   snapshot: GlanceableAgentsSnapshot,
-  terminal: boolean
+  terminal: GlanceableTerminalStatus | null
 ): { at: number | null; iso: string | null } {
-  if (terminal || snapshot.scheduled <= 0) return { at: null, iso: null };
+  if (terminal !== null || snapshot.scheduled <= 0) return { at: null, iso: null };
   return { at: timestampMs(snapshot.scheduledAt), iso: timestampToIso(snapshot.scheduledAt) };
 }
 
 /** One retry after the wake's own schedule; a snapshot with no wake has no retry. */
-function wakeRetryAt(snapshot: GlanceableAgentsSnapshot, terminal: boolean): number | null {
+function wakeRetryAt(
+  snapshot: GlanceableAgentsSnapshot,
+  terminal: GlanceableTerminalStatus | null
+): number | null {
   const wake = scheduledWake(snapshot, terminal).at;
   return wake === null ? null : wake + WAKE_RETRY_MS;
 }
@@ -306,14 +317,16 @@ function wakeRetryAt(snapshot: GlanceableAgentsSnapshot, terminal: boolean): num
 /**
  * The one status precedence: a terminal snapshot outranks content, content
  * outranks a request for input, and an acknowledged snapshot that is neither is
- * either empty or unavailable.
+ * either empty or unavailable. A terminal status is returned as it is, so a
+ * terminal member the presentation status enum lacks fails to compile here
+ * instead of being reported as another terminal state.
  */
 function presentationStatus(
+  terminal: GlanceableTerminalStatus | null,
   snapshot: GlanceableAgentsSnapshot,
-  terminal: boolean,
   primaryKind: GlanceableStatusKind | null
 ): HomeWidgetPresentation['status'] {
-  if (terminal) return snapshot.status === 'privacy' ? 'privacy' : 'signed_out';
+  if (terminal !== null) return terminal;
   if (primaryKind !== null) return 'content';
   if (snapshot.status === 'waiting') return 'waiting';
   if (snapshot.status === 'empty') return 'empty';
@@ -330,36 +343,42 @@ export function buildHomeWidgetPresentation(
   const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
   const retry = wakeRetryAt(snapshot, terminal);
-  const status = presentationStatus(snapshot, terminal, primaryKind);
+  const status = presentationStatus(terminal, snapshot, primaryKind);
+  // One approval availability: the same value decides the key the native action
+  // submits and whether Approve is offered, so the card cannot advertise Approve
+  // without a request key. This is visibility, not approval authority. Every
+  // action revalidates the exact current request.
+  const approvalAvailable =
+    terminal === null && snapshot.needsApproval > 0 && details.approvalKey !== null;
   return {
     status,
     primaryKind,
     primaryCount: primaryKind === null ? 0 : snapshot[primaryKind],
-    secondaryCounts: terminal
-      ? []
-      : KIND_ORDER.filter(kind => kind !== primaryKind && snapshot[kind] > 0).map(kind => ({
-          kind,
-          count: snapshot[kind],
-        })),
+    secondaryCounts:
+      terminal !== null
+        ? []
+        : KIND_ORDER.filter(kind => kind !== primaryKind && snapshot[kind] > 0).map(kind => ({
+            kind,
+            count: snapshot[kind],
+          })),
     checkedAt,
     stale:
-      !terminal &&
+      terminal === null &&
       (snapshot.status === 'stale' ||
         snapshot.status === 'expired' ||
         (staleAt !== null && now >= staleAt)),
     scheduledAt: wake.iso,
-    approvalKey: terminal || snapshot.needsInput === 0 ? null : details.approvalKey,
+    approvalKey: approvalAvailable ? details.approvalKey : null,
     // The card never advertises an update past the retry deadline.
     awaitingUpdate: wake.at !== null && now >= wake.at && (retry === null || now < retry),
     primaryTitle:
-      terminal || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
+      terminal !== null || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
         ? null
         : details.primaryTitle,
-    waitingAgents: terminal || snapshot.needsInput === 0 ? [] : details.waitingAgents,
-    scheduledAgents: terminal || snapshot.scheduled === 0 ? [] : details.scheduledAgents,
+    waitingAgents: terminal !== null || snapshot.needsInput === 0 ? [] : details.waitingAgents,
+    scheduledAgents: terminal !== null || snapshot.scheduled === 0 ? [] : details.scheduledAgents,
     canCreate: status === 'content' || status === 'empty' || status === 'unavailable',
-    // This is visibility, not approval authority. Every action revalidates the exact current request.
-    canApprove: !terminal && snapshot.needsApproval > 0 && details.approvalKey !== null,
+    canApprove: approvalAvailable,
   };
 }
 
@@ -369,8 +388,8 @@ export function buildHomeWidgetPresentation(
  */
 export function homeWidgetRefreshAt(data: HomeWidgetData, now: number): number {
   const { snapshot } = data;
-  const terminal = isTerminalGlanceableStatus(snapshot.status);
-  const next = now + (terminal ? QUIET_REFRESH_MS : refreshInterval(snapshot));
+  const terminal = isTerminalGlanceableStatus(snapshot.status) ? snapshot.status : null;
+  const next = now + (terminal !== null ? QUIET_REFRESH_MS : refreshInterval(snapshot));
   const wake = scheduledWake(snapshot, terminal).at;
   const retry = wakeRetryAt(snapshot, terminal);
   // Both instants come from the snapshot, so a passed wake cannot create a busy refresh loop.
@@ -387,7 +406,7 @@ export function buildHomeWidgetPresentationTimeline(
   const times = [now];
   const { snapshot } = data;
   const { terminal, staleAt } = staleness(data);
-  if (!terminal) {
+  if (terminal === null) {
     if (staleAt !== null && staleAt > now) times.push(staleAt);
     const wake = scheduledWake(snapshot, terminal).at;
     if (wake !== null && wake > now && wake !== staleAt) times.push(wake);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
+import type { StepUpOperationBinding } from '@kilocode/web-shared/lib/admin/privileged-access';
 import {
   formatStepUpRemaining,
   stepUpDialogDescription,
@@ -52,6 +53,48 @@ describe('step-up dialog copy', () => {
       expect(stepUpDialogTitle({ code })).not.toHaveLength(0);
       expect(stepUpDialogDescription({ code })).not.toHaveLength(0);
     }
+  });
+
+  const binding = {
+    actionClass: 'sensitive_write',
+    surface: 'trpc',
+    route: 'admin.users.updateStatus',
+    method: 'mutation',
+    targetKind: 'user',
+    targetId: 'user_123',
+  } as const satisfies StepUpOperationBinding;
+
+  it('names the route and target of a bound operation', () => {
+    const description = stepUpDialogDescription({
+      code: 'MFA_REQUIRED',
+      actionClass: 'sensitive_write',
+      purpose: 'operation',
+      binding,
+    });
+    expect(description).toContain('Confirm it is you with your passkey to continue.');
+    expect(description).toContain('admin.users.updateStatus');
+    expect(description).toContain('user_123');
+  });
+
+  it('keeps the session sentence with no operation text', () => {
+    const description = stepUpDialogDescription({
+      code: 'MFA_REQUIRED',
+      actionClass: 'sensitive_write',
+      purpose: 'session',
+    });
+    expect(description).toBe('Confirm it is you with your passkey to continue.');
+    expect(description).not.toContain('admin.users.updateStatus');
+  });
+
+  it('names the route alone when the binding has no target', () => {
+    const description = stepUpDialogDescription({
+      code: 'MFA_EXPIRED',
+      actionClass: 'sensitive_write',
+      purpose: 'operation',
+      binding: { ...binding, targetKind: 'none', targetId: null },
+    });
+    expect(description).toContain('admin.users.updateStatus');
+    expect(description).not.toContain('null');
   });
 });
 

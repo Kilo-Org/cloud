@@ -2840,6 +2840,7 @@
       "reconnectAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di riconnetterla.",
       "bitbucketNotConnectedTitle": "Bitbucket non è connesso",
       "bitbucketAdminOnlyDescription": "Chiedi a un Proprietario, a un Amministratore o a un Responsabile della fatturazione dell'organizzazione di connetterlo.",
+      "adminOnlyConnectDescription": "Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
       "contextLine": "Per {{organization}}",
       "contextLinePersonal": "Per il tuo account personale"
     },
@@ -3467,7 +3468,8 @@
         "accounting_adjustment": "Rettifica contabile",
         "credits_expired": "Crediti scaduti"
       },
-      "truncated": "Sono disponibili movimenti dei crediti precedenti."
+      "truncated": "Sono disponibili movimenti dei crediti precedenti.",
+      "retentionLimit": "Vengono mostrati i movimenti dei crediti più recenti."
     },
     "hub": {
       "balance": "Saldo",
@@ -3512,7 +3514,8 @@
         "void": "Annullata",
         "uncollectible": "Inesigibile"
       },
-      "truncated": "Sono disponibili fatture precedenti."
+      "truncated": "Sono disponibili fatture precedenti.",
+      "retentionLimit": "Vengono mostrate le fatture più recenti."
     },
     "lowBalanceAlert": {
       "enableA11y": "Attiva l'avviso di saldo basso",
@@ -3992,6 +3995,8 @@
       "downloading": "Download in corso: {{written}} di {{total}}",
       "downloadingUnknown": "Download in corso: {{written}}",
       "paused": "In pausa: {{written}} di {{total}}",
+      "retrying": "Nuovo tentativo: {{written}} di {{total}}",
+      "retryingUnknown": "Nuovo tentativo: {{written}}",
       "verifying": "Verifica del file scaricato…",
       "downloaded": "Scaricato · {{size}}",
       "url": "Link di download diretto",
@@ -4082,7 +4087,9 @@
         "androidModelUnavailable": "Questo dispositivo non supporta Gemini Nano, oppure l'app di sistema AICore è ancora in fase di configurazione. Riprova più tardi.",
         "aicoreUpdateRequired": "Aggiorna l'app AICore e il software di sistema per usare questo modello.",
         "downloadable": "Questo modello richiede un download una tantum prima di poterlo usare.",
-        "downloading": "Il download del modello è in corso. Sarà pronto al termine del download."
+        "downloading": "Il download del modello è in corso. Sarà pronto al termine del download.",
+        "batteryQuota": "Il modello sul dispositivo ha esaurito la sua quota di batteria per ora. Riprova più tardi.",
+        "checkFailed": "L'app non è riuscita a verificare questo modello. Riprova."
       },
       "unavailable": "Il modello sul dispositivo non è disponibile al momento. Controllane lo stato in $t(modelChat.backends.title).",
       "busy": "Il modello sul dispositivo è occupato con un'altra risposta. Riprova quando avrà finito.",
@@ -4449,7 +4456,8 @@
       "purchaseFallback": "Acquisto crediti",
       "receipt": "Ricevuta",
       "receiptA11y": "Apri la ricevuta di {{description}}, {{amount}}, del {{date}}",
-      "receiptUnavailable": "Nessuna ricevuta disponibile per questo acquisto."
+      "receiptUnavailable": "Nessuna ricevuta disponibile per questo acquisto.",
+      "retentionLimit": "Viene mostrata la cronologia crediti più recente."
     },
     "title": "Acquista crediti",
     "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",
@@ -4704,6 +4712,9 @@
     "couldNotLoad": "Impossibile caricare le integrazioni",
     "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
     "managedByOwner": "Chiedi a un proprietario dell'organizzazione di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerOrAdmin": "Chiedi a un proprietario dell'organizzazione o a un amministratore di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerOrBilling": "Chiedi a un proprietario dell'organizzazione o a un responsabile della fatturazione di modificare un collegamento che non puoi modificare.",
+    "managedByOwnerAdminOrBilling": "Chiedi a un proprietario dell'organizzazione, a un amministratore o a un responsabile della fatturazione di modificare un collegamento che non puoi modificare.",
     "connectFailed": "Impossibile aprire la pagina di collegamento"
   },
   "invoices": {

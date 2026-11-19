@@ -2801,6 +2801,7 @@
       "reconnectAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
       "bitbucketNotConnectedTitle": "Bitbucket tidak terhubung",
       "bitbucketAdminOnlyDescription": "Minta pemilik, admin, atau manajer penagihan organisasi untuk menghubungkannya.",
+      "adminOnlyConnectDescription": "Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akun pribadi Anda"
     },
@@ -3409,7 +3410,8 @@
         "accounting_adjustment": "Penyesuaian akuntansi",
         "credits_expired": "Kredit kedaluwarsa"
       },
-      "truncated": "Masih ada aktivitas kredit sebelumnya."
+      "truncated": "Masih ada aktivitas kredit sebelumnya.",
+      "retentionLimit": "Menampilkan aktivitas kredit terbaru."
     },
     "hub": {
       "balance": "Saldo",
@@ -3454,7 +3456,8 @@
         "void": "Batal",
         "uncollectible": "Tidak tertagih"
       },
-      "truncated": "Masih ada faktur sebelumnya."
+      "truncated": "Masih ada faktur sebelumnya.",
+      "retentionLimit": "Menampilkan faktur terbaru."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktifkan peringatan saldo rendah",
@@ -3931,6 +3934,8 @@
       "downloading": "Mengunduh: {{written}} dari {{total}}",
       "downloadingUnknown": "Mengunduh: {{written}}",
       "paused": "Dijeda: {{written}} dari {{total}}",
+      "retrying": "Mencoba lagi: {{written}} dari {{total}}",
+      "retryingUnknown": "Mencoba lagi: {{written}}",
       "verifying": "Memeriksa file yang diunduh…",
       "downloaded": "Terunduh · {{size}}",
       "url": "Tautan unduhan langsung",
@@ -4021,7 +4026,9 @@
         "androidModelUnavailable": "Perangkat ini tidak mendukung Gemini Nano, atau aplikasi sistem AICore masih disiapkan. Coba lagi nanti.",
         "aicoreUpdateRequired": "Perbarui aplikasi AICore dan perangkat lunak sistem untuk menggunakan model ini.",
         "downloadable": "Model ini perlu diunduh satu kali sebelum dapat digunakan.",
-        "downloading": "Model sedang diunduh dan akan siap digunakan setelah unduhan selesai."
+        "downloading": "Model sedang diunduh dan akan siap digunakan setelah unduhan selesai.",
+        "batteryQuota": "Model di perangkat telah menggunakan jatah baterainya untuk saat ini. Coba lagi nanti.",
+        "checkFailed": "Aplikasi tidak dapat memeriksa model ini. Coba lagi."
       },
       "unavailable": "Model di perangkat sedang tidak tersedia. Periksa statusnya di $t(modelChat.backends.title).",
       "busy": "Model di perangkat sedang menyusun balasan lain. Coba lagi setelah selesai.",
@@ -4382,7 +4389,8 @@
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Tanda terima",
       "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
-      "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini."
+      "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini.",
+      "retentionLimit": "Menampilkan riwayat kredit terbaru."
     },
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
@@ -4629,6 +4637,9 @@
     "couldNotLoad": "Tidak dapat memuat integrasi",
     "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
+    "managedByOwnerOrAdmin": "Minta pemilik atau admin organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
+    "managedByOwnerOrBilling": "Minta pemilik atau manajer penagihan organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
+    "managedByOwnerAdminOrBilling": "Minta pemilik, admin, atau manajer penagihan organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
     "connectFailed": "Tidak dapat membuka halaman koneksi"
   },
   "invoices": {

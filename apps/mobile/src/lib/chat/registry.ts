@@ -883,7 +883,7 @@ async function askInTurn(
       throw new Error('the chat is not open');
     }
     const before = snapshotOf(current);
-    if (typed && from === undefined && before.asked !== null && held.waiting.length > 0) {
+    if (typed && from == null && before.asked !== null && held.waiting.length > 0) {
       /* A failed attempt keeps its Retry, and the line it holds is what the
          person asked before that failure. A new send joins the line rather
          than overtaking it, so questions reach the model in the order they

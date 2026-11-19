@@ -736,6 +736,30 @@ describe('prepareSession prompt rule', () => {
       }).success
     ).toBe(true);
   });
+
+  it('refuses a whitespace-only grouped start prompt and keeps a real one', () => {
+    for (const prompt of ['   ', '\n\t ']) {
+      const result = StartSessionInput.safeParse({
+        ...baseStartInput,
+        message: { ...baseStartInput.message, prompt },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find(entry => entry.message === 'Prompt is required');
+        expect(issue?.path).toEqual(['message', 'prompt']);
+      }
+    }
+    expect(StartSessionInput.parse(baseStartInput).message.prompt).toBe('continue');
+  });
+
+  it('keeps the attachment-only grouped start exemption', () => {
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        message: { prompt: '   ', attachments: validAttachments },
+      }).success
+    ).toBe(true);
+  });
 });
 
 describe('prepareSession clone-only variant', () => {

@@ -968,11 +968,18 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
 export const StartSessionInput = z
   .object({
     operationKey: z.string().uuid().optional(),
-    message: z.object({
-      prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
-      ...AttachmentFieldsSchema,
-      id: MessageIdSchema.optional(),
-    }),
+    message: z
+      .object({
+        prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
+        ...AttachmentFieldsSchema,
+        id: MessageIdSchema.optional(),
+      })
+      .superRefine((message, ctx) =>
+        rejectEmptyPromptWithoutAttachments(
+          { prompt: message.prompt, attachments: message.attachments },
+          ctx
+        )
+      ),
     agent: z.object({
       mode: ModeSlugSchema,
       model: modelIdSchema,

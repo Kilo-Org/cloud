@@ -120,9 +120,10 @@ export const requestedEnvironmentSchema = z
 
 /**
  * The one rule for a cloud-agent prompt: non-blank after trim, length-bounded.
- * Every boundary that accepts a first-user-instruction prompt (delegated
- * authority launches, web prepareSession, worker prepareSession) uses this
- * schema instead of its own copy of the refine.
+ * Every boundary that accepts a first-user-instruction prompt applies it here
+ * instead of keeping its own copy. A boundary that also accepts attachments
+ * applies the same trim rule through an attachment-aware check, so a launch
+ * whose instruction is only files stays valid.
  */
 export const cloudAgentPromptSchema = z
   .string()

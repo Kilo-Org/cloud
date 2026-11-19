@@ -17,6 +17,7 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { foldForSearch } from '@/i18n/fold-for-search';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -128,13 +129,17 @@ export function ShareDestinationList({
   const showSearch = state.kind === 'happy' && destinations.length > SEARCH_THRESHOLD;
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = foldForSearch(search.trim());
     if (q === '') {
       return destinations;
     }
     return destinations.filter(row => {
-      const title = (row.title ?? '').toLowerCase();
-      const branch = (row.git_branch ?? '').toLowerCase();
+      // Every compared value folds case and diacritics, the same as the query,
+      // so an unaccented query finds `Revisão do fluxo` and an accented query
+      // still matches an accented branch: folding is a superset of the plain
+      // lowercase comparison, so no match it found is lost.
+      const title = foldForSearch(row.title ?? '');
+      const branch = foldForSearch(row.git_branch ?? '');
       return title.includes(q) || branch.includes(q);
     });
   }, [destinations, search]);

@@ -246,6 +246,25 @@ describe('ShareDestinationList surface states', () => {
     unmount();
   });
 
+  it('matches an accented destination title from an unaccented query', async () => {
+    const accented = Array.from({ length: 9 }, (_, index) => ({
+      session_id: `accented-${index}`,
+      title: index === 0 ? 'Revisão do fluxo' : `Task ${index}`,
+      git_branch: 'main',
+      live: false,
+    })) as ShareDestinationRow[];
+    const { renderer, unmount } = await mount(happy, [], accented);
+    // The mock renders `SearchField` as a bare TextInput; this is its only prop
+    // surface, so naming the probe shape here is the whole contract.
+    const input = renderer.root.find(node => String(node.type) === 'TextInput');
+    const searchField: { onChangeText: (text: string) => void } = input.props;
+    act(() => {
+      searchField.onChangeText('revisao');
+    });
+    expect(renderer.root.findAll(node => String(node.type) === 'StoredSessionRow')).toHaveLength(1);
+    unmount();
+  });
+
   it('keeps the loading skeleton ahead of empty states', async () => {
     const { renderer, unmount } = await mount({
       kind: 'loading',

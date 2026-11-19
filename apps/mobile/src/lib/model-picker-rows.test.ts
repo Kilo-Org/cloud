@@ -312,6 +312,29 @@ describe('buildModelPickerRows', () => {
     ).toEqual([]);
   });
 
+  it('folds diacritics so an unaccented query keeps an accented provider row', () => {
+    const mistralModel: SessionModelOption = {
+      ...remoteWorkspaceClaude,
+      id: 'remote-model-2',
+      name: 'Codestral',
+      displayId: 'codestral',
+      provider: { id: 'mistral', name: 'Mistrál Labs' },
+      modelRef: { providerID: 'mistral', modelID: 'codestral' },
+    };
+    expect(
+      buildModelPickerRows({ models: [mistralModel], search: 'mistral', favoriteIds: noFavorites })
+    ).toEqual([
+      { key: 'provider:mistral', title: 'MISTRÁL LABS', type: 'header' },
+      {
+        key: 'model:remote-model-2',
+        model: mistralModel,
+        isFavorite: false,
+        showsProvider: false,
+        type: 'model',
+      },
+    ]);
+  });
+
   it('keeps a favorited remote model out of its provider group', () => {
     const favoriteIds = new Set(['remote:custom-openai:shared/model.id']);
     expect(buildModelPickerRows({ models: remoteModels, search: '', favoriteIds })).toEqual([

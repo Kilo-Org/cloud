@@ -317,6 +317,14 @@ jobs:
           name: harness-sdk-dist
           path: packages/harness-sdk/dist
 
+      # The app's typed-route declarations are generated, not committed, and this
+      # job never starts Metro; without them `Href` is plain `string`, so a route
+      # that builds its own href cannot fail the check below. `expo customize
+      # tsconfig.json` runs the same generator with no server, no bundler and no
+      # network, and reads the app's committed `.env`.
+      - name: Generate the Expo Router types
+        run: pnpm --filter kilo-app exec expo customize tsconfig.json > /dev/null
+
       - name: Typecheck
         run: pnpm --filter kilo-app run typecheck
 

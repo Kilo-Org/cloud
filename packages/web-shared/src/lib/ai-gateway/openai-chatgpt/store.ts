@@ -155,11 +155,32 @@ export type OpenAiChatGptStoredConnection = {
  *
  * Reads the replica: it runs before inference on gateway requests, which also
  * execute in sfo1. Token refresh re-reads the row on the primary under a lock.
+ * A caller that reports state to a person must use
+ * `getOpenAiChatGptStoredConnectionFromPrimary` instead, so a just-reconnected
+ * row never reads as the connector it had a moment earlier.
  */
 export async function getOpenAiChatGptStoredConnection(
   owner: OpenAiChatGptOwner
 ): Promise<OpenAiChatGptStoredConnection | null> {
-  const row = await readOpenAiChatGptConnectionRow(readDb, owner);
+  return await getStoredConnection(readDb, owner);
+}
+
+/**
+ * The stored row as the primary holds it. A surface that tells a person what
+ * their connection is must read this, so the answer matches the payload the same
+ * page shows and a reconnect is visible at once.
+ */
+export async function getOpenAiChatGptStoredConnectionFromPrimary(
+  owner: OpenAiChatGptOwner
+): Promise<OpenAiChatGptStoredConnection | null> {
+  return await getStoredConnection(db, owner);
+}
+
+async function getStoredConnection(
+  fromDb: OpenAiChatGptDatabase,
+  owner: OpenAiChatGptOwner
+): Promise<OpenAiChatGptStoredConnection | null> {
+  const row = await readOpenAiChatGptConnectionRow(fromDb, owner);
   if (!row) return null;
   const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
   return connection ? { connection, isEnabled: row.is_enabled, createdBy: row.created_by } : null;

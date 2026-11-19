@@ -12,7 +12,7 @@ import {
   clearOpenAiChatGptConnection,
   readOpenAiChatGptUsageLimit,
   getOpenAiChatGptConnection,
-  getOpenAiChatGptStoredConnection,
+  getOpenAiChatGptStoredConnectionFromPrimary,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
@@ -100,9 +100,11 @@ async function resolveOwner(
  * The payload is read on the primary through `getOpenAiChatGptConnection`, so a
  * terminal refresh failure surfaces its reconnect message and a just-completed
  * disconnect never shows a lagging replica's stale row. Only the
- * shared-services owner adds a second read, `getOpenAiChatGptStoredConnection`,
- * for the `createdBy` the connector decision needs; every other owner reads
- * once.
+ * shared-services owner adds a second read,
+ * `getOpenAiChatGptStoredConnectionFromPrimary`, for the `createdBy` the
+ * connector decision needs; it reads the primary for the same reason, so a row
+ * that was just reconnected never reports the connector it had a moment ago.
+ * Every other owner reads once.
  */
 async function readStatus(owner: OpenAiChatGptOwner): Promise<OpenAiChatGptStatus> {
   const connection = await getOpenAiChatGptConnection(owner);
@@ -128,7 +130,7 @@ async function readStatus(owner: OpenAiChatGptOwner): Promise<OpenAiChatGptStatu
   // absence the organization must fix; a personal or member connection is the
   // caller's own and is never checked for it.
   if (owner.scope === 'shared_services') {
-    const stored = await getOpenAiChatGptStoredConnection(owner);
+    const stored = await getOpenAiChatGptStoredConnectionFromPrimary(owner);
     if (stored && (await openAiChatGptConnectorGone(stored))) {
       return {
         state: 'reconnect_required',

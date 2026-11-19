@@ -2,7 +2,7 @@
 // runs against the mocked connection store, never against the database.
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptConnection: jest.fn(),
-  getOpenAiChatGptStoredConnection: jest.fn(),
+  getOpenAiChatGptStoredConnectionFromPrimary: jest.fn(),
   clearOpenAiChatGptConnection: jest.fn(),
   readOpenAiChatGptUsageLimit: jest.fn(),
   openAiChatGptSharedServicesOwner: (organizationId: string) => ({
@@ -31,7 +31,7 @@ import { rootRouter } from '@/routers/root-router';
 import {
   clearOpenAiChatGptConnection,
   getOpenAiChatGptConnection,
-  getOpenAiChatGptStoredConnection,
+  getOpenAiChatGptStoredConnectionFromPrimary,
   readOpenAiChatGptUsageLimit,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
@@ -75,7 +75,7 @@ function callerFor(user: { id: string } | null) {
 
 describe('openAiChatGpt.status', () => {
   const getConnection = jest.mocked(getOpenAiChatGptConnection);
-  const getStoredConnection = jest.mocked(getOpenAiChatGptStoredConnection);
+  const getStoredConnection = jest.mocked(getOpenAiChatGptStoredConnectionFromPrimary);
   const connectorGone = jest.mocked(openAiChatGptConnectorGone);
   const ensureOrgAccess = jest.mocked(ensureOrganizationAccess);
   const usageLimitRead = jest.mocked(readOpenAiChatGptUsageLimit);

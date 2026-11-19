@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { describeRouteStep } from './BYOKRoutingPreview';
+import { describeRouteStep, isRoutingPreviewModelId } from './BYOKRoutingPreview';
 
 const NAMES: Record<string, string> = {
   'zai-coding': 'Z.ai Coding Plan',
@@ -131,5 +131,26 @@ describe('describeRouteStep', () => {
         false
       ).title
     ).toBe('Anthropic, OpenAI API keys via Vercel AI Gateway');
+  });
+});
+
+describe('isRoutingPreviewModelId', () => {
+  it.each(['anthropic/claude-sonnet-4.5', 'openai/gpt-5', 'kilo-auto/frontier'])(
+    'offers the catalog model %s',
+    modelId => {
+      expect(isRoutingPreviewModelId(modelId)).toBe(true);
+    }
+  );
+
+  it.each(['private-a1b2c3d4e5/my-model', 'private-a1b2c3d4e5/org/model', 'synthetic/hf:model'])(
+    'does not offer the model %s, which the preview cannot route',
+    modelId => {
+      expect(isRoutingPreviewModelId(modelId)).toBe(false);
+    }
+  );
+
+  it('offers an id that only resembles a private provider id', () => {
+    expect(isRoutingPreviewModelId('private-short/model')).toBe(true);
+    expect(isRoutingPreviewModelId('private-a1b2c3d4e5')).toBe(true);
   });
 });

@@ -34,6 +34,12 @@ const GATEWAY_NAMES = { vercel: 'Vercel AI Gateway', openrouter: 'OpenRouter' } 
 // Provider model IDs such as `synthetic/...` route straight to their provider, not through this list.
 const DIRECT_BYOK_MODEL_PREFIXES = Object.keys(DIRECT_BYOK_PROVIDERS_META).map(id => `${id}/`);
 
+/** Whether the preview can route `modelId`; direct provider and private provider ids are not routed by it. */
+export function isRoutingPreviewModelId(modelId: string) {
+  if (DIRECT_BYOK_MODEL_PREFIXES.some(prefix => modelId.startsWith(prefix))) return false;
+  return !isByokPrivateProviderId(modelId.slice(0, Math.max(0, modelId.indexOf('/'))));
+}
+
 function formatApiKinds(apiKinds: readonly ApiKind[]) {
   return apiKinds.map(apiKind => API_KIND_LABELS[apiKind]).join(' and ');
 }
@@ -208,7 +214,7 @@ export function BYOKRoutingPreview({
   const modelOptions = useMemo<ModelOption[]>(
     () =>
       models?.data
-        .filter(model => !DIRECT_BYOK_MODEL_PREFIXES.some(prefix => model.id.startsWith(prefix)))
+        .filter(model => isRoutingPreviewModelId(model.id))
         .map(model => ({
           id: model.id,
           name: model.name,

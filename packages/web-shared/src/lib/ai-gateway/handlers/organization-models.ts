@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import * as z from 'zod';
 import { ORGANIZATION_MODEL_AUDIENCES } from '@kilocode/app-shared/organizations';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { handleTRPCRequest } from '@kilocode/web-shared/lib/organizations/organization-settings-route-handler';
 import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 

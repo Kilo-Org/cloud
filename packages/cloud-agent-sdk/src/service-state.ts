@@ -202,6 +202,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   let terminated = false;
 
   /**
+   * True once a transport drop reported its spent reconnect budget. The
+   * transport reports exhaustion once per connection, and this latch keeps a
+   * repeated report from firing the terminal error twice. A `connected` event
+   * clears it.
+   */
+  let transportExhausted = false;
+
+  /**
    * The message id whose `cloud.message.failed` last set the terminal error
    * state (`status`, `terminated`, `config.onError`), together with the exact
    * `status` object it installed. Kept so a later `clearFailedMessage` for that
@@ -369,11 +377,25 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         // (unlike the CLI's always-on `session.queue.changed` replay), so
         // clearing here would silently and permanently drop "Queued" badges
         // for messages that are still queued server-side.
-        terminated = true;
         disconnectedSource = 'transport';
         completed = false;
-        status = { type: 'disconnected' };
-        config.onError?.('Connection to agent lost');
+        if (event.exhausted === true) {
+          // The retry budget is spent, so the socket will not come back on its
+          // own. This reads as a terminal loss and asks the reader to retry.
+          // The code carries the classified connection copy, so both the
+          // indicator and the error sink state one canonical message.
+          terminated = true;
+          status = { type: 'disconnected', code: 'connection-lost' };
+          if (!transportExhausted) {
+            transportExhausted = true;
+            config.onError?.('Connection lost. Please retry in a moment.');
+          }
+          break;
+        }
+        // A drop the transport recovers from on its own. Keep the session
+        // alive and let the status line read "Reconnecting…" instead of an
+        // error the reader cannot act on.
+        status = { type: 'disconnected', reconnecting: true };
         break;
     }
 
@@ -1047,10 +1069,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     clearPendingInteractions();
 
     terminated = false;
+    transportExhausted = false;
     if (
       status.type === 'disconnected' &&
       (sessionStatus !== undefined || disconnectedSource === 'transport')
     ) {
+      // Covers both the reconnecting drop and the exhausted loss: a live
+      // connection is the one proof either status is over.
       status = IDLE_STATUS;
       disconnectedSource = null;
     }

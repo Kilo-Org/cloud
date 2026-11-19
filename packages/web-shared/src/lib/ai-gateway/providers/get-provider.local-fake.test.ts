@@ -1019,6 +1019,7 @@ describe('getProvider direct BYOK routing', () => {
     expect(await firstRoute(result)).toMatchObject({
       provider: { type: 'direct-byok', apiKey: 'zai-key' },
       bypassAccessCheck: false,
+      directByokPolicyProviderId: 'z-ai',
     });
   });
 

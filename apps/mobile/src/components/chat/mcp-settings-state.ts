@@ -165,7 +165,7 @@ export function mcpSettingsView(state: KiloMcpState, flag: ChatFlag): McpSetting
         statusKey: 'modelChat.mcp.none',
         descriptionKey: 'modelChat.mcp.noneDescription',
         toolCount: 0,
-        retry: false,
+        retry: true,
         busy: false,
         tone: 'warn',
       };

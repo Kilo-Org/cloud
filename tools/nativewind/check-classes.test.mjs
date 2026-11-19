@@ -492,24 +492,137 @@ function stubbedCompilerFixture(context, entrySource) {
   return root;
 }
 
-for (const [name, entrySource, expected] of [
+/** A compiler stub whose two reads return the given expression sources. */
+function compilerStub({ warnings, stylesheet }) {
+  return (
+    'module.exports = {\n' +
+    '  compile() {\n' +
+    '    return {\n' +
+    `      warnings() { return ${warnings}; },\n` +
+    `      stylesheet() { return ${stylesheet}; },\n` +
+    '    };\n' +
+    '  },\n' +
+    '};\n'
+  );
+}
+
+/**
+ * A stylesheet still holding both declarations the bans warn about: a deferred
+ * colorMix for `backgroundColor` and a deferred calc for `lineHeight`. The stub
+ * answers every fixture with it, so a case that fails one pin leaves the other
+ * pins passing.
+ */
+const HOLDING_STYLESHEET =
+  "{ s: [['x', [{ d: [" +
+  "[['colorMix', [['color', '#b0483a'], ['percent', 10]]], 'backgroundColor'], " +
+  "[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']" +
+  '] }]]] }';
+
+for (const [name, entrySource, expected, absent] of [
   [
-    'throws at compile',
+    'will not load, which is the only failure that stops the pins',
+    "throw new Error('compiler entry exploded');\n",
+    ['react-native-css/compiler did not resolve (compiler entry exploded) — run pnpm install'],
+    'the compiler failed on',
+  ],
+  [
+    'throws at compile, and every fixture still reports',
     "module.exports = { compile() { throw new Error('stubbed compiler exploded on line one'); } };\n",
-    'the compiler failed on the text-align: start fixture (stubbed compiler exploded on line one)',
+    [
+      'the compiler failed on the text-align: start fixture (stubbed compiler exploded on line one)',
+      'the compiler failed on the text-align: end fixture (stubbed compiler exploded on line one)',
+      'the compiler failed on the color-mix over an @theme inline variable fixture (stubbed compiler exploded on line one)',
+      'the compiler failed on the spacing-scale line-height fixture (stubbed compiler exploded on line one)',
+    ],
   ],
   [
-    'returns a warnings value with no text-align',
-    'module.exports = { compile() { return { warnings() { return undefined; } }; } };\n',
-    'text-align: start is no longer dropped — drop the text-start/end rule',
+    'throws for the color-mix fixture only',
+    // The fixture CSS is the stub's only input, so a throw it raises for one
+    // fixture leaves the other pins running on the same stylesheet.
+    [
+      'module.exports = {',
+      '  compile(css) {',
+      "    if (css.includes('color-mix')) throw new Error('color-mix fixture exploded');",
+      '    return {',
+      "      warnings() { return { values: { 'text-align': ['start', 'end'] } }; },",
+      '      stylesheet() {',
+      "        return { s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] };",
+      '      },',
+      '    };',
+      '  },',
+      '};',
+    ].join('\n') + '\n',
+    [
+      'the compiler failed on the color-mix over an @theme inline variable fixture (color-mix fixture exploded)',
+    ],
+    'drop the numeric leading rule',
   ],
   [
-    'throws at stylesheet',
-    "module.exports = { compile() { return { warnings() { return ['text-align']; }, stylesheet() { throw new Error('stylesheet boom first line'); } }; } };\n",
-    'the compiler failed on the color-mix over an @theme inline variable fixture (stylesheet boom first line)',
+    'still drops only the text-align: start keyword',
+    compilerStub({
+      warnings: `{ values: { 'text-align': ['start'] } }`,
+      stylesheet: HOLDING_STYLESHEET,
+    }),
+    // `start` still appears in the dropped values, so its rule holds; `end`
+    // no longer does, so only the text-end rule is retired.
+    ['text-align: end is no longer dropped — drop the text-end rule'],
+    'drop the text-start rule',
+  ],
+  [
+    'drops neither text-align keyword',
+    compilerStub({ warnings: '{ values: {} }', stylesheet: HOLDING_STYLESHEET }),
+    [
+      'text-align: start is no longer dropped — drop the text-start rule',
+      'text-align: end is no longer dropped — drop the text-end rule',
+    ],
+  ],
+  [
+    'reports prose around the keyword instead of the dropped value',
+    // The words `end` and `start` sit inside longer words of a warning
+    // sentence, so neither pin may read them as the dropped keyword.
+    compilerStub({
+      warnings: `{ values: {}, notes: ['text-align rendered is extended, restart'] }`,
+      stylesheet: HOLDING_STYLESHEET,
+    }),
+    [
+      'text-align: start is no longer dropped — drop the text-start rule',
+      'text-align: end is no longer dropped — drop the text-end rule',
+    ],
+  ],
+  [
+    'emits no backgroundColor declaration for the color-mix fixture',
+    compilerStub({
+      warnings: '{ values: {} }',
+      stylesheet: `{ s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] }`,
+    }),
+    [
+      'color-mix over an @theme inline variable emits no backgroundColor declaration — the ban still applies, so keep the theme-token opacity rule',
+    ],
+    'drop the theme-token opacity rule',
+  ],
+  [
+    'resolves the color-mix at build time',
+    compilerStub({
+      warnings: '{ values: {} }',
+      stylesheet: `{ s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight'], [{ color: '#b0483a10' }, 'backgroundColor']] }]]] }`,
+    }),
+    [
+      'now compiles to {"color":"#b0483a10"} instead of a deferred colorMix — drop the theme-token opacity rule',
+    ],
+  ],
+  [
+    'emits no lineHeight declaration for the spacing-scale fixture',
+    compilerStub({
+      warnings: '{ values: {} }',
+      stylesheet: `{ s: [['x', [{ d: [[['colorMix', [['var', ['--color-destructive']]]], 'backgroundColor']] }]]] }`,
+    }),
+    [
+      'a spacing-scale line height emits no lineHeight declaration — the ban still applies, so keep the numeric leading rule',
+    ],
+    'drop the numeric leading rule',
   ],
 ]) {
-  test(`reports compiler pins the stub ${name}, keeping the source findings`, context => {
+  test(`reports compiler pins when the stub ${name}, keeping the source findings`, context => {
     const root = stubbedCompilerFixture(context, entrySource);
     const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
       cwd: root,
@@ -519,8 +632,13 @@ for (const [name, entrySource, expected] of [
     assert.ifError(result.error);
     assert.equal(result.status, 1, result.stderr);
     // The source-tree findings made it out before the stub failed the pins.
-    assert.match(result.stderr, /bans\.ts:1: "text-start" text-align: start\/end is dropped/);
-    assert.match(result.stderr, new RegExp(expected.replace(/[()]/g, m => `\\${m}`)));
+    assert.match(result.stderr, /bans\.ts:1: "text-start" text-align: start is dropped/);
+    for (const fragment of expected) {
+      assert.match(result.stderr, new RegExp(fragment.replace(/[()]/g, m => `\\${m}`)));
+    }
+    if (absent !== undefined) {
+      assert.doesNotMatch(result.stderr, new RegExp(absent));
+    }
     assert.match(result.stderr, /check-classes: \d+ problem\(s\)/);
     assert.doesNotMatch(result.stderr, /Error:|at /);
   });
@@ -634,15 +752,15 @@ test('reports each ban at its own line', () => {
     'apps/mobile/src/bans.ts',
     'const a = 1;\n' +
       '\n' +
-      'const b = "text-start";\n' +
+      'const b = "text-start text-end";\n' +
       'const c = 2;\n' +
-      'const d = "ltr: leading-9";\n' +
+      'const d = "leading-9";\n' +
       '/* "bg-primary/50" in the rule comment is documentation\n' +
       ' * text-start in a block-comment body */\n'
   );
   assert.deepEqual(found, [
-    `apps/mobile/src/bans.ts:3: "text-start" text-align: start/end is dropped; the shared Text handles RTL alignment already`,
-    `apps/mobile/src/bans.ts:5: "ltr:" the ltr: variant also matches in RTL; express the rule with rtl: instead`,
+    `apps/mobile/src/bans.ts:3: "text-start" text-align: start is dropped; the shared Text handles RTL alignment already`,
+    `apps/mobile/src/bans.ts:3: "text-end" text-align: end is dropped; the shared Text handles RTL alignment already`,
     `apps/mobile/src/bans.ts:5: "leading-9" a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]`,
   ]);
 });
@@ -656,7 +774,7 @@ test('reads a ban inside a template chunk but not one in a comment or a regular 
       '/* ltr: and leading-9 in a comment body read as documentation */\n'
   );
   assert.deepEqual(found, [
-    `apps/mobile/src/bans.ts:1: "text-start" text-align: start/end is dropped; the shared Text handles RTL alignment already`,
+    `apps/mobile/src/bans.ts:1: "text-start" text-align: start is dropped; the shared Text handles RTL alignment already`,
   ]);
 });
 

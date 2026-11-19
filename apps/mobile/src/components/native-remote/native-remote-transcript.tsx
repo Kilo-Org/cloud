@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { type TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { displaySafeText } from '@kilocode/app-shared/display-text';
 import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber } from '@/lib/format';
+import { isolateBidiText, isolateLtrBidiText } from '@/lib/bidi';
 import { transcriptText } from '@/lib/native-remote/projections';
 import { type NativeRemoteSession } from '@/lib/native-remote/use-native-session';
 import { NativeRemoteQuestion } from './native-remote-question';
@@ -80,9 +82,21 @@ export function NativeRemoteTranscript({
       ) : null}
       {pending.permissions.map(permission => (
         <View key={permission.id} className="gap-2 rounded-lg border border-border p-3">
-          <Text>{permission.action}</Text>
-          <Text selectable>{permission.resources.join('\n')}</Text>
-          {permission.message ? <Text>{permission.message}</Text> : null}
+          <Text>{isolateLtrBidiText(displaySafeText(permission.action))}</Text>
+          <View className="gap-1">
+            {permission.resources.map((resource, index) => (
+              <Text key={index} selectable>
+                {'• '}
+                {isolateLtrBidiText(displaySafeText(resource))}
+              </Text>
+            ))}
+          </View>
+          {permission.message ? (
+            // The message is prose, so it keeps the direction of its own first
+            // strong character; the action and resources are machine values and
+            // stay pinned left to right.
+            <Text>{isolateBidiText(displaySafeText(permission.message))}</Text>
+          ) : null}
           <View className="flex-row flex-wrap gap-2">
             <Button
               disabled={!canControl}

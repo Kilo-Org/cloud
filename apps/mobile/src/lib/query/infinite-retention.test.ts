@@ -66,7 +66,6 @@ describe('reconcileFirstPage', () => {
     const gate: { release?: () => void } = {};
     let hold = false;
     const calls: number[] = [];
-    // eslint-disable-next-line require-await -- the held fetch is the point: the recipe resolves it from the test.
     const queryFn = async ({ pageParam }: { pageParam: number }): Promise<Page> => {
       calls.push(pageParam);
       if (hold) {

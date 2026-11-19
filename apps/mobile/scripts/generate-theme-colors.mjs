@@ -47,6 +47,8 @@ export const TOKEN_KEYS = [
   ['good', '--good'],
   ['warn', '--warn'],
   ['warnForeground', '--warn-foreground'],
+  ['warnSolid', '--warn-solid'],
+  ['warnSolidForeground', '--warn-solid-foreground'],
   ['info', '--info'],
   ['agentYuki', '--agent-yuki'],
   ['agentWorkclaw', '--agent-workclaw'],

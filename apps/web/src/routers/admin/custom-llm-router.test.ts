@@ -871,6 +871,234 @@ describe('adminCustomLlmRouter', () => {
     });
   });
 
+  describe('partner definitions', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-partner-secret' } as const;
+    const catalogPublicId = 'openai/gpt-4o';
+    const pricing: CustomPricingTiers = [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 1,
+          completion_per_million: 2,
+          input_cache_read_per_million: null,
+          input_cache_write_per_million: null,
+        },
+      },
+    ];
+    const partnerDefinition: CustomLlmDefinition = {
+      internal_id: 'partner-gpt-4o',
+      display_name: 'Partner GPT-4o',
+      context_length: 128000,
+      max_completion_tokens: 4096,
+      base_url: 'https://partner.example.com/v1',
+      partner: { inference_provider: 'acme-ai' },
+      pricing,
+    };
+
+    it('creates a partner for a model in the OpenRouter model list', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: catalogPublicId,
+        definition: partnerDefinition,
+        credentials,
+      });
+
+      expect(result.definition.partner).toEqual({ inference_provider: 'acme-ai' });
+      const [row] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, catalogPublicId));
+      expect(row?.definition).toEqual(partnerDefinition);
+      expect(row?.encrypted_api_key).toBeDefined();
+    });
+
+    it('keeps accepting updates to an existing partner', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: catalogPublicId,
+        definition: partnerDefinition,
+        credentials,
+      });
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: catalogPublicId,
+        definition: { ...partnerDefinition, display_name: 'Renamed partner' },
+      });
+
+      expect(result.definition.display_name).toBe('Renamed partner');
+    });
+
+    it('keeps an existing partner editable after its model leaves the OpenRouter model list', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: catalogPublicId,
+        definition: partnerDefinition,
+        credentials,
+      });
+      jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: catalogPublicId,
+        definition: { ...partnerDefinition, display_name: 'Renamed partner' },
+      });
+
+      expect(result.definition.display_name).toBe('Renamed partner');
+    });
+
+    it('rejects a partner whose id differs only in case from an existing custom LLM', async () => {
+      await db
+        .insert(custom_llm2)
+        .values({ public_id: 'OpenAI/GPT-4o', definition: validDefinition });
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: catalogPublicId,
+          definition: partnerDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('differs only in case'),
+      });
+    });
+
+    it('rejects a partner whose id the public id schema reserves', async () => {
+      jest
+        .mocked(getOpenRouterModelsMetadataFromDatabase)
+        .mockResolvedValue({ '~openai/gpt-latest': {} as GatewayModelWithEndpoints });
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: '~openai/gpt-latest',
+          definition: partnerDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining('~') });
+    });
+
+    it('rejects a partner whose id is not in the OpenRouter model list', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/not-a-catalog-model',
+          definition: partnerDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('must exist in the OpenRouter model list'),
+      });
+
+      const rows = await db.select().from(custom_llm2);
+      expect(rows).toEqual([]);
+    });
+
+    it('rejects a partner without pricing', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: catalogPublicId,
+          definition: { ...partnerDefinition, pricing: undefined },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('rejects a partner that is also public or granted to an organization', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      for (const overrides of [
+        { public: publicDefinition.public },
+        { organization_ids: ['00000000-0000-4000-8000-000000000100'] },
+      ]) {
+        await expect(
+          caller.admin.customLlm.upsert({
+            public_id: catalogPublicId,
+            definition: { ...partnerDefinition, ...overrides },
+            credentials,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      }
+    });
+
+    it('does not let removing partner turn a catalog model id into a custom LLM', async () => {
+      await db.insert(custom_llm2).values({
+        public_id: catalogPublicId,
+        definition: partnerDefinition,
+      });
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: catalogPublicId,
+          definition: { ...validDefinition, pricing },
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('already exists in the OpenRouter model list'),
+      });
+
+      const [row] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, catalogPublicId));
+      expect(row?.definition.partner).toEqual({ inference_provider: 'acme-ai' });
+    });
+
+    it('lets a former partner become a custom LLM once its id is claimable', async () => {
+      await db.insert(custom_llm2).values({
+        public_id: 'acme/former-partner',
+        definition: partnerDefinition,
+      });
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'acme/former-partner',
+        definition: validDefinition,
+        credentials,
+      });
+
+      expect(result.definition.partner).toBeUndefined();
+      const [row] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, 'acme/former-partner'));
+      expect(row?.definition.partner).toBeUndefined();
+    });
+
+    it('rejects copying a partner', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: catalogPublicId,
+        definition: partnerDefinition,
+        credentials,
+      });
+
+      await expect(
+        caller.admin.customLlm.copy({
+          source_public_id: catalogPublicId,
+          public_id: 'acme/partner-copy',
+          display_name: 'Partner copy',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'A partner custom LLM cannot be copied',
+      });
+
+      const [copiedRow] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, 'acme/partner-copy'));
+      expect(copiedRow).toBeUndefined();
+    });
+  });
+
   describe('delete', () => {
     it('deletes a custom LLM by public_id', async () => {
       const caller = await createCallerForUser(admin.id);

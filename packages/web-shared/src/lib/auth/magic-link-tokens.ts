@@ -123,9 +123,6 @@ export const MagicLinkTokenWithPlaintext = MagicLinkToken.extend({
 });
 
 /**
- * Generate a new magic link token using Node's crypto module.
- * The token is generated in JS and the hash is stored in the database.
- *
  * @param email - The email address to associate with the token
  * @param expiresInMinutes - Number of minutes until the token expires (default: 30)
  * @returns The created token record with the plaintext token (for sending in email)
@@ -375,14 +372,10 @@ async function settleSignInCode({
 }
 
 /**
- * Commit a reserved sign-in code by setting consumed_at.
+ * Commit a reserved sign-in code.
  * Must be called only after a successful settlement.
- * The reservation must still be live (reserved_until > NOW()).
  *
  * When challengeId is supplied, the commit is scoped to the challenge.
- *
- * Returns true when the code was committed, false when the reservation
- * lapsed or the row was already consumed.
  */
 export async function commitSignInCode(
   email: string,

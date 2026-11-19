@@ -39,6 +39,8 @@ import { resolveSecret } from '../auth.js';
 import { fetchSessionMetadata } from './metadata.js';
 import jwt from 'jsonwebtoken';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
+import { runtimeAuthorizationLifetime } from './runtime-authorization-lifetime.js';
+import { renewWorkspaceAuthorityForUserSend } from './workspace-authority-renewal.js';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 
 /** Retryable error codes that should map to 503 Service Unavailable. */
@@ -130,10 +132,29 @@ export type QueueMessageContext = {
   authToken?: string;
 };
 
+/**
+ * Checks this chat's own runtime authorization and recovers it when it has
+ * expired. A user send then also renews its workspace's expired Cloud Agent
+ * authority; the chat's authorization never stands in for the workspace's.
+ */
 export async function preflightRuntimeAuthorizationRecovery(
   cloudAgentSessionId: string,
   ctx: QueueMessageContext
 ): Promise<void> {
+  const workspaceSessionId = await preflightChatRuntimeAuthorization(cloudAgentSessionId, ctx);
+  await renewWorkspaceAuthorityForUserSend({
+    env: ctx.env,
+    userId: ctx.userId,
+    authToken: ctx.authToken,
+    workspaceSessionId,
+  });
+}
+
+/** Returns the chat's workspace when the send may proceed on its authorization. */
+async function preflightChatRuntimeAuthorization(
+  cloudAgentSessionId: string,
+  ctx: QueueMessageContext
+): Promise<string | undefined> {
   if (!ctx.authToken) return;
   const claims = jwt.decode(ctx.authToken);
   if (
@@ -152,7 +173,7 @@ export async function preflightRuntimeAuthorizationRecovery(
   );
   // `legacy` is a credential-compatibility status for a stored authorization,
   // not the retired `agent_*` session plane.
-  if (state.state === 'legacy' || state.state === 'active') return;
+  if (state.state === 'legacy' || state.state === 'active') return state.workspaceSessionId;
   if (state.state === 'revoked') {
     logRuntimeAuthorizationDiagnostic(
       cloudAgentSessionId,
@@ -165,10 +186,10 @@ export async function preflightRuntimeAuthorizationRecovery(
     logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'preflight', 'delegation_expired');
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization expired' });
   }
-  if (!state.id) return;
+  if (!state.id) return state.workspaceSessionId;
   const expectedOldId = state.id;
   const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, cloudAgentSessionId);
-  if (!metadata || metadata.identity.userId !== ctx.userId) return;
+  if (!metadata || metadata.identity.userId !== ctx.userId) return state.workspaceSessionId;
   const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
   if (!secret)
     throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
@@ -179,6 +200,7 @@ export async function preflightRuntimeAuthorizationRecovery(
     resourceKind: 'cloud-agent-next',
     resourceId: metadata.identity.sessionId,
     environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+    ...runtimeAuthorizationLifetime(ctx.env),
     onAdmissionRejected: reason =>
       logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
     ...(metadata.identity.orgId ? { organizationId: metadata.identity.orgId } : {}),
@@ -212,6 +234,7 @@ export async function preflightRuntimeAuthorizationRecovery(
       message: 'Runtime authorization recovery is waiting for the session runtime to become idle',
     });
   }
+  return state.workspaceSessionId;
 }
 
 /**

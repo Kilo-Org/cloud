@@ -229,8 +229,7 @@ describe('disabled primary action fill contrast (WCAG AA text)', () => {
   // `--primary-disabled-action`: the palette's disabled primary under white in
   // light, and a dim neutral under `--foreground` in dark. The dark plate must
   // stay a visible object on the near-black page and stand off the outlined
-  // control beside it, while staying clearly below the enabled brand fill. The
-  // palette's `--primary-disabled` is left to the Switch's disabled on-track.
+  // control beside it, while staying clearly below the enabled brand fill.
   it('light theme: primaryForeground vs primaryDisabledAction >= 4.5:1', () => {
     const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabledAction);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
@@ -391,73 +390,49 @@ describe('idle composer control and ring track contrast (non-text)', () => {
   });
 });
 
-describe('disabled switch pair contrast (non-text)', () => {
-  // The shared switch paints this pair for a disabled control on Android, in
-  // place of the brand on-track: `primary-disabled` under a grip that sits
-  // below it in strength for the on position, `muted-soft` with the mid neutral
-  // grip for the off one. iOS keeps the brand pair and fades it itself. The
-  // switch sits on a `secondary` row, so its tracks are measured over that. The
-  // floors are perception floors: the pair has to read as a control and the two
-  // positions have to stay apart. Light has no third neutral for the off track
-  // — `control-idle` equals `secondary` there — so the disabled off track is
-  // the same neutral as the enabled off track, and only its grip dims.
-  const MIN_VISIBLE_SURFACE_RATIO = 1.6;
-  // [theme, palette, the grip the switch paints on the on track]. The on grip
-  // is the one colour a disabled pair cannot share with its enabled one: the
-  // scheme's on ink is what marks a control that still works.
+describe('switch pair contrast (non-text)', () => {
+  // The shared switch paints the scheme's enabled pair: the olive on track
+  // under the scheme's on ink, and an off pair whose grip stays readable on its
+  // own track. A disabled control keeps that pair and takes the shared opacity,
+  // so the separation is measured undimmed: dimming both tracks together
+  // leaves their ratio unchanged. The switch sits on a `secondary` row, so its
+  // on track is measured over that. Dark's pair separates by hue as much as by
+  // ratio, which is why the floor is a perception floor, not WCAG's 3:1.
+  const MIN_ON_TRACK_RATIO = 3;
+  const MIN_PAIR_SEPARATION_RATIO = 1.4;
+  // [theme, palette, the enabled on track, the enabled off track]. Light fills
+  // the on track with `primary`, dark with the muted olive `selection`: dark's
+  // `primary` is the brand yellow, which glares on the near-black page.
   const themes = [
-    ['light', lightColors, lightColors.primaryForeground],
-    ['dark', darkColors, darkColors.mutedSoft],
+    ['light', lightColors, lightColors.primary, lightColors.mutedSoft],
+    ['dark', darkColors, darkColors.selection, darkColors.mutedForeground],
   ] as const;
 
-  it('every theme: the disabled off track reads on the row surface', () => {
-    for (const [themeName, colors] of themes) {
+  it('every theme: the on track reads on the row surface', () => {
+    for (const [themeName, colors, onTrack] of themes) {
       expect(
-        contrastRatio(colors.mutedSoft, colors.secondary),
-        `muted-soft vs secondary (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+        contrastRatio(onTrack, colors.secondary),
+        `on track vs secondary (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_ON_TRACK_RATIO);
     }
   });
 
-  it('every theme: the disabled on track stays apart from the disabled off track', () => {
-    for (const [themeName, colors] of themes) {
+  it('every theme: the on track stays apart from the off track', () => {
+    for (const [themeName, , onTrack, offTrack] of themes) {
       expect(
-        contrastRatio(colors.primaryDisabled, colors.mutedSoft),
-        `primary-disabled vs muted-soft (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+        contrastRatio(onTrack, offTrack),
+        `on track vs off track (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_PAIR_SEPARATION_RATIO);
     }
   });
 
-  it('every theme: the disabled off grip reads on its own track', () => {
-    for (const [themeName, colors] of themes) {
+  it('every theme: the off track reads on the row surface', () => {
+    for (const [themeName, colors, , offTrack] of themes) {
       expect(
-        contrastRatio(colors.mutedForeground, colors.mutedSoft),
-        `muted-foreground vs muted-soft (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+        contrastRatio(offTrack, colors.secondary),
+        `off track vs secondary (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_PAIR_SEPARATION_RATIO);
     }
-  });
-
-  it('every theme: the disabled on grip reads on its own track', () => {
-    for (const [themeName, colors, onGrip] of themes) {
-      expect(
-        contrastRatio(onGrip, colors.primaryDisabled),
-        `on grip vs primary-disabled (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    }
-  });
-
-  // Regression: the disabled on grip once fell back to `primaryForeground` in
-  // both schemes, which dark defines as the near-black card colour. Android's
-  // thumb is wider than the track, so its outer arc lands on the row itself —
-  // 1.1:1 there, and the dark scheme draws no shadow to outline it, so what
-  // remained of the pill read as a blank grey bar. The dark grip is the mid
-  // neutral instead: darker than its fill, and still a visible step off the
-  // near-black row its arc sits on.
-  it('dark theme: the disabled on grip reads on the row its arc overhangs', () => {
-    expect(
-      contrastRatio(darkColors.mutedSoft, darkColors.secondary),
-      'muted-soft vs secondary (dark)'
-    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
   });
 });
 

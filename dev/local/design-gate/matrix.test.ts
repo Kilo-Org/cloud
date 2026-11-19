@@ -44,6 +44,7 @@ test('rtl-compact combines rtl and compact and mirrors against compact', () => {
     rtl: true,
     compact: true,
     landscape: false,
+    fontMax: false,
   });
   assert.ok(cell);
   assert.equal(mirrorReference(cell), 'compact');

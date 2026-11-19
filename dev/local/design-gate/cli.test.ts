@@ -233,6 +233,7 @@ test('parseCliArgs parses run with repeated links and defaults', () => {
       links: ['kiloapp://sessions', 'kiloapp://profile'],
       targets: undefined,
       matrix: 'standard',
+      cells: [],
       platform: undefined,
       device: undefined,
       metro: 'http://127.0.0.1:8081',

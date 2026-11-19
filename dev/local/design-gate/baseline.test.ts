@@ -391,7 +391,14 @@ function capture(
         : [
             {
               id: 'base',
-              config: { id: 'base', dark: false, rtl: false, compact: false, landscape: false },
+              config: {
+                id: 'base',
+                dark: false,
+                rtl: false,
+                compact: false,
+                landscape: false,
+                fontMax: false,
+              },
               screens: [
                 {
                   target: (options.target ?? TARGET).id,

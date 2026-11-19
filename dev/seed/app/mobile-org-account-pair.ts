@@ -47,14 +47,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('This fixture requires a local development database.');
   }
   const db = getSeedDb();
-  const userId = `dev-seed:mobile-org-account-pair:${email}`;
   const [existing] = await db
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
     .where(eq(kilocode_users.normalized_email, email));
-  if (existing && existing.id !== userId) {
-    throw new Error('The requested email belongs to a different account; choose a new fake email.');
-  }
+  // A fake account that already signed in keeps its own row: the pair joins it,
+  // so the seed runs before or after the device-code sign-in.
+  const userId = existing?.id ?? `dev-seed:mobile-org-account-pair:${email}`;
   await db
     .insert(kilocode_users)
     .values({

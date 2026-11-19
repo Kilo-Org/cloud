@@ -397,7 +397,8 @@ jobs:
       # kilo-mcp-release and kilo-extension-release suites; dev/** for
       # dev-local; tools/oxlint/** for the plugin suite. The rewrites suite also
       # enumerates the route directories of both apps, the dev-local suites read
-      # the mobile design-gate sources, the web env example, the auto-routing and
+      # the mobile design-gate sources and the mobile route files (the coverage
+      # map needs a row per route), the web env example, the auto-routing and
       # meter dev-vars examples, the fake LLM used by the tunnel tests, the
       # native build workflow, the web load-env module and three workspace
       # packages. The extension suite pins the store build's sources allowlist in
@@ -423,6 +424,7 @@ jobs:
               - 'apps/web/src/lib/load-env.ts'
               - 'apps/web/.env.development.local.example'
               - 'apps/mobile/src/lib/design-gate/**'
+              - 'apps/mobile/src/app/**'
               - 'services/*/package.json'
               - 'services/*/wrangler.jsonc'
               - 'services/auto-routing/.dev.vars.example'
@@ -455,6 +457,7 @@ jobs:
               - 'apps/web/src/lib/load-env.ts'
               - 'apps/web/.env.development.local.example'
               - 'apps/mobile/src/lib/design-gate/**'
+              - 'apps/mobile/src/app/**'
               - 'services/*/package.json'
               - 'services/*/wrangler.jsonc'
               - 'services/auto-routing/.dev.vars.example'

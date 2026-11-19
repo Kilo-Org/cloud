@@ -15,7 +15,11 @@ type AndroidState = {
   sizeOverride: string | undefined;
   accelerometerRotation: string;
   userRotation: string;
+  fontScale: string;
 };
+
+/** The largest font scale Android's settings offer (Android 14 and later). */
+export const ANDROID_MAX_FONT_SCALE = '2.0';
 
 export function parseAdbDevices(output: string): string[] {
   return output
@@ -75,6 +79,7 @@ export function createAndroidDevice(options: {
     sizeOverride: parseWmValue(shell('wm', 'size')).override,
     accelerometerRotation: shell('settings', 'get', 'system', 'accelerometer_rotation'),
     userRotation: shell('settings', 'get', 'system', 'user_rotation'),
+    fontScale: shell('settings', 'get', 'system', 'font_scale'),
   };
   const current: AndroidState = { ...initial };
 
@@ -98,6 +103,11 @@ export function createAndroidDevice(options: {
       current.userRotation = userRotation;
     }
   };
+  const setFontScale = (fontScale: string) => {
+    if (current.fontScale === fontScale) return;
+    putSetting('font_scale', fontScale);
+    current.fontScale = fontScale;
+  };
 
   const names = [
     shell('getprop', 'ro.product.model'),
@@ -114,6 +124,7 @@ export function createAndroidDevice(options: {
       setSize(config.compact ? compactSize(densityDpi) : initial.sizeOverride);
       if (config.landscape) setRotation('0', '1');
       else setRotation(initial.accelerometerRotation, initial.userRotation);
+      setFontScale(config.fontMax ? ANDROID_MAX_FONT_SCALE : initial.fontScale);
     },
     // The dev client's inspector does not survive a runtime reload on every
     // emulator: after a language switch the app keeps painting while the page
@@ -141,6 +152,7 @@ export function createAndroidDevice(options: {
         () => setNight(initial.night),
         () => setSize(initial.sizeOverride),
         () => setRotation(initial.accelerometerRotation, initial.userRotation),
+        () => setFontScale(initial.fontScale),
       ]) {
         try {
           step();

@@ -358,11 +358,14 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
 - For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.
 - For an interaction, `pnpm dev:mobile:design-gate motion --link <deep link> --tap <label>` presses the control, reports any layout shift it causes, and records the motion. The press runs the real handler: tap only an action with no effect outside the app, never one that opens a browser, pays, or sends data. The Android emulator renders in software, so judge animation feel on the iOS simulator or a device.
+- The whole-app pass lives in `dev/local/design-gate/batches/`: `manifest.tsv` holds one row per deep link (batch, tier, phase, matrix, platforms, state, forced state, link, expected kind and screen), and `coverage.tsv` maps every route file to the links, fixtures and seeds that reach each state on each platform. A new screen needs a coverage row: `pnpm dev:mobile:design-gate batches coverage` fails without one, and `batches coverage --write` adds it.
+- `batches seed --email <fake@example.com> --out <map.json>` runs every seed the manifest needs and writes the id map; links name seeded ids as `{{seed:<step>.<key>}}`. `batches run --device <serial>@<metro-url> [--device ...] --seeds <map.json> --out <dir>` runs the batches in parallel across devices, each with its own Metro, and writes a merged `summary.tsv`. `batches help` lists every flag.
+- `--cell font-max` adds the largest text size (Android font scale 2.0, iOS `accessibility-extra-extra-extra-large`) as an opt-in cell; the gate restores the device setting after the run. No preset includes it.
 
 ## Debugging
 
 - Keep the simulator font size and font scaling at their defaults.
-- Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging.
+- Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging. The design gate's opt-in `font-max` cell is the only exception, and it restores the setting itself.
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
 

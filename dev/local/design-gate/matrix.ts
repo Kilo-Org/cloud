@@ -2,7 +2,7 @@ import type { ProbeEnv } from './tree';
 
 export type Platform = 'android' | 'ios';
 export type MatrixName = 'base' | 'standard' | 'full';
-export type CellId = 'base' | 'dark' | 'compact' | 'landscape' | 'rtl' | 'rtl-compact';
+export type CellId = 'base' | 'dark' | 'compact' | 'landscape' | 'rtl' | 'rtl-compact' | 'font-max';
 
 export type CellConfig = Readonly<{
   id: CellId;
@@ -10,7 +10,19 @@ export type CellConfig = Readonly<{
   rtl: boolean;
   compact: boolean;
   landscape: boolean;
+  /** The platform's largest text size: Android font scale, iOS Dynamic Type. */
+  fontMax: boolean;
 }>;
+
+export const CELL_IDS: readonly CellId[] = [
+  'base',
+  'dark',
+  'compact',
+  'landscape',
+  'rtl',
+  'rtl-compact',
+  'font-max',
+];
 
 export const MATRIX_NAMES: readonly MatrixName[] = ['base', 'standard', 'full'];
 export const COMPACT_WIDTH_DP = 360;
@@ -45,6 +57,7 @@ function cell(id: CellId): CellConfig {
     rtl: id === 'rtl' || id === 'rtl-compact',
     compact: id === 'compact' || id === 'rtl-compact',
     landscape: id === 'landscape',
+    fontMax: id === 'font-max',
   };
 }
 
@@ -61,8 +74,28 @@ const PRESETS: Record<Platform, Record<MatrixName, readonly CellId[]>> = {
   },
 };
 
-export function matrixCells(platform: Platform, matrix: MatrixName): CellConfig[] {
-  return PRESETS[platform][matrix].map(cell);
+/**
+ * Cells a run may add to its matrix with `--cell`, opt-in only: no preset holds
+ * `font-max`, so the default matrices keep font scale at 1. iOS has no
+ * simulator command for rotation or window size.
+ */
+export const OPTIONAL_CELLS: Record<Platform, readonly CellId[]> = {
+  android: ['dark', 'compact', 'rtl', 'landscape', 'rtl-compact', 'font-max'],
+  ios: ['dark', 'rtl', 'font-max'],
+};
+
+export function matrixCells(
+  platform: Platform,
+  matrix: MatrixName,
+  extra: readonly CellId[] = []
+): CellConfig[] {
+  const unsupported = extra.filter(id => !OPTIONAL_CELLS[platform].includes(id));
+  if (unsupported.length > 0) {
+    throw new Error(`${platform} has no ${unsupported.join(', ')} cell`);
+  }
+  const ids = [...PRESETS[platform][matrix]];
+  for (const id of extra) if (!ids.includes(id)) ids.push(id);
+  return ids.map(cell);
 }
 
 export function compactSize(densityDpi: number): string {
@@ -94,7 +127,9 @@ export function envMismatches(
   if (env.colorScheme !== scheme)
     mismatches.push(`colorScheme ${env.colorScheme}, expected ${scheme}`);
   if (env.isRTL !== config.rtl) mismatches.push(`isRTL ${env.isRTL}, expected ${config.rtl}`);
-  if (env.fontScale !== 1) mismatches.push(`fontScale ${env.fontScale}, expected 1`);
+  if (config.fontMax ? !(env.fontScale > 1) : env.fontScale !== 1) {
+    mismatches.push(`fontScale ${env.fontScale}, expected ${config.fontMax ? 'above 1' : 1}`);
+  }
   if (language !== undefined && env.language !== language) {
     mismatches.push(`language ${env.language}, expected ${language}`);
   }

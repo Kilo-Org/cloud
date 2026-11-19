@@ -55,7 +55,12 @@ export class InfraError extends Error {
   override name = 'InfraError';
 }
 
-export type Target = Readonly<{ id: string; link: string }>;
+/**
+ * `after` is a link opened once the target is captured: the reset of a state
+ * the target link forced (`kiloapp:///dev/force-state/clear`), so the next
+ * target does not inherit it.
+ */
+export type Target = Readonly<{ id: string; link: string; after?: string }>;
 
 export type Screen = {
   target: string;
@@ -1043,12 +1048,16 @@ export async function runMatrix(
           // target itself caused (the previous target switched the app language)
           // leaves this target cold whatever its index.
           const warm = targetLanguage.reloaded || (cellLanguage.reloaded && index === 0);
+          // The reset runs even when the capture fails, so a forced state never
+          // leaks into the next target.
           const { sampled, screen, unopened, image } = await captureScreen(
             ctx,
             config.id,
             target,
             warm
-          );
+          ).finally(async () => {
+            if (target.after !== undefined) await ctx.probe.openLink(target.after);
+          });
           const { dump } = sampled;
           run.env ??= dump.env;
           run.screens.push(screen);

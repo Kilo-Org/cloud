@@ -12,7 +12,7 @@ import {
 } from './native-conversation-source';
 import { cloudAgentSdkRuntime } from './runtime';
 import {
-  hasUnresolvedKilo2Assets,
+  hasPendingKilo2Assets,
   kilo2AssetKey,
   readKilo2FileReferences,
   type Kilo2FileReference,
@@ -181,7 +181,7 @@ function snapshotCoversLiveGap(
   if (snapshot.revision <= requirement.revision || snapshot.position < requirement.position)
     return false;
   const item = snapshot.messages.find(item => item.message.id === requirement.messageID);
-  if (!item || item.incomplete || hasUnresolvedKilo2Assets(item.message, snapshot.assetURLs))
+  if (!item || item.incomplete || hasPendingKilo2Assets(item.message, snapshot.assetURLs))
     return false;
   const files = readKilo2FileReferences(item.message);
   if (
@@ -245,7 +245,10 @@ function nativeAssetURLsAfterMessages(
     if (before?.message === item.message) continue;
     for (const file of readKilo2FileReferences(item.message)) {
       const key = kilo2AssetKey(file.id, file.uri, file.mime);
-      if (/^(media:|data:|https?:\/\/)/.test(file.uri) || assetURLs[key] === undefined) continue;
+      // Content-addressed `media:` bytes stay valid and inline `data:` needs no
+      // authorization; every other reference, a network one included, loses its
+      // cached bytes when its content is replaced.
+      if (/^(media:|data:)/.test(file.uri) || assetURLs[key] === undefined) continue;
       const replaced =
         file.contentIndex === undefined
           ? before?.message.files !== item.message.files
@@ -778,7 +781,7 @@ export class NativeSyncClient {
               item =>
                 item.message.id === id &&
                 !item.incomplete &&
-                !hasUnresolvedKilo2Assets(item.message, next.assetURLs)
+                !hasPendingKilo2Assets(item.message, next.assetURLs)
             )
         ),
       });
@@ -892,7 +895,7 @@ export class NativeSyncClient {
                     item =>
                       item.message.id === id &&
                       !item.incomplete &&
-                      !hasUnresolvedKilo2Assets(item.message, next.assetURLs)
+                      !hasPendingKilo2Assets(item.message, next.assetURLs)
                   )
               ),
             });
@@ -909,7 +912,7 @@ export class NativeSyncClient {
           if (
             state.session &&
             !state.messages.some(
-              item => item.incomplete || hasUnresolvedKilo2Assets(item.message, state.assetURLs)
+              item => item.incomplete || hasPendingKilo2Assets(item.message, state.assetURLs)
             ) &&
             !state.pendingSnapshotMessageIDs?.length
           ) {
@@ -1004,7 +1007,7 @@ export class NativeSyncClient {
           return (
             missingDependency ||
             (!item.incomplete &&
-              hasUnresolvedKilo2Assets(item.message, assetURLs) &&
+              hasPendingKilo2Assets(item.message, assetURLs) &&
               !state.pendingSnapshotMessageIDs?.includes(item.message.id))
           );
         });

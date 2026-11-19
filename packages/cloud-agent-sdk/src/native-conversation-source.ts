@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { hasUnresolvedKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
+import {
+  hasPendingKilo2Assets,
+  hasUnresolvedKilo2Assets,
+  readKilo2Messages,
+} from './kilo2-source-messages';
 import type { NativeEvent, NativeSessionState } from './native-sync';
 import type { NativeSnapshotMessage, NativeSnapshotSession } from './native-sync-snapshot';
 import { upsertByRequestId } from './pending-requests';
@@ -142,14 +146,17 @@ export function reduceNativePendingRequests(
 /** Shared native display boundary. It never opens a socket or owns replay/recovery. */
 export function readNativeConversation(state: NativeSessionState): NativeConversation {
   const complete = state.messages.filter(item => !item.incomplete);
+  // Display omission covers every attachment the projection cannot render.
   const unresolved = complete.filter(item =>
     hasUnresolvedKilo2Assets(item.message, state.assetURLs)
   );
+  // Recovery waits only for references an authorized asset read can still satisfy.
+  const pending = complete.filter(item => hasPendingKilo2Assets(item.message, state.assetURLs));
   const incompleteMessageIDs = [
     ...new Set([
       ...state.messages.filter(item => item.incomplete).map(item => item.message.id),
       ...(state.pendingSnapshotMessageIDs ?? []),
-      ...unresolved.map(item => item.message.id),
+      ...pending.map(item => item.message.id),
     ]),
   ];
   const session = state.session && {

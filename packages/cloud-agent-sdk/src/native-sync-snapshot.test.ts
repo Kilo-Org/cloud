@@ -878,7 +878,7 @@ describe('canonical native snapshot projection', () => {
           {
             mime: 'image/png',
             name: 'remote.png',
-            data: '',
+            data: 'aW1n',
             source: { type: 'uri', uri: 'https://fixture.invalid/image.png' },
           },
         ],
@@ -998,9 +998,12 @@ describe('canonical native snapshot projection', () => {
     expect(projection.messages[0]?.parts).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'file', url: 'data:text/plain;base64,aGVsbG8=' }),
-        expect.objectContaining({ type: 'file', url: 'https://fixture.invalid/image.png' }),
+        expect.objectContaining({ type: 'file', url: 'data:image/png;base64,aW1n' }),
       ])
     );
+    expect(
+      projection.messages[0]?.parts.flatMap(part => (part.type === 'file' ? [part.url] : []))
+    ).toEqual(['data:text/plain;base64,aGVsbG8=', 'data:image/png;base64,aW1n']);
     expect(projection.messages[1]?.info).toMatchObject({
       parentID: 'msg_user',
       cost: 0.25,
@@ -1231,6 +1234,51 @@ describe('authorized native snapshot attachments', () => {
         url: 'data:image/png;base64,BAU=',
       },
     ]);
+  });
+
+  it('leaves a network file reference unresolved instead of failing the snapshot', async () => {
+    const assistantID = 'msg_network_assistant';
+    const toolPart = {
+      type: 'tool',
+      id: 'tool_network',
+      name: 'read',
+      state: {
+        status: 'completed',
+        input: { path: '/synthetic' },
+        content: [
+          {
+            type: 'file',
+            mime: 'image/png',
+            name: 'remote.png',
+            uri: 'https://fixture.invalid/x.png',
+          },
+        ],
+      },
+    };
+    const { request } = snapshotFetch([
+      entity('session', sessionID, nativeSession),
+      entity('message', assistantID, {
+        seq: 1,
+        message: native(assistantID, 'assistant'),
+        parts: { count: 1, through: 20 },
+      }),
+      entity('message-part', `${assistantID}/0`, {
+        messageID: assistantID,
+        ordinal: 0,
+        position: 19,
+        part: toolPart,
+      }),
+    ]);
+    const readAsset = jest.fn(async () => {
+      throw new Error('A network reference must not read private bytes');
+    });
+    const snapshot = await fetchNativeSnapshot(request, sessionID, undefined, readAsset);
+    expect(readAsset).not.toHaveBeenCalled();
+    expect(Object.keys(snapshot.assetURLs ?? {})).toEqual([]);
+    expect(projectNativeSnapshot(snapshot)).toMatchObject({
+      messages: [],
+      incompleteMessageIDs: [assistantID],
+    });
   });
 
   it.each<[string, unknown[]]>([

@@ -80,6 +80,17 @@ export function readKilo2FileReferences(message: Kilo2Message): Kilo2FileReferen
   return result;
 }
 
+/** Inline bytes carry their own display data, so they need no authorized read. */
+function isInlineDataUri(uri: string): boolean {
+  return /^data:/.test(uri);
+}
+
+/** A network reference names remote content, which never carries authorized bytes. */
+function isNetworkUri(uri: string): boolean {
+  return /^https?:\/\//i.test(uri);
+}
+
+/** A native attachment is displayable only from authorized bytes or inline bytes. */
 export function hasUnresolvedKilo2Assets(
   message: Kilo2Message,
   assetURLs?: Readonly<Record<string, string>>
@@ -87,7 +98,23 @@ export function hasUnresolvedKilo2Assets(
   return readKilo2FileReferences(message).some(
     file =>
       assetURLs?.[kilo2AssetKey(file.id, file.uri, file.mime)] === undefined &&
-      !/^(data:|https?:\/\/)/.test(file.uri)
+      !isInlineDataUri(file.uri)
+  );
+}
+
+/**
+ * A network reference can never be satisfied by an authorized asset read, so
+ * recovery does not wait for it.
+ */
+export function hasPendingKilo2Assets(
+  message: Kilo2Message,
+  assetURLs?: Readonly<Record<string, string>>
+): boolean {
+  return readKilo2FileReferences(message).some(
+    file =>
+      assetURLs?.[kilo2AssetKey(file.id, file.uri, file.mime)] === undefined &&
+      !isInlineDataUri(file.uri) &&
+      !isNetworkUri(file.uri)
   );
 }
 
@@ -117,7 +144,8 @@ export function readKilo2Messages(
   const fileURL = (id: string, uri: string, mime: string): string => {
     const resolved = options.assetURLs?.[kilo2AssetKey(id, uri, mime)];
     if (resolved !== undefined) return resolved;
-    if (/^(data:|https?:\/\/)/.test(uri)) return uri;
+    // A file part is displayable only from its inline bytes.
+    if (isInlineDataUri(uri)) return uri;
     throw Object.assign(new Error(`Native attachment ${id} requires authorized asset resolution`), {
       code: 'native_asset_unresolved',
     });
@@ -152,7 +180,7 @@ export function readKilo2Messages(
             const id = kilo2PartId(message.id, index + 1);
             const uri =
               typeof file.data === 'string'
-                ? file.source.type === 'uri' && /^(data:|https?:\/\/)/.test(file.source.uri)
+                ? file.source.type === 'uri' && isInlineDataUri(file.source.uri)
                   ? file.source.uri
                   : `data:${file.mime};base64,${file.data}`
                 : typeof file.uri === 'string'

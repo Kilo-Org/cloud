@@ -67,9 +67,15 @@ test('native snapshots use the exact Cloud projector for files, errors, costs, m
           { mime: 'image/png', data: 'aW1hZ2U=', name: 'inline.png', source: { type: 'inline' } },
           {
             mime: 'text/plain',
-            data: '',
+            data: 'c291cmNl',
             name: 'uri.txt',
             source: { type: 'uri', uri: 'https://example.test/file.txt' },
+          },
+          {
+            mime: 'text/plain',
+            data: '',
+            name: 'empty.txt',
+            source: { type: 'uri', uri: 'https://example.test/empty.txt' },
           },
         ],
       },
@@ -119,7 +125,17 @@ test('native snapshots use the exact Cloud projector for files, errors, costs, m
   expect(result.messages[0]?.parts).toMatchObject([
     { type: 'text' },
     { type: 'file', url: 'data:image/png;base64,aW1hZ2U=' },
-    { type: 'file', url: 'https://example.test/file.txt' },
+    { type: 'file', url: 'data:text/plain;base64,c291cmNl' },
+    { type: 'file', url: 'data:text/plain;base64,' },
+  ]);
+  expect(
+    result.messages.flatMap(message =>
+      message.parts.flatMap(part => (part.type === 'file' ? [part.url] : []))
+    )
+  ).toEqual([
+    'data:image/png;base64,aW1hZ2U=',
+    'data:text/plain;base64,c291cmNl',
+    'data:text/plain;base64,',
   ]);
   expect(result.messages[1]?.info).toMatchObject({
     cost: 1.25,
@@ -691,6 +707,44 @@ test('unresolved live media stays explicit without hiding other messages or cras
       assetURLs: { [kilo2AssetKey('msg_media_000001', uri, 'image/png')]: bytes },
     }).incompleteMessageIDs
   ).toEqual(['msg_media']);
+});
+
+test('a network file reference leaves display omission separate from recovery', () => {
+  const messages: NativeSnapshotMessage[] = [
+    {
+      seq: 1,
+      message: {
+        id: 'msg_network',
+        type: 'assistant',
+        time: { created: 1, completed: 2 },
+        content: [
+          {
+            type: 'tool',
+            id: 'call_network',
+            name: 'read',
+            state: {
+              status: 'completed',
+              input: {},
+              content: [{ type: 'file', uri: 'https://example.test/a.png', mime: 'image/png' }],
+            },
+          },
+        ],
+      },
+    },
+    {
+      seq: 2,
+      message: {
+        id: 'msg_other',
+        type: 'assistant',
+        time: { created: 2 },
+        content: [{ type: 'text', text: 'Other readable content' }],
+      },
+    },
+  ];
+  const conversation = readNativeConversation({ ...state, messages });
+  expect(conversation.incompleteMessageIDs).toEqual([]);
+  expect(conversation.error).toBeUndefined();
+  expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_other']);
 });
 
 test.each<[string, Record<string, unknown>]>([

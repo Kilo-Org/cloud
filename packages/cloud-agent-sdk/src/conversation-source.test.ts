@@ -3,6 +3,7 @@ import { cloudSessionMessagesPageSchema, cloudSessionMessagesPageWireSchema } fr
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import type { MessageInfo } from './types';
 import {
+  hasPendingKilo2Assets,
   hasUnresolvedKilo2Assets,
   isCompactionSummaryPart,
   kilo2AssetKey,
@@ -876,6 +877,57 @@ describe('native file result projection', () => {
     });
     expect(hasUnresolvedKilo2Assets(tool)).toBe(true);
     expect(() => readKilo2Messages(session, [tool])).toThrow('authorized asset resolution');
+  });
+
+  it('resolves a network file reference only through authorized bytes and never as a pending read', () => {
+    const uri = 'https://example.test/a.png';
+    const id = kilo2ToolFileId('msg_network_file', 0, 0);
+    const message = kilo2MessageSchema.parse({
+      id: 'msg_network_file',
+      type: 'assistant',
+      time: { created: 1 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call_network',
+          name: 'read',
+          state: {
+            status: 'completed',
+            input: {},
+            content: [{ type: 'file', uri, mime: 'image/png' }],
+          },
+        },
+      ],
+    });
+    expect(hasUnresolvedKilo2Assets(message)).toBe(true);
+    expect(hasPendingKilo2Assets(message)).toBe(false);
+    expect(() => readKilo2Messages(session, [message])).toThrow('authorized asset resolution');
+    const assetURLs = { [kilo2AssetKey(id, uri, 'image/png')]: 'data:image/png;base64,AQID' };
+    expect(hasUnresolvedKilo2Assets(message, assetURLs)).toBe(false);
+    expect(readKilo2Messages(session, [message], { assetURLs })[0]?.parts[1]).toMatchObject({
+      id,
+      type: 'file',
+      url: 'data:image/png;base64,AQID',
+    });
+
+    const media = kilo2MessageSchema.parse({
+      id: 'msg_media_file',
+      type: 'assistant',
+      time: { created: 1 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call_media',
+          name: 'read',
+          state: {
+            status: 'completed',
+            input: {},
+            content: [{ type: 'file', uri: `media:${'d'.repeat(64)}`, mime: 'image/png' }],
+          },
+        },
+      ],
+    });
+    expect(hasPendingKilo2Assets(media)).toBe(true);
   });
 });
 

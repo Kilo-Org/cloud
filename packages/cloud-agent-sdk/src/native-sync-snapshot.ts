@@ -6,6 +6,7 @@ import {
   type Kilo2Session,
 } from '@kilocode/session-ingest-contracts';
 import {
+  hasUnresolvedKilo2Assets,
   kilo2AssetKey,
   readKilo2FileReferences,
   readKilo2Messages,
@@ -165,6 +166,11 @@ export function projectNativeSnapshot(snapshot: NativeSnapshot): NativeSnapshotP
   const incompleteMessageIDs: string[] = [];
   for (const item of snapshot.messages) {
     if (item.incomplete) incompleteMessageIDs.push(item.message.id);
+    // An attachment is displayable only from inline or authorized bytes; a message
+    // that still lacks them stays out of the projected messages, never rendered as
+    // a complete answer.
+    else if (hasUnresolvedKilo2Assets(item.message, snapshot.assetURLs))
+      incompleteMessageIDs.push(item.message.id);
     else messages.push(item.message);
   }
   return {
@@ -267,7 +273,11 @@ async function resolveSnapshotAssets(
   for (const item of snapshot.messages) {
     if (item.incomplete) continue;
     for (const file of readKilo2FileReferences(item.message)) {
-      if (/^(data:|https?:\/\/)/.test(file.uri)) continue;
+      // Inline `data:` needs no authorized read.
+      if (/^data:/.test(file.uri)) continue;
+      // A network uri can never have an authorized blob, so it stays unresolved
+      // and the projection omits that message instead of failing the snapshot.
+      if (/^https?:\/\//i.test(file.uri)) continue;
       const split =
         file.contentIndex === undefined ? undefined : item.partOrdinals?.[file.contentIndex];
       const owner =

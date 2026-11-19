@@ -318,6 +318,15 @@ type ScreenHeaderProps = {
    */
   inlineActionsWidth?: number;
   /**
+   * Width, in dp, of the fixed-size controls inside a pinned `inlineActions`
+   * cluster (`allowInlineActionsStacking={false}`): an icon button beside the
+   * account picker. The pinned slot gives way before the title, so without
+   * this floor a large font scale could shrink it below an icon button that
+   * cannot shrink, and the button would paint past the header's edge. Omit it
+   * for a cluster whose every control truncates.
+   */
+  inlineActionsMinWidth?: number;
+  /**
    * Keep the `inlineActions` cluster on the title row even when the shared-row
    * check would reflow it. That check reserves a readable title, and the home
    * header's heading is a fixed 40dp mark with no text, so the reserve does not
@@ -461,6 +470,7 @@ export function ScreenHeader({
   headerRightShrinks = false,
   inlineActions,
   inlineActionsWidth,
+  inlineActionsMinWidth,
   allowInlineActionsStacking = true,
   modal,
   modalTopInset = 'android-window-top',
@@ -977,11 +987,18 @@ export function ScreenHeader({
   // give way first. The heading sits on its content's basis, and Yoga splits a
   // shortfall by shrink factor times basis, so the slot's 100x factor takes
   // nearly all of it: a long account name ends in an ellipsis while "Chat" and
-  // its BETA pill keep their width.
+  // its BETA pill keep their width. The slot never gives way below the fixed
+  // controls the caller declares (`inlineActionsMinWidth`); past that floor the
+  // title truncates instead.
   const inlineActionsSlot =
     inlineActions && !stackInlineActions ? (
       <View
         className={cn('ms-3 min-w-0', pinnedInlineActions ? 'max-w-[50%] shrink-[100]' : 'shrink')}
+        style={
+          pinnedInlineActions && inlineActionsMinWidth !== undefined
+            ? { minWidth: inlineActionsMinWidth }
+            : undefined
+        }
         onLayout={onInlineActionsLayout}
       >
         {inlineActions}

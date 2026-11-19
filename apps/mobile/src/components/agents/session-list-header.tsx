@@ -8,7 +8,7 @@ import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { IconButton } from '@/components/ui/icon-button';
 import { Search } from '@/components/ui/icons';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_DP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
@@ -60,6 +60,9 @@ export function SessionListHeader({
           </View>
         }
         allowInlineActionsStacking={false}
+        // The header action is one icon button, which cannot shrink; the
+        // account picker beside it truncates instead.
+        inlineActionsMinWidth={headerAction ? ICON_TARGET_DP : undefined}
       />
       <View style={sideInsetStyle} className={SCREEN_GUTTER_CLASS}>
         <View

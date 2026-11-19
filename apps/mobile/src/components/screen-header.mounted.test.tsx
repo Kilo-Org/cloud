@@ -585,6 +585,8 @@ describe('ScreenHeader mounted', () => {
     const inline = findInlineActionsWrapper(renderer.root);
     expect(inline.props.className).toContain('shrink-[100]');
     expect(inline.props.className).toContain('max-w-[50%]');
+    // A cluster of truncating controls declares no floor.
+    expect(inline.props.style).toBeUndefined();
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
     // Text → accessory row → title column → title band → heading block.
     const titleColumn = title.parent?.parent;
@@ -599,6 +601,32 @@ describe('ScreenHeader mounted', () => {
     expect(
       reflowing.root.findByProps({ accessibilityRole: 'header' }).parent?.props.className
     ).toBe('min-w-0 flex-1');
+  });
+
+  it('keeps a pinned slot at least as wide as the fixed controls its caller declares', () => {
+    // The 100x shrink would otherwise take a large-font shortfall out of a
+    // slot that holds a 48dp icon button, and the button would paint past the
+    // header's edge.
+    Object.assign(layout, { width: 360, fontScale: 3 });
+    const pinned = renderHeader({
+      title: 'Agents',
+      size: 'large',
+      showBackButton: false,
+      inlineActions: 'ACTIONS',
+      inlineActionsMinWidth: 48,
+      allowInlineActionsStacking: false,
+    });
+    expect(findInlineActionsWrapper(pinned.root).props.style).toEqual({ minWidth: 48 });
+
+    // A reflowing header has no pinned slot to floor.
+    Object.assign(layout, { width: 360, fontScale: 1 });
+    const reflowing = renderHeader({
+      title: 'Agents',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+      inlineActionsMinWidth: 48,
+    });
+    expect(findInlineActionsWrapper(reflowing.root).props.style).toBeUndefined();
   });
 
   it('keeps the title touch area out of the row gap beside it', () => {

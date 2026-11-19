@@ -65,9 +65,11 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
  * mode and resets `SET` state when it returns a connection to its pool, and it does not apply
  * settings sent at connection startup. So the bounds are `SET LOCAL`
  * statements in the same message as `BEGIN`, and a Worker that stops right after `BEGIN` still
- * leaves a transaction that PostgreSQL ends. `lock_timeout` bounds row-lock waits such as
- * `FOR UPDATE`. The idle bound stays above the longest awaited non-database step inside a Worker
- * transaction: two consecutive 10 s GitHub requests in the git-token-service disconnect flow.
+ * leaves a transaction that PostgreSQL ends. `lock_timeout` bounds row-lock and advisory-lock
+ * waits. The git-token-service disconnect flow holds the GitHub identity and grant advisory locks
+ * across two consecutive 10 s GitHub requests, so a Worker that waits for those locks can fail
+ * with `55P03` after 10 s. The idle bound stays above those two requests, the longest awaited
+ * non-database step inside a Worker transaction.
  */
 export const workerTransactionBoundsSql =
   "SET LOCAL lock_timeout = '10s'; SET LOCAL idle_in_transaction_session_timeout = '30s'";
@@ -125,9 +127,13 @@ function boundTransactionStarts(client: pg.PoolClient): void {
 /**
  * pg emits `error` on a checked-out connection that fails between statements, for example when
  * PostgreSQL ends an idle transaction. pg still rejects the queries that use the failed
- * connection. The Workers socket also emits `error` when the pool closes a released connection,
- * and pg-pool forwards errors of released connections to the pool. Without listeners each of
- * these events is an uncaught exception. Only the failure of a checked-out connection is reported.
+ * connection. Only this failure is reported.
+ *
+ * pg-pool forwards errors of connections that are not checked out to the pool. With `maxUses: 1`
+ * no connection waits idle in the pool. So these are connections that the pool released and
+ * closes, where the Workers socket emits `error`, or connections that failed to connect, whose
+ * error the caller already received. Without listeners each of these events is an uncaught
+ * exception.
  */
 function reportConnectionErrors(pool: pg.Pool): void {
   const released = new WeakSet<pg.PoolClient>();

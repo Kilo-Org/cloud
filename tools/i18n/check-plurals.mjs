@@ -241,7 +241,13 @@ export function auditCountedCalls(rootDir = SOURCE_DIR) {
  * It projects a scan the caller made once with `auditCountedCalls`.
  */
 export function collectCountedKeys(scan) {
-  return countedKeysFrom(scan.calls);
+  const keys = new Set();
+  for (const call of scan.calls) {
+    if (call.key !== undefined) {
+      keys.add(call.key);
+    }
+  }
+  return [...keys].sort();
 }
 
 /**
@@ -252,7 +258,13 @@ export function collectCountedKeys(scan) {
  * It projects a scan the caller made once with `auditCountedCalls`.
  */
 export function collectDynamicCountedCalls(scan) {
-  return dynamicCallsFrom(scan.calls);
+  const dynamic = new Set();
+  for (const call of scan.calls) {
+    if (call.dynamic !== undefined) {
+      dynamic.add(call.dynamic);
+    }
+  }
+  return [...dynamic].sort();
 }
 
 /**
@@ -263,28 +275,6 @@ export function collectDynamicCountedCalls(scan) {
  */
 export function findUnparsedFiles(scan) {
   return scan.problems;
-}
-
-/** The literal-key view of one collection of counted calls. */
-function countedKeysFrom(calls) {
-  const keys = new Set();
-  for (const call of calls) {
-    if (call.key !== undefined) {
-      keys.add(call.key);
-    }
-  }
-  return [...keys].sort();
-}
-
-/** The dynamic-expression view of one collection of counted calls. */
-function dynamicCallsFrom(calls) {
-  const dynamic = new Set();
-  for (const call of calls) {
-    if (call.dynamic !== undefined) {
-      dynamic.add(call.dynamic);
-    }
-  }
-  return [...dynamic].sort();
 }
 
 /**
@@ -509,10 +499,13 @@ function readDeclarationModule(rootDir, source) {
  * list is a message the audit never reads; a key the entry lists and the
  * declaration dropped is a stale review. Each mismatch is one problem line
  * naming the key, the expression, the declaration and the module that owns it.
- * Empty on a healthy tree. It reads the declaration modules only, so it is
- * separate from the source-tree scan.
+ * Empty on a healthy tree. It reads the declaration modules only, so an audit
+ * can check them without walking the source tree first. A caller that also
+ * scanned the tree passes the parse problems that scan already printed as
+ * `reported`: the declaration modules live below the source root, so the same
+ * `cannot parse` line reaches both reads, and the tree's own scan owns it.
  */
-export function checkDynamicCountedKeySources(rootDir = ROOT) {
+export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set()) {
   const problems = [];
   const modules = new Map();
   for (const [expression, listed] of DYNAMIC_COUNTED_KEYS) {
@@ -521,7 +514,9 @@ export function checkDynamicCountedKeySources(rootDir = ROOT) {
       source = readDeclarationModule(rootDir, listed.source);
       modules.set(listed.source, source);
       for (const problem of source.problems) {
-        problems.push(problem);
+        if (!reported.has(problem)) {
+          problems.push(problem);
+        }
       }
     }
     // A file the parser refused has no declaration to read, and its parse
@@ -569,9 +564,9 @@ export function readEnglishCatalog(localesDir = LOCALES_DIR) {
  * Every counted key the audit is responsible for: the literal ones and every
  * key a reviewed dynamic call can produce.
  */
-function auditKeys(calls) {
-  const keys = new Set(countedKeysFrom(calls));
-  for (const expression of dynamicCallsFrom(calls)) {
+function auditKeys(scan) {
+  const keys = new Set(collectCountedKeys(scan));
+  for (const expression of collectDynamicCountedCalls(scan)) {
     const listed = DYNAMIC_COUNTED_KEYS.get(expression);
     if (listed !== undefined) {
       for (const key of listed.keys) {
@@ -582,60 +577,57 @@ function auditKeys(calls) {
   return [...keys].sort();
 }
 
-/** The unlisted dynamic calls among one collection of counted calls. */
-function unlistedDynamicCalls(calls) {
-  return dynamicCallsFrom(calls).filter(expression => !DYNAMIC_COUNTED_KEYS.has(expression));
-}
-
-/** The countless counted keys among one collection, checked against `english`. */
-function countlessFamilies(calls, english) {
-  return auditKeys(calls).filter(
-    key => !NO_AGREEMENT.has(key) && !declaresPluralFamily(english, key)
-  );
-}
-
 /**
  * The variable-key counted calls that are not in `DYNAMIC_COUNTED_KEYS`. Each
  * one is a call whose possible messages the audit cannot see. It projects a
  * scan the caller made once with `auditCountedCalls`.
  */
 export function findUnlistedDynamicCalls(scan) {
-  return unlistedDynamicCalls(scan.calls);
+  return collectDynamicCountedCalls(scan).filter(
+    expression => !DYNAMIC_COUNTED_KEYS.has(expression)
+  );
 }
 
 /**
  * The counted keys — literal, or produced by a reviewed dynamic call — that
  * are neither a plural family in English nor a reviewed `NO_AGREEMENT` entry.
  * Empty on a healthy tree; every entry is a message whose count cannot select
- * a form. It projects a scan the caller made once with `auditCountedCalls`,
- * and reads the English catalog per call.
+ * a form. It projects a scan the caller made once with `auditCountedCalls` and
+ * checks it against the `english` catalog the caller read once.
  */
-export function findCountlessFamilies(scan, localesDir = LOCALES_DIR) {
-  return countlessFamilies(scan.calls, readEnglishCatalog(localesDir));
+export function findCountlessFamilies(scan, english) {
+  return auditKeys(scan).filter(
+    key => !NO_AGREEMENT.has(key) && !declaresPluralFamily(english, key)
+  );
 }
 
 function run() {
   const sourceOnly = process.argv.includes('--source-only');
   const problems = [];
   const report = [];
-  const { calls, problems: unparsed } = auditCountedCalls(SOURCE_DIR);
+  const scan = auditCountedCalls(SOURCE_DIR);
   const english = readEnglishCatalog();
+  // The scan already read every file below the source root, the declaration
+  // modules included, so it owns their parse diagnostics; the declaration check
+  // skips the lines this scan already reported.
+  const unparsed = findUnparsedFiles(scan);
+  const reported = new Set(unparsed);
 
   for (const problem of unparsed) {
     problems.push(problem);
   }
 
-  for (const problem of checkDynamicCountedKeySources()) {
+  for (const problem of checkDynamicCountedKeySources(ROOT, reported)) {
     problems.push(problem);
   }
 
-  for (const key of countlessFamilies(calls, english)) {
+  for (const key of findCountlessFamilies(scan, english)) {
     problems.push(
       `en: counted key "${key}" has no plural family; add _one/_other or list it in NO_AGREEMENT`
     );
   }
 
-  for (const expression of unlistedDynamicCalls(calls)) {
+  for (const expression of findUnlistedDynamicCalls(scan)) {
     problems.push(
       `en: counted call with variable key "${expression}" is not listed in DYNAMIC_COUNTED_KEYS; name its possible keys or add the call site's expression`
     );

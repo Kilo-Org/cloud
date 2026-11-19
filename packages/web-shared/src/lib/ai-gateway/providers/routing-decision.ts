@@ -48,6 +48,7 @@ type RoutingDecisionByokCandidate = z.infer<typeof RoutingDecisionByokCandidateS
 
 const PartnerSkipReasonSchema = z.enum([
   'unsupported-api-kind',
+  'server-features',
   'bounded-spending',
   'openrouter-disabled',
   'provider-settings',

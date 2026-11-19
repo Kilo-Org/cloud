@@ -38,13 +38,14 @@ describe('describeStep', () => {
     ).toEqual({
       title: 'Kilo credits',
       detail:
-        'Paid with Kilo credits and sent to Acme Ai directly, with Vercel AI Gateway as the fallback.',
+        'Paid with Kilo credits, with Acme Ai as the direct provider and Vercel AI Gateway as the fallback.',
       tone: 'selected',
     });
   });
 
   test.each([
     ['unsupported-api-kind', 'this API is not supported.'],
+    ['server-features', 'the request uses plugins or server tools, which only the gateway runs.'],
     ['bounded-spending', 'the request carries a spend ceiling.'],
     ['openrouter-disabled', 'excluded by the organization gateway settings.'],
     ['provider-settings', 'excluded by provider settings.'],

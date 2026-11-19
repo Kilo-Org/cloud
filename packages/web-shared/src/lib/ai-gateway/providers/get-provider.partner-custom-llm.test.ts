@@ -509,6 +509,35 @@ describe('getProvider skips the partner', () => {
     });
   });
 
+  test.each<[string, Record<string, unknown>]>([
+    ['a paid plugin', { plugins: [{ id: 'web' }] }],
+    ['a server tool', { tools: [{ type: 'openrouter:web_search' }] }],
+  ])('when the request asks for %s', async (_name, extra) => {
+    await insertPartner();
+
+    await expectKiloRouteOnly(
+      { request: { kind: 'chat_completions', body: { ...chatRequest().body, ...extra } } as never },
+      'server-features'
+    );
+  });
+
+  test('not for a free plugin or a function tool', async () => {
+    await insertPartner();
+
+    const { result } = await routeAndRecord({
+      request: {
+        kind: 'chat_completions',
+        body: {
+          ...chatRequest().body,
+          plugins: [{ id: 'response-healing' }],
+          tools: [{ type: 'function', function: { name: 'f', parameters: {} } }],
+        },
+      } as never,
+    });
+
+    expect((await result.routes[0]()).provider.type).toBe('partner');
+  });
+
   test('not when only lists the partner in another case', async () => {
     await insertPartner();
 

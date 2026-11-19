@@ -251,6 +251,7 @@ function describeByokKey(step: RequestLogRoutingStep, failedOver: boolean): stri
 
 const PARTNER_SKIP_REASON_LABELS: Record<string, string> = {
   'unsupported-api-kind': 'This API is not supported.',
+  'server-features': 'The request uses plugins or server tools, which only the gateway runs.',
   'bounded-spending': 'The request carries a spend ceiling.',
   'openrouter-disabled': 'Excluded by the organization gateway settings.',
   'provider-settings': 'Excluded by provider settings.',
@@ -268,7 +269,7 @@ function describeKilo(step: RequestLogRoutingStep): string {
   const gateway = (step.gateway ? gatewayName(step.gateway) : null) ?? 'a Kilo gateway';
   if (step.partner_inference_provider) {
     const partner = inferenceProviderNames([step.partner_inference_provider]);
-    return `Paid with Kilo credits and sent to ${partner} directly, with ${gateway} as the fallback.`;
+    return `Paid with Kilo credits, with ${partner} as the direct provider and ${gateway} as the fallback.`;
   }
   return `Paid with Kilo credits and routed through ${gateway}.`;
 }

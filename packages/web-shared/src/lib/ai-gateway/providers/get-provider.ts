@@ -98,7 +98,10 @@ import {
   resolveEmbeddingOrDecisionRoute,
   resolveTranscriptionRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
-import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
+import {
+  removePaidServerFeatures,
+  requestsPaidServerFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import {
   getLocalFakeLlmProvider,
   getLocalFakeTranscriptionProvider,
@@ -388,6 +391,8 @@ async function resolvePartnerRoute(
   if (!getCustomLlmApiKinds(definition).includes(input.request.kind)) {
     return 'unsupported-api-kind';
   }
+  // Only the gateways run and bill plugins and server tools, so the gateway serves those requests.
+  if (requestsPaidServerFeatures(input.request)) return 'server-features';
   if (input.boundedSpending) return 'bounded-spending';
   // Implied by an inference region, which admits only Kilo's Vercel AI Gateway route.
   if (input.openRouterDisabled) return 'openrouter-disabled';

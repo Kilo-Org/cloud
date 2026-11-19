@@ -219,7 +219,9 @@ describe('RoutingSections partner fallback', () => {
     );
 
     const text = document.body.textContent ?? '';
-    expect(text).toContain('sent to Mistral directly, with Vercel AI Gateway as the fallback');
+    expect(text).toContain(
+      'with Mistral as the direct provider and Vercel AI Gateway as the fallback'
+    );
     expect(text).toContain('Sent to Vercel AI Gateway');
     expect(text).toContain('Paid by: Kilo credits');
     expect(text).toContain('Mistral failed before this attempt');

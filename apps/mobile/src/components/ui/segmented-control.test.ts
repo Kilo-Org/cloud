@@ -128,6 +128,33 @@ describe('SegmentedControl', () => {
     });
   });
 
+  // A segment may show a short form of its name (a merge method's "Squash")
+  // and announce the full one ("Squash and merge") with what choosing it does.
+  it('announces an option by its spoken name and hint when it has them', () => {
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = SegmentedControl({
+      accessibilityLabel: 'Method',
+      options: [
+        {
+          value: 'squash',
+          label: 'Squash',
+          accessibilityLabel: 'Squash and merge',
+          accessibilityHint: 'Combines every commit into one.',
+        },
+        { value: 'rebase', label: 'Rebase' },
+      ],
+      value: 'squash',
+      onChange: noopOnChange,
+    }) as ReactElement;
+
+    const [squash, rebase] = collectByType(element, 'Pressable');
+    expect(squash?.props?.accessibilityLabel).toBe('Squash and merge');
+    expect(squash?.props?.accessibilityHint).toBe('Combines every commit into one.');
+    expect(collectByType(squash, 'Text')[0]?.props?.children).toBe('Squash');
+    expect(rebase?.props?.accessibilityLabel).toBe('Rebase');
+    expect(rebase?.props?.accessibilityHint).toBeUndefined();
+  });
+
   // A segment can carry a mark (a count, a status dot). It rides the label's
   // line, and the label shrinks into the width left over, so a long label still
   // wraps instead of pushing the mark out of the segment.

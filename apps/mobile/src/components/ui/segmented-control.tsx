@@ -16,6 +16,10 @@ type SegmentedControlOption<T extends string> = {
   disabled?: boolean;
   /** The segment's own handle for a test or a tour target. */
   testID?: string;
+  /** The spoken name, when the visible label is a short form of it. */
+  accessibilityLabel?: string;
+  /** What choosing this option does, when its name alone does not say it. */
+  accessibilityHint?: string;
 };
 
 type SegmentedControlProps<T extends string> = {
@@ -65,7 +69,8 @@ export function SegmentedControl<T extends string>({
         // no ellipsis. A label longer than its equal-width segment wraps onto
         // as many lines as it needs, and the row's default `alignItems:
         // stretch` keeps every segment the same height. The radio's
-        // accessibilityLabel carries the same full text.
+        // accessibilityLabel carries the same full text, or the option's own
+        // longer spoken name.
         const label = (
           <Text
             className={cn(
@@ -85,10 +90,11 @@ export function SegmentedControl<T extends string>({
             key={option.value}
             testID={option.testID}
             {...radioItemA11y({
-              label: option.label,
+              label: option.accessibilityLabel ?? option.label,
               checked: selected,
               disabled: optionDisabled,
             })}
+            accessibilityHint={option.accessibilityHint}
             disabled={optionDisabled}
             onPress={() => {
               if (selected || optionDisabled) {

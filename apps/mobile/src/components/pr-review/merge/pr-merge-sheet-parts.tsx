@@ -13,6 +13,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SEGMENTED_FRAME_HEIGHT_CLASS } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -157,11 +158,7 @@ export function MergeSheetFormSkeleton(props: {
           {props.methodOptions.length === 0 ? (
             <Skeleton className="h-11 rounded-md" />
           ) : (
-            <View className="flex-row flex-wrap gap-2">
-              {props.methodOptions.map(option => (
-                <Skeleton key={option.value} className="h-11 w-20 rounded-full" />
-              ))}
-            </View>
+            <Skeleton className={cn(SEGMENTED_FRAME_HEIGHT_CLASS, 'rounded-lg')} />
           )}
         </View>
         {props.showTitle ? (

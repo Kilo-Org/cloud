@@ -1,14 +1,10 @@
-import { selectionHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { tabEntryA11y } from '@/lib/a11y/tab-entry';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
-import { PR_REVIEW_TAB_HIT_SLOP } from '@/lib/pr-review/pr-review-tab-target';
-import { cn } from '@/lib/utils';
 
 export type PrReviewTabId = 'overview' | 'files' | 'discussion';
 
@@ -39,10 +35,9 @@ type PrReviewTabSelectorProps = {
 const NO_DISABLED_TABS: readonly PrReviewTabId[] = [];
 
 /**
- * Horizontal pill row at the top of the PR review surface that picks
- * between the Overview, Files, and Discussion tabs. S5 owns the API;
- * S6b (Files body) and S7b (Discussion body) only ever render their
- * respective tab bodies — the parent screen owns the tab state.
+ * The shared segmented control at the top of the PR review surface that picks
+ * between the Overview, Files, and Discussion tabs. The parent screen owns the
+ * tab state; each tab body only renders itself.
  */
 export function PrReviewTabSelector({
   activeTab,
@@ -51,59 +46,33 @@ export function PrReviewTabSelector({
   disabledTabs = NO_DISABLED_TABS,
 }: PrReviewTabSelectorProps) {
   const { t } = useTranslation();
+  const options = TABS.map(tab => ({
+    value: tab.id,
+    label: t(tab.labelKey),
+    disabled: disabledTabs.includes(tab.id),
+    badge:
+      tab.id === 'discussion' && discussionCount && discussionCount > 0 ? (
+        <DiscussionCountBadge count={discussionCount} />
+      ) : undefined,
+  }));
   return (
-    // The row stays a pill track because each tab also carries a count badge and
-    // its own disabled state, which `SegmentedControl` does not express; the
-    // pill radius is the contract's control role and keeps the row out of the
-    // hand-built-card pattern.
-    <View accessibilityRole="tablist" className="flex-row rounded-full bg-secondary p-1">
-      {TABS.map(tab => {
-        const active = tab.id === activeTab;
-        const disabled = disabledTabs.includes(tab.id);
-        const badge =
-          tab.id === 'discussion' && discussionCount && discussionCount > 0
-            ? formatNumber(discussionCount, i18n.language)
-            : null;
-        return (
-          <Pressable
-            key={tab.id}
-            {...tabEntryA11y({ selected: active, disabled })}
-            hitSlop={PR_REVIEW_TAB_HIT_SLOP}
-            disabled={disabled}
-            onPress={() => {
-              if (active) {
-                return;
-              }
-              selectionHaptic();
-              onChange(tab.id);
-            }}
-            className={cn(
-              ROW_TARGET_CLASS,
-              'flex-1 justify-center rounded-full px-2 py-2 active:opacity-70',
-              active && 'bg-background',
-              disabled && 'opacity-60'
-            )}
-          >
-            <View className="flex-row items-center gap-1">
-              <Text
-                className={cn(
-                  'text-sm',
-                  active ? 'font-semibold text-foreground' : 'text-muted-foreground dark:text-ink2'
-                )}
-              >
-                {t(tab.labelKey)}
-              </Text>
-              {badge ? (
-                // `muted` equals the row's `secondary` in both palettes, so the
-                // badge fills with `muted-soft` to read as a pill at all.
-                <View className="min-w-5 items-center justify-center rounded-full bg-muted-soft px-1.5 py-0.5">
-                  <Text className="text-center text-xs font-medium text-foreground">{badge}</Text>
-                </View>
-              ) : null}
-            </View>
-          </Pressable>
-        );
-      })}
+    <SegmentedControl
+      accessibilityLabel={t('common.prReview')}
+      options={options}
+      value={activeTab}
+      onChange={onChange}
+    />
+  );
+}
+
+function DiscussionCountBadge({ count }: Readonly<{ count: number }>) {
+  // `muted` equals the track's `secondary` in both palettes, so the badge
+  // fills with `muted-soft` to read as a pill at all.
+  return (
+    <View className="min-w-5 items-center justify-center rounded-full bg-muted-soft px-1.5 py-0.5">
+      <Text className="text-center text-xs font-medium text-foreground">
+        {formatNumber(count, i18n.language)}
+      </Text>
     </View>
   );
 }

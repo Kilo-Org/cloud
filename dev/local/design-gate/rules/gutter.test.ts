@@ -93,6 +93,26 @@ test('gutter: text painted inside the gutter is an error, its block named once',
   }
 });
 
+test('gutter: a box painted on the page edge is inside the gutter', () => {
+  // A child pulled out of its padded parent to the page's own start is not
+  // aligned to that parent's content box, so only the paint can report it.
+  const nodes = screen({ body: 14 });
+  nodes[6] = { ...nodes[6], rect: [0, 130, 300, 80] };
+  nodes[7] = { ...nodes[7], rect: [14, 144, 200, 16] };
+  const [finding, ...rest] = run(nodes);
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.measured, 0);
+  assert.equal(finding?.element.tag, 'View');
+  assert.match(finding?.message, /starts 0 dp from the page edge, inside the 14 dp page gutter/);
+});
+
+test('gutter: an unpadded body that starts on the page edge fails once', () => {
+  const [finding, ...rest] = run(screen({ body: 0 }));
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.measured, 0);
+  assert.match(finding?.message, /inside the 14 dp page gutter/);
+});
+
 test('gutter: the tolerance admits half a dp of rounding, not an off-grid inset', () => {
   assert.deepEqual(run(screen({ body: 14.5 })), []);
   assert.equal(run(screen({ body: 13.2 }))[0]?.measured, 13.2);

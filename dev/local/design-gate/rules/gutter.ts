@@ -374,7 +374,9 @@ export function checkGutter(tree: LayoutTree): Finding[] {
     if (fullBleed(node, page)) continue;
     const offset = startOffset(layoutRect(node), page.box, page);
 
-    if (offset > 0 && offset < SCREEN_GUTTER_DP - GUTTER_TOLERANCE_DP) {
+    // Nothing may sit closer to the page edge than the gutter: an edge on the
+    // page's own start, or outdented past it, is inside the gutter too.
+    if (offset < SCREEN_GUTTER_DP - GUTTER_TOLERANCE_DP) {
       // One finding per offending block: the rows inside a misplaced card are
       // not each their own defect.
       if (nodes.some(candidate => flagged.has(candidate))) continue;
@@ -439,8 +441,6 @@ export function checkGutter(tree: LayoutTree): Finding[] {
 
   for (const { node, offset } of columns.values()) {
     if (Math.abs(offset - SCREEN_GUTTER_DP) <= GUTTER_TOLERANCE_DP) continue;
-    // Paint inside the gutter is reported above, against the box that paints.
-    if (offset > 0 && offset < SCREEN_GUTTER_DP - GUTTER_TOLERANCE_DP) continue;
     findings.push(
       finding({
         rule: 'gutter',

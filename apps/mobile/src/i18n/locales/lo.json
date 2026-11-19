@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "ກະລຸນາລອງອີກຄັ້ງ.",
     "offlineTitle": "ໂຫຼດບໍ່ສຳເລັດ.",
+    "offlineDescription": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບເຊີບເວີໄດ້.",
     "permissionDescription": "ທ່ານບໍ່ມີສິດເບິ່ງລາຍການນີ້.",
     "notFoundDescription": "ລາຍການນີ້ອາດຖືກລຶບ ຫຼື ບໍ່ມີອີກແລ້ວ.",
     "serverTitle": "ບໍ່ສາມາດໂຫຼດໄດ້.",

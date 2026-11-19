@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Pakisubukang muli.",
     "offlineTitle": "Hindi na-load ang data.",
+    "offlineDescription": "Hindi maabot ang server.",
     "permissionDescription": "Wala kang pahintulot na tingnan ito.",
     "notFoundDescription": "Maaaring inalis na ito o hindi na ito makuha.",
     "serverTitle": "Hindi ma-load ang data.",

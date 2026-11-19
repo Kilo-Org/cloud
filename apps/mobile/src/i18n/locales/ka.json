@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "სცადე ხელახლა.",
     "offlineTitle": "ჩატვირთვა ვერ მოხერხდა.",
+    "offlineDescription": "სერვერთან დაკავშირება ვერ მოხერხდა.",
     "permissionDescription": "ამის ნახვის უფლება არ გაქვს.",
     "notFoundDescription": "შესაძლოა, ეს ელემენტი წაიშალა ან აღარ არის ხელმისაწვდომი.",
     "serverTitle": "ჩატვირთვა ვერ მოხერხდა.",

@@ -3164,6 +3164,7 @@
   "queryError": {
     "neutralDescription": "Bandyk dar kartą.",
     "offlineTitle": "Nepavyko įkelti",
+    "offlineDescription": "Nepavyko pasiekti serverio.",
     "permissionDescription": "Neturi teisės peržiūrėti šio turinio.",
     "notFoundDescription": "Galbūt šis turinys pašalintas arba nebepasiekiamas.",
     "serverTitle": "Nepavyko įkelti",

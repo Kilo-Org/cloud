@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Whakamātau anō.",
     "offlineTitle": "I rahua te uta",
+    "offlineDescription": "Kāore i taea te toro atu ki te tūmau.",
     "permissionDescription": "Kāore koe e whakaaetia kia tiro ki tēnei.",
     "notFoundDescription": "Kua tangohia pea tēnei mea, kua kore rānei e wātea.",
     "serverTitle": "Kāore i taea te uta",

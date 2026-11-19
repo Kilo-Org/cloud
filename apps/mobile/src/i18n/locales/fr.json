@@ -2467,6 +2467,7 @@
   "queryError": {
     "neutralDescription": "Réessayez.",
     "offlineTitle": "Le chargement a échoué",
+    "offlineDescription": "Impossible de joindre le serveur.",
     "permissionDescription": "Vous n'avez pas l'autorisation de consulter ce contenu.",
     "notFoundDescription": "Cet élément a peut-être été supprimé ou n'est plus disponible.",
     "serverTitle": "Impossible de charger les données",

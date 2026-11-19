@@ -3164,6 +3164,7 @@
   "queryError": {
     "neutralDescription": "Poskusi znova.",
     "offlineTitle": "Nalaganje ni uspelo.",
+    "offlineDescription": "Strežnika ni bilo mogoče doseči.",
     "permissionDescription": "Za ogled te vsebine nimaš dovoljenja.",
     "notFoundDescription": "Ta element je bil morda odstranjen ali ni več na voljo.",
     "serverTitle": "Podatkov ni bilo mogoče naložiti.",

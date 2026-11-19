@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Sicela uzame futhi.",
     "offlineTitle": "Ukulayisha kwehlulekile.",
+    "offlineDescription": "Ukuxhumana neseva kwehlulekile.",
     "permissionDescription": "Awunayo imvume yokubuka lokhu.",
     "notFoundDescription": "Le nto kungenzeka isusiwe noma ayisatholakali.",
     "serverTitle": "Asikwazanga ukulayisha.",

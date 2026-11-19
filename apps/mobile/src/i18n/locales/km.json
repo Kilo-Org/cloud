@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "សូមព្យាយាមម្តងទៀត។",
     "offlineTitle": "ការផ្ទុកបានបរាជ័យ",
+    "offlineDescription": "មិនអាចភ្ជាប់ទៅម៉ាស៊ីនបម្រើបានទេ។",
     "permissionDescription": "អ្នកមិនមានសិទ្ធិមើលធាតុនេះទេ។",
     "notFoundDescription": "ធាតុនេះអាចត្រូវបានដកចេញ ឬលែងមានទៀតហើយ។",
     "serverTitle": "មិនអាចផ្ទុកបានទេ",

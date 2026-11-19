@@ -2509,6 +2509,7 @@
   "queryError": {
     "neutralDescription": "Lütfen tekrar dene.",
     "offlineTitle": "Yüklenemedi.",
+    "offlineDescription": "Sunucuya ulaşılamadı.",
     "permissionDescription": "Bunu görüntüleme iznin yok.",
     "notFoundDescription": "Bu öğe kaldırılmış veya artık kullanılamıyor olabilir.",
     "serverTitle": "Yüklenemedi.",

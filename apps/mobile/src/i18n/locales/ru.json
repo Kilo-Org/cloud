@@ -2575,6 +2575,7 @@
   "queryError": {
     "neutralDescription": "Попробуйте снова.",
     "offlineTitle": "Не удалось загрузить данные.",
+    "offlineDescription": "Не удалось связаться с сервером.",
     "permissionDescription": "У вас нет прав на просмотр.",
     "notFoundDescription": "Возможно, этот элемент удалён или больше недоступен.",
     "serverTitle": "Не удалось загрузить данные.",

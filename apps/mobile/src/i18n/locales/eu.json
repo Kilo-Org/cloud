@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Saiatu berriro.",
     "offlineTitle": "Ezin izan da kargatu.",
+    "offlineDescription": "Ezin izan da zerbitzarira iritsi.",
     "permissionDescription": "Ez duzu baimenik hau ikusteko.",
     "notFoundDescription": "Baliteke elementu hau kendu izana edo jada eskuragarri ez egotea.",
     "serverTitle": "Ezin izan da kargatu.",

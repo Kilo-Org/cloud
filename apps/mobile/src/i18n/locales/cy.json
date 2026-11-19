@@ -3276,6 +3276,7 @@
   "queryError": {
     "neutralDescription": "Ceisiwch eto.",
     "offlineTitle": "Methodd y llwytho.",
+    "offlineDescription": "Ni ellid cyrraedd y gweinydd.",
     "permissionDescription": "Nid oes gen ti ganiatâd i weld hyn.",
     "notFoundDescription": "Efallai bod yr eitem hon wedi'i thynnu neu nad yw ar gael mwyach.",
     "serverTitle": "Ni ellid llwytho'r data.",

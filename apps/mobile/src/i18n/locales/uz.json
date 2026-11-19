@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Iltimos, qayta urinib ko'ring.",
     "offlineTitle": "Yuklab bo'lmadi.",
+    "offlineDescription": "Serverga ulanib bo'lmadi.",
     "permissionDescription": "Buni ko‘rishga ruxsatingiz yo‘q.",
     "notFoundDescription": "Bu element olib tashlangan yoki undan endi foydalanib bo‘lmaydigan bo‘lishi mumkin.",
     "serverTitle": "Yuklab bo'lmadi.",

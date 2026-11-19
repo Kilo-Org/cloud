@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "እባክዎ እንደገና ይሞክሩ።",
     "offlineTitle": "መጫን አልተሳካም።",
+    "offlineDescription": "ሰርቨሩን ማግኘት አልተቻለም።",
     "permissionDescription": "ይህን ለማየት ፈቃድ የለህም።",
     "notFoundDescription": "ይህ ንጥል ተወግዶ ሊሆን ይችላል፣ ወይም ከእንግዲህ አይገኝም።",
     "serverTitle": "መጫን አልተቻለም።",

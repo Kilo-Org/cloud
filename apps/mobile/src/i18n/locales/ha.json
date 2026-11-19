@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Sake gwadawa.",
     "offlineTitle": "An kasa loda bayanai.",
+    "offlineDescription": "Ba a iya isa ga uwar garken ba.",
     "permissionDescription": "Ba ka da izinin ganin wannan.",
     "notFoundDescription": "Wataƙila an cire wannan abu ko kuma ba a samunsa yanzu.",
     "serverTitle": "An kasa loda bayanai.",

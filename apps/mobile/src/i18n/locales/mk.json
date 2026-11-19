@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Обиди се повторно.",
     "offlineTitle": "Вчитувањето не успеа.",
+    "offlineDescription": "Не можевме да стигнеме до серверот.",
     "permissionDescription": "Немаш дозвола да го видиш ова.",
     "notFoundDescription": "Оваа ставка можеби е отстранета или повеќе не е достапна.",
     "serverTitle": "Вчитувањето не е можно.",

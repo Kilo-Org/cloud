@@ -2542,6 +2542,7 @@
   "queryError": {
     "neutralDescription": "Riprova.",
     "offlineTitle": "Il caricamento non è riuscito.",
+    "offlineDescription": "Impossibile raggiungere il server.",
     "permissionDescription": "Non hai il permesso di visualizzare questo contenuto.",
     "notFoundDescription": "Questo elemento potrebbe essere stato rimosso o non essere più disponibile.",
     "serverTitle": "Impossibile caricare i dati.",

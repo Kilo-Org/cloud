@@ -3164,6 +3164,7 @@
   "queryError": {
     "neutralDescription": "Zkuste to prosím znovu.",
     "offlineTitle": "Načtení se nezdařilo.",
+    "offlineDescription": "Nepodařilo se připojit k serveru.",
     "permissionDescription": "Nemáš oprávnění k zobrazení tohoto obsahu.",
     "notFoundDescription": "Tato položka mohla být odebrána nebo již není k dispozici.",
     "serverTitle": "Načtení se nepodařilo.",

@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Proovi uuesti.",
     "offlineTitle": "Laadimine ebaõnnestus",
+    "offlineDescription": "Serveriga ei õnnestunud ühendust saada.",
     "permissionDescription": "Sul pole õigust seda vaadata.",
     "notFoundDescription": "See on kas eemaldatud või pole enam saadaval.",
     "serverTitle": "Laadimine ei õnnestunud",

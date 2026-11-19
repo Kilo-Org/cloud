@@ -2509,6 +2509,7 @@
   "queryError": {
     "neutralDescription": "請再試一次。",
     "offlineTitle": "載入失敗。",
+    "offlineDescription": "無法連線到伺服器。",
     "permissionDescription": "你沒有權限查看這個內容。",
     "notFoundDescription": "這個項目可能已移除，或已無法使用。",
     "serverTitle": "無法載入。",

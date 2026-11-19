@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Yenidən cəhd et.",
     "offlineTitle": "Yükləmək mümkün olmadı.",
+    "offlineDescription": "Serverə qoşulmaq mümkün olmadı.",
     "permissionDescription": "Buna baxmağa icazən yoxdur.",
     "notFoundDescription": "Bu element silinmiş ola bilər və ya artıq əlçatan deyil.",
     "serverTitle": "Yükləmək mümkün olmadı.",

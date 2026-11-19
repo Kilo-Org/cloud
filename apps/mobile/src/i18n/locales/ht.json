@@ -3052,6 +3052,7 @@
   "queryError": {
     "neutralDescription": "Tanpri eseye ankò.",
     "offlineTitle": "Nou pa t ka chaje done yo.",
+    "offlineDescription": "Nou pa t ka jwenn sèvè a.",
     "permissionDescription": "Ou pa gen pèmisyon pou wè sa.",
     "notFoundDescription": "Yo ka retire eleman sa a, oswa li pa disponib ankò.",
     "serverTitle": "Nou pa t ka chaje done yo.",

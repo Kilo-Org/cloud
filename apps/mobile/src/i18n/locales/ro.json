@@ -3108,6 +3108,7 @@
   "queryError": {
     "neutralDescription": "Încearcă din nou.",
     "offlineTitle": "Încărcarea a eșuat.",
+    "offlineDescription": "Nu s-a putut contacta serverul.",
     "permissionDescription": "Nu ai permisiunea să vizualizezi acest conținut.",
     "notFoundDescription": "Este posibil ca acest element să fi fost eliminat sau să nu mai fie disponibil.",
     "serverTitle": "Nu s-au putut încărca datele.",

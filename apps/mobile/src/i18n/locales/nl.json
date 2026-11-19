@@ -2509,6 +2509,7 @@
   "queryError": {
     "neutralDescription": "Probeer het opnieuw.",
     "offlineTitle": "Het laden is mislukt.",
+    "offlineDescription": "De server is niet bereikbaar.",
     "permissionDescription": "Je hebt geen toestemming om dit te bekijken.",
     "notFoundDescription": "Dit item is mogelijk verwijderd of is niet meer beschikbaar.",
     "serverTitle": "Het laden is mislukt.",

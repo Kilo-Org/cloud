@@ -318,13 +318,16 @@ describe('buildModelPickerRows', () => {
       id: 'remote-model-2',
       name: 'Codestral',
       displayId: 'codestral',
-      provider: { id: 'mistral', name: 'Mistrál Labs' },
-      modelRef: { providerID: 'mistral', modelID: 'codestral' },
+      // The provider id carries no part of the query, so only folding the
+      // accented display name can keep this row: the pre-fold filter matched the
+      // lowercased text and missed `mistral` here.
+      provider: { id: 'acme-llm', name: 'Mistrál Labs' },
+      modelRef: { providerID: 'acme-llm', modelID: 'codestral' },
     };
     expect(
       buildModelPickerRows({ models: [mistralModel], search: 'mistral', favoriteIds: noFavorites })
     ).toEqual([
-      { key: 'provider:mistral', title: 'MISTRÁL LABS', type: 'header' },
+      { key: 'provider:acme-llm', title: 'MISTRÁL LABS', type: 'header' },
       {
         key: 'model:remote-model-2',
         model: mistralModel,

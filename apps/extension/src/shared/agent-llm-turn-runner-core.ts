@@ -79,7 +79,7 @@ const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.ab
 
 /** Abort reason for a run whose target tab left the inspectable list: nobody pressed Stop. */
 export const TARGET_TAB_UNAVAILABLE_ABORT_REASON = 'kilo-target-tab-unavailable';
-const STOPPED_MESSAGE = 'Stopped.';
+export const STOPPED_MESSAGE = 'Stopped.';
 const TARGET_TAB_UNAVAILABLE_MESSAGE =
   'The tab you picked closed or is no longer available, so I stopped this turn. Open or pick a tab, then ask again.';
 
@@ -136,7 +136,20 @@ const CONTINUE_NUDGE_MAX_TEXT_LENGTH = 300;
  * "Let me know" is a sign-off, not work the model is about to do.
  */
 const ANNOUNCEMENT_RE =
-  /^\s*(?:(?:i'?ll|i will|i'?m \w+ing|i am \w+ing|i am going to|let me(?! know\b)|now i|next i)\b|\w+(?<!th)ing\b[^.!?]*\b(?:workflow|script|search|page|result))/iu;
+  /^(?:(?:i'?ll|i will|i'?m \w+ing|i am \w+ing|i am going to|let me(?! know\b)|now i|next i)\b|\w+(?<!th)ing\b[^.!?]*\b(?:workflow|script|search|page|result))/iu;
+
+// A model decorates its announcement with a bullet, Markdown emphasis, quotes, or a short opener ("Sure — I'll create the workflow now."). Those are the same announcements, so the anchor runs after this chrome.
+const ANNOUNCEMENT_CHROME_RE = /^[\s"'`>*_#\u2018\u2019\u201C\u201D\u2013\u2014:,-]+/u;
+const ANNOUNCEMENT_NUMBER_RE = /^\d+[.)]\s*/u;
+const ANNOUNCEMENT_OPENER_RE =
+  /^(?:sure|okay|ok|alright|right|great|perfect|got it|yes|absolutely|first)\b[^\p{L}\p{N}]*/iu;
+
+const stripAnnouncementChrome = (sentence: string): string =>
+  sentence
+    .replace(ANNOUNCEMENT_CHROME_RE, '')
+    .replace(ANNOUNCEMENT_NUMBER_RE, '')
+    .replace(ANNOUNCEMENT_OPENER_RE, '')
+    .replace(ANNOUNCEMENT_CHROME_RE, '');
 
 // A real question to the user ends the message with "?"; a mid-text "?" is usually a URL query string (…/search?q=) or code, not a question, so only a trailing "?" suppresses the nudge.
 const endsWithQuestion = (text: string): boolean => text.trimEnd().endsWith('?');
@@ -145,7 +158,9 @@ const deservesContinueNudge = (lastAssistantText: string): boolean =>
   lastAssistantText.length > 0 &&
   lastAssistantText.length < CONTINUE_NUDGE_MAX_TEXT_LENGTH &&
   !endsWithQuestion(lastAssistantText) &&
-  lastAssistantText.split(/[.!?]+/u).some(sentence => ANNOUNCEMENT_RE.test(sentence));
+  lastAssistantText
+    .split(/[.!?]+/u)
+    .some(sentence => ANNOUNCEMENT_RE.test(stripAnnouncementChrome(sentence)));
 
 // A turn that ends with thinking but no assistant text and no tool calls never answered the user; the model spent its completion reasoning and stopped. The finish reason is healthy, so the retry tier never sees it — the nudge does.
 const endedThinkingOnly = (

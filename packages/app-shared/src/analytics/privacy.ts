@@ -60,10 +60,10 @@ export function isProhibitedPropertyKey(key: string): boolean {
 
 /**
  * Returns a partial copy of `properties` with every prohibited key removed.
- * Callers must narrow before reading any key of the result. Used at runtime
- * capture for record-shaped payloads whose keys a strict object schema cannot
- * enumerate (`app_startup`) and for uncataloged dynamic-name events (the
- * AppsFlyer mirror path).
+ * Callers must narrow before reading any key of the result. Use it where a
+ * payload's keys are known only at runtime and its values are safe to omit;
+ * a call site whose sink rejects `undefined` values filters with
+ * {@link isProhibitedPropertyKey} directly instead.
  */
 export function redactProhibitedProperties<T extends Record<string, unknown>>(
   properties: T

@@ -66,6 +66,7 @@ import {
   runtimeProxyRequestShape,
 } from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
+import { withEventStreamIdlePing } from './kilo/event-stream-idle-ping.js';
 import {
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopeIngestRoute,
@@ -554,11 +555,15 @@ function sanitizeRuntimeProxyResponse(response: Response): Response {
     headers.delete(name);
   }
   headers.delete(RUNTIME_PROXY_ATTESTATION_HEADER);
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
+  const eventStream = headers
+    .get('Content-Type')
+    ?.trimStart()
+    .toLowerCase()
+    .startsWith('text/event-stream');
+  return new Response(
+    response.body && eventStream ? withEventStreamIdlePing(response.body) : response.body,
+    { status: response.status, statusText: response.statusText, headers }
+  );
 }
 
 async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Response> {

@@ -360,16 +360,19 @@ export function useSettledSheetHeaderTopClearance(input: {
   }, [followMovement, readable]);
 
   // Every keyboard change moves the sheet, so each one starts a new burst. The
-  // first render is the presentation, which the burst above already follows.
+  // first render is the presentation, which the burst above already follows. A
+  // bottom formSheet skips it: its header follows the keyboard's lift itself,
+  // and the state reports the keyboard down when the dismissal starts, while
+  // the sheet is still lifted, so a burst then would pin that lifted edge.
   useEffect(() => {
     if (keyboardHeightRef.current === keyboardHeight) {
       return;
     }
     keyboardHeightRef.current = keyboardHeight;
-    if (readable) {
+    if (readable && topInset !== 'bottom-form-sheet') {
       followMovement(SHEET_MOVE_SAMPLE_MS);
     }
-  }, [followMovement, keyboardHeight, readable]);
+  }, [followMovement, keyboardHeight, readable, topInset]);
 
   const onLayout = useCallback(() => {
     if (readable) {

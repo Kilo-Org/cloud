@@ -727,10 +727,13 @@ describe('SheetHeader', () => {
 
     const wrapper = findSafeAreaWrapper(renderer.root);
     expect(wrapper.props.style).toBeUndefined();
-    const band = wrapper.children[0];
-    expect(typeof band === 'string' ? undefined : band?.props.style).toEqual({
-      height: expect.closeTo(27.81, 2) as number,
-    });
+    const band = wrapper.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        (node.props.style as { height?: number } | undefined)?.height !== undefined
+    );
+    expect(band.props.style).toEqual({ height: expect.closeTo(27.81, 2) as number });
 
     renderer.unmount();
   });

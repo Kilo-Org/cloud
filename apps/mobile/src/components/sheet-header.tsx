@@ -50,6 +50,29 @@ export function sheetUnderHandlePaddingClass(surface: 'header' | 'row'): string 
   return surface === 'header' ? 'pb-4 pt-1.5' : 'pb-3.5 pt-2';
 }
 
+/**
+ * The band an Android bottom formSheet's header grows above its row while the
+ * keyboard lifts the sheet into the status bar (`sheetHeaderKeyboardTopClearance`).
+ * It follows the keyboard's own frames on the UI thread, so the row never enters
+ * the bar and does not move once the sheet has stopped. It adds only what the
+ * header's `reserved` clearance does not already cover.
+ */
+function SheetHeaderKeyboardBand({ reserved }: Readonly<{ reserved: number }>) {
+  const { top, bottom } = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardMotionHeight();
+  const band = useAnimatedStyle(() => ({
+    height: Math.max(
+      0,
+      sheetHeaderKeyboardTopClearance({
+        insetTop: top,
+        insetBottom: bottom,
+        keyboardHeight: keyboardHeight.value,
+      }) - reserved
+    ),
+  }));
+  return <Animated.View style={band} />;
+}
+
 export function SheetHeader({
   title,
   eyebrow,
@@ -166,31 +189,15 @@ export function SheetHeader({
         }
       : undefined;
   // Android lifts a bottom formSheet into the status bar on every keyboard
-  // frame (`sheetHeaderKeyboardTopClearance`). The band above the row grows in
-  // the same frames on the UI thread, so the row never enters the bar and does
-  // not move once the sheet has stopped; it only adds what the settled
-  // clearance does not already cover.
+  // frame; `SheetHeaderKeyboardBand` follows it. Only that sheet mounts it, so
+  // no other header runs the animated style.
   const followsKeyboard = topInset === 'bottom-form-sheet' && Platform.OS === 'android';
-  const windowInsets = useSafeAreaInsets();
-  const windowTop = windowInsets.top;
-  const windowBottom = windowInsets.bottom;
-  const keyboardHeight = useKeyboardMotionHeight();
-  const keyboardBand = useAnimatedStyle(() => ({
-    height: Math.max(
-      0,
-      sheetHeaderKeyboardTopClearance({
-        insetTop: windowTop,
-        insetBottom: windowBottom,
-        keyboardHeight: keyboardHeight.value,
-      }) - topInsetHeight
-    ),
-  }));
   // The busy mark takes the accent the label it replaces carried, so the frame
   // reads as the same control still working. It is the platform indicator rather
-  // than the animated wrapper: the wrapper loads Reanimated and the motion
-  // policy, and every sheet that paints a header would pay for that import to
-  // show a mark. The control announces `busy` itself, so the reduced-motion
-  // reading does not depend on the spinner.
+  // than the animated wrapper: the wrapper adds the motion policy, and every
+  // sheet that paints a header would pay for it to show a mark. The control
+  // announces `busy` itself, so the reduced-motion reading does not depend on
+  // the spinner.
   let doneMark: ReactNode = null;
   if (doneBusy) {
     doneMark = <ActivityIndicator size="small" color={colors.primary} />;
@@ -239,7 +246,7 @@ export function SheetHeader({
       )}
     >
       <View style={safeAreaStyle}>
-        {followsKeyboard ? <Animated.View style={keyboardBand} /> : null}
+        {followsKeyboard ? <SheetHeaderKeyboardBand reserved={topInsetHeight} /> : null}
         <View className="min-h-[48px] flex-row items-center gap-x-3">
           {onShare !== undefined && !closeOnly ? (
             <Pressable

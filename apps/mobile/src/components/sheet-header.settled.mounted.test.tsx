@@ -213,10 +213,10 @@ describe('SheetHeader settled top clearance', () => {
         await Promise.resolve();
       });
 
-      // Dismissing the keyboard drops the sheet back to the half detent; the
-      // reserve only grows within a mount, so the header stays where it is
-      // instead of jumping while the sheet moves.
-      surface.top = 457.14;
+      // The keyboard state reports the keyboard down when the dismissal
+      // starts, while the sheet is still lifted (edge 0). A read then would pin
+      // the lifted edge, so the header keeps the presented reserve.
+      surface.top = 0;
       await act(async () => {
         setKeyboardHeight(0);
         await Promise.resolve();

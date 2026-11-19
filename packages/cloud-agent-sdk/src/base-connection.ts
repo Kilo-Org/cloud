@@ -202,8 +202,16 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
-  async function refreshAndConnect(expectedGeneration: number, attempt = 0): Promise<void> {
-    if (paused) return;
+  // One resume can arrive from several triggers at once (NetInfo online, a
+  // visibility resume, a BFCache restore). The first starts the refresh; the
+  // rest join it, so one resume costs one ticket refresh and one socket.
+  let inflightRefresh: { generation: number; promise: Promise<void> } | null = null;
+
+  async function runRefreshAndConnect(
+    expectedGeneration: number,
+    attempt: number,
+    socketBeforeRefresh: WebSocket | null
+  ): Promise<void> {
     preconnectAuthRefreshAttempted = true;
 
     try {
@@ -222,6 +230,12 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         // socket is still CONNECTING, but the socket establishes before the
         // refresh resolves.
         if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
+        // A socket that appeared during the gap belongs to another recovery
+        // path that is already opening it for this generation. Replacing it
+        // would report route loss for a connection this resume never
+        // superseded.
+        if (ws !== null && ws !== socketBeforeRefresh && ws.readyState === WebSocket.CONNECTING)
+          return;
       }
       connectInternal(attempt, expectedGeneration, true);
     } finally {
@@ -229,6 +243,23 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         preconnectAuthRefreshAttempted = false;
       }
     }
+  }
+
+  function refreshAndConnect(expectedGeneration: number, attempt = 0): Promise<void> {
+    if (paused) return Promise.resolve();
+
+    const joined = inflightRefresh;
+    if (joined !== null && joined.generation === expectedGeneration) return joined.promise;
+
+    const tracked: Promise<void> = runRefreshAndConnect(expectedGeneration, attempt, ws).finally(
+      () => {
+        if (inflightRefresh !== null && inflightRefresh.promise === tracked) {
+          inflightRefresh = null;
+        }
+      }
+    );
+    inflightRefresh = { generation: expectedGeneration, promise: tracked };
+    return tracked;
   }
 
   function scheduleReconnect(attempt: number, expectedGeneration: number) {
@@ -521,6 +552,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     hasConnectedOnce = false;
     lastMessageTime = 0;
     generation += 1;
+    // A promise from the previous generation must never be joined by this one.
+    inflightRefresh = null;
     clearReconnectTimer();
     clearStalenessTimeout();
     clearHiddenPause();
@@ -532,6 +565,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     intentionalDisconnect = true;
     generation += 1;
     preconnectAuthRefreshAttempted = false;
+    inflightRefresh = null;
     mutationRecovery = 'idle';
 
     clearReconnectTimer();
@@ -590,6 +624,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     destroyed = true;
     generation += 1;
     preconnectAuthRefreshAttempted = false;
+    inflightRefresh = null;
     mutationRecovery = 'idle';
 
     clearReconnectTimer();

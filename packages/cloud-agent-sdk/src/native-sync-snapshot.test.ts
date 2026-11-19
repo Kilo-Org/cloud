@@ -1225,6 +1225,81 @@ describe('authorized native snapshot attachments', () => {
     'image/png'
   );
 
+  // Mirrors BASE64_CHUNK_BYTES in native-sync-snapshot.ts: the largest multiple
+  // of 3 that fills one 0x8000-byte 8-bit string step.
+  const BASE64_CHUNK_BYTES = 0x8000 - (0x8000 % 3);
+  const streamHash = 'f'.repeat(64);
+  const streamUser = {
+    ...storedUser,
+    id: 'msg_media_stream',
+    files: [
+      {
+        mime: 'image/png',
+        name: 'image.png',
+        uri: `media:${streamHash}`,
+        source: { type: 'inline' },
+      },
+    ],
+  };
+
+  function bytePattern(length: number): Uint8Array {
+    const bytes = new Uint8Array(length);
+    for (let index = 0; index < length; index++) bytes[index] = index % 251;
+    return bytes;
+  }
+
+  /** Resolve one stored user attachment of `bytes` and return its data URL. */
+  async function streamUserAssetURL(bytes: Uint8Array): Promise<string | undefined> {
+    const { request } = snapshotFetch([
+      entity('message', streamUser.id, { seq: 0, message: streamUser }),
+      asset(
+        'stream-image',
+        'message',
+        streamUser.id,
+        '/message/files/0',
+        `media:${streamHash}`,
+        streamHash,
+        bytes.byteLength,
+        'image/png'
+      ),
+    ]);
+    const readAsset = jest.fn(async (path: string, advertisedBytes: number) => {
+      expect(path).toBe(`${sessionPath}/blobs/${streamHash}`);
+      expect(advertisedBytes).toBe(bytes.byteLength);
+      // Hand over a fresh buffer: the encoder must own the bytes it reads.
+      const buffer = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(buffer).set(bytes);
+      return buffer;
+    });
+    const snapshot = await fetchNativeSnapshot(request, sessionID, undefined, readAsset);
+    expect(readAsset).toHaveBeenCalledTimes(1);
+    return snapshot.assetURLs?.[
+      kilo2AssetKey(kilo2PartId(streamUser.id, 1), `media:${streamHash}`, 'image/png')
+    ];
+  }
+
+  it('base64-encodes a multi-chunk attachment byte-identically to the canonical encoder', async () => {
+    // One full chunk plus two bytes: the encoder has to join chunks and pad the
+    // final one (the total is not a multiple of 3).
+    const bytes = bytePattern(BASE64_CHUNK_BYTES + 2);
+    expect(bytes.byteLength).toBeGreaterThan(BASE64_CHUNK_BYTES);
+    expect(bytes.byteLength % 3).not.toBe(0);
+
+    expect(await streamUserAssetURL(bytes)).toBe(
+      `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`
+    );
+  });
+
+  it.each([0, 1, 2, 3, BASE64_CHUNK_BYTES])(
+    'base64-encodes a %i-byte attachment byte-identically to the canonical encoder',
+    async length => {
+      const bytes = bytePattern(length);
+      expect(await streamUserAssetURL(bytes)).toBe(
+        `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`
+      );
+    }
+  );
+
   it('accepts stored media without invented inline data and resolves exact authorized user/tool positions', async () => {
     const toolPart = {
       type: 'tool',

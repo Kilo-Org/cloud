@@ -74,6 +74,7 @@ beforeEach(() => {
   global.WebSocket = webSocketMock;
   (global.WebSocket as unknown as Record<string, number>).OPEN = 1;
   (global.WebSocket as unknown as Record<string, number>).CLOSED = 3;
+  (global.WebSocket as unknown as Record<string, number>).CONNECTING = 0;
 
   mockDocument = Object.assign(new EventTarget(), { visibilityState: 'visible' });
   mockWindow = new EventTarget();
@@ -414,6 +415,45 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       expect(onReplacingConnection).not.toHaveBeenCalled();
       expect(sockets[0].close).not.toHaveBeenCalled();
       expect(refreshAuth).toHaveBeenCalledTimes(1);
+
+      connection.destroy();
+    });
+
+    it('joins one resume that arrives through both the visibility and online triggers', async () => {
+      // The first refresh stays pending while the other resume triggers fire.
+      let releaseRefresh!: () => void;
+      const pendingRefresh = new Promise<void>(resolve => {
+        releaseRefresh = resolve;
+      });
+      const refreshAuth = jest.fn(() => pendingRefresh);
+      const onReplacingConnection = jest.fn();
+      const { connection } = createTestConnection({ refreshAuth, onReplacingConnection });
+      connection.connect();
+
+      // Socket 1 is still CONNECTING when the resume triggers fire.
+      sockets[0].readyState = 0; // WebSocket.CONNECTING
+
+      // A backgrounded tab that comes back also reports `online`: the visibility
+      // resume and the NetInfo report are two triggers of one resume.
+      simulateVisibilityChange('hidden');
+      simulateVisibilityChange('visible');
+      mockWindow.dispatchEvent(new Event('online'));
+
+      // The online trigger joins the refresh the visibility resume started
+      // instead of minting a second ticket for the same resume.
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+      expect(sockets).toHaveLength(1);
+
+      releaseRefresh();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // One resume costs one refresh and one replacement socket.
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+      expect(sockets).toHaveLength(2);
+      // Socket 1 is the only socket the replacement actually supersedes, so the
+      // joined trigger adds no second route-loss report.
+      expect(onReplacingConnection).toHaveBeenCalledTimes(1);
 
       connection.destroy();
     });

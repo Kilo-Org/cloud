@@ -789,6 +789,8 @@ type Harness = {
   setUnavailable: (key: string, value: boolean) => void;
   setRuntimeRestarting: (value: boolean) => void;
   setStamp: (value: WorkspaceStamp | null) => void;
+  /** Seeds one directory's stamp, so a test can force a stored root to be adopted. */
+  setStampFor: (directory: string, value: WorkspaceStamp | null) => void;
   stamp: () => WorkspaceStamp | null;
   setHasGit: (value: boolean) => void;
   setSetupResult: (value: ExecResult) => void;
@@ -1129,6 +1131,10 @@ function createHarness(
       stamp = value;
       pendingStamp = value;
       hasPendingStamp = true;
+    },
+    setStampFor: (directory, value) => {
+      if (value === null) stampsByDirectory.delete(directory);
+      else stampsByDirectory.set(directory, value);
     },
     stamp: () => stamp,
     setHasGit: value => {
@@ -2673,6 +2679,94 @@ describe('createPreparationManager', () => {
     // appears exactly once across both preparations.
     expect(harness.setupCalls).toEqual(['npm install', 'serve']);
     expect(harness.logs.some(line => line.includes('workspace setup skipped'))).toBe(true);
+  });
+
+  it('runs the commands again when a re-prepare removes a prepared root', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ setupCommands: ['npm install'], startCommands: ['serve'] });
+    const app = {
+      directory: path.join(spec.directory, 'app'),
+      repoFullName: 'acme/app',
+      git: { url: 'https://github.com/acme/app.git', platform: 'github' as const },
+      branch: 'kilo/generated',
+      branchMode: 'working' as const,
+    };
+    const lib = {
+      directory: path.join(spec.directory, 'lib'),
+      repoFullName: 'acme/lib',
+      git: { url: 'https://github.com/acme/lib.git', platform: 'github' as const },
+      branch: 'kilo/generated',
+      branchMode: 'working' as const,
+    };
+    const roots: NonNullable<ControlPlaneRouteSpec['roots']> = [app, lib];
+    await harness.manager.prepare({ ...spec, roots });
+    expect(harness.setupCalls).toEqual(['npm install', 'serve']);
+    harness.frames.length = 0;
+    harness.preparedRoutes.length = 0;
+    harness.gitCalls.length = 0;
+
+    // `lib` is gone from the route: the workspace the commands ran in is no
+    // longer the one this route names, so they run again.
+    await harness.manager.prepare({ ...spec, roots: [app] });
+
+    expect(harness.setupCalls).toEqual(['npm install', 'serve', 'npm install', 'serve']);
+    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toEqual([]);
+    expect(harness.logs.some(line => line.includes('workspace setup skipped'))).toBe(false);
+    expect(harness.logs.some(line => line.includes('workspace setup repeated'))).toBe(true);
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' },
+    ]);
+  });
+
+  it('runs the commands again when a re-prepare adopts a prepared root', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ setupCommands: ['npm install'], startCommands: ['serve'] });
+    const app = {
+      directory: path.join(spec.directory, 'app'),
+      repoFullName: 'acme/app',
+      git: { url: 'https://github.com/acme/app.git', platform: 'github' as const },
+      branch: 'kilo/generated',
+      branchMode: 'working' as const,
+    };
+    const lib = {
+      directory: path.join(spec.directory, 'lib'),
+      repoFullName: 'acme/lib',
+      git: { url: 'https://github.com/acme/lib.git', platform: 'github' as const },
+      branch: 'kilo/generated',
+      branchMode: 'working' as const,
+    };
+    const extra = {
+      directory: path.join(spec.directory, 'extra'),
+      repoFullName: 'acme/extra',
+      git: { url: 'https://github.com/acme/extra.git', platform: 'github' as const },
+      branch: 'kilo/generated',
+      branchMode: 'working' as const,
+    };
+    const roots: NonNullable<ControlPlaneRouteSpec['roots']> = [app, lib];
+    await harness.manager.prepare({ ...spec, roots });
+    expect(harness.setupCalls).toEqual(['npm install', 'serve']);
+    harness.frames.length = 0;
+    harness.preparedRoutes.length = 0;
+    harness.gitCalls.length = 0;
+
+    // A stamp from another allocation makes reconcileRoots adopt `app`, a root
+    // the stored route had prepared, so the workspace is reconciled again.
+    harness.setStampFor(app.directory, { allocationId: 'alloc-builder', commit: 'old-commit' });
+    harness.setGit(args => {
+      if (args[0] === 'show-ref') return result(1);
+      if (args[0] === 'rev-parse') return { stdout: 'new-commit\n', stderr: '', exitCode: 0 };
+      return result(0);
+    });
+
+    await harness.manager.prepare({ ...spec, roots: [app, lib, extra] });
+
+    expect(harness.logs.some(line => line.includes('workspace adopt done'))).toBe(true);
+    expect(harness.setupCalls).toEqual(['npm install', 'serve', 'npm install', 'serve']);
+    expect(harness.logs.some(line => line.includes('workspace setup skipped'))).toBe(false);
+    expect(harness.logs.some(line => line.includes('workspace setup repeated'))).toBe(true);
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: spec.sessionId, workspace: 'cloned' },
+    ]);
   });
 
   it('keeps the fast path for a re-prepare that names the same roots', async () => {
@@ -4875,6 +4969,45 @@ describe('release cleanup and last-route accounting', () => {
           diagnostic.fields.ok === false
       )
     ).toBe(true);
+  });
+
+  it('settles an older cleanup of the same session after a rapid binding change', async () => {
+    const harness = createHarness();
+    const rootC = 'ses_dddddddddddddddddddddddddd';
+    // A sibling keeps the runtime key, so each released binding walks its own
+    // native session instead of releasing the runtime.
+    const keeper = sharedSpec('ses_keeper', rootB);
+    await harness.manager.prepare(keeper, credentialsFor(keeper, proxyHandle(exp)));
+    const specA = sharedSpec('ses_a', rootA);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    // A's walk resolves only once its abort signal fires.
+    const gate = Promise.withResolvers<void>();
+    harness.setCleanupGate(rootA, gate.promise);
+
+    // A → C queues a cleanup for A, which keeps walking.
+    const specC = sharedSpec('ses_a', rootC);
+    await harness.manager.prepare(specC, credentialsFor(specC, proxyHandle(exp)));
+    expect(harness.abortCalls).toContain(rootA);
+
+    // C → A queues a cleanup for C and must still settle A's walk, not mistake
+    // the session's newest cleanup for the one it is about to replace.
+    harness.frames.length = 0;
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    expect(
+      harness.nativeDiagnostics.filter(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.sessionId === specA.sessionId &&
+          diagnostic.fields.ok === false
+      )
+    ).toHaveLength(1);
+    // The aborted walk settled only because this prepare aborted it, and the
+    // prepare reported ready only after it settled.
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: specA.sessionId },
+    ]);
+    gate.resolve();
   });
 
   it('leaves a superseded binding cleanup running when another binding is prepared', async () => {

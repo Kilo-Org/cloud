@@ -350,7 +350,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const homeRoots = deps.homeRoots ?? defaultHomeRoots();
   const prepared = new Map<string, PreparedRoute>();
   const preparing = new Map<string, PreparingRoute>();
-  const releaseCleanups = new Map<string, InflightCleanup>();
+  // Every in-flight walk of a session, kept per binding: after a rapid
+  // binding change several walks of one session can still be running, and one
+  // must never replace another before it settles.
+  const releaseCleanups = new Map<string, Set<InflightCleanup>>();
   const releaseCleanupDeadlineMs = deps.releaseCleanupDeadlineMs ?? RELEASE_CLEANUP_DEADLINE_MS;
   // Spec §7: clone/checkout/setup mutate one shared worktree, so they must not
   // run concurrently for two sessions on the same directory. The lock is keyed
@@ -824,10 +827,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     setStep: (step: ControlPlanePreparationStep) => void,
     onReplacementWorkspace?: () => Promise<boolean>,
     /**
-     * This preparation starts from an existing prepared workspace whose roots
-     * were already stamped, so setup and start commands already ran on it.
+     * The roots the stored prepared route already prepared, when this
+     * preparation re-prepares that route. Empty for a fresh preparation.
      */
-    fromPreparedWorkspace = false
+    preparedRoots: readonly RouteRoot[] = []
   ): Promise<{
     outcome: ControlPlaneWorkspaceOutcome;
     deferredStamps: Array<{ directory: string; commit: string; workspacePrepared?: false }> | null;
@@ -954,9 +957,33 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     log(
       `control-plane workspace inspect session=${spec.sessionId} inspection=${reconciled.inspections.join(',')} elapsedMs=${Date.now() - inspectStartedAt}`
     );
-    if (reconciled.kind === 'same')
+    // The skip is only for a re-prepare that keeps every prepared root unchanged
+    // and adds roots: every stored prepared root is still there and inspected
+    // `same` (nothing adopted or cloned it), with its branch unchanged, and every
+    // root that needed work is one the stored route never prepared. A removed
+    // root, a changed branch, or a re-cloned checkout runs the commands again.
+    const keptPreparedRoots = preparedRoots.every(stored => {
+      // A route without `roots` prepares its one repository at the route
+      // directory, which is the workspace itself: a re-prepare keeps that root
+      // by keeping the route directory, even when its roots now live inside it.
+      if (stored.repoFullName === undefined) return stored.directory === spec.directory;
+      const index = roots.findIndex(root => root.directory === stored.directory);
+      if (index < 0) return false;
+      const incoming = roots[index]!;
+      const requestedBranch =
+        incoming.spec.branchMode === 'working' ? undefined : incoming.spec.branch;
+      return reconciled.inspections[index] === 'same' && requestedBranch === stored.requestedBranch;
+    });
+    const preparedDirectories = new Set(preparedRoots.map(root => root.directory));
+    const addedOnlyNewRoots = roots.every(
+      (root, index) =>
+        reconciled.inspections[index] === 'same' || !preparedDirectories.has(root.directory)
+    );
+    const skipCommands = preparedRoots.length > 0 && keptPreparedRoots && addedOnlyNewRoots;
+    if (reconciled.kind === 'same' && keptPreparedRoots)
       return { outcome: 'same', deferredStamps: null, commandFailures: [] };
-    const { adopted, cloning } = reconciled;
+    const adopted = reconciled.kind === 'prepared' ? reconciled.adopted : false;
+    const cloning = reconciled.kind === 'prepared' ? reconciled.cloning : false;
     setStep('setup');
     const fromEnvironmentSnapshot = reconciled.inspections.every(
       inspection => inspection === 'foreign'
@@ -966,20 +993,20 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const skippedSetupCommands = spec.environmentSetupCommandCount ?? 0;
     const setupCommands = (spec.setupCommands ?? []).slice(skippedSetupCommands);
     const startCommands = spec.startCommands ?? [];
-    if (fromPreparedWorkspace) {
-      // A re-prepare that only adds roots keeps a workspace whose setup and
-      // start commands already ran; running them again would start a second
-      // server on the same workspace.
+    log(
+      skipCommands
+        ? `control-plane workspace setup skipped session=${spec.sessionId} reason=prepared_workspace_roots_added sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
+        : `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} preparedWorkspaceReused=${preparedRoots.length > 0} environmentBuildCommands=${skippedSetupCommands} sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
+    );
+    if (!skipCommands && preparedRoots.length > 0) {
+      // A prepared workspace whose roots changed: the commands run as a fresh
+      // preparation does, because that workspace is no longer the one prepared.
       log(
-        `control-plane workspace setup skipped session=${spec.sessionId} reason=prepared_workspace_roots_added sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
-      );
-    } else {
-      log(
-        `control-plane workspace setup session=${spec.sessionId} fromEnvironmentSnapshot=${fromEnvironmentSnapshot} environmentBuildCommands=${skippedSetupCommands} sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
+        `control-plane workspace setup repeated session=${spec.sessionId} reason=prepared_roots_changed sessionSetupCommands=${setupCommands.length} startCommands=${startCommands.length}`
       );
     }
     const commandFailures: ControlPlaneCommandFailure[] = [];
-    if (!fromPreparedWorkspace) {
+    if (!skipCommands) {
       await runPreparationCommands(
         spec,
         setupCommands,
@@ -994,6 +1021,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     // with no `.git` yet, or a surviving workspace, never runs it.
     const recoveryApplied =
       cloning || adopted ? ((await onReplacementWorkspace?.()) ?? false) : false;
+    // A surviving workspace whose prepared root set changed runs its commands
+    // again but is still the same workspace: nothing was cloned or adopted.
+    const preparedOutcome: ControlPlaneWorkspaceOutcome =
+      reconciled.kind === 'same' ? 'same' : adopted ? 'adopted' : 'cloned';
     const stamps: Array<{ directory: string; commit: string }> = [];
     for (const root of roots) {
       stamps.push({ directory: root.directory, commit: await headCommit(root.directory, env) });
@@ -1006,7 +1037,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         `control-plane workspace stamp deferred session=${spec.sessionId} elapsedMs=${Date.now() - workspaceStartedAt}`
       );
       return {
-        outcome: adopted ? 'adopted' : 'cloned',
+        outcome: preparedOutcome,
         deferredStamps: stamps,
         commandFailures: commandFailures.slice(0, CONTROL_PLANE_COMMAND_FAILURES_MAX),
       };
@@ -1015,10 +1046,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       await writeStamp(stamp.directory, { allocationId: deps.allocationId, commit: stamp.commit });
     }
     log(
-      `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
+      `control-plane workspace prepared session=${spec.sessionId} outcome=${preparedOutcome} elapsedMs=${Date.now() - workspaceStartedAt}`
     );
     return {
-      outcome: adopted ? 'adopted' : 'cloned',
+      outcome: preparedOutcome,
       deferredStamps: null,
       commandFailures: commandFailures.slice(0, CONTROL_PLANE_COMMAND_FAILURES_MAX),
     };
@@ -1203,17 +1234,21 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         });
       })
       .catch(() => undefined);
-    releaseCleanups.set(input.sessionId, entry);
+    const walkers = releaseCleanups.get(input.sessionId) ?? new Set<InflightCleanup>();
+    releaseCleanups.set(input.sessionId, walkers);
+    walkers.add(entry);
     void entry.promise.finally(() => {
-      if (releaseCleanups.get(input.sessionId) === entry) releaseCleanups.delete(input.sessionId);
+      walkers.delete(entry);
+      if (walkers.size === 0) releaseCleanups.delete(input.sessionId);
     });
   }
 
   /**
    * Stop any release cleanup still walking the binding being prepared before it
-   * resolves the same Kilo session. A cleanup for another binding (a superseded
-   * native session on a shared runtime) is left to finish on its own. Bounded by
-   * the cleanup's own deadline.
+   * resolves the same Kilo session. Cleanups for another binding — a superseded
+   * native session on a shared runtime, or an older binding of this session
+   * still walking — are left to finish on their own. Bounded by each cleanup's
+   * own deadline.
    */
   async function settleReleaseCleanup(binding: {
     sessionId: string;
@@ -1221,17 +1256,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     directory: string;
     kiloSessionId: string;
   }): Promise<void> {
-    const entry = releaseCleanups.get(binding.sessionId);
-    if (!entry) return;
-    if (
-      entry.key !== binding.key ||
-      entry.directory !== binding.directory ||
-      entry.kiloSessionId !== binding.kiloSessionId
-    ) {
-      return;
-    }
-    entry.controller.abort();
-    await entry.promise;
+    const walkers = releaseCleanups.get(binding.sessionId);
+    if (!walkers) return;
+    const matching = [...walkers].filter(
+      entry =>
+        entry.key === binding.key &&
+        entry.directory === binding.directory &&
+        entry.kiloSessionId === binding.kiloSessionId
+    );
+    if (matching.length === 0) return;
+    for (const entry of matching) entry.controller.abort();
+    await Promise.all(matching.map(entry => entry.promise));
   }
 
   /**
@@ -1255,11 +1290,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     credentials: ControlPlaneSessionCredentialsPayload | undefined,
     owner: PreparingRoute,
     /**
-     * This preparation starts from a prepared workspace whose roots were
-     * already stamped: a re-prepare that only adds roots. Setup and start
-     * commands already ran there and must not run again.
+     * The roots the stored prepared route already prepared, when this
+     * preparation re-prepares that route. Empty for a fresh preparation.
      */
-    fromPreparedWorkspace = false
+    preparedRoots: readonly RouteRoot[] = []
   ): Promise<void> {
     const sessionId = spec.sessionId;
     let currentStep: ControlPlanePreparationStep = 'kilo_runtime';
@@ -1505,7 +1539,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               return false;
             }
           },
-          fromPreparedWorkspace
+          preparedRoots
         );
         workspace = preparedWorkspace.outcome;
         workspaceCommandFailures = preparedWorkspace.commandFailures;
@@ -1770,11 +1804,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           // acknowledgement stay the route's own.
           const rootsAdded = !sameRouteRoots(route.spec, spec);
           if (rootsAdded) {
+            // The roots the stored route prepared: a re-prepare that keeps them
+            // unchanged and only adds roots skips the setup and start commands.
+            const preparedRoots = routeRoots(route.spec);
             log(
               `control-plane re-prepare prepares new roots session=${spec.sessionId} directory=${route.directory}`
             );
             prepared.delete(spec.sessionId);
-            const running = runPrepare(spec, credentials, owner, true).finally(() =>
+            const running = runPrepare(spec, credentials, owner, preparedRoots).finally(() =>
               finalizePreparingOwner(owner, spec)
             );
             owner.promise = running;

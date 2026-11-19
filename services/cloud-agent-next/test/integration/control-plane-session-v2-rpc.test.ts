@@ -441,6 +441,98 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     ).toBe(true);
   });
 
+  it('publishes Kilo v2 transcript activity and native renames with the list status', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    const readTransitionId = () =>
+      runInDurableObject(
+        stub,
+        (_instance, state) =>
+          state.storage.kv.get<{ update: { transitionId: string } }>('session_list_status')?.update
+            .transitionId
+      );
+    const source = (title?: string) => ({
+      version: 'v2',
+      session: {
+        id: kiloId,
+        location: { directory: '/workspace/app' },
+        ...(title === undefined ? {} : { title }),
+        time: { created: 1, updated: 2 },
+      },
+    });
+    const firstMessage = messageId();
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(firstMessage),
+    });
+    peer.prepareView = peer.view('ready');
+    await stub.onRoute(peer.view('ready'));
+    const answeredFrom = Date.now();
+    await stub.onEvents({
+      events: [
+        {
+          type: 'conversation.source',
+          properties: {
+            sessionID: kiloId,
+            source: source('New session - 2026-01-01T00:00:00.000Z'),
+          },
+        },
+        {
+          type: 'conversation.message.updated',
+          properties: {
+            sessionID: kiloId,
+            source: source(),
+            message: {
+              id: 'msg_v2_answer',
+              type: 'assistant',
+              time: { created: 1 },
+              content: [{ type: 'text', text: 'Writing response' }],
+            },
+          },
+        },
+        {
+          type: 'conversation.source',
+          properties: { sessionID: kiloId, source: source('Renamed by the agent') },
+        },
+      ],
+    });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: firstMessage });
+    await waitFor(async () => {
+      const published = await runInDurableObject(
+        stub,
+        async (_instance, state) =>
+          (await state.storage.get<PublishCloudAgentSessionStatusParams[]>(
+            LIST_STATUS_PUBLISHES_KEY
+          )) ?? []
+      );
+      // The rename forces its own snapshot and leaves the snapshots after its delivery.
+      expect(published).toContainEqual(
+        expect.objectContaining({ sessionId: kiloId, title: 'Renamed by the agent' })
+      );
+      const latest = published.at(-1);
+      expect(latest).toMatchObject({ sessionId: kiloId, status: 'idle' });
+      expect(Date.parse(latest?.lastActivityAt ?? '')).toBeGreaterThanOrEqual(answeredFrom);
+    });
+
+    // Neither a repeated v2 source nor a v1 session update, whose CLI reports
+    // its own titles, is a rename to publish.
+    const settled = await readTransitionId();
+    await stub.onEvents({
+      events: [
+        {
+          type: 'conversation.source',
+          properties: { sessionID: kiloId, source: source('Renamed by the agent') },
+        },
+        {
+          type: 'session.updated',
+          properties: { info: { id: kiloId, title: 'A title the CLI reports itself' } },
+        },
+      ],
+    });
+    expect(await readTransitionId()).toBe(settled);
+  });
+
   it('accepts delivery when the runtime record has an invalid ingest session identity', async () => {
     const { stub, peer, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
     peer.prepareView = {

@@ -154,6 +154,47 @@ describe('session-list status outbox', () => {
     expect(publish).toHaveBeenCalledTimes(3);
   });
 
+  it('publishes the latest transcript activity with every snapshot and never moves it back', async () => {
+    const { outbox, publish } = fixture();
+    outbox.record(identity, 'busy', 1000, { activityAt: 900 });
+    await outbox.repair(1000);
+    outbox.record(identity, 'idle', 2000, { activityAt: 800 });
+    await outbox.repair(2000);
+    expect(publish.mock.calls.map(([update]) => [update.status, update.lastActivityAt])).toEqual([
+      ['busy', new Date(900).toISOString()],
+      ['idle', new Date(900).toISOString()],
+    ]);
+  });
+
+  it('publishes a native rename without waiting for the next status change', async () => {
+    const { outbox, publish } = fixture();
+    outbox.record(identity, 'busy', 1000);
+    await outbox.repair(1000);
+    outbox.record(identity, 'busy', 1001, { title: 'Renamed by the agent' });
+    await outbox.repair(1001);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(publish.mock.calls[1]?.[0]).toMatchObject({
+      status: 'busy',
+      title: 'Renamed by the agent',
+    });
+  });
+
+  it('keeps an undelivered rename in newer snapshots and drops it once delivered', async () => {
+    const { outbox, publish } = fixture();
+    publish.mockRejectedValueOnce(new Error('unavailable'));
+    outbox.record(identity, 'busy', 1000, { title: 'Renamed by the agent' });
+    await outbox.repair(1000);
+    outbox.record(identity, 'idle', 2000);
+    await outbox.repair(2000);
+    outbox.record(identity, 'busy', 3000);
+    await outbox.repair(3000);
+    expect(publish.mock.calls.map(([update]) => [update.status, update.title])).toEqual([
+      ['busy', 'Renamed by the agent'],
+      ['idle', 'Renamed by the agent'],
+      ['busy', undefined],
+    ]);
+  });
+
   it('retains failures for alarm retry after eviction without retrying early', async () => {
     const { outbox, storage, publish } = fixture();
     publish.mockRejectedValueOnce(new Error('unavailable'));

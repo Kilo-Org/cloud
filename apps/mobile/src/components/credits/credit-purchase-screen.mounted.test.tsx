@@ -436,7 +436,7 @@ describe('CreditPurchaseScreen', () => {
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(renderer).length === 4);
-    const labels = packRows(renderer).map(row => row.props.accessibilityLabel);
+    const labels = packRows(renderer).map(row => labelOf(row));
     expect(labels[0]).toContain('These credits expire one calendar year after purchase.');
     expect(labels[1]).toContain('These credits do not expire.');
     expect(allText(renderer)).not.toContain(
@@ -463,7 +463,7 @@ describe('CreditPurchaseScreen', () => {
 
     expect(allText(renderer)).toContain('No expiring credits.');
     expect(allText(renderer)).not.toContain('These credits do not expire.');
-    const labels = packRows(renderer).map(row => row.props.accessibilityLabel);
+    const labels = packRows(renderer).map(row => labelOf(row));
     expect(labels).toHaveLength(4);
     expect(labels.every(label => label.endsWith(', These credits do not expire.'))).toBe(true);
     unmount();
@@ -490,7 +490,7 @@ describe('CreditPurchaseScreen', () => {
     );
     expect(captions).toHaveLength(1);
     expect(allText(renderer)).toContain(oneYearCaption);
-    const labels = packRows(renderer).map(row => row.props.accessibilityLabel);
+    const labels = packRows(renderer).map(row => labelOf(row));
     expect(labels.every(label => label.endsWith(`, ${oneYearCaption}`))).toBe(true);
     unmount();
   });

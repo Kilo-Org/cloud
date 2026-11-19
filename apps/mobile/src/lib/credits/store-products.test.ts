@@ -126,7 +126,12 @@ describe('getStoreCreditGroupExpiryMessageKey', () => {
   const catalog = (
     policy: NonNullable<BackendStoreCreditProduct['creditExpiryPolicy']>
   ): BackendStoreCreditProduct[] =>
-    backendProducts.map(product => ({ ...product, creditExpiryPolicy: policy }));
+    backendProducts.map(({ amountUsd, appleProductId, googleProductId }) => ({
+      amountUsd,
+      appleProductId,
+      googleProductId,
+      creditExpiryPolicy: policy,
+    }));
 
   it('adds no caption when the balance card already says the credits do not expire', () => {
     expect(getStoreCreditGroupExpiryMessageKey(catalog('never'), 'play')).toBeUndefined();

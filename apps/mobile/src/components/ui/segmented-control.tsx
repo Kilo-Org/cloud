@@ -108,7 +108,14 @@ export function SegmentedControl<T extends string>({
               // instead of touching the edges.
               ROW_TARGET_CLASS,
               'flex-1 justify-center rounded-md px-2 py-2 active:opacity-70',
-              selected && 'bg-background',
+              // The selected pill stands above the `bg-secondary` track in both
+              // schemes. Light's page surface (#FBFAF5) already does; dark's
+              // `--background` (#0E0E10) is darker than the track (#1F1F24) and
+              // reads as a hole, so dark takes the palette's raised neutral
+              // above `--secondary` (#44444A: 1.70:1 off the track, 8.5:1
+              // under the segment's foreground ink), the step the secondary
+              // button and the add-credits row paint in dark.
+              selected && 'bg-background dark:bg-secondary-fill',
               optionDisabled && 'opacity-50'
             )}
           >

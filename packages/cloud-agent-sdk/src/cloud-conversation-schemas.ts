@@ -160,6 +160,9 @@ const cloudMessageSchema = z.discriminatedUnion('role', [
   kiloSdkAssistantMessageSchema,
 ]);
 
+// The worker sends a user Stop as this string (worker-utils `user_interrupt`), not a structured error.
+const USER_INTERRUPT_ERROR = /^(\[BYOK\] )?The message was interrupted by the user$/;
+
 export function normalizeAssistantMessageError(value: unknown): unknown {
   if (
     typeof value !== 'object' ||
@@ -178,13 +181,12 @@ export function normalizeAssistantMessageError(value: unknown): unknown {
     decoded = undefined;
   }
   const parsed = kiloSdkAssistantMessageSchema.shape.error.safeParse(decoded);
-  return {
-    ...value,
-    error:
-      parsed.success && parsed.data !== undefined
-        ? parsed.data
-        : { name: 'UnknownError', data: { message: value.error } },
-  };
+  let error: unknown;
+  if (parsed.success && parsed.data !== undefined) error = parsed.data;
+  else if (USER_INTERRUPT_ERROR.test(value.error))
+    error = { name: 'MessageAbortedError', data: { message: value.error } };
+  else error = { name: 'UnknownError', data: { message: value.error } };
+  return { ...value, error };
 }
 
 export const cloudMessageInfoSchema = z.preprocess(

@@ -157,6 +157,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (app)/bitbucket-connect.tsx	(app)/bitbucket-connect	route	ios	none	n/a: sheet	T2-G14 kiloapp:///(app)/bitbucket-connect	none	none	none	none	n/a
 (app)/changelog.tsx	(app)/changelog	route	android	n/a: bundled copy	n/a	T2-G04b kiloapp:///(app)/changelog	n/a	n/a	n/a	n/a	B:T2-G04b
 (app)/changelog.tsx	(app)/changelog	route	ios	n/a: bundled copy	n/a	T2-G04b kiloapp:///(app)/changelog	n/a	n/a	n/a	n/a	B:T2-G04b
+(app)/chat-fixture.tsx	(app)/chat-fixture	dev-fixture	android	none	none	none	none	none	none	none	none
+(app)/chat-fixture.tsx	(app)/chat-fixture	dev-fixture	ios	none	none	none	none	none	none	none	none
 (app)/code-reviewer/[scope]/[platform]/(edit)/council.tsx	(app)/code-reviewer/[scope]/[platform]/(edit)/council	route	android	none	n/a: form	T1-G13b kiloapp:///(app)/code-reviewer/personal/github/council ; B:T1-G13b	none	B:T1-G13b (CouncilRefusalScreen)	none	none	none
 (app)/code-reviewer/[scope]/[platform]/(edit)/council.tsx	(app)/code-reviewer/[scope]/[platform]/(edit)/council	route	ios	none	n/a: form	T1-G13b kiloapp:///(app)/code-reviewer/personal/github/council ; B:T1-G13b	none	B:T1-G13b (CouncilRefusalScreen)	none	none	none
 (app)/code-reviewer/[scope]/[platform]/(edit)/focus-areas.tsx	(app)/code-reviewer/[scope]/[platform]/(edit)/focus-areas	route	android	none	n/a	T2-G13 kiloapp:///(app)/code-reviewer/personal/github/focus-areas ; B:T2-G13	none	none	none	none	none
@@ -347,6 +349,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (auth)/language-picker.tsx	(auth)/language-picker	route	ios	n/a	n/a	none	n/a	n/a	n/a	n/a	none
 (auth)/legal/[document].tsx	(auth)/legal/[document]	route	android	none	n/a	T2-auth01b kiloapp:///(auth)/legal/privacy	none	note: none (legal-document-screen.tsx:100)	n/a	none	B:T2-auth01b
 (auth)/legal/[document].tsx	(auth)/legal/[document]	route	ios	none	n/a	T2-auth01b kiloapp:///(auth)/legal/privacy	none	note: none (legal-document-screen.tsx:100)	n/a	none	B:T2-auth01b
+(auth)/login-fixture.tsx	(auth)/login-fixture	dev-fixture	android	none	none	none	none	none	none	none	none
+(auth)/login-fixture.tsx	(auth)/login-fixture	dev-fixture	ios	none	none	none	none	none	none	none	none
 (auth)/login.tsx	(auth)/login	route	android	none	n/a	T2-auth01b kiloapp:///(auth)/login	none	none	n/a	none	n/a
 (auth)/login.tsx	(auth)/login	route	ios	none	n/a	T2-auth01b kiloapp:///(auth)/login	none	none	n/a	none	n/a
 (auth)/part-detail-transition-fixture.tsx	(auth)/part-detail-transition-fixture	dev-fixture	android	n/a	n/a	T1-auth02 kiloapp:///(auth)/part-detail-transition-fixture?open=file ; F:dev/part-detail-transition-fixture?open=file	n/a	T2-auth01a kiloapp:///(auth)/part-detail-transition-fixture?open=missing&state=running ; F:dev/part-detail-transition-fixture?open=missing&state=running	n/a	n/a	B:T1-auth02

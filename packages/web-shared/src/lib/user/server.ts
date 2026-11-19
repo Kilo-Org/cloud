@@ -200,6 +200,7 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      cloudAgentRuntimeProxied?: undefined;
       credential?: undefined;
       webSessionId?: undefined;
       webSessionPepper?: undefined;
@@ -219,6 +220,8 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      /** True only for a token whose runtime claim the Cloud Agent runtime proxy attested. */
+      cloudAgentRuntimeProxied?: boolean;
       credential?: PrivilegedCredentialKind;
       /** Server-only per-session id for MFA step-up; never sent to the browser. */
       webSessionId?: string;
@@ -556,6 +559,7 @@ async function resolveUserFromAuth(
       tokenSource,
       deviceSessionId,
       cloudAgentAuthority: scope,
+      cloudAgentRuntimeProxied: authorizationValidationResult.cloudAgentRuntimeProxied,
     });
     if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
       return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
@@ -687,6 +691,8 @@ type UserAuthorizationRequest = {
   tokenSource?: string;
   deviceSessionId?: string;
   cloudAgentAuthority?: CloudAgentAuthority;
+  /** True only for a token whose runtime claim the Cloud Agent runtime proxy attested. */
+  cloudAgentRuntimeProxied?: boolean;
   webSession?: {
     id?: string;
     pepper?: string | null;
@@ -707,6 +713,7 @@ async function validateUserAuthorization({
   tokenSource,
   deviceSessionId,
   cloudAgentAuthority,
+  cloudAgentRuntimeProxied,
   webSession,
 }: UserAuthorizationRequest): Promise<GetAuthResponse> {
   if (!user) {
@@ -800,6 +807,7 @@ async function validateUserAuthorization({
     tokenSource,
     deviceSessionId,
     cloudAgentAuthority,
+    cloudAgentRuntimeProxied,
     webSessionId: webSession?.id,
     webSessionPepper: webSession?.pepper,
     authenticatedAt: webSession?.authenticatedAt,

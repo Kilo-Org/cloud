@@ -130,12 +130,17 @@ async function readCloudSnapshotPage(
   fetchPage: NonNullable<CloudAgentTransportConfig['fetchCloudSnapshotPage']>,
   sessionId: CloudAgentSessionId
 ): Promise<SnapshotRead> {
+  let payload: unknown;
   try {
-    const page = cloudSessionMessagesPageSchema.parse(await fetchPage(sessionId, {}));
-    return page === null ? { kind: 'missing' } : { kind: 'page', page };
+    payload = await fetchPage(sessionId, {});
   } catch (error) {
     return { kind: 'rejected', error };
   }
+  // A page that fails the schema is terminal: a retry replays the same
+  // persisted page, and its validation text is not a user-facing message.
+  const parsed = cloudSessionMessagesPageSchema.safeParse(payload);
+  if (!parsed.success) return { kind: 'typed', outcome: { kind: 'invalid_data' } };
+  return parsed.data === null ? { kind: 'missing' } : { kind: 'page', page: parsed.data };
 }
 
 function snapshotReadFailureMessage(error: unknown): string {

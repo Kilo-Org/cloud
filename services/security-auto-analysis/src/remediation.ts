@@ -1416,6 +1416,7 @@ async function launchAttempt(params: {
     return { status: cancelled ? 'cancelled' : 'claim-lost' };
   }
 
+  const callbackAttemptTokenHash = await hashToken(attemptToken);
   const runningTransitioned = await params.db.transaction(async tx => {
     const rows = await tx
       .update(security_remediation_attempts)
@@ -1423,7 +1424,7 @@ async function launchAttempt(params: {
         status: 'running',
         cloud_agent_session_id: cloudAgentSessionId,
         kilo_session_id: kiloSessionId,
-        callback_attempt_token_hash: await hashToken(attemptToken),
+        callback_attempt_token_hash: callbackAttemptTokenHash,
         launched_at: sql`now()`,
         updated_at: sql`now()`,
       })

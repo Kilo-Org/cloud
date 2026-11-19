@@ -27,6 +27,7 @@ import {
   type StageAndEnqueueFailureStage,
 } from './stage-and-enqueue';
 import { validateAndParseIngestPayload } from './validate';
+import { describeWorkerDbError } from '../util/worker-db-error';
 
 type DirectIngestContext = { waitUntil(promise: Promise<unknown>): void };
 
@@ -193,7 +194,7 @@ export async function handleDirectIngestRequest(
     console.error({
       event: 'direct_ingest_config_error',
       reason: 'bucket_failure',
-      error: errorMessage(error),
+      ...describeWorkerDbError(error),
     });
     return legacyWithBoundedBody('gate_config', unknownMetrics());
   }
@@ -243,7 +244,7 @@ export async function handleDirectIngestRequest(
         items: null,
       }),
       stage: 'body_read',
-      error: errorMessage(error),
+      ...describeWorkerDbError(error),
     });
     throw error;
   }
@@ -361,7 +362,7 @@ export async function handleDirectIngestRequest(
       event: 'direct_ingest_post_commit_error',
       ingestRequestId: request.ingestRequestId,
       sessionId: request.sessionId,
-      error: errorMessage(error),
+      ...describeWorkerDbError(error),
     });
   });
   if (request.executionContext) {
@@ -413,7 +414,7 @@ async function legacy(
       ...eventBase(request, options.startedAt, options.metrics),
       reason: options.reason,
       failureStage: error instanceof StageAndEnqueueError ? error.stage : 'staging_upload',
-      error: errorMessage(error),
+      ...describeWorkerDbError(error),
     });
     throw error;
   }
@@ -461,7 +462,7 @@ async function runMetadataProjection(
       event: 'direct_ingest_metadata_error',
       ingestRequestId: request.ingestRequestId,
       sessionId: request.sessionId,
-      error: errorMessage(error),
+      ...describeWorkerDbError(error),
     });
   });
 }
@@ -491,7 +492,7 @@ async function runDirectPostCommitTasks(
         ingestRequestId: request.ingestRequestId,
         sessionId: request.sessionId,
         notificationId,
-        error: errorMessage(error),
+        ...describeWorkerDbError(error),
       });
     }
   };
@@ -550,7 +551,7 @@ async function runDirectPostCommitTasks(
               ingestRequestId: request.ingestRequestId,
               sessionId: request.sessionId,
               signalId: signal.signalId,
-              error: errorMessage(error),
+              ...describeWorkerDbError(error),
             });
           }
         }
@@ -560,7 +561,7 @@ async function runDirectPostCommitTasks(
         event: 'direct_ingest_attention_error',
         ingestRequestId: request.ingestRequestId,
         sessionId: request.sessionId,
-        error: errorMessage(error),
+        ...describeWorkerDbError(error),
       });
     }
   }
@@ -675,12 +676,15 @@ function logFallback(
 ) {
   const failureStage: 'do_rpc' | StageAndEnqueueFailureStage =
     stage ?? (error instanceof StageAndEnqueueError ? error.stage : 'staging_upload');
+  const direct = directError === undefined ? undefined : describeWorkerDbError(directError);
   logEvent('warn', {
     event: 'direct_ingest_fallback',
     ...eventBase(request, startedAt, metrics),
     stage: failureStage,
-    error: errorMessage(error),
-    ...(directError === undefined ? {} : { directError: errorMessage(directError) }),
+    ...describeWorkerDbError(error),
+    ...(direct === undefined
+      ? {}
+      : { directError: direct.error, directErrorCauses: direct.causes }),
   });
 }
 
@@ -719,8 +723,4 @@ function logEvent(level: 'info' | 'warn', event: CommonEvent & Record<string, un
 
 function elapsed(startedAt: number): number {
   return Math.round(performance.now() - startedAt);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

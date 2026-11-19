@@ -29,6 +29,7 @@ import {
   getOrganizationByokProviderIds,
   getStoredByokKeys,
   getUserByokProviderIds,
+  parseByokSettings,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -268,11 +269,23 @@ describe('byokOwner', () => {
 
 describe('servesCatalogModels', () => {
   test('is true only for stored settings that enable catalog mode', () => {
-    expect(servesCatalogModels({ serve_catalog_models: true })).toBe(true);
-    expect(servesCatalogModels({ serve_catalog_models: false })).toBe(false);
-    expect(servesCatalogModels({})).toBe(false);
-    expect(servesCatalogModels(null)).toBe(false);
-    expect(servesCatalogModels({ serve_catalog_models: 'true' })).toBe(false);
+    expect(servesCatalogModels(parseByokSettings({ serve_catalog_models: true }))).toBe(true);
+    expect(servesCatalogModels(parseByokSettings({ serve_catalog_models: false }))).toBe(false);
+    expect(servesCatalogModels(parseByokSettings({}))).toBe(false);
+    expect(servesCatalogModels(parseByokSettings(null))).toBe(false);
+    expect(servesCatalogModels(parseByokSettings({ serve_catalog_models: 'true' }))).toBe(false);
+  });
+});
+
+describe('parseByokSettings', () => {
+  test('reads invalid or missing settings as empty', () => {
+    expect(parseByokSettings({})).toEqual({});
+    expect(parseByokSettings({ priority: 'x' })).toEqual({});
+    expect(parseByokSettings(null)).toEqual({});
+    expect(parseByokSettings({ serve_catalog_models: true, priority: 2 })).toEqual({
+      serve_catalog_models: true,
+      priority: 2,
+    });
   });
 });
 
@@ -358,13 +371,45 @@ describe('getByokCredentials', () => {
       'anthropic',
       '2026-01-01T00:00:00.000Z',
       {
-        settings: { serve_catalog_models: true },
+        settings: { serve_catalog_models: true, priority: 2 },
       }
     );
 
     await expect(getBYOKforUser(db, user.id, ['anthropic'])).resolves.toEqual([
-      { decryptedAPIKey: expect.any(String), providerId: 'anthropic' },
+      { decryptedAPIKey: expect.any(String), providerId: 'anthropic', priority: 2 },
     ]);
+  });
+
+  test('emits one credential shape across the routing and list paths', async () => {
+    const user = await createUser();
+    const owner = byokOwner(user.id, null);
+    await insertByokKey(owner, user.id, 'anthropic', '2026-01-01T00:00:00.000Z', {
+      settings: { serve_catalog_models: true, priority: 2 },
+    });
+    await insertByokKey(owner, user.id, 'minimax', '2026-01-02T00:00:00.000Z');
+    const providers: UserByokProviderId[] = ['anthropic', 'minimax'];
+
+    const [credentials, rows, stored] = await Promise.all([
+      getByokCredentials(db, owner, providers),
+      getBYOKforUser(db, user.id, providers),
+      getStoredByokKeys(db, owner),
+    ]);
+    const decrypted = await Promise.all(stored.keys.map(key => stored.decrypt(key.providerId)));
+
+    // A credential field added in one place must reach every consumer, and an undefined priority is
+    // omitted by each of them: the own keys, not only the values, are the contract here.
+    const ownKeys = (value: object) => Object.keys(value).sort();
+    const fromList = credentials.map(({ serveCatalogModels: _catalog, ...rest }) => rest);
+    expect(rows).toEqual(fromList);
+    expect(decrypted).toEqual(fromList);
+    expect(ownKeys(credentials[0])).toEqual([
+      'decryptedAPIKey',
+      'priority',
+      'providerId',
+      'serveCatalogModels',
+    ]);
+    expect(ownKeys(fromList[1])).toEqual(['decryptedAPIKey', 'providerId']);
+    expect(ownKeys(decrypted[1])).toEqual(['decryptedAPIKey', 'providerId']);
   });
 });
 

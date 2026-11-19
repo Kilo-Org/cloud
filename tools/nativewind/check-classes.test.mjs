@@ -281,6 +281,35 @@ test('accepts Intl type references', () => {
   );
 });
 
+// The same source checked under two paths: the app tree reports five hand-built
+// formatters, so the empty result for the shared package proves the rule's
+// scope rather than a broken fixture.
+const INTL_SOURCE =
+  "export const a = new Intl.DateTimeFormat('en-US');\n" +
+  "export const b = Intl.NumberFormat('en-US');\n" +
+  'export const c = value.toLocaleDateString();\n' +
+  'export const d = value.toLocaleTimeString();\n' +
+  'export const e = value.toLocaleString();\n';
+
+test('flags toLocale*String calls on the app tree', () => {
+  const found = check('apps/mobile/src/format.ts', INTL_SOURCE);
+  assert.deepEqual(found, [
+    'apps/mobile/src/format.ts:1: "new Intl.DateTimeFormat" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:2: "Intl.NumberFormat(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:3: ".toLocaleDateString(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:4: ".toLocaleTimeString(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+    'apps/mobile/src/format.ts:5: ".toLocaleString(" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once',
+  ]);
+});
+
+test('keeps the formatter rule out of the shared package', () => {
+  assert.deepEqual(
+    check('packages/app-shared/src/format.ts', INTL_SOURCE),
+    [],
+    'the same source reports five diagnostics under apps/mobile/src'
+  );
+});
+
 test('reads padding from a typed scroll container tag', () => {
   const found = check(
     'apps/mobile/src/screen.tsx',

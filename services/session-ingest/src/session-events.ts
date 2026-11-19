@@ -54,15 +54,31 @@ export function notifyUserSessionEvent(
   ctx?: { waitUntil(promise: Promise<unknown>): void }
 ): void {
   const notify = async () => {
-    try {
-      const stub = getUserConnectionDO(env, { kiloUserId });
-      await stub.notifySessionEvent(event);
-    } catch (error) {
-      console.error('Failed to notify session event (non-fatal)', {
-        event: event.type,
-        sessionId: 'session' in event.data ? event.data.session.sessionId : event.data.sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    const session =
+      'session' in event.data
+        ? event.data.session
+        : event.type === 'session.deleted'
+          ? event.data
+          : undefined;
+    const events: SessionEventPayload[] = [event];
+    if (session?.parentSessionId === null && session.worktreeId) {
+      events.push({ type: 'workspace.updated', data: { worktreeId: session.worktreeId } });
+    }
+    for (const notification of events) {
+      try {
+        const stub = getUserConnectionDO(env, { kiloUserId });
+        await stub.notifySessionEvent(notification);
+      } catch (error) {
+        console.error('Failed to notify session event (non-fatal)', {
+          event: notification.type,
+          ...('session' in notification.data
+            ? { sessionId: notification.data.session.sessionId }
+            : 'sessionId' in notification.data
+              ? { sessionId: notification.data.sessionId }
+              : { worktreeId: notification.data.worktreeId }),
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   };
 

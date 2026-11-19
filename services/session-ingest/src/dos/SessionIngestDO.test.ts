@@ -33,6 +33,7 @@ vi.mock('@kilocode/db/client', () => ({
 }));
 
 import { SessionIngestDO, ingestOrderCursor } from './SessionIngestDO';
+import { cli_sessions_v2, cloud_agent_worktrees } from '@kilocode/db/schema';
 import { ingestItems, ingestMeta } from '../db/sqlite-schema';
 import { BRIEFING_MAX_EXCERPT_SOURCE_ROWS } from '../ingest/briefing-excerpt';
 import { INACTIVITY_TIMEOUT_MS, POST_CLOSE_DRAIN_MS } from './session-metrics';
@@ -1164,7 +1165,13 @@ describe('SessionIngestDO live activity + cost persist', () => {
       lastPgSet = set;
       return { where: pgWhere };
     });
-    const pgUpdate = vi.fn(() => ({ set: pgSet }));
+    const workspacePgWhere = vi.fn(async (_condition: unknown) => undefined);
+    const workspacePgSet = vi.fn((_set: Record<string, unknown>) => ({ where: workspacePgWhere }));
+    const pgUpdate = vi.fn((table: unknown) => {
+      if (table === cli_sessions_v2) return { set: pgSet };
+      if (table === cloud_agent_worktrees) return { set: workspacePgSet };
+      throw new Error('Unexpected PostgreSQL update target');
+    });
     dbClientMocks.getWorkerDb.mockReset();
     dbClientMocks.getWorkerDb.mockReturnValue({ update: pgUpdate });
 
@@ -1223,6 +1230,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
       metaWritesInTransaction,
       pgSet,
       pgWhere,
+      workspacePgSet,
+      workspacePgWhere,
       getWorkerDb: dbClientMocks.getWorkerDb,
     };
   }
@@ -2383,6 +2392,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(sqlFragmentText(set.total_cost_microdollars)).toContain('150000');
     const activityIso = new Date(ingestedAt).toISOString();
     expect(sqlFragmentText(set.last_activity_at)).toContain(activityIso);
+    expect(harness.workspacePgSet).toHaveBeenCalledExactlyOnceWith({
+      last_activity_at: activityIso,
+    });
+    expect(harness.workspacePgWhere).toHaveBeenCalledOnce();
     // Meta advanced only after successful write
     expect(harness.meta.get('lastActivityPersistedValueMs')).toBe(String(ingestedAt));
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('150000');
@@ -2404,6 +2417,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     );
     await harness.settle();
     expect(harness.pgCallCount).toBe(0);
+    expect(harness.workspacePgSet).not.toHaveBeenCalled();
   });
 
   it('does not persist when message is stale-skipped by ingested_at guard', async () => {

@@ -31,7 +31,7 @@ jest.mock('@/lib/trpc/utils', () => ({
     },
     cliSessionsV2: {
       listWorkspaces: { pathFilter: () => ({ queryKey: ['listWorkspaces'] }) },
-      worktreeDetails: { pathFilter: () => ({ queryKey: ['worktreeDetails'] }) },
+      workspaceSummaries: { pathFilter: () => ({ queryKey: ['workspaceSummaries'] }) },
     },
   }),
 }));
@@ -66,7 +66,7 @@ describe('smart-folder order dispatch', () => {
     expect(mockMutateAsync).not.toHaveBeenCalled();
     expect(mockInvalidateQueries).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledWith(
-      'Cannot save workspace order for smart folders with more than 200 workspaces.'
+      'Cannot save workspace order for smart folders with more than 500 workspaces.'
     );
     expect(toast.success).not.toHaveBeenCalled();
   });
@@ -83,6 +83,9 @@ describe('smart-folder order dispatch', () => {
       worktreeIds: ids,
     });
     expect(mockInvalidateQueries).toHaveBeenCalledTimes(3);
+    expect(mockInvalidateQueries).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['workspaceSummaries'] })
+    );
     expect(toast.success).toHaveBeenCalledWith('Workspace order saved');
     expect(toast.error).not.toHaveBeenCalled();
   });

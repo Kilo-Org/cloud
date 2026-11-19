@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import {
   cli_sessions_v2,
   cloud_agent_workspace_folders,
@@ -22,7 +22,16 @@ import {
 } from '@/lib/cloud-agent/workspace-folders';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { workspaceFoldersRouter } from './workspace-folders-router';
+import type * as WorkspaceFoldersRouterModule from './workspace-folders-router';
+import type * as SessionEventsModule from '@/lib/cloud-agent/session-events';
+jest.mock('@/lib/cloud-agent/session-events', () => ({ queueWorkspaceUpdates: jest.fn() }));
+
+const { workspaceFoldersRouter } = jest.requireActual<typeof WorkspaceFoldersRouterModule>(
+  './workspace-folders-router'
+);
+const { queueWorkspaceUpdates } = jest.requireMock<typeof SessionEventsModule>(
+  '@/lib/cloud-agent/session-events'
+);
 
 const USER_ID = 'oauth/github|workspace-folder-owner';
 const OTHER_USER_ID = 'oauth/github|other-workspace-folder-owner';
@@ -341,7 +350,7 @@ describe('workspaceFolders persistence and validation', () => {
     await expect(
       callerFor().reorderWorktrees({
         ...input,
-        worktreeIds: Array.from({ length: 201 }, newWorktreeId),
+        worktreeIds: Array.from({ length: 501 }, newWorktreeId),
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     await expect(callerFor(otherUser).reorderWorktrees(input)).rejects.toMatchObject({
@@ -522,6 +531,7 @@ describe('workspaceFolders persistence and validation', () => {
   );
 
   it('writes a fractional sidebar position only when supplied and clears it on null', async () => {
+    jest.mocked(queueWorkspaceUpdates).mockClear();
     await insertWorktree();
     const folder = await createFolder(null, 'Manual');
     const caller = callerFor();
@@ -533,6 +543,9 @@ describe('workspaceFolders persistence and validation', () => {
       position: 'a0',
     });
     expect((await readWorktree())?.sidebar_position).toBe('a0');
+    expect(queueWorkspaceUpdates).toHaveBeenCalledWith({ userId: USER_ID, organizationId: null }, [
+      WORKTREE_ID,
+    ]);
 
     await caller.moveWorktree({
       organizationId: null,

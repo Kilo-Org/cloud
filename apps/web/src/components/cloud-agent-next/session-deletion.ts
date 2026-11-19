@@ -1,4 +1,4 @@
-import type { QueryClient } from '@tanstack/react-query';
+import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { TRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import {
@@ -60,6 +60,8 @@ export function invalidateSessionQueries({ queryClient, trpc }: SessionQueryCont
     queryClient.invalidateQueries(trpc.cliSessionsV2.listWorkspaces.pathFilter()),
     queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter()),
     queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter()),
+    queryClient.invalidateQueries(trpc.cliSessionsV2.workspaceSummaries.pathFilter()),
+    queryClient.invalidateQueries(trpc.cliSessionsV2.workspaceChats.pathFilter()),
     queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeParent.pathFilter()),
     queryClient.invalidateQueries(trpc.activeSessions.list.pathFilter()),
     queryClient.invalidateQueries(trpc.workspaceFolders.list.pathFilter()),
@@ -82,6 +84,7 @@ export async function removeDeletedSession({
   await Promise.all([
     queryClient.cancelQueries(trpc.cliSessionsV2.list.pathFilter()),
     queryClient.cancelQueries(trpc.cliSessionsV2.search.pathFilter()),
+    queryClient.cancelQueries(trpc.cliSessionsV2.workspaceChats.pathFilter()),
     queryClient.cancelQueries(trpc.activeSessions.list.pathFilter()),
   ]);
 
@@ -101,6 +104,19 @@ export async function removeDeletedSession({
         ...current,
         results: current.results.filter(session => session.session_id !== sessionId),
       }
+  );
+  queryClient.setQueriesData<InfiniteData<SessionOutputs['workspaceChats']>>(
+    trpc.cliSessionsV2.workspaceChats.pathFilter(),
+    current =>
+      current
+        ? {
+            ...current,
+            pages: current.pages.map(page => ({
+              ...page,
+              chats: page.chats.filter(chat => chat.sessionId !== sessionId),
+            })),
+          }
+        : current
   );
   queryClient.setQueryData(
     trpc.activeSessions.list.queryKey(),

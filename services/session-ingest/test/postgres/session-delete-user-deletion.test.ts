@@ -69,7 +69,10 @@ beforeAll(async () => {
       deletion_completed_at timestamptz,
       runtime_locations jsonb NOT NULL DEFAULT '[]'::jsonb,
       deletion_manifest jsonb,
-      deleted_session_ids text[] NOT NULL DEFAULT '{}'::text[]
+      deleted_session_ids text[] NOT NULL DEFAULT '{}'::text[],
+      closed_session_ids text[] NOT NULL DEFAULT '{}',
+      tab_order text[] NOT NULL DEFAULT '{}',
+      last_activity_at timestamptz
     );
     CREATE TEMP TABLE cli_sessions_v2 (
       session_id text NOT NULL,

@@ -29,6 +29,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
+import { persistWorkspaceActivity } from '../services/workspace-activity';
 import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
 import { MAX_INGEST_ITEM_BYTES, CLONE_WINDOW_MAX_BYTES } from '../util/ingest-limits';
@@ -427,12 +428,16 @@ export async function persistLiveSessionColumns(
 
   if (Object.keys(set).length === 0) return;
 
-  await getWorkerDb(connectionString)
+  const db = getWorkerDb(connectionString);
+  await db
     .update(cli_sessions_v2)
     .set(set)
     .where(
       and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
     );
+  if (columns.lastActivityAtIso) {
+    await persistWorkspaceActivity(db, kiloUserId, sessionId, columns.lastActivityAtIso);
+  }
 }
 
 const INGEST_META_EXTRACTORS: Array<{

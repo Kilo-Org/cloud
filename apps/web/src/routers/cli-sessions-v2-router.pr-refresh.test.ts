@@ -164,6 +164,7 @@ jest.mock('@/lib/session-ingest-client', () => ({
 
 jest.mock('@/lib/cloud-agent/session-events', () => ({
   notifyCliSessionRenamed: jest.fn(),
+  queueWorkspaceUpdates: jest.fn(),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/batch-review-decisions', () => ({

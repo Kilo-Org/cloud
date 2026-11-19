@@ -1,37 +1,23 @@
 import { startOfDay, subDays } from 'date-fns';
 import type { TRPCQueryKey } from '@trpc/tanstack-react-query';
-import {
-  cloudAgentWorktreeIdSchema,
-  type CloudAgentWorktreeId,
-} from '@kilocode/session-ingest-contracts';
 import { WORKSPACE_LIST_SEARCH_MAX_LENGTH } from '@/lib/cloud-agent/workspace-folders';
-
-/**
- * The sidebar's query inputs, shared by the client hooks and the server prefetch,
- * so a prefetched query has the exact key the client reads first.
- */
 
 export const SIDEBAR_LIST_LIMIT = 200;
 export const SIDEBAR_WORKSPACE_PAGE_LIMIT = 200;
 export const DEFAULT_SIDEBAR_PLATFORM_FILTER = ['cloud-agent'];
-const WORKTREE_DETAILS_BATCH_SIZE = 200;
 
-/** The oldest activity the sidebar lists. */
 export function sidebarUpdatedSince(now: Date): string {
   return startOfDay(subDays(now, 5)).toISOString();
 }
 
-/** The platforms the server filters by for the sidebar's platform choice. */
 export function createdOnPlatformForFilter(
   platformFilter: readonly string[]
 ): string[] | undefined {
   if (platformFilter.length === 0) return undefined;
   return platformFilter.flatMap(platform => {
     switch (platform) {
-      // 'cloud-agent-web' is a variant of the cloud agent
       case 'cloud-agent':
         return ['cloud-agent', 'cloud-agent-web'];
-      // Extension sessions are created from VS Code or agent-manager
       case 'extension':
         return ['vscode', 'agent-manager'];
       default:
@@ -41,9 +27,9 @@ export function createdOnPlatformForFilter(
 }
 
 type SidebarFilters = {
-  organizationId: string | null | undefined;
-  createdOnPlatform: string | string[] | undefined;
-  gitUrl: string | string[] | undefined;
+  organizationId?: string | null;
+  createdOnPlatform?: string | string[];
+  gitUrl?: string | string[];
 };
 
 export function sidebarListInput({
@@ -60,10 +46,10 @@ export function sidebarListInput({
     createdOnPlatform,
     gitUrl,
     fetchReviewDecision: true,
+    standaloneOnly: true,
   };
 }
 
-/** Workspace rows are loaded independently of the 5-day chat window. */
 export function sidebarWorkspaceListInput({
   organizationId,
   createdOnPlatform,
@@ -79,34 +65,27 @@ export function sidebarWorkspaceListInput({
   };
 }
 
-/** The folders list is cached per user, so another user's folders never show. */
+export function sidebarScopeKey(filters: SidebarFilters): string {
+  return JSON.stringify([
+    filters.organizationId ?? null,
+    filters.createdOnPlatform,
+    filters.gitUrl,
+  ]);
+}
+
+export function sidebarQueryScopeKey(queryKey: readonly unknown[]): string | null {
+  const options = queryKey[1];
+  if (!options || typeof options !== 'object' || !('input' in options)) return null;
+  const input = options.input;
+  if (!input || typeof input !== 'object') return null;
+  return JSON.stringify([
+    'organizationId' in input ? (input.organizationId ?? null) : null,
+    'createdOnPlatform' in input ? input.createdOnPlatform : undefined,
+    'gitUrl' in input ? input.gitUrl : undefined,
+  ]);
+}
+
 export function workspaceFoldersQueryKey(baseKey: TRPCQueryKey, userId: string): TRPCQueryKey {
   const options = { ...baseKey[1], userId };
   return [baseKey[0], options];
-}
-
-/** Worktree ids in sorted batches, one details query per batch. */
-export function sidebarWorktreeDetailsBatches(
-  sessionWorktreeIds: Iterable<string | null | undefined>,
-  workspaces: readonly { worktreeId: string | null }[]
-): CloudAgentWorktreeId[][] {
-  return worktreeDetailsBatches([...sessionWorktreeIds, ...workspaces.map(row => row.worktreeId)]);
-}
-
-export function worktreeDetailsBatches(
-  worktreeIds: Iterable<string | null | undefined>
-): CloudAgentWorktreeId[][] {
-  const ids = [
-    ...new Set(
-      [...worktreeIds].flatMap(id => {
-        const parsed = cloudAgentWorktreeIdSchema.safeParse(id);
-        return parsed.success ? [parsed.data] : [];
-      })
-    ),
-  ].sort();
-  const batches: CloudAgentWorktreeId[][] = [];
-  for (let index = 0; index < ids.length; index += WORKTREE_DETAILS_BATCH_SIZE) {
-    batches.push(ids.slice(index, index + WORKTREE_DETAILS_BATCH_SIZE));
-  }
-  return batches;
 }

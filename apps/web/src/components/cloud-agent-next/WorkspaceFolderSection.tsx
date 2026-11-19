@@ -49,7 +49,6 @@ export function WorkspaceFolderSection({
   dropPlacement,
   visibleCount,
   totalCount,
-  workspaceRowsTruncated = false,
   onEdit,
   onDelete,
   onMove,
@@ -68,7 +67,6 @@ export function WorkspaceFolderSection({
   dropPlacement: 'inside' | 'before' | 'after' | null;
   visibleCount: number;
   totalCount?: number;
-  workspaceRowsTruncated?: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onMove: (direction: 'up' | 'down') => void;
@@ -249,9 +247,7 @@ export function WorkspaceFolderSection({
           ) : (
             <p className="text-muted-foreground px-3 py-3 text-xs">
               {isSmart
-                ? workspaceRowsTruncated
-                  ? 'Workspace list limited to 200. Use search to find matching workspaces.'
-                  : 'No matching workspaces. Workspaces appear here automatically.'
+                ? 'No matching workspaces. Workspaces appear here automatically.'
                 : count > 0
                   ? 'No matching workspaces'
                   : 'Drop workspaces here'}

@@ -2738,6 +2738,7 @@ describe('deleteSessionForCloudAgent clone rollback', () => {
     const db = {
       select: vi.fn(() => select),
       delete: deleteFn,
+      transaction: vi.fn(async callback => callback(db)),
     };
     return { db, selectResult, deleteFn };
   }

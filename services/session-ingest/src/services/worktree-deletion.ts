@@ -180,6 +180,7 @@ export async function registerCloudAgentWorktree(
         worktree_id: worktreeId,
         kilo_user_id: params.kiloUserId,
         organization_id: params.organizationId ?? null,
+        last_activity_at: new Date().toISOString(),
         ...(params.parentWorktreeId !== undefined
           ? { parent_worktree_id: params.parentWorktreeId }
           : {}),
@@ -933,6 +934,8 @@ async function deleteWorktreeContentCore(
       .update(cloud_agent_worktrees)
       .set({
         name: null,
+        closed_session_ids: [],
+        tab_order: [],
         deleted_session_ids: sessionIds,
       })
       .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId));
@@ -952,7 +955,10 @@ function notifyDeletedSessions(
     notifyUserSessionEvent(
       env,
       params.kiloUserId,
-      { type: 'session.deleted', data: { source: 'v2', ...session, deletedAt } },
+      {
+        type: 'session.deleted',
+        data: { source: 'v2', ...session, worktreeId: params.worktreeId, deletedAt },
+      },
       executionContext
     );
   }
@@ -988,6 +994,8 @@ async function finalizeWorktreeDeletion(
       .set({
         name: null,
         runtime_locations: [],
+        closed_session_ids: [],
+        tab_order: [],
         deletion_manifest: null,
         deletion_completed_at: new Date().toISOString(),
         deleted_session_ids: sessionIds,

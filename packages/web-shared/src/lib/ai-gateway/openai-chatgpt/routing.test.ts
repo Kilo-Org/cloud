@@ -398,6 +398,28 @@ describe('checkOpenAiChatGptByok', () => {
     expect(result.subscription_sharing_activity_id).toBe('sess_limit');
   });
 
+  it('trims a large caller metadata map in one pass, keeping the last entries', async () => {
+    const provider = await buildProviderForTest();
+    const metadata = Object.fromEntries(
+      Array.from({ length: 200 }, (_, index) => [`k${index}`, `v${index}`])
+    );
+    const body: GatewayResponsesRequest = { model: 'openai/gpt-5-nano', input: 'hello', metadata };
+
+    await transformResponsesRequest(provider, body, 'sess_large');
+
+    const result = body.metadata as Record<string, string>;
+    expect(Object.keys(result)).toHaveLength(16);
+    expect(result.subscription_sharing_activity).toBe('coding_agent');
+    expect(result.subscription_sharing_purpose).toBe("Run the user's coding task in Kilo Code.");
+    expect(result.subscription_sharing_activity_id).toBe('sess_large');
+    expect(result.k0).toBeUndefined();
+    expect(result.k1).toBeUndefined();
+    expect(result.k186).toBeUndefined();
+    for (let index = 187; index < 200; index += 1) {
+      expect(result[`k${index}`]).toBe(`v${index}`);
+    }
+  });
+
   it.each(['auto', 'default', 'flex', 'priority', 'scale', null] as const)(
     'drops service_tier %s',
     async serviceTier => {

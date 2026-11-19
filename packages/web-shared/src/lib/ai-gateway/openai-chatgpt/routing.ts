@@ -87,8 +87,11 @@ export function withTraceabilityMetadata(
 
   const merged: Record<string, string> = { ...(metadata ?? {}), ...traceability };
   const removable = Object.keys(merged).filter(key => !(key in traceability));
-  while (Object.keys(merged).length > METADATA_ENTRY_LIMIT && removable.length > 0) {
-    delete merged[removable.shift() as string];
+  const excess = Object.keys(merged).length - METADATA_ENTRY_LIMIT;
+  if (excess > 0) {
+    for (const key of removable.slice(0, excess)) {
+      delete merged[key];
+    }
   }
   return merged;
 }

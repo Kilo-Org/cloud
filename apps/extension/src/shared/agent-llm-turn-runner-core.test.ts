@@ -1344,7 +1344,7 @@ describe('continue nudge', () => {
       "All right, I'll open the page.",
       "Got it — I'll snapshot the page now.",
       "Sounds good, I'll create the workflow.",
-      "Of course, let me check the page first.",
+      'Of course, let me check the page first.',
       'No problem, I am going to read the page.',
       'Will do: I will create the workflow.',
       "Now, I'll create the workflow now.",

@@ -23,9 +23,8 @@ export interface KiloGatewayModelOption {
   readonly isFree?: boolean;
   readonly isPreferred: boolean;
   readonly mayTrainOnYourPrompts?: boolean;
+  /** The catalog name with the English retirement note already composed in. */
   readonly name: string;
-  /** The date this catalog entry retires, when the picker shows the English note. */
-  readonly retires_on?: string;
   readonly supportsImages?: boolean;
   readonly variants: string[];
 }

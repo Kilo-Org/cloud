@@ -36,7 +36,14 @@ import {
 } from './coverage';
 import { createAndroidDevice } from './devices/android';
 import { createIosDevice, resolveSimulator } from './devices/ios';
-import { CELL_IDS, MATRIX_NAMES, type CellId, type MatrixName, type Platform } from './matrix';
+import {
+  assertCellsSupported,
+  CELL_IDS,
+  MATRIX_NAMES,
+  type CellId,
+  type MatrixName,
+  type Platform,
+} from './matrix';
 import { APP_ID } from './report';
 import { pnpmSeedRunner, readSeedMap, SEED_STEPS, seedAll, writeSeedMap } from './seed-all';
 
@@ -53,10 +60,12 @@ export const BATCHES_USAGE = `Usage: pnpm dev:mobile:design-gate batches <comman
       ${FORCE_CLEAR_LINK} after their capture.
       Writes <out>/<batch>/ (gate artifacts, targets.json, expectations.json, gate.log),
       <out>/summary.tsv and <out>/resolved-links.tsv.
-      --matrix overrides every batch's own matrix; --cell adds a cell (${CELL_IDS.join(', ')}).
-  seed --email <fake@example.com> --out <seed-map.json> [--step <name> ...]
-      Runs every seed topic the manifest needs (${SEED_STEPS.map(step => step.step).join(', ')})
-      for a signed-in fake account and writes the id map {{seed:<step>.<key>}} links resolve against.
+      --matrix overrides every batch's own matrix; --cell adds a cell the platform supports
+      (${CELL_IDS.join(', ')}; iOS has no compact, landscape or rtl-compact).
+  seed --email <fake@example.com> --out <seed-map.json> [--manifest <file>] [--only <batch>,...] [--step <name> ...]
+      Runs the seed steps (${SEED_STEPS.map(step => step.step).join(', ')}) that the manifest rows
+      reference, narrowed to the --only batches, or exactly the --step names, for a signed-in fake
+      account and writes the id map {{seed:<step>.<key>}} links resolve against.
   expect [--manifest <file>] [--write]
       Recomputes each row's kind and screen from the route files; exit 1 when the manifest differs.
   coverage [--manifest <file>] [--coverage <file>] [--write]
@@ -540,6 +549,9 @@ export async function batchesMain(argv: readonly string[], deps: BatchesDeps): P
           if (cell === undefined) throw new Error(`--cell must be one of ${CELL_IDS.join(', ')}`);
           return cell;
         });
+        // A cell the platform cannot run is a usage error, not a gate run that
+        // exits 2 twice and stops the whole run as infrastructure.
+        assertCellsSupported(platform, cells);
         const batches = selectBatches(readManifest(manifestFile), {
           platform,
           phase,

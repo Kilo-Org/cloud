@@ -80,19 +80,26 @@ const PRESETS: Record<Platform, Record<MatrixName, readonly CellId[]>> = {
  * simulator command for rotation or window size.
  */
 export const OPTIONAL_CELLS: Record<Platform, readonly CellId[]> = {
-  android: ['dark', 'compact', 'rtl', 'landscape', 'rtl-compact', 'font-max'],
-  ios: ['dark', 'rtl', 'font-max'],
+  android: ['base', 'dark', 'compact', 'rtl', 'landscape', 'rtl-compact', 'font-max'],
+  ios: ['base', 'dark', 'rtl', 'font-max'],
 };
+
+/** Throws for a `--cell` the platform cannot run, before any device work. */
+export function assertCellsSupported(platform: Platform, extra: readonly CellId[]): void {
+  const unsupported = extra.filter(id => !OPTIONAL_CELLS[platform].includes(id));
+  if (unsupported.length > 0) {
+    throw new Error(
+      `${platform} has no ${unsupported.join(', ')} cell; --cell takes ${OPTIONAL_CELLS[platform].join(', ')}`
+    );
+  }
+}
 
 export function matrixCells(
   platform: Platform,
   matrix: MatrixName,
   extra: readonly CellId[] = []
 ): CellConfig[] {
-  const unsupported = extra.filter(id => !OPTIONAL_CELLS[platform].includes(id));
-  if (unsupported.length > 0) {
-    throw new Error(`${platform} has no ${unsupported.join(', ')} cell`);
-  }
+  assertCellsSupported(platform, extra);
   const ids = [...PRESETS[platform][matrix]];
   for (const id of extra) if (!ids.includes(id)) ids.push(id);
   return ids.map(cell);

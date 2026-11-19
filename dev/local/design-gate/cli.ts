@@ -44,6 +44,7 @@ import { createProbeClient } from './cdp';
 import { createAndroidDevice, parseAdbDevices, resolveSerial } from './devices/android';
 import { createIosDevice, resolveSimulator } from './devices/ios';
 import {
+  assertCellsSupported,
   CELL_IDS,
   MATRIX_NAMES,
   matrixCells,
@@ -273,13 +274,22 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ) {
         throw new UsageError('prepared run needs --targets only, no --link overrides');
       }
+      const cells = (values.cell ?? []).map(id => oneOf('cell', id, CELL_IDS) ?? 'base');
+      // A detected platform is checked by matrixCells, before any cell changes the device.
+      if (common.platform !== undefined) {
+        try {
+          assertCellsSupported(common.platform, cells);
+        } catch (error) {
+          throw new UsageError(error instanceof Error ? error.message : String(error));
+        }
+      }
       return {
         ...common,
         command,
         links,
         targets: values.targets,
         matrix: oneOf('matrix', values.matrix, MATRIX_NAMES) ?? 'standard',
-        cells: (values.cell ?? []).map(id => oneOf('cell', id, CELL_IDS) ?? 'base'),
+        cells,
         observeMs,
         ...(values.preparation === undefined
           ? {}

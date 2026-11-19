@@ -84,6 +84,24 @@ test('landscape expects the base height as width', () => {
   assert.equal(envMismatches(landscape, env, env.window).length, 1);
 });
 
+test('--cell base is a no-op, and a cell the platform lacks is refused by name', () => {
+  assert.deepEqual(
+    matrixCells('android', 'base', ['base', 'font-max']).map(cell => cell.id),
+    ['base', 'font-max']
+  );
+  assert.throws(() => matrixCells('ios', 'standard', ['landscape']), /ios has no landscape cell/);
+});
+
+test('font-max expects a scale above 1 and every other cell expects 1', () => {
+  const [base, fontMax] = matrixCells('android', 'base', ['font-max']);
+  assert.ok(base && fontMax);
+  assert.deepEqual(envMismatches(fontMax, { ...env, fontScale: 2 }, env.window), []);
+  assert.deepEqual(envMismatches(fontMax, env, env.window), ['fontScale 1, expected above 1']);
+  assert.deepEqual(envMismatches(base, { ...env, fontScale: 2 }, env.window), [
+    'fontScale 2, expected 1',
+  ]);
+});
+
 test('every right-to-left language the app ships is classified as right-to-left', () => {
   // `RTL_LANGUAGES` in apps/mobile/src/i18n/languages.ts: a language missing from
   // this tool's list loses the left-to-right fallback when the app is already set

@@ -226,15 +226,19 @@ export const organizationsRouter = createTRPCRouter({
     );
     await getOrCreateStripeCustomerIdForOrganization(org.id);
 
-    const hog = PostHogClient();
-    hog.capture({
-      event: 'start_free_trial',
-      distinctId: user.google_user_email,
-      properties: {
-        organizationId: org.id,
-        product: 'enterprise',
-      },
-    });
+    // The event reports a trial start, so it follows the organization's trial
+    // grant rather than every creation.
+    if (org.trial_granted) {
+      const hog = PostHogClient();
+      hog.capture({
+        event: 'start_free_trial',
+        distinctId: user.google_user_email,
+        properties: {
+          organizationId: org.id,
+          product: 'enterprise',
+        },
+      });
+    }
 
     await createAuditLog({
       organization_id: org.id,

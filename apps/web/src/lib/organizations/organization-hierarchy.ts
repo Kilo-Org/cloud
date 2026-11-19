@@ -147,6 +147,9 @@ export async function createChildOrganization(
         plan: parentOrganization.plan,
         require_seats: false,
         free_trial_end_at: null,
+        // A child organization never carries a trial window, so record that no
+        // trial was granted instead of relying on the column default.
+        trial_granted: false,
         parent_organization_id: parentOrganizationId,
         settings: {
           enable_usage_limits: false,

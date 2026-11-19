@@ -215,4 +215,18 @@ describe('classifyOrganizationEntitlement', () => {
       });
     }
   );
+
+  // A child organization carries no trial window and no seat requirement.
+  it('keeps an organization without a trial window entitled while seats are not required', () => {
+    expect(
+      classify({ free_trial_end_at: null, require_seats: false, trial_granted: false })
+    ).toMatchObject({
+      bypassReason: 'require_seats_disabled',
+      daysRemaining: -4,
+      displayStatus: 'subscribed',
+      hasEntitlement: true,
+      isTrialExpiredForEnforcement: false,
+      trialStatus: 'trial_expired_hard',
+    });
+  });
 });

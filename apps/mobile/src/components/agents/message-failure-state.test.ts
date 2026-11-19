@@ -270,6 +270,31 @@ describe('selectMessageFailure', () => {
       ).toBe(false);
     });
 
+    it('states a chat failure that hangs off the words a stopped answer left', () => {
+      const result = selectMessageFailure({
+        info: assistantInfoWithoutError(),
+        deliveryState: {
+          status: 'failed',
+          error: '',
+          reason: 'chat-response',
+          detailKey: 'modelChat.connectionLost',
+        },
+      });
+      expect(result?.side).toBe('assistant');
+      expect(result?.error).toBe(true);
+      expect(result?.titleKey).toBe('agentChat.messageFailure.assistantTitle');
+      expect(result?.detailKey).toBe('modelChat.connectionLost');
+      expect(result?.canRetry).toBe(true);
+
+      const refused = selectMessageFailure({
+        info: assistantInfoWithoutError(),
+        deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      });
+      expect(refused?.side).toBe('assistant');
+      expect(refused?.canAddCredits).toBe(true);
+      expect(refused?.canRetry).toBe(false);
+    });
+
     it('sets canRetry false only for NON_RETRYABLE_ASSISTANT_ERRORS', () => {
       for (const name of NON_RETRYABLE_ASSISTANT_ERRORS) {
         const result = selectMessageFailure({ info: assistantInfo(name) });

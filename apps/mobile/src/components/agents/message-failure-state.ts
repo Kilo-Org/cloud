@@ -413,7 +413,14 @@ export function selectMessageFailure(input: {
   const { deliveryState, info } = input;
   const retryAvailable = input.retryAvailable ?? true;
 
-  if (info.role === 'user' && deliveryState?.status === 'failed') {
+  // A chat's own statements (a failed answer, a refused send) can also hang off
+  // the words a stopped answer left, which is an assistant row: a failure that
+  // lands after the Stop is stated there, under what the person read.
+  const chatStatement =
+    deliveryState?.status === 'failed' &&
+    (deliveryState.reason === CHAT_RESPONSE_DELIVERY_REASON ||
+      deliveryState.reason === CREDITS_DELIVERY_REASON);
+  if (deliveryState?.status === 'failed' && (info.role === 'user' || chatStatement)) {
     // A failed response and a send the balance refused state their own cause
     // rather than the transport's; both keep Copy to composer. The credits row
     // drops the Retry its cause would make pointless and carries the one action
@@ -431,7 +438,8 @@ export function selectMessageFailure(input: {
           : copy.detailKey;
       return {
         kind: 'delivery',
-        side: copy.side,
+        // Under a stopped answer's words the row stays in the answer's column.
+        side: info.role === 'assistant' ? 'assistant' : copy.side,
         error: copy.error,
         titleKey: copy.titleKey,
         title: i18n.t(copy.titleKey),

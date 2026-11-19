@@ -32,12 +32,17 @@ describe('stateTint', () => {
     expect(stateTint('repository').hueClass).toBe('bg-session-strip');
   });
 
-  it('keeps live at the tint its English word first rendered', () => {
-    // The continuity contract: the pre-pin row tint was the hash of the
-    // rendered English word, so the LIVE state pin must equal that hash or
-    // an existing live surface changes hue for no reason.
-    expect(stateTint('live')).toBe(agentColor('LIVE'));
-    expect(stateTint('live').hueTextClass).toBe('text-agent-sky');
+  it('pins live to the agent-sky step it rendered before the pin', () => {
+    // The continuity contract: the live state keeps the hue it rendered before
+    // the pin — the sky step — so an existing live row changes colour for no
+    // reason. The pin is the contract, not the hash: `agentColor('LIVE')`
+    // happens to land on the same step today, and asserting the hash here
+    // would silently move live the next time a step is appended to the ramp.
+    const live = stateTint('live');
+    expect(live.hueClass).toBe('bg-agent-sky');
+    expect(live.hueTextClass).toBe('text-agent-sky');
+    expect(live).not.toBe(PLACEHOLDER_TINT);
+    expect(live).not.toBe(stateTint('idle'));
   });
 
   it('pins idle to the quiet neutral strip, distinct from live and from every other state', () => {

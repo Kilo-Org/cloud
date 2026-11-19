@@ -31,7 +31,13 @@ const statusTransitionIdSchema = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$
  * `liveSummary` and `totalCostMicrodollars` are present only for a Kilo v2 transcript; Kilo v1
  * keeps reporting both through its ingest client. Ingest writes the summary with the status
  * transition, so a late older publication cannot replace a newer summary, and moves the cost
- * forward only, as it does for a Kilo v1 report.
+ * forward only, as it does for a Kilo v1 report. A publication whose `transitionId` is not newer
+ * than the stored one counts as stale and its summary is dropped, so every summary change must
+ * carry a new `transitionId`.
+ *
+ * The schema is strict: a receiver that predates a field rejects the whole publication, status
+ * included. Deploy a new field to the receiver before any sender sends it, and do not roll the
+ * receiver back past a sender that sends it.
  */
 export const publishCloudAgentSessionStatusSchema = z
   .object({

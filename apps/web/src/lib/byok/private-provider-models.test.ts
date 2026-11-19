@@ -1,4 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
+import { ByokPrivateModelSchema } from '@kilocode/db/schema-types';
 import {
   parseByokPrivateProviderModelsResponse,
   toByokPrivateModelId,
@@ -276,6 +277,34 @@ describe('parseByokPrivateProviderModelsResponse', () => {
     expect(
       parseByokPrivateProviderModelsResponse({ data: [{ id }] }).map(m => m.internal_id)
     ).toEqual([id]);
+  });
+
+  test('treats limits the saved definition rejects as missing, and still lists the model', () => {
+    const models = parseByokPrivateProviderModelsResponse({
+      data: [
+        { id: 'huge', context_length: 1e300, max_completion_tokens: 2 ** 60 },
+        { id: 'fraction', context_length: 4096.5, max_completion_tokens: '8.5' },
+        { id: 'negative', context_length: -1, max_completion_tokens: 0 },
+        { id: 'valid', context_length: '4096', max_completion_tokens: 1024 },
+      ],
+    });
+
+    expect(
+      models.map(model => [model.id, model.context_length, model.max_completion_tokens])
+    ).toEqual([
+      ['huge', 200000, 32000],
+      ['fraction', 200000, 32000],
+      ['negative', 200000, 32000],
+      ['valid', 4096, 1024],
+    ]);
+  });
+
+  test('produces models the saved definition accepts', () => {
+    const models = parseByokPrivateProviderModelsResponse({
+      data: [{ id: 'huge', context_length: 1e300 }, { id: 'valid' }],
+    });
+
+    expect(models.every(model => ByokPrivateModelSchema.safeParse(model).success)).toBe(true);
   });
 
   test('trusts an explicit chat signal over the id', () => {

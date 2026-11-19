@@ -51,10 +51,11 @@ function field(value: unknown, ...path: string[]): unknown {
   return current;
 }
 
+/** A limit the saved definition accepts; anything else counts as missing so the default applies. */
 function positiveInteger(value: unknown): number | undefined {
   const number = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
-  if (typeof number !== 'number' || !Number.isFinite(number) || number < 1) return undefined;
-  return Math.floor(number);
+  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 1) return undefined;
+  return number;
 }
 
 function firstPositiveInteger(entry: JsonObject, paths: string[][]): number | undefined {

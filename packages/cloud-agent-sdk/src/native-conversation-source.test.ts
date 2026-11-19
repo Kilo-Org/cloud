@@ -65,10 +65,11 @@ test('native snapshots use the exact Cloud projector for files, errors, costs, m
       metadata: { nested: { private: 'retained' } },
       files: [
         { mime: 'image/png', data: 'aW1hZ2U=', name: 'inline.png', source: { type: 'inline' } },
-        // An absolute remote reference: no snapshot ever authorizes a display for it.
+        // A legal native user file: inline bytes plus a source reference. The bytes are
+        // the display, so the reference beside them never becomes one.
         {
           mime: 'text/plain',
-          uri: 'https://example.test/file.txt',
+          data: 'aGVsbG8=',
           name: 'uri.txt',
           source: { type: 'uri', uri: 'https://example.test/file.txt' },
         },
@@ -112,19 +113,29 @@ test('native snapshots use the exact Cloud projector for files, errors, costs, m
   expect(result.nativeMessages).toBe(messages);
   expect(result.nativeMessages.map(item => item.message.id)).toEqual(['msg_user', 'msg_answer']);
   expect(result.session).toBe(session);
-  // The message with the remote reference is undisplayable rather than recoverable, so
-  // it is omitted without waiting on recovery and the rest still projects.
-  expect(result.messages).toEqual(readKilo2Messages(projectedSession, [answer.message]));
-  expect(result.messages.map(item => item.info.id)).toEqual(['msg_answer']);
+  expect(result.messages).toEqual(
+    readKilo2Messages(
+      projectedSession,
+      messages.map(item => item.message)
+    )
+  );
+  expect(result.messages.map(item => item.info.id)).toEqual(['msg_user', 'msg_answer']);
+  // Both files are legal native user files, so both display; the one that carries
+  // inline bytes displays those bytes rather than its source reference.
+  expect(result.messages[0]?.parts).toMatchObject([
+    { type: 'text' },
+    { type: 'file', url: 'data:image/png;base64,aW1hZ2U=' },
+    { type: 'file', url: 'data:text/plain;base64,aGVsbG8=' },
+  ]);
   expect(JSON.stringify(result.messages)).not.toContain('https://example.test/file.txt');
   expect(result.incompleteMessageIDs).toEqual([]);
   expect(result.error).toBeUndefined();
-  expect(result.messages[0]?.info).toMatchObject({
+  expect(result.messages[1]?.info).toMatchObject({
     cost: 1.25,
     tokens: answer.message.tokens,
     error: { data: { message: 'Specific provider failure' } },
   });
-  expect(result.messages[0]?.parts[1]).toMatchObject({
+  expect(result.messages[1]?.parts[1]).toMatchObject({
     type: 'tool',
     tool: 'bash',
     state: { status: 'error', error: 'Exit code 1' },

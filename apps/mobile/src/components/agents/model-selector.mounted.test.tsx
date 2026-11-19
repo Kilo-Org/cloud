@@ -338,6 +338,82 @@ describe('ModelPickerOptionRow provider and model id lines', () => {
   });
 });
 
+// The retirement note is a fact about the model beside its name, so it renders
+// on its own muted line under the id and never inside the title: the row keeps
+// the Latin name as its primary text in every reading direction.
+describe('ModelPickerOptionRow retirement note', () => {
+  const retiresOn = '2026-11-22';
+  const englishNote = 'Retires Nov 22';
+  const textNodes = (root: TestRenderer.ReactTestInstance) =>
+    root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        typeof node.props.children === 'string'
+    );
+
+  it('renders the note on its own muted line after the model id, with the bare name as title', () => {
+    const renderer = renderRow(cliCatalogOption({ retires_on: retiresOn }));
+    const texts = textStrings(renderer.root);
+    const title = texts.indexOf('Minimax M2.5');
+    const id = texts.indexOf('minimax/minimax-m2.5');
+    const note = texts.indexOf(englishNote);
+
+    expect(title).toBeGreaterThanOrEqual(0);
+    expect(id).toBeGreaterThan(title);
+    expect(note).toBeGreaterThan(id);
+    expect(
+      textNodes(renderer.root).find(node => node.props.children === englishNote)?.props.className
+    ).toBe('text-xs text-muted-foreground');
+  });
+
+  it('places the note above the row badge copy', () => {
+    const texts = textStrings(
+      renderRow(cliCatalogOption({ retires_on: retiresOn, hasUserByokAvailable: true })).root
+    );
+
+    expect(texts.indexOf(englishNote)).toBeLessThan(texts.indexOf(BYOK_MODEL_LABEL));
+  });
+
+  it('reads the note inside the row accessibility label', () => {
+    const renderer = renderRow(cliCatalogOption({ retires_on: retiresOn }));
+    const [row] = renderer.root.findAll(node => node.props.accessibilityRole === 'button');
+
+    expect(String(row?.props.accessibilityLabel)).toContain(englishNote);
+  });
+
+  it('renders no note for a model the catalogue does not date', () => {
+    const renderer = renderRow(cliCatalogOption());
+    const labels = renderer.root
+      .findAll(node => typeof node.props.accessibilityLabel === 'string')
+      .map(node => node.props.accessibilityLabel as string);
+
+    expect(textStrings(renderer.root)).not.toContain(englishNote);
+    expect(labels.some(label => label.includes(englishNote))).toBe(false);
+  });
+
+  it('words the note in the catalog language and keeps the Latin name as the title', async () => {
+    await i18n.changeLanguage('hi');
+    try {
+      const renderer = renderRow(cliCatalogOption({ retires_on: retiresOn }));
+      const texts = textStrings(renderer.root);
+      const title = texts.indexOf('Minimax M2.5');
+      const note = texts.indexOf('22 नव॰ को बंद हो जाएगा');
+
+      expect(title).toBeGreaterThanOrEqual(0);
+      expect(note).toBeGreaterThan(texts.indexOf('minimax/minimax-m2.5'));
+      expect(
+        String(
+          textNodes(renderer.root).find(node => node.props.children === 'Minimax M2.5')?.props
+            .className
+        )
+      ).toBe('text-base text-foreground');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+});
+
 // Kilo's auto models arrive from the gateway with an English product name
 // ("Auto Efficient"), which was the one English word left on the Arabic
 // new-session screen. The name must come from the catalogs instead, in both

@@ -3,13 +3,14 @@ import { useSyncExternalStore } from 'react';
 /**
  * Which surface draws the app's toasts.
  *
- * A native sheet covers the root Toaster in the app's main view tree: the
- * imperative `Sheet` is its own window on Android, and on iOS it and every
- * `formSheet` or `modal` route are presented controllers. A `toast.error`
- * raised while one was open stayed invisible until it closed. Every open sheet
- * mounts a `SheetToastScope`, which claims a host here, and `AppToaster`
- * renders into the top claim; with no claim it renders in the main tree. Route
- * sheets host on Android too, so the toast placement is one rule.
+ * On Android a native sheet covers the root Toaster in the app's main view
+ * tree: the imperative `Sheet` is its own window, so a `toast.error` raised
+ * while one was open stayed invisible until it closed. Every open sheet there
+ * (route sheets too, so the in-sheet placement is one rule) mounts a
+ * `SheetToastScope`, which claims a host here, and `AppToaster` renders into
+ * the top claim; with no claim it renders in the main tree. iOS never claims:
+ * the root Toaster's window-level overlay already draws above every presented
+ * sheet.
  *
  * The top claim is the deepest one — a sheet presented from another sheet's
  * content sits above it even when both mount in one commit — and among sheets

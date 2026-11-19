@@ -1,25 +1,31 @@
-// A native sheet covers the app's main view tree on both platforms, so a toast
-// the root Toaster draws while a sheet is open stays out of sight until the
-// sheet closes (the save-as-to-do failure, the MCP settings and language picker
-// failures). The app's one Toaster must render inside the open sheet instead —
-// the imperative `Sheet` and a focused formSheet scene both host it — and hand
-// the toasts back when the sheet goes.
+// On Android a native sheet covers the app's main view tree, so a toast the
+// root Toaster draws while a sheet is open stays out of sight until the sheet
+// closes (the save-as-to-do failure, the MCP settings failures). There the
+// app's one Toaster must render inside the open sheet — the imperative `Sheet`
+// and a focused presented route both host it — below the sheet's header, clear
+// of its actions, and hand the toasts back when the sheet goes. On iOS the root
+// Toaster's window-level overlay already draws above every sheet, so it stays
+// exactly where it is.
 
 import { QueryClientProvider } from '@tanstack/react-query';
-import { createElement, type ReactElement, type ReactNode } from 'react';
+import { createElement, type ReactElement, type ReactNode, useRef } from 'react';
+import { type ViewInstance } from 'react-native';
 import { act, type ReactTestInstance } from '@/test/renderer';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { toast } from 'sonner-native';
 
 import { AppToaster } from '@/components/app-toaster';
 import { appSceneLayout } from '@/components/app-screen-layout';
 import { type ScreenLayoutProps } from '@/components/centered-state-surface';
+import { useSheetToastHeader } from '@/components/sheet-toast-host';
 import { Sheet } from '@/components/ui/sheet';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
+const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
+
 vi.mock('react-native', () => ({
   BackHandler: { addEventListener: () => ({ remove: () => undefined }) },
-  Platform: { OS: 'ios' },
+  Platform: platform,
   View: 'View',
   useWindowDimensions: () => ({ width: 400, height: 800 }),
 }));
@@ -32,13 +38,13 @@ vi.mock('@/components/ui/icons', () => ({
   XCircle: 'Icon',
 }));
 vi.mock('expo-router', () => ({ usePathname: () => '/agents', useSegments: () => ['(app)'] }));
-// The formSheet scene's covered-scene gate is under test, not the unlock
+// The presented scene's covered-scene gate is under test, not the unlock
 // surface the layout module also builds for the root scenes.
 vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: ReactNode }) => children,
 }));
-// The measured surface reports native observation failures to Sentry, whose
-// React Native SDK cannot load in Node.
+// The layout module's measured scene surface reports native observation
+// failures to Sentry, whose React Native SDK cannot load in Node.
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 /**
@@ -95,6 +101,10 @@ vi.mock('sonner-native', async () => {
 
 let view: RenderWithProvidersResult | null = null;
 
+beforeEach(() => {
+  platform.OS = 'android';
+});
+
 afterEach(() => {
   view?.unmount();
   view = null;
@@ -134,6 +144,17 @@ function hostsOfType(type: string): ReactTestInstance[] {
   return view?.renderer.root.findAll(node => (node.type as string) === type) ?? [];
 }
 
+function theToaster(): ReactTestInstance {
+  const toasters = hostsOfType('Toaster');
+  // The root Toaster steps aside while a sheet hosts: one Toaster draws.
+  expect(toasters).toHaveLength(1);
+  const [toaster] = toasters;
+  if (!toaster) {
+    throw new Error('No Toaster is mounted');
+  }
+  return toaster;
+}
+
 /** The host element that draws `title`. Exactly one Toaster draws it. */
 function toastText(title: string): ReactTestInstance {
   const matches = hostsOfType('Text').filter(node => node.children.includes(title));
@@ -145,14 +166,18 @@ function toastText(title: string): ReactTestInstance {
   return match;
 }
 
-function ancestors(node: ReactTestInstance): string[] {
-  const types: string[] = [];
+function hostAncestors(node: ReactTestInstance): ReactTestInstance[] {
+  const hosts: ReactTestInstance[] = [];
   for (let parent = node.parent; parent; parent = parent.parent) {
     if (typeof parent.type === 'string') {
-      types.push(parent.type);
+      hosts.push(parent);
     }
   }
-  return types;
+  return hosts;
+}
+
+function ancestors(node: ReactTestInstance): string[] {
+  return hostAncestors(node).map(host => host.type as string);
 }
 
 function sheet(visible: boolean, content: ReactNode = createElement('SheetBody')) {
@@ -162,38 +187,6 @@ function sheet(visible: boolean, content: ReactNode = createElement('SheetBody')
     </Sheet>
   );
 }
-
-it('draws a toast raised while an imperative sheet is open inside that sheet', async () => {
-  await mount(createElement('Screen', null, sheet(true)));
-
-  raise('Couldn’t load MCP servers');
-
-  expect(ancestors(toastText('Couldn’t load MCP servers'))).toContain('BottomSheet');
-  // The root Toaster steps aside: one Toaster draws the toasts.
-  expect(hostsOfType('Toaster')).toHaveLength(1);
-});
-
-it('hands the toasts back to the app tree once the sheet starts to close', async () => {
-  await mount(createElement('Screen', null, sheet(true)));
-  raise('Saved');
-  expect(ancestors(toastText('Saved'))).toContain('BottomSheet');
-
-  // The sheet stays mounted until the native dismissal reports; the toast must
-  // not leave with it.
-  rerender(createElement('Screen', null, sheet(false)));
-
-  expect(hostsOfType('BottomSheet')).toHaveLength(1);
-  expect(ancestors(toastText('Saved'))).not.toContain('BottomSheet');
-});
-
-it('draws in the top sheet when a sheet opens over another', async () => {
-  await mount(createElement('Screen', null, sheet(true, sheet(true, createElement('Inner')))));
-
-  raise('Couldn’t change the language');
-
-  const inner = ancestors(toastText('Couldn’t change the language'));
-  expect(inner.filter(type => type === 'BottomSheet')).toHaveLength(2);
-});
 
 /** A route scene as the native Stack hands it to the scene layout. */
 function routeScene(
@@ -218,8 +211,50 @@ function routeScene(
   return createElement('Scene', null, appSceneLayout(props as unknown as ScreenLayoutProps));
 }
 
+it('draws a toast raised while an Android sheet is open at the top of that sheet', async () => {
+  await mount(createElement('Screen', null, sheet(true)));
+
+  raise('Couldn’t load MCP servers');
+
+  expect(ancestors(toastText('Couldn’t load MCP servers'))).toContain('BottomSheet');
+  expect(theToaster().props).toMatchObject({
+    position: 'top-center',
+    fullWindowOverlay: false,
+    // The container spans from the toast down, so the toast is inside its
+    // parent's rect and stays in the accessibility tree.
+    positionerStyle: { bottom: 0 },
+  });
+  // Touches outside the toast's own box reach the sheet: the nearest view
+  // around the Toaster is the anchor over the sheet's frame.
+  const [anchor] = hostAncestors(theToaster());
+  expect(anchor?.props.pointerEvents).toBe('box-none');
+});
+
+it('hands the toasts back to the app tree once the sheet starts to close', async () => {
+  await mount(createElement('Screen', null, sheet(true)));
+  raise('Saved');
+  expect(ancestors(toastText('Saved'))).toContain('BottomSheet');
+
+  // The sheet stays mounted until the native dismissal reports; the toast must
+  // not leave with it.
+  rerender(createElement('Screen', null, sheet(false)));
+
+  expect(hostsOfType('BottomSheet')).toHaveLength(1);
+  expect(ancestors(toastText('Saved'))).not.toContain('BottomSheet');
+  expect(theToaster().props.position).toBe('bottom-center');
+});
+
+it('draws in the top sheet when a sheet opens over another', async () => {
+  await mount(createElement('Screen', null, sheet(true, sheet(true, createElement('Inner')))));
+
+  raise('That URL is already saved.');
+
+  const inner = ancestors(toastText('That URL is already saved.'));
+  expect(inner.filter(type => type === 'BottomSheet')).toHaveLength(2);
+});
+
 it.each(['formSheet', 'modal'])(
-  'draws a toast raised from a focused %s route inside its scene',
+  'draws a toast raised from a focused Android %s route inside its scene',
   async presentation => {
     const focused = { current: true };
     const listeners = new Map<string, () => void>();
@@ -244,4 +279,89 @@ it('keeps the toasts in the app tree for a card screen', async () => {
   raise('Link copied');
 
   expect(ancestors(toastText('Link copied'))).not.toContain('Scene');
+});
+
+it('keeps the root Toaster on iOS while sheets and route sheets are open', async () => {
+  platform.OS = 'ios';
+  await mount(
+    createElement(
+      'Screen',
+      null,
+      sheet(true, sheet(true)),
+      routeScene('formSheet', { current: true }, new Map())
+    )
+  );
+
+  raise('Couldn’t load MCP servers');
+
+  const placement = ancestors(toastText('Couldn’t load MCP servers'));
+  expect(placement).not.toContain('BottomSheet');
+  expect(placement).not.toContain('Scene');
+  // Main's root Toaster, unchanged: bottom, window-level overlay, the
+  // accessibility anchor, sonner's own padding.
+  expect(theToaster().props).toMatchObject({
+    position: 'bottom-center',
+    fullWindowOverlay: true,
+    positionerStyle: { top: 0 },
+  });
+  const toastOptions = theToaster().props.toastOptions as { style: { paddingVertical?: number } };
+  expect(toastOptions.style.paddingVertical).toBeUndefined();
+});
+
+/**
+ * The "Discard changes?" confirm's geometry, from its own classes: the header,
+ * then `SCREEN_BODY_CLASS` (10.5dp top pad, 21dp gap) around a one-line muted
+ * message (`text-sm`, a 17.5dp line) and the Discard button. The header's
+ * bottom is whatever the device measures (about 73.5dp: 14dp top pad, the
+ * 48dp row, 10.5dp bottom pad and the divider); the clearance below it does
+ * not depend on it.
+ */
+const CONFIRM = { headerBottom: 73.5, bodyTopPad: 10.5, messageLine: 17.5, sectionGap: 21 };
+/** sonner-native's title line height. */
+const SONNER_TITLE_LINE = 20;
+
+/** A `SheetHeader` stand-in that reports the measured frame the device gives it. */
+function MeasuredHeader({ bottom }: Readonly<{ bottom: number }>) {
+  const ref = useRef({
+    measureLayout: (_relativeTo: unknown, onSuccess: (...frame: number[]) => void) => {
+      // left, top, width, height of the header inside the sheet's frame
+      onSuccess(0, 0, 400, bottom);
+    },
+  } as unknown as ViewInstance);
+  useSheetToastHeader(ref);
+  return createElement('SheetHeader');
+}
+
+it('keeps a short sheet’s bottom actions clear of the toast on Android', async () => {
+  await mount(
+    createElement(
+      'Screen',
+      null,
+      sheet(
+        true,
+        <>
+          <MeasuredHeader bottom={CONFIRM.headerBottom} />
+          {createElement('Message')}
+          {createElement('DiscardButton')}
+        </>
+      )
+    )
+  );
+
+  raise('That URL is already saved.');
+
+  const { offset, toastOptions } = theToaster().props as {
+    offset: number;
+    toastOptions: { style: { paddingVertical: number; borderWidth: number } };
+  };
+  // The toast starts below the header, so the header's own actions stay above it.
+  expect(offset).toBeGreaterThan(CONFIRM.headerBottom);
+  const toastBottom =
+    offset +
+    SONNER_TITLE_LINE +
+    2 * toastOptions.style.paddingVertical +
+    2 * toastOptions.style.borderWidth;
+  const discardTop =
+    CONFIRM.headerBottom + CONFIRM.bodyTopPad + CONFIRM.messageLine + CONFIRM.sectionGap;
+  expect(toastBottom).toBeLessThan(discardTop);
 });

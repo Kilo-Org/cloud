@@ -1,11 +1,12 @@
 import { Portal } from '@rn-primitives/portal';
 import { usePathname, useSegments } from 'expo-router';
-import { useEffect } from 'react';
+import { useRef } from 'react';
+import { View, type ViewInstance, type ViewStyle } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 
-import { StateSurface, useStateSurface } from '@/components/centered-state-surface';
+import { useSheetHeaderBottom } from '@/components/sheet-toast-host';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { shouldHideTabBar } from '@/lib/tab-bar-layout';
@@ -33,23 +34,34 @@ import { useToastHost } from '@/lib/toast-host';
 const TOAST_POSITIONER_STYLE = { top: 0 } as const;
 
 /**
- * The app's one toast appearance. bottom-center: sonner-native's default
- * top-center placement renders a toast over the screen header, hiding the back
- * control for the toast's whole lifetime (spot check e4-end). Bottom is the
- * transient-message convention: a toast may cover the composer briefly, never
- * the navigation.
+ * The app's one toast appearance. The root Toaster sits at the bottom:
+ * sonner-native's default top-center placement renders a toast over the
+ * screen header, hiding the back control for the toast's whole lifetime (spot
+ * check e4-end). Bottom is the transient-message convention: a toast may cover
+ * the composer briefly, never the navigation. Inside a sheet the bottom holds
+ * the sheet's actions instead, so there it sits under the header
+ * (`SheetToaster`).
  */
 function ThemedToaster({
+  position,
   offset,
+  positionerStyle,
+  paddingVertical,
   fullWindowOverlay,
-}: Readonly<{ offset: number; fullWindowOverlay: boolean }>) {
+}: Readonly<{
+  position: 'bottom-center' | 'top-center';
+  offset: number;
+  positionerStyle: ViewStyle;
+  paddingVertical?: number;
+  fullWindowOverlay: boolean;
+}>) {
   const colors = useThemeColors();
   return (
     <Toaster
-      position="bottom-center"
+      position={position}
       offset={offset}
       fullWindowOverlay={fullWindowOverlay}
-      positionerStyle={TOAST_POSITIONER_STYLE}
+      positionerStyle={positionerStyle}
       icons={{
         success: <CheckCircle2 size={20} color={colors.good} />,
         error: <XCircle size={20} color={colors.destructive} />,
@@ -62,6 +74,7 @@ function ThemedToaster({
           backgroundColor: colors.card,
           borderColor: colors.border,
           borderWidth: 1,
+          paddingVertical,
         },
         titleStyle: { color: colors.foreground },
         descriptionStyle: { color: colors.mutedForeground },
@@ -71,11 +84,12 @@ function ThemedToaster({
 }
 
 /**
- * The app's one Toaster. While no native sheet is open it renders in the
- * app's main view tree. A native sheet covers that tree on both platforms, so
- * while one is open the Toaster renders into the top sheet's toast host
- * instead (`SheetToastScope`, `@/lib/toast-host`), and a toast raised from the
- * sheet is visible over it. The toasts live in sonner-native's store, so the
+ * The app's one Toaster. It renders in the app's main view tree unless an
+ * Android native sheet is open: the sheet covers that tree there, so the
+ * Toaster renders into the top sheet's toast host instead (`SheetToastScope`,
+ * `@/lib/toast-host`), and a toast raised from the sheet is visible over it.
+ * On iOS no sheet claims a host, and the root Toaster's window-level overlay
+ * keeps it above every sheet. The toasts live in sonner-native's store, so the
  * ones on screen move with the Toaster.
  */
 export function AppToaster() {
@@ -139,6 +153,7 @@ function RootToaster() {
 
   return (
     <ThemedToaster
+      position="bottom-center"
       // Explicit offset, rather than sonner-native's `safe area inset + 8`:
       // the reported inset can under-report the bottom chrome (Android's IME
       // navigation row), which left the error toast's last line clipped under
@@ -149,49 +164,68 @@ function RootToaster() {
         keyboardHeight: keyboardOcclusion,
         tabBarHeight,
       })}
+      positionerStyle={TOAST_POSITIONER_STYLE}
+      // On iOS this lifts the Toaster into a window above every presented
+      // sheet; Android has no such window and hosts it in the sheet instead.
       fullWindowOverlay
     />
   );
 }
 
+/** The gap between a sheet's header divider and the toast below it. */
+const SHEET_TOAST_GAP = 4;
+
 /**
- * The Toaster inside a sheet's toast host. The toasts anchor to the
- * sheet's content frame, and that frame can reach past what is on screen:
- * Android lays a formSheet route out at its largest detent and hands an
- * imperative sheet with snap points the window height, and the software
- * keyboard covers the bottom of a sheet the platform does not lift. So the
- * Toaster sits in a measured surface over the frame and clears the part of it
- * that is not visible.
+ * Inside a sheet the container spans from the toast's top to the sheet's
+ * bottom, so the top-anchored toast is inside its parent's rect (see
+ * `TOAST_POSITIONER_STYLE`). `bottom` is the one edge sonner-native never sets
+ * for top-center toasts. The container passes every touch outside the toast's
+ * own box through to the sheet (sonner's `box-none`).
+ */
+const SHEET_TOAST_POSITIONER_STYLE = { bottom: 0 } as const;
+
+/**
+ * The in-sheet toast's vertical padding, down from sonner-native's 16. A short
+ * sheet puts its actions right under its header: the "Discard changes?"
+ * confirm's Discard button starts 49dp below the header divider (the body's
+ * 10.5dp top pad, one 17.5dp line of message, the 21dp section gap). The
+ * compact toast is 38dp tall (a 20dp line, 8dp above and below, the 1dp
+ * border), so with the gap it ends 7dp above that button. Both lines grow
+ * with the font scale (the message's by 17.5dp per unit of scale, the toast's
+ * by 20dp), so at Android's largest scale, 200%, it still ends 4.5dp above.
+ */
+const SHEET_TOAST_PADDING_VERTICAL = 8;
+
+/**
+ * The Toaster inside a sheet's toast host (Android only, `SheetToastScope`).
+ * It draws at the top of the sheet, right below the sheet's `SheetHeader`: a
+ * bottom toast covered the bottom actions of a short sheet (the Discard button
+ * of the "Discard changes?" confirm stopped taking taps on its centre), and the
+ * header's own actions stay clear above it. A sheet with no `SheetHeader` gets
+ * the toast at its top edge.
+ *
+ * The anchor fills the sheet's content frame and takes no touches itself.
  */
 function SheetToaster() {
+  const anchor = useRef<ViewInstance | null>(null);
+  const { headerBottom, onAnchorLayout } = useSheetHeaderBottom(anchor);
   return (
-    <StateSurface pointerEvents="box-none" className="absolute inset-0">
-      <SheetToasterContent />
-    </StateSurface>
-  );
-}
-
-function SheetToasterContent() {
-  const surface = useStateSurface();
-  const register = surface?.register;
-  // The native geometry observer runs only while a reader is registered.
-  useEffect(() => register?.(), [register]);
-  // `frame` is the visible part of the sheet's content frame, after the
-  // window, the sheet's clip and the keyboard; `bounds` is the whole frame.
-  const hiddenBelow =
-    surface?.frame && surface.bounds
-      ? Math.max(0, surface.bounds.bottom - surface.frame.bottom)
-      : 0;
-  return (
-    <ThemedToaster
-      offset={
-        hiddenBelow +
-        getToastBottomOffset({ safeAreaBottom: surface?.safeAreaBottom ?? 0, keyboardHeight: 0 })
-      }
-      // A window-level overlay draws in the app's main window, and on-device
-      // testing found it behind the presented sheet (2026-07-07, iOS): the
-      // toast renders inline in the sheet's own views instead.
-      fullWindowOverlay={false}
-    />
+    <View
+      ref={anchor}
+      onLayout={onAnchorLayout}
+      collapsable={false}
+      pointerEvents="box-none"
+      className="absolute inset-0"
+    >
+      <ThemedToaster
+        position="top-center"
+        offset={(headerBottom ?? 0) + SHEET_TOAST_GAP}
+        positionerStyle={SHEET_TOAST_POSITIONER_STYLE}
+        paddingVertical={SHEET_TOAST_PADDING_VERTICAL}
+        // The window-level overlay is iOS-only and draws in the app's main
+        // window; the toast renders inline in the sheet's own views.
+        fullWindowOverlay={false}
+      />
+    </View>
   );
 }

@@ -29,11 +29,12 @@ import { sceneAt, settleLeaveWindow } from '@/lib/navigation/leave-settle';
  * scene — the one a sighted user sees — stays exposed.
  *
  * A focused presented scene — a formSheet or a modal route — also hosts the
- * app's toasts (`SheetToastScope`): the native presentation covers the root
- * Toaster, so a failure the scene raised would stay out of sight until it
- * closed. A covered or dismissing scene hands them back with its focus. The
- * host is the scene's last child, so the scroll view react-native-screens
- * finds through the first descendants stays the same.
+ * app's toasts on Android (`SheetToastScope`), the same in-sheet placement the
+ * imperative `Sheet` uses there; iOS keeps the root Toaster, whose overlay
+ * already draws above the presentation. A covered or dismissing scene hands
+ * the toasts back with its focus. The host is the scene's last child, so the
+ * scroll view react-native-screens finds through the first descendants stays
+ * the same.
  */
 function CoveredScreenA11yGate({
   navigation,

@@ -78,7 +78,7 @@ const createScriptingHarness = () => {
 
       const payload = code.includes('__buildAria')
         ? {
-            lines: ['- button "Go" e1'],
+            lines: ['- button "Go" [ref=e1]'],
             nextRef: 1,
             refs: [{ ref: 'e1', selector: 'button.go' }],
           }

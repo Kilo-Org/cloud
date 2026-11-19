@@ -186,17 +186,18 @@ export function useListDirectories(connectionId: string | null): UseListDirector
             lastCause
           );
         }
-        if (!nudged && !connection.isConnected() && !connection.isSocketOpen()) {
+        if (!nudged && !connection.isConnected() && connection.socketPhase() === 'absent') {
           // The reconnect loop may have parked on a long backoff or exhausted
           // itself while the sheet sat on the error, and the send below would
           // then block in the SDK's open waiter until the deadline instead of
           // returning a failure the loop could react to. Nudge the transport
           // BEFORE waiting, so an attempt that starts just after the relay came
           // back rebuilds the socket instead of reporting the sheet's error;
-          // the same nudge the session-connection indicator's Retry uses. An
-          // OPEN socket whose first inbound frame has not arrived is a working
-          // transport: replacing it would reject the pending commands sharing
-          // this connection, so it is left alone too.
+          // the same nudge the session-connection indicator's Retry uses. Only
+          // a connection with no socket at all is nudged: an open socket, or
+          // one whose handshake is still in flight, is left alone because
+          // replacing it would reject the commands sharing this connection and
+          // abort a handshake that can still succeed.
           nudged = true;
           connection.retryConnection();
         }

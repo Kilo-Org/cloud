@@ -3,6 +3,7 @@ import {
   MAX_RECONNECT_ATTEMPTS,
   type Connection,
   type ConnectionLifecycleHooks,
+  type SocketPhase,
 } from './base-connection';
 import { cloudAgentSdkRuntime } from './runtime';
 import {
@@ -89,13 +90,11 @@ type UserWebConnection = {
    */
   isConnected: () => boolean;
   /**
-   * Returns whether the current viewer socket's `readyState` is `OPEN`. Read
-   * live from the socket the base connection holds now, so it turns false on
-   * `null` and every non-OPEN state. Independent of `isConnected`, which waits
-   * for the first parsed inbound message: a socket that is OPEN but has not
-   * delivered that message yet is a working transport.
+   * Reports the phase of the current viewer socket. Independent of
+   * `isConnected`, which only turns true after the first parsed inbound
+   * message.
    */
-  isSocketOpen: () => boolean;
+  socketPhase: () => SocketPhase;
   /**
    * Subscribes to transport-readiness transitions. The listener fires only
    * when the boolean value actually changes. The returned function
@@ -728,7 +727,7 @@ function createUserWebConnection(
       exhaustionSignal.clear();
     },
     isConnected: connectionSignal.get,
-    isSocketOpen: () => currentWs !== null && currentWs.readyState === WebSocket.OPEN,
+    socketPhase: () => baseConnection?.socketPhase() ?? 'absent',
     onConnectionChange(listener) {
       if (destroyed) return () => {};
       return connectionSignal.subscribe(listener);

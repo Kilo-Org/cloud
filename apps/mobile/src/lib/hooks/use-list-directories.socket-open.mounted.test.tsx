@@ -25,6 +25,7 @@ const sockets: TestSocket[] = [];
 
 class TestSocket {
   static readonly OPEN = 1;
+  static readonly CONNECTING = 0;
   readyState = 0;
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
@@ -89,13 +90,13 @@ function currentConnection(): UserWebConnection {
 }
 
 /**
- * The picker's guard must not tear down a viewer socket that is OPEN but has
- * not parsed its first inbound frame: that socket is a working transport, and
- * replacing it rejects the commands sharing the connection (the picker's own
- * `list_directories` included, plus unrelated in-flight commands such as
- * `list_models`).
+ * The picker's guard must not tear down a viewer socket that is OPEN or still
+ * CONNECTING when its first inbound frame has not parsed: that socket is a
+ * working transport, and replacing it rejects the commands sharing the
+ * connection (the picker's own `list_directories` included, plus unrelated
+ * in-flight commands such as `list_models`).
  */
-describe('useListDirectories with an open socket that has not delivered its first message', () => {
+describe('useListDirectories with a socket the picker must not replace', () => {
   beforeEach(() => {
     vi.stubGlobal('WebSocket', TestSocket);
     sockets.length = 0;
@@ -118,7 +119,7 @@ describe('useListDirectories with an open socket that has not delivered its firs
     try {
       const socket = firstSocket();
       socket.open();
-      expect(connection.isSocketOpen()).toBe(true);
+      expect(connection.socketPhase()).toBe('open');
       expect(connection.isConnected()).toBe(false);
 
       let settled = false;
@@ -161,6 +162,56 @@ describe('useListDirectories with an open socket that has not delivered its firs
       expect(socket.close).not.toHaveBeenCalled();
       expect(settled).toBe(false);
 
+      socket.receive({ type: 'response', id: frame.id, result: { providers: [] } });
+      await expect(pending).resolves.toEqual({ providers: [] });
+      unmount();
+    } finally {
+      release();
+    }
+  });
+
+  it('lists the directory while the handshake is still in flight', async () => {
+    const connection = currentConnection();
+    const release = connection.retain();
+    try {
+      const socket = firstSocket();
+      expect(socket.readyState).toBe(0);
+      expect(connection.socketPhase()).toBe('connecting');
+      expect(connection.isConnected()).toBe(false);
+
+      const pending = connection.sendCommandToConnection({
+        command: 'list_models',
+        data: { protocolVersion: 1 },
+        expectedConnectionId: 'conn-1',
+      });
+      await flushMicrotasks();
+      expect(socket.frames).toHaveLength(0);
+
+      listFn.mockResolvedValue({ ok: true, path: 'src', directories: [server] });
+      const probe: Probe = { current: null };
+      const { unmount } = await renderWithProviders(
+        createElement(Harness, { connectionId: 'conn-1', probe })
+      );
+      const api = () => {
+        if (probe.current === null) {
+          throw new Error('hook has not rendered yet');
+        }
+        return probe.current;
+      };
+      act(() => {
+        api().list('src');
+      });
+      await waitFor(() => api().state?.phase === 'ready');
+
+      expect(api().state).toEqual({ phase: 'ready', path: 'src', directories: [server] });
+      expect(sockets).toHaveLength(1);
+      expect(socket.close).not.toHaveBeenCalled();
+
+      socket.open();
+      await flushMicrotasks();
+      expect(socket.frames).toHaveLength(1);
+      const frame: { id?: unknown } = JSON.parse(socket.frames[0] ?? '{}');
+      expect(typeof frame.id).toBe('string');
       socket.receive({ type: 'response', id: frame.id, result: { providers: [] } });
       await expect(pending).resolves.toEqual({ providers: [] });
       unmount();

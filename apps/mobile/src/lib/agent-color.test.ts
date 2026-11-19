@@ -69,7 +69,7 @@ describe('stateTint', () => {
       list.push(state);
       identityGroups.set(tint, list);
     }
-    expect(new Set(identityGroups.keys())).toHaveLength(3);
+    expect(new Set(identityGroups.keys()).size).toBe(3);
     expect(identityGroups.get(stateTint('unknown'))).toEqual(['unknown', 'platform', 'repository']);
     expect(identityGroups.get(stateTint('idle'))).toEqual(['idle']);
     expect(identityGroups.get(stateTint('live'))).toEqual(['live']);

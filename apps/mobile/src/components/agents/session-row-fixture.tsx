@@ -51,9 +51,9 @@ export function SessionRowFixture() {
         />
       ) : null}
       {stateRows ? (
-        // The exact words the tray renders, so each row's tint is the pin the
-        // contract names (see `stateTint`): an idle live row and a running
-        // live row keep their state word's tint distinct.
+        // The tray words. Note: no production surface derives the `idle` key
+        // yet, so this renders a latent pin (`stateTint`), not a row the tray
+        // can show today; LIVE is the tray's real state-word row.
         <>
           <SessionRow agentLabel="IDLE" agentState="idle" title="Idle state fixture" />
           <SessionRow agentLabel="LIVE" agentState="live" title="Live state fixture" live />

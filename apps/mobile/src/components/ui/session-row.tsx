@@ -23,9 +23,10 @@ type SessionRowProps = {
    * placeholder for a value the row cannot name, `platform` names the kind of
    * agent the row ran on, and `repository` names the repository it ran in; all
    * three label the row's context rather than the session, so they take the
-   * muted pair and the title leads. `idle`/`live` keep the ramp entry the
-   * English word already hashed to (sky blue). Omit it for a label that is the
-   * session's own name, such as a chat's model, which hashes.
+   * muted pair and the title leads. `idle` and `live` each pin their own ramp
+   * entry — no two states share one (see `stateTint`'s pin table). Omit it for
+   * a label that is the session's own name, such as a chat's model, which
+   * hashes.
    */
   agentState?: 'unknown' | 'platform' | 'repository' | 'idle' | 'live' | null;
   title: string;

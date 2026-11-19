@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite covers every readout the billing model derives for the billing screen, the hub and the seats card, so the shared state transitions stay readable in one place. */
 import { describe, expect, it } from 'vitest';
 
 import {

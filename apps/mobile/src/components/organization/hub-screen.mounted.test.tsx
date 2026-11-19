@@ -479,11 +479,14 @@ describe('Organization hub plan', () => {
       month: 'short',
       day: 'numeric',
     });
-    expect(row?.props.valueStatus).toMatchObject({
+    const status = row?.props.valueStatus;
+    expect(status).toMatchObject({
       label: i18n.t('organization.hub.planStatusTrialEndsOn', { date: expectedDate }),
       tone: 'default',
     });
-    expect(row?.props.valueStatus?.label.startsWith(' · ')).toBe(true);
+    // The separator lives in the catalog value, so this pins it as the row's
+    // leading segment rather than folding the trial into the plan name.
+    expect(status).toMatchObject({ label: expect.stringMatching(/^ · /) });
     // A running trial is not the lapsed state, so nothing above the card
     // explains an ending that has not happened.
     expect(refusals(renderer)).toHaveLength(0);

@@ -323,13 +323,20 @@ describe('GET /api/v1/models', () => {
   test('answers 500 when the live catalogue fails the schema', async () => {
     const request = createTestRequest('/api/v1/models');
 
+    // Every field the catalogue uses is present and well-typed; a single optional
+    // field carries the wrong type, so only the schema can reject this body.
+    const schemaInvalidModel = {
+      ...mockOpenRouterModels.data[0],
+      per_request_limits: 'unlimited',
+    };
+
     global.fetch = jest.fn(() => {
       return Promise.resolve(
         createMockResponse({
           ok: true,
           status: 200,
           statusText: 'OK',
-          jsonData: cataloguePayload([{ id: 'vendor/incomplete', name: 'Incomplete entry' }]),
+          jsonData: cataloguePayload([schemaInvalidModel]),
         })
       );
     }) as unknown as typeof fetch;

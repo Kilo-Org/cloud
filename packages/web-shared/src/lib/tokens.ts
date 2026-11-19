@@ -77,12 +77,14 @@ const boundedInternalServiceAudienceSet: ReadonlySet<string> = new Set(
 const FIVE_YEARS_IN_SECONDS = 5 * 365 * 24 * 60 * 60;
 const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60;
 const ONE_HOUR_IN_SECONDS = 60 * 60;
+const FIFTEEN_MINUTES_IN_SECONDS = 15 * 60;
 const FIVE_MINUTES_IN_SECONDS = 5 * 60;
 
 export const TOKEN_EXPIRY = {
   default: FIVE_YEARS_IN_SECONDS,
   thirtyDays: THIRTY_DAYS_IN_SECONDS,
   oneHour: ONE_HOUR_IN_SECONDS,
+  fifteenMinutes: FIFTEEN_MINUTES_IN_SECONDS,
   fiveMinutes: FIVE_MINUTES_IN_SECONDS,
 } as const;
 
@@ -180,7 +182,7 @@ export function generateOrganizationApiToken(
   organizationId: string,
   organizationRole: OrganizationRole
 ) {
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+  const expiresAt = new Date(Date.now() + FIFTEEN_MINUTES_IN_SECONDS * 1000);
 
   const token = jwt.sign(
     {
@@ -194,7 +196,7 @@ export function generateOrganizationApiToken(
     NEXTAUTH_SECRET,
     {
       algorithm: jwtSigningAlgorithm,
-      expiresIn: '15m',
+      expiresIn: FIFTEEN_MINUTES_IN_SECONDS,
     }
   );
 

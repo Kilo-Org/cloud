@@ -9,7 +9,7 @@ let insets = { top: 0, bottom: 0, left: 0, right: 0 };
 let keyboardHeight = 0;
 let tabBarBand = 64;
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View', I18nManager: { isRTL: false } }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => insets }));
 vi.mock('react-native-keyboard-controller', () => ({
   useKeyboardState: (selector: (state: { height: number }) => unknown) =>

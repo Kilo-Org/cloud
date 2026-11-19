@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import {
   type AllowedMergeMethod,
@@ -46,8 +47,11 @@ export function MethodPicker({
                 disabled: isDisabled,
               })}
               accessibilityHint={prMergeDescription(option.value)}
+              // `min-h-11` measured 38.5 dp at NativeWind's 14pt rem; the
+              // explicit 44 dp floor is the target it meant.
               className={cn(
-                'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
+                TOUCH_TARGET_CLASS,
+                'items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
                 // The selected chip is a selection state, not a call to action:
                 // light fills with `primary`, dark with the muted `selection`
                 // olive, because dark's `primary` is the brand yellow

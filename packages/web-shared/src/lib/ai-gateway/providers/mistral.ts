@@ -71,10 +71,9 @@ export function applyMistralThinkingRequestTransform(request: GatewayRequest) {
   if (request.kind !== 'chat_completions') return;
   const body = request.body;
   // Mistral reasons only when asked to, while OpenRouter's reasoning models reason by default.
-  body.reasoning_effort =
-    isReasoningExplicitlyDisabled(request) || body.reasoning?.enabled === false
-      ? 'none'
-      : (body.reasoning?.effort ?? body.reasoning_effort ?? 'high');
+  body.reasoning_effort = isReasoningExplicitlyDisabled(request)
+    ? 'none'
+    : (body.reasoning?.effort ?? body.reasoning_effort ?? 'high');
   delete body.reasoning;
 
   for (const message of body.messages) {

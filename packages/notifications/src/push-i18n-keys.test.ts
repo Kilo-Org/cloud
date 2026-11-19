@@ -1,3 +1,8 @@
+/// <reference types="node" />
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { translatePush } from './i18n';
@@ -5,8 +10,6 @@ import en from './locales/en.json';
 import { genericPushContentForPushData } from './push-copy';
 import type { PushData } from './push-data';
 import {
-  GENERIC_PUSH_TITLE_KEY,
-  SECURITY_FINDING_PUSH_BODY_KEY,
   SECURITY_FINDING_PUSH_TITLE_KEYS,
   pushBodyCatalogKey,
   pushTitleCatalogKey,
@@ -17,6 +20,12 @@ const SECURITY_FINDING_KINDS =
   internalDispatchSecurityFindingRequestSchema.shape.notificationKind.options;
 
 const FINDING_PARAMS = { findingTitle: 'XSS in admin', repoFullName: 'acme/api' };
+
+const FINDING_PUSH_KEYS_BY_KIND = [
+  ['new_finding', 'internal.securityFindingNew', 'internal.securityFindingNew.title'],
+  ['sla_warning', 'internal.securityFindingSlaWarning', 'internal.securityFindingSlaWarning.title'],
+  ['sla_breach', 'internal.securityFindingSlaBreach', 'internal.securityFindingSlaBreach.title'],
+] as const;
 
 function catalogEntry(key: string): unknown {
   let entry: unknown = en;
@@ -34,11 +43,13 @@ describe('security finding push keys', () => {
     );
   });
 
-  it.each(SECURITY_FINDING_KINDS)('routes the %s push body to the shared entry', kind => {
-    expect(pushBodyCatalogKey(SECURITY_FINDING_PUSH_TITLE_KEYS[kind])).toBe(
-      SECURITY_FINDING_PUSH_BODY_KEY
-    );
-  });
+  it.each(FINDING_PUSH_KEYS_BY_KIND)(
+    'routes the %s push title to %s and its body to the shared sentence',
+    (_kind, i18nKey, titleKey) => {
+      expect(pushTitleCatalogKey(i18nKey)).toBe(titleKey);
+      expect(pushBodyCatalogKey(i18nKey)).toBe('internal.securityFinding.body');
+    }
+  );
 
   it.each(['internal.lowBalance', 'sessionReady', 'agentSession.notification', 'chat.untitled'])(
     'keeps the body of %s under its own entry',
@@ -48,8 +59,7 @@ describe('security finding push keys', () => {
   );
 
   it('defines the shared body sentence with the finding placeholders', () => {
-    expect(SECURITY_FINDING_PUSH_BODY_KEY).toBe('internal.securityFinding.body');
-    const body = catalogEntry(SECURITY_FINDING_PUSH_BODY_KEY);
+    const body = catalogEntry('internal.securityFinding.body');
     expect(typeof body).toBe('string');
     expect(body).toContain('{{findingTitle}}');
     expect(body).toContain('{{repoFullName}}');
@@ -90,7 +100,7 @@ describe('shared push copy', () => {
   });
 
   it('points the security lifecycle push at the product name and the generic update', () => {
-    expect(pushTitleCatalogKey(LIFECYCLE_KEY)).toBe(GENERIC_PUSH_TITLE_KEY);
+    expect(pushTitleCatalogKey(LIFECYCLE_KEY)).toBe('generic.title');
     expect(pushBodyCatalogKey(LIFECYCLE_KEY)).toBe('generic.body.securityUpdate');
   });
 
@@ -129,5 +139,91 @@ describe('shared push copy', () => {
         )
       ).toBe(preview.body);
     }
+  });
+});
+
+const LOCALES_DIR = fileURLToPath(new URL('./locales/', import.meta.url));
+
+const SAMPLE_PUSH_KEYS: readonly { key: string; params: Record<string, string> }[] = [
+  { key: 'internal.securityFindingNew.title', params: { severity: 'high' } },
+  { key: 'internal.securityFindingSlaWarning.title', params: {} },
+  { key: 'internal.securityFindingSlaBreach.title', params: {} },
+  { key: 'internal.securityFinding.body', params: FINDING_PARAMS },
+  { key: 'generic.body.securityUpdate', params: {} },
+  { key: 'generic.title', params: {} },
+  { key: 'session.title', params: { sessionTitle: 'Fix the login bug' } },
+  { key: 'sessionReady.body', params: {} },
+];
+
+function readShippedCatalogs(): Record<string, unknown> {
+  const catalogs: Record<string, unknown> = {};
+  for (const file of readdirSync(LOCALES_DIR)) {
+    if (!file.endsWith('.json')) continue;
+    const locale = file.slice(0, -'.json'.length);
+    catalogs[locale] = JSON.parse(readFileSync(join(LOCALES_DIR, file), 'utf8'));
+  }
+  return catalogs;
+}
+
+/**
+ * The value a catalog itself holds at a dotted key, without i18next's English
+ * fallback. A locale that lacks the entry still renders English, so only the
+ * raw lookup shows the gap.
+ */
+function ownEntry(catalog: unknown, key: string): unknown {
+  let entry: unknown = catalog;
+  for (const part of key.split('.')) {
+    if (entry === null || typeof entry !== 'object') return undefined;
+    entry = (entry as Record<string, unknown>)[part];
+  }
+  return entry;
+}
+
+describe('shipped push catalogs', () => {
+  it('renders every push key in every shipped locale', () => {
+    const catalogs = readShippedCatalogs();
+    expect(Object.keys(catalogs).length).toBeGreaterThan(80);
+
+    const failures: string[] = [];
+    for (const locale of Object.keys(catalogs)) {
+      for (const { key, params } of SAMPLE_PUSH_KEYS) {
+        // i18next answers with the English entry when this catalog lacks the
+        // key, so check the catalog's own entry first.
+        const own = ownEntry(catalogs[locale], key);
+        if (typeof own !== 'string' || own.trim() === '') {
+          failures.push(`${locale} ${key}: catalog defines no entry`);
+          continue;
+        }
+        if (own === key) {
+          failures.push(`${locale} ${key}: catalog holds the key itself`);
+        }
+        // The production callers all pass the English copy as the fallback;
+        // this catalog audit renders with the same argument.
+        const english = ownEntry(en, key);
+        const rendered = translatePush(
+          locale,
+          key,
+          params,
+          typeof english === 'string' ? english : key
+        );
+        if (typeof rendered !== 'string' || rendered.trim() === '') {
+          failures.push(`${locale} ${key}: rendered an empty string`);
+          continue;
+        }
+        if (rendered.includes('{{')) {
+          failures.push(`${locale} ${key}: left a placeholder unresolved: ${rendered}`);
+        }
+        for (const [name, value] of Object.entries(params)) {
+          if (!rendered.includes(value)) {
+            failures.push(`${locale} ${key}: dropped the ${name} value: ${rendered}`);
+          }
+        }
+      }
+    }
+
+    expect(
+      failures,
+      'every shipped catalog must render every push key with its placeholders filled'
+    ).toEqual([]);
   });
 });

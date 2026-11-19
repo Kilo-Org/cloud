@@ -9,6 +9,7 @@ import { Pressable, View } from 'react-native';
 
 import { MarkViewedToggle } from '@/components/pr-review/diff/pr-diff-file-rows';
 import { Text } from '@/components/ui/text';
+import { DENSE_ROW_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText, LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -54,6 +55,9 @@ export function NavigatorFileRow({
             ? t('prReview.fileNavigator.openFileViewed', { path: file.path })
             : t('prReview.fileNavigator.openFile', { path: file.path })
         }
+        // `min-h-11` measures 38.5 dp at NativeWind's 14pt rem; the dense-row
+        // slop carries it past 44 dp inside the row's own `py-2.5`.
+        hitSlop={DENSE_ROW_HIT_SLOP}
         className="min-h-11 min-w-0 flex-1 flex-row items-center active:opacity-70"
       >
         <View className="min-w-0 flex-1">
@@ -93,9 +97,11 @@ export function NavigatorFileRow({
           </View>
         </View>
       </Pressable>
-      <View className="shrink-0">
-        <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
-      </View>
+      {/* A direct child of the padded row: Android delivers a touch only inside
+          the parent view, so a wrapper sized to the 32 dp box would drop the
+          toggle's 8 dp slop. React Native's flexShrink defaults to 0, so the
+          path beside it cannot squeeze the box. */}
+      <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
     </View>
   );
 }

@@ -38,9 +38,9 @@ describe('translatePush', () => {
     ).toBe('Your balance needs attention');
   });
 
-  it('returns the fallback string when the key is unknown and a fallback is given', () => {
-    expect(translatePush('es', 'missing.key', undefined, 'Fallback English')).toBe(
-      'Fallback English'
+  it('returns the given fallback when the key is unknown', () => {
+    expect(translatePush('de', 'not.a.catalog.key', undefined, 'Something went wrong')).toBe(
+      'Something went wrong'
     );
   });
 });

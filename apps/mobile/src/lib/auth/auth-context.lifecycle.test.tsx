@@ -2297,8 +2297,9 @@ describe('bootstrap and foreground race fencing', () => {
     // the remote cleanup runs inside `signOut`, so reading the flag there
     // catches a teardown that starts before the explanation is raised.
     const blockedAtTeardown: boolean[] = [];
-    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(() => {
       blockedAtTeardown.push(blockedAccount.isBlockedAccountActive());
+      return Promise.resolve();
     });
 
     // The refresh route names the blocked account in its 401 body.

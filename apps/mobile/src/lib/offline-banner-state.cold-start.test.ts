@@ -60,4 +60,18 @@ describe('createOfflineBannerStore cold start', () => {
     await settle(0, 'offline');
     expect(store.isOffline()).toBe(true);
   });
+
+  it('commits a confirmOffline made while starting, then waits again after recovery', async () => {
+    const { store, source, timer, probe, changes, settle } = createStore();
+    store.confirmOffline();
+    expect(store.phase().kind).toBe('offline');
+    source.emit(onlineState);
+    source.emit(disconnectedState);
+    timer.advanceBy(4999);
+    expect(store.isOffline()).toBe(false);
+    timer.advanceBy(1);
+    expect(probe).toHaveBeenCalledOnce();
+    await settle(0, 'offline');
+    expect(changes).toEqual(['offline', 'online', 'offline']);
+  });
 });

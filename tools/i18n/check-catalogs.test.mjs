@@ -1919,6 +1919,51 @@ test('rejects two push keys that hold one piece of copy', () => {
   );
 });
 
+// The prefix expansion reads one snapshot of the literals: `b.` then `a.` over
+// the literal `c` builds `b.c` and `a.c`, never `a.b.c`.
+test('rejects a push key that only a second prefix pass would synthesize', () => {
+  const found = run({
+    pushEnglish: { a: { b: { c: 'Translated elsewhere' } } },
+    pushTranslated: { a: { b: { c: 'Переведено' } } },
+    pushSource: [
+      "const leaf = 'c';",
+      'translatePush(locale, `b.${leaf}`, undefined, stored);',
+      'translatePush(locale, `a.${leaf}`, undefined, stored);',
+    ].join('\n'),
+  });
+  assert.match(
+    found.join('\n'),
+    /^notifications: en\.json defines "a\.b\.c", which no source file uses$/m
+  );
+});
+
+// The exemption is looked up through wording(), so the remedy has to print that
+// same folded form: adding the raw copy would leave the duplicate in place.
+test('names the folded copy in the duplicate-copy remedy', () => {
+  const found = run({
+    english: { agents: { title: 'Cancel' }, profile: { action: 'Cancel' } },
+    translated: { agents: { title: 'Отмена' }, profile: { action: 'Отменить' } },
+    source: "t('agents.title');\nt('profile.action');",
+  });
+  const text = found.join('\n');
+  assert.match(text, /or add "cancel" to TWO_SENSE_COPY in tools\/i18n\/check-catalogs\.mjs/);
+  assert.ok(
+    text.includes(
+      ' (entries are compared after trimming, case folding and dropping trailing sentence punctuation)'
+    ),
+    'the remedy explains how the entry is compared'
+  );
+
+  // A copy the fold leaves alone is printed as it stands, with no explanation.
+  const plain = run({
+    english: { agents: { title: 'not now' }, profile: { action: 'not now' } },
+    translated: { agents: { title: 'не сейчас' }, profile: { action: 'не сейчас' } },
+    source: "t('agents.title');\nt('profile.action');",
+  }).join('\n');
+  assert.match(plain, /or add "not now" to TWO_SENSE_COPY/);
+  assert.ok(!plain.includes('entries are compared after trimming'), 'no note when nothing folds');
+});
+
 test('accepts push producers that read one shared key', () => {
   // Both session producers state the session title, so one entry carries it and
   // each payload names its own base.

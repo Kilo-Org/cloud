@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "ទិដ្ឋភាពទូទៅ",
       "files": "ឯកសារ",
-      "discussion": "ការពិភាក្សា"
+      "discussion": "ការពិភាក្សា",
+      "discussionAccessibility_one": "{{title}}: មតិយោបល់ 1",
+      "discussionAccessibility": "{{title}}: មតិយោបល់ {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: មតិយោបល់ {{displayCount}}"
     },
     "fileStatus": {
       "modified": "បានកែប្រែ",

@@ -46,6 +46,13 @@ const LOGIN_FIXTURE_REQUESTS = {
   error: { deviceCode: '', userCode: 'DEVE-RRRR' },
 } satisfies Record<LoginFixtureState, { deviceCode: string; userCode: string }>;
 
+/**
+ * How long the resumed code lives, as the server's code response names it in
+ * `expiresIn`. Five minutes keeps the fixture's poll budget as it was; the
+ * seeded requests themselves live a day, so the server never expires them first.
+ */
+const LOGIN_FIXTURE_CODE_LIFETIME_MS = 5 * 60 * 1000;
+
 export function isLoginFixtureState(value: string): value is LoginFixtureState {
   return LOGIN_FIXTURE_STATES.some(state => state === value);
 }
@@ -62,6 +69,6 @@ export async function writeLoginFixture(state: LoginFixtureState): Promise<void>
     deviceCode,
     userCode,
     verificationUrl: `${API_BASE_URL}/device-auth?code=${userCode}`,
-    startedAt: Date.now(),
+    expiresAt: Date.now() + LOGIN_FIXTURE_CODE_LIFETIME_MS,
   });
 }

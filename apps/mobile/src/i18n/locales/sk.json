@@ -1070,7 +1070,12 @@
     "tabs": {
       "overview": "Prehľad",
       "files": "Súbory",
-      "discussion": "Diskusia"
+      "discussion": "Diskusia",
+      "discussionAccessibility_one": "{{title}}: 1 komentár",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentárov",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentárov",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentáre",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} komentára"
     },
     "fileStatus": {
       "modified": "Upravené",

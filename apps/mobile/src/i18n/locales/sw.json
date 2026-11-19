@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Muhtasari",
       "files": "Faili",
-      "discussion": "Mazungumzo"
+      "discussion": "Mazungumzo",
+      "discussionAccessibility_one": "{{title}}: maoni 1",
+      "discussionAccessibility": "{{title}}: Maoni {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: Maoni {{displayCount}}"
     },
     "fileStatus": {
       "modified": "Imebadilishwa",

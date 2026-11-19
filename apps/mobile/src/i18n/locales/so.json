@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Dulmarka",
       "files": "Faylal",
-      "discussion": "Dood"
+      "discussion": "Dood",
+      "discussionAccessibility_one": "{{title}}: 1 faallo",
+      "discussionAccessibility": "{{title}}: {{displayCount}} faallo",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} faallo"
     },
     "fileStatus": {
       "modified": "Waa la beddelay",

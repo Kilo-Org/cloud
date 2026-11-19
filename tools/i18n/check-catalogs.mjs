@@ -93,6 +93,9 @@ function catalogsOf(root) {
  * The value records why the split is real. Adding an entry claims the call sites
  * mean different things; removing one promises the copy means the same thing
  * everywhere it appears.
+ *
+ * Each key is the copy compared through `wording()`, so it is trimmed, case
+ * folded and stripped of trailing sentence punctuation.
  */
 const TWO_SENSE_COPY = new Map([
   [
@@ -200,6 +203,7 @@ const WORDED_COUNTS = new Set([
   'agentChat.contextUsage.stepsCount:two:ar',
   'agentChat.contextUsage.modelsCount:two:ar',
   'prReview.discussion.comment:two:ar',
+  'prReview.tabs.discussionAccessibility:two:ar',
   'prReview.hunkRows.fileLoadedCount:two:ar',
   'prReview.hunkRows.fileLoadedOfTotalCount:two:ar',
   'organization.kiloPass.paidSeat:one:ar',
@@ -1312,10 +1316,12 @@ function scanSource(catalog, root) {
   }
   // A key the source builds from the catalog has no literal of its own, so the
   // literals beside it stand in for it: `generic.body.` plus `chatMessage` is
-  // `generic.body.chatMessage`. The set is copied because the expansion grows
-  // it while it runs.
+  // `generic.body.chatMessage`. The literals are snapshotted once: a second
+  // head must not prefix a key an earlier head already synthesized, since
+  // `a.` then `b.` over the literal `c` would also yield `b.a.c`.
+  const literals = [...referenced];
   for (const prefix of keyPrefixes) {
-    for (const value of [...referenced]) {
+    for (const value of literals) {
       referenced.add(`${prefix}${value}`);
     }
   }
@@ -1872,15 +1878,21 @@ function checkEnglishCopies({ catalogName, english }) {
   // The per-line bucket phrases are registered once in PER_LINE_BUCKET_PHRASES,
   // which checkSharedWordings also reads.
   for (const [value, keys] of byCopy) {
-    if (
-      keys.length < 2 ||
-      TWO_SENSE_COPY.has(wording(value)) ||
-      keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))
-    ) {
+    if (keys.length < 2 || keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))) {
       continue;
     }
+    const folded = wording(value);
+    if (TWO_SENSE_COPY.has(folded)) {
+      continue;
+    }
+    // The remedy prints the folded form, because that is the one the exemption
+    // lookup compares; adding the raw copy would not exempt it.
+    const foldNote =
+      folded === value
+        ? ''
+        : ' (entries are compared after trimming, case folding and dropping trailing sentence punctuation)';
     problems.push(
-      `${catalogName}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add the string to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs with the two senses it carries.`
+      `${catalogName}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add "${folded}" to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs${foldNote} with the two senses it carries.`
     );
   }
   return problems;

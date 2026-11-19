@@ -1026,7 +1026,10 @@
     "tabs": {
       "overview": "Buod",
       "files": "Mga payl",
-      "discussion": "Talakayan"
+      "discussion": "Talakayan",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komento",
+      "discussionAccessibility": "{{title}}: {{displayCount}} na komento",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} na komento"
     },
     "fileStatus": {
       "modified": "Binago",

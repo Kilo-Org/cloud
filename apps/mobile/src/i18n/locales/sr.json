@@ -1048,7 +1048,11 @@
     "tabs": {
       "overview": "Pregled",
       "files": "Datoteke",
-      "discussion": "Diskusija"
+      "discussion": "Diskusija",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentara",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentara",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentara"
     },
     "fileStatus": {
       "modified": "Izmenjeno",

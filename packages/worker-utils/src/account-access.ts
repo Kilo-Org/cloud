@@ -50,7 +50,7 @@ export async function findOrganizationMemberRole(
       organizations,
       activeOrganizationJoinCondition(organization_memberships.organization_id)
     )
-    .where(directOrganizationMembershipCondition(organizationId, userId))
+    .where(directOrganizationMembershipCondition({ organizationId, kiloUserId: userId }))
     .limit(1);
   return membership?.role ?? null;
 }

@@ -115,16 +115,17 @@ export function activeOrganizationJoinCondition(organizationIdColumn: Organizati
 /**
  * Equality filters for the caller's own membership in a given organization.
  * Pair it with {@link activeOrganizationJoinCondition} for the live-organization
- * check.
+ * check. The arguments are named because both are strings: a swapped call
+ * would still compile.
  */
-export function directOrganizationMembershipCondition(
-  organizationId: string,
-  kiloUserId: string
-): SQL {
+export function directOrganizationMembershipCondition(params: {
+  organizationId: string;
+  kiloUserId: string;
+}): SQL {
   return (
     and(
-      eq(organization_memberships.organization_id, organizationId),
-      eq(organization_memberships.kilo_user_id, kiloUserId)
+      eq(organization_memberships.organization_id, params.organizationId),
+      eq(organization_memberships.kilo_user_id, params.kiloUserId)
     ) ?? sql`false`
   );
 }
@@ -259,7 +260,12 @@ export function organizationAccessQuery(
       organizations,
       activeOrganizationJoinCondition(organization_memberships.organization_id)
     )
-    .where(directOrganizationMembershipCondition(params.organizationId, params.kiloUserId))
+    .where(
+      directOrganizationMembershipCondition({
+        organizationId: params.organizationId,
+        kiloUserId: params.kiloUserId,
+      })
+    )
     .limit(1);
 }
 

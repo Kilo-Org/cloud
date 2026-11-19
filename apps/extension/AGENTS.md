@@ -88,6 +88,7 @@ The background owns one runtime (`src/shared/browser-runtime.ts`); the side pane
 - **Ref lifetime is Playwright-like.** A caller's refs (`[ref=eN]` from a snapshot, resolved by `resolveTarget`) outlive its turn. They are cleared only by a navigation (main-frame document change), by tab session dispose, or by `disposeCaller` (`DISPOSE_BROWSER_CALLER_MESSAGE`) when the caller is gone for good: its conversation was deleted, its workflow run finished, or its agent session closed. A full snapshot from another caller replaces that caller's registry only.
 - **One attachment, one serial chain per tab.** Calls on a tab run in admission order; a session is reused across callers and turns, so no caller may expect a fresh attach.
 - **Downloads are refused before a finished file exists.** On Chrome the guard holds a download in `chrome.downloads.onDeterminingFilename` and refuses it before a finished file appears (temp data can be written and is deleted); on Firefox, which has no such event, the guard cancels after the download starts, so a small file can be saved without approval.
+- **Firefox reports a late download on the next call.** A download that starts after a call returns — a `browser_navigate` to an attachment, for example — is reported on the session's next call, not on the call that started it. Do not hold every navigate open to fix that: it would slow ordinary calls, and Firefox is meant to stay as it is.
 
 ## Workflows
 

@@ -201,6 +201,12 @@ export interface SettleWindow {
 export interface DownloadHold {
   /** The browser announced a download on an agent tab, before its item existed. */
   readonly announce: (download: DownloadHoldAnnouncement) => void;
+  /**
+   * Reports an announcement the browser will never complete into an item — no
+   * `downloads` permission, so the event this hold answers does not exist — as
+   * possibly saved, at once instead of after the tripwire's wait.
+   */
+  readonly escape: (download: DownloadHoldAnnouncement, session: string) => void;
   /** Arms the need a redeemed step token carries, replacing the session's earlier one. */
   readonly arm: (need: ApprovalNeed) => void;
   readonly closeSession: (session: string) => void;
@@ -864,6 +870,33 @@ export const createDownloadHold = ({
       }
 
       return reports;
+    },
+    escape: (download, session) => {
+      // The item will never exist: nothing was listening for it. The file may, so it is reported now.
+      const [entry] = announcements.get(download.tabId) ?? [];
+
+      if (entry !== undefined) {
+        entry.claimed = true;
+      }
+
+      report({
+        filename:
+          download.suggestedFilename ?? requestedName(download.url) ?? 'the downloaded file',
+        itemId: undefined,
+        kind: 'escaped',
+        need: needs.get(session) ?? {
+          expiresAt: now(),
+          kind: 'armed',
+          session,
+          step: tabs.get(download.tabId)?.step,
+          tabId: download.tabId,
+          target: targetOf(download.url ?? ''),
+        },
+        reason: 'unobserved',
+        since: now(),
+        tabId: download.tabId,
+        url: download.url,
+      });
     },
     handle,
     needOf,

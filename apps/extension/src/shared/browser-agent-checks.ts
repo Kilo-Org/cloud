@@ -119,13 +119,34 @@ export const DOWNLOAD_STEP_TAB_GONE_ERROR =
   'The tab that step opened is gone. Take a fresh snapshot and try again (blocked).';
 
 /**
- * A refusal for a download-capable call when the guard cannot run: the optional
- * `downloads` permission is missing, so `chrome.downloads.onDeterminingFilename`
- * does not exist for this extension and no download can be held or cancelled.
- * The switch re-requests the permission, so the message names that one action.
+ * A report for a download the browser started where nothing could hold it: the
+ * optional `downloads` permission is missing, so `onDeterminingFilename` does
+ * not exist. On Chrome the response interceptor still stops an http(s)
+ * attachment, so this text is only reached by a `blob:`, `data:` or
+ * `<a download>` file no network response can fail. The step ran and the file
+ * may exist, so the text names both and the one action that guards the next.
  */
 export const DOWNLOAD_PERMISSION_MISSING_ERROR =
-  'The browser cannot cancel downloads for this agent call: the optional Downloads permission is not granted (blocked). Turn "Allow local agents" off and on again to grant it, then retry.';
+  'A download may have been saved: the optional Downloads permission is not granted, so the download guard could not watch it. Turn "Allow local agents" off and on again to grant it, then retry.';
+
+/**
+ * The refusal for an http(s) download the response interceptor stopped: the file
+ * is named, and the approval is named as the thing the Downloads permission
+ * makes possible. Without that permission a step token cannot be redeemed, so no
+ * approval is offered — the text asks for the grant instead.
+ */
+export const downloadStoppedWithoutPermissionError = (filename: string): string =>
+  `The download of ${filename} was stopped before it was saved. Granting the optional Downloads permission lets this download be approved and repeated.`;
+
+/**
+ * The refusal for an approval that could not produce its file: Chrome's own
+ * multiple-downloads limiter blocks the approved repeat, so the browser creates
+ * no item at all. The approval is still unspent — a second human approval must
+ * not be needed for a file Chrome silently swallowed — and the text names the
+ * browser setting that unblocks it.
+ */
+export const DOWNLOAD_BLOCKED_BY_BROWSER_ERROR =
+  'The browser blocked this download. The user can allow automatic downloads for this site in Chrome, then repeat the step.';
 
 const DEFAULT_PORTS = { 'http:': '80', 'https:': '443' } as const;
 

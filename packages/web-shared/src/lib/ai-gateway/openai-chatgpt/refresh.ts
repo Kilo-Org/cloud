@@ -417,10 +417,6 @@ async function resolveOpenAiChatGptAccessTokenUncached(
     }
 
     for (let attempt = 1; attempt <= OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS; attempt++) {
-      // The row lock is held for one refresh request only. The backoff between
-      // attempts runs with it released, and each attempt re-reads the row, so a
-      // sibling instance that refreshed meanwhile is adopted rather than
-      // refreshed over.
       const decision = await db.transaction(tx => resolveInsideLock(tx, owner));
 
       // A terminal decision has already disabled the row inside that transaction.

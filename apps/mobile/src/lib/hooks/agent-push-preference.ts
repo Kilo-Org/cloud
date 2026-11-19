@@ -38,7 +38,6 @@ export type NotificationPreferences = Readonly<{
   notificationPreviews?: 'generic' | 'full';
 }>;
 
-/** What the cache may hold — either the typed full row or the legacy `agentPushEnabled` snapshot. */
 type NotificationPreferencesSnapshot =
   | NotificationPreferences
   | Readonly<{ agentPushEnabled: boolean }>
@@ -98,7 +97,6 @@ export function deriveGateSettled({
   return pushTokensSettled && deviceTokenSettled;
 }
 
-/** Map the legacy single-key cache shape to the new per-category shape. */
 function defaultPreferences(
   overrides: Partial<NotificationPreferences> = {}
 ): NotificationPreferences {
@@ -265,9 +263,6 @@ export function rollbackAgentPushOptimistic(args: RollbackArgs): void {
   }
   if (args.context.previous) {
     if (args.context.previousWasLegacy) {
-      // Restore the exact legacy shape by overwriting the cache with only the
-      // original legacy fields. The next refetch will repopulate the new
-      // per-category shape.
       args.queryClient.setQueryData(args.queryKey, args.context.previous);
       return;
     }

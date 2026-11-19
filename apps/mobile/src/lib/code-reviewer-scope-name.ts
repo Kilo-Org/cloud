@@ -119,7 +119,6 @@ function parseStoredRecord(raw: string): ScopeNamesRecord | null {
   }
 }
 
-/** Drop the oldest names past the cap. */
 function trimNames(): void {
   while (names.size > MAX_REMEMBERED_SCOPE_NAMES) {
     const oldest = names.keys().next();

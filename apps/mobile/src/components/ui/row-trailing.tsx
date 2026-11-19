@@ -91,7 +91,8 @@ export type RowTrailingSpec =
 /**
  * Paints a row's trailing cell. A row without one passes `undefined`; the
  * switch keeps its own accessible node and test handle, and a text action
- * carries its own 48pt target, which its margin cancels out of the row's height.
+ * carries its own platform target (44pt on iOS, 48dp on Android), which its
+ * margin cancels out of the row's height.
  */
 export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactNode {
   if (trailing === undefined) {

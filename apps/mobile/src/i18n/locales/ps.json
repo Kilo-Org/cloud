@@ -2505,7 +2505,7 @@
     },
     "modelCost": {
       "lessThan": "له {{amount}} څخه کم",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} په {{million}} {{tokens}} کې"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} هر {{million}} {{tokens}}"
     },
     "partDetail": {
       "detailsUnavailable": "جزیات د لاسرسي وړ نه دي.",

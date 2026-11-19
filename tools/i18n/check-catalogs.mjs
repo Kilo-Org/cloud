@@ -517,10 +517,10 @@ const VISIBILITY_KEYS = [
  * is the sampling parameter's published name, so a translated word would hide
  * which parameter the field sets; `profiles.mcp.jsonPlaceholder` is the JSON
  * sample the multiline field shows the reader, and a translated one stops
- * demonstrating the shape. This list is the only registration such a key
- * needs: `checkVerbatimLabels` requires the key to read English everywhere,
- * and the untranslated check exempts the same key from the "equals English
- * everywhere" failure.
+ * demonstrating the shape. A key listed here reads English in every catalog:
+ * `checkVerbatimLabels` requires it, and `ENGLISH_IDENTICAL_ALLOWLIST` and,
+ * for the JSON sample, `JSON_SAMPLE_EXEMPT_KEYS` exempt the same key from the
+ * rules that would otherwise reject the identical or serialized value.
  */
 const VERBATIM_KEYS = ['profiles.agents.topP', 'profiles.mcp.jsonPlaceholder'];
 
@@ -1512,8 +1512,11 @@ function isSerializedJson(value) {
  * Catalog values whose text is literally a JSON sample the reader types
  * beside: the MCP form's multiline config placeholder shows the shape the
  * stored value takes, so its braces and quoted key are the content, not a
- * storage slip. The key's value also must read as English everywhere
- * (VERBATIM_KEYS), which the sample's unverifiable translation would break.
+ * storage slip. The same key is registered in VERBATIM_KEYS (whose
+ * checkVerbatimLabels requires the English text) and in
+ * ENGLISH_IDENTICAL_ALLOWLIST (which exempts it from the "equals English
+ * everywhere" failure), so a maintainer registering a sister key lists it in
+ * all three.
  */
 const JSON_SAMPLE_EXEMPT_KEYS = new Set(['profiles.mcp.jsonPlaceholder']);
 
@@ -1678,6 +1681,10 @@ function checkTranslatedValues({
   const problems = [];
   const ownValues = new Set(translated.values());
   for (const [key, value] of translated) {
+    // The serialized-JSON rule needs no English reference: a locale's own
+    // plural category (`agents.liveCount_few` of ar) never appears in en.json,
+    // but a JSON object stored in it is the same storage slip.
+    problems.push(...checkSerializedJson(label, key, value));
     if (!english.has(key)) {
       continue;
     }
@@ -1735,7 +1742,6 @@ function checkTranslatedValue({
   }
   problems.push(...checkValuePlaceholders({ label, tag, english, key, value, englishValue }));
   problems.push(...checkValueEdges({ label, key, value, englishValue }));
-  problems.push(...checkSerializedJson(label, key, value));
   // A quoted English label. The copy must name the label's key with
   // `$t(key)`, or the message points at a button this user never sees.
   for (const run of quotedRuns(value)) {

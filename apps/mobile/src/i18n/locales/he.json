@@ -1942,7 +1942,7 @@
     },
     "modelCost": {
       "lessThan": "מתחת ל-{{amount}}",
-      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} ל{{million}} {{tokens}}"
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} ל-{{million}} {{tokens}}"
     },
     "modeOptions": {
       "code": "כתיבת קוד",

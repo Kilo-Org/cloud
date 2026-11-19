@@ -36,7 +36,9 @@ export function modelPickerFixtureRoute(path: string): string | null {
   ];
   // One priced shape per cost line the picker paints, so a catalog change to
   // `agentChat.modelCost.*` renders without a live gateway: a sub-cent side
-  // shows the `lessThan` label, the others show the two-decimal shape.
+  // shows the `lessThan` label, the others show the two-decimal shape. The
+  // rows carry `pricing` with `showGatewayMetadata: true` like a gateway
+  // option, because a CLI-catalog row (the flag off) ships no pricing.
   const pricedOptions: SessionModelOption[] = [
     {
       id: 'fixture-priced-sub-cent',
@@ -46,7 +48,7 @@ export function modelPickerFixtureRoute(path: string): string | null {
       provider: { id: 'fixture', name: 'Fixture' },
       variants: [],
       isPreferred: false,
-      showGatewayMetadata: false,
+      showGatewayMetadata: true,
       pricing: { prompt: '0.000000005', completion: '0.000000014' },
     },
     {
@@ -57,7 +59,7 @@ export function modelPickerFixtureRoute(path: string): string | null {
       provider: { id: 'fixture', name: 'Fixture' },
       variants: [],
       isPreferred: false,
-      showGatewayMetadata: false,
+      showGatewayMetadata: true,
       pricing: { prompt: '0.000003', completion: '0.000014' },
     },
   ];

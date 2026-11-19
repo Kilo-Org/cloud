@@ -101,10 +101,7 @@ function rejection(message: string, code: string): Error {
   return Object.assign(new Error(message), { data: { code, message } });
 }
 
-async function mountWith<I>(
-  useMutation: ProbeProps<I>['useMutation'],
-  input: I
-) {
+async function mountWith<I>(useMutation: ProbeProps<I>['useMutation'], input: I) {
   toastError.mockClear();
   const mounted = await renderWithProviders(
     createElement<ProbeProps<I>>(Probe, { useMutation, input }),

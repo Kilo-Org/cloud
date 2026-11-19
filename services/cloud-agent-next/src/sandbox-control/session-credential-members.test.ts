@@ -653,36 +653,31 @@ describe('a persisted V2 grant', () => {
     ).toBe(false);
   });
 
-  // Each grant below is valid for its mode without `additionalRepositories`, so a
-  // failure with them comes from the rule that only a contained grant served by
-  // the outbound proxy can hold several repositories.
-  it.each([
-    [
-      'direct',
-      { containmentEnabled: false },
-      () => ({
-        purpose: 'github' as const,
-        gitUrl: 'https://github.com/acme/widgets.git',
-        nativeToken: 'ghs_native',
-      }),
-    ],
-    [
-      'Vercel',
-      { provider: 'vercel' },
-      () => ({
-        purpose: 'github' as const,
-        alias: GITHUB_ALIAS,
-        gitUrl: 'https://github.com/acme/widgets.git',
-        capability: capability('kgh2.vercel'),
-      }),
-    ],
-  ])('is invalid on a %s grant that holds additional repositories', (name, mode, launchScm) => {
+  it('is valid on a Vercel grant, which the same proxy rules serve', () => {
+    expect(
+      persistedSessionCredentialGrantSchema.safeParse(persisted({ provider: 'vercel' })).success
+    ).toBe(true);
+  });
+
+  // The grant below is valid without `additionalRepositories`, so a failure with
+  // them comes from the rule that only a contained grant can hold several repositories.
+  it('is invalid on a direct grant that holds additional repositories', () => {
+    const launchScm = () => ({
+      purpose: 'github' as const,
+      gitUrl: 'https://github.com/acme/widgets.git',
+      nativeToken: 'ghs_native',
+    });
     const launch = githubEntry('acme/widgets', 'launch');
     const gadgets = { ...githubEntry('acme/gadgets', 'gadgets'), scm: launchScm() };
     const base = persisted();
     // A direct grant is a legacy one: its Kilo credential has no alias.
-    const kilo = name === 'direct' ? { ...base.kilo, alias: undefined } : base.kilo;
-    const grant = persisted({ ...mode, kilo, scm: launchScm(), repository: launch.repository });
+    const kilo = { ...base.kilo, alias: undefined };
+    const grant = persisted({
+      containmentEnabled: false,
+      kilo,
+      scm: launchScm(),
+      repository: launch.repository,
+    });
     const without = { ...grant, additionalRepositories: undefined };
     const withMembers = { ...grant, additionalRepositories: [gadgets] };
 

@@ -57,6 +57,7 @@ const flashListMock = vi.hoisted(
 
 vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -81,8 +82,14 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+  // The shared `cn` helper reaches `@/i18n`, which installs this plugin at
+  // module load. Partially mocked callers keep the real export instead.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Icon',

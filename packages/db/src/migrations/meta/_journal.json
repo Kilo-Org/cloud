@@ -2584,6 +2584,27 @@
       "when": 1795013963877,
       "tag": "0368_blacklisted_domains_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 369,
+      "version": "7",
+      "when": 1795019131973,
+      "tag": "0369_step_up_proof_binding_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 370,
+      "version": "7",
+      "when": 1795095756630,
+      "tag": "0370_anthropic_user_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 371,
+      "version": "7",
+      "when": 1795103892816,
+      "tag": "0371_melodic_starjammers",
+      "breakpoints": true
     }
   ]
 }

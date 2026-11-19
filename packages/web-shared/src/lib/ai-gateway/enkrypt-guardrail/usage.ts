@@ -59,11 +59,11 @@ export type EnkryptGuardrailCall = {
   scannedCharacters: number;
   /** The text the scan covers, including what the verdict cache covered; see the ledger column. */
   totalCharacters: number;
+  /** How long this Enkrypt call took, in milliseconds; see the ledger column. */
+  addedLatencyMs: number;
 };
 
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
-  /** The request's wait for the verdict, on one call per request only; see the ledger column. */
-  addedLatencyMs: number | null;
   /** Defaults to the input guardrail. */
   guardrail?: EnkryptGuardrailDirection;
 };

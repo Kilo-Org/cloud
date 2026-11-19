@@ -19,14 +19,33 @@ type SdkDeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['re
 export const CREDITS_DELIVERY_REASON = 'credits';
 
 /**
+ * The reason a chat reports for a question whose answer failed. A chat runs no
+ * agent, so the bubble names the cause the chat classified (`detailKey`, a fixed
+ * catalog key such as a lost connection) instead of the agent-run copy the
+ * SDK's `execution` reason states, and that one statement is the only place the
+ * failure is shown.
+ */
+export const CHAT_RESPONSE_DELIVERY_REASON = 'chat-response';
+
+/**
  * What a bubble is told about a turn that failed: the SDK's delivery record, or
- * the chat's own credits statement above.
+ * one of the chat's own statements above.
  */
 export type MessageDeliveryStatement =
   | MessageDeliveryState
-  | { status: 'failed'; error: string; reason: typeof CREDITS_DELIVERY_REASON };
+  | { status: 'failed'; error: string; reason: typeof CREDITS_DELIVERY_REASON }
+  | {
+      status: 'failed';
+      error: string;
+      reason: typeof CHAT_RESPONSE_DELIVERY_REASON;
+      /** The cause's fixed copy, or null when the title alone says it. */
+      detailKey: string | null;
+    };
 
-type DeliveryReason = SdkDeliveryReason | typeof CREDITS_DELIVERY_REASON;
+type DeliveryReason =
+  | SdkDeliveryReason
+  | typeof CREDITS_DELIVERY_REASON
+  | typeof CHAT_RESPONSE_DELIVERY_REASON;
 
 /**
  * The row a delivery failure draws, keyed by its `reason`. A message the person
@@ -70,6 +89,15 @@ const DELIVERY_FAILURE_ROW = {
     side: 'user',
     error: true,
     titleKey: 'modelChat.creditsRequired',
+    detailKey: null,
+  },
+  /* A chat's answer failed: stated like `execution`, in the assistant's column,
+     but the second line is the chat's classified cause (the statement's own
+     `detailKey`), never the agent-run copy. */
+  'chat-response': {
+    side: 'assistant',
+    error: true,
+    titleKey: 'agentChat.messageFailure.assistantTitle',
     detailKey: null,
   },
 } as const satisfies Record<
@@ -385,25 +413,38 @@ export function selectMessageFailure(input: {
   const { deliveryState, info } = input;
   const retryAvailable = input.retryAvailable ?? true;
 
-  if (info.role === 'user' && deliveryState?.status === 'failed') {
+  // A chat's own statements (a failed answer, a refused send) can also hang off
+  // the words a stopped answer left, which is an assistant row: a failure that
+  // lands after the Stop is stated there, under what the person read.
+  const chatStatement =
+    deliveryState?.status === 'failed' &&
+    (deliveryState.reason === CHAT_RESPONSE_DELIVERY_REASON ||
+      deliveryState.reason === CREDITS_DELIVERY_REASON);
+  if (deliveryState?.status === 'failed' && (info.role === 'user' || chatStatement)) {
     // A failed response and a send the balance refused state their own cause
     // rather than the transport's; both keep Copy to composer. The credits row
     // drops the Retry its cause would make pointless and carries the one action
     // that settles it.
     if (
       deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON ||
-      deliveryState.reason === CREDITS_DELIVERY_REASON
+      deliveryState.reason === CREDITS_DELIVERY_REASON ||
+      deliveryState.reason === CHAT_RESPONSE_DELIVERY_REASON
     ) {
       const credits = deliveryState.reason === CREDITS_DELIVERY_REASON;
-      const copy = credits ? DELIVERY_FAILURE_ROW.credits : DELIVERY_FAILURE_ROW.execution;
+      const copy = DELIVERY_FAILURE_ROW[deliveryState.reason];
+      const detailKey =
+        deliveryState.reason === CHAT_RESPONSE_DELIVERY_REASON
+          ? deliveryState.detailKey
+          : copy.detailKey;
       return {
         kind: 'delivery',
-        side: copy.side,
+        // Under a stopped answer's words the row stays in the answer's column.
+        side: info.role === 'assistant' ? 'assistant' : copy.side,
         error: copy.error,
         titleKey: copy.titleKey,
         title: i18n.t(copy.titleKey),
-        detailKey: copy.detailKey,
-        detail: copy.detailKey === null ? null : i18n.t(copy.detailKey),
+        detailKey,
+        detail: detailKey === null ? null : i18n.t(detailKey),
         copyDetail: deliveryState.error,
         canRetry: credits ? false : retryAvailable,
         canAddCredits: credits,
@@ -432,6 +473,18 @@ export function selectMessageFailure(input: {
     };
   }
 
+  // A chat draws the words a stopped answer had reached as the answer, and the
+  // stop is stated under them instead of under the question. The chat can ask
+  // that question again, so this stop keeps the Retry a session's stop has no
+  // use for.
+  if (
+    info.role === 'assistant' &&
+    deliveryState?.status === 'failed' &&
+    deliveryState.reason === 'interrupted'
+  ) {
+    return stoppedAnswerFailure(retryAvailable);
+  }
+
   if (info.role === 'assistant' && info.error) {
     const { error } = info;
     const errorName = error.name;
@@ -440,19 +493,7 @@ export function selectMessageFailure(input: {
     // message the person stopped does (`DELIVERY_FAILURE_ROW.interrupted`). The
     // stop is the recovery that was already taken, so the row offers none.
     if (errorName === STOPPED_ASSISTANT_ERROR) {
-      return {
-        kind: 'assistant',
-        side: 'assistant',
-        error: false,
-        titleKey: 'agentChat.messageFailure.assistantStopped',
-        title: i18n.t('agentChat.messageFailure.assistantStopped'),
-        detailKey: null,
-        detail: null,
-        copyDetail: '',
-        canRetry: false,
-        canAddCredits: false,
-        canCopy: false,
-      };
+      return stoppedAnswerFailure(false);
     }
     // A terminal gateway verdict drops the Retry and changes the detail line;
     // the name set still covers the errors whose class is terminal on every
@@ -488,4 +529,21 @@ export function selectMessageFailure(input: {
   }
 
   return null;
+}
+
+/** The neutral row under an answer the person stopped: no error marker and no second line. */
+function stoppedAnswerFailure(canRetry: boolean): MessageFailure {
+  return {
+    kind: 'assistant',
+    side: 'assistant',
+    error: false,
+    titleKey: 'agentChat.messageFailure.assistantStopped',
+    title: i18n.t('agentChat.messageFailure.assistantStopped'),
+    detailKey: null,
+    detail: null,
+    copyDetail: '',
+    canRetry,
+    canAddCredits: false,
+    canCopy: false,
+  };
 }

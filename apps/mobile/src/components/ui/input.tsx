@@ -6,9 +6,16 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { withRtlInputAlignment } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
-// Callers override the box's physical horizontal inset and chrome; the single-
-// line height comes last because text-* sizes carry their own line height.
-const INPUT_BOX_SHAPE_CLASS = 'min-h-[44px] pl-3 pr-3';
+/**
+ * The single-line box's own shape: the 44pt floor and the 10.5pt physical
+ * horizontal inset, without the caller's chrome or text size. Exported so a
+ * read-only or preview box that stands in for a single-line `Input` (a value
+ * that swaps into an editable field) carries the same box instead of a second,
+ * drifting height.
+ */
+export const INPUT_BOX_SHAPE_CLASS = 'min-h-[44px] pl-3 pr-3';
+// The single-line box's line height; kept private because a preview box paints
+// its own text line, and the text size arrives last on the real field.
 const INPUT_BOX_LINE_HEIGHT_CLASS = 'leading-[normal]';
 
 /**

@@ -1,7 +1,6 @@
 import { type ComponentProps, type ReactElement } from 'react';
 import { Platform, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { type EdgeInsets, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CenteredState } from '@/components/centered-state';
 import { NativeStateSurface, StateSurface } from '@/components/centered-state-surface';
@@ -10,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { useAppUnlock } from '@/lib/app-unlock-context';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 type UnlockOutcome = ReturnType<typeof useAppUnlock>['outcome'];
@@ -66,14 +66,10 @@ export function AppUnlockFeedback({ outcome }: Readonly<{ outcome: UnlockOutcome
   return feedback;
 }
 
-function contentPadding({ left, right }: EdgeInsets) {
-  return { paddingLeft: left + 24, paddingRight: right + 24 };
-}
-
 function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
   const { status, busy, outcome, retry } = useAppUnlock();
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const hidden = status !== 'unlocked';
 
   // Keep the unlocked wrapper layout-only so native sheet headers and scroll views
@@ -91,27 +87,29 @@ function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
       {hidden ? (
         <StateSurface className="absolute inset-0 bg-background" accessibilityViewIsModal>
           <CenteredState>
-            <View className="w-full gap-8" style={contentPadding(insets)}>
-              <View className="gap-3">
-                <Text accessibilityRole="header" className="text-center text-xl font-semibold">
-                  {t('preferences.biometricUnlock')}
-                </Text>
-                <AppUnlockFeedback outcome={outcome} />
-              </View>
-              {status === 'preference-loading' ? (
-                <View
-                  accessible
-                  accessibilityRole="progressbar"
-                  accessibilityLabel={t('preferences.biometricUnlock')}
-                  accessibilityState={{ busy: true }}
-                >
-                  <Skeleton className="h-11 w-full rounded-md" />
+            <View className="w-full" style={sideInsetStyle}>
+              <View className="w-full gap-8 px-4">
+                <View className="gap-3">
+                  <Text variant="large" accessibilityRole="header" className="text-center">
+                    {t('preferences.biometricUnlock')}
+                  </Text>
+                  <AppUnlockFeedback outcome={outcome} />
                 </View>
-              ) : (
-                <Button onPress={retry} loading={busy} accessibilityLabel={t('common.retry')}>
-                  <Text>{t('common.retry')}</Text>
-                </Button>
-              )}
+                {status === 'preference-loading' ? (
+                  <View
+                    accessible
+                    accessibilityRole="progressbar"
+                    accessibilityLabel={t('preferences.biometricUnlock')}
+                    accessibilityState={{ busy: true }}
+                  >
+                    <Skeleton className="h-11 w-full rounded-md" />
+                  </View>
+                ) : (
+                  <Button onPress={retry} loading={busy} accessibilityLabel={t('common.retry')}>
+                    <Text>{t('common.retry')}</Text>
+                  </Button>
+                )}
+              </View>
             </View>
           </CenteredState>
         </StateSurface>

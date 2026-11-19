@@ -15,12 +15,14 @@ export const RULE_IDS = [
   'rtl-mirror',
   'safe-area',
   'leading-gap',
+  'gutter',
   'unsettled',
   'loading-placeholder',
   'capture-alignment',
   'blank-frame',
   'env-mismatch',
   'link-unopened',
+  'dev-overlay',
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];

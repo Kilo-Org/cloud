@@ -42,7 +42,7 @@ export function NativeRemoteSessionList({
 export function NativeRemoteMessages({ messages }: { messages: StoredMessage[] }) {
   const { t } = useTranslation();
   if (messages.length === 0) {
-    return <Text className="text-muted-foreground">{t('agentChat.session.emptyTitle')}</Text>;
+    return <Text variant="muted">{t('agentChat.session.emptyTitle')}</Text>;
   }
   return (
     <PartDetailSheetHost messages={messages}>

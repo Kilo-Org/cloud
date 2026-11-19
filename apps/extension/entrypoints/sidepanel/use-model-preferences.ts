@@ -10,10 +10,10 @@ import {
   fetchModelPreferences,
   removeModelFavorite,
 } from '@/src/shared/model-preferences-client';
+import { createSerialAsyncChain } from '@/src/shared/serial-async-chain';
 import { getModelPreferencesQueryKey } from '@/src/shared/side-panel-query-options';
 import {
   applyFavoriteToggleCompletionUi,
-  createSerialAsyncChain,
   deriveModelPreferencesStatus,
   emptyFavoriteIds,
   reduceTerminalLatch,

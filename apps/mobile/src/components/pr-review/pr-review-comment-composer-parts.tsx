@@ -20,6 +20,7 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -201,21 +202,20 @@ export function ContextPreview({
       ? fallbackLineLabel
       : composerRangeLabel(selection.line, selection.startLine);
   const previewText = preferFallback ? '' : (selection?.selectedText ?? '');
-  // Single-line context keeps half-detent + keyboard-open room for CTAs.
+  // Single-line context keeps half-detent + keyboard-open room for CTAs; the
+  // two lines sit tighter than a card's default stack because they are one
+  // read (the selection and where it came from).
   return (
-    <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-4 py-2">
-      <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
+    <Card className="gap-0.5">
+      <Text className="font-mono-medium text-xs text-muted-foreground" numberOfLines={1}>
         {`${isolateLtrBidiText(path)} ${lineLabel}`}
       </Text>
       {previewText.length > 0 ? (
-        <Text
-          className="font-mono-medium text-[12px] leading-[1rem] text-foreground"
-          numberOfLines={1}
-        >
+        <Text className="font-mono-medium text-sm text-foreground" numberOfLines={1}>
           {previewText}
         </Text>
       ) : null}
-    </View>
+    </Card>
   );
 }
 

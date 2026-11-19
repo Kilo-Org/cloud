@@ -7,6 +7,7 @@ import { BriefingNotificationToggle } from './briefing-notification-toggle';
 import { ScheduleSettings } from './briefing-schedule-settings';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -17,6 +18,8 @@ import {
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied } from '@/lib/agent-briefing-state';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 
 export function BriefingSettingsScreen() {
   const { t } = useTranslation();
@@ -35,30 +38,42 @@ export function BriefingSettingsScreen() {
         backFallback={BRIEFING_PATH as Href}
       />
       {available && (
-        <ScrollView automaticallyAdjustKeyboardInsets contentContainerClassName="gap-6 p-4 pb-12">
-          {offline ? (
-            <Text className="text-xs text-muted-foreground">{t('agentBriefing.offline')}</Text>
-          ) : null}
-          <ScheduleSettings
-            key={`${available.timezone}:${available.nightStart}:${available.morningStart}:${available.morningEnd}`}
-            preferences={available}
-          />
-          <BriefingNotificationToggle />
+        <ScrollView
+          automaticallyAdjustKeyboardInsets
+          contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-12')}
+        >
+          {offline ? <Text variant="caption">{t('agentBriefing.offline')}</Text> : null}
+          <Section>
+            <ScheduleSettings
+              key={`${available.timezone}:${available.nightStart}:${available.morningStart}:${available.morningEnd}`}
+              preferences={available}
+            />
+          </Section>
+          <Section>
+            <BriefingNotificationToggle />
+          </Section>
           {available.contexts
             .filter(item => access.canRead(item.context.organizationId))
             .map(item => (
-              <BriefingContextSettings
+              <Section
                 key={`${item.context.id}:${item.model}:${item.maxDurationSeconds}:${item.maxSpendMicrodollars}`}
-                preference={item}
-                defaultModel={available.defaultModel}
-                timezone={available.timezone}
-              />
+                label={t('agentBriefing.scheduledContextSettings', {
+                  context:
+                    item.context.organizationId === null ? t('common.personal') : item.context.name,
+                })}
+              >
+                <BriefingContextSettings
+                  preference={item}
+                  defaultModel={available.defaultModel}
+                  timezone={available.timezone}
+                />
+              </Section>
             ))}
         </ScrollView>
       )}
       {loading && (
-        <View className="p-4">
-          <Skeleton className="h-96 rounded-2xl" />
+        <View className={SCREEN_BODY_CLASS}>
+          <Skeleton className="h-96 rounded-xl" />
         </View>
       )}
       {failure && (

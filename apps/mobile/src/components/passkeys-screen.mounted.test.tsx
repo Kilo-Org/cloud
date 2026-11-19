@@ -61,12 +61,7 @@ describe('PasskeysScreen', () => {
     });
     const view = await mount();
 
-    expect(nodes(view, 'Skeleton')).toHaveLength(15);
-    // Every row reserves both controls' final 44x44pt boxes, so a loaded row is
-    // the same height as its skeleton and the list does not jump on load.
-    expect(
-      nodes(view, 'View').filter(node => String(node.props.className).includes('min-h-[44px]'))
-    ).toHaveLength(6);
+    expect(nodes(view, 'Skeleton')).toHaveLength(9);
     // The Add CTA is on screen from the first frame, in its final slot.
     expect(hasButtonLabel(view, 'Add a passkey')).toBe(true);
     expect(nodes(view, 'EmptyState')).toHaveLength(0);
@@ -85,19 +80,22 @@ describe('PasskeysScreen', () => {
     view.unmount();
   });
 
-  it('keeps the Add control in the footer slot, outside the scrolling body', async () => {
+  it('keeps the Add control in the header slot, outside the scrolling body', async () => {
     const view = await mount();
     await waitFor(() => texts(view).includes('MacBook'));
 
-    // The control's slot is the footer. Nothing the list renders — skeletons,
-    // rows, or the empty state — carries it, so its coordinates cannot move
-    // when the query settles and swaps one of those for another.
+    // The create control's slot is the header. Nothing the list renders —
+    // skeletons, rows, or the empty state — carries it, so its coordinates
+    // cannot move when the query settles and swaps one of those for another.
+    const header = first(view, 'ScreenHeader');
+    expect(
+      header.findAll(
+        node =>
+          String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Add a passkey'
+      )
+    ).toHaveLength(1);
     const addInsideScroll = first(view, 'ScrollView').findAll(
-      inner =>
-        String(inner.type) === 'Button' &&
-        inner.findAll(
-          leaf => String(leaf.type) === 'Text' && leaf.props.children === 'Add a passkey'
-        ).length > 0
+      node => node.props.accessibilityLabel === 'Add a passkey'
     );
     expect(addInsideScroll).toHaveLength(0);
     view.unmount();
@@ -125,8 +123,9 @@ describe('PasskeysScreen', () => {
     expect(texts(view)).toContain('Work laptop');
     expect(texts(view)).toContain('MacBook');
     expect(texts(view)).toContain('Added Jan 1, 2026');
-    // Only the recorded-use row carries the line; a credential the server has
-    // never seen used keeps the name-and-added pair.
+    // Each fact keeps its own line: a recorded use prints under the added date,
+    // and a credential the server has never seen used keeps the date alone.
+    expect(texts(view)).toContain('Last used Jan 1, 2026');
     expect(texts(view).filter(text => text === 'Last used Jan 1, 2026')).toHaveLength(1);
     view.unmount();
   });

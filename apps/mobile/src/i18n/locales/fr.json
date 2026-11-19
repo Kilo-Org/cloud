@@ -57,6 +57,7 @@
     "link": "lien",
     "takingLonger": "Cela prend plus de temps que prévu. Vous pouvez fermer cet écran et revenir vérifier plus tard.",
     "model": "Modèle",
+    "notSelected": "Non sélectionné",
     "accessDenied": "Accès refusé",
     "allRepositories": "Tous les dépôts",
     "personal": "Personnel",
@@ -147,6 +148,7 @@
     "performance": "Performances",
     "preferences": "Préférences",
     "privacyPolicy": "Politique de confidentialité",
+    "termsOfService": "Conditions d'utilisation",
     "profile": "Profil",
     "reactions": "Réactions",
     "recent": "Récentes",
@@ -216,8 +218,8 @@
     "verifyCode": "Vérifier le code",
     "resendCode": "Renvoyer le code",
     "termsPrefix": "En continuant, vous acceptez nos ",
-    "terms": "Conditions d'utilisation",
     "termsInSentence": "Conditions d'utilisation",
+    "terms": "Conditions d'utilisation",
     "termsConnector": " et ",
     "termsSuffix": ".",
     "moreSignInOptions": "Autres options de connexion",
@@ -515,16 +517,16 @@
     },
     "category": {
       "agentAttentionTitle": "L'agent a besoin de vous",
-      "agentAttentionSubtitle": "questions, autorisations et réponses attendues",
+      "agentAttentionSubtitle": "Questions, autorisations et réponses attendues",
       "agentUpdatesTitle": "Nouvelles de l'agent",
-      "agentUpdatesSubtitle": "messages de l'agent pendant une tâche",
+      "agentUpdatesSubtitle": "Messages de l'agent pendant une tâche",
       "sessionStatusTitle": "Statut de la session",
-      "sessionStatusSubtitle": "terminée / en échec / prête à être contrôlée",
-      "balanceAlertsSubtitle": "alertes de solde faible pour l'organisation",
+      "sessionStatusSubtitle": "Terminée / en échec / prête à être contrôlée",
+      "balanceAlertsSubtitle": "Alertes de solde faible pour l'organisation",
       "balanceAlertsUnavailable": "Rejoignez une organisation pour recevoir les alertes de solde.",
-      "securityFindingsSubtitle": "nouvelles vulnérabilités et rappels SLA",
+      "securityFindingsSubtitle": "Nouvelles vulnérabilités et rappels SLA",
       "securityFindingsUnavailable": "Activez l'Agent de sécurité Kilo sur un périmètre pour recevoir les signalements de sécurité.",
-      "spendAlertsSubtitle": "franchissements de seuils et pics horaires",
+      "spendAlertsSubtitle": "Franchissements de seuils et pics horaires",
       "spendAlertsToggle": "Catégorie « Alertes de dépenses »"
     },
     "history": {
@@ -662,8 +664,9 @@
       "notConnectedReadOnly": "Bitbucket n'est pas connecté. Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "La connexion Bitbucket de cette organisation se gère sur le web, depuis un ordinateur.",
-      "description": "Créez un jeton d'accès à l'espace de travail avec les autorisations requises, puis collez-le ci-dessous.",
+      "managedOnWeb": "La connexion Bitbucket à {{organization}} se gère sur le web, depuis un ordinateur.",
+      "description": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
+      "descriptionReconnect": "Créez un nouveau jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "scopes": "Compte : lecture · Dépôts : lecture/écriture · Demandes de fusion : lecture · Webhooks : lecture/écriture",
       "tokenPlaceholder": "Jeton d'accès à l'espace de travail",
       "tokenRefused": "Bitbucket n'a pas accepté ce jeton d'accès à l'espace de travail. Vérifiez qu'il dispose des autorisations ci-dessus, puis réessayez."
@@ -1522,6 +1525,8 @@
       "renameAccessibility": "Renommer la session : {{title}}",
       "cloningSession": "Clonage de la session…",
       "couldNotLoadThisSession": "Impossible de charger cette session",
+      "historyTooLarge": "La transcription de cette session est trop volumineuse pour être chargée.",
+      "historyUnavailable": "Impossible de lire la transcription de cette session.",
       "cloneFailedRetry": "Impossible de cloner cette session. Réessayez.",
       "notEnoughCredits": "Crédits insuffisants pour cette requête. Ajoutez des crédits et réessayez.",
       "previousTaskFinishing": "La tâche précédente se termine. Patientez un instant.",
@@ -1598,6 +1603,7 @@
       "branchDefault": "Par défaut",
       "branchAccessibility": "Branche : {{label}}",
       "branchLoading": "Chargement des branches",
+      "branchInactive": "Sélectionnez un dépôt pour charger ses branches.",
       "branchLoadError": "Impossible de charger les branches",
       "branchUnavailable": "Aucune branche n'est disponible pour ce dépôt. Vérifiez votre accès auprès du fournisseur, puis choisissez un autre dépôt.",
       "branchEmpty": "Aucune branche disponible",
@@ -2423,6 +2429,7 @@
     "noSessions": "Aucune session active",
     "noSessionsDescription": "Connectez-vous à l'application Kilo sur un autre appareil pour le voir apparaître ici.",
     "signedIn": "Connexion : {{signedIn}} · Dernière activité : {{lastSeen}}",
+    "signedInThisDevice": "Connexion : {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Les connexions à l'application Kilo, à Kilo CLI et à un navigateur web apparaissent ici. Les connexions depuis l'éditeur ne sont pas affichées.",
     "thisDevice": "Cet appareil",
     "viewProfile": "Voir le profil",
@@ -2445,7 +2452,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Impossible de charger les sessions",
-    "couldNotLoadActiveSessions": "Impossible de charger les sessions actives",
     "agentSessions": "En cours",
     "newCodingTask": "Nouvelle tâche de programmation",
     "newTaskFromPicture": "Nouvelle tâche à partir d'une image",
@@ -2553,6 +2559,11 @@
       "billingHistory": "Historique de facturation",
       "billingHistoryEmpty": "Aucun historique de facturation pour le moment.",
       "billingHistoryError": "Impossible de charger l'historique de facturation",
+      "billingRowInitial": "Premier paiement · {{tier}}",
+      "billingRowRenewal": "Renouvellement · {{tier}}",
+      "billingRowSubscription": "Abonnement · {{tier}}",
+      "billingRowTrial": "Essai gratuit · {{tier}}",
+      "billingRowUpgrade": "Changement de forfait · {{tier}}",
       "cancel": "Résilier l'abonnement",
       "cancelDescription": "Votre Kilo Pass reste actif jusqu'à la fin de la période de facturation et ne sera pas renouvelé.",
       "cancelScheduled": "Prend fin le {{date}}",
@@ -2649,6 +2660,7 @@
     "why": "Finalité",
     "who": "Destinataires",
     "acceptAndContinue": "Accepter et continuer",
+    "loadingConsentSettings": "Chargement de vos réglages de consentement…",
     "decline": "Refuser",
     "declineAndSignOut": "Refuser et se déconnecter",
     "declineTitle": "Refuser le partage de données ?",
@@ -2839,7 +2851,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ce compte n'a encore aucune organisation. Les PR Bitbucket peuvent être examinées une fois que vous créez ou rejoignez une organisation.",
       "gitlabReconnectAdminOnlyDescription": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de la reconnecter.",
       "bitbucketNotConnectedTitle": "Bitbucket n'est pas connecté",
-      "bitbucketAdminOnlyDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
+      "adminOnlyConnectDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
       "contextLine": "Pour {{organization}}",
       "contextLinePersonal": "Pour votre compte personnel"
     },
@@ -2912,7 +2924,6 @@
       "submitReply": "Envoyer la réponse",
       "termsAcceptRetry": "Impossible d'accepter les conditions d'utilisation. Vérifiez votre connexion et réessayez.",
       "termsCopy": "Vous devez avoir au moins 13 ans pour publier.",
-      "termsTitle": "Conditions d'utilisation",
       "threadAccessibilityLabel": "Fil de discussion {{anchorLabel}}",
       "unavailable": "Les échanges sont indisponibles",
       "unavailableMessage": "Cette pull request a peut-être été supprimée.",
@@ -3467,7 +3478,8 @@
         "accounting_adjustment": "Ajustement comptable",
         "credits_expired": "Crédits expirés"
       },
-      "truncated": "Des mouvements de crédits plus anciens sont disponibles."
+      "truncated": "Des mouvements de crédits plus anciens sont disponibles.",
+      "retentionLimit": "Affichage des mouvements de crédits les plus récents."
     },
     "hub": {
       "balance": "Solde",
@@ -3512,7 +3524,8 @@
         "void": "Annulée",
         "uncollectible": "Irrecouvrable"
       },
-      "truncated": "Des factures plus anciennes sont disponibles."
+      "truncated": "Des factures plus anciennes sont disponibles.",
+      "retentionLimit": "Affichage des factures les plus récentes."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activer l'alerte de solde faible",
@@ -3591,6 +3604,7 @@
       "truncated": "Cette heure compte plus de requêtes que la liste n'en affiche.",
       "emptyTitle": "Aucune requête pour cette heure",
       "emptyDescription": "Utilisez Heure précédente pour voir les requêtes antérieures.",
+      "emptyBoundDescription": "L'historique des requêtes ne remonte pas plus loin.",
       "loadError": "Impossible de charger les journaux des requêtes.",
       "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes.",
       "tokens": "{{input}} en entrée · {{output}} en sortie",
@@ -3743,8 +3757,7 @@
     "imagesSectionEmpty": "Aucun site d'images de confiance",
     "revoke": "Retirer {{host}} des sites de confiance",
     "revokeMessage": "Les liens vers ce site demanderont à nouveau une confirmation.",
-    "revokeImageMessage": "Les images de ce site demanderont à nouveau une confirmation.",
-    "backToPreferences": "Retour aux préférences"
+    "revokeImageMessage": "Les images de ce site demanderont à nouveau une confirmation."
   },
   "glanceable": {
     "waiting": "Actualisation des agents",
@@ -3823,6 +3836,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ce modèle nécessite une connexion Internet. Connectez-vous et réessayez, ou passez à un modèle sur cet appareil.",
+    "connectionLost": "La connexion au modèle a été perdue. Vérifiez votre connexion et réessayez.",
     "empty": {
       "title": "Démarrer une discussion",
       "description": "Envoyez un message pour discuter avec un modèle."
@@ -3992,6 +4006,8 @@
       "downloading": "Téléchargement : {{written}} sur {{total}}",
       "downloadingUnknown": "Téléchargement : {{written}}",
       "paused": "En pause : {{written}} sur {{total}}",
+      "retrying": "Nouvelle tentative : {{written}} sur {{total}}",
+      "retryingUnknown": "Nouvelle tentative : {{written}}",
       "verifying": "Vérification du fichier téléchargé…",
       "downloaded": "Téléchargé · {{size}}",
       "url": "Lien de téléchargement direct",
@@ -4082,7 +4098,9 @@
         "androidModelUnavailable": "Cet appareil ne prend pas en charge Gemini Nano, ou l'application système AICore est encore en cours de configuration. Réessayez plus tard.",
         "aicoreUpdateRequired": "Mettez à jour l'application AICore et le logiciel système pour utiliser ce modèle.",
         "downloadable": "Ce modèle doit être téléchargé une seule fois avant de pouvoir être utilisé.",
-        "downloading": "Le modèle est en cours de téléchargement. Il sera prêt une fois le téléchargement terminé."
+        "downloading": "Le modèle est en cours de téléchargement. Il sera prêt une fois le téléchargement terminé.",
+        "batteryQuota": "Le modèle sur l'appareil a épuisé son quota de batterie pour le moment. Réessayez plus tard.",
+        "checkFailed": "L'app n'a pas pu vérifier ce modèle. Réessayez."
       },
       "unavailable": "Le modèle sur l'appareil n'est pas disponible pour le moment. Vérifiez son état dans $t(modelChat.backends.title).",
       "busy": "Le modèle sur l'appareil est occupé à générer une autre réponse. Réessayez une fois qu'il aura terminé.",
@@ -4250,6 +4268,7 @@
     "instructionsHint": "Règles markdown appliquées à chaque session utilisant ce profil.",
     "instructionsEmpty": "Aucun fichier d'instructions",
     "instructionsEmptyDescription": "Ajoutez des fichiers de règles appliqués à chaque session utilisant ce profil.",
+    "instructionsEmptyDescriptionReadOnly": "Les fichiers de règles ajoutés ici s'appliquent à chaque session qui utilise ce profil.",
     "instructionNameRequired": "Saisissez un nom de fichier",
     "instructionNameTooLong": "Le nom doit faire {{max}} caractères ou moins",
     "instructionNameInvalid": "Commencez par une lettre ou un chiffre, puis uniquement des minuscules, chiffres et tirets",
@@ -4449,7 +4468,8 @@
       "purchaseFallback": "Achat de crédits",
       "receipt": "Reçu",
       "receiptA11y": "Ouvrir le reçu pour {{description}}, {{amount}}, du {{date}}",
-      "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat."
+      "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat.",
+      "retentionLimit": "Affichage de l'historique de crédits le plus récent."
     },
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
@@ -4598,6 +4618,7 @@
     "summary": "Résumé IA",
     "summaryPending": "Résumé IA en cours. Il s’affichera ici une fois prêt.",
     "summaryUnavailable": "Résumé IA indisponible. Votre briefing structuré reste disponible.",
+    "summaryNotAdmitted": "Le résumé IA n'a pas été généré pour ce briefing. Votre briefing structuré reste disponible.",
     "summaryCharge": "IA facturée {{cost}}",
     "summaryChargePending": "Facturation IA en attente de rapprochement",
     "summaryModel": "$t(common.model) : {{model}}",
@@ -4686,7 +4707,7 @@
     "topFeatures": "Principales fonctionnalités",
     "emptyTitle": "Aucune utilisation sur cette période",
     "unavailableTitle": "Utilisation indisponible",
-    "unavailableDescription": "Cet espace de travail ne signale aucune utilisation. Réessayer ne servira à rien.",
+    "unavailableDescription": "Le suivi de l'utilisation n'est pas configuré pour cet espace de travail. Contactez l'assistance si vous vous attendez à voir l'utilisation ici.",
     "orgSelfNotice": "Vous voyez votre propre utilisation dans cette organisation.",
     "viewDetails": "Voir les détails d'utilisation"
   },
@@ -4694,7 +4715,7 @@
     "title": "Intégrations",
     "sectionTitle": "Services connectés",
     "entrySubtitle": "GitHub, Slack, Linear et plus encore",
-    "subtitle": "Connectez vos outils et flux de travail de développement à Kilo",
+    "subtitle": "Connectez vos outils et flux de travail de développement à Kilo.",
     "disconnect": "Déconnecter",
     "disconnectTitle": "Déconnecter {{provider}} ?",
     "disconnectMessage": "Kilo ne répondra plus dans {{provider}}. Vous pouvez le reconnecter à tout moment.",
@@ -4704,6 +4725,9 @@
     "couldNotLoad": "Impossible de charger les intégrations",
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer ces intégrations.",
     "managedByOwner": "Demandez à un propriétaire de l'organisation de modifier une connexion que vous ne pouvez pas modifier.",
+    "managedByOwnerOrAdmin": "Demandez à un propriétaire de l'organisation ou à un administrateur de modifier une connexion que vous ne pouvez pas modifier.",
+    "managedByOwnerOrBilling": "Demandez à un propriétaire de l'organisation ou à un responsable de la facturation de modifier une connexion que vous ne pouvez pas modifier.",
+    "managedByOwnerAdminOrBilling": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de modifier une connexion que vous ne pouvez pas modifier.",
     "connectFailed": "Impossible d'ouvrir la page de connexion"
   },
   "invoices": {
@@ -4740,7 +4764,7 @@
       "new": "Nouveau déclencheur",
       "create": "Créer un déclencheur",
       "emptyTitle": "Aucun déclencheur pour l’instant",
-      "emptyDescription": "Créez un déclencheur pour lancer une exécution de Cloud Agent à partir d’un appel webhook ou selon une planification.",
+      "emptyDescription": "Créez votre premier déclencheur.",
       "loadFailedTitle": "Impossible de charger les déclencheurs",
       "loadFailedDescription": "Réessayez lorsque vous avez une connexion.",
       "detailLoadFailedTitle": "Impossible de charger ce déclencheur",
@@ -4763,7 +4787,6 @@
       "nameLocked": "Le nom ne peut pas être modifié après la création du déclencheur.",
       "repositoryLocked": "Le dépôt ne peut pas être modifié après la création du déclencheur.",
       "environmentAutomatic": "Automatique selon le dépôt",
-      "notSelected": "Non sélectionné",
       "profileDefaults": "Utiliser les valeurs par défaut",
       "profileHelp": "Les paramètres du profil s’appliquent lorsque le déclencheur s’exécute. Ses secrets sont résolus à ce moment-là.",
       "customAgent": "Agent personnalisé",

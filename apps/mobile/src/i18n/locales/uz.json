@@ -57,6 +57,7 @@
     "link": "havola",
     "takingLonger": "Bu kutilganidan uzoqroq davom etmoqda. Bu oynani yopib, keyin qayta tekshirishingiz mumkin.",
     "model": "SI modeli",
+    "notSelected": "Tanlanmagan",
     "accessDenied": "Kirish rad etildi.",
     "allRepositories": "Barcha repozitoriylar",
     "personal": "Shaxsiy",
@@ -147,6 +148,7 @@
     "performance": "Unumdorlik",
     "preferences": "Shaxsiy sozlamalar",
     "privacyPolicy": "Maxfiylik siyosati",
+    "termsOfService": "Xizmat shartlari",
     "profile": "Profil",
     "reactions": "Reaksiya",
     "recent": "Oxirgilar",
@@ -216,8 +218,8 @@
     "verifyCode": "Kodni tekshirish",
     "resendCode": "Kodni qayta yuborish",
     "termsPrefix": "Davom etish orqali quyidagi hujjatlarga rozilik bildirasiz: ",
+    "termsInSentence": "Xizmat shartlari",
     "terms": "Shartlar",
-    "termsInSentence": "Shartlar",
     "termsConnector": " va ",
     "termsSuffix": ".",
     "moreSignInOptions": "Boshqa kirish usullari",
@@ -762,7 +764,6 @@
       "replyPlaceholder": "Javob…",
       "replyBody": "Javob matni",
       "submitReply": "Javobni yuborish",
-      "termsTitle": "Xizmat shartlari",
       "termsCopy": "Xabar joylash uchun kamida 13 yoshda bo'lishingiz kerak.",
       "termsAcceptRetry": "Shartlarni qabul qilib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
       "viewTerms": "Shartlarni ko'rish",
@@ -944,7 +945,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Bu hisobda hozircha hech qanday tashkilot yo‘q. Tashkilot yaratganingizdan yoki unga qo‘shilganingizdan so‘ng Bitbucket PRlarini ko‘rib chiqish mumkin.",
       "gitlabReconnectAdminOnlyDescription": "Uni ulashni tashkilot Egasi, Administrator yoki To'lov menejeridan so'rang.",
       "bitbucketNotConnectedTitle": "Bitbucket ulanmagan",
-      "bitbucketAdminOnlyDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
+      "adminOnlyConnectDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
       "contextLine": "{{organization}} uchun",
       "contextLinePersonal": "Shaxsiy hisob uchun"
     },
@@ -1131,16 +1132,16 @@
     },
     "category": {
       "agentAttentionTitle": "Agentga yordamingiz kerak",
-      "agentAttentionSubtitle": "savollar, ruxsat va ma'lumot so'rovlari",
+      "agentAttentionSubtitle": "Savollar, ruxsat va ma'lumot so'rovlari",
       "agentUpdatesTitle": "Agentdan yangiliklar",
-      "agentUpdatesSubtitle": "vazifa bajarilayotganda agent yuborgan xabarlar",
+      "agentUpdatesSubtitle": "Vazifa bajarilayotganda agent yuborgan xabarlar",
       "sessionStatusTitle": "Sessiya holati",
-      "sessionStatusSubtitle": "tugadi / xatolik yuz berdi / boshqarishga tayyor",
-      "balanceAlertsSubtitle": "tashkilot balansi kamaygani haqida ogohlantirishlar",
+      "sessionStatusSubtitle": "Tugadi / xatolik yuz berdi / boshqarishga tayyor",
+      "balanceAlertsSubtitle": "Tashkilot balansi kamaygani haqida ogohlantirishlar",
       "balanceAlertsUnavailable": "Balans ogohlantirishlarini olish uchun tashkilotga qo'shiling.",
-      "securityFindingsSubtitle": "aniqlangan yangi zaifliklar va SLA eslatmalari",
+      "securityFindingsSubtitle": "Aniqlangan yangi zaifliklar va SLA eslatmalari",
       "securityFindingsUnavailable": "Xavfsizlik zaifliklarini olish uchun bir qamrovda Kilo Xavfsizlik agentini yoqing.",
-      "spendAlertsSubtitle": "chegaradan oshish va soatlik ko'tarilishlar",
+      "spendAlertsSubtitle": "Chegaradan oshish va soatlik ko'tarilishlar",
       "spendAlertsToggle": "Xarajat bildirishnomalari toifasi"
     },
     "history": {
@@ -1385,8 +1386,9 @@
       "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bu tashkilotning Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
-      "description": "Kerakli ruxsatlarga ega ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
+      "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
+      "description": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
+      "descriptionReconnect": "{{organization}} uchun yangi ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
       "tokenPlaceholder": "Ish maydoniga kirish tokeni",
       "tokenRefused": "Bitbucket bu ish maydoniga kirish tokenini qabul qilmadi. U yuqoridagi ruxsatlarga ega ekanligini tekshirib, qayta urinib ko'ring."
@@ -2160,6 +2162,8 @@
       "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
       "cloningSession": "Sessiya klonlanmoqda",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
+      "historyTooLarge": "Bu sessiya transkripti yuklash uchun juda katta.",
+      "historyUnavailable": "Bu sessiya transkriptini o'qish mumkin emas.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
       "notEnoughCredits": "Bu so'rov uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali yakunlanmoqda. Biroz kuting.",
@@ -2236,6 +2240,7 @@
       "branchDefault": "Standart",
       "branchAccessibility": "Tarmoq: {{label}}",
       "branchLoading": "Tarmoqlar yuklanmoqda",
+      "branchInactive": "Tarmoqlarini yuklash uchun repozitoriya tanlang.",
       "branchLoadError": "Tarmoqlarni yuklab bo‘lmadi",
       "branchUnavailable": "Ushbu repozitoriy uchun tarmoqlar mavjud emas. Provayderdagi kirish huquqingizni tekshiring, so‘ng boshqa repozitoriy tanlang.",
       "branchEmpty": "Mavjud tarmoqlar yo‘q",
@@ -3016,6 +3021,7 @@
     "noSessions": "Faol sessiyalar yo'q",
     "noSessionsDescription": "Boshqa qurilmadagi Kilo ilovasida tizimga kiring. Shunda u shu yerda ko'rinadi.",
     "signedIn": "Kirilgan vaqt: {{signedIn}} · Oxirgi faollik: {{lastSeen}}",
+    "signedInThisDevice": "Kirilgan vaqt: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Bu yerda Kilo ilovasi, Kilo CLI va veb-brauzer orqali kirilgan sessiyalar ko'rsatiladi. Muharrir orqali kirilgan sessiyalar ko'rsatilmaydi.",
     "thisDevice": "Bu qurilma",
     "webBrowser": "Veb-brauzer",
@@ -3038,7 +3044,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Seanslarni yuklab bo'lmadi.",
-    "couldNotLoadActiveSessions": "Faol seanslarni yuklab bo'lmadi.",
     "agentSessions": "Hozir faol",
     "newCodingTask": "Yangi kodlash vazifasi",
     "newTaskFromPicture": "Rasmdan yangi vazifa",
@@ -3148,6 +3153,11 @@
       "billingHistory": "To‘lovlar tarixi",
       "billingHistoryEmpty": "Hozircha to‘lovlar tarixi yo‘q.",
       "billingHistoryError": "To‘lovlar tarixi yuklanmadi",
+      "billingRowInitial": "Birinchi to'lov · {{tier}}",
+      "billingRowRenewal": "Yangilanish · {{tier}}",
+      "billingRowSubscription": "Obuna · {{tier}}",
+      "billingRowTrial": "Bepul sinov muddati · {{tier}}",
+      "billingRowUpgrade": "Tarif o'zgarishi · {{tier}}",
       "cancel": "Obunani bekor qilish",
       "cancelDescription": "Kilo Pass to‘lov davri oxirigacha faol qoladi va yangilanmaydi.",
       "cancelScheduled": "{{date}} kuni bekor qilinadi",
@@ -3243,6 +3253,7 @@
     "revokeConsent": "Rozilikni olib tashlash",
     "revokeConsentTitle": "Ma'lumot ulashishga berilgan rozilik bekor qilinsinmi?",
     "acceptAndContinue": "Qabul qilish va davom etish",
+    "loadingConsentSettings": "Rozilik sozlamalari yuklanmoqda…",
     "decline": "Rad etish",
     "declineAndSignOut": "Rad etish va tizimdan chiqish",
     "declineTitle": "Ma'lumot ulashish rad etilsinmi?",
@@ -3417,7 +3428,8 @@
         "accounting_adjustment": "Buxgalteriya tuzatmasi",
         "credits_expired": "Kreditlarning muddati tugadi"
       },
-      "truncated": "Kreditlar bo'yicha oldingi amallar ham mavjud."
+      "truncated": "Kreditlar bo'yicha oldingi amallar ham mavjud.",
+      "retentionLimit": "Eng so'nggi kredit amallari ko'rsatilmoqda."
     },
     "inviteMember": {
       "emailError": "To'g'ri elektron pochta manzilini kiriting.",
@@ -3449,7 +3461,8 @@
         "void": "Bekor qilingan",
         "uncollectible": "Undirib bo'lmaydi"
       },
-      "truncated": "Oldingi hisob-fakturalar ham mavjud."
+      "truncated": "Oldingi hisob-fakturalar ham mavjud.",
+      "retentionLimit": "Eng so'nggi hisob-fakturalar ko'rsatilmoqda."
     },
     "lowBalanceAlert": {
       "enableA11y": "Balans kamayishi haqida ogohlantirishni yoqish",
@@ -3528,6 +3541,7 @@
       "truncated": "Bu soatda ro'yxatda ko'rsatilganidan ko'proq so'rov bor.",
       "emptyTitle": "Bu soatda so'rovlar yo'q",
       "emptyDescription": "Oldingi so'rovlarni ko'rish uchun «Oldingi soat» tugmasidan foydalaning.",
+      "emptyBoundDescription": "So'rovlar jurnali bundan oldingi vaqtni qamrab olmaydi.",
       "loadError": "So'rovlar jurnallarini yuklab bo'lmadi.",
       "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
       "tokens": "{{input}} kirish · {{output}} chiqish",
@@ -3683,8 +3697,7 @@
     "imagesSectionEmpty": "Ishonchli rasm saytlari yo'q",
     "revoke": "{{host}} saytiga berilgan ishonchni bekor qilish",
     "revokeMessage": "Bu saytga havolalar yana tasdiq so'raydi.",
-    "revokeImageMessage": "Bu saytning rasmlari yana tasdiq so'raydi.",
-    "backToPreferences": "Sozlamalarga qaytish"
+    "revokeImageMessage": "Bu saytning rasmlari yana tasdiq so'raydi."
   },
   "glanceable": {
     "waiting": "Agentlar yangilanmoqda",
@@ -3763,6 +3776,7 @@
   },
   "modelChat": {
     "offlineFailure": "Bu model internet aloqasini talab qiladi. Ulaning va qaytadan urinib ko'ring yoki ushbu qurilmadagi modelga o'ting.",
+    "connectionLost": "Model bilan aloqa uzildi. Ulanishni tekshiring va qayta urinib ko'ring.",
     "empty": {
       "title": "Suhbatni boshlang",
       "description": "Model bilan gaplashish uchun xabar yuboring."
@@ -3931,6 +3945,8 @@
       "downloading": "Yuklanmoqda: {{total}} dan {{written}}",
       "downloadingUnknown": "Yuklanmoqda: {{written}}",
       "paused": "To‘xtatib turildi: {{total}} dan {{written}}",
+      "retrying": "Qayta urinilmoqda: {{total}} dan {{written}}",
+      "retryingUnknown": "Qayta urinilmoqda: {{written}}",
       "verifying": "Yuklab olingan fayl tekshirilmoqda…",
       "downloaded": "Yuklab olindi · {{size}}",
       "url": "To‘g‘ridan-to‘g‘ri yuklab olish havolasi",
@@ -4021,7 +4037,9 @@
         "androidModelUnavailable": "Bu qurilma Gemini Nano’ni qo‘llab-quvvatlamaydi yoki AICore tizim ilovasi hali sozlanmoqda. Keyinroq qayta urining.",
         "aicoreUpdateRequired": "Bu modeldan foydalanish uchun AICore ilovasi va tizim dasturini yangilang.",
         "downloadable": "Bu modeldan foydalanishdan oldin uni bir marta yuklab olish kerak.",
-        "downloading": "Model yuklab olinmoqda. Yuklab olish tugagach, u tayyor bo‘ladi."
+        "downloading": "Model yuklab olinmoqda. Yuklab olish tugagach, u tayyor bo‘ladi.",
+        "batteryQuota": "Qurilmadagi model hozircha o‘ziga ajratilgan batareya miqdorini ishlatdi. Keyinroq qayta urining.",
+        "checkFailed": "Ilova bu modelni tekshira olmadi. Qayta urining."
       },
       "unavailable": "Qurilmadagi model hozir mavjud emas. Uning holatini $t(modelChat.backends.title) bo‘limida tekshiring.",
       "busy": "Qurilmadagi model boshqa javob bilan band. U tugagach, qayta urining.",
@@ -4184,6 +4202,7 @@
     "instructionsHint": "Ushbu profildan foydalanadigan har bir sessiyaga qo'llaniladigan qoidalar markdown fayli.",
     "instructionsEmpty": "Hozircha ko'rsatma fayllari yo'q",
     "instructionsEmptyDescription": "Ushbu profildan foydalanadigan har bir sessiya qo'llaydigan qoida fayllarini qo'shing.",
+    "instructionsEmptyDescriptionReadOnly": "Bu yerga qo'shilgan qoidalar fayllari ushbu profildan foydalanadigan har bir sessiyaga qo'llaniladi.",
     "instructionNameRequired": "Fayl nomini kiriting",
     "instructionNameTooLong": "Fayl nomi {{max}} belgidan oshmasligi kerak",
     "instructionNameInvalid": "Harf yoki raqam bilan boshlang va faqat kichik harflar, raqamlar va tire ishlating",
@@ -4382,7 +4401,8 @@
       "purchaseFallback": "Kredit xaridi",
       "receipt": "Chek",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
-      "receiptUnavailable": "Bu xarid uchun chek mavjud emas."
+      "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
+      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda."
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
@@ -4527,6 +4547,7 @@
     "summary": "AI xulosasi",
     "summaryPending": "AI xulosasi tayyorlanmoqda. Tayyor bo‘lgach shu yerga qo‘shiladi.",
     "summaryUnavailable": "AI xulosasi mavjud emas. Tuzilgan brifingiz baribir mavjud.",
+    "summaryNotAdmitted": "AI xulosasi ushbu brifing uchun yaratilmadi. Tuzilgan brifingiz baribir mavjud.",
     "summaryCharge": "AI uchun {{cost}} olindi",
     "summaryChargePending": "AI to‘lovi solishtirilmoqda",
     "summaryModel": "$t(common.model): {{model}}",
@@ -4611,7 +4632,7 @@
     "topFeatures": "Yetakchi funksiyalar",
     "emptyTitle": "Bu davrda foydalanish yo'q",
     "unavailableTitle": "Foydalanish mavjud emas",
-    "unavailableDescription": "Bu Workspace foydalanish haqida xabar bermaydi. Qayta urinish yordam bermaydi.",
+    "unavailableDescription": "Bu Workspace uchun foydalanish sozlanmagan. Agar bu yerda foydalanish ma'lumotlarini ko'rishni kutsangiz, qo'llab-quvvatlash xizmatiga murojaat qiling.",
     "orgSelfNotice": "Siz ushbu tashkilotdagi o'z foydalanishingizni ko'ryapsiz.",
     "viewDetails": "Foydalanish tafsilotlarini ko'rish"
   },
@@ -4619,7 +4640,7 @@
     "title": "Integratsiyalar",
     "sectionTitle": "Ulangan xizmatlar",
     "entrySubtitle": "GitHub, Slack, Linear va boshqalar",
-    "subtitle": "Ishlab chiqish vositalaringiz va ish jarayonlaringizni Kilo bilan ulang",
+    "subtitle": "Ishlab chiqish vositalaringiz va ish jarayonlaringizni Kilo bilan ulang.",
     "disconnect": "Uzish",
     "disconnectTitle": "{{provider}} xizmati uzilsinmi?",
     "disconnectMessage": "Kilo endi {{provider}} xizmatida javob bermaydi. Istalgan vaqtda qayta ulashingiz mumkin.",
@@ -4629,6 +4650,9 @@
     "couldNotLoad": "Integratsiyalarni yuklab boʻlmadi",
     "permissionDenied": "Sizda bu integratsiyalarni boshqarish uchun ruxsat yoʻq.",
     "managedByOwner": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasiga murojaat qiling.",
+    "managedByOwnerOrAdmin": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasi yoki administratordan so'rang.",
+    "managedByOwnerOrBilling": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasi yoki to'lov menejeridan so'rang.",
+    "managedByOwnerAdminOrBilling": "Siz oʻzgartira olmaydigan ulanishni oʻzgartirish uchun tashkilot egasi, administrator yoki to'lov menejeridan so'rang.",
     "connectFailed": "Ulanish sahifasini ochib boʻlmadi"
   },
   "invoices": {
@@ -4665,7 +4689,7 @@
       "new": "Yangi ishga tushirgich",
       "create": "Ishga tushirgich yarating",
       "emptyTitle": "Hozircha ishga tushirgichlar yoʻq",
-      "emptyDescription": "Cloud Agent ishga tushirishini vebhook chaqiruvi yoki jadval boʻyicha boshlash uchun ishga tushirgich yarating.",
+      "emptyDescription": "Birinchi ishga tushirgichingizni yarating.",
       "loadFailedTitle": "Ishga tushirgichlarni yuklab boʻlmadi",
       "loadFailedDescription": "Ulanish mavjud boʻlganda qayta urinib koʻring.",
       "detailLoadFailedTitle": "Bu ishga tushirgichni yuklab boʻlmadi",
@@ -4688,7 +4712,6 @@
       "nameLocked": "Ishga tushirgich yaratilgandan soʻng nomni oʻzgartirib boʻlmaydi.",
       "repositoryLocked": "Ishga tushirgich yaratilgandan soʻng repozitoriyni oʻzgartirib boʻlmaydi.",
       "environmentAutomatic": "Repozitoriy boʻyicha avtomatik",
-      "notSelected": "Tanlanmagan",
       "profileDefaults": "Standart sozlamalardan foydalanish",
       "profileHelp": "Profil sozlamalari ishga tushirgich ishlaganda qoʻllanadi. Uning sirlari oʻsha paytda aniqlanadi.",
       "customAgent": "Maxsus agent",

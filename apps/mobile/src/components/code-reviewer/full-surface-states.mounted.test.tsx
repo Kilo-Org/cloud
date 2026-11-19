@@ -105,6 +105,11 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   useColorScheme: () => 'light',
   View: 'View',
+  // The migrated rows draw their chevron through the directional icon, which
+  // reads the RTL flag on every render.
+  I18nManager: { isRTL: false },
+  StatusBar: { currentHeight: 24 },
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({
@@ -161,7 +166,10 @@ vi.mock('react-native-reanimated', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: state.toastError } }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
@@ -178,13 +186,21 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/radio-group', () => ({ RadioGroup: 'RadioGroup' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The loading body is compared with the loaded rows, so the row primitive is a
+// host node this suite reads by its own props.
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
   FolderGit2: 'FolderGit2',
   GitPullRequest: 'GitPullRequest',
   Search: 'Search',
   SearchX: 'SearchX',
   X: 'X',
+  Settings: 'Settings',
+  ArrowRight: 'ArrowRight',
+  ShieldCheck: 'ShieldCheck',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: state.handoffUrl }));
@@ -588,11 +604,11 @@ describe('repository search', () => {
 
 describe('Recent review bodies', () => {
   it.each([
-    { orientation: 'portrait', left: 0, right: 0, paddingLeft: 24, paddingRight: 24 },
-    { orientation: 'landscape', left: 47, right: 59, paddingLeft: 71, paddingRight: 83 },
+    { orientation: 'portrait', left: 0, right: 0 },
+    { orientation: 'landscape', left: 47, right: 59 },
   ])(
-    'keeps the $orientation rows inside the side insets on top of the gutter',
-    async ({ left, right, paddingLeft, paddingRight }) => {
+    'keeps the $orientation list inside the side insets, with rows drawing the gutter',
+    async ({ left, right }) => {
       state.insets.left = left;
       state.insets.right = right;
       state.reviews.data = {
@@ -602,11 +618,21 @@ describe('Recent review bodies', () => {
       const { renderer, unmount } = await renderWithProviders(
         createElement(ReviewListScreen, { scope: 'personal' })
       );
+      // The container carries exactly the safe-area side insets, so a landscape
+      // row never starts under the sensor housing; the page gutter and the top
+      // space belong to the row, which every recycled row draws identically.
       expect(firstList(renderer).props.contentContainerStyle).toEqual({
-        paddingTop: 16,
-        paddingLeft,
-        paddingRight,
+        paddingLeft: left,
+        paddingRight: right,
       });
+      const reviewRows = renderer.root.findAll(node => String(node.type) === 'ReviewRow');
+      expect(reviewRows.length).toBeGreaterThan(0);
+      for (const row of reviewRows) {
+        const pressable = row.find(node => Object.is(node.type, 'Pressable'));
+        const classes = String(pressable.props.className ?? '').split(' ');
+        expect(classes).toContain('px-4');
+        expect(classes).toContain('py-3');
+      }
       unmount();
     }
   );
@@ -753,7 +779,7 @@ describe('Recent review bodies', () => {
       createElement(ReviewListScreen, { scope: 'personal' })
     );
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).not.toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'RowSkeleton')).not.toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
     unmount();
   });
@@ -826,7 +852,7 @@ describe('Recent review bodies', () => {
     unmount();
   });
 
-  it('shows one footer spinner while the next page loads', async () => {
+  it('shows one footer row skeleton while the next page loads', async () => {
     state.reviews.data = {
       pages: [{ success: true, reviews: [review('r1')] }],
       pageParams: [0],
@@ -839,9 +865,14 @@ describe('Recent review bodies', () => {
     const footer = firstList(renderer).props.ListFooterComponent as ReactNode;
     unmount();
     const footerRender = await renderWithProviders(createElement('Footer', null, footer));
-    expect(
-      footerRender.renderer.root.findAll(node => String(node.type) === 'Skeleton')
-    ).toHaveLength(1);
+    // The footer's placeholder is the row primitive's own two-line shape, so it
+    // hands over to the next page's rows without moving them.
+    const placeholders = footerRender.renderer.root.findAll(
+      node => String(node.type) === 'RowSkeleton'
+    );
+    expect(placeholders).toHaveLength(1);
+    const [placeholder] = placeholders;
+    expect(placeholder?.props.lines).toBe(3);
     footerRender.unmount();
   });
 
@@ -939,29 +970,26 @@ describe('Recent review header', () => {
       createElement(ReviewListScreen, { scope: 'org-1' })
     );
     const findHeader = () => renderer.root.find(node => String(node.type) === 'ScreenHeader');
-    await waitFor(() => findHeader().props.title === 'Drain Labs');
+    await waitFor(() => findHeader().props.subtitle === 'Drain Labs');
 
-    expect(findHeader().props.eyebrow).toBe('Recent reviews');
-    // The scope name is prose, but the header paints it on the one line the
-    // personal scope uses: a second line reserved for it made this header
-    // taller than the Personal one, pushing the eyebrow down and opening a
-    // wider gap above the first review. One line needs no reserved blank line —
-    // a name that arrives later still paints on that same line — so the header
-    // keeps the personal header's height instead of outgrowing it.
-    expect(findHeader().props.titleNumberOfLines).toBe(1);
+    // The list's own name titles the screen and the scope sits on the subtitle
+    // line below it: the same two-line header the personal scope paints, so
+    // both scopes keep one header height above the first review.
+    expect(findHeader().props.title).toBe('Recent reviews');
+    expect(findHeader().props.titleNumberOfLines).toBeUndefined();
     expect(findHeader().props.reserveTitleSpace).toBe(false);
     unmount();
   });
 
-  it('names the personal scope, on the single line it always fills', async () => {
+  it('names the personal scope on the subtitle line', async () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(ReviewListScreen, { scope: 'personal' })
     );
 
     const node = renderer.root.find(candidate => String(candidate.type) === 'ScreenHeader');
-    expect(node.props.title).toBe('Personal');
-    expect(node.props.eyebrow).toBe('Recent reviews');
-    expect(node.props.titleNumberOfLines).toBe(1);
+    expect(node.props.title).toBe('Recent reviews');
+    expect(node.props.subtitle).toBe('Personal');
+    expect(node.props.titleNumberOfLines).toBeUndefined();
     expect(node.props.reserveTitleSpace).toBe(false);
     unmount();
   });
@@ -982,13 +1010,13 @@ describe('empty reviews connect action', () => {
   }
 
   /**
-   * The scope title paints from the same `organizations.list` read the role
+   * The scope subtitle paints from the same `organizations.list` read the role
    * comes from, so reading the name means the role has settled too.
    */
   async function settled(renderer: RenderWithProvidersResult['renderer']) {
     await waitFor(
       () =>
-        String(renderer.root.find(node => String(node.type) === 'ScreenHeader').props.title) ===
+        String(renderer.root.find(node => String(node.type) === 'ScreenHeader').props.subtitle) ===
         ORG_NAME
     );
   }
@@ -999,10 +1027,8 @@ describe('empty reviews connect action', () => {
   }
 
   function actionLabel(renderer: RenderWithProvidersResult['renderer']) {
-    const action = emptyState(renderer).props.action as ReactElement<{
-      children: ReactElement<{ children: string }>;
-    }>;
-    return action.props.children.props.children;
+    const action = emptyState(renderer).props.action as ReactElement<{ label: string }>;
+    return action.props.label;
   }
 
   it('replaces the button with a role notice for a plain member', async () => {
@@ -1109,8 +1135,29 @@ describe('empty reviews connect action', () => {
     await settled(renderer);
 
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(3);
+    // The loading body reserves the loaded overview's geometry: the same number
+    // of two-line rows, so swapping in the real data never changes the height.
+    const loadingRows = renderer.root.findAll(node => String(node.type) === 'RowSkeleton');
+    expect(loadingRows.length).toBeGreaterThan(0);
+    expect(loadingRows.every(row => row.props.lines === 3)).toBe(true);
     unmount();
+
+    state.permissionOverride = null;
+    state.reviews.data = {
+      pages: [
+        {
+          success: true,
+          reviews: [review('r1'), review('r2'), review('r3')],
+        },
+      ],
+      pageParams: [0],
+    };
+    const loaded = await renderWithProviders(createElement(ReviewListScreen, { scope: SCOPE }));
+    await settled(loaded.renderer);
+    expect(loaded.renderer.root.findAll(node => String(node.type) === 'ReviewRow')).toHaveLength(
+      loadingRows.length
+    );
+    loaded.unmount();
   });
 
   it('keeps the manual-review action for a member once a provider is connected', async () => {

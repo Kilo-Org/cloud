@@ -1,10 +1,9 @@
-import { selectionHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
-import { CenteredState } from '@/components/centered-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketSetupRecovery } from '@/components/code-reviewer/bitbucket-setup-recovery';
 import {
@@ -15,12 +14,18 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Switch } from '@/components/ui/switch';
+import { GitMerge } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { bitbucketRepair } from '@/lib/code-reviewer-bitbucket';
+import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import {
@@ -31,6 +36,7 @@ import {
   type useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
+import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
 const capabilities = PLATFORM_CAPABILITIES.bitbucket;
 
@@ -50,6 +56,14 @@ export function BitbucketOverview({
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const readiness = useBitbucketReadiness(scope);
+  // Bitbucket is org-only, so the scope always names an organization, and both
+  // the header subtitle and the connect copy name it from this one read. Until
+  // the membership list resolves the name, the screen keeps its skeleton rather
+  // than painting an unfilled placeholder, and the subtitle holds the generic
+  // stand-in so the header keeps its line.
+  const orgBoundary = useOrgBoundary(scope);
+  const organizationName = orgBoundary.org?.organizationName;
+  const scopeTitle = organizationName ?? t('common.organization');
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
   const { reducedMotion } = useMotionPolicy();
@@ -69,7 +83,7 @@ export function BitbucketOverview({
   if (providerState.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <QueryError
           onRetry={() => {
             providerState.refetch();
@@ -80,7 +94,8 @@ export function BitbucketOverview({
     );
   }
 
-  const isLoading = providerState.status === 'loading' || permissionLoading;
+  const isLoading =
+    providerState.status === 'loading' || permissionLoading || orgBoundary.isResolving;
   const connected = providerState.status === 'connected';
 
   // A connected workspace whose config read failed (no cache to fall back on),
@@ -90,7 +105,7 @@ export function BitbucketOverview({
   if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <QueryError
           variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
           onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
@@ -102,23 +117,43 @@ export function BitbucketOverview({
 
   if (!isLoading && !connected) {
     const readinessData = readiness.data;
+    // The state is the screen's whole surface, so its action carries the repair
+    // the readiness read names: a first connection or a replaced token. A reader
+    // the role rule refuses gets the sentence naming who can connect instead of
+    // a press it cannot finish.
+    const repair = readinessData === undefined ? null : bitbucketRepair(readinessData);
+    // An organization the membership list cannot resolve has no name for the
+    // connect copy, so the screen shows who can connect and offers no action
+    // that would contradict that sentence.
+    const canConnect = canEdit && organizationName !== undefined;
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState contentContainerClassName="px-6">
-          {canEdit && readinessData ? (
-            <BitbucketSetupRecovery
-              scope={scope}
-              readiness={readinessData}
-              message={t('prReview.connect.bitbucketNotConnectedTitle')}
-              className="w-full"
-            />
-          ) : (
-            <Text className="text-center text-xs text-muted-foreground">
-              {t('codeReviewer.bitbucket.notConnectedReadOnly')}
-            </Text>
-          )}
-        </CenteredState>
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
+        <EmptyState
+          icon={GitMerge}
+          iconSize={28}
+          title={t('prReview.connect.bitbucketNotConnectedTitle')}
+          description={
+            canConnect && readinessData
+              ? t('codeReviewer.bitbucketConnect.description', { organization: organizationName })
+              : t('codeReviewer.bitbucket.notConnectedReadOnly')
+          }
+          action={
+            canConnect && repair !== null ? (
+              <StateAction
+                label={
+                  repair.kind === 'replace-token'
+                    ? t('prReview.connect.reconnectTitleBitbucket')
+                    : t('common.connectBitbucket')
+                }
+                icon={GitMerge}
+                onPress={() => {
+                  pushOnce(bitbucketConnectHref(scope));
+                }}
+              />
+            ) : undefined
+          }
+        />
       </View>
     );
   }
@@ -163,10 +198,10 @@ export function BitbucketOverview({
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View layout={LinearTransition}>
@@ -188,7 +223,7 @@ export function BitbucketOverview({
                 />
               )}
 
-              <View className="rounded-lg bg-secondary p-4">
+              <Card>
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
@@ -198,22 +233,21 @@ export function BitbucketOverview({
                       </Text>
                     ) : null}
                   </View>
-                  <Switch
-                    accessibilityLabel={t('codeReviewer.autoReviews')}
-                    value={config.data.isEnabled}
-                    disabled={
+                  {renderRowTrailing({
+                    kind: 'switch',
+                    accessibilityLabel: t('codeReviewer.autoReviews'),
+                    value: config.data.isEnabled,
+                    disabled:
                       !canEdit ||
                       toggle.isPending ||
-                      (!canEnableAutoReview && !config.data.isEnabled)
-                    }
-                    onValueChange={value => {
-                      selectionHaptic();
+                      (!canEnableAutoReview && !config.data.isEnabled),
+                    onValueChange: value => {
                       toggle.mutate({ isEnabled: value });
-                    }}
-                  />
+                    },
+                  })}
                 </View>
                 {isReady && !hasRepoSelection && (
-                  <View className="mt-3 gap-2 border-t border-hair-soft pt-3">
+                  <View className="gap-2 border-t-[0.5px] border-hair-soft pt-3">
                     <Text variant="muted" className="text-xs">
                       {t('codeReviewer.selectRepository')}
                     </Text>
@@ -229,20 +263,19 @@ export function BitbucketOverview({
                     </Button>
                   </View>
                 )}
-              </View>
+              </Card>
 
-              <View>
-                {rows.map((row, index) => (
+              <RowGroup leadingTile>
+                {rows.map(row => (
                   <ConfigureRow
                     key={row.field}
                     icon={row.icon}
                     title={row.title}
                     subtitle={row.subtitle}
-                    last={index === rows.length - 1}
                     onPress={resolveRowOnPress(row, canEdit, pushField)}
                   />
                 ))}
-              </View>
+              </RowGroup>
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">

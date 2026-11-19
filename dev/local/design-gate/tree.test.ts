@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { dump } from './rules/test-dump';
-import { contentBox, normalize, parseDump } from './tree';
+import {
+  contentBox,
+  layoutRect,
+  normalize,
+  parseDump,
+  type LayoutTree,
+  type ProbeNode,
+} from './tree';
 
 test('parseDump accepts JSON strings and rejects malformed dumps', () => {
   const valid = dump([{ parent: 0, tag: 'Paragraph', rect: [0, 0, 10, 10], text: 'x' }]);
@@ -189,20 +196,125 @@ test('normalize places a presented sheet in window space', () => {
   );
 });
 
-test('normalize leaves iOS sheets and non-sheet subtrees where they report', () => {
+test('normalize places an iOS @expo/ui sheet above the bottom inset and leaves other subtrees', () => {
+  // The part-detail sheet on iOS: the host reports 778 pt on an 874 pt window
+  // with a 34 pt home indicator inset, and its title paints 62 pt lower than the
+  // probe reports, like the Android dialog.
   const nodes = [
-    { parent: 0, tag: 'ViewManagerAdapter_ExpoUI_HostView', rect: [0, 0, 400, 200] },
-    { parent: 1, tag: 'ViewManagerAdapter_ExpoUI_RNHostView', rect: [0, 0, 400, 200] },
-    { parent: 2, tag: 'Paragraph', rect: [10, 20, 200, 24], text: 'Title' },
-    { parent: 0, tag: 'View', rect: [0, 300, 400, 100] },
-    { parent: 4, tag: 'Paragraph', rect: [10, 320, 200, 24], text: 'Body' },
+    { parent: 0, tag: 'ViewManagerAdapter_ExpoUI_HostView', rect: [0, 0, 402, 778] },
+    { parent: 1, tag: 'ViewManagerAdapter_ExpoUI_RNHostView', rect: [0, 0, 402, 778] },
+    { parent: 2, tag: 'Paragraph', rect: [14, 25.5, 315.5, 24.5], text: 'Sent file' },
+    { parent: 0, tag: 'View', rect: [0, 70, 48, 48] },
+    { parent: 4, tag: 'Paragraph', rect: [10, 80, 20, 24], text: 'Back' },
   ] as const;
-  const ios = normalize(dump([...nodes], { platform: 'ios' }));
+  const ios = normalize(
+    dump([...nodes], {
+      platform: 'ios',
+      window: { width: 402, height: 874 },
+      safeArea: { top: 62, right: 0, bottom: 34, left: 0 },
+    })
+  );
   assert.deepEqual(
     ios.nodes.map(node => node.rect[1]),
-    [0, 0, 0, 20, 300, 320]
+    [0, 62, 62, 87.5, 70, 80]
   );
-  assert.ok(ios.nodes.every(node => node.presented === undefined));
+  assert.deepEqual(ios.nodes[3].presented, { space: 1, dy: 62 });
+  assert.equal(ios.nodes[4].presented, undefined);
+});
+
+test('normalize drops an inactive iOS modal and one a later presentation covers', () => {
+  const ios = { platform: 'ios', window: { width: 402, height: 874 } };
+  const stack = (first: Partial<ProbeNode>, second?: Partial<ProbeNode>) =>
+    normalize(
+      dump(
+        [
+          { parent: 0, tag: 'RNSScreenStack', rect: [0, 0, 402, 874] },
+          { parent: 1, tag: 'RNSScreen', rect: [0, 0, 402, 874], screenState: 2 },
+          { parent: 2, tag: 'Paragraph', rect: [14, 100, 200, 24], text: 'Profile' },
+          { parent: 1, tag: 'RNSModalScreen', rect: [0, 0, 402, 423], screenState: 2, ...first },
+          { parent: 4, tag: 'Paragraph', rect: [14, 30, 200, 24], text: 'Language' },
+          ...(second
+            ? [
+                {
+                  parent: 1,
+                  tag: 'RNSModalScreen',
+                  rect: [0, 0, 402, 812],
+                  screenState: 2,
+                  ...second,
+                },
+                { parent: 6, tag: 'Paragraph', rect: [14, 30, 200, 24], text: 'Credits' },
+              ]
+            : []),
+        ] as ProbeNode[],
+        ios
+      )
+    );
+  const texts = (layout: LayoutTree) =>
+    layout.nodes.flatMap(node => (node.probe.text ? [node.probe.text] : []));
+  // An active sheet leaves the screen it opened from painted behind it.
+  assert.deepEqual(texts(stack({})), ['Profile', 'Language']);
+  // A sheet react-native-screens keeps mounted but inactive is not on screen.
+  assert.deepEqual(texts(stack({ screenState: 0 })), ['Profile']);
+  // A sheet presented over another covers it.
+  assert.deepEqual(texts(stack({}, {})), ['Profile', 'Credits']);
+});
+
+test('normalize places an iOS form sheet and page sheet at the window bottom', () => {
+  // react-native-screens reports a presented sheet's frames from the sheet's
+  // own top, and UIKit anchors the sheet to the window's bottom edge.
+  const ios = { platform: 'ios', window: { width: 402, height: 874 } };
+  const sheet = (height: number) =>
+    normalize(
+      dump(
+        [
+          { parent: 0, tag: 'RNSScreenStack', rect: [0, 0, 402, 874] },
+          { parent: 1, tag: 'RNSScreen', rect: [0, 0, 402, 874], screenState: 2 },
+          { parent: 2, tag: 'Paragraph', rect: [14, 100, 200, 24], text: 'Profile' },
+          { parent: 1, tag: 'RNSModalScreen', rect: [0, 0, 402, height], screenState: 2 },
+          {
+            parent: 4,
+            tag: 'View',
+            rect: [14, 14, 52.67, 48],
+            layoutRect: [14, 14, 52.67, 48],
+            label: 'Cancel',
+            pressable: true,
+          },
+          { parent: 5, tag: 'Paragraph', rect: [14, 27.5, 45.5, 21.5], text: 'Cancel' },
+        ],
+        ios
+      )
+    );
+  const tops = (layout: LayoutTree) => layout.nodes.map(node => node.rect[1]);
+  // A 423 pt form sheet starts at 874 - 423 = 451; the screen behind it stays.
+  const form = sheet(423);
+  assert.deepEqual(tops(form), [0, 0, 0, 100, 451, 465, 478.5]);
+  assert.deepEqual(form.nodes[5].presented, { space: 4, dy: 451 });
+  assert.deepEqual(layoutRect(form.nodes[5]), [14, 465, 52.67, 48]);
+  assert.equal(form.nodes[3].presented, undefined);
+  // A page sheet stops 62 pt below the top.
+  assert.deepEqual(tops(sheet(812)), [0, 0, 0, 100, 62, 76, 89.5]);
+  // A modal as tall as the window covers it and stays where it is.
+  const full = sheet(874);
+  assert.deepEqual(tops(full), [0, 0, 0, 100, 0, 14, 27.5]);
+  assert.ok(full.nodes.every(node => node.presented === undefined));
+});
+
+test('normalize drops the iOS keyboard accessory placeholder', () => {
+  // Its content paints only in the keyboard's accessory window.
+  const layout = normalize(
+    dump(
+      [
+        { parent: 0, tag: 'InputAccessoryView', rect: [14, 139.33, 402, 45.67] },
+        { parent: 1, tag: 'View', rect: [350, 139.33, 52, 45.67], label: 'Done', pressable: true },
+        { parent: 0, tag: 'Paragraph', rect: [14, 100, 200, 24], text: 'Instructions' },
+      ],
+      { platform: 'ios', window: { width: 402, height: 874 } }
+    )
+  );
+  assert.deepEqual(
+    layout.nodes.map(node => node.tag),
+    ['View', 'Paragraph']
+  );
 });
 
 test('normalize drops the development error overlay', () => {

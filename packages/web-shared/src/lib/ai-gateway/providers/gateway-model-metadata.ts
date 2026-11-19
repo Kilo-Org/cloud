@@ -91,8 +91,21 @@ function gatewayModelEndpointsUrlPrefix(gateway: Provider) {
 
 const GATEWAY_MODEL_ENDPOINTS_URL_SUFFIX = '/endpoints';
 
+/**
+ * The endpoints URL of one model. A string id returns the URL the live fetch reads; a SQL id
+ * expression returns the same URL as SQL, for the stored-row join.
+ */
+function gatewayModelEndpointsUrlFor(gateway: Provider, id: string): string;
+function gatewayModelEndpointsUrlFor(gateway: Provider, id: SQL): SQL;
+function gatewayModelEndpointsUrlFor(gateway: Provider, id: string | SQL): string | SQL {
+  const prefix = gatewayModelEndpointsUrlPrefix(gateway);
+  return typeof id === 'string'
+    ? `${prefix}${id}${GATEWAY_MODEL_ENDPOINTS_URL_SUFFIX}`
+    : sql`${prefix} || ${id} || ${GATEWAY_MODEL_ENDPOINTS_URL_SUFFIX}`;
+}
+
 export function gatewayModelEndpointsUrl(gateway: Provider, modelId: string) {
-  return `${gatewayModelEndpointsUrlPrefix(gateway)}${modelId}${GATEWAY_MODEL_ENDPOINTS_URL_SUFFIX}`;
+  return gatewayModelEndpointsUrlFor(gateway, modelId);
 }
 
 function parseGatewayModelEndpoints(raw: unknown): GatewayModelEndpoints {
@@ -233,7 +246,7 @@ export async function readStoredGatewayModels(
       FROM jsonb_array_elements(${jsonbArrayOrEmpty(sql`list.data->'data'`)})
         WITH ORDINALITY AS items(item, ordinality)
       LEFT JOIN ai_gateway_metadata_cache AS endpoints_row
-        ON endpoints_row.url = ${gatewayModelEndpointsUrlPrefix(gateway)} || (${item}->>'id') || ${GATEWAY_MODEL_ENDPOINTS_URL_SUFFIX}
+        ON endpoints_row.url = ${gatewayModelEndpointsUrlFor(gateway, sql`(${item}->>'id')`)}
     ) AS projected
     WHERE list.url = ${source.url}
   `);

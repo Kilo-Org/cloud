@@ -14,8 +14,8 @@ export function SettingsScreenSkeleton({ titleKey }: Readonly<{ titleKey: string
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader className="px-6" title={t(titleKey)} />
-      <View className="gap-3 px-6 pt-4">
+      <ScreenHeader title={t(titleKey)} />
+      <View className="gap-3 px-4 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg" />

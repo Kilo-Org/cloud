@@ -41,6 +41,7 @@ import {
 import { notificationPathForData, prPathForData } from './notification-path';
 import {
   clearPostedNeedsInputNotification,
+  markNeedsInputReplyResult,
   notificationIdentifierForSession,
 } from './needs-input-presentation';
 import { type NotificationPreviews } from './needs-input-notification';
@@ -490,9 +491,9 @@ async function runAnswerAction(args: {
     clearPostedNeedsInputNotification(data.cliSessionId);
   }
 
+  const identities = resultIdentities(response, data);
   await replaceNotification({
-    resultIdentifier: notificationIdentifierForSession(data.cliSessionId),
-    originalIdentifier: response.notification.request.identifier,
+    ...identities,
     title: resultTitleFor({
       previews: deps.readPreviews?.(),
       actedOnTitle: response.notification.request.content.title,
@@ -503,6 +504,11 @@ async function runAnswerAction(args: {
     categoryIdentifier: presentation.categoryIdentifier,
     interruptionLevel: presentation.interruptionLevel,
   });
+  if (identities.resultIdentifier !== notificationIdentifierForSession(data.cliSessionId)) {
+    // The result sits under a push's identifier, which the session's plan does
+    // not name: it is recorded so the plan retires it with the raise.
+    markNeedsInputReplyResult(data.cliSessionId, identities.resultIdentifier);
+  }
 
   if (presentation.raiseCleared) {
     // The raise is over for the user. The glanceable surfaces count the tray
@@ -523,11 +529,36 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
 }
 
 /**
- * Replace the acted-on notification with the action's result. The result is
- * posted under `notificationIdentifierForSession` — the identifier the next
- * sync's plan dismisses — and the notification the user actually acted on is
- * dismissed when it is a different one (a server push carries an OS-assigned
- * identifier), so one raise never ends with two notifications.
+ * Where the result goes, and which notification it replaces.
+ *
+ * The result is normally posted under `notificationIdentifierForSession` — the
+ * identifier the next sync's plan dismisses — and the notification the user
+ * acted on is dismissed when it is a different one (a server push carries an
+ * OS-assigned identifier).
+ *
+ * An inline Reply is the exception. Android keeps the replied notification on
+ * screen for the reply (`LIFETIME_EXTENDED_BY_DIRECT_REPLY`) and ignores a
+ * dismissal of it, so the raise would end with two notifications. Only a post
+ * under its own identifier ends that, so the result replaces it in place, and
+ * the session's identifier is the one dismissed. iOS removes a replied
+ * notification itself, and a post under its identifier is an ordinary post, so
+ * both platforms take the same path.
+ */
+function resultIdentities(
+  response: Notifications.NotificationResponse,
+  data: NeedsInputRaiseData
+): { resultIdentifier: string; replacedIdentifier: string } {
+  const actedOn = response.notification.request.identifier;
+  const session = notificationIdentifierForSession(data.cliSessionId);
+  return response.userText === undefined
+    ? { resultIdentifier: session, replacedIdentifier: actedOn }
+    : { resultIdentifier: actedOn, replacedIdentifier: session };
+}
+
+/**
+ * Replace a notification with the action's result: post the result under
+ * `resultIdentifier`, and dismiss `replacedIdentifier` when it is a different
+ * one, so one raise never ends with two notifications.
  *
  * `interruptionLevel` is outcome-derived: the retryable failure keeps the
  * raise's time-sensitive break-through because it still needs the user; the
@@ -535,7 +566,7 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
  */
 async function replaceNotification(args: {
   resultIdentifier: string;
-  originalIdentifier: string;
+  replacedIdentifier: string;
   title: string;
   body: string;
   data: NeedsInputRaiseData;
@@ -544,7 +575,7 @@ async function replaceNotification(args: {
 }): Promise<void> {
   const {
     resultIdentifier,
-    originalIdentifier,
+    replacedIdentifier,
     title,
     body,
     data,
@@ -568,9 +599,9 @@ async function replaceNotification(args: {
   } catch (error) {
     reportActionFailure('publish', error);
   }
-  if (originalIdentifier !== resultIdentifier) {
+  if (replacedIdentifier !== resultIdentifier) {
     try {
-      await Notifications.dismissNotificationAsync(originalIdentifier);
+      await Notifications.dismissNotificationAsync(replacedIdentifier);
     } catch (error) {
       reportActionFailure('dismiss', error);
     }

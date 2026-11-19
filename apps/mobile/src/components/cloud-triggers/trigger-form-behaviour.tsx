@@ -87,7 +87,7 @@ export function TriggerFormBehaviour({
         onBlur={() => {
           markTouched('prompt');
         }}
-        className="min-h-[120px] leading-[1.25rem]"
+        className="min-h-32"
         textAlignVertical="top"
       />
 
@@ -108,12 +108,10 @@ export function TriggerFormBehaviour({
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
-            className="min-h-[120px] font-mono text-xs leading-[1.25rem]"
+            className="min-h-32 font-mono text-xs"
             textAlignVertical="top"
           />
-          <Text variant="muted" className="text-xs">
-            {t('cloudAgent.triggers.bodySchemaHelp')}
-          </Text>
+          <Text variant="caption">{t('cloudAgent.triggers.bodySchemaHelp')}</Text>
 
           <View className="gap-1">
             <TriggerSwitchRow
@@ -170,9 +168,7 @@ export function TriggerFormBehaviour({
                       : t('cloudAgent.triggers.authSecretLabel')
                   }
                 />
-                <Text variant="muted" className="text-xs">
-                  {t(secretHelpKey)}
-                </Text>
+                <Text variant="caption">{t(secretHelpKey)}</Text>
               </View>
             )}
           </View>

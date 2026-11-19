@@ -247,8 +247,14 @@ export type CustomRoutingTable = z.infer<typeof CustomRoutingTableSchema>;
 export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';
 export const FRONTIER_ROUTING_TABLE_KV_KEY = 'routing_table_frontier_v1';
 
+// Exhaustive map: a new AutoRouter without a key here is a type error.
+const ROUTING_TABLE_KV_KEY_BY_ROUTER = {
+  efficient: ROUTING_TABLE_KV_KEY,
+  frontier: FRONTIER_ROUTING_TABLE_KV_KEY,
+} as const satisfies Record<AutoRouter, string>;
+
 export function routingTableKvKey(router: AutoRouter = DEFAULT_AUTO_ROUTER): string {
-  return router === 'frontier' ? FRONTIER_ROUTING_TABLE_KV_KEY : ROUTING_TABLE_KV_KEY;
+  return ROUTING_TABLE_KV_KEY_BY_ROUTER[router];
 }
 
 const LATENCY_WEIGHT = 1.5;
@@ -259,7 +265,6 @@ const ACCURACY_WEIGHT = 15;
 export const RANKING_POLICY_VERSION = 'value-ttft-prodcost-request-pairs-v6';
 
 type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
-  meetsThreshold?: boolean;
   // Benchmark p50 latency for this route. Null ranks last among competitors.
   p50LatencyMs: number | null;
 };

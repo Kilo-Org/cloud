@@ -14,6 +14,7 @@ import { postLatencyBatch } from '@/lib/telemetry/latency-ingest';
 import { createLatencyBuffer, createLatencyFetch } from '@/lib/telemetry/request-latency';
 import { requestUrlString } from '@/lib/telemetry/request-target';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { isForcedProcedure, withForceState } from '@/lib/force-state-fixture';
 import {
   type ActiveTokenSnapshot,
   getActiveToken,
@@ -355,23 +356,31 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   );
 }
 
+// Both links share one latency-measured fetch. In a dev build it also answers
+// a dev-only forced data state (`force-state-fixture.ts`); the split below
+// sends every forced procedure to the single link, and a batched call passes.
+const linkFetch = __DEV__ ? withForceState(measuredFetch) : measuredFetch;
+
 const singleLink = httpLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: measuredFetch,
+  fetch: linkFetch,
   methodOverride: 'POST',
 });
 
 const batchLink = httpBatchLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: measuredFetch,
+  fetch: linkFetch,
   methodOverride: 'POST',
 });
 
 const trpcLinks = [
   splitLink({
-    condition: op => op.context.skipBatch === true || UNBATCHED_PROCEDURES.has(op.path),
+    condition: op =>
+      op.context.skipBatch === true ||
+      UNBATCHED_PROCEDURES.has(op.path) ||
+      (__DEV__ && isForcedProcedure(op.path)),
     true: singleLink,
     false: batchLink,
   }),

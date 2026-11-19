@@ -53,10 +53,7 @@
       "indexes": {
         "chats_scope_updated_at": {
           "name": "chats_scope_updated_at",
-          "columns": [
-            "scope",
-            "updated_at"
-          ],
+          "columns": ["scope", "updated_at"],
           "isUnique": false
         }
       },
@@ -101,10 +98,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "kv_scope_k_pk": {
-          "columns": [
-            "scope",
-            "k"
-          ],
+          "columns": ["scope", "k"],
           "name": "kv_scope_k_pk"
         }
       },

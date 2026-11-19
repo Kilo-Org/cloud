@@ -129,8 +129,9 @@ describe('PrReviewTabSelector failure states', () => {
   });
 
   it('gives every tab the shared vertical slop', () => {
-    // The pill frame renders 31.5pt, under the design touch target, so the
-    // pressable carries the slop that lifts its touch area past 44pt.
+    // The pill fills the shared row floor; the slop the row has always carried
+    // costs nothing on top of that box and keeps the touch area clear of the
+    // track's padding.
     const { pills } = renderSelector({ activeTab: 'overview' });
     for (const pill of pills) {
       expect(pill.props.hitSlop).toEqual(PR_REVIEW_TAB_HIT_SLOP);

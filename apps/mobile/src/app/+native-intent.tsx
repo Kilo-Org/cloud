@@ -1,17 +1,21 @@
 import { getShareExtensionKey } from 'expo-share-intent';
 
+import { agentChatPickerFixtureRoute } from '@/lib/agent-chat-picker-fixture';
 import { handleAppActionPath } from '@/lib/app-actions/action-url-handler';
 import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
+import { applyForceStatePath } from '@/lib/force-state-fixture';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
+import { loginFixtureRoute } from '@/lib/login-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
 import { handleOrganizationInviteMemberFixturePath } from '@/lib/organization-invite-member-fixture';
 import { handlePrReviewCopyFixturePath } from '@/lib/pr-review/pr-review-copy-fixture-route';
 import { handlePrReviewInstanceFixturePath } from '@/lib/pr-review/pr-review-instance-fixture';
 import { profilePickerFixtureRoute } from '@/lib/profile-picker-fixture';
+import { queryClient } from '@/lib/query-client';
 import { handleRenderRecoveryFixturePath } from '@/lib/render-recovery-fixture';
 import { securityAgentSingleRouteFixtureRoute } from '@/lib/security-agent-single-route-fixture';
 
@@ -21,7 +25,13 @@ import { securityAgentSingleRouteFixtureRoute } from '@/lib/security-agent-singl
 // reaches the universal-link mapper. Every handled or ignored link returns
 // falsy (`deep-link-handler.ts`); a truthy return re-dispatches the linking
 // resolver.
-export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {
+export function redirectSystemPath({
+  path,
+  initial,
+}: {
+  path: string;
+  initial: boolean;
+}): string | null {
   let shareKey: string | null = null;
   try {
     shareKey = getShareExtensionKey();
@@ -50,6 +60,15 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     return null;
   }
   if (__DEV__) {
+    // Dev-only forced data state
+    // (`kiloapp:///dev/force-state/<mode|clear>?next=<url-encoded app link>`):
+    // the mode is set, then `next` resolves exactly as that link would alone.
+    const forcedNext = applyForceStatePath(path, queryClient);
+    if (forcedNext !== undefined) {
+      return forcedNext === null ? null : redirectSystemPath({ path: forcedNext, initial });
+    }
+  }
+  if (__DEV__) {
     // Dev-only link that opens the connect gate's GitLab-instance state the way
     // the paste flow reaches it: a provider route carrying the paste's
     // `?instance=` hint. The handler navigates itself, so this returns falsy —
@@ -62,6 +81,23 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     const instancePickerRoute = instancePickerFixtureRoute(path);
     if (instancePickerRoute) {
       return instancePickerRoute;
+    }
+    // Dev-only branch, folder, mode and repository sheets, opened with the
+    // bridge the composer writes (`dev/<picker>-picker-fixture/<state>`).
+    const agentChatPickerRoute = agentChatPickerFixtureRoute(path);
+    if (agentChatPickerRoute) {
+      return agentChatPickerRoute;
+    }
+    // Dev-only sign-in states (`dev/login-fixture/<state>`): a screen of its own
+    // that writes the resumed sign-in record before the sign-in screen mounts.
+    const loginFixture = loginFixtureRoute(path);
+    if (loginFixture) {
+      return loginFixture;
+    }
+    // Dev-only chat conversation in a fixed state (`dev/chat-fixture/<state>`).
+    const chatFixture = /(?:^|\/)dev\/chat-fixture\/([a-z]+)\/?(?:[?#].*)?$/.exec(path);
+    if (chatFixture) {
+      return `/(app)/chat-fixture?state=${chatFixture[1]}`;
     }
     // Dev-only: open a Security Agent screen as its group's only route
     // (`kiloapp:///dev/security-agent-single-route-fixture/<scope>/<route…>`).
@@ -89,6 +125,18 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     const sessionRowFixture = /(?:^|\/)dev\/session-row-fixture\/?(\?.*)?$/.exec(path);
     if (sessionRowFixture) {
       return `/(auth)/session-row-fixture${sessionRowFixture[1] ?? ''}`;
+    }
+    // Dev-only chat failure copy for every stable on-device refusal reason. The
+    // state is the link's last segment, so it is forwarded as the route's
+    // `state` param; the fixture falls back to `all` for a name it does not know.
+    const localFailureCopyFixture =
+      /(?:^|\/)dev\/local-failure-copy-fixture\/([a-z][a-z-]*)\/?$/.exec(path);
+    if (localFailureCopyFixture) {
+      return `/(app)/local-failure-copy-fixture?state=${localFailureCopyFixture[1]}`;
+    }
+    // Dev-only GGUF row: the retrying line and the plain downloading line together.
+    if (/(?:^|\/)dev\/gguf-retry-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/gguf-retry-fixture';
     }
     if (/(?:^|\/)dev\/system-search-unresolved-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/system-search-unresolved-fixture';
@@ -178,6 +226,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';
     }
+    // Dev-only destructive settings confirmation: the screen that runs the
+    // agent's `settings_set` call, so the confirm can be driven without a chat.
+    if (/(?:^|\/)dev\/settings-confirm-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(auth)/settings-confirm-fixture';
+    }
     const reauthorizeFixtureMatch =
       /(?:^|\/)dev\/security-agent-reauthorize-fixture\/?(\?.*)?$/.exec(path);
     if (reauthorizeFixtureMatch) {
@@ -188,8 +241,17 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (fixtureRoute) {
       return fixtureRoute;
     }
-    if (/(?:^|\/)dev\/organization-invoices-fixture\/?(?:[?#].*)?$/.test(path)) {
-      return '/(app)/(tabs)/(3_profile)/organization/invoices-fixture';
+    // Dev-only organization invoices screen against fixed Stripe answers
+    // (`dev/organization-invoices-fixture/<listed|empty|error>`): the list is a
+    // Stripe read a local stack cannot serve, so every capture state routes
+    // here. A link without a state opens the listed page.
+    const organizationInvoicesFixture =
+      /(?:^|\/)dev\/organization-invoices-fixture(?:\/(listed|empty|error))?\/?(?:[?#].*)?$/.exec(
+        path
+      );
+    if (organizationInvoicesFixture) {
+      const state = organizationInvoicesFixture[1] ?? 'listed';
+      return `/(app)/(tabs)/(3_profile)/organization/invoices-fixture?state=${state}`;
     }
     // Dev-only personal invoices screen against fixed Stripe answers
     // (`dev/personal-invoices-fixture/<listed|empty|error>`): the personal list

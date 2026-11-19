@@ -232,11 +232,27 @@ export function glanceableNeedsInputKind(status: string): GlanceableNeedsInputKi
 
 /**
  * The snapshot statuses that end the surface: a signed-out or privacy-cleared
- * scope. Every terminal-status decision reads this one predicate, so the data
- * payload, presentation, refresh cadence and timeline cannot disagree.
+ * scope. The one terminal vocabulary: a consumer that maps a terminal status to
+ * its own value reads the narrowed status this predicate returns instead of
+ * restating the set.
  */
-export function isTerminalGlanceableStatus(status: GlanceableAgentsSnapshotStatus): boolean {
-  return status === 'signed_out' || status === 'privacy';
+export const GLANCEABLE_TERMINAL_STATUSES = [
+  'signed_out',
+  'privacy',
+] as const satisfies readonly GlanceableAgentsSnapshotStatus[];
+
+export type GlanceableTerminalStatus = (typeof GLANCEABLE_TERMINAL_STATUSES)[number];
+
+/**
+ * The snapshot statuses that end the surface. Every terminal-status decision
+ * reads this one predicate, so the data payload, presentation, refresh cadence
+ * and timeline cannot disagree, and it narrows its caller to the terminal
+ * vocabulary so a presentation cannot label one terminal member as another.
+ */
+export function isTerminalGlanceableStatus(
+  status: GlanceableAgentsSnapshotStatus
+): status is GlanceableTerminalStatus {
+  return (GLANCEABLE_TERMINAL_STATUSES as readonly string[]).includes(status);
 }
 
 /**

@@ -10,13 +10,12 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { Mic, Search, SearchX } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Mic, SearchX } from '@/components/ui/icons';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SearchField } from '@/components/ui/search-field';
 import { foldForSearch } from '@/i18n/fold-for-search';
 import { languageRows } from '@/i18n/language-rows';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import {
@@ -31,36 +30,27 @@ import {
 } from '@/lib/voice-input/voice-input-language-preference';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { useVoiceRecognitionLanguages } from '@/lib/voice-input/use-voice-recognition-languages';
-import { cn } from '@/lib/utils';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
-// the list fills the sheet's body.
+// the list fills the sheet's body. Rows own the page gutter, so the list adds
+// none of its own.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  paddingHorizontal: 16,
-  paddingBottom: 16,
-} satisfies ViewStyle;
+const listContentContainerStyle = { paddingBottom: 16 } satisfies ViewStyle;
 
-// Static skeleton rows: count and shape match the real ChoiceRow rows (name
-// line + caption; the trailing check is transparent unless selected, so the
-// skeleton carries no trailing control) so the swap never moves layout and
-// never shows a shape the loaded row will not have.
+// Static skeleton rows: count and shape match the real ChoiceRow rows so the
+// swap never moves layout and never shows a shape the loaded row will not have.
 const SKELETON_ROW_COUNT = 6;
 
 function SkeletonRows() {
   return (
-    <View className="px-4 pb-4 pt-1">
+    <View className="pt-1">
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-        // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
-        <View
+        <RowSkeleton
+          // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
           key={index}
-          className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between py-3')}
-        >
-          <View className="flex-1 gap-1.5 pr-3">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-3 w-28" />
-          </View>
-        </View>
+          subtitle
+          className={index < SKELETON_ROW_COUNT - 1 ? 'border-b-[0.5px] border-hair-soft' : ''}
+        />
       ))}
     </View>
   );
@@ -255,7 +245,6 @@ function DeviceVoiceLanguages({
 export function VoiceLanguagePickerSheet() {
   const { t } = useTranslation();
   const router = useRouter();
-  const colors = useThemeColors();
   const { gatewayTranscriptionEnabled, hasLoaded: gatewayTranscriptionLoaded } =
     useGatewayTranscriptionPreference();
   const chosen = useVoiceInputLanguage();
@@ -324,29 +313,14 @@ export function VoiceLanguagePickerSheet() {
       }}
       scrollable={false}
       headerContent={
-        // Same filled pill as the account language picker and the repository
-        // and share pickers: one search-field shape for the same control. The
-        // field itself is the shared single-line `Input`, so the pill owns only
-        // the chrome while the field owns the height floor, the one line box for
-        // the placeholder and the value, and the RTL content alignment.
-        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-          <Search size={18} color={colors.mutedForeground} />
-          <Input
-            accessibilityLabel={t('language.search')}
-            // The pill supplies the horizontal inset, so the field zeroes both
-            // physical sides of the shared box.
-            className="flex-1 pl-0 pr-0 text-base text-foreground"
-            placeholder={t('language.search')}
-            placeholderTextColor={colors.mutedForeground}
-            // Uncontrolled: iOS drops keystrokes when state drives `value`;
-            // `onChangeText` only feeds the filter.
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-          />
-        </View>
+        // Uncontrolled: iOS drops keystrokes when state drives `value`;
+        // `onChangeText` only feeds the filter.
+        <SearchField
+          className="mx-4 my-3"
+          placeholder={t('language.search')}
+          hasText={query !== ''}
+          onChangeText={setQuery}
+        />
       }
     >
       {content}

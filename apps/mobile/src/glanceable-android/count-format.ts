@@ -2,7 +2,7 @@ import { getCalendars } from 'expo-localization';
 import { i18n } from '@/i18n';
 import { RTL_LANGUAGES, type SupportedLanguage } from '@/i18n/languages';
 import { dateTimeFormat } from '@/lib/intl-cache';
-import { parseTimestamp, timeAgo } from '@/lib/utils';
+import { parseTimestamp, relativeTime } from '@/lib/utils';
 
 /**
  * Whether the active language reads right to left.
@@ -19,15 +19,15 @@ export function isWidgetRtl(): boolean {
  * The relative time an Android glanceable draws: the large cell's newest-result
  * footer, and the ongoing notification's scheduled wake.
  *
- * `timeAgo` already localizes through `Intl.RelativeTimeFormat` and falls back
- * to `common.justNow` for sub-minute ages, so the widget bakes no timer and no
- * second wording. It is direction-aware too, so a scheduled wake ahead of the
- * clock reads "in 2 hours" rather than the "Just now" a past-only read would
- * give. `parseTimestamp` accepts both the ISO strings this app writes and the
- * PostgreSQL form Hermes cannot parse with `new Date`.
+ * `relativeTime` already localizes through `Intl.RelativeTimeFormat` and falls
+ * back to `common.justNow` for sub-minute ages, so the widget bakes no timer
+ * and no second wording. It is direction-aware too, so a scheduled wake ahead
+ * of the clock reads "in 2 hours" rather than the "Just now" a past-only read
+ * would give. `parseTimestamp` accepts both the ISO strings this app writes and
+ * the PostgreSQL form Hermes cannot parse with `new Date`.
  */
 export function formatGlanceableAgo(at: string): string {
-  return timeAgo(parseTimestamp(at));
+  return relativeTime(parseTimestamp(at));
 }
 
 /** Clock time for today, date and time otherwise: a widget bitmap cannot advance a relative age offline. */

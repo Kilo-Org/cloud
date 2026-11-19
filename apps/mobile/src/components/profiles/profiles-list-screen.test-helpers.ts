@@ -100,9 +100,11 @@ export function groupTexts(group: ReactTestInstance): ReactTestInstance[] {
   return findAll(group, 'Text');
 }
 
-/** The heading that opens the group hosting the repo-defaults entry. */
+/** The heading that opens the section hosting the repo-defaults entry. */
 export function repoDefaultsHeading(root: ReactTestInstance): ReactTestInstance {
-  const [heading] = groupTexts(rowGroup(root, repoDefaultsRow(root)));
+  const heading = findAll(root, 'Text').find(
+    node => String(node.props.children) === REPO_DEFAULTS_HEADING
+  );
   if (!heading) {
     throw new Error('repo defaults group has no heading');
   }

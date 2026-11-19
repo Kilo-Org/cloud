@@ -13,6 +13,7 @@ import {
   useSaveOrgModelAccess,
 } from '@/lib/hooks/use-org-settings-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import {
   type AvailableModel,
   type CatalogModel,
@@ -220,7 +221,7 @@ export function ModelAccessForm({
     } catch (error) {
       attempt.fail({
         kind: 'save-failed',
-        message: error instanceof Error ? error.message : t('organizationGuardrails.statusFailed'),
+        message: knownServerErrorMessage(error) ?? t('organizationGuardrails.statusFailed'),
       });
     }
   };
@@ -245,8 +246,8 @@ export function ModelAccessForm({
     <View className="flex-1">
       <View className="gap-3 px-4 pt-3">
         {catalogUnavailable ? (
-          <View className="flex-row items-center gap-3 rounded-lg bg-muted-soft px-3 py-2">
-            <Text className="flex-1 text-xs text-muted-foreground">
+          <View className="flex-row items-center gap-3 rounded-md bg-muted-soft px-3 py-2">
+            <Text variant="caption" className="flex-1">
               {t('organizationModelAccess.catalogUnavailable')}
             </Text>
             <Button
@@ -269,11 +270,7 @@ export function ModelAccessForm({
           onChange={setTab}
           accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
         />
-        {canEdit ? null : (
-          <Text className="text-xs text-muted-foreground">
-            {t('organizationModelAccess.readOnly')}
-          </Text>
-        )}
+        {canEdit ? null : <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>}
         {/* The buttons keep their place while the draft is clean, so a save
             that settles never moves the list below them. */}
         <View className="flex-row items-center gap-2">
@@ -312,7 +309,7 @@ export function ModelAccessForm({
       {tab === 'providers' ? (
         <View className="flex-1">
           {catalogUnavailable ? (
-            <Text className="px-4 pb-2 text-xs text-muted-foreground">
+            <Text variant="caption" className="px-4 pb-2">
               {t('organizationModelAccess.providersNeedCatalog')}
             </Text>
           ) : null}

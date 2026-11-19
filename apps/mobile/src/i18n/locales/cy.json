@@ -57,6 +57,7 @@
     "link": "dolen",
     "takingLonger": "Mae hyn yn cymryd yn hirach na'r disgwyl. Gallwch gau hwn ac edrych eto.",
     "model": "Model AI",
+    "notSelected": "Heb ei ddewis",
     "accessDenied": "Mynediad wedi'i wrthod",
     "allRepositories": "Pob ystorfa",
     "personal": "Personol",
@@ -147,6 +148,7 @@
     "performance": "Perfformiad",
     "preferences": "Dewisiadau",
     "privacyPolicy": "Polisi preifatrwydd",
+    "termsOfService": "Telerau gwasanaeth",
     "profile": "Proffil",
     "reactions": "Ymatebion",
     "recent": "Diweddar",
@@ -216,8 +218,8 @@
     "verifyCode": "Gwirio cod",
     "resendCode": "Anfon y cod eto",
     "termsPrefix": "Drwy barhau, rydych yn cytuno i'n ",
+    "termsInSentence": "Telerau gwasanaeth",
     "terms": "Telerau",
-    "termsInSentence": "Telerau",
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mwy o opsiynau mewngofnodi",
@@ -802,7 +804,6 @@
       "replyPlaceholder": "Ateb…",
       "replyBody": "Testun yr ateb",
       "submitReply": "Cyflwyno ateb",
-      "termsTitle": "Telerau gwasanaeth",
       "termsCopy": "Rhaid i chi fod yn 13 oed neu'n hŷn i bostio.",
       "termsAcceptRetry": "Ni lwyddwyd i dderbyn y telerau. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
       "viewTerms": "Gweld y telerau",
@@ -1012,7 +1013,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Nid oes unrhyw sefydliadau gyda'r cyfrif hwn eto. Gallwch adolygu ceisiadau tynnu Bitbucket unwaith y byddwch yn creu sefydliad neu'n ymuno ag un.",
       "gitlabReconnectAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei ailgysylltu.",
       "bitbucketNotConnectedTitle": "Nid yw Bitbucket wedi'i gysylltu",
-      "bitbucketAdminOnlyDescription": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
+      "adminOnlyConnectDescription": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
       "contextLine": "Ar gyfer {{organization}}",
       "contextLinePersonal": "Ar gyfer eich cyfrif personol"
     },
@@ -1223,16 +1224,16 @@
     },
     "category": {
       "agentAttentionTitle": "Mae'r asiant angen eich sylw",
-      "agentAttentionSubtitle": "cwestiynau a cheisiadau am ganiatâd neu fewnbwn",
+      "agentAttentionSubtitle": "Cwestiynau a cheisiadau am ganiatâd neu fewnbwn",
       "agentUpdatesTitle": "Diweddariadau asiant",
-      "agentUpdatesSubtitle": "negeseuon gan yr asiant yn ystod tasg",
+      "agentUpdatesSubtitle": "Negeseuon gan yr asiant yn ystod tasg",
       "sessionStatusTitle": "Statws sesiwn",
-      "sessionStatusSubtitle": "wedi gorffen / wedi methu / yn barod i'w reoli",
-      "balanceAlertsSubtitle": "rhybuddion am falans isel y sefydliad",
+      "sessionStatusSubtitle": "Wedi gorffen / wedi methu / yn barod i'w reoli",
+      "balanceAlertsSubtitle": "Rhybuddion am falans isel y sefydliad",
       "balanceAlertsUnavailable": "Ymunwch â sefydliad i gael rhybuddion balans.",
-      "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA",
+      "securityFindingsSubtitle": "Canfyddiadau newydd a nodiadau atgoffa SLA",
       "securityFindingsUnavailable": "Galluogwch Asiant diogelwch Kilo ar gwmpas i gael canfyddiadau diogelwch.",
-      "spendAlertsSubtitle": "croesi trothwyon a sbigau bob awr",
+      "spendAlertsSubtitle": "Croesi trothwyon a sbigau bob awr",
       "spendAlertsToggle": "Categori rhybuddion gwariant"
     },
     "history": {
@@ -1477,8 +1478,9 @@
       "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Caiff cysylltiad Bitbucket y sefydliad hwn ei reoli ar y we o gyfrifiadur.",
-      "description": "Crëwch docyn mynediad gweithle gyda'r cwmpasau gofynnol a'i ludo isod.",
+      "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
+      "description": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo isod.",
+      "descriptionReconnect": "Crëwch docyn mynediad gweithle newydd ar gyfer {{organization}} a'i ludo isod.",
       "scopes": "Cyfrif: darllen · Ystorfeydd: darllen/ysgrifennu · Ceisiadau tynnu: darllen · Bachau gwe: darllen/ysgrifennu",
       "tokenPlaceholder": "Tocyn mynediad gweithle",
       "tokenRefused": "Ni dderbyniodd Bitbucket y tocyn mynediad gweithle hwn. Gwiriwch fod ganddo'r cwmpasau uchod, yna ceisiwch eto."
@@ -2336,6 +2338,8 @@
       "renameAccessibility": "Ailenwi sesiwn: {{title}}",
       "cloningSession": "Yn clonio sesiwn",
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
+      "historyTooLarge": "Mae trawsgrifiad y sesiwn hon yn rhy fawr i'w llwytho.",
+      "historyUnavailable": "Ni ellir darllen trawsgrifiad y sesiwn hon.",
       "cloneFailedRetry": "Methu clonio'r sesiwn hon. Ceisiwch eto.",
       "notEnoughCredits": "Nid oes digon o gredydau ar gyfer y cais hwn. Ychwanegwch gredydau a cheisiwch eto.",
       "previousTaskFinishing": "Nid yw'r dasg flaenorol wedi gorffen eto. Arhoswch am eiliad.",
@@ -2412,6 +2416,7 @@
       "branchDefault": "Rhagosodedig",
       "branchAccessibility": "Cangen: {{label}}",
       "branchLoading": "Yn llwytho ceangau",
+      "branchInactive": "Dewiswch ystorfa i lwytho ei cheangau.",
       "branchLoadError": "Ni lwyddwyd i lwytho ceangau",
       "branchUnavailable": "Nid yw ceangau ar gael ar gyfer yr ystorfa hon. Gwiriwch eich mynediad gyda'r darparwr, yna dewiswch ystorfa arall.",
       "branchEmpty": "Dim ceangau ar gael",
@@ -2464,7 +2469,7 @@
       "manageProfiles": "Rheoli proffiliau",
       "advancedConfig": "Ffurfweddiad Uwch",
       "advancedConfigDescription": "Yn berthnasol i’r sesiwn hon. Mae cadw fel proffil yn ei gadw ar gyfer y tro nesaf.",
-      "saveAsProfile": "Cadw fel Proffil",
+      "saveAsProfile": "Cadw fel proffil",
       "saveProfileDescription": "Arbedwch y newidynnau amgylchedd cyfredol a'r gorchmynion gosod fel proffil y gellir ei ailddefnyddio.",
       "profileSaved": "Proffil \"{{name}}\" wedi'i gadw",
       "organizationProfiles": "Proffiliau Sefydliad",
@@ -3240,6 +3245,7 @@
     "noSessions": "Dim sesiynau gweithredol",
     "noSessionsDescription": "Mewngofnodwch i ap Kilo ar ddyfais arall a bydd y sesiwn yn ymddangos yma.",
     "signedIn": "Wedi mewngofnodi {{signedIn}} · Gwelwyd ddiwethaf {{lastSeen}}",
+    "signedInThisDevice": "Wedi mewngofnodi {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Mae sesiynau ap Kilo, Kilo CLI a phorwr gwe yn ymddangos yma. Nid yw sesiynau'r golygydd wedi'u rhestru.",
     "thisDevice": "Y ddyfais hon",
     "viewProfile": "Gweld y proffil",
@@ -3262,7 +3268,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ni ellid llwytho'r sesiynau.",
-    "couldNotLoadActiveSessions": "Ni ellid llwytho'r sesiynau gweithredol.",
     "agentSessions": "Ar waith nawr",
     "newCodingTask": "Tasg codio newydd",
     "newTaskFromPicture": "Tasg newydd o lun",
@@ -3380,6 +3385,11 @@
       "billingHistory": "Hanes bilio",
       "billingHistoryEmpty": "Dim hanes bilio eto.",
       "billingHistoryError": "Methwyd â llwytho hanes bilio",
+      "billingRowInitial": "Tâl cyntaf · {{tier}}",
+      "billingRowRenewal": "Adnewyddiad · {{tier}}",
+      "billingRowSubscription": "Tanysgrifiad · {{tier}}",
+      "billingRowTrial": "Treial am ddim · {{tier}}",
+      "billingRowUpgrade": "Newid cynllun · {{tier}}",
       "cancel": "Canslo tanysgrifiad",
       "cancelDescription": "Bydd eich Kilo Pass yn parhau'n weithredol tan ddiwedd y cyfnod bilio ac ni fydd yn adnewyddu.",
       "cancelScheduled": "Yn cael ei ganslo ar {{date}}",
@@ -3475,6 +3485,7 @@
     "revokeConsent": "Dirymu cydsyniad",
     "revokeConsentTitle": "Dirymu cydsyniad i rannu data?",
     "acceptAndContinue": "Derbyn a pharhau",
+    "loadingConsentSettings": "Yn llwytho eich gosodiadau cydsyniad…",
     "decline": "Gwrthod",
     "declineAndSignOut": "Gwrthod ac allgofnodi",
     "declineTitle": "Gwrthod rhannu data?",
@@ -3649,7 +3660,8 @@
         "accounting_adjustment": "Addasiad cyfrifyddu",
         "credits_expired": "Credydau wedi dod i ben"
       },
-      "truncated": "Mae gweithgaredd credyd cynharach ar gael."
+      "truncated": "Mae gweithgaredd credyd cynharach ar gael.",
+      "retentionLimit": "Yn dangos gweithgaredd credyd diweddaraf."
     },
     "inviteMember": {
       "emailError": "Nodwch gyfeiriad e-bost dilys.",
@@ -3681,7 +3693,8 @@
         "void": "Wedi'i dirymu",
         "uncollectible": "Anghasgladwy"
       },
-      "truncated": "Mae anfonebau cynharach ar gael."
+      "truncated": "Mae anfonebau cynharach ar gael.",
+      "retentionLimit": "Yn dangos yr anfonebau diweddaraf."
     },
     "lowBalanceAlert": {
       "enableA11y": "Galluogi rhybudd balans isel",
@@ -3760,6 +3773,7 @@
       "truncated": "Mae gan yr awr hon fwy o geisiadau nag y mae'r rhestr yn eu dangos.",
       "emptyTitle": "Dim ceisiadau yn yr awr hon",
       "emptyDescription": "Defnyddiwch Awr gynharach i weld ceisiadau cynharach.",
+      "emptyBoundDescription": "Dyma mor bell yn ôl ag y mae logiau ceisiadau'n mynd.",
       "loadError": "Methu llwytho logiau ceisiadau.",
       "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau.",
       "tokens": "{{input}} i mewn · {{output}} allan",
@@ -3923,8 +3937,7 @@
     "imagesSectionEmpty": "Dim gwesteiwyr delwedd dibynadwy",
     "revoke": "Dirymu ymddiriedaeth yn {{host}}",
     "revokeMessage": "Bydd dolenni i'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
-    "revokeImageMessage": "Bydd delweddau o'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
-    "backToPreferences": "Yn ôl i'r dewisiadau"
+    "revokeImageMessage": "Bydd delweddau o'r gwesteiwr hwn yn gofyn am gadarnhad eto."
   },
   "glanceable": {
     "waiting": "Yn diweddaru asiantau",
@@ -4003,6 +4016,7 @@
   },
   "modelChat": {
     "offlineFailure": "Mae angen cysylltiad rhyngrwyd ar y model hwn. Cysylltwch a rhowch gynnig arall arni, neu newidiwch i fodel ar y ddyfais hon.",
+    "connectionLost": "Collwyd y cysylltiad â'r model. Gwiriwch eich cysylltiad a cheisiwch eto.",
     "empty": {
       "title": "Dechrau sgwrs",
       "description": "Anfonwch neges i siarad â model."
@@ -4175,6 +4189,8 @@
       "downloading": "Yn lawrlwytho: {{written}} o {{total}}",
       "downloadingUnknown": "Yn lawrlwytho: {{written}}",
       "paused": "Wedi'i seibio: {{written}} o {{total}}",
+      "retrying": "Yn ceisio eto: {{written}} o {{total}}",
+      "retryingUnknown": "Yn ceisio eto: {{written}}",
       "verifying": "Wrthi'n gwirio'r ffeil a lawrlwythwyd…",
       "downloaded": "Wedi'i lawrlwytho · {{size}}",
       "url": "Dolen lawrlwytho uniongyrchol",
@@ -4265,7 +4281,9 @@
         "androidModelUnavailable": "Nid yw'r ddyfais hon yn cefnogi Gemini Nano, neu mae ap system AICore yn dal i baratoi. Rhowch gynnig arall arni nes ymlaen.",
         "aicoreUpdateRequired": "Diweddarwch yr ap AICore a meddalwedd eich system i ddefnyddio'r model hwn.",
         "downloadable": "Mae angen llwytho'r model hwn i lawr unwaith cyn y gallwch ei ddefnyddio.",
-        "downloading": "Mae'r model yn llwytho i lawr. Bydd yn barod pan fydd y llwytho i lawr wedi gorffen."
+        "downloading": "Mae'r model yn llwytho i lawr. Bydd yn barod pan fydd y llwytho i lawr wedi gorffen.",
+        "batteryQuota": "Mae'r model ar y ddyfais wedi defnyddio ei lwfans batri am y tro. Rhowch gynnig arall arni yn nes ymlaen.",
+        "checkFailed": "Ni allai'r ap wirio'r model hwn. Rhowch gynnig arall arni."
       },
       "unavailable": "Nid yw'r model ar y ddyfais ar gael ar hyn o bryd. Gwiriwch ei statws yn $t(modelChat.backends.title).",
       "busy": "Mae'r model ar y ddyfais yn brysur gydag ateb arall. Rhowch gynnig arall arni pan fydd wedi gorffen.",
@@ -4448,6 +4466,7 @@
     "instructionsHint": "Rheolau markdown a gymhwysir i bob sesiwn sy'n defnyddio'r proffil hwn.",
     "instructionsEmpty": "Dim ffeiliau cyfarwyddyd eto",
     "instructionsEmptyDescription": "Ychwanegwch ffeiliau rheolau y bydd pob sesiwn sy'n defnyddio'r proffil hwn yn eu cymhwyso.",
+    "instructionsEmptyDescriptionReadOnly": "Mae ffeiliau rheolau a ychwanegir yma yn cael eu cymhwyso i bob sesiwn sy'n defnyddio'r proffil hwn.",
     "instructionNameRequired": "Rhowch enw ffeil",
     "instructionNameTooLong": "Rhaid i enw'r ffeil fod yn {{max}} nod neu lai",
     "instructionNameInvalid": "Dechreuwch gyda llythyren neu rif a defnyddiwch lythrennau bach, rhifau a llinellau tosturiol yn unig",
@@ -4650,7 +4669,8 @@
       "purchaseFallback": "Pryniant credyd",
       "receipt": "Derbynneb",
       "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
-      "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn."
+      "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn.",
+      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf."
     },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
@@ -4811,6 +4831,7 @@
     "summary": "Crynodeb AI",
     "summaryPending": "Mae'r crynodeb AI ar y gweill. Bydd yn ymddangos yma pan fydd yn barod.",
     "summaryUnavailable": "Crynodeb AI ddim ar gael. Mae eich briff strwythuredig yn dal ar gael.",
+    "summaryNotAdmitted": "Ni chynhyrchwyd crynodeb AI ar gyfer y briff hwn. Mae eich briff strwythuredig yn dal ar gael.",
     "summaryCharge": "Tâl AI: {{cost}}",
     "summaryChargePending": "Tâl AI yn aros i'w gysoni",
     "summaryModel": "$t(common.model): {{model}}",
@@ -4911,7 +4932,7 @@
     "topFeatures": "Prif nodweddion",
     "emptyTitle": "Dim defnydd yn y cyfnod hwn",
     "unavailableTitle": "Nid yw defnydd ar gael",
-    "unavailableDescription": "Nid yw'r weithfan hon yn adrodd defnydd. Ni fydd ceisio eto yn helpu.",
+    "unavailableDescription": "Nid yw defnydd wedi'i osod ar gyfer y weithfan hon. Cysylltwch â'r tîm cymorth os ydych yn disgwyl gweld defnydd yma.",
     "orgSelfNotice": "Rydych chi'n gweld eich defnydd eich hun yn y sefydliad hwn.",
     "viewDetails": "Gweld manylion defnydd"
   },
@@ -4919,7 +4940,7 @@
     "title": "Integreiddiadau",
     "sectionTitle": "Gwasanaethau cysylltiedig",
     "entrySubtitle": "GitHub, Slack, Linear a mwy",
-    "subtitle": "Cysylltwch eich offer datblygu a'ch llifoedd gwaith â Kilo",
+    "subtitle": "Cysylltwch eich offer datblygu a'ch llifoedd gwaith â Kilo.",
     "disconnect": "Datgysylltu",
     "disconnectTitle": "Datgysylltu {{provider}}?",
     "disconnectMessage": "Bydd Kilo yn peidio ag ymateb yn {{provider}}. Gallwch ailgysylltu unrhyw bryd.",
@@ -4929,6 +4950,9 @@
     "couldNotLoad": "Methu llwytho'r integreiddiadau",
     "permissionDenied": "Does gennych chi ddim caniatâd i reoli'r integreiddiadau hyn.",
     "managedByOwner": "Gofynnwch i berchennog y sefydliad newid cysylltiad na allwch ei newid.",
+    "managedByOwnerOrAdmin": "Gofynnwch i berchennog y sefydliad neu weinyddwr newid cysylltiad na allwch ei newid.",
+    "managedByOwnerOrBilling": "Gofynnwch i berchennog y sefydliad neu reolwr bilio newid cysylltiad na allwch ei newid.",
+    "managedByOwnerAdminOrBilling": "Gofynnwch i berchennog y sefydliad, gweinyddwr neu reolwr bilio newid cysylltiad na allwch ei newid.",
     "connectFailed": "Methu agor y dudalen gysylltu"
   },
   "invoices": {
@@ -4965,7 +4989,7 @@
       "new": "Sbardun newydd",
       "create": "Crëwch sbardun",
       "emptyTitle": "Dim sbardunau eto",
-      "emptyDescription": "Crëwch sbardun i ddechrau rhediad Cloud Agent o alwad bachyn gwe neu ar atodlen.",
+      "emptyDescription": "Crëwch eich sbardun cyntaf.",
       "loadFailedTitle": "Methwyd llwytho sbardunau",
       "loadFailedDescription": "Rhowch gynnig eto pan fydd gennych gysylltiad.",
       "detailLoadFailedTitle": "Methwyd llwytho’r sbardun hwn",
@@ -4988,7 +5012,6 @@
       "nameLocked": "Ni all yr enw newid ar ôl creu’r sbardun.",
       "repositoryLocked": "Ni all y storfa newid ar ôl creu’r sbardun.",
       "environmentAutomatic": "Awtomatig yn ôl y storfa",
-      "notSelected": "Heb ei ddewis",
       "profileDefaults": "Defnyddio rhagosodiadau",
       "profileHelp": "Mae gosodiadau’r proffil yn gymwys pan fydd y sbardun yn rhedeg. Bydd ei gyfrinachau’n cael eu datrys bryd hynny.",
       "customAgent": "Asiant cyfaddas",

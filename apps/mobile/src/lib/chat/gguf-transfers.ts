@@ -134,6 +134,8 @@ export function mayRetryTransfer(download: GgufActiveDownload): boolean {
 
 /** A transfer that stopped short is started from zero once more, and a file that was refused is read once more. */
 const ATTEMPTS = 2;
+/** `attempts` starts here on a fresh transfer, so anything above it is a retry. */
+const FIRST_ATTEMPT = 1;
 export const PASSES = 2;
 
 export function currentTransfer(download: GgufActiveDownload): GgufTransfer {
@@ -280,5 +282,9 @@ export function downloadProgress(download: GgufActiveDownload): GgufDownload {
     pending: download.pausing || download.stop !== undefined,
     written: download.done + download.written,
     total: download.total > 0 ? download.done + download.total + later : 0,
+    // `again()` counts the attempt before it starts the transfer from zero, and
+    // a refused resume drops the partial the same way (`restart()`), so either
+    // backwards move is published as the retry that explains it.
+    retrying: download.attempts > FIRST_ATTEMPT || download.restarted,
   };
 }

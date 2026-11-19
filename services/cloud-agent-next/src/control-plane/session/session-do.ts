@@ -22,7 +22,12 @@ import {
 } from '../../cloud-agent-authority.js';
 import { getWorkspaceStub } from '../workspace/workspace-stub.js';
 import { sessionCallbackContext } from './callback-context.js';
-import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
+import {
+  createSessionListStatusOutbox,
+  deriveSessionListStatus,
+  nativeSessionTitle,
+  TRANSCRIPT_EVENT_TYPES,
+} from './list-status.js';
 import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
 import {
   cloudAgentWorktreeIdSchema,
@@ -777,6 +782,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
   private rootStatus: RootStatus | undefined;
+  /**
+   * Latest transcript write, for the list row's activity time. Memory only:
+   * the list status snapshot keeps the last published value across eviction.
+   */
+  private transcriptActivityAt: number | undefined;
+  /** A Kilo v2 rename of the root not yet handed to the list status outbox. */
+  private pendingRootRename: string | undefined;
   private readonly historyHydrations = new Map<string, Promise<void>>();
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
@@ -2435,6 +2447,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
         }
         await this.recordRootStatus(event);
+        const rootRename = this.nativeRootRename(event);
         // A retried batch can be partially applied; commit its receipt with the row mutation.
         const stored = this.partText.transaction(() =>
           this.ctx.storage.transactionSync(() => {
@@ -2448,6 +2461,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             return persisted;
           })
         );
+        if (stored !== null && stored.id !== 0 && TRANSCRIPT_EVENT_TYPES.has(event.type))
+          this.transcriptActivityAt = Date.now();
+        if (rootRename !== undefined) this.pendingRootRename = rootRename;
         if (stored !== null) this.broadcast(stored);
         if (event.type === 'session.created' && this.registration !== null) {
           const info = z
@@ -2626,8 +2642,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               kiloUserId: this.metadata.identity.userId,
               cloudAgentSessionId: this.sessionId,
             },
-            status
+            status,
+            Date.now(),
+            { activityAt: this.transcriptActivityAt, title: this.pendingRootRename }
           );
+          this.pendingRootRename = undefined;
         }
         statusDueAt = this.listStatusOutbox.nextDueAt();
       }
@@ -3259,13 +3278,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Worktree deletion, phase 2 (legacy `finishWorktreeDeletion`): purge this
-   * session's data once the Sandbox DO confirmed the worktree cleanup. Idempotent
-   * and holds no per-worktree state: the Sandbox DO already removed the routes.
+   * session's data once the Sandbox DO confirmed the worktree cleanup, for the
+   * stored worktree binding. Idempotent and holds no per-worktree state: the
+   * Sandbox DO already removed the routes.
    */
   async finishWorktreeDeletion(worktreeId: string): Promise<void> {
     await this.initialized;
-    cloudAgentWorktreeIdSchema.parse(worktreeId);
+    const requested = cloudAgentWorktreeIdSchema.parse(worktreeId);
     if (this.registration === null) return;
+    if (this.metadata !== null && this.metadata.workspace?.worktreeId !== requested) {
+      throw new Error('Worktree identity conflict');
+    }
     await this.enqueue(async () => {
       await this.tearDownSession();
     });
@@ -4546,6 +4569,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!parsed.success || parsed.data.sessionID !== this.registration?.spec.kiloSessionId) return;
     this.rootStatus = { type: parsed.data.status.type, settled: false };
     await this.ctx.storage.put(ROOT_STATUS_KEY, this.rootStatus);
+  }
+
+  /** A Kilo v2 rename of the root: its title against the source stored before this event. */
+  private nativeRootRename(event: {
+    type: string;
+    properties: Record<string, unknown>;
+  }): string | undefined {
+    const rootKiloSessionId = this.registration?.spec.kiloSessionId;
+    if (
+      rootKiloSessionId === undefined ||
+      event.type !== 'conversation.source' ||
+      event.properties.sessionID !== rootKiloSessionId
+    )
+      return undefined;
+    // persistConversationEvent drops a source that names another session, so it is no rename.
+    const title = nativeSessionTitle(event.properties.source, rootKiloSessionId);
+    if (title === undefined) return undefined;
+    const stored = this.eventQueries.findByEntityId(`conversation-source/${rootKiloSessionId}`);
+    const previous =
+      stored === null
+        ? undefined
+        : nativeSessionTitle(
+            readNativeEventPayload(stored.payload)?.properties.source,
+            rootKiloSessionId
+          );
+    return title === previous ? undefined : title;
   }
 
   private async settleRootStatus(): Promise<void> {

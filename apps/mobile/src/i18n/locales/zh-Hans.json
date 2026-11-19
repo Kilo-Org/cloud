@@ -57,6 +57,7 @@
     "link": "链接",
     "takingLonger": "用时比预期更长。你可以关闭此页面，稍后再查看。",
     "model": "模型",
+    "notSelected": "未选择",
     "accessDenied": "无权访问",
     "allRepositories": "全部仓库",
     "personal": "个人",
@@ -147,6 +148,7 @@
     "performance": "性能",
     "preferences": "偏好设置",
     "privacyPolicy": "隐私政策",
+    "termsOfService": "服务条款",
     "profile": "个人资料",
     "reactions": "表情回应",
     "recent": "最近",
@@ -216,8 +218,8 @@
     "verifyCode": "验证",
     "resendCode": "重新发送验证码",
     "termsPrefix": "继续即表示你同意我们的",
+    "termsInSentence": "服务条款",
     "terms": "条款",
-    "termsInSentence": "条款",
     "termsConnector": "和",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登录方式",
@@ -695,8 +697,9 @@
       "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "此组织的 Bitbucket 连接需在电脑上通过网页版进行管理。",
-      "description": "创建具有所需权限范围的工作区访问令牌，并粘贴到下方。",
+      "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
+      "description": "为 {{organization}} 创建工作区访问令牌，然后粘贴到下方。",
+      "descriptionReconnect": "为 {{organization}} 创建新的工作区访问令牌，然后粘贴到下方。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
       "tokenPlaceholder": "工作区访问令牌",
       "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
@@ -1605,6 +1608,8 @@
       "renameAccessibility": "重命名会话：{{title}}",
       "cloningSession": "正在克隆会话",
       "couldNotLoadThisSession": "无法加载此会话",
+      "historyTooLarge": "此会话的对话记录过大，无法加载。",
+      "historyUnavailable": "无法读取此会话的对话记录。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
       "notEnoughCredits": "额度不足，无法处理此请求。请充值后重试。",
       "previousTaskFinishing": "上一个任务正在收尾，请稍等。",
@@ -1681,6 +1686,7 @@
       "branchDefault": "默认",
       "branchAccessibility": "分支: {{label}}",
       "branchLoading": "正在加载分支",
+      "branchInactive": "选择一个仓库以加载其分支。",
       "branchLoadError": "无法加载分支",
       "branchUnavailable": "此仓库没有可用的分支。检查你在提供商处的访问权限，然后选择另一个仓库。",
       "branchEmpty": "没有可用的分支",
@@ -2461,6 +2467,7 @@
     "noSessions": "暂无已登录的设备",
     "noSessionsDescription": "在其他设备上登录 Kilo 应用后，即可在这里看到该设备。",
     "signedIn": "登录于 {{signedIn}} · 最后在线 {{lastSeen}}",
+    "signedInThisDevice": "登录于 {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "这里会显示来自 Kilo 应用、Kilo CLI 和浏览器的登录。编辑器的登录不会列出。",
     "thisDevice": "此设备",
     "webBrowser": "浏览器",
@@ -2483,7 +2490,6 @@
   },
   "home": {
     "couldNotLoadSessions": "无法加载会话。",
-    "couldNotLoadActiveSessions": "无法加载进行中的会话。",
     "agentSessions": "正在进行",
     "newCodingTask": "新建编程任务",
     "newTaskFromPicture": "从图片新建任务",
@@ -2593,6 +2599,11 @@
       "billingHistory": "账单记录",
       "billingHistoryEmpty": "暂无账单记录。",
       "billingHistoryError": "无法加载账单记录",
+      "billingRowInitial": "首次扣费 · {{tier}}",
+      "billingRowRenewal": "续费 · {{tier}}",
+      "billingRowSubscription": "订阅 · {{tier}}",
+      "billingRowTrial": "免费试用 · {{tier}}",
+      "billingRowUpgrade": "计划变更 · {{tier}}",
       "cancel": "取消订阅",
       "cancelDescription": "你的 Kilo Pass 将保持有效至当前计费周期结束，之后不再续订。",
       "cancelScheduled": "将于 {{date}} 取消",
@@ -2688,6 +2699,7 @@
     "revokeConsent": "撤销授权",
     "revokeConsentTitle": "撤销数据共享授权？",
     "acceptAndContinue": "同意并继续",
+    "loadingConsentSettings": "正在加载你的授权设置…",
     "decline": "拒绝",
     "declineAndSignOut": "拒绝并退出登录",
     "declineTitle": "拒绝数据共享？",
@@ -2800,7 +2812,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
       "gitlabReconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
       "bitbucketNotConnectedTitle": "尚未连接 Bitbucket",
-      "bitbucketAdminOnlyDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
+      "adminOnlyConnectDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
     },
@@ -2873,7 +2885,6 @@
       "submitReply": "提交回复",
       "termsAcceptRetry": "未能确认同意服务条款。请检查网络连接后重试。",
       "termsCopy": "年满 13 岁才能发布内容。",
-      "termsTitle": "服务条款",
       "threadAccessibilityLabel": "讨论串 {{anchorLabel}}",
       "unavailable": "无法查看讨论",
       "unavailableMessage": "此拉取请求可能已被删除。",
@@ -3409,7 +3420,8 @@
         "accounting_adjustment": "账务调整",
         "credits_expired": "额度已过期"
       },
-      "truncated": "还有更早的额度变动记录可供查看。"
+      "truncated": "还有更早的额度变动记录可供查看。",
+      "retentionLimit": "仅显示最近的额度变动记录。"
     },
     "hub": {
       "balance": "余额",
@@ -3454,7 +3466,8 @@
         "void": "已作废",
         "uncollectible": "无法收款"
       },
-      "truncated": "可查看更早的发票。"
+      "truncated": "可查看更早的发票。",
+      "retentionLimit": "仅显示最近的发票。"
     },
     "lowBalanceAlert": {
       "enableA11y": "启用余额不足提醒",
@@ -3533,6 +3546,7 @@
       "truncated": "该小时的请求数超出列表可显示的数量。",
       "emptyTitle": "该小时暂无请求",
       "emptyDescription": "使用“上一小时”查看更早的请求。",
+      "emptyBoundDescription": "请求日志最多只能追溯到此处。",
       "loadError": "无法加载请求日志。",
       "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
       "tokens": "输入 {{input}} · 输出 {{output}}",
@@ -3683,8 +3697,7 @@
     "imagesSectionEmpty": "暂无受信任的图片主机",
     "revoke": "撤销对 {{host}} 的信任",
     "revokeMessage": "指向此主机的链接将再次请求确认。",
-    "revokeImageMessage": "来自此主机的图片将再次请求确认。",
-    "backToPreferences": "返回偏好设置"
+    "revokeImageMessage": "来自此主机的图片将再次请求确认。"
   },
   "glanceable": {
     "waiting": "正在更新智能体状态",
@@ -3763,6 +3776,7 @@
   },
   "modelChat": {
     "offlineFailure": "此模型需要联网。请连接网络后重试，或切换到此设备上的模型。",
+    "connectionLost": "与模型的连接已断开。请检查网络连接后重试。",
     "empty": {
       "title": "开始聊天",
       "description": "发送消息以与模型聊天。"
@@ -3931,6 +3945,8 @@
       "downloading": "正在下载：{{written}} / {{total}}",
       "downloadingUnknown": "正在下载：{{written}}",
       "paused": "已暂停：{{written}} / {{total}}",
+      "retrying": "正在重试：{{written}} / {{total}}",
+      "retryingUnknown": "正在重试：{{written}}",
       "verifying": "正在检查下载的文件…",
       "downloaded": "已下载 · {{size}}",
       "url": "直接下载链接",
@@ -4021,7 +4037,9 @@
         "androidModelUnavailable": "此设备不支持 Gemini Nano，或 AICore 系统应用仍在设置中。请稍后再试。",
         "aicoreUpdateRequired": "请更新 AICore 应用和系统软件后再使用此模型。",
         "downloadable": "此模型需要先下载一次才能使用。",
-        "downloading": "模型正在下载，下载完成后即可使用。"
+        "downloading": "模型正在下载，下载完成后即可使用。",
+        "batteryQuota": "本机模型已用完当前的电池用量额度。请稍后再试。",
+        "checkFailed": "应用无法检查此模型。请重试。"
       },
       "unavailable": "本机模型目前不可用。请在“$t(modelChat.backends.title)”中查看其状态。",
       "busy": "本机模型正忙于生成另一条回复，请在其完成后再试。",
@@ -4184,6 +4202,7 @@
     "instructionsHint": "应用于使用此配置的每个会话的规则 markdown。",
     "instructionsEmpty": "尚无指令文件",
     "instructionsEmptyDescription": "添加使用此配置的每个会话都会应用的规则文件。",
+    "instructionsEmptyDescriptionReadOnly": "此处添加的规则文件会应用于使用此配置文件的每个会话。",
     "instructionNameRequired": "请输入文件名",
     "instructionNameTooLong": "文件名不得超过 {{max}} 个字符",
     "instructionNameInvalid": "以字母或数字开头，仅使用小写字母、数字和连字符",
@@ -4382,7 +4401,8 @@
       "purchaseFallback": "积分购买",
       "receipt": "收据",
       "receiptA11y": "打开 {{description}}，{{amount}}，{{date}} 的收据",
-      "receiptUnavailable": "此购买暂无可用收据。"
+      "receiptUnavailable": "此购买暂无可用收据。",
+      "retentionLimit": "仅显示最近的积分记录。"
     },
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
@@ -4527,6 +4547,7 @@
     "summary": "AI 摘要",
     "summaryPending": "AI 摘要生成中，完成后将附在此处。",
     "summaryUnavailable": "AI 摘要不可用。你的结构化简报仍可查看。",
+    "summaryNotAdmitted": "AI 摘要未为本简报生成。你的结构化简报仍可查看。",
     "summaryCharge": "AI 已收费 {{cost}}",
     "summaryChargePending": "AI 费用待核对",
     "summaryModel": "$t(common.model)：{{model}}",
@@ -4611,7 +4632,7 @@
     "topFeatures": "常用功能",
     "emptyTitle": "此期间无用量",
     "unavailableTitle": "用量不可用",
-    "unavailableDescription": "此工作区未报告用量。重试不会有帮助。",
+    "unavailableDescription": "此工作区尚未设置用量。如果认为此处应显示用量，请联系支持团队。",
     "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
     "viewDetails": "查看用量详情"
   },
@@ -4619,7 +4640,7 @@
     "title": "集成",
     "sectionTitle": "已连接的服务",
     "entrySubtitle": "GitHub、Slack、Linear 等",
-    "subtitle": "将你的开发工具和工作流连接到 Kilo",
+    "subtitle": "将你的开发工具和工作流连接到 Kilo。",
     "disconnect": "断开连接",
     "disconnectTitle": "要断开 {{provider}} 的连接吗？",
     "disconnectMessage": "Kilo 将不再在 {{provider}} 中响应。你可以随时重新连接。",
@@ -4629,6 +4650,9 @@
     "couldNotLoad": "无法加载集成",
     "permissionDenied": "你没有管理这些集成的权限。",
     "managedByOwner": "请联系组织所有者更改你无法更改的连接。",
+    "managedByOwnerOrAdmin": "请让组织所有者或管理员更改你无法更改的连接。",
+    "managedByOwnerOrBilling": "请让组织所有者或账单管理员更改你无法更改的连接。",
+    "managedByOwnerAdminOrBilling": "请让组织所有者、管理员或账单管理员更改你无法更改的连接。",
     "connectFailed": "无法打开连接页面"
   },
   "invoices": {
@@ -4665,7 +4689,7 @@
       "new": "新建触发器",
       "create": "创建触发器",
       "emptyTitle": "还没有触发器",
-      "emptyDescription": "创建触发器，以便通过 Webhook 调用或按计划启动 Cloud Agent 运行。",
+      "emptyDescription": "创建你的第一个触发器。",
       "loadFailedTitle": "无法加载触发器",
       "loadFailedDescription": "请在连接可用后重试。",
       "detailLoadFailedTitle": "无法加载此触发器",
@@ -4688,7 +4712,6 @@
       "nameLocked": "创建触发器后，名称无法更改。",
       "repositoryLocked": "创建触发器后，仓库无法更改。",
       "environmentAutomatic": "按仓库自动选择",
-      "notSelected": "未选择",
       "profileDefaults": "使用默认值",
       "profileHelp": "配置文件设置会在触发器运行时生效，其密钥届时解析。",
       "customAgent": "自定义智能体",

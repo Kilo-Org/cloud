@@ -34,10 +34,18 @@ function toEffective(profile: AgentProfileListItem): EffectiveAgentProfile {
  * "personal default > org default > none").
  *
  * `overrideProfileId` is the profile the user picked for this task. When it is
- * null the effective default resolves as before; when it names a profile it
- * replaces the default in the top layer; when it no longer resolves the hook
- * reports `overrideNeedsAttention` and returns no id to submit, so a stale pick
- * is never sent.
+ * null the effective default resolves as before. When it names a profile that
+ * the read resolves, that profile replaces the default in the top layer and the
+ * create submits it. The pick has three states the caller can tell apart:
+ *
+ *   - a pick that resolves: `resolvedOverrideProfileId` carries its id, so the
+ *     form shows the same profile the create submits;
+ *   - a pick that no longer resolves after a successful read: the hook reports
+ *     `overrideNeedsAttention` and returns no id, so a stale pick is never sent
+ *     and Start stays enabled on the default;
+ *   - a pick whose read settled with an error: the pick cannot be confirmed, so
+ *     the hook returns no id, reports `overrideNeedsAttention`, and the caller's
+ *     profile gate blocks Start until the retry resolves the pick.
  */
 export function useEffectiveAgentProfile(
   organizationId?: string,
@@ -109,8 +117,12 @@ export function useEffectiveAgentProfile(
     [allProfiles, effectiveDefaultId, overrideProfileId]
   );
 
-  // A failed profile query must not leak a cached profile into the form: the
-  // error row is shown and Start submits with no effective profile id.
+  // A failed profile read never leaks a cached profile into the form: `profile`
+  // and `profileId` stay null, so the error row is what the Environment row
+  // shows. With no pick the create submits no id and the server applies its
+  // default. With a pick the pick cannot be confirmed, so `overrideNeedsAttention`
+  // reports it and the caller's profile gate blocks Start until the retry
+  // resolves the read.
   const profile = query.isError ? null : (picker.topProfile ?? picker.baseProfile);
   const profileId = query.isError ? null : picker.selectedProfileId;
 
@@ -120,10 +132,12 @@ export function useEffectiveAgentProfile(
     allProfiles,
     effectiveDefaultId,
     effectiveDefaultProfile,
-    // The user's explicit pick, echoed for the picker's selected row.
-    selectedProfileId: overrideProfileId ?? null,
-    hasOverride: query.isError ? false : picker.hasOverride,
-    overrideNeedsAttention: query.isError ? false : picker.overrideNeedsAttention,
+    /** The pick the create will submit, or null when nothing picked resolves. */
+    resolvedOverrideProfileId:
+      query.isError || !picker.hasOverride ? null : (picker.topProfile?.id ?? null),
+    overrideNeedsAttention: query.isError
+      ? overrideProfileId != null
+      : picker.overrideNeedsAttention,
     // Gate on `isPending`, not `isLoading`: in React Query v5 `isLoading` is
     // `isPending && isFetching`, so a paused (offline) first fetch has
     // `isLoading: false` while still unsettled. `isPending` stays true until

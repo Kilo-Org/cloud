@@ -22,14 +22,10 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 vi.mock('@/components/ui/icons', () => ({
-  Columns2: () => null,
   Rows3: () => null,
 }));
 
-vi.mock('@/components/ui/radio-group', () => ({
-  RadioGroup: 'RadioGroup',
-  radioItemA11y: () => ({}),
-}));
+vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-is-tablet', () => ({ useIsTablet: () => false }));

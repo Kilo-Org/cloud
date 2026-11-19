@@ -79,6 +79,8 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
+  RefreshCw: 'RefreshCw',
   Check: 'Check',
   Cloud: 'Cloud',
   Info: 'Info',
@@ -92,6 +94,7 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: createContext('') };
 });
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#666',
   useThemeColors: () => ({
     foreground: '#000',
     mutedForeground: '#666',

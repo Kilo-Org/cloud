@@ -54,9 +54,17 @@ export function pressPressable(root: ReactTestInstance, label: string): void {
 }
 
 export function findButton(root: ReactTestInstance, label: string): ReactTestInstance {
-  const button = findAll(root, 'Button').find(node => node.props.accessibilityLabel === label);
+  // A `Button`/`StateAction` wins over the header's `IconButton`: a create
+  // control opens the form, and the form's own commit carries the same label.
+  const button = [...findAll(root, 'Button'), ...findAll(root, 'StateAction')].find(
+    node => node.props.label === label || node.props.accessibilityLabel === label
+  );
   if (!button) {
-    throw new Error(`button ${label} was not rendered`);
+    const icon = findAll(root, 'Pressable').find(node => node.props.accessibilityLabel === label);
+    if (!icon) {
+      throw new Error(`button ${label} was not rendered`);
+    }
+    return icon;
   }
   return button;
 }

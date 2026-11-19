@@ -13,10 +13,11 @@
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { act } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
 
-import { EmptyState } from './empty-state';
+import { EmptyState, StateAction } from './empty-state';
 
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
 
@@ -37,8 +38,20 @@ vi.mock('@/components/centered-state-band', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ SearchX: 'SearchX' }));
+vi.mock('@/components/ui/button', () => ({
+  Button: (props: {
+    accessibilityLabel?: string;
+    accessibilityState?: { busy?: boolean };
+    onPress?: () => void;
+    children?: ReactNode;
+  }) => createElement('Button', props),
+}));
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#777777' }),
+  useThemeColors: () => ({ mutedForeground: '#777777', primaryForeground: '#ffffff' }),
+  useMutedDisabledInk: () => '#777777',
 }));
 
 const action = createElement('Button', null, 'Clear search');
@@ -55,10 +68,15 @@ async function mount() {
       action={action}
     />
   );
-  // The `CenteredState` mock renders its children; the state's own body is the
-  // outermost host it renders, and it carries the gap classes.
+  // The `CenteredState` mock renders its children; the state's body is the
+  // surface, and the stack inside it carries the gap classes the short band
+  // tightens.
   const content = mounted.renderer.root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'View'
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      /(?:^|\s)gap-[24](?:\s|$)/.test(node.props.className)
   )[0] as Host | undefined;
   if (!content) {
     throw new Error('the empty state body did not render');
@@ -126,6 +144,45 @@ describe('EmptyState in a centered band', () => {
 });
 
 const ICON_BUBBLE_CLASS = 'h-14 w-14';
+
+async function bodyFor(props: Partial<Parameters<typeof EmptyState>[0]>) {
+  const mounted = await renderWithProviders(
+    <EmptyState icon={SearchX} title="Nothing here" description="Nothing to show." {...props} />
+  );
+  const content = mounted.renderer.root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'View'
+  )[0] as Host | undefined;
+  if (!content) {
+    throw new Error('the empty state body did not render');
+  }
+  const { className } = content.props;
+  mounted.unmount();
+  return className;
+}
+
+describe('EmptyState page gutter', () => {
+  // One rule for every caller: the state owns the 14pt gutter only where it is
+  // the full-bleed content of its surface. A state laid out inside a body, a
+  // card or a list header that already insets must draw none — its own inset
+  // put the copy at 28pt, and callers were cancelling it with `px-0`.
+  it('draws the gutter for a centered state, whose surface does not', async () => {
+    expect(await bodyFor({})).toContain('px-4');
+  });
+
+  it('draws no gutter for a state the caller lays out in a body', async () => {
+    expect(await bodyFor({ placement: 'top' })).not.toContain('px-4');
+    expect(await bodyFor({ placement: 'static' })).not.toContain('px-4');
+  });
+
+  it('draws the gutter for a top state that is its surface full-bleed content', async () => {
+    expect(await bodyFor({ placement: 'top', inset: 'gutter' })).toContain('px-4');
+    expect(await bodyFor({ placement: 'static', inset: 'gutter' })).toContain('px-4');
+  });
+
+  it('leaves the gutter to a centered state the container already insets', async () => {
+    expect(await bodyFor({ inset: 'none' })).not.toContain('px-4');
+  });
+});
 
 function presentationEmptyState(compact: boolean) {
   return (
@@ -211,5 +268,87 @@ describe('EmptyState presentation', () => {
     expect(mounted.renderer.root.findAllByType(SearchX)).toHaveLength(0);
     assertKeptContent(mounted);
     mounted.unmount();
+  });
+});
+
+// A state action's busy state is the same action mid-flight: the label stays
+// drawn and only the leading icon becomes the spinner, so a retry never
+// collapses to a ring and the reader can still tell what is running. The
+// control announces the wait and admits no press until it clears.
+async function mountAction(loading?: boolean) {
+  const onPress = vi.fn<() => void>();
+  const mounted = await renderWithProviders(
+    <StateAction label="Try again" icon={SearchX} onPress={onPress} loading={loading} />
+  );
+  const button = mounted.renderer.root.findAllByType('Button')[0];
+  if (!button) {
+    throw new Error('the state action rendered no button');
+  }
+  const accessibilityState = button.props.accessibilityState as unknown;
+  return {
+    mounted,
+    button,
+    onPress,
+    busy:
+      typeof accessibilityState === 'object' &&
+      accessibilityState !== null &&
+      'busy' in accessibilityState &&
+      accessibilityState.busy === true,
+    drawsLabel: mounted.renderer.root.findAllByType('Text').some(node => {
+      const { children } = node.props;
+      return typeof children === 'string' && children === 'Try again';
+    }),
+  };
+}
+
+describe('StateAction busy', () => {
+  it('draws its icon and label and admits the press while it is idle', async () => {
+    const { mounted, button, onPress, busy, drawsLabel } = await mountAction();
+
+    expect(mounted.renderer.root.findAllByType(SearchX)).toHaveLength(1);
+    expect(mounted.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+    expect(drawsLabel).toBe(true);
+    expect(busy).toBe(false);
+
+    const props = button.props as { onPress?: () => void };
+    act(() => {
+      props.onPress?.();
+    });
+    expect(onPress).toHaveBeenCalledOnce();
+    mounted.unmount();
+  });
+
+  it('keeps the label and replaces only the icon while it is busy', async () => {
+    const { mounted, button, onPress, busy, drawsLabel } = await mountAction(true);
+
+    expect(mounted.renderer.root.findAllByType(SearchX)).toHaveLength(0);
+    expect(mounted.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
+    expect(drawsLabel).toBe(true);
+    expect(busy).toBe(true);
+    // The busy control keeps its face: nothing dims or hides the label.
+    expect(String(button.props.className)).not.toContain('opacity');
+
+    const props = button.props as { onPress?: () => void };
+    act(() => {
+      props.onPress?.();
+    });
+    expect(onPress).not.toHaveBeenCalled();
+    mounted.unmount();
+  });
+
+  it('paints the mark in the ink of the face the action is showing', async () => {
+    // Busy keeps the enabled face, so the spinner takes the label's own ink on
+    // the brand fill; the muted ink belongs to the disabled face's muted fill.
+    const busyAction = await renderWithProviders(
+      <StateAction label="Try again" icon={SearchX} onPress={() => undefined} loading />
+    );
+    expect(busyAction.renderer.root.findByType('ActivityIndicator').props.color).toBe('#ffffff');
+    busyAction.unmount();
+
+    const disabledAction = await renderWithProviders(
+      <StateAction label="Try again" icon={SearchX} onPress={() => undefined} disabled />
+    );
+    expect(disabledAction.renderer.root.findByType(SearchX).props.color).toBe('#777777');
+    disabledAction.unmount();
   });
 });

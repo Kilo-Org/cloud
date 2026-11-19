@@ -57,6 +57,7 @@
     "link": "Link",
     "takingLonger": "Das dauert länger als erwartet. Du kannst diese Ansicht schließen und später erneut nachsehen.",
     "model": "Modell",
+    "notSelected": "Nicht ausgewählt",
     "accessDenied": "Zugriff verweigert",
     "allRepositories": "Alle Code-Repositories",
     "personal": "Persönlich",
@@ -147,6 +148,7 @@
     "performance": "Leistung",
     "preferences": "Einstellungen",
     "privacyPolicy": "Datenschutzerklärung",
+    "termsOfService": "Nutzungsbedingungen",
     "profile": "Profil",
     "reactions": "Reaktionen",
     "recent": "Zuletzt",
@@ -216,8 +218,8 @@
     "verifyCode": "Code bestätigen",
     "resendCode": "Code erneut senden",
     "termsPrefix": "Wenn du fortfährst, akzeptierst du unsere ",
-    "terms": "Nutzungsbedingungen",
     "termsInSentence": "Nutzungsbedingungen",
+    "terms": "Nutzungsbedingungen",
     "termsConnector": " und ",
     "termsSuffix": ".",
     "moreSignInOptions": "Weitere Anmeldeoptionen",
@@ -576,14 +578,14 @@
     },
     "category": {
       "agentAttentionTitle": "Der Agent braucht dich",
-      "agentAttentionSubtitle": "fragen, Berechtigungsanfragen und erforderliche Eingaben",
+      "agentAttentionSubtitle": "Fragen, Berechtigungsanfragen und erforderliche Eingaben",
       "agentUpdatesTitle": "Neuigkeiten vom Agenten",
-      "agentUpdatesSubtitle": "nachrichten des Agenten während der Bearbeitung",
+      "agentUpdatesSubtitle": "Nachrichten des Agenten während der Bearbeitung",
       "sessionStatusTitle": "Sitzungsstatus",
-      "sessionStatusSubtitle": "beendet / fehlgeschlagen / bereit zur Steuerung",
-      "balanceAlertsSubtitle": "warnungen bei niedrigem Organisationsguthaben",
+      "sessionStatusSubtitle": "Beendet / fehlgeschlagen / bereit zur Steuerung",
+      "balanceAlertsSubtitle": "Warnungen bei niedrigem Organisationsguthaben",
       "balanceAlertsUnavailable": "Tritt einer Organisation bei, um Guthabenwarnungen zu erhalten.",
-      "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen",
+      "securityFindingsSubtitle": "Neue Sicherheitsbefunde und SLA-Erinnerungen",
       "securityFindingsUnavailable": "Aktiviere den Kilo-Sicherheitsagenten in einem Bereich, um Sicherheitsbefunde zu erhalten.",
       "spendAlertsSubtitle": "Schwellenwertüberschreitungen und stündliche Spitzen",
       "spendAlertsToggle": "Kategorie „Ausgaben-Warnungen“"
@@ -695,8 +697,9 @@
       "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Die Bitbucket-Verbindung dieser Organisation wird im Web über einen Computer verwaltet.",
-      "description": "Erstelle ein Workspace-Zugriffstoken mit den erforderlichen Berechtigungen und füge es unten ein.",
+      "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
+      "description": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
+      "descriptionReconnect": "Erstelle ein neues Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "scopes": "Konto: Lesen · Repositories: Lesen/Schreiben · Pull-Requests: Lesen · Webhooks: Lesen/Schreiben",
       "tokenPlaceholder": "Workspace-Zugriffstoken",
       "tokenRefused": "Bitbucket hat dieses Workspace-Zugriffstoken nicht akzeptiert. Prüfe, ob es die oben genannten Berechtigungen enthält, und versuche es dann erneut."
@@ -1605,6 +1608,8 @@
       "renameAccessibility": "Sitzung umbenennen: {{title}}",
       "cloningSession": "Sitzung wird geklont",
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
+      "historyTooLarge": "Das Protokoll dieser Sitzung ist zum Laden zu groß.",
+      "historyUnavailable": "Das Protokoll dieser Sitzung kann nicht gelesen werden.",
       "cloneFailedRetry": "Diese Sitzung konnte nicht geklont werden. Versuche es erneut.",
       "notEnoughCredits": "Dein Guthaben reicht für diese Anfrage nicht aus. Lade Guthaben auf und versuche es erneut.",
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
@@ -1681,6 +1686,7 @@
       "branchDefault": "Standard",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Branches werden geladen",
+      "branchInactive": "Wähle ein Repository aus, um seine Branches zu laden.",
       "branchLoadError": "Branches konnten nicht geladen werden",
       "branchUnavailable": "Für dieses Repository sind keine Branches verfügbar. Prüfe deinen Zugriff beim Anbieter und wähle dann ein anderes Repository.",
       "branchEmpty": "Keine Branches verfügbar",
@@ -2461,6 +2467,7 @@
     "noSessions": "Keine aktiven Sitzungen",
     "noSessionsDescription": "Melde dich auf einem anderen Gerät in der Kilo-App an. Das Gerät erscheint dann hier.",
     "signedIn": "Angemeldet: {{signedIn}} · Zuletzt aktiv: {{lastSeen}}",
+    "signedInThisDevice": "Angemeldet: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Hier erscheinen Anmeldungen über die Kilo-App, die Kilo CLI und einen Webbrowser. Editor-Anmeldungen werden nicht aufgeführt.",
     "thisDevice": "Dieses Gerät",
     "viewProfile": "Profil ansehen",
@@ -2483,7 +2490,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Die Sitzungen konnten nicht geladen werden.",
-    "couldNotLoadActiveSessions": "Die aktiven Sitzungen konnten nicht geladen werden.",
     "agentSessions": "Jetzt aktiv",
     "newCodingTask": "Neue Programmieraufgabe",
     "newTaskFromPicture": "Neue Aufgabe aus einem Bild",
@@ -2593,6 +2599,11 @@
       "billingHistory": "Abrechnungsverlauf",
       "billingHistoryEmpty": "Noch kein Abrechnungsverlauf.",
       "billingHistoryError": "Abrechnungsverlauf konnte nicht geladen werden",
+      "billingRowInitial": "Erste Zahlung · {{tier}}",
+      "billingRowRenewal": "Verlängerung · {{tier}}",
+      "billingRowSubscription": "Abonnement · {{tier}}",
+      "billingRowTrial": "Kostenlose Testphase · {{tier}}",
+      "billingRowUpgrade": "Tarifwechsel · {{tier}}",
       "cancel": "Abo kündigen",
       "cancelDescription": "Dein Kilo Pass bleibt bis zum Ende des Abrechnungszeitraums aktiv und wird nicht verlängert.",
       "cancelScheduled": "Endet am {{date}}",
@@ -2688,6 +2699,7 @@
     "revokeConsent": "Einwilligung widerrufen",
     "revokeConsentTitle": "Einwilligung zur Datenweitergabe widerrufen?",
     "acceptAndContinue": "Akzeptieren und fortfahren",
+    "loadingConsentSettings": "Deine Einwilligungseinstellungen werden geladen…",
     "decline": "Ablehnen",
     "declineAndSignOut": "Ablehnen und abmelden",
     "declineTitle": "Datenweitergabe ablehnen?",
@@ -2800,7 +2812,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
       "gitlabReconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
       "bitbucketNotConnectedTitle": "Bitbucket ist nicht verbunden",
-      "bitbucketAdminOnlyDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
+      "adminOnlyConnectDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
     },
@@ -2873,7 +2885,6 @@
       "submitReply": "Antwort senden",
       "termsAcceptRetry": "Die Nutzungsbedingungen konnten nicht akzeptiert werden. Prüfe deine Verbindung und versuche es erneut.",
       "termsCopy": "Du musst mindestens 13 Jahre alt sein, um Beiträge zu veröffentlichen.",
-      "termsTitle": "Nutzungsbedingungen",
       "threadAccessibilityLabel": "Diskussionsthread {{anchorLabel}}",
       "unavailable": "Die Diskussion ist nicht verfügbar.",
       "unavailableMessage": "Dieser Pull-Request wurde möglicherweise entfernt.",
@@ -3409,7 +3420,8 @@
         "accounting_adjustment": "Buchhaltungskorrektur",
         "credits_expired": "Verfallenes Guthaben"
       },
-      "truncated": "Es sind ältere Guthabenbewegungen verfügbar."
+      "truncated": "Es sind ältere Guthabenbewegungen verfügbar.",
+      "retentionLimit": "Es werden die neuesten Guthabenbewegungen angezeigt."
     },
     "hub": {
       "balance": "Guthaben",
@@ -3454,7 +3466,8 @@
         "void": "Storniert",
         "uncollectible": "Uneinbringlich"
       },
-      "truncated": "Ältere Rechnungen sind verfügbar."
+      "truncated": "Ältere Rechnungen sind verfügbar.",
+      "retentionLimit": "Es werden die neuesten Rechnungen angezeigt."
     },
     "lowBalanceAlert": {
       "enableA11y": "Warnung bei niedrigem Guthaben aktivieren",
@@ -3533,6 +3546,7 @@
       "truncated": "Diese Stunde enthält mehr Anfragen, als die Liste anzeigt.",
       "emptyTitle": "Keine Anfragen in dieser Stunde",
       "emptyDescription": "Tippe auf „Frühere Stunde“, um frühere Anfragen anzuzeigen.",
+      "emptyBoundDescription": "Weiter zurück reichen die Anfrageprotokolle nicht.",
       "loadError": "Anfrage-Logs konnten nicht geladen werden.",
       "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Anfrage-Logs einsehen.",
       "tokens": "{{input}} ein · {{output}} aus",
@@ -3683,8 +3697,7 @@
     "imagesSectionEmpty": "Keine vertrauenswürdigen Bild-Hosts",
     "revoke": "Vertrauen in {{host}} widerrufen",
     "revokeMessage": "Links zu diesem Host fragen künftig wieder nach einer Bestätigung.",
-    "revokeImageMessage": "Bilder von diesem Host fragen künftig wieder nach einer Bestätigung.",
-    "backToPreferences": "Zurück zu den Einstellungen"
+    "revokeImageMessage": "Bilder von diesem Host fragen künftig wieder nach einer Bestätigung."
   },
   "glanceable": {
     "waiting": "Agenten werden aktualisiert",
@@ -3763,6 +3776,7 @@
   },
   "modelChat": {
     "offlineFailure": "Dieses Modell benötigt eine Internetverbindung. Stelle eine Verbindung her und versuche es erneut, oder wechsle zu einem Modell auf diesem Gerät.",
+    "connectionLost": "Die Verbindung zum Modell wurde unterbrochen. Prüfe deine Verbindung und versuche es erneut.",
     "empty": {
       "title": "Chat starten",
       "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."
@@ -3931,6 +3945,8 @@
       "downloading": "Wird heruntergeladen: {{written}} von {{total}}",
       "downloadingUnknown": "Wird heruntergeladen: {{written}}",
       "paused": "Pausiert: {{written}} von {{total}}",
+      "retrying": "Erneuter Versuch: {{written}} von {{total}}",
+      "retryingUnknown": "Erneuter Versuch: {{written}}",
       "verifying": "Die heruntergeladene Datei wird überprüft…",
       "downloaded": "Heruntergeladen · {{size}}",
       "url": "Direkter Download-Link",
@@ -4021,7 +4037,9 @@
         "androidModelUnavailable": "Dieses Gerät unterstützt Gemini Nano nicht, oder die System-App AICore wird noch eingerichtet. Versuche es später erneut.",
         "aicoreUpdateRequired": "Aktualisiere die AICore-App und deine Systemsoftware, um dieses Modell zu nutzen.",
         "downloadable": "Dieses Modell muss einmalig heruntergeladen werden, bevor du es nutzen kannst.",
-        "downloading": "Das Modell wird heruntergeladen. Es ist einsatzbereit, sobald der Download abgeschlossen ist."
+        "downloading": "Das Modell wird heruntergeladen. Es ist einsatzbereit, sobald der Download abgeschlossen ist.",
+        "batteryQuota": "Das Modell auf dem Gerät hat sein Batteriekontingent vorerst ausgeschöpft. Versuche es später erneut.",
+        "checkFailed": "Die App konnte dieses Modell nicht prüfen. Versuche es erneut."
       },
       "unavailable": "Das Modell auf dem Gerät ist gerade nicht verfügbar. Prüfe seinen Status unter $t(modelChat.backends.title).",
       "busy": "Das Modell auf dem Gerät erstellt gerade eine andere Antwort. Versuche es erneut, wenn es fertig ist.",
@@ -4184,6 +4202,7 @@
     "instructionsHint": "Regeln als Markdown, angewendet auf jede Sitzung mit diesem Profil.",
     "instructionsEmpty": "Noch keine Anweisungsdateien",
     "instructionsEmptyDescription": "Füge Regeldateien hinzu, die jede Sitzung mit diesem Profil anwendet.",
+    "instructionsEmptyDescriptionReadOnly": "Hier hinzugefügte Regeldateien gelten für jede Sitzung, die dieses Profil verwendet.",
     "instructionNameRequired": "Gib einen Dateinamen ein",
     "instructionNameTooLong": "Der Dateiname darf höchstens {{max}} Zeichen haben",
     "instructionNameInvalid": "Beginne mit Buchstabe oder Ziffer, nur Kleinbuchstaben, Ziffern und Bindestriche",
@@ -4382,7 +4401,8 @@
       "purchaseFallback": "Credit-Kauf",
       "receipt": "Beleg",
       "receiptA11y": "Beleg für {{description}}, {{amount}}, vom {{date}} öffnen",
-      "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar."
+      "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar.",
+      "retentionLimit": "Es wird der neueste Credit-Verlauf angezeigt."
     },
     "title": "Guthaben kaufen",
     "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",
@@ -4527,6 +4547,7 @@
     "summary": "AI-Zusammenfassung",
     "summaryPending": "AI-Zusammenfassung wird erstellt. Sie erscheint hier, sobald sie fertig ist.",
     "summaryUnavailable": "AI-Zusammenfassung nicht verfügbar. Dein strukturiertes Briefing ist weiterhin verfügbar.",
+    "summaryNotAdmitted": "AI-Zusammenfassung wurde für dieses Briefing nicht erstellt. Dein strukturiertes Briefing ist weiterhin verfügbar.",
     "summaryCharge": "AI-Kosten: {{cost}}",
     "summaryChargePending": "AI-Kosten werden noch abgerechnet",
     "summaryModel": "$t(common.model): {{model}}",
@@ -4611,7 +4632,7 @@
     "topFeatures": "Top-Funktionen",
     "emptyTitle": "Keine Nutzung in diesem Zeitraum",
     "unavailableTitle": "Nutzung nicht verfügbar",
-    "unavailableDescription": "Dieser Workspace meldet keine Nutzung. Erneutes Versuchen hilft nicht.",
+    "unavailableDescription": "Die Nutzungserfassung ist für diesen Workspace nicht eingerichtet. Wende dich an den Kundendienst, wenn du hier Nutzungsdaten erwartest.",
     "orgSelfNotice": "Du siehst deine eigene Nutzung in dieser Organisation.",
     "viewDetails": "Nutzungsdetails anzeigen"
   },
@@ -4619,7 +4640,7 @@
     "title": "Integrationen",
     "sectionTitle": "Verbundene Dienste",
     "entrySubtitle": "GitHub, Slack, Linear und mehr",
-    "subtitle": "Verbinde deine Entwicklungstools und Workflows mit Kilo",
+    "subtitle": "Verbinde deine Entwicklungstools und Workflows mit Kilo.",
     "disconnect": "Trennen",
     "disconnectTitle": "{{provider}} trennen?",
     "disconnectMessage": "Kilo reagiert dann nicht mehr in {{provider}}. Du kannst die Verbindung jederzeit wiederherstellen.",
@@ -4629,6 +4650,9 @@
     "couldNotLoad": "Integrationen konnten nicht geladen werden",
     "permissionDenied": "Du hast keine Berechtigung, diese Integrationen zu verwalten.",
     "managedByOwner": "Bitte einen Inhaber der Organisation, eine Verbindung zu ändern, die du nicht ändern kannst.",
+    "managedByOwnerOrAdmin": "Bitte einen Inhaber der Organisation oder Admin, eine Verbindung zu ändern, die du nicht ändern kannst.",
+    "managedByOwnerOrBilling": "Bitte einen Inhaber der Organisation oder Abrechnungsmanager, eine Verbindung zu ändern, die du nicht ändern kannst.",
+    "managedByOwnerAdminOrBilling": "Bitte einen Inhaber der Organisation, Admin oder Abrechnungsmanager, eine Verbindung zu ändern, die du nicht ändern kannst.",
     "connectFailed": "Die Verbindungsseite konnte nicht geöffnet werden"
   },
   "invoices": {
@@ -4665,7 +4689,7 @@
       "new": "Neuer Auslöser",
       "create": "Auslöser erstellen",
       "emptyTitle": "Noch keine Auslöser",
-      "emptyDescription": "Erstelle einen Auslöser, um einen Lauf von Cloud Agent per Webhook-Aufruf oder nach Zeitplan zu starten.",
+      "emptyDescription": "Erstelle deinen ersten Auslöser.",
       "loadFailedTitle": "Auslöser konnten nicht geladen werden",
       "loadFailedDescription": "Versuche es erneut, wenn du eine Verbindung hast.",
       "detailLoadFailedTitle": "Dieser Auslöser konnte nicht geladen werden",
@@ -4688,7 +4712,6 @@
       "nameLocked": "Der Name kann nach dem Erstellen des Auslösers nicht geändert werden.",
       "repositoryLocked": "Das Repository kann nach dem Erstellen des Auslösers nicht geändert werden.",
       "environmentAutomatic": "Automatisch je Repository",
-      "notSelected": "Nicht ausgewählt",
       "profileDefaults": "Standardwerte verwenden",
       "profileHelp": "Die Einstellungen des Profils gelten, wenn der Auslöser ausgeführt wird. Seine Geheimnisse werden dann aufgelöst.",
       "customAgent": "Benutzerdefinierter Agent",

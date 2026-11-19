@@ -22,9 +22,9 @@ import {
   loadLocalAgentStatus,
 } from '@/src/shared/local-agents/status';
 import type { LocalAgentEndpointStatus } from '@/src/shared/local-agents/status';
+import { createSerialAsyncChain } from '@/src/shared/serial-async-chain';
 import { setLocalAgentsEnabled } from './local-agent-toggle';
 import { deriveLocalAgentsSettingsView } from './local-agents-settings-state';
-import { createSerialAsyncChain } from './model-preferences-state';
 import { SettingsToggle } from './workflow-settings';
 
 const SWITCH_LABEL = 'Allow local agents';
@@ -54,17 +54,20 @@ const secondaryButtonClass =
 const PERMISSION_WAIT_MS = 2000;
 
 /**
- * Requests the optional nativeMessaging permission from the toggle's own user
- * gesture. A refusal or a prompt nobody answers is not an error: the native
- * endpoint reports `host_missing` and the loopback endpoint still works.
+ * Requests the two optional permissions from the toggle's own user gesture:
+ * `nativeMessaging` for the native host and `downloads`, which the browser
+ * cannot grant at install time without disabling the extension for every
+ * existing user. A refusal or a prompt nobody answers is not an error: the
+ * native endpoint reports `host_missing`, the loopback endpoint still works,
+ * and the agent's download guard falls back to cancelling at the response.
  */
-const requestNativeMessagingPermission = async (): Promise<void> => {
+const requestLocalAgentPermissions = async (): Promise<void> => {
   const settled = Promise.withResolvers<void>();
   const timer = setTimeout(settled.resolve, PERMISSION_WAIT_MS);
 
   try {
     await Promise.race([
-      browser.permissions.request({ permissions: ['nativeMessaging'] }),
+      browser.permissions.request({ permissions: ['downloads', 'nativeMessaging'] }),
       settled.promise,
     ]);
   } catch {
@@ -146,7 +149,7 @@ export const LocalAgentsSettings = (): JSX.Element => {
       try {
         await setLocalAgentsEnabled({
           next,
-          requestPermission: requestNativeMessagingPermission,
+          requestPermission: requestLocalAgentPermissions,
           storage,
         });
       } catch {

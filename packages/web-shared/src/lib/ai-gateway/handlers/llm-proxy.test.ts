@@ -233,7 +233,7 @@ jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => (
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
-  getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
+  getDirectByokModel: jest.fn(async () => null),
   supportsCatalogMode: jest.fn(() => false),
   createDirectByokReferenceResolver: jest.fn(async () => async (modelId: string) => modelId),
 }));
@@ -672,6 +672,88 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
     });
     expect(mockedGetProvider).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  describe('Cloud Agent runtime proxy keep-alive', () => {
+    const runtimeToken = jwt.sign(
+      {
+        version: KILO_TOKEN_VERSION,
+        kiloUserId: 'user-123',
+        apiTokenPepper: 'test-pepper',
+        aud: KILO_GATEWAY_AUDIENCE,
+        runtimeAuthorization: {
+          id: '11111111-1111-4111-8111-111111111111',
+          resourceKind: 'cloud-agent-next',
+          resourceId: 'workspace_123',
+        },
+      },
+      NEXTAUTH_SECRET,
+      { algorithm: 'HS256' }
+    );
+    const user = { id: 'user-123', google_user_email: 'test@example.com' } as User;
+
+    /** Mirrors `getUserFromAuth`, which passes its attestation check to the token validation. */
+    function setRuntimeTokenAuth(runtimeProxyAttestationVerified: boolean) {
+      mockedGetUserFromAuth.mockImplementation(async options => {
+        const validation = validateAuthorizationHeader(
+          new Headers({ authorization: `Bearer ${runtimeToken}` }),
+          { expectedAudience: options.expectedAudience, runtimeProxyAttestationVerified }
+        );
+        if ('error' in validation) {
+          return {
+            user: null,
+            authFailedResponse: new Response(validation.error, { status: 401 }),
+            credentialsRejected: isRejectedCredentialReason(validation.reason),
+            organizationId: undefined,
+          } as AuthResult;
+        }
+        return {
+          user,
+          authFailedResponse: null,
+          cloudAgentRuntimeProxied: validation.cloudAgentRuntimeProxied,
+        };
+      });
+    }
+
+    async function send() {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      return handleLlmProxyRequest(
+        makeRequest(makeBody(), { authorization: `Bearer ${runtimeToken}` }) as never
+      );
+    }
+
+    it('rejects a runtime bearer without a verified attestation before any upstream call', async () => {
+      setRuntimeTokenAuth(false);
+
+      const response = await send();
+
+      expect(response.status).toBe(401);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+    });
+
+    it('turns on the first-byte keep-alive for an attested runtime bearer', async () => {
+      setRuntimeTokenAuth(true);
+
+      const response = await send();
+
+      expect(response.status).toBe(200);
+      expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ keepAliveUntilFirstByte: true })
+      );
+    });
+
+    it('leaves the keep-alive off for every other caller', async () => {
+      setUserAuth();
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ keepAliveUntilFirstByte: false })
+      );
+    });
   });
 
   it('retains verified gateway-token identity through the provider path', async () => {
@@ -2364,9 +2446,8 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
     it.each([
       ['the organization model deny list', 'organization_model'],
+      ['an organization provider restriction', 'organization_provider'],
       ['a missing group grant', 'no_grant'],
-      ['a group model restriction', 'group_model'],
-      ['a group provider restriction', 'group_provider'],
     ] as const)(
       'keeps denying a model excluded by %s through a Vercel BYOK inference provider key',
       async (_name, denialSource) => {
@@ -3373,7 +3454,7 @@ describe('organization data-collection policy on provider-policy exempt routes',
 describe('kilo-auto/efficient classifier billing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
+    mockedGetDirectByokModel.mockResolvedValue(null);
     mockedSupportsCatalogMode.mockReturnValue(false);
     mockedCreateDirectByokReferenceResolver.mockResolvedValue(async modelId => modelId);
     setUserAuth();
@@ -3843,7 +3924,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
     mockedGetEffectiveModelDecision.mockResolvedValue({
       allowed: false,
-      denialSource: 'group_model',
+      denialSource: 'no_grant',
     });
     mockedApplyResolvedAutoModel.mockImplementation(async params => {
       const isCandidateAllowed = params.isAutoFreeCandidateAllowed;
@@ -4237,7 +4318,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       });
       mockedGetEffectiveModelDecision.mockResolvedValue({
         allowed: false,
-        denialSource: 'group_model',
+        denialSource: 'no_grant',
       });
       mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
@@ -4382,7 +4463,7 @@ describe('custom routers and signed auto decisions', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
+    mockedGetDirectByokModel.mockResolvedValue(null);
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
@@ -7485,7 +7566,13 @@ describe('Enkrypt input guardrail', () => {
 
       expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
         [expect.objectContaining({ decision: 'allowed', addedLatencyMs: expect.any(Number) })],
-        [expect.objectContaining({ decision: 'error', creditsCost: 3, addedLatencyMs: null })],
+        [
+          expect.objectContaining({
+            decision: 'error',
+            creditsCost: 3,
+            addedLatencyMs: expect.any(Number),
+          }),
+        ],
       ]);
     });
 
@@ -7517,7 +7604,7 @@ describe('Enkrypt input guardrail', () => {
         await runAfterTasks();
         expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
           [expect.objectContaining({ decision, addedLatencyMs: expect.any(Number) })],
-          [expect.objectContaining({ decision: 'allowed', addedLatencyMs: null })],
+          [expect.objectContaining({ decision: 'allowed', addedLatencyMs: expect.any(Number) })],
         ]);
       }
     );

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '@/lib/auth/auth-context';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -24,5 +25,8 @@ export function useOrganizationsList() {
   return useQuery({
     ...trpc.organizations.list.queryOptions(),
     enabled: token != null,
+    // The boundary waits on this first read; a paused one keeps it from
+    // reaching its offline/error branch.
+    ...SETTLE_WHILE_OFFLINE,
   });
 }

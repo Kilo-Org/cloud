@@ -556,6 +556,15 @@ export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set
 }
 
 /**
+ * One catalog, flattened by tag. The English read and the per-locale loop both
+ * decode through here, so a change to how a catalog is read has one place to
+ * land; each caller keeps its own handling of a refused or malformed file.
+ */
+function readCatalog(tag, localesDir = LOCALES_DIR) {
+  return flattenCatalog(JSON.parse(readFileSync(join(localesDir, `${tag}.json`), 'utf8')));
+}
+
+/**
  * The English catalog, flattened. A caller that cannot read English gets one
  * problem line and skips only the checks that need English: a read the
  * filesystem refuses, or a file JSON.parse rejects, leaves the rest of the
@@ -563,10 +572,7 @@ export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set
  */
 export function readEnglishCatalog(localesDir = LOCALES_DIR) {
   try {
-    return {
-      catalog: flattenCatalog(JSON.parse(readFileSync(join(localesDir, 'en.json'), 'utf8'))),
-      problems: [],
-    };
+    return { catalog: readCatalog('en', localesDir), problems: [] };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { catalog: null, problems: [`en: cannot audit catalog: ${message}`] };
@@ -664,9 +670,7 @@ function run() {
       let catalog;
       let missing;
       try {
-        catalog = flattenCatalog(
-          JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8'))
-        );
+        catalog = readCatalog(tag);
         missing = missingPluralCategories(english, catalog, tag);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

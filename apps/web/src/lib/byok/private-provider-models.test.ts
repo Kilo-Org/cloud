@@ -251,22 +251,32 @@ describe('parseByokPrivateProviderModelsResponse', () => {
     'sora-2',
     'gpt-4o-transcribe',
     'gpt-4o-realtime-preview',
-    'gpt-4o-audio-preview',
     'gpt-realtime',
+    'gpt-realtime-mini',
+    'gpt-4o-mini-transcribe',
     'cohere/embed-english-v3.0',
     'nomic-embed-text',
   ])('skips %s, whose id names a model that cannot chat', id => {
     expect(parseByokPrivateProviderModelsResponse({ data: [{ id }] })).toEqual([]);
   });
 
-  test.each(['gpt-5.5', 'gpt-4o-mini', 'o3', 'claude-sonnet-5', 'llama-3.3-70b', 'embedded-chat'])(
-    'keeps %s',
-    id => {
-      expect(
-        parseByokPrivateProviderModelsResponse({ data: [{ id }] }).map(m => m.internal_id)
-      ).toEqual([id]);
-    }
-  );
+  test.each([
+    'gpt-5.5',
+    'gpt-4o-mini',
+    'o3',
+    'claude-sonnet-5',
+    'llama-3.3-70b',
+    'embedded-chat',
+    'gpt-audio-1.5',
+    'gpt-audio',
+    'gpt-audio-mini',
+    'gpt-4o-audio-preview',
+    'gpt-4o-mini-audio-preview',
+  ])('keeps %s', id => {
+    expect(
+      parseByokPrivateProviderModelsResponse({ data: [{ id }] }).map(m => m.internal_id)
+    ).toEqual([id]);
+  });
 
   test('trusts an explicit chat signal over the id', () => {
     const models = parseByokPrivateProviderModelsResponse({

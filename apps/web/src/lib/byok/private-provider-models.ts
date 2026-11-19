@@ -28,11 +28,12 @@ const CHAT_MODEL_TYPES = new Set(['chat', 'completion', 'language', 'llm', 'text
 
 /**
  * Ids of models that cannot serve chat requests. Providers such as OpenAI list them without any
- * type information, so the id is the only signal left.
+ * type information, so the id is the only signal left. Audio chat models such as `gpt-audio` and
+ * `gpt-4o-audio-preview` do serve Chat Completions and are kept.
  */
 const NON_CHAT_MODEL_ID_PATTERNS = [
   /(^|[/:._-])(text-embedding|embed|embedding|embeddings|tts|whisper|dall-e|gpt-image|moderation|omni-moderation|davinci|babbage|sora|transcribe|rerank)(?![a-z])/,
-  /-(realtime|audio-preview|audio|transcribe|tts)(-|$)/,
+  /-(realtime|transcribe|tts)(-|$)/,
 ];
 
 type JsonObject = Record<string, unknown>;

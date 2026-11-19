@@ -1028,7 +1028,10 @@
     "tabs": {
       "overview": "Vista xeral",
       "files": "Ficheiros",
-      "discussion": "Conversa"
+      "discussion": "Conversa",
+      "discussionAccessibility_one": "{{title}}: 1 comentario",
+      "discussionAccessibility": "{{title}}: {{displayCount}} comentarios",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} comentarios"
     },
     "fileStatus": {
       "modified": "Modificado",
@@ -1225,7 +1228,7 @@
     },
     "instructions": {
       "title": "Instrucións personalizadas",
-      "deprecation": "Está previsto deixar de admitir as instrucións personalizadas. Traslada estas pautas a un ficheiro REVIEW.md do teu repositorio.",
+      "deprecation": "As instrucións personalizadas vanse eliminar. Traslada estas pautas a un ficheiro REVIEW.md do teu repositorio.",
       "placeholder": "p. ex.: aplicar as nosas convencións de xestión de erros…",
       "clearTitle": "Eliminar as instrucións personalizadas?",
       "clearMessage": "Gardar un campo baleiro elimina as instrucións personalizadas almacenadas para este revisor."
@@ -1391,6 +1394,7 @@
       "managedOnWeb": "A conexión de Bitbucket con {{organization}} xestiónase na web desde un ordenador.",
       "description": "Crea un token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
       "descriptionReconnect": "Crea un novo token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
+      "descriptionOverview": "Crea un token de acceso ao espazo de traballo para {{organization}} e pégao na seguinte pantalla.",
       "scopes": "Conta: lectura · Repositorios: lectura/escritura · Solicitudes de cambios: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso ao espazo de traballo",
       "tokenRefused": "Bitbucket non aceptou este token do espazo de traballo. Comproba que ten os ámbitos indicados arriba e téntao de novo."
@@ -3185,6 +3189,8 @@
     "retryHint": "Volve consultar o estado de Kilo Pass.",
     "endedOn": "Rematado o {{date}}",
     "notAvailableInApp": "Kilo Pass non está dispoñible na aplicación.",
+    "notAvailableTitle": "Kilo Pass non se ofrece na aplicación",
+    "noPassDescription": "Esta conta non ten Kilo Pass.",
     "statusActive": "Activo",
     "statusTrialing": "En proba",
     "statusPastDue": "Pagamento atrasado",
@@ -3467,7 +3473,7 @@
       "retentionLimit": "Mostrando as facturas máis recentes."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Activar a alerta de saldo baixo",
+      "subtitle": "Envía unha alerta por correo aos enderezos que indiques cando o saldo desta organización baixe da cantidade que establezas.",
       "notifyEmailsLabel": "Enderezos para as notificacións",
       "permissionDenied": "Non tes permiso para xestionar alertas de facturación.",
       "separateEmailsHint": "Se introduces varios enderezos de correo, sepáraos con comas.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "Para rematar de crear a túa conta, usa \"$t(login.moreSignInOptions)\".",
     "signupStepUpApple": "Para rematar de crear a túa conta, usa \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "Para rematar de crear a túa conta, usa \"$t(login.signInWithGoogle)\".",
-    "invalidCode": "Ese código é incorrecto. Téntao de novo.",
+    "signupStepUpBack": "Para rematar de crear a túa conta, volve atrás e usa \"$t(login.moreSignInOptions)\".",
+    "invalidCode": "Ese código é incorrecto ou caducou. Téntao de novo ou usa \"$t(login.resendCode)\".",
     "codeInProgress": "O teu código está a procesarse. Agarda un momento e téntao de novo.",
     "tooManyAttempts": "Demasiados intentos. Solicita un código novo.",
     "invalidToken": "Fallou o inicio de sesión. Téntao de novo.",
@@ -4536,6 +4543,7 @@
     "empty": "Sen actividade nesta xanela do informe",
     "emptyHint": "As túas sesións de programación na nube e na CLI aparecerán aquí cando un informe programado teña actividade.",
     "loadError": "Non se puideron cargar os informes",
+    "estimateLoadError": "Non se puido cargar a estimación.",
     "view": "Ler informe",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Función empresarial",
-    "enterpriseOnly": "Esta é unha función exclusiva para empresas.",
+    "enterpriseOnly": "Os provedores e os modelos están dispoñibles no plan Enterprise.",
     "readOnly": "Só os propietarios e administradores da organización poden cambiar estes axustes.",
     "loadError": "Non se puideron cargar os provedores e os modelos",
     "tabModels": "Modelos",

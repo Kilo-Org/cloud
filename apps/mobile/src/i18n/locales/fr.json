@@ -639,7 +639,7 @@
     },
     "instructions": {
       "title": "Instructions personnalisées",
-      "deprecation": "L'obsolescence des instructions personnalisées est prévue. Déplacez plutôt ces consignes dans un fichier REVIEW.md de votre dépôt.",
+      "deprecation": "Les instructions personnalisées vont être supprimées. Déplacez plutôt ces consignes dans un fichier REVIEW.md de votre dépôt.",
       "placeholder": "ex. : respecter nos conventions de gestion des erreurs…",
       "clearTitle": "Supprimer les instructions personnalisées ?",
       "clearMessage": "L'enregistrement d'un champ vide supprime les instructions personnalisées stockées pour ce réviseur."
@@ -670,6 +670,7 @@
       "managedOnWeb": "La connexion Bitbucket à {{organization}} se gère sur le web, depuis un ordinateur.",
       "description": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "descriptionReconnect": "Créez un nouveau jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
+      "descriptionOverview": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le sur l'écran suivant.",
       "scopes": "Compte : lecture · Dépôts : lecture/écriture · Demandes de fusion : lecture · Webhooks : lecture/écriture",
       "tokenPlaceholder": "Jeton d'accès à l'espace de travail",
       "tokenRefused": "Bitbucket n'a pas accepté ce jeton d'accès à l'espace de travail. Vérifiez qu'il dispose des autorisations ci-dessus, puis réessayez."
@@ -1308,7 +1309,7 @@
       "githubAppSettings": "Paramètres de l'application GitHub",
       "manageAccess": "Gérer l'accès de l'application GitHub",
       "noRepositories": "Aucun dépôt",
-      "noRepositoriesDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts",
+      "noRepositoriesDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts.",
       "selectAtLeastOne": "Sélectionnez au moins un dépôt."
     },
     "scopeEntry": {
@@ -2592,6 +2593,8 @@
     "retryHint": "Actualise à nouveau l'état de Kilo Pass.",
     "endedOn": "Terminé le {{date}}",
     "notAvailableInApp": "Kilo Pass n'est pas disponible dans l'application.",
+    "notAvailableTitle": "Kilo Pass n'est pas proposé dans l'application",
+    "noPassDescription": "Ce compte n'a pas de Kilo Pass.",
     "statusActive": "Actif",
     "statusTrialing": "Période d'essai",
     "statusPastDue": "Paiement en retard",
@@ -3298,6 +3301,10 @@
     },
     "tabs": {
       "discussion": "Échanges",
+      "discussionAccessibility": "{{title}}: {{displayCount}} commentaires",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} commentaires",
+      "discussionAccessibility_one": "{{title}}: 1 commentaire",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} commentaires",
       "files": "Fichiers",
       "overview": "Aperçu"
     },
@@ -3531,7 +3538,7 @@
       "retentionLimit": "Affichage des factures les plus récentes."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Activer l'alerte de solde faible",
+      "subtitle": "Envoyez une alerte par e-mail aux adresses indiquées lorsque le solde de cette organisation passe sous le montant défini.",
       "notifyEmailsLabel": "Adresses e-mail à prévenir",
       "permissionDenied": "Vous n'avez pas l'autorisation de gérer les alertes de facturation.",
       "separateEmailsHint": "Séparez les adresses e-mail par des virgules.",
@@ -3710,7 +3717,8 @@
     "signupStepUp": "Pour finaliser la création de votre compte, utilisez « $t(login.moreSignInOptions) ».",
     "signupStepUpApple": "Pour finaliser la création de votre compte, utilisez « $t(login.signInWithApple) ».",
     "signupStepUpGoogle": "Pour finaliser la création de votre compte, utilisez « $t(login.signInWithGoogle) ».",
-    "invalidCode": "Ce code est incorrect. Veuillez réessayer.",
+    "signupStepUpBack": "Pour finaliser la création de votre compte, revenez en arrière et utilisez « $t(login.moreSignInOptions) ».",
+    "invalidCode": "Ce code est incorrect ou a expiré. Réessayez ou utilisez « $t(login.resendCode) ».",
     "codeInProgress": "Votre code est en cours de traitement. Attendez un instant et réessayez.",
     "tooManyAttempts": "Trop de tentatives. Veuillez demander un nouveau code.",
     "invalidToken": "Échec de la connexion. Réessayez.",
@@ -4608,6 +4616,7 @@
     "empty": "Aucune activité dans cette fenêtre de briefing",
     "emptyHint": "Vos sessions de code cloud et CLI apparaissent ici lorsqu’un briefing planifié a de l’activité.",
     "loadError": "Impossible de charger les briefings",
+    "estimateLoadError": "Impossible de charger l’estimation.",
     "view": "Lire le briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view) : $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5017,7 +5026,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fonctionnalité Enterprise",
-    "enterpriseOnly": "Cette fonctionnalité est réservée à l'offre Enterprise.",
+    "enterpriseOnly": "Les fournisseurs et modèles sont disponibles avec l'offre Enterprise.",
     "readOnly": "Seuls les propriétaires et administrateurs de l'organisation peuvent modifier ces paramètres.",
     "loadError": "Impossible de charger les fournisseurs et modèles",
     "tabModels": "Modèles",

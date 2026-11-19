@@ -1028,7 +1028,10 @@
     "tabs": {
       "overview": "አጠቃላይ እይታ",
       "files": "ፋይሎች",
-      "discussion": "ውይይት"
+      "discussion": "ውይይት",
+      "discussionAccessibility_one": "{{title}}: 1 አስተያየት",
+      "discussionAccessibility": "{{title}}: {{displayCount}} አስተያየቶች",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} አስተያየቶች"
     },
     "fileStatus": {
       "modified": "ተቀይሯል",
@@ -1225,7 +1228,7 @@
     },
     "instructions": {
       "title": "ብጁ መመሪያዎች",
-      "deprecation": "ብጁ መመሪያዎችን የመጠቀም ባህሪ ከአገልግሎት ሊወጣ ታቅዷል። በምትኩ እነዚህን መመሪያዎች በማከማቻዎ ውስጥ ወዳለ REVIEW.md ፋይል ያዛውሩ።",
+      "deprecation": "ብጁ መመሪያዎችን የመጠቀም ባህሪ ይወገዳል። በምትኩ እነዚህን መመሪያዎች በማከማቻዎ ውስጥ ወዳለ REVIEW.md ፋይል ያዛውሩ።",
       "placeholder": "ለምሳሌ፦ የስህተት አያያዝ መመሪያዎቻችን መከበራቸውን ያረጋግጡ…",
       "clearTitle": "ብጁ መመሪያዎችን ማስወገድ ይፈልጋሉ?",
       "clearMessage": "ባዶውን መስክ ማስቀመጥ ለዚህ ገምጋሚ የተከማቹትን ብጁ መመሪያዎች ይሰርዛል።"
@@ -1391,6 +1394,7 @@
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
       "description": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
       "descriptionReconnect": "ለ{{organization}} አዲስ የሥራ ቦታ መዳረሻ ቶከን እንደገና ይፍጠሩና ከታች ይለጥፉት።",
+      "descriptionOverview": "ለ{{organization}} የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና በሚቀጥለው ማያ ገጽ ላይ ይለጥፉት።",
       "scopes": "መለያ፦ ማንበብ · ማከማቻዎች፦ ማንበብ/መጻፍ · የኮድ ውህደት ጥያቄዎች፦ ማንበብ · ዌብሁኮች፦ ማንበብ/መጻፍ",
       "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን",
       "tokenRefused": "Bitbucket ይህን የሥራ ቦታ ቶከን አልተቀበለውም። ከላይ ያሉት አስፈላጊ ፈቃዶች እንዳሉት ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
@@ -3185,6 +3189,8 @@
     "retryHint": "የKilo Pass ሁኔታን ለማግኘት እንደገና ይሞክራል።",
     "endedOn": "በ{{date}} ተጠናቋል",
     "notAvailableInApp": "Kilo Pass በመተግበሪያው ውስጥ አይገኝም።",
+    "notAvailableTitle": "Kilo Pass በመተግበሪያው ውስጥ የለም",
+    "noPassDescription": "ይህ መለያ Kilo Pass የለውም።",
     "statusActive": "ንቁ",
     "statusTrialing": "በሙከራ ላይ",
     "statusPastDue": "ክፍያ ዘግይቷል",
@@ -3467,7 +3473,7 @@
       "retentionLimit": "የቅርብ ጊዜ ደረሰኞችን በማሳየት ላይ።"
     },
     "lowBalanceAlert": {
-      "enableA11y": "የዝቅተኛ ቀሪ ሂሳብ ማንቂያን ያንቁ",
+      "subtitle": "የዚህ ድርጅት ቀሪ ሂሳብ ካስቀመጡት መጠን በታች ሲወርድ ለዘረዘሯቸው አድራሻዎች በኢሜይል ማንቂያ ላክ።",
       "notifyEmailsLabel": "ማንቂያ የሚላክላቸው ኢሜይሎች",
       "permissionDenied": "የክፍያ ማንቂያዎችን ለማስተዳደር ፈቃድ የለዎትም።",
       "separateEmailsHint": "ብዙ የኢሜይል አድራሻዎችን በነጠላ ሰረዝ ይለዩ።",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "መለያህን መፍጠር ለመጨረስ '$t(login.moreSignInOptions)'ን ተጠቀም።",
     "signupStepUpApple": "መለያህን መፍጠር ለመጨረስ '$t(login.signInWithApple)'ን ተጠቀም።",
     "signupStepUpGoogle": "መለያህን መፍጠር ለመጨረስ '$t(login.signInWithGoogle)'ን ተጠቀም።",
-    "invalidCode": "ያ ኮድ ትክክል አይደለም። እንደገና ሞክር።",
+    "signupStepUpBack": "መለያህን መፍጠር ለመጨረስ ወደ ኋላ ተመለስና '$t(login.moreSignInOptions)'ን ተጠቀም።",
+    "invalidCode": "ያ ኮድ ትክክል አይደለም ወይም ጊዜው አልፎበታል። እንደገና ሞክር ወይም '$t(login.resendCode)'ን ተጠቀም።",
     "codeInProgress": "ኮድህ እየተሠራበት ነው። ትንሽ ጠብቅና እንደገና ሞክር።",
     "tooManyAttempts": "በጣም ብዙ ሙከራዎች ተደርገዋል። አዲስ ኮድ ጠይቅ።",
     "invalidToken": "መግባት አልተሳካም። እባክህ እንደገና ሞክር።",
@@ -4536,6 +4543,7 @@
     "empty": "በዚህ የሪፖርት ጊዜ ውስጥ እንቅስቃሴ የለም",
     "emptyHint": "የክላውድ እና CLI ኮዲንግ ክፍለ ጊዜዎችዎ የመርሃ ግብር ሪፖርት እንቅስቃሴ ሲኖረው እዚህ ይታያሉ።",
     "loadError": "ሪፖርቶችን መጫን አልተቻለም",
+    "estimateLoadError": "ግምቱን መጫን አልተቻለም።",
     "view": "ሪፖርቱን አንብብ",
     "viewWithPreview": "$t(agentBriefing.view)። {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}፣ $t(agentBriefing.snapshotPullRequests) {{pullRequests}}፣ $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "የኢንተርፕራይዝ ባህሪ",
-    "enterpriseOnly": "ይህ ለኢንተርፕራይዝ ብቻ የሆነ ባህሪ ነው።",
+    "enterpriseOnly": "አቅራቢዎች እና ሞዴሎች በኢንተርፕራይዝ ፕላን ይገኛሉ።",
     "readOnly": "እነዚህን ቅንብሮች መቀየር የሚችሉት የድርጅቱ ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
     "loadError": "አቅራቢዎችን እና ሞዴሎችን መጫን አልተቻለም",
     "tabModels": "ሞዴሎች",

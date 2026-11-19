@@ -671,7 +671,7 @@
     },
     "instructions": {
       "title": "Eigen instructies",
-      "deprecation": "De functie voor aangepaste instructies wordt op termijn uitgefaseerd. Verplaats deze richtlijnen naar een REVIEW.md-bestand in je repository.",
+      "deprecation": "De functie voor aangepaste instructies wordt verwijderd. Verplaats deze richtlijnen naar een REVIEW.md-bestand in je repository.",
       "placeholder": "bijvoorbeeld: onze afspraken over foutafhandeling controleren…",
       "clearTitle": "Eigen instructies verwijderen?",
       "clearMessage": "Door een leeg veld op te slaan worden de eigen instructies verwijderd die voor deze reviewer zijn opgeslagen."
@@ -702,6 +702,7 @@
       "managedOnWeb": "De Bitbucket-verbinding voor {{organization}} wordt via het web op een computer beheerd.",
       "description": "Maak voor {{organization}} een toegangstoken voor de werkruimte en plak het hieronder.",
       "descriptionReconnect": "Maak voor {{organization}} een nieuw toegangstoken voor de werkruimte en plak het hieronder.",
+      "descriptionOverview": "Maak voor {{organization}} een toegangstoken voor de werkruimte en plak het op het volgende scherm.",
       "scopes": "Vereiste rechten: account lezen, repositories lezen en schrijven, PR's lezen en webhooks lezen en schrijven.",
       "tokenPlaceholder": "Toegangstoken voor de werkruimte",
       "tokenRefused": "Bitbucket heeft dit toegangstoken voor de werkruimte niet geaccepteerd. Controleer of het de rechten hierboven heeft en probeer het daarna opnieuw."
@@ -2631,6 +2632,8 @@
     "retryHint": "Haalt de Kilo Pass-status opnieuw op.",
     "endedOn": "Beëindigd op {{date}}",
     "notAvailableInApp": "Kilo Pass is niet beschikbaar in de app.",
+    "notAvailableTitle": "Kilo Pass zit niet in de app",
+    "noPassDescription": "Dit account heeft geen Kilo Pass.",
     "statusActive": "Actief",
     "statusTrialing": "Proefperiode",
     "statusPastDue": "Achterstallige betaling",
@@ -3240,6 +3243,9 @@
     },
     "tabs": {
       "discussion": "Discussie",
+      "discussionAccessibility": "{{title}}: {{displayCount}} opmerkingen",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} opmerkingen",
+      "discussionAccessibility_one": "{{title}}: 1 opmerking",
       "files": "Bestanden",
       "overview": "Overzicht"
     },
@@ -3472,7 +3478,7 @@
       "retentionLimit": "De meest recente facturen worden weergegeven."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Waarschuwing voor laag saldo inschakelen",
+      "subtitle": "Stuur een waarschuwing per e-mail naar de opgegeven adressen wanneer het saldo van deze organisatie onder het ingestelde bedrag zakt.",
       "notifyEmailsLabel": "E-mailadressen voor meldingen",
       "permissionDenied": "Je hebt geen toestemming om factureringswaarschuwingen te beheren.",
       "separateEmailsHint": "Scheid meerdere e-mailadressen met komma's.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "Gebruik '$t(login.moreSignInOptions)' om het aanmaken van je account te voltooien.",
     "signupStepUpApple": "Gebruik '$t(login.signInWithApple)' om het aanmaken van je account te voltooien.",
     "signupStepUpGoogle": "Gebruik '$t(login.signInWithGoogle)' om het aanmaken van je account te voltooien.",
-    "invalidCode": "Die code is onjuist. Probeer het opnieuw.",
+    "signupStepUpBack": "Ga terug en gebruik '$t(login.moreSignInOptions)' om het aanmaken van je account te voltooien.",
+    "invalidCode": "Die code is onjuist of verlopen. Probeer het opnieuw of gebruik '$t(login.resendCode)'.",
     "codeInProgress": "Je code wordt verwerkt. Wacht even en probeer het opnieuw.",
     "tooManyAttempts": "Te veel pogingen. Vraag een nieuwe code aan.",
     "invalidToken": "Aanmelden is mislukt. Probeer het opnieuw.",
@@ -4536,6 +4543,7 @@
     "empty": "Geen activiteit in dit briefingvenster",
     "emptyHint": "Je cloud- en CLI-codeersessies verschijnen hier wanneer een geplande briefing activiteit heeft.",
     "loadError": "Briefings konden niet worden geladen",
+    "estimateLoadError": "De schatting kon niet worden geladen.",
     "view": "Briefing lezen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Functie voor ondernemingen",
-    "enterpriseOnly": "Deze functie is alleen beschikbaar voor ondernemingen.",
+    "enterpriseOnly": "Aanbieders en modellen zijn beschikbaar in het Enterprise-abonnement.",
     "readOnly": "Alleen eigenaren en beheerders van de organisatie kunnen deze instellingen wijzigen.",
     "loadError": "Aanbieders en modellen konden niet worden geladen",
     "tabModels": "Modellen",

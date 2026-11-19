@@ -1028,7 +1028,10 @@
     "tabs": {
       "overview": "Ülevaade",
       "files": "Failid",
-      "discussion": "Arutelu"
+      "discussion": "Arutelu",
+      "discussionAccessibility_one": "{{title}}: 1 kommentaar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentaari",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentaari"
     },
     "fileStatus": {
       "modified": "Muudetud",
@@ -1225,7 +1228,7 @@
     },
     "instructions": {
       "title": "Kohandatud juhised",
-      "deprecation": "Kohandatud juhiste funktsioon on kavas kasutuselt kõrvaldada. Tõsta need juhised oma hoidla faili REVIEW.md.",
+      "deprecation": "Kohandatud juhiste funktsioon eemaldatakse. Tõsta need juhised oma hoidla faili REVIEW.md.",
       "placeholder": "nt meie veakäsitluse reeglite järgimine…",
       "clearTitle": "Kas eemaldada kohandatud juhised?",
       "clearMessage": "Tühja välja salvestamine kustutab sellele retsensendile salvestatud kohandatud juhised."
@@ -1391,6 +1394,7 @@
       "managedOnWeb": "Bitbucketi ühendust {{organization}}-ga hallatakse arvutis veebi kaudu.",
       "description": "Loo tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
       "descriptionReconnect": "Loo uus tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
+      "descriptionOverview": "Loo tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see järgmisel ekraanil.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
       "tokenPlaceholder": "Tööruumi juurdepääsutunnus",
       "tokenRefused": "Bitbucket ei võtnud seda tööruumi juurdepääsutunnust vastu. Kontrolli, et sellel oleksid ülaltoodud õigused, ja proovi seejärel uuesti."
@@ -3185,6 +3189,8 @@
     "retryHint": "Proovib Kilo Passi olekut uuesti laadida.",
     "endedOn": "Lõppenud {{date}}",
     "notAvailableInApp": "Kilo Pass ei ole rakenduses saadaval.",
+    "notAvailableTitle": "Kilo Pass pole rakenduses",
+    "noPassDescription": "Sellel kontol puudub Kilo Pass.",
     "statusActive": "Aktiivne",
     "statusTrialing": "Prooviperioodil",
     "statusPastDue": "Makse tähtaeg ületatud",
@@ -3467,7 +3473,7 @@
       "retentionLimit": "Kuvatakse kõige hiljutisemad arved."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Luba madala saldo hoiatus",
+      "subtitle": "Saada e-posti teel hoiatus sinu määratud aadressidele, kui selle organisatsiooni saldo langeb alla sinu seatud summa.",
       "notifyEmailsLabel": "Teavituste e-posti aadressid",
       "permissionDenied": "Sul puudub õigus arveldusteavitusi hallata.",
       "separateEmailsHint": "Eralda e-posti aadressid komadega.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "Konto loomise lõpetamiseks kasuta valikut „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithGoogle)“.",
-    "invalidCode": "See kood on vale. Proovi uuesti.",
+    "signupStepUpBack": "Konto loomise lõpetamiseks mine tagasi ja kasuta valikut „$t(login.moreSignInOptions)“.",
+    "invalidCode": "See kood on vale või aegunud. Proovi uuesti või kasuta valikut „$t(login.resendCode)“.",
     "codeInProgress": "Sinu koodi töödeldakse. Oota hetk ja proovi uuesti.",
     "tooManyAttempts": "Liiga palju katseid. Küsi uus kood.",
     "invalidToken": "Sisselogimine ebaõnnestus. Proovi uuesti.",
@@ -4536,6 +4543,7 @@
     "empty": "Selles ülevaatevahemikus tegevust pole",
     "emptyHint": "Sinu pilve- ja CLI-koodimisseansid ilmuvad siia, kui ajastatud ülevaates on tegevust.",
     "loadError": "Ülevaateid ei õnnestunud laadida",
+    "estimateLoadError": "Hinnangut ei õnnestunud laadida.",
     "view": "Loe ülevaadet",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise-funktsioon",
-    "enterpriseOnly": "See funktsioon on saadaval ainult Enterprise-paketiga.",
+    "enterpriseOnly": "Teenusepakkujad ja mudelid on saadaval Enterprise'i paketis.",
     "readOnly": "Neid sätteid saavad muuta ainult organisatsiooni omanikud ja administraatorid.",
     "loadError": "Teenusepakkujaid ja mudeleid ei õnnestunud laadida",
     "tabModels": "Mudelid",

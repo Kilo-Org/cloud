@@ -1028,7 +1028,10 @@
     "tabs": {
       "overview": "Umumiy ko'rinish",
       "files": "Fayllar",
-      "discussion": "Muhokama"
+      "discussion": "Muhokama",
+      "discussionAccessibility_one": "{{title}}: 1 izoh",
+      "discussionAccessibility": "{{title}}: {{displayCount}} ta izoh",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} ta izoh"
     },
     "fileStatus": {
       "modified": "O'zgartirildi",
@@ -1225,7 +1228,7 @@
     },
     "instructions": {
       "title": "Maxsus ko‘rsatmalar",
-      "deprecation": "Maxsus ko'rsatmalar funksiyasini bekor qilish rejalashtirilgan. Bu ko'rsatmalarni repozitoriyangizdagi REVIEW.md fayliga ko'chiring.",
+      "deprecation": "Maxsus ko'rsatmalar funksiyasi olib tashlanadi. Bu ko'rsatmalarni repozitoriyangizdagi REVIEW.md fayliga ko'chiring.",
       "placeholder": "masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…",
       "clearTitle": "Maxsus ko‘rsatmalar olib tashlansinmi?",
       "clearMessage": "Bo'sh maydonni saqlash ushbu ko'rib chiquvchi uchun saqlangan maxsus ko'rsatmalarni o'chiradi."
@@ -1391,6 +1394,7 @@
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
       "description": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "descriptionReconnect": "{{organization}} uchun yangi ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
+      "descriptionOverview": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni keyingi ekranda joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
       "tokenPlaceholder": "Ish maydoniga kirish tokeni",
       "tokenRefused": "Bitbucket bu ish maydoniga kirish tokenini qabul qilmadi. U yuqoridagi ruxsatlarga ega ekanligini tekshirib, qayta urinib ko'ring."
@@ -3185,6 +3189,8 @@
     "retryHint": "Kilo Pass holatini qayta yuklashga urinadi.",
     "endedOn": "Yakunlandi: {{date}}",
     "notAvailableInApp": "Kilo Pass ilovada mavjud emas.",
+    "notAvailableTitle": "Kilo Pass ilovada yo'q",
+    "noPassDescription": "Bu hisobda Kilo Pass yo'q.",
     "statusActive": "Faol",
     "statusTrialing": "Sinov muddati",
     "statusPastDue": "To'lov muddati o'tgan",
@@ -3467,7 +3473,7 @@
       "retentionLimit": "Eng so'nggi hisob-fakturalar ko'rsatilmoqda."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Balans kamayishi haqida ogohlantirishni yoqish",
+      "subtitle": "Bu tashkilot balansi siz belgilagan miqdordan pastga tushganda, siz ko'rsatgan manzillarga email orqali ogohlantirish yuborish.",
       "notifyEmailsLabel": "Xabar yuboriladigan manzillar",
       "permissionDenied": "To'lov ogohlantirishlarini boshqarishga ruxsatingiz yo'q.",
       "separateEmailsHint": "Elektron pochta manzillarini vergul bilan ajrating.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "Hisob yaratishni yakunlash uchun '$t(login.moreSignInOptions)' dan foydalaning.",
     "signupStepUpApple": "Hisob yaratishni yakunlash uchun '$t(login.signInWithApple)' dan foydalaning.",
     "signupStepUpGoogle": "Hisob yaratishni yakunlash uchun '$t(login.signInWithGoogle)' dan foydalaning.",
-    "invalidCode": "Bu kod noto‘g‘ri. Iltimos, qayta urinib ko‘ring.",
+    "signupStepUpBack": "Hisob yaratishni yakunlash uchun orqaga qayting va '$t(login.moreSignInOptions)' dan foydalaning.",
+    "invalidCode": "Bu kod noto‘g‘ri yoki muddati o‘tgan. Qayta urinib ko‘ring yoki '$t(login.resendCode)' dan foydalaning.",
     "codeInProgress": "Kodingiz tekshirilmoqda. Biroz kuting va qayta urinib ko'ring.",
     "tooManyAttempts": "Juda ko'p urinish bo'ldi. Yangi kod so'rang.",
     "invalidToken": "Hisobga kirib bo‘lmadi. Qayta urinib ko‘ring.",
@@ -4536,6 +4543,7 @@
     "empty": "Bu brifing davrida faoliyat yo‘q",
     "emptyHint": "Bulut va CLI kodlash seanslaringiz rejalashtirilgan brifingda faoliyat bo‘lganda shu yerda ko‘rinadi.",
     "loadError": "Brifinglarni yuklab bo‘lmadi",
+    "estimateLoadError": "Taxminiy hisobni yuklab bo‘lmadi.",
     "view": "Brifingni o‘qish",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Korxona xususiyati",
-    "enterpriseOnly": "Bu faqat korxonalar uchun mavjud xususiyat.",
+    "enterpriseOnly": "Provayderlar va modellar Enterprise tarifida mavjud.",
     "readOnly": "Faqat tashkilot egalari va administratorlari bu sozlamalarni o'zgartira oladi.",
     "loadError": "Provayderlar va modellarni yuklab bo'lmadi",
     "tabModels": "Modellar",

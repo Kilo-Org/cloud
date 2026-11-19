@@ -672,7 +672,7 @@
     },
     "instructions": {
       "title": "Instrucciones personalizadas",
-      "deprecation": "Está previsto retirar las instrucciones personalizadas. Traslada estas directrices a un archivo REVIEW.md de tu repositorio.",
+      "deprecation": "Las instrucciones personalizadas se retirarán. Traslada estas directrices a un archivo REVIEW.md de tu repositorio.",
       "placeholder": "p. ej., aplicar nuestras convenciones de gestión de errores…",
       "clearTitle": "¿Eliminar las instrucciones personalizadas?",
       "clearMessage": "Si guardas un campo vacío, se eliminarán las instrucciones personalizadas almacenadas para este revisor."
@@ -703,6 +703,7 @@
       "managedOnWeb": "La conexión de Bitbucket con {{organization}} se gestiona en la web desde un ordenador.",
       "description": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
       "descriptionReconnect": "Crea un nuevo token de acceso del espacio de trabajo para {{organization}} y pégalo abajo.",
+      "descriptionOverview": "Crea un token de acceso del espacio de trabajo para {{organization}} y pégalo en la siguiente pantalla.",
       "scopes": "Cuenta: lectura · Repositorios: lectura/escritura · PR: lectura · Webhooks: lectura/escritura",
       "tokenPlaceholder": "Token de acceso del espacio de trabajo",
       "tokenRefused": "Bitbucket no ha aceptado este token de acceso del espacio de trabajo. Comprueba que tiene los permisos indicados arriba y vuelve a intentarlo."
@@ -2667,6 +2668,8 @@
     "retryHint": "Vuelve a consultar el estado de Kilo Pass.",
     "endedOn": "Finalizado el {{date}}",
     "notAvailableInApp": "Kilo Pass no está disponible en la app.",
+    "notAvailableTitle": "Kilo Pass no se ofrece en la app",
+    "noPassDescription": "Esta cuenta no tiene Kilo Pass.",
     "statusActive": "Activo",
     "statusTrialing": "En prueba",
     "statusPastDue": "Pago atrasado",
@@ -3298,6 +3301,10 @@
     },
     "tabs": {
       "discussion": "Conversación",
+      "discussionAccessibility": "{{title}}: {{displayCount}} comentarios",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} comentarios",
+      "discussionAccessibility_one": "{{title}}: 1 comentario",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} comentarios",
       "files": "Archivos",
       "overview": "Resumen"
     },
@@ -3531,7 +3538,7 @@
       "retentionLimit": "Mostrando las facturas más recientes."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Activar la alerta de saldo bajo",
+      "subtitle": "Envía un aviso por correo a las direcciones que indiques cuando el saldo de esta organización baje del importe que establezcas.",
       "notifyEmailsLabel": "Direcciones de correo para los avisos",
       "permissionDenied": "No tienes permiso para gestionar las alertas de facturación.",
       "separateEmailsHint": "Separa las direcciones de correo con comas.",
@@ -3710,7 +3717,8 @@
     "signupStepUp": "Para terminar de crear tu cuenta, usa «$t(login.moreSignInOptions)».",
     "signupStepUpApple": "Para terminar de crear tu cuenta, usa «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Para terminar de crear tu cuenta, usa «$t(login.signInWithGoogle)».",
-    "invalidCode": "Ese código es incorrecto. Inténtalo de nuevo.",
+    "signupStepUpBack": "Para terminar de crear tu cuenta, vuelve atrás y usa «$t(login.moreSignInOptions)».",
+    "invalidCode": "Ese código es incorrecto o ha caducado. Inténtalo de nuevo o usa «$t(login.resendCode)».",
     "codeInProgress": "Tu código se está procesando. Espera un momento e inténtalo de nuevo.",
     "tooManyAttempts": "Demasiados intentos. Solicita un código nuevo.",
     "invalidToken": "No se pudo iniciar sesión. Inténtalo de nuevo.",
@@ -4608,6 +4616,7 @@
     "empty": "Sin actividad en esta ventana del informe",
     "emptyHint": "Tus sesiones de programación en la nube y en la CLI aparecerán aquí cuando un informe programado tenga actividad.",
     "loadError": "No se pudieron cargar los informes",
+    "estimateLoadError": "No se pudo cargar el estimado.",
     "view": "Leer informe",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5017,7 +5026,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Función de Enterprise",
-    "enterpriseOnly": "Esta función solo está disponible en Enterprise.",
+    "enterpriseOnly": "Los proveedores y modelos están disponibles en el plan Enterprise.",
     "readOnly": "Solo los propietarios y administradores de la organización pueden cambiar esta configuración.",
     "loadError": "No se pudieron cargar los proveedores y modelos",
     "tabModels": "Modelos",

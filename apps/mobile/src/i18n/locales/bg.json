@@ -1028,7 +1028,10 @@
     "tabs": {
       "overview": "Обзор",
       "files": "Файлове",
-      "discussion": "Дискусия"
+      "discussion": "Дискусия",
+      "discussionAccessibility_one": "{{title}}: 1 коментар",
+      "discussionAccessibility": "{{title}}: {{displayCount}} коментара",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} коментара"
     },
     "fileStatus": {
       "modified": "Променен",
@@ -1225,7 +1228,7 @@
     },
     "instructions": {
       "title": "Персонализирани инструкции",
-      "deprecation": "Предстои спиране на поддръжката за персонализираните инструкции. Вместо това премести тези насоки във файл REVIEW.md в хранилището си.",
+      "deprecation": "Персонализираните инструкции ще бъдат премахнати. Вместо това премести тези насоки във файл REVIEW.md в хранилището си.",
       "placeholder": "напр. спазване на правилата ни за обработка на грешки…",
       "clearTitle": "Премахване на персонализираните инструкции?",
       "clearMessage": "Ако запазиш празно поле, ще изтриеш персонализираните инструкции, съхранени за този рецензент."
@@ -1391,6 +1394,7 @@
       "managedOnWeb": "Връзката на {{organization}} с Bitbucket се управлява в уеб версията от компютър.",
       "description": "Създай токен за достъп до работното пространство за {{organization}} и го постави по-долу.",
       "descriptionReconnect": "Създай нов токен за достъп до работното пространство за {{organization}} и го постави по-долу.",
+      "descriptionOverview": "Създай токен за достъп до работното пространство за {{organization}} и го постави на следващия екран.",
       "scopes": "Права за достъп: акаунт — четене; хранилища — четене/запис; заявки за сливане — четене; уебкукове — четене/запис.",
       "tokenPlaceholder": "Токен за достъп до работното пространство",
       "tokenRefused": "Bitbucket не прие този токен за достъп до работното пространство. Провери дали има правата за достъп по-горе и опитай отново."
@@ -3185,6 +3189,8 @@
     "retryHint": "Повтаря зареждането на състоянието на Kilo Pass.",
     "endedOn": "Приключил на {{date}}",
     "notAvailableInApp": "Kilo Pass не е достъпен в приложението.",
+    "notAvailableTitle": "Kilo Pass не се предлага в приложението",
+    "noPassDescription": "Този акаунт няма Kilo Pass.",
     "statusActive": "Активен",
     "statusTrialing": "Пробен период",
     "statusPastDue": "Просрочено плащане",
@@ -3467,7 +3473,7 @@
       "retentionLimit": "Показват се най-новите фактури."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Включи предупреждението за ниска наличност",
+      "subtitle": "Изпращай предупреждение по имейл до посочените от теб адреси, когато наличността на тази организация падне под зададената от теб сума.",
       "notifyEmailsLabel": "Имейл адреси за известия",
       "permissionDenied": "Нямаш разрешение да управляваш известията за плащания.",
       "separateEmailsHint": "Ако въвеждаш няколко имейл адреса, раздели ги със запетаи.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "За да завършиш създаването на акаунта си, използвай „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "За да завършиш създаването на акаунта си, използвай „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "За да завършиш създаването на акаунта си, използвай „$t(login.signInWithGoogle)“.",
-    "invalidCode": "Кодът е неправилен. Опитай отново.",
+    "signupStepUpBack": "За да завършиш създаването на акаунта си, върни се назад и използвай „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Кодът е неправилен или е изтекъл. Опитай отново или използвай „$t(login.resendCode)“.",
     "codeInProgress": "Кодът ти се обработва. Изчакай малко и опитай отново.",
     "tooManyAttempts": "Твърде много опити. Поискай нов код.",
     "invalidToken": "Влизането беше неуспешно. Опитай отново.",
@@ -4536,6 +4543,7 @@
     "empty": "Няма активност в този период на брифинга",
     "emptyHint": "Вашите облачни и CLI сесии за програмиране се появяват тук, когато планиран брифинг има активност.",
     "loadError": "Брифингите не могат да се заредят",
+    "estimateLoadError": "Прогнозата не можа да се зареди.",
     "view": "Прочети брифинга",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Функция за Enterprise",
-    "enterpriseOnly": "Тази функция е налична само в Enterprise.",
+    "enterpriseOnly": "Доставчиците и моделите са достъпни в плана Enterprise.",
     "readOnly": "Само собствениците и администраторите на организацията могат да променят тези настройки.",
     "loadError": "Доставчиците и моделите не можаха да се заредят",
     "tabModels": "Модели",

@@ -671,7 +671,7 @@
     },
     "instructions": {
       "title": "Instruksi kustom",
-      "deprecation": "Fitur instruksi khusus akan dihentikan. Pindahkan panduan ini ke berkas REVIEW.md di repositorimu.",
+      "deprecation": "Fitur instruksi khusus akan dihapus. Pindahkan panduan ini ke berkas REVIEW.md di repositorimu.",
       "placeholder": "contoh: Terapkan aturan penanganan kesalahan kami…",
       "clearTitle": "Hapus instruksi kustom?",
       "clearMessage": "Menyimpan kolom yang kosong akan menghapus instruksi kustom yang tersimpan untuk peninjau ini."
@@ -702,6 +702,7 @@
       "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
       "description": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di bawah.",
       "descriptionReconnect": "Buat token akses ruang kerja baru untuk {{organization}}, lalu tempelkan di bawah.",
+      "descriptionOverview": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di layar berikutnya.",
       "scopes": "Akun: baca · Repositori: baca/tulis · PR: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja",
       "tokenRefused": "Bitbucket tidak menerima token akses ruang kerja ini. Periksa bahwa token tersebut memiliki cakupan izin di atas, lalu coba lagi."
@@ -2631,6 +2632,8 @@
     "retryHint": "Mencoba memuat ulang status Kilo Pass.",
     "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia di aplikasi.",
+    "notAvailableTitle": "Kilo Pass tidak ada di aplikasi",
+    "noPassDescription": "Akun ini tidak memiliki Kilo Pass.",
     "statusActive": "Aktif",
     "statusTrialing": "Uji coba",
     "statusPastDue": "Pembayaran terlambat",
@@ -3240,6 +3243,9 @@
     },
     "tabs": {
       "discussion": "Diskusi",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility_one": "{{title}}: 1 komentar",
       "files": "Berkas",
       "overview": "Ringkasan"
     },
@@ -3472,7 +3478,7 @@
       "retentionLimit": "Menampilkan faktur terbaru."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktifkan peringatan saldo rendah",
+      "subtitle": "Kirim peringatan lewat email ke alamat yang kamu cantumkan saat saldo organisasi ini turun di bawah jumlah yang kamu tetapkan.",
       "notifyEmailsLabel": "Alamat email penerima",
       "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan penagihan.",
       "separateEmailsHint": "Pisahkan setiap alamat email dengan koma.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Kode tersebut salah. Coba lagi.",
+    "signupStepUpBack": "Untuk menyelesaikan pembuatan akunmu, kembali lalu gunakan '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Kode tersebut salah atau sudah kedaluwarsa. Coba lagi atau gunakan '$t(login.resendCode)'.",
     "codeInProgress": "Kodemu sedang diproses. Tunggu sebentar dan coba lagi.",
     "tooManyAttempts": "Terlalu banyak percobaan. Silakan minta kode baru.",
     "invalidToken": "Gagal masuk. Coba lagi.",
@@ -4536,6 +4543,7 @@
     "empty": "Tidak ada aktivitas dalam periode laporan ini",
     "emptyHint": "Sesi coding cloud dan CLI Anda muncul di sini saat laporan terjadwal memiliki aktivitas.",
     "loadError": "Tidak dapat memuat laporan",
+    "estimateLoadError": "Tidak dapat memuat estimasi.",
     "view": "Baca laporan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fitur perusahaan",
-    "enterpriseOnly": "Ini adalah fitur khusus perusahaan.",
+    "enterpriseOnly": "Penyedia dan model tersedia di paket Enterprise.",
     "readOnly": "Hanya pemilik dan administrator organisasi yang dapat mengubah pengaturan ini.",
     "loadError": "Penyedia dan model tidak dapat dimuat",
     "tabModels": "Model",

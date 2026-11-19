@@ -1028,7 +1028,10 @@
     "tabs": {
       "overview": "Yfirlit",
       "files": "Skrár",
-      "discussion": "Umræða"
+      "discussion": "Umræða",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} athugasemd",
+      "discussionAccessibility": "{{title}}: {{displayCount}} athugasemdir",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} athugasemdir"
     },
     "fileStatus": {
       "modified": "Breytt",
@@ -1225,7 +1228,7 @@
     },
     "instructions": {
       "title": "Sérsniðnar leiðbeiningar",
-      "deprecation": "Fyrirhugað er að hætta stuðningi við sérsniðnar leiðbeiningar í stillingunum. Færðu þær í REVIEW.md-skrá í geymslunni þinni í staðinn.",
+      "deprecation": "Sérsniðnar leiðbeiningar í stillingunum verða fjarlægðar. Færðu þær í REVIEW.md-skrá í geymslunni þinni í staðinn.",
       "placeholder": "t.d. fylgja reglum okkar um villumeðhöndlun…",
       "clearTitle": "Fjarlægja sérsniðnar leiðbeiningar?",
       "clearMessage": "Ef þú vistar tóman reit eyðast þær sérsniðnu leiðbeiningar sem geymdar eru fyrir þennan yfirferðaraðila."
@@ -1391,6 +1394,7 @@
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "descriptionReconnect": "Búðu til nýjan aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
+      "descriptionOverview": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann á næsta skjá.",
       "scopes": "Reikningur: lestur · Geymslur: lestur/skrift · Samrunabeiðnir: lestur · Vefkrækjur: lestur/skrift",
       "tokenPlaceholder": "Aðgangstóki vinnusvæðis",
       "tokenRefused": "Bitbucket tók ekki við þessum aðgangstóka vinnusvæðis. Athugaðu að hann hafi heimildirnar hér fyrir ofan og reyndu svo aftur."
@@ -3185,6 +3189,8 @@
     "retryHint": "Reynir aftur að sækja stöðu Kilo Pass.",
     "endedOn": "Lokið {{date}}",
     "notAvailableInApp": "Kilo Pass er ekki tiltækt í appinu.",
+    "notAvailableTitle": "Kilo Pass er ekki í appinu",
+    "noPassDescription": "Þessi aðgangur er ekki með Kilo Pass.",
     "statusActive": "Virkt",
     "statusTrialing": "Á prufutímabili",
     "statusPastDue": "Greiðsla fram yfir gjalddaga",
@@ -3467,7 +3473,7 @@
       "retentionLimit": "Nýjustu reikningarnir eru sýndir."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Virkja viðvörun um lága inneign",
+      "subtitle": "Sendu viðvörun í tölvupósti á netföngin sem þú tilgreinir þegar inneign stofnunarinnar fer undir upphæðina sem þú stillir.",
       "notifyEmailsLabel": "Tölvupóstföng viðtakenda",
       "permissionDenied": "Þú hefur ekki heimild til að stjórna innheimtuviðvörunum.",
       "separateEmailsHint": "Aðgreindu tölvupóstföng með kommum.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "Veldu „$t(login.moreSignInOptions)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpApple": "Veldu „$t(login.signInWithApple)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpGoogle": "Veldu „$t(login.signInWithGoogle)“ til að ljúka við að stofna reikninginn þinn.",
-    "invalidCode": "Þessi kóði er rangur. Reyndu aftur.",
+    "signupStepUpBack": "Farðu til baka og veldu „$t(login.moreSignInOptions)“ til að ljúka við að stofna reikninginn þinn.",
+    "invalidCode": "Þessi kóði er rangur eða útrunninn. Reyndu aftur eða veldu „$t(login.resendCode)“.",
     "codeInProgress": "Kóðinn þinn er í vinnslu. Bíddu í smá stund og reyndu aftur.",
     "tooManyAttempts": "Of margar tilraunir. Biddu um nýjan kóða.",
     "invalidToken": "Innskráning mistókst. Reyndu aftur.",
@@ -4536,6 +4543,7 @@
     "empty": "Engin virkni í þessum yfirlitsglugga",
     "emptyHint": "Forritunarlotur þínar í skýinu og CLI birtast hér þegar áætlað yfirlit hefur virkni.",
     "loadError": "Ekki tókst að hlaða yfirlitum",
+    "estimateLoadError": "Ekki tókst að hlaða áætluninni.",
     "view": "Lesa yfirlit",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fyrirtækjaeiginleiki",
-    "enterpriseOnly": "Þetta er eingöngu fyrirtækjaeiginleiki.",
+    "enterpriseOnly": "Veitendur og líkön eru í boði með Enterprise-áskrift.",
     "readOnly": "Aðeins eigendur og stjórnendur samtaka geta breytt þessum stillingum.",
     "loadError": "Ekki tókst að hlaða veitendum og líkönum",
     "tabModels": "Líkön",

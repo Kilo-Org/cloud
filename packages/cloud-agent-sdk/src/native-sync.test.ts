@@ -83,7 +83,7 @@ const hello = (runnerConnected = true) => ({
 async function flush() {
   for (let index = 0; index < 25; index++) await Promise.resolve();
 }
-function fixture() {
+function fixture(respond?: (path: string) => Promise<Response> | undefined) {
   const calls: {
     path: string;
     body: Record<string, unknown>;
@@ -104,6 +104,8 @@ function fixture() {
         ticket: 'private-ticket',
         expiresAt: new Date(Date.now() + 90_000).toISOString(),
       });
+    const overridden = await respond?.(path);
+    if (overridden) return overridden;
     return Response.json({ commandID: body.commandID ?? 'known', status: 'queued' });
   });
   const client = new NativeSyncClient({
@@ -287,6 +289,66 @@ test('rejects offline live-only commands and queues opt-in prompts with TTL and 
     type: 'send_message',
   });
   expect(await connection.getCommandStatus(commandID)).toBe('queued');
+  connection.close();
+});
+
+test('keeps the newest command status when a frame advances it before the POST answer settles', async () => {
+  let answer: (response: Response) => void = () => {
+    throw new Error('command POST answer was not requested');
+  };
+  const pending = new Promise<Response>(resolve => {
+    answer = resolve;
+  });
+  const { client, calls } = fixture(path => (path.endsWith('/commands') ? pending : undefined));
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  const sent = connection.sendMessage('queue me', { queueIfOffline: true });
+  await flush();
+  const posted = calls.find(call => call.path.endsWith('/commands'))?.body.commandID;
+  expect(typeof posted).toBe('string');
+  const commandID = posted as string;
+  socket.frame('command_status', { commandID, status: 'delivered' });
+  await flush();
+  expect(state?.commands[commandID]).toBe('delivered');
+  answer(Response.json({ commandID, status: 'queued' }));
+  await sent;
+  await flush();
+  expect(state?.commands[commandID]).toBe('delivered');
+  connection.close();
+});
+
+test('a late status poll answer does not regress a frame-reported expiry', async () => {
+  let answer: (response: Response) => void = () => {
+    throw new Error('status poll answer was not requested');
+  };
+  const pending = new Promise<Response>(resolve => {
+    answer = resolve;
+  });
+  const { client } = fixture(path =>
+    path.endsWith('/commands/cmd_expired') ? pending : undefined
+  );
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello());
+  await flush();
+  socket.frame('command_status', { commandID: 'cmd_expired', status: 'expired' });
+  await flush();
+  expect(state?.commands['cmd_expired']).toBe('expired');
+  const status = connection.getCommandStatus('cmd_expired');
+  await flush();
+  answer(Response.json({ commandID: 'cmd_expired', status: 'queued' }));
+  await expect(status).resolves.toBe('expired');
+  expect(state?.commands['cmd_expired']).toBe('expired');
   connection.close();
 });
 

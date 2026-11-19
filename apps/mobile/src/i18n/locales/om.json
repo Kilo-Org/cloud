@@ -1028,7 +1028,10 @@
     "tabs": {
       "overview": "Ilaalcha waliigalaa",
       "files": "Faayiloota",
-      "discussion": "Marii"
+      "discussion": "Marii",
+      "discussionAccessibility_one": "{{title}}: yaada 1",
+      "discussionAccessibility": "{{title}}: Yaadota {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: Yaadota {{displayCount}}"
     },
     "fileStatus": {
       "modified": "Fooyya'e",
@@ -1225,7 +1228,7 @@
     },
     "instructions": {
       "title": "Qajeelfamoota dhuunfaa",
-      "deprecation": "Qajeelfamoota dhuunfaa hojii ala gochuuf karoorfameera. Qajeelfamoota kana bakka isaanii faayila REVIEW.md kuusaa koodii kee keessa jirutti dabarsi.",
+      "deprecation": "Qajeelfamoota dhuunfaa ni haqamu. Qajeelfamoota kana bakka isaanii faayila REVIEW.md kuusaa koodii kee keessa jirutti dabarsi.",
       "placeholder": "fkn. Akkaataa dogoggora itti qabnu kabachiisuu…",
       "clearTitle": "Qajeelfamoota dhuunfaa keessaa baasuu barbaaddaa?",
       "clearMessage": "Bakka duwwaa olkaa'uun qajeelfamoota dhuunfaa qorataa kanaaf kuufaman ni balleessa."
@@ -1391,6 +1394,7 @@
       "managedOnWeb": "Walqunnamtiin Bitbucket {{organization}}iif weebii irratti kompiitara irraa bulfama.",
       "description": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
       "descriptionReconnect": "{{organization}}iif tokanii haaraa hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
+      "descriptionOverview": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii fuula itti aanu irratti maxxansi.",
       "scopes": "Herrega: dubbisuu · Kuusaawwan koodii: dubbisuu/barreessuu · Gaaffii makuu: dubbisuu · Weebhuukii: dubbisuu/barreessuu",
       "tokenPlaceholder": "Tokanii hayyama iddoo hojii",
       "tokenRefused": "Bitbucket tokanii hayyama iddoo hojii kana hin fudhanne. Hayyamoonni armaan olii isa keessa jiraachuu mirkaneessi, sana booda ammas yaali."
@@ -3185,6 +3189,8 @@
     "retryHint": "Haala Kilo Pass fe'uu irra deebi'ee yaala.",
     "endedOn": "{{date}} xumurameera",
     "notAvailableInApp": "Kilo Pass appii keessatti hin argamu.",
+    "notAvailableTitle": "Kilo Pass appii keessa hin jiru",
+    "noPassDescription": "Akkaawuntiin kun Kilo Pass hin qabu.",
     "statusActive": "Socho'aa",
     "statusTrialing": "Yaalii irra jira",
     "statusPastDue": "Kaffaltiin yeroon dabre",
@@ -3467,7 +3473,7 @@
       "retentionLimit": "Gaaffiiwwan kaffaltii haaraan agarsiifamaa jiran."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Akeekkachiisa haftee xiqqaa bani",
+      "subtitle": "Yeroo hafteen dhaabbata kanaa hamma ati kaa'te gadi bu'u, teessoowwan imeelii ati tarreessitetti akeekkachiisa imeeliin ergi.",
       "notifyEmailsLabel": "Imeeliiwwan beeksifaman",
       "permissionDenied": "Akeekkachiisa kaffaltii bulchuuf hayyama hin qabdu.",
       "separateEmailsHint": "Teessoowwan imeelii hedduu qoodduudhaan adda baasi.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "Herrega kee uumuu xumuruuf '$t(login.moreSignInOptions)' fayyadami.",
     "signupStepUpApple": "Herrega kee uumuu xumuruuf '$t(login.signInWithApple)' fayyadami.",
     "signupStepUpGoogle": "Herrega kee uumuu xumuruuf '$t(login.signInWithGoogle)' fayyadami.",
-    "invalidCode": "Koodiin sun sirrii miti. Irra deebi'ii yaali.",
+    "signupStepUpBack": "Herrega kee uumuu xumuruuf duubatti deebi'ii '$t(login.moreSignInOptions)' fayyadami.",
+    "invalidCode": "Koodiin sun sirrii miti ykn yeroon isaa darbeera. Irra deebi'ii yaali ykn '$t(login.resendCode)' fayyadami.",
     "codeInProgress": "Koodiin kee adeemsifamaa jira. Yeroo xiqqoo eegiitii irra deebi'ii yaali.",
     "tooManyAttempts": "Yaallii baay'ee godhame. Koodii haaraa gaafadhu.",
     "invalidToken": "Seenuun hin milkoofne. Irra deebi'ii yaali.",
@@ -4536,6 +4543,7 @@
     "empty": "Sochiin yeroo gabaasaa kana keessatti hin jiru.",
     "emptyHint": "Taa'umsawwan koodii cloud fi CLI kee yeroo gabaasni sagantaa sochii qabaatu asitti ni mul'atu.",
     "loadError": "Gabaasota fe'uun hin danda'amne",
+    "estimateLoadError": "Tilmaama fe'uun hin danda'amne.",
     "view": "Gabaasa dubbisi",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Amala dhaabbata guddaa",
-    "enterpriseOnly": "Kun amala dhaabbata guddaaf qofa.",
+    "enterpriseOnly": "Dhiyeessitoonni fi moodeloonni karoora Enterprise irratti ni argamu.",
     "readOnly": "Abbootii fi bulchitoonni dhaabbataa qofti qindaa'ina kana jijjiiruu danda'u.",
     "loadError": "Dhiyeessitoonni fi moodeloonni fe'uu hin dandeenye",
     "tabModels": "Moodeloota",

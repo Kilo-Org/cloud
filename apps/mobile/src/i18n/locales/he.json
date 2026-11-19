@@ -672,7 +672,7 @@
     },
     "instructions": {
       "title": "הוראות מותאמות אישית",
-      "deprecation": "התמיכה בהוראות מותאמות אישית צפויה להסתיים. העבר את ההנחיות האלה לקובץ REVIEW.md במאגר שלך.",
+      "deprecation": "ההוראות המותאמות אישית יוסרו. העבר את ההנחיות האלה לקובץ REVIEW.md במאגר שלך.",
       "placeholder": "לדוגמה: הקפדה על כללי הטיפול בשגיאות שלנו…",
       "clearTitle": "להסיר את ההוראות המותאמות אישית?",
       "clearMessage": "שמירת שדה ריק תמחק את ההוראות המותאמות אישית שנשמרו עבור סוקר הקוד הזה."
@@ -703,6 +703,7 @@
       "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
       "description": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
       "descriptionReconnect": "צור אסימון גישה חדש לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
+      "descriptionOverview": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו במסך הבא.",
       "scopes": "חשבון: קריאה · מאגרים: קריאה/כתיבה · בקשות משיכה: קריאה · התראות אוטומטיות: קריאה/כתיבה",
       "tokenPlaceholder": "אסימון גישה לסביבת העבודה",
       "tokenRefused": "Bitbucket לא קיבל את אסימון הגישה לסביבת העבודה הזה. בדוק שיש לו את ההרשאות שלמעלה, ולאחר מכן נסה שוב."
@@ -2667,6 +2668,8 @@
     "retryHint": "טעינת המצב של Kilo Pass שוב.",
     "endedOn": "הסתיים ב-{{date}}",
     "notAvailableInApp": "Kilo Pass אינו זמין באפליקציה.",
+    "notAvailableTitle": "Kilo Pass אינו מוצע באפליקציה",
+    "noPassDescription": "לחשבון זה אין Kilo Pass.",
     "statusActive": "פעיל",
     "statusTrialing": "בתקופת ניסיון",
     "statusPastDue": "התשלום באיחור",
@@ -3298,6 +3301,10 @@
     },
     "tabs": {
       "discussion": "דיון",
+      "discussionAccessibility": "{{title}}: {{displayCount}} תגובות",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} תגובות",
+      "discussionAccessibility_one": "{{title}}: תגובה אחת",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} תגובות",
       "files": "קבצים",
       "overview": "סקירה כללית"
     },
@@ -3531,7 +3538,7 @@
       "retentionLimit": "מוצגות החשבוניות העדכניות ביותר."
     },
     "lowBalanceAlert": {
-      "enableA11y": "הפעלת התראה על יתרה נמוכה",
+      "subtitle": "שלח התראה בדוא״ל לכתובות שציינת כאשר היתרה של הארגון יורדת מתחת לסכום שהגדרת.",
       "notifyEmailsLabel": "כתובות דוא״ל לקבלת התראות",
       "permissionDenied": "אין לך הרשאה לנהל התראות חיוב.",
       "separateEmailsHint": "אם הזנת כמה כתובות דוא״ל, הפרד ביניהן בפסיקים.",
@@ -3710,7 +3717,8 @@
     "signupStepUp": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithGoogle)'.",
-    "invalidCode": "הקוד שגוי. נסה שוב.",
+    "signupStepUpBack": "כדי להשלים את יצירת החשבון שלך, חזור אחורה ובחר ב-'$t(login.moreSignInOptions)'.",
+    "invalidCode": "הקוד שגוי או שפג תוקפו. נסה שוב או בחר ב-'$t(login.resendCode)'.",
     "codeInProgress": "הקוד שלך נבדק. המתן רגע ונסה שוב.",
     "tooManyAttempts": "יותר מדי ניסיונות. בקש קוד חדש.",
     "invalidToken": "ההתחברות נכשלה. אפשר לנסות שוב.",
@@ -4608,6 +4616,7 @@
     "empty": "אין פעילות בחלון הדוח הזה",
     "emptyHint": "סשנים שלך לקידוד בענן וב-CLI יופיעו כאן כשיש פעילות בדוח מתוזמן.",
     "loadError": "לא ניתן לטעון דוחות",
+    "estimateLoadError": "לא ניתן לטעון את הערכת העלות.",
     "view": "קריאת הדוח",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5017,7 +5026,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "תכונת ארגונים",
-    "enterpriseOnly": "זוהי תכונה לארגונים בלבד.",
+    "enterpriseOnly": "ספקים ומודלים זמינים בתוכנית Enterprise.",
     "readOnly": "רק בעלי הארגון והמנהלים יכולים לשנות הגדרות אלה.",
     "loadError": "לא ניתן היה לטעון ספקים ומודלים",
     "tabModels": "מודלים",

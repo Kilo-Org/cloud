@@ -11,12 +11,23 @@ import type { LocalAgentStorageArea } from './storage';
 
 export const LOCAL_AGENT_STATUS_STORAGE_KEY = 'session:kiloLocalAgentStatus';
 
-const endpointStatusSchema = z.object({
-  endpointId: z.string().min(1),
-  hubId: z.uuid().optional(),
-  state: connectionStateSchema,
-  transport: z.enum(['native', 'loopback']),
-});
+const endpointStatusSchema = z.discriminatedUnion('transport', [
+  z.object({
+    endpointId: z.string().min(1),
+    state: connectionStateSchema,
+    transport: z.literal('native'),
+  }),
+  z.object({
+    /** `host:port` of the hub's socket, the one thing a user can tell two paired CLIs apart by. */
+    address: z.string().min(1),
+    endpointId: z.string().min(1),
+    hubId: z.uuid(),
+    /** The last time the hub was reachable; absent when this worker has no record of it. */
+    lastConnectedAt: z.number().optional(),
+    state: connectionStateSchema,
+    transport: z.literal('loopback'),
+  }),
+]);
 
 export const localAgentStatusSchema = z
   .object({

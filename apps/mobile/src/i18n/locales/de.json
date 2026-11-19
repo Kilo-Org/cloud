@@ -671,7 +671,7 @@
     },
     "instructions": {
       "title": "Benutzerdefinierte Anweisungen",
-      "deprecation": "Benutzerdefinierte Anweisungen sollen künftig entfallen. Verschiebe diese Richtlinien stattdessen in eine REVIEW.md-Datei in deinem Repository.",
+      "deprecation": "Benutzerdefinierte Anweisungen werden entfernt. Verschiebe diese Richtlinien stattdessen in eine REVIEW.md-Datei in deinem Repository.",
       "placeholder": "z. B. auf die Einhaltung unserer Regeln zur Fehlerbehandlung achten …",
       "clearTitle": "Benutzerdefinierte Anweisungen entfernen?",
       "clearMessage": "Wenn du ein leeres Feld speicherst, werden die für diesen Reviewer gespeicherten benutzerdefinierten Anweisungen gelöscht."
@@ -702,6 +702,7 @@
       "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
       "description": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "descriptionReconnect": "Erstelle ein neues Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
+      "descriptionOverview": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es auf dem nächsten Bildschirm ein.",
       "scopes": "Konto: Lesen · Repositories: Lesen/Schreiben · Pull-Requests: Lesen · Webhooks: Lesen/Schreiben",
       "tokenPlaceholder": "Workspace-Zugriffstoken",
       "tokenRefused": "Bitbucket hat dieses Workspace-Zugriffstoken nicht akzeptiert. Prüfe, ob es die oben genannten Berechtigungen enthält, und versuche es dann erneut."
@@ -2631,6 +2632,8 @@
     "retryHint": "Ruft den Status von Kilo Pass erneut ab.",
     "endedOn": "Beendet am {{date}}",
     "notAvailableInApp": "Kilo Pass ist in der App nicht verfügbar.",
+    "notAvailableTitle": "Kilo Pass gibt es nicht in der App",
+    "noPassDescription": "Dieses Konto hat keinen Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Testphase",
     "statusPastDue": "Zahlung überfällig",
@@ -3240,6 +3243,9 @@
     },
     "tabs": {
       "discussion": "Diskussion",
+      "discussionAccessibility": "{{title}}: {{displayCount}} Kommentare",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} Kommentare",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
       "files": "Dateien",
       "overview": "Übersicht"
     },
@@ -3472,7 +3478,7 @@
       "retentionLimit": "Es werden die neuesten Rechnungen angezeigt."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Warnung bei niedrigem Guthaben aktivieren",
+      "subtitle": "Sende eine E-Mail-Warnung an die angegebenen Adressen, wenn das Guthaben dieser Organisation unter den festgelegten Betrag fällt.",
       "notifyEmailsLabel": "E-Mail-Adressen für Benachrichtigungen",
       "permissionDenied": "Du hast keine Berechtigung, Abrechnungswarnungen zu verwalten.",
       "separateEmailsHint": "Trenne mehrere E-Mail-Adressen durch Kommas.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "Wähle „$t(login.moreSignInOptions)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpApple": "Wähle „$t(login.signInWithApple)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpGoogle": "Wähle „$t(login.signInWithGoogle)“, um die Erstellung deines Kontos abzuschließen.",
-    "invalidCode": "Dieser Code ist falsch. Bitte versuche es erneut.",
+    "signupStepUpBack": "Um die Erstellung deines Kontos abzuschließen, geh zurück und wähle „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Dieser Code ist falsch oder abgelaufen. Versuche es erneut oder wähle „$t(login.resendCode)“.",
     "codeInProgress": "Dein Code wird verarbeitet. Warte einen Moment und versuche es erneut.",
     "tooManyAttempts": "Du hast zu viele Versuche unternommen. Bitte fordere einen neuen Code an.",
     "invalidToken": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
@@ -4536,6 +4543,7 @@
     "empty": "Keine Aktivität in diesem Briefing-Zeitraum.",
     "emptyHint": "Deine Cloud- und CLI-Coding-Sitzungen erscheinen hier, wenn ein geplantes Briefing Aktivität hat.",
     "loadError": "Briefings konnten nicht geladen werden",
+    "estimateLoadError": "Die Schätzung konnte nicht geladen werden.",
     "view": "Briefing lesen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise-Funktion",
-    "enterpriseOnly": "Diese Funktion ist nur für Enterprise verfügbar.",
+    "enterpriseOnly": "Anbieter und Modelle sind im Enterprise-Tarif verfügbar.",
     "readOnly": "Nur Inhaber und Admins der Organisation können diese Einstellungen ändern.",
     "loadError": "Anbieter und Modelle konnten nicht geladen werden",
     "tabModels": "Modelle",

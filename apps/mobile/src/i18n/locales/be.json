@@ -1074,7 +1074,12 @@
     "tabs": {
       "overview": "Агляд",
       "files": "Файлы",
-      "discussion": "Абмеркаванне"
+      "discussion": "Абмеркаванне",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} каментар",
+      "discussionAccessibility": "{{title}}: {{displayCount}} каментара",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} каментара",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} каментары",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} каментароў"
     },
     "fileStatus": {
       "modified": "Зменены",
@@ -1273,7 +1278,7 @@
     },
     "instructions": {
       "title": "Уласныя інструкцыі",
-      "deprecation": "Падтрымку ўласных інструкцый плануецца спыніць. Перанясіце гэтыя рэкамендацыі ў файл REVIEW.md у вашым рэпазіторыі.",
+      "deprecation": "Уласныя інструкцыі будуць выдалены. Перанясіце гэтыя рэкамендацыі ў файл REVIEW.md у вашым рэпазіторыі.",
       "placeholder": "напрыклад: правяраць выкананне нашых правілаў апрацоўкі памылак…",
       "clearTitle": "Выдаліць уласныя інструкцыі?",
       "clearMessage": "Захаванне пустога поля выдаляе ўласныя інструкцыі, захаваныя для гэтага рэцэнзента."
@@ -1439,6 +1444,7 @@
       "managedOnWeb": "Падключэнне Bitbucket для {{organization}} кіруецца ў вэб-версіі з камп'ютара.",
       "description": "Стварыце токен доступу да працоўнай прасторы для {{organization}} і ўстаўце яго ніжэй.",
       "descriptionReconnect": "Стварыце новы токен доступу да працоўнай прасторы для {{organization}} і ўстаўце яго ніжэй.",
+      "descriptionOverview": "Стварыце токен доступу да працоўнай прасторы для {{organization}} і ўстаўце яго на наступным экране.",
       "scopes": "Уліковы запіс: чытанне · Рэпазіторыі: чытанне і запіс · Запыты на зліццё: чытанне · Вэбхукі: чытанне і запіс.",
       "tokenPlaceholder": "Токен доступу да працоўнай прасторы",
       "tokenRefused": "Bitbucket не прыняў гэты токен доступу да працоўнай прасторы. Праверце, што ён мае правы, пералічаныя вышэй, затым паспрабуйце яшчэ раз."
@@ -3303,6 +3309,8 @@
     "retryHint": "Паўторна загружае стан Kilo Pass.",
     "endedOn": "Завершана {{date}}",
     "notAvailableInApp": "Kilo Pass недаступны ў праграме.",
+    "notAvailableTitle": "Kilo Pass няма ў праграме",
+    "noPassDescription": "У гэтага ўліковага запісу няма Kilo Pass.",
     "statusActive": "Актыўны",
     "statusTrialing": "Пробны перыяд",
     "statusPastDue": "Платёж пратэрмінаваны",
@@ -3585,7 +3593,7 @@
       "retentionLimit": "Паказваюцца самыя апошнія рахункі."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Уключыць апавяшчэнне аб нізкім балансе",
+      "subtitle": "Дасылайце апавяшчэнне па электроннай пошце на ўказаныя вамі адрасы, калі баланс гэтай арганізацыі апускаецца ніжэй за зададзеную вамі суму.",
       "notifyEmailsLabel": "Адрасы для апавяшчэнняў",
       "permissionDenied": "У вас няма дазволу кіраваць апавяшчэннямі аб плацяжах.",
       "separateEmailsHint": "Аддзяляйце адрасы электроннай пошты коскамі.",
@@ -3771,7 +3779,8 @@
     "signupStepUp": "Каб завяршыць стварэнне ўліковага запісу, выберы «$t(login.moreSignInOptions)».",
     "signupStepUpApple": "Каб завяршыць стварэнне ўліковага запісу, выберы «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Каб завяршыць стварэнне ўліковага запісу, выберы «$t(login.signInWithGoogle)».",
-    "invalidCode": "Гэты код няправільны. Паспрабуй яшчэ раз.",
+    "signupStepUpBack": "Каб завяршыць стварэнне ўліковага запісу, вярніся назад і выберы «$t(login.moreSignInOptions)».",
+    "invalidCode": "Гэты код няправільны або тэрмін яго дзеяння скончыўся. Паспрабуй яшчэ раз або выберы «$t(login.resendCode)».",
     "codeInProgress": "Твой код апрацоўваецца. Крыху пачакай і паспрабуй яшчэ раз.",
     "tooManyAttempts": "Занадта шмат спроб. Запытай новы код.",
     "invalidToken": "Не атрымалася ўвайсці. Паспрабуй яшчэ раз.",
@@ -4680,6 +4689,7 @@
     "empty": "Няма актыўнасці ў гэтым акне зводкі",
     "emptyHint": "Вашы воблачныя і CLI-сеансы кадавання з'явяцца тут, калі ў запланаванай зводцы ёсць актыўнасць.",
     "loadError": "Не ўдалося загрузіць зводкі",
+    "estimateLoadError": "Не ўдалося загрузіць ацэнку.",
     "view": "Чытаць зводку",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5093,7 +5103,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Функцыя Enterprise",
-    "enterpriseOnly": "Гэта функцыя даступная толькі для Enterprise.",
+    "enterpriseOnly": "Пастаўшчыкі і мадэлі даступныя ў плане Enterprise.",
     "readOnly": "Толькі ўладальнікі і адміністратары арганізацыі могуць змяняць гэтыя налады.",
     "loadError": "Не ўдалося загрузіць пастаўшчыкоў і мадэлі",
     "tabModels": "Мадэлі",

@@ -1028,7 +1028,10 @@
     "tabs": {
       "overview": "Oversikt",
       "files": "Filer",
-      "discussion": "Diskusjon"
+      "discussion": "Diskusjon",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentarer",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentarer"
     },
     "fileStatus": {
       "modified": "Endret",
@@ -1225,7 +1228,7 @@
     },
     "instructions": {
       "title": "Egendefinerte instruksjoner",
-      "deprecation": "Funksjonen for egendefinerte instruksjoner skal fases ut. Flytt disse retningslinjene til en REVIEW.md-fil i kodelageret ditt i stedet.",
+      "deprecation": "Funksjonen for egendefinerte instruksjoner blir fjernet. Flytt disse retningslinjene til en REVIEW.md-fil i kodelageret ditt i stedet.",
       "placeholder": "f.eks. følg reglene våre for feilhåndtering…",
       "clearTitle": "Fjerne egendefinerte instruksjoner?",
       "clearMessage": "Hvis du lagrer et tomt felt, slettes de egendefinerte instruksjonene som er lagret for denne anmelderen."
@@ -1391,6 +1394,7 @@
       "managedOnWeb": "Bitbucket-tilkoblingen for {{organization}} administreres på nettet fra en datamaskin.",
       "description": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
       "descriptionReconnect": "Opprett et nytt tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
+      "descriptionOverview": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn på neste skjerm.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
       "tokenPlaceholder": "Tilgangstoken for arbeidsområdet",
       "tokenRefused": "Bitbucket godtok ikke dette tilgangstokenet for arbeidsområdet. Kontroller at det har tillatelsene ovenfor, og prøv deretter på nytt."
@@ -3185,6 +3189,8 @@
     "retryHint": "Prøver å hente statusen for Kilo Pass på nytt.",
     "endedOn": "Avsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgjengelig i appen.",
+    "notAvailableTitle": "Kilo Pass finnes ikke i appen",
+    "noPassDescription": "Denne kontoen har ikke Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Prøveperiode",
     "statusPastDue": "Forfalt betaling",
@@ -3467,7 +3473,7 @@
       "retentionLimit": "Viser de nyeste fakturaene."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktiver varsel om lav saldo",
+      "subtitle": "Send et varsel på e-post til adressene du oppgir når saldoen til denne organisasjonen faller under beløpet du angir.",
       "notifyEmailsLabel": "E-postadresser for varsler",
       "permissionDenied": "Du har ikke tillatelse til å administrere faktureringsvarsler.",
       "separateEmailsHint": "Skill flere e-postadresser med komma.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "Bruk «$t(login.moreSignInOptions)» for å fullføre opprettelsen av kontoen din.",
     "signupStepUpApple": "Bruk «$t(login.signInWithApple)» for å fullføre opprettelsen av kontoen din.",
     "signupStepUpGoogle": "Bruk «$t(login.signInWithGoogle)» for å fullføre opprettelsen av kontoen din.",
-    "invalidCode": "Koden er feil. Prøv igjen.",
+    "signupStepUpBack": "For å fullføre opprettelsen av kontoen din, gå tilbake og bruk «$t(login.moreSignInOptions)».",
+    "invalidCode": "Koden er feil eller utløpt. Prøv igjen, eller bruk «$t(login.resendCode)».",
     "codeInProgress": "Koden din behandles. Vent et øyeblikk og prøv igjen.",
     "tooManyAttempts": "For mange forsøk. Be om en ny kode.",
     "invalidToken": "Påloggingen mislyktes. Prøv igjen.",
@@ -4536,6 +4543,7 @@
     "empty": "Ingen aktivitet i dette briefvinduet",
     "emptyHint": "Kodeøktene dine i skyen og CLI vises her når en planlagt brief har aktivitet.",
     "loadError": "Kunne ikke laste briefer",
+    "estimateLoadError": "Kunne ikke laste estimatet.",
     "view": "Les brief",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Bedriftsfunksjon",
-    "enterpriseOnly": "Dette er en funksjon kun for bedrifter.",
+    "enterpriseOnly": "Leverandører og modeller er tilgjengelige på Enterprise-planen.",
     "readOnly": "Bare organisasjonseiere og administratorer kan endre disse innstillingene.",
     "loadError": "Leverandører og modeller kunne ikke lastes inn",
     "tabModels": "Modeller",

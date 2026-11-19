@@ -1051,7 +1051,11 @@
     "tabs": {
       "overview": "Pregled",
       "files": "Datoteke",
-      "discussion": "Rasprava"
+      "discussion": "Rasprava",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentara",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentara",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentara"
     },
     "fileStatus": {
       "modified": "Izmijenjeno",
@@ -1249,7 +1253,7 @@
     },
     "instructions": {
       "title": "Prilagođene upute",
-      "deprecation": "Planirano je ukidanje prilagođenih uputa. Premjesti ove smjernice u datoteku REVIEW.md u svom repozitoriju.",
+      "deprecation": "Prilagođene upute bit će uklonjene. Premjesti ove smjernice u datoteku REVIEW.md u svom repozitoriju.",
       "placeholder": "npr. obavezna primjena naših pravila za obradu grešaka…",
       "clearTitle": "Ukloniti prilagođene upute?",
       "clearMessage": "Ako sačuvaš prazno polje, izbrisat ćeš prilagođene upute pohranjene za ovog recenzenta."
@@ -1415,6 +1419,7 @@
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računara.",
       "description": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
       "descriptionReconnect": "Kreiraj novi token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
+      "descriptionOverview": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga na sljedećem ekranu.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru",
       "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Provjeri da ima gore navedene dozvole, pa pokušaj ponovo."
@@ -3244,6 +3249,8 @@
     "retryHint": "Ponovo učitava stanje pretplate na Kilo Pass.",
     "endedOn": "Završeno {{date}}",
     "notAvailableInApp": "Kilo Pass nije dostupan u aplikaciji.",
+    "notAvailableTitle": "Kilo Pass nije u aplikaciji",
+    "noPassDescription": "Ovaj račun nema Kilo Pass.",
     "statusActive": "Aktivan",
     "statusTrialing": "Probni period",
     "statusPastDue": "Plaćanje kasni",
@@ -3526,7 +3533,7 @@
       "retentionLimit": "Prikazuju se najnovije fakture."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Omogući upozorenje o niskom saldu",
+      "subtitle": "Pošalji upozorenje e-poštom na navedene adrese kada saldo ove organizacije padne ispod iznosa koji postaviš.",
       "notifyEmailsLabel": "Adrese e-pošte za obavijesti",
       "permissionDenied": "Nemaš dozvolu za upravljanje upozorenjima o naplati.",
       "separateEmailsHint": "Odvoji adrese e-pošte zarezima.",
@@ -3710,7 +3717,8 @@
     "signupStepUp": "Za dovršetak kreiranja računa odaberi „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "Za dovršetak kreiranja računa odaberi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Za dovršetak kreiranja računa odaberi „$t(login.signInWithGoogle)“.",
-    "invalidCode": "Kod nije ispravan. Pokušaj ponovo.",
+    "signupStepUpBack": "Za dovršetak kreiranja računa vrati se nazad i odaberi „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Kod nije ispravan ili je istekao. Pokušaj ponovo ili odaberi „$t(login.resendCode)“.",
     "codeInProgress": "Tvoj kod se obrađuje. Sačekaj trenutak i pokušaj ponovo.",
     "tooManyAttempts": "Previše pokušaja. Zatraži novi kod.",
     "invalidToken": "Prijava nije uspjela. Pokušaj ponovo.",
@@ -4608,6 +4616,7 @@
     "empty": "Nema aktivnosti u ovom periodu izvještaja",
     "emptyHint": "Vaše cloud i CLI sesije kodiranja pojavljuju se ovdje kada zakazani izvještaj ima aktivnost.",
     "loadError": "Nije moguće učitati izvještaje",
+    "estimateLoadError": "Nije moguće učitati procjenu.",
     "view": "Pročitaj izvještaj",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5017,7 +5026,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise funkcija",
-    "enterpriseOnly": "Ova funkcija je dostupna samo u Enterprise paketu.",
+    "enterpriseOnly": "Pružaoci i modeli su dostupni na Enterprise planu.",
     "readOnly": "Samo vlasnici i administratori organizacije mogu mijenjati ove postavke.",
     "loadError": "Učitavanje pružalaca i modela nije uspjelo",
     "tabModels": "Modeli",

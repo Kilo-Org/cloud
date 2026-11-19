@@ -1028,7 +1028,10 @@
     "tabs": {
       "overview": "მიმოხილვა",
       "files": "ფაილები",
-      "discussion": "დისკუსია"
+      "discussion": "დისკუსია",
+      "discussionAccessibility_one": "{{title}}: 1 კომენტარი",
+      "discussionAccessibility": "{{title}}: {{displayCount}} კომენტარი",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} კომენტარი"
     },
     "fileStatus": {
       "modified": "შეცვლილია",
@@ -1225,7 +1228,7 @@
     },
     "instructions": {
       "title": "მორგებული ინსტრუქციები",
-      "deprecation": "მორგებული ინსტრუქციების ფუნქციის გაუქმება იგეგმება. გადაიტანე ეს მითითებები შენი რეპოზიტორის REVIEW.md ფაილში.",
+      "deprecation": "მორგებული ინსტრუქციების ფუნქცია წაიშლება. გადაიტანე ეს მითითებები შენი რეპოზიტორის REVIEW.md ფაილში.",
       "placeholder": "მაგ., შეცდომების დამუშავების ჩვენი წესების დაცვა…",
       "clearTitle": "მორგებული ინსტრუქციების ამოღება",
       "clearMessage": "ცარიელი ველის შენახვა წაშლის ამ რეცენზენტისთვის შენახულ მორგებულ ინსტრუქციებს."
@@ -1391,6 +1394,7 @@
       "managedOnWeb": "{{organization}}-ის Bitbucket-თან კავშირი იმართება ვებში, კომპიუტერიდან.",
       "description": "შექმენი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი ქვემოთ.",
       "descriptionReconnect": "შექმენი ახალი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი ქვემოთ.",
+      "descriptionOverview": "შექმენი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი შემდეგ ეკრანზე.",
       "scopes": "ანგარიში: წაკითხვა · რეპოზიტორები: წაკითხვა/ჩაწერა · PR-ები: წაკითხვა · ვებჰუკები: წაკითხვა/ჩაწერა",
       "tokenPlaceholder": "სამუშაო სივრცის წვდომის ტოკენი",
       "tokenRefused": "Bitbucket-მა არ მიიღო ეს სამუშაო სივრცის წვდომის ტოკენი. შეამოწმე, რომ მას აქვს ზემოთ მოცემული ნებართვები, შემდეგ კი სცადე ხელახლა."
@@ -3185,6 +3189,8 @@
     "retryHint": "ხელახლა ამოწმებს Kilo Pass-ის მდგომარეობას.",
     "endedOn": "დასრულდა {{date}}",
     "notAvailableInApp": "Kilo Pass აპში მიუწვდომელია.",
+    "notAvailableTitle": "Kilo Pass აპში არ არის",
+    "noPassDescription": "ამ ანგარიშს Kilo Pass არ აქვს.",
     "statusActive": "აქტიური",
     "statusTrialing": "საცდელი პერიოდი",
     "statusPastDue": "გადახდა ვადაგადაცილებულია",
@@ -3467,7 +3473,7 @@
       "retentionLimit": "ნაჩვენებია უახლესი ინვოისები."
     },
     "lowBalanceAlert": {
-      "enableA11y": "დაბალი ბალანსის შეტყობინების ჩართვა",
+      "subtitle": "გაუგზავნე შეტყობინება ელფოსტით მითითებულ მისამართებზე, როცა ამ ორგანიზაციის ბალანსი დაეცემა შენ მიერ დაყენებულ თანხაზე ქვემოთ.",
       "notifyEmailsLabel": "მიმღებების ელფოსტის მისამართები",
       "permissionDenied": "ანგარიშსწორების შეტყობინებების მართვის უფლება არ გაქვთ.",
       "separateEmailsHint": "ელფოსტის მისამართები ერთმანეთისგან მძიმეებით გამოყავით.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "ანგარიშის შექმნის დასასრულებლად გამოიყენე „$t(login.moreSignInOptions)“.",
     "signupStepUpApple": "ანგარიშის შექმნის დასასრულებლად გამოიყენე „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "ანგარიშის შექმნის დასასრულებლად გამოიყენე „$t(login.signInWithGoogle)“.",
-    "invalidCode": "ეს კოდი არასწორია. ხელახლა სცადე.",
+    "signupStepUpBack": "ანგარიშის შექმნის დასასრულებლად დაბრუნდი უკან და გამოიყენე „$t(login.moreSignInOptions)“.",
+    "invalidCode": "ეს კოდი არასწორია ან ვადა გაუვიდა. ხელახლა სცადე ან გამოიყენე „$t(login.resendCode)“.",
     "codeInProgress": "შენი კოდი მუშავდება. ცოტა მოიცადე და ხელახლა სცადე.",
     "tooManyAttempts": "მცდელობების რაოდენობა გადაჭარბებულია. მოითხოვე ახალი კოდი.",
     "invalidToken": "შესვლა ვერ მოხერხდა. ხელახლა სცადე.",
@@ -4536,6 +4543,7 @@
     "empty": "ამ ანგარიშის ინტერვალში აქტივობა არ არის",
     "emptyHint": "თქვენი ღრუბლოვანი და CLI კოდირების სესიები აქ გამოჩნდება, როცა დაგეგმილ ანგარიშს აქტივობა ექნება.",
     "loadError": "ანგარიშების ჩატვირთვა ვერ მოხერხდა",
+    "estimateLoadError": "შეფასების ჩატვირთვა ვერ მოხერხდა.",
     "view": "ანგარიშის წაკითხვა",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "საწარმოს ფუნქცია",
-    "enterpriseOnly": "ეს ფუნქცია მხოლოდ საწარმოებისთვისაა.",
+    "enterpriseOnly": "პროვაიდერები და მოდელები ხელმისაწვდომია Enterprise გეგმაზე.",
     "readOnly": "ამ პარამეტრების შეცვლა მხოლოდ ორგანიზაციის მფლობელებს და ადმინისტრატორებს შეუძლიათ.",
     "loadError": "პროვაიდერები და მოდელები ვერ ჩაიტვირთა",
     "tabModels": "მოდელები",

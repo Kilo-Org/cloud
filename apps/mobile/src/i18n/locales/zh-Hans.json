@@ -671,7 +671,7 @@
     },
     "instructions": {
       "title": "自定义说明",
-      "deprecation": "自定义说明功能计划停用。请将这些准则移至仓库中的 REVIEW.md 文件。",
+      "deprecation": "自定义说明功能将被移除。请将这些准则移至仓库中的 REVIEW.md 文件。",
       "placeholder": "例如：遵循我们的错误处理规范…",
       "clearTitle": "移除自定义说明？",
       "clearMessage": "保存空字段将删除为此审查者存储的自定义说明。"
@@ -702,6 +702,7 @@
       "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
       "description": "为 {{organization}} 创建工作区访问令牌，然后粘贴到下方。",
       "descriptionReconnect": "为 {{organization}} 创建新的工作区访问令牌，然后粘贴到下方。",
+      "descriptionOverview": "为 {{organization}} 创建工作区访问令牌，然后在下一个页面中粘贴。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
       "tokenPlaceholder": "工作区访问令牌",
       "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
@@ -2631,6 +2632,8 @@
     "retryHint": "重新获取 Kilo Pass 状态。",
     "endedOn": "{{date}} 已结束",
     "notAvailableInApp": "Kilo Pass 在应用中不可用。",
+    "notAvailableTitle": "应用内不提供 Kilo Pass",
+    "noPassDescription": "此账户没有 Kilo Pass。",
     "statusActive": "生效中",
     "statusTrialing": "试用中",
     "statusPastDue": "付款逾期",
@@ -3240,6 +3243,9 @@
     },
     "tabs": {
       "discussion": "讨论",
+      "discussionAccessibility": "{{title}}：{{displayCount}} 条评论",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}} 条评论",
+      "discussionAccessibility_one": "{{title}}：1 条评论",
       "files": "文件",
       "overview": "概览"
     },
@@ -3472,7 +3478,7 @@
       "retentionLimit": "仅显示最近的发票。"
     },
     "lowBalanceAlert": {
-      "enableA11y": "启用余额不足提醒",
+      "subtitle": "当此组织的余额低于你设置的金额时，向你填写的邮箱发送邮件提醒。",
       "notifyEmailsLabel": "接收通知的邮箱",
       "permissionDenied": "你没有管理账单提醒的权限。",
       "separateEmailsHint": "多个邮箱请用逗号分隔。",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "如需完成账户创建，请选择“$t(login.moreSignInOptions)”。",
     "signupStepUpApple": "如需完成账户创建，请选择“$t(login.signInWithApple)”。",
     "signupStepUpGoogle": "如需完成账户创建，请选择“$t(login.signInWithGoogle)”。",
-    "invalidCode": "验证码不正确。请重试。",
+    "signupStepUpBack": "如需完成账户创建，请返回上一步并选择“$t(login.moreSignInOptions)”。",
+    "invalidCode": "验证码不正确或已过期。请重试，或选择“$t(login.resendCode)”。",
     "codeInProgress": "正在处理你的验证码。请稍后重试。",
     "tooManyAttempts": "尝试次数过多。请重新获取验证码。",
     "invalidToken": "登录失败。请重试。",
@@ -4536,6 +4543,7 @@
     "empty": "此简报时段内无活动",
     "emptyHint": "定时简报有活动时，你的云端和 CLI 编码会话将显示在这里。",
     "loadError": "无法加载简报",
+    "estimateLoadError": "无法加载预估。",
     "view": "阅读简报",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scorecardLabel": "$t(agentBriefing.view)：$t(agentBriefing.selectedSessions) {{sessions}}，$t(agentBriefing.snapshotPullRequests) {{pullRequests}}，$t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "企业版功能",
-    "enterpriseOnly": "这是仅限企业版使用的功能。",
+    "enterpriseOnly": "提供商和模型仅在企业版套餐中可用。",
     "readOnly": "只有组织所有者和管理员可以更改这些设置。",
     "loadError": "提供商和模型加载失败",
     "tabModels": "模型",

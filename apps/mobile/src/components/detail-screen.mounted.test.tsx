@@ -26,7 +26,7 @@ vi.mock('react-native-keyboard-controller', () => ({
 vi.mock('@/lib/keyboard-reveal', () => ({ scrollFocusedInputAboveKeyboard: vi.fn() }));
 vi.mock('@/lib/screen-insets', () => ({
   useDetailScreenBottomPadding: () => 0,
-  useScreenInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  useSideInsetMarginStyle: () => undefined,
 }));
 vi.mock('@/lib/a11y/motion-context', () => ({
   useProvidedMotionPolicy: () => ({

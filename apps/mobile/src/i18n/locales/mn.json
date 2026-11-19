@@ -1028,7 +1028,10 @@
     "tabs": {
       "overview": "Тойм",
       "files": "Файлууд",
-      "discussion": "Хэлэлцүүлэг"
+      "discussion": "Хэлэлцүүлэг",
+      "discussionAccessibility_one": "{{title}}: 1 сэтгэгдэл",
+      "discussionAccessibility": "{{title}}: {{displayCount}} сэтгэгдэл",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} сэтгэгдэл"
     },
     "fileStatus": {
       "modified": "Өөрчилсөн",
@@ -1225,7 +1228,7 @@
     },
     "instructions": {
       "title": "Тусгай заавар",
-      "deprecation": "Тусгай зааврын дэмжлэгийг зогсоохоор төлөвлөсөн. Эдгээр зааврыг репозиторийнхоо REVIEW.md файлд шилжүүлнэ үү.",
+      "deprecation": "Тусгай зааврыг хасах болно. Эдгээр зааврыг репозиторийнхоо REVIEW.md файлд шилжүүлнэ үү.",
       "placeholder": "жишээ нь: Алдаа боловсруулах дүрмийг мөрдүүлэх…",
       "clearTitle": "Тусгай зааврыг устгах уу?",
       "clearMessage": "Хоосон талбарыг хадгалснаар энэ хянагчид хадгалагдсан тусгай зааврыг устгана."
@@ -1391,6 +1394,7 @@
       "managedOnWeb": "{{organization}}-ийн Bitbucket холболтыг компьютерээс вэб дээр удирддаг.",
       "description": "{{organization}}-д зориулсан ажлын талбарын хандалтын токен үүсгээд доор буулгана уу.",
       "descriptionReconnect": "{{organization}}-д зориулсан шинэ ажлын талбарын хандалтын токен үүсгээд доор буулгана уу.",
+      "descriptionOverview": "{{organization}}-д зориулсан ажлын талбарын хандалтын токен үүсгээд дараагийн дэлгэц дээр буулгана уу.",
       "scopes": "Бүртгэл: унших · Репозитори: унших/бичих · Нэгтгэх хүсэлт: унших · Вэбхүүк: унших/бичих",
       "tokenPlaceholder": "Ажлын талбарын хандалтын токен",
       "tokenRefused": "Bitbucket энэ ажлын талбарын хандалтын токеныг хүлээж аваагүй. Токен дээрх эрхүүдтэй эсэхийг шалгаад, дахин оролдоно уу."
@@ -3185,6 +3189,8 @@
     "retryHint": "Kilo Pass-ын төлөвийг дахин ачаална.",
     "endedOn": "Дууссан {{date}}",
     "notAvailableInApp": "Kilo Pass апп дотор боломжгүй байна.",
+    "notAvailableTitle": "Kilo Pass апп дотор байхгүй",
+    "noPassDescription": "Энэ бүртгэлд Kilo Pass байхгүй.",
     "statusActive": "Идэвхтэй",
     "statusTrialing": "Туршилтын хугацаа",
     "statusPastDue": "Төлбөр хугацаа хэтэрсэн",
@@ -3467,7 +3473,7 @@
       "retentionLimit": "Хамгийн сүүлийн нэхэмжлэхүүдийг харуулж байна."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Үлдэгдэл багасах анхааруулгыг идэвхжүүлэх",
+      "subtitle": "Энэ байгууллагын үлдэгдэл таны тогтоосон дүнгээс доош буурах үед таны оруулсан хаягууд руу имэйлээр анхааруулга илгээнэ.",
       "notifyEmailsLabel": "Мэдэгдэл хүлээн авах имэйл хаягууд",
       "permissionDenied": "Танд төлбөрийн анхааруулгыг удирдах эрх байхгүй.",
       "separateEmailsHint": "Олон имэйл хаягийг таслалаар тусгаарлана уу.",
@@ -3649,7 +3655,8 @@
     "signupStepUp": "Бүртгэл үүсгэж дуусгахын тулд '$t(login.moreSignInOptions)' сонголтыг ашиглана уу.",
     "signupStepUpApple": "Бүртгэл үүсгэж дуусгахын тулд '$t(login.signInWithApple)' сонголтыг ашиглана уу.",
     "signupStepUpGoogle": "Бүртгэл үүсгэж дуусгахын тулд '$t(login.signInWithGoogle)' сонголтыг ашиглана уу.",
-    "invalidCode": "Энэ код буруу байна. Дахин оролдоно уу.",
+    "signupStepUpBack": "Бүртгэл үүсгэж дуусгахын тулд буцаад '$t(login.moreSignInOptions)' сонголтыг ашиглана уу.",
+    "invalidCode": "Энэ код буруу эсвэл хугацаа нь дууссан байна. Дахин оролдох эсвэл '$t(login.resendCode)' товчийг ашиглана уу.",
     "codeInProgress": "Таны кодыг боловсруулж байна. Хэсэг хүлээгээд дахин оролдоно уу.",
     "tooManyAttempts": "Хэт олон удаа оролдсон байна. Шинэ код хүснэ үү.",
     "invalidToken": "Нэвтрэлт амжилтгүй боллоо. Дахин оролдоно уу.",
@@ -4536,6 +4543,7 @@
     "empty": "Энэ тоймын хугацаанд үйл ажиллагаа алга",
     "emptyHint": "Товлосон тоймд үйл ажиллагаа байгаа үед таны үүлэн болон CLI кодчиллын сешнүүд энд харагдана.",
     "loadError": "Тоймуудыг ачаалж чадсангүй",
+    "estimateLoadError": "Тооцоог ачаалж чадсангүй.",
     "view": "Тойм унших",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4941,7 +4949,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Аж ахуйн нэгжийн боломж",
-    "enterpriseOnly": "Энэ нь зөвхөн аж ахуйн нэгжид зориулсан боломж юм.",
+    "enterpriseOnly": "Нийлүүлэгчид болон загварууд Enterprise төлөвлөгөөнд боломжтой.",
     "readOnly": "Зөвхөн байгууллагын эзэд болон администраторууд эдгээр тохиргоог өөрчилж болно.",
     "loadError": "Нийлүүлэгчид болон загваруудыг ачаалж чадсангүй",
     "tabModels": "Загварууд",

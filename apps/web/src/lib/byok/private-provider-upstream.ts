@@ -2,10 +2,6 @@ import {
   type ByokPrivateProviderCredentials,
   type ByokPrivateModel,
 } from '@kilocode/db/schema-types';
-import {
-  byokPrivateProviderCredentialSecrets,
-  redactByokPrivateProviderSecrets,
-} from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/redaction';
 import { resolveByokPrivateProviderUpstreamAuth } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/direct-provider';
 import {
   MAX_LISTED_MODELS,
@@ -58,10 +54,7 @@ export async function findByokPrivateProviderBaseUrlViolation(
   return decision.allowed ? null : URL_POLICY_MESSAGES[decision.violation];
 }
 
-/**
- * Headers that authorize the request as gateway requests to the private provider do, and every secret
- * value that went into them.
- */
+/** Headers that authorize the request as gateway requests to the private provider do. */
 async function authorizedHeaders({
   url,
   method,
@@ -74,13 +67,10 @@ async function authorizedHeaders({
   body: string;
   credentials: ByokPrivateProviderCredentials;
   extraHeaders: Record<string, string>;
-}): Promise<{ headers: Headers; secrets: string[] }> {
+}): Promise<Headers> {
   const headers = new Headers({ accept: 'application/json' });
   if (body) headers.set('content-type', 'application/json');
   const auth = await resolveByokPrivateProviderUpstreamAuth(credentials);
-  const secrets = [...byokPrivateProviderCredentialSecrets(credentials), auth.apiKey].filter(
-    Boolean
-  );
   if (auth.apiKeyHeader === 'x-api-key') {
     headers.set('x-api-key', auth.apiKey);
     headers.set('anthropic-version', ANTHROPIC_VERSION);
@@ -88,11 +78,8 @@ async function authorizedHeaders({
     headers.set('authorization', `Bearer ${auth.apiKey}`);
   }
   for (const [name, value] of Object.entries(extraHeaders)) headers.set(name, value);
-  if (!auth.awsBedrock) return { headers, secrets };
-  return {
-    headers: await signBedrockRequest({ url, method, headers, body, credentials: auth.awsBedrock }),
-    secrets,
-  };
+  if (!auth.awsBedrock) return headers;
+  return signBedrockRequest({ url, method, headers, body, credentials: auth.awsBedrock });
 }
 
 async function readTextWithLimit(response: Response): Promise<string> {
@@ -117,8 +104,6 @@ export type ByokPrivateProviderResponse = {
   status: number;
   ok: boolean;
   text: string;
-  /** The secret values sent with the request; an upstream may echo them in an error. */
-  secrets: readonly string[];
 };
 
 /**
@@ -140,13 +125,7 @@ export async function fetchByokPrivateProvider({
   headers?: Record<string, string>;
   timeoutMs?: number;
 }): Promise<ByokPrivateProviderResponse> {
-  const { headers, secrets } = await authorizedHeaders({
-    url,
-    method,
-    body,
-    credentials,
-    extraHeaders,
-  });
+  const headers = await authorizedHeaders({ url, method, body, credentials, extraHeaders });
 
   let response: Response;
   try {
@@ -172,7 +151,6 @@ export async function fetchByokPrivateProvider({
     status: response.status,
     ok: response.ok,
     text: await readTextWithLimit(response),
-    secrets,
   };
 }
 
@@ -304,7 +282,7 @@ const MAX_ERROR_DETAIL_LENGTH = 300;
 
 /**
  * A short, human-readable reason from an upstream error body: the `error.message` of a JSON body,
- * otherwise the beginning of the text. Credentials the upstream echoes are redacted.
+ * otherwise the beginning of the text.
  */
 export function describeByokPrivateProviderError(response: ByokPrivateProviderResponse): string {
   let detail: string | undefined;
@@ -322,10 +300,5 @@ export function describeByokPrivateProviderError(response: ByokPrivateProviderRe
     detail = response.text.trim() || undefined;
   }
   const status = `HTTP ${response.status}`;
-  if (!detail) return status;
-  const redacted = redactByokPrivateProviderSecrets(detail, response.secrets).slice(
-    0,
-    MAX_ERROR_DETAIL_LENGTH
-  );
-  return `${status}: ${redacted}`;
+  return detail ? `${status}: ${detail.slice(0, MAX_ERROR_DETAIL_LENGTH)}` : status;
 }

@@ -6,13 +6,8 @@ import {
   type ByokPrivateProviderResponse,
 } from './private-provider-upstream';
 
-const API_KEY = 'sk-proj-AbCdEfGh1234567890wxyz';
-
-function failure(
-  text: string,
-  secrets: readonly string[] = [API_KEY]
-): ByokPrivateProviderResponse {
-  return { status: 401, ok: false, text, secrets };
+function failure(text: string): ByokPrivateProviderResponse {
+  return { status: 401, ok: false, text };
 }
 
 describe('describeByokPrivateProviderError', () => {
@@ -35,43 +30,6 @@ describe('describeByokPrivateProviderError', () => {
   test('keeps at most 300 characters of the detail', () => {
     expect(describeByokPrivateProviderError(failure('x'.repeat(1000)))).toBe(
       `HTTP 401: ${'x'.repeat(300)}`
-    );
-  });
-
-  test('redacts a credential the upstream echoes in a JSON message', () => {
-    const response = failure(JSON.stringify({ error: { message: `Invalid key ${API_KEY}.` } }));
-
-    expect(describeByokPrivateProviderError(response)).toBe('HTTP 401: Invalid key [redacted].');
-  });
-
-  test('redacts a credential the upstream echoes in a plain text body', () => {
-    expect(describeByokPrivateProviderError(failure(`Bad credentials: ${API_KEY}`))).toBe(
-      'HTTP 401: Bad credentials: [redacted]'
-    );
-  });
-
-  test.each([
-    ['a masked middle', 'Incorrect API key provided: sk-proj-********wxyz.'],
-    ['a prefix only', 'Incorrect API key provided: sk-proj-AbCd.'],
-    ['a suffix only', 'Incorrect API key provided: ...7890wxyz.'],
-  ])('redacts the visible ends of %s', (_case, message) => {
-    const described = describeByokPrivateProviderError(failure(message));
-
-    expect(described).not.toContain('sk-proj-');
-    expect(described).not.toContain('wxyz');
-    expect(described).toContain('[redacted]');
-  });
-
-  test('redacts every secret of the credentials, including a derived token', () => {
-    const secrets = ['AKIAEXAMPLEKEYID123', 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'];
-    const response = failure(`${secrets[1]} for ${secrets[0]}`, secrets);
-
-    expect(describeByokPrivateProviderError(response)).toBe('HTTP 401: [redacted] for [redacted]');
-  });
-
-  test('keeps text that shares no run with a secret', () => {
-    expect(describeByokPrivateProviderError(failure('Rate limit exceeded, retry later'))).toBe(
-      'HTTP 401: Rate limit exceeded, retry later'
     );
   });
 });

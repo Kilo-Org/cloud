@@ -389,6 +389,14 @@ test('row-misaligned: an iOS switch is measured by the track it paints', () => {
   // Before iOS 26 the track is 31 pt.
   const legacy = run('row-misaligned', switchAndIcon(161.33), { ...IOS_26, osVersion: '18.4' });
   assert.equal(Math.round((legacy[0]?.measured ?? 0) * 100) / 100, 9.17);
+  // A snapshot names no iOS release, and it reports the track it measured as the
+  // switch's child: that box wins over any size the rule would assume.
+  const measuredTrack = run(
+    'row-misaligned',
+    [...switchAndIcon(161.33), { parent: 2, tag: 'UISwitch', rect: [261.67, 161.33, 63, 31] }],
+    { ...IOS_26, osVersion: '' }
+  );
+  assert.equal(Math.round((measuredTrack[0]?.measured ?? 0) * 100) / 100, 9.17);
   // Android centers its track in the frame, so the frame's center is the track's.
   assert.deepEqual(
     run('row-misaligned', switchAndIcon(164), { ...IOS_26, platform: 'android' }),

@@ -1,7 +1,7 @@
 import { InfraError } from './capture';
 import { TAP_TARGET } from './matrix';
 import { APP_ID } from './report';
-import type { Insets, ProbeDump, ProbeNode } from './tree';
+import { IOS_SWITCH_TRACK_TAG, type Insets, type ProbeDump, type ProbeNode } from './tree';
 import { snapshotScrollAxes, uiautomatorTag } from './uiautomator';
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
@@ -177,7 +177,14 @@ const IOS_TAGS: Record<string, string> = {
   TextView: 'TextInput',
   Other: 'View',
 };
-const IOS_PRESSABLE_KINDS = new Set(['button', 'link', 'switch', 'text-field', 'text-view']);
+const IOS_PRESSABLE_KINDS = new Set(['button', 'link', 'text-field', 'text-view']);
+/**
+ * A React Native `Switch` is two views on iOS: the host, whose frame is the touch
+ * area React Native lays out, and the `UISwitch` inside it, whose frame is the
+ * track UIKit draws from the host's top. The host is the control; the track keeps
+ * its own tag so the row rule measures what is painted.
+ */
+const IOS_SWITCH_HOST = 'RCTSwitchComponentView';
 
 /** Where one snapshot's frames live, and how its nodes read. */
 type Conversion = {
@@ -269,10 +276,14 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
       // The snapshot names no system bars on iOS, so the insets are unknown.
       safeArea: { insets: { top: 0, right: 0, bottom: 0, left: 0 }, known: false },
       tag: node =>
-        node.role === 'RCTSwitchComponentView'
+        node.role === IOS_SWITCH_HOST
           ? 'Switch'
-          : (IOS_TAGS[node.type ?? 'Other'] ?? node.type ?? 'View'),
-      pressable: node => node.hittable === true && IOS_PRESSABLE_KINDS.has(node.kind ?? ''),
+          : node.role === IOS_SWITCH_TRACK_TAG
+            ? IOS_SWITCH_TRACK_TAG
+            : (IOS_TAGS[node.type ?? 'Other'] ?? node.type ?? 'View'),
+      pressable: node =>
+        node.hittable === true &&
+        (node.role === IOS_SWITCH_HOST || IOS_PRESSABLE_KINDS.has(node.kind ?? '')),
       testID: () => true,
     });
   }

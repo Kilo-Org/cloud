@@ -4,7 +4,7 @@ import test from 'node:test';
 import { agentDeviceArgs, agentDeviceToProbeDump, withScreenshotScale } from './agent-device';
 import { InfraError } from './capture';
 import { normalize } from './rules';
-import { checkTouchOverlap } from './rules/screen';
+import { checkTouchOverlap, checkTouchTargets } from './rules/screen';
 import type { ProbeNode } from './tree';
 
 const APP = 'com.kilocode.kiloapp';
@@ -225,18 +225,23 @@ test('agent-device iOS snapshot converts the app views in points', () => {
       [1, 'View', 186.33],
       [2, 'Paragraph', 197],
       [2, 'Switch', 188.33],
-      [4, 'Switch', 188.33],
+      [4, 'UISwitch', 188.33],
       [1, 'Button', 300],
     ]
   );
   assert.equal(dump.nodes[3]?.text, 'Active agents');
   assert.equal(dump.nodes[5]?.label, 'Active agents');
   assert.equal(dump.nodes[5]?.testID, 'notification-toggle-agents');
-  // Every iOS view is hittable; only a control kind is pressable.
+  // Every iOS view is hittable; a control kind is pressable, and so is the switch
+  // host, whose 44 pt frame is the touch area. The 28 pt track is not a control.
   assert.deepEqual(
     dump.nodes.map(node => node.pressable === true),
-    [false, false, false, false, false, true, true]
+    [false, false, false, false, true, false, true]
   );
+  const layout = normalize(dump);
+  assert.deepEqual(checkTouchTargets(layout), []);
+  // The track keeps the box UIKit draws, which the row rule reads as the paint.
+  assert.deepEqual(dump.nodes[5]?.rect, [311, 188.33, 63, 28]);
   // The screenshot supplies the scale the snapshot does not report.
   assert.equal(withScreenshotScale(dump, 1206).env.pixelRatio, 3);
   const android = agentDeviceToProbeDump(SNAPSHOT);

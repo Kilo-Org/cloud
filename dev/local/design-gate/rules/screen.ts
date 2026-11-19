@@ -5,6 +5,7 @@ import {
   contains,
   contentBox,
   insidePresentedSurface,
+  IOS_SWITCH_TRACK_TAG,
   intersection,
   layoutRect,
   right,
@@ -244,9 +245,15 @@ const IOS_LEGACY_SWITCH_HEIGHT_PT = 31;
  * whatever frame React Native gives it, so an iOS `Switch` taller than that paints
  * at the frame's top and the frame's center is not where the track is. Android's
  * switch centers its track in its frame.
+ *
+ * An accessibility snapshot reports the drawn track as the switch's child, and
+ * that measured box wins. The probe reports the host only, so the track's size
+ * comes from the iOS release the probe names.
  */
 function paintedRect(node: LayoutNode, env: LayoutTree['env']): Rect {
   if (env.platform !== 'ios' || node.tag !== 'Switch') return node.rect;
+  const track = node.children.find(child => child.tag === IOS_SWITCH_TRACK_TAG);
+  if (track) return track.rect;
   const drawn =
     Number.parseInt(env.osVersion, 10) < 26 ? IOS_LEGACY_SWITCH_HEIGHT_PT : IOS_SWITCH_HEIGHT_PT;
   return [node.rect[0], node.rect[1], node.rect[2], Math.min(node.rect[3], drawn)];

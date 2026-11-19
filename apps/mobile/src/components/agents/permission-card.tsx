@@ -128,7 +128,10 @@ export function PermissionCard({
   // Only the command is display copy. Other metadata entries are control flags
   // or machine payloads and must not reach the card as raw key/value rows.
   const parsedCommand = commandSchema.safeParse(metadata?.command);
-  const command = parsedCommand.success ? parsedCommand.data : null;
+  // An empty or whitespace-only command names no text to show; treat it as
+  // absent so the stored scope stays visible in the standalone block.
+  const command =
+    parsedCommand.success && parsedCommand.data.trim() !== '' ? parsedCommand.data : null;
   // The patterns name the scope a stored rule covers. With a command visible,
   // only the patterns that differ from the command after trimming and
   // collapsing whitespace need a scope caption, and the command stays visible.
@@ -183,12 +186,12 @@ export function PermissionCard({
               <Text className="text-xs text-muted-foreground">
                 {isolateLtrBidiText(displaySafeText(command))}
               </Text>
-              {scopePatterns.length > 0 ? (
-                <Text className="text-xs text-muted-foreground">
+              {scopePatterns.map((pattern, index) => (
+                <Text key={index} className="text-xs text-muted-foreground">
                   {t('agentChat.permissionCard.appliesTo')}{' '}
-                  {isolateLtrBidiText(displaySafeText(scopePatterns.join(', ')))}
+                  {isolateLtrBidiText(displaySafeText(pattern))}
                 </Text>
-              ) : null}
+              ))}
             </View>
           ) : null}
         </View>

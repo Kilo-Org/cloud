@@ -62,7 +62,11 @@ export const BLOCKED_BASH_COMMAND: StoredMessage = {
       type: 'tool',
       callID: 'call_designGateBlocked',
       tool: 'bash',
-      state: { status: 'running', input: { command: 'pnpm test --filter api' }, time: { start: 1 } },
+      state: {
+        status: 'running',
+        input: { command: 'pnpm test --filter api' },
+        time: { start: 1 },
+      },
     },
   ],
 };

@@ -95,13 +95,41 @@ describe('PermissionCard mounted', () => {
     });
     const lines = textLines(renderer.root);
 
-    expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
-    expect(lines).toContain(isolated('rg todo *, rg --files *'));
+    expect(
+      lines.filter(value => value === i18n.t('agentChat.permissionCard.appliesTo'))
+    ).toHaveLength(2);
+    expect(lines).toContain(isolated('rg todo *'));
+    expect(lines).toContain(isolated('rg --files *'));
     expect(lines).toContain(i18n.t('profiles.commandLabel'));
     expect(lines).toContain(isolated('rg todo 2>/dev/null'));
     expect(lines).not.toContain('• ');
-    expect(lines).not.toContain(isolated('rg todo *'));
-    expect(lines).not.toContain(isolated('rg --files *'));
+  });
+
+  it('keeps a caption for the one pattern that differs from the command', async () => {
+    const renderer = await renderCard({
+      patterns: ['rg todo *', ' rg  todo  2>/dev/null '],
+      metadata: { command: 'rg todo 2>/dev/null' },
+    });
+    const lines = textLines(renderer.root);
+
+    expect(
+      lines.filter(value => value === i18n.t('agentChat.permissionCard.appliesTo'))
+    ).toHaveLength(1);
+    expect(lines).toContain(isolated('rg todo *'));
+    expect(lines).toContain(isolated('rg todo 2>/dev/null'));
+    expect(lines).not.toContain(isolated(' rg  todo  2>/dev/null '));
+  });
+
+  it('shows the standalone scope when the command is whitespace only', async () => {
+    const renderer = await renderCard({
+      patterns: ['pnpm test *'],
+      metadata: { command: '   ' },
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain(isolated('pnpm test *'));
+    expect(lines).not.toContain(i18n.t('profiles.commandLabel'));
   });
 
   it('lists only the command when every pattern reads the same after whitespace normalization', async () => {

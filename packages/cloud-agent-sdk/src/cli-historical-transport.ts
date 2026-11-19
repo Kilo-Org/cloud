@@ -75,7 +75,7 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
               // forever.
               const failure = sessionSnapshotFailureMessage(page.kind);
               config.onError?.(failure.message, failure);
-              sink.onServiceEvent({ type: 'stopped', reason: 'error' });
+              sink.onServiceEvent({ type: 'stopped', reason: 'error', failure });
             },
             (error: unknown) => {
               if (expectedGeneration !== generation) return;

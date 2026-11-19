@@ -354,7 +354,13 @@ describe('CliHistoricalTransport page-seam', () => {
       message: 'Session history temporarily unavailable',
     });
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
-    expect(serviceEvents).toEqual([{ type: 'stopped', reason: 'error' }]);
+    expect(serviceEvents).toEqual([
+      {
+        type: 'stopped',
+        reason: 'error',
+        failure: { kind: 'retryable_failure', message: 'Session history temporarily unavailable' },
+      },
+    ]);
     transport.destroy();
   });
 
@@ -372,7 +378,13 @@ describe('CliHistoricalTransport page-seam', () => {
       message: 'Session history too large to load',
     });
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
-    expect(serviceEvents).toEqual([{ type: 'stopped', reason: 'error' }]);
+    expect(serviceEvents).toEqual([
+      {
+        type: 'stopped',
+        reason: 'error',
+        failure: { kind: 'too_large', message: 'Session history too large to load' },
+      },
+    ]);
     transport.destroy();
   });
 
@@ -389,7 +401,13 @@ describe('CliHistoricalTransport page-seam', () => {
       kind: 'invalid_data',
       message: 'Session history is unavailable',
     });
-    expect(serviceEvents).toEqual([{ type: 'stopped', reason: 'error' }]);
+    expect(serviceEvents).toEqual([
+      {
+        type: 'stopped',
+        reason: 'error',
+        failure: { kind: 'invalid_data', message: 'Session history is unavailable' },
+      },
+    ]);
     transport.destroy();
   });
 

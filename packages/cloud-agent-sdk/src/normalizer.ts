@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 import type { BackgroundActivityState } from './background-activity';
+import type { SessionSnapshotFailure } from './snapshot-page';
 import type { Part, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
@@ -150,6 +151,13 @@ export type ServiceEvent =
       type: 'stopped';
       reason: 'complete' | 'interrupted' | 'disconnected' | 'transport-disconnected' | 'error';
       branch?: string | undefined;
+      /**
+       * The typed transcript-read failure this stop ends, when the transport
+       * reports one. `service-state` forwards it to the same `onError` channel
+       * the read used, so the terminal-vs-retryable decision keeps the machine
+       * kind instead of degrading to the generic stop message.
+       */
+      failure?: SessionSnapshotFailure | undefined;
     }
   | { type: 'warning' }
   | {

@@ -270,4 +270,4 @@ export function resetSheetMocks(): void {
   confirmMock.requests.length = 0;
 }
 
-export { confirmMock, platformMock, preventRemoveMock, routerMock, state, statusStore };
+export { confirmMock, preventRemoveMock, routerMock, state, statusStore };

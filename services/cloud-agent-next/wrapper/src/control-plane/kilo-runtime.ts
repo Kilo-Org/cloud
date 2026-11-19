@@ -1569,21 +1569,28 @@ function canonicalJson(value: unknown): string {
  */
 function authorizationConfigurationSignature(env: Record<string, string>): string {
   const raw = env.KILO_CONFIG_CONTENT;
-  let permission: unknown = null;
-  if (raw !== undefined) {
+  let permission: unknown;
+  if (raw === undefined) {
+    permission = null;
+  } else {
+    // A configuration that cannot be read has its own signature, which includes
+    // the raw text, so it matches only an identically written configuration.
+    let parsed: unknown;
     try {
-      const parsed: unknown = JSON.parse(raw);
-      if (
-        typeof parsed === 'object' &&
-        parsed !== null &&
-        !Array.isArray(parsed) &&
-        'permission' in parsed
-      ) {
-        permission = parsed.permission ?? null;
-      }
+      parsed = JSON.parse(raw);
     } catch {
-      permission = null;
+      return canonicalJson({
+        unreadable: raw,
+        reviewTarget: env[GITHUB_REVIEW_TARGET_ENV] ?? null,
+      });
     }
+    permission =
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      'permission' in parsed
+        ? (parsed.permission ?? null)
+        : null;
   }
   return canonicalJson({ permission, reviewTarget: env[GITHUB_REVIEW_TARGET_ENV] ?? null });
 }

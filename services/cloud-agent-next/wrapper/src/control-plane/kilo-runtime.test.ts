@@ -3028,6 +3028,39 @@ describe('createKiloRuntimes', () => {
     await runtime.shutdown();
   });
 
+  it('signs an unreadable runtime configuration by its own text', async () => {
+    // A configuration that cannot be read compares by its own text, so a
+    // credential install admits it only when the text is identical.
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      env: { KILO_CONFIG_CONTENT: 'not json' },
+    });
+    let drift: unknown;
+    try {
+      await runtime.installCredentials({ KILO_CONFIG_CONTENT: '{"permission":' });
+    } catch (error) {
+      drift = error;
+    }
+    expect(drift).toBeInstanceOf(KiloWorktreePolicyMismatchError);
+    expect(runtime.env.KILO_CONFIG_CONTENT).toBe('not json');
+    await runtime.shutdown();
+
+    // The identical configuration is accepted.
+    const { runtime: unreadable } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      env: { KILO_CONFIG_CONTENT: '{"permission":' },
+    });
+    await unreadable.installCredentials({ KILO_CONFIG_CONTENT: '{"permission":' });
+    expect(unreadable.env.KILO_CONFIG_CONTENT).toBe('{"permission":');
+    await unreadable.shutdown();
+  });
+
   it('rejects a proxy/non-proxy credential-class mismatch and never recreates the runtime', async () => {
     let created = 0;
     const runtimes = createKiloRuntimes({

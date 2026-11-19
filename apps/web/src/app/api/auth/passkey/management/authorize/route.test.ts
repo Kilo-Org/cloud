@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
@@ -16,6 +16,14 @@ jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/auth/magic-link-tokens') as object),
   commitSignInCode: jest.fn(),
 }));
+jest.mock('@/lib/auth/passkey-management', () => ({
+  ...(jest.requireActual('@/lib/auth/passkey-management') as object),
+  discardPasskeyManagementAuthorization: jest.fn(),
+}));
+jest.mock('@/lib/auth/passkey', () => ({
+  ...(jest.requireActual('@/lib/auth/passkey') as object),
+  consumeSignInTicket: jest.fn(),
+}));
 
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { findUserBySignInCodeEmail } from '@/lib/user';
@@ -28,11 +36,16 @@ import {
   reserveSignInCode,
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import type * as MagicLinkTokensModule from '@kilocode/web-shared/lib/auth/magic-link-tokens';
-import { createSignInTicket } from '@/lib/auth/passkey';
+import { consumeSignInTicket, createSignInTicket } from '@/lib/auth/passkey';
+import type * as PasskeyModule from '@/lib/auth/passkey';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_sessions, passkey_management_authorizations, type User } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { validatePasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
+import {
+  discardPasskeyManagementAuthorization,
+  validatePasskeyManagementAuthorization,
+} from '@/lib/auth/passkey-management';
+import type * as PasskeyManagementModule from '@/lib/auth/passkey-management';
 import { POST } from './route';
 
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -40,10 +53,19 @@ const mockFindUserBySignInCodeEmail = jest.mocked(findUserBySignInCodeEmail);
 const mockCheckDomainSignInEligibility = jest.mocked(checkDomainSignInEligibility);
 const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
 const mockCommitSignInCode = jest.mocked(commitSignInCode);
+const mockConsumeSignInTicket = jest.mocked(consumeSignInTicket);
+const mockDiscardPasskeyManagementAuthorization = jest.mocked(
+  discardPasskeyManagementAuthorization
+);
 
 const realCommitSignInCode = jest.requireActual<typeof MagicLinkTokensModule>(
   '@kilocode/web-shared/lib/auth/magic-link-tokens'
 ).commitSignInCode;
+
+const realPasskeyModule = jest.requireActual<typeof PasskeyModule>('@/lib/auth/passkey');
+const realPasskeyManagementModule = jest.requireActual<typeof PasskeyManagementModule>(
+  '@/lib/auth/passkey-management'
+);
 
 const admission = {
   platform: 'android',
@@ -104,12 +126,44 @@ async function grantCount(kiloUserId: string): Promise<number> {
   return rows.length;
 }
 
+/**
+ * Refuses every insert into `passkey_management_authorizations` until the
+ * returned drop runs, so a test can make minting a grant fail at the database
+ * rather than through a mock. The function and trigger carry a unique name so
+ * parallel workers cannot collide on them.
+ */
+async function refuseManagementGrantInserts() {
+  const name = `refuse_grant_${randomUUID().replaceAll('-', '')}`;
+  await db.execute(
+    sql.raw(
+      `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ ` +
+        `BEGIN RAISE EXCEPTION 'management grant insert refused'; END $$`
+    )
+  );
+  await db.execute(
+    sql.raw(
+      `CREATE TRIGGER ${name} BEFORE INSERT ON passkey_management_authorizations ` +
+        `FOR EACH ROW EXECUTE FUNCTION ${name}()`
+    )
+  );
+  return {
+    async drop() {
+      await db.execute(sql.raw(`DROP TRIGGER ${name} ON passkey_management_authorizations`));
+      await db.execute(sql.raw(`DROP FUNCTION ${name}()`));
+    },
+  };
+}
+
 describe('POST /api/auth/passkey/management/authorize', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCheckDomainSignInEligibility.mockResolvedValue({ ok: true, existingUser: true });
     mockVerifyAdmissionAsync.mockResolvedValue({ ok: true } as never);
     mockCommitSignInCode.mockImplementation(realCommitSignInCode);
+    mockDiscardPasskeyManagementAuthorization.mockImplementation(
+      realPasskeyManagementModule.discardPasskeyManagementAuthorization
+    );
+    mockConsumeSignInTicket.mockImplementation(realPasskeyModule.consumeSignInTicket);
   });
 
   it('issues a grant for a valid email code and spends the code', async () => {
@@ -470,5 +524,127 @@ describe('POST /api/auth/passkey/management/authorize', () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'INVALID_REQUEST' });
+  });
+
+  it('keeps a passkey ticket usable when the domain policy cannot be resolved', async () => {
+    const user = await insertTestUser();
+    const deviceSessionId = await insertNativeSession(user.id);
+    authenticate(user, deviceSessionId);
+    const ticket = await createSignInTicket(user.id);
+    mockCheckDomainSignInEligibility.mockResolvedValue({
+      ok: false,
+      status: 503,
+      errorCode: 'SSO_ERROR',
+    });
+
+    const refused = await POST(
+      createRequest({ proof: 'passkey', operation: 'enroll', ticket, admission })
+    );
+
+    expect(refused.status).toBe(503);
+    await expect(refused.json()).resolves.toEqual({ error: 'SSO_ERROR' });
+    await expect(grantCount(user.id)).resolves.toBe(0);
+
+    mockCheckDomainSignInEligibility.mockResolvedValue({ ok: true, existingUser: true });
+    const retried = await POST(
+      createRequest({ proof: 'passkey', operation: 'enroll', ticket, admission })
+    );
+
+    expect(retried.status).toBe(200);
+    const body = (await retried.json()) as { authorization: string; operation: string };
+    expect(body.operation).toBe('enroll');
+    await expect(grantCount(user.id)).resolves.toBe(1);
+    await expect(
+      validatePasskeyManagementAuthorization({
+        token: body.authorization,
+        userId: user.id,
+        deviceSessionId,
+        operation: 'enroll',
+      })
+    ).resolves.toBe(true);
+  });
+
+  it('keeps a passkey ticket usable when the domain check throws', async () => {
+    const user = await insertTestUser();
+    const deviceSessionId = await insertNativeSession(user.id);
+    authenticate(user, deviceSessionId);
+    const ticket = await createSignInTicket(user.id);
+    mockCheckDomainSignInEligibility.mockRejectedValue(new Error('policy db down'));
+
+    await expect(
+      POST(createRequest({ proof: 'passkey', operation: 'remove', ticket, admission }))
+    ).rejects.toThrow('policy db down');
+
+    mockCheckDomainSignInEligibility.mockResolvedValue({ ok: true, existingUser: true });
+    const retried = await POST(
+      createRequest({ proof: 'passkey', operation: 'remove', ticket, admission })
+    );
+
+    expect(retried.status).toBe(200);
+    await expect(grantCount(user.id)).resolves.toBe(1);
+  });
+
+  it('keeps a passkey ticket usable when minting the grant fails', async () => {
+    const user = await insertTestUser();
+    const deviceSessionId = await insertNativeSession(user.id);
+    authenticate(user, deviceSessionId);
+    const ticket = await createSignInTicket(user.id);
+
+    const refusedInserts = await refuseManagementGrantInserts();
+    try {
+      await expect(
+        POST(createRequest({ proof: 'passkey', operation: 'remove', ticket, admission }))
+      ).rejects.toThrow();
+    } finally {
+      await refusedInserts.drop();
+    }
+
+    const retried = await POST(
+      createRequest({ proof: 'passkey', operation: 'remove', ticket, admission })
+    );
+
+    expect(retried.status).toBe(200);
+    await expect(grantCount(user.id)).resolves.toBe(1);
+  });
+
+  it('returns INVALID_CODE when the grant cannot be discarded after a lapsed reservation', async () => {
+    const user = await insertTestUser();
+    const deviceSessionId = await insertNativeSession(user.id);
+    authenticate(user, deviceSessionId);
+    mockFindUserBySignInCodeEmail.mockResolvedValue(user);
+    const { code, challengeId } = await createSignInCode(user.google_user_email);
+    mockCommitSignInCode.mockResolvedValue(false);
+    mockDiscardPasskeyManagementAuthorization.mockRejectedValue(new Error('discard down'));
+
+    const response = await POST(
+      createRequest({
+        proof: 'email',
+        operation: 'remove',
+        email: user.google_user_email,
+        code,
+        challengeId,
+        admission,
+      })
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'INVALID_CODE' });
+  });
+
+  it('refuses a ticket another request redeemed first', async () => {
+    const user = await insertTestUser();
+    const deviceSessionId = await insertNativeSession(user.id);
+    authenticate(user, deviceSessionId);
+    const ticket = await createSignInTicket(user.id);
+    mockConsumeSignInTicket.mockResolvedValueOnce(null);
+
+    const response = await POST(
+      createRequest({ proof: 'passkey', operation: 'remove', ticket, admission })
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'INVALID_TICKET' });
+    expect(mockDiscardPasskeyManagementAuthorization).toHaveBeenCalledTimes(1);
+    await expect(grantCount(user.id)).resolves.toBe(0);
   });
 });

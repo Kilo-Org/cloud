@@ -39,32 +39,22 @@ export const FORM_SHEET_ROUTE_SUFFIXES: readonly (readonly string[])[] = [
 
 /** Is the route these segments point at presented as a form sheet? */
 export function isFormSheetRoute(segments: readonly string[]): boolean {
-  return findFormSheetSuffix(segments) !== undefined;
+  return FORM_SHEET_ROUTE_SUFFIXES.some(suffix => matchesSuffix(segments, suffix));
 }
 
 /**
- * The route segments a presented form sheet covers: the sheet's own route
+ * The route segments a presented form sheet covers: the sheet's own screen
  * removed, so a rule that decides something about the screen beneath the sheet
- * reads that screen instead of the sheet. A route that is not a form sheet comes
- * back unchanged, and the longest matching suffix wins when two could match.
+ * reads that screen instead of the sheet. A sheet is a screen of the stack it
+ * opens in, and `useSegments` reports the stack's path to it, so the covered
+ * route is the segments with the trailing sheet screen dropped — one segment,
+ * whichever stack the sheet belongs to. The profile stack's organization sheets
+ * (`organization/invite-member`) and the app stack's chat pickers
+ * (`agent-chat/model-picker`) both cover the screen their route is appended to
+ * or replaces. A route that is not a form sheet comes back unchanged.
  */
 export function segmentsBeneathFormSheet(segments: readonly string[]): readonly string[] {
-  const suffix = findFormSheetSuffix(segments);
-  return suffix === undefined ? segments : segments.slice(0, -suffix.length);
-}
-
-/** The form-sheet route suffix these segments end with, or `undefined`. */
-function findFormSheetSuffix(segments: readonly string[]): readonly string[] | undefined {
-  let matched: readonly string[] | undefined = undefined;
-  for (const suffix of FORM_SHEET_ROUTE_SUFFIXES) {
-    if (
-      matchesSuffix(segments, suffix) &&
-      (matched === undefined || suffix.length > matched.length)
-    ) {
-      matched = suffix;
-    }
-  }
-  return matched;
+  return isFormSheetRoute(segments) ? segments.slice(0, -1) : segments;
 }
 
 /**

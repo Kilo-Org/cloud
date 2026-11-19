@@ -55,10 +55,13 @@ describe('segmentsBeneathFormSheet', () => {
     ).toEqual(['(app)', '(tabs)', '(3_profile)', 'organization']);
   });
 
-  it('removes a dynamic sheet route by its pattern', () => {
+  it('removes a dynamic sheet screen by its pattern', () => {
+    // The covered route is the stack's path one screen up: the sheet is the
+    // stack's own screen, so its leaf goes and everything before it stays. A
+    // concrete value (`abc`) still matches the pattern the registry names.
     expect(
       segmentsBeneathFormSheet(['(app)', 'security-agent', '[scope]', 'dismiss', 'abc'])
-    ).toEqual(['(app)', 'security-agent', '[scope]']);
+    ).toEqual(['(app)', 'security-agent', '[scope]', 'dismiss']);
   });
 
   it('returns a route that is not a sheet unchanged', () => {

@@ -164,13 +164,20 @@ function controls(root: ReactTestInstance, label: string): ReactTestInstance[] {
     );
 }
 
-/** The row the gate leaves behind: the actions row, out of the accessibility tree. */
+/**
+ * The row the gate leaves behind: the actions row, out of the accessibility
+ * tree. It matches the props that hide it from assistive technology as well as
+ * the paint and the touch shield, because those props are what keep a screen
+ * reader off two controls that do nothing.
+ */
 function reservedRow(root: ReactTestInstance): ReactTestInstance[] {
   return root.findAll(
     node =>
       Object.is(node.type, 'View') &&
       String(node.props.className ?? '').includes('opacity-0') &&
-      node.props.pointerEvents === 'none'
+      node.props.pointerEvents === 'none' &&
+      node.props.accessibilityElementsHidden === true &&
+      node.props.importantForAccessibility === 'no-hide-descendants'
   );
 }
 

@@ -9,11 +9,12 @@ import {
   type RepositoryGroup,
 } from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { resolveNewSessionStartBlockedReason } from '@/lib/new-session-submit';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
 import { i18n as appI18n } from '@/i18n';
@@ -24,8 +25,8 @@ vi.mock('react-i18next', async importOriginal => {
   return {
     ...actual,
     useTranslation: () => {
-      const i18n = actual.getI18n();
-      return { t: i18n.t.bind(i18n), i18n };
+      const instance = actual.getI18n();
+      return { t: instance.t.bind(instance), i18n: instance };
     },
   };
 });
@@ -456,6 +457,31 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByComponent(footer, OrganizationPlanRefusal)).toBeNull();
   });
 
+  it('hands the plan refusal the billing step for a reader who may change the plan', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const onPress = (): void => undefined;
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: appI18n.t('common.organizationTrialEndedBilling'),
+      planRefusalAction: { label: appI18n.t('organization.hub.manageBilling'), onPress },
+    }) as Node;
+
+    // The caller owns the role read, so the block paints exactly the reader it
+    // is handed: the copy that offers the step, and the step itself.
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(findElementByComponent(scrollBody, OrganizationPlanRefusal)).toMatchObject({
+      message: appI18n.t('common.organizationTrialEndedBilling'),
+      action: { label: appI18n.t('organization.hub.manageBilling'), onPress },
+    });
+    // The pinned footer still takes no copy of the refusal.
+    const lift = findElementByType(element, 'KeyboardAvoidingView');
+    expect(findElementByComponent(lift, OrganizationPlanRefusal)).toBeNull();
+  });
+
   it('keeps the uploading-attachment reason in the pinned footer with Start', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
@@ -508,6 +534,25 @@ describe('NewSessionConfigureForm', () => {
       // These reasons are a wait or a file fix; neither needs a second control.
       startBlockedAction: null,
     });
+  });
+
+  it('keeps the plan refusal actionless for a reader who cannot change the plan', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: appI18n.t('common.organizationTrialEnded'),
+    }) as Node;
+
+    const block = findElementByComponent(
+      findElement(element, 'ScrollView'),
+      OrganizationPlanRefusal
+    );
+    expect(block).toMatchObject({ message: appI18n.t('common.organizationTrialEnded') });
+    expect(block?.action).toBeUndefined();
   });
 
   // ── Case 1: Cloud, selector shown ──
@@ -957,9 +1002,9 @@ describe('NewSessionConfigureForm', () => {
   it('renders the loading environment row as its title line', () => {
     const element = renderRow({ isProfileLoading: true });
 
-    // No blank line is reserved while the query runs: the loading copy is the
-    // row's one line, so the card is as tall as what it shows.
-    expect(findTextContent(element, t => t === 'Environment')).toBe(true);
+    // The label stays mounted as the shared field label, and no blank line is
+    // reserved while the query runs: the loading copy is the row's one line.
+    expect(findElementByComponent(element, FormFieldLabel)?.label).toBe('Environment');
     expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(false);
     expect(findElementByType(element, 'Skeleton')).toBeNull();
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
@@ -988,22 +1033,26 @@ describe('NewSessionConfigureForm', () => {
     expect(slots).toHaveLength(0);
   });
 
-  it('renders every Environment row state inside the same card', () => {
-    const chrome = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card`;
-
+  it('renders every Environment row state with the same field frame and label', () => {
     for (const row of [
       renderRow({ isProfileLoading: true }),
       renderRow({ isProfileError: true }),
       renderRow({ profile: PROFILE }),
       renderRow(),
     ]) {
-      const cards = [
+      // The label and the trigger frame are the row's fixed anatomy: every
+      // state paints on the same frame, so the state swap cannot move the rows
+      // below it.
+      expect(findElementByComponent(row, FormFieldLabel)?.label).toBe('Environment');
+      const frames = [
         ...collectElementsByType(row, 'View'),
         ...collectElementsByType(row, 'Pressable'),
-      ]
-        .map(element => element.className)
-        .filter(className => typeof className === 'string' && className.includes(chrome));
-      expect(cards).toEqual([expect.stringContaining(chrome)]);
+      ].filter(
+        element =>
+          typeof element.className === 'string' &&
+          element.className.includes(FIELD_TRIGGER_FRAME_CLASS)
+      );
+      expect(frames).toHaveLength(1);
     }
   });
 
@@ -1034,7 +1083,7 @@ describe('NewSessionConfigureForm', () => {
     const row = findElementByComponent(element, NewSessionProfileRow);
     expect(row?.isProfileLoading).toBe(true);
     const loadingRow = renderRow({ isProfileLoading: true });
-    expect(findTextContent(loadingRow, t => t === 'Environment')).toBe(true);
+    expect(findElementByComponent(loadingRow, FormFieldLabel)?.label).toBe('Environment');
     expect(findTextContent(loadingRow, t => t === 'Loading…')).toBe(true);
     expect(findTextContent(loadingRow, t => t === 'Default environment')).toBe(false);
     expect(findTextContent(loadingRow, t => t === '\u00A0\n\u00A0')).toBe(false);

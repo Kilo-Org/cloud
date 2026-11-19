@@ -126,11 +126,6 @@ export function useConsentCardState(mode: ConsentMode) {
   }, [mode, userId, storedLoadRetryKey]);
 
   const handlePrimaryAction = async () => {
-    if (mode === 'review') {
-      router.back();
-      return;
-    }
-
     if (!userId) {
       setError('consent.couldNotLoadAccount');
       return;
@@ -243,14 +238,15 @@ export function useConsentCardState(mode: ConsentMode) {
     [mode, userId]
   );
 
+  // The card renders the primary only when `actions.primaryLabel` exists, which
+  // is onboarding alone (review mode's header owns the way back, so its footer
+  // offers the destructive action only). Onboarding with a resolved account
+  // needs the stored read's answer before an accept can write a choice over it —
+  // a failed or timed-out read stays disabled beside its Retry. With no
+  // resolved account the primary stays operable and the guard reports the
+  // account error.
   const primaryBlocked =
-    // Onboarding with a resolved account needs the stored read's answer
-    // before an accept can write a choice over it — a failed or timed-out
-    // read stays disabled beside its Retry. With no resolved account the
-    // primary stays operable and the guard reports the account error. In
-    // review mode the primary is Back, which needs no stored choice.
-    (mode === 'onboarding' && userId !== undefined && storedLoad.status !== 'ready') ||
-    pendingAction === 'secondary';
+    (userId !== undefined && storedLoad.status !== 'ready') || pendingAction === 'secondary';
 
   return {
     t,

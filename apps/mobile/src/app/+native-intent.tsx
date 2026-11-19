@@ -90,6 +90,18 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (sessionRowFixture) {
       return `/(auth)/session-row-fixture${sessionRowFixture[1] ?? ''}`;
     }
+    // Dev-only chat failure copy for every stable on-device refusal reason. The
+    // state is the link's last segment, so it is forwarded as the route's
+    // `state` param; the fixture falls back to `all` for a name it does not know.
+    const localFailureCopyFixture =
+      /(?:^|\/)dev\/local-failure-copy-fixture\/([a-z][a-z-]*)\/?$/.exec(path);
+    if (localFailureCopyFixture) {
+      return `/(app)/local-failure-copy-fixture?state=${localFailureCopyFixture[1]}`;
+    }
+    // Dev-only GGUF row: the retrying line and the plain downloading line together.
+    if (/(?:^|\/)dev\/gguf-retry-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/gguf-retry-fixture';
+    }
     if (/(?:^|\/)dev\/system-search-unresolved-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/system-search-unresolved-fixture';
     }
@@ -109,11 +121,32 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/attachment-chip-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/attachment-chip-fixture';
     }
+    // Dev-only header geometry fixture: a centered title against each trailing
+    // variant the plan names (`?variant=cluster|back-only|no-back`, default
+    // cluster), so the emulator probe can measure all three from one link.
+    const headerBalanceFixture = /(?:^|\/)dev\/header-balance-fixture\/?(\?.*)?$/.exec(path);
+    if (headerBalanceFixture) {
+      return `/(app)/header-balance-fixture${headerBalanceFixture[1] ?? ''}`;
+    }
     if (/(?:^|\/)dev\/preparation-copy-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/preparation-copy-fixture';
     }
-    if (/(?:^|\/)dev\/new-session-plan-refusal-fixture\/?(?:[?#].*)?$/.test(path)) {
-      return '/(app)/new-session-plan-refusal-fixture';
+    // Dev-only plan refusal at the new-session composer. The optional query
+    // picks the reader's state (`?billing=1` is the role that may change the
+    // plan), so it is forwarded.
+    const planRefusalFixture = /(?:^|\/)dev\/new-session-plan-refusal-fixture\/?(\?.*)?$/.exec(
+      path
+    );
+    if (planRefusalFixture) {
+      return `/(app)/new-session-plan-refusal-fixture${planRefusalFixture[1] ?? ''}`;
+    }
+    // Dev-only plan refusal on the low-balance alert sheet's form. The same
+    // optional query picks the reader's state (`?billing=1` is the role that
+    // may change the plan), so it is forwarded the same way.
+    const lowBalanceRefusalFixture =
+      /(?:^|\/)dev\/low-balance-alert-refusal-fixture\/?(\?.*)?$/.exec(path);
+    if (lowBalanceRefusalFixture) {
+      return `/(app)/low-balance-alert-refusal-fixture${lowBalanceRefusalFixture[1] ?? ''}`;
     }
     if (/(?:^|\/)dev\/transcript-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-failure-fixture';
@@ -157,6 +190,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';
     }
+    // Dev-only destructive settings confirmation: the screen that runs the
+    // agent's `settings_set` call, so the confirm can be driven without a chat.
+    if (/(?:^|\/)dev\/settings-confirm-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(auth)/settings-confirm-fixture';
+    }
     const reauthorizeFixtureMatch =
       /(?:^|\/)dev\/security-agent-reauthorize-fixture\/?(\?.*)?$/.exec(path);
     if (reauthorizeFixtureMatch) {
@@ -169,6 +207,15 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     }
     if (/(?:^|\/)dev\/organization-invoices-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/(tabs)/(3_profile)/organization/invoices-fixture';
+    }
+    // Dev-only personal invoices screen against fixed Stripe answers
+    // (`dev/personal-invoices-fixture/<listed|empty|error>`): the personal list
+    // is a Stripe read a local stack cannot serve, so every capture state routes
+    // here.
+    const personalInvoicesFixture =
+      /(?:^|\/)dev\/personal-invoices-fixture\/(listed|empty|error)\/?$/.exec(path);
+    if (personalInvoicesFixture) {
+      return `/(app)/(tabs)/(3_profile)/personal-invoices-fixture?state=${personalInvoicesFixture[1]}`;
     }
     // Dev-only invite sheet: it navigates itself, so this returns falsy.
     if (handleOrganizationInviteMemberFixturePath(path)) {

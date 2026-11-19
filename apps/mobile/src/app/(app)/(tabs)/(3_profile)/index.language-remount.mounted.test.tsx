@@ -22,6 +22,7 @@ import ProfileRoute from '@/app/(app)/(tabs)/(3_profile)/index';
 
 // The account row opens the shared picker through the press-burst guard; this
 // suite never presses it, so the guarded push is a stub.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/hooks/use-single-push-route', () => ({
   useSinglePushRoute: () => vi.fn(),
 }));

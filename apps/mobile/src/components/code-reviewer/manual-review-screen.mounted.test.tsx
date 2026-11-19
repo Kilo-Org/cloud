@@ -130,8 +130,28 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), push: status.push }),
   useFocusEffect: () => undefined,
 }));
+// The connect actions read the reader's organization role for a trial refusal.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: 'org_1', isLoaded: true }),
+}));
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => ({
+    data: [{ organizationId: 'org_1', role: 'member' }],
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {},
+  useTRPC: () => ({}),
+}));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -141,6 +161,8 @@ vi.mock('@/components/ui/radio-group', () => ({
   radioItemA11y: () => ({}),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // The real `@/components/tab-screen` and `@/lib/code-reviewer-status` are used
 // on purpose. The footer measures its clearance with the real
@@ -149,6 +171,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // depend on the real `classifyProviderErrorCode` to tell retryable from
 // permanent failures.
 vi.mock('@/lib/code-reviewer-config', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
   PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -412,8 +435,15 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     status.connected = false;
     const { renderer, unmount } = await renderScreen();
     // Neither the form nor its pinned action can be rendered before the status
-    // says whether the scope can start one, and the body cannot stay empty.
-    expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(3);
+    // says whether the scope can start one, and the body cannot stay empty. The
+    // placeholder reserves the form's own geometry — the platform section's
+    // label and its two-choice row group — instead of a bar count.
+    expect(findAllOfType(renderer.root, 'RowGroup')).toHaveLength(1);
+    const subtitleRows = renderer.root.findAll(
+      node => String(node.type) === 'RowSkeleton' && node.props.subtitle === true
+    );
+    expect(subtitleRows).toHaveLength(2);
+    expect(findAllOfType(renderer.root, 'Skeleton').length).toBeGreaterThan(0);
     expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
     expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(0);
     expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
@@ -467,15 +497,14 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
 });
 
 describe('ManualReviewScreen connect provider CTA', () => {
-  it('renders the Connect GitHub action full-width like the PR-review connect gate', async () => {
+  it('renders the Connect GitHub action through the shared state action', async () => {
     status.connected = false;
     const { renderer, unmount } = await renderScreen();
 
     const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
-    const { action } = empty.props as { action: ReactElement<{ className?: string }> };
-    const className = String(action.props.className);
-    expect(className).toContain('w-full');
-    expect(className).toContain('mt-3');
+    const { action } = empty.props as { action: ReactElement<{ label: string }> };
+    expect(action.type).toBe('StateAction');
+    expect(action.props.label).toBe(i18n.t('common.connectGithub'));
 
     unmount();
   });

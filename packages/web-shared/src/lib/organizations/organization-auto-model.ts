@@ -16,9 +16,10 @@ import {
   formatDirectByokModelId,
   getDirectByokCatalogModelId,
   getDirectByokModel,
+  getDirectByokModelChatApis,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { getByokCredentials } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KILO_AUTO_BALANCED_MODEL,
@@ -207,25 +208,24 @@ export async function validateOrganizationAutoTarget(
 
   const directByokTarget = await getDirectByokModel(rawModelId);
   if (directByokTarget.provider && directByokTarget.model) {
-    const [credential] = await getByokCredentials(
-      options.dbClient ?? readDb,
-      { type: 'organization', id: organization.id },
-      [directByokTarget.provider.id]
-    );
-    if (!credential) {
+    const key = (
+      await getEnabledByokProviders(options.dbClient ?? readDb, {
+        type: 'organization',
+        id: organization.id,
+      })
+    ).find(candidate => candidate.providerId === directByokTarget.provider?.id);
+    if (!key) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`,
       };
     }
-    const upstream = options.apiKind
-      ? await directByokTarget.provider.resolveUpstream({
-          credential: credential.decryptedAPIKey,
-          model: directByokTarget.model,
-          stream: false,
-        })
-      : null;
-    if (options.apiKind && !upstream?.supportedChatApis.includes(options.apiKind)) {
+    if (
+      options.apiKind &&
+      !getDirectByokModelChatApis(directByokTarget.provider, directByokTarget.model).includes(
+        options.apiKind
+      )
+    ) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
@@ -233,7 +233,7 @@ export async function validateOrganizationAutoTarget(
     }
     // A catalog-mode key serves the model only under its catalog id, which organization model and
     // provider policies cover, so a stored bespoke target resolves to that id.
-    if (credential.serveCatalogModels && supportsCatalogMode(directByokTarget.provider.id)) {
+    if (key.serveCatalogModels && supportsCatalogMode(directByokTarget.provider.id)) {
       const catalogModelId = await getDirectByokCatalogModelId(directByokTarget.model);
       if (!catalogModelId) {
         return {

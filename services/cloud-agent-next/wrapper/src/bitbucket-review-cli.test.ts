@@ -120,6 +120,19 @@ function pullRequestResponseWithoutRepositoryWorkspace(): Record<string, unknown
   return response;
 }
 
+const reviewerCommentAuthor = {
+  uuid: principalUuid,
+  display_name: 'Kilo Reviewer',
+  type: 'app_user',
+  kind: 'workspace_access_token',
+};
+const foreignCommentAuthor = {
+  uuid: '{ffffffff-ffff-4fff-8fff-ffffffffffff}',
+  display_name: 'Repo Owner',
+  type: 'user',
+  kind: 'user',
+};
+
 function commentResponse(
   id: number,
   body: string,
@@ -127,12 +140,14 @@ function commentResponse(
     inline?: { path: string; from?: number | null; to?: number | null; outdated?: boolean };
     deleted?: boolean;
     parentId?: number;
+    author?: Record<string, unknown>;
+    omitAuthor?: boolean;
   } = {}
 ): Record<string, unknown> {
   return {
     id,
     content: { raw: body },
-    user: { uuid: principalUuid, display_name: 'Kilo Reviewer' },
+    ...(options.omitAuthor ? {} : { user: options.author ?? reviewerCommentAuthor }),
     created_on: '2026-06-24T00:00:00.000Z',
     updated_on: '2026-06-24T00:00:00.000Z',
     deleted: options.deleted ?? false,
@@ -876,6 +891,99 @@ describe('bb', () => {
     expect(requests.some(request => request.init.method === 'POST')).toBe(false);
   });
 
+  it('creates a summary when a heading comment belongs to another author', async () => {
+    const requests: RecordedRequest[] = [];
+    const body = '## Code Review Summary\n\n**Status:** No Issues Found';
+    const providerResponse = commentResponse(30, body);
+    const result = await execute(
+      ['comments', 'create', '42', '--input', '-'],
+      providerFetch({
+        requests,
+        comments: [
+          commentResponse(29, '## Code Review Summary\n\n**Status:** Not from this reviewer', {
+            author: foreignCommentAuthor,
+          }),
+        ],
+        createResponse: providerResponse,
+      }),
+      { body }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(requests.map(request => `${request.init.method} ${request.url}`)).toEqual([
+      `GET ${pullRequestUrl}`,
+      `GET ${commentsUrl}?pagelen=100`,
+      `POST ${commentsUrl}`,
+    ]);
+    expect(requestBody(requests.at(-1))).toEqual({ content: { raw: body } });
+  });
+
+  it('creates a summary when a heading comment carries no author object', async () => {
+    const requests: RecordedRequest[] = [];
+    const body = '## Code Review Summary\n\n**Status:** No Issues Found';
+    const result = await execute(
+      ['comments', 'create', '42', '--input', '-'],
+      providerFetch({
+        requests,
+        comments: [
+          commentResponse(29, '## Code Review Summary\n\n**Status:** Unknown author', {
+            omitAuthor: true,
+          }),
+        ],
+        createResponse: commentResponse(30, body),
+      }),
+      { body }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(requests.some(request => request.init.method === 'POST')).toBe(true);
+  });
+
+  it("refuses to update another author's heading comment", async () => {
+    const requests: RecordedRequest[] = [];
+    const result = await execute(
+      ['comments', 'update', '42', '30', '--input', '-'],
+      providerFetch({
+        requests,
+        updateTarget: commentResponse(30, '## Code Review Summary\n\n- Not this reviewer', {
+          author: foreignCommentAuthor,
+        }),
+      }),
+      { body: '## Code Review Summary\n\n- Replacement' }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('bb: comment_not_owned\n');
+    expect(result.stderr).toContain(
+      're-run comments list and update your own summary, or create one when none exists'
+    );
+    expect(requests.map(request => `${request.init.method} ${request.url}`)).toEqual([
+      `GET ${pullRequestUrl}`,
+      `GET ${commentsUrl}/30`,
+    ]);
+  });
+
+  it("updates this reviewer's own summary in place", async () => {
+    const requests: RecordedRequest[] = [];
+    const providerResponse = commentResponse(30, '## Code Review Summary\n\n- Current finding');
+    const result = await execute(
+      ['comments', 'update', '42', '30', '--input', '-'],
+      providerFetch({
+        requests,
+        updateTarget: commentResponse(30, '## Code Review Summary\n\n- Old finding'),
+        updateResponse: providerResponse,
+      }),
+      { body: '## Code Review Summary\n\n- Current finding' }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(requests.map(request => `${request.init.method} ${request.url}`)).toEqual([
+      `GET ${pullRequestUrl}`,
+      `GET ${commentsUrl}/30`,
+      `PUT ${commentsUrl}/30`,
+    ]);
+  });
+
   it('creates a batch of comments after one immediate writable PR reread', async () => {
     const requests: RecordedRequest[] = [];
     let created = 0;
@@ -1028,10 +1136,9 @@ describe('bb', () => {
 
   it('refuses to update a comment that is not the Code Review Summary', async () => {
     const requests: RecordedRequest[] = [];
-    const foreignComment = {
-      ...commentResponse(30, 'Looks good to me'),
-      user: { uuid: '{ffffffff-ffff-4fff-8fff-ffffffffffff}', display_name: 'Repo Owner' },
-    };
+    const foreignComment = commentResponse(30, 'Looks good to me', {
+      author: foreignCommentAuthor,
+    });
     const result = await execute(
       ['comments', 'update', '42', '30', '--input', '-'],
       providerFetch({ requests, updateTarget: foreignComment }),
@@ -1041,7 +1148,7 @@ describe('bb', () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain('bb: comment_not_owned\n');
     expect(result.stderr).toContain(
-      'only the existing Code Review Summary comment can be updated; create a new comment instead'
+      're-run comments list and update your own summary, or create one when none exists'
     );
     expect(requests.map(request => `${request.init.method} ${request.url}`)).toEqual([
       `GET ${pullRequestUrl}`,

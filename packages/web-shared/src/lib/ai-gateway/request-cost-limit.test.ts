@@ -1,5 +1,5 @@
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsMetadataFromDatabase,
@@ -141,7 +141,8 @@ describe('request cost admission', () => {
       catalogOnly,
       {},
       { rules: [] },
-      EMPTY_VERCEL_PRICING_METADATA
+      EMPTY_VERCEL_PRICING_METADATA,
+      'shortContext'
     );
 
     await expect(
@@ -170,7 +171,8 @@ describe('request cost admission', () => {
       catalogEntry,
       { [id]: routeModel },
       preferredOrder,
-      EMPTY_VERCEL_PRICING_METADATA
+      EMPTY_VERCEL_PRICING_METADATA,
+      'shortContext'
     );
     expect(pickerPrice).toEqual(routeModel.endpoints[0]?.pricing);
 
@@ -205,7 +207,8 @@ describe('request cost admission', () => {
         catalogEntry,
         { [id]: routeModel },
         preferredOrder,
-        EMPTY_VERCEL_PRICING_METADATA
+        EMPTY_VERCEL_PRICING_METADATA,
+        'shortContext'
       )
     ).toEqual({ prompt: '0.0000001', completion: '0.0000002' });
     // The bound is about 220 microdollars at OpenRouter's price and about 630 at Vercel's
@@ -217,7 +220,8 @@ describe('request cost admission', () => {
         catalogEntry,
         { [id]: routeModel },
         preferredOrder,
-        await getVercelPricingMetadata()
+        await getVercelPricingMetadata(),
+        'shortContext'
       )
     ).toEqual({ prompt: '0.0000003', completion: '0.0000002' });
     await expect(enforceRequestCostLimit('400', id, body, 2_000_000)).resolves.toMatch(
@@ -247,7 +251,9 @@ describe('request cost admission', () => {
         }
       );
 
-      expect(pickerModelPricing(catalogEntry, {}, togetherPreferred, vercel)).toEqual({
+      expect(
+        pickerModelPricing(catalogEntry, {}, togetherPreferred, vercel, 'shortContext')
+      ).toEqual({
         prompt: '0.000002000000',
         completion: '0.000004000000',
       });
@@ -258,7 +264,9 @@ describe('request cost admission', () => {
         pricing: { prompt: '0.0000005', completion: '0.000001', discount: 0.5 },
       });
 
-      expect(pickerModelPricing(catalogEntry, {}, togetherPreferred, vercel)).toEqual({
+      expect(
+        pickerModelPricing(catalogEntry, {}, togetherPreferred, vercel, 'shortContext')
+      ).toEqual({
         prompt: '0.000001000000',
         completion: '0.000002000000',
       });
@@ -269,11 +277,13 @@ describe('request cost admission', () => {
         { provider_name: 'novita', pricing: { prompt: '0.000009', completion: '0.000009' } }
       );
 
-      expect(pickerModelPricing(catalogEntry, {}, togetherPreferred, vercel)).toEqual({
+      expect(
+        pickerModelPricing(catalogEntry, {}, togetherPreferred, vercel, 'shortContext')
+      ).toEqual({
         prompt: '0.000003',
         completion: '0.000004',
       });
-      expect(pickerModelPricing(catalogEntry, {}, { rules: [] }, vercel)).toEqual({
+      expect(pickerModelPricing(catalogEntry, {}, { rules: [] }, vercel, 'shortContext')).toEqual({
         prompt: '0.000003',
         completion: '0.000004',
       });
@@ -281,9 +291,9 @@ describe('request cost admission', () => {
     it('falls back to the catalog price when the Vercel endpoint has no pricing', () => {
       const vercel = vercelMetadata({ provider_name: 'togetherai' });
 
-      expect(pickerModelPricing(catalogEntry, {}, togetherPreferred, vercel)).toEqual(
-        catalogEntry.pricing
-      );
+      expect(
+        pickerModelPricing(catalogEntry, {}, togetherPreferred, vercel, 'shortContext')
+      ).toEqual(catalogEntry.pricing);
     });
     it('ignores Vercel for a free model id', () => {
       const freeEntry = catalogModel('vendor/model:free', { prompt: '0', completion: '0' });
@@ -300,7 +310,7 @@ describe('request cost admission', () => {
         overrides: new Map(),
       };
 
-      expect(pickerModelPricing(freeEntry, {}, togetherPreferred, vercel)).toEqual({
+      expect(pickerModelPricing(freeEntry, {}, togetherPreferred, vercel, 'shortContext')).toEqual({
         prompt: '0',
         completion: '0',
       });
@@ -316,9 +326,15 @@ describe('request cost admission', () => {
         pricing: { prompt: '0.0001', completion: '0.0001' },
       });
 
-      expect(pickerModelPricing(catalogEntry, { [id]: routeModel }, { rules: [] }, vercel)).toEqual(
-        { prompt: '0.000001', completion: '0.000001' }
-      );
+      expect(
+        pickerModelPricing(
+          catalogEntry,
+          { [id]: routeModel },
+          { rules: [] },
+          vercel,
+          'shortContext'
+        )
+      ).toEqual({ prompt: '0.000001', completion: '0.000001' });
     });
   });
   it('undoes the catalog discount when no route matches', () => {
@@ -329,8 +345,109 @@ describe('request cost admission', () => {
     });
 
     expect(
-      pickerModelPricing(discounted, {}, { rules: [] }, EMPTY_VERCEL_PRICING_METADATA)
+      pickerModelPricing(
+        discounted,
+        {},
+        { rules: [] },
+        EMPTY_VERCEL_PRICING_METADATA,
+        'shortContext'
+      )
     ).toEqual({ prompt: '0.000001000000', completion: '0.000002000000' });
+  });
+  it('shows the short-context price but bounds spending at the long-context price', async () => {
+    const id = 'test/long-context';
+    const routeModel: GatewayModelWithEndpoints = {
+      id,
+      name: 'Long context model',
+      endpoints: [
+        {
+          tag: 'only-route',
+          pricing: {
+            prompt: '0.000001',
+            completion: '0.000002',
+            overrides: [{ min_prompt_tokens: 272000, prompt: '0.000004', completion: '0.000008' }],
+          },
+        },
+      ],
+    };
+    const catalogEntry = catalogModel(id, { prompt: '0.000001', completion: '0.000002' });
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [id]: routeModel });
+    jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
+
+    expect(
+      pickerModelPricing(
+        catalogEntry,
+        { [id]: routeModel },
+        { rules: [] },
+        EMPTY_VERCEL_PRICING_METADATA,
+        'shortContext'
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.000002' });
+    expect(
+      pickerModelPricing(
+        catalogEntry,
+        { [id]: routeModel },
+        { rules: [] },
+        EMPTY_VERCEL_PRICING_METADATA,
+        'worstCase'
+      )
+    ).toEqual({ prompt: '0.000004', completion: '0.000008' });
+    // The bound is about 2200 microdollars at the short-context price and about 8700 at the long one
+    await expect(enforceRequestCostLimit('4000', id, body, 2_000_000)).resolves.toMatch(
+      /spend safeguard/
+    );
+    await expect(enforceRequestCostLimit('10000', id, body, 2_000_000)).resolves.toBeNull();
+  });
+  it("bounds spending at Vercel's highest context-length price tier", async () => {
+    const id = 'test/vercel-tiers';
+    const routeModel: GatewayModelWithEndpoints = {
+      id,
+      name: 'Vercel tiers model',
+      endpoints: [{ tag: 'novita/fp8', pricing: { prompt: '0.000001', completion: '0.000002' } }],
+    };
+    const vercelModel: GatewayModelWithEndpoints = {
+      id,
+      name: 'Vercel tiers model',
+      endpoints: [
+        {
+          provider_name: 'novita',
+          pricing: {
+            prompt: '0.000001',
+            prompt_tiers: [
+              { cost: '0.000001', min: 0, max: 256000 },
+              { cost: '0.000004', min: 256000 },
+            ],
+            completion: '0.000002',
+            completion_tiers: [
+              { cost: '0.000002', min: 0, max: 256000 },
+              { cost: '0.000008', min: 256000 },
+            ],
+          },
+        },
+      ],
+    };
+    const catalogEntry = catalogModel(id, { prompt: '0.000001', completion: '0.000002' });
+    const preferredOrder = { rules: [{ includes: ['test/'], providers: ['novita'] }] };
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [id]: routeModel });
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({ [id]: vercelModel });
+    jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue(preferredOrder);
+    const vercel = await getVercelPricingMetadata();
+
+    expect(
+      pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder, vercel, 'shortContext')
+    ).toEqual({
+      prompt: '0.000001',
+      completion: '0.000002',
+    });
+    expect(
+      pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder, vercel, 'worstCase')
+    ).toEqual({ prompt: '0.000004', completion: '0.000008' });
+    // The bound is about 2200 microdollars at the first tier and about 8700 at the highest
+    await expect(enforceRequestCostLimit('4000', id, body, 2_000_000)).resolves.toMatch(
+      /spend safeguard/
+    );
+    await expect(enforceRequestCostLimit('10000', id, body, 2_000_000)).resolves.toBeNull();
   });
   it('refuses a managed provider that cannot enforce the quoted route price', async () => {
     const decision = await enforceRequestCostLimitDecision(

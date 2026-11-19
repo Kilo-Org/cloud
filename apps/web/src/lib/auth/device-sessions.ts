@@ -182,10 +182,6 @@ function invalidateEvictedSessions(evictedSessionIds: string[]): void {
   }
 }
 
-/**
- * Create a new device session.
- * @returns the created session ID.
- */
 export async function createDeviceSession(params: {
   userId: string;
   userAgent?: string;

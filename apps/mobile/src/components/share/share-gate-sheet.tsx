@@ -2,10 +2,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
-import { GitPullRequest, Plus, X } from '@/components/ui/icons';
+import { GitPullRequest, Plus } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import {
@@ -14,16 +14,16 @@ import {
 } from '@/components/agents/session-detail-routes';
 import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
-import { DestinationOptionRow } from '@/components/destination-option-row';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
+import { SheetHeader } from '@/components/sheet-header';
+import { ConfigureRow } from '@/components/ui/configure-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { resolveRemoteStartPlan } from '@/lib/remote-spawn-admission';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
@@ -35,6 +35,7 @@ import {
 } from '@/lib/share-payload';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { useTRPC } from '@/lib/trpc';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 
 import {
   resolveShareDestinationAdmission,
@@ -60,7 +61,6 @@ type ShareGateSheetProps = {
 
 export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const router = useRouter();
-  const colors = useThemeColors();
   const trpc = useTRPC();
   const { t } = useTranslation();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
@@ -84,6 +84,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   });
 
   const { spawn } = useRemoteInstanceSpawn();
+  // The reader's part in a trial refusal: the sentence follows the role, and
+  // the billing step exists only for a role the server would let change the
+  // plan. The plan's refusal is the only one that offers it.
+  const canManageBilling = useCanManageBilling(organizationId);
+  const billingAction = useBillingAction(organizationId);
   const [spawningConnectionId, setSpawningConnectionId] = useState<string | null>(null);
   // P1-A-08b: one `operationKey` per share-spawn intent (share + instance), so
   // a retryable failure keeps the key and the relay dedupes the retry.
@@ -345,13 +350,19 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       // The remote start is a relay command, so the organization subscription
       // gate never runs for it and the session would be created before the
       // model request was refused. Refuse here, before the spawn, in the same
-      // words the cloud start path uses for the same organization state.
+      // words the cloud start path uses for the same organization state, and
+      // with the step that ends it for the reader who may change the plan. The
+      // toast already takes sonner's action shape, so the step is reachable
+      // from here like it is from the inline refusal on the new-session form.
       const plan = resolveRemoteStartPlan({
         organizationId: organizationId ?? null,
         organizations: memberships,
+        canManageBilling,
       });
       if (!plan.allowed) {
-        toast.error(plan.toast);
+        // This block only runs for the plan's own refusal, so the step follows
+        // the role the plan already read.
+        announceTrialRefusal(plan.toast, billingAction, true);
         return;
       }
 
@@ -426,6 +437,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       })();
     },
     [
+      billingAction,
+      canManageBilling,
       commit,
       commitEnabled,
       getKey,
@@ -449,56 +462,44 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const previewPayload = payload !== null && state.kind !== 'stale-share' ? payload : null;
 
   const header = (
-    <View className="border-b border-border bg-background pt-4">
-      <View className="min-h-[48px] flex-row items-center justify-center px-4">
-        <Text
-          className="min-w-0 flex-1 px-12 text-center text-lg font-semibold text-foreground"
-          accessibilityRole="header"
-        >
-          {t('share.title')}
-        </Text>
-        <Button
-          size="icon"
-          variant="ghost"
-          accessibilityLabel={t('common.close')}
-          onPress={dismiss}
-          className="absolute right-2"
-        >
-          <X size={20} color={colors.foreground} />
-        </Button>
-      </View>
-
+    <View className="bg-background">
+      <SheetHeader
+        title={t('share.title')}
+        onDone={dismiss}
+        // Nothing to commit here: the destinations commit themselves, so the
+        // header's one control closes the sheet.
+        variant="close"
+        topInset="ios-page-sheet"
+      />
       {previewPayload ? (
         <SharePayloadPreview payload={previewPayload} validation={validation} />
       ) : null}
-
-      {reviewPr ? (
-        <DestinationOptionRow
-          icon={GitPullRequest}
-          title={t('common.reviewPr')}
-          subtitle={selectShareReviewPrSubtitle(reviewPr)}
-          accessibilityLabel={t('common.reviewPr')}
-          onPress={handleReviewPr}
-        />
-      ) : null}
-
-      {showNewSession ? (
-        <Pressable
-          onPress={newSessionDisabled ? undefined : handleNewSession}
-          disabled={newSessionDisabled}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.newSession')}
-          accessibilityState={{ disabled: newSessionDisabled }}
-          className={`flex-row items-center gap-3 border-t border-border px-4 py-3.5 ${
-            newSessionDisabled ? 'opacity-50' : 'active:opacity-70'
-          }`}
-        >
-          <View className="h-9 w-9 items-center justify-center rounded-full bg-primary">
-            <Plus size={18} color={colors.primaryForeground} />
-          </View>
-          <Text className="text-base font-semibold text-foreground">{t('common.newSession')}</Text>
-        </Pressable>
-      ) : null}
+      {reviewPr === null && !showNewSession ? null : (
+        <View className="px-4 pb-3">
+          <RowGroup leadingTile>
+            {reviewPr === null ? null : (
+              <ConfigureRow
+                icon={GitPullRequest}
+                title={t('common.reviewPr')}
+                subtitle={selectShareReviewPrSubtitle(reviewPr)}
+                variant="action"
+                accessibilityLabel={t('common.reviewPr')}
+                onPress={handleReviewPr}
+              />
+            )}
+            {showNewSession ? (
+              <ConfigureRow
+                icon={Plus}
+                title={t('common.newSession')}
+                variant="action"
+                disabled={newSessionDisabled}
+                accessibilityLabel={t('common.newSession')}
+                onPress={handleNewSession}
+              />
+            ) : null}
+          </RowGroup>
+        </View>
+      )}
     </View>
   );
 
@@ -509,7 +510,6 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       destinations={destinations}
       onSelect={handleSelectDestination}
       onRetry={handleRetry}
-      onDismiss={dismiss}
       instances={instanceRows}
       spawningConnectionId={spawningConnectionId}
       instanceRowsDisabled={instanceRowsDisabled}

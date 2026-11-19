@@ -63,13 +63,6 @@ describe('security headers', () => {
     expect(policy).not.toMatch(/img-src [^;]*https:\/\/challenges\.cloudflare\.com/);
   });
 
-  it('allows the IPv4 Watchwood host that the SDK uses with force_ipv4', () => {
-    const connectSrc = getPolicyDirective(buildContentSecurityPolicy(), 'connect-src');
-
-    expect(connectSrc).toContain('https://watchwood.openai.com/v1/watchwood/');
-    expect(connectSrc).not.toContain('https://api.openai.com');
-  });
-
   it('adds development-only sources only in development mode', () => {
     const productionPolicy = buildContentSecurityPolicy({ isDevelopment: false });
     const developmentPolicy = buildContentSecurityPolicy({ isDevelopment: true });

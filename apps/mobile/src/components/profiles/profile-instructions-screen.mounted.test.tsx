@@ -30,8 +30,13 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+/** The manage permission the mocked profile hook reports; read-only drops every control. */
+const permission = vi.hoisted(() => ({
+  value: 'allowed' as 'allowed' | 'read-only' | 'resolving',
+}));
+
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useOrganizationProfilePermission: () => 'allowed',
+  useOrganizationProfilePermission: () => permission.value,
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileInstructions: () => h.query,
@@ -74,7 +79,10 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScrollView' }));
 vi.mock('@/components/profiles/profile-section-header', () => ({
@@ -184,13 +192,17 @@ function rowControls(root: ReactTestInstance): string[] {
   return findAll(root, 'Pressable').map(node => String(node.props.accessibilityLabel));
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  permission.value = 'allowed';
+  h.query.data = [testInstruction()];
+  h.query.isError = false;
+  h.query.isPending = false;
+  h.query.isRefetching = false;
+});
+
 describe('ProfileInstructionsScreen delete confirmation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    h.query.data = [testInstruction()];
-    h.query.isError = false;
-    h.query.isPending = false;
-    h.query.isRefetching = false;
     h.mutations.deleteInstruction.mutateAsync.mockReset();
     h.mutations.deleteInstruction.mutateAsync.mockResolvedValue({ success: true });
     h.mutations.setInstructionEnabled.mutate.mockReset();
@@ -292,13 +304,6 @@ describe('ProfileInstructionsScreen delete confirmation', () => {
 });
 
 describe('ProfileInstructionsScreen instruction cap', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    h.query.isError = false;
-    h.query.isPending = false;
-    h.query.isRefetching = false;
-  });
-
   it('names the cap above the disabled add control', async () => {
     const capCopy = i18n.t('profiles.instructionLimitReached', { max: MAX_PROFILE_INSTRUCTIONS });
     h.query.data = Array.from({ length: MAX_PROFILE_INSTRUCTIONS }, (_, index) =>
@@ -323,5 +328,47 @@ describe('ProfileInstructionsScreen instruction cap', () => {
     expect(findAll(belowCap.renderer.root, 'AccessibleStatus')).toHaveLength(0);
     expect(findAll(belowCap.renderer.root, 'Button')[0]?.props.disabled).toBe(false);
     belowCap.unmount();
+  });
+});
+
+describe('ProfileInstructionsScreen row controls', () => {
+  it('names the path it opens after the file name', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    // The path is painted under the name and merged into the content press, so
+    // it rides the control's spoken name instead of disappearing.
+    expect(rowControls(renderer.root)).toContain(
+      [
+        i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME }),
+        `.kilocode/rules/${INSTRUCTION_NAME}.md`,
+      ].join(', ')
+    );
+
+    unmount();
+  });
+});
+
+describe('ProfileInstructionsScreen read-only row', () => {
+  beforeEach(() => {
+    permission.value = 'read-only';
+  });
+
+  it('drops the edit control and keeps the rules path readable', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    // The content is the edit action, so a read-only profile renders no row
+    // control at all — and, because there is no press to name the row, the path
+    // it paints stays a text stop instead of being hidden for that control.
+    expect(rowControls(renderer.root)).not.toContain(
+      i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME })
+    );
+    const pathLine = findAll(renderer.root, 'Text').find(
+      node => node.props.children === `.kilocode/rules/${INSTRUCTION_NAME}.md`
+    );
+    expect(pathLine?.props.accessible).toBeUndefined();
+    expect(pathLine?.props.importantForAccessibility).toBeUndefined();
+    expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe(INSTRUCTION_NAME);
+
+    unmount();
   });
 });

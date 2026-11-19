@@ -9,6 +9,7 @@ import { ConfigureRow } from './configure-row';
 
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
@@ -53,6 +54,7 @@ function renderRow(
     title?: string;
     tone?: 'good' | 'warn' | 'danger';
     disabled?: boolean;
+    testID?: string;
     /** `false` renders the inert row a display-only row is: no Pressable at all. */
     pressable?: boolean;
   } = {}
@@ -65,6 +67,7 @@ function renderRow(
       ...(props.pressable === false ? {} : { onPress: () => undefined }),
       ...(props.tone === undefined ? {} : { tone: props.tone }),
       ...(props.disabled === undefined ? {} : { disabled: props.disabled }),
+      ...(props.testID === undefined ? {} : { testID: props.testID }),
     });
     if (renderer) {
       renderer.update(element);
@@ -78,10 +81,10 @@ function renderRow(
   return renderer.root;
 }
 
-/** The classes of the row body: the one View that carries the row padding. */
+/** The classes of the row body: the one element that carries the row padding. */
 function rowClasses(root: TestRenderer.ReactTestInstance): string[] {
   const body = root.find(
-    node => Object.is(node.type, 'View') && String(node.props.className).includes('py-3')
+    node => typeof node.props.className === 'string' && node.props.className.includes('py-3')
   );
   return String(body.props.className).split(' ');
 }
@@ -128,6 +131,12 @@ describe('ConfigureRow mounted layout', () => {
     const classes = rowClasses(renderRow());
     expect(classes).toEqual(expect.arrayContaining(['flex-row', 'items-center', 'gap-3']));
     expect(classes).not.toContain('gap-2');
+  });
+
+  it('takes the contract row anatomy', () => {
+    const classes = rowClasses(renderRow());
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+    expect(classes.some(name => name.startsWith('border-'))).toBe(false);
   });
 
   it('still stacks at the large-font-scale threshold', () => {
@@ -236,5 +245,24 @@ describe('ConfigureRow disabled cue', () => {
     // no state of its own to announce from a node a reader never reaches.
     expect(root.findAllByType('Pressable' as never)).toHaveLength(0);
     expect(root.findAll(node => node.props.accessibilityState !== undefined)).toHaveLength(0);
+  });
+});
+
+describe('ConfigureRow test handle', () => {
+  it("puts the caller's testID on the tappable row", () => {
+    const control = renderRow({ testID: 'configure-1' }).find(node =>
+      Object.is(node.type, 'Pressable')
+    );
+
+    expect(control.props.testID).toBe('configure-1');
+  });
+
+  it('puts it on the inert row, which has no Pressable', () => {
+    const root = renderRow({ testID: 'configure-2', pressable: false });
+    const row = root.find(
+      node => typeof node.type === 'string' && node.props.testID === 'configure-2'
+    );
+
+    expect(row.type).toBe('View');
   });
 });

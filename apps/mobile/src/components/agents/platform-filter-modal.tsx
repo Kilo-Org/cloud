@@ -1,6 +1,6 @@
 import { Check } from '@/components/ui/icons';
 import { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -12,12 +12,15 @@ import {
   type ProjectFilterOption,
   projectOptionKey,
 } from '@/components/agents/session-list-helpers';
-import { Button } from '@/components/ui/button';
+import { SheetHeader } from '@/components/sheet-header';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type AgentSessionFilters } from '@/lib/agent-session-filters';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { platformLabel } from '@/lib/platform-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -94,10 +97,7 @@ function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckbo
 
   return (
     <Pressable
-      className={cn(
-        ROW_TARGET_CLASS,
-        'flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-secondary'
-      )}
+      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3 active:opacity-70')}
       onPress={onPress}
       {...selectableRowA11y({ multi: true, selected: isChecked })}
     >
@@ -195,29 +195,35 @@ function SessionFilterContent({
   };
 
   return (
-    <View
-      className="flex-1 gap-4 p-5"
-      style={{
-        paddingTop: Platform.OS === 'ios' ? undefined : insets.top + 20,
-        paddingBottom: insets.bottom + 20,
-      }}
-    >
-      <Text accessibilityRole="header" className="text-center text-base font-semibold">
-        {t('agentChat.sessionFilter.title')}
-      </Text>
-      <ScrollView nestedScrollEnabled className="flex-1" showsVerticalScrollIndicator={false}>
-        <View className="gap-4">
-          {/* The rows are derived from the live sessions, so a list whose
-              rows all have an unknown origin (`liveSessionPlatformBucket`
-              returns null) offers no platform at all and nothing is
-              selected. Rendering the label then leaves an orphaned section
-              header above PROJECT (spot defect e4-filter); the section is
-              omitted exactly as PROJECT already is when it has no rows. */}
-          {platforms.length > 0 && (
-            <View className="gap-1">
-              <Text variant="eyebrow" className="px-3">
-                {t('common.platform')}
-              </Text>
+    <View className="flex-1">
+      <SheetHeader
+        title={t('agentChat.sessionFilter.title')}
+        onDone={() => {
+          onApply({
+            platformFilter: draftPlatforms,
+            projectFilter: draftProjects,
+          });
+          onClose();
+        }}
+        doneLabel={t('common.apply')}
+        onCancel={onClose}
+        topInset="ios-page-sheet"
+      />
+      <ScrollView
+        nestedScrollEnabled
+        className="flex-1"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* The rows are derived from the live sessions, so a list whose rows all
+            have an unknown origin (`liveSessionPlatformBucket` returns null)
+            offers no platform at all and nothing is selected. Rendering the
+            label then leaves an orphaned section header above PROJECT (spot
+            defect e4-filter); the section is omitted exactly as PROJECT already
+            is when it has no rows. */}
+        {platforms.length > 0 ? (
+          <Section label={t('common.platform')}>
+            <RowGroup>
               {platforms.map(platform => (
                 <FilterCheckboxRow
                   key={platform}
@@ -228,13 +234,12 @@ function SessionFilterContent({
                   }}
                 />
               ))}
-            </View>
-          )}
-          {projectGroups.size > 0 && (
-            <View className="gap-1">
-              <Text variant="eyebrow" className="px-3">
-                {t('agentChat.sessionFilter.project')}
-              </Text>
+            </RowGroup>
+          </Section>
+        ) : null}
+        {projectGroups.size > 0 ? (
+          <Section label={t('agentChat.sessionFilter.project')}>
+            <RowGroup>
               {[...projectGroups.entries()].map(([key, group]) => (
                 <FilterCheckboxRow
                   key={key}
@@ -245,26 +250,11 @@ function SessionFilterContent({
                   }}
                 />
               ))}
-            </View>
-          )}
-        </View>
+            </RowGroup>
+          </Section>
+        ) : null}
       </ScrollView>
-      <View className="flex-row justify-end gap-3">
-        <Button variant="outline" onPress={onClose}>
-          <Text>{t('common.cancel')}</Text>
-        </Button>
-        <Button
-          onPress={() => {
-            onApply({
-              platformFilter: draftPlatforms,
-              projectFilter: draftProjects,
-            });
-            onClose();
-          }}
-        >
-          <Text className="text-primary-foreground">{t('common.apply')}</Text>
-        </Button>
-      </View>
+      <View style={{ height: insets.bottom }} />
     </View>
   );
 }

@@ -39,6 +39,7 @@ type Dashboard = {
 };
 
 const queries = vi.hoisted(() => ({
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
   organizations: {
     data: [] as Membership[],
     isFetching: false,
@@ -49,6 +50,7 @@ const queries = vi.hoisted(() => ({
     isPending: false,
     isError: false,
     isFetching: false,
+    fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
     error: undefined as unknown,
     refetch: vi.fn<() => Promise<void>>(),
   },
@@ -109,8 +111,20 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 
+// The screen classifies its read through the shared body-state hook, which
+// subscribes to the probe-backed connectivity store. That store loads NetInfo
+// and therefore react-native's Flow sources, which this node project cannot
+// parse; the committed answer is all the screen needs, so it answers from the
+// per-case `queries.connectivity` instead of a constant `online`.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => queries.connectivity,
+}));
+
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyStateMock' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyStateMock',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'SkeletonMock' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 
@@ -158,6 +172,17 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
+// The route draws the shared skeleton and segmented primitives, whose motion
+// and haptic helpers load Expo native modules Node cannot evaluate (`__DEV__`
+// comes from the Expo runtime). Both are decoration only on this screen.
+vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+  selectionAsync: vi.fn(),
+  ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' },
+  NotificationFeedbackType: { Success: 'Success', Warning: 'Warning', Error: 'Error' },
+}));
 
 const Screen = CodeReviewerAnalyticsRoute as ComponentType<Record<string, never>>;
 
@@ -185,6 +210,7 @@ function segmentedControl(renderer: TestRenderer.ReactTestRenderer, index: numbe
 }
 
 beforeEach(() => {
+  queries.connectivity = 'online';
   queries.organizations.data = [{ organizationId: 'org-drain', organizationName: 'Drain Labs' }];
   queries.organizations.isFetching = false;
   queries.organizations.refetch.mockReset();
@@ -192,6 +218,7 @@ beforeEach(() => {
   queries.dashboard.isPending = false;
   queries.dashboard.isError = false;
   queries.dashboard.isFetching = false;
+  queries.dashboard.fetchStatus = 'idle';
   queries.dashboard.error = undefined;
   queries.dashboard.refetch.mockReset();
   rememberedNames.clear();
@@ -314,6 +341,127 @@ describe('CodeReviewerAnalytics retryable failure', () => {
     const renderer = mountScreen();
 
     expect(findByType(renderer.root, 'QueryErrorMock')[0]?.props.onRetry).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('CodeReviewerAnalytics first read offline states', () => {
+  it('renders the retryable offline state instead of the skeleton when the first read is paused offline', () => {
+    // A confirmed offline pause never reaches react-query's error branch
+    // (`isPending` stays true), so a body switch keyed on `isError` alone kept
+    // the skeleton forever instead of offering Retry (finding).
+    queries.dashboard.data = undefined;
+    queries.dashboard.isPending = true;
+    queries.dashboard.fetchStatus = 'paused';
+    queries.connectivity = 'offline';
+    const renderer = mountScreen();
+
+    const errors = findByType(renderer.root, 'QueryErrorMock');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.variant).toBe('offline');
+    expect(errors[0]?.props.title).toBe('Failed to load');
+    expect(typeof errors[0]?.props.onRetry).toBe('function');
+    expect(findByType(renderer.root, 'SkeletonMock')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the skeleton while a first read is paused with connectivity unsettled', () => {
+    // The pause is real but not yet attributed to offline, so the read stays
+    // inside the classifier's loading state and the screen keeps its skeleton.
+    queries.dashboard.data = undefined;
+    queries.dashboard.isPending = true;
+    queries.dashboard.fetchStatus = 'paused';
+    queries.connectivity = 'unknown';
+    const renderer = mountScreen();
+
+    expect(findByType(renderer.root, 'QueryErrorMock')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SkeletonMock')).not.toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('shows the skeleton while the first read is in flight', () => {
+    queries.dashboard.data = undefined;
+    queries.dashboard.isPending = true;
+    queries.dashboard.isFetching = true;
+    queries.dashboard.fetchStatus = 'fetching';
+    const renderer = mountScreen();
+
+    expect(findByType(renderer.root, 'QueryErrorMock')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SkeletonMock')).not.toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('CodeReviewerAnalytics stale cache', () => {
+  it('keeps the metrics and offers Retry on the offline notice when the refresh pauses', () => {
+    queries.dashboard.fetchStatus = 'paused';
+    const renderer = mountScreen();
+
+    const notices = findByType(renderer.root, 'QueryErrorMock');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.placement).toBe('top');
+    expect(notices[0]?.props.variant).toBe('offline');
+    const retry = notices[0]?.props.onRetry as (() => void) | undefined;
+    expect(typeof retry).toBe('function');
+    retry?.();
+    expect(queries.dashboard.refetch).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the paused notice mounted while its Retry runs', () => {
+    queries.dashboard.fetchStatus = 'paused';
+    queries.dashboard.isFetching = true;
+    const renderer = mountScreen();
+
+    const notices = findByType(renderer.root, 'QueryErrorMock');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.variant).toBe('offline');
+    expect(notices[0]?.props.isRetrying).toBe(true);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the metrics and offers Retry when the refresh fails retryably', () => {
+    queries.dashboard.isError = true;
+    queries.dashboard.error = { data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 } };
+    const renderer = mountScreen();
+
+    const notices = findByType(renderer.root, 'QueryErrorMock');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.placement).toBe('top');
+    expect(typeof notices[0]?.props.onRetry).toBe('function');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('withholds Retry from a stale notice whose failure cannot recover', () => {
+    queries.dashboard.isError = true;
+    queries.dashboard.error = { data: { code: 'UNPROCESSABLE_CONTENT', httpStatus: 422 } };
+    const renderer = mountScreen();
+
+    const notices = findByType(renderer.root, 'QueryErrorMock');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.placement).toBe('top');
+    expect(notices[0]?.props.onRetry).toBeUndefined();
 
     act(() => {
       renderer.unmount();

@@ -5643,6 +5643,11 @@ export const session_step_up_proofs = pgTable(
       table.session_id_hash,
       table.expires_at
     ),
+    // The operation lookup matches user + session + binding hash; without this
+    // index the claim scans every proof of the session.
+    index('idx_session_step_up_proofs_user_session_binding')
+      .on(table.kilo_user_id, table.session_id_hash, table.action_binding_hash)
+      .concurrently(),
     index('idx_session_step_up_proofs_expires_at').on(table.expires_at),
     index('idx_session_step_up_proofs_passkey_credential_id').on(table.passkey_credential_id),
     check('check_session_step_up_proofs_method', sql`${table.method} IN ('webauthn_uv')`),
@@ -6041,6 +6046,18 @@ export const ai_gateway_config = pgTable(
 export const blacklisted_domains = pgTable('blacklisted_domains', {
   domain: text().primaryKey(),
 });
+
+export const blacklisted_domains_settings = pgTable(
+  'blacklisted_domains_settings',
+  {
+    id: integer().primaryKey().default(1),
+    blocked_signup_tlds: text().array().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    updated_by: text(),
+    updated_by_email: text(),
+  },
+  table => [check('blacklisted_domains_settings_singleton', sql`${table.id} = 1`)]
+);
 
 export const ai_gateway_sync_providers_state = pgTable(
   'ai_gateway_sync_providers_state',
@@ -11269,7 +11286,9 @@ export const enkrypt_usage = pgTable(
     // guardrail, and between the end of the upstream response and its release for the output
     // guardrail. Set only on the final call of the guardrail's blocking scan, or of its log-only
     // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
-    // on other calls or when the request returned before awaiting the verdict.
+    // on other calls or when the request returned before awaiting the verdict. A guardrail that only
+    // logs adds no wait, so it stores its log-only scan time: how long the scan ran past the point
+    // where a blocking scan would hold the request or response.
     added_latency_ms: integer(),
     // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
     guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),

@@ -8,9 +8,7 @@ import { Text } from '@/components/ui/text';
  * element so they cannot diverge again.
  */
 export function PrReviewSectionLabel({ label }: Readonly<{ label: string }>) {
-  return (
-    <Text variant="eyebrow" className="uppercase tracking-wide text-muted-foreground">
-      {label}
-    </Text>
-  );
+  // The eyebrow variant owns the 10pt mono capitals and their tracking, so the
+  // heading is that one line and nothing else.
+  return <Text variant="eyebrow">{label}</Text>;
 }

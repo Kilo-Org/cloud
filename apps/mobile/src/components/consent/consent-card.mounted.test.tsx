@@ -57,7 +57,14 @@ vi.mock('@/components/ui/icons', () => ({
   Sparkles: 'Sparkles',
   User: 'User',
 }));
-vi.mock('@/components/consent/consent-row', () => ({ ConsentRow: 'ConsentRow' }));
+vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: (select: (state: { height: number }) => unknown) => select({ height: 0 }),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -159,6 +166,21 @@ function texts(root: I): string[] {
     .map(n => n.props.children as string);
 }
 
+/**
+ * The titles the shared row primitives render. Their rows are host elements in
+ * this suite, so a title lives in the row's props rather than in a Text child.
+ */
+function rowTitles(root: I): string[] {
+  return root
+    .findAll(
+      n =>
+        typeof n.type === 'string' &&
+        ((n.type as string) === 'ConfigureRow' || (n.type as string) === 'PreferenceRow') &&
+        typeof n.props.title === 'string'
+    )
+    .map(n => n.props.title as string);
+}
+
 function disclosureTexts(root: I): I[] {
   return root.findAll(
     n =>
@@ -234,7 +256,7 @@ describe('ConsentCard', () => {
 
   it('renders required rows grouped under "Required to use Kilo"', () => {
     const renderer = mountCard('onboarding');
-    const t = texts(renderer.root);
+    const t = [...texts(renderer.root), ...rowTitles(renderer.root)];
     expect(t).toContain('Required to use Kilo');
     expect(t).toContain('Before we get started');
     expect(t).toContain('Optional — on unless you turn it off');
@@ -247,11 +269,11 @@ describe('ConsentCard', () => {
     // The feature-rollout disclosure belongs to the required group, so it is
     // visible before the user has to open the full details.
     const rows = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'ConsentRow'
+      node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
     );
     const featureRow = rows.find(node => (node.props.title as string) === 'Feature rollout');
     expect(featureRow).toBeDefined();
-    expect(featureRow?.props.description as string).toContain('PostHog');
+    expect(featureRow?.props.subtitle as string).toContain('PostHog');
   });
 
   it('names the brand with the header mark instead of repeating it as text', () => {
@@ -265,10 +287,14 @@ describe('ConsentCard', () => {
     expect(marks[0]?.props.accessibilityRole).toBe('image');
   });
 
-  it('renders review wording in review mode', () => {
+  it('renders review wording in the screen header and revoke alone', () => {
     const renderer = mountCard('review');
+    const header = renderer.root.find(node => String(node.type) === 'ScreenHeader');
+    expect(header.props.title).toBe(i18n.t('consent.summaryTitle'));
     const t = texts(renderer.root);
-    expect(t).toContain('Data sharing preferences');
+    // The title lives in the header, so the body does not repeat it as a large
+    // title beside it.
+    expect(t).not.toContain(i18n.t('consent.summaryTitle'));
     // The optional section header is the headword alone: the toggle card's own
     // description already says the choice can be changed in Settings.
     expect(t).toContain('Optional');
@@ -276,11 +302,16 @@ describe('ConsentCard', () => {
     expect(t).not.toContain('Before we get started');
     expect(t).not.toContain('Optional — on unless you turn it off');
 
-    // One filled action per footer: the safe way out keeps the fill, and the
-    // destructive one is outlined so it cannot compete with it.
-    const back = findButton(renderer.root, 'Back');
+    // The header carries the way back, so the footer offers the destructive
+    // action alone, outlined.
+    const back = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Button' &&
+        (n.props.accessibilityLabel as string) === 'Back'
+    );
+    expect(back).toHaveLength(0);
     const revoke = findButton(renderer.root, 'Revoke consent');
-    expect(back.props.variant ?? 'default').toBe('default');
     expect(revoke.props.variant).toBe('outline-destructive');
   });
 
@@ -458,13 +489,31 @@ describe('ConsentCard', () => {
     // The pre-load state must not claim "off": an e3 revoke check mistook the
     // pre-load off for a completed revoke (b911 vr5, e3-toggled-off.png).
     expect(countByType(renderer.root, 'Switch')).toBe(0);
-    expect(countByType(renderer.root, 'Skeleton')).toBe(1);
+    const placeholderRows = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'ConfigureRow' &&
+        n.props.title === 'Help improve Kilo'
+    );
+    expect(placeholderRows).toHaveLength(1);
+    const placeholderRow = placeholderRows[0];
+    if (!placeholderRow) {
+      throw new Error('missing placeholder row');
+    }
+    // The trailing slot holds the loading bar until the consent record lands.
+    const trailing: unknown =
+      'trailing' in placeholderRow.props ? placeholderRow.props.trailing : undefined;
+    expect(
+      typeof trailing === 'object' && trailing !== null && 'type' in trailing
+        ? trailing.type
+        : undefined
+    ).toBe('Skeleton');
 
     await act(() => {
       resolveLoad?.({ mandatory: true, optional: true });
     });
     await act(flush);
-    expect(countByType(renderer.root, 'Skeleton')).toBe(0);
+    expect(countByType(renderer.root, 'Switch')).toBe(1);
     expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
@@ -827,7 +876,7 @@ describe('ConsentCard', () => {
     const rows = renderer.root.findAll(
       n =>
         typeof n.type === 'string' &&
-        (n.type as string) === 'ConsentRow' &&
+        (n.type as string) === 'ConfigureRow' &&
         (n.props.title as string).includes('usage data')
     );
     expect(rows.length).toBe(1);
@@ -861,7 +910,7 @@ describe('ConsentCard', () => {
       const disclosure = requireDisclosure(root);
       expect(hasAncestorOfType(disclosure, 'ScrollView')).toBe(false);
 
-      const primary = mode === 'onboarding' ? 'Accept and continue' : 'Back';
+      const primary = mode === 'onboarding' ? 'Accept and continue' : 'Revoke consent';
       const footer = requireParent(findButton(root, primary));
       expect(disclosureTexts(footer).length).toBe(1);
     }
@@ -873,7 +922,7 @@ describe('ConsentCard', () => {
     await act(flush);
     const root = renderer.root;
     expect(texts(root)).toContain('Could not load your consent settings. Please try again.');
-    const footer = requireParent(findButton(root, 'Back'));
+    const footer = requireParent(findButton(root, 'Revoke consent'));
     expect(disclosureTexts(footer).length).toBe(1);
     expect(hasAncestorOfType(requireDisclosure(root), 'ScrollView')).toBe(false);
   });

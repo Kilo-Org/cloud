@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { CardControl } from '@/components/home/adaptive-home-card-frame';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { Card } from '@/components/ui/card';
 import { X } from '@/components/ui/icons';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Text } from '@/components/ui/text';
 import {
   BRIEFING_PATH,
@@ -16,36 +17,38 @@ import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { briefingSummaryStatusKey, visibleHomeBriefing } from '@/lib/agent-briefing-state';
 import { cn } from '@/lib/utils';
 import { formatCalendarDate, formatNumber } from '@/lib/format';
 
-export function BriefingScorecard({ report }: { readonly report: BriefingReport }) {
-  const { t, i18n } = useTranslation();
-  const rows = [
+/** One source of truth for the scorecard counts, in announced order. */
+const briefingScorecardRows = (report: BriefingReport) =>
+  [
     {
-      label: t('agentBriefing.selectedSessions'),
+      labelKey: 'agentBriefing.selectedSessions',
       amount: report.scorecard.sessions,
     },
     {
-      label: t('agentBriefing.snapshotPullRequests'),
+      labelKey: 'agentBriefing.snapshotPullRequests',
       amount: report.scorecard.pullRequests,
     },
     {
-      label: t('agentBriefing.snapshotBlockers'),
+      labelKey: 'agentBriefing.snapshotBlockers',
       amount: report.scorecard.blockers,
     },
-  ];
+  ] as const;
+
+export function BriefingScorecard({ report }: { readonly report: BriefingReport }) {
+  const { t, i18n } = useTranslation();
+  const rows = briefingScorecardRows(report);
   return (
-    <View className="gap-2 px-4 py-3">
+    <View className="gap-2">
       {rows.map(row => (
-        <View key={row.label} className="min-h-6 flex-row items-center gap-2">
-          <Text className="text-sm font-semibold text-foreground">
-            {formatNumber(row.amount, i18n.language)}
-          </Text>
-          <Text numberOfLines={1} className="min-w-0 shrink text-sm text-muted-foreground">
-            {row.label}
+        <View key={row.labelKey} className="flex-row items-center gap-2">
+          <Text variant="figure">{formatNumber(row.amount, i18n.language)}</Text>
+          <Text variant="muted" numberOfLines={1} className="min-w-0 shrink">
+            {t(row.labelKey)}
           </Text>
         </View>
       ))}
@@ -95,55 +98,46 @@ export function BriefingCard({
     .filter(Boolean)
     .join(' · ');
   const previewLabel = hasAiPreview ? t('agentBriefing.viewWithPreview', { preview }) : preview;
-  return (
-    <View
-      className={cn(
-        'overflow-hidden rounded-2xl border border-border bg-card',
-        // `grow` lets the frame's taller layer stretch the card, so no slack is left
-        // below it. The divider then follows the counts at their own padding, and the
-        // summary row takes the height the frame reserves beyond the live card's
-        // fourth count row and centers its content in it, so the counts and the
-        // summary stay evenly spaced inside the card.
-        embedded && 'grow rounded-none border-0 bg-transparent'
-      )}
-    >
-      <CardControl
-        accessibilityRole="button"
-        accessibilityLabel={t('agentBriefing.view')}
-        onPress={() => {
-          router.push(`${BRIEFING_PATH}/${report.id}` as Href);
-        }}
-      >
+  const open = () => {
+    router.push(`${BRIEFING_PATH}/${report.id}` as Href);
+  };
+  // The control's name carries the action and the three counts, in the same
+  // formatted values the scorecard rows announce.
+  const scorecardLabel = t('agentBriefing.scorecardLabel', {
+    sessions: formatNumber(report.scorecard.sessions, i18n.language),
+    pullRequests: formatNumber(report.scorecard.pullRequests, i18n.language),
+    blockers: formatNumber(report.scorecard.blockers, i18n.language),
+  });
+  // The frame's taller layer stretches the embedded card, so no slack is left
+  // below it: the divider follows the counts, and the summary row takes the
+  // height the frame reserves beyond them and centers its content in it, so the
+  // counts and the summary stay evenly spaced inside the card.
+  const body = (
+    <>
+      <CardControl accessibilityRole="button" accessibilityLabel={scorecardLabel} onPress={open}>
         <BriefingScorecard report={report} />
       </CardControl>
-      <View className="h-px bg-border" />
-      <View
-        className={cn(
-          'flex-row items-center gap-2 px-4 py-3',
-          // Only the stretched card has height to share; outside the frame the row
-          // keeps its content height instead of collapsing to a zero flex basis.
-          embedded && 'flex-1'
-        )}
-      >
+      <View className="border-b-[0.5px] border-hair-soft" />
+      <View className={cn('flex-row items-center gap-2', embedded && 'flex-1')}>
         <CardControl
           accessibilityRole="button"
           accessibilityLabel={previewLabel}
-          className="min-h-[44px] min-w-0 flex-1 flex-row items-center gap-2"
-          onPress={() => {
-            router.push(`${BRIEFING_PATH}/${report.id}` as Href);
-          }}
+          className={cn(ROW_TARGET_CLASS, 'min-w-0 flex-1 flex-row items-center gap-2')}
+          onPress={open}
         >
-          <Text numberOfLines={2} className="min-w-0 flex-1 text-sm text-foreground">
+          <Text variant="muted" numberOfLines={2} className="min-w-0 flex-1">
             {preview}
           </Text>
-          <DirectionalChevronRight size={18} color={colors.foreground} />
+          <RowChevron />
         </CardControl>
         <CardControl
           accessibilityRole="button"
           accessibilityLabel={t('agentBriefing.dismiss')}
           className={cn(
             ICON_TARGET_BOX_CLASS,
-            'shrink-0 rounded-full border border-border bg-secondary'
+            // `bg-secondary` is the card's own fill, so the control painted
+            // nothing at all; the outline treatment gives it an edge.
+            'shrink-0 rounded-full border border-border bg-card'
           )}
           disabled={dismissals.save.isPending}
           onPress={() => {
@@ -153,6 +147,10 @@ export function BriefingCard({
           <X size={18} color={colors.foreground} />
         </CardControl>
       </View>
-    </View>
+    </>
   );
+  if (embedded) {
+    return <View className="grow gap-3 px-4 py-3">{body}</View>;
+  }
+  return <Card>{body}</Card>;
 }

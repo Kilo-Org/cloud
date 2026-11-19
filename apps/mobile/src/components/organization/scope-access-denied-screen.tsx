@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
+import { StateAction } from '@/components/empty-state';
+import { ArrowLeft, RotateCcw } from '@/components/ui/icons';
 import { type OrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
@@ -52,37 +52,24 @@ export function ScopeAccessDeniedScreen({
           ? 'organization.boundary.unavailableDescription'
           : 'organization.boundary.accessDeniedDescription'
       )}
-      // The access-denied sentence runs just past the width the compact cell
-      // gives this state, so it wrapped with one word alone on its last line.
-      // At this measure it breaks into two lines that each carry a whole
-      // phrase. The longer unavailable sentence keeps the shared measure.
-      descriptionClassName={notFound ? undefined : 'max-w-[205px]'}
       action={
         <View className="gap-3">
           {/* Leaving is the recovery this surface leads with, so it holds the
-              one filled control: dark `--primary` is the brand yellow that
-              glares on the near-black page, so dark takes the muted olive
-              `--selection` with its own foreground ink. Retry only re-resolves
-              the membership, so it stays the outlined secondary. */}
-          <Button
-            className="bg-primary dark:bg-selection"
-            accessibilityLabel={t('organization.boundary.backToProfile')}
+              one filled control. Retry only re-resolves the membership, and
+              the state slot has one action shape for both. */}
+          <StateAction
+            label={t('organization.boundary.backToProfile')}
+            icon={ArrowLeft}
             onPress={() => {
               router.replace(PROFILE_TAB_HREF);
             }}
-          >
-            <Text className="dark:text-selection-foreground">
-              {t('organization.boundary.backToProfile')}
-            </Text>
-          </Button>
-          <Button
-            variant="outline"
+          />
+          <StateAction
+            label={t('common.retry')}
+            icon={RotateCcw}
             loading={isRetrying}
-            accessibilityLabel={t('common.retry')}
             onPress={onRetry}
-          >
-            <Text>{t('common.retry')}</Text>
-          </Button>
+          />
         </View>
       }
     />

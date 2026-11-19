@@ -14,7 +14,8 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
-import { canStepOlderTo, OrganizationRequestLogsScreen } from './request-logs-screen';
+import { canStepOlderTo, HISTORY_DAYS } from './request-log-window';
+import { OrganizationRequestLogsScreen } from './request-logs-screen';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -90,11 +91,14 @@ vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black' }),
+  useMutedDisabledInk: () => '#999999',
 }));
 
 vi.mock('@/components/ui/icons', () => ({ Logs: 'Logs' }));
 
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
+  DirectionalArrowRight: 'DirectionalArrowRight',
   DirectionalChevronLeft: 'DirectionalChevronLeft',
   DirectionalChevronRight: 'DirectionalChevronRight',
   DirectionalLogs: 'DirectionalLogs',
@@ -129,6 +133,7 @@ vi.mock('@/components/query-error', async () => {
 vi.mock('@/components/empty-state', async () => {
   const { createElement: h } = await import('react');
   return {
+    StateAction: 'StateAction',
     EmptyState: (props: { title?: string; description?: string }) => h('EmptyState', props),
   };
 });
@@ -262,9 +267,47 @@ describe('OrganizationRequestLogsScreen', () => {
     const { renderer, unmount } = await mount();
 
     const [empty] = renderer.root.findAllByType('EmptyState');
-    expect(empty?.props.title).toBe('No requests');
-    // The window line above already names the hour, so a description here would
-    // only restate the title.
+    expect(empty?.props.title).toBe('No requests in this hour');
+    // The window header names the hour; the description points at the paging
+    // control, so it is here while an older hour still exists.
+    expect(empty?.props.description).toBe('Use Older hour to see earlier requests.');
+    unmount();
+  });
+
+  it('drops the Older-hour pointer once the history bound stops the step', async () => {
+    logsQuery.data = [];
+    const { renderer, unmount } = await mount();
+
+    const buttons = renderer.root.findAllByType('Button');
+    const older = buttons.find(node => node.props.accessibilityLabel === 'Older hour');
+    expect(older).toBeDefined();
+    // Drive the window to the bound one step at a time: the oldest reachable
+    // window end is one hour inside the age bound, so the loop needs the
+    // full history of hours. Each act flushes one batch of updates through
+    // React's scheduler.
+    const BATCH = 1000;
+    const maxSteps = HISTORY_DAYS * 24;
+    for (let steps = 0; steps < maxSteps; steps += BATCH) {
+      if (older?.props.disabled) {
+        break;
+      }
+      for (let step = 0; step < BATCH && steps + step < maxSteps; step += 1) {
+        if (older?.props.disabled) {
+          break;
+        }
+        act(() => {
+          if (older) {
+            handlerOf(older, 'onPress')?.();
+          }
+        });
+      }
+    }
+    expect(older?.props.disabled).toBe(true);
+
+    const [empty] = renderer.root.findAllByType('EmptyState');
+    expect(empty?.props.title).toBe('No requests in this hour');
+    // A pointer at a disabled control would be a dead end; the scoped title
+    // alone is the truth here.
     expect(empty?.props.description).toBeUndefined();
     unmount();
   });

@@ -116,7 +116,7 @@ export function useSettingsSaveFeedback(): SettingsSaveFeedback {
   // sentence's height, so the body gives up that room only while it is needed.
   const node =
     failure === null ? null : (
-      <View className="px-6">
+      <View className="px-4">
         <AccessibleStatus
           message={securityConfigMutationMessage(failure)}
           tone="error"

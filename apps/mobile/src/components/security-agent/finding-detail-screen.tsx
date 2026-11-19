@@ -31,8 +31,11 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { isSecurityTrialRefusalCopyKey } from '@/lib/security-agent-ledger';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
 type FindingTab = 'details' | 'analysis' | 'remediation';
@@ -88,6 +91,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const capability = useSecurityAgentCapability(scope);
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
   const { refresh: refreshDismissDraft } = dismissDraft;
+  // One role answer decides both the sentence a stored refusal paints and the
+  // step under it: the draft records which refusal it was, not which reader saw
+  // it, so `useCanManageBilling` is handed to the copy resolver while the step
+  // comes from the same predicate inside `useBillingAction`. A draft written for
+  // a member therefore reads the billing sentence with the step when a billing
+  // role opens it, and the reverse keeps the ask-an-owner sentence with no step.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
 
   // The detail screen stays mounted while the dismiss sheet is open, so
   // re-read the draft on focus: a fresh failure must show the retry card and
@@ -170,7 +181,6 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     findingQuery.isFetching && !notFound ? { kind: 'loading' } : { kind: 'held' };
   const pendingHeader = (
     <ScreenHeader
-      className="px-6"
       title={t('securityAgent.findingDetail.title')}
       {...eyebrowHeaderProps(pendingEyebrow)}
       showBackButton
@@ -208,11 +218,11 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         {pendingHeader}
-        <View className="flex-1 gap-3 px-6 pt-4">
+        <View className={cn('flex-1', SCREEN_BODY_CLASS)}>
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />
-          <Skeleton className="h-10 w-full rounded-lg" />
-          <Skeleton className="h-40 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-xl" />
         </View>
       </View>
     );
@@ -224,12 +234,10 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // A pre-accept dismissal failure (no command id) leaves a durable draft; the
   // retry card restores it until the user retries or discards it.
   const draft = dismissDraft.draft;
-  const dismissFailure = draft?.lastError != null ? securityDismissFailureCopy(draft) : null;
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('securityAgent.findingDetail.title')}
         eyebrow={finding.repo_full_name}
         showBackButton
@@ -247,7 +255,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               // the way the settings Save button does: the label shrinks inside
               // the cap instead of taking the title's room (see the trailing
               // cluster note in screen-header.tsx).
-              className="min-w-0 max-w-[140px] shrink"
+              className="min-w-0 max-w-40 shrink"
             >
               <Ban size={16} color={colors.secondaryForeground} />
               <Text className="shrink text-center">
@@ -258,7 +266,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         }
       />
       {findingQuery.isError ? (
-        <View className="px-6 pb-2">
+        <View className="px-4 pb-2">
           <SettingsRecoveryStatus
             message={t('securityAgent.dismiss.couldNotLoad')}
             isRetrying={findingQuery.isFetching}
@@ -266,11 +274,12 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           />
         </View>
       ) : null}
-      {dismissFailure !== null && dismissDraft.draft ? (
-        <View className="px-6 pb-2">
+      {draft?.lastError != null ? (
+        <View className="px-4 pb-2">
           <SecurityCommandRetryCard
-            lastError={dismissFailure}
-            retryable={dismissDraft.draft.retryable === true}
+            lastError={securityDismissFailureCopy(draft, canManageBilling)}
+            retryable={draft.retryable === true}
+            action={isSecurityTrialRefusalCopyKey(draft.lastErrorKey) ? billingAction : undefined}
             onRetry={() => {
               pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
             }}
@@ -280,7 +289,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           />
         </View>
       ) : null}
-      <View accessibilityRole="tablist" className="flex-row gap-2 px-6 pb-2 pt-1">
+      <View accessibilityRole="tablist" className="flex-row gap-2 px-4 pb-2 pt-1">
         {TABS.map(({ key, labelKey }) => {
           const selected = tab === key;
           return (
@@ -291,8 +300,13 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
                 // row floor on its own node so a tap anywhere in the tab's
                 // height lands, not just the label line.
                 ROW_TARGET_CLASS,
-                'flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
-                selected ? 'bg-selection' : 'bg-secondary'
+                'flex-1 items-center justify-center rounded-md py-2 active:opacity-80',
+                // The selected pill takes the palette's in-page tab pair. The
+                // unselected pill paints no fill of its own: a `bg-secondary`
+                // chip surface built here would be a hand-made card (the layout
+                // contract keeps surfaces in the primitives), and the muted
+                // label already reads as the unpicked side.
+                selected ? 'bg-selection' : 'bg-transparent'
               )}
               onPress={() => {
                 setTab(key);
@@ -302,7 +316,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               <Text
                 className={cn(
                   'text-xs font-medium',
-                  selected ? 'text-selection-foreground' : 'text-foreground'
+                  selected ? 'text-selection-foreground' : 'text-muted-foreground'
                 )}
               >
                 {t(labelKey)}
@@ -312,7 +326,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         })}
       </View>
       {tab === 'details' && (
-        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-2">
+        <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
           <FindingDetailsPanel finding={finding} scope={scope} />
         </TabScreenScrollView>
       )}

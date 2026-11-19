@@ -169,7 +169,7 @@ describe('toSpectatorRow status frames', () => {
     const busy = toSpectatorRow(statusEvent({ status: 'busy' }), t);
     expect(busy?.message).toBe(i18n.t('codeReviewer.reviewDetail.agentWorking'));
     expect(busy?.message).not.toContain('busy');
-    expect(busy?.message).not.toBe('Agent working...');
+    expect(busy?.message).not.toBe('Agent working…');
 
     const undeclared = toSpectatorRow(statusEvent({ status: 'warming-up' }), t);
     expect(undeclared?.message).toBe(

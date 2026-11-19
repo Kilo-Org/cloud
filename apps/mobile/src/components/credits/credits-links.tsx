@@ -1,9 +1,10 @@
 import { type Href, useRouter } from 'expo-router';
 import { FileText, Receipt } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { CREDIT_HISTORY_HREF } from '@/lib/profile-navigation';
 
 /**
  * The rows under the personal Credits section: the person's own credit history
@@ -18,15 +19,14 @@ export function PersonalCreditsLinks() {
   const router = useRouter();
 
   return (
-    <View className="gap-3">
+    <RowGroup leadingTile>
       <ConfigureRow
         icon={Receipt}
         title={t('common.creditHistory')}
         subtitle={t('profile.creditHistorySubtitle')}
         hue="moss"
-        className="rounded-lg bg-secondary px-3"
         onPress={() => {
-          router.push('/(app)/(tabs)/(3_profile)/credit-history' as Href);
+          router.push(CREDIT_HISTORY_HREF);
         }}
       />
       <ConfigureRow
@@ -34,12 +34,10 @@ export function PersonalCreditsLinks() {
         title={t('organization.invoices.title')}
         subtitle={t('profile.invoicesSubtitle')}
         hue="moss"
-        className="rounded-lg bg-secondary px-3"
-        last
         onPress={() => {
           router.push('/(app)/(tabs)/(3_profile)/invoices' as Href);
         }}
       />
-    </View>
+    </RowGroup>
   );
 }

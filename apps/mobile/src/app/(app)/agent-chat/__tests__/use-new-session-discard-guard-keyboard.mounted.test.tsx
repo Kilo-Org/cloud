@@ -81,7 +81,7 @@ describe('useNewSessionDiscardGuard with the keyboard open', () => {
 
     act(() => vi.advanceTimersByTime(1));
     expect(renderedLabels(renderer)).toContain('Discard draft?');
-    pressDialogButton(renderer, 'border-border');
+    pressDialogButton(renderer, 'border-input');
     dismissDialogSheet(renderer);
 
     act(() => vi.runAllTimers());
@@ -100,7 +100,7 @@ describe('useNewSessionDiscardGuard with the keyboard open', () => {
 
     triggerPreventRemoveInAct();
     setKeyboardVisible(false);
-    pressDialogButton(renderer, 'border-border');
+    pressDialogButton(renderer, 'border-input');
 
     expect(focusTextInputMock).not.toHaveBeenCalled();
 
@@ -125,7 +125,7 @@ describe('useNewSessionDiscardGuard with the keyboard open', () => {
     setKeyboardVisible(false);
     // The presented sheet's dialog window takes focus from the app window.
     setWindowFocused(false);
-    pressDialogButton(renderer, 'border-border');
+    pressDialogButton(renderer, 'border-input');
     dismissDialogSheet(renderer);
 
     // The dismissal reports before the app window is focused, where Android

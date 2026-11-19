@@ -61,6 +61,17 @@ export const GLANCEABLE_SNAPSHOT_STATUSES = [
 
 export type GlanceableAgentsSnapshotStatus = (typeof GLANCEABLE_SNAPSHOT_STATUSES)[number];
 
+/**
+ * The statuses a caller may force on a built snapshot. `happy` and `empty` are
+ * not among them: those two come from the counts alone, so a forced value
+ * could only contradict the counts and details built beside it. A caller that
+ * wants one of them omits the override.
+ */
+export type GlanceableSnapshotStatusOverride = Exclude<
+  GlanceableAgentsSnapshotStatus,
+  'happy' | 'empty'
+>;
+
 /** The one kind vocabulary every surface reads (membership only; consumers own presentation order). */
 export const GLANCEABLE_STATUS_KINDS = ['needsInput', 'running', 'idle', 'scheduled'] as const;
 
@@ -75,9 +86,9 @@ export type GlanceableNeedsInputKind = (typeof GLANCEABLE_NEEDS_INPUT_STATUSES)[
 export const glanceableAgentsSnapshotSchema = z.object({
   schemaVersion: z.literal(GLANCEABLE_SNAPSHOT_SCHEMA_VERSION),
   revision: z.number().int().min(1),
-  /** ISO 8601 timestamp. */
+  /** Snapshot write time; producers emit the `epochMsToIso` UTC form. */
   updatedAt: z.string(),
-  /** ISO 8601 timestamp; `updatedAt + GLANCEABLE_SNAPSHOT_EXPIRY_MS`. */
+  /** When the snapshot stops being eligible work; `updatedAt + GLANCEABLE_SNAPSHOT_EXPIRY_MS`. */
   expiresAt: z.string(),
   /** Opaque scope key; never a raw user or organization id. */
   scopeKey: z.string().min(1),
@@ -221,11 +232,27 @@ export function glanceableNeedsInputKind(status: string): GlanceableNeedsInputKi
 
 /**
  * The snapshot statuses that end the surface: a signed-out or privacy-cleared
- * scope. Every terminal-status decision reads this one predicate, so the data
- * payload, presentation, refresh cadence and timeline cannot disagree.
+ * scope. The one terminal vocabulary: a consumer that maps a terminal status to
+ * its own value reads the narrowed status this predicate returns instead of
+ * restating the set.
  */
-export function isTerminalGlanceableStatus(status: GlanceableAgentsSnapshotStatus): boolean {
-  return status === 'signed_out' || status === 'privacy';
+export const GLANCEABLE_TERMINAL_STATUSES = [
+  'signed_out',
+  'privacy',
+] as const satisfies readonly GlanceableAgentsSnapshotStatus[];
+
+export type GlanceableTerminalStatus = (typeof GLANCEABLE_TERMINAL_STATUSES)[number];
+
+/**
+ * The snapshot statuses that end the surface. Every terminal-status decision
+ * reads this one predicate, so the data payload, presentation, refresh cadence
+ * and timeline cannot disagree, and it narrows its caller to the terminal
+ * vocabulary so a presentation cannot label one terminal member as another.
+ */
+export function isTerminalGlanceableStatus(
+  status: GlanceableAgentsSnapshotStatus
+): status is GlanceableTerminalStatus {
+  return (GLANCEABLE_TERMINAL_STATUSES as readonly string[]).includes(status);
 }
 
 /**
@@ -442,7 +469,7 @@ export type BuildGlanceableSnapshotInput = {
   previousRevision?: number;
   accountEpoch?: number;
   /** Overrides the happy/empty derivation for waiting, stale, expired, signed_out, privacy. */
-  status?: GlanceableAgentsSnapshotStatus;
+  status?: GlanceableSnapshotStatusOverride;
 };
 
 /**
@@ -515,8 +542,10 @@ export function isIdleOnlyGlanceableWork(snapshot: GlanceableAgentsSnapshot): bo
 
 /**
  * True when `incoming` must be discarded in favour of `current`: a strictly
- * lower revision, or the same revision with an older `updatedAt`. ISO 8601
- * strings from `epochMsToIso` compare correctly as strings.
+ * lower revision, or the same revision with an older `updatedAt`. The tie is
+ * settled on the parsed instants so any ISO 8601 form orders chronologically;
+ * when either instant does not parse, the raw strings decide, matching the
+ * behavior before instants were parsed.
  */
 export function shouldDiscardGlanceableRevision(
   incoming: GlanceableAgentsSnapshot,
@@ -526,6 +555,11 @@ export function shouldDiscardGlanceableRevision(
     return true;
   }
   if (incoming.revision === current.revision) {
+    const incomingAt = timestampMs(incoming.updatedAt);
+    const currentAt = timestampMs(current.updatedAt);
+    if (incomingAt !== null && currentAt !== null) {
+      return incomingAt < currentAt;
+    }
     return incoming.updatedAt < current.updatedAt;
   }
   return false;

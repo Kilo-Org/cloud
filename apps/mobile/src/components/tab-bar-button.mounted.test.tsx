@@ -18,7 +18,7 @@ vi.mock('react-native', () => ({
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderButton(props: Partial<BottomTabBarButtonProps>) {
+function renderButton(props: Partial<BottomTabBarButtonProps> & { hiddenFromA11y?: boolean }) {
   act(() => {
     const element = createElement(TabBarButton, {
       children: null,
@@ -74,6 +74,21 @@ describe('TabBarButton mounted layout', () => {
   it('keeps the pointer cursor on every platform', () => {
     const button = renderButton({ style: { opacity: 1 } });
     expect(button.props.style).toEqual(expect.arrayContaining([{ cursor: 'pointer' }]));
+  });
+
+  // While a form sheet covers the tab's screen, the bar's entries must leave
+  // the accessibility tree with the covered scene (the sheet is what a reader
+  // reaches). The entry keeps taking sighted touches; only the tree changes.
+  it('hides the entry from accessibility while a form sheet covers its screen', () => {
+    const button = renderButton({ hiddenFromA11y: true });
+    expect(button.props.accessibilityElementsHidden).toBe(true);
+    expect(button.props.importantForAccessibility).toBe('no-hide-descendants');
+  });
+
+  it('keeps the entry readable when no form sheet is presented', () => {
+    const button = renderButton({ hiddenFromA11y: false });
+    expect(button.props.accessibilityElementsHidden).toBe(false);
+    expect(button.props.importantForAccessibility).toBe('auto');
   });
 });
 

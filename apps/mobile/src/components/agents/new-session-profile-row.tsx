@@ -4,6 +4,7 @@ import { type TFunction } from 'i18next';
 
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { Button } from '@/components/ui/button';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Text } from '@/components/ui/text';
 import {
   formatProfileCountItems,
@@ -41,10 +42,8 @@ export function renderProfileRow({
   onRetryProfile,
 }: Readonly<RenderProfileRowArgs>): ReactNode {
   return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.environment')}
-      </Text>
+    <View className="gap-2">
+      <FormFieldLabel label={t('agentChat.newSession.environment')} />
       {renderProfileRowBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })}
     </View>
   );

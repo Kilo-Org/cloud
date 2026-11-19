@@ -2,7 +2,13 @@ import { getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import type { RequestLogByokFailoverAttempt } from '@/lib/request-logs/routing-details';
 import { DetailSection, ToneBadge } from './detail-primitives';
 import { formatDurationMs } from './format';
-import type { StepTone } from './routing-labels';
+import {
+  capitalize,
+  gatewayName,
+  isPartnerFailover,
+  partnerName,
+  type StepTone,
+} from './routing-labels';
 
 const OUTCOMES: Record<string, { label: string; tone: StepTone }> = {
   'failed-over': { label: 'Failed, tried next key', tone: 'rejected' },
@@ -14,6 +20,27 @@ function outcomeOf(outcome: string) {
   return Object.hasOwn(OUTCOMES, outcome)
     ? OUTCOMES[outcome]
     : { label: outcome, tone: 'info' as const };
+}
+
+const PARTNER_OUTCOMES: Record<string, { label: string; tone: StepTone }> = {
+  ...OUTCOMES,
+  'failed-over': { label: 'Failed, fell back', tone: 'rejected' },
+};
+
+function partnerOutcomeOf(outcome: string) {
+  return Object.hasOwn(PARTNER_OUTCOMES, outcome)
+    ? PARTNER_OUTCOMES[outcome]
+    : { label: outcome, tone: 'info' as const };
+}
+
+function partnerAttemptName(
+  attempt: RequestLogByokFailoverAttempt,
+  partnerInferenceProvider: string | undefined
+): string {
+  if (attempt.provider_type === 'partner') {
+    return capitalize(partnerName(partnerInferenceProvider));
+  }
+  return (attempt.provider_type && gatewayName(attempt.provider_type)) ?? 'Kilo gateway';
 }
 
 function keyName(attempt: RequestLogByokFailoverAttempt): string {
@@ -29,15 +56,30 @@ function isThroughVercel(attempt: RequestLogByokFailoverAttempt): boolean {
   );
 }
 
-export function ByokFailoverSection({ attempts }: { attempts: RequestLogByokFailoverAttempt[] }) {
+export function ByokFailoverSection({
+  attempts,
+  partnerInferenceProvider,
+}: {
+  attempts: RequestLogByokFailoverAttempt[];
+  /** The partner a partner-first Kilo route tried first, when the routing record names it. */
+  partnerInferenceProvider?: string;
+}) {
+  const partner = isPartnerFailover(attempts);
   return (
     <DetailSection
-      title="BYOK failover"
-      description="The upstream provider returned an error, so Kilo retried with the next BYOK key in route order. Failover never uses Kilo credits."
+      title={partner ? 'Provider fallback' : 'BYOK failover'}
+      description={
+        partner
+          ? `${capitalize(partnerName(partnerInferenceProvider))} returned an error, so Kilo sent the request through its own gateway instead. Both are paid with Kilo credits; only the attempt that served is charged.`
+          : 'The upstream provider returned an error, so Kilo retried with the next BYOK key in route order. Failover never uses Kilo credits.'
+      }
     >
-      <ol className="flex flex-col gap-1 rounded-md border p-2" aria-label="BYOK failover attempts">
+      <ol
+        className="flex flex-col gap-1 rounded-md border p-2"
+        aria-label={partner ? 'Provider fallback attempts' : 'BYOK failover attempts'}
+      >
         {attempts.map((attempt, index) => {
-          const outcome = outcomeOf(attempt.outcome);
+          const outcome = partner ? partnerOutcomeOf(attempt.outcome) : outcomeOf(attempt.outcome);
           return (
             <li
               key={`${attempt.byok_provider_ids.join('-')}-${index}`}
@@ -47,8 +89,12 @@ export function ByokFailoverSection({ attempts }: { attempts: RequestLogByokFail
                 {index + 1}.
               </span>
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="font-medium">{keyName(attempt)}</span>
-                {isThroughVercel(attempt) && (
+                <span className="font-medium">
+                  {partner
+                    ? partnerAttemptName(attempt, partnerInferenceProvider)
+                    : keyName(attempt)}
+                </span>
+                {!partner && isThroughVercel(attempt) && (
                   <span className="text-muted-foreground">via Vercel AI Gateway</span>
                 )}
                 <ToneBadge tone={outcome.tone}>{outcome.label}</ToneBadge>

@@ -22,6 +22,7 @@ function reactNativeMock() {
 }
 
 vi.mock('react-native', reactNativeMock);
+vi.mock('react-native-gesture-handler', () => ({ GestureDetector: 'GestureDetector' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },

@@ -22,6 +22,7 @@ import {
 } from '@/lib/organization/guardrails-draft';
 import { guardrailsIssues } from '@/lib/organization/guardrails-issues';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 
 /**
  * The guardrails form: the dirty draft, its save, and the keep-editing gate.
@@ -120,7 +121,7 @@ export function GuardrailsForm({
     } catch (error) {
       attempt.fail({
         kind: 'save-failed',
-        message: error instanceof Error ? error.message : t('organizationGuardrails.statusFailed'),
+        message: knownServerErrorMessage(error) ?? t('organizationGuardrails.statusFailed'),
       });
     }
   };

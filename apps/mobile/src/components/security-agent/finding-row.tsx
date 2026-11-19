@@ -8,11 +8,7 @@ import { ExternalLink } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import {
-  FINDING_ICONS,
-  FINDING_TONE_TEXT_CLASS,
-  findingToneColor,
-} from '@/components/security-agent/finding-tone';
+import { FINDING_ICONS } from '@/components/security-agent/finding-tone';
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { RowChevron } from '@/components/ui/row-chevron';
@@ -247,7 +243,10 @@ export function FindingRow({
   return (
     <View className={cn(FINDING_ROW_CLASS, last && 'border-b-0')}>
       <Pressable
-        className="flex-row items-start gap-3 active:opacity-70"
+        // The row is one block, so its disclosure mark centres on the row's
+        // height instead of sitting level with the severity eyebrow: every
+        // other chevron in the app is centred in the row it ends.
+        className="flex-row items-center gap-3 active:opacity-70"
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         onPress={() => {
@@ -265,28 +264,28 @@ export function FindingRow({
             {finding.repo_full_name}
           </Text>
           <View className="flex-row flex-wrap items-center gap-3 pt-0.5">
+            {/* One saturated colour per row: the severity eyebrow owns it, so
+                the state line reads in the muted ink with its own icon. Three
+                coloured tokens on one row (severity, analysis state, deadline)
+                competed for the same glance and none of them won. */}
             <View className="flex-row items-center gap-1">
               <SpinningIcon
                 icon={AnalysisIcon}
                 size={13}
-                color={findingToneColor(colors, analysis.tone)}
+                color={colors.mutedForeground}
                 spinning={Boolean(analysis.spinning)}
               />
-              <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
-                {analysisLabel}
-              </Text>
+              <Text className="text-xs text-muted-foreground">{analysisLabel}</Text>
             </View>
             {deadline && DeadlineIcon && (
               <View className="flex-row items-center gap-1">
                 <SpinningIcon
                   icon={DeadlineIcon}
                   size={13}
-                  color={findingToneColor(colors, deadline.tone)}
+                  color={colors.mutedForeground}
                   spinning={Boolean(deadline.spinning)}
                 />
-                <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
-                  {deadlineLabel}
-                </Text>
+                <Text className="text-xs text-muted-foreground">{deadlineLabel}</Text>
               </View>
             )}
           </View>

@@ -21,7 +21,6 @@ import { FindingAnalysisPanel } from './finding-analysis-panel';
 import { FindingRemediationPanel } from './finding-remediation-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type SecurityFinding } from '@/lib/security-agent';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { TRIAL_ENDED_BILLING_COPY_KEY, TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
 import { FindingDetailScreen } from './finding-detail-screen';
 
@@ -145,6 +144,29 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: 'TabScreenScrollView',
 }));
+// The view switch is the shared segmented control, whose own suite owns its
+// track, floor and selection tick. Here it only has to hand the screen's
+// choices and the current one back, so a test can pick a view the way a press
+// does.
+const viewSwitch = vi.hoisted(() => ({
+  props: null as null | {
+    options: { value: string; label: string }[];
+    value: string;
+    onChange: (next: string) => void;
+    accessibilityLabel: string;
+  },
+}));
+vi.mock('@/components/ui/segmented-control', () => ({
+  SegmentedControl: (props: {
+    options: { value: string; label: string }[];
+    value: string;
+    onChange: (next: string) => void;
+    accessibilityLabel: string;
+  }) => {
+    viewSwitch.props = props;
+    return null;
+  },
+}));
 vi.mock('@/components/security-agent/finding-analysis-panel', () => ({
   FindingAnalysisPanel: () => null,
 }));
@@ -182,17 +204,18 @@ function press(tree: R, accessibilityLabel: string) {
   act(tree.root.findByProps({ accessibilityLabel }).props.onPress as () => void);
 }
 
-/**
- * The detail strip's entries. The mocked platform is iOS, where an entry is
- * typed as a button (see lib/a11y/tab-entry); the `tablist` container keeps
- * them apart from the header's own buttons.
- */
-function findingTabs(tree: R): TestRenderer.ReactTestInstance[] {
-  const strip = tree.root.findAllByProps({ accessibilityRole: 'tablist' })[0];
-  if (!strip) {
-    throw new Error('finding tabs not mounted');
+/** The view switch the screen mounted, as the shared control received it. */
+function mountedViewSwitch() {
+  const props = viewSwitch.props;
+  if (!props) {
+    throw new Error('finding view switch not mounted');
   }
-  return strip.findAllByProps({ role: 'button' });
+  return props;
+}
+
+/** Pick one of the screen's views the way a press on the control does. */
+function selectView(view: string): void {
+  act(mountedViewSwitch().onChange(view));
 }
 
 beforeEach(() => {
@@ -218,20 +241,23 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('FindingDetailScreen tab touch target', () => {
-  // Regression: each tab was a `min-h-11` node, 38.5 dp in this app's rem, so
-  // the strip's upper and lower bands were not part of the tab. The floor has
-  // to be the tab node's own class; `hitSlop` would not move the rect a
-  // control-size audit measures.
-  it('carries the shared row floor on every tab node', () => {
-    const tree = renderScreen();
-    const tabs = findingTabs(tree);
+describe('FindingDetailScreen view switch', () => {
+  // The three views are the app's one view switch, so the screen mounts the
+  // shared segmented control instead of a strip of its own: the track, the
+  // selected pill and the control's floor are the primitive's.
+  it('mounts the shared segmented control over the three views', () => {
+    renderScreen();
+    const control = mountedViewSwitch();
 
-    expect(tabs).toHaveLength(3);
-    for (const tab of tabs) {
-      expect(String(tab.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
-      expect(tab.props.hitSlop).toBeUndefined();
-    }
+    expect(control.options.map(option => option.value)).toEqual([
+      'details',
+      'analysis',
+      'remediation',
+    ]);
+    expect(control.value).toBe('details');
+    // The group is named by the screen's own title, so a reader hears the
+    // finding's views rather than an unnamed radio group.
+    expect(control.accessibilityLabel).toBe('securityAgent.findingDetail.title');
   });
 });
 
@@ -243,9 +269,7 @@ describe('FindingDetailScreen pane containers', () => {
     finding.isError = true;
     finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     const tree = renderScreen();
-    const tabs = findingTabs(tree);
-    const onPress = tabs[tab === 'analysis' ? 1 : 2]?.props.onPress as () => void;
-    act(onPress);
+    selectView(tab);
     expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
     expect(tree.root.findAllByType(Panel)).toHaveLength(1);
     expect(tree.root.findAllByType(CenteredState)).toHaveLength(0);
@@ -301,21 +325,21 @@ describe('FindingDetailScreen analysis query activation', () => {
     return useSecurityAnalysis.mock.lastCall?.[2];
   }
 
-  function pressTab(tree: R, index: number) {
-    act(findingTabs(tree)[index]?.props.onPress as () => void);
+  function pressTab(index: number) {
+    selectView(['details', 'analysis', 'remediation'][index] ?? 'details');
   }
 
   it('reads the analysis only while an analysis surface is selected', () => {
-    const tree = renderScreen();
+    renderScreen();
     expect(enabledArg()).toBeFalsy();
 
-    pressTab(tree, 1);
+    pressTab(1);
     expect(enabledArg()).toBe(true);
 
-    pressTab(tree, 2);
+    pressTab(2);
     expect(enabledArg()).toBe(true);
 
-    pressTab(tree, 0);
+    pressTab(0);
     expect(enabledArg()).toBeFalsy();
   });
 
@@ -484,7 +508,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     finding.data = undefined;
     const tree = renderScreen();
 
-    // Four body skeletons plus the bar on the header's reserved eyebrow line.
+    // Four body skeletons plus the bar on the header's reserved subtitle line.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
@@ -498,7 +522,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     const tree = renderScreen();
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
-    // The header keeps the eyebrow line it reserved while loading, and no bar
+    // The header keeps the subtitle line it reserved while loading, and no bar
     // paints over it once the read has failed: this state leaves no skeleton.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
     expectSafeBack(tree);
@@ -520,7 +544,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
     expect(tree.root.findByType(QueryError).props.isRetrying).toBe(true);
-    // The body stays on the error surface; only the header's reserved eyebrow
+    // The body stays on the error surface; only the header's reserved subtitle
     // bar remains, so the retry window paints no body skeleton.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(1);
 
@@ -545,7 +569,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     renderScreen('finding-2');
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
-    // Four body skeletons plus the bar on the header's reserved eyebrow line.
+    // Four body skeletons plus the bar on the header's reserved subtitle line.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
   });
 

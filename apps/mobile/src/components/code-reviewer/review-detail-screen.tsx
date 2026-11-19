@@ -28,7 +28,6 @@ import {
   CouncilSection,
   FindingCard,
   GateSection,
-  MetaRow,
 } from '@/components/code-reviewer/review-detail-sections';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
@@ -37,6 +36,8 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Card } from '@/components/ui/card';
 import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
@@ -342,38 +343,47 @@ export function ReviewDetailScreen({
 
         {/* Metadata: technical details after the outcome. */}
         <Section label={t('common.details')}>
-          <Card className="gap-1">
-            <MetaRow label={t('common.branch')} value={`${review.head_ref} → ${review.base_ref}`} />
-            <MetaRow label={t('common.platform')} value={reviewerPlatformLabel(review.platform)} />
-            {review.model ? <MetaRow label={t('common.model')} value={review.model} /> : null}
-            <MetaRow
+          {/* One row height for every key/value row on this screen, the
+              shared one: the gate's check run and the council's votes above
+              stand at this same pitch. */}
+          <RowGroup>
+            <KvRow
+              label={t('common.branch')}
+              value={`${review.head_ref} → ${review.base_ref}`}
+            />
+            <KvRow label={t('common.platform')} value={reviewerPlatformLabel(review.platform)} valueFace="text" />
+            {review.model ? <KvRow label={t('common.model')} value={review.model} /> : null}
+            <KvRow
               label={t('codeReviewer.reviewDetail.created')}
               value={timeAgo(parseTimestamp(review.created_at), undefined, now)}
+              valueFace="text"
             />
             {review.started_at ? (
-              <MetaRow
+              <KvRow
                 label={t('codeReviewer.reviewDetail.started')}
                 value={timeAgo(parseTimestamp(review.started_at), undefined, now)}
+                valueFace="text"
               />
             ) : null}
             {review.completed_at ? (
-              <MetaRow
+              <KvRow
                 label={t(
                   review.status === 'completed'
                     ? 'common.completed'
                     : 'codeReviewer.reviewDetail.reviewEnded'
                 )}
                 value={timeAgo(parseTimestamp(review.completed_at), undefined, now)}
+                valueFace="text"
               />
             ) : null}
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
-              <MetaRow
+              <KvRow
                 label={t('common.cost')}
                 value={formatPrefixedMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
               />
             ) : null}
             {tokenUsage.input > 0 || tokenUsage.output > 0 ? (
-              <MetaRow
+              <KvRow
                 label={t('codeReviewer.reviewDetail.tokens')}
                 value={t('codeReviewer.reviewDetail.tokensInOut', {
                   input: formatNumber(tokenUsage.input, i18n.language),
@@ -381,7 +391,7 @@ export function ReviewDetailScreen({
                 })}
               />
             ) : null}
-          </Card>
+          </RowGroup>
         </Section>
 
         {/* Actions. The pull request is the screen's primary action, so it takes

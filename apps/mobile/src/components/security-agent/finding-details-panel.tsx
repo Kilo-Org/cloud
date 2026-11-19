@@ -134,7 +134,7 @@ function DismissalOrSupersessionNote({
 // Ported from FindingDetailDialog.tsx:552 (getFindingDetailsPresentation) —
 // source, package, severity/status, timestamps, and dismissal/supersession
 // context as plain facts rather than the web's hero + next-step action card
-// (Task 7 owns actions). The repository is the screen header's eyebrow, so this
+// (Task 7 owns actions). The repository is the screen header's subtitle, so this
 // card does not repeat it.
 export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsPanelProps>) {
   const router = useRouter();
@@ -220,7 +220,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
       : []),
   ];
 
-  // The repository is the header's eyebrow, which sits directly above this
+  // The repository is the header's subtitle, which sits directly above this
   // card, so the details list does not repeat it. What the source reported of
   // the advisory identifiers is optional; the group's divider hangs under
   // whichever row ends it.
@@ -251,6 +251,9 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
               icon={deadline.icon}
               label={deadlineBadgeCopy.label}
               tone={deadline.tone}
+              // The severity and the lifecycle status beside it are captions;
+              // the badge joins that one size instead of standing a step larger.
+              textClassName="text-xs"
             />
           ) : null}
         </View>

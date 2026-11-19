@@ -11,8 +11,9 @@ import {
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { ConfigureRow } from '@/components/ui/configure-row';
+import { RotateCcw } from '@/components/ui/icons';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
@@ -145,21 +146,18 @@ export function FindingFilterModal({
 
   return (
     <View className="gap-6 bg-background px-4 pb-8 pt-3">
-      {/* Reset is a secondary action, not the sheet's heading: at the default
-          label size and foreground ink it outweighed the section labels below
-          it. It takes the gutter and the muted secondary text so it reads as
-          the least of the sheet's controls while keeping a 48 dp target. */}
-      <Button
-        variant="ghost"
-        className="self-start"
-        onPress={() => {
-          onChange(DEFAULT_SECURITY_FINDING_FILTERS);
-        }}
-      >
-        <Text className="text-sm font-medium text-muted-foreground">
-          {t('securityAgent.filter.reset')}
-        </Text>
-      </Button>
+      {/* Reset is the sheet's first row, not loose text above the sections: it
+          starts on the gutter like every section label below it and takes the
+          row's own height and target instead of a hand-sized line. */}
+      <RowGroup>
+        <ConfigureRow
+          icon={RotateCcw}
+          title={t('securityAgent.filter.reset')}
+          onPress={() => {
+            onChange(DEFAULT_SECURITY_FINDING_FILTERS);
+          }}
+        />
+      </RowGroup>
       <View className="gap-6">
         <FilterSection
           title={t('common.repository')}

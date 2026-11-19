@@ -1,22 +1,21 @@
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import { Ban, ShieldOff } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
+import { ScreenHeader } from '@/components/screen-header';
 import { FindingAnalysisPanel } from '@/components/security-agent/finding-analysis-panel';
 import { FindingDetailsPanel } from '@/components/security-agent/finding-details-panel';
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
 import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boundary';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
-import { Button } from '@/components/ui/button';
-import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';
+import { IconButton } from '@/components/ui/icon-button';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentCapability,
@@ -33,8 +32,6 @@ import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/fin
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { isSecurityTrialRefusalCopyKey } from '@/lib/security-agent-ledger';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
@@ -170,19 +167,22 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
   // The not-found, load-failure and loading states share one header with its
-  // eyebrow line reserved. The payload draws the finding's repository on that
+  // subtitle line reserved. The payload names the finding's repository on that
   // line, and neither a not-found nor a failed read can be known before the
   // first paint — the first frame is always the loading one — so dropping the
   // line afterwards would pull the title up out of the position the loading
   // frame gave it. Only a read that is still running paints the placeholder
   // bar: a terminal answer, and a failure the retry surface holds, keep the
   // same line blank so nothing pulses on a finishable screen.
-  const pendingEyebrow: HeaderEyebrow =
-    findingQuery.isFetching && !notFound ? { kind: 'loading' } : { kind: 'held' };
   const pendingHeader = (
     <ScreenHeader
       title={t('securityAgent.findingDetail.title')}
-      {...eyebrowHeaderProps(pendingEyebrow)}
+      reserveSubtitle
+      subtitlePlaceholder={
+        findingQuery.isFetching && !notFound ? (
+          <Skeleton className="h-3.5 w-28 rounded-full" />
+        ) : undefined
+      }
       showBackButton
       onBack={handleBack}
     />
@@ -234,34 +234,33 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   // A pre-accept dismissal failure (no command id) leaves a durable draft; the
   // retry card restores it until the user retries or discards it.
   const draft = dismissDraft.draft;
+  // The segmented control's options: the three views under the labels the
+  // catalogs already carry for them.
+  const viewOptions = TABS.map(({ key, labelKey }) => ({ value: key, label: t(labelKey) }));
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('securityAgent.findingDetail.title')}
-        eyebrow={finding.repo_full_name}
+        subtitle={finding.repo_full_name}
+        reserveSubtitle
         showBackButton
         onBack={handleBack}
+        // The dismiss is one icon target, the shape every other header action
+        // in the app takes (the dashboard's findings and settings, the
+        // findings list's filter): a labelled button here outweighed the
+        // title it sits beside.
+        headerRightWidth={48}
         headerRight={
           canDismiss ? (
-            <Button
-              variant="secondary"
-              size="sm"
+            <IconButton
               onPress={() => {
                 pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
               accessibilityLabel={t('securityAgent.dismiss.title')}
-              // A labelled header action is variable width, so it bounds itself
-              // the way the settings Save button does: the label shrinks inside
-              // the cap instead of taking the title's room (see the trailing
-              // cluster note in screen-header.tsx).
-              className="min-w-0 max-w-40 shrink"
             >
-              <Ban size={16} color={colors.secondaryForeground} />
-              <Text className="shrink text-center">
-                {t('securityAgent.analysis.action.dismiss')}
-              </Text>
-            </Button>
+              <Ban size={20} color={colors.foreground} />
+            </IconButton>
           ) : undefined
         }
       />
@@ -289,41 +288,17 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           />
         </View>
       ) : null}
-      <View accessibilityRole="tablist" className="flex-row gap-2 px-4 pb-2 pt-1">
-        {TABS.map(({ key, labelKey }) => {
-          const selected = tab === key;
-          return (
-            <Pressable
-              key={key}
-              className={cn(
-                // The strip is a segmented row: each tab carries the shared
-                // row floor on its own node so a tap anywhere in the tab's
-                // height lands, not just the label line.
-                ROW_TARGET_CLASS,
-                'flex-1 items-center justify-center rounded-md py-2 active:opacity-80',
-                // The selected pill takes the palette's in-page tab pair. The
-                // unselected pill paints no fill of its own: a `bg-secondary`
-                // chip surface built here would be a hand-made card (the layout
-                // contract keeps surfaces in the primitives), and the muted
-                // label already reads as the unpicked side.
-                selected ? 'bg-selection' : 'bg-transparent'
-              )}
-              onPress={() => {
-                setTab(key);
-              }}
-              {...tabEntryA11y({ selected })}
-            >
-              <Text
-                className={cn(
-                  'text-xs font-medium',
-                  selected ? 'text-selection-foreground' : 'text-muted-foreground'
-                )}
-              >
-                {t(labelKey)}
-              </Text>
-            </Pressable>
-          );
-        })}
+      {/* The three views are the app's one view switch: the shared segmented
+          control, which owns the track, the selected pill, the 48pt floor and
+          the selection tick. Its accessible name is the screen's own, so a
+          reader hears the finding's views, not an unnamed radio group. */}
+      <View className="px-4 pb-2 pt-1">
+        <SegmentedControl
+          options={viewOptions}
+          value={tab}
+          accessibilityLabel={t('securityAgent.findingDetail.title')}
+          onChange={setTab}
+        />
       </View>
       {tab === 'details' && (
         <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>

@@ -8,6 +8,8 @@ import {
   severityLabelKey,
 } from '@/components/code-reviewer/review-detail-helpers';
 import { Card } from '@/components/ui/card';
+import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { type useReviewDetail } from '@/lib/hooks/use-code-reviews';
@@ -26,21 +28,6 @@ const SEVERITY_CLASS = {
   suggestion: 'text-info',
   nitpick: 'text-muted-foreground',
 } satisfies Record<string, string>;
-
-export function MetaRow({
-  label,
-  value,
-  valueClassName,
-}: Readonly<{ label: string; value: string; valueClassName?: string }>) {
-  return (
-    <View className="flex-row items-center justify-between py-1">
-      <Text variant="muted" className="text-xs">
-        {label}
-      </Text>
-      <Text className={cn('text-xs', valueClassName)}>{value}</Text>
-    </View>
-  );
-}
 
 export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) {
   const { t } = useTranslation();
@@ -71,19 +58,24 @@ export function CouncilSection({ councilResult }: Readonly<{ councilResult: Coun
   const { t } = useTranslation();
   return (
     <Section label={t('codeReviewer.reviewDetail.council')}>
-      <Card className="gap-1">
-        <MetaRow
+      {/* Facts, not a card of prose: every key/value row on this screen is the
+          shared row, so the council's rows stand at the same height as the
+          gate's and the details'. */}
+      <RowGroup>
+        <KvRow
           label={t('codeReviewer.reviewDetail.decision')}
           value={councilDecisionLabel(councilResult.decision)}
+          valueFace="text"
         />
         {councilResult.specialists.map(specialist => (
-          <MetaRow
+          <KvRow
             key={specialist.id}
             label={specialist.name}
             value={councilVoteLabel(specialist.vote)}
+            valueFace="text"
           />
         ))}
-      </Card>
+      </RowGroup>
     </Section>
   );
 }
@@ -106,15 +98,20 @@ export function GateSection({
   }
   return (
     <Section label={t('codeReviewer.reviewDetail.gate')}>
-      <Card className="gap-1">
-        <MetaRow label={t('codeReviewer.reviewDetail.checkRun')} value={checkRunLabel} />
+      <RowGroup>
+        <KvRow
+          label={t('codeReviewer.reviewDetail.checkRun')}
+          value={checkRunLabel}
+          valueFace={checkRunId == null ? 'text' : 'mono'}
+        />
         {gateThreshold ? (
-          <MetaRow
+          <KvRow
             label={t('codeReviewer.reviewDetail.threshold')}
             value={gateThresholdLabel(gateThreshold)}
+            valueFace="text"
           />
         ) : null}
-      </Card>
+      </RowGroup>
     </Section>
   );
 }

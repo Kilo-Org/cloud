@@ -7,11 +7,11 @@ import {
   LOCAL_FAKE_LLM_API_KEY,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   OpenRouterModelsResponseSchema,
   type OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';

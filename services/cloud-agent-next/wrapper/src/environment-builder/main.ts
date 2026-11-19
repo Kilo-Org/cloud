@@ -145,6 +145,7 @@ async function main(): Promise<void> {
       repository,
       runGit,
       filesystemBaseline: archive?.baseline,
+      retireScm: input.filesystemArchive ? () => client.retireScm(controller.signal) : undefined,
       stopProcesses: async () => {
         if (ownedScope === undefined) {
           await stopOtherProcesses();

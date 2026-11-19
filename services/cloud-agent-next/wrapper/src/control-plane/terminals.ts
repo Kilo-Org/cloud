@@ -82,6 +82,7 @@ function failure(error: unknown): {
  */
 export function createControlPlaneTerminals(options: {
   controlUrl: string;
+  proxyUrl?: string;
   wrapperId: string;
   runtimes: KiloRuntimes;
 }): ControlPlaneTerminalRuntime {
@@ -89,6 +90,7 @@ export function createControlPlaneTerminals(options: {
   const inputAt = new Map<string, number>();
   const runtime = createControlTerminalRuntime({
     controlUrl: options.controlUrl,
+    proxyUrl: options.proxyUrl,
     wrapperInstanceId: options.wrapperId,
     getKiloRuntime: identity => {
       const attachedSession = attached.get(identity.sessionId);

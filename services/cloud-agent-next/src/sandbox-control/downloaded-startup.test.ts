@@ -859,6 +859,7 @@ describe('AWS archive launch size and target admission', () => {
     return {
       snapshotId: encodeAwsArchiveSnapshot(snapshot),
       connectionId,
+      provider: 'aws' as const,
       configuration: AWS_TEST_CONFIGURATION,
       downloadUrl: `https://customer-artifacts.s3.us-east-1.amazonaws.com/${awsArchiveObjectKey(snapshot)}?synthetic-signature=fixture`,
       reportUrl,

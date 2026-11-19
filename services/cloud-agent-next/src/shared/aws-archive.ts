@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
+import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import { rootfsArchiveDescriptorSchema } from './rootfs-archive.js';
 
 /**
@@ -17,16 +18,42 @@ export const awsArchiveIdentityFields = {
     .regex(/^arn:aws:lambda:us-east-1:\d{12}:microvm-image:[A-Za-z0-9_-]+$/),
   imageVersion: z.string().regex(/^\d+\.\d+$/),
 };
+export const awsEcsArchiveIdentityFields = {
+  runtimeImage: z
+    .string()
+    .regex(
+      /^\d{12}\.dkr\.ecr\.us-east-1\.amazonaws\.com\/[a-z0-9][a-z0-9._/-]*@sha256:[a-f0-9]{64}$/
+    ),
+  taskDefinitionArn: z
+    .string()
+    .regex(/^arn:aws:ecs:us-east-1:\d{12}:task-definition\/[A-Za-z0-9_-]{1,255}:[1-9]\d*$/),
+};
 
-const baseSchema = z
+const archiveLocation = z
   .object({
     connectionId: z.uuid(),
-    ...awsArchiveIdentityFields,
+    region: awsArchiveIdentityFields.region,
+    bucket: awsArchiveIdentityFields.bucket,
+    stackId: awsArchiveIdentityFields.stackId,
+  })
+  .strict();
+const baseSchema = archiveLocation
+  .extend({
+    imageIdentifier: awsArchiveIdentityFields.imageIdentifier,
+    imageVersion: awsArchiveIdentityFields.imageVersion,
   })
   .strict()
   .refine(value => value.stackId.split(':')[4] === value.imageIdentifier.split(':')[4]);
-export type AwsArchiveBase = z.infer<typeof baseSchema>;
+const ecsBaseSchema = archiveLocation
+  .extend({
+    provider: z.literal('aws-ecs'),
+    ...awsEcsArchiveIdentityFields,
+  })
+  .strict()
+  .refine(value => value.stackId.split(':')[4] === value.taskDefinitionArn.split(':')[4]);
+export type AwsArchiveBase = z.infer<typeof baseSchema> | z.infer<typeof ecsBaseSchema>;
 const BASE_PREFIX = 'aws-image:v1:';
+const ECS_BASE_PREFIX = 'aws-ecs-image:v1:';
 const SNAPSHOT_PREFIX = 'aws-archive:v1:';
 const MAX_ENCODED_CHARS = 8192;
 
@@ -60,7 +87,27 @@ export function awsArchiveBaseImage(
     baseSchema.parse({ connectionId, region, bucket, stackId, imageIdentifier, imageVersion })
   );
 }
+export function awsEcsArchiveBaseImage(
+  connectionId: string,
+  configuration: AwsEcsByocConfiguration
+): string {
+  const { region, bucket, stackId, runtimeImage, taskDefinitionArn } = configuration;
+  return encode(
+    ECS_BASE_PREFIX,
+    ecsBaseSchema.parse({
+      connectionId,
+      region,
+      bucket,
+      stackId,
+      provider: 'aws-ecs',
+      runtimeImage,
+      taskDefinitionArn,
+    })
+  );
+}
 export function decodeAwsArchiveBase(value: string): AwsArchiveBase | null {
+  if (value.startsWith(ECS_BASE_PREFIX))
+    return ecsBaseSchema.safeParse(decode(ECS_BASE_PREFIX, value)).data ?? null;
   return baseSchema.safeParse(decode(BASE_PREFIX, value)).data ?? null;
 }
 export const awsArchiveSnapshotSchema = z

@@ -1,3 +1,4 @@
+import { ScmCapabilityIssueError } from '../scm-broker/failure.js';
 import { assertAwsScmRepositories } from '../scm-broker/aws-policy.js';
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import jwt from 'jsonwebtoken';
@@ -779,7 +780,7 @@ export async function refreshScmCapability(
     });
     if (!authorized.success) {
       diagnostic?.record(brokerGrantFailure('broker_authorization', authorized.error.reason));
-      throw new Error('GitHub credential is unavailable');
+      throw new ScmCapabilityIssueError('github', authorized.error.reason);
     }
   }
   if (
@@ -814,7 +815,7 @@ export async function refreshScmCapability(
           issued.success ? undefined : issued.error.rejectionProvenance
         )
       );
-      throw new Error('GitHub capability issuance is unavailable');
+      throw new ScmCapabilityIssueError('github', issued.success ? 'unknown' : issued.error.reason);
     }
     scm = {
       purpose: 'github',
@@ -838,7 +839,7 @@ export async function refreshScmCapability(
     });
     if (!issued.success) {
       diagnostic?.record(brokerGrantFailure('broker_issuance', issued.reason));
-      throw new Error('GitLab capability issuance is unavailable');
+      throw new ScmCapabilityIssueError('gitlab', issued.reason);
     }
     const { capability, gitUrl, ...gitlab } = issued.value;
     if (
@@ -881,7 +882,7 @@ export async function refreshScmCapability(
     });
     if (!issued.success) {
       diagnostic?.record(brokerGrantFailure('broker_issuance', issued.reason));
-      throw new Error('Bitbucket capability issuance is unavailable');
+      throw new ScmCapabilityIssueError('bitbucket', issued.reason);
     }
     const gitUrl = canonicalRepositoryUrl(issued.value.gitUrl, true, diagnostic);
     if (!parseCanonicalBitbucketCloneUrl(gitUrl)) {

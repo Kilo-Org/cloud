@@ -49,3 +49,26 @@ describe('archive RPC cancellation', () => {
     expect(requests).toBe(1);
   });
 });
+
+describe('SCM retirement acknowledgement', () => {
+  it('retries an uncertain response with the same authenticated transition', async () => {
+    const calls: string[] = [];
+    const client = createBuilderClient({
+      baseUrl: 'https://worker.example.com/build',
+      credential: 'synthetic-runner',
+      sleep: async () => undefined,
+      async fetch(url, init) {
+        calls.push(url);
+        expect(init.method).toBe('POST');
+        expect(init.headers).toEqual({ authorization: 'Bearer synthetic-runner' });
+        if (calls.length === 1) throw new Error('response lost');
+        return Response.json({ ok: true });
+      },
+    });
+    await client.retireScm();
+    expect(calls).toEqual([
+      'https://worker.example.com/build/retire-scm',
+      'https://worker.example.com/build/retire-scm',
+    ]);
+  });
+});

@@ -692,6 +692,7 @@ async function main(
   artifactSyncRef.current?.start();
   terminalsRef.current = createControlPlaneTerminals({
     controlUrl: url,
+    proxyUrl,
     wrapperId: connection.wrapperId,
     runtimes,
   });

@@ -823,6 +823,7 @@ export async function loadEnvironmentBuildInput(
         encryptedSecrets,
         sandboxAllocation: environment.sandbox_allocation,
         egressMode: environment.egress_mode,
+        egressAllowlist: environment.egress_allowlist,
       };
       return reference.repositories
         ? { ...common, repositories: reference.repositories }

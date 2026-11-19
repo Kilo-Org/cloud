@@ -1,6 +1,14 @@
-import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
+import {
+  awsByocConfigurationSchema,
+  type AwsByocConfiguration,
+} from '@kilocode/worker-utils/aws-byoc';
+import {
+  awsEcsByocConfigurationSchema,
+  type AwsEcsByocConfiguration,
+} from '@kilocode/worker-utils/aws-ecs';
 import {
   awsArchiveBaseImage,
+  awsEcsArchiveBaseImage,
   awsArchiveMatchesBase,
   awsArchiveObjectKey,
   decodeAwsArchiveSnapshot,
@@ -124,21 +132,42 @@ try { process.execve(C.argv[0], C.argv, environment); }
 catch { await report('environment_restore_unavailable'); process.exit(C.failureExitCodes.environment_restore_unavailable); }
 `;
 
+type AwsArchiveRestoreTarget =
+  | { provider: 'aws'; configuration: AwsByocConfiguration }
+  | { provider: 'aws-ecs'; configuration: AwsEcsByocConfiguration };
+
 /** Restore before the fresh runtime and credentials start. A failed restore never starts that command. */
-export function renderAwsArchiveRestore(input: {
-  snapshotId: string;
-  connectionId: string;
-  configuration: AwsByocConfiguration;
-  downloadUrl: string;
-  reportUrl: string;
-  allocationId: string;
-  deadlineAt: number;
-  command: ProviderStartupCommand;
-  /** Explicit so tests can use an isolated filesystem. Production always supplies '/'. */
-  filesystemRoot: string;
-}): ProviderStartupCommand {
+export function renderAwsArchiveRestore(
+  input: AwsArchiveRestoreTarget & {
+    snapshotId: string;
+    connectionId: string;
+    downloadUrl: string;
+    reportUrl: string;
+    allocationId: string;
+    deadlineAt: number;
+    command: ProviderStartupCommand;
+    /** Explicit so tests can use an isolated filesystem. Production always supplies '/'. */
+    filesystemRoot: string;
+  }
+): ProviderStartupCommand {
+  let baseImage: string;
+  switch (input.provider) {
+    case 'aws':
+      baseImage = awsArchiveBaseImage(
+        input.connectionId,
+        awsByocConfigurationSchema.parse(input.configuration)
+      );
+      break;
+    case 'aws-ecs':
+      baseImage = awsEcsArchiveBaseImage(
+        input.connectionId,
+        awsEcsByocConfigurationSchema.parse(input.configuration)
+      );
+      break;
+    default:
+      throw new Error('Unsupported AWS archive provider');
+  }
   const snapshot = decodeAwsArchiveSnapshot(input.snapshotId);
-  const baseImage = awsArchiveBaseImage(input.connectionId, input.configuration);
   if (!snapshot || !awsArchiveMatchesBase(snapshot, baseImage))
     throw new Error('AWS archive base is incompatible');
   const source = new URL(input.downloadUrl);

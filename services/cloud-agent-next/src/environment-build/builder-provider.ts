@@ -1,3 +1,9 @@
+import { awsBuilderAllocation } from './aws-build-target.js';
+import { builderAllocationSandboxName } from './builder-identity.js';
+import type { EnvironmentBuildTarget } from './target.js';
+import type { AwsBuilderAllocation } from './aws-build-target.js';
+import type { AwsEnvironmentBuildServices } from './aws-build.js';
+export { builderAllocationSandboxName } from './builder-identity.js';
 import type { CloudflareContainersInstance } from '@kilocode/worker-utils/sandbox-allocation';
 import { hashToSandboxId } from '../sandbox-id.js';
 import type { EnvironmentBuildRunner } from '../shared/environment-build-protocol.js';
@@ -54,14 +60,13 @@ export type VercelBuilderAllocation = {
   target: VercelBuildTarget;
 };
 
-export type BuilderAllocation = NativeBuilderAllocation | VercelBuilderAllocation;
+export type BuilderAllocation =
+  | NativeBuilderAllocation
+  | VercelBuilderAllocation
+  | AwsBuilderAllocation;
 
-/** Mutable, non-secret Vercel lifecycle state kept outside the immutable build input. */
-export type BuilderLifecycleState = {
-  get(): Promise<unknown>;
-  set(value: unknown): Promise<void>;
-  clear(): Promise<void>;
-};
+export type { BuilderLifecycleState } from './builder-state.js';
+import type { BuilderLifecycleState } from './builder-state.js';
 
 export type BuilderLaunch = {
   /** Delivered to the running builder by exec or write, never as image environment. */
@@ -102,11 +107,6 @@ export function builderSandboxId(environmentId: string): Promise<string> {
   return hashToSandboxId(`environment-build:v1:${environmentId}`, 'sbx');
 }
 
-/** A deterministic, provider-valid builder sandbox name for one build. */
-export function vercelBuilderSandboxName(buildId: string): string {
-  return `ses-envbuild-${buildId.replaceAll('-', '').slice(0, 40)}`;
-}
-
 function providerRef(allocation: NativeBuilderAllocation): string {
   return encodeCloudflareProviderRef({
     sandboxId: allocation.sandboxId,
@@ -137,7 +137,12 @@ export function createBuilderProvider(deps: {
   env: BuilderProviderEnv;
   now?: () => number;
   fetch?: typeof fetch;
+  aws?: AwsEnvironmentBuildServices;
 }): BuilderProvider {
+  function aws() {
+    if (!deps.aws) throw new ProviderCreationError('invalid_configuration');
+    return deps.aws;
+  }
   const adapterFor = (allocation: NativeBuilderAllocation): ProviderAdapter =>
     createCloudflareContainersProviderAdapter({
       logicalSandboxId: allocation.sandboxId,
@@ -150,10 +155,12 @@ export function createBuilderProvider(deps: {
 
   return {
     async admitBilling(allocation, billing) {
-      if (allocation.provider === 'vercel') return;
+      if (allocation.provider !== 'cloudflare-containers') return;
       await adapterFor(allocation).ensureBillingAdmission(providerRef(allocation), billing);
     },
     async launch(allocation, launch, state) {
+      if (allocation.provider === 'aws' || allocation.provider === 'aws-ecs')
+        return aws().launch(allocation, launch, state);
       if (allocation.provider === 'vercel') {
         const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
         if (!descriptor) throw new ProviderCreationError('invalid_configuration');
@@ -201,6 +208,8 @@ export function createBuilderProvider(deps: {
       await stub(allocation).ensureLeaseAtLeast(ref, leaseAtLeastMs());
     },
     async capture(allocation, captureId, state) {
+      if (allocation.provider === 'aws' || allocation.provider === 'aws-ecs')
+        return aws().capture(allocation, captureId);
       if (allocation.provider === 'vercel') {
         let opened;
         try {
@@ -233,6 +242,8 @@ export function createBuilderProvider(deps: {
       return stub(allocation).captureSnapshot(providerRef(allocation), captureId);
     },
     async stop(allocation, state) {
+      if (allocation.provider === 'aws' || allocation.provider === 'aws-ecs')
+        return aws().stop(allocation, state);
       if (allocation.provider === 'vercel') {
         return stopVercelBuilder({
           allocation,
@@ -247,7 +258,7 @@ export function createBuilderProvider(deps: {
       // Native containers need a lease extension. A Vercel builder's initial
       // timeout already covers the build deadline and extending it would only
       // outlive the build.
-      if (allocation.provider === 'vercel') return;
+      if (allocation.provider !== 'cloudflare-containers') return;
       await adapterFor(allocation).ensureLeaseAtLeast(providerRef(allocation), leaseAtLeastMs());
     },
     async runtimeReleaseId() {
@@ -265,5 +276,41 @@ export function createBuilderProvider(deps: {
         return null;
       }
     },
+  };
+}
+
+/** Project the pinned build target into its physical allocation identity. */
+export function builderAllocation(input: {
+  target: EnvironmentBuildTarget;
+  environmentId: string;
+  buildId: string;
+  allocationId: string;
+  owner: EnvironmentReference['owner'];
+  actorUserId: string;
+  nativeSandboxId: string;
+}): BuilderAllocation {
+  const { target, allocationId, owner } = input;
+  if (target.provider === 'aws' || target.provider === 'aws-ecs')
+    return awsBuilderAllocation({
+      target,
+      environmentId: input.environmentId,
+      buildId: input.buildId,
+      allocationId,
+      owner,
+      actorUserId: input.actorUserId,
+    });
+  if (target.provider === 'vercel')
+    return {
+      provider: 'vercel',
+      sandboxId: builderAllocationSandboxName(input.buildId),
+      allocationId,
+      owner,
+      target,
+    };
+  return {
+    provider: 'cloudflare-containers',
+    sandboxId: input.nativeSandboxId,
+    allocationId,
+    instance: target.instance,
   };
 }

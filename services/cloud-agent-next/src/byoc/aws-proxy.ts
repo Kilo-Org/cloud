@@ -112,13 +112,22 @@ async function prepareProxyStartup(
   const claims = verifyAwsEgressCredential(token, input.signingSecret);
   if (claims?.sandboxId !== input.ref.sandboxId || claims.allocationId !== input.ref.intentId)
     throw new ByocAwsProviderError('byoc_aws_connection_changed');
+  return awsProxyStartup(input.startup, deployment, token);
+}
+
+/** Shared transport environment; callers supply their purpose-specific authenticated credential. */
+export function awsProxyStartup(
+  startup: ProviderStartup,
+  deployment: AwsEgressPublicDeployment,
+  token: string
+): ProviderStartup {
   const proxy = new URL(`http://${deployment.hostname}:${deployment.port}`);
   proxy.username = 'kilo';
   proxy.password = token;
   return {
-    ...input.startup,
+    ...startup,
     env: {
-      ...input.startup.env,
+      ...startup.env,
       HTTPS_PROXY: proxy.href,
       HTTP_PROXY: proxy.href,
       ALL_PROXY: proxy.href,

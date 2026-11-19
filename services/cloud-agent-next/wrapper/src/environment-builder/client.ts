@@ -32,6 +32,7 @@ export type BuilderClient = {
   input(): Promise<EnvironmentBuildInput>;
   events(batch: EnvironmentBuildEvents): Promise<EnvironmentBuildEventsReply>;
   result(result: EnvironmentBuildResult): Promise<void>;
+  retireScm(signal?: AbortSignal): Promise<void>;
 };
 
 export type BuilderClientDeps = {
@@ -103,6 +104,9 @@ export function createBuilderClient(deps: BuilderClientDeps): BuilderClient & Bu
         body: JSON.stringify({ action: 'complete' }),
         signal,
       });
+    },
+    async retireScm(signal) {
+      await call('retire-scm', { method: 'POST', signal });
     },
     async input() {
       return environmentBuildInputSchema.parse(await call('input', { method: 'GET' }));

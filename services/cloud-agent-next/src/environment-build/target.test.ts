@@ -27,6 +27,7 @@ vi.mock('../byoc/vercel-owner.js', async importOriginal => ({
 }));
 
 import { resolveEnvironmentBuildTarget } from './target.js';
+import { resolveAwsEnvironmentBuildTarget } from './aws-build-target.js';
 import {
   ByocCredentialMissingError,
   ByocCredentialResolverError,
@@ -83,6 +84,23 @@ beforeEach(() => {
 });
 
 describe('resolveEnvironmentBuildTarget', () => {
+  it('refuses the saved MicroVM build target before account resolution', async () => {
+    resolveSaved.mockResolvedValue('aws-microvm-8g');
+    expect(await target()).toEqual({
+      ok: false,
+      provider: 'aws',
+      reason: 'Environment snapshots are not supported by this provider',
+    });
+  });
+
+  it('applies the same capability gate to direct AWS build resolution', async () => {
+    expect(await resolveAwsEnvironmentBuildTarget(ENV, REFERENCE, 'aws-microvm-8g')).toEqual({
+      ok: false,
+      provider: 'aws',
+      reason: 'Environment snapshots are not supported by this provider',
+    });
+  });
+
   it('pins the BYOC credential, account and base snapshot of a saved Vercel allocation', async () => {
     resolveSaved.mockResolvedValue('vercel-small');
     await expect(target()).resolves.toEqual({

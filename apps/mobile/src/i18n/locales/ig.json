@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaụntụ a enweghị òtù ọ bụla ruo ugbu a. Enwere ike ịnyochaa arịrịọ ijikọ koodu Bitbucket ozugbo ị mepụtara òtù ma ọ bụ sonye na òtù.",
       "gitlabReconnectAdminOnlyDescription": "Rịọ onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ ka ha jikọọ ya.",
       "bitbucketNotConnectedTitle": "E jikọghị Bitbucket",
-      "bitbucketAdminOnlyDescription": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ijikọ ya.",
+      "adminOnlyConnectDescription": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ijikọ ya.",
       "contextLine": "Maka {{organization}}",
       "contextLinePersonal": "Maka nkeonwe"
     },
@@ -3416,7 +3416,8 @@
         "accounting_adjustment": "Mmezi ndekọ ego",
         "credits_expired": "Oge ego ojiji agwụla"
       },
-      "truncated": "Ndekọ ego ojiji gara aga dị."
+      "truncated": "Ndekọ ego ojiji gara aga dị.",
+      "retentionLimit": "Na-egosi ndekọ ego ojiji ndị kachasị ọhụrụ."
     },
     "inviteMember": {
       "emailError": "Tinye adreesị ozi ịntanetị ziri ezi.",
@@ -3448,7 +3449,8 @@
         "void": "Akagbuola",
         "uncollectible": "A pụghị ịnakọta ụgwọ"
       },
-      "truncated": "Akwụkwọ ịgba ụgwọ gara aga dị."
+      "truncated": "Akwụkwọ ịgba ụgwọ gara aga dị.",
+      "retentionLimit": "Na-egosi akwụkwọ ịgba ụgwọ ndị kachasị ọhụrụ."
     },
     "lowBalanceAlert": {
       "enableA11y": "Gbanye ịdọ aka na ntị mgbe ego fọdụrụ dị ntakịrị",
@@ -4380,7 +4382,8 @@
       "purchaseFallback": "Ịzụ kredit",
       "receipt": "Rịsịt",
       "receiptA11y": "Mepee rịsịt maka {{description}}, {{amount}}, site na {{date}}",
-      "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a."
+      "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a.",
+      "retentionLimit": "Na-egosi akụkọ kredit kachasị ọhụrụ."
     },
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
@@ -4627,6 +4630,9 @@
     "couldNotLoad": "Enweghị ike ibudata njikọ",
     "permissionDenied": "Ị nweghị ikike ijikwa njikọ ndị a.",
     "managedByOwner": "Gwa onye nwe nzukọ ka ọ gbanwee njikọ ị na-enweghị ike ịgbanwe.",
+    "managedByOwnerOrAdmin": "Gwa onye nwe nzukọ ma ọ bụ onye nchịkwa ka ha gbanwee njikọ ị na-enweghị ike ịgbanwe.",
+    "managedByOwnerOrBilling": "Gwa onye nwe nzukọ ma ọ bụ onye njikwa ịgba ụgwọ ka ha gbanwee njikọ ị na-enweghị ike ịgbanwe.",
+    "managedByOwnerAdminOrBilling": "Gwa onye nwe nzukọ, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ ka ha gbanwee njikọ ị na-enweghị ike ịgbanwe.",
     "connectFailed": "Enweghị ike imepe ibe njikọ"
   },
   "invoices": {

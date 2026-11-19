@@ -33,6 +33,7 @@ const pageQuery = vi.hoisted(() => ({
 const pageHook = vi.hoisted(() => ({
   entries: [] as unknown[],
   hasMore: false,
+  isRetentionLimited: false,
 }));
 
 const queryErrors = vi.hoisted(() => ({
@@ -97,6 +98,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     query: pageQuery,
     entries: pageHook.entries,
     hasMore: pageHook.hasMore,
+    isRetentionLimited: pageHook.isRetentionLimited,
   }),
 }));
 
@@ -259,6 +261,7 @@ beforeEach(() => {
   pageQuery.fetchNextPage.mockClear();
   pageHook.entries = [];
   pageHook.hasMore = false;
+  pageHook.isRetentionLimited = false;
   queryErrors.errors = [];
   buttons.rendered = [];
   boundaryState.isResolving = false;
@@ -534,5 +537,46 @@ describe('OrganizationInvoicesScreen header', () => {
     expect(boundaryProps.rendered).toHaveLength(1);
     expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
     expect(boundaryProps.rendered[0]?.reserveEyebrow).not.toBe(true);
+  });
+});
+
+describe('OrganizationInvoicesScreen retention-limit footer', () => {
+  it('names the retention bound with no Load more at the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: null, hasMore: false }] };
+    pageHook.entries = [INVOICE];
+    pageHook.isRetentionLimited = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('INV-0001');
+    expect(texts).toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(texts).not.toContain('Older invoices are available.');
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(false);
+  });
+
+  it('keeps the truncated note and Load more below the bound', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('Older invoices are available.');
+    expect(texts).not.toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
+
+  it('never renders the two notes together when the impossible flag pairing is forced', async () => {
+    // The hooks can never return the bound flag next to `hasMore: true`, so
+    // force the pairing from the mock side and hold the footer to one note.
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+    pageHook.isRetentionLimited = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).not.toContain(i18n.t('organization.invoices.retentionLimit'));
+    expect(texts).toContain('Older invoices are available.');
   });
 });

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { type CreditPurchaseEntry } from '@/lib/credits/credit-history';
 
 import { PersonalCreditHistoryScreen } from './credit-history-screen';
@@ -48,6 +48,7 @@ const state = vi.hoisted(() => ({
     },
     entries: [] as unknown[],
     hasMore: false,
+    isRetentionLimited: false,
   },
   blocks: {
     data: undefined as unknown,
@@ -147,6 +148,7 @@ beforeEach(() => {
   state.purchases.query.fetchNextPage.mockClear();
   state.purchases.entries = [];
   state.purchases.hasMore = false;
+  state.purchases.isRetentionLimited = false;
   state.blocks.data = undefined;
   state.blocks.isError = false;
   state.blocks.isPending = false;
@@ -217,6 +219,53 @@ describe('PersonalCreditHistoryScreen', () => {
     expect(nodesOfType(renderer, 'ScreenHeader')[0]?.props.backFallback).toBe(
       '/(app)/(tabs)/(3_profile)'
     );
+    unmount();
+  });
+
+  it('names the retention bound with no Load more at the bound', async () => {
+    state.purchases.entries = [purchase()];
+    state.purchases.isRetentionLimited = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    // The purchase read stopped at the cache's page bound, so the footer names
+    // the bound where "Load more" would otherwise sit.
+    expect(texts(renderer)).toContain(i18n.t('credits.history.retentionLimit'));
+    expect(
+      nodesOfType(renderer, 'Button').some(node => node.props.accessibilityLabel === 'Load more')
+    ).toBe(false);
+    expect(texts(renderer)).not.toContain('Older credit activity is available.');
+    unmount();
+  });
+
+  it('keeps the truncated note and Load more below the bound', async () => {
+    state.purchases.entries = [purchase()];
+    state.purchases.hasMore = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    expect(texts(renderer)).toContain('Older credit activity is available.');
+    expect(texts(renderer)).not.toContain(i18n.t('credits.history.retentionLimit'));
+    expect(
+      nodesOfType(renderer, 'Button').some(node => node.props.accessibilityLabel === 'Load more')
+    ).toBe(true);
+    unmount();
+  });
+
+  it('never renders the two notes together when the impossible flag pairing is forced', async () => {
+    // The hooks can never return the bound flag next to `hasMore: true`, so
+    // force the pairing from the mock side and hold the footer to one note.
+    state.purchases.entries = [purchase()];
+    state.purchases.hasMore = true;
+    state.purchases.isRetentionLimited = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    expect(texts(renderer)).not.toContain(i18n.t('credits.history.retentionLimit'));
+    expect(texts(renderer)).toContain('Older credit activity is available.');
     unmount();
   });
 });

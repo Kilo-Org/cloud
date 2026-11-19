@@ -10,6 +10,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatNumber, formatPrefixedMoney } from '@/lib/format';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrgUsageStats } from '@/lib/hooks/use-organization-queries';
 
 /**
@@ -61,8 +62,12 @@ type OrgUsageStatsProps = {
  */
 export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();
-  const { data, isError, isPaused, isFetching, refetch } = useOrgUsageStats(organizationId);
-  const unavailable = data == null && (isError || isPaused);
+  const { data, isError, isFetching, refetch } = useOrgUsageStats(organizationId);
+  // The read settles offline too (`SETTLE_WHILE_OFFLINE`), so `isPaused` can
+  // no longer name the connection; the committed connectivity state does, the
+  // same source the offline banner paints.
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const unavailable = data == null && (isError || committedConnectivity === 'offline');
   // A tile with no totals yet shows a loading block while the first request is
   // outstanding, the dash when the section cannot load at all, and the cached
   // totals through a refetch error.
@@ -103,7 +108,12 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
       {unavailable && (
         <View className="gap-2">
           <Text accessibilityRole="alert" variant="muted">
-            {t(isPaused ? 'queryError.offlineTitle' : 'common.somethingWentWrong')}
+            {t(
+              committedConnectivity === 'offline'
+                ? 'queryError.offlineTitle'
+                : 'common.somethingWentWrong'
+            )}
+          </Text>
           </Text>
           <Button variant="outline" loading={isFetching} onPress={() => void refetch()}>
             <Text>{t('common.retry')}</Text>

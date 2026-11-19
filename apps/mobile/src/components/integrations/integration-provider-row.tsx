@@ -45,7 +45,8 @@ type IntegrationProviderRowProps = Readonly<{
   disconnecting: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
-  onManageOnWeb: () => void;
+  /** Opens the provider's organization page on the web: its controls, or its details. */
+  onOpenOnWeb: () => void;
   /** Runs the read that names a connected row's connection again. */
   onRetryConnection: () => void;
   retryingConnection: boolean;
@@ -65,7 +66,7 @@ export function IntegrationProviderRow({
   disconnecting,
   onConnect,
   onDisconnect,
-  onManageOnWeb,
+  onOpenOnWeb,
   onRetryConnection,
   retryingConnection,
 }: IntegrationProviderRowProps) {
@@ -76,7 +77,6 @@ export function IntegrationProviderRow({
     scope,
     role,
     action: 'connect',
-    installed: row.installed,
   });
   const canDisconnect = canManageProvider({
     provider: row.provider,
@@ -96,9 +96,8 @@ export function IntegrationProviderRow({
   // primary action per screen, and a hub of four filled buttons read as four of
   // them. Connect is that cell's text action; a management action stays a
   // secondary button, because it is not the row's primary offer. An installed
-  // row offers Disconnect or the web page and never a body tap — a destructive
-  // action must not follow from a stray tap — and a pending row has no action to
-  // offer yet.
+  // row's body never starts a destructive action — that must not follow from a
+  // stray tap — and a pending row has no action to offer yet.
   let action: RowTrailingSpec | undefined = undefined;
   if (row.actionPending) {
     // The connections read that decides between Disconnect and the web page has
@@ -112,7 +111,7 @@ export function IntegrationProviderRow({
             <Button
               size="sm"
               variant="outline"
-              onPress={onManageOnWeb}
+              onPress={onOpenOnWeb}
               accessibilityLabel={namedAction(t('common.manageOnWeb'))}
             >
               <Text>{t('common.manageOnWeb')}</Text>
@@ -173,13 +172,26 @@ export function IntegrationProviderRow({
     };
   }
 
+  // A row the viewer's role leaves without a control still carries a press: it
+  // opens the provider's page, which shows the connection details and names the
+  // roles that can change them. That press leaves the app for the browser, as
+  // Connect already does, so the hub reads as a list of destinations rather than
+  // a list of labels. Its name repeats the subtitle, because the row's own name
+  // replaces its visible text. Bitbucket's page is the app's own connect sheet,
+  // so its name claims no browser trip.
+  const opensProviderPage = action === undefined;
+  const blockedRowName = (
+    row.provider === 'bitbucket' ? [label, subtitle] : [t('common.openInBrowser'), label, subtitle]
+  ).join(t('common.sentenceJoiner'));
   return (
     <ConfigureRow
       icon={PROVIDER_ICONS[row.provider]}
       title={label}
       subtitle={subtitle}
       subtitleNumberOfLines={1}
-      trailing={renderRowTrailing(action)}
+      trailing={action === undefined ? undefined : renderRowTrailing(action)}
+      onPress={opensProviderPage ? onOpenOnWeb : undefined}
+      accessibilityLabel={opensProviderPage ? blockedRowName : undefined}
     />
   );
 }

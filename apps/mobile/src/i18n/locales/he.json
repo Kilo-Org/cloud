@@ -2838,7 +2838,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
       "gitlabReconnectAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
       "bitbucketNotConnectedTitle": "Bitbucket לא מחובר",
-      "bitbucketAdminOnlyDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
+      "adminOnlyConnectDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },
@@ -3466,7 +3466,8 @@
         "accounting_adjustment": "התאמה חשבונאית",
         "credits_expired": "פג תוקף הקרדיטים"
       },
-      "truncated": "יש תנועות קודמות בקרדיטים."
+      "truncated": "יש תנועות קודמות בקרדיטים.",
+      "retentionLimit": "מוצגות תנועות הקרדיטים העדכניות ביותר."
     },
     "hub": {
       "balance": "יתרה",
@@ -3511,7 +3512,8 @@
         "void": "בוטלה",
         "uncollectible": "לא ניתנת לגבייה"
       },
-      "truncated": "קיימות חשבוניות ישנות יותר."
+      "truncated": "קיימות חשבוניות ישנות יותר.",
+      "retentionLimit": "מוצגות החשבוניות העדכניות ביותר."
     },
     "lowBalanceAlert": {
       "enableA11y": "הפעלת התראה על יתרה נמוכה",
@@ -4447,7 +4449,8 @@
       "purchaseFallback": "רכישת קרדיטים",
       "receipt": "קבלה",
       "receiptA11y": "פתיחת הקבלה עבור {{description}}, {{amount}}, מתאריך {{date}}",
-      "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו."
+      "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו.",
+      "retentionLimit": "מוצגת היסטוריית הקרדיטים העדכנית ביותר."
     },
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
@@ -4702,6 +4705,9 @@
     "couldNotLoad": "לא ניתן לטעון את האינטגרציות",
     "permissionDenied": "אין לך הרשאה לנהל את האינטגרציות האלה.",
     "managedByOwner": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון.",
+    "managedByOwnerOrAdmin": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון או מנהל.",
+    "managedByOwnerOrBilling": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון או מנהל חיובים.",
+    "managedByOwnerAdminOrBilling": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון, מנהל או מנהל חיובים.",
     "connectFailed": "לא ניתן לפתוח את דף החיבור"
   },
   "invoices": {

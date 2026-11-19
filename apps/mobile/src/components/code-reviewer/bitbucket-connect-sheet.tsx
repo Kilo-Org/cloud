@@ -138,7 +138,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (status.isError && status.data == null) {
       return isPermissionDeniedError(status.error) ? (
         <PermissionDenied
-          description={t('prReview.connect.bitbucketAdminOnlyDescription')}
+          description={t('prReview.connect.adminOnlyConnectDescription')}
           showBack={false}
         />
       ) : (
@@ -154,7 +154,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (readiness.isError && readiness.data == null) {
       return isPermissionDeniedError(readiness.error) ? (
         <PermissionDenied
-          description={t('prReview.connect.bitbucketAdminOnlyDescription')}
+          description={t('prReview.connect.adminOnlyConnectDescription')}
           showBack={false}
         />
       ) : (

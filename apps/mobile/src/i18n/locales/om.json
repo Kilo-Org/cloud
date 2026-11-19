@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Herrega kun dhaabbilee ammas hin qabu. Dhaabbata uumtee yookiin dhaabbataatti seeteen, gaaffiiwwan walitti makuu Bitbucket ilaaluu ni dandeessa.",
       "gitlabReconnectAdminOnlyDescription": "Isa irra deebi'ii akka walqabsiisuuf dhaabbataa abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
       "bitbucketNotConnectedTitle": "Bitbucket hin walqabsiifamne",
-      "bitbucketAdminOnlyDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
+      "adminOnlyConnectDescription": "Abbootiin dhaabbataa, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
       "contextLine": "{{organization}}iif",
       "contextLinePersonal": "Dhuunfaa'iif"
     },
@@ -3416,7 +3416,8 @@
         "accounting_adjustment": "Sirreeffama herregaa",
         "credits_expired": "Kiriiditiin yeroon isaa darbe"
       },
-      "truncated": "Sochiin kiriiditii duraanii ni argama."
+      "truncated": "Sochiin kiriiditii duraanii ni argama.",
+      "retentionLimit": "Sochiin kiriiditii haaraan agarsiifamaa jira."
     },
     "inviteMember": {
       "emailError": "Teessoo imeelii sirrii galchi.",
@@ -3448,7 +3449,8 @@
         "void": "Haqame",
         "uncollectible": "Sassaabamuu hin danda'u"
       },
-      "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu."
+      "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu.",
+      "retentionLimit": "Gaaffiiwwan kaffaltii haaraan agarsiifamaa jiran."
     },
     "lowBalanceAlert": {
       "enableA11y": "Akeekkachiisa haftee xiqqaa bani",
@@ -4380,7 +4382,8 @@
       "purchaseFallback": "Bittaa kireeditii",
       "receipt": "Nagahee",
       "receiptA11y": "Nagahee {{description}}, {{amount}}, {{date}} bani",
-      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru."
+      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru.",
+      "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira."
     },
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
@@ -4627,6 +4630,9 @@
     "couldNotLoad": "Walitti hidhamiinsota fe'uun hin danda'amne",
     "permissionDenied": "Walitti hidhamiinsota kana bulchuuf hayyama hin qabdu.",
     "managedByOwner": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa gaafadhu.",
+    "managedByOwnerOrAdmin": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa ykn bulchaa gaafadhu.",
+    "managedByOwnerOrBilling": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa ykn bulchaa kaffaltii gaafadhu.",
+    "managedByOwnerAdminOrBilling": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa, bulchaa, ykn bulchaa kaffaltii gaafadhu.",
     "connectFailed": "Fuula walitti hidhamiinsaa banuun hin danda'amne"
   },
   "invoices": {

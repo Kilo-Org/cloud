@@ -1,3 +1,4 @@
+import { type OrganizationRole } from '@kilocode/app-shared/organizations';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -30,13 +31,36 @@ import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refr
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { buildIntegrationRows, type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
+  blockedConnectionRoles,
   type IntegrationProvider,
   integrationScope,
   providerLabelKey,
-  providerRowBlocked,
 } from '@/lib/integrations/provider-catalog';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
+
+/**
+ * The catalog key naming who can change the connections the viewer cannot. The
+ * hub names only the roles that can change at least one blocked row, so the
+ * sentence follows the providers the viewer is actually shut out of.
+ */
+export function blockedNoteKey(roles: readonly OrganizationRole[]): string | null {
+  if (roles.length === 0) {
+    return null;
+  }
+  const namesAdmin = roles.includes('admin');
+  const namesBilling = roles.includes('billing_manager');
+  if (namesAdmin && namesBilling) {
+    return 'integrations.managedByOwnerAdminOrBilling';
+  }
+  if (namesAdmin) {
+    return 'integrations.managedByOwnerOrAdmin';
+  }
+  if (namesBilling) {
+    return 'integrations.managedByOwnerOrBilling';
+  }
+  return 'integrations.managedByOwner';
+}
 
 type IntegrationsScreenProps = Readonly<{
   /** Organization scope from the route; absent is the caller's personal scope. */
@@ -147,27 +171,21 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     bitbucketIntegrationPending: bitbucket.isPending,
   });
   const role = boundary.role ?? undefined;
-  // One row that offers the viewer no action is enough to need the sentence,
-  // and `owner` can change a connection in every role set these rows follow, so
-  // the hub names that role once here instead of under each blocked row.
-  const namesOwner =
-    scope === 'organization' &&
-    rows.some(
-      row =>
-        !row.actionPending &&
-        providerRowBlocked({
-          provider: row.provider,
-          scope,
-          role,
-          installed: row.installed,
-        })
-    );
+  // The hub names the roles once, above the list, instead of under every row
+  // that offers the viewer no action. It names only the roles that can change at
+  // least one of those rows, because the provider role sets differ.
+  const noteKey = blockedNoteKey(blockedConnectionRoles({ rows, scope, role }));
 
   // A GitHub row whose installations the hub cannot name is the only row with a
   // web management link, and it opens the app-shell integration page through a
-  // one-time hand-off. Bitbucket's controls run in the app's own connect sheet.
+  // one-time hand-off. A Bitbucket row has no web page here: its connect sheet
+  // is the app's own surface for that provider, and it states the connection's
+  // state and the roles that may change it for a viewer without them.
   const manageRowOnWeb = (provider: IntegrationProvider) => {
     if (provider === 'bitbucket') {
+      if (organizationId) {
+        pushOnce(bitbucketConnectHref(organizationId));
+      }
       return;
     }
     void openAppShellHandoff(
@@ -219,7 +237,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
       >
         <Section>
           <Text variant="muted">{t('integrations.subtitle')}</Text>
-          {namesOwner ? <Text variant="caption">{t('integrations.managedByOwner')}</Text> : null}
+          {noteKey ? <Text variant="caption">{t(noteKey)}</Text> : null}
           {rows.length > 0 ? (
             <RowGroup leadingTile>
               {rows.map(row => (
@@ -238,7 +256,7 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
                   onDisconnect={() => {
                     requestDisconnect(row);
                   }}
-                  onManageOnWeb={() => {
+                  onOpenOnWeb={() => {
                     manageRowOnWeb(row.provider);
                   }}
                   onRetryConnection={() => void bitbucket.refetch()}

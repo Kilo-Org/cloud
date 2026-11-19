@@ -134,8 +134,11 @@ vi.mock('@/components/empty-state', () => ({
       loading === true ? React.createElement('ActivityIndicator') : React.createElement(Icon, {}),
       React.createElement('Text', null, label)
     ),
-  EmptyState: (props: { description?: React.ReactNode; action?: React.ReactNode }) =>
-    React.createElement('EmptyState', props, props.description, props.action),
+  EmptyState: (props: {
+    title?: React.ReactNode;
+    description?: React.ReactNode;
+    action?: React.ReactNode;
+  }) => React.createElement('EmptyState', props, props.title, props.description, props.action),
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
@@ -266,13 +269,22 @@ describe('organization GitLab reconnect state', () => {
     expect(renderedText(renderer)).not.toContain('GitLab connection expired');
   });
 
-  it('keeps the first-time connect action for a member', () => {
-    // The organization OAuth connect only requires a billing role when a
-    // connection already exists, so a member can complete a first connect.
+  it('names the roles that can connect instead of offering a member an action', () => {
+    // Every organization GitLab connect requires a billing role, a first
+    // connect included, so a member cannot complete the integration page's
+    // action and the gate names who can instead of offering it.
     queryState.status = { connected: false, reconnectRequired: false };
     const renderer = mount('gitlab', 'org-1');
-    expect(renderedText(renderer)).toContain('Connect GitLab');
-    expect(renderer.root.findAllByType('StateAction')).toHaveLength(1);
+    expect(renderedText(renderer)).toContain(
+      'Only organization owners, admins, and billing managers can connect it.'
+    );
+    // The title names the provider the state is about; the copy that explains
+    // why there is nothing to press is the description above.
+    expect(renderer.root.findByType('EmptyState').props.title).toBe('Connect GitLab');
+    // The reader never had a connection, so no line claims an expired one, and
+    // no control offers the action the role cannot complete.
+    expect(renderedText(renderer)).not.toContain('GitLab connection expired');
+    expect(renderer.root.findAllByType('StateAction')).toHaveLength(0);
   });
 
   it('waits for the restored selection instead of painting the personal scope', () => {

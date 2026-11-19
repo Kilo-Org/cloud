@@ -150,6 +150,7 @@ export function OrganizationCreditActivityScreen() {
     query,
     entries: transactions,
     hasMore,
+    isRetentionLimited,
   } = useOrgCreditTransactionsPage(reconcile.queryOrganizationId);
   const paddingBottom = useTabBarBottomPadding();
   useRouteForegroundRefresh([[['organizations']]]);
@@ -236,6 +237,13 @@ export function OrganizationCreditActivityScreen() {
       // The former container gap also separated the last row from this footer
       // block, which the item separator does not cover.
       <View className="pt-3">
+        {isRetentionLimited && !isLaterPageError && !hasMore && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('organization.creditActivity.retentionLimit')}
+            </Text>
+          </View>
+        )}
         {hasMore && !isLaterPageError && (
           <View className="items-center gap-3 px-4 py-4">
             <Text variant="caption" className="text-center">

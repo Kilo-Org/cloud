@@ -89,6 +89,11 @@ type InvoiceListScreenProps = Readonly<{
   query: InvoiceListQuery;
   entries: readonly Invoice[];
   hasMore: boolean;
+  /**
+   * The read paused at the cache's page bound with the server still offering
+   * more: the footer names that bound where "Load more" would otherwise sit.
+   */
+  isRetentionLimited: boolean;
   emptyTitle: string;
   emptyDescription: string;
   /**
@@ -112,6 +117,7 @@ export function InvoiceListScreen({
   query,
   entries,
   hasMore,
+  isRetentionLimited,
   emptyTitle,
   emptyDescription,
   emptyAction,
@@ -191,6 +197,13 @@ export function InvoiceListScreen({
       // The paging block follows the rows: the last row draws no hairline, so
       // the footer owns the gap above it.
       <View className="pt-3">
+        {isRetentionLimited && !isLaterPageError && !hasMore && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('organization.invoices.retentionLimit')}
+            </Text>
+          </View>
+        )}
         {hasMore && !isLaterPageError && (
           <View className="items-center gap-3 px-4 py-4">
             <Text variant="muted" className="text-center text-xs">

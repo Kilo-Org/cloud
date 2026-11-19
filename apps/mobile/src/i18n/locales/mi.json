@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Kāore anō he whakahaere ō tēnei pūkete. Ka arotakehia ngā tono kume Bitbucket inā waihanga rānei koe i tētahi whakahaere, inā uru rānei koe ki tētahi.",
       "gitlabReconnectAdminOnlyDescription": "Tonoa tētahi rangatira, kaiwhakahaere, kaiwhakahaere utu rānei o te whakahaere kia honoa anō ia.",
       "bitbucketNotConnectedTitle": "Kāore anō kia honoa a Bitbucket",
-      "bitbucketAdminOnlyDescription": "Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono.",
+      "adminOnlyConnectDescription": "Ko ngā rangatira o te rōpū, ngā kaiwhakahaere me ngā kaiwhakahaere utu anake ka āhei ki te hono.",
       "contextLine": "Mō {{organization}}",
       "contextLinePersonal": "Mō tō whaiaro"
     },
@@ -3416,7 +3416,8 @@
         "accounting_adjustment": "Te whakatikatika kaute",
         "credits_expired": "Kua mōnehu ngā moni tōmua"
       },
-      "truncated": "E wātea ana ngā tauwhitinga moni tōmua o mua."
+      "truncated": "E wātea ana ngā tauwhitinga moni tōmua o mua.",
+      "retentionLimit": "E whakaatu ana i ngā tauwhitinga moni tōmua tino hou."
     },
     "inviteMember": {
       "emailError": "Whakaurua he wāhitau īmēra tika",
@@ -3448,7 +3449,8 @@
         "void": "Kua whakakorea",
         "uncollectible": "Kāore e taea te kohi utu"
       },
-      "truncated": "E wātea ana ngā nama tawhito."
+      "truncated": "E wātea ana ngā nama tawhito.",
+      "retentionLimit": "E whakaatu ana i ngā nama tino hou."
     },
     "lowBalanceAlert": {
       "enableA11y": "Whakahohea te whakatūpato toenga iti",
@@ -4380,7 +4382,8 @@
       "purchaseFallback": "Hoko whiwhinga",
       "receipt": "Rihīti",
       "receiptA11y": "Huakina te rihīti mō {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Kāore he rihīti mō tēnei hoko."
+      "receiptUnavailable": "Kāore he rihīti mō tēnei hoko.",
+      "retentionLimit": "E whakaatu ana i te hītori whiwhinga tino hou."
     },
     "title": "Hoko whiwhinga",
     "description": "He hokonga kotahi ngā whiwhinga ka tāpirihia ki tō toenga Kilo hei whakahaere i ngā wātū whakawaehere AI i te Taupānga Kilo. Ka utu te toa i tō pūkete, ā, ka tāpirihia ngā whiwhinga i muri i te whakamanatanga a te toa i te utu.",
@@ -4627,6 +4630,9 @@
     "couldNotLoad": "Kāore i taea te uta i ngā tūhononga",
     "permissionDenied": "Kāore ōu whakaaetanga ki te whakahaere i ēnei tūhononga.",
     "managedByOwner": "Tonoa tētahi kaipupuri o te rōpū kia whakarerekē i tētahi hononga kāore e taea e koe te whakarerekē.",
+    "managedByOwnerOrAdmin": "Tonoa tētahi Rangatira, Kaiwhakahaere rānei o te rōpū kia whakarerekē i tētahi hononga kāore e taea e koe te whakarerekē.",
+    "managedByOwnerOrBilling": "Tonoa tētahi Rangatira, Kaiwhakahaere utu rānei o te rōpū kia whakarerekē i tētahi hononga kāore e taea e koe te whakarerekē.",
+    "managedByOwnerAdminOrBilling": "Tonoa tētahi Rangatira, Kaiwhakahaere, Kaiwhakahaere utu rānei o te rōpū kia whakarerekē i tētahi hononga kāore e taea e koe te whakarerekē.",
     "connectFailed": "Kāore i taea te huaki i te whārangi hononga"
   },
   "invoices": {

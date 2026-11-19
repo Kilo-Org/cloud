@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Sellel kontol pole veel organisatsioone. Bitbucketi tõmbetaotlusi saab üle vaadata, kui lood või liitud organisatsiooniga.",
       "gitlabReconnectAdminOnlyDescription": "Palu organisatsiooni omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
       "bitbucketNotConnectedTitle": "Bitbucket pole ühendatud",
-      "bitbucketAdminOnlyDescription": "Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
+      "adminOnlyConnectDescription": "Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
       "contextLine": "{{organization}} jaoks",
       "contextLinePersonal": "Sinu isikliku konto jaoks"
     },
@@ -3416,7 +3416,8 @@
         "accounting_adjustment": "Raamatupidamislik korrigeerimine",
         "credits_expired": "Krediit aegus"
       },
-      "truncated": "Saadaval on ka varasemad krediiditehingud."
+      "truncated": "Saadaval on ka varasemad krediiditehingud.",
+      "retentionLimit": "Kuvatakse kõige hiljutisemad krediiditehingud."
     },
     "inviteMember": {
       "emailError": "Sisesta kehtiv e-posti aadress.",
@@ -3448,7 +3449,8 @@
         "void": "Tühistatud",
         "uncollectible": "Sissenõudmatu"
       },
-      "truncated": "Varasemad arved on saadaval."
+      "truncated": "Varasemad arved on saadaval.",
+      "retentionLimit": "Kuvatakse kõige hiljutisemad arved."
     },
     "lowBalanceAlert": {
       "enableA11y": "Luba madala saldo hoiatus",
@@ -4380,7 +4382,8 @@
       "purchaseFallback": "Krediidiost",
       "receipt": "Kviitung",
       "receiptA11y": "Ava kviitung: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Selle ostu kohta kviitung puudub."
+      "receiptUnavailable": "Selle ostu kohta kviitung puudub.",
+      "retentionLimit": "Kuvatakse kõige hiljutisem krediitide ajalugu."
     },
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",
@@ -4627,6 +4630,9 @@
     "couldNotLoad": "Integratsioone ei õnnestunud laadida",
     "permissionDenied": "Sul pole õigust neid integratsioone hallata.",
     "managedByOwner": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku poole.",
+    "managedByOwnerOrAdmin": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku või administraatori poole.",
+    "managedByOwnerOrBilling": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku või arveldushalduri poole.",
+    "managedByOwnerAdminOrBilling": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku, administraatori või arveldushalduri poole.",
     "connectFailed": "Ühendamise lehte ei õnnestunud avada"
   },
   "invoices": {

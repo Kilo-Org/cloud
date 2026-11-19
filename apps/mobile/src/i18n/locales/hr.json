@@ -961,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj račun još nema organizacija. Zahtjeve za spajanje na Bitbucketu moći ćeš pregledati kada stvoriš ili se pridružiš organizaciji.",
       "gitlabReconnectAdminOnlyDescription": "Zamolite vlasnika organizacije, administratora ili upravitelja naplate da ga ponovno poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
-      "bitbucketAdminOnlyDescription": "Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati.",
+      "adminOnlyConnectDescription": "Samo vlasnici organizacije, administratori i upravitelji naplate mogu ga povezati.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osobni račun"
     },
@@ -3474,7 +3474,8 @@
         "accounting_adjustment": "Računovodstveno usklađenje",
         "credits_expired": "Istekli krediti"
       },
-      "truncated": "Dostupan je raniji promet po kreditima."
+      "truncated": "Dostupan je raniji promet po kreditima.",
+      "retentionLimit": "Prikazuje se najnoviji promet po kreditima."
     },
     "inviteMember": {
       "emailError": "Unesi valjanu adresu e-pošte.",
@@ -3506,7 +3507,8 @@
         "void": "Poništeno",
         "uncollectible": "Nenaplativo"
       },
-      "truncated": "Dostupni su stariji računi."
+      "truncated": "Dostupni su stariji računi.",
+      "retentionLimit": "Prikazuju se najnoviji računi."
     },
     "lowBalanceAlert": {
       "enableA11y": "Omogući upozorenje o niskom saldu",
@@ -4447,7 +4449,8 @@
       "purchaseFallback": "Kupnja kredita",
       "receipt": "Račun",
       "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
-      "receiptUnavailable": "Račun za ovu kupnju nije dostupan."
+      "receiptUnavailable": "Račun za ovu kupnju nije dostupan.",
+      "retentionLimit": "Prikazuje se najnovija povijest kredita."
     },
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupnja koja se dodaje tvom Kilo saldu za pokretanje AI sesija kodiranja u aplikaciji Kilo. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
@@ -4702,6 +4705,9 @@
     "couldNotLoad": "Nije moguće učitati integracije",
     "permissionDenied": "Nemate dopuštenje za upravljanje ovim integracijama.",
     "managedByOwner": "Zamolite vlasnika organizacije da promijeni vezu koju ne možete promijeniti.",
+    "managedByOwnerOrAdmin": "Zamolite vlasnika organizacije ili administratora da promijeni vezu koju ne možete promijeniti.",
+    "managedByOwnerOrBilling": "Zamolite vlasnika organizacije ili upravitelja naplate da promijeni vezu koju ne možete promijeniti.",
+    "managedByOwnerAdminOrBilling": "Zamolite vlasnika organizacije, administratora ili upravitelja naplate da promijeni vezu koju ne možete promijeniti.",
     "connectFailed": "Nije moguće otvoriti stranicu za povezivanje"
   },
   "invoices": {

@@ -1,6 +1,6 @@
 import { MutationCache, QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
@@ -34,6 +34,7 @@ import {
 } from '@/components/pr-review/pr-review-tab-selector';
 import { ScreenHeader } from '@/components/screen-header';
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
+import { clearDiffSelection, setDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import {
   pendingReviewDraftKey,
   PendingReviewProvider,
@@ -48,8 +49,10 @@ import { TRPCProvider } from '@/lib/trpc';
 // merge-request-missing,merge-request-error}.
 // The checks-not-available surface answers the checks read as not found, the
 // terminal that renders the section's unavailable message; the composer surface
-// mounts the comment composer on a line; the gate surfaces are
-// dev/pr-review-copy-fixture/gate-*.
+// mounts the comment composer on a line, with
+// dev/pr-review-copy-fixture/composer?side=LEFT reaching the deleted-line
+// (suggestions unavailable) state and composer?selected=1 the added line with a
+// seeded selection; the gate surfaces are dev/pr-review-copy-fixture/gate-*.
 // Uses the app's selected language without changing its preference.
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
 // Reads never invoke global fetch. The mutation cache rejects before any mutation
@@ -96,7 +99,14 @@ function ChecksSectionSurface() {
 }
 
 export function PrReviewCopyFixture() {
-  const { surface } = useLocalSearchParams<{ surface?: string }>();
+  const { surface, side, selected } = useLocalSearchParams<{
+    surface?: string;
+    side?: string;
+    selected?: string;
+  }>();
+  // The composer surface defaults to the added-line state; `side=LEFT` reaches
+  // the deleted-line state and `selected=1` seeds an added-line selection.
+  const fixtureSide = side === 'LEFT' ? 'LEFT' : 'RIGHT';
   const router = useRouter();
   const { t } = useTranslation();
   const [queryClient] = useState(
@@ -111,6 +121,28 @@ export function PrReviewCopyFixture() {
       })
   );
   const [client] = useState(() => createFixtureClient(surface));
+  // Point the selection bridge at the state the link asks for, before the
+  // composer below reads it. Applied once per distinct link, so navigating
+  // between the three composer surfaces does not leave one's selection on the
+  // next: the composer reads the bridge during render, not reactively.
+  const selectionKey = surface === 'composer' ? `${fixtureSide}:${selected ?? ''}` : null;
+  const appliedSelectionRef = useRef<string | null>(null);
+  if (selectionKey !== null && appliedSelectionRef.current !== selectionKey) {
+    appliedSelectionRef.current = selectionKey;
+    if (fixtureSide === 'RIGHT' && selected === '1') {
+      setDiffSelection({
+        owner: triple.owner,
+        repo: triple.repo,
+        number: triple.number,
+        path: 'src/greeting.ts',
+        side: 'RIGHT',
+        line: 2,
+        selectedText: 'export function greet(): string { return "hello"; }',
+      });
+    } else {
+      clearDiffSelection({ owner: triple.owner, repo: triple.repo, number: triple.number });
+    }
+  }
   const [tab, setTab] = useState<PrReviewTabId>('files');
   const header = (
     <ScreenHeader title={t('prReview.fileNavigator.title')} eyebrow="sample/review-copy#1" />
@@ -213,7 +245,7 @@ export function PrReviewCopyFixture() {
           number={triple.number}
           mode={{ kind: 'create', headSha }}
           path="src/greeting.ts"
-          side="RIGHT"
+          side={fixtureSide}
           line={2}
           title={t('prReview.composer.addTitle')}
           eyebrow="sample/review-copy#1"

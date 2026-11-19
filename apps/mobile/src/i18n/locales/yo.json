@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Àkọọ́lẹ̀ yìí kò tíì ní àjọ rárá. A ó lè ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ Bitbucket nígbà tí o bá dá àjọ sílẹ̀ tàbí darapọ̀ mọ́ àjọ kan.",
       "gitlabReconnectAdminOnlyDescription": "Ẹ bẹ̀ Ẹni tó ni àjọ, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n tún so ó pọ̀.",
       "bitbucketNotConnectedTitle": "A kò tíì so Bitbucket pọ̀",
-      "bitbucketAdminOnlyDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
+      "adminOnlyConnectDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
       "contextLine": "Fún {{organization}}",
       "contextLinePersonal": "Fún ti ara ẹni"
     },
@@ -3416,7 +3416,8 @@
         "accounting_adjustment": "Àtúnṣe ìṣirò owó",
         "credits_expired": "Kirẹ́dítì ti dópin"
       },
-      "truncated": "Àwọn ìṣe kirẹ́dítì tó ṣáájú ṣì wà."
+      "truncated": "Àwọn ìṣe kirẹ́dítì tó ṣáájú ṣì wà.",
+      "retentionLimit": "Ń ṣàfihàn àwọn ìṣe kirẹ́dítì tuntun jùlọ."
     },
     "inviteMember": {
       "emailError": "Tẹ àdírẹ́sì ímeèlì tó péye.",
@@ -3448,7 +3449,8 @@
         "void": "A ti fagilé",
         "uncollectible": "Kò ṣeé gbà"
       },
-      "truncated": "Àwọn ìwé ìbéèrè owó tó ṣáájú ṣì wà."
+      "truncated": "Àwọn ìwé ìbéèrè owó tó ṣáájú ṣì wà.",
+      "retentionLimit": "Ń ṣàfihàn àwọn ìwé ìbéèrè owó tuntun jùlọ."
     },
     "lowBalanceAlert": {
       "enableA11y": "Tan ìkìlọ̀ owó tó kù díẹ̀",
@@ -4380,7 +4382,8 @@
       "purchaseFallback": "Ìrajà kírẹ́dítì",
       "receipt": "Ìwé ẹ̀rí ìsanwó",
       "receiptA11y": "Ṣí ìwé ẹ̀rí ìsanwó fún {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Kò sí ìwé ẹ̀rí ìsanwó fún ìrajà yìí."
+      "receiptUnavailable": "Kò sí ìwé ẹ̀rí ìsanwó fún ìrajà yìí.",
+      "retentionLimit": "Ń ṣàfihàn ìtàn kírẹ́dítì tuntun jùlọ."
     },
     "title": "Ra kírẹ́dítì",
     "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",
@@ -4627,6 +4630,9 @@
     "couldNotLoad": "Kò ṣeé ṣe láti gbé àwọn ìsopọ̀ wá",
     "permissionDenied": "O kò ní àṣẹ láti ṣàkóso àwọn ìsopọ̀ wọ̀nyí.",
     "managedByOwner": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà láti yí ìsopọ̀ kan tí o kò lè yí padà.",
+    "managedByOwnerOrAdmin": "Bèèrè lọ́wọ́ ẹni tó ni àjọ tàbí alákòóso láti yí ìsopọ̀ kan tí o kò lè yí padà.",
+    "managedByOwnerOrBilling": "Bèèrè lọ́wọ́ ẹni tó ni àjọ tàbí olùṣàkóso ìsanwó láti yí ìsopọ̀ kan tí o kò lè yí padà.",
+    "managedByOwnerAdminOrBilling": "Bèèrè lọ́wọ́ ẹni tó ni àjọ, alákòóso, tàbí olùṣàkóso ìsanwó láti yí ìsopọ̀ kan tí o kò lè yí padà.",
     "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀"
   },
   "invoices": {

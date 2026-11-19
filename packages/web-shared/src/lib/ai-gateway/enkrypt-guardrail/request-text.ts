@@ -77,6 +77,11 @@ function unrecognized(role: string | null, value: never): Piece[] {
   return [piece(role ? `${role} ${type}` : type, jsonTexts(value))];
 }
 
+/** A block type the SDK now models but whose fields carry no top-level text for `jsonTexts`. */
+function unscanned(role: string, type: string): Piece[] {
+  return [piece(`${role} ${type}`, [])];
+}
+
 function jsonType(value: JsonValue): string {
   return typeof value === 'object' &&
     value !== null &&
@@ -266,7 +271,13 @@ function chatCompletionsParts(body: OpenRouterChatCompletionRequest): ScanPieces
   };
 }
 
-type AnthropicBlock = Anthropic.Beta.BetaContentBlockParam;
+/** No longer in the SDK types, but clients can still send it. */
+type MidConversationSystemBlock = {
+  type: 'mid_conv_system';
+  content: Anthropic.Beta.BetaTextBlockParam[];
+};
+
+type AnthropicBlock = Anthropic.Beta.BetaContentBlockParam | MidConversationSystemBlock;
 
 function anthropicTextBlocksTexts(blocks: Anthropic.Beta.BetaTextBlockParam[]): Text[] {
   return blocks.map(block => block.text);
@@ -324,6 +335,8 @@ function anthropicToolResultPieces(content: AnthropicToolResultContent | undefin
         return [omitted(`${header} image`)];
       case 'tool_reference':
         return [];
+      case 'browser_state':
+        return unscanned(header, part.type);
       default:
         return unrecognized(header, part);
     }
@@ -422,6 +435,10 @@ function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
     case 'redacted_thinking':
     case 'fallback':
       return [];
+    case 'mcp_tool_listing':
+    case 'tool_addition':
+    case 'tool_removal':
+      return unscanned(role, block.type);
     default:
       return unrecognized(role, block);
   }
@@ -432,7 +449,7 @@ function anthropicMessageItems(message: Anthropic.Beta.BetaMessageParam): Item[]
   if (typeof message.content === 'string') return [[piece(message.role, [message.content])]];
   const items: Item[] = [];
   let previous: AnthropicBlock | undefined;
-  for (const block of message.content) {
+  for (const block of message.content ?? []) {
     const pieces = anthropicBlockPieces(message.role, block);
     const item = items.at(-1);
     if (item && block.type === 'text' && previous?.type === 'text') item.push(...pieces);

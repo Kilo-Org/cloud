@@ -101,11 +101,16 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
     delete message.reasoning;
 
     const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
+    const toolCallsById = new Map<string, Record<string, unknown>>();
     for (const toolCall of toolCalls) {
       const legacySignature = toolCall.thoughtSignature;
       delete toolCall.thoughtSignature;
       if (typeof legacySignature === 'string') {
         setGeminiThoughtSignature(toolCall, legacySignature);
+      }
+      // First write wins, so a duplicate id keeps the earliest tool call.
+      if (typeof toolCall.id === 'string' && !toolCallsById.has(toolCall.id)) {
+        toolCallsById.set(toolCall.id, toolCall);
       }
     }
 
@@ -125,10 +130,7 @@ function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
         continue;
       }
 
-      const toolCall =
-        typeof detail.id === 'string'
-          ? toolCalls.find(candidate => candidate.id === detail.id)
-          : undefined;
+      const toolCall = typeof detail.id === 'string' ? toolCallsById.get(detail.id) : undefined;
       setGeminiThoughtSignature(toolCall ?? message, detail.data);
     }
   }

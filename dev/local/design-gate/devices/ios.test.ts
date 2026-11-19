@@ -58,3 +58,40 @@ test('ios cells toggle appearance and restore it; recording stops with SIGINT', 
     `xcrun simctl io A recordVideo --codec h264 --force ${video}`,
   ]);
 });
+
+test('ios font-max restores Dynamic Type even when the appearance restore fails', () => {
+  const commands: string[] = [];
+  const device = createIosDevice({
+    exec: (_command, args) => {
+      const line = args.join(' ');
+      commands.push(line);
+      if (line === 'simctl ui A appearance') return Buffer.from('dark\n');
+      if (line === 'simctl ui A content_size') return Buffer.from('large\n');
+      if (line === 'simctl ui A appearance dark') throw new Error('simctl failed');
+      return Buffer.from('');
+    },
+    spawn: () => ({ signal: () => undefined, exited: Promise.resolve(0) }),
+    simulator: { udid: 'A', name: 'iPhone 17' },
+  });
+  const [fontMax] = matrixCells('ios', 'base', ['font-max']).filter(cell => cell.fontMax);
+  assert.ok(fontMax);
+  device.apply(fontMax);
+  assert.throws(() => device.restore(), /iOS restore failed on A/);
+  assert.deepEqual(commands.slice(-2), [
+    'simctl ui A appearance dark',
+    'simctl ui A content_size large',
+  ]);
+});
+
+test('ios font-max on a runtime without content_size fails as infrastructure', () => {
+  const device = createIosDevice({
+    exec: (_command, args) =>
+      Buffer.from(args.join(' ') === 'simctl ui A content_size' ? 'unsupported\n' : 'light\n'),
+    spawn: () => ({ signal: () => undefined, exited: Promise.resolve(0) }),
+    simulator: { udid: 'A', name: 'iPhone 17' },
+  });
+  const [fontMax] = matrixCells('ios', 'base', ['font-max']).filter(cell => cell.fontMax);
+  assert.ok(fontMax);
+  assert.throws(() => device.apply(fontMax), /content_size is unsupported/);
+  device.restore();
+});

@@ -109,6 +109,10 @@ const TWO_SENSE_COPY = new Map([
     'the recovery action beside a Code Reviewer alert, versus the support contact beside the AI Guardrails availability notice',
   ],
   [
+    'terms of service',
+    "the document's own title on the Legal screen and the PR-discussion alert, versus the form the sign-in consent sentence's verb governs in an inflected language",
+  ],
+  [
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
   ],
@@ -1005,14 +1009,9 @@ function placeholderTokens(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map(match => match[1]);
 }
 
-/** The `{{token}}` set of one string, as a sorted, counted signature. */
-function placeholders(value) {
-  return placeholderTokens(value).sort().join(',');
-}
-
-/** The tokens of a `placeholders` signature. */
-function signatureTokens(signature) {
-  return signature === '' ? [] : signature.split(',');
+/** The sorted, comma-joined signature the diagnostics print for one token list. */
+function signature(tokens) {
+  return tokens.slice().sort().join(',');
 }
 
 /** The `$t(key)` set of one string. A copy names a label; it never spells it. */
@@ -1637,16 +1636,17 @@ function familyVisibleCounts(english, base) {
 
 /**
  * Whether a plural category's placeholder set is English's plus tokens from its
- * own family. Returns false for a non-plural key, for a dropped required token,
- * and for a token no value of the family uses.
+ * own family. `actualTokens` and `expectedTokens` are the category's own
+ * `{{token}}` lists, one element per placeholder. Returns false for a non-plural
+ * key, for a dropped required token, and for a token no value of the family uses.
  */
-function addsFamilyPlaceholderOnly(english, key, actual, expected) {
+function addsFamilyPlaceholderOnly(english, key, actualTokens, expectedTokens) {
   const parts = pluralParts(key);
   if (!parts) {
     return false;
   }
-  const required = new Set(signatureTokens(expected));
-  const used = new Set(signatureTokens(actual));
+  const required = new Set(expectedTokens);
+  const used = new Set(actualTokens);
   if (used.size <= required.size) {
     return false;
   }
@@ -2205,12 +2205,12 @@ function checkValuePlaceholders({
   requiredCounts,
 }) {
   const problems = [];
-  const expected = placeholders(englishValue);
-  const actual = placeholders(value);
-  const expectedSet = placeholderTokens(englishValue);
-  const actualSet = placeholderTokens(value);
-  const dropped = expectedSet.filter(name => !actualSet.includes(name));
-  const added = actualSet.some(name => !expectedSet.includes(name));
+  const expectedTokens = placeholderTokens(englishValue);
+  const actualTokens = placeholderTokens(value);
+  const expected = signature(expectedTokens);
+  const actual = signature(actualTokens);
+  const dropped = expectedTokens.filter(name => !actualTokens.includes(name));
+  const added = actualTokens.some(name => !expectedTokens.includes(name));
   // A visible count the form must show and does not. `requiredCounts` comes
   // from the whole family, not from the reference, because a reference may
   // spell its own numeral out ("1 live session") while a sibling carries the
@@ -2219,7 +2219,9 @@ function checkValuePlaceholders({
   // names its key, category and locale. A form that also uses a token the
   // family never uses is the mismatch below instead: its signature names both.
   const missingCounts =
-    countsMayBeWorded || added ? [] : [...requiredCounts].filter(name => !actualSet.includes(name));
+    countsMayBeWorded || added
+      ? []
+      : [...requiredCounts].filter(name => !actualTokens.includes(name));
   for (const name of missingCounts) {
     problems.push(
       `${label}: "${key}" drops {{${name}}} without a reviewed worded form (WORDED_COUNTS)`
@@ -2239,7 +2241,7 @@ function checkValuePlaceholders({
       ));
   if (
     actual !== expected &&
-    !addsFamilyPlaceholderOnly(english, key, actual, expected) &&
+    !addsFamilyPlaceholderOnly(english, key, actualTokens, expectedTokens) &&
     !explained
   ) {
     problems.push(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
@@ -2250,10 +2252,10 @@ function checkValuePlaceholders({
       `${label}: "${key}" $t() references differ from English (${expectedRefs || 'none'})`
     );
   }
-  const expectedTokens = expansionTokens(englishValue).join(',');
-  if (expansionTokens(value).join(',') !== expectedTokens) {
+  const expectedExpansions = expansionTokens(englishValue).join(',');
+  if (expansionTokens(value).join(',') !== expectedExpansions) {
     problems.push(
-      `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedTokens || 'none'})`
+      `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedExpansions || 'none'})`
     );
   }
   return problems;

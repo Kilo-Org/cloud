@@ -285,6 +285,9 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               />
               <FormField
                 label={t('securityAgent.notifications.slaLeadTimeLabel')}
+                // The severity picker above labels itself with the section
+                // eyebrow, so this field's label takes the same style.
+                labelRole="section"
                 error={
                   isValidDayCount(slaNotificationWarningDays)
                     ? undefined

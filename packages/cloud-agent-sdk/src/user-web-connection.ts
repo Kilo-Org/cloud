@@ -152,6 +152,38 @@ function parseCommandError(error: unknown): Error {
   return new Error(GENERIC_COMMAND_ERROR_MESSAGE);
 }
 
+type EdgeSignal = {
+  get: () => boolean;
+  set: (value: boolean) => void;
+  subscribe: (listener: (value: boolean) => void) => () => void;
+  clear: () => void;
+};
+
+/**
+ * One boolean edge signal: a synchronous snapshot plus listeners that fire
+ * only when the value actually changes. `clear` drops every listener; a
+ * subscription taken before it stays valid but never fires again.
+ */
+function createEdgeSignal(): EdgeSignal {
+  let value = false;
+  const listeners = new Set<(next: boolean) => void>();
+  return {
+    get: () => value,
+    set(next) {
+      if (value === next) return;
+      value = next;
+      for (const listener of listeners) listener(next);
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    clear: () => listeners.clear(),
+  };
+}
+
 function createUserWebConnection(
   config: UserWebConnectionConfig
 ): UserWebConnection & { retain: () => () => void } {
@@ -204,27 +236,13 @@ function createUserWebConnection(
   // Wrapper-owned transport-readiness state. The base connection deliberately
   // emits no callback on `destroy()`, so transitions around full release /
   // destroy are driven here rather than from base-connection callbacks.
-  let connected = false;
-  const connectionChangeListeners = new Set<(connected: boolean) => void>();
+  const connectionSignal = createEdgeSignal();
 
-  function setConnected(value: boolean): void {
-    if (connected === value) return;
-    connected = value;
-    for (const listener of connectionChangeListeners) listener(value);
-  }
-
-  // Wrapper-owned reconnect-exhaustion snapshot, mirroring `connected`. The base
-  // connection fires the two-edge callback; the wrapper keeps a synchronous
-  // snapshot so `isReconnectExhausted()` reads it without crossing the base
-  // boundary and listeners fire only on value changes.
-  let exhausted = false;
-  const exhaustionChangeListeners = new Set<(exhausted: boolean) => void>();
-
-  function setExhausted(value: boolean): void {
-    if (exhausted === value) return;
-    exhausted = value;
-    for (const listener of exhaustionChangeListeners) listener(value);
-  }
+  // Wrapper-owned reconnect-exhaustion snapshot, mirroring the readiness
+  // signal. The base connection fires the two-edge callback; the wrapper keeps
+  // a synchronous snapshot so `isReconnectExhausted()` reads it without
+  // crossing the base boundary.
+  const exhaustionSignal = createEdgeSignal();
 
   function hasLifetime(): boolean {
     return retainCount > 0;
@@ -289,7 +307,7 @@ function createUserWebConnection(
     // signal restarts the attempt series and clears exhaustion before the probe,
     // so the surface reads "reconnecting" rather than terminal while it tries.
     clearInitialAuthRetry();
-    setExhausted(false);
+    exhaustionSignal.set(false);
     startConnection(false);
   }
 
@@ -467,7 +485,7 @@ function createUserWebConnection(
     baseConnection = createBaseConnection({
       lifecycleHooks: createLifecycleHooks(),
       maxReconnectAttempts: config.maxReconnectAttempts,
-      onReconnectExhaustionChange: setExhausted,
+      onReconnectExhaustionChange: exhaustionSignal.set,
       buildUrl,
       parseMessage: (data: unknown) => {
         if (typeof data !== 'string') return null;
@@ -490,10 +508,10 @@ function createUserWebConnection(
         startLiveness();
       },
       onConnected: () => {
-        setConnected(true);
+        connectionSignal.set(true);
       },
       onReconnected: () => {
-        setConnected(true);
+        connectionSignal.set(true);
         config.onReconnect?.();
         for (const listener of reconnectListeners) listener();
       },
@@ -503,11 +521,11 @@ function createUserWebConnection(
       onDisconnected: () => {
         currentWs = null;
         clearLiveness();
-        setConnected(false);
+        connectionSignal.set(false);
       },
       onUnexpectedDisconnect: () => {
         rejectPending('Connection lost during reconnect');
-        setConnected(false);
+        connectionSignal.set(false);
       },
       onError: config.onError,
       isAuthFailure: event => event.code === 4001 || event.code === 1008,
@@ -540,7 +558,7 @@ function createUserWebConnection(
       // only a token that finally resolves (manual retry, or lifecycle recovery
       // after signing in again) can clear it. Afterwards the base connection
       // emits its own edges, so the flag is left alone.
-      if (!baseConnection) setExhausted(false);
+      if (!baseConnection) exhaustionSignal.set(false);
       token = value;
       ensureBaseConnection();
       baseConnection?.connect();
@@ -556,7 +574,7 @@ function createUserWebConnection(
       // counter stays spent here; only `retryConnection()` or a lifecycle
       // resume restarts the series, and both go through `clearInitialAuthRetry`.
       if (initialAuthRetryAttempt + 1 >= maxInitialAuthAttempts) {
-        setExhausted(true);
+        exhaustionSignal.set(true);
         return;
       }
       scheduleInitialAuthRetry(expectedGeneration);
@@ -591,8 +609,8 @@ function createUserWebConnection(
     // `base-connection.destroy()` deliberately emits no `onDisconnected`
     // callback, so the wrapper must drive the disconnected transition itself
     // before the next `startConnection()` reopens from a false baseline.
-    setConnected(false);
-    setExhausted(false);
+    connectionSignal.set(false);
+    exhaustionSignal.set(false);
   }
 
   function connect(): void {
@@ -698,24 +716,18 @@ function createUserWebConnection(
       systemListeners.clear();
       reconnectListeners.clear();
       sessionListeners.clear();
-      connectionChangeListeners.clear();
-      exhaustionChangeListeners.clear();
+      connectionSignal.clear();
+      exhaustionSignal.clear();
     },
-    isConnected: () => connected,
+    isConnected: connectionSignal.get,
     onConnectionChange(listener) {
       if (destroyed) return () => {};
-      connectionChangeListeners.add(listener);
-      return () => {
-        connectionChangeListeners.delete(listener);
-      };
+      return connectionSignal.subscribe(listener);
     },
-    isReconnectExhausted: () => exhausted,
+    isReconnectExhausted: exhaustionSignal.get,
     onReconnectExhaustionChange(listener) {
       if (destroyed) return () => {};
-      exhaustionChangeListeners.add(listener);
-      return () => {
-        exhaustionChangeListeners.delete(listener);
-      };
+      return exhaustionSignal.subscribe(listener);
     },
     retryConnection() {
       if (baseConnection) {
@@ -727,7 +739,7 @@ function createUserWebConnection(
       // the wrapper owns: clear that state, restart the attempt budget, and ask
       // for a token again so the user can recover after signing in again.
       clearInitialAuthRetry();
-      setExhausted(false);
+      exhaustionSignal.set(false);
       if (!started && !connectPromise) startConnection(false);
     },
     subscribeToCliSession(sessionId) {

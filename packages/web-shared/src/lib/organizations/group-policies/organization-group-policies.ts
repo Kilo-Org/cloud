@@ -8,6 +8,11 @@ import {
   ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,
   OrganizationGroupModelAccessPolicySchema,
 } from './model-access/model-access.schema';
+import {
+  OrganizationGroupAgentPermissionsPolicySchema,
+  OrganizationGroupClientAccessPolicySchema,
+  OrganizationPermissionPolicyTypeSchema,
+} from './permission-policy/permission-policy.schema';
 
 export * from './model-access/model-access.schema';
 
@@ -27,10 +32,13 @@ export const ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE =
 
 export const OrganizationGroupPolicyTypeSchema = z.enum([
   ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,
+  ...OrganizationPermissionPolicyTypeSchema.options,
 ]);
 
 export const OrganizationGroupPolicySchema = z.discriminatedUnion('type', [
   OrganizationGroupModelAccessPolicySchema,
+  OrganizationGroupAgentPermissionsPolicySchema,
+  OrganizationGroupClientAccessPolicySchema,
 ]);
 
 export const OrganizationGroupPoliciesSchema = z

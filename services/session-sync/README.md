@@ -1363,7 +1363,8 @@ The preview defaults to the isolated local Worker at `http://localhost:8817`;
 permissions are included in the web CSP only in development. The CLI and SDK
 production endpoints are unchanged.
 The mobile preview also requires a development bundle (`__DEV__`) and an explicit
-`EXPO_PUBLIC_SESSION_SYNC_URL`. Release bundles expose neither its Profile entry
+`EXPO_PUBLIC_SESSION_SYNC_URL`; `pnpm dev:env:mobile` writes the local Worker URL.
+Release bundles expose neither its Profile entry
 nor its route, regardless of remote feature flags.
 Browser HTTP reads/commands allow bearer-authenticated CORS from `https://kilo.ai`
 and `https://app.kilo.ai`, without cookies. `http://localhost:3000` is allowed only

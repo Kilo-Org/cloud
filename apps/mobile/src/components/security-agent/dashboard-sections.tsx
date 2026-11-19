@@ -183,7 +183,7 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
             pushOnce(getSecurityAgentPath(scope, `findings/${finding.id}`));
           }}
         >
-          <Text className="text-sm font-medium" numberOfLines={1}>
+          <Text className="text-sm font-medium" numberOfLines={1} direction="auto">
             {finding.title}
           </Text>
           <Text variant="muted" className="text-xs" numberOfLines={1}>

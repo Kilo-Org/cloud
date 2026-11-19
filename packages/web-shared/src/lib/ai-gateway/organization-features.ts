@@ -7,9 +7,11 @@ import {
   type OrganizationFeature,
   type OrganizationFeatures,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
-import { readDb, type db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb, type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
-export async function readOrganizationFeatures(fromDb: typeof db): Promise<OrganizationFeatures> {
+export async function readOrganizationFeatures(
+  fromDb: Pick<typeof db | DrizzleTransaction, 'select'>
+): Promise<OrganizationFeatures> {
   const [row] = await fromDb
     .select({ config: ai_gateway_config.config })
     .from(ai_gateway_config)

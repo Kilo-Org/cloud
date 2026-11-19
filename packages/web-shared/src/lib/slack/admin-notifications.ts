@@ -18,21 +18,48 @@ export type AdminSlackNotification = {
   unfurl_media?: boolean;
 };
 
-export class AdminSlackNotificationError extends Error {
-  constructor(
-    readonly kind: 'configuration' | 'network' | 'upstream',
-    readonly status?: number
-  ) {
+class AdminSlackNotificationErrorImpl extends Error {
+  readonly kind: 'configuration' | 'network' | 'upstream';
+  readonly status?: number;
+
+  constructor(kind: 'configuration' | 'network' | 'upstream', status?: number) {
     super('Admin Slack notification request failed');
     this.name = 'AdminSlackNotificationError';
+    this.kind = kind;
+    this.status = status;
   }
 }
 
+/** Only the `upstream` variant carries the HTTP status its request returned. */
+export type AdminSlackNotificationError =
+  | (Error & { readonly kind: 'configuration' | 'network'; readonly status?: undefined })
+  | (Error & { readonly kind: 'upstream'; readonly status: number });
+
+interface AdminSlackNotificationErrorConstructor {
+  new (kind: 'configuration' | 'network'): AdminSlackNotificationError;
+  new (kind: 'upstream', status: number): AdminSlackNotificationError;
+}
+
+// A class cannot declare overloaded constructors that return a union instance
+// type, so the runtime class is exported through a constructor interface and
+// the instance type is that union.
+export const AdminSlackNotificationError =
+  AdminSlackNotificationErrorImpl as unknown as AdminSlackNotificationErrorConstructor;
+
 /**
- * Sends a notification to the Slack channel configured for Admin UI events.
+ * Sends a notification to the Slack channel configured by
+ * `SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL`.
  *
  * This function is server-only. Call it from an admin tRPC procedure, route
  * handler, or server action; never send the webhook URL to a browser.
+ *
+ * `options.requireConfigured` defaults to `false` (`{}`), so an unset webhook
+ * URL only logs a warning and sends nothing. Pass `{ requireConfigured: true }`
+ * when a dropped Admin notification must fail loudly: the function then throws
+ * an `AdminSlackNotificationError` with kind `'configuration'`. Failures are
+ * `'configuration'` (unset URL, only with `requireConfigured`), `'network'`
+ * (the fetch failed), and `'upstream'` (Slack answered non-ok; carries the
+ * response `status`).
  */
 export async function sendAdminSlackNotification(
   notification: AdminSlackNotification,

@@ -58,78 +58,86 @@ function start(messages: NativeSnapshotMessage[] = []) {
 }
 
 test('native snapshots use the exact Cloud projector for files, errors, costs, metadata and message order', () => {
-  const messages: NativeSnapshotMessage[] = [
-    {
-      seq: 1,
-      message: {
-        id: 'msg_user',
-        type: 'user',
-        text: 'Read this',
-        time: { created: 1 },
-        metadata: { nested: { private: 'retained' } },
-        files: [
-          { mime: 'image/png', data: 'aW1hZ2U=', name: 'inline.png', source: { type: 'inline' } },
-          {
-            mime: 'text/plain',
-            data: '',
-            name: 'uri.txt',
-            source: { type: 'uri', uri: 'https://example.test/file.txt' },
-          },
-        ],
-      },
+  const projectedSession = { ...session, location: { directory: session.origin.directory } };
+  const user: NativeSnapshotMessage = {
+    seq: 1,
+    message: {
+      id: 'msg_user',
+      type: 'user',
+      text: 'Read this',
+      time: { created: 1 },
+      metadata: { nested: { private: 'retained' } },
+      files: [
+        { mime: 'image/png', data: 'aW1hZ2U=', name: 'inline.png', source: { type: 'inline' } },
+        // A legal native user file: inline bytes plus a source reference. The bytes are
+        // the display, so the reference beside them never becomes one.
+        {
+          mime: 'text/plain',
+          data: 'aGVsbG8=',
+          name: 'uri.txt',
+          source: { type: 'uri', uri: 'https://example.test/file.txt' },
+        },
+      ],
     },
-    {
-      seq: 2,
-      message: {
-        id: 'msg_answer',
-        type: 'assistant',
-        time: { created: 2, completed: 3 },
-        cost: 1.25,
-        tokens: { input: 4, output: 5, reasoning: 6, cache: { read: 7, write: 8 } },
-        error: { type: 'provider.error', message: 'Specific provider failure' },
-        content: [
-          {
-            type: 'reasoning',
-            text: 'Considering',
-            time: { created: 2, completed: 3 },
-            native: { nested: ['kept'] },
+  };
+  const answer: NativeSnapshotMessage = {
+    seq: 2,
+    message: {
+      id: 'msg_answer',
+      type: 'assistant',
+      time: { created: 2, completed: 3 },
+      cost: 1.25,
+      tokens: { input: 4, output: 5, reasoning: 6, cache: { read: 7, write: 8 } },
+      error: { type: 'provider.error', message: 'Specific provider failure' },
+      content: [
+        {
+          type: 'reasoning',
+          text: 'Considering',
+          time: { created: 2, completed: 3 },
+          native: { nested: ['kept'] },
+        },
+        {
+          type: 'tool',
+          id: 'call',
+          name: 'shell',
+          state: {
+            status: 'error',
+            input: { command: 'false' },
+            error: { type: 'tool.error', message: 'Exit code 1' },
+            metadata: { retained: { exact: true } },
           },
-          {
-            type: 'tool',
-            id: 'call',
-            name: 'shell',
-            state: {
-              status: 'error',
-              input: { command: 'false' },
-              error: { type: 'tool.error', message: 'Exit code 1' },
-              metadata: { retained: { exact: true } },
-            },
-          },
-          { type: 'text', text: 'Failed' },
-        ],
-      },
+        },
+        { type: 'text', text: 'Failed' },
+      ],
     },
-  ];
+  };
+  const messages = [user, answer];
   const result = readNativeConversation({ ...state, messages });
+  // Native values stay exactly as received; only the display is gated.
   expect(result.nativeMessages).toBe(messages);
+  expect(result.nativeMessages.map(item => item.message.id)).toEqual(['msg_user', 'msg_answer']);
   expect(result.session).toBe(session);
   expect(result.messages).toEqual(
     readKilo2Messages(
-      { ...session, location: { directory: session.origin.directory } },
+      projectedSession,
       messages.map(item => item.message)
     )
   );
   expect(result.messages.map(item => item.info.id)).toEqual(['msg_user', 'msg_answer']);
+  // Both files are legal native user files, so both display; the one that carries
+  // inline bytes displays those bytes rather than its source reference.
   expect(result.messages[0]?.parts).toMatchObject([
     { type: 'text' },
     { type: 'file', url: 'data:image/png;base64,aW1hZ2U=' },
-    { type: 'file', url: 'https://example.test/file.txt' },
+    { type: 'file', url: 'data:text/plain;base64,aGVsbG8=' },
   ]);
+  expect(JSON.stringify(result.messages)).not.toContain('https://example.test/file.txt');
+  expect(result.incompleteMessageIDs).toEqual([]);
+  expect(result.error).toBeUndefined();
   expect(result.messages[1]?.info).toMatchObject({
     cost: 1.25,
-    tokens: messages[1]?.message.tokens,
+    tokens: answer.message.tokens,
     error: { data: { message: 'Specific provider failure' } },
-    parentID: 'msg_user',
   });
   expect(result.messages[1]?.parts[1]).toMatchObject({
     type: 'tool',
@@ -803,6 +811,50 @@ test('unresolved live media stays explicit without hiding other messages or cras
       assetURLs: { [kilo2AssetKey('msg_media_000001', uri, 'image/png')]: bytes },
     }).incompleteMessageIDs
   ).toEqual(['msg_media']);
+});
+
+test('a native message whose attachment can never display is omitted without a recovery signal', () => {
+  const messages: NativeSnapshotMessage[] = [
+    {
+      seq: 1,
+      message: {
+        id: 'msg_remote_file',
+        type: 'assistant',
+        time: { created: 1, completed: 2 },
+        content: [
+          { type: 'text', text: 'Retrieved the report' },
+          {
+            type: 'tool',
+            id: 'call_remote',
+            name: 'read',
+            state: {
+              status: 'completed',
+              input: { path: 'report.png' },
+              content: [
+                { type: 'file', uri: 'https://example.test/report.png', mime: 'image/png' },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      seq: 2,
+      message: {
+        id: 'msg_after',
+        type: 'assistant',
+        time: { created: 3, completed: 4 },
+        content: [{ type: 'text', text: 'All done' }],
+      },
+    },
+  ];
+  const conversation = readNativeConversation({ ...state, messages });
+  // No snapshot can authorize this reference, so it is neither displayed nor a gap.
+  expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_after']);
+  expect(conversation.incompleteMessageIDs).toEqual([]);
+  expect(conversation.error).toBeUndefined();
+  expect(JSON.stringify(conversation.messages)).not.toContain('https://example.test/report.png');
+  expect(conversation.nativeMessages).toBe(messages);
 });
 
 test.each<[string, Record<string, unknown>]>([

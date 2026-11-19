@@ -50,6 +50,12 @@ type RespondInput = {
   /** Null when the organization has no output guardrail. */
   enkryptOutputScan: EnkryptOutputScan | null;
   signal: AbortSignal;
+  /**
+   * The caller is the Cloud Agent runtime credential proxy, a Worker that sees its own client
+   * close only when it writes. A streamed 2xx answer then sends keep-alive comments until the
+   * first upstream byte, so a stopped run's request is cancelled before its model answers.
+   */
+  keepAliveUntilFirstByte: boolean;
   captureEnkryptOutputReport: (report: () => Promise<EnkryptOutputGuardrailReport>) => void;
 };
 
@@ -195,6 +201,7 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
           customLlmPricing: usageContext.custom_llm_pricing,
           logging,
           responseTransforms: provider.responseTransforms,
+          keepAliveUntilFirstByte: input.keepAliveUntilFirstByte,
         }),
       captureReport: input.captureEnkryptOutputReport,
       captureRequestLogs: logs => {

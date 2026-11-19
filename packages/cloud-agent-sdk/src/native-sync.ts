@@ -6,6 +6,7 @@ import {
   type NativeSnapshotSession,
 } from './native-sync-snapshot';
 import { applyNativeEvent, applyNativeSessionEvent } from './native-conversation-reducer';
+import { messageIDFromEventID } from './message-id';
 import {
   reduceNativePendingRequests,
   type NativePendingRequests,
@@ -17,6 +18,7 @@ import {
   readKilo2FileReferences,
   type Kilo2FileReference,
 } from './kilo2-source-messages';
+import { NATIVE_SYNC_RETAINED_WORK_BYTES, NATIVE_SYNC_RETAINED_WORK_FRAMES } from './limits';
 
 const tenantSchema = z.object({ type: z.enum(['user', 'organization']), id: z.string() });
 const envelopeSchema = z.object({
@@ -31,6 +33,7 @@ const envelopeSchema = z.object({
 const ticketSchema = z.object({ ticket: z.string(), expiresAt: z.iso.datetime() });
 const grantSchema = z.object({ token: z.string(), expiresAt: z.iso.datetime() });
 const commandStatusSchema = z.enum(['queued', 'delivered', 'expired']);
+const commandAckSchema = z.object({ commandID: z.string(), status: commandStatusSchema });
 const instanceSchema = z.object({
   instanceID: z.string(),
   tenant: tenantSchema,
@@ -76,7 +79,7 @@ export type NativeSessionState = {
   messages: NativeSnapshotMessage[];
   pending: NativePendingRequests;
   events: NativeEvent[];
-  commands: Record<string, 'queued' | 'delivered' | 'expired'>;
+  commands: Record<string, z.infer<typeof commandStatusSchema>>;
   error?: string | undefined;
   /**
    * Set when automatic transcript reads stopped after repeated failures. The transport does
@@ -113,7 +116,7 @@ export type NativeSessionConnection = {
   replyQuestion(requestID: string, answers: string[][]): Promise<string>;
   rejectQuestion(requestID: string): Promise<string>;
   sendCommand(command: string, args?: string): Promise<string>;
-  getCommandStatus(commandID: string): Promise<'queued' | 'delivered' | 'expired'>;
+  getCommandStatus(commandID: string): Promise<z.infer<typeof commandStatusSchema>>;
   /** Retries missing transcript parts over the live socket without reconnecting. */
   requestRecovery(): Promise<void>;
   clear(): void;
@@ -167,8 +170,6 @@ const isPermanent = (error: unknown) =>
 
 // Count UTF-16 storage conservatively for raw frames and retained parsed replay.
 const liveFrameBytes = 512 * 1024;
-const liveBacklogBytes = 4 * 1024 * 1024;
-const liveBacklogCount = 1024;
 const SNAPSHOT_FAILURE_LIMIT = 3;
 // Bounds for a connect that never reaches hello: a failing ticket mint, an offline fetch, or an
 // immediate close.
@@ -271,7 +272,7 @@ function nativeAssetURLsAfterMessages(
     if (before?.message === item.message) continue;
     for (const file of readKilo2FileReferences(item.message)) {
       const key = kilo2AssetKey(file.id, file.uri, file.mime);
-      if (/^(media:|data:|https?:\/\/)/.test(file.uri) || assetURLs[key] === undefined) continue;
+      if (/^(media:|data:)/.test(file.uri) || assetURLs[key] === undefined) continue;
       const replaced =
         file.contentIndex === undefined
           ? before?.message.files !== item.message.files
@@ -316,6 +317,61 @@ function nativeGapMessages(
       gaps.push(item);
   }
   return gaps;
+}
+
+/** A transcript entry the client can certify: complete, and every private asset resolved. */
+function certifiedTranscriptEntry(
+  item: NativeSnapshotMessage,
+  assetURLs: Readonly<Record<string, string>> | undefined
+): boolean {
+  return !item.incomplete && !hasUnresolvedKilo2Assets(item.message, assetURLs);
+}
+
+/**
+ * Pending identities a snapshot still owes. An identity is settled by a certified message with the
+ * same id, unless a live replay still requires it; one with no certified message stays owed.
+ */
+function owedPendingSnapshotIDs(
+  pendingIDs: readonly string[] | undefined,
+  messages: NativeSnapshotMessage[],
+  assetURLs: Readonly<Record<string, string>> | undefined,
+  liveRequirementIDs?: ReadonlySet<string>
+): string[] | undefined {
+  return pendingIDs?.filter(
+    id =>
+      liveRequirementIDs?.has(id) === true ||
+      !messages.some(item => item.message.id === id && certifiedTranscriptEntry(item, assetURLs))
+  );
+}
+
+type NativeTranscriptFacts = {
+  session: NativeSnapshotSession | undefined;
+  messages: NativeSnapshotMessage[];
+  assetURLs: Readonly<Record<string, string>> | undefined;
+  pendingSnapshotMessageIDs: readonly string[] | undefined;
+  quarantinedFrames: number;
+};
+
+/**
+ * Whether the transcript still has unrecovered content. Every recovery decision uses this one
+ * rule: recovery starts, recovery completes, pending identities are pruned, and the integrity
+ * notice clears only while it reports no gap.
+ *
+ * A gap is any of: no session yet, a frame the client could not project, a listed pending
+ * identity, an incomplete message, or a private asset with no authorized bytes. An unresolved
+ * asset is a gap because the transcript cannot render that reference until its bytes arrive.
+ *
+ * `integrityGap` is deliberately not an input: it means live replay was lost, which only a
+ * canonical snapshot read can repair, so it never blocks a recovery. Callers apply it where it
+ * matters, as the reason the notice is not cleared.
+ */
+function transcriptHasGap(facts: NativeTranscriptFacts): boolean {
+  if (facts.session === undefined || facts.quarantinedFrames > 0) return true;
+  if (facts.messages.some(item => !certifiedTranscriptEntry(item, facts.assetURLs))) return true;
+  // Every listed identity renders as pending in the shared projection until a snapshot or its
+  // live replay settles it, so the list itself is the gap signal; `owedPendingSnapshotIDs`
+  // decides which entries may leave it.
+  return (facts.pendingSnapshotMessageIDs?.length ?? 0) > 0;
 }
 
 const projectedFrameGap =
@@ -571,8 +627,8 @@ export class NativeSyncClient {
         retain: bytes => {
           if (
             !epoch.current() ||
-            retainedCount >= liveBacklogCount ||
-            retainedBytes + bytes > liveBacklogBytes
+            retainedCount >= NATIVE_SYNC_RETAINED_WORK_FRAMES ||
+            retainedBytes + bytes > NATIVE_SYNC_RETAINED_WORK_BYTES
           )
             return false;
           retainedCount++;
@@ -838,6 +894,12 @@ export class NativeSyncClient {
       state = { ...state, ...patch, error };
       listener(state);
     };
+    const recordCommandStatus = (
+      commandID: string,
+      status: z.infer<typeof commandStatusSchema>
+    ) => {
+      publish({ commands: { ...state.commands, [commandID]: status } });
+    };
     const visible = (messages: NativeSnapshotMessage[]) =>
       clearedIDs.size === 0 ? messages : messages.filter(item => !clearedIDs.has(item.message.id));
     const beyond = (frame: NativeEvent, position: number) => {
@@ -865,14 +927,10 @@ export class NativeSyncClient {
         snapshot: { position: next.position, revision: next.revision },
         messages: visible(next.messages),
         assetURLs: next.assetURLs,
-        pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs?.filter(
-          id =>
-            !next.messages.some(
-              item =>
-                item.message.id === id &&
-                !item.incomplete &&
-                !hasUnresolvedKilo2Assets(item.message, next.assetURLs)
-            )
+        pendingSnapshotMessageIDs: owedPendingSnapshotIDs(
+          state.pendingSnapshotMessageIDs,
+          next.messages,
+          next.assetURLs
         ),
       });
     };
@@ -910,17 +968,19 @@ export class NativeSyncClient {
     const pruneQuarantined = (position: number) => {
       quarantined = quarantined.filter(entry => entry.position > position);
     };
+    /** The live transcript facts every recovery decision shares. */
+    const transcriptFacts = (): NativeTranscriptFacts => ({
+      session: state.session,
+      messages: state.messages,
+      assetURLs: state.assetURLs,
+      pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs,
+      quarantinedFrames: quarantined.length,
+    });
     /**
      * A snapshot cycle is successful only when nothing it could not certify remains: a read
      * that returns, yet still leaves a gap, is a failure cycle.
      */
-    const transcriptSettled = () =>
-      state.session !== undefined &&
-      quarantined.length === 0 &&
-      !state.pendingSnapshotMessageIDs?.length &&
-      !state.messages.some(
-        message => message.incomplete || hasUnresolvedKilo2Assets(message.message, state.assetURLs)
-      );
+    const transcriptSettled = () => !transcriptHasGap(transcriptFacts());
     /** A settled transcript owns no terminal failure, so the published marker goes with it. */
     const settleSnapshotStreak = () => {
       snapshotFailures = 0;
@@ -929,16 +989,7 @@ export class NativeSyncClient {
       publish({ snapshotFailure: undefined, error: undefined });
     };
     const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
-      if (
-        recovery ||
-        !epoch.current() ||
-        (!force &&
-          state.session &&
-          !state.messages.some(message => message.incomplete) &&
-          !state.pendingSnapshotMessageIDs?.length &&
-          !quarantined.length)
-      )
-        return;
+      if (recovery || !epoch.current() || (!force && !transcriptHasGap(transcriptFacts()))) return;
       const controller = new AbortController();
       // ES2022/Hermes consumers do not provide Promise.withResolvers.
       let settle: () => void = () => {};
@@ -1036,22 +1087,19 @@ export class NativeSyncClient {
           }
           if (!stale) {
             snapshotPosition = next.position;
+            const requiredMessageIDs = new Set(
+              [...current.requirements.values()].map(requirement => requirement.messageID)
+            );
             publish({
               session,
               snapshot: { position: next.position, revision: next.revision },
               messages: visible(messages),
               assetURLs,
-              pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs?.filter(
-                id =>
-                  [...current.requirements.values()].some(
-                    requirement => requirement.messageID === id
-                  ) ||
-                  !next.messages.some(
-                    item =>
-                      item.message.id === id &&
-                      !item.incomplete &&
-                      !hasUnresolvedKilo2Assets(item.message, next.assetURLs)
-                  )
+              pendingSnapshotMessageIDs: owedPendingSnapshotIDs(
+                state.pendingSnapshotMessageIDs,
+                next.messages,
+                next.assetURLs,
+                requiredMessageIDs
               ),
             });
           }
@@ -1065,14 +1113,9 @@ export class NativeSyncClient {
             });
             pruneQuarantined(next.position);
           }
-          if (
-            state.session &&
-            !state.messages.some(
-              item => item.incomplete || hasUnresolvedKilo2Assets(item.message, state.assetURLs)
-            ) &&
-            !state.pendingSnapshotMessageIDs?.length &&
-            !quarantined.length
-          ) {
+          if (!transcriptHasGap(transcriptFacts())) {
+            // A snapshot read cannot prove live replay loss is repaired, so the notice stays
+            // until `refresh()` reads the transcript again.
             if (!integrityGap) {
               integrityError = undefined;
               publish({ error: undefined });
@@ -1150,9 +1193,7 @@ export class NativeSyncClient {
             frame.type === 'subscribed' &&
             state.session &&
             !integrityGap &&
-            !quarantined.length &&
-            !state.messages.some(message => message.incomplete) &&
-            !state.pendingSnapshotMessageIDs?.length
+            !transcriptHasGap(transcriptFacts())
           ) {
             integrityError = undefined;
             publish({ error: undefined });
@@ -1162,9 +1203,11 @@ export class NativeSyncClient {
             publish({ runnerConnected: body['runnerConnected'] === true });
           }
           if (frame.type === 'command_status' && typeof body['commandID'] === 'string') {
-            const parsed = commandStatusSchema.safeParse(body['status']);
-            if (parsed.success)
-              publish({ commands: { ...state.commands, [body['commandID']]: parsed.data } });
+            const parsed = commandAckSchema.safeParse({
+              commandID: body['commandID'],
+              status: body['status'],
+            });
+            if (parsed.success) recordCommandStatus(parsed.data.commandID, parsed.data.status);
           }
           if (frame.type === 'error')
             publish({
@@ -1200,8 +1243,7 @@ export class NativeSyncClient {
               ]),
             ];
           if (frame.type === 'session.moved') {
-            const eventID = z.string().startsWith('evt_').parse(record(body['data'])['id']);
-            const messageID = `msg_${eventID.slice(4)}`;
+            const messageID = messageIDFromEventID(record(body['data'])['id']);
             if (!messages.some(item => item.message.id === messageID && !item.incomplete))
               pendingSnapshotMessageIDs = [
                 ...new Set([...(pendingSnapshotMessageIDs ?? []), messageID]),
@@ -1325,7 +1367,7 @@ export class NativeSyncClient {
       if (options.liveOnly && (state.connection !== 'connected' || !state.runnerConnected))
         throw new NativeSyncError('runner_offline');
       const commandID = cloudAgentSdkRuntime.randomUUID();
-      const result = z.object({ commandID: z.string(), status: commandStatusSchema }).parse(
+      const result = commandAckSchema.parse(
         await this.request(
           `${path}/commands`,
           {
@@ -1335,7 +1377,7 @@ export class NativeSyncClient {
           organizationID
         )
       );
-      publish({ commands: { ...state.commands, [result.commandID]: result.status } });
+      recordCommandStatus(result.commandID, result.status);
       return result.commandID;
     };
     const live = (type: string, body: Record<string, unknown> = {}) => {
@@ -1377,16 +1419,14 @@ export class NativeSyncClient {
         );
       },
       getCommandStatus: async (commandID: string) => {
-        const result = z
-          .object({ commandID: z.string(), status: commandStatusSchema })
-          .parse(
-            await this.request(
-              `${path}/commands/${encodeURIComponent(commandID)}`,
-              undefined,
-              organizationID
-            )
-          );
-        publish({ commands: { ...state.commands, [result.commandID]: result.status } });
+        const result = commandAckSchema.parse(
+          await this.request(
+            `${path}/commands/${encodeURIComponent(commandID)}`,
+            undefined,
+            organizationID
+          )
+        );
+        recordCommandStatus(result.commandID, result.status);
         return result.status;
       },
       requestRecovery: async () => {

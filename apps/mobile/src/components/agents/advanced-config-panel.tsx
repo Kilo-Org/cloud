@@ -90,7 +90,7 @@ type AdvancedConfigPanelProps = Readonly<{
 /**
  * The Advanced Configuration panel: a collapsed disclosure that expands to the
  * effective var/command summary, a manual environment variables editor,
- * a manual setup commands editor, and `Save as Profile` when
+ * a manual setup commands editor, and `Save as profile` when
  * manual configuration exists. Mobile-first — plain tap rows and native
  * sheets, no JSON blob and no drag anywhere.
  */

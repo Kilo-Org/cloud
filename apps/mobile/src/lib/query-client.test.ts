@@ -10,6 +10,7 @@ import {
 import {
   createKiloAppQueryClient,
   getActiveSessionsQueryMetadata,
+  hasActiveSessionsServerOutcome,
   subscribeActiveSessionsQueryMetadata,
 } from './query-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -547,6 +548,37 @@ describe('accepted active-session outcomes', () => {
       expect(published).toEqual([0]);
     }
   );
+
+  it.each([
+    ['an accepted empty result', () => emptyResult],
+    [
+      'a terminal failure',
+      () => {
+        throw Object.assign(new Error('gone'), { shape: { data: { code: 'NOT_FOUND' } } });
+      },
+    ],
+  ] as const)('drops the provenance of %s when the query is reset', async (_outcome, queryFn) => {
+    const client = makeClient();
+    try {
+      await client.query({ queryKey: QUERY_KEY, queryFn });
+    } catch {
+      // The failure case settles as the query's error; the metadata records it.
+    }
+    const query = client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
+    expect(hasActiveSessionsServerOutcome(client, QUERY_KEY)).toBe(true);
+    const published: number[] = [];
+    subscribeActiveSessionsQueryMetadata(query, () => {
+      published.push(getActiveSessionsQueryMetadata(query).acceptedRevision);
+    });
+
+    await client.resetQueries({ queryKey: QUERY_KEY, exact: true });
+
+    // The reset keeps the same query object: it now holds no server answer.
+    expect(client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true })).toBe(query);
+    expect(getActiveSessionsQueryMetadata(query)).toBe(getActiveSessionsQueryMetadata(undefined));
+    expect(hasActiveSessionsServerOutcome(client, QUERY_KEY)).toBe(false);
+    expect(published).toEqual([0]);
+  });
 
   it.each([
     { otherKey: [['activeSessions', 'list', 'detail'], { type: 'query' }] },

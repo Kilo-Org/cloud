@@ -7,8 +7,8 @@ import {
   InternalClientEvalPlanRequestSchema,
   InternalClientEvalResultRequestSchema,
   customRouterEntryKey,
-  customRouterEntryRef,
   taxonomyRouteKey,
+  toCustomRouterEntryRef,
   type AutoRouter,
   type BenchmarkConfig,
   type ClientEvalCaseResponse,
@@ -107,7 +107,7 @@ export async function planClientEval(
       ? item.variants
           .filter(variant => !item.linkedVariants?.has(variant))
           .map(variant => {
-            const entry = customRouterEntryRef(item.entry);
+            const entry = toCustomRouterEntryRef(item.entry);
             return { entry, variant, rows: profiles.get(clientPairKey(entry, variant)) ?? [] };
           })
       : []

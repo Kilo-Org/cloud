@@ -7,6 +7,16 @@ import {
 import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 
+/**
+ * Bounds a scan. The input guardrail starts one deadline for all Enkrypt calls of a request, which
+ * run one at a time: those of its blocking detectors first, then those of its log-only detectors.
+ * The gateway awaits the blocking scans just before the upstream request, so this is the most
+ * latency an enabled organization's request can gain. The log-only scans, which the request does
+ * not wait for, get what the blocking scans leave of it. Defined here so the request log UI can
+ * show it.
+ */
+export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 60_000;
+
 const DetectorIdSchema = z.enum(ENKRYPT_DETECTOR_IDS);
 
 /**
@@ -96,6 +106,29 @@ const scanOutcomeShape = {
    * was counted, and from per-call and output scan reports.
    */
   failed_calls_cached: z.number().optional(),
+  /**
+   * Calls of an input part whose verdicts are cached for the usual TTL: a clean allow, a log-only
+   * detection, or a genuine block. Counts eligibility like `failed_calls_cached`, which counts the
+   * failed ones. Absent from reports written before it was counted, and from per-call and output
+   * scan reports.
+   */
+  calls_cached: z.number().optional(),
+  /**
+   * How each call of an input part ended, apart from those counted in `calls_skipped`. `failed`
+   * calls were sent but returned no usable result, such as one cut off by the deadline; `not_sent`
+   * calls were never sent, because the request's deadline left no time, the client disconnected,
+   * or the guardrail could not run. Absent from reports written before it was counted, and from
+   * per-call and output scan reports.
+   */
+  call_outcomes: z
+    .object({
+      allowed: z.number(),
+      flagged: z.number(),
+      blocked: z.number(),
+      failed: z.number(),
+      not_sent: z.number(),
+    })
+    .optional(),
   /**
    * Calls of an input part not made because an earlier call of the request's blocking scan, or a
    * cached block, possibly of this part, blocked the request. Their units are neither scanned nor

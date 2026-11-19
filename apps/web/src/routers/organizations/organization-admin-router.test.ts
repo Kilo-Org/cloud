@@ -1601,6 +1601,74 @@ describe('organization admin router', () => {
       }
     });
 
+    it('moves the Anthropic user profile id with the parent organization', async () => {
+      const searchPrefix = `Admin Profile Hierarchy ${crypto.randomUUID()}`;
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
+      const readProfileId = async (organizationId: string) => {
+        const [row] = await db
+          .select({ id: organizations.anthropic_user_profile_id })
+          .from(organizations)
+          .where(eq(organizations.id, organizationId));
+        return row.id;
+      };
+
+      try {
+        await db
+          .update(organizations)
+          .set({ anthropic_user_profile_id: 'uprof_parent' })
+          .where(eq(organizations.id, parentOrganization.id));
+        await db
+          .update(organizations)
+          .set({ anthropic_user_profile_id: 'uprof_child_own' })
+          .where(eq(organizations.id, childOrganization.id));
+        const caller = await createCallerForUser(adminUser.id);
+
+        await caller.organizations.admin.setParent({
+          organizationId: childOrganization.id,
+          parentOrganizationId: parentOrganization.id,
+        });
+        expect(await readProfileId(childOrganization.id)).toBe('uprof_parent');
+
+        await caller.organizations.admin.setParent({
+          organizationId: childOrganization.id,
+          parentOrganizationId: null,
+        });
+        expect(await readProfileId(childOrganization.id)).toBeNull();
+        expect(await readProfileId(parentOrganization.id)).toBe('uprof_parent');
+
+        await db
+          .update(organizations)
+          .set({ anthropic_user_profile_id: null })
+          .where(eq(organizations.id, parentOrganization.id));
+        await db
+          .update(organizations)
+          .set({ anthropic_user_profile_id: 'uprof_child_own' })
+          .where(eq(organizations.id, childOrganization.id));
+        await caller.organizations.admin.setParent({
+          organizationId: childOrganization.id,
+          parentOrganizationId: parentOrganization.id,
+        });
+        expect(await readProfileId(childOrganization.id)).toBeNull();
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, childOrganization.id));
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [childOrganization.id, parentOrganization.id]));
+      }
+    });
+
     it('only returns addable organizations from child autocomplete search', async () => {
       const searchPrefix = `Admin Addable Child Search ${crypto.randomUUID()}`;
       const parentOrganization = await createTestOrganization(

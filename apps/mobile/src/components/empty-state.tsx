@@ -183,7 +183,7 @@ type StateActionIcon = ComponentType<{ size?: number; color?: string }>;
 
 type StateActionProps = {
   label: string;
-  /** The action's cue: `Plus` creates, `RotateCcw` retries, `ArrowLeft` goes back. */
+  /** The action's cue: `Plus` creates, `RotateCcw` retries, `DirectionalArrowLeft` goes back. */
   icon: StateActionIcon;
   onPress: () => void;
   /** The action is running: only the leading icon becomes a spinner and presses are ignored. */

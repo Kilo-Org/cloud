@@ -1,8 +1,8 @@
 // The no-access surface is the product landings' shared state for an
 // organization the reader may not see. It must say who can grant access (or
-// that the organization is gone), and offer both recoveries: a Retry that
+// that the organization is gone). A denial offers both recoveries: a Retry that
 // re-resolves the membership and a way back to Profile that drops the stale
-// selection.
+// selection; a deleted organization offers the way back alone.
 
 import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -61,7 +61,11 @@ vi.mock('@/components/ui/text', () => ({
     createElement('TextMock', { className: props.className }, props.children),
 }));
 
-vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  I18nManager: { isRTL: false },
+  useColorScheme: () => 'light',
+}));
 
 // The centered state's geometry hook reports through `@sentry/react-native`,
 // whose real module loads react-native in Node; the reporter is stubbed here.
@@ -187,11 +191,12 @@ describe('ScopeAccessDeniedScreen', () => {
       'This organization is no longer available. Choose another account from the account picker to continue.'
     );
     expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.subtitle).toBe('Drain Labs');
-    // A deleted organization does not come back by retrying either, so the
-    // order is the denied state's, with Back to profile first.
-    const [backAction, retryAction] = findByType(renderer.root, 'ButtonMock');
-    expect(backAction).toBe(button('Back to profile', renderer.root));
-    expect(retryAction).toBe(button('Retry', renderer.root));
+    // A deleted organization does not come back by retrying, so the shared
+    // not-found state keeps one way out: Back to profile.
+    const actions = findByType(renderer.root, 'ButtonMock');
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toBe(button('Back to profile', renderer.root));
+    expect(button('Retry', renderer.root)).toBeUndefined();
 
     act(() => {
       renderer.unmount();

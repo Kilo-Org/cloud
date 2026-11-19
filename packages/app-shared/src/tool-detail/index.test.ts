@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildToolDetail, buildToolDetailSummary, formatToolDetailOutput } from './index';
-import type { ToolPart } from '../opencode.gen';
+import type { ToolPart } from '../opencode';
 
 type ToolState = ToolPart['state'];
 

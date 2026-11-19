@@ -44,8 +44,8 @@ export type RequestedModel =
 export async function classifyRequestedModel(requestedModel: string): Promise<RequestedModel> {
   const customLlm = await findCustomLlm(requestedModel);
   if (customLlm) return { kind: 'custom-llm', customLlm };
-  const { provider, model } = await getDirectByokModel(requestedModel);
-  if (provider && model) return { kind: 'direct-byok-model', provider, model };
+  const directByok = await getDirectByokModel(requestedModel);
+  if (directByok) return { kind: 'direct-byok-model', ...directByok };
   return { kind: 'catalog' };
 }
 

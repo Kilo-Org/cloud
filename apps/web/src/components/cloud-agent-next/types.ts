@@ -38,7 +38,7 @@ import type {
   EventSessionUpdated,
   Session,
   SessionStatus,
-} from '@/types/opencode.gen';
+} from '@/types/opencode';
 
 export type {
   Part,

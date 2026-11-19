@@ -52,6 +52,21 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
       sink.onServiceEvent({ type: 'stopped', reason: 'complete' });
     }
 
+    // One terminal-error path: report the failure, then stop the session as an
+    // error so the UI cannot appear to load forever.
+    function fail(message: string, failure?: SessionSnapshotFailure): void {
+      if (failure) {
+        config.onError?.(message, failure);
+      } else {
+        config.onError?.(message);
+      }
+      sink.onServiceEvent({
+        type: 'stopped',
+        reason: 'error',
+        ...(failure ? { failure } : {}),
+      });
+    }
+
     return {
       connect() {
         generation += 1;
@@ -62,9 +77,7 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
             page => {
               if (expectedGeneration !== generation) return;
               if (page === null) {
-                const message = 'Session not found';
-                config.onError?.(message);
-                sink.onServiceEvent({ type: 'stopped', reason: 'error' });
+                fail('Session not found');
                 return;
               }
               if (page.kind === 'success') {
@@ -76,23 +89,18 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
               // stopped with `error` so the UI doesn't appear to load
               // forever.
               const failure = sessionSnapshotFailureMessage(page.kind);
-              config.onError?.(failure.message, failure);
-              sink.onServiceEvent({ type: 'stopped', reason: 'error', failure });
+              fail(failure.message, failure);
             },
             (error: unknown) => {
               if (expectedGeneration !== generation) return;
-              const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
-              config.onError?.(message);
-              sink.onServiceEvent({ type: 'stopped', reason: 'error' });
+              fail(error instanceof Error ? error.message : 'Failed to fetch snapshot');
             }
           );
           return;
         }
 
         if (!config.fetchSnapshot) {
-          const message = 'fetchSnapshot is not configured';
-          config.onError?.(message);
-          sink.onServiceEvent({ type: 'stopped', reason: 'error' });
+          fail('fetchSnapshot is not configured');
           return;
         }
 
@@ -103,9 +111,7 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
           },
           (error: unknown) => {
             if (expectedGeneration !== generation) return;
-            const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
-            config.onError?.(message);
-            sink.onServiceEvent({ type: 'stopped', reason: 'error' });
+            fail(error instanceof Error ? error.message : 'Failed to fetch snapshot');
           }
         );
       },

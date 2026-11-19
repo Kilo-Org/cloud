@@ -1,10 +1,9 @@
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
-import { Ban, ShieldOff } from '@/components/ui/icons';
+import { Ban } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { FindingAnalysisPanel } from '@/components/security-agent/finding-analysis-panel';
@@ -192,10 +191,10 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         {pendingHeader}
-        <EmptyState
-          icon={ShieldOff}
+        <QueryError
+          variant="not-found"
           title={t('securityAgent.dismiss.notFoundTitle')}
-          description={t('securityAgent.dismiss.notFoundDescription')}
+          message={t('securityAgent.dismiss.notFoundDescription')}
         />
       </View>
     );

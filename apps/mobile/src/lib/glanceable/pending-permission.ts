@@ -23,9 +23,9 @@ import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-conn
 /** The interaction identity the control plane's projection guarantees. */
 const pendingPermissionSchema = z.object({ id: z.string().min(1) });
 
-/** The `connected` frame's interaction projection; absent means none pending. */
+/** The `connected` frame's interaction projection; a present, empty list means none pending. */
 const connectedInteractionsSchema = z.object({
-  pendingInteractions: z.object({ permissions: z.array(pendingPermissionSchema) }).optional(),
+  pendingInteractions: z.object({ permissions: z.array(pendingPermissionSchema) }),
 });
 
 type StreamConnectionLike = { connect: () => void; destroy: () => void };
@@ -107,9 +107,13 @@ export class PendingPermissionUnreadableError extends Error {
 
 /**
  * The pending permission ids the connected frame carries, in the projection's
- * order. A decodable frame with no projection, or with an empty list, reads as
- * nothing pending. A frame this module cannot decode rejects with
- * `PendingPermissionUnreadableError`, because the ask may still be pending.
+ * order. Three cases decide the result:
+ *
+ * - A present, empty `permissions` array reads as nothing pending.
+ * - An absent projection rejects with `PendingPermissionUnreadableError`. The
+ *   control plane omits the projection when it holds no snapshot. Absence is
+ *   unknown, not empty.
+ * - A frame this module cannot decode also rejects with that error.
  */
 function readPendingPermissionIds(
   input: PendingPermissionReadInput,
@@ -194,9 +198,7 @@ function readPendingPermissionIds(
             fail(new PendingPermissionUnreadableError());
             return;
           }
-          settle(
-            parsed.data.pendingInteractions?.permissions.map(permission => permission.id) ?? []
-          );
+          settle(parsed.data.pendingInteractions.permissions.map(permission => permission.id));
         },
         onConnected: () => undefined,
         onDisconnected: () => undefined,

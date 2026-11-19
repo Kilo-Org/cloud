@@ -261,14 +261,14 @@ describe('resolvePendingPermissionId', () => {
     expect(stream.destroy).toHaveBeenCalledTimes(1);
   });
 
-  it('is none for a decodable frame with no projection', async () => {
-    // The frame decodes and carries no projection, so nothing is pending.
+  it('rejects as unreadable for a decodable frame with no projection', async () => {
+    // The control plane omits the projection when it holds no snapshot: absence is unknown, not empty.
     const stream = fakeStream([connectedFrameWithData({})]);
-    const match = await resolvePendingPermissionId(
+    const pending = resolvePendingPermissionId(
       { cloudAgentSessionId: 'agent_1', target: byId('perm_first') },
       { getTicket: resolveTicket, createConnection: stream.open }
     );
-    expect(match).toEqual({ kind: 'none' });
+    await expect(pending).rejects.toBeInstanceOf(PendingPermissionUnreadableError);
     expect(stream.destroy).toHaveBeenCalledTimes(1);
   });
 
@@ -486,14 +486,15 @@ describe('resolveLeadingPendingPermissionId', () => {
     ).resolves.toBeNull();
   });
 
-  it('returns null for a decodable frame with no projection', async () => {
+  it('rejects as unreadable for a decodable frame with no projection', async () => {
+    // The control plane omits the projection when it holds no snapshot: absence is unknown, not empty.
     const stream = fakeStream([connectedFrameWithData({})]);
-    await expect(
-      resolveLeadingPendingPermissionId(
-        { cloudAgentSessionId: 'agent_1' },
-        { getTicket: resolveTicket, createConnection: stream.open }
-      )
-    ).resolves.toBeNull();
+    const pending = resolveLeadingPendingPermissionId(
+      { cloudAgentSessionId: 'agent_1' },
+      { getTicket: resolveTicket, createConnection: stream.open }
+    );
+    await expect(pending).rejects.toBeInstanceOf(PendingPermissionUnreadableError);
+    expect(stream.destroy).toHaveBeenCalledTimes(1);
   });
 
   it('rejects as unreadable when the projection carries no id this module can read', async () => {

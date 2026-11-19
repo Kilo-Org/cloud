@@ -185,6 +185,10 @@ describe('PlatformListScreen organization access', () => {
 
     expect(findByType(renderer.root, 'ScopeAccessDeniedScreenMock')).toHaveLength(0);
     expect(findByType(renderer.root, 'ConfigureRowMock').length).toBeGreaterThan(0);
+    // The granted header is the product over the scope, like the denied one.
+    const header = findByType(renderer.root, 'ScreenHeaderMock')[0];
+    expect(header?.props.title).toBe('Code Reviewer');
+    expect(header?.props.subtitle).toBe('Drain Labs');
 
     act(() => {
       renderer.unmount();

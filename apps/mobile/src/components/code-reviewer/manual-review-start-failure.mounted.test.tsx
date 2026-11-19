@@ -34,9 +34,9 @@ const startMutation = vi.hoisted(() => ({
 const orgState = vi.hoisted(() => ({ role: 'member' as string | undefined }));
 
 // The header's scope subtitle reads the membership list; this suite tests the
-// failure copy, so the subtitle is a fixed name.
+// failure copy, so the subtitle is a fixed name for each kind of scope.
 vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
-  useReviewerScopeTitle: () => 'Personal',
+  useReviewerScopeTitle: (scope: string) => (scope === 'personal' ? 'Personal' : 'Drain Labs'),
 }));
 
 vi.mock('react-native', () => ({

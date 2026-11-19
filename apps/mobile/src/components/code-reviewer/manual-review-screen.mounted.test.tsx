@@ -64,9 +64,9 @@ const keyboardStore = vi.hoisted(() => {
 });
 
 // The header's scope subtitle reads the membership list; this suite tests the
-// form, so the subtitle is a fixed name.
+// form, so the subtitle is a fixed name for each kind of scope.
 vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
-  useReviewerScopeTitle: () => 'Personal',
+  useReviewerScopeTitle: (scope: string) => (scope === 'personal' ? 'Personal' : 'Drain Labs'),
 }));
 
 // The screen scrolls the body back to the URL section when Start rejects an

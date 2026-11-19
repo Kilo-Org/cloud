@@ -84,7 +84,7 @@ export async function isModelRestrictionExempt(
       ? await getBespokePrivateProviders(customLlmGrantee)
       : undefined
   );
-  return directByokModel.provider !== null && directByokModel.model !== null;
+  return directByokModel !== null;
 }
 
 /**

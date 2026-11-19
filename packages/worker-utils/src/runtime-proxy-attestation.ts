@@ -56,7 +56,7 @@ function signingKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-export async function issueRuntimeProxyAttestation(input: {
+export type RuntimeProxyAttestationSubject = {
   secret: string;
   audience: RuntimeProxyAttestationAudience;
   userId: string;
@@ -64,7 +64,11 @@ export async function issueRuntimeProxyAttestation(input: {
   resourceId: string;
   bearer: string;
   now?: Date;
-}): Promise<string> {
+};
+
+export async function issueRuntimeProxyAttestation(
+  input: RuntimeProxyAttestationSubject
+): Promise<string> {
   const now = input.now ?? new Date();
   const issuedAt = Math.floor(now.getTime() / 1000);
   if (!Number.isSafeInteger(issuedAt) || issuedAt < 0)
@@ -83,23 +87,12 @@ export async function issueRuntimeProxyAttestation(input: {
   });
   return new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-    .setIssuedAt(claims.iat)
-    .setExpirationTime(claims.exp)
-    .setIssuer(claims.iss)
-    .setAudience(claims.aud)
     .sign(signingKey(input.secret));
 }
 
-export async function verifyRuntimeProxyAttestation(input: {
-  value: string | null | undefined;
-  secret: string;
-  audience: RuntimeProxyAttestationAudience;
-  userId: string;
-  authorizationId: string;
-  resourceId: string;
-  bearer: string;
-  now?: Date;
-}): Promise<boolean> {
+export async function verifyRuntimeProxyAttestation(
+  input: RuntimeProxyAttestationSubject & { value: string | null | undefined }
+): Promise<boolean> {
   if (!input.value || input.value.length > 4096) return false;
   try {
     const { payload } = await verifyKiloTokenSignature(input.value, input.secret, {

@@ -4,7 +4,6 @@ import {
   type DirectByokModel,
   type DirectByokProvider,
   type DirectByokUpstream,
-  type StaticDirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import type { OpenRouterProvider } from '@kilocode/db/schema-types';
 import {
@@ -13,7 +12,7 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
-import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
+import { directByokProviderList } from './direct-byok-definitions';
 import {
   getEnabledByokProviders,
   type ByokOwner,
@@ -68,8 +67,7 @@ export function getDirectByokPolicyTarget(provider: DirectByokProvider): DirectB
  * lacks.
  */
 export function getDirectByokProviderListings(): OpenRouterProvider[] {
-  const providers: ReadonlyArray<StaticDirectByokProvider> = DIRECT_BYOK_PROVIDERS;
-  return providers.flatMap(({ id, provider_listing }) => {
+  return directByokProviderList.flatMap(({ id, provider_listing }) => {
     if (!provider_listing) return [];
     const name = DIRECT_BYOK_PROVIDERS_META[id];
     return [{ name, displayName: name, slug: id, ...provider_listing }];
@@ -196,8 +194,7 @@ export function getDirectByokUpstreamModelId(
 }
 
 export function findDirectByokProvider(providerId: string): DirectByokProvider | undefined {
-  const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
-  return providers.find(provider => provider.id === providerId);
+  return directByokProviderList.find(provider => provider.id === providerId);
 }
 
 type DirectByokKey = Pick<EnabledByokProvider, 'providerId' | 'privateProvider'>;
@@ -226,7 +223,7 @@ export function directByokProvidersForKeys(
   keys: ReadonlyArray<DirectByokKey>
 ): DirectByokProvider[] {
   return [
-    ...DIRECT_BYOK_PROVIDERS.filter(provider => keys.some(key => key.providerId === provider.id)),
+    ...directByokProviderList.filter(provider => keys.some(key => key.providerId === provider.id)),
     ...getByokPrivateProviders(keys),
   ];
 }
@@ -289,26 +286,36 @@ export async function getDirectByokCatalogModelId(model: DirectByokModel): Promi
 export type DirectByokCatalogModel = { provider: DirectByokProvider; model: DirectByokModel };
 
 /**
+ * The catalog id that serves `catalogModelId`: a latest alias's current target, or the id itself.
+ * Null when the id, or the target its alias points at, is no longer a servable catalog id.
+ */
+async function resolveServedCatalogModelId(catalogModelId: string): Promise<string | null> {
+  const targetModelId = await resolveOpenRouterModelAlias(catalogModelId);
+  if (!(await isByokServableCatalogModelId(catalogModelId))) return null;
+  if (targetModelId !== catalogModelId && !(await isByokServableCatalogModelId(targetModelId))) {
+    return null;
+  }
+  return targetModelId;
+}
+
+/**
  * The primary model of each provider that serves `catalogModelId`, in provider order. A latest
  * alias (`~vendor/family-latest`) is served by the models that serve its current target.
  */
 export async function findDirectByokCatalogModels(
   catalogModelId: string,
-  providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS
+  providers: ReadonlyArray<DirectByokProvider> = directByokProviderList
 ): Promise<DirectByokCatalogModel[]> {
-  const targetModelId = await resolveOpenRouterModelAlias(catalogModelId);
+  const servedModelId = await resolveServedCatalogModelId(catalogModelId);
+  if (servedModelId === null) return [];
   const candidates = await Promise.all(
     providers.map(async provider => {
       if (!supportsCatalogMode(provider)) return [];
-      const model = getPrimaryCatalogModels(await provider.models()).get(targetModelId);
+      const model = getPrimaryCatalogModels(await provider.models()).get(servedModelId);
       return model ? [{ provider, model }] : [];
     })
   );
-  const found = candidates.flat();
-  if (found.length === 0 || !(await isByokServableCatalogModelId(catalogModelId))) return [];
-  if (targetModelId !== catalogModelId && !(await isByokServableCatalogModelId(targetModelId)))
-    return [];
-  return found;
+  return candidates.flat();
 }
 
 /** Serving models per catalog id; a latest alias is served by the models of its target. */
@@ -317,12 +324,11 @@ type CatalogModeModels = Map<string, DirectByokCatalogModel[]>;
 async function addLatestAliasModelIds(modelsByModelId: CatalogModeModels): Promise<void> {
   if (modelsByModelId.size === 0) return;
   const storedModels = await getOpenRouterModelsMetadataFromDatabase();
-  for (const [modelId, storedModel] of Object.entries(storedModels)) {
-    const targetModelId = storedModel.alias_target?.slug;
-    const targetModels = targetModelId ? modelsByModelId.get(targetModelId) : undefined;
-    if (modelId.startsWith('~') && targetModels && (await isByokServableCatalogModelId(modelId))) {
-      modelsByModelId.set(modelId, targetModels);
-    }
+  for (const modelId of Object.keys(storedModels)) {
+    if (!modelId.startsWith('~')) continue;
+    const servedModelId = await resolveServedCatalogModelId(modelId);
+    const targetModels = servedModelId ? modelsByModelId.get(servedModelId) : undefined;
+    if (targetModels) modelsByModelId.set(modelId, targetModels);
   }
 }
 
@@ -398,12 +404,9 @@ export async function createDirectByokReferenceResolver(
   });
   return async modelId => {
     if (catalogModeProviders.length === 0) return modelId;
-    const { provider, model } = await getDirectByokModel(
-      modelId.toLowerCase(),
-      catalogModeProviders
-    );
-    if (!provider || !model) return modelId;
-    return getDirectByokCatalogModelId(model);
+    const directByok = await getDirectByokModel(modelId.toLowerCase(), catalogModeProviders);
+    if (!directByok) return modelId;
+    return getDirectByokCatalogModelId(directByok.model);
   };
 }
 
@@ -419,26 +422,20 @@ export async function getDirectByokModels(keys: ReadonlyArray<EnabledByokProvide
   );
 }
 
+/**
+ * Resolves a `<provider>/<model>` id to the provider among `providers` and the model it serves, or
+ * null when either is unknown.
+ */
 export async function getDirectByokModel(
   requestedModel: string,
-  providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS
-): Promise<{
-  provider: DirectByokProvider | null;
-  model: DirectByokModel | null;
-}> {
+  providers: ReadonlyArray<DirectByokProvider> = directByokProviderList
+): Promise<{ provider: DirectByokProvider; model: DirectByokModel } | null> {
   const provider = providers.find(provider => requestedModel.startsWith(`${provider.id}/`));
-  if (!provider) {
-    return { provider: null, model: null };
-  }
-
+  if (!provider) return null;
   const model = (await provider.models()).find(
     model => formatDirectByokModelId(provider, model) === requestedModel
   );
-  if (model) {
-    return { provider, model };
-  }
-
-  return { provider: null, model: null };
+  return model ? { provider, model } : null;
 }
 
 /** Models the owner's enabled keys serve. */

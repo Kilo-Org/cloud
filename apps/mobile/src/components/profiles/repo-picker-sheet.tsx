@@ -14,9 +14,9 @@ import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { GitBranch, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
+import { GitBranch, Lock, SearchX, Unlock } from '@/components/ui/icons';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
@@ -106,7 +106,6 @@ export function RepoPickerSheet({
   onClose,
 }: Readonly<RepoPickerSheetProps>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -170,20 +169,12 @@ export function RepoPickerSheet({
         cancelLabel={t('common.cancel')}
         topInset="ios-page-sheet"
       />
-      <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-        <Search size={18} color={colors.mutedForeground} />
-        <Input
-          placeholder={t('profiles.repoBindings.search')}
-          placeholderTextColor={colors.mutedForeground}
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-          accessibilityLabel={t('profiles.repoBindings.search')}
-          className="flex-1 pl-0 pr-0 text-base text-foreground"
-          onChangeText={setSearch}
-        />
-      </View>
+      <SearchField
+        className="mx-4 my-3"
+        placeholder={t('profiles.repoBindings.search')}
+        hasText={search !== ''}
+        onChangeText={setSearch}
+      />
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-4"

@@ -2376,6 +2376,46 @@ describe('CliLiveTransport remote command catalog', () => {
     transport.destroy();
   });
 
+  it('clears the published command catalog when connect supersedes a live owner', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : COMMAND_WIRE_CATALOG)
+      );
+    const { transport, serviceEvents } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(serviceEvents.filter(event => event.type === 'commands.available').at(-1)).toEqual({
+      type: 'commands.available',
+      commands: PARSED_COMMAND_CATALOG,
+    });
+
+    // A second connect re-enters with the owner still known, so it must take the
+    // same owner-replacement path as a real owner change: drop the cached
+    // catalog rather than keep serving commands the new connection may not have.
+    transport.connect();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available').at(-1)).toEqual({
+      type: 'commands.available',
+      commands: [],
+    });
+    transport.destroy();
+  });
+
+  it('keeps the command catalog when connect starts from no owner', async () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+
+    transport.connect();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available')).toEqual([]);
+    transport.destroy();
+  });
+
   it('clears the published command catalog when the current owner disconnects', async () => {
     const connection = createConnection();
     jest

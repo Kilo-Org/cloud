@@ -10,17 +10,21 @@ import { Text } from '@/components/ui/text';
 import { useOrganization } from '@/lib/organization-context';
 import { TRPCProvider } from '@/lib/trpc';
 
-// In a development build, open dev/organization-invoices-fixture through the
-// app's native link scheme. The app's selected language applies.
+// In a development build, open dev/organization-invoices-fixture/<state> through
+// the app's native link scheme, where <state> is `listed`, `empty` or `error`.
+// The app's selected language applies.
 //
 // The invoices list is a Stripe read served by the backend, and a local stack
 // has no Stripe customer to list, so this fixture answers the two reads the real
 // screen makes instead of seeding a customer: the membership list for the
 // selected organization and one page of invoices. The rows hold the three
 // statuses the list colors, so the status pill renders its paid, open and void
-// states on one page. The screen, its pagination hook and the row layout are the
-// production ones, and the DTOs cross the usual tRPC boundary. Reads never touch
-// the network, and the mutation cache rejects before any mutation function runs.
+// states on one page; `empty` serves the settled page with no rows; `error`
+// makes that one read reject the way a network or backend read failure does, so
+// the screen shows its retryable neutral error state. The screen, its pagination
+// hook and the row layout are the production ones, and the DTOs cross the usual
+// tRPC boundary. Reads never touch the network, and the mutation cache rejects
+// before any mutation function runs.
 //
 // Select an organization in the app first: the boundary the screen reads takes
 // its id from the app's choice, and the fixture repeats that id back in the list.
@@ -29,6 +33,19 @@ type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type InvoicesPage = RouterOutputs['organizations']['invoicesPage'];
 type OrganizationList = RouterOutputs['organizations']['list'];
 type FixtureReadData = InvoicesPage | OrganizationList;
+
+export type OrganizationInvoicesFixtureState = 'listed' | 'empty' | 'error';
+
+const FIXTURE_STATES: readonly OrganizationInvoicesFixtureState[] = ['listed', 'empty', 'error'];
+
+/** The fixture state a `?state=` value names; anything else opens `listed`. */
+export function organizationInvoicesFixtureState(
+  value: string | undefined
+): OrganizationInvoicesFixtureState {
+  return FIXTURE_STATES.find(state => state === value) ?? 'listed';
+}
+
+const EMPTY_PAGE: InvoicesPage = { entries: [], hasMore: false, nextCursor: null };
 
 /**
  * Sample rows. Each `created` is noon UTC on the first of the month its
@@ -109,7 +126,10 @@ function organizationEntry(organizationId: string): OrganizationList[number] {
  * Answers the reads with the selected organization, read at request time so the
  * fixture follows the app's choice instead of freezing the first render.
  */
-function createFixtureClient(selected: { readonly organizationId: string | null }) {
+function createFixtureClient(
+  selected: { readonly organizationId: string | null },
+  state: OrganizationInvoicesFixtureState
+) {
   return createTRPCClient<MobileRouter>({
     links: [
       httpLink({
@@ -121,7 +141,15 @@ function createFixtureClient(selected: { readonly organizationId: string | null 
             throw new Error('Organization invoices fixture does not allow writes');
           }
           if (url.includes('/organizations.invoicesPage')) {
-            return fixtureResponse({ entries: INVOICES, hasMore: false, nextCursor: null });
+            if (state === 'error') {
+              // A plain rejection, not an error response, so the screen
+              // classifies the failure by cause and keeps its retryable neutral
+              // variant.
+              throw new Error('Read failed');
+            }
+            return fixtureResponse(
+              state === 'listed' ? { ...EMPTY_PAGE, entries: INVOICES } : EMPTY_PAGE
+            );
           }
           if (url.includes('/organizations.list')) {
             const organizationId = selected.organizationId;
@@ -136,7 +164,20 @@ function createFixtureClient(selected: { readonly organizationId: string | null 
   });
 }
 
-export function OrganizationInvoicesFixture() {
+/**
+ * The state is fixed for one mount: the fixture key remounts this body when the
+ * route's `?state=` changes, so a link that switches `listed` to `empty` gets a
+ * fresh client and an empty cache instead of the first page it already served.
+ */
+export function OrganizationInvoicesFixture({
+  state,
+}: {
+  state: OrganizationInvoicesFixtureState;
+}) {
+  return <OrganizationInvoicesFixtureBody key={state} state={state} />;
+}
+
+function OrganizationInvoicesFixtureBody({ state }: { state: OrganizationInvoicesFixtureState }) {
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const selected = useState(() => ({ organizationId }))[0];
@@ -152,7 +193,7 @@ export function OrganizationInvoicesFixture() {
         }),
       })
   );
-  const [client] = useState(() => createFixtureClient(selected));
+  const [client] = useState(() => createFixtureClient(selected, state));
 
   return (
     <QueryClientProvider client={queryClient}>

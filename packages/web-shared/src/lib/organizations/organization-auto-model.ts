@@ -224,9 +224,9 @@ export async function validateOrganizationAutoTarget(
     rawModelId,
     isPrivateProviderTarget ? getByokPrivateProviders(await loadEnabledKeys()) : undefined
   );
-  if (directByokTarget.provider && directByokTarget.model) {
+  if (directByokTarget) {
     const key = (await loadEnabledKeys()).find(
-      candidate => candidate.providerId === directByokTarget.provider?.id
+      candidate => candidate.providerId === directByokTarget.provider.id
     );
     if (!key) {
       return {

@@ -1,4 +1,4 @@
-import { OrganizationSSODomainSchema } from './organization-types';
+import { OrganizationSSODomainSchema } from './company-domain';
 
 const INVALID_DOMAIN_MESSAGE = 'Please enter a valid domain (e.g. acme.com)';
 

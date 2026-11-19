@@ -1,4 +1,4 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { describe, expect, it, jest, afterEach, beforeEach } from '@jest/globals';
 import type { NextRequest } from 'next/server';
 import type * as nextServerModule from 'next/server';
 import type * as codeReviewsDbModule from '@/lib/code-reviews/db/code-reviews';
@@ -514,6 +514,10 @@ beforeEach(async () => {
   mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
   ({ POST, isWorkspaceCapacityFailure, USAGE_LAG_RECHECK_DELAY_MS } = await import('./route'));
   ({ AUTOMATIC_RETRY_ATTEMPT_LIMIT } = await import('@/lib/code-reviews/retry-review'));
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 describe('isWorkspaceCapacityFailure', () => {
@@ -2432,7 +2436,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           cli_session_id: 'ses_assistant_error',
         })
       );
-      mockListCodeReviewAttempts.mockResolvedValue([makeAttempt()]);
+      const boundRead = Promise.withResolvers<void>();
+      mockListCodeReviewAttempts.mockImplementation(async () => {
+        boundRead.resolve();
+        return [makeAttempt()];
+      });
       mockCreateInfraRetryAttemptIfMissing.mockResolvedValue({
         outcome: 'created',
         attempt: makeAttempt({
@@ -2446,37 +2454,32 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       mockGetSessionUsageFromBilling.mockResolvedValue(null);
       jest.useFakeTimers();
 
-      let response: Response | undefined;
-      let responsePromise: Promise<Response> | undefined;
-      try {
-        responsePromise = POST(
-          makeRequest({
-            status: 'failed',
-            cloudAgentSessionId: 'agent-assistant-error',
-            kiloSessionId: 'ses_assistant_error',
-            errorMessage: 'Assistant request failed',
-            terminalReason: 'assistant_failed',
-            failure: {
-              stage: 'agent_activity',
-              code: 'assistant_error',
-              message: 'Assistant request failed',
-            },
-          }),
-          makeParams(REVIEW_ID)
-        );
+      const responsePromise = POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-assistant-error',
+          kiloSessionId: 'ses_assistant_error',
+          errorMessage: 'Assistant request failed',
+          terminalReason: 'assistant_failed',
+          failure: {
+            stage: 'agent_activity',
+            code: 'assistant_error',
+            message: 'Assistant request failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
 
-        // Flush the first usage read and the bound read without advancing the
-        // lag timer, so a premature wait would hang the flush below.
-        await jest.advanceTimersByTimeAsync(0);
-        // The bound still allows the retry, so the guard waits out the billing
-        // lag and re-reads before treating the review as unmeasurable.
-        await jest.advanceTimersByTimeAsync(USAGE_LAG_RECHECK_DELAY_MS);
-        response = await responsePromise;
-      } finally {
-        jest.useRealTimers();
-      }
+      // The callback token check awaits a WebCrypto job on the libuv threadpool,
+      // which fake timers cannot flush. Advancing the clock before the bound
+      // read lets the lag timer be scheduled after the jump, so it never fires.
+      await boundRead.promise;
+      // The bound still allows the retry, so the guard waits out the billing
+      // lag and re-reads before treating the review as unmeasurable.
+      await jest.advanceTimersByTimeAsync(USAGE_LAG_RECHECK_DELAY_MS);
+      const response = await responsePromise;
 
-      expect(response?.status).toBe(200);
+      expect(response.status).toBe(200);
       // Both the first read and the lag re-read return nothing.
       expect(mockGetSessionUsageFromBilling).toHaveBeenCalledTimes(2);
       expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(

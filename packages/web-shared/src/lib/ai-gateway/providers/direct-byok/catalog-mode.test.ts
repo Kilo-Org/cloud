@@ -62,9 +62,8 @@ function mockModel(id: string, catalog_model_id?: string): DirectByokTypes.Direc
 
 const FREE_CATALOG_MODEL_ID = 'vendor/free-model:free';
 
-jest.mock('./direct-byok-definitions', () => ({
-  __esModule: true,
-  default: [
+jest.mock('./direct-byok-definitions', () => {
+  const providers = [
     mockProvider('synthetic', 'synthetic', [
       mockModel('hf:moonshotai/Kimi-K2.6', 'moonshotai/kimi-k2.6'),
       mockModel('hf:moonshotai/Kimi-K2.6-fast', 'moonshotai/kimi-k2.6'),
@@ -88,8 +87,9 @@ jest.mock('./direct-byok-definitions', () => ({
     ]),
     mockProvider('morph-byok', 'morph', [mockModel('morph-v3-fast')]),
     mockProvider('chutes-byok', 'chutes', [mockModel('moonshotai/retired', 'moonshotai/retired')]),
-  ],
-}));
+  ];
+  return { __esModule: true, default: providers, directByokProviderList: providers };
+});
 
 const mockedKeys = jest.mocked(getEnabledByokProviders);
 const mockedIsValid = jest.mocked(isValidOpenRouterModelId);

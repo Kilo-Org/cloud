@@ -1,14 +1,12 @@
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
 import { ModeForm } from '@/components/organization/mode-form';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { ArrowLeft, SlidersHorizontal } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useOrgModes } from '@/lib/hooks/use-org-modes-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
@@ -74,27 +72,19 @@ export function OrganizationModeFormScreen() {
   );
 }
 
+/**
+ * The shared not-found state. The header owns the one way out, and its
+ * fallback lands on the modes list when a deep link left no history to pop.
+ */
 function ModeNotFound() {
-  const router = useRouter();
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('agentChat.modePicker.customModes')} />
-      <EmptyState
-        icon={SlidersHorizontal}
-        placement="top"
-        inset="gutter"
-        title={t('organization.modes.notFound')}
-        action={
-          <StateAction
-            label={t('common.back')}
-            icon={ArrowLeft}
-            onPress={() => {
-              router.replace(MODES_LIST_PATH as Href);
-            }}
-          />
-        }
+      <ScreenHeader
+        title={t('agentChat.modePicker.customModes')}
+        backFallback={MODES_LIST_PATH as Href}
       />
+      <QueryError variant="not-found" message={t('organization.modes.notFound')} />
     </View>
   );
 }

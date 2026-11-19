@@ -8534,7 +8534,9 @@
             "mcpServers": {
               "type": "object",
               "propertyNames": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
               },
               "additionalProperties": {
                 "oneOf": [
@@ -8547,15 +8549,19 @@
                       },
                       "command": {
                         "minItems": 1,
+                        "maxItems": 50,
                         "type": "array",
                         "items": {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 8192
                         }
                       },
                       "environment": {
                         "type": "object",
                         "propertyNames": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
                         },
                         "additionalProperties": {
                           "anyOf": [
@@ -8567,10 +8573,12 @@
                               "type": "object",
                               "properties": {
                                 "encryptedData": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 32816
                                 },
                                 "encryptedDEK": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 684
                                 },
                                 "algorithm": {
                                   "type": "string",
@@ -8615,12 +8623,15 @@
                       },
                       "url": {
                         "type": "string",
+                        "maxLength": 4096,
                         "format": "uri"
                       },
                       "headers": {
                         "type": "object",
                         "propertyNames": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
                         },
                         "additionalProperties": {
                           "anyOf": [
@@ -8632,10 +8643,12 @@
                               "type": "object",
                               "properties": {
                                 "encryptedData": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 32816
                                 },
                                 "encryptedDEK": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 684
                                 },
                                 "algorithm": {
                                   "type": "string",
@@ -9197,7 +9210,9 @@
             "mcpServers": {
               "type": "object",
               "propertyNames": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
               },
               "additionalProperties": {
                 "oneOf": [
@@ -9210,15 +9225,19 @@
                       },
                       "command": {
                         "minItems": 1,
+                        "maxItems": 50,
                         "type": "array",
                         "items": {
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 8192
                         }
                       },
                       "environment": {
                         "type": "object",
                         "propertyNames": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
                         },
                         "additionalProperties": {
                           "anyOf": [
@@ -9230,10 +9249,12 @@
                               "type": "object",
                               "properties": {
                                 "encryptedData": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 32816
                                 },
                                 "encryptedDEK": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 684
                                 },
                                 "algorithm": {
                                   "type": "string",
@@ -9278,12 +9299,15 @@
                       },
                       "url": {
                         "type": "string",
+                        "maxLength": 4096,
                         "format": "uri"
                       },
                       "headers": {
                         "type": "object",
                         "propertyNames": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
                         },
                         "additionalProperties": {
                           "anyOf": [
@@ -9295,10 +9319,12 @@
                               "type": "object",
                               "properties": {
                                 "encryptedData": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 32816
                                 },
                                 "encryptedDEK": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "maxLength": 684
                                 },
                                 "algorithm": {
                                   "type": "string",
@@ -20920,7 +20946,9 @@
                 "mcpServers": {
                   "type": "object",
                   "propertyNames": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
                   },
                   "additionalProperties": {
                     "oneOf": [
@@ -20933,15 +20961,19 @@
                           },
                           "command": {
                             "minItems": 1,
+                            "maxItems": 50,
                             "type": "array",
                             "items": {
-                              "type": "string"
+                              "type": "string",
+                              "maxLength": 8192
                             }
                           },
                           "environment": {
                             "type": "object",
                             "propertyNames": {
-                              "type": "string"
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
                             },
                             "additionalProperties": {
                               "anyOf": [
@@ -20953,10 +20985,12 @@
                                   "type": "object",
                                   "properties": {
                                     "encryptedData": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 32816
                                     },
                                     "encryptedDEK": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 684
                                     },
                                     "algorithm": {
                                       "type": "string",
@@ -21001,12 +21035,15 @@
                           },
                           "url": {
                             "type": "string",
+                            "maxLength": 4096,
                             "format": "uri"
                           },
                           "headers": {
                             "type": "object",
                             "propertyNames": {
-                              "type": "string"
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
                             },
                             "additionalProperties": {
                               "anyOf": [
@@ -21018,10 +21055,12 @@
                                   "type": "object",
                                   "properties": {
                                     "encryptedData": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 32816
                                     },
                                     "encryptedDEK": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 684
                                     },
                                     "algorithm": {
                                       "type": "string",
@@ -21589,7 +21628,9 @@
                 "mcpServers": {
                   "type": "object",
                   "propertyNames": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
                   },
                   "additionalProperties": {
                     "oneOf": [
@@ -21602,15 +21643,19 @@
                           },
                           "command": {
                             "minItems": 1,
+                            "maxItems": 50,
                             "type": "array",
                             "items": {
-                              "type": "string"
+                              "type": "string",
+                              "maxLength": 8192
                             }
                           },
                           "environment": {
                             "type": "object",
                             "propertyNames": {
-                              "type": "string"
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
                             },
                             "additionalProperties": {
                               "anyOf": [
@@ -21622,10 +21667,12 @@
                                   "type": "object",
                                   "properties": {
                                     "encryptedData": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 32816
                                     },
                                     "encryptedDEK": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 684
                                     },
                                     "algorithm": {
                                       "type": "string",
@@ -21670,12 +21717,15 @@
                           },
                           "url": {
                             "type": "string",
+                            "maxLength": 4096,
                             "format": "uri"
                           },
                           "headers": {
                             "type": "object",
                             "propertyNames": {
-                              "type": "string"
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
                             },
                             "additionalProperties": {
                               "anyOf": [
@@ -21687,10 +21737,12 @@
                                   "type": "object",
                                   "properties": {
                                     "encryptedData": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 32816
                                     },
                                     "encryptedDEK": {
-                                      "type": "string"
+                                      "type": "string",
+                                      "maxLength": 684
                                     },
                                     "algorithm": {
                                       "type": "string",

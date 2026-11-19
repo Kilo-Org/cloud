@@ -1,4 +1,4 @@
-import type { AssistantMessage } from '@/types/opencode.gen';
+import type { AssistantMessage } from '@/types/opencode';
 
 /**
  * Extract a human-readable error message from an AssistantMessage error field.

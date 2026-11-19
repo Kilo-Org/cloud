@@ -8,7 +8,7 @@ import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MetaRow } from '@/components/code-reviewer/review-detail-sections';
+import { KvRow } from '@/components/ui/kv-row';
 import { i18n } from '@/i18n';
 import { openExternalUrl } from '@/lib/external-link';
 import { ReviewDetailScreen } from './review-detail-screen';
@@ -165,6 +165,18 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The shared key/value row draws the label column and then the value column;
+// the stub keeps that order in the rendered text so a test can prove which row
+// carries which sentence, without dragging the row frame's native pieces in.
+vi.mock('@/components/ui/kv-row', () => ({
+  KvRow: (props: { label: string; value: string }) =>
+    createElement(
+      'KvRow',
+      props,
+      createElement('Text', { key: 'label' }, props.label),
+      createElement('Text', { key: 'value' }, props.value)
+    ),
+}));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: ({ children }: { children?: unknown }) => children,
 }));
@@ -544,9 +556,9 @@ describe('ReviewDetailScreen outcome-first order', () => {
 describe('ReviewDetailScreen details metadata', () => {
   it('labels the completion-timestamp row in the Details list', () => {
     // The Details key-value list pairs every label with its value in one
-    // MetaRow. The completion row must pass the localized
-    // `common.completed` copy as MetaRow's label beside its
-    // timeAgo value; a value-only row would leave the label column blank
+    // shared key/value row. The completion row must pass the localized
+    // `common.completed` copy as the row's label beside its timeAgo value; a
+    // value-only row would leave the label column blank
     // (finding: review-detail.png).
     detail.data = {
       success: true,
@@ -562,19 +574,18 @@ describe('ReviewDetailScreen details metadata', () => {
     const completedLabel = i18n.t('common.completed');
 
     // `timeAgo` is mocked to "now" in this suite, so the completion row is the
-    // one MetaRow that carries the completion label and the timeAgo value.
+    // one key/value row that carries the completion label and the timeAgo
+    // value.
     const completionRows = renderer.root.findAll(
-      node => node.type === MetaRow && node.props.label === completedLabel
+      node => node.type === KvRow && node.props.label === completedLabel
     );
     expect(completionRows).toHaveLength(1);
-    // MetaRow renders the label column first, then the value column: assert the
-    // label is what the row draws beside its timestamp, not just a prop the
-    // screen passes.
-    expect(collectText(completionRows[0]?.children ?? [])).toEqual([completedLabel, 'now']);
+    expect(completionRows[0]?.props.value).toBe('now');
 
-    // The row belongs to the Details card. The Gate card carries the check run
-    // and the threshold only, so the review status paints once, as the
-    // conclusion above the findings.
+    // The row belongs to the Details group. The Gate group carries the check
+    // run and the threshold only, so the review status paints once, as the
+    // conclusion above the findings. The ordered text proves the row draws the
+    // label beside its timestamp, not just receives it as a prop.
     const texts = collectText(renderer.toJSON());
     const completionRowIndex = texts.findIndex(
       (text, index) => text === completedLabel && texts[index + 1] === 'now'
@@ -606,13 +617,13 @@ describe('ReviewDetailScreen details metadata', () => {
       const endedLabel = i18n.t('codeReviewer.reviewDetail.reviewEnded');
 
       const endRows = renderer.root.findAll(
-        node => node.type === MetaRow && node.props.label === endedLabel
+        node => node.type === KvRow && node.props.label === endedLabel
       );
       expect(endRows).toHaveLength(1);
-      expect(collectText(endRows[0]?.children ?? [])).toEqual([endedLabel, 'now']);
+      expect(endRows[0]?.props.value).toBe('now');
       expect(
         renderer.root.findAll(
-          node => node.type === MetaRow && node.props.label === i18n.t('common.completed')
+          node => node.type === KvRow && node.props.label === i18n.t('common.completed')
         )
       ).toHaveLength(0);
     }
@@ -632,7 +643,7 @@ describe('ReviewDetailScreen details metadata', () => {
     const completedLabel = i18n.t('common.completed');
 
     expect(
-      renderer.root.findAll(node => node.type === MetaRow && node.props.label === completedLabel)
+      renderer.root.findAll(node => node.type === KvRow && node.props.label === completedLabel)
     ).toHaveLength(0);
   });
 });
@@ -777,7 +788,7 @@ describe('ReviewDetailScreen gate threshold', () => {
     const renderer = mountScreen();
     const row = renderer.root.findAll(
       node =>
-        node.type === MetaRow && node.props.label === i18n.t('codeReviewer.reviewDetail.threshold')
+        node.type === KvRow && node.props.label === i18n.t('codeReviewer.reviewDetail.threshold')
     );
     expect(row).toHaveLength(1);
     expect(collectText(row[0]?.children ?? [])).toEqual([

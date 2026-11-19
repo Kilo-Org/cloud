@@ -276,13 +276,18 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
         eyebrow={t('codeReviewer.analytics.title')}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
-        <View className="gap-2">
+        {/* Two segmented controls of the same face, one under the other, read
+            as one control; each takes its own section label and the body's
+            section gap. */}
+        <Section label={t('common.platform')}>
           <SegmentedControl
             options={PLATFORM_OPTIONS}
             value={platform}
             accessibilityLabel={t('common.platform')}
             onChange={setPlatform}
           />
+        </Section>
+        <Section label={t('usage.rangePicker')}>
           <SegmentedControl
             options={periodOptions}
             value={String(period)}
@@ -294,7 +299,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
               }
             }}
           />
-        </View>
+        </Section>
         {body}
       </TabScreenScrollView>
     </View>

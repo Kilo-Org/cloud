@@ -20,13 +20,14 @@ import {
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getOpenAiChatGptCandidateModel } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { openAiChatGptConnectorGone } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connector';
 import {
   getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { resolveClaudeBillingModel } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
-import { resolveClaudeBillingConnector } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/connector';
+import { resolveConnectionConnector } from '@kilocode/web-shared/lib/ai-gateway/connector';
 import {
   getGrantedClaudeBillingConnection,
   type ClaudeBillingOwner,
@@ -51,6 +52,10 @@ export type BalanceCheckModelEligibility = {
    * gone. Routing refuses every request for the model in that state, so no
    * balance and no other credential runs it; a caller that refuses on the
    * balance reports this requirement instead.
+   *
+   * A shared "Sign in with ChatGPT" row whose connector is gone never sets
+   * this: that row simply stops counting as a billing path, and the caller's
+   * own connection serves the request instead.
    */
   reconnectRequired?: 'claude_billing';
 };
@@ -65,7 +70,9 @@ export type BalanceCheckModelEligibility = {
  *   provider key, a gateway key, a direct BYOK key or organization private provider
  *   (bespoke or catalog mode), a "Sign in with ChatGPT" connection, or a
  *   Claude billing link, so the session is billed against the user's own key,
- *   plan, or Claude organization rather than their balance.
+ *   plan, or Claude organization rather than their balance. A service run's
+ *   organization shared ChatGPT row counts only while the person who connected
+ *   it is still usable.
  */
 export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   fromDb: typeof db;
@@ -177,13 +184,17 @@ async function hasDirectByokForModel(params: {
   const loadEnabledKeys = () =>
     (enabledKeys ??= getEnabledByokProviders(params.fromDb, params.owner));
   // Only the owner's keys know its private providers, whose model ids nobody else can use.
-  const { provider, model } = await getDirectByokModel(
+  const directByok = await getDirectByokModel(
     modelId,
     isByokPrivateModelId(modelId) ? getByokPrivateProviders(await loadEnabledKeys()) : undefined
   );
-  if (provider && model) {
-    const key = (await loadEnabledKeys()).find(enabled => enabled.providerId === provider.id);
-    return key !== undefined && !(key.serveCatalogModels && supportsCatalogMode(provider));
+  if (directByok) {
+    const key = (await loadEnabledKeys()).find(
+      enabled => enabled.providerId === directByok.provider.id
+    );
+    return (
+      key !== undefined && !(key.serveCatalogModels && supportsCatalogMode(directByok.provider))
+    );
   }
 
   const catalogModeCapable = [...params.enabledProviderIds].some(providerId => {
@@ -204,9 +215,13 @@ async function hasDirectByokForModel(params: {
 /**
  * Whether a "Sign in with ChatGPT" connection serves the model, so the ChatGPT
  * plan pays instead of the Kilo balance. Service runs also consider the
- * organization's shared-services connection, which routing tries first.
+ * organization's shared-services connection, which routing tries first, but only
+ * while the person recorded as its connector is still usable: a gone connector
+ * makes the row unusable, so it does not count and the caller's own connection
+ * serves the request instead.
  */
 async function hasOpenAiChatGptByokForModel(params: {
+  fromDb: typeof db;
   user: Pick<User, 'id'>;
   modelId: string;
   organizationId?: string;
@@ -222,7 +237,16 @@ async function hasOpenAiChatGptByokForModel(params: {
 
   for (const owner of owners) {
     const stored = await getOpenAiChatGptStoredConnection(owner);
-    if (stored?.isEnabled && stored.connection.status === 'connected') return true;
+    if (!stored?.isEnabled || stored.connection.status !== 'connected') continue;
+    // The shared row bills the organization only while the person who connected
+    // it is usable. A row that records no connector still counts.
+    if (
+      owner.scope === 'shared_services' &&
+      (await openAiChatGptConnectorGone(stored, params.fromDb))
+    ) {
+      continue;
+    }
+    return true;
   }
   return false;
 }
@@ -263,7 +287,7 @@ async function resolveClaudeBillingForModel(params: {
   if (row?.status === ClaudeBillingConnectionStatus.BillingUnavailable) return 'none';
   if (row?.status !== ClaudeBillingConnectionStatus.Connected) return 'none';
   if (owner.kind === 'organization') {
-    const connector = await resolveClaudeBillingConnector(row.created_by, params.fromDb);
+    const connector = await resolveConnectionConnector(row.created_by, params.fromDb);
     if (connector.kind === 'gone') return 'reconnect';
   }
   return 'byok';

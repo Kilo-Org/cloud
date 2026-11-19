@@ -43,6 +43,14 @@ const DIRECT_BYOK_PROVIDERS = [
   zaiCoding,
 ] satisfies ReadonlyArray<StaticDirectByokProvider>;
 
+/**
+ * The provider list as one widened list, for lookups and iterations: the tuple keeps
+ * `EveryDirectByokProviderHasDefinition` exhaustive, and consumers read this view instead of
+ * restating the widening.
+ */
+export const directByokProviderList: ReadonlyArray<StaticDirectByokProvider> =
+  DIRECT_BYOK_PROVIDERS;
+
 /** A provider the shared metadata names without a definition; such a provider cannot be used. */
 type UndefinedDirectByokProviderId = Exclude<
   DirectByokProviderMetaId,

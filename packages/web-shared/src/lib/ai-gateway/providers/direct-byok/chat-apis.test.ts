@@ -3,18 +3,16 @@ import {
   getDirectByokModelChatApis,
   getDirectByokUpstreamModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
+import { directByokProviderList } from './direct-byok-definitions';
 import type { DirectByokProvider } from './types';
 import bedrockByok, { AwsBedrockEndpointSchema, resolveAwsBedrockUpstream } from './bedrock-byok';
 import vertexByok, { buildGcpVertexUpstream, GcpVertexEndpointSchema } from './vertex-byok';
 
 // Routing and the BYOK routing preview choose keys by `getDirectByokModelChatApis`, without the
 // credential, while requests use the upstream resolved from it. The two must agree.
-const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
-
 describe('getDirectByokModelChatApis', () => {
   test.each(
-    providers
+    directByokProviderList
       .filter(provider => provider.supportedChatApis !== undefined)
       .map(provider => [provider.id, provider] as const)
   )('matches the upstream %s resolves', async (_id, provider) => {

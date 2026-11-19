@@ -70,9 +70,9 @@ async function classifyPrivateModel(
   const provider = key && directByokProviderForKey(key);
   if (!key || !provider) return { kind: 'unavailable-private-model', providerId, reason: 'no-key' };
   if (!key.isEnabled) return { kind: 'unavailable-private-model', providerId, reason: 'disabled' };
-  const { model } = await getDirectByokModel(requestedModel, [provider]);
-  return model
-    ? { kind: 'direct-byok-model', provider, model }
+  const directByok = await getDirectByokModel(requestedModel, [provider]);
+  return directByok
+    ? { kind: 'direct-byok-model', ...directByok }
     : { kind: 'unavailable-private-model', providerId, reason: 'unknown-model' };
 }
 
@@ -85,8 +85,8 @@ export async function classifyRequestedModel(
   if (customLlm) return { kind: 'custom-llm', customLlm };
   const privateProviderId = getByokPrivateProviderIdOfModel(requestedModel);
   if (privateProviderId) return classifyPrivateModel(requestedModel, privateProviderId, loadKeys);
-  const { provider, model } = await getDirectByokModel(requestedModel);
-  if (provider && model) return { kind: 'direct-byok-model', provider, model };
+  const directByok = await getDirectByokModel(requestedModel);
+  if (directByok) return { kind: 'direct-byok-model', ...directByok };
   return { kind: 'catalog' };
 }
 
@@ -239,7 +239,7 @@ function createGatewayKeyDecider(
     if (!(await gatewayProviders).includes(providerId)) return 'model-unavailable';
     if (
       providerId === 'vercel-ai-gateway' &&
-      !(await canRouteToVercel(requestedModel, getRoutingProviderConfig))
+      !(await canRouteToVercel(requestedModel, await getRoutingProviderConfig()))
     ) {
       return 'provider-settings';
     }

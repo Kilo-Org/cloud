@@ -299,7 +299,7 @@ export async function resolveProviderAndPolicy(
     if (orgAutoRouteTarget) {
       try {
         const directByokTarget = await getDirectByokModel(orgAutoRouteTarget);
-        if (directByokTarget.provider && route.provider.type !== 'direct-byok') {
+        if (directByokTarget && route.provider.type !== 'direct-byok') {
           return organizationAutoConfigurationResponse(
             `Organization Auto route target '${orgAutoRouteTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
           );

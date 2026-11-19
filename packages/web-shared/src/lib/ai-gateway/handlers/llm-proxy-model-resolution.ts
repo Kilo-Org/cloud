@@ -342,8 +342,8 @@ async function resolveAutoModelId(
 async function mayNameCatalogModeKeyModel(model: string): Promise<boolean> {
   // Only the caller's keys know its private providers, which can all serve catalog ids.
   if (isByokPrivateModelId(model.toLowerCase())) return true;
-  const { provider } = await getDirectByokModel(model.toLowerCase());
-  return !!provider && supportsCatalogMode(provider);
+  const directByok = await getDirectByokModel(model.toLowerCase());
+  return directByok !== null && supportsCatalogMode(directByok.provider);
 }
 
 /**

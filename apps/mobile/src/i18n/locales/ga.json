@@ -275,6 +275,7 @@
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
+    "availableToSpendInOrganization": "Ar fáil le caitheamh san eagraíocht seo",
     "signOutTitle": "Ar mhaith leat síniú amach?",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
     "deleteAccountTitle": "An scriosfar an cuntas?",

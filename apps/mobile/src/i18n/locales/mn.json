@@ -275,6 +275,7 @@
     "hideBalance": "Үлдэгдэл нуух",
     "showBalance": "Үлдэгдэл харуулах",
     "balanceHidden": "Үлдэгдэл нуугдсан",
+    "availableToSpendInOrganization": "Энэ байгууллагад зарцуулах боломжтой",
     "signOutTitle": "Гарах уу?",
     "signOutMessage": "Ажлын орчиндоо хандахын тулд дахин нэвтрэх шаардлагатай.",
     "deleteAccountTitle": "Бүртгэлийг устгах уу?",

@@ -275,6 +275,7 @@
     "hideBalance": "ซ่อนยอดคงเหลือ",
     "showBalance": "แสดงยอดคงเหลือ",
     "balanceHidden": "ยอดคงเหลือถูกซ่อน",
+    "availableToSpendInOrganization": "ใช้จ่ายได้ในองค์กรนี้",
     "signOutTitle": "ออกจากระบบหรือไม่?",
     "signOutMessage": "คุณต้องลงชื่อเข้าใช้อีกครั้งเพื่อใช้พื้นที่ทำงาน",
     "deleteAccountTitle": "ลบบัญชีหรือไม่?",

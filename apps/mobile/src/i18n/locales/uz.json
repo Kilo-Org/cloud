@@ -275,6 +275,7 @@
     "hideBalance": "Balansni yashirish",
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
+    "availableToSpendInOrganization": "Bu tashkilotda sarflash uchun mavjud",
     "signOutTitle": "Tizimdan chiqilsinmi?",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi.",
     "deleteAccountTitle": "Hisob o'chirilsinmi?",

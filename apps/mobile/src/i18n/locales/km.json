@@ -275,6 +275,7 @@
     "hideBalance": "លាក់សមតុល្យ",
     "showBalance": "បង្ហាញសមតុល្យ",
     "balanceHidden": "សមតុល្យត្រូវបានលាក់",
+    "availableToSpendInOrganization": "អាចប្រើសម្រាប់ចំណាយក្នុងស្ថាប័ននេះ",
     "signOutTitle": "ចេញពីគណនី?",
     "signOutMessage": "អ្នកត្រូវចូលគណនីម្តងទៀត ដើម្បីប្រើកន្លែងធ្វើការរបស់អ្នក។",
     "deleteAccountTitle": "លុបគណនី?",

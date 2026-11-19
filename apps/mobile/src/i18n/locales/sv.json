@@ -275,6 +275,7 @@
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
+    "availableToSpendInOrganization": "Tillgängligt att spendera i den här organisationen",
     "signOutTitle": "Logga ut?",
     "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "deleteAccountTitle": "Ta bort konto?",

@@ -275,6 +275,7 @@
     "hideBalance": "Теңгерімді жасыру",
     "showBalance": "Теңгерімді көрсету",
     "balanceHidden": "Теңгерім жасырылған",
+    "availableToSpendInOrganization": "Осы ұйымда жұмсауға қолжетімді",
     "signOutTitle": "Шығу керек пе?",
     "signOutMessage": "Жұмыс кеңістігіңізді пайдалану үшін аккаунтыңызға қайта кіру қажет болады.",
     "deleteAccountTitle": "Тіркелгіні жою керек пе?",

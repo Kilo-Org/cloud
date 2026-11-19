@@ -275,6 +275,7 @@
     "hideBalance": "بیلنس چھپائیں",
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
+    "availableToSpendInOrganization": "اس تنظیم میں خرچ کرنے کے لیے دستیاب",
     "signOutTitle": "سائن آؤٹ کریں؟",
     "signOutMessage": "اپنے ورک اسپیس تک رسائی کے لیے آپ کو دوبارہ سائن ان کرنا ہوگا۔",
     "deleteAccountTitle": "اکاؤنٹ حذف کریں؟",

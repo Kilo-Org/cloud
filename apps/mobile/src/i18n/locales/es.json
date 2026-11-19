@@ -275,6 +275,7 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
+    "availableToSpendInOrganization": "Disponible para gastar en esta organización",
     "signOutTitle": "¿Cerrar sesión?",
     "signOutMessage": "Tendrás que iniciar sesión de nuevo para acceder a tu espacio de trabajo.",
     "deleteAccountTitle": "¿Eliminar cuenta?",

@@ -29,7 +29,7 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { useContextPicker } from '@/components/context-control';
 import { ActionTile } from '@/components/profile-action-tile';
-import { CreditsCard } from '@/components/profile-credits-card';
+import { CreditsCard, type CreditsCardOrgList } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -153,6 +153,16 @@ export function ProfileScreen() {
   const showOrganizationSection =
     organizationId != null ||
     (organizationContextLoaded && (organizationsError || orgs !== undefined));
+
+  // The credits card draws a money role's organization balance from this list,
+  // so it needs the read's pending and failed windows kept apart: one
+  // `undefined` would make it paint the member spend balance — `$0.00` for a
+  // billing manager — while the list is still on its way.
+  const creditsOrgList: CreditsCardOrgList = organizationsError
+    ? { status: 'error', retry: () => void refetchOrganizations() }
+    : orgs === undefined
+      ? { status: 'loading' }
+      : { status: 'ready', orgs };
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
   // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
@@ -284,7 +294,7 @@ export function ProfileScreen() {
         onLayout={onDeleteScrollLayout}
       >
         {/* Credits */}
-        <CreditsCard orgs={orgs} enabled={isAuthenticated} />
+        <CreditsCard orgList={creditsOrgList} enabled={isAuthenticated} />
 
         {/* Usage: one row on the balance's own section, because spend and
             remaining credits are the two halves of the same question. */}

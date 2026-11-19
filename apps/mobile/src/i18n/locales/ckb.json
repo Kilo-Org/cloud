@@ -275,6 +275,7 @@
     "hideBalance": "شاردنەوەی باڵانس",
     "showBalance": "پیشاندانی باڵانس",
     "balanceHidden": "باڵانس شاردراوەتەوە",
+    "availableToSpendInOrganization": "بۆ خەرجکردن لەم ڕێکخراوەدا بەردەستە",
     "signOutTitle": "دەرچوون؟",
     "signOutMessage": "بۆ دەستگەیشتن بە شوێنی کارەکەت، پێویستە دووبارە بچیتە ژوورەوە.",
     "deleteAccountTitle": "سڕینەوەی هەژمار؟",

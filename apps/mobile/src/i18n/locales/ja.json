@@ -275,6 +275,7 @@
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
+    "availableToSpendInOrganization": "この組織で支出できる金額",
     "signOutTitle": "サインアウトしますか？",
     "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
     "deleteAccountTitle": "アカウントを削除しますか？",

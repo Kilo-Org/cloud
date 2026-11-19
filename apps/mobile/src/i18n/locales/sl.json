@@ -275,6 +275,7 @@
     "hideBalance": "Skrij stanje",
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",
+    "availableToSpendInOrganization": "Na voljo za porabo v tej organizaciji",
     "signOutTitle": "Želiš se odjaviti?",
     "signOutMessage": "Za dostop do delovnega prostora se moraš znova prijaviti.",
     "deleteAccountTitle": "Želiš izbrisati račun?",

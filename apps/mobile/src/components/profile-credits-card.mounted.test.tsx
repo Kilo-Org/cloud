@@ -13,7 +13,7 @@ import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { CreditsCard } from './profile-credits-card';
+import { CreditsCard, type CreditsCardOrgList } from './profile-credits-card';
 import {
   ICON_TARGET_BOX_CLASS,
   LINE_ACTION_BOX_CLASS,
@@ -247,9 +247,9 @@ let saveCompletion: Promise<undefined> | undefined = undefined;
 
 async function mountCard(
   queryClient: QueryClient = createTestQueryClient(),
-  orgs?: OrgListEntry[]
+  orgList: CreditsCardOrgList = { status: 'loading' }
 ) {
-  const ui = await renderWithProviders(createElement(CreditsCard, { enabled: true, orgs }), {
+  const ui = await renderWithProviders(createElement(CreditsCard, { enabled: true, orgList }), {
     queryClient,
     wrapper: OrganizationProvider,
   });
@@ -504,14 +504,21 @@ describe('CreditsCard balance state', () => {
   it('shows the skeleton instead of the previous account balance while a switch settles', async () => {
     currentUser.userId = 'user-a';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    // Both contexts are plain members: their amount is the member spend balance
+    // from `getContextBalance`, which is the read this test stalls on a switch.
+    // A money role paints the organization's own balance from the membership
+    // list instead, so it never waits on that read.
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
-      { organizationId: 'org-b', organizationName: 'Beta', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'member' },
+      { organizationId: 'org-b', organizationName: 'Beta', role: 'member' },
     ] as OrgListEntry[];
     listState.payload = orgs;
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
 
-    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), {
+      status: 'ready',
+      orgs,
+    });
     await waitFor(() => texts().includes('$10.00'));
 
     // The newly selected account's read never answers: the previous account's
@@ -602,7 +609,7 @@ describe('CreditsCard balance state', () => {
       currentUser.userId = 'user-a';
       getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
       const orgs = [
-        { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+        { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 10_000_000 },
       ] as OrgListEntry[];
       if (context === 'organization') {
         listState.payload = orgs;
@@ -611,7 +618,10 @@ describe('CreditsCard balance state', () => {
       } else {
         personalCreditBlocksQueryFn.mockRejectedValue(new Error('Unavailable'));
       }
-      const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+      const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), {
+        status: 'ready',
+        orgs,
+      });
       await waitFor(() => texts().includes('Credit expiry unavailable.'));
       expect(texts()).not.toContain('No expiring credits.');
       await pressLabel(renderer, 'Hide balance');
@@ -624,15 +634,18 @@ describe('CreditsCard balance state', () => {
     currentUser.userId = 'user-a';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
-      { organizationId: 'org-b', organizationName: 'Beta', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 10_000_000 },
+      { organizationId: 'org-b', organizationName: 'Beta', role: 'owner', balance: 10_000_000 },
     ] as OrgListEntry[];
     listState.payload = orgs;
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     orgCreditBlocksQueryFn.mockResolvedValue({
       creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
     });
-    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), {
+      status: 'ready',
+      orgs,
+    });
     const previousNote =
       '$2.00 in credits expires 12/17/2099 (UTC). Credits with the earliest expiry are used first.';
     await waitFor(() =>
@@ -711,11 +724,14 @@ describe('CreditsCard balance state', () => {
       ],
     });
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
     ] as OrgListEntry[];
     listState.payload = orgs;
     try {
-      const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+      const { texts, unmount } = await mountCard(createTestQueryClient(), {
+        status: 'ready',
+        orgs,
+      });
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
         expect(
@@ -739,10 +755,10 @@ describe('CreditsCard balance state', () => {
     getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
     orgCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
     ] as OrgListEntry[];
     listState.payload = orgs;
-    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    const { texts, unmount } = await mountCard(createTestQueryClient(), { status: 'ready', orgs });
     try {
       await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
       expect(texts().filter(text => text.includes('in credits expires'))).toEqual([]);
@@ -755,7 +771,7 @@ describe('CreditsCard balance state', () => {
   it.each([
     { orgs: [], options: ['Personal', 'Cancel'], choice: 0, expected: null, label: 'Personal' },
     {
-      orgs: [{ organizationId: 'org-a', organizationName, role: 'owner' }],
+      orgs: [{ organizationId: 'org-a', organizationName, role: 'owner', balance: 0 }],
       options: ['Personal', organizationName, 'Cancel'],
       choice: 1,
       expected: 'org-a',
@@ -769,10 +785,10 @@ describe('CreditsCard balance state', () => {
     listState.payload = state.orgs as OrgListEntry[];
     const seededSelection = (state.orgs as OrgListEntry[])[0]?.organizationId;
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, seededSelection ?? 'missing-org');
-    const { renderer, unmount } = await mountCard(
-      createTestQueryClient(),
-      state.orgs as OrgListEntry[]
-    );
+    const { renderer, unmount } = await mountCard(createTestQueryClient(), {
+      status: 'ready',
+      orgs: state.orgs as OrgListEntry[],
+    });
     await openSheet(renderer);
     expect(accountLabels()).toEqual(state.options.filter(label => label !== 'Cancel'));
     await choose('Cancel');
@@ -793,15 +809,28 @@ describe('CreditsCard balance state', () => {
       Platform.OS = 'android';
       savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'previous-org');
       const orgs = [
-        { organizationId: 'org-a', organizationName: 'Supplied organization', role: 'owner' },
-        { organizationId: 'org-b', organizationName: 'Latest organization', role: 'owner' },
+        {
+          organizationId: 'org-a',
+          organizationName: 'Supplied organization',
+          role: 'owner',
+          balance: 0,
+        },
+        {
+          organizationId: 'org-b',
+          organizationName: 'Latest organization',
+          role: 'owner',
+          balance: 0,
+        },
       ] as OrgListEntry[];
       // The staged 'previous-org' selection must stay in the fetched list, or
       // the provider's lost-membership recovery switches it away before the
       // save-failure flow under test runs.
       listState.payload = orgs;
       storage.write.mockRejectedValueOnce(new Error('write failed'));
-      const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+      const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), {
+        status: 'ready',
+        orgs,
+      });
       await openSheet(renderer);
       await choose('Supplied organization');
       expect(texts()).toContain('Could not save setting');
@@ -844,7 +873,7 @@ describe('CreditsCard balance state', () => {
       expect(texts()).not.toContain('Could not save setting');
       expect(texts()).not.toContain('Retry');
       unmount();
-      const reopened = await mountCard(createTestQueryClient(), orgs);
+      const reopened = await mountCard(createTestQueryClient(), { status: 'ready', orgs });
       expect(reopened.texts()).toContain(label);
       reopened.unmount();
     }
@@ -1099,6 +1128,135 @@ describe('CreditsCard balance state', () => {
   });
 });
 
+describe('CreditsCard organization balance source', () => {
+  // 36_120_000 microdollars is $36.12: a member's `$0.00` read under the same
+  // organization name is visibly wrong beside it.
+  const organizationBalance = 36_120_000;
+  const billingManagerOrgs = [
+    {
+      organizationId: 'org-a',
+      organizationName: 'Acme',
+      role: 'billing_manager',
+      balance: organizationBalance,
+    },
+  ] as OrgListEntry[];
+
+  it('paints the organization balance for a billing manager instead of the member read', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    // The member spend balance answers zero for a billing manager — the defect
+    // was painting it under the organization's name.
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    listState.payload = billingManagerOrgs;
+
+    const { texts, unmount } = await mountCard(createTestQueryClient(), {
+      status: 'ready',
+      orgs: billingManagerOrgs,
+    });
+    try {
+      await waitFor(() => texts().includes('$36.12'));
+      expect(texts()).not.toContain('$0.00');
+      // The amount is the organization's own balance, so no member-scope copy.
+      expect(texts()).not.toContain('Available to spend in this organization');
+    } finally {
+      unmount();
+    }
+  });
+
+  it("paints a plain member's spend balance with its scope caption", async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 4.2 });
+    const orgs = [
+      {
+        organizationId: 'org-a',
+        organizationName: 'Acme',
+        role: 'member',
+        balance: organizationBalance,
+      },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { texts, unmount } = await mountCard(createTestQueryClient(), {
+      status: 'ready',
+      orgs,
+    });
+    try {
+      // The allowance the server caps at the organization balance, not the
+      // organization balance itself; the caption marks the member branch, so
+      // the wait cannot pass on the personal frame before the context restores.
+      await waitFor(
+        () =>
+          texts().includes('$4.20') && texts().includes('Available to spend in this organization')
+      );
+      expect(texts()).not.toContain('$36.12');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('turns a failed membership list into the balance retry surface', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    const retryOrganizations = vi.fn();
+    // The provider still needs the memberships to restore the selection.
+    listState.payload = billingManagerOrgs;
+
+    const { renderer, labels, texts, unmount } = await mountCard(createTestQueryClient(), {
+      status: 'error',
+      retry: retryOrganizations,
+    });
+    try {
+      await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+      expect(texts()).toContain("Couldn't load balance");
+      expect(texts()).not.toContain('$36.12');
+
+      const reads = getContextBalanceQueryFn.mock.calls.length;
+      const retry = renderer.root.find(
+        node =>
+          node.type === Pressable &&
+          node.props.accessibilityRole === 'button' &&
+          node.props.accessibilityLabel === 'Failed to load balance. Tap to retry.'
+      );
+      await act(async () => {
+        (retry.props.onPress as () => void)();
+        await Promise.resolve();
+      });
+
+      expect(retryOrganizations).toHaveBeenCalledTimes(1);
+      expect(refetchUserId).toHaveBeenCalledTimes(1);
+      // The balance read runs again too: the retry re-fetches every source the
+      // failure surface stands for.
+      await waitFor(() => getContextBalanceQueryFn.mock.calls.length > reads);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('holds the skeleton while the membership list has not named the role', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    // The member read answers `$0.00` for this billing manager, and the list
+    // that decides the amount's source has not answered: neither figure paints.
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    listState.payload = billingManagerOrgs;
+
+    const { texts, unmount } = await mountCard(createTestQueryClient());
+    try {
+      // The caption marks the organization branch, whose balance state is the
+      // list's: the wait cannot pass on the personal frame before the context
+      // restores, where the `$0.00` read is legitimately painted.
+      await waitFor(() => texts().includes('Available to spend in this organization'));
+      expect(texts()).toContain('SKELETON');
+      expect(texts()).not.toContain('$0.00');
+      expect(texts()).not.toContain('$36.12');
+    } finally {
+      unmount();
+    }
+  });
+});
+
 describe('CreditsCard add-credits entry point', () => {
   it.each([
     ['ios', 0],
@@ -1202,13 +1360,13 @@ describe('CreditsCard add-credits entry point', () => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData([...BALANCE_KEY], { balance: 0 });
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
     ] as OrgListEntry[];
     // The stored selection must stay in the fetched list, or the provider's
     // lost-membership recovery switches it to Personal before the card reads it.
     listState.payload = orgs;
 
-    const { texts, unmount } = await mountCard(queryClient, orgs);
+    const { texts, unmount } = await mountCard(queryClient, { status: 'ready', orgs });
     await waitFor(() => addCreditsRowProps.latest?.url !== undefined);
 
     expect(texts()).toContain('ADD_CREDITS_ROW');
@@ -1230,11 +1388,11 @@ describe('CreditsCard add-credits entry point', () => {
     const balance = Promise.withResolvers<{ balance: number }>();
     getContextBalanceQueryFn.mockReturnValue(balance.promise);
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
     ] as OrgListEntry[];
     listState.payload = orgs;
 
-    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    const { texts, unmount } = await mountCard(createTestQueryClient(), { status: 'ready', orgs });
     await waitFor(() => texts().includes('Acme'));
 
     expect(texts()).toContain('ADD_CREDITS_ROW');
@@ -1256,7 +1414,7 @@ describe('CreditsCard add-credits entry point', () => {
     // Same seeding as the money-role case: keep the selection recoverable.
     listState.payload = orgs;
 
-    const { texts, unmount } = await mountCard(queryClient, orgs);
+    const { texts, unmount } = await mountCard(queryClient, { status: 'ready', orgs });
     await waitFor(() => texts().includes('Acme'));
 
     // The personal row may render before the stored org resolves; the settled
@@ -1272,11 +1430,11 @@ describe('CreditsCard add-credits entry point', () => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData([...BALANCE_KEY], { balance: 0 });
     const orgs = [
-      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner', balance: 0 },
     ] as OrgListEntry[];
     listState.payload = orgs;
 
-    const { renderer, unmount } = await mountCard(queryClient, orgs);
+    const { renderer, unmount } = await mountCard(queryClient, { status: 'ready', orgs });
     await waitFor(
       () => renderer.root.findAll(node => node.children.includes('ADD_CREDITS_ROW')).length > 0
     );
@@ -1301,11 +1459,14 @@ describe('CreditsCard add-credits entry point', () => {
 
 describe('CreditsCard credits header', () => {
   const headerOrgs = [
-    { organizationId: 'org-a', organizationName, role: 'owner' },
+    { organizationId: 'org-a', organizationName, role: 'owner', balance: 0 },
   ] as OrgListEntry[];
 
   it('keeps the credits eyebrow and the account picker on one row at phone widths', async () => {
-    const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
+    const { renderer, unmount } = await mountCard(createTestQueryClient(), {
+      status: 'ready',
+      orgs: headerOrgs,
+    });
 
     // The 160 dp window of the e1 round squeezed the eyebrow until Android
     // broke it mid-word ("CREDIT S"); a phone-width window must not.
@@ -1315,7 +1476,10 @@ describe('CreditsCard credits header', () => {
 
   it('stacks the credits eyebrow above the account picker in a narrow window', async () => {
     windowDims.width = 160;
-    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), {
+      status: 'ready',
+      orgs: headerOrgs,
+    });
 
     const classes = headerClasses(renderer);
     expect(classes).toContain('flex-col');
@@ -1326,7 +1490,10 @@ describe('CreditsCard credits header', () => {
   });
 
   it('keeps the header one text line tall and reaches the picker target with hitSlop', async () => {
-    const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
+    const { renderer, unmount } = await mountCard(createTestQueryClient(), {
+      status: 'ready',
+      orgs: headerOrgs,
+    });
 
     // The header is the eyebrow's line, so "Credits" starts at the screen's top
     // padding like the other Profile section headings; a taller row pushes it

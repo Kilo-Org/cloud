@@ -275,6 +275,7 @@
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
+    "availableToSpendInOrganization": "Bu kuruluşta harcanabilir",
     "signOutTitle": "Oturum kapatılsın mı?",
     "signOutMessage": "Çalışma alanına erişmek için tekrar oturum açman gerekecek.",
     "deleteAccountTitle": "Hesap silinsin mi?",

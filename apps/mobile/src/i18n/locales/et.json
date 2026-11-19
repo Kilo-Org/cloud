@@ -275,6 +275,7 @@
     "hideBalance": "Peida saldo",
     "showBalance": "Näita saldot",
     "balanceHidden": "Saldo on peidetud",
+    "availableToSpendInOrganization": "Saadaval kulutamiseks selles organisatsioonis",
     "signOutTitle": "Kas logida välja?",
     "signOutMessage": "Tööruumi kasutamiseks pead uuesti sisse logima.",
     "deleteAccountTitle": "Kas kustutada konto?",

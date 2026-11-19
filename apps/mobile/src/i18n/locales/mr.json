@@ -275,6 +275,7 @@
     "hideBalance": "शिल्लक लपवा",
     "showBalance": "शिल्लक दाखवा",
     "balanceHidden": "शिल्लक लपवली आहे",
+    "availableToSpendInOrganization": "या संस्थेत खर्च करण्यासाठी उपलब्ध",
     "signOutTitle": "साइन आउट करायचे?",
     "signOutMessage": "तुमच्या वर्कस्पेसमध्ये प्रवेश करण्यासाठी तुम्हाला पुन्हा साइन इन करावे लागेल.",
     "deleteAccountTitle": "खाते हटवायचे?",

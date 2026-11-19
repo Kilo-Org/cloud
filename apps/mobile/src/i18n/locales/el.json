@@ -275,6 +275,7 @@
     "hideBalance": "Απόκρυψη υπολοίπου",
     "showBalance": "Εμφάνιση υπολοίπου",
     "balanceHidden": "Το υπόλοιπο είναι κρυφό",
+    "availableToSpendInOrganization": "Διαθέσιμο για δαπάνες σε αυτόν τον οργανισμό",
     "signOutTitle": "Αποσύνδεση;",
     "signOutMessage": "Θα χρειαστεί να συνδεθείς ξανά για να έχεις πρόσβαση στον χώρο εργασίας σου.",
     "deleteAccountTitle": "Διαγραφή λογαριασμού;",

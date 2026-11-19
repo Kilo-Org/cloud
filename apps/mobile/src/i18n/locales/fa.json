@@ -275,6 +275,7 @@
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
+    "availableToSpendInOrganization": "برای خرج کردن در این سازمان در دسترس است",
     "signOutTitle": "از حساب خود خارج می‌شوید؟",
     "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
     "deleteAccountTitle": "حساب حذف شود؟",

@@ -275,6 +275,7 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
+    "availableToSpendInOrganization": "Tilgængelig til forbrug i denne organisation",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",

@@ -341,6 +341,7 @@
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
+    "availableToSpendInOrganization": "Available to spend in this organization",
     "signOutTitle": "Sign out?",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "deleteAccountTitle": "Delete account?",

@@ -275,6 +275,7 @@
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
+    "availableToSpendInOrganization": "Pieejams iztērēšanai šajā organizācijā",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
     "deleteAccountTitle": "Dzēst kontu?",

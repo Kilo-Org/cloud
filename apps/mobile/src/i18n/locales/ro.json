@@ -275,6 +275,7 @@
     "hideBalance": "Ascunde soldul",
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",
+    "availableToSpendInOrganization": "Disponibil pentru cheltuieli în această organizație",
     "signOutTitle": "Te deconectezi?",
     "signOutMessage": "Va trebui să te autentifici din nou pentru a accesa spațiul tău de lucru.",
     "deleteAccountTitle": "Ștergi contul?",

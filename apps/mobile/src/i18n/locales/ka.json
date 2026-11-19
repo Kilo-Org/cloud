@@ -275,6 +275,7 @@
     "hideBalance": "ბალანსის დამალვა",
     "showBalance": "ბალანსის ჩვენება",
     "balanceHidden": "ბალანსი დამალულია",
+    "availableToSpendInOrganization": "ამ ორგანიზაციაში დასახარჯად ხელმისაწვდომია",
     "signOutTitle": "ანგარიშიდან გასვლა?",
     "signOutMessage": "სამუშაო სივრცის გამოსაყენებლად ანგარიშში ხელახლა შესვლა დაგჭირდება.",
     "deleteAccountTitle": "ანგარიშის წაშლა?",

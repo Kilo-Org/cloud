@@ -275,6 +275,7 @@
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
+    "availableToSpendInOrganization": "Kulutettavissa tässä organisaatiossa",
     "signOutTitle": "Kirjaudutaanko ulos?",
     "signOutMessage": "Pääset takaisin työtilaasi kirjautumalla uudelleen sisään.",
     "deleteAccountTitle": "Poistetaanko tili?",

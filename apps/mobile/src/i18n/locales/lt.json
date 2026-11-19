@@ -275,6 +275,7 @@
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
+    "availableToSpendInOrganization": "Galima išleisti šioje organizacijoje",
     "signOutTitle": "Atsijungti?",
     "signOutMessage": "Kad galėtum pasiekti savo darbo sritį, turėsi prisijungti iš naujo.",
     "deleteAccountTitle": "Ištrinti paskyrą?",

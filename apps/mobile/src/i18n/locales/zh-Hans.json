@@ -275,6 +275,7 @@
     "hideBalance": "隐藏余额",
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
+    "availableToSpendInOrganization": "可用于此组织内支出",
     "signOutTitle": "退出登录？",
     "signOutMessage": "退出后，需要重新登录才能访问工作区。",
     "deleteAccountTitle": "删除账户？",

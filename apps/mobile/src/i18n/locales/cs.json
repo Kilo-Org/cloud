@@ -275,6 +275,7 @@
     "hideBalance": "Skrýt zůstatek",
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",
+    "availableToSpendInOrganization": "Dostupné k utracení v této organizaci",
     "signOutTitle": "Odhlásit se?",
     "signOutMessage": "Pro přístup do pracovního prostoru se budeš muset znovu přihlásit.",
     "deleteAccountTitle": "Smazat účet?",

@@ -275,6 +275,7 @@
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
+    "availableToSpendInOrganization": "Có thể chi tiêu trong tổ chức này",
     "signOutTitle": "Đăng xuất?",
     "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình.",
     "deleteAccountTitle": "Xóa tài khoản?",

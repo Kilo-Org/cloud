@@ -275,6 +275,7 @@
     "hideBalance": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອ",
     "showBalance": "ສະແດງຍອດເງິນຄົງເຫຼືອ",
     "balanceHidden": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອແລ້ວ",
+    "availableToSpendInOrganization": "ສາມາດໃຊ້ຈ່າຍໄດ້ໃນອົງກອນນີ້",
     "signOutTitle": "ອອກຈາກລະບົບບໍ?",
     "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບໃໝ່ ເພື່ອໃຊ້ພື້ນທີ່ເຮັດວຽກຂອງທ່ານ.",
     "deleteAccountTitle": "ລຶບບັນຊີບໍ?",

@@ -275,6 +275,7 @@
     "hideBalance": "Թաքցնել մնացորդը",
     "showBalance": "Ցուցադրել մնացորդը",
     "balanceHidden": "Մնացորդը թաքցված է",
+    "availableToSpendInOrganization": "Հասանելի է այս կազմակերպությունում ծախսելու համար",
     "signOutTitle": "Դո՞ւրս գալ հաշվից",
     "signOutMessage": "Աշխատանքային տարածքից օգտվելու համար պետք է նորից մուտք գործեք։",
     "deleteAccountTitle": "Ջնջե՞լ հաշիվը",

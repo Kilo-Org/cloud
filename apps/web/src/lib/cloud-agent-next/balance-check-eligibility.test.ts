@@ -94,7 +94,7 @@ beforeEach(() => {
   mockGetUserByokProviderIds.mockResolvedValue([]);
   mockGetOrganizationByokProviderIds.mockResolvedValue([]);
   mockGetEnabledByokProviders.mockResolvedValue([]);
-  mockGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
+  mockGetDirectByokModel.mockResolvedValue(null);
   mockSupportsCatalogMode.mockReturnValue(false);
   mockGetDirectByokCatalogModelIds.mockResolvedValue(new Set());
   mockGetAllowedDirectByokCatalogModelIds.mockResolvedValue(new Set());

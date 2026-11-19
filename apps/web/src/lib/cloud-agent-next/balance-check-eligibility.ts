@@ -166,11 +166,13 @@ async function hasDirectByokForModel(params: {
   // Routing serves a custom LLM before any direct BYOK route, so no key serves
   // an id a custom LLM owns.
   if (await isCustomLlm(modelId)) return false;
-  const { provider, model } = await getDirectByokModel(modelId);
-  if (provider && model) {
+  const directByok = await getDirectByokModel(modelId);
+  if (directByok) {
     const enabledProviders = await getEnabledByokProviders(params.fromDb, params.owner);
-    const key = enabledProviders.find(enabled => enabled.providerId === provider.id);
-    return key !== undefined && !(key.serveCatalogModels && supportsCatalogMode(provider.id));
+    const key = enabledProviders.find(enabled => enabled.providerId === directByok.provider.id);
+    return (
+      key !== undefined && !(key.serveCatalogModels && supportsCatalogMode(directByok.provider.id))
+    );
   }
 
   if (![...params.enabledProviderIds].some(providerId => supportsCatalogMode(providerId))) {

@@ -38,6 +38,22 @@ function variantEfforts(options: readonly ReasoningOption[]): VariantEffort[] {
   return efforts.map(effort => [effort, effort]);
 }
 
+/**
+ * The efforts a client can select from the options, the same set the legacy variants offer: a
+ * toggle stands for `none` and, without effort values, `high`. Undefined when the options do not
+ * say, which is the case for `[]` (reasoning that is always on) and for effort options without
+ * concrete values.
+ */
+export function getSupportedReasoningEfforts(
+  options: readonly ReasoningOption[] | undefined
+): ReadonlySet<ReasoningEffort> | undefined {
+  if (!options?.length) {
+    return undefined;
+  }
+  const efforts = variantEfforts(options).map(([, effort]) => effort);
+  return efforts.length > 0 ? new Set(efforts) : undefined;
+}
+
 function legacyVariant(effort: ReasoningEffort, includeVerbosity: boolean): OpenCodeVariant {
   const verbosity = includeVerbosity ? VerbositySchema.safeParse(effort).data : undefined;
   return { reasoning: { enabled: effort !== 'none', effort }, ...(verbosity && { verbosity }) };

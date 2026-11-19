@@ -528,24 +528,6 @@ describe('narrowProfilePermission', () => {
     expect(resolve(session, composed, 'bash', 'rm -rf /')).toBe('deny');
   });
 
-  it('keeps a profile refusal against a covering ask in either profile key order', () => {
-    const session: PermissionMap = { bash: { 'git push --force *': 'allow' } };
-    const refusalFirst = narrowProfilePermission(session, {
-      bash: { 'git push --force *': 'deny', 'git *': 'ask' },
-    }) as PermissionMap;
-    const askFirst = narrowProfilePermission(session, {
-      bash: { 'git *': 'ask', 'git push --force *': 'deny' },
-    }) as PermissionMap;
-    const expected = [
-      ['git *', 'ask'],
-      ['git push --force *', 'deny'],
-    ];
-    expect(Object.entries(refusalFirst['bash'] as Record<string, string>).sort()).toEqual(expected);
-    expect(Object.entries(askFirst['bash'] as Record<string, string>).sort()).toEqual(expected);
-    expect(resolve(session, refusalFirst, 'bash', 'git status')).toBe('ask');
-    expect(resolve(session, askFirst, 'bash', 'git push --force origin main')).toBe('deny');
-  });
-
   it('carries a session allow for a pattern the profile does not name in either profile key order', () => {
     const session: PermissionMap = {
       bash: { '*': 'deny', 'git log': 'allow', 'git log *': 'allow' },

@@ -9,11 +9,7 @@
     "terms of service",
     "token"
   ],
-  "am": [
-    "github connection expired",
-    "open",
-    "open pull request"
-  ],
+  "am": ["github connection expired", "open", "open pull request"],
   "ar": [
     "commit",
     "file",
@@ -490,11 +486,7 @@
     "terms of service",
     "tokens"
   ],
-  "id": [
-    "open",
-    "open pull request",
-    "remediation blocked"
-  ],
+  "id": ["open", "open pull request", "remediation blocked"],
   "ig": [
     "analysis failed",
     "cancelled",
@@ -744,13 +736,7 @@
     "review",
     "superseded"
   ],
-  "ms": [
-    "deleted",
-    "dismissed",
-    "open",
-    "open pull request",
-    "review"
-  ],
+  "ms": ["deleted", "dismissed", "open", "open pull request", "review"],
   "mt": [
     "(empty)",
     "analysis failed",
@@ -1095,13 +1081,7 @@
     "review",
     "superseded"
   ],
-  "ta": [
-    "dismissed",
-    "open",
-    "open pull request",
-    "pr opened",
-    "superseded"
-  ],
+  "ta": ["dismissed", "open", "open pull request", "pr opened", "superseded"],
   "te": [
     "cancelled",
     "commit",
@@ -1115,12 +1095,7 @@
     "superseded",
     "unknown"
   ],
-  "th": [
-    "completed",
-    "no kiloclaw instances",
-    "plan",
-    "receipt"
-  ],
+  "th": ["completed", "no kiloclaw instances", "plan", "receipt"],
   "tr": [
     "block",
     "created",

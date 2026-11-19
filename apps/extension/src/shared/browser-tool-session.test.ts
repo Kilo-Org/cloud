@@ -1371,6 +1371,19 @@ const scriptingSnapshotPayload = {
 const scriptingResultForCode = (code: string): unknown =>
   code.includes('__buildAria') ? scriptingSnapshotPayload : 'ok';
 
+/** A snapshot whose page registered more refs than the cap while its returned text names only e1 and e2. */
+const oversizedSnapshotPayload = {
+  lines: ['- button "One" [ref=e1]', '- button "Two" [ref=e2]'],
+  nextRef: MAX_BROWSER_TOOL_REFS + 1,
+  refs: Array.from({ length: MAX_BROWSER_TOOL_REFS + 1 }, (_slot, index) => ({
+    ref: `e${String(index + 1)}`,
+    selector: `#node-${String(index + 1)}`,
+  })),
+};
+
+const oversizedSnapshotResultForCode = (code: string): unknown =>
+  code.includes('__buildAria') ? oversizedSnapshotPayload : 'ok';
+
 describe('browser tool session scripting backend', () => {
   it('selects the scripting backend when chrome.debugger is unavailable', () => {
     const { session } = createScriptingSession();
@@ -1829,22 +1842,11 @@ describe('browser tool session scripting backend', () => {
   });
 
   it('registers only the refs a snapshot’s returned text names', async () => {
-    const refs = Array.from({ length: MAX_BROWSER_TOOL_REFS + 1 }, (_slot, index) => ({
-      ref: `e${String(index + 1)}`,
-      selector: `#node-${String(index + 1)}`,
-    }));
-    const { session } = createScriptingSession({
-      result: () => ({
-        lines: ['- button "One" [ref=e1]', '- button "Two" [ref=e2]'],
-        nextRef: refs.length,
-        refs,
-      }),
-    });
+    const { session } = createScriptingSession({ result: oversizedSnapshotResultForCode });
 
     await expect(session.callTool('browser_snapshot', {})).resolves.toMatchObject({ ok: true });
-    await expect(session.resolveTarget('e1')).resolves.toMatchObject({
-      kind: 'selector',
-      selector: '#node-1',
+    await expect(session.callTool('browser_click', { target: 'e1' })).resolves.toMatchObject({
+      ok: true,
     });
     await expect(session.resolveTarget('e3')).resolves.toBeUndefined();
   });

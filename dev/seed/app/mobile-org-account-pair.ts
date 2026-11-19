@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
@@ -75,6 +75,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     { id: OWNER_ORGANIZATION_ID, name: 'Kestrel Studio' },
     { id: MEMBER_ORGANIZATION_ID, name: 'Lantern Studio' },
   ];
+  // The ids stay fixed so deep links stay stable, and the pair belongs to one
+  // account at a time: a run for another email takes it over instead of adding
+  // that email beside the previous owner.
   for (const organization of pair) {
     await db
       .insert(organizations)
@@ -86,8 +89,20 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         plan: 'teams',
         settings: {},
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: organizations.id,
+        set: { created_by_kilo_user_id: userId },
+      });
   }
+  await db.delete(organization_memberships).where(
+    and(
+      inArray(
+        organization_memberships.organization_id,
+        pair.map(organization => organization.id)
+      ),
+      ne(organization_memberships.kilo_user_id, userId)
+    )
+  );
   await db
     .insert(organization_memberships)
     .values({ organization_id: OWNER_ORGANIZATION_ID, kilo_user_id: userId, role: 'owner' })

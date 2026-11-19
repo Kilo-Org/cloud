@@ -5,6 +5,12 @@ import { PolicyEditorPanel } from './PolicyEditorPanel';
 import { PolicyTypePickerPanel } from './PolicyTypePickerPanel';
 import type { OrganizationGroupsDrawerRef } from './types';
 import { organizationGroupPolicyClientRegistry } from '@/components/organizations/groups/policies/registry.client';
+import {
+  PermissionPoliciesPanel,
+  PermissionPolicyEditorPanel,
+} from '../policies/permission-policy/PermissionPolicyPanels';
+import { PermissionPolicyDiagnostics } from '../policies/permission-policy/PermissionPolicyDiagnostics';
+import { permissionPolicyLabels } from '../policies/permission-policy/permission-policy-ui';
 
 export function renderOrganizationGroupsDrawerContent(
   organizationId: string,
@@ -12,6 +18,35 @@ export function renderOrganizationGroupsDrawerContent(
   helpers: DrawerStackHelpers<OrganizationGroupsDrawerRef>
 ): DrawerRenderResult {
   switch (entry.type) {
+    case 'permission-policies':
+      return {
+        header: <h2 className="type-body font-medium">Permission policies</h2>,
+        body: (
+          <PermissionPoliciesPanel
+            organizationId={organizationId}
+            entry={entry}
+            helpers={helpers}
+          />
+        ),
+      };
+    case 'permission-policy-editor':
+      return {
+        header: (
+          <h2 className="type-body font-medium">{permissionPolicyLabels[entry.policyType]}</h2>
+        ),
+        body: (
+          <PermissionPolicyEditorPanel
+            organizationId={organizationId}
+            entry={entry}
+            helpers={helpers}
+          />
+        ),
+      };
+    case 'permission-policy-diagnostics':
+      return {
+        header: <h2 className="type-body font-medium">Effective member policy</h2>,
+        body: <PermissionPolicyDiagnostics organizationId={organizationId} />,
+      };
     case 'group-details':
       return {
         header: (

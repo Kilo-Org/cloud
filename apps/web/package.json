@@ -147,6 +147,7 @@
     "jose": "catalog:",
     "jotai-minidb": "0.0.8",
     "js-yaml": "4.3.2",
+    "jsonc-parser": "3.3.1",
     "jsonwebtoken": "catalog:",
     "linkify-it": "5.0.2",
     "lucide-react": "0.552.0",

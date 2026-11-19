@@ -48,6 +48,11 @@ function GroupsPageContent({
     ...trpc.organizations.groups.getPolicySettings.queryOptions({ organizationId }),
     enabled: canViewSettings,
   });
+  const permissionSettings = useQuery({
+    ...trpc.organizations.groups.adminPermissionPolicy.settings.queryOptions({ organizationId }),
+    enabled: canViewSettings,
+  });
+  const showPermissionPolicies = canViewSettings && permissionSettings.data?.managed === true;
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: trpc.organizations.groups.pathKey() });
   }
@@ -92,7 +97,7 @@ function GroupsPageContent({
               Configure organization defaults, then add independent policies to each group.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="grid gap-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="type-body font-medium">Default policies</p>
@@ -119,6 +124,37 @@ function GroupsPageContent({
                 Manage defaults
               </Button>
             </div>
+            {showPermissionPolicies && (
+              <div className="grid gap-3 border-t pt-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+                <div>
+                  <p className="type-body font-medium">Permission policies</p>
+                  <p className="type-label text-muted-foreground">
+                    Set the organization baseline for agent permissions and client access.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      drawer.open({
+                        type: 'permission-policies',
+                        target: { kind: 'default' },
+                        appliesTo: 'Organization default',
+                        canEdit: canManage,
+                      })
+                    }
+                  >
+                    Default permissions
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => drawer.open({ type: 'permission-policy-diagnostics' })}
+                  >
+                    Inspect member policy
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -211,6 +247,24 @@ function GroupsPageContent({
                       </span>
                     )}
                   </button>
+                  {showPermissionPolicies && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Permissions for ${group.name}`}
+                      onClick={() =>
+                        drawer.open({
+                          type: 'permission-policies',
+                          target: { kind: 'group', groupId: group.id },
+                          appliesTo: group.name,
+                          canEdit: canManage,
+                        })
+                      }
+                    >
+                      <ShieldCheck className="size-4" />
+                      <span className="hidden sm:inline">Permissions</span>
+                    </Button>
+                  )}
                   {canManage && (
                     <div className="flex items-center gap-1">
                       <AlertDialog>

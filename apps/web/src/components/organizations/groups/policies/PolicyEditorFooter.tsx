@@ -16,12 +16,14 @@ export function PolicyEditorFooter({
   onCancel,
   onDelete,
   isDeleting,
+  canSave = true,
 }: {
   isSaving: boolean;
   onSave: () => void;
   onCancel: () => void;
   onDelete?: () => Promise<void> | void;
   isDeleting?: boolean;
+  canSave?: boolean;
 }) {
   return (
     <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t bg-surface-raised px-5 py-3">
@@ -38,7 +40,7 @@ export function PolicyEditorFooter({
       <Button variant="outline" onClick={onCancel}>
         Cancel
       </Button>
-      <Button disabled={isSaving} onClick={onSave}>
+      <Button disabled={isSaving || isDeleting || !canSave} onClick={onSave}>
         {isSaving ? 'Saving...' : 'Save policy'}
       </Button>
     </div>

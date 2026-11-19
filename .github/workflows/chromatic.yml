@@ -103,6 +103,24 @@ jobs:
           path: ./test-results
           retention-days: 7
 
+      - name: Run Enterprise permission policy E2E
+        env:
+          E2E_ORGANIZATION_PERMISSION_POLICY: 'true'
+          ORG_PERMISSION_POLICY_WRITES_ENABLED: 'true'
+          SKIP_STRIPE_API: 'true'
+        run: >-
+          pnpm --filter web run test:e2e organization-permission-policy.spec.ts
+          --project=chromium --no-deps --grep @permission-policy-write
+          --reporter=line --output=test-results/organization-permission-policy
+
+      - name: Upload Enterprise permission policy E2E evidence
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        if: ${{ !cancelled() }}
+        with:
+          name: organization-permission-policy-e2e
+          path: apps/web/test-results/organization-permission-policy
+          retention-days: 7
+
   chromatic:
     needs: playwright
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

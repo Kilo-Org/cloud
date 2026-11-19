@@ -2,6 +2,7 @@
 import { ScrollView, View } from 'react-native';
 
 import { ChatFailureRow } from '@/components/chat/chat-failure-row';
+import { GGUF_FAILURE_KEYS } from '@/components/chat/gguf-model-section';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { type GgufDownloadProblem } from '@/lib/chat/gguf-records';
@@ -75,18 +76,6 @@ const CASES = {
   'quota-exhausted': [{ code: 'battery_quota_exceeded', problem: 'quotaExhausted' }],
   'check-failed': [{ code: 'check_failed', problem: 'checkFailed' }],
 } satisfies Record<Exclude<CaseState, 'gguf'>, readonly FailureCase[]>;
-
-/**
- * The table `GgufDownloadControls` paints its failure line from. The section
- * keeps it private, so this mirrors it: the four GGUF problems are rendered
- * through the same chat failure row as the on-device refusals.
- */
-const GGUF_FAILURE_KEYS = {
-  space: 'modelChat.gguf.errors.space',
-  network: 'modelChat.gguf.errors.network',
-  invalidFile: 'modelChat.gguf.errors.invalidFile',
-  checksum: 'modelChat.gguf.errors.checksum',
-} as const satisfies Record<GgufDownloadProblem, string>;
 
 /** The GGUF problems, as the codes the fixture rows show. */
 const GGUF_PROBLEMS = [

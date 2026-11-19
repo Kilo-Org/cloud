@@ -21,7 +21,11 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { BackendProviderChoice, type ProviderSelection } from './backend-provider-choices';
 import { modelCapabilityKey } from './model-capability';
 
-const FAILURE_KEYS = {
+/**
+ * The catalog key of each GGUF failure. Exported because the local failure
+ * copy fixture renders the same four problems through the same row.
+ */
+export const GGUF_FAILURE_KEYS = {
   space: 'modelChat.gguf.errors.space',
   network: 'modelChat.gguf.errors.network',
   invalidFile: 'modelChat.gguf.errors.invalidFile',
@@ -183,7 +187,7 @@ export function GgufDownloadControls({
       )}
       {failure !== undefined && (
         <Text accessibilityRole="alert" className="text-sm text-destructive">
-          {t(FAILURE_KEYS[failure.problem])}
+          {t(GGUF_FAILURE_KEYS[failure.problem])}
         </Text>
       )}
       {dialog}
@@ -310,7 +314,7 @@ export function GgufModelSection({
       {advanced && <DirectLinkForm snapshot={snapshot} />}
       {otherFailure !== null && (
         <Text accessibilityRole="alert" className="text-sm text-destructive">
-          {t(FAILURE_KEYS[otherFailure.problem])}
+          {t(GGUF_FAILURE_KEYS[otherFailure.problem])}
         </Text>
       )}
     </View>

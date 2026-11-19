@@ -1,4 +1,7 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
+import { type TFunction } from 'i18next';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
@@ -74,6 +77,23 @@ export function providerRows(params: {
 
 /** One row of the deny list: a model an admin may allow or deny, by its bare id. */
 export type DenyListModel = Readonly<{ id: string; name: string; retiresOn?: string }>;
+
+/**
+ * The row label with the localized retirement note the old composed English
+ * suffix carried: `Retires Nov 20` after the name, worded in the app language
+ * from `retires_on`, and absent when the entry carries no date.
+ */
+export function denyListRowLabel(item: DenyListModel, t: TFunction): string {
+  if (!item.retiresOn) {
+    return item.name;
+  }
+  const date = formatDate(new Date(`${item.retiresOn}T00:00:00Z`), i18n.language, {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+  return `${item.name} (${t('common.modelRetires', { date })})`;
+}
 
 /**
  * The two entry shapes the lists read: a `CatalogModel` (whose date is

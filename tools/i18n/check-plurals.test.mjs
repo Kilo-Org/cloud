@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   copyFileSync,
   mkdirSync,
   mkdtempSync,
@@ -170,6 +171,33 @@ test('accepts a healthy tree through the command', () => {
   const result = cli(root);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /check-plurals: every counted message declares a plural family/);
+});
+
+test('reports an unreadable file through the command and invents no key for it', context => {
+  // The read refusal must reach the problem list, or the command ends on a
+  // stack trace and loses the scan it had already made.
+  if (process.getuid?.() === 0) {
+    context.skip('root reads any file, so chmod 000 leaves it readable');
+    return;
+  }
+  const root = cliFixture({
+    ...standardFiles(),
+    'apps/mobile/src/locked.ts': 'export const c = 1;\n',
+  });
+  const locked = join(root, 'apps/mobile/src/locked.ts');
+  chmodSync(locked, 0o000);
+  try {
+    const result = cli(root);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /locked\.ts: cannot read: /);
+    // The unreadable file yields the read line only: no counted key and no
+    // declaration line can come out of text nobody read.
+    assert.match(result.stderr, /check-plurals: 1 problem\(s\)/);
+    assert.doesNotMatch(result.stderr, /locked\.ts:\d+:/);
+    assert.doesNotMatch(result.stderr, /\n\s+at /);
+  } finally {
+    chmodSync(locked, 0o644);
+  }
 });
 
 test('projects one scan into sorted keys, unlisted calls and countless families', () => {

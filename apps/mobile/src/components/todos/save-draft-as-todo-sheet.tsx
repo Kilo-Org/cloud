@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -17,13 +17,19 @@ import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { i18n } from '@/i18n';
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import {
+  isExpectedAuthFailure,
+  settledTrpcUnauthorizedHandling,
+} from '@/lib/auth/trpc-unauthorized';
 import { invalidateTodoQueries, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { todoFromDraft } from '@/lib/todos/todo-model';
 import { todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
-import { trpcClient, useTRPC } from '@/lib/trpc';
+import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 import { TODO_SHEET_STATE_BODY_CLASS } from './todo-sheet-body';
@@ -36,6 +42,25 @@ type SaveDraftAsTodoSheetProps = {
   onSaved: () => void;
   onClose: () => void;
 };
+
+/**
+ * Reports a save that failed. The draft stays in the composer either way: only
+ * a saved to-do lets the screen discard it. A refused session credential
+ * reaches the auth handler through the mutation cache. When that handler ends
+ * the session, its own toast is the report, and the draft waits for the same
+ * account's next sign-in; when it renews the token, the save still failed and
+ * says so.
+ */
+async function reportSaveFailure(error: unknown, epoch: number): Promise<void> {
+  if (isExpectedAuthFailure(error)) {
+    // Waits for the handler run the mutation cache started for this error.
+    await settledTrpcUnauthorizedHandling();
+    if (!isCurrentAuthEpoch(epoch) || isSignOutActive()) {
+      return;
+    }
+  }
+  toast.error(error instanceof Error ? error.message : i18n.t('common.somethingWentWrong'));
+}
 
 /**
  * The list picker behind the new-session discard confirm's "Save as to-do":
@@ -56,6 +81,9 @@ export function SaveDraftAsTodoSheet({
   const bottomClearance = useDetailScreenBottomPadding();
   const lists = useTodoLists(organizationId, visible);
   const [savingListId, setSavingListId] = useState<string | null>(null);
+  // Through the query client, so the mutation cache sees a failure: a 401
+  // there goes to the auth handler, as it does for every other mutation.
+  const createTodo = useMutation(trpc.todos.items.create.mutationOptions());
   // The create-list route is a formSheet, and the native sheet stacks above a
   // formSheet route: with the sheet up, the form would render behind it. Drop
   // the sheet while the form is open and restore it on return, so the picker
@@ -79,18 +107,24 @@ export function SaveDraftAsTodoSheet({
     if (!todo || savingListId !== null) {
       return;
     }
+    const epoch = currentAuthEpoch();
     setSavingListId(list.id);
     try {
-      await trpcClient.todos.items.create.mutate({ listId: list.id, ...todo });
+      await createTodo.mutateAsync({ listId: list.id, ...todo });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : i18n.t('common.somethingWentWrong'));
       setSavingListId(null);
+      await reportSaveFailure(error, epoch);
+      return;
+    }
+    setSavingListId(null);
+    // A save that settles after the account changed must not discard the
+    // draft or announce itself to the next account.
+    if (!isCurrentAuthEpoch(epoch)) {
       return;
     }
     void invalidateTodoQueries(queryClient, trpc);
     notificationHaptic(Haptics.NotificationFeedbackType.Success);
     toast.success(t('todos.saveSheet.saved', { list: list.name }));
-    setSavingListId(null);
     onSaved();
   }
 

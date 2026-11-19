@@ -3933,6 +3933,8 @@
       "downloading": "Iyalandwa: {{written}} kwe-{{total}}",
       "downloadingUnknown": "Iyalandwa: {{written}}",
       "paused": "Kumisiwe: {{written}} kwe-{{total}}",
+      "retrying": "Kuzamiwa futhi: {{written}} kwe-{{total}}",
+      "retryingUnknown": "Kuzamiwa futhi: {{written}}",
       "verifying": "Kuhlolwa ifayela elilandiwe…",
       "downloaded": "Kulandiwe · {{size}}",
       "url": "Isixhumanisi sokulanda ngqo",
@@ -4023,7 +4025,9 @@
         "androidModelUnavailable": "Le divayisi ayiyisekeli i-Gemini Nano, noma uhlelo lwesistimu lwe-AICore lusalungiswa. Zama futhi emuva kwesikhathi.",
         "aicoreUpdateRequired": "Buyekeza uhlelo lwe-AICore nesofthiwe yesistimu yakho ukuze usebenzise le modeli.",
         "downloadable": "Le modeli idinga ukudawunilodwa kanye kuphela ngaphambi kokuthi uyisebenzise.",
-        "downloading": "Imodeli iyadawunilodwa. Izolunga uma ukudawuniloda sekuqedile."
+        "downloading": "Imodeli iyadawunilodwa. Izolunga uma ukudawuniloda sekuqedile.",
+        "batteryQuota": "Imodeli esedivayisini isisebenzise isabelo sayo sebhethri okwamanje. Zama futhi emuva kwesikhathi.",
+        "checkFailed": "I-app ayikwazanga ukuhlola le modeli. Zama futhi."
       },
       "unavailable": "Imodeli esedivayisini ayitholakali okwamanje. Hlola isimo sayo ku-$t(modelChat.backends.title).",
       "busy": "Imodeli esedivayisini isamatasa nenye impendulo. Zama futhi uma isiqedile.",

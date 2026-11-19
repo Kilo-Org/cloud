@@ -3994,6 +3994,8 @@
       "downloading": "Preuzimanje: {{written}} od {{total}}",
       "downloadingUnknown": "Preuzimanje: {{written}}",
       "paused": "Pauzirano: {{written}} od {{total}}",
+      "retrying": "Ponovni pokušaj: {{written}} od {{total}}",
+      "retryingUnknown": "Ponovni pokušaj: {{written}}",
       "verifying": "Provjera preuzete datoteke…",
       "downloaded": "Preuzeto · {{size}}",
       "url": "Izravna poveznica za preuzimanje",
@@ -4084,7 +4086,9 @@
         "androidModelUnavailable": "Ovaj uređaj ne podržava Gemini Nano ili se sustavna aplikacija AICore još postavlja. Pokušajte ponovno kasnije.",
         "aicoreUpdateRequired": "Da biste upotrebljavali ovaj model, ažurirajte aplikaciju AICore i softver sustava.",
         "downloadable": "Ovaj model treba jednom preuzeti prije upotrebe.",
-        "downloading": "Model se preuzima. Bit će spreman kad preuzimanje završi."
+        "downloading": "Model se preuzima. Bit će spreman kad preuzimanje završi.",
+        "batteryQuota": "Model na uređaju je za sada iskoristio svoju dopuštenu količinu baterije. Pokušajte ponovno kasnije.",
+        "checkFailed": "Aplikacija nije mogla provjeriti ovaj model. Pokušajte ponovno."
       },
       "unavailable": "Model na uređaju trenutačno nije dostupan. Provjerite njegov status u odjeljku $t(modelChat.backends.title).",
       "busy": "Model na uređaju zauzet je drugim odgovorom. Pokušajte ponovno kad završi.",

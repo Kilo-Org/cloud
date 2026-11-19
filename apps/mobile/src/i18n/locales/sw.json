@@ -3933,6 +3933,8 @@
       "downloading": "Inapakuliwa: {{written}} kati ya {{total}}",
       "downloadingUnknown": "Inapakuliwa: {{written}}",
       "paused": "Imesimamishwa: {{written}} kati ya {{total}}",
+      "retrying": "Inajaribu tena: {{written}} kati ya {{total}}",
+      "retryingUnknown": "Inajaribu tena: {{written}}",
       "verifying": "Inakagua faili iliyopakuliwa…",
       "downloaded": "Imepakuliwa · {{size}}",
       "url": "Kiungo cha kupakua moja kwa moja",
@@ -4023,7 +4025,9 @@
         "androidModelUnavailable": "Kifaa hiki hakitumii Gemini Nano, au programu ya mfumo ya AICore bado inaandaliwa. Jaribu tena baadaye.",
         "aicoreUpdateRequired": "Sasisha programu ya AICore na programu ya mfumo wako ili utumie modeli hii.",
         "downloadable": "Modeli hii inahitaji kupakuliwa mara moja kabla ya kuitumia.",
-        "downloading": "Modeli inapakuliwa. Itakuwa tayari upakuaji utakapokamilika."
+        "downloading": "Modeli inapakuliwa. Itakuwa tayari upakuaji utakapokamilika.",
+        "batteryQuota": "Modeli ya kwenye kifaa imetumia kiasi chake cha betri kwa sasa. Jaribu tena baadaye.",
+        "checkFailed": "Programu haikuweza kukagua modeli hii. Jaribu tena."
       },
       "unavailable": "Modeli ya kwenye kifaa haipatikani kwa sasa. Angalia hali yake katika $t(modelChat.backends.title).",
       "busy": "Modeli ya kwenye kifaa inashughulikia jibu jingine. Jaribu tena itakapomaliza.",

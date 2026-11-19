@@ -3933,6 +3933,8 @@
       "downloading": "Deskargatzen: {{written}}/{{total}}",
       "downloadingUnknown": "Deskargatzen: {{written}}",
       "paused": "Pausatuta: {{written}}/{{total}}",
+      "retrying": "Berriro saiatzen: {{written}}/{{total}}",
+      "retryingUnknown": "Berriro saiatzen: {{written}}",
       "verifying": "Deskargatutako fitxategia egiaztatzen…",
       "downloaded": "Deskargatuta · {{size}}",
       "url": "Deskarga-esteka zuzena",
@@ -4023,7 +4025,9 @@
         "androidModelUnavailable": "Gailu honek ez du Gemini Nano onartzen, edo AICore sistema-aplikazioa prestatzen ari da oraindik. Saiatu berriro geroago.",
         "aicoreUpdateRequired": "Modelo hau erabiltzeko, eguneratu AICore aplikazioa eta sistemaren softwarea.",
         "downloadable": "Modelo hau erabili aurretik, behin deskargatu behar da.",
-        "downloading": "Modeloa deskargatzen ari da. Deskarga amaitzean prest egongo da."
+        "downloading": "Modeloa deskargatzen ari da. Deskarga amaitzean prest egongo da.",
+        "batteryQuota": "Gailuko modeloak bateria-kuota agortu du oraingoz. Saiatu berriro geroago.",
+        "checkFailed": "Aplikazioak ezin izan du modelo hau egiaztatu. Saiatu berriro."
       },
       "unavailable": "Gailuko modeloa ez dago erabilgarri une honetan. Egiaztatu haren egoera hemen: $t(modelChat.backends.title).",
       "busy": "Gailuko modeloa beste erantzun batekin lanpetuta dago. Saiatu berriro amaitzen duenean.",

@@ -3933,6 +3933,8 @@
       "downloading": "Ladataan: {{written}} / {{total}}",
       "downloadingUnknown": "Ladataan: {{written}}",
       "paused": "Keskeytetty: {{written}} / {{total}}",
+      "retrying": "Yritetään uudelleen: {{written}} / {{total}}",
+      "retryingUnknown": "Yritetään uudelleen: {{written}}",
       "verifying": "Tarkistetaan ladattua tiedostoa…",
       "downloaded": "Ladattu · {{size}}",
       "url": "Suora latauslinkki",
@@ -4023,7 +4025,9 @@
         "androidModelUnavailable": "Tämä laite ei tue Gemini Nanoa, tai AICore-järjestelmäsovelluksen käyttöönotto on vielä kesken. Yritä myöhemmin uudelleen.",
         "aicoreUpdateRequired": "Jos haluat käyttää tätä mallia, päivitä AICore-sovellus ja laitteen järjestelmäohjelmisto.",
         "downloadable": "Malli täytyy ladata kerran ennen käyttöä.",
-        "downloading": "Mallia ladataan. Se on käyttövalmis, kun lataus on valmis."
+        "downloading": "Mallia ladataan. Se on käyttövalmis, kun lataus on valmis.",
+        "batteryQuota": "Laitteessa toimiva malli on käyttänyt akkukiintiönsä toistaiseksi. Yritä myöhemmin uudelleen.",
+        "checkFailed": "Sovellus ei voinut tarkistaa tätä mallia. Yritä uudelleen."
       },
       "unavailable": "Laitteessa toimiva malli ei ole nyt saatavilla. Tarkista sen tila kohdasta $t(modelChat.backends.title).",
       "busy": "Laitteessa toimiva malli kirjoittaa toista vastausta. Yritä uudelleen, kun se on valmis.",

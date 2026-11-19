@@ -4000,6 +4000,8 @@
       "downloading": "A transferir: {{written}} de {{total}}",
       "downloadingUnknown": "A transferir: {{written}}",
       "paused": "Em pausa: {{written}} de {{total}}",
+      "retrying": "Nova tentativa: {{written}} de {{total}}",
+      "retryingUnknown": "Nova tentativa: {{written}}",
       "verifying": "A verificar o ficheiro transferido…",
       "downloaded": "Transferido · {{size}}",
       "url": "Ligação de transferência direta",
@@ -4090,7 +4092,9 @@
         "androidModelUnavailable": "Este dispositivo não suporta o Gemini Nano ou a aplicação de sistema AICore ainda está a ser configurada. Tente novamente mais tarde.",
         "aicoreUpdateRequired": "Atualize a aplicação AICore e o software do sistema para usar este modelo.",
         "downloadable": "Este modelo tem de ser descarregado uma vez antes de o poder usar.",
-        "downloading": "O modelo está a ser descarregado. Ficará pronto quando a transferência terminar."
+        "downloading": "O modelo está a ser descarregado. Ficará pronto quando a transferência terminar.",
+        "batteryQuota": "O modelo no dispositivo esgotou a sua quota de bateria por agora. Tente novamente mais tarde.",
+        "checkFailed": "A aplicação não conseguiu verificar este modelo. Tente novamente."
       },
       "unavailable": "O modelo no dispositivo não está disponível de momento. Verifique o estado em $t(modelChat.backends.title).",
       "busy": "O modelo no dispositivo está ocupado com outra resposta. Tente novamente quando terminar.",

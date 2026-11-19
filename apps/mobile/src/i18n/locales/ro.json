@@ -3994,6 +3994,8 @@
       "downloading": "Se descarcă: {{written}} din {{total}}",
       "downloadingUnknown": "Se descarcă: {{written}}",
       "paused": "În pauză: {{written}} din {{total}}",
+      "retrying": "Se încearcă din nou: {{written}} din {{total}}",
+      "retryingUnknown": "Se încearcă din nou: {{written}}",
       "verifying": "Se verifică fișierul descărcat…",
       "downloaded": "Descărcat · {{size}}",
       "url": "Link de descărcare directă",
@@ -4084,7 +4086,9 @@
         "androidModelUnavailable": "Acest dispozitiv nu acceptă Gemini Nano sau aplicația de sistem AICore încă se configurează. Încearcă din nou mai târziu.",
         "aicoreUpdateRequired": "Actualizează aplicația AICore și software-ul sistemului pentru a folosi acest model.",
         "downloadable": "Acest model trebuie descărcat o singură dată înainte de a-l putea folosi.",
-        "downloading": "Modelul se descarcă. Va fi gata când se termină descărcarea."
+        "downloading": "Modelul se descarcă. Va fi gata când se termină descărcarea.",
+        "batteryQuota": "Modelul pe dispozitiv și-a folosit alocația de baterie pentru moment. Încearcă din nou mai târziu.",
+        "checkFailed": "Aplicația nu a putut verifica acest model. Încearcă din nou."
       },
       "unavailable": "Modelul pe dispozitiv nu este disponibil momentan. Verifică-i starea în $t(modelChat.backends.title).",
       "busy": "Modelul pe dispozitiv este ocupat cu un alt răspuns. Încearcă din nou după ce termină.",

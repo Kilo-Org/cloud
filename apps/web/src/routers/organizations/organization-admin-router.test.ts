@@ -2207,7 +2207,7 @@ describe('organization admin router', () => {
       }
     });
 
-    it('includes an organization with a stored date even when the creation grant is false', async () => {
+    it('leaves organizations created without a trial out of the filter', async () => {
       const searchPrefix = `Admin No Trial ${crypto.randomUUID()}`;
       const grantedOrg = await createTestOrganization(`${searchPrefix} granted`, adminUser.id, 0);
       const noTrialDatedOrg = await createTestOrganization(
@@ -2247,10 +2247,8 @@ describe('organization admin router', () => {
           trial_ending_in_future: true,
         });
 
-        expect(result.organizations.map(organization => organization.id).sort()).toEqual(
-          [grantedOrg.id, noTrialDatedOrg.id].sort()
-        );
-        expect(result.pagination.total).toBe(2);
+        expect(result.organizations.map(organization => organization.id)).toEqual([grantedOrg.id]);
+        expect(result.pagination.total).toBe(1);
       } finally {
         await db
           .delete(organizations)

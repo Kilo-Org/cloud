@@ -919,10 +919,12 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
     function startEnsureSessionStub(
       sessionId: string,
-      record?: EnsureSessionRecord
+      record?: EnsureSessionRecord,
+      options: { failUpdates?: number } = {}
     ): { url: string; imports: EnsureSessionImport[]; updates: EnsureSessionUpdate[] } {
       const imports: EnsureSessionImport[] = [];
       const updates: EnsureSessionUpdate[] = [];
+      let updatesToFail = options.failUpdates ?? 0;
       const server = Bun.serve({
         port: 0,
         async fetch(request) {
@@ -947,6 +949,10 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
           if (request.method === 'PATCH' && url.pathname === `/session/${sessionId}`) {
             const body = (await request.json()) as EnsureSessionUpdate['body'];
             updates.push({ queryDirectory: url.searchParams.get('directory'), body });
+            if (updatesToFail > 0) {
+              updatesToFail -= 1;
+              return Response.json({ error: { message: 'update unavailable' } }, { status: 503 });
+            }
             return Response.json({ ...record, id: sessionId });
           }
           if (request.method === 'POST' && url.pathname === '/kilocode/session-import/session') {
@@ -1042,6 +1048,43 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
       expect(stub.updates).toHaveLength(1);
       expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+    });
+
+    it('retries a ruleset application that fails once, then applies it', async () => {
+      const sessionId = 'ses_record_permission_retry';
+      const directory = temporaryDirectory('kilo-api-permission-retry-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-retry-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, permission },
+        { failUpdates: 1 }
+      );
+
+      await createClient(stub.url).ensureSession(sessionId, directory);
+
+      expect(stub.updates).toHaveLength(2);
+      expect(stub.updates[1]).toEqual({ queryDirectory: directory, body: { permission } });
+    });
+
+    it('reports a ruleset application that keeps failing', async () => {
+      const sessionId = 'ses_record_permission_failing';
+      const directory = temporaryDirectory('kilo-api-permission-fail-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-fail-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, permission },
+        { failUpdates: 5 }
+      );
+
+      const error = await createClient(stub.url)
+        .ensureSession(sessionId, directory)
+        .catch((error: unknown) => error);
+
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain('Session permission restore');
+      expect(stub.updates).toHaveLength(3);
     });
 
     it('does not apply a record permission that is not a ruleset', async () => {

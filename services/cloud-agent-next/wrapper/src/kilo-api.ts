@@ -625,6 +625,37 @@ export function createWrapperKiloClient(
     },
 
     ensureSession: async (sessionId, directory, signal) => {
+      // The import commits the record before a ruleset is applied, so a
+      // transient failure on that second call is retried here: the enclosing
+      // step retry would find the record in place and return early.
+      const applyRuleset = async (
+        permission: NonNullable<Parameters<typeof v2Client.session.update>[0]['permission']>
+      ): Promise<void> => {
+        const attemptOnce = async () => {
+          const restoreTimeout = AbortSignal.timeout(8_000);
+          const restored = await v2Client.session.update(
+            { sessionID: sessionId, directory, permission },
+            { signal: signal ? AbortSignal.any([signal, restoreTimeout]) : restoreTimeout }
+          );
+          requireSdkData(restored, `Session permission restore for ${sessionId}`);
+        };
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          try {
+            await attemptOnce();
+            return;
+          } catch (error) {
+            lastError = error;
+            if (signal?.aborted) break;
+            if (attempt < 3) {
+              const { promise, resolve } = Promise.withResolvers<void>();
+              setTimeout(resolve, 50 * attempt);
+              await promise;
+            }
+          }
+        }
+        throw lastError;
+      };
       const lookupTimeout = AbortSignal.timeout(5_000);
       const lookupSignal = signal ? AbortSignal.any([signal, lookupTimeout]) : lookupTimeout;
       const existing = await v2Client.session.get(
@@ -691,14 +722,13 @@ export function createWrapperKiloClient(
       // The import body types `permission` as a string map, while a record
       // carries a ruleset, so the ruleset is applied through the update
       // endpoint that accepts it. The read is unvalidated JSON, so check the
-      // shape before applying it.
+      // shape before applying it. The import has already committed the record,
+      // so a transient failure here must not leave a route that prepares
+      // without the record's rules; retry within this call, because the step
+      // retry above would find the record in place and return before reaching
+      // this point again.
       if (record?.permission !== undefined && Array.isArray(record.permission)) {
-        const restoreTimeout = AbortSignal.timeout(8_000);
-        const restored = await v2Client.session.update(
-          { sessionID: sessionId, directory, permission: record.permission },
-          { signal: signal ? AbortSignal.any([signal, restoreTimeout]) : restoreTimeout }
-        );
-        requireSdkData(restored, `Session permission restore for ${sessionId}`);
+        await applyRuleset(record.permission);
       }
     },
 

@@ -815,10 +815,9 @@ export function ScreenHeader({
   // column, so the block needs no surface of its own. The eyebrow and subtitle
   // rows keep the control's column as a spacer without the band's height, so
   // the band's extra space stays on the title's line alone.
-  const headingBlockClassName = cn(
-    'min-w-0 justify-center',
-    pinnedInlineActions ? 'grow shrink' : 'flex-1'
-  );
+  const headingBlockClassName = pinnedInlineActions
+    ? 'min-w-0 grow shrink justify-center'
+    : 'min-w-0 flex-1 justify-center';
   const titledHeading = (
     <View className={headingBlockClassName}>
       {eyebrowSlot ? (
@@ -982,10 +981,7 @@ export function ScreenHeader({
   const inlineActionsSlot =
     inlineActions && !stackInlineActions ? (
       <View
-        className={cn(
-          'ms-3 min-w-0',
-          pinnedInlineActions ? 'max-w-[50%] shrink-[100]' : 'shrink'
-        )}
+        className={cn('ms-3 min-w-0', pinnedInlineActions ? 'max-w-[50%] shrink-[100]' : 'shrink')}
         onLayout={onInlineActionsLayout}
       >
         {inlineActions}

@@ -259,11 +259,7 @@ export function InvoiceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={title}
-        subtitle={subtitle}
-        backFallback={backFallback}
-      />
+      <ScreenHeader title={title} subtitle={subtitle} backFallback={backFallback} />
       {body}
     </View>
   );

@@ -634,15 +634,16 @@ test('web promotion waits for a completed or deliberately skipped gateway rollou
     ['skipped', 'skipped', 'success', 'skipped', false, false],
     ['success', 'success', 'success', 'success', true, false],
   ]) {
+    // Every entry in `needs` must appear here: a dependency added to the job
+    // without a fixture value must fail a case, not default to success.
     const results = {
+      'verify-main': 'success',
       'stage-app': app,
       'db-gate': database,
       'stage-ai-gateway': stage,
       'promote-ai-gateway': promotion,
     };
-    const needs = Object.fromEntries(
-      job.needs.map(name => [name, { result: results[name] ?? 'success' }])
-    );
+    const needs = Object.fromEntries(job.needs.map(name => [name, { result: results[name] }]));
     assert.equal(
       runInNewContext(expression, {
         needs,

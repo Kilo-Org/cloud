@@ -195,7 +195,9 @@ describe('AddCreditsRow line action', () => {
 
   it('fills the box without carrying a frame or margin of its own', () => {
     const classes = String(renderLineAction().findByType(BUTTON).props.className).split(' ');
-    expect(classes).toContain(`min-h-[${MIN_TAP_TARGET_DP}px]`);
+    // The frame is the layout scale's own step (`min-h-8` = 28pt at the app's
+    // 14pt rem), which is the box's floor: the box alone cancels the height.
+    expect(classes).toContain('min-h-8');
     expect(classes).not.toContain('min-h-[48px]');
     // A vertical margin here would move the control inside the box instead of
     // leaving the box to cancel the height.

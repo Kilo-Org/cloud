@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { Card } from '@/components/ui/card';
 import { FilterChip } from '@/components/ui/filter-chip';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -56,10 +57,10 @@ export function DetectorCard({
     { value: 'block' as const, label: t('codeReviewer.decision.block') },
   ];
   return (
-    <View className="gap-3 rounded-lg bg-secondary p-3">
+    <Card>
       <View className="gap-1">
         <Text className="text-sm font-medium text-foreground">{label}</Text>
-        <Text className="text-xs text-muted-foreground">{description}</Text>
+        <Text variant="caption">{description}</Text>
       </View>
       <SegmentedControl
         options={options}
@@ -71,7 +72,7 @@ export function DetectorCard({
       {choice === 'off' ? null : (
         <View className={disabled ? 'pointer-events-none opacity-50' : undefined}>{children}</View>
       )}
-    </View>
+    </Card>
   );
 }
 
@@ -106,7 +107,7 @@ export function PiiEntitiesField({
                   );
                 }}
               />
-              <Text className="max-w-44 text-xs text-muted-foreground">
+              <Text variant="caption" className="max-w-44">
                 {t(PII_ENTITY_DESCRIPTION_KEYS[entity])}
               </Text>
             </View>
@@ -152,7 +153,7 @@ export function LineListField({
         disabled={disabled}
         onChangeText={onChange}
       />
-      <Text className="text-xs text-muted-foreground">{hint}</Text>
+      <Text variant="caption">{hint}</Text>
     </View>
   );
 }
@@ -183,7 +184,7 @@ export function PolicyFormatField({
         disabled={disabled}
         accessibilityLabel={t('organizationGuardrails.policyFormat')}
       />
-      <Text className="text-xs text-muted-foreground">
+      <Text variant="caption">
         {format === 'rules'
           ? t('organizationGuardrails.policyFormatRulesDescription')
           : t('organizationGuardrails.policyFormatTextDescription')}

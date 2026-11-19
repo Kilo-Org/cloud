@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sessionerne kunne ikke indlæses.",
-    "couldNotLoadActiveSessions": "De aktive sessioner kunne ikke indlæses.",
     "agentSessions": "I gang nu",
     "newCodingTask": "Ny programmeringsopgave",
     "newTaskFromPicture": "Ny opgave fra et billede",
@@ -3686,8 +3685,7 @@
     "imagesSectionEmpty": "Ingen betroede billeddomæner",
     "revoke": "Fjern tillid til {{host}}",
     "revokeMessage": "Links til dette domæne vil igen bede om bekræftelse.",
-    "revokeImageMessage": "Billeder fra dette domæne vil igen bede om bekræftelse.",
-    "backToPreferences": "Tilbage til indstillinger"
+    "revokeImageMessage": "Billeder fra dette domæne vil igen bede om bekræftelse."
   },
   "glanceable": {
     "waiting": "Opdaterer agenter",
@@ -3934,6 +3932,8 @@
       "downloading": "Downloader: {{written}} af {{total}}",
       "downloadingUnknown": "Downloader: {{written}}",
       "paused": "Sat på pause: {{written}} af {{total}}",
+      "retrying": "Prøver igen: {{written}} af {{total}}",
+      "retryingUnknown": "Prøver igen: {{written}}",
       "verifying": "Tjekker den downloadede fil…",
       "downloaded": "Downloadet · {{size}}",
       "url": "Direkte downloadlink",
@@ -4024,7 +4024,9 @@
         "androidModelUnavailable": "Denne enhed understøtter ikke Gemini Nano, eller systemappen AICore er stadig ved at blive klargjort. Prøv igen senere.",
         "aicoreUpdateRequired": "Opdater AICore-appen og din systemsoftware for at bruge denne model.",
         "downloadable": "Modellen skal downloades én gang, før du kan bruge den.",
-        "downloading": "Modellen downloades. Den er klar, når downloaden er færdig."
+        "downloading": "Modellen downloades. Den er klar, når downloaden er færdig.",
+        "batteryQuota": "Modellen på enheden har opbrugt sin batterikvote for nu. Prøv igen senere.",
+        "checkFailed": "Appen kunne ikke tjekke denne model. Prøv igen."
       },
       "unavailable": "Modellen på enheden er ikke tilgængelig lige nu. Tjek dens status i $t(modelChat.backends.title).",
       "busy": "Modellen på enheden er optaget af et andet svar. Prøv igen, når den er færdig.",

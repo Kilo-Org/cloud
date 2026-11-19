@@ -3,12 +3,13 @@ import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
-import { SettingsSwitchRow } from '@/components/organization/settings-form-sections';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { FilterChip } from '@/components/ui/filter-chip';
 import { Input } from '@/components/ui/input';
 import { SearchX } from '@/components/ui/icons';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import {
@@ -23,8 +24,6 @@ import {
 } from '@/lib/organization/model-access';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-
-const ItemSeparator = () => <View className="h-2" />;
 
 /** The search field and filter row both lists carry above their rows. */
 function ListHeader({
@@ -43,8 +42,8 @@ function ListHeader({
   bulk: ReactNode;
 }>) {
   return (
-    <View className="gap-3 pb-3">
-      <Text className="text-xs text-muted-foreground">{description}</Text>
+    <View className="gap-3 pt-3 pb-3">
+      <Text variant="caption">{description}</Text>
       <Input
         defaultValue={search}
         placeholder={searchPlaceholder}
@@ -62,7 +61,8 @@ function ListHeader({
 }
 
 function NoMatch({ label }: Readonly<{ label: string }>) {
-  return <EmptyState icon={SearchX} title={label} className="bg-background py-8" />;
+  // The list's content container carries the page gutter, so the state adds none.
+  return <EmptyState icon={SearchX} title={label} inset="none" className="bg-background py-8" />;
 }
 
 /**
@@ -84,21 +84,25 @@ export function ProviderAllowList({
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const paddingBottom = useTabBarBottomPadding();
-  const contentContainerStyle = { paddingHorizontal: 16, paddingBottom };
+  const contentContainerStyle = { paddingBottom };
   const shown = providers.filter(provider => matchesSearch([provider], search));
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<string>) => (
-      <SettingsSwitchRow
-        label={item}
-        value={draft.providerAllowList.includes(item)}
-        disabled={disabled}
-        onValueChange={next => {
-          onChange(toggleProvider(draft, item, next));
-        }}
-      />
+    ({ item, index }: ListRenderItemInfo<string>) => (
+      <RowGroupItem
+        position={rowGroupPosition({ first: index === 0, last: index === shown.length - 1 })}
+      >
+        <PreferenceRow
+          title={item}
+          value={draft.providerAllowList.includes(item)}
+          disabled={disabled}
+          onValueChange={next => {
+            onChange(toggleProvider(draft, item, next));
+          }}
+        />
+      </RowGroupItem>
     ),
-    [draft, disabled, onChange]
+    [draft, disabled, onChange, shown.length]
   );
 
   return (
@@ -106,8 +110,8 @@ export function ProviderAllowList({
       data={shown}
       keyExtractor={provider => provider}
       renderItem={renderItem}
-      ItemSeparatorComponent={ItemSeparator}
       style={listStyle}
+      contentContainerClassName="px-4"
       contentContainerStyle={contentContainerStyle}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
@@ -169,7 +173,7 @@ export function ModelDenyList({
   const [search, setSearch] = useState('');
   const [deniedOnly, setDeniedOnly] = useState(false);
   const paddingBottom = useTabBarBottomPadding();
-  const contentContainerStyle = { paddingHorizontal: 16, paddingBottom };
+  const contentContainerStyle = { paddingBottom };
   const shown = models.filter(
     model =>
       matchesSearch([model.name, model.id], search) &&
@@ -178,19 +182,23 @@ export function ModelDenyList({
   const shownIds = shown.map(model => model.id);
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<DenyListModel>) => (
-      <SettingsSwitchRow
-        label={item.name}
-        note={denyListRowNote(item, t)}
-        description={item.id}
-        value={!draft.modelDenyList.includes(item.id)}
-        disabled={disabled}
-        onValueChange={next => {
-          onChange(toggleModel(draft, item.id, next));
-        }}
-      />
+    ({ item, index }: ListRenderItemInfo<DenyListModel>) => (
+      <RowGroupItem
+        position={rowGroupPosition({ first: index === 0, last: index === shown.length - 1 })}
+      >
+        <PreferenceRow
+          title={item.name}
+          subtitle={item.id}
+          note={denyListRowNote(item, t)}
+          value={!draft.modelDenyList.includes(item.id)}
+          disabled={disabled}
+          onValueChange={next => {
+            onChange(toggleModel(draft, item.id, next));
+          }}
+        />
+      </RowGroupItem>
     ),
-    [draft, disabled, onChange, t]
+    [draft, disabled, onChange, shown.length, t]
   );
 
   const emptyLabel = (() => {
@@ -208,8 +216,8 @@ export function ModelDenyList({
       data={shown}
       keyExtractor={model => model.id}
       renderItem={renderItem}
-      ItemSeparatorComponent={ItemSeparator}
       style={listStyle}
+      contentContainerClassName="px-4"
       contentContainerStyle={contentContainerStyle}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={

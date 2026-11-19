@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Seansse ei õnnestunud laadida.",
-    "couldNotLoadActiveSessions": "Aktiivseid seansse ei õnnestunud laadida",
     "agentSessions": "Praegu käimas",
     "newCodingTask": "Uus programmeerimisülesanne",
     "newTaskFromPicture": "Uus ülesanne pildist",
@@ -3686,8 +3685,7 @@
     "imagesSectionEmpty": "Usaldatud pildihoste pole",
     "revoke": "Lõpeta hosti {{host}} usaldamine",
     "revokeMessage": "Selle hosti lingid küsivad taas kinnitust.",
-    "revokeImageMessage": "Selle hosti pildid küsivad taas kinnitust.",
-    "backToPreferences": "Tagasi eelistuste juurde"
+    "revokeImageMessage": "Selle hosti pildid küsivad taas kinnitust."
   },
   "glanceable": {
     "waiting": "Agentide oleku värskendamine",
@@ -3934,6 +3932,8 @@
       "downloading": "Allalaadimine: {{written}} / {{total}}",
       "downloadingUnknown": "Allalaadimine: {{written}}",
       "paused": "Peatatud: {{written}} / {{total}}",
+      "retrying": "Uus katse: {{written}} / {{total}}",
+      "retryingUnknown": "Uus katse: {{written}}",
       "verifying": "Allalaaditud faili kontrollimine…",
       "downloaded": "Allalaaditud · {{size}}",
       "url": "Otsene allalaadimislink",
@@ -4024,7 +4024,9 @@
         "androidModelUnavailable": "See seade ei toeta Gemini Nanot või on AICore'i süsteemirakendus alles seadistamisel. Proovi hiljem uuesti.",
         "aicoreUpdateRequired": "Selle mudeli kasutamiseks värskenda AICore'i rakendust ja süsteemitarkvara.",
         "downloadable": "Enne kasutamist tuleb see mudel ühekordselt alla laadida.",
-        "downloading": "Mudelit laaditakse alla. See on kasutusvalmis, kui allalaadimine lõpeb."
+        "downloading": "Mudelit laaditakse alla. See on kasutusvalmis, kui allalaadimine lõpeb.",
+        "batteryQuota": "Seadmesisene mudel on praeguseks oma akukvoodi ära kasutanud. Proovi hiljem uuesti.",
+        "checkFailed": "Rakendus ei saanud seda mudelit kontrollida. Proovi uuesti."
       },
       "unavailable": "Seadmesisene mudel pole praegu saadaval. Kontrolli selle olekut jaotises $t(modelChat.backends.title).",
       "busy": "Seadmesisene mudel koostab praegu teist vastust. Proovi uuesti, kui see on lõpetanud.",

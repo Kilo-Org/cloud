@@ -2517,7 +2517,6 @@
   },
   "home": {
     "couldNotLoadSessions": "No se pudieron cargar las sesiones.",
-    "couldNotLoadActiveSessions": "No se pudieron cargar las sesiones activas.",
     "agentSessions": "En curso ahora",
     "newCodingTask": "Nueva tarea de programación",
     "newTaskFromPicture": "Nueva tarea a partir de una imagen",
@@ -3746,8 +3745,7 @@
     "imagesSectionEmpty": "No hay dominios de imágenes de confianza",
     "revoke": "Dejar de confiar en {{host}}",
     "revokeMessage": "Los enlaces a este dominio volverán a pedir confirmación.",
-    "revokeImageMessage": "Las imágenes de este dominio volverán a pedir confirmación.",
-    "backToPreferences": "Volver a preferencias"
+    "revokeImageMessage": "Las imágenes de este dominio volverán a pedir confirmación."
   },
   "glanceable": {
     "waiting": "Actualizando el estado de los agentes",
@@ -3995,6 +3993,8 @@
       "downloading": "Descargando: {{written}} de {{total}}",
       "downloadingUnknown": "Descargando: {{written}}",
       "paused": "En pausa: {{written}} de {{total}}",
+      "retrying": "Reintentando: {{written}} de {{total}}",
+      "retryingUnknown": "Reintentando: {{written}}",
       "verifying": "Comprobando el archivo descargado…",
       "downloaded": "Descargado · {{size}}",
       "url": "Enlace de descarga directa",
@@ -4085,7 +4085,9 @@
         "androidModelUnavailable": "Este dispositivo no es compatible con Gemini Nano o la app del sistema AICore aún se está configurando. Inténtalo más tarde.",
         "aicoreUpdateRequired": "Actualiza la app AICore y el software del sistema para usar este modelo.",
         "downloadable": "Este modelo requiere una descarga única antes de poder usarlo.",
-        "downloading": "El modelo se está descargando. Estará listo cuando termine la descarga."
+        "downloading": "El modelo se está descargando. Estará listo cuando termine la descarga.",
+        "batteryQuota": "El modelo en el dispositivo ha agotado su cuota de batería por ahora. Inténtalo de nuevo más tarde.",
+        "checkFailed": "La app no ha podido comprobar este modelo. Inténtalo de nuevo."
       },
       "unavailable": "El modelo en el dispositivo no está disponible ahora. Consulta su estado en $t(modelChat.backends.title).",
       "busy": "El modelo en el dispositivo está ocupado con otra respuesta. Inténtalo de nuevo cuando termine.",

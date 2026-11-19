@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, type ScrollViewInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Sortable, { type SortableGridRenderItemInfo } from 'react-native-sortables';
 
 import { QueryError } from '@/components/query-error';
@@ -15,11 +14,12 @@ import { TodoItemRow } from '@/components/todos/todo-item-row';
 import { TodoQuickAdd } from '@/components/todos/todo-quick-add';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { useTodoListDefaultsSummary } from '@/components/todos/use-todo-list-defaults-summary';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowFrame } from '@/components/ui/row-frame';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ChevronDown, Settings2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import {
   PENDING_TODO_ID_PREFIX,
   useTodoItemMutations,
@@ -28,47 +28,50 @@ import {
 } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { selectTodoQueryErrorView, type TodoQueryErrorView } from '@/lib/todos/todo-query-error';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { selectTodoQueryErrorView } from '@/lib/todos/todo-query-error';
 import { todoItemPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
-import { cn } from '@/lib/utils';
 
 const LISTS_HREF = '/(app)/(tabs)/(2_agents)' as Href;
 
 function TodoRowsSkeleton() {
   return (
-    <View className="gap-3 px-4 pt-2">
-      {[0, 1, 2].map(row => (
-        <View key={row} className="min-h-14 flex-row items-center gap-3">
-          <Skeleton className="size-6 rounded-full" />
-          <Skeleton className="h-4 flex-1 rounded" />
-        </View>
-      ))}
+    <View className="pt-3">
+      <RowSkeleton subtitle />
+      <RowSkeleton subtitle />
+      <RowSkeleton subtitle last />
     </View>
   );
 }
 
 function ListDefaultsLine({ list, onPress }: Readonly<{ list: TodoList; onPress: () => void }>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const summary = useTodoListDefaultsSummary(list);
+  // The row's title is the resolved defaults, so the accessible name carries
+  // them too; the summary is a whole repository/mode/model sentence and takes
+  // a second line rather than a tail ellipsis.
+  const title = summary ?? t('todos.list.setDefaults');
+  const accessibilityLabel =
+    summary === null
+      ? t('todos.listSettings.title')
+      : `${t('todos.listSettings.title')}: ${summary}`;
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={t('todos.listSettings.title')}
-      accessibilityHint={summary ?? undefined}
-      className={cn(
-        ROW_TARGET_CLASS,
-        'mx-4 mb-1 flex-row items-center gap-2 py-2 active:opacity-70'
-      )}
-    >
-      <Settings2 size={16} color={colors.mutedForeground} />
-      <Text className="min-w-0 flex-1 text-sm leading-[1.25rem] text-ink2">
-        {summary ?? t('todos.list.setDefaults')}
-      </Text>
-      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
-    </Pressable>
+    <View className="mx-4 pb-1">
+      <RowGroup leadingTile>
+        <RowFrame
+          icon={Settings2}
+          trailing={{ kind: 'chevron' }}
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+        >
+          <Text className="text-sm font-medium text-foreground" numberOfLines={2}>
+            {title}
+          </Text>
+        </RowFrame>
+      </RowGroup>
+    </View>
   );
 }
 
@@ -77,7 +80,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
   const { organizationId } = useOrganization();
   const lists = useTodoLists(organizationId);
   const list = lists.data?.find(candidate => candidate.id === listId);
@@ -154,20 +157,18 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   let body: ReactNode = null;
   if (items.isPending || (lists.isPending && !list)) {
     body = <TodoRowsSkeleton />;
-  } else if (items.isError || notFound) {
-    // A list the caller's collection no longer names is missing, not denied.
-    const errorView: TodoQueryErrorView = notFound
-      ? { variant: 'not-found', showRetry: false }
-      : selectTodoQueryErrorView(items.error);
+  } else if (items.isError) {
+    const errorView = selectTodoQueryErrorView(items.error);
     body = (
       <QueryError
         variant={errorView.variant}
         placement="top"
+        inset="gutter"
         onRetry={errorView.showRetry ? () => void items.refetch() : undefined}
         isRetrying={items.isFetching}
       />
     );
-  } else {
+  } else if (!notFound) {
     body = (
       <>
         <TodoQuickAdd
@@ -219,7 +220,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
             {showCompleted ? (
               <ChevronDown size={16} color={colors.mutedForeground} />
             ) : (
-              <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+              <RowChevron />
             )}
             <Text variant="eyebrow">{t('todos.list.completed', { count: doneItems.length })}</Text>
           </Pressable>
@@ -261,15 +262,19 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
           : {})}
       />
       {list ? <ListDefaultsLine list={list} onPress={openSettings} /> : null}
-      <KeyboardAvoidingView className="flex-1" behavior="padding">
-        <Animated.ScrollView
-          ref={scrollRef}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: bottom + 24 }}
-        >
-          {body}
-        </Animated.ScrollView>
-      </KeyboardAvoidingView>
+      {notFound ? (
+        <QueryError variant="not-found" />
+      ) : (
+        <KeyboardAvoidingView className="flex-1" behavior="padding">
+          <Animated.ScrollView
+            ref={scrollRef}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: bottomClearance }}
+          >
+            {body}
+          </Animated.ScrollView>
+        </KeyboardAvoidingView>
+      )}
     </View>
   );
 }

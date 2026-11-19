@@ -3,18 +3,27 @@ import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { type TFunction } from 'i18next';
-import { AlertCircle, Check, ChevronDown, Square, Terminal } from '@/components/ui/icons';
+import {
+  AlertCircle,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Square,
+  Terminal,
+} from '@/components/ui/icons';
 import {
   isPreparationCancellation,
   type PreparationAttempt,
   type PreparationStepSnapshot,
 } from '@kilocode/cloud-agent-sdk';
 
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 import {
   preparationErrorText,
@@ -65,7 +74,7 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
     attempt.steps.filter(step => step.kind === 'phase').map(step => [step.id, step.key])
   );
   return (
-    <View className="mx-4 my-2 overflow-hidden rounded-md border border-border bg-card">
+    <RowGroup className="mx-4 my-2">
       <Pressable
         onPress={() => {
           setExpanded(value => !value);
@@ -74,12 +83,14 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
         accessibilityLabel={copy.title}
         accessibilityState={{ expanded }}
         hitSlop={ROW_TOUCH_SLOP}
-        className="flex-row items-center gap-2 px-3 py-3 active:bg-secondary"
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3 active:opacity-70')}
       >
+        {/* A disclosure caret, not a navigation chevron: it names the state of
+            the run under it. */}
         {expanded ? (
-          <ChevronDown size={16} color={colors.mutedForeground} />
+          <ChevronUp size={16} color={colors.mutedForeground} />
         ) : (
-          <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+          <ChevronDown size={16} color={colors.mutedForeground} />
         )}
         <AttemptIcon
           status={attempt.status}
@@ -91,7 +102,7 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
         </Text>
       </Pressable>
       {expanded && (
-        <View className="gap-2 border-t border-border px-3 py-2">
+        <View className="gap-3 px-4 pb-3">
           {copy.detail !== undefined ? (
             <Text selectable className="text-sm text-muted-foreground">
               {copy.detail}
@@ -106,18 +117,20 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
               showProgress={attempt.status !== 'failed'}
             />
           )}
-          {steps.map(step => (
-            <PreparationStepRow
-              key={step.id}
-              step={step}
-              phaseKey={
-                step.parentStepId === undefined ? undefined : phaseKeys.get(step.parentStepId)
-              }
-            />
-          ))}
+          <View className="gap-2">
+            {steps.map(step => (
+              <PreparationStepRow
+                key={step.id}
+                step={step}
+                phaseKey={
+                  step.parentStepId === undefined ? undefined : phaseKeys.get(step.parentStepId)
+                }
+              />
+            ))}
+          </View>
         </View>
       )}
-    </View>
+    </RowGroup>
   );
 }
 
@@ -271,9 +284,9 @@ function PreparationStepRow({
     step.kind === 'setup_command' && phaseKey === START_COMMANDS_STEP_KEY
       ? (step.command ?? preparationStepLabel(step, t))
       : (setupCommandLabel(step, t) ?? preparationStepLabel(step, t));
-  const DetailsIcon = expanded ? ChevronDown : DirectionalChevronRight;
+  const DetailsIcon = expanded ? ChevronUp : ChevronDown;
   return (
-    <View className="overflow-hidden rounded border border-border">
+    <View>
       <Pressable
         disabled={!hasDetails}
         onPress={() => {
@@ -283,7 +296,7 @@ function PreparationStepRow({
         accessibilityLabel={label}
         accessibilityState={hasDetails ? { expanded } : undefined}
         hitSlop={ROW_TOUCH_SLOP}
-        className="flex-row items-center gap-2 px-2 py-2.5 active:bg-secondary"
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 py-1 active:opacity-70')}
       >
         {hasDetails ? (
           <DetailsIcon size={STEP_CARET_SIZE} color={colors.mutedForeground} />

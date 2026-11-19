@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Enweghị ike ibudata nnọkọ",
-    "couldNotLoadActiveSessions": "Enweghị ike ibudata nnọkọ na-aga n'ihu",
     "agentSessions": "Na-aga n'ihu ugbu a",
     "newCodingTask": "Ọrụ ịde koodu ọhụrụ",
     "newTaskFromPicture": "Ọrụ ọhụrụ site na foto",
@@ -3686,8 +3685,7 @@
     "imagesSectionEmpty": "Enweghị saịtị onyonyo a tụkwasịrị obi",
     "revoke": "Kagbuo ntụkwasị obi na {{host}}",
     "revokeMessage": "Njikọ ndị na-aga saịtị a ga-arịọ nkwenye ọzọ.",
-    "revokeImageMessage": "Onyonyo sitere na saịtị a ga-arịọ nkwenye ọzọ.",
-    "backToPreferences": "Laghachi na nhọrọ"
+    "revokeImageMessage": "Onyonyo sitere na saịtị a ga-arịọ nkwenye ọzọ."
   },
   "glanceable": {
     "waiting": "Na-emelite ndị nnọchi anya",
@@ -3934,6 +3932,8 @@
       "downloading": "Na-ebudata: {{written}} n'ime {{total}}",
       "downloadingUnknown": "Na-ebudata: {{written}}",
       "paused": "A kwụsịrị: {{written}} n'ime {{total}}",
+      "retrying": "Na-anwa ọzọ: {{written}} n'ime {{total}}",
+      "retryingUnknown": "Na-anwa ọzọ: {{written}}",
       "verifying": "Na-enyocha faịlụ e budatara…",
       "downloaded": "E budatara · {{size}}",
       "url": "Njikọ ibudata kpọmkwem",
@@ -4024,7 +4024,9 @@
         "androidModelUnavailable": "Ngwaọrụ a anaghị akwado Gemini Nano, ma ọ bụ ngwa sistemụ AICore ka na-akwado onwe ya. Nwaa ọzọ ma emechaa.",
         "aicoreUpdateRequired": "Melite ngwa AICore na sọftụwia sistemụ gị iji ihe nlereanya a.",
         "downloadable": "Ihe nlereanya a chọrọ nbudata otu ugboro tupu i nwee ike iji ya.",
-        "downloading": "Ihe nlereanya ahụ na-ebudata. Ọ ga-adị njikere mgbe nbudata ahụ gwụchara."
+        "downloading": "Ihe nlereanya ahụ na-ebudata. Ọ ga-adị njikere mgbe nbudata ahụ gwụchara.",
+        "batteryQuota": "Ihe nlereanya dị na ngwaọrụ ejirila oke batrị ya ugbu a. Nwaa ọzọ ma emechaa.",
+        "checkFailed": "Ngwa ahụ enweghị ike ịlele ihe nlereanya a. Nwaa ọzọ."
       },
       "unavailable": "Ihe nlereanya na ngwaọrụ adịghị ugbu a. Lelee ọnọdụ ya na $t(modelChat.backends.title).",
       "busy": "Ihe nlereanya na ngwaọrụ na-arụ ọrụ na nzaghachi ọzọ. Nwaa ọzọ mgbe ọ gwụchara.",

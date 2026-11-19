@@ -3,10 +3,11 @@ import {
   COUNCIL_SPECIALIST_PRESETS,
 } from '@kilocode/app-shared/code-review';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
-import { Text } from '@/components/ui/text';
+import { ShieldCheck } from '@/components/ui/icons';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type CouncilConfig } from '@/lib/code-reviewer-config';
@@ -73,27 +74,27 @@ export function CouncilSpecialistsSection({
   };
 
   return (
-    <View className="gap-2">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('codeReviewer.council.specialists')}
-      </Text>
-      {COUNCIL_SPECIALIST_PRESETS.map(preset => {
-        const copy = specialistCopy(preset.id);
-        return (
-          <ToggleRow
-            key={preset.id}
-            title={t(copy.nameKey)}
-            subtitle={t(copy.descriptionKey)}
-            value={council.specialists.some(
-              specialist => specialist.id === preset.id && specialist.enabled
-            )}
-            disabled={disabled}
-            onValueChange={value => {
-              setSpecialistEnabled(preset.id, value);
-            }}
-          />
-        );
-      })}
-    </View>
+    <Section label={t('codeReviewer.council.specialists')}>
+      <RowGroup leadingTile>
+        {COUNCIL_SPECIALIST_PRESETS.map(preset => {
+          const copy = specialistCopy(preset.id);
+          return (
+            <PreferenceRow
+              key={preset.id}
+              icon={ShieldCheck}
+              title={t(copy.nameKey)}
+              subtitle={t(copy.descriptionKey)}
+              value={council.specialists.some(
+                specialist => specialist.id === preset.id && specialist.enabled
+              )}
+              disabled={disabled}
+              onValueChange={value => {
+                setSpecialistEnabled(preset.id, value);
+              }}
+            />
+          );
+        })}
+      </RowGroup>
+    </Section>
   );
 }

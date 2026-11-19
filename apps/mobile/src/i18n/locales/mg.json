@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Tsy nety nampidirina ny fotoam-piasana.",
-    "couldNotLoadActiveSessions": "Tsy nety nampidirina ny fotoam-piasana mandeha.",
     "agentSessions": "Mandeha izao",
     "newCodingTask": "Asa fanoratana kaody vaovao",
     "newTaskFromPicture": "Asa vaovao avy amin'ny sary",
@@ -3686,8 +3685,7 @@
     "imagesSectionEmpty": "Tsy misy mpampiantrano sary atokisana",
     "revoke": "Foano ny fitokisana ny {{host}}",
     "revokeMessage": "Hangataka fanamafisana indray ny rohy mankany amin'ity mpampiantrano ity.",
-    "revokeImageMessage": "Hangataka fanamafisana indray ny sary avy amin'ity mpampiantrano ity.",
-    "backToPreferences": "Miverena amin'ny safidy"
+    "revokeImageMessage": "Hangataka fanamafisana indray ny sary avy amin'ity mpampiantrano ity."
   },
   "glanceable": {
     "waiting": "Manavao ny mpanatanteraka",
@@ -3934,6 +3932,8 @@
       "downloading": "Mampidina: {{written}} amin'ny {{total}}",
       "downloadingUnknown": "Mampidina: {{written}}",
       "paused": "Najanona: {{written}} amin'ny {{total}}",
+      "retrying": "Mamerina manandrana: {{written}} amin'ny {{total}}",
+      "retryingUnknown": "Mamerina manandrana: {{written}}",
       "verifying": "Manamarina ny rakitra voampidina…",
       "downloaded": "Voampidina · {{size}}",
       "url": "Rohy fampidinana mivantana",
@@ -4024,7 +4024,9 @@
         "androidModelUnavailable": "Tsy mandeha amin'ity fitaovana ity ny Gemini Nano, na mbola eo am-panomanana ny rindranasa AICore. Andramo indray any aoriana.",
         "aicoreUpdateRequired": "Havaozy ny rindranasa AICore sy ny rindrankajin'ny rafitra mba hampiasana ity modely ity.",
         "downloadable": "Mila sintonina indray mandeha ity modely ity vao azo ampiasaina.",
-        "downloading": "Eo am-pisintonana ny modely. Ho vonona izy rehefa vita ny fisintonana."
+        "downloading": "Eo am-pisintonana ny modely. Ho vonona izy rehefa vita ny fisintonana.",
+        "batteryQuota": "Efa nampiasa ny fetran'ny bateria nomena azy ny modely ao amin'ny fitaovana. Andramo indray any aoriana.",
+        "checkFailed": "Tsy afaka nanamarina ity modely ity ny fampiharana. Andramo indray."
       },
       "unavailable": "Tsy azo ampiasaina amin'izao fotoana izao ny modely ao amin'ny fitaovana. Jereo ny toetrany ao amin'ny $t(modelChat.backends.title).",
       "busy": "Mbola mamaly hafatra hafa ny modely ao amin'ny fitaovana. Andramo indray rehefa vita izany.",

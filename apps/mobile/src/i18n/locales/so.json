@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kalfadhiyada lama soo dejin karin.",
-    "couldNotLoadActiveSessions": "Kalfadhiyada socda lama soo dejin karin.",
     "agentSessions": "Hadda socda",
     "newCodingTask": "Hawl cusub oo koodh qorista ah",
     "newTaskFromPicture": "Hawl cusub oo sawir laga bilaabo",
@@ -3686,8 +3685,7 @@
     "imagesSectionEmpty": "Ma jiraan martigeliyeyaal sawir la aaminay",
     "revoke": "Ka noqo aaminaadda {{host}}",
     "revokeMessage": "Xiriiriyeyaasha martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
-    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
-    "backToPreferences": "Ku noqo doorashooyinka"
+    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin."
   },
   "glanceable": {
     "waiting": "Wakiillada ayaa la cusboonaysiinayaa",
@@ -3934,6 +3932,8 @@
       "downloading": "Soo dejinaya: {{written}} ka mid ah {{total}}",
       "downloadingUnknown": "Soo dejinaya: {{written}}",
       "paused": "La joojiyay: {{written}} ka mid ah {{total}}",
+      "retrying": "Waa la isku dayayaa: {{written}} ka mid ah {{total}}",
+      "retryingUnknown": "Waa la isku dayayaa: {{written}}",
       "verifying": "Waxaa la hubinayaa faylka la soo dejiyay…",
       "downloaded": "La soo dejiyay · {{size}}",
       "url": "Xiriirka soo dejinta ee tooska ah",
@@ -4024,7 +4024,9 @@
         "androidModelUnavailable": "Aaladdani ma taageerto Gemini Nano, ama barnaamijka nidaamka AICore weli waa la diyaarinayaa. Mar dambe isku day.",
         "aicoreUpdateRequired": "Cusboonaysii barnaamijka AICore iyo software-ka nidaamkaaga si aad u isticmaasho moodeelkan.",
         "downloadable": "Moodeelkan waxa uu u baahan yahay in hal mar la soo dejiyo ka hor intaadan isticmaalin.",
-        "downloading": "Moodeelka waa la soo dejinayaa. Wuxuu diyaar noqonayaa marka soo dejintu dhammaato."
+        "downloading": "Moodeelka waa la soo dejinayaa. Wuxuu diyaar noqonayaa marka soo dejintu dhammaato.",
+        "batteryQuota": "Moodeelka aaladda gudaheeda wuu isticmaalay qaybta batariga ee la oggolaaday. Mar dambe isku day.",
+        "checkFailed": "Abkani wuu hubi waayay moodeelkan. Mar kale isku day."
       },
       "unavailable": "Moodeelka aaladda gudaheeda hadda lama heli karo. Ka hubi xaaladdiisa $t(modelChat.backends.title).",
       "busy": "Moodeelka aaladda gudaheeda wuxuu ku mashquulsan yahay jawaab kale. Isku day marka uu dhammeeyo.",

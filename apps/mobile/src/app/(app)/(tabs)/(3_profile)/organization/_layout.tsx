@@ -50,7 +50,6 @@ export default function OrganizationLayout() {
         }}
       />
       <Stack.Screen name="member-limit" options={organizationSheetOptions} />
-      <Stack.Screen name="low-balance-alert" options={organizationSheetOptions} />
       {/* The organization screens land without a transition when the stack
           repair pushes them (`use-repair-organization-route-stack.ts`), so a
           link opened without the hub does not slide the rebuilt screens past

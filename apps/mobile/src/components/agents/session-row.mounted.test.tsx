@@ -72,17 +72,16 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/icons/slack-icon', () => ({ SlackIcon: 'SlackIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'Chevron' }));
-vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
-vi.mock('@/components/destination-option-row', () => ({
-  DestinationOptionRow: 'DestinationOptionRow',
-}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
@@ -431,7 +430,6 @@ describe('StoredSessionRow live speech', () => {
             selectedId = selected.session_id;
           },
           onRetry: () => undefined,
-          onDismiss: () => undefined,
           instances: [],
           spawningConnectionId: null,
           instanceRowsDisabled: false,

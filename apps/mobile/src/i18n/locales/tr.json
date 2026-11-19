@@ -2484,7 +2484,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Oturumlar yüklenemedi.",
-    "couldNotLoadActiveSessions": "Etkin oturumlar yüklenemedi.",
     "agentSessions": "Şu anda etkin",
     "newCodingTask": "Yeni kodlama görevi",
     "newTaskFromPicture": "Resimden yeni görev",
@@ -3686,8 +3685,7 @@
     "imagesSectionEmpty": "Güvenilen görsel sunucusu yok",
     "revoke": "{{host}} sunucusuna verilen güveni kaldır",
     "revokeMessage": "Bu sunucuya verilen bağlantılar yeniden onay isteyecek.",
-    "revokeImageMessage": "Bu sunucudaki görseller yeniden onay isteyecek.",
-    "backToPreferences": "Tercihlere dön"
+    "revokeImageMessage": "Bu sunucudaki görseller yeniden onay isteyecek."
   },
   "glanceable": {
     "waiting": "Ajanlar güncelleniyor",
@@ -3934,6 +3932,8 @@
       "downloading": "İndiriliyor: {{written}} / {{total}}",
       "downloadingUnknown": "İndiriliyor: {{written}}",
       "paused": "Duraklatıldı: {{written}} / {{total}}",
+      "retrying": "Yeniden deneniyor: {{written}} / {{total}}",
+      "retryingUnknown": "Yeniden deneniyor: {{written}}",
       "verifying": "İndirilen dosya denetleniyor…",
       "downloaded": "İndirildi · {{size}}",
       "url": "Doğrudan indirme bağlantısı",
@@ -4024,7 +4024,9 @@
         "androidModelUnavailable": "Bu cihaz Gemini Nano'yu desteklemiyor veya AICore sistem uygulaması hâlâ kuruluyor. Daha sonra yeniden deneyin.",
         "aicoreUpdateRequired": "Bu modeli kullanmak için AICore uygulamasını ve sistem yazılımınızı güncelleyin.",
         "downloadable": "Bu modeli kullanabilmek için bir kereliğine indirmeniz gerekiyor.",
-        "downloading": "Model indiriliyor. İndirme tamamlandığında kullanıma hazır olacak."
+        "downloading": "Model indiriliyor. İndirme tamamlandığında kullanıma hazır olacak.",
+        "batteryQuota": "Cihazdaki model şimdilik kendisine ayrılan pil kotasını kullandı. Daha sonra yeniden deneyin.",
+        "checkFailed": "Uygulama bu modeli denetleyemedi. Yeniden deneyin."
       },
       "unavailable": "Cihazdaki model şu anda kullanılamıyor. Durumunu $t(modelChat.backends.title) bölümünden denetleyin.",
       "busy": "Cihazdaki model başka bir yanıtla meşgul. Tamamlandığında yeniden deneyin.",

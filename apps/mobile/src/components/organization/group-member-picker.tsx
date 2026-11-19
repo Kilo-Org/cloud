@@ -1,14 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { type OrgGroupMemberPickerState } from '@/components/organization/org-group-form-model';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
 import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { type ActiveOrgMember } from '@/lib/hooks/use-organization-queries';
-import { cn } from '@/lib/utils';
 
 type GroupMemberPickerProps = Readonly<{
   /** The picker's phase: a pending or failed fetch never reads as an empty search. */
@@ -46,11 +45,11 @@ export function GroupMemberPicker({
 
   if (picker.kind === 'loading') {
     return (
-      <View className="gap-2 rounded-lg bg-secondary p-4">
-        <Skeleton className="h-4 w-40 rounded" />
-        <Skeleton className="h-4 w-56 rounded" />
-        <Skeleton className="h-4 w-48 rounded" />
-      </View>
+      <RowGroup>
+        <RowSkeleton />
+        <RowSkeleton />
+        <RowSkeleton />
+      </RowGroup>
     );
   }
   if (picker.kind === 'error') {
@@ -65,14 +64,10 @@ export function GroupMemberPicker({
     );
   }
   if (picker.kind === 'empty') {
-    return (
-      <Text variant="muted" className="text-sm">
-        {t('organization.groups.membersEmpty')}
-      </Text>
-    );
+    return <Text variant="muted">{t('organization.groups.membersEmpty')}</Text>;
   }
   return (
-    <View className="overflow-hidden rounded-lg bg-secondary">
+    <RowGroup>
       <ChoiceRow
         label={t('organization.groups.selectAllVisible')}
         selected={allVisibleSelected}
@@ -81,9 +76,8 @@ export function GroupMemberPicker({
         onPress={() => {
           onToggleAll(!allVisibleSelected);
         }}
-        className={cn('border-b-[0.5px] border-hair-soft')}
       />
-      {visibleMembers.map((member, index) => (
+      {visibleMembers.map(member => (
         <ChoiceRow
           key={member.id}
           label={member.name}
@@ -94,9 +88,8 @@ export function GroupMemberPicker({
           onPress={() => {
             onToggleMember(member.id, !memberIds.includes(member.id));
           }}
-          className={cn(index < visibleMembers.length - 1 && 'border-b-[0.5px] border-hair-soft')}
         />
       ))}
-    </View>
+    </RowGroup>
   );
 }

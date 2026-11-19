@@ -3039,7 +3039,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ክፍለ ጊዜዎችን መጫን አልተቻለም።",
-    "couldNotLoadActiveSessions": "ንቁ ክፍለ ጊዜዎችን መጫን አልተቻለም።",
     "agentSessions": "አሁን በሂደት ላይ",
     "newCodingTask": "አዲስ የኮድ ሥራ",
     "newTaskFromPicture": "ከምስል አዲስ ሥራ",
@@ -3686,8 +3685,7 @@
     "imagesSectionEmpty": "የታመኑ የምስል አስተናጋጆች የሉም",
     "revoke": "{{host}}ን ከታመኑ አስተናጋጆች ያስወግዱ",
     "revokeMessage": "ወደዚህ አስተናጋጅ የሚወስዱ አገናኞች እንደገና ማረጋገጫ ይጠይባሉ።",
-    "revokeImageMessage": "ከዚህ አስተናጋጅ የሚመጡ ምስሎች እንደገና ማረጋገጫ ይጠይባሉ።",
-    "backToPreferences": "ወደ ምርጫዎች ይመለሱ"
+    "revokeImageMessage": "ከዚህ አስተናጋጅ የሚመጡ ምስሎች እንደገና ማረጋገጫ ይጠይባሉ።"
   },
   "glanceable": {
     "waiting": "ወኪሎችን በማዘመን ላይ",
@@ -3934,6 +3932,8 @@
       "downloading": "በማውረድ ላይ፦ {{written}} ከ{{total}}",
       "downloadingUnknown": "በማውረድ ላይ፦ {{written}}",
       "paused": "ቆሟል፦ {{written}} ከ{{total}}",
+      "retrying": "በድጋሚ በመሞከር ላይ፦ {{written}} ከ{{total}}",
+      "retryingUnknown": "በድጋሚ በመሞከር ላይ፦ {{written}}",
       "verifying": "የወረደውን ፋይል በመፈተሽ ላይ…",
       "downloaded": "ወርዷል · {{size}}",
       "url": "ቀጥታ የማውረድ አገናኝ",
@@ -4024,7 +4024,9 @@
         "androidModelUnavailable": "ይህ መሣሪያ Gemini Nanoን አይደግፍም፣ ወይም የAICore ሥርዓት መተግበሪያ አሁንም በመዘጋጀት ላይ ነው። ቆይተው እንደገና ይሞክሩ።",
         "aicoreUpdateRequired": "ይህን ሞዴል ለመጠቀም የAICore መተግበሪያውን እና የሥርዓት ሶፍትዌርዎን ያዘምኑ።",
         "downloadable": "ይህን ሞዴል ከመጠቀምዎ በፊት አንድ ጊዜ ማውረድ ያስፈልጋል።",
-        "downloading": "ሞዴሉ በመውረድ ላይ ነው። ማውረዱ ሲጠናቀቅ ዝግጁ ይሆናል።"
+        "downloading": "ሞዴሉ በመውረድ ላይ ነው። ማውረዱ ሲጠናቀቅ ዝግጁ ይሆናል።",
+        "batteryQuota": "በመሣሪያ ላይ ያለው ሞዴል የባትሪ አቅሙን ለአሁኑ ተጠቅሟል። በኋላ እንደገና ይሞክሩ።",
+        "checkFailed": "መተግበሪያው ይህን ሞዴል ማረጋገጥ አልቻለም። እንደገና ይሞክሩ።"
       },
       "unavailable": "በመሣሪያ ላይ ያለው ሞዴል አሁን አይገኝም። ሁኔታውን በ$t(modelChat.backends.title) ውስጥ ያረጋግጡ።",
       "busy": "በመሣሪያ ላይ ያለው ሞዴል ሌላ ምላሽ በመስጠት ተጠምዷል። ሲጨርስ እንደገና ይሞክሩ።",

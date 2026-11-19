@@ -3095,7 +3095,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas.",
-    "couldNotLoadActiveSessions": "Neizdevās ielādēt aktīvās sesijas.",
     "agentSessions": "Pašlaik aktīvs",
     "newCodingTask": "Jauns programmēšanas uzdevums",
     "newTaskFromPicture": "Jauns uzdevums no attēla",
@@ -3746,8 +3745,7 @@
     "imagesSectionEmpty": "Nav uzticamu attēlu resursdatoru",
     "revoke": "Atsaukt uzticību resursdatoram {{host}}",
     "revokeMessage": "Saites uz šo resursdatoru atkal prasīs apstiprinājumu.",
-    "revokeImageMessage": "Attēli no šī resursdatora atkal prasīs apstiprinājumu.",
-    "backToPreferences": "Atpakaļ uz iestatījumiem"
+    "revokeImageMessage": "Attēli no šī resursdatora atkal prasīs apstiprinājumu."
   },
   "glanceable": {
     "waiting": "Tiek atjaunināta informācija par aģentiem",
@@ -3995,6 +3993,8 @@
       "downloading": "Lejupielāde: {{written}} no {{total}}",
       "downloadingUnknown": "Lejupielāde: {{written}}",
       "paused": "Pauzēta: {{written}} no {{total}}",
+      "retrying": "Mēģina vēlreiz: {{written}} no {{total}}",
+      "retryingUnknown": "Mēģina vēlreiz: {{written}}",
       "verifying": "Pārbauda lejupielādēto failu…",
       "downloaded": "Lejupielādēts · {{size}}",
       "url": "Tiešā lejupielādes saite",
@@ -4085,7 +4085,9 @@
         "androidModelUnavailable": "Šī ierīce neatbalsta Gemini Nano, vai arī AICore sistēmas lietotne vēl tiek iestatīta. Mēģiniet vēlāk vēlreiz.",
         "aicoreUpdateRequired": "Lai izmantotu šo modeli, atjauniniet AICore lietotni un sistēmas programmatūru.",
         "downloadable": "Pirms šī modeļa lietošanas tas ir vienreiz jālejupielādē.",
-        "downloading": "Modelis tiek lejupielādēts. Tas būs gatavs, kad lejupielāde beigsies."
+        "downloading": "Modelis tiek lejupielādēts. Tas būs gatavs, kad lejupielāde beigsies.",
+        "batteryQuota": "Ierīces modelis šobrīd ir iztērējis atļauto akumulatora apjomu. Mēģiniet vēlāk vēlreiz.",
+        "checkFailed": "Lietotne nevarēja pārbaudīt šo modeli. Mēģiniet vēlreiz."
       },
       "unavailable": "Ierīces modelis pašlaik nav pieejams. Pārbaudiet tā statusu sadaļā $t(modelChat.backends.title).",
       "busy": "Ierīces modelis ir aizņemts ar citu atbildi. Mēģiniet vēlreiz, kad tas būs pabeidzis.",

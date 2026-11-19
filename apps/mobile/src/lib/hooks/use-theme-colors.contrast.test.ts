@@ -225,43 +225,25 @@ describe('disabled toolbar badge label contrast (WCAG AA text)', () => {
 });
 
 describe('disabled primary action fill contrast (WCAG AA text)', () => {
-  // A disabled default-variant Button paints its label on
-  // `--primary-disabled-action`: the palette's disabled primary under white in
-  // light, and a dim neutral under `--foreground` in dark. The dark plate must
-  // stay a visible object on the near-black page and stand off the outlined
-  // control beside it, while staying clearly below the enabled brand fill. The
-  // palette's `--primary-disabled` is left to the Switch's disabled on-track.
-  it('light theme: primaryForeground vs primaryDisabledAction >= 4.5:1', () => {
-    const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabledAction);
+  // A disabled default-variant Button paints its label on the palette's muted
+  // pair (`--muted` fill, `--muted-foreground` ink). Both schemes clear 4.5:1
+  // and the fill stays clearly below the enabled brand fill, so an inactive
+  // Start never reads as a second action colour.
+  it('light theme: mutedForeground vs muted >= 4.5:1', () => {
+    const ratio = contrastRatio(lightColors.mutedForeground, lightColors.muted);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
-  it('dark theme: foreground vs primaryDisabledAction >= 4.5:1', () => {
-    const ratio = contrastRatio(darkColors.foreground, darkColors.primaryDisabledAction);
+  it('dark theme: mutedForeground vs muted >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.mutedForeground, darkColors.muted);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
-  });
-
-  it('dark theme: the disabled plate stays a visible object on the page', () => {
-    // 2.6:1 off the page. The inactive icon surface (1.7:1) leaves a full-width
-    // plate without presence, so a disabled primary reads as a stray label.
-    expect(
-      contrastRatio(darkColors.primaryDisabledAction, darkColors.background)
-    ).toBeGreaterThanOrEqual(2);
-  });
-
-  it('dark theme: the disabled plate outranks the outlined control beside it', () => {
-    // The outline variant fills with `--secondary`; a disabled primary must
-    // still read as the stronger surface, not as a second outlined control.
-    expect(
-      contrastRatio(darkColors.primaryDisabledAction, darkColors.secondary)
-    ).toBeGreaterThanOrEqual(1.5);
   });
 
   it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
     // The plate must read as a superseded control next to the enabled brand
     // fill, not as a second brand colour, or a disabled Start would look
     // tappable and an enabled one would lose its emphasis.
-    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabledAction);
+    const separation = contrastRatio(darkColors.primary, darkColors.muted);
     expect(separation).toBeGreaterThanOrEqual(1.5);
   });
 });

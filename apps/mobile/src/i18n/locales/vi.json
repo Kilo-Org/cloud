@@ -2484,7 +2484,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Không thể tải danh sách phiên.",
-    "couldNotLoadActiveSessions": "Không thể tải các phiên đang hoạt động.",
     "agentSessions": "Đang hoạt động",
     "newCodingTask": "Tác vụ lập trình mới",
     "newTaskFromPicture": "Tác vụ mới từ hình ảnh",
@@ -3686,8 +3685,7 @@
     "imagesSectionEmpty": "Chưa có máy chủ hình ảnh được tin cậy",
     "revoke": "Bỏ tin cậy {{host}}",
     "revokeMessage": "Liên kết đến máy chủ này sẽ hỏi xác nhận lại.",
-    "revokeImageMessage": "Hình ảnh từ máy chủ này sẽ hỏi xác nhận lại.",
-    "backToPreferences": "Quay lại cài đặt"
+    "revokeImageMessage": "Hình ảnh từ máy chủ này sẽ hỏi xác nhận lại."
   },
   "glanceable": {
     "waiting": "Đang cập nhật tác nhân",
@@ -3934,6 +3932,8 @@
       "downloading": "Đang tải xuống: {{written}} / {{total}}",
       "downloadingUnknown": "Đang tải xuống: {{written}}",
       "paused": "Đã tạm dừng: {{written}} / {{total}}",
+      "retrying": "Đang thử lại: {{written}} / {{total}}",
+      "retryingUnknown": "Đang thử lại: {{written}}",
       "verifying": "Đang kiểm tra tệp đã tải xuống…",
       "downloaded": "Đã tải xuống · {{size}}",
       "url": "Liên kết tải xuống trực tiếp",
@@ -4024,7 +4024,9 @@
         "androidModelUnavailable": "Thiết bị này không hỗ trợ Gemini Nano hoặc ứng dụng hệ thống AICore vẫn đang thiết lập. Hãy thử lại sau.",
         "aicoreUpdateRequired": "Hãy cập nhật ứng dụng AICore và phần mềm hệ thống để sử dụng mô hình này.",
         "downloadable": "Mô hình này cần được tải xuống một lần trước khi sử dụng.",
-        "downloading": "Mô hình đang tải xuống và sẽ sẵn sàng khi tải xong."
+        "downloading": "Mô hình đang tải xuống và sẽ sẵn sàng khi tải xong.",
+        "batteryQuota": "Mô hình trên thiết bị đã dùng hết mức pin được phép trong lúc này. Hãy thử lại sau.",
+        "checkFailed": "Ứng dụng không thể kiểm tra mô hình này. Hãy thử lại."
       },
       "unavailable": "Mô hình trên thiết bị hiện không khả dụng. Hãy kiểm tra trạng thái trong $t(modelChat.backends.title).",
       "busy": "Mô hình trên thiết bị đang bận trả lời tin nhắn khác. Hãy thử lại khi hoàn tất.",

@@ -7,6 +7,10 @@ import { BriefingDetailScreen } from './briefing-detail-screen';
 
 const state = vi.hoisted(() => ({
   report: undefined as BriefingReport | undefined,
+  isPending: false,
+  isError: false,
+  error: undefined as unknown,
+  offline: false,
   options: undefined as
     | undefined
     | {
@@ -25,7 +29,13 @@ vi.mock('react-i18next', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: typeof state.options) => {
     state.options = options;
-    return { data: state.report, isPending: false, isError: false, refetch: vi.fn() };
+    return {
+      data: state.report,
+      isPending: state.isPending,
+      isError: state.isError,
+      error: state.error,
+      refetch: vi.fn(),
+    };
   },
   useMutation: () => ({ mutate: vi.fn() }),
   useQueryClient: () => ({ removeQueries: vi.fn() }),
@@ -45,7 +55,9 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
-vi.mock('@/lib/hooks/use-offline-banner-state', () => ({ useOfflineBannerState: () => false }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useOfflineBannerState: () => state.offline,
+}));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ setOrganizationId: vi.fn() }),
 }));
@@ -97,6 +109,10 @@ const report: BriefingReport = {
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 beforeEach(() => {
   state.report = report;
+  state.isPending = false;
+  state.isError = false;
+  state.error = undefined;
+  state.offline = false;
   state.options = undefined;
   vi.clearAllMocks();
 });
@@ -164,4 +180,35 @@ it('uses the frozen report timezone and a localized artifact heading for readabl
   expect(texts).toContain('agentBriefing.sourceMetadata');
   expect(texts).toContain('Plan: one step remaining.\n\nChanges: updated files.');
   expect(texts).not.toContain('Captured session metadata');
+});
+
+it('says it is offline, not a load failure, while the first read is paused', () => {
+  // Paused offline, the read never settles: the skeleton and the failure both
+  // describe a fetch that has not started, so connectivity names the state.
+  state.report = undefined;
+  state.isPending = true;
+  state.offline = true;
+  const mounted = mount();
+
+  const errors = mounted.root.findAllByType('QueryError' as ElementType);
+  expect(errors).toHaveLength(1);
+  expect(errors[0]?.props).toMatchObject({ variant: 'offline' });
+  expect(errors[0]?.props.onRetry).toBeUndefined();
+  expect(errors[0]?.props.title).toBe('offline.noInternet');
+  expect(mounted.root.findAllByType('Skeleton' as ElementType)).toHaveLength(0);
+});
+
+it('renders a rejected read as a permission state with no retry', () => {
+  state.report = undefined;
+  state.isError = true;
+  state.error = { data: { code: 'FORBIDDEN' } };
+  const mounted = mount();
+
+  const errors = mounted.root.findAllByType('QueryError' as ElementType);
+  expect(errors).toHaveLength(1);
+  // Retrying a rejected read returns the same rejection, so the state offers none.
+  expect(errors[0]?.props).toMatchObject({ variant: 'permission' });
+  expect(errors[0]?.props.onRetry).toBeUndefined();
+  // The variant's own copy names the denial; the screen adds no title of its own.
+  expect(errors[0]?.props.title).toBeUndefined();
 });

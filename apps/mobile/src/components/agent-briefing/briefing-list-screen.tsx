@@ -22,7 +22,7 @@ import {
   useBriefingInvalidation,
   useBriefingPreferences,
 } from '@/lib/agent-briefing';
-import { briefingAccessDenied } from '@/lib/agent-briefing-state';
+import { briefingAccessDenied, selectBriefingListPhase } from '@/lib/agent-briefing-state';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useBriefingListFilters } from '@/lib/hooks/use-briefing-list-filters';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
@@ -80,18 +80,22 @@ export function BriefingListScreen() {
     : (query.data?.pages.flatMap(page => page.reports) ?? []).filter(report =>
         access.canRead(report.context.organizationId)
       );
-  const loading = query.isPending && !offline;
-  const failure = !loading && query.isError && reports.length === 0;
-  const listEmpty = !loading && !failure && reports.length === 0;
+  const phase = selectBriefingListPhase({
+    hasReports: reports.length > 0,
+    offline,
+    isPending: query.isPending,
+    isError: query.isError,
+    accessDenied: briefingAccessDenied(query.error),
+  });
   // The empty state's own button is the settings entry point while it is on screen,
   // so the header carries the action only in the states that button does not cover.
-  const emptySettingsAction = noEnabledContexts === true && listEmpty;
+  const emptySettingsAction = noEnabledContexts === true && phase === 'empty';
   // The hint explains an empty list of an enabled brief. With no context enabled
   // the list is empty for a different reason, and the settings action is that
   // reason's way out, so claiming a scheduled brief would have activity here
   // would be wrong.
   const emptyDescription =
-    listEmpty && !emptySettingsAction
+    phase === 'empty' && !emptySettingsAction
       ? t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')
       : undefined;
   const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
@@ -145,19 +149,24 @@ export function BriefingListScreen() {
             {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.allContexts')}
           </Text>
         ) : null}
-        {offline || (query.isError && reports.length > 0) ? (
+        {phase === 'ready' && (offline || query.isError) ? (
           <Text className="text-xs text-muted-foreground">
             {t(offline ? 'agentBriefing.offline' : 'agentBriefing.cached')}
           </Text>
         ) : null}
       </View>
-      {loading && (
+      {phase === 'loading' && (
         <View className="gap-4 px-4">
           <Skeleton className="h-48 rounded-2xl" />
           <Skeleton className="h-48 rounded-2xl" />
         </View>
       )}
-      {failure && (
+      {/* Connectivity pauses the first fetch instead of failing it, so the screen
+          says what it is waiting for and leaves recovery to the reconnect. */}
+      {phase === 'offline' && <QueryError variant="offline" title={t('offline.noInternet')} />}
+      {/* The server rejected this account's access, which no retry can change. */}
+      {phase === 'denied' && <QueryError variant="permission" />}
+      {phase === 'failed' && (
         <QueryError
           title={t('agentBriefing.loadError')}
           onRetry={() => {
@@ -168,7 +177,7 @@ export function BriefingListScreen() {
       {/* The empty state owns the body so the shared centered form measures the
           band the header and the filters leave, instead of sitting at the top
           of a list that has nothing to scroll. */}
-      {listEmpty && (
+      {phase === 'empty' && (
         <EmptyState
           icon={Newspaper}
           title={t(emptyLabel)}
@@ -189,7 +198,7 @@ export function BriefingListScreen() {
           }
         />
       )}
-      {!loading && !failure && reports.length > 0 && (
+      {phase === 'ready' && (
         <FlashList
           data={reports}
           keyExtractor={report => report.id}

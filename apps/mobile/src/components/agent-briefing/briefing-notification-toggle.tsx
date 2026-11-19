@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 import { Button } from '@/components/ui/button';
 import { Newspaper } from '@/components/ui/icons';
 import { IconTile } from '@/components/ui/icon-tile';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
@@ -50,6 +51,9 @@ function useBriefingNotificationSwitch() {
   return {
     preferences,
     value: preferences.data?.notificationsEnabled ?? false,
+    // An offline-paused first fetch stays pending forever: the placeholder is a
+    // wait this row cannot own, so connectivity gates it like the screens do.
+    loading: preferences.isPending && !offline,
     pending: update.isPending,
     unavailable: offline || !preferences.data || update.isPending,
     setEnabled: (notificationsEnabled: boolean) => {
@@ -72,21 +76,29 @@ function useBriefingNotificationSwitch() {
 /**
  * The notification switch for the agent brief on its own settings screen, plus
  * the way to the device's notification permission.
+ *
+ * While the preferences read is pending the value is unknown, so the switch's
+ * 44dp slot holds a `Skeleton` and the row does not shift when the value
+ * arrives.
  */
 export function BriefingNotificationToggle() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { preferences, value, unavailable, setEnabled } = useBriefingNotificationSwitch();
+  const { preferences, value, unavailable, loading, setEnabled } = useBriefingNotificationSwitch();
   return (
     <View className="gap-2 rounded-2xl border border-border bg-card p-4">
       <View className="flex-row items-center gap-3">
         <Text className="min-w-0 flex-1 text-sm">{t('agentBriefing.title')}</Text>
-        <Switch
-          accessibilityLabel={t('agentBriefing.title')}
-          value={value}
-          disabled={unavailable}
-          onValueChange={setEnabled}
-        />
+        {loading ? (
+          <Skeleton className="h-11 w-11 rounded-full" />
+        ) : (
+          <Switch
+            accessibilityLabel={t('agentBriefing.title')}
+            value={value}
+            disabled={unavailable}
+            onValueChange={setEnabled}
+          />
+        )}
       </View>
       <Text className="text-xs text-muted-foreground">{t('agentBriefing.notificationsHint')}</Text>
       {preferences.isError ? (
@@ -115,14 +127,22 @@ export function BriefingNotificationToggle() {
 /**
  * The agent brief as one row of the Notifications categories. `disabled` is the
  * screen's device-notification gate, which disables every category row.
+ *
+ * While the preferences read is pending the row is busy and disabled, and its
+ * switch slot holds a `Skeleton`, so assistive tech does not read a control it
+ * cannot use and the row does not shift when the value arrives.
  */
 export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disabled: boolean }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { preferences, value, pending, unavailable, setEnabled } = useBriefingNotificationSwitch();
-  const isDisabled = disabled || unavailable;
+  const { preferences, value, pending, loading, unavailable, setEnabled } =
+    useBriefingNotificationSwitch();
+  const isDisabled = disabled || unavailable || loading;
   return (
-    <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+    <View
+      className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
+      accessibilityState={{ busy: pending || loading, disabled: isDisabled }}
+    >
       <IconTile icon={Newspaper} tint={NEUTRAL_TINT} />
       <View className="flex-1">
         <Text className={cn('text-sm font-medium', isDisabled && 'text-muted-foreground')}>
@@ -145,17 +165,21 @@ export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disable
         ) : null}
       </View>
       {pending && <ActivityIndicator size="small" color={colors.mutedForeground} />}
-      <Switch
-        value={value}
-        disabled={isDisabled}
-        accessibilityLabel={t('agentBriefing.title')}
-        accessibilityState={{ disabled: isDisabled, busy: pending }}
-        onValueChange={next => {
-          if (!isDisabled) {
-            setEnabled(next);
-          }
-        }}
-      />
+      {loading ? (
+        <Skeleton className="h-11 w-11 rounded-full" />
+      ) : (
+        <Switch
+          value={value}
+          disabled={isDisabled}
+          accessibilityLabel={t('agentBriefing.title')}
+          accessibilityState={{ disabled: isDisabled, busy: pending }}
+          onValueChange={next => {
+            if (!isDisabled) {
+              setEnabled(next);
+            }
+          }}
+        />
+      )}
     </View>
   );
 }

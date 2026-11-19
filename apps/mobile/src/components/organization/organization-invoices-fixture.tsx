@@ -164,11 +164,20 @@ function createFixtureClient(
   });
 }
 
+/**
+ * The state is fixed for one mount: the fixture key remounts this body when the
+ * route's `?state=` changes, so a link that switches `listed` to `empty` gets a
+ * fresh client and an empty cache instead of the first page it already served.
+ */
 export function OrganizationInvoicesFixture({
   state,
 }: {
   state: OrganizationInvoicesFixtureState;
 }) {
+  return <OrganizationInvoicesFixtureBody key={state} state={state} />;
+}
+
+function OrganizationInvoicesFixtureBody({ state }: { state: OrganizationInvoicesFixtureState }) {
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const selected = useState(() => ({ organizationId }))[0];

@@ -99,6 +99,26 @@ it('reuses MessageBubble for files/tools/errors and keeps empty, incomplete and 
   expect(renderer.root.findAllByType('MessageBubble')).toHaveLength(0);
 });
 
+it.each(['forbidden', 'session_deleted'])(
+  'keeps %s distinct from an empty transcript',
+  async failureCode => {
+    const fixture = nativeRemoteFixture();
+    const renderer = await mount(fixture.client);
+    await press(renderer, 'ses-first');
+    await act(() =>
+      fixture.publishSession('ses-first', {
+        ...readySession,
+        session: undefined,
+        messages: [],
+        connection: 'disconnected',
+        error: failureCode,
+      })
+    );
+    expect(text(renderer.root)).toContain(failureCode);
+    expect(text(renderer.root)).not.toContain('agentChat.session.emptyTitle');
+  }
+);
+
 it('shows one unreadable notice instead of consent controls and keeps readable cards', async () => {
   const fixture = nativeRemoteFixture();
   const renderer = await mount(fixture.client);

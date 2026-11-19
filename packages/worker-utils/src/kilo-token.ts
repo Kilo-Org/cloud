@@ -124,7 +124,9 @@ export async function signKiloToken(params: {
  * Verify a Kilo user JWT (HS256, version 3).
  *
  * Checks: signature, expiration (built into jose), version === 3, and that
- * kiloUserId is a non-empty string.
+ * kiloUserId is a non-empty string. When the token carries
+ * `cloudAgentAuthority`, it also checks that `iat` is present and not in the
+ * future.
  *
  * When `options.audience` is set, the token must have that exact audience.
  * When omitted, tokens that include an audience are rejected so a

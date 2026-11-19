@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
 import { useSessionListAnchorReport } from '@/components/agents/use-session-list-anchor-report';
@@ -205,7 +205,7 @@ export function SessionMessageList<T>({
   }, [onOpenSettledChange, openSettled, sessionId]);
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { left, right } = useSafeAreaInsets();
+  const { left, right } = useStyleSideInsets();
 
   // Coalesce the trigger: only fire `onLoadOlderMessages` while there is
   // actually a cursor, we are not already loading, and we are not in a

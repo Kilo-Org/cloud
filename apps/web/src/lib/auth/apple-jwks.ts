@@ -57,6 +57,19 @@ const appleJwksResponseSchema = z.object({
   ),
 });
 
+/**
+ * Throws the recorded refresh failure after marking the outage reported.
+ * Propagating hands the error to a route or the framework handler, which
+ * reports it; marking the outage reported keeps a later verification of the
+ * same failure from reporting it again.
+ */
+function throwJwksUnavailable(): never {
+  refreshOutageReported = true;
+  throw lastRefreshError instanceof Error
+    ? lastRefreshError
+    : new Error('Apple JWKS is unavailable');
+}
+
 async function fetchApplePublicKeys(): Promise<AppleJWK[]> {
   const response = await fetch(appleJwksUrl(), {
     signal: AbortSignal.timeout(JWKS_FETCH_TIMEOUT_MS),
@@ -82,13 +95,7 @@ async function refreshAppleKeys(): Promise<AppleJWK[]> {
     if (cachedKeys && now - cachedKeys.fetchedAt <= STALE_CACHE_MAX_AGE_MS) {
       return cachedKeys.keys;
     }
-    // Propagating hands the error to a route or the framework handler, which
-    // reports it; marking the outage reported keeps a later verification of
-    // the same failure from reporting it again.
-    refreshOutageReported = true;
-    throw lastRefreshError instanceof Error
-      ? lastRefreshError
-      : new Error('Apple JWKS is unavailable');
+    throwJwksUnavailable();
   }
 
   lastRefreshStartedAt = now;
@@ -175,13 +182,9 @@ export async function verifyAppleJwtWithJwks(
       // the stale fallback (a success clears lastRefreshError): the missing
       // kid may be a rotated one that a healthy fetch would resolve. A fetch
       // failure is a server fault, not a caller error, so it propagates and
-      // routes answer 500 instead of misreporting an invalid token. The
-      // receiving route reports it, so the outage is marked reported here.
+      // routes answer 500 instead of misreporting an invalid token.
       if (lastRefreshError !== null) {
-        refreshOutageReported = true;
-        throw lastRefreshError instanceof Error
-          ? lastRefreshError
-          : new Error('Apple JWKS is unavailable');
+        throwJwksUnavailable();
       }
       throw new AppleJwtClientError('No matching Apple public key');
     }

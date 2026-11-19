@@ -62,7 +62,10 @@ vi.mock('@/components/todos/up-next-section', () => ({
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: () => null,
 }));
-vi.mock('@/components/context-control', () => ({ ContextControl: () => null }));
+vi.mock('@/components/context-control', () => ({
+  CONTEXT_CONTROL_INLINE_MIN_DP: 21,
+  ContextControl: () => null,
+}));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: 'ScrollView',
   useTabBarBottomPadding: () => 0,

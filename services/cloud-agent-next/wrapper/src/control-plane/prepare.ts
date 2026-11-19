@@ -51,6 +51,7 @@ import { createSecretRedactor, redactSecrets } from '../redact-output.js';
 import {
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
+  KiloWorktreePolicyMismatchError,
 } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import type { RestoreRoots } from '../restore-roots.js';
@@ -182,7 +183,6 @@ type PreparedRoute = {
   directory: string;
   home: string;
   kilo: WorktreeKiloAuth;
-  env: Record<string, string>;
 };
 
 type PreparingRoute = {
@@ -375,7 +375,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       type: 'session.failed',
       sessionId,
       reason:
-        error instanceof RuntimeProfileMismatchError
+        error instanceof RuntimeProfileMismatchError ||
+        error instanceof KiloWorktreePolicyMismatchError
           ? 'invalid_configuration'
           : 'workspace_setup_failed',
       step,
@@ -1058,12 +1059,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       try {
         return await operation();
       } catch (error) {
-        // An MCP or credential-class drift against the shared runtime is permanent for this key;
-        // retrying would drop the existing runtime and accept the changed configuration.
+        // An MCP, credential-class, or authorization-policy drift against the shared runtime is
+        // permanent for this key; retrying would drop the existing runtime and accept the changed
+        // configuration.
         if (
           !isCurrent() ||
           error instanceof KiloWorktreeMcpMismatchError ||
-          error instanceof KiloWorktreeCredentialClassMismatchError
+          error instanceof KiloWorktreeCredentialClassMismatchError ||
+          error instanceof KiloWorktreePolicyMismatchError
         ) {
           throw error;
         }
@@ -1505,7 +1508,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         directory,
         home,
         kilo: kiloAuth,
-        env: builtEnv,
       });
       // A credentials frame that arrived while this route was preparing is
       // applied before the route reports ready; a release during the apply
@@ -1600,7 +1602,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       ),
       route.spec
     );
-    route.env = nextEnv;
     await deps.runtimes.installCredentials(route.key, nextEnv, cloudAgentMcp);
     commitWorkspaceMcpGrant(route.key, cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
@@ -1669,6 +1670,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       };
       const route = prepared.get(spec.sessionId);
       if (route) {
+        // A prepared route reuses its runtime without a new policy check: the
+        // route spec is fixed when the session registers and the runtime
+        // contract is pinned per allocation, so a re-prepare offers the
+        // permission map and review target that `ensure` already admitted.
         // M2: a failed route (spent restart budget / dead runtime) must start
         // fresh (spec §7), not short-circuit to `ready`.
         if (deps.runtimes.isUnavailable(route.key)) {

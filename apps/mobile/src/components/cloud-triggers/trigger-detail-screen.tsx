@@ -94,11 +94,7 @@ export function TriggerDetailScreen({
     body = <TriggerDetailSkeleton />;
   } else if (query.isError && query.data == null) {
     body = notFound ? (
-      <QueryError
-        variant="not-found"
-        title={t('cloudAgent.triggers.detailNotFoundTitle')}
-        message={triggerId}
-      />
+      <QueryError variant="not-found" title={t('cloudAgent.triggers.detailNotFoundTitle')} />
     ) : (
       <QueryError
         placement="top"

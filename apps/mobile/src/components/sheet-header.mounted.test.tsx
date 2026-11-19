@@ -6,17 +6,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PickerSheet } from './picker-sheet';
 import { SheetHeader } from './sheet-header';
+import { SurfaceClearsSideInsets } from '@/lib/screen-insets';
 import '@/i18n';
 
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const rn = vi.hoisted(() => ({ os: 'ios', statusHeight: 0 }));
+const i18nManager = vi.hoisted(() => ({
+  allowRTL: vi.fn(),
+  forceRTL: vi.fn(),
+  isRTL: false,
+  doLeftAndRightSwapInRTL: true,
+}));
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
-  I18nManager: { allowRTL: vi.fn(), isRTL: false, forceRTL: vi.fn() },
+  I18nManager: i18nManager,
   Platform: {
     get OS() {
       return rn.os;
@@ -161,6 +168,7 @@ describe('SheetHeader', () => {
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
     rn.os = 'ios';
     rn.statusHeight = 0;
+    i18nManager.isRTL = false;
   });
 
   it('renders a Share pressable in the leading slot when onShare is provided', async () => {
@@ -602,6 +610,51 @@ describe('SheetHeader', () => {
     expect(done?.parent?.parent).toBe(wrapper);
 
     renderer.unmount();
+  });
+
+  it('keeps each landscape inset on its own physical side in right-to-left', async () => {
+    // React Native rewrites a Left/Right padding to start/end in a
+    // right-to-left tree, so the cutout's left inset is written as the right
+    // padding there and lands back on the left edge of the glass.
+    i18nManager.isRTL = true;
+    safeArea.left = 47;
+    safeArea.right = 59;
+    const renderer = await mount({
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+
+    expect(findSafeAreaWrapper(renderer.root).props.style).toEqual({
+      paddingLeft: 59,
+      paddingRight: 47,
+    });
+
+    renderer.unmount();
+  });
+
+  it('adds no side inset inside a surface that clears the window sides on Android', async () => {
+    safeArea.left = 47;
+    safeArea.right = 59;
+    const sheet = (os: string) => {
+      rn.os = os;
+      return createElement(
+        SurfaceClearsSideInsets,
+        { value: true },
+        createElement(SheetHeader, { title: 'Save as profile', onDone: () => undefined })
+      );
+    };
+    const android = await mountElement(sheet('android'));
+    expect(findSafeAreaWrapper(android.root).props.style).toBeUndefined();
+    android.unmount();
+
+    // An iOS page sheet still spans the notch in landscape.
+    const ios = await mountElement(sheet('ios'));
+    expect(findSafeAreaWrapper(ios.root).props.style).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
+    ios.unmount();
   });
 
   it('clears the status bar when the sheet reaches the top safe area', async () => {

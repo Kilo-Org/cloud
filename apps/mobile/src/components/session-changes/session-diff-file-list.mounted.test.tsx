@@ -37,6 +37,7 @@ vi.mock('@/components/pr-review/diff/pr-diff-file-list-render', () => ({
 }));
 vi.mock('@/lib/screen-insets', () => ({
   useDetailScreenBottomPadding: () => 0,
+  useStyleSideInsets: () => ({ left: 0, right: 0 }),
   useSideInsetStyle: () => ({}),
 }));
 vi.mock('@/lib/pr-review/diff/pr-diff-list-builder', () => ({ buildFileItems: () => [] }));

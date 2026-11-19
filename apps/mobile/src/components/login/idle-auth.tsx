@@ -111,9 +111,10 @@ export function IdleAuth({
   // with whatever separator the locale puts before the Terms link — a space
   // where words are space-separated, nothing in Chinese — `termsConnector`
   // carries the conjunction with its own spacing, and the suffix is the
-  // sentence's final punctuation. The link inside the sentence reads
-  // `termsInSentence`, the form the locale's consent verb governs, while
-  // `login.terms` is the noun phrase the link announces on its own.
+  // sentence's final punctuation. The link inside the sentence paints and reads
+  // `termsInSentence`, the form the locale's consent verb governs, while it
+  // announces, and the screen it opens names, `common.termsOfService` — the
+  // document's own title.
   const legalSentence =
     `${t('login.termsPrefix')}${t('login.termsInSentence')}${t('login.termsConnector')}` +
     `${t('common.privacyPolicy')}${t('login.termsSuffix')}`;
@@ -315,16 +316,16 @@ export function IdleAuth({
           setVerifyError(undefined);
           clearPendingLinkFailure();
         }}
-        onResend={() => {
+        onResend={async () => {
           verifyAttemptRef.current += 1;
           setVerifyError(undefined);
           clearPendingLinkFailure();
-          void (async () => {
-            const ok = await requestEmailCode(otpEmail);
-            if (ok) {
-              toast.success(t('login.codeSent'));
-            }
-          })();
+          const ok = await requestEmailCode(otpEmail);
+          if (ok) {
+            toast.success(t('login.codeSent'));
+          }
+          // The code field empties only when a code was actually sent.
+          return ok;
         }}
         onBack={() => {
           verifyAttemptRef.current += 1;
@@ -551,7 +552,7 @@ export function IdleAuth({
           className={INLINE_LINK_BOX_CLASS}
           hitSlop={inlineLinkHitSlop('start')}
           accessibilityRole="link"
-          accessibilityLabel={t('login.termsInSentence')}
+          accessibilityLabel={t('common.termsOfService')}
           onPress={() => {
             openLegalDocument('terms');
           }}

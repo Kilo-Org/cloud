@@ -210,9 +210,13 @@ export function LowBalanceAlertForm({
 
   return (
     <>
+      <Text variant="muted" className="text-sm">
+        {t('organization.lowBalanceAlert.subtitle')}
+      </Text>
+
       <RowGroup>
         <PreferenceRow
-          title={t('organization.lowBalanceAlert.enableA11y')}
+          title={t('spendAlerts.sendAlerts')}
           value={enabled}
           disabled={false}
           onValueChange={value => {

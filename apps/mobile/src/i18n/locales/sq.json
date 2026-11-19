@@ -57,6 +57,7 @@
     "link": "lidhja",
     "takingLonger": "Kjo po zgjat më shumë nga sa pritej. Mund ta mbyllësh dhe të kontrollosh përsëri.",
     "model": "Modeli",
+    "notSelected": "Nuk është zgjedhur",
     "accessDenied": "Qasja u refuzua.",
     "allRepositories": "Të gjitha depot",
     "personal": "Personale",
@@ -147,6 +148,7 @@
     "performance": "Performanca",
     "preferences": "Preferencat",
     "privacyPolicy": "Politika e privatësisë",
+    "termsOfService": "Kushtet e shërbimit",
     "profile": "Profili",
     "reactions": "Reagime",
     "recent": "Të fundit",
@@ -170,6 +172,7 @@
     "generating": "Duke gjeneruar…",
     "working": "Duke punuar",
     "yourOwnRepositories": "Depot e tua",
+    "organizationRepositories": "Depot e organizatës",
     "dismissed": "E hedhur poshtë",
     "agent": "Agjenti",
     "durationMinuteShort": "min",
@@ -216,8 +219,8 @@
     "verifyCode": "Verifiko kodin",
     "resendCode": "Ridërgo kodin",
     "termsPrefix": "Duke vazhduar, pajtohesh me ",
+    "termsInSentence": "Kushtet e shërbimit",
     "terms": "Kushtet",
-    "termsInSentence": "Kushtet",
     "termsConnector": " dhe ",
     "termsSuffix": ".",
     "moreSignInOptions": "Më shumë opsione hyrjeje",
@@ -762,7 +765,6 @@
       "replyPlaceholder": "Përgjigjja jote…",
       "replyBody": "Përmbajtja e përgjigjes",
       "submitReply": "Dërgo përgjigjen",
-      "termsTitle": "Kushtet e shërbimit",
       "termsCopy": "Duhet të jesh të paktën 13 vjeç për të postuar.",
       "termsAcceptRetry": "Kushtet nuk u pranuan. Kontrollo lidhjen dhe provo përsëri.",
       "viewTerms": "Shiko kushtet",
@@ -1025,7 +1027,10 @@
     "tabs": {
       "overview": "Përmbledhja",
       "files": "Skedarë",
-      "discussion": "Diskutimi"
+      "discussion": "Diskutimi",
+      "discussionAccessibility_one": "{{title}}: 1 koment",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komente",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komente"
     },
     "fileStatus": {
       "modified": "I modifikuar",
@@ -1131,16 +1136,16 @@
     },
     "category": {
       "agentAttentionTitle": "Agjenti ka nevojë për ty",
-      "agentAttentionSubtitle": "pyetje, kërkesa për leje dhe informacion",
+      "agentAttentionSubtitle": "Pyetje, kërkesa për leje dhe informacion",
       "agentUpdatesTitle": "Përditësimet e agjentit",
-      "agentUpdatesSubtitle": "mesazhe nga agjenti gjatë detyrës",
+      "agentUpdatesSubtitle": "Mesazhe nga agjenti gjatë detyrës",
       "sessionStatusTitle": "Statusi i seancës",
-      "sessionStatusSubtitle": "e përfunduar / e dështuar / gati për kontroll",
-      "balanceAlertsSubtitle": "paralajmërime për gjendje të ulët të organizatës",
+      "sessionStatusSubtitle": "E përfunduar / e dështuar / gati për kontroll",
+      "balanceAlertsSubtitle": "Paralajmërime për gjendje të ulët të organizatës",
       "balanceAlertsUnavailable": "Bashkohu me një organizatë për të marrë paralajmërime për gjendjen.",
-      "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA",
+      "securityFindingsSubtitle": "Gjetje të reja dhe kujtesa për SLA",
       "securityFindingsUnavailable": "Aktivizo Agjentin e sigurisë Kilo në një fushëveprim për të marrë gjetje sigurie.",
-      "spendAlertsSubtitle": "tejkalime pragjesh dhe rritje për orë",
+      "spendAlertsSubtitle": "Tejkalime pragjesh dhe rritje për orë",
       "spendAlertsToggle": "Kategoria e njoftimeve për shpenzimet"
     },
     "history": {
@@ -1222,7 +1227,7 @@
     },
     "instructions": {
       "title": "Udhëzime të personalizuara",
-      "deprecation": "Funksioni i udhëzimeve të personalizuara do të hiqet nga përdorimi. Zhvendosi këto udhëzime në një skedar REVIEW.md në depon tënde.",
+      "deprecation": "Udhëzimet e personalizuara do të hiqen. Zhvendosi këto udhëzime në një skedar REVIEW.md në depon tënde.",
       "placeholder": "p.sh. respektimi i rregullave tona për trajtimin e gabimeve…",
       "clearTitle": "Të hiqen udhëzimet e personalizuara?",
       "clearMessage": "Ruajtja e një fushe bosh do të fshijë udhëzimet e personalizuara të ruajtura për këtë recensues kodi."
@@ -1388,6 +1393,7 @@
       "managedOnWeb": "Lidhja me Bitbucket e {{organization}} menaxhohet në ueb nga një kompjuter.",
       "description": "Krijo një token qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite më poshtë.",
       "descriptionReconnect": "Krijo një token të ri qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite më poshtë.",
+      "descriptionOverview": "Krijo një token qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite në ekranin tjetër.",
       "scopes": "Llogaria: lexim · Depot: lexim/shkrim · PR: lexim · Webhook-et: lexim/shkrim",
       "tokenPlaceholder": "Token qasjeje për hapësirën e punës",
       "tokenRefused": "Bitbucket nuk e pranoi këtë token qasjeje për hapësirën e punës. Kontrollo që ai t'i ketë lejet më sipër, pastaj provo përsëri."
@@ -3021,6 +3027,7 @@
     "noSessionsDescription": "Hyr në aplikacionin Kilo në një pajisje tjetër dhe ajo do të shfaqet këtu.",
     "signInScopeNote": "Këtu shfaqen hyrjet nga aplikacioni Kilo, Kilo CLI dhe shfletuesi i uebit. Hyrjet nga redaktori nuk renditen.",
     "signedIn": "Hyrja: {{signedIn}} · Aktiviteti i fundit: {{lastSeen}}",
+    "signedInThisDevice": "Hyrja: {{signedIn}} · {{thisDevice}}",
     "thisDevice": "Kjo pajisje",
     "viewProfile": "Shiko profilin",
     "signOutThisDevice": "Dil nga kjo pajisje",
@@ -3151,6 +3158,11 @@
       "billingHistory": "Historiku i faturimit",
       "billingHistoryEmpty": "Ende nuk ka historik faturimi.",
       "billingHistoryError": "Nuk mundi të ngarkohet historiku i faturimit",
+      "billingRowInitial": "Pagesa e parë · {{tier}}",
+      "billingRowRenewal": "Rinovimi · {{tier}}",
+      "billingRowSubscription": "Abonimi · {{tier}}",
+      "billingRowTrial": "Prova falas · {{tier}}",
+      "billingRowUpgrade": "Ndryshimi i planit · {{tier}}",
       "cancel": "Anulo abonimin",
       "cancelDescription": "Kilo Pass mbetet aktiv deri në fund të periudhës së faturimit dhe nuk do të rinovohet.",
       "cancelScheduled": "Anulohet më {{date}}",
@@ -3176,6 +3188,8 @@
     "retryHint": "Riprovohet ngarkimi i gjendjes së Kilo Pass.",
     "endedOn": "Përfundoi më {{date}}",
     "notAvailableInApp": "Kilo Pass nuk është i disponueshëm në aplikacion.",
+    "notAvailableTitle": "Kilo Pass nuk ofrohet në aplikacion",
+    "noPassDescription": "Kjo llogari nuk ka Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Në provë",
     "statusPastDue": "Pagesa e vonuar",
@@ -3246,6 +3260,7 @@
     "revokeConsent": "Tërhiq pëlqimin",
     "revokeConsentTitle": "Të tërhiqet pëlqimi për ndarjen e të dhënave?",
     "acceptAndContinue": "Prano dhe vazhdo",
+    "loadingConsentSettings": "Po ngarkohen cilësimet e tua të pëlqimit…",
     "decline": "Refuzo",
     "declineAndSignOut": "Refuzo dhe dil",
     "declineTitle": "Të refuzohet ndarja e të dhënave?",
@@ -3457,7 +3472,7 @@
       "retentionLimit": "Po shfaqen faturat më të fundit."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktivizo njoftimin për gjendje të ulët",
+      "subtitle": "Dërgo një njoftim me email te adresat që shënon kur gjendja e kësaj organizate bie nën shumën që cakton.",
       "notifyEmailsLabel": "Adresat e emailit për njoftime",
       "permissionDenied": "Nuk ke leje për të menaxhuar njoftimet e faturimit.",
       "separateEmailsHint": "Ndaji adresat e emailit me presje.",
@@ -3533,6 +3548,7 @@
       "truncated": "Kjo orë ka më shumë kërkesa nga sa shfaq lista.",
       "emptyTitle": "Nuk ka kërkesa në këtë orë",
       "emptyDescription": "Përdorni Ora e mëparshme për të parë kërkesat e mëparshme.",
+      "emptyBoundDescription": "Regjistrat e kërkesave nuk shkojnë më mbrapa se kaq.",
       "loadError": "Regjistrat e kërkesave nuk u ngarkuan.",
       "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave.",
       "tokens": "{{input}} hyrëse · {{output}} dalëse",
@@ -3603,8 +3619,7 @@
       "renameTitle": "Riemërto organizatën",
       "renamePlaceholder": "Emri i organizatës",
       "balance": "Gjendja",
-      "organizationSeats": "Vendet për anëtarë në organizatë",
-      "plan": "Plani i organizatës",
+      "plan": "Plani",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Skaduar",
@@ -3638,7 +3653,8 @@
     "signupStepUp": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Kodi është i pasaktë. Provo përsëri.",
+    "signupStepUpBack": "Për të përfunduar krijimin e llogarisë, kthehu prapa dhe përdor '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Kodi është i pasaktë ose ka skaduar. Provo përsëri ose përdor '$t(login.resendCode)'.",
     "codeInProgress": "Kodi yt po përpunohet. Prit pak dhe provo përsëri.",
     "tooManyAttempts": "Ke bërë shumë përpjekje. Kërko një kod të ri.",
     "invalidToken": "Hyrja dështoi. Provo përsëri.",
@@ -3767,6 +3783,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ky model ka nevojë për lidhje interneti. Lidhu dhe provo sërish, ose kalo te një model në këtë pajisje.",
+    "connectionLost": "Lidhja me modelin u ndërpre. Kontrollo lidhjen dhe provo përsëri.",
     "empty": {
       "title": "Filloni një bisedë",
       "description": "Dërgo një mesazh për të biseduar me një model."
@@ -3906,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) dërgon një kërkesë të shkurtër inference te kjo pikë fundore duke përdorur protokollin dhe modelin e zgjedhur. Ofruesi mund të kërkojë pagesë për të.",
       "connectionSucceeded": "Modeli përfundoi një kërkesë duke përdorur këtë protokoll.",
       "connectionFailed": "Modeli nuk arriti të përfundonte një kërkesë. Kontrollo URL-në bazë të API-së, protokollin, të dhënat e hyrjes dhe ID-në e modelit.",
+      "requestTimedOut": "Pika fundore nuk u përgjigj në kohë. Kontrollo URL-në bazë të API-së dhe lidhjen, pastaj provo sërish.",
+      "requestUnauthorized": "Pika fundore i refuzoi të dhënat e hyrjes. Kontrollo çelësin API dhe header-at e personalizuar, pastaj provo sërish.",
+      "requestNotFound": "Pika fundore ose modeli nuk u gjet. Kontrollo URL-në bazë të API-së dhe ID-në e modelit.",
+      "requestRateLimited": "Pika fundore po kufizon kërkesat. Prit një çast dhe provo sërish.",
+      "requestUnavailable": "Pika fundore nuk është e disponueshme tani. Provo sërish pas një çasti.",
+      "requestUnreachable": "Pika fundore nuk u arrit dot. Kontrollo URL-në bazë të API-së dhe lidhjen.",
+      "requestInvalidResponse": "Pika fundore u përgjigj, por jo në formatin e pritur. Kontrollo që URL-ja bazë e API-së dhe protokolli të përputhen me serverin, pastaj provo përsëri.",
+      "discoveryNoModels": "Pika fundore nuk renditi asnjë model. Fut modelet manualisht.",
+      "connectionIncomplete": "Modeli u përgjigj, por nuk përfundoi. Provo sërish, ose kontrollo ID-në e modelit dhe protokollin.",
       "invalidInput": "Fut një emër për shërbimin mbështetës, kryefusha të vlefshme dhe të paktën një model me ID dhe emër unik. Kufijtë e tokenëve duhet të jenë numra të plotë pozitivë.",
       "invalidUrl": "Fut një URL bazë API me HTTP ose HTTPS, pa të dhëna hyrjeje, parametra kërkimi ose fragment.",
       "publicHttp": "Pikat fundore publike HTTP nuk lejohen. Përdor HTTPS ose një pikë fundore lokale private.",
@@ -4044,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"
     },
-    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh."
+    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh.",
+    "providerKeyRefused": "Ofruesi i refuzoi të dhënat e hyrjes. Kontrollo çelësin API të tij, pastaj dërgo sërish.",
+    "providerModelMissing": "Ky backend nuk ofron më këtë model. Zgjidh një tjetër.",
+    "providerRateLimited": "Ofruesi po kufizon kërkesat. Prit një çast dhe dërgo sërish.",
+    "providerUnavailable": "Ofruesi nuk është i disponueshëm tani. Dërgo sërish pas pak."
   },
   "settingsTools": {
     "confirmTitle": "Të konfirmohet ky ndryshim?"
@@ -4192,6 +4222,7 @@
     "instructionsHint": "Rregulla markdown që zbatohen për çdo sesion që përdor këtë profil.",
     "instructionsEmpty": "Nuk ka ende skedarë udhëzimesh",
     "instructionsEmptyDescription": "Shto skedarë rregullash që zbatohen në çdo sesion me këtë profil.",
+    "instructionsEmptyDescriptionReadOnly": "Skedarët e rregullave të shtuar këtu zbatohen për çdo sesion që përdor këtë profil.",
     "instructionNameRequired": "Jep një emër skedari",
     "instructionNameTooLong": "Emri i skedarit duhet të ketë {{max}} karaktere ose më pak",
     "instructionNameInvalid": "Fillo me një shkronjë ose shifër dhe përdor vetëm shkronja të vogla, shifra dhe viza",
@@ -4418,6 +4449,7 @@
     "pickPackToBuyAgain": "Zgjidhni një paketë më sipër për të nisur një blerje të re.",
     "purchasePending": "Dyqani ende po e përpunon këtë pagesë. Kreditet do të mbërrijnë sapo ai ta miratojë tarifën.",
     "buyAgain": "Bli sërish",
+    "checkPurchase": "Kontrollo blerjen",
     "purchaseOwnedByAnotherAccount": "Kreditet në këtë Apple Account i përkasin një llogarie tjetër Kilo. Hyr në atë llogari Kilo për t'i përdorur.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditet në këtë llogari Google Play i përkasin një llogarie tjetër Kilo. Hyni në atë llogari Kilo për t'i përdorur."
   },
@@ -4511,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "Ruaj në listë",
-      "saved": "U ruajt në {{list}}"
+      "saved": "U ruajt në {{list}}",
+      "saveFailed": "Nuk u ruajt detyra. Kontrollo lidhjen dhe provo përsëri.",
+      "saveRefused": "Nuk u ruajt detyra në këtë listë. Zgjidh një listë tjetër."
     }
   },
   "agentBriefing": {
@@ -4523,6 +4557,7 @@
     "empty": "Asnjë aktivitet në këtë dritare kohore të raportit",
     "emptyHint": "Seancat e kodimit në cloud dhe CLI shfaqen këtu kur një raport i planifikuar ka aktivitet.",
     "loadError": "Raportet nuk u ngarkuan",
+    "estimateLoadError": "Vlerësimi nuk mund të ngarkohej.",
     "view": "Lexo raportin",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4536,6 +4571,7 @@
     "summary": "Përmbledhje AI",
     "summaryPending": "Përmbledhja AI është në proces. Do të shtohet këtu kur të jetë gati.",
     "summaryUnavailable": "Përmbledhja AI nuk është e disponueshme. Raporti i strukturuar mbetet i disponueshëm.",
+    "summaryNotAdmitted": "Përmbledhja AI nuk u gjenerua për këtë raport. Raporti i strukturuar mbetet i disponueshëm.",
     "summaryCharge": "AI tarifoi {{cost}}",
     "summaryChargePending": "Tarifa AI në pritje të rakordimit",
     "summaryModel": "$t(common.model): {{model}}",
@@ -4620,7 +4656,7 @@
     "topFeatures": "Veçoritë kryesore",
     "emptyTitle": "Asnjë përdorim në këtë periudhë",
     "unavailableTitle": "Përdorimi nuk është i disponueshëm",
-    "unavailableDescription": "Kjo hapësirë pune nuk raporton përdorim. Riprovimi nuk do të ndihmojë.",
+    "unavailableDescription": "Përdorimi nuk është konfiguruar për këtë hapësirë pune. Kontaktoni mbështetjen nëse prisni të shihni përdorim këtu.",
     "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
     "viewDetails": "Shiko detajet e përdorimit"
   },
@@ -4628,7 +4664,7 @@
     "title": "Integrimet",
     "sectionTitle": "Shërbimet e lidhura",
     "entrySubtitle": "GitHub, Slack, Linear dhe të tjera",
-    "subtitle": "Lidh mjetet dhe proceset e tua të zhvillimit me Kilo",
+    "subtitle": "Lidh mjetet dhe proceset e tua të zhvillimit me Kilo.",
     "disconnect": "Shkëput",
     "disconnectTitle": "Të shkëputet {{provider}}?",
     "disconnectMessage": "Kilo do të ndalojë së përgjigjuri në {{provider}}. Mund ta lidhësh sërish në çdo kohë.",
@@ -4700,7 +4736,6 @@
       "nameLocked": "Emri nuk mund të ndryshojë pas krijimit të shkaktarit.",
       "repositoryLocked": "Repozitori nuk mund të ndryshojë pas krijimit të shkaktarit.",
       "environmentAutomatic": "Automatik sipas repozitorit",
-      "notSelected": "Nuk është zgjedhur",
       "profileDefaults": "Përdor parazgjedhjet",
       "profileHelp": "Cilësimet e profilit zbatohen kur ekzekutohet shkaktari. Sekretet e tij zgjidhen në atë moment.",
       "customAgent": "Agjent i personalizuar",
@@ -4928,7 +4963,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Veçori e ndërmarrjes",
-    "enterpriseOnly": "Kjo është një veçori vetëm për ndërmarrjet.",
+    "enterpriseOnly": "Ofruesit dhe modelet janë të disponueshëm në planin Enterprise.",
     "readOnly": "Vetëm pronarët dhe administratorët e organizatës mund t'i ndryshojnë këto cilësime.",
     "loadError": "Ofruesit dhe modelet nuk u ngarkuan dot",
     "tabModels": "Modelet",

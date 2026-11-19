@@ -16,6 +16,7 @@ const surface = vi.hoisted(() => ({
   show: [] as (() => void)[],
   hide: [] as (() => void)[],
 }));
+const keyboardMotion = vi.hoisted(() => ({ value: 0 }));
 
 vi.mock('react-native', () => {
   // The header measures its own window edge through the transform-aware rect,
@@ -64,6 +65,10 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Info: 'Info', Share: 'Share', X: 'X' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111827', primary: '#2563eb', mutedForeground: '#6b7280' }),
+}));
+// The keyboard's UI-thread height; a header must not grow from it alone.
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  useKeyboardMotionHeight: () => keyboardMotion,
 }));
 
 async function mount(
@@ -131,6 +136,7 @@ describe('SheetHeader settled top clearance', () => {
     surface.top = 24;
     surface.show = [];
     surface.hide = [];
+    keyboardMotion.value = 0;
   });
 
   it('covers the inset the presented sheet left above the header', async () => {
@@ -144,6 +150,33 @@ describe('SheetHeader settled top clearance', () => {
 
       // 24 dp edge inside a 51.81 dp inset: the header adds the 27.8 dp band.
       expect(topClearance(renderer)).toBeCloseTo(27.81);
+
+      renderer.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('adds no space above the row while the keyboard is up and the sheet stays at the half detent', async () => {
+    // The sheet can keep its half detent with the keyboard up (list settings
+    // in the dark, compact and Arabic gate cells). Its header is far below the
+    // status bar, so any band above the row only pushes the Emoji and Name
+    // fields under the keyboard.
+    vi.useFakeTimers();
+    try {
+      surface.top = 443.05;
+      keyboardMotion.value = 330;
+      const renderer = await mountHeader();
+      await act(async () => {
+        for (const listener of surface.show) {
+          listener();
+        }
+        vi.advanceTimersByTime(1100);
+        await Promise.resolve();
+      });
+
+      expect(topClearance(renderer)).toBe(0);
+      expect(findSafeAreaWrapper(renderer.root).children).toHaveLength(1);
 
       renderer.unmount();
     } finally {

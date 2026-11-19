@@ -78,10 +78,10 @@ describe('replaceModelSummaries', () => {
     await replaceModelSummaries({} as D1Database, 'run-1', [
       {
         ...makeSummary('model/legacy'),
-        avgInputTokens: undefined,
-        avgCachedInputTokens: undefined,
-        avgOutputTokens: undefined,
-        avgReasoningTokens: undefined,
+        avgInputTokens: null,
+        avgCachedInputTokens: null,
+        avgOutputTokens: null,
+        avgReasoningTokens: null,
       },
     ]);
 

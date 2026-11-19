@@ -57,6 +57,7 @@
     "link": "länk",
     "takingLonger": "Det här tar längre tid än väntat. Du kan stänga vyn och kontrollera igen.",
     "model": "Modell",
+    "notSelected": "Inte valt",
     "accessDenied": "Åtkomst nekad",
     "allRepositories": "Alla kodarkiv",
     "personal": "Personligt",
@@ -147,6 +148,7 @@
     "performance": "Prestanda",
     "preferences": "Inställningar",
     "privacyPolicy": "Integritetspolicy",
+    "termsOfService": "Användarvillkor",
     "profile": "Profil",
     "reactions": "Reaktioner",
     "recent": "Senaste",
@@ -170,6 +172,7 @@
     "generating": "Genererar…",
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
+    "organizationRepositories": "Organisationens kodarkiv",
     "dismissed": "Avfärdad",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -216,8 +219,8 @@
     "verifyCode": "Verifiera kod",
     "resendCode": "Skicka koden igen",
     "termsPrefix": "Genom att fortsätta godkänner du våra ",
+    "termsInSentence": "Användarvillkor",
     "terms": "Villkor",
-    "termsInSentence": "Villkor",
     "termsConnector": " och ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fler inloggningsalternativ",
@@ -762,7 +765,6 @@
       "replyPlaceholder": "Ditt svar…",
       "replyBody": "Svarstext",
       "submitReply": "Skicka svar",
-      "termsTitle": "Användarvillkor",
       "termsCopy": "Du måste vara minst 13 år för att publicera inlägg.",
       "termsAcceptRetry": "Kunde inte godkänna villkoren. Kontrollera anslutningen och försök igen.",
       "viewTerms": "Visa villkoren",
@@ -1025,7 +1027,10 @@
     "tabs": {
       "overview": "Översikt",
       "files": "Filer",
-      "discussion": "Diskussion"
+      "discussion": "Diskussion",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentarer",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentarer"
     },
     "fileStatus": {
       "modified": "Ändrad",
@@ -1131,16 +1136,16 @@
     },
     "category": {
       "agentAttentionTitle": "Agenten behöver dig",
-      "agentAttentionSubtitle": "frågor, behörigheter och annat som kräver ditt svar",
+      "agentAttentionSubtitle": "Frågor, behörigheter och annat som kräver ditt svar",
       "agentUpdatesTitle": "Agentuppdateringar",
-      "agentUpdatesSubtitle": "meddelanden från agenten medan uppgiften pågår",
+      "agentUpdatesSubtitle": "Meddelanden från agenten medan uppgiften pågår",
       "sessionStatusTitle": "Sessionsstatus",
-      "sessionStatusSubtitle": "avslutad / misslyckad / redo att styras",
-      "balanceAlertsSubtitle": "varningar om lågt organisationssaldo",
+      "sessionStatusSubtitle": "Avslutad / misslyckad / redo att styras",
+      "balanceAlertsSubtitle": "Varningar om lågt organisationssaldo",
       "balanceAlertsUnavailable": "Gå med i en organisation för att få saldovarningar.",
-      "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser",
+      "securityFindingsSubtitle": "Nya säkerhetsfynd och SLA-påminnelser",
       "securityFindingsUnavailable": "Aktivera Kilo-säkerhetsagenten i en omfattning för att få säkerhetsfynd.",
-      "spendAlertsSubtitle": "gränsöverskridanden och toppar per timme",
+      "spendAlertsSubtitle": "Gränsöverskridanden och toppar per timme",
       "spendAlertsToggle": "Kategorin utgiftsvarningar"
     },
     "history": {
@@ -1222,7 +1227,7 @@
     },
     "instructions": {
       "title": "Anpassade instruktioner",
-      "deprecation": "Funktionen för anpassade instruktioner ska fasas ut. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
+      "deprecation": "Funktionen för anpassade instruktioner kommer att tas bort. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
       "placeholder": "t.ex. följ våra regler för felhantering…",
       "clearTitle": "Ta bort anpassade instruktioner?",
       "clearMessage": "Om du sparar ett tomt fält tas de anpassade instruktioner som sparats för den här granskaren bort."
@@ -1388,6 +1393,7 @@
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "descriptionReconnect": "Skapa en ny åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
+      "descriptionOverview": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den på nästa skärm.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
       "tokenPlaceholder": "Åtkomsttoken för arbetsytan",
       "tokenRefused": "Bitbucket accepterade inte den här åtkomsttoken för arbetsytan. Kontrollera att den har behörigheterna ovan och försök igen."
@@ -1919,7 +1925,7 @@
       "githubAppSettings": "Inställningarna för GitHub-appen",
       "manageAccess": "Hantera GitHub-appens åtkomst",
       "noRepositories": "Inga kodarkiv",
-      "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv",
+      "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv.",
       "selectAtLeastOne": "Välj minst ett kodarkiv."
     },
     "scopeEntry": {
@@ -3021,6 +3027,7 @@
     "noSessionsDescription": "Logga in i Kilo-appen på en annan enhet så visas den här.",
     "signInScopeNote": "Här visas inloggningar i Kilo-appen, Kilo CLI och en webbläsare. Inloggningar i kodredigeraren visas inte.",
     "signedIn": "Inloggad {{signedIn}} · Senast aktiv {{lastSeen}}",
+    "signedInThisDevice": "Inloggad {{signedIn}} · {{thisDevice}}",
     "thisDevice": "Den här enheten",
     "viewProfile": "Visa profil",
     "signOutThisDevice": "Logga ut från den här enheten",
@@ -3151,6 +3158,11 @@
       "billingHistory": "Faktureringshistorik",
       "billingHistoryEmpty": "Ingen faktureringshistorik än.",
       "billingHistoryError": "Kunde inte läsa in faktureringshistoriken",
+      "billingRowInitial": "Första debiteringen · {{tier}}",
+      "billingRowRenewal": "Förnyelse · {{tier}}",
+      "billingRowSubscription": "Prenumeration · {{tier}}",
+      "billingRowTrial": "Gratis provperiod · {{tier}}",
+      "billingRowUpgrade": "Planbyte · {{tier}}",
       "cancel": "Avsluta prenumeration",
       "cancelDescription": "Ditt Kilo Pass är aktivt till slutet av faktureringsperioden och förnyas inte.",
       "cancelScheduled": "Avslutas {{date}}",
@@ -3176,6 +3188,8 @@
     "retryHint": "Försöker läsa in Kilo Pass-status igen.",
     "endedOn": "Avslutad {{date}}",
     "notAvailableInApp": "Kilo Pass är inte tillgängligt i appen.",
+    "notAvailableTitle": "Kilo Pass finns inte i appen",
+    "noPassDescription": "Det här kontot har inget Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Provperiod",
     "statusPastDue": "Betalning förfallen",
@@ -3246,6 +3260,7 @@
     "revokeConsent": "Återkalla samtycke",
     "revokeConsentTitle": "Återkalla samtycke till datadelning?",
     "acceptAndContinue": "Acceptera och fortsätt",
+    "loadingConsentSettings": "Läser in dina samtyckesinställningar…",
     "decline": "Avböj",
     "declineAndSignOut": "Avböj och logga ut",
     "declineTitle": "Avböj datadelning?",
@@ -3457,7 +3472,7 @@
       "retentionLimit": "Visar de senaste fakturorna."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktivera varning för lågt saldo",
+      "subtitle": "Skicka en varning via e-post till de adresser du anger när organisationens saldo understiger det belopp du ställer in.",
       "notifyEmailsLabel": "E-postadresser för varningar",
       "permissionDenied": "Du har inte behörighet att hantera faktureringsvarningar.",
       "separateEmailsHint": "Separera flera e-postadresser med kommatecken.",
@@ -3533,6 +3548,7 @@
       "truncated": "Den här timmen har fler förfrågningar än listan visar.",
       "emptyTitle": "Inga förfrågningar den här timmen",
       "emptyDescription": "Använd Tidigare timme för att se tidigare förfrågningar.",
+      "emptyBoundDescription": "Förfrågningsloggarna sträcker sig inte längre tillbaka än så här.",
       "loadError": "Det gick inte att läsa in förfrågningsloggarna.",
       "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar.",
       "tokens": "{{input}} in · {{output}} ut",
@@ -3603,8 +3619,7 @@
       "renameTitle": "Byt namn på organisation",
       "renamePlaceholder": "Organisationens namn",
       "balance": "Saldo",
-      "organizationSeats": "Platser i organisationen",
-      "plan": "Organisationsplan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Har löpt ut",
@@ -3638,7 +3653,8 @@
     "signupStepUp": "Välj ”$t(login.moreSignInOptions)” för att slutföra skapandet av ditt konto.",
     "signupStepUpApple": "Välj ”$t(login.signInWithApple)” för att slutföra skapandet av ditt konto.",
     "signupStepUpGoogle": "Välj ”$t(login.signInWithGoogle)” för att slutföra skapandet av ditt konto.",
-    "invalidCode": "Koden är felaktig. Försök igen.",
+    "signupStepUpBack": "Gå tillbaka och välj ”$t(login.moreSignInOptions)” för att slutföra skapandet av ditt konto.",
+    "invalidCode": "Koden är felaktig eller har gått ut. Försök igen eller välj ”$t(login.resendCode)”.",
     "codeInProgress": "Din kod behandlas. Vänta en stund och försök igen.",
     "tooManyAttempts": "För många försök. Begär en ny kod.",
     "invalidToken": "Inloggningen misslyckades. Försök igen.",
@@ -3767,6 +3783,7 @@
   },
   "modelChat": {
     "offlineFailure": "Den här modellen kräver en internetanslutning. Anslut och försök igen, eller byt till en modell på den här enheten.",
+    "connectionLost": "Anslutningen till modellen bröts. Kontrollera anslutningen och försök igen.",
     "empty": {
       "title": "Starta en chatt",
       "description": "Skicka ett meddelande för att prata med en modell."
@@ -3906,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) skickar en kort inferensbegäran till den här slutpunkten med valt protokoll och vald modell. Leverantören kan ta betalt för den.",
       "connectionSucceeded": "Modellen slutförde en begäran med det här protokollet.",
       "connectionFailed": "Modellen kunde inte slutföra en begäran. Kontrollera API-roten, protokollet, inloggningsuppgifterna och modell-ID:t.",
+      "requestTimedOut": "Slutpunkten svarade inte i tid. Kontrollera API-roten och din anslutning och försök igen.",
+      "requestUnauthorized": "Slutpunkten nekade inloggningsuppgifterna. Kontrollera API-nyckeln och de anpassade rubrikerna och försök igen.",
+      "requestNotFound": "Slutpunkten eller modellen hittades inte. Kontrollera API-roten och modell-ID:t.",
+      "requestRateLimited": "Slutpunkten begränsar antalet förfrågningar. Vänta ett ögonblick och försök igen.",
+      "requestUnavailable": "Slutpunkten är inte tillgänglig just nu. Försök igen om en stund.",
+      "requestUnreachable": "Det gick inte att nå slutpunkten. Kontrollera API-roten och din anslutning.",
+      "requestInvalidResponse": "Slutpunkten svarade inte i det förväntade formatet. Kontrollera att API-roten och protokollet matchar servern och försök igen.",
+      "discoveryNoModels": "Slutpunkten listade inga modeller. Ange modeller manuellt.",
+      "connectionIncomplete": "Modellen svarade men slutförde inte. Försök igen eller kontrollera modell-ID:t och protokollet.",
       "invalidInput": "Ange ett backendnamn, giltiga headers och minst en modell med unikt ID och namn. Tokengränser måste vara positiva heltal.",
       "invalidUrl": "Ange en HTTP- eller HTTPS-API-rot utan inloggningsuppgifter, frågesträng eller fragment.",
       "publicHttp": "Publika HTTP-slutpunkter är inte tillåtna. Använd HTTPS eller en privat lokal slutpunkt.",
@@ -4044,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"
     },
-    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet."
+    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet.",
+    "providerKeyRefused": "Leverantören nekade inloggningsuppgifterna. Kontrollera dess API-nyckel och skicka igen.",
+    "providerModelMissing": "Den här backenden tillhandahåller inte längre den här modellen. Välj en annan.",
+    "providerRateLimited": "Leverantören begränsar antalet förfrågningar. Vänta ett ögonblick och skicka igen.",
+    "providerUnavailable": "Leverantören är inte tillgänglig just nu. Skicka igen om en stund."
   },
   "settingsTools": {
     "confirmTitle": "Bekräfta denna ändring?"
@@ -4192,6 +4222,7 @@
     "instructionsHint": "Regler i markdown som tillämpas på varje session som använder den här profilen.",
     "instructionsEmpty": "Inga instruktionsfiler än",
     "instructionsEmptyDescription": "Lägg till regel­filer som varje session med den här profilen tillämpar.",
+    "instructionsEmptyDescriptionReadOnly": "Regelfiler som läggs till här tillämpas på varje session som använder den här profilen.",
     "instructionNameRequired": "Ange ett filnamn",
     "instructionNameTooLong": "Filnamnet får vara högst {{max}} tecken",
     "instructionNameInvalid": "Börja med en bokstav eller siffra och använd bara gemena bokstäver, siffror och bindestreck",
@@ -4418,6 +4449,7 @@
     "pickPackToBuyAgain": "Välj ett paket ovan för att starta ett nytt köp.",
     "purchasePending": "Butiken behandlar fortfarande betalningen. Dina krediter kommer så snart den godkänner debiteringen.",
     "buyAgain": "Köp igen",
+    "checkPurchase": "Kontrollera köpet",
     "purchaseOwnedByAnotherAccount": "Krediterna på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem.",
     "purchaseOwnedByAnotherAccountPlay": "Krediterna på detta Google Play-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem."
   },
@@ -4511,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "Spara i lista",
-      "saved": "Sparat i {{list}}"
+      "saved": "Sparat i {{list}}",
+      "saveFailed": "Det gick inte att spara uppgiften. Kontrollera din anslutning och försök igen.",
+      "saveRefused": "Det gick inte att spara uppgiften i den här listan. Välj en annan lista."
     }
   },
   "agentBriefing": {
@@ -4523,6 +4557,7 @@
     "empty": "Ingen aktivitet under den här rapportperioden",
     "emptyHint": "Dina kodningssessioner i molnet och CLI visas här när en schemalagd rapport har aktivitet.",
     "loadError": "Det gick inte att läsa in rapporter",
+    "estimateLoadError": "Det gick inte att läsa in uppskattningen.",
     "view": "Läs rapport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4536,6 +4571,7 @@
     "summary": "AI-sammanfattning",
     "summaryPending": "AI-sammanfattningen pågår. Den bifogas här när den är klar.",
     "summaryUnavailable": "AI-sammanfattningen är inte tillgänglig. Din strukturerade rapport finns fortfarande.",
+    "summaryNotAdmitted": "AI-sammanfattningen genererades inte för den här rapporten. Din strukturerade rapport finns fortfarande.",
     "summaryCharge": "AI debiterade {{cost}}",
     "summaryChargePending": "AI-avgiften väntar på avstämning",
     "summaryModel": "$t(common.model): {{model}}",
@@ -4620,7 +4656,7 @@
     "topFeatures": "Mest använda funktioner",
     "emptyTitle": "Ingen användning under perioden",
     "unavailableTitle": "Användning är inte tillgänglig",
-    "unavailableDescription": "Den här arbetsytan rapporterar ingen användning. Det hjälper inte att försöka igen.",
+    "unavailableDescription": "Användning är inte konfigurerad för den här arbetsytan. Kontakta supporten om du förväntar dig att se användning här.",
     "orgSelfNotice": "Du ser din egen användning i den här organisationen.",
     "viewDetails": "Visa användningsdetaljer"
   },
@@ -4628,7 +4664,7 @@
     "title": "Integrationer",
     "sectionTitle": "Anslutna tjänster",
     "entrySubtitle": "GitHub, Slack, Linear med flera",
-    "subtitle": "Anslut dina utvecklingsverktyg och arbetsflöden till Kilo",
+    "subtitle": "Anslut dina utvecklingsverktyg och arbetsflöden till Kilo.",
     "disconnect": "Koppla från",
     "disconnectTitle": "Koppla från {{provider}}?",
     "disconnectMessage": "Kilo slutar svara i {{provider}}. Du kan ansluta igen när som helst.",
@@ -4700,7 +4736,6 @@
       "nameLocked": "Namnet kan inte ändras efter att utlösaren har skapats.",
       "repositoryLocked": "Kodförrådet kan inte ändras efter att utlösaren har skapats.",
       "environmentAutomatic": "Automatiskt per kodförråd",
-      "notSelected": "Inte valt",
       "profileDefaults": "Använd standardvärden",
       "profileHelp": "Profilens inställningar gäller när utlösaren körs. Dess hemligheter hämtas då.",
       "customAgent": "Anpassad agent",
@@ -4928,7 +4963,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Företagsfunktion",
-    "enterpriseOnly": "Det här är en funktion som endast är tillgänglig för företag.",
+    "enterpriseOnly": "Leverantörer och modeller är tillgängliga på Enterprise-planen.",
     "readOnly": "Endast organisationsägare och administratörer kan ändra dessa inställningar.",
     "loadError": "Leverantörer och modeller kunde inte läsas in",
     "tabModels": "Modeller",

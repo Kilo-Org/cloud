@@ -258,6 +258,27 @@ describe('convertProviderOptions', () => {
     });
   });
 
+  // Pins the chat path's divergence from `getNonChatGatewayOptions`: the chat path is already
+  // vetted by `canRouteToVercel`, so it emits the mapped `only` list even when none of the listed
+  // providers is compatible, while the non-chat path rejects the request instead.
+  it('emits a mapped only list with no compatible provider, unlike the non-chat path', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { only: ['google-vertex'] },
+      },
+    };
+
+    expect(hasCompatibleVercelInferenceProvider(['google-vertex'], ['anthropic', 'bedrock'])).toBe(
+      false
+    );
+    expect(convertProviderOptions(request, ['anthropic', 'bedrock']).gateway?.only).toEqual([
+      'vertex',
+    ]);
+  });
+
   it('filters ignored providers from an explicit only list when metadata is unavailable', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
@@ -334,7 +355,7 @@ describe('shouldRouteToVercel', () => {
       })),
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
       getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => openRouterModels),
       resolveOpenRouterModelAlias: jest.fn(
@@ -407,6 +428,27 @@ describe('shouldRouteToVercel', () => {
       await expect(shouldRouteToVercel(routing, async () => ({ only: ['telnyx'] }))).resolves.toBe(
         true
       );
+    });
+
+    // Pins the opt-out fallback path reading the provider config exactly once: both halves of
+    // the decision (the opt-out exemption and `canRouteToVercel`) must see one snapshot.
+    it('reads the provider config once while deciding an opted-out model', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+      const getRoutingProviderConfig = jest.fn(async () => ({ only: ['telnyx'] }));
+
+      await expect(shouldRouteToVercel(routing, getRoutingProviderConfig)).resolves.toBe(true);
+      expect(getRoutingProviderConfig).toHaveBeenCalledTimes(1);
+    });
+
+    // Regression test for a double read: a second read could observe a different config than the
+    // one the decision was computed from, so the decision must come from the first value alone.
+    it('decides an opted-out model from the first provider config read', async () => {
+      const shouldRouteToVercel = await loadShouldRouteToVercel({ ...providerData, optOut: true });
+      const configs: (OpenRouterProviderConfig | undefined)[] = [{ only: ['telnyx'] }, undefined];
+      const getRoutingProviderConfig = jest.fn(async () => configs.shift());
+
+      await expect(shouldRouteToVercel(routing, getRoutingProviderConfig)).resolves.toBe(true);
+      expect(getRoutingProviderConfig).toHaveBeenCalledTimes(1);
     });
 
     it('stays on OpenRouter when `only` allows a provider OpenRouter serves', async () => {
@@ -599,7 +641,9 @@ describe('canRouteToVercel', () => {
   async function loadCanRouteToVercel(vercelInferenceProviders: string[] | null = ['anthropic']) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(
+        async () => new Set(['anthropic/claude-sonnet-4.5'])
+      ),
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel')).canRouteToVercel;
@@ -608,16 +652,14 @@ describe('canRouteToVercel', () => {
   it('rejects a model Vercel does not serve', async () => {
     const canRouteToVercel = await loadCanRouteToVercel();
 
-    await expect(canRouteToVercel('vendor/unknown-model', async () => undefined)).resolves.toBe(
-      false
-    );
+    await expect(canRouteToVercel('vendor/unknown-model', undefined)).resolves.toBe(false);
   });
 
   it('rejects an only list with no provider available on Vercel', async () => {
     const canRouteToVercel = await loadCanRouteToVercel();
 
     await expect(
-      canRouteToVercel('anthropic/claude-sonnet-4.5', async () => ({ only: ['google-vertex'] }))
+      canRouteToVercel('anthropic/claude-sonnet-4.5', { only: ['google-vertex'] })
     ).resolves.toBe(false);
   });
 
@@ -625,7 +667,7 @@ describe('canRouteToVercel', () => {
     const canRouteToVercel = await loadCanRouteToVercel(null);
 
     await expect(
-      canRouteToVercel('anthropic/claude-sonnet-4.5', async () => ({ ignore: ['openai'] }))
+      canRouteToVercel('anthropic/claude-sonnet-4.5', { ignore: ['openai'] })
     ).resolves.toBe(false);
   });
 
@@ -633,10 +675,10 @@ describe('canRouteToVercel', () => {
     const canRouteToVercel = await loadCanRouteToVercel();
 
     await expect(
-      canRouteToVercel('anthropic/claude-sonnet-4.5', async () => ({
+      canRouteToVercel('anthropic/claude-sonnet-4.5', {
         only: ['anthropic'],
         ignore: ['amazon-bedrock'],
-      }))
+      })
     ).resolves.toBe(true);
   });
 });
@@ -655,7 +697,7 @@ describe('isValidVercelModelId', () => {
   }) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
       isValidOpenRouterModelId: jest.fn(
         async (modelId: string) =>
           legacyOpenRouterAliases.has(modelId) || openRouterModelIds.includes(modelId)
@@ -1176,7 +1218,7 @@ describe('applyVercelSettings managed requests', () => {
       .mockResolvedValue(vercelInferenceProviders);
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getCachedVercelInferenceProviderIdsForModel: getVercelInferenceProvidersMock,
-      getVercelModelsFromDatabase: jest.fn(),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(),
     }));
     const { applyVercelSettings: applyManagedSettings } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel');
@@ -1330,7 +1372,7 @@ describe('applyVercelSettings session affinity', () => {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['vertex', 'bedrock']),
-      getVercelModelsFromDatabase: jest.fn(),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
       .applyVercelSettings;
@@ -1392,7 +1434,7 @@ describe('getNonChatGatewayOptions', () => {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
-      getVercelModelsFromDatabase: jest.fn(),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
       .getNonChatGatewayOptions;

@@ -122,7 +122,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/detail-screen', () => ({
   DetailScreenScrollView: 'DetailScreenScrollView',
 }));
@@ -133,6 +133,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // loads lucide's NativeWind-processed modules, which this project's transform
 // cannot parse; the tests read structure, not icon internals.
 vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
   Check: 'Check',
   RotateCcw: 'RotateCcw',
   Wallet: 'Wallet',
@@ -967,10 +968,12 @@ describe('CreditPurchaseScreen', () => {
     dimensions.fontScale = 1;
     safeAreaInsets.bottom = 0;
 
-    const textHeight = 63;
-    // The floating card's own padding (14 above and below) and the 8 dp gap
-    // its wrapper keeps above the footer.
-    const fixed = 28 + 8;
+    // Three `text-sm` lines of 17.5 dp each, the size the tile renders.
+    const textHeight = 3 * 17.5;
+    // The danger tile's own padding (`py-2.5`, 8.75 above and below at the
+    // app's 14pt rem), its 1 dp border on each edge, and the 8 dp gap its
+    // wrapper keeps above the footer.
+    const fixed = 2 * 8.75 + 2 + 8;
     expect(single.some(height => Math.abs(height - (textHeight + fixed)) <= 0.5)).toBe(true);
     expect(withHomeIndicator).toEqual(single);
     expect(raised.some(height => Math.abs(height - (textHeight * 1.5 + fixed)) <= 0.5)).toBe(true);
@@ -1021,9 +1024,15 @@ describe('CreditPurchaseScreen', () => {
     expect(spacerHeight).toBeGreaterThanOrEqual(cardText);
 
     const [status] = renderer.root.findAllByType(AccessibleStatus);
-    // The status sits inside the floating `Card`; the gutter wrapper is the
-    // first ancestor that owns the page gutter, and the insets sit on the
-    // wrapper outside it.
+    // The status is the danger tile's small error text, beside the alert icon,
+    // as the organization plan refusal draws it: never a line larger than the
+    // pack rows. The gutter wrapper is the first ancestor that owns the page
+    // gutter, and the insets sit on the wrapper outside it.
+    expect(String(status?.props.className)).toContain('text-sm');
+    const tile = status?.parent?.parent;
+    expect(String(tile?.props.className)).toContain('bg-danger-tile-bg');
+    expect(String(tile?.props.className)).toContain('border-danger-tile-border');
+    expect(tile?.findAll(node => String(node.type) === 'AlertCircle')).toHaveLength(1);
     const ancestors: TestRenderer.ReactTestInstance[] = [];
     for (let node = status?.parent ?? null; node !== null; node = node.parent) {
       ancestors.push(node);
@@ -1772,7 +1781,15 @@ describe('CreditPurchaseScreen unresolved purchase card', () => {
 
     const actions = card.findAll(node => String(node.type) === 'Button');
     expect(actions).toHaveLength(2);
-    await press(actions.find(node => labelOf(node).startsWith('Try again')));
+    // The store query is named for what it does: "Try again" beside a warning
+    // about a second charge read as "buy again". It checks the earlier charge,
+    // so its name carries none of the selected pack, which only Buy again names.
+    const check = actions.find(node => labelOf(node).startsWith('Check purchase'));
+    expect(labelOf(check)).toBe('Check purchase');
+    expect(labelOf(actions.find(node => labelOf(node).startsWith('Buy again')))).toMatch(
+      /^Buy again, /
+    );
+    await press(check);
     expect(owner.reconcilePurchase).toHaveBeenCalledTimes(1);
     await press(actions.find(node => labelOf(node).startsWith('Buy again')));
     expect(owner.buyAgain).toHaveBeenCalledTimes(1);

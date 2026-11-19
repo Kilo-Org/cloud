@@ -1,7 +1,15 @@
-import { Redirect } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
-import { OrganizationInvoicesFixture } from '@/components/organization/organization-invoices-fixture';
+import {
+  OrganizationInvoicesFixture,
+  organizationInvoicesFixtureState,
+} from '@/components/organization/organization-invoices-fixture';
 
 export default function InvoicesFixtureRoute() {
-  return __DEV__ ? <OrganizationInvoicesFixture /> : <Redirect href="/(app)" />;
+  const { state } = useLocalSearchParams<{ state?: string }>();
+  return __DEV__ ? (
+    <OrganizationInvoicesFixture state={organizationInvoicesFixtureState(state)} />
+  ) : (
+    <Redirect href="/(app)" />
+  );
 }

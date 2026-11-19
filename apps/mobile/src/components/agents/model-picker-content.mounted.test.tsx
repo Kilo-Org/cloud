@@ -797,8 +797,8 @@ describe('ModelPickerContent thinking effort availability', () => {
   });
 
   // The sheet stays open after a tap on a model with several efforts, so that
-  // pick is pending until the sheet closes. The focus cleanup commits it; this
-  // block runs that cleanup for real to tell Done and Cancel apart.
+  // pick is pending until the sheet closes. The focus cleanup commits it only
+  // after Done; this block runs that cleanup for real to tell the exits apart.
   describe('closing with a pending pick', () => {
     const otherOption: SessionModelOption = { ...makeOption(1), id: 'other-model' };
 
@@ -820,7 +820,8 @@ describe('ModelPickerContent thinking effort availability', () => {
       vi.mocked(useFocusEffect).mockReset();
     });
 
-    async function pickEffortModelThen(header: 'onDone' | 'onCancel') {
+    /** `null` leaves the way the sheet's own dismissals do: Android Back or an iOS swipe pops the route. */
+    async function pickEffortModelThen(header: 'onDone' | 'onCancel' | null) {
       const bridge = slotState.bridge as ModelPickerBridge;
       const renderer = await mount();
       await act(async () => {
@@ -831,9 +832,11 @@ describe('ModelPickerContent thinking effort availability', () => {
       if (!sheet) {
         throw new Error('the picker sheet was not rendered');
       }
-      act(() => {
-        (sheet.props[header] as () => void)();
-      });
+      if (header !== null) {
+        act(() => {
+          (sheet.props[header] as () => void)();
+        });
+      }
       act(() => {
         renderer.unmount();
       });
@@ -851,6 +854,12 @@ describe('ModelPickerContent thinking effort availability', () => {
       const onSelect = await pickEffortModelThen('onCancel');
 
       expect(routerBack).toHaveBeenCalledTimes(1);
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it('drops the pending pick when Back or a swipe closes the sheet', async () => {
+      const onSelect = await pickEffortModelThen(null);
+
       expect(onSelect).not.toHaveBeenCalled();
     });
   });

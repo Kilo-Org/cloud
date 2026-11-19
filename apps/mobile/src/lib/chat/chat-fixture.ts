@@ -1,8 +1,11 @@
+import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
+
 import { CREDITS_FAILURE_KEY } from './backend-target';
-import { newKeptId, rememberAsked, replaceKept } from './pending';
+import { forgetQuestions, newKeptId, rememberAsked, replaceKept } from './pending';
 import { releaseChat, startChat } from './registry';
 import { type ChatPlace } from './scope';
 import { type Displaced } from './state';
+import { deleteChat } from './store';
 
 /**
  * Development-only chat conversation in each state the chat screen draws from
@@ -71,20 +74,31 @@ function keptQuestions(): Displaced[] {
   }));
 }
 
-/** Starts the state's chat, writes its records, and answers the session the chat route opens. */
+/**
+ * Starts the state's chat, writes its records, and answers the session the chat
+ * route opens. A record write that fails deletes the started chat, the way the
+ * chat list deletes one, so a failed attempt leaves no live session and no row.
+ */
 export async function writeChatFixture(place: ChatPlace, state: ChatFixtureState): Promise<string> {
   const sessionId = await startChat(place, { model: FIXTURE_MODEL, effort: null });
-  if (state === 'long') {
-    await replaceKept(sessionId, keptQuestions());
-  }
-  if (state !== 'empty') {
-    await rememberAsked(sessionId, {
-      text: state === 'long' ? LONG_QUESTION : 'Summarize the open pull requests for me.',
-      images: [],
-      model: FIXTURE_MODEL,
-      effort: null,
-      failureKey: state === 'credits' ? CREDITS_FAILURE_KEY : 'common.somethingWentWrong',
-    });
+  try {
+    if (state === 'long') {
+      await replaceKept(sessionId, keptQuestions());
+    }
+    if (state !== 'empty') {
+      await rememberAsked(sessionId, {
+        text: state === 'long' ? LONG_QUESTION : 'Summarize the open pull requests for me.',
+        images: [],
+        model: FIXTURE_MODEL,
+        effort: null,
+        failureKey: state === 'credits' ? CREDITS_FAILURE_KEY : 'common.somethingWentWrong',
+      });
+    }
+  } catch (error) {
+    await releaseChat(sessionId);
+    await forgetQuestions(sessionId);
+    deleteChat(await encryptedDatabase(), sessionId);
+    throw error;
   }
   // The registry holds a started chat as it was started. Releasing it makes the
   // route's open read the records back, as a reopen after a restart does.

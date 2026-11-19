@@ -38,6 +38,8 @@ const CHATS = [
 
 const database = vi.hoisted(() => ({ current: undefined as DatabaseSync | undefined }));
 const kv = vi.hoisted(() => new Map<string, string>());
+/** Makes the next write to this scope refuse, the way a full or closed store does. */
+const refuse = vi.hoisted((): { scope: string | null } => ({ scope: null }));
 
 function sqlite(): DatabaseSync {
   if (database.current === undefined) {
@@ -64,6 +66,10 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
     }),
   getItem: (scope: string, key: string) => Promise.resolve(kv.get(`${scope}:${key}`) ?? null),
   setItem: (scope: string, key: string, value: string) => {
+    if (refuse.scope === scope) {
+      refuse.scope = null;
+      return Promise.reject(new Error('the store refused the write'));
+    }
     kv.set(`${scope}:${key}`, value);
     return Promise.resolve();
   },
@@ -169,5 +175,14 @@ describe('the chat fixture, opened by the chat route', () => {
     });
     const { transcriptFailure } = await opened('row-only');
     expect(transcriptFailure).toBe('common.somethingWentWrong');
+  });
+
+  it('deletes the started chat when a record write fails, so Retry leaves no row behind', async () => {
+    const count = (table: 'chats' | 'sessions') =>
+      sqlite().prepare(`select count(*) as n from ${table}`).get();
+    const before = { chats: count('chats'), sessions: count('sessions') };
+    refuse.scope = 'chat-asked-target';
+    await expect(writeChatFixture(place, 'failed')).rejects.toThrow('the store refused the write');
+    expect({ chats: count('chats'), sessions: count('sessions') }).toEqual(before);
   });
 });

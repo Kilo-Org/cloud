@@ -1,3 +1,4 @@
+import type { ScopedScmGrant } from '../scm-broker/scoped-admission.js';
 import {
   controlPlaneScmForwardAdmissionSchema,
   type ControlPlaneScmForwardAdmission,
@@ -5,8 +6,15 @@ import {
 } from '../shared/control-plane-protocol.js';
 import { isAllowedEgressUrl } from '@kilocode/worker-utils/egress-allowlist';
 import { STANDARD_SCM_HOSTS } from '@kilocode/worker-utils/scm-capability-contract';
-import { admitScmRequest, type ScmAdmissionDependencies } from '../scm-broker/admission.js';
-import type { AwsEgressIdentity, AwsEgressProof } from './aws-egress-identity.js';
+import {
+  admitScopedScmRequest,
+  type ScopedScmAdmissionDependencies,
+} from '../scm-broker/scoped-admission.js';
+import type {
+  AwsEgressIdentity,
+  AwsEgressProof,
+  AwsScopedEgressContext,
+} from './aws-egress-identity.js';
 import {
   AwsEgressAdmissionError as AdmissionFailure,
   awsEgressFailure,
@@ -15,9 +23,9 @@ import {
 export type AwsScmAdmission = Omit<ControlPlaneScmForwardAdmission, 'oidcToken'>;
 const scmAdmissionSchema = controlPlaneScmForwardAdmissionSchema.omit({ oidcToken: true });
 
-export async function admitAwsScm(
-  deps: Pick<ScmAdmissionDependencies, 'resolve' | 'persist'> & {
-    identity: AwsEgressIdentity;
+export async function admitAwsScm<G extends ScopedScmGrant, C extends AwsScopedEgressContext<G>>(
+  deps: Pick<ScopedScmAdmissionDependencies<G, C>, 'resolve' | 'persist' | 'memberIds'> & {
+    identity: AwsEgressIdentity<G, C>;
   },
   proof: AwsEgressProof,
   request: AwsScmAdmission
@@ -36,11 +44,16 @@ export async function admitAwsScm(
     )
       throw new AdmissionFailure(403, 'target_denied');
     let authenticated: Awaited<ReturnType<typeof deps.identity.authenticate>> | undefined;
-    const admission = await admitScmRequest(parsed.data, {
+    const admission = await admitScopedScmRequest<
+      G,
+      C & { organizationId: string | undefined; identityBinding: string }
+    >(parsed.data, {
       serial: deps.identity.serial,
       readContext: deps.identity.readContext,
       resolve: deps.resolve,
       persist: deps.persist,
+      memberIds: deps.memberIds,
+      now: deps.identity.now,
       async authenticate(context) {
         const identity = await deps.identity.authenticate(context, proof);
         authenticated = identity;

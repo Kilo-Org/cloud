@@ -1,13 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AwsRequestError } from '@kilocode/worker-utils/aws-client';
 import { AwsEgressMetadataError } from '@kilocode/worker-utils/aws-egress-store';
+import { ECS_TEST_CONFIG } from '../../test/fixtures/aws-ecs.js';
 import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
 import {
   mintSandboxLaunchCredential,
   verifySandboxLaunchCredential,
 } from '../sandbox-control/credential.js';
 import { verifyAwsEgressCredential } from '../egress/aws-credential.js';
-import { prepareAwsProxyStartup, readPinnedAwsProxyDeployment } from './aws-proxy.js';
+import {
+  prepareAwsEcsProxyStartup,
+  prepareAwsProxyStartup,
+  readPinnedAwsProxyDeployment,
+} from './aws-proxy.js';
 
 const secret = 'worker-test-key';
 const generation = '22222222-2222-4222-8222-222222222222';
@@ -56,6 +61,48 @@ function fixture() {
   };
 }
 describe('AWS proxy launch admission', () => {
+  it('keeps ECS egress usable after eight hours and expires it at the deployment certificate boundary', async () => {
+    const common = fixture();
+    const deployment = metadata();
+    const input = {
+      ...common,
+      configuration: { ...ECS_TEST_CONFIG, proxy: configuration.proxy },
+      ref: { ...common.ref, provider: 'aws-ecs' as const },
+      readMetadata: async () => deployment,
+    };
+    const result = await prepareAwsEcsProxyStartup(input);
+    const token = new URL(result.env.HTTPS_PROXY).password;
+    const expiresAt = Date.parse(deployment.deployment.expiresAt);
+    expect(verifyAwsEgressCredential(token, secret, Date.now() + 28_801_000)).not.toBeNull();
+    expect(verifyAwsEgressCredential(token, secret)?.exp).toBe(Math.floor(expiresAt / 1000));
+    expect(verifyAwsEgressCredential(token, secret, expiresAt)).toBeNull();
+    expect(verifySandboxLaunchCredential(token, secret)).toBeNull();
+    expect(JSON.stringify(result)).not.toContain(deployment.identity.secret);
+    const microvm = await prepareAwsProxyStartup(common);
+    expect(
+      verifyAwsEgressCredential(
+        new URL(microvm.env.HTTPS_PROXY).password,
+        secret,
+        Date.now() + 28_801_000
+      )
+    ).toBeNull();
+  });
+  it('requires the certificate health reserve for ECS without signing an already expired certificate', async () => {
+    const common = fixture();
+    const deployment = metadata();
+    deployment.deployment.expiresAt = new Date(Date.now() + 3_600_000).toISOString();
+    await expect(
+      prepareAwsEcsProxyStartup({
+        ...common,
+        configuration: ECS_TEST_CONFIG,
+        ref: { ...common.ref, provider: 'aws-ecs' },
+        readMetadata: async () => ({
+          ...deployment,
+          deployment: { ...deployment.deployment, hostname: ECS_TEST_CONFIG.proxy.hostname },
+        }),
+      })
+    ).rejects.toMatchObject({ reason: 'byoc_aws_proxy_expired' });
+  });
   it('adds a separate allocation credential and public CA without sharing proxy identity', async () => {
     const input = fixture();
     const result = await prepareAwsProxyStartup(input);

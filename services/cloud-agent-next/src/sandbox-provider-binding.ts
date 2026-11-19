@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { AgentSandboxProvider } from './types.js';
 
 export type SandboxProviderBinding =
-  | { kind: 'aws'; source: { kind: 'byoc' } & ByocSource }
+  | { kind: 'aws' | 'aws-ecs'; source: { kind: 'byoc' } & ByocSource }
   | { kind: 'cloudflare' }
   | { kind: 'cloudflare-containers' }
   // Decode-only legacy binding. Runtime admission rejects retired platform Vercel.
@@ -17,7 +17,7 @@ export const SandboxProviderBindingSchema: z.ZodType<SandboxProviderBinding> = z
   [
     z
       .object({
-        kind: z.literal('aws'),
+        kind: z.enum(['aws', 'aws-ecs']),
         source: z.object({ kind: z.literal('byoc'), credentialId: z.uuid() }).and(byocOwnerSchema),
       })
       .strict(),
@@ -49,7 +49,8 @@ export const SandboxProviderBindingSchema: z.ZodType<SandboxProviderBinding> = z
 ) as z.ZodType<SandboxProviderBinding>;
 
 export function bindingFromLegacyProvider(provider: AgentSandboxProvider): SandboxProviderBinding {
-  if (provider === 'aws') throw new Error('AWS requires a customer connection');
+  if (provider === 'aws' || provider === 'aws-ecs')
+    throw new Error('AWS requires a customer connection');
   return provider === 'vercel'
     ? { kind: 'vercel', source: { kind: 'platform' } }
     : { kind: provider };
@@ -65,8 +66,8 @@ export function sameSandboxProviderBinding(
 ): boolean {
   if (left.kind !== right.kind) return false;
   if (
-    (left.kind !== 'vercel' && left.kind !== 'aws') ||
-    (right.kind !== 'vercel' && right.kind !== 'aws')
+    (left.kind !== 'vercel' && left.kind !== 'aws' && left.kind !== 'aws-ecs') ||
+    (right.kind !== 'vercel' && right.kind !== 'aws' && right.kind !== 'aws-ecs')
   )
     return true;
   if (left.source.kind !== right.source.kind) return false;

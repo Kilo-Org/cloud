@@ -39,6 +39,9 @@ function pin(provider: AgentSandboxProvider, extra: Partial<StoredProviderPin> =
 
 /** A configured pin for each provider: Vercel needs a BYOC source. */
 const CONFIGURED_PINS: Record<AgentSandboxProvider, StoredProviderPin> = {
+  'aws-ecs': pin('aws-ecs', {
+    byoc: { userId: 'user-1', credentialId: '22222222-2222-4222-8222-222222222222' },
+  }),
   aws: pin('aws', {
     byoc: { userId: 'user-1', credentialId: '22222222-2222-4222-8222-222222222222' },
   }),

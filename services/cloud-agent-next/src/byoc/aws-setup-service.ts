@@ -16,12 +16,23 @@ import {
   awsByocConfigurationSchema,
   type AwsByocConfiguration,
 } from '@kilocode/worker-utils/aws-byoc';
-import type { AwsSetupBinding } from '@kilocode/worker-utils/aws-onboarding';
-import { assumeAwsKiloRole } from './aws-credential-resolver.js';
-import { awsQuickCreateUrl } from './aws-setup-links.js';
+import { awsEcsSetupIntentSchema } from '@kilocode/worker-utils/aws-ecs-onboarding';
+import { awsEcsByocConfigurationSchema } from '@kilocode/worker-utils/aws-ecs';
+import { createEcsClient, assertEcsTaskDefinition } from '../agent-sandbox/aws/ecs-client.js';
 import {
-  readAwsSetupIntent,
-  readReadyAwsConfiguration,
+  awsEcsResourcesFromSetupStack,
+  assertAwsEcsAllocationStack,
+} from './aws-ecs-stack-validation.js';
+import {
+  awsSetupIntentSchema,
+  type AwsSetupProvider,
+  type AwsSetupBinding,
+} from '@kilocode/worker-utils/aws-onboarding';
+import { assumeAwsKiloRole } from './aws-credential-resolver.js';
+import { awsProviderQuickCreateUrl } from './aws-setup-links.js';
+import {
+  readAwsProviderSetupIntent,
+  readReadyAwsProviderConfiguration,
   requireAwsSetupEnrollment,
   type AwsSetupEnvironment,
 } from './aws-setup-intent.js';
@@ -61,6 +72,19 @@ function checksum(bytes: Uint8Array): Promise<string> {
 /** One request-scoped service. AWS credentials and proxy shared identity never enter its public results. */
 export function createAwsSetupService(
   env: AwsSetupEnvironment,
+  input: { fetch?: AwsFetch; now?: () => number } = {}
+) {
+  const service = createAwsProviderSetupService(env, 'aws', input);
+  return {
+    ...service,
+    async validate(...args: Parameters<typeof service.validate>) {
+      return awsByocConfigurationSchema.parse(await service.validate(...args));
+    },
+  };
+}
+export function createAwsProviderSetupService(
+  env: AwsSetupEnvironment,
+  provider: AwsSetupProvider,
   input: { fetch?: AwsFetch; now?: () => number } = {}
 ) {
   const fetcher = input.fetch ?? fetch;
@@ -140,7 +164,7 @@ export function createAwsSetupService(
   }
   async function proxy(
     credentials: AwsCredentials,
-    configuration: AwsByocConfiguration,
+    configuration: Pick<AwsByocConfiguration, 'region' | 'bucket' | 'stackId'>,
     hostname: string | undefined,
     signal: AbortSignal
   ) {
@@ -177,7 +201,7 @@ export function createAwsSetupService(
   return {
     async instructions(binding: AwsSetupBinding, envelope: unknown) {
       requireAwsSetupEnrollment(env, binding.owner);
-      const intent = readAwsSetupIntent(env, binding, envelope);
+      const intent = readAwsProviderSetupIntent(env, binding, envelope, provider);
       const signal = AbortSignal.timeout(30_000);
       const credentials = await kilo(signal);
       const client = createAwsClient({
@@ -197,7 +221,7 @@ export function createAwsSetupService(
         const url = await client.signedUrl(source, 'GET', TEMPLATE_LINK_TTL_SECONDS);
         signal.throwIfAborted();
         return {
-          launchUrl: awsQuickCreateUrl(intent, url),
+          launchUrl: awsProviderQuickCreateUrl(provider, intent, url),
           accountId: intent.accountId,
           stackName: intent.stackName,
           templateVersion: intent.release.templateVersion,
@@ -207,33 +231,65 @@ export function createAwsSetupService(
         throw new AwsSetupError('byoc_aws_setup_unavailable');
       }
     },
-    async validate(
-      binding: AwsSetupBinding,
-      envelope: unknown,
-      roleArn: string
-    ): Promise<AwsByocConfiguration> {
+    async validate(binding: AwsSetupBinding, envelope: unknown, roleArn: string) {
       requireAwsSetupEnrollment(env, binding.owner);
-      const intent = readAwsSetupIntent(env, binding, envelope);
+      const intent = readAwsProviderSetupIntent(env, binding, envelope, provider);
       if (roleArn.split(':')[4] !== intent.accountId)
         throw new AwsSetupError('byoc_aws_stack_mismatch');
       const signal = AbortSignal.timeout(45_000);
       const credentials = await customer(roleArn, intent.externalId, signal);
       const current = await stack(credentials, intent.stackName, signal);
-      const configuration = awsConfigurationFromSetupStack({ intent, roleArn, stack: current });
+      if (provider === 'aws-ecs') {
+        const resources = awsEcsResourcesFromSetupStack({
+          intent: awsEcsSetupIntentSchema.parse(intent),
+          roleArn,
+          stack: current,
+        });
+        const pin = await proxy(credentials, resources, current.outputs.ProxyHostname, signal);
+        const configuration = awsEcsByocConfigurationSchema.parse({ ...resources, proxy: pin });
+        const client = createEcsClient({
+          credentials,
+          region: configuration.region,
+          fetch: fetcher,
+        });
+        let definition;
+        try {
+          definition = await safeRead(
+            () => client.definition(configuration.taskDefinitionArn, signal),
+            signal
+          );
+        } catch {
+          throw new AwsSetupError('byoc_aws_stack_unavailable');
+        }
+        try {
+          assertEcsTaskDefinition(definition, configuration);
+        } catch {
+          throw new AwsSetupError('byoc_aws_stack_mismatch');
+        }
+        signal.throwIfAborted();
+        return configuration;
+      }
+      const configuration = awsConfigurationFromSetupStack({
+        intent: awsSetupIntentSchema.parse(intent),
+        roleArn,
+        stack: current,
+      });
       const pin = await proxy(credentials, configuration, current.outputs.ProxyHostname, signal);
       signal.throwIfAborted();
       return awsByocConfigurationSchema.parse({ ...configuration, proxy: pin });
     },
     async revalidate(binding: AwsSetupBinding, envelope: unknown, roleArn: string): Promise<void> {
       requireAwsSetupEnrollment(env, binding.owner);
-      const configuration = readReadyAwsConfiguration(env, binding, envelope);
+      const configuration = readReadyAwsProviderConfiguration(env, binding, envelope, provider);
       if (roleArn !== configuration.roleArn)
         throw new AwsSetupError('byoc_aws_connection_update_required');
       const signal = AbortSignal.timeout(45_000);
       const credentials = await customer(roleArn, configuration.externalId, signal);
       const current = await stack(credentials, configuration.stackId, signal);
       try {
-        assertAwsAllocationStack(current, configuration);
+        if (provider === 'aws-ecs')
+          assertAwsEcsAllocationStack(current, awsEcsByocConfigurationSchema.parse(configuration));
+        else assertAwsAllocationStack(current, awsByocConfigurationSchema.parse(configuration));
       } catch (error) {
         if (error instanceof AwsSetupError && error.code === 'byoc_aws_stack_mismatch')
           throw new AwsSetupError('byoc_aws_connection_update_required');

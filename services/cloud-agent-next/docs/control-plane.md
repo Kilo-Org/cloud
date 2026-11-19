@@ -1579,6 +1579,20 @@ and a 30-second total read deadline. GitHub git replay is capped at 1 MiB; boots
 inspection is capped at 16,000 bytes. An unavailable replay body keeps the single-forward path.
 The reader inspects a clone and preserves the original request body for forwarding.
 
+### AWS bootstrap credentials
+
+The MVP permits an allocation-scoped egress proxy credential in the ECS `RunTask` request.
+It appears in the launch envelope command and the `HTTP_PROXY` and `HTTPS_PROXY` overrides.
+The envelope also contains a bounded S3 download capability, its digest, and the bootstrap deadline.
+The proxy credential is necessary before downloading the startup environment through the customer proxy.
+
+Customer principals with task inspection or CloudTrail read access can see this bootstrap data.
+The proxy credential authorizes the current allocation's egress policy and audit identity through the customer proxy.
+Its audience cannot authenticate wrapper sockets; managed SCM admission also requires a repository alias and grant.
+The S3 capability can retrieve the startup environment, including the separate wrapper credential, while the document remains accessible.
+Request metadata is therefore sensitive even though it does not directly embed the full startup environment.
+See [AWS bootstrap credential access](aws-byoc.md#bootstrap-credential-access) for the operator access boundary and lifetime details.
+
 ### Managed SCM containment inventory
 
 The shared core in `src/scm-broker/` parses carriers, redeems capabilities, forwards requests,

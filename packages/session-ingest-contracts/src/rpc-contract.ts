@@ -73,7 +73,7 @@ export type CanGenerateTitleForCloudAgentParams = z.infer<
 export const cloudAgentWorktreeLocationSchema = z
   .object({
     sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
-    provider: z.enum(['cloudflare', 'vercel', 'cloudflare-containers', 'aws']),
+    provider: z.enum(['cloudflare', 'vercel', 'cloudflare-containers', 'aws', 'aws-ecs']),
   })
   .strict();
 export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocationSchema>;

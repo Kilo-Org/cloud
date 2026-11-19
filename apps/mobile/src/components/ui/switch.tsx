@@ -9,13 +9,6 @@ import {
 import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-const ANDROID_BOX_STYLE = { minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP } as const;
-const IOS_TOUCH_BOX_STYLE = {
-  alignSelf: 'center',
-  justifyContent: 'center',
-  minHeight: TOUCH_TARGET_DP,
-} as const;
-
 /**
  * The native `Switch`, painted with the app palette, with its disabled state
  * mirrored into `accessibilityState`.
@@ -124,7 +117,7 @@ export function Switch({
   const control = (
     <NativeSwitch
       {...props}
-      style={ios ? undefined : [ANDROID_BOX_STYLE, style]}
+      style={ios ? undefined : [{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]}
       // The switch claims the JS responder, so a tap on it never reaches the touch box too.
       onStartShouldSetResponder={ios ? () => true : undefined}
       value={value}
@@ -142,7 +135,8 @@ export function Switch({
   return (
     <View
       accessible={false}
-      style={[IOS_TOUCH_BOX_STYLE, style]}
+      className="justify-center self-center"
+      style={[{ minHeight: TOUCH_TARGET_DP }, style]}
       onStartShouldSetResponder={() => resolvedDisabled !== true}
       onResponderRelease={() => {
         void props.onValueChange?.(!value);

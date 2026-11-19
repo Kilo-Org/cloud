@@ -63,6 +63,7 @@ function nativeProps(root: I): {
 function touchBox(root: I):
   | {
       accessible?: boolean;
+      className?: string;
       style?: unknown;
       onStartShouldSetResponder?: () => boolean;
       onResponderRelease?: () => void;
@@ -181,10 +182,8 @@ describe('Switch', () => {
     expect(props.onStartShouldSetResponder?.()).toBe(true);
     const box = touchBox(root);
     expect(box?.accessible).toBe(false);
-    expect(box?.style).toEqual([
-      { alignSelf: 'center', justifyContent: 'center', minHeight: TOUCH_TARGET_DP },
-      style,
-    ]);
+    expect(box?.className).toBe('justify-center self-center');
+    expect(box?.style).toEqual([{ minHeight: TOUCH_TARGET_DP }, style]);
   });
 
   it('flips the iOS value when a tap in the touch box ends, and not when disabled', () => {

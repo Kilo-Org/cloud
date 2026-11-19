@@ -52,33 +52,14 @@ const frameTreeSchema = z.object({
   frameTree: z.object({ frame: z.object({ id: z.string() }) }),
 });
 
-const describeNodeSchema = z.object({
-  node: z.object({ frameId: z.string().optional() }).optional(),
-});
-
-/** The frame a resolved target lives in, so the probe can run in that frame's isolated world. */
-const targetFrameId = async (
-  session: ProbeSession,
-  resolved:
-    | { readonly kind: 'ref'; readonly backendNodeId: number }
-    | { readonly kind: 'selector'; readonly nodeId: number }
-): Promise<string | undefined> => {
-  try {
-    const parsed = describeNodeSchema.safeParse(
-      await session.send(
-        'DOM.describeNode',
-        resolved.kind === 'ref'
-          ? { backendNodeId: resolved.backendNodeId }
-          : { nodeId: resolved.nodeId }
-      )
-    );
-
-    return parsed.success ? parsed.data.node?.frameId : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
+/**
+ * The world a target is probed in: the tab's own frame. `DOM.describeNode`
+ * reports a frame id only for frame-owner elements, so a node's own frame
+ * cannot be read from the node; it does not matter here, because a node from a
+ * child document resolves into this world as a handle of this world, whose
+ * `Node` prototype page script cannot shadow. Where the node lives is decided
+ * by the gate's grant check, not by this probe.
+ */
 const mainFrameId = async (
   session: Pick<BrowserToolPageSession, 'send'>
 ): Promise<string | undefined> => {
@@ -259,12 +240,34 @@ export const readFrameSensitiveValues = async (
 };
 
 /**
+ * Playwright's `follow-label` retarget (`InjectedScript.retarget` in the
+ * pinned release): a node inside a button-like control acts on that control,
+ * and a label, or a node inside one, acts on the control the label names.
+ * `browser_type` fills the element this returns, so the sensitive probe must
+ * classify the same element.
+ */
+export const RETARGET_TO_CONTROL_FUNCTION = `function (node) {
+  var element = node.nodeType === 1 ? node : node.parentElement;
+  if (!element) { return null; }
+  if (!element.matches('input, textarea, select') && !element.isContentEditable) {
+    element = element.closest('button, [role=button], [role=checkbox], [role=radio]') || element;
+  }
+  if (!element.matches('a, input, textarea, button, select, [role=link], [role=button], [role=checkbox], [role=radio]') && !element.isContentEditable) {
+    var label = element.closest('label');
+    if (label && label.control) { element = label.control; }
+  }
+  return element;
+}`;
+
+/**
  * Classifies the element a call targets (and, for a submit control, the form
  * it submits). Runs in the element's own context, so it sees the frame the
- * element lives in and the frame's own forms.
+ * element lives in and the frame's own forms. A target that retargets to
+ * another control (a label naming a password field) is classified as that
+ * control too.
  */
 export const SENSITIVE_TARGET_PROBE_FUNCTION = `function () {
-  var element = this;
+  var element = (${RETARGET_TO_CONTROL_FUNCTION})(this) || this;
   var kindOf = function (input) {
     var type = String(input.type || '').toLowerCase();
     if (type === 'password') { return 'password'; }
@@ -279,8 +282,11 @@ export const SENSITIVE_TARGET_PROBE_FUNCTION = `function () {
     return null;
   };
   var fields = [];
-  var ownKind = kindOf(element);
-  if (ownKind !== null) { fields.push({ kind: ownKind }); }
+  var candidates = element === this ? [element] : [this, element];
+  for (var candidate = 0; candidate < candidates.length; candidate += 1) {
+    var kind = kindOf(candidates[candidate]);
+    if (kind !== null) { fields.push({ kind: kind }); }
+  }
   var form = element.closest ? element.closest('form') : null;
   var tag = String(element.tagName || '').toUpperCase();
   var role = element.getAttribute ? String(element.getAttribute('role') || '') : '';
@@ -481,7 +487,7 @@ export const classifyTargetElement = async (
       return { cause: 'the selector matches several elements', kind: 'unknown' };
     }
 
-    const frameId = await targetFrameId(session, resolved);
+    const frameId = await mainFrameId(session);
 
     if (frameId === undefined) {
       return { cause: 'the target frame could not be read', kind: 'unknown' };
@@ -568,6 +574,83 @@ export const sensitiveTargetsOf = (
   }
 
   return targets;
+};
+
+const sensitiveFieldPresencePayloadSchema = z.object({
+  closed: z.boolean().optional(),
+  present: z.boolean().optional(),
+});
+
+/**
+ * Whether a frame holds any field the sensitive gate protects. `browser_evaluate`
+ * and `browser_run_code_unsafe` run model-authored script, which can read and
+ * write every field a page script can reach, so their classification is the page
+ * itself rather than a target element (the CLI #16285 aligns).
+ *
+ * Page script also reaches into **open** shadow roots, so the walk recurses
+ * through them. A custom element without an open root may still hold a closed
+ * one that no probe can read; that is reported as `closed` and the gate treats
+ * it as sensitive rather than absent.
+ */
+export const SENSITIVE_FIELD_PRESENCE_PROBE_EXPRESSION = `(() => {
+  var kindOf = function (input) {
+    var type = String(input.type || '').toLowerCase();
+    if (type === 'password') { return 'password'; }
+    var autocomplete = String(input.getAttribute('autocomplete') || '').toLowerCase().split(/\\s+/);
+    for (var index = 0; index < autocomplete.length; index += 1) {
+      var token = autocomplete[index];
+      if (token === 'one-time-code') { return 'one-time-code'; }
+      if (token.indexOf('cc-') === 0) { return 'payment'; }
+    }
+    var name = String(input.getAttribute('name') || '').toLowerCase();
+    if (/(^|[-_])(cc|card)([-_]|$)/.test(name) || name === 'cardnumber') { return 'payment'; }
+    return null;
+  };
+  var found = { closed: false, present: false };
+  var scan = function (root) {
+    var inputs = root.querySelectorAll('input, textarea, select');
+    for (var index = 0; index < inputs.length; index += 1) {
+      if (kindOf(inputs[index]) !== null) { found.present = true; return; }
+    }
+    var elements = root.querySelectorAll('*');
+    for (var index = 0; index < elements.length; index += 1) {
+      var element = elements[index];
+      var shadow = element.shadowRoot;
+      if (shadow !== null) { scan(shadow); if (found.present) { return; } continue; }
+      // A hyphenated tag is a custom element: with no open root it may hold a closed one.
+      if (String(element.tagName).indexOf('-') !== -1) { found.closed = true; }
+    }
+  };
+  scan(document);
+  return JSON.stringify(found);
+})()`;
+
+/**
+ * `present` when the frame holds a password, one-time-code or payment field,
+ * `absent` only when a fully parsed probe said so and no closed shadow root
+ * could hide one, and `unknown` when the frame could not be inspected — which
+ * the gate treats as sensitive.
+ */
+export const readFrameSensitiveFields = async (
+  session: Pick<BrowserToolPageSession, 'send'>,
+  frameId: string
+): Promise<'absent' | 'present' | 'unknown'> => {
+  const payload = await readProbePayload({
+    expression: SENSITIVE_FIELD_PRESENCE_PROBE_EXPRESSION,
+    frameId,
+    schema: sensitiveFieldPresencePayloadSchema,
+    session,
+  });
+
+  if (payload === undefined) {
+    return 'unknown';
+  }
+
+  if (payload.present === true) {
+    return 'present';
+  }
+
+  return payload.closed === true ? 'unknown' : 'absent';
 };
 
 /**

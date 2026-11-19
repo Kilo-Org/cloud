@@ -219,10 +219,11 @@ export function NewSessionRepositorySection({
     return (
       <CollapsibleSection
         className="mt-3"
-        // The body is plain copy and buttons, not a surface of its own, so it
-        // takes the section's own gutter: without it the text started at the
-        // page edge while the header's row started at 14pt. The section draws
-        // no surface around the body, so nothing is nested inside its card.
+        // The body is plain copy and buttons that belong to the header, so it
+        // sits on the header's own surface under a hairline: on the page, the
+        // copy read as apart from the filled header bar. It brings no surface of
+        // its own, so nothing is nested, and it takes the header row's gutter.
+        bodyOnSurface
         contentClassName="gap-3 px-4"
         titleClassName="font-semibold"
         title={t(copy.connectTitle)}

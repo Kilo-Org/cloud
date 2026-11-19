@@ -144,6 +144,60 @@ describe('artifacts File Provider extension contract', () => {
     expect(extensionSource).toContain('let stagedName = ArtifactPath.isSafeComponent(filename)');
   });
 
+  it('drops the same code points as the manifest writer', () => {
+    // Two sanitizers read one contract: the writer decides what a manifest
+    // name may contain, and the extension applies the same strip to an index
+    // an older build wrote. A stale index must not paint a name the writer
+    // would refuse, so the two predicates have to hold the same set — and the
+    // extension's own predicate asserts nothing about its numbers (the shape
+    // test above pins only its signature), so this reads both sides.
+    const writerPredicate = /function isUnnameableCodePoint[\s\S]*?\n\}/u
+      .exec(manifestWriterSource)?.[0]
+      // The predicate may document a range inline, as the extension's own copy
+      // does; a comment's words are not constant names.
+      ?.replaceAll(/\/\/.*$/gmu, '');
+    const swiftPredicate = extensionSource
+      .slice(
+        extensionSource.indexOf('private static func isUnnameableScalar'),
+        extensionSource.indexOf('private static func splitExtension')
+      )
+      .replaceAll(/\/\/.*$/gmu, '');
+    expect(swiftPredicate).toContain('isUnnameableScalar');
+    if (writerPredicate === undefined) {
+      throw new Error('the manifest writer has no isUnnameableCodePoint predicate');
+    }
+    // The type name carries its own digits; read only the body's comparison
+    // values, never the signature.
+    const swiftValues = [
+      ...new Set(
+        [...swiftPredicate.slice(swiftPredicate.indexOf('{')).matchAll(/\d+/gu)].map(m => m[0])
+      ),
+    ];
+    // The writer names its bounds through constants; resolve every constant
+    // the predicate references, so a range added there under a new name is a
+    // value the Swift side must also carry.
+    const writerValues = [
+      ...new Set([...writerPredicate.matchAll(/\b([A-Z][A-Z0-9_]+)\b/gu)].map(m => m[1])),
+    ].map(name => {
+      const value = new RegExp(String.raw`const ${name} = (\d+);`, 'u').exec(
+        manifestWriterSource
+      )?.[1];
+      if (value === undefined) {
+        throw new Error(`${name} is not a plain decimal constant in the manifest writer`);
+      }
+      return value;
+    });
+    // A predicate that reads no constant would compare two empty sets.
+    expect(writerValues.length).toBeGreaterThan(0);
+    expect(new Set(swiftValues)).toEqual(new Set(writerValues));
+    // The joiners shape an RTL name's letters, so both sides keep them.
+    expect(swiftPredicate).not.toMatch(/\b(?:8204|8205)\b/u);
+    expect(writerPredicate).not.toMatch(/\b(?:8204|8205)\b/u);
+    // And the strip must consult the predicate, so the constants above cannot
+    // go dead while `sanitizeArtifactName` keeps copying every code point.
+    expect(manifestWriterSource).toContain('if (!isUnnameableCodePoint(codePoint)) {');
+  });
+
   it('exposes an item version and honours the requested version', () => {
     // The version is the mirror file's own size and modification date, which
     // the wholesale rewrite changes on every rewrite. It is exposed as the

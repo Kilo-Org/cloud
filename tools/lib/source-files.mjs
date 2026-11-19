@@ -149,7 +149,7 @@ export function* parseSourceTree(dir, root, skip) {
  * shared shape — the path, an empty text, and an empty tree — so the caller
  * meets one problem line where it would have read the file's own findings.
  */
-function readSourceEntry(dir, root, file) {
+export function readSourceEntry(dir, root, file) {
   let text;
   try {
     text = readFileSync(file, 'utf8');

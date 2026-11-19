@@ -47,7 +47,7 @@ function renderControl(showBriefing: boolean): ReactTestRenderer {
   return ref.current;
 }
 
-function render(showBriefing: boolean, reserveMinimumFrame = true): ReactTestRenderer {
+function render(showBriefing: boolean): ReactTestRenderer {
   const ref: { current: ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
@@ -55,7 +55,6 @@ function render(showBriefing: boolean, reserveMinimumFrame = true): ReactTestRen
         live={<LayerFlag name="live" />}
         briefing={<LayerFlag name="briefing" />}
         showBriefing={showBriefing}
-        reserveMinimumFrame={reserveMinimumFrame}
       />
     );
   });
@@ -130,13 +129,5 @@ describe('AdaptiveHomeCardFrame', () => {
       importantForAccessibility: 'auto',
     });
     expect(String(briefing?.props.className)).not.toContain('opacity-0');
-  });
-
-  it('keeps the minimum frame behind the two cards by default', () => {
-    expect(layers(render(false))).toHaveLength(3);
-  });
-
-  it('drops the minimum frame so the card sizes to its own content', () => {
-    expect(layers(render(false, false))).toHaveLength(2);
   });
 });

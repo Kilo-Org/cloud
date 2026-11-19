@@ -20,7 +20,7 @@ import { isCodestralModel } from '@kilocode/web-shared/lib/ai-gateway/providers/
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -72,7 +72,7 @@ export async function getModelGatewayUserByokProviders(
     return [];
   }
   const [vercelModels, vercelModelId, isOpenRouterModel] = await Promise.all([
-    getVercelModelsFromDatabase(),
+    getVercelLanguageModelIdsFromDatabase(),
     mapModelIdToVercel(modelId),
     isValidOpenRouterModelId(modelId),
   ]);
@@ -299,7 +299,7 @@ export async function getStoredByokKeys(
 }
 
 export async function getUserByokProviderIds(
-  fromDb: typeof db,
+  fromDb: ByokSourceDb,
   userId: string
 ): Promise<UserByokProviderId[]> {
   const providers = await getEnabledByokProviders(fromDb, { type: 'user', id: userId });
@@ -307,7 +307,7 @@ export async function getUserByokProviderIds(
 }
 
 export async function getOrganizationByokProviderIds(
-  fromDb: typeof db,
+  fromDb: ByokSourceDb,
   organizationId: string
 ): Promise<UserByokProviderId[]> {
   const providers = await getEnabledByokProviders(fromDb, {
@@ -535,7 +535,7 @@ async function getByokRowsForOwner(
 }
 
 export async function getBYOKforUser(
-  fromDb: typeof db,
+  fromDb: ByokSourceDb,
   userId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {
@@ -543,7 +543,7 @@ export async function getBYOKforUser(
 }
 
 export async function getBYOKforOrganization(
-  fromDb: typeof db | DrizzleTransaction,
+  fromDb: ByokSourceDb,
   organizationId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {

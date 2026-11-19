@@ -360,6 +360,27 @@ function publishPartsChanged(
   subscribers.notifyParts(messageId);
 }
 
+/**
+ * One parts read for the whole message: the cached snapshot when this message
+ * already has one, `EMPTY_PARTS` when it stores nothing, else the per-part
+ * clone-plus-readonly-view snapshot recorded for later reads. A `null` marker
+ * (a change that dropped the snapshot) is falsy, so it rebuilds.
+ */
+function readPartsSnapshot(
+  messageId: string,
+  arr: Part[] | undefined,
+  snapshot: PartsSnapshot
+): readonly ReadonlyPart[] {
+  const cached = snapshot.get(messageId);
+  if (cached) return cached;
+
+  if (!arr || arr.length === 0) return EMPTY_PARTS;
+
+  const built = arr.map(part => createReadonlyPartView(clonePart(part)));
+  snapshot.set(messageId, built);
+  return built;
+}
+
 function createSeedTextPart(messageId: string, partId: string, text: string): TextPart {
   return {
     id: partId,
@@ -442,6 +463,7 @@ export {
   messageIdKey,
   partsKey,
   publishPartsChanged,
+  readPartsSnapshot,
   upsertPartDroppingStaleSyntheticParts,
 };
 export { orderMessageIds } from './message-order';

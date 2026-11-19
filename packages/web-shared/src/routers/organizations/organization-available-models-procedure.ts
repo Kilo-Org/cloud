@@ -32,16 +32,6 @@ export async function loadAvailableModelsForOrganization(params: {
 }): Promise<OpenRouterModelsResponse> {
   const { userId, organizationId, audience, headersList, fromDb } = params;
 
-  const routersPromise = listUsableCustomRouters({
-    userId,
-    organizationId,
-  }).catch(error => {
-    captureException(error, {
-      tags: { endpoint: 'organizations/models' },
-      extra: { action: 'listing_custom_routers', organizationId },
-    });
-    return [];
-  });
   const result = await getAvailableModelsForOrganization(
     organizationId,
     {
@@ -64,7 +54,16 @@ export async function loadAvailableModelsForOrganization(params: {
       message: 'Organization not found',
     });
   }
-  const routers = await routersPromise;
+  const routers = await listUsableCustomRouters({
+    userId,
+    organizationId,
+  }).catch(error => {
+    captureException(error, {
+      tags: { endpoint: 'organizations/models' },
+      extra: { action: 'listing_custom_routers', organizationId },
+    });
+    return [];
+  });
   return {
     ...result,
     data: addCustomRouterModels(

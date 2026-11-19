@@ -3,7 +3,8 @@ import { View } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
 import { StateAction } from '@/components/empty-state';
-import { ArrowLeft, RotateCcw } from '@/components/ui/icons';
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
+import { RotateCcw } from '@/components/ui/icons';
 import { CHAT_UNAVAILABLE_KEY } from '@/lib/chat/state';
 
 type ChatTranscriptFailureProps = Readonly<{
@@ -65,7 +66,7 @@ export function ChatTranscriptFailure({
           {/* Back is the only way out of the terminal state, so it carries a
               control shape like the shared error states' action instead of
               reading as a caption under the description. */}
-          <StateAction label={t('common.back')} icon={ArrowLeft} onPress={onBack} />
+          <StateAction label={t('common.back')} icon={DirectionalArrowLeft} onPress={onBack} />
         </View>
       }
     />

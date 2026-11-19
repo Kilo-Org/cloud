@@ -109,8 +109,8 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   if (access !== 'granted') {
     return (
       <ScopeAccessDeniedScreen
-        title={scopeTitle}
-        eyebrow={t('common.codeReviewer')}
+        title={t('common.codeReviewer')}
+        subtitle={scopeTitle}
         backFallback={CODE_REVIEWER_HOME_PATH}
         kind={access}
         onRetry={() => void retryAccess()}
@@ -141,13 +141,12 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
-        title={scopeTitle}
-        // The same one-line header the review list for this scope paints, so
-        // both scopes report one header height and the platform rows never move
-        // when the name arrives with the membership read: a longer name
-        // tail-truncates inside that line.
-        titleNumberOfLines={1}
-        eyebrow={t('common.codeReviewer')}
+        title={t('common.codeReviewer')}
+        // The scope is the subtitle under the product name, the one two-line
+        // header every Code Reviewer screen paints: a longer organization name
+        // tail-truncates inside that line, so the rows never move when it
+        // arrives with the membership read.
+        subtitle={scopeTitle}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <Section label={t('codeReviewer.platformList.platforms')}>

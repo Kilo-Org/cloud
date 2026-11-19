@@ -128,7 +128,9 @@ describe('persisted message history for a stored session id', () => {
       })
     );
     expect(unsupplied.success).toBe(true);
-    expect(unsupplied.data).toMatchObject({ messages: [{}, {}] });
+    // The schema defaults the count to 0, so asserting it catches a repair that
+    // starts counting the message it only touches.
+    expect(unsupplied.data).toMatchObject({ omittedItemCount: 0, messages: [{}, {}] });
   });
 
   it('still rejects a page whose user summary is not a record', () => {

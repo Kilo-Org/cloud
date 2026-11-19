@@ -28,6 +28,9 @@ vi.mock('../../src/dos/SessionIngestDO', () => ({
   CLONE_ITEM_TYPES: ['session', 'message', 'part', 'session_diff'],
 }));
 vi.mock('../../src/dos/SessionAccessCacheDO', () => ({ getSessionAccessCacheDO: vi.fn() }));
+// The real UserConnectionDO imports the metadata module while the session-events
+// mock below loads its original, which would bind metadata to the real notifier.
+vi.mock('../../src/dos/UserConnectionDO', () => ({ getUserConnectionDO: vi.fn() }));
 vi.mock('../../src/session-events', async importOriginal => ({
   ...(await importOriginal<typeof SessionEvents>()),
   notifyUserSessionEvent: vi.fn(),

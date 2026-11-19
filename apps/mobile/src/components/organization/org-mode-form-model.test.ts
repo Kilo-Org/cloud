@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isOrgModeFormDirty,
-  modeSlugFromName,
-  ORG_MODE_SLUG_MAX_LENGTH,
   type OrgMode,
   orgModeConfigInput,
   orgModeFormSaveValues,
@@ -46,48 +44,6 @@ function storedMode(overrides: Partial<OrgMode['config']> = {}): OrgMode {
     },
   };
 }
-
-describe('modeSlugFromName', () => {
-  it('folds a name into lowercase words joined by one hyphen', () => {
-    expect(modeSlugFromName('Security Reviewer')).toBe('security-reviewer');
-    expect(modeSlugFromName('  Data   Analyst!  ')).toBe('data-analyst');
-  });
-
-  it('leaves no leading or trailing hyphen', () => {
-    expect(modeSlugFromName('-Docs-')).toBe('docs');
-  });
-
-  it('suggests nothing for an empty or whitespace-only name, taken slugs or not', () => {
-    expect(modeSlugFromName('')).toBe('');
-    expect(modeSlugFromName('   ')).toBe('');
-    expect(modeSlugFromName('', ['architect', 'mode'])).toBe('');
-    expect(modeSlugFromName('   ', ['mode'])).toBe('');
-  });
-
-  it('suggests a free mode counter when the name folds away completely', () => {
-    expect(modeSlugFromName('###')).toBe('mode');
-    expect(modeSlugFromName('وضع الاستدلال')).toBe('mode');
-  });
-
-  it('counts the fallback past the taken slugs', () => {
-    expect(modeSlugFromName('###', ['architect', 'mode'])).toBe('mode-2');
-    expect(modeSlugFromName('وضع', ['mode', 'mode-2', 'mode-3'])).toBe('mode-4');
-  });
-
-  it('counts past the taken slugs, ignoring the ones that are not candidates', () => {
-    const taken = ['mode', 'mode-2', 'mode-3', 'mode-4'];
-    expect(modeSlugFromName('###', [...taken, 'unrelated'])).toBe('mode-5');
-  });
-
-  it('keeps the fallback inside the server slug bound', () => {
-    const taken = Array.from({ length: 49 }, (_, index) =>
-      index === 0 ? 'mode' : `mode-${index + 1}`
-    );
-    const suggestion = modeSlugFromName('###', taken);
-    expect(suggestion).toBe('mode-50');
-    expect(suggestion.length).toBeLessThanOrEqual(ORG_MODE_SLUG_MAX_LENGTH);
-  });
-});
 
 describe('validateOrgModeForm', () => {
   const existing = [

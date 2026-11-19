@@ -1,5 +1,5 @@
 import type { PreparationAttempt, SessionCommit } from '@kilocode/cloud-agent-sdk';
-import type { AssistantMessage } from '@/types/opencode.gen';
+import type { AssistantMessage } from '@/types/opencode';
 import type { StoredMessage } from './types';
 import { groupConversationMessages, commitsByMessageAnchor } from './message-presentation';
 import {

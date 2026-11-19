@@ -200,6 +200,7 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      cloudAgentRuntimeProxied?: undefined;
       credential?: undefined;
       webSessionId?: undefined;
       webSessionPepper?: undefined;
@@ -219,6 +220,8 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      /** True only for a token whose runtime claim the Cloud Agent runtime proxy attested. */
+      cloudAgentRuntimeProxied?: boolean;
       credential?: PrivilegedCredentialKind;
       /** Server-only per-session id for MFA step-up; never sent to the browser. */
       webSessionId?: string;
@@ -560,7 +563,13 @@ async function resolveUserFromAuth(
         cloudAgentAuthority: scope,
       });
     }
-    return result.user ? { ...result, cloudAgentAuthority: scope } : result;
+    return result.user
+      ? {
+          ...result,
+          cloudAgentAuthority: scope,
+          cloudAgentRuntimeProxied: authorizationValidationResult.cloudAgentRuntimeProxied,
+        }
+      : result;
   }
 
   return resolveUserFromSession(opts, readDb);

@@ -23,6 +23,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', X: 'X' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
 }));

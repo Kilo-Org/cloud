@@ -325,7 +325,20 @@ function PreparationStepRow({
           {label}
         </Text>
       </Pressable>
-      {expanded && hasDetails ? <PreparationStepDetails step={step} divided /> : null}
+      {expanded && hasDetails ? (
+        // The details start under the row's label, past the caret and status
+        // columns and the row's own gaps, so a step's evidence reads as that
+        // step's and never starts left of its title.
+        <View className="flex-row gap-2">
+          {/* eslint-disable-next-line react-native/no-inline-styles -- the slots equal the caret's and the status mark's numeric sizes */}
+          <View style={{ width: STEP_CARET_SIZE }} />
+          {/* eslint-disable-next-line react-native/no-inline-styles -- the slots equal the caret's and the status mark's numeric sizes */}
+          <View style={{ width: STEP_STATUS_SIZE }} />
+          <View className="min-w-0 flex-1">
+            <PreparationStepDetails step={step} divided />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -14,7 +14,7 @@ import { ScreenHeader } from '@/components/screen-header';
  */
 export function PlatformErrorScreen({
   title,
-  eyebrow,
+  subtitle,
   backFallback,
   errorTitle,
   message,
@@ -26,7 +26,8 @@ export function PlatformErrorScreen({
 }: Readonly<{
   /** ScreenHeader's title, e.g. the screen/feature name. */
   title: string;
-  eyebrow?: string;
+  /** The header's line under the title: the scope the failed screen acts on. */
+  subtitle?: string;
   /**
    * Where the header's Back lands when the failed screen has no history to pop,
    * e.g. a deep link or a relaunch restore that opened it on its own. A caller
@@ -51,7 +52,7 @@ export function PlatformErrorScreen({
 }>) {
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} eyebrow={eyebrow} backFallback={backFallback} />
+      <ScreenHeader title={title} subtitle={subtitle} backFallback={backFallback} />
       <QueryError
         variant={variant}
         title={errorTitle}

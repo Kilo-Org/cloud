@@ -4,17 +4,17 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { readDb, type db } from '@kilocode/web-shared/lib/drizzle';
 
 /**
- * The person a Claude billing row names as the one who linked it. An
- * organization connection bills on that person, so it needs them to still be
- * usable.
+ * The person a connection row names as the one whose delegated account it
+ * holds. An organization connection's credential is that person's account, so
+ * it needs them to still be usable.
  */
-export type ClaudeBillingConnector =
+export type ConnectionConnector =
   /** The row names no connector; an older release did not record one. */
   | { kind: 'unrecorded' }
-  /** The connector resolves to an account that can still bill. */
+  /** The connector resolves to an account that is still usable. */
   | { kind: 'present' }
   /**
-   * The connector can no longer bill: the account row is gone, the account is
+   * The connector is gone: the account row is missing, the account is
    * soft-deleted or being deleted, or it holds no usable email.
    */
   | { kind: 'gone' };
@@ -24,10 +24,10 @@ export type ClaudeBillingConnector =
  * `kilocode_users` row and replaces it with a placeholder address and a
  * soft-deleted reason, so a missing row alone never reports a gone connector.
  */
-export async function resolveClaudeBillingConnector(
+export async function resolveConnectionConnector(
   createdBy: string | null | undefined,
   fromDb: typeof db = readDb
-): Promise<ClaudeBillingConnector> {
+): Promise<ConnectionConnector> {
   if (!createdBy) return { kind: 'unrecorded' };
   const user = await findUserById(createdBy, fromDb);
   if (!user || isGoneOrDeletingBlockedReason(user.blocked_reason)) return { kind: 'gone' };

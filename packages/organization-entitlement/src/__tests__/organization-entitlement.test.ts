@@ -3,9 +3,12 @@ import {
   classifyOrganizationEntitlement,
   getDaysRemainingInTrial,
   getOrgTrialStatusFromDays,
+  isPaidOrganizationSeatSubscriptionStatus,
+  ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES,
   PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES,
+  toOrganizationSeatPurchaseSubscriptionStatus,
+  UNRECOGNIZED_ORGANIZATION_SEAT_PURCHASE_STATUS,
   type OrganizationEntitlementOrganization,
-  type OrganizationSeatPurchaseSubscriptionStatus,
 } from '..';
 
 describe('getOrgTrialStatusFromDays', () => {
@@ -56,7 +59,7 @@ describe('classifyOrganizationEntitlement', () => {
 
   function classify(
     organizationOverrides: Partial<OrganizationEntitlementOrganization> = {},
-    latestSeatPurchaseStatus: OrganizationSeatPurchaseSubscriptionStatus | null = null
+    latestSeatPurchaseStatus: string | null = null
   ) {
     const { settings, ...organizationFields } = organizationOverrides;
     const organization: OrganizationEntitlementOrganization = {
@@ -116,7 +119,7 @@ describe('classifyOrganizationEntitlement', () => {
     'unpaid',
     'paused',
     'an_unrecognized_provider_status',
-  ] satisfies OrganizationSeatPurchaseSubscriptionStatus[])(
+  ] satisfies string[])(
     'keeps a hard-expired trial enforced for %s seat purchases',
     subscriptionStatus => {
       expect(classify({}, subscriptionStatus)).toMatchObject({
@@ -146,4 +149,40 @@ describe('classifyOrganizationEntitlement', () => {
       });
     }
   );
+});
+
+describe('toOrganizationSeatPurchaseSubscriptionStatus', () => {
+  const paidStatuses: ReadonlySet<string> = new Set(PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES);
+  const knownStatuses: ReadonlySet<string> = new Set(
+    ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES
+  );
+
+  it('keeps every paid status in the known list', () => {
+    for (const status of PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES) {
+      expect(knownStatuses.has(status)).toBe(true);
+    }
+  });
+
+  it('round-trips every named status unchanged', () => {
+    for (const status of ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES) {
+      expect(toOrganizationSeatPurchaseSubscriptionStatus(status)).toBe(status);
+    }
+  });
+
+  it('maps a status the union does not name to the sentinel', () => {
+    for (const status of ['pending_cancel', 'an_unrecognized_provider_status', '']) {
+      expect(toOrganizationSeatPurchaseSubscriptionStatus(status)).toBe(
+        UNRECOGNIZED_ORGANIZATION_SEAT_PURCHASE_STATUS
+      );
+    }
+  });
+
+  it('treats the named statuses as paid exactly when the paid set names them', () => {
+    for (const status of ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES) {
+      expect(isPaidOrganizationSeatSubscriptionStatus(status)).toBe(paidStatuses.has(status));
+    }
+    expect(
+      isPaidOrganizationSeatSubscriptionStatus(UNRECOGNIZED_ORGANIZATION_SEAT_PURCHASE_STATUS)
+    ).toBe(false);
+  });
 });

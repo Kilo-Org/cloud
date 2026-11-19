@@ -287,6 +287,7 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
     const response = await post(usageWrite, fromQueue);
 
     expect(response.status).toBe(429);
+    expect(response.headers.get('x-usage-class-limit')).toBeNull();
     expect(await response.json()).toEqual({
       error: 'Usage writer overloaded',
       reason: 'queue_limit',
@@ -311,6 +312,7 @@ describe('POST /api/internal/enkrypt-usage/record', () => {
 
     expect(nonLlm).toHaveLength(NON_LLM_CEILING);
     expect(response.status).toBe(429);
+    expect(response.headers.get('x-usage-class-limit')).toBe('non_llm');
     expect(await response.json()).toEqual({
       error: 'Usage writer overloaded',
       reason: 'queue_limit',

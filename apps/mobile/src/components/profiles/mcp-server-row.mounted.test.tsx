@@ -186,8 +186,7 @@ describe('<McpServerRowView>', () => {
       .findAllByType(TEXT)
       .filter(
         node =>
-          node.props.children === 'Remote' ||
-          node.props.children === 'https://mcp.example.com/docs'
+          node.props.children === 'Remote' || node.props.children === 'https://mcp.example.com/docs'
       );
     expect(factLines).toHaveLength(2);
     for (const line of factLines) {

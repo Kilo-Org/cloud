@@ -377,9 +377,13 @@ Rules 51-55 protect against rapid cross-account reuse of a recently first-used c
     amount of the latest paid yearly invoice issuance, or while a non-deleted scheduled change is effective at or before
     that step. It MUST leave the step's issuance and next monthly issue cursor unchanged, so the paid upgrade invoice
     owns that month, and MUST append one audit entry that names the condition and records both the row tier and the
-    paid base amount. A row without a paid invoice base issuance keeps issuing at its row tier. Known limit: a yearly
-    upgrade whose invoice is never paid receives no further cron base credits, because the Stripe phase has already
-    reset the prepaid year.
+    paid base amount. It MUST record that audit entry once per held month and condition, and MUST alert once when
+    the hold lasts longer than 24 hours. A row without a paid invoice base issuance keeps issuing at its row tier.
+    Known limit: a yearly upgrade whose invoice is never paid receives no further cron base credits, because the
+    Stripe phase has already reset the prepaid year.
+81. A paid Stripe invoice owns the issuance month it pays. When the yearly cron or a usage bonus already created a
+    cron-sourced header for that month, the invoice MUST claim that header as invoice-sourced and record its invoice
+    ID, unless the invoice already owns another header.
 
 ### Pause, Cancellation, and Store Expiry
 
@@ -477,7 +481,10 @@ promo or Kilo Pass referral conversion.
 ### 2026-11-19 -- Yearly cron holds unpaid tier changes
 
 - The yearly monthly-base cron no longer issues at a tier whose yearly invoice is unpaid (Rule 80). It holds the
-  month and cursor until the paid invoice issues that month, then continues at the paid tier.
+  month and cursor until the paid invoice issues that month, then continues at the paid tier. A repeated hold is
+  audited once and alerts after 24 hours.
+- A paid invoice claims a cron-sourced header for its month (Rule 81). A data migration claims the headers that
+  earlier paid invoices reused.
 
 ### 2026-11-09 -- Store subscription backend retirement
 

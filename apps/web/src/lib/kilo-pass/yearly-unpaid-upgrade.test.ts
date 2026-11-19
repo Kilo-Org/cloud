@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -26,8 +28,9 @@ import {
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
+import type * as UtilsServer from '@kilocode/web-shared/lib/utils.server';
 
-import { runKiloPassYearlyMonthlyBaseCron } from '@/lib/kilo-pass/yearly-monthly-base-cron';
+import type { runKiloPassYearlyMonthlyBaseCron as RunYearlyMonthlyBaseCron } from '@/lib/kilo-pass/yearly-monthly-base-cron';
 
 const mockStripeSubscriptionsRetrieve = jest.fn<(id: string) => Promise<Stripe.Subscription>>();
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
@@ -37,6 +40,24 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
     },
   },
 }));
+
+const mockSentryWarning = jest.fn();
+jest.mock('@kilocode/web-shared/lib/utils.server', () => {
+  const actual = jest.requireActual<typeof UtilsServer>('@kilocode/web-shared/lib/utils.server');
+  return {
+    ...actual,
+    sentryLogger: (source: string, severity?: Parameters<typeof actual.sentryLogger>[1]) =>
+      severity === 'warning'
+        ? (message: string, ...args: unknown[]) => mockSentryWarning(source, message, ...args)
+        : actual.sentryLogger(source, severity),
+  };
+});
+
+// Loaded after the mocks above so the cron module captures the mocked Sentry logger.
+const runKiloPassYearlyMonthlyBaseCron: typeof RunYearlyMonthlyBaseCron = async (...args) => {
+  const cron = await import('@/lib/kilo-pass/yearly-monthly-base-cron');
+  return await cron.runKiloPassYearlyMonthlyBaseCron(...args);
+};
 
 jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
   runAfterResponse: async (work: () => Promise<void>) => {
@@ -310,7 +331,70 @@ async function getHoldAudits(subscriptionId: string) {
         sql`${kilo_pass_audit_log.payload_json}->>'kind' = 'yearly_monthly_base'`,
         sql`${kilo_pass_audit_log.payload_json}->>'reason' is not null`
       )
+    )
+    .orderBy(asc(kilo_pass_audit_log.created_at));
+}
+
+async function getSubscriptionStartedAuditCount(subscriptionId: string): Promise<number> {
+  const rows = await db
+    .select({ id: kilo_pass_audit_log.id })
+    .from(kilo_pass_audit_log)
+    .where(
+      and(
+        eq(kilo_pass_audit_log.kilo_pass_subscription_id, subscriptionId),
+        eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.YearlyMonthlyBaseCronStarted)
+      )
     );
+  return rows.length;
+}
+
+/** Returns the subscription to the pre-claim state that earlier paid invoices left behind. */
+async function unclaimIssuanceHeader(subscriptionId: string, issueMonth: string): Promise<void> {
+  await db
+    .update(kilo_pass_issuances)
+    .set({ source: KiloPassIssuanceSource.Cron, stripe_invoice_id: null })
+    .where(
+      and(
+        eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId),
+        eq(kilo_pass_issuances.issue_month, issueMonth)
+      )
+    );
+}
+
+async function applyReusedHeaderClaimMigration(): Promise<void> {
+  const migration = readFileSync(
+    resolve(
+      process.cwd(),
+      '../../packages/db/src/migrations/0369_kilo_pass_claim_invoice_reused_cron_headers.sql'
+    ),
+    'utf8'
+  );
+  await db.execute(sql.raw(migration));
+}
+
+/** Issues the upgrade month at the row tier, as the cron did before unpaid holds existed. */
+async function issueMonthAsLegacyCron(incident: Incident): Promise<void> {
+  await db.transaction(async tx => {
+    const header = await createOrGetIssuanceHeader(tx, {
+      subscriptionId: incident.subscriptionId,
+      issueMonth: '2026-11-01',
+      source: KiloPassIssuanceSource.Cron,
+      stripeInvoiceId: null,
+    });
+    await issueBaseCreditsForIssuance(tx, {
+      issuanceId: header.issuanceId,
+      subscriptionId: incident.subscriptionId,
+      kiloUserId: incident.kiloUserId,
+      amountUsd: 49,
+      stripeInvoiceId: `kilo-pass-yearly-base:${incident.subscriptionId}:2026-11-01`,
+      description: 'Kilo Pass base credits (tier_49, yearly, 2026-11-01)',
+      issuedAt: UPGRADE_AT,
+    });
+    await tx
+      .update(kilo_pass_subscriptions)
+      .set({ next_yearly_issue_at: '2026-12-09T19:44:45.000Z' })
+      .where(eq(kilo_pass_subscriptions.id, incident.subscriptionId));
+  });
 }
 
 function monthlyIssuancesThrough(lastMonth: string, amountUsd: number, firstMonth: string) {
@@ -331,6 +415,7 @@ function monthlyIssuancesThrough(lastMonth: string, amountUsd: number, firstMont
 beforeEach(async () => {
   await cleanupDbForTest();
   mockStripeSubscriptionsRetrieve.mockReset();
+  mockSentryWarning.mockReset();
 });
 
 describe('yearly tier upgrade whose annual invoice is not paid', () => {
@@ -381,12 +466,53 @@ describe('yearly tier upgrade whose annual invoice is not paid', () => {
     expect(await getBaseIssuances(incident.subscriptionId)).toHaveLength(1);
     expect(await getCreditTotalUsd(incident.kiloUserId)).toBe(19);
     expect(await getCursor(incident.subscriptionId)).toBe(UPGRADE_AT);
+    expect(await getHoldAudits(incident.subscriptionId)).toHaveLength(1);
+    expect(await getSubscriptionStartedAuditCount(incident.subscriptionId)).toBe(1);
+    expect(mockSentryWarning).not.toHaveBeenCalled();
+  });
+
+  test('a long hold is audited once and alerts once after 24 hours', async () => {
+    const incident = await seedPaidStarterYearlyWithScheduledUpgrade();
+    await applyUpgradePhase(incident);
+    await runKiloPassYearlyMonthlyBaseCron(db, { now: CRON_AFTER_UPGRADE });
+    await db
+      .update(kilo_pass_audit_log)
+      .set({ created_at: CRON_AFTER_UPGRADE.toISOString() })
+      .where(
+        and(
+          eq(kilo_pass_audit_log.kilo_pass_subscription_id, incident.subscriptionId),
+          sql`${kilo_pass_audit_log.payload_json}->>'reason' is not null`
+        )
+      );
+
+    await runKiloPassYearlyMonthlyBaseCron(db, { now: new Date('2026-11-10T19:00:00.000Z') });
+    expect(await getHoldAudits(incident.subscriptionId)).toHaveLength(1);
+    expect(mockSentryWarning).not.toHaveBeenCalled();
+
+    await runKiloPassYearlyMonthlyBaseCron(db, { now: new Date('2026-11-10T21:00:00.000Z') });
+    await runKiloPassYearlyMonthlyBaseCron(db, { now: new Date('2026-11-10T22:00:00.000Z') });
+
     const holds = await getHoldAudits(incident.subscriptionId);
     expect(holds).toHaveLength(2);
     expect(holds[1]?.payload).toMatchObject({
       reason: 'row_tier_not_paid',
-      pendingScheduledChangeId: null,
+      issueMonth: '2026-11-01',
+      longHold: true,
+      heldSince: CRON_AFTER_UPGRADE.toISOString(),
     });
+    expect(mockSentryWarning).toHaveBeenCalledTimes(1);
+    expect(mockSentryWarning).toHaveBeenCalledWith(
+      'kilo-pass-yearly-monthly-base-cron',
+      'Kilo Pass yearly base issuance held for over 24 hours',
+      {
+        kiloPassSubscriptionId: incident.subscriptionId,
+        reason: 'row_tier_not_paid',
+        issueMonth: '2026-11-01',
+        heldSince: CRON_AFTER_UPGRADE.toISOString(),
+      }
+    );
+    expect(await getSubscriptionStartedAuditCount(incident.subscriptionId)).toBe(1);
+    expect(await getCursor(incident.subscriptionId)).toBe(UPGRADE_AT);
   });
 
   test('cron run before the phase applies holds on the scheduled change', async () => {
@@ -548,6 +674,122 @@ describe('yearly tier upgrade whose annual invoice is not paid', () => {
       { issueMonth: '2026-10-01', source: KiloPassIssuanceSource.StripeInvoice, baseAmountUsd: 19 },
     ]);
     expect(await getCursor(incident.subscriptionId)).toBe(UPGRADE_AT);
+  });
+});
+
+describe('paid invoice for a month that already has a cron header', () => {
+  const novemberHeader = async (subscriptionId: string) =>
+    (
+      await db
+        .select({
+          source: kilo_pass_issuances.source,
+          stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
+        })
+        .from(kilo_pass_issuances)
+        .where(
+          and(
+            eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId),
+            eq(kilo_pass_issuances.issue_month, '2026-11-01')
+          )
+        )
+    )[0];
+
+  async function payUpgradeAfterLegacyCron(): Promise<{
+    incident: Incident;
+    proInvoiceId: string;
+  }> {
+    const incident = await seedPaidStarterYearlyWithScheduledUpgrade();
+    await applyUpgradePhase(incident);
+    await issueMonthAsLegacyCron(incident);
+    const proInvoiceId = `in_pro_${crypto.randomUUID()}`;
+    await payUpgradeInvoice(incident, {
+      paidAtIso: PRO_PAID_AT,
+      invoiceId: proInvoiceId,
+      eventId: `evt_pro_paid_${crypto.randomUUID()}`,
+    });
+    return { incident, proInvoiceId };
+  }
+
+  const issuedThroughDecember = [
+    { issueMonth: '2026-10-01', source: KiloPassIssuanceSource.StripeInvoice, baseAmountUsd: 19 },
+    { issueMonth: '2026-11-01', source: KiloPassIssuanceSource.StripeInvoice, baseAmountUsd: 49 },
+    { issueMonth: '2026-12-01', source: KiloPassIssuanceSource.Cron, baseAmountUsd: 49 },
+  ];
+
+  test('the invoice claims the cron header and the paid tier keeps issuing', async () => {
+    const { incident, proInvoiceId } = await payUpgradeAfterLegacyCron();
+
+    expect(await novemberHeader(incident.subscriptionId)).toEqual({
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripeInvoiceId: proInvoiceId,
+    });
+    expect(await getCursor(incident.subscriptionId)).toBe('2026-12-09T20:45:10.000Z');
+
+    const summary = await runKiloPassYearlyMonthlyBaseCron(db, {
+      now: new Date('2026-12-09T21:00:00.000Z'),
+    });
+
+    expect(summary).toMatchObject({ baseIssuedCount: 1, baseHeldForUnpaidTierChangeCount: 0 });
+    expect(await getBaseIssuances(incident.subscriptionId)).toEqual(issuedThroughDecember);
+    expect(await getHoldAudits(incident.subscriptionId)).toEqual([]);
+  });
+
+  test('the migration claims a header that an earlier paid invoice reused', async () => {
+    const { incident, proInvoiceId } = await payUpgradeAfterLegacyCron();
+    await unclaimIssuanceHeader(incident.subscriptionId, '2026-11-01');
+
+    const held = await runKiloPassYearlyMonthlyBaseCron(db, {
+      now: new Date('2026-12-09T21:00:00.000Z'),
+    });
+    expect(held).toMatchObject({ baseIssuedCount: 0, baseHeldForUnpaidTierChangeCount: 1 });
+
+    await applyReusedHeaderClaimMigration();
+
+    expect(await novemberHeader(incident.subscriptionId)).toEqual({
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripeInvoiceId: proInvoiceId,
+    });
+    const resumed = await runKiloPassYearlyMonthlyBaseCron(db, {
+      now: new Date('2026-12-09T22:00:00.000Z'),
+    });
+    expect(resumed).toMatchObject({ baseIssuedCount: 1, baseHeldForUnpaidTierChangeCount: 0 });
+    expect(await getBaseIssuances(incident.subscriptionId)).toEqual(issuedThroughDecember);
+  });
+
+  test('the migration leaves a header alone when its invoice already owns another header', async () => {
+    const { incident, proInvoiceId } = await payUpgradeAfterLegacyCron();
+    await unclaimIssuanceHeader(incident.subscriptionId, '2026-11-01');
+    await db
+      .update(kilo_pass_issuances)
+      .set({ stripe_invoice_id: proInvoiceId })
+      .where(
+        and(
+          eq(kilo_pass_issuances.kilo_pass_subscription_id, incident.subscriptionId),
+          eq(kilo_pass_issuances.issue_month, '2026-10-01')
+        )
+      );
+
+    await applyReusedHeaderClaimMigration();
+
+    expect(await novemberHeader(incident.subscriptionId)).toEqual({
+      source: KiloPassIssuanceSource.Cron,
+      stripeInvoiceId: null,
+    });
+  });
+
+  test('the migration leaves a cron header without a paid invoice alone', async () => {
+    const incident = await seedPaidStarterYearlyWithScheduledUpgrade();
+    await db
+      .delete(kilo_pass_scheduled_changes)
+      .where(eq(kilo_pass_scheduled_changes.id, incident.scheduledChangeId));
+    await runKiloPassYearlyMonthlyBaseCron(db, { now: CRON_AFTER_UPGRADE });
+
+    await applyReusedHeaderClaimMigration();
+
+    expect(await novemberHeader(incident.subscriptionId)).toEqual({
+      source: KiloPassIssuanceSource.Cron,
+      stripeInvoiceId: null,
+    });
   });
 });
 

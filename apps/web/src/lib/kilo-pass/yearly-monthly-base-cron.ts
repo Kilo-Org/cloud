@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  kilo_pass_audit_log,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_scheduled_changes,
@@ -26,9 +27,12 @@ import {
 import { computeIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issue-month';
 import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { updateKiloPassThresholdAfterBaseCredits } from './subscription-accounting';
 
 type Db = typeof defaultDb;
+
+const logLongUnpaidTierChangeHold = sentryLogger('kilo-pass-yearly-monthly-base-cron', 'warning');
 
 /**
  * Maximum number of catch-up steps per subscription per cron run.
@@ -57,8 +61,13 @@ type DueSubscription = {
   nextYearlyIssueAt: string | null;
 };
 
+const UNPAID_TIER_CHANGE_HOLD_REASONS = ['row_tier_not_paid', 'scheduled_change_not_paid'] as const;
+const UNPAID_TIER_CHANGE_HOLD_ALERT_AFTER_HOURS = 24;
+
+type UnpaidTierChangeHoldReason = (typeof UNPAID_TIER_CHANGE_HOLD_REASONS)[number];
+
 type UnpaidTierChangeHold = {
-  reason: 'row_tier_not_paid' | 'scheduled_change_not_paid';
+  reason: UnpaidTierChangeHoldReason;
   issueMonth: string;
   dueAt: string;
   rowTier: KiloPassTier;
@@ -140,6 +149,122 @@ async function findUnpaidTierChangeHold(
       ? dayjs(pendingScheduledChange.effectiveAt).utc().toISOString()
       : null,
   };
+}
+
+function unpaidTierChangeHoldAuditKey(
+  subscriptionId: string,
+  issueMonth: string,
+  reason: UnpaidTierChangeHoldReason
+): string {
+  return `yearly_monthly_base_hold:${subscriptionId}:${issueMonth}:${reason}`;
+}
+
+function longUnpaidTierChangeHoldAuditKey(holdAuditKey: string): string {
+  return `${holdAuditKey}:long_hold`;
+}
+
+/** Returns the first created_at of each hold audit key recorded for this subscription month. */
+async function findUnpaidTierChangeHoldAudits(
+  db: Db,
+  params: { subscriptionId: string; issueMonth: string }
+): Promise<Map<string, string>> {
+  const keys = UNPAID_TIER_CHANGE_HOLD_REASONS.flatMap(reason => {
+    const holdAuditKey = unpaidTierChangeHoldAuditKey(
+      params.subscriptionId,
+      params.issueMonth,
+      reason
+    );
+    return [holdAuditKey, longUnpaidTierChangeHoldAuditKey(holdAuditKey)];
+  });
+
+  const rows = await db
+    .select({
+      key: kilo_pass_audit_log.idempotency_key,
+      createdAt: kilo_pass_audit_log.created_at,
+    })
+    .from(kilo_pass_audit_log)
+    .where(
+      and(
+        eq(kilo_pass_audit_log.kilo_pass_subscription_id, params.subscriptionId),
+        inArray(kilo_pass_audit_log.idempotency_key, keys)
+      )
+    )
+    .orderBy(desc(kilo_pass_audit_log.created_at));
+
+  return new Map(rows.flatMap(row => (row.key ? [[row.key, row.createdAt] as const] : [])));
+}
+
+/**
+ * A held step stays due, so the cron sees it every run. Record the hold once per month and
+ * reason, and alert once when it outlasts the alert threshold.
+ */
+async function recordUnpaidTierChangeHold(
+  db: Db,
+  params: {
+    subscription: DueSubscription;
+    runId: string;
+    now: dayjs.Dayjs;
+    hold: UnpaidTierChangeHold;
+    priorHoldAudits: Map<string, string>;
+  }
+): Promise<void> {
+  const { subscription, runId, now, hold, priorHoldAudits } = params;
+  const holdAuditKey = unpaidTierChangeHoldAuditKey(
+    subscription.subscriptionId,
+    hold.issueMonth,
+    hold.reason
+  );
+  const audit = {
+    action: KiloPassAuditLogAction.BaseCreditsIssued,
+    result: KiloPassAuditLogResult.SkippedIdempotent,
+    kiloUserId: subscription.kiloUserId,
+    kiloPassSubscriptionId: subscription.subscriptionId,
+    stripeSubscriptionId: subscription.stripeSubscriptionId,
+  };
+  const payload = {
+    kind: 'yearly_monthly_base',
+    reason: hold.reason,
+    runId,
+    issueMonth: hold.issueMonth,
+    nextYearlyIssueAt: hold.dueAt,
+    rowTier: hold.rowTier,
+    rowTierBaseAmountUsd: hold.rowTierBaseAmountUsd,
+    paidBaseAmountUsd: hold.paidBaseAmountUsd,
+    pendingScheduledChangeId: hold.pendingScheduledChangeId,
+    pendingScheduledChangeToTier: hold.pendingScheduledChangeToTier,
+    pendingScheduledChangeEffectiveAt: hold.pendingScheduledChangeEffectiveAt,
+  };
+
+  const heldSince = priorHoldAudits.get(holdAuditKey);
+  if (!heldSince) {
+    await appendKiloPassAuditLog(db, { ...audit, idempotencyKey: holdAuditKey, payload });
+    return;
+  }
+
+  const longHoldAuditKey = longUnpaidTierChangeHoldAuditKey(holdAuditKey);
+  const heldSinceUtc = dayjs(new Date(heldSince)).utc();
+  if (
+    priorHoldAudits.has(longHoldAuditKey) ||
+    now.diff(heldSinceUtc, 'hour') < UNPAID_TIER_CHANGE_HOLD_ALERT_AFTER_HOURS
+  ) {
+    return;
+  }
+
+  const heldSinceIso = heldSinceUtc.toISOString();
+  await appendKiloPassAuditLog(db, {
+    ...audit,
+    idempotencyKey: longHoldAuditKey,
+    payload: { ...payload, longHold: true, heldSince: heldSinceIso },
+  });
+  logLongUnpaidTierChangeHold(
+    `Kilo Pass yearly base issuance held for over ${UNPAID_TIER_CHANGE_HOLD_ALERT_AFTER_HOURS} hours`,
+    {
+      kiloPassSubscriptionId: subscription.subscriptionId,
+      reason: hold.reason,
+      issueMonth: hold.issueMonth,
+      heldSince: heldSinceIso,
+    }
+  );
 }
 
 async function issueYearlyCadenceMonthlyBaseOnce(
@@ -306,21 +431,27 @@ export async function runKiloPassYearlyMonthlyBaseCron(
     }
 
     const issueMonth = computeIssueMonth(dayjs(nextYearlyIssueAt).utc());
-
-    await appendKiloPassAuditLog(db, {
-      action: KiloPassAuditLogAction.YearlyMonthlyBaseCronStarted,
-      result: KiloPassAuditLogResult.Success,
-      kiloUserId: subscription.kiloUserId,
-      kiloPassSubscriptionId: subscription.subscriptionId,
-      stripeSubscriptionId: subscription.stripeSubscriptionId,
-      payload: {
-        scope: 'subscription',
-        kind: 'yearly_monthly_base',
-        runId,
-        issueMonth,
-        nextYearlyIssueAt,
-      },
+    const priorHoldAudits = await findUnpaidTierChangeHoldAudits(db, {
+      subscriptionId: subscription.subscriptionId,
+      issueMonth,
     });
+
+    if (priorHoldAudits.size === 0) {
+      await appendKiloPassAuditLog(db, {
+        action: KiloPassAuditLogAction.YearlyMonthlyBaseCronStarted,
+        result: KiloPassAuditLogResult.Success,
+        kiloUserId: subscription.kiloUserId,
+        kiloPassSubscriptionId: subscription.subscriptionId,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+        payload: {
+          scope: 'subscription',
+          kind: 'yearly_monthly_base',
+          runId,
+          issueMonth,
+          nextYearlyIssueAt,
+        },
+      });
+    }
 
     let subscriptionSteps: Awaited<ReturnType<typeof issueYearlyCadenceMonthlyBaseOnce>>[] = [];
     let unpaidTierChangeHold: UnpaidTierChangeHold | null = null;
@@ -376,25 +507,18 @@ export async function runKiloPassYearlyMonthlyBaseCron(
 
     if (unpaidTierChangeHold) {
       baseHeldForUnpaidTierChangeCount += 1;
-      await appendKiloPassAuditLog(db, {
-        action: KiloPassAuditLogAction.BaseCreditsIssued,
-        result: KiloPassAuditLogResult.SkippedIdempotent,
-        kiloUserId: subscription.kiloUserId,
-        kiloPassSubscriptionId: subscription.subscriptionId,
-        stripeSubscriptionId: subscription.stripeSubscriptionId,
-        payload: {
-          kind: 'yearly_monthly_base',
-          reason: unpaidTierChangeHold.reason,
-          runId,
-          issueMonth: unpaidTierChangeHold.issueMonth,
-          nextYearlyIssueAt: unpaidTierChangeHold.dueAt,
-          rowTier: unpaidTierChangeHold.rowTier,
-          rowTierBaseAmountUsd: unpaidTierChangeHold.rowTierBaseAmountUsd,
-          paidBaseAmountUsd: unpaidTierChangeHold.paidBaseAmountUsd,
-          pendingScheduledChangeId: unpaidTierChangeHold.pendingScheduledChangeId,
-          pendingScheduledChangeToTier: unpaidTierChangeHold.pendingScheduledChangeToTier,
-          pendingScheduledChangeEffectiveAt: unpaidTierChangeHold.pendingScheduledChangeEffectiveAt,
-        },
+      await recordUnpaidTierChangeHold(db, {
+        subscription,
+        runId,
+        now,
+        hold: unpaidTierChangeHold,
+        priorHoldAudits:
+          unpaidTierChangeHold.issueMonth === issueMonth
+            ? priorHoldAudits
+            : await findUnpaidTierChangeHoldAudits(db, {
+                subscriptionId: subscription.subscriptionId,
+                issueMonth: unpaidTierChangeHold.issueMonth,
+              }),
       });
     }
 

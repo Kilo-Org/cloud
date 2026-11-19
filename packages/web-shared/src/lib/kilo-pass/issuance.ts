@@ -170,6 +170,36 @@ export async function appendKiloPassAuditLog(
   });
 }
 
+/**
+ * A paid invoice owns its month even when the yearly cron or a usage bonus created the
+ * header first. Paid-tier checks and the yearly period start read invoice-sourced headers.
+ */
+async function claimCronIssuanceHeaderForInvoice(
+  tx: DrizzleTransaction,
+  params: { issuanceId: string; stripeInvoiceId: string }
+): Promise<void> {
+  const [invoiceHeader] = await tx
+    .select({ issuanceId: kilo_pass_issuances.id })
+    .from(kilo_pass_issuances)
+    .where(eq(kilo_pass_issuances.stripe_invoice_id, params.stripeInvoiceId))
+    .limit(1);
+  if (invoiceHeader) return;
+
+  await tx
+    .update(kilo_pass_issuances)
+    .set({
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripe_invoice_id: params.stripeInvoiceId,
+    })
+    .where(
+      and(
+        eq(kilo_pass_issuances.id, params.issuanceId),
+        eq(kilo_pass_issuances.source, KiloPassIssuanceSource.Cron),
+        isNull(kilo_pass_issuances.stripe_invoice_id)
+      )
+    );
+}
+
 export async function createOrGetIssuanceHeader(
   tx: DrizzleTransaction,
   params: {
@@ -210,6 +240,12 @@ export async function createOrGetIssuanceHeader(
 
   const existingIssuanceId = bySubscriptionMonth[0]?.issuanceId;
   if (existingIssuanceId) {
+    if (source === KiloPassIssuanceSource.StripeInvoice && stripeInvoiceId) {
+      await claimCronIssuanceHeaderForInvoice(tx, {
+        issuanceId: existingIssuanceId,
+        stripeInvoiceId,
+      });
+    }
     return { issuanceId: existingIssuanceId, wasCreated: false };
   }
 

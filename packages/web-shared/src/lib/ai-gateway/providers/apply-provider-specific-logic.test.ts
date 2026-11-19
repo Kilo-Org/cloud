@@ -903,7 +903,8 @@ describe('applyReasoningDetailsTransform', () => {
 
     applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
 
-    const toolCalls = request.body.messages[0].tool_calls as Array<Record<string, unknown>>;
+    const assistant = request.body.messages[0] as unknown as Record<string, unknown>;
+    const toolCalls = assistant.tool_calls as Array<Record<string, unknown>>;
     expect(toolCalls[0]).toMatchObject({
       function: { name: 'first' },
       extra_content: { google: { thought_signature: 'duplicate-id-signature' } },
@@ -943,10 +944,13 @@ describe('applyReasoningDetailsTransform', () => {
 
     applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
 
-    expect(request.body.messages[0]).toMatchObject({
+    const assistant = request.body.messages[0] as unknown as Record<string, unknown>;
+    expect(assistant).toMatchObject({
       extra_content: { google: { thought_signature: 'unmatched-signature' } },
     });
-    expect(request.body.messages[0].tool_calls[0]).not.toHaveProperty('extra_content');
+    expect((assistant.tool_calls as Array<Record<string, unknown>>)[0]).not.toHaveProperty(
+      'extra_content'
+    );
   });
 
   it('does not touch Messages requests', () => {

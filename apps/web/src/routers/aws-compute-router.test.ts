@@ -298,7 +298,14 @@ describe('AWS compute owner and persistence contracts', () => {
     const status = await orgCaller({ user: admin }).prepare({ organizationId, accountId });
     expect(status.accountId).toBe(accountId);
     expect(requests.at(-1)?.owner).toEqual({ organizationId });
-    expect((await row()).user_id).toBe(user.id);
+    const orgRow = await db.query.byoc_connections.findFirst({
+      where: and(
+        eq(byoc_connections.provider, 'aws'),
+        eq(byoc_connections.organization_id, organizationId)
+      ),
+    });
+    expect(orgRow?.user_id).toBeNull();
+    expect((await row()).organization_id).toBeNull();
   });
   it('sanitizes an unknown upstream error body', async () => {
     remoteFailure = 'private-provider-error-must-not-return';

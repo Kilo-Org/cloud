@@ -110,8 +110,13 @@ export type HomeWidgetTimelineEntry = z.infer<typeof homeWidgetTimelineEntrySche
 export const homeWidgetResponseSchema = homeWidgetDataSchema.extend({
   home: homeWidgetPresentationSchema,
   refreshAt: z.number().finite(),
-  /** Optional for persisted older responses; current server producers always supply it. */
-  presentationTimeline: z.array(homeWidgetTimelineEntrySchema).max(3).optional(),
+  /**
+   * Optional for persisted older responses; current server producers always
+   * supply it. Four is the most the policy can build: the request instant, the
+   * wake, its one retry, and the stale instant. A cap below that would refuse a
+   * payload the producers are entitled to send.
+   */
+  presentationTimeline: z.array(homeWidgetTimelineEntrySchema).max(4).optional(),
 });
 export type HomeWidgetResponse = z.infer<typeof homeWidgetResponseSchema>;
 export type HomeWidgetSessionRow = GlanceableSessionRow & {

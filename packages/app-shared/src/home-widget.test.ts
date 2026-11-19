@@ -8,6 +8,7 @@ import {
   glanceableSessionTitle,
   homeWidgetRefreshAt,
   homeWidgetDataSchema,
+  homeWidgetResponseSchema,
 } from './home-widget';
 import { GLANCEABLE_STALE_MS, GLANCEABLE_TITLE_LIMIT } from './glanceable-agents-snapshot';
 
@@ -458,6 +459,25 @@ describe('native Home presentation timeline', () => {
     expect(buildHomeWidgetPresentationTimeline(data, now + GLANCEABLE_STALE_MS)).toHaveLength(2);
     data.snapshot.status = 'privacy';
     expect(buildHomeWidgetPresentationTimeline(data, now)).toHaveLength(1);
+  });
+
+  it('keeps every built timeline inside the response schema the client parses', () => {
+    // The published timeline is capped, and a cap below the longest policy
+    // output would make the app silently drop a whole response.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'scheduled', scheduledAt: '2026-10-09T10:05:00Z' }],
+    });
+    const timeline = buildHomeWidgetPresentationTimeline(data, now);
+    expect(timeline).toHaveLength(4);
+    expect(
+      homeWidgetResponseSchema.safeParse({
+        ...data,
+        home: buildHomeWidgetPresentation(data, now),
+        refreshAt: homeWidgetRefreshAt(data, now),
+        presentationTimeline: timeline,
+      }).success
+    ).toBe(true);
   });
 
   it('flips the stale flag exactly at the boundary the timeline publishes', () => {

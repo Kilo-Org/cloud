@@ -685,7 +685,8 @@ workflow can deploy merged changes automatically; deployment authorization and a
 must be satisfied before merge. There is no guaranteed manual deployment window.
 To deploy it individually when separately authorized, dispatch that
 workflow with `worker: services/usage-ingest` and `target_environment: production`
-or `staging`.
+or `staging`. A manual dispatch must run from `main`; any other ref is
+rejected before the deploy job starts.
 
 Normal production and staging CI prepare their selected EU queues before Worker upload.
 It reads queue names from `wrangler.jsonc`, creates missing resources with

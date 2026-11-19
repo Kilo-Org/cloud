@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       worker:
-        description: 'Worker folder to deploy (e.g. services/session-ingest)'
+        description: 'Worker folder to deploy (e.g. services/session-ingest). A manual dispatch must come from main.'
         required: true
         type: string
       target_environment:
-        description: 'Worker environment to deploy to'
+        description: 'Worker environment to deploy to. A manual dispatch must come from main.'
         required: false
         default: production
         type: choice

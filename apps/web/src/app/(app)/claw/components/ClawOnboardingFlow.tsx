@@ -28,7 +28,6 @@ import {
 } from '@/lib/kiloclaw/morning-briefing-interests';
 import { controllerCalverSupports } from '@/lib/kiloclaw/version';
 import { ClawContextProvider, useClawContext } from './ClawContext';
-import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { ProvisioningStep, ProvisioningStepView } from './ProvisioningStep';
 import { DEFAULT_BOT_IDENTITY, DEFAULT_ONBOARDING_EXEC_PRESET } from './claw.types';
@@ -753,8 +752,6 @@ function ClawOnboardingFlowInner({
           </AlertDescription>
         </Alert>
       )}
-
-      <ClawConfigServiceBanner status={status} />
 
       <MaybeBillingWrapper skip={!!organizationId} hideBanners>
         {renderStepContent()}

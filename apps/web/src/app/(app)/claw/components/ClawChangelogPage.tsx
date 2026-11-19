@@ -4,7 +4,6 @@ import { Sparkles } from 'lucide-react';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChangelogTab } from './ChangelogTab';
-import { ClawConfigServiceBannerWithStatus } from './ClawConfigServiceBanner';
 import { BillingWrapper } from './billing/BillingWrapper';
 
 function ChangelogCard() {
@@ -20,7 +19,6 @@ function ChangelogCard() {
 export function ClawChangelogPage({ organizationId }: { organizationId?: string }) {
   const content = (
     <>
-      <ClawConfigServiceBannerWithStatus organizationId={organizationId} />
       <ChangelogCard />
     </>
   );

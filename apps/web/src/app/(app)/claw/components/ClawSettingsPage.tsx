@@ -14,7 +14,6 @@ import {
   useOrgKiloClawMyPin,
 } from '@/hooks/useOrgKiloClaw';
 import { ClawContextProvider, useClawContext } from './ClawContext';
-import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawInstanceOverview } from './ClawInstanceOverview';
 import { SettingsTab } from './SettingsTab';
 import { UpgradeKiloClawDialog } from './UpgradeKiloClawDialog';
@@ -234,7 +233,6 @@ function ClawSettingsWithStatus({
   if (!status || status.status === null) return null;
   const settingsContent = (
     <div className="flex flex-col gap-6">
-      <ClawConfigServiceBanner status={status} />
       <ClawSettingsInner status={status} organizationName={organizationName} />
     </div>
   );

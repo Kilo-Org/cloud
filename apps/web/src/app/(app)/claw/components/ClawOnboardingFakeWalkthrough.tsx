@@ -13,7 +13,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { BotIdentityStep } from './BotIdentityStep';
-import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { CalendarConnectStepView } from './CalendarConnectStep';
 import { InboundEmailStepView } from './InboundEmailStep';
@@ -115,7 +114,6 @@ export function ClawOnboardingFakeWalkthrough({
         </AlertDescription>
       </Alert>
 
-      <ClawConfigServiceBanner status={fakeStatus} />
       <FakeWalkthroughControls currentStep={step} onStepChange={setStep} />
       {renderFakeStep({
         step,

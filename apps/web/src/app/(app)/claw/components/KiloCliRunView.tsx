@@ -9,7 +9,6 @@ import { SetPageTitle } from '@/components/SetPageTitle';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { useClawContext } from './ClawContext';
 import { useClawKiloCliRunStatus } from '../hooks/useClawHooks';
-import { ClawConfigServiceBannerWithStatus } from './ClawConfigServiceBanner';
 import { stripAnsi } from '@/lib/stripAnsi';
 
 function StatusBadge({ status }: { status: string | null }) {
@@ -84,8 +83,6 @@ export function KiloCliRunView({
           Back to Dashboard
         </Button>
       </div>
-
-      <ClawConfigServiceBannerWithStatus organizationId={organizationId} />
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">

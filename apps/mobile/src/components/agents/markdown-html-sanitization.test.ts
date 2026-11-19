@@ -18,6 +18,38 @@ const replacesOf = (value: string) => {
   return calls;
 };
 
+/**
+ * The characters the emptiness scan reads through `String.prototype.indexOf`:
+ * the distance each lookup travels, whether or not it finds its needle. A tail
+ * walk is one lookup that reads the whole remainder, so this separates a scan
+ * that re-reads the tail per tag from one that reads each region once; the call
+ * count alone cannot, because either version makes about one call per tag.
+ */
+// The native lookup, captured before the spy replaces it. `Reflect.get` reads
+// the function value without forming an unbound method reference.
+const nativeIndexOf = Reflect.get(String.prototype, 'indexOf') as (
+  this: string,
+  search: string,
+  from?: number
+) => number;
+
+function charactersRead(value: string): number {
+  let read = 0;
+  const spy = vi.spyOn(String.prototype, 'indexOf');
+  spy.mockImplementation(function countScan(this: string, search: string, from = 0): number {
+    const found = nativeIndexOf.call(this, search, from);
+    read += found === -1 ? this.length - from : found - from + 1;
+    return found;
+  } as never);
+  try {
+    clearHtmlEmptinessCacheForTests();
+    htmlSanitizesToEmpty(value);
+  } finally {
+    spy.mockRestore();
+  }
+  return read;
+}
+
 beforeEach(() => {
   clearHtmlEmptinessCacheForTests();
 });
@@ -109,62 +141,63 @@ describe('htmlSanitizesToEmpty', () => {
     }
   });
 
-  it('scans a value with many void removed tags in one linear pass', () => {
+  it('scans a value with many void removed tags in linear time', () => {
     // Regression: the container pattern paired `<input>` and `<source>` with a
     // closer that a void element cannot have, so every occurrence walked the
-    // rest of the value on every streamed publish. Count the character lookups
-    // instead of timing them: the count is deterministic, so this cannot flake
-    // on a loaded runner.
-    const countOf = (tags: number): number => {
+    // rest of the value on every streamed publish. Measured on the Android
+    // emulator with the app's own bundle: 20,000 such tags took 14.2 s before
+    // and 35 ms after, growing quadratically against linearly. Time the same
+    // scaling here; the ratio is wide enough (about 15× for quadratic, about 4×
+    // for linear) that a noisy runner cannot flip it, and the absolute bound
+    // fails outright on the quadratic shape.
+    const timeOf = (tags: number): number => {
       const value = `${'<input><source><link><meta>'.repeat(tags / 4)}visible`;
-      const indexOf = vi.spyOn(String.prototype, 'indexOf');
+      clearHtmlEmptinessCacheForTests();
+      const start = performance.now();
       expect(htmlSanitizesToEmpty(value)).toBe(false);
-      const scanned = indexOf.mock.calls.length;
-      indexOf.mockRestore();
-      return scanned;
+      return performance.now() - start;
     };
-    const small = countOf(1_000);
-    const large = countOf(10_000);
-    // Ten times the tags cost about ten times the lookups. A tail walk per
-    // occurrence would cost about a hundred times (occurrences × length).
-    expect(large).toBeLessThan(small * 20);
-    expect(large).toBeLessThan(100_000);
+    // Warm the JIT so the first measurement is not the slow one.
+    timeOf(4_000);
+    const small = timeOf(5_000);
+    const large = timeOf(20_000);
+    // Four times the input: linear work stays under about 10×, the quadratic
+    // shape lands near 16× and its absolute cost reaches hundreds of
+    // milliseconds. Both assertions fail if the tail walk returns.
+    expect(large).toBeLessThan(Math.max(small, 0.5) * 10);
+    expect(large).toBeLessThan(400);
   });
 
-  it('stops at a truncated start tag instead of walking the tail for each one', () => {
-    // No '>' follows the last start tag, so no start tag in the value can
-    // complete. A scan that re-walks the tail per tag pays lookups proportional
-    // to tags × remaining length; this scan runs in one pass, so its lookups
-    // stay proportional to the tag count. The count is deterministic, so the
-    // assertion cannot flake on a loaded runner.
-    const countOf = (value: string): number => {
-      const indexOf = vi.spyOn(String.prototype, 'indexOf');
-      expect(htmlSanitizesToEmpty(value)).toBe(false);
-      const scanned = indexOf.mock.calls.length;
-      indexOf.mockRestore();
-      return scanned;
-    };
-    const small = countOf(`${'<input><source>'.repeat(500)}<link`);
-    const large = countOf(`${'<input><source>'.repeat(5_000)}<link`);
-    // Ten times the tags cost about ten times the lookups; a tail walk per tag
-    // would cost about a hundred times.
-    expect(large).toBeLessThan(small * 20);
-    expect(large).toBeLessThan(100_000);
+  it('scans a value whose start tags never complete in one pass', () => {
+    // A streaming part can arrive with start tags that have no `>` yet. The
+    // scan must not re-read the remainder per tag: characters read stay
+    // proportional to the value length, where a tail walk per tag reads
+    // occurrences × length.
+    const readsOf = (tags: number): number => charactersRead('<input><source>'.repeat(tags / 2));
+    const small = readsOf(1_000);
+    const large = readsOf(5_000);
+    expect(large).toBeLessThan(small * 10);
   });
 
-  it('matches a removed tag in upper case regardless of the device locale', () => {
+  it('folds a removed tag name without consulting the device locale', () => {
     // A tag name is an ASCII token, not display text. Folding it with the
     // device locale would make `INPUT` read as `ınput` under Turkish, so the
-    // removed element would stop matching on that device and the answer would
-    // change. This pins the locale-independent fold the module uses; the
-    // module's source is the other half of the pin, because the case guard
-    // allowlists this comparison beside its HTML-tag peers.
-    expect(htmlSanitizesToEmpty('<INPUT>hidden</INPUT>')).toBe(true);
-    expect(htmlSanitizesToEmpty('<SCRIPT>x</SCRIPT>')).toBe(true);
-    expect(htmlSanitizesToEmpty('<Style>.x{}</Style>')).toBe(true);
-    // A non-ASCII look-alike is not a removed tag name, and its text stays
-    // visible.
-    expect(htmlSanitizesToEmpty('<ınput>text</ınput>')).toBe(false);
+    // removed element would stop matching there and the answer would change.
+    // The runner's own locale is not Turkish, so asserting the answer alone
+    // cannot see that: this asserts the locale-aware call is never made, which
+    // fails as soon as the fold consults the locale.
+    const localeFold = vi.spyOn(String.prototype, 'toLocaleLowerCase');
+    try {
+      expect(htmlSanitizesToEmpty('<INPUT>hidden</INPUT>')).toBe(true);
+      expect(htmlSanitizesToEmpty('<SCRIPT>x</SCRIPT>')).toBe(true);
+      expect(htmlSanitizesToEmpty('<Style>.x{}</Style>')).toBe(true);
+      // A non-ASCII look-alike is not a removed tag name, and its text stays
+      // visible.
+      expect(htmlSanitizesToEmpty('<ınput>text</ınput>')).toBe(false);
+      expect(localeFold).not.toHaveBeenCalled();
+    } finally {
+      localeFold.mockRestore();
+    }
   });
 
   it('answers the same as the previous pattern pipeline for generated values', () => {

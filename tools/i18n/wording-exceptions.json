@@ -1,5 +1,15 @@
 {
-  "af": ["commit", "open", "open pull request", "plan", "receipt", "review", "starting", "token"],
+  "af": [
+    "commit",
+    "open",
+    "open pull request",
+    "plan",
+    "receipt",
+    "review",
+    "starting",
+    "terms of service",
+    "token"
+  ],
   "am": ["github connection expired", "open", "open pull request"],
   "ar": [
     "commit",
@@ -42,6 +52,7 @@
     "personal",
     "privacy policy",
     "receipt",
+    "terms of service",
     "tokens",
     "truncated",
     "unknown"
@@ -60,6 +71,7 @@
     "open pull request",
     "receipt",
     "search models",
+    "terms of service",
     "tokens",
     "unknown"
   ],
@@ -81,6 +93,7 @@
     "plan",
     "pr opened",
     "reactions",
+    "terms of service",
     "tokens"
   ],
   "ca": [
@@ -109,7 +122,8 @@
     "open",
     "pr opened",
     "remediation blocked",
-    "superseded"
+    "superseded",
+    "terms of service"
   ],
   "cs": [
     "comment",
@@ -126,6 +140,7 @@
     "receipt",
     "recommended",
     "remediation blocked",
+    "terms of service",
     "tokens",
     "unknown"
   ],
@@ -151,6 +166,7 @@
     "open pull request",
     "plan",
     "review",
+    "terms of service",
     "token"
   ],
   "de": [
@@ -165,7 +181,6 @@
     "token"
   ],
   "el": [
-    "{{count}} open",
     "archived ({{count}})",
     "balanced",
     "completed ({{count}})",
@@ -177,6 +192,8 @@
     "pr opened",
     "remediation blocked",
     "review",
+    "terms of service",
+    "{{count}} open",
     "{{displaycount}} failed",
     "{{displaycount}} passed",
     "{{displaycount}} skipped",
@@ -204,6 +221,7 @@
     "remediation failed",
     "review",
     "superseded",
+    "terms of service",
     "token"
   ],
   "et": [
@@ -263,6 +281,7 @@
     "reactions",
     "remediation blocked",
     "superseded",
+    "terms of service",
     "tokens"
   ],
   "fi": [
@@ -282,6 +301,7 @@
     "plan",
     "reactions",
     "review",
+    "terms of service",
     "token",
     "tokens",
     "{{count}} open"
@@ -344,6 +364,7 @@
     "receipt",
     "remediation failed",
     "review",
+    "terms of service",
     "token"
   ],
   "gu": [
@@ -374,6 +395,7 @@
     "no changes needed",
     "receipt",
     "remediation blocked",
+    "terms of service",
     "token"
   ],
   "he": [
@@ -421,6 +443,7 @@
     "pr opened",
     "reactions",
     "receipt",
+    "terms of service",
     "tokens"
   ],
   "ht": [
@@ -429,6 +452,7 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "terms of service",
     "token"
   ],
   "hu": [
@@ -446,6 +470,7 @@
     "search sessions",
     "stopped",
     "superseded",
+    "terms of service",
     "tokens"
   ],
   "hy": [
@@ -467,6 +492,7 @@
     "search repositories",
     "stopped",
     "superseded",
+    "terms of service",
     "tokens"
   ],
   "id": ["open", "open pull request", "plan", "remediation blocked"],
@@ -484,6 +510,7 @@
     "remediation blocked",
     "remediation failed",
     "superseded",
+    "terms of service",
     "token",
     "tokens"
   ],
@@ -495,6 +522,7 @@
     "pr opened",
     "remediation blocked",
     "superseded",
+    "terms of service",
     "token"
   ],
   "it": [
@@ -539,6 +567,7 @@
     "reactions",
     "remediation blocked",
     "remediation failed",
+    "terms of service",
     "tokens"
   ],
   "kk": [
@@ -563,6 +592,7 @@
     "remediation failed",
     "review",
     "superseded",
+    "terms of service",
     "token"
   ],
   "kn": [
@@ -597,7 +627,8 @@
     "receipt",
     "remediation blocked",
     "review",
-    "superseded"
+    "superseded",
+    "terms of service"
   ],
   "lt": [
     "analysis failed",
@@ -617,6 +648,7 @@
     "receipt",
     "remediation failed",
     "superseded",
+    "terms of service",
     "token"
   ],
   "lv": [
@@ -629,6 +661,7 @@
     "pr opened",
     "receipt",
     "review",
+    "terms of service",
     "token"
   ],
   "mg": [
@@ -640,6 +673,7 @@
     "open",
     "open pull request",
     "receipt",
+    "terms of service",
     "token"
   ],
   "mi": [
@@ -656,6 +690,7 @@
     "receipt",
     "remediation blocked",
     "remediation failed",
+    "terms of service",
     "token",
     "tokens"
   ],
@@ -668,7 +703,8 @@
     "open pull request",
     "receipt",
     "remediation blocked",
-    "remediation failed"
+    "remediation failed",
+    "terms of service"
   ],
   "ml": [
     "comment",
@@ -745,9 +781,18 @@
     "remediation requested",
     "review",
     "superseded",
+    "terms of service",
     "unavailable"
   ],
-  "nb": ["analysis failed", "no changes needed", "open", "open pull request", "plan", "review"],
+  "nb": [
+    "analysis failed",
+    "no changes needed",
+    "open",
+    "open pull request",
+    "plan",
+    "review",
+    "terms of service"
+  ],
   "ne": [
     "block",
     "github connection expired",
@@ -769,6 +814,7 @@
     "plan",
     "pr opened",
     "receipt",
+    "terms of service",
     "token"
   ],
   "om": [
@@ -845,6 +891,7 @@
     "reactions",
     "remediation blocked",
     "superseded",
+    "terms of service",
     "tokens",
     "unknown"
   ],
@@ -909,7 +956,8 @@
     "open pull request",
     "pr opened",
     "receipt",
-    "superseded"
+    "superseded",
+    "terms of service"
   ],
   "ru": [
     "analysis failed",
@@ -928,6 +976,7 @@
     "pr opened",
     "receipt",
     "remediation failed",
+    "terms of service",
     "tokens"
   ],
   "si": [
@@ -956,6 +1005,7 @@
     "privacy policy",
     "receipt",
     "review",
+    "terms of service",
     "tokens"
   ],
   "sl": [
@@ -967,6 +1017,7 @@
     "reactions",
     "retry loading more",
     "superseded",
+    "terms of service",
     "tokens"
   ],
   "so": [
@@ -1015,17 +1066,16 @@
     "reactions",
     "receipt",
     "starting…",
+    "terms of service",
     "tokens"
   ],
   "sv": [
     "block",
-    "comment",
     "commit",
     "copied",
     "deleted",
     "dismissed",
     "edit",
-    "merge",
     "open",
     "open pull request",
     "plan",
@@ -1033,7 +1083,9 @@
     "remediation failed",
     "review",
     "tokens",
-    "{{count}} open"
+    "{{count}} open",
+    "comment",
+    "merge"
   ],
   "sw": [
     "analysis failed",
@@ -1085,7 +1137,8 @@
     "privacy policy",
     "reactions",
     "receipt",
-    "remediation failed"
+    "remediation failed",
+    "terms of service"
   ],
   "ur": [
     "analysis failed",
@@ -1104,7 +1157,8 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
-    "superseded"
+    "superseded",
+    "terms of service"
   ],
   "uz": [
     "block",
@@ -1148,6 +1202,7 @@
     "remediation failed",
     "remediation requested",
     "superseded",
+    "terms of service",
     "token"
   ],
   "zh-Hans": [

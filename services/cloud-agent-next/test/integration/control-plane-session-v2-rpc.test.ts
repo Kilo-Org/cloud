@@ -441,6 +441,405 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     ).toBe(true);
   });
 
+  it('publishes Kilo v2 transcript activity and native renames with the list status', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    const readTransitionId = () =>
+      runInDurableObject(
+        stub,
+        (_instance, state) =>
+          state.storage.kv.get<{ update: { transitionId: string } }>('session_list_status')?.update
+            .transitionId
+      );
+    const source = (title?: string, id = kiloId) => ({
+      version: 'v2',
+      session: {
+        id,
+        location: { directory: '/workspace/app' },
+        ...(title === undefined ? {} : { title }),
+        time: { created: 1, updated: 2 },
+      },
+    });
+    const firstMessage = messageId();
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(firstMessage),
+    });
+    peer.prepareView = peer.view('ready');
+    await stub.onRoute(peer.view('ready'));
+    const answeredFrom = Date.now();
+    await stub.onEvents({
+      events: [
+        {
+          type: 'conversation.source',
+          properties: {
+            sessionID: kiloId,
+            source: source('New session - 2026-01-01T00:00:00.000Z'),
+          },
+        },
+        {
+          type: 'conversation.message.updated',
+          properties: {
+            sessionID: kiloId,
+            source: source(),
+            message: {
+              id: 'msg_v2_answer',
+              type: 'assistant',
+              time: { created: 1 },
+              content: [{ type: 'text', text: 'Writing response' }],
+            },
+          },
+        },
+        {
+          type: 'conversation.source',
+          properties: { sessionID: kiloId, source: source('Renamed by the agent') },
+        },
+      ],
+    });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: firstMessage });
+    await waitFor(async () => {
+      const published = await runInDurableObject(
+        stub,
+        async (_instance, state) =>
+          (await state.storage.get<PublishCloudAgentSessionStatusParams[]>(
+            LIST_STATUS_PUBLISHES_KEY
+          )) ?? []
+      );
+      // The rename forces its own snapshot and leaves the snapshots after its delivery.
+      expect(published).toContainEqual(
+        expect.objectContaining({
+          sessionId: kiloId,
+          rename: expect.objectContaining({ title: 'Renamed by the agent' }),
+        })
+      );
+      const latest = published.at(-1);
+      expect(latest).toMatchObject({ sessionId: kiloId, status: 'idle' });
+      expect(Date.parse(latest?.lastActivityAt ?? '')).toBeGreaterThanOrEqual(answeredFrom);
+    });
+
+    // Neither a repeated v2 source nor a v1 session update, whose CLI reports
+    // its own titles, is a rename to publish.
+    const settled = await readTransitionId();
+    await stub.onEvents({
+      events: [
+        {
+          type: 'conversation.source',
+          properties: { sessionID: kiloId, source: source('Renamed by the agent') },
+        },
+        {
+          type: 'session.updated',
+          properties: { info: { id: kiloId, title: 'A title the CLI reports itself' } },
+        },
+      ],
+    });
+    expect(await readTransitionId()).toBe(settled);
+
+    // A root event whose source names another session is never stored, so it is no rename.
+    await stub.onEvents({
+      events: [
+        {
+          type: 'conversation.source',
+          properties: {
+            sessionID: kiloId,
+            source: source('A title from another session', 'ses_another_session'),
+          },
+        },
+      ],
+    });
+    expect(await readTransitionId()).toBe(settled);
+  });
+
+  it('publishes the Kilo v2 session card summary and cost total with the list status', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    const readPublished = () =>
+      runInDurableObject(
+        stub,
+        async (_instance, state) =>
+          (await state.storage.get<PublishCloudAgentSessionStatusParams[]>(
+            LIST_STATUS_PUBLISHES_KEY
+          )) ?? []
+      );
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const native = (message: Record<string, unknown>) => ({
+      type: 'conversation.message.updated',
+      properties: { sessionID: kiloId, source, message },
+    });
+    const firstMessage = messageId();
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(firstMessage),
+    });
+    peer.prepareView = peer.view('ready');
+    await stub.onRoute(peer.view('ready'));
+    await stub.onEvents({
+      events: [
+        native({ id: 'msg_v2_first_prompt', type: 'user', time: { created: 1 }, text: 'hello' }),
+        native({
+          id: 'msg_v2_first_answer',
+          type: 'assistant',
+          time: { created: 2 },
+          cost: 0.25,
+          content: [
+            {
+              type: 'tool',
+              id: 'call_plan',
+              name: 'todowrite',
+              state: {
+                status: 'completed',
+                input: {
+                  todos: [
+                    { content: 'Read the code', status: 'completed' },
+                    { content: 'Write the tests', status: 'in_progress' },
+                  ],
+                },
+              },
+            },
+            {
+              type: 'tool',
+              id: 'call_edit',
+              name: 'edit',
+              state: { status: 'running', input: { filePath: '/workspace/app/src/index.ts' } },
+            },
+          ],
+        }),
+      ],
+    });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        sessionId: kiloId,
+        status: 'busy',
+        liveSummary: {
+          step: { verb: 'editing', target: 'index.ts' },
+          plan: { done: 1, total: 2, current: 'Write the tests' },
+          changes: null,
+          failure: null,
+        },
+        totalCostMicrodollars: 250_000,
+      });
+    });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: firstMessage });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'idle',
+        liveSummary: { step: null, plan: null, changes: null, failure: null },
+        totalCostMicrodollars: 250_000,
+      });
+    });
+
+    // The next turn fails at the provider: the finished turn keeps its failure and the cost grows.
+    const secondMessage = messageId();
+    await stub.send(promptPayload(secondMessage));
+    await stub.onEvents({
+      events: [
+        native({ id: 'msg_v2_second_prompt', type: 'user', time: { created: 3 }, text: 'again' }),
+        native({
+          id: 'msg_v2_second_answer',
+          type: 'assistant',
+          time: { created: 4, completed: 5 },
+          cost: 0.5,
+          error: { type: 'provider.internal', message: 'overloaded' },
+        }),
+      ],
+    });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: secondMessage });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'idle',
+        liveSummary: { step: null, plan: null, changes: null, failure: { kind: 'provider' } },
+        totalCostMicrodollars: 750_000,
+      });
+    });
+
+    // A background command's completion opens the next turn with a busy status and no root user
+    // message: the working snapshot must not carry the failure of the turn before it.
+    await stub.onEvents({
+      events: [
+        { type: 'session.status', properties: { sessionID: kiloId, status: { type: 'busy' } } },
+      ],
+    });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'busy',
+        liveSummary: { step: null, plan: null, changes: null, failure: null },
+        totalCostMicrodollars: 750_000,
+      });
+    });
+  });
+
+  it('opens a Kilo v2 turn without a user message without the step and plan of the last one', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    const readPublished = () =>
+      runInDurableObject(
+        stub,
+        async (_instance, state) =>
+          (await state.storage.get<PublishCloudAgentSessionStatusParams[]>(
+            LIST_STATUS_PUBLISHES_KEY
+          )) ?? []
+      );
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const native = (message: Record<string, unknown>) => ({
+      type: 'conversation.message.updated',
+      properties: { sessionID: kiloId, source, message },
+    });
+    const status = (type: string, details: Record<string, unknown> = {}) => ({
+      type: 'session.status',
+      properties: { sessionID: kiloId, status: { type, ...details } },
+    });
+    const working = (id: string, created: number, tool: Record<string, unknown>) =>
+      native({
+        id,
+        type: 'assistant',
+        time: { created },
+        content: [
+          {
+            type: 'tool',
+            id: `call_plan_${created}`,
+            name: 'todowrite',
+            state: {
+              status: 'completed',
+              input: {
+                todos: [
+                  { content: 'Read the code', status: 'completed' },
+                  { content: 'Write the tests', status: 'in_progress' },
+                ],
+              },
+            },
+          },
+          tool,
+        ],
+      });
+    const firstMessage = messageId();
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(firstMessage),
+    });
+    peer.prepareView = peer.view('ready');
+    await stub.onRoute(peer.view('ready'));
+    await stub.onEvents({
+      events: [
+        status('busy'),
+        native({ id: 'msg_v2_prompt', type: 'user', time: { created: 1 }, text: 'hello' }),
+        working('msg_v2_answer', 2, {
+          type: 'tool',
+          id: 'call_edit',
+          name: 'edit',
+          state: { status: 'running', input: { filePath: '/workspace/app/src/index.ts' } },
+        }),
+      ],
+    });
+    await stub.onEvents({ events: [status('idle')] });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: firstMessage });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'idle',
+        liveSummary: { step: null, plan: null },
+      });
+    });
+
+    // A background command's completion opens the next turn with a synthetic notice.
+    const notice = (id: string, created: number) =>
+      native({ id, type: 'synthetic', time: { created }, text: 'Command completed' });
+    await stub.onEvents({
+      events: [
+        notice('msg_v2_first_notice', 3),
+        status('busy'),
+        working('msg_v2_first_notice_answer', 4, {
+          type: 'tool',
+          id: 'call_grep',
+          name: 'grep',
+          state: { status: 'running', input: { pattern: 'TODO' } },
+        }),
+      ],
+    });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'busy',
+        liveSummary: {
+          step: { verb: 'searching', target: 'TODO' },
+          plan: { done: 1, total: 2, current: 'Write the tests' },
+        },
+      });
+    });
+
+    // That turn ends and another completion opens the next one in the same delivery, so no
+    // snapshot sees the root idle; the next snapshot must not carry the finished turn's work.
+    await stub.onEvents({
+      events: [status('idle'), notice('msg_v2_second_notice', 5), status('busy')],
+    });
+    await stub.onEvents({
+      events: [status('retry', { attempt: 1, message: 'overloaded', next: 6 })],
+    });
+    await waitFor(async () => {
+      expect((await readPublished()).at(-1)).toMatchObject({
+        status: 'retry',
+        liveSummary: { step: null, plan: null, changes: null, failure: null },
+      });
+    });
+  });
+
+  it('leaves the Kilo v1 session card summary and cost to its ingest client', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    const firstMessage = messageId();
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(firstMessage),
+    });
+    peer.prepareView = peer.view('ready');
+    await stub.onRoute(peer.view('ready'));
+    await stub.onEvents({
+      events: [
+        {
+          type: 'message.updated',
+          properties: {
+            info: {
+              id: 'msg_v1_answer',
+              sessionID: kiloId,
+              role: 'assistant',
+              time: { created: 1 },
+              cost: 0.25,
+            },
+          },
+        },
+      ],
+    });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: firstMessage });
+    await waitFor(async () => {
+      const published = await runInDurableObject(
+        stub,
+        async (_instance, state) =>
+          (await state.storage.get<PublishCloudAgentSessionStatusParams[]>(
+            LIST_STATUS_PUBLISHES_KEY
+          )) ?? []
+      );
+      expect(published.at(-1)).toMatchObject({ sessionId: kiloId, status: 'idle' });
+      for (const update of published) {
+        expect(update).not.toHaveProperty('liveSummary');
+        expect(update).not.toHaveProperty('totalCostMicrodollars');
+      }
+    });
+  });
+
   it('accepts delivery when the runtime record has an invalid ingest session identity', async () => {
     const { stub, peer, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
     peer.prepareView = {

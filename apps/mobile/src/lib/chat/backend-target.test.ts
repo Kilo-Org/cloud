@@ -44,6 +44,18 @@ describe('backendFailureKey', () => {
     expect(backendFailureKey(new Error('upstream 500'))).toBe('common.somethingWentWrong');
   });
 
+  it('names the connection when the request or its stream breaks while the device reads online', () => {
+    const dropped = new ModelError({
+      reason: 'transport',
+      cause: new TypeError('Network request failed'),
+    });
+
+    expect(backendFailureKey(dropped)).toBe('modelChat.connectionLost');
+    expect(backendFailureKey(new ModelError({ reason: 'body', cause: '{' }))).toBe(
+      'common.somethingWentWrong'
+    );
+  });
+
   it('says the account cannot pay when the gateway answers payment required', () => {
     const failure = new ModelError({
       reason: 'status',

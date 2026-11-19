@@ -57,6 +57,7 @@
     "link": "link sa pahina",
     "takingLonger": "Mas tumatagal ito kaysa sa inaasahan. Maaari mong isara ito at tingnan muli.",
     "model": "Modelo",
+    "notSelected": "Hindi napili",
     "accessDenied": "Hindi pinapayagan ang pag-access.",
     "allRepositories": "Lahat ng repositoryo",
     "personal": "Pansarili",
@@ -147,6 +148,7 @@
     "performance": "Pagganap",
     "preferences": "Mga kagustuhan",
     "privacyPolicy": "Patakaran sa pribasiya",
+    "termsOfService": "Mga tuntunin ng serbisyo",
     "profile": "Propayl",
     "reactions": "Mga reaksyon",
     "recent": "Kamakailan",
@@ -217,8 +219,8 @@
     "verifyCode": "Patunayan ang code",
     "resendCode": "Ipadala muli ang code",
     "termsPrefix": "Sa pagpapatuloy, sumasang-ayon ka sa aming ",
+    "termsInSentence": "Mga tuntunin ng serbisyo",
     "terms": "Mga tuntunin",
-    "termsInSentence": "Mga tuntunin",
     "termsConnector": " at ",
     "termsSuffix": ".",
     "moreSignInOptions": "Higit pang mga opsyon sa pag-sign in",
@@ -763,7 +765,6 @@
       "replyPlaceholder": "Sagot…",
       "replyBody": "Nilalaman ng sagot",
       "submitReply": "Isumite ang sagot",
-      "termsTitle": "Mga tuntunin ng serbisyo",
       "termsCopy": "Kailangan mong maging 13 taong gulang o higit pa para makapag-post.",
       "termsAcceptRetry": "Hindi matanggap ang mga tuntunin. Suriin ang koneksyon mo at subukan muli.",
       "viewTerms": "Tingnan ang mga tuntunin",
@@ -1026,7 +1027,10 @@
     "tabs": {
       "overview": "Buod",
       "files": "Mga payl",
-      "discussion": "Talakayan"
+      "discussion": "Talakayan",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komento",
+      "discussionAccessibility": "{{title}}: {{displayCount}} na komento",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} na komento"
     },
     "fileStatus": {
       "modified": "Binago",
@@ -1132,16 +1136,16 @@
     },
     "category": {
       "agentAttentionTitle": "Kailangan ka ng ahente",
-      "agentAttentionSubtitle": "mga tanong, pahintulot, kailangang sagot",
+      "agentAttentionSubtitle": "Mga tanong, pahintulot, kailangang sagot",
       "agentUpdatesTitle": "Mga update ng ahente",
-      "agentUpdatesSubtitle": "mga mensahe mula sa ahente habang isinasagawa ang gawain",
+      "agentUpdatesSubtitle": "Mga mensahe mula sa ahente habang isinasagawa ang gawain",
       "sessionStatusTitle": "Status ng sesyon",
-      "sessionStatusSubtitle": "tapos / nabigo / handa nang kontrolin",
-      "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
+      "sessionStatusSubtitle": "Tapos / nabigo / handa nang kontrolin",
+      "balanceAlertsSubtitle": "Mga babala sa mababang balanse ng organisasyon",
       "balanceAlertsUnavailable": "Sumali sa isang organisasyon para makakuha ng mga babala sa balanse.",
-      "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA",
+      "securityFindingsSubtitle": "Mga bagong natuklasan at paalala sa SLA",
       "securityFindingsUnavailable": "I-enable ang Ahente sa seguridad ng Kilo sa isang saklaw para makakuha ng mga natuklasan sa seguridad.",
-      "spendAlertsSubtitle": "mga paglampas sa hangganan at pagtaas bawat oras",
+      "spendAlertsSubtitle": "Mga paglampas sa hangganan at pagtaas bawat oras",
       "spendAlertsToggle": "Kategorya ng mga babala sa gastos"
     },
     "history": {
@@ -1223,7 +1227,7 @@
     },
     "instructions": {
       "title": "Mga sariling tagubilin",
-      "deprecation": "Planong ihinto ang suporta sa mga pasadyang tagubilin. Ilipat na lang ang mga gabay na ito sa isang REVIEW.md file sa iyong repository.",
+      "deprecation": "Aalisin na ang mga pasadyang tagubilin. Ilipat na lang ang mga gabay na ito sa isang REVIEW.md file sa iyong repository.",
       "placeholder": "hal. Ipatupad ang aming mga pamantayan sa paghawak ng error…",
       "clearTitle": "Alisin ang mga sariling tagubilin?",
       "clearMessage": "Sa pag-save ng walang laman na field, mabubura ang mga sariling tagubilin na naka-imbak para sa reviewer na ito."
@@ -1389,6 +1393,7 @@
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng {{organization}}.",
       "description": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
       "descriptionReconnect": "Gumawa ng bagong token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
+      "descriptionOverview": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa susunod na screen.",
       "scopes": "Account: pagbasa · Mga repository: pagbasa/pagsulat · Mga pull request: pagbasa · Mga webhook: pagbasa/pagsulat",
       "tokenPlaceholder": "Token para sa access sa workspace",
       "tokenRefused": "Hindi tinanggap ng Bitbucket ang token para sa access sa workspace na ito. Tiyakin na taglay nito ang mga saklaw ng pahintulot sa itaas, pagkatapos ay subukan muli."
@@ -2293,7 +2298,7 @@
       "manageProfiles": "Pamahalaan ang mga profile",
       "advancedConfig": "Advanced na kompigurasyon",
       "advancedConfigDescription": "Nalalapat sa session na ito. Ang pag-save bilang profile ay nagpapanatili nito para sa susunod.",
-      "saveAsProfile": "I-save bilang Profile",
+      "saveAsProfile": "I-save bilang profile",
       "saveProfileDescription": "I-save ang kasalukuyang mga variable ng kapaligiran at mga utos sa pag-setup bilang isang reusable na profile.",
       "profileSaved": "Na-save ang profile na \"{{name}}\".",
       "organizationProfiles": "Mga Profile ng Organisasyon",
@@ -3021,6 +3026,7 @@
     "noSessions": "Walang aktibong sesyon",
     "noSessionsDescription": "Mag-sign in gamit ang Kilo app sa ibang device para makita ito rito.",
     "signedIn": "Nag-sign in: {{signedIn}} · Huling nakita: {{lastSeen}}",
+    "signedInThisDevice": "Nag-sign in: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Lumalabas dito ang mga sign-in mula sa Kilo app, Kilo CLI, at browser sa web. Hindi nakalista ang mga sign-in sa editor.",
     "thisDevice": "Device na ito",
     "viewProfile": "Tingnan ang profile",
@@ -3182,6 +3188,8 @@
     "retryHint": "Sinusubukang kunin muli ang katayuan ng Kilo Pass.",
     "endedOn": "Natapos {{date}}",
     "notAvailableInApp": "Hindi magagamit ang Kilo Pass sa app.",
+    "notAvailableTitle": "Wala sa app ang Kilo Pass",
+    "noPassDescription": "Walang Kilo Pass ang account na ito.",
     "statusActive": "Aktibo",
     "statusTrialing": "Nasa pagsubok",
     "statusPastDue": "Lampas na ang bayad",
@@ -3252,6 +3260,7 @@
     "revokeConsent": "Bawiin ang pahintulot",
     "revokeConsentTitle": "Bawiin ang pahintulot sa pagbabahagi ng datos?",
     "acceptAndContinue": "Tanggapin at magpatuloy",
+    "loadingConsentSettings": "Naglo-load ang iyong mga setting ng pahintulot…",
     "decline": "Tanggihan",
     "declineAndSignOut": "Tanggihan at mag-sign out",
     "declineTitle": "Tanggihan ang pagbabahagi ng datos?",
@@ -3463,7 +3472,7 @@
       "retentionLimit": "Ipinapakita ang mga pinakabagong talaan ng singil."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Paganahin ang babala sa mababang balanse",
+      "subtitle": "Magpadala ng babala sa email sa mga address na ilalagay mo kapag naging mas mababa ang balanse ng organisasyong ito sa halagang itinakda mo.",
       "notifyEmailsLabel": "Mga email na padadalhan ng babala",
       "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa pagsingil.",
       "separateEmailsHint": "Paghiwalayin ang mga email gamit ang kuwit.",
@@ -3539,6 +3548,7 @@
       "truncated": "Mas marami ang request sa oras na ito kaysa sa ipinapakita ng listahan.",
       "emptyTitle": "Walang request sa oras na ito",
       "emptyDescription": "Gamitin ang \"Mas lumang oras\" para makita ang mga naunang request.",
+      "emptyBoundDescription": "Hanggang dito na lang ang kasaysayan ng mga request.",
       "loadError": "Hindi ma-load ang mga request log.",
       "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
       "tokens": "{{input}} input · {{output}} output",
@@ -3772,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "Kailangan ng modelong ito ng koneksyon sa internet. Kumonekta at subukang muli, o lumipat sa isang modelo sa device na ito.",
+    "connectionLost": "Naputol ang koneksyon sa modelo. Suriin ang iyong koneksyon at subukang muli.",
     "empty": {
       "title": "Magsimula ng chat",
       "description": "Magpadala ng mensahe para makipag-usap sa isang modelo."
@@ -4530,6 +4541,7 @@
     "empty": "Walang aktibidad sa window ng briefing na ito",
     "emptyHint": "Lalabas dito ang iyong mga cloud at CLI coding session kapag may aktibidad ang isang naka-iskedyul na briefing.",
     "loadError": "Hindi ma-load ang mga briefing",
+    "estimateLoadError": "Hindi ma-load ang tantiya.",
     "view": "Basahin ang briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4628,7 +4640,7 @@
     "topFeatures": "Nangungunang mga feature",
     "emptyTitle": "Walang paggamit sa panahong ito",
     "unavailableTitle": "Hindi available ang paggamit",
-    "unavailableDescription": "Hindi nag-uulat ng paggamit ang workspace na ito. Hindi makakatulong ang pagsubok muli.",
+    "unavailableDescription": "Hindi pa naisasaayos ang paggamit para sa workspace na ito. Makipag-ugnayan sa suporta kung inaasahan mong may makikitang paggamit dito.",
     "orgSelfNotice": "Nakikita mo ang sarili mong paggamit sa organisasyong ito.",
     "viewDetails": "Tingnan ang detalye ng paggamit"
   },
@@ -4636,7 +4648,7 @@
     "title": "Mga Integration",
     "sectionTitle": "Mga nakakonektang serbisyo",
     "entrySubtitle": "GitHub, Slack, Linear at iba pa",
-    "subtitle": "Ikonekta ang iyong mga development tool at workflow sa Kilo",
+    "subtitle": "Ikonekta ang iyong mga development tool at workflow sa Kilo.",
     "disconnect": "Idiskonekta",
     "disconnectTitle": "Idiskonekta ang {{provider}}?",
     "disconnectMessage": "Hihinto na ang Kilo sa pagtugon sa {{provider}}. Maaari kang kumonekta muli anumang oras.",
@@ -4708,7 +4720,6 @@
       "nameLocked": "Hindi na mababago ang pangalan pagkatapos magawa ang pampapagana.",
       "repositoryLocked": "Hindi na mababago ang imbakan pagkatapos magawa ang pampapagana.",
       "environmentAutomatic": "Awtomatiko batay sa imbakan",
-      "notSelected": "Hindi napili",
       "profileDefaults": "Gamitin ang mga paunang halaga",
       "profileHelp": "Ang mga kaayusan ng propil ay nalalapat kapag tumakbo ang pampapagana. Malalaman ang mga sekreto nito sa oras na iyon.",
       "customAgent": "Pasadyang ahente",
@@ -4936,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Feature ng Enterprise",
-    "enterpriseOnly": "Para sa enterprise lang ang feature na ito.",
+    "enterpriseOnly": "Makukuha ang mga provider at modelo sa Enterprise plan.",
     "readOnly": "Ang mga owner at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
     "loadError": "Hindi ma-load ang mga provider at modelo",
     "tabModels": "Mga modelo",

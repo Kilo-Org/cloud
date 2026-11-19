@@ -39,11 +39,17 @@ const TRIAL_REFUSAL = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE
 });
 
 describe('low balance alert screen form', () => {
-  it('renders the pushed screen header instead of a sheet header', async () => {
+  it('renders the pushed header, the intro and the Spend alerts switch label', async () => {
     const { renderer, unmount } = await mountScreen();
     expect(renderer.root.findAll(node => String(node.type) === 'ScreenHeader')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'SheetHeader')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'Switch')).toHaveLength(1);
+    // The title already says "Low balance alert": the body says when the alert
+    // fires and who gets it, and the switch takes the Spend alerts label.
+    const copy = renderer.root.findAll(n => String(n.type) === 'Text').map(n => n.props.children);
+    expect(copy).toContain(i18n.t('organization.lowBalanceAlert.subtitle'));
+    expect(copy).toContain(i18n.t('spendAlerts.sendAlerts'));
+    expect(copy).not.toContain(i18n.t('organization.lowBalanceAlert.title'));
     unmount();
   });
 

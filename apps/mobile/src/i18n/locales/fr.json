@@ -57,6 +57,7 @@
     "link": "lien",
     "takingLonger": "Cela prend plus de temps que prévu. Vous pouvez fermer cet écran et revenir vérifier plus tard.",
     "model": "Modèle",
+    "notSelected": "Non sélectionné",
     "accessDenied": "Accès refusé",
     "allRepositories": "Tous les dépôts",
     "personal": "Personnel",
@@ -147,6 +148,7 @@
     "performance": "Performances",
     "preferences": "Préférences",
     "privacyPolicy": "Politique de confidentialité",
+    "termsOfService": "Conditions d'utilisation",
     "profile": "Profil",
     "reactions": "Réactions",
     "recent": "Récentes",
@@ -217,8 +219,8 @@
     "verifyCode": "Vérifier le code",
     "resendCode": "Renvoyer le code",
     "termsPrefix": "En continuant, vous acceptez nos ",
-    "terms": "Conditions d'utilisation",
     "termsInSentence": "Conditions d'utilisation",
+    "terms": "Conditions d'utilisation",
     "termsConnector": " et ",
     "termsSuffix": ".",
     "moreSignInOptions": "Autres options de connexion",
@@ -516,16 +518,16 @@
     },
     "category": {
       "agentAttentionTitle": "L'agent a besoin de vous",
-      "agentAttentionSubtitle": "questions, autorisations et réponses attendues",
+      "agentAttentionSubtitle": "Questions, autorisations et réponses attendues",
       "agentUpdatesTitle": "Nouvelles de l'agent",
-      "agentUpdatesSubtitle": "messages de l'agent pendant une tâche",
+      "agentUpdatesSubtitle": "Messages de l'agent pendant une tâche",
       "sessionStatusTitle": "Statut de la session",
-      "sessionStatusSubtitle": "terminée / en échec / prête à être contrôlée",
-      "balanceAlertsSubtitle": "alertes de solde faible pour l'organisation",
+      "sessionStatusSubtitle": "Terminée / en échec / prête à être contrôlée",
+      "balanceAlertsSubtitle": "Alertes de solde faible pour l'organisation",
       "balanceAlertsUnavailable": "Rejoignez une organisation pour recevoir les alertes de solde.",
-      "securityFindingsSubtitle": "nouvelles vulnérabilités et rappels SLA",
+      "securityFindingsSubtitle": "Nouvelles vulnérabilités et rappels SLA",
       "securityFindingsUnavailable": "Activez l'Agent de sécurité Kilo sur un périmètre pour recevoir les signalements de sécurité.",
-      "spendAlertsSubtitle": "franchissements de seuils et pics horaires",
+      "spendAlertsSubtitle": "Franchissements de seuils et pics horaires",
       "spendAlertsToggle": "Catégorie « Alertes de dépenses »"
     },
     "history": {
@@ -635,7 +637,7 @@
     },
     "instructions": {
       "title": "Instructions personnalisées",
-      "deprecation": "L'obsolescence des instructions personnalisées est prévue. Déplacez plutôt ces consignes dans un fichier REVIEW.md de votre dépôt.",
+      "deprecation": "Les instructions personnalisées vont être supprimées. Déplacez plutôt ces consignes dans un fichier REVIEW.md de votre dépôt.",
       "placeholder": "ex. : respecter nos conventions de gestion des erreurs…",
       "clearTitle": "Supprimer les instructions personnalisées ?",
       "clearMessage": "L'enregistrement d'un champ vide supprime les instructions personnalisées stockées pour ce réviseur."
@@ -666,6 +668,7 @@
       "managedOnWeb": "La connexion Bitbucket à {{organization}} se gère sur le web, depuis un ordinateur.",
       "description": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
       "descriptionReconnect": "Créez un nouveau jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le ci-dessous.",
+      "descriptionOverview": "Créez un jeton d'accès à l'espace de travail pour {{organization}}, puis collez-le sur l'écran suivant.",
       "scopes": "Compte : lecture · Dépôts : lecture/écriture · Demandes de fusion : lecture · Webhooks : lecture/écriture",
       "tokenPlaceholder": "Jeton d'accès à l'espace de travail",
       "tokenRefused": "Bitbucket n'a pas accepté ce jeton d'accès à l'espace de travail. Vérifiez qu'il dispose des autorisations ci-dessus, puis réessayez."
@@ -1304,7 +1307,7 @@
       "githubAppSettings": "Paramètres de l'application GitHub",
       "manageAccess": "Gérer l'accès de l'application GitHub",
       "noRepositories": "Aucun dépôt",
-      "noRepositoriesDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts",
+      "noRepositoriesDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts.",
       "selectAtLeastOne": "Sélectionnez au moins un dépôt."
     },
     "scopeEntry": {
@@ -2428,6 +2431,7 @@
     "noSessions": "Aucune session active",
     "noSessionsDescription": "Connectez-vous à l'application Kilo sur un autre appareil pour le voir apparaître ici.",
     "signedIn": "Connexion : {{signedIn}} · Dernière activité : {{lastSeen}}",
+    "signedInThisDevice": "Connexion : {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Les connexions à l'application Kilo, à Kilo CLI et à un navigateur web apparaissent ici. Les connexions depuis l'éditeur ne sont pas affichées.",
     "thisDevice": "Cet appareil",
     "viewProfile": "Voir le profil",
@@ -2587,6 +2591,8 @@
     "retryHint": "Actualise à nouveau l'état de Kilo Pass.",
     "endedOn": "Terminé le {{date}}",
     "notAvailableInApp": "Kilo Pass n'est pas disponible dans l'application.",
+    "notAvailableTitle": "Kilo Pass n'est pas proposé dans l'application",
+    "noPassDescription": "Ce compte n'a pas de Kilo Pass.",
     "statusActive": "Actif",
     "statusTrialing": "Période d'essai",
     "statusPastDue": "Paiement en retard",
@@ -2658,6 +2664,7 @@
     "why": "Finalité",
     "who": "Destinataires",
     "acceptAndContinue": "Accepter et continuer",
+    "loadingConsentSettings": "Chargement de vos réglages de consentement…",
     "decline": "Refuser",
     "declineAndSignOut": "Refuser et se déconnecter",
     "declineTitle": "Refuser le partage de données ?",
@@ -2921,7 +2928,6 @@
       "submitReply": "Envoyer la réponse",
       "termsAcceptRetry": "Impossible d'accepter les conditions d'utilisation. Vérifiez votre connexion et réessayez.",
       "termsCopy": "Vous devez avoir au moins 13 ans pour publier.",
-      "termsTitle": "Conditions d'utilisation",
       "threadAccessibilityLabel": "Fil de discussion {{anchorLabel}}",
       "unavailable": "Les échanges sont indisponibles",
       "unavailableMessage": "Cette pull request a peut-être été supprimée.",
@@ -3293,6 +3299,10 @@
     },
     "tabs": {
       "discussion": "Échanges",
+      "discussionAccessibility": "{{title}}: {{displayCount}} commentaires",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} commentaires",
+      "discussionAccessibility_one": "{{title}}: 1 commentaire",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} commentaires",
       "files": "Fichiers",
       "overview": "Aperçu"
     },
@@ -3525,7 +3535,7 @@
       "retentionLimit": "Affichage des factures les plus récentes."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Activer l'alerte de solde faible",
+      "subtitle": "Envoyez une alerte par e-mail aux adresses indiquées lorsque le solde de cette organisation passe sous le montant défini.",
       "notifyEmailsLabel": "Adresses e-mail à prévenir",
       "permissionDenied": "Vous n'avez pas l'autorisation de gérer les alertes de facturation.",
       "separateEmailsHint": "Séparez les adresses e-mail par des virgules.",
@@ -3601,6 +3611,7 @@
       "truncated": "Cette heure compte plus de requêtes que la liste n'en affiche.",
       "emptyTitle": "Aucune requête pour cette heure",
       "emptyDescription": "Utilisez Heure précédente pour voir les requêtes antérieures.",
+      "emptyBoundDescription": "L'historique des requêtes ne remonte pas plus loin.",
       "loadError": "Impossible de charger les journaux des requêtes.",
       "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes.",
       "tokens": "{{input}} en entrée · {{output}} en sortie",
@@ -3832,6 +3843,7 @@
   },
   "modelChat": {
     "offlineFailure": "Ce modèle nécessite une connexion Internet. Connectez-vous et réessayez, ou passez à un modèle sur cet appareil.",
+    "connectionLost": "La connexion au modèle a été perdue. Vérifiez votre connexion et réessayez.",
     "empty": {
       "title": "Démarrer une discussion",
       "description": "Envoyez un message pour discuter avec un modèle."
@@ -4601,6 +4613,7 @@
     "empty": "Aucune activité dans cette fenêtre de briefing",
     "emptyHint": "Vos sessions de code cloud et CLI apparaissent ici lorsqu’un briefing planifié a de l’activité.",
     "loadError": "Impossible de charger les briefings",
+    "estimateLoadError": "Impossible de charger l’estimation.",
     "view": "Lire le briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view) : $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4703,7 +4716,7 @@
     "topFeatures": "Principales fonctionnalités",
     "emptyTitle": "Aucune utilisation sur cette période",
     "unavailableTitle": "Utilisation indisponible",
-    "unavailableDescription": "Cet espace de travail ne signale aucune utilisation. Réessayer ne servira à rien.",
+    "unavailableDescription": "Le suivi de l'utilisation n'est pas configuré pour cet espace de travail. Contactez l'assistance si vous vous attendez à voir l'utilisation ici.",
     "orgSelfNotice": "Vous voyez votre propre utilisation dans cette organisation.",
     "viewDetails": "Voir les détails d'utilisation"
   },
@@ -4711,7 +4724,7 @@
     "title": "Intégrations",
     "sectionTitle": "Services connectés",
     "entrySubtitle": "GitHub, Slack, Linear et plus encore",
-    "subtitle": "Connectez vos outils et flux de travail de développement à Kilo",
+    "subtitle": "Connectez vos outils et flux de travail de développement à Kilo.",
     "disconnect": "Déconnecter",
     "disconnectTitle": "Déconnecter {{provider}} ?",
     "disconnectMessage": "Kilo ne répondra plus dans {{provider}}. Vous pouvez le reconnecter à tout moment.",
@@ -4783,7 +4796,6 @@
       "nameLocked": "Le nom ne peut pas être modifié après la création du déclencheur.",
       "repositoryLocked": "Le dépôt ne peut pas être modifié après la création du déclencheur.",
       "environmentAutomatic": "Automatique selon le dépôt",
-      "notSelected": "Non sélectionné",
       "profileDefaults": "Utiliser les valeurs par défaut",
       "profileHelp": "Les paramètres du profil s’appliquent lorsque le déclencheur s’exécute. Ses secrets sont résolus à ce moment-là.",
       "customAgent": "Agent personnalisé",
@@ -5011,7 +5023,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fonctionnalité Enterprise",
-    "enterpriseOnly": "Cette fonctionnalité est réservée à l'offre Enterprise.",
+    "enterpriseOnly": "Les fournisseurs et modèles sont disponibles avec l'offre Enterprise.",
     "readOnly": "Seuls les propriétaires et administrateurs de l'organisation peuvent modifier ces paramètres.",
     "loadError": "Impossible de charger les fournisseurs et modèles",
     "tabModels": "Modèles",

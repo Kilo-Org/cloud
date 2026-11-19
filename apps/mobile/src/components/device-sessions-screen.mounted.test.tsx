@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type DeviceSession } from '@/lib/device-sessions';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { act } from '@/test/renderer';
 import { DeviceSessionsScreen } from './device-sessions-screen';
 import { TrustedHostsScreen } from './trusted-hosts-screen';
 
@@ -35,6 +36,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
@@ -328,6 +330,17 @@ describe('device session sign-out controls', () => {
       'هاتف-قديم',
       'axios',
     ]);
+    // The current row cannot say when it was last seen, and it already names
+    // itself, so its subtitle carries the label instead of a second date.
+    const subtitles = renderer.root
+      .findAll(node => String(node.type) === 'Text' && typeof node.props.children === 'string')
+      .map(node => node.props.children as string)
+      .filter(text => text.startsWith('Signed in '));
+    expect(subtitles).toStrictEqual([
+      'Signed in 2026-01-03 · This device',
+      'Signed in 2026-02-28 · Last seen 2026-03-11',
+      'Signed in 2026-03-04 · Last seen 2026-03-04',
+    ]);
     unmount();
   });
 
@@ -357,6 +370,23 @@ describe('device session sign-out controls', () => {
       `Sign out ${FIRST_STRONG_ISOLATE}Web browser${POP_DIRECTIONAL_ISOLATE}, signed in 2026-03-12, last seen 2026-03-14`,
     ]);
     expect(new Set(labels).size).toBe(2);
+    unmount();
+  });
+
+  it('asks the server again on a pull, so a session revoked elsewhere leaves the list', async () => {
+    query.data = [session({ id: 'current', kind: 'app', platform: 'android', isCurrent: true })];
+    query.refetch.mockResolvedValue({ isError: false });
+    const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
+    const scroller = renderer.root.find(node => String(node.type) === 'TabScreenScrollView');
+    const refreshControl = scroller.props.refreshControl as
+      | { props: { onRefresh: () => void } }
+      | undefined;
+    expect(refreshControl).toBeDefined();
+    await act(async () => {
+      refreshControl?.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(query.refetch).toHaveBeenCalledTimes(1);
     unmount();
   });
 });

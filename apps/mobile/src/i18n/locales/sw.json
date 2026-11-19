@@ -57,6 +57,7 @@
     "link": "kiungo",
     "takingLonger": "Hii inachukua muda mrefu kuliko ilivyotarajiwa. Unaweza kuifunga na kuangalia tena.",
     "model": "Modeli",
+    "notSelected": "Haijachaguliwa",
     "accessDenied": "Huna ruhusa.",
     "allRepositories": "Hazina zote",
     "personal": "Binafsi",
@@ -147,6 +148,7 @@
     "performance": "Utendaji",
     "preferences": "Mapendeleo",
     "privacyPolicy": "Sera ya faragha",
+    "termsOfService": "Masharti ya huduma",
     "profile": "Wasifu",
     "reactions": "Miitikio",
     "recent": "Za hivi karibuni",
@@ -217,8 +219,8 @@
     "verifyCode": "Thibitisha msimbo",
     "resendCode": "Tuma msimbo tena",
     "termsPrefix": "Kwa kuendelea unakubali ",
+    "termsInSentence": "Masharti ya Huduma",
     "terms": "Masharti",
-    "termsInSentence": "Masharti",
     "termsConnector": " na ",
     "termsSuffix": ".",
     "moreSignInOptions": "Machaguo zaidi ya kuingia",
@@ -763,7 +765,6 @@
       "replyPlaceholder": "Jibu…",
       "replyBody": "Maandishi ya jibu",
       "submitReply": "Wasilisha jibu",
-      "termsTitle": "Masharti ya huduma",
       "termsCopy": "Lazima uwe na umri wa miaka 13 au zaidi ili uchapishe.",
       "termsAcceptRetry": "Imeshindikana kukubali masharti. Angalia muunganisho wako kisha ujaribu tena.",
       "viewTerms": "Angalia masharti",
@@ -1026,7 +1027,10 @@
     "tabs": {
       "overview": "Muhtasari",
       "files": "Faili",
-      "discussion": "Mazungumzo"
+      "discussion": "Mazungumzo",
+      "discussionAccessibility_one": "{{title}}: maoni 1",
+      "discussionAccessibility": "{{title}}: Maoni {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: Maoni {{displayCount}}"
     },
     "fileStatus": {
       "modified": "Imebadilishwa",
@@ -1132,16 +1136,16 @@
     },
     "category": {
       "agentAttentionTitle": "Wakala anakuhitaji",
-      "agentAttentionSubtitle": "maswali, maombi ya ruhusa na maelezo yanayohitajika",
+      "agentAttentionSubtitle": "Maswali, maombi ya ruhusa na maelezo yanayohitajika",
       "agentUpdatesTitle": "Masasisho ya wakala",
-      "agentUpdatesSubtitle": "ujumbe kutoka kwa wakala wakati kazi inaendelea",
+      "agentUpdatesSubtitle": "Ujumbe kutoka kwa wakala wakati kazi inaendelea",
       "sessionStatusTitle": "Hali ya kikao",
-      "sessionStatusSubtitle": "kimekamilika / kimeshindikana / kiko tayari kudhibitiwa",
-      "balanceAlertsSubtitle": "maonyo ya salio la chini la shirika",
+      "sessionStatusSubtitle": "Kimekamilika / kimeshindikana / kiko tayari kudhibitiwa",
+      "balanceAlertsSubtitle": "Maonyo ya salio la chini la shirika",
       "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio.",
-      "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA",
+      "securityFindingsSubtitle": "Matokeo mapya na vikumbusho vya SLA",
       "securityFindingsUnavailable": "Washa Wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya usalama.",
-      "spendAlertsSubtitle": "kuvuka vizingiti na kuongezeka kwa saa",
+      "spendAlertsSubtitle": "Kuvuka vizingiti na kuongezeka kwa saa",
       "spendAlertsToggle": "Aina ya tahadhari za matumizi"
     },
     "history": {
@@ -1223,7 +1227,7 @@
     },
     "instructions": {
       "title": "Maagizo maalum",
-      "deprecation": "Kipengele cha maagizo maalumu kimepangiwa kuondolewa. Badala yake, hamishia miongozo hii kwenye faili ya REVIEW.md katika hazina yako.",
+      "deprecation": "Maagizo maalumu yataondolewa. Badala yake, hamishia miongozo hii kwenye faili ya REVIEW.md katika hazina yako.",
       "placeholder": "mfano: Hakikisha kanuni zetu za kushughulikia hitilafu zinafuatwa…",
       "clearTitle": "Ondoa maagizo maalum?",
       "clearMessage": "Kuhifadhi sehemu tupu hufuta maagizo maalum yaliyohifadhiwa kwa mkaguzi huyu."
@@ -1389,6 +1393,7 @@
       "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
       "description": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
       "descriptionReconnect": "Unda tokeni mpya ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike hapa chini.",
+      "descriptionOverview": "Unda tokeni ya kufikia nafasi ya kazi kwa ajili ya {{organization}} kisha uibandike kwenye skrini inayofuata.",
       "scopes": "Akaunti: kusoma · Hazina: kusoma/kuandika · Maombi ya kuunganisha: kusoma · Arifa za wavuti: kusoma/kuandika",
       "tokenPlaceholder": "Tokeni ya kufikia nafasi ya kazi",
       "tokenRefused": "Bitbucket haikukubali tokeni hii ya kufikia nafasi ya kazi. Hakikisha kuwa ina ruhusa zilizo hapo juu, kisha ujaribu tena."
@@ -2293,7 +2298,7 @@
       "manageProfiles": "Dhibiti wasifu",
       "advancedConfig": "Usanidi wa hali ya juu",
       "advancedConfigDescription": "Inatumika kwa kipindi hiki. Kuihifadhi kama wasifu huihifadhi kwa mara ijayo.",
-      "saveAsProfile": "Hifadhi kama Wasifu",
+      "saveAsProfile": "Hifadhi kama wasifu",
       "saveProfileDescription": "Hifadhi vigezo vya sasa vya mazingira na amri za usanidi kama wasifu unaoweza kutumika tena.",
       "profileSaved": "Wasifu \"{{name}}\" umehifadhiwa",
       "organizationProfiles": "Wasifu wa Shirika",
@@ -3022,6 +3027,7 @@
     "noSessionsDescription": "Ingia kwenye akaunti kwa kutumia programu ya Kilo kwenye kifaa kingine. Kifaa hicho kitaonekana hapa.",
     "signInScopeNote": "Hapa huonekana vikao vya kuingia kupitia programu ya Kilo, Kilo CLI na kivinjari cha wavuti. Vikao vya kihariri havijaorodheshwa.",
     "signedIn": "Kuingia: {{signedIn}} · Kuonekana mara ya mwisho: {{lastSeen}}",
+    "signedInThisDevice": "Kuingia: {{signedIn}} · {{thisDevice}}",
     "thisDevice": "Kifaa hiki",
     "viewProfile": "Tazama wasifu",
     "signOutThisDevice": "Toka kwenye akaunti kwenye kifaa hiki",
@@ -3182,6 +3188,8 @@
     "retryHint": "Hujaribu kupakia hali ya Kilo Pass tena.",
     "endedOn": "Imekwisha {{date}}",
     "notAvailableInApp": "Kilo Pass haipatikani kwenye programu.",
+    "notAvailableTitle": "Kilo Pass haipo kwenye programu",
+    "noPassDescription": "Akaunti hii haina Kilo Pass.",
     "statusActive": "Inatumika",
     "statusTrialing": "Inajaribiwa",
     "statusPastDue": "Malipo yamechelewa",
@@ -3252,6 +3260,7 @@
     "revokeConsent": "Batilisha idhini",
     "revokeConsentTitle": "Ungependa kubatilisha idhini ya kushiriki data?",
     "acceptAndContinue": "Kubali na uendelee",
+    "loadingConsentSettings": "Inapakia mipangilio yako ya idhini…",
     "decline": "Kataa",
     "declineAndSignOut": "Kataa na utoke kwenye akaunti",
     "declineTitle": "Ungependa kukataa kushiriki data?",
@@ -3463,7 +3472,7 @@
       "retentionLimit": "Inaonyesha ankara za hivi karibuni."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Washa arifa ya salio la chini",
+      "subtitle": "Tuma arifa kwa barua pepe kwa anwani utakazoorodhesha salio la shirika hili linaposhuka chini ya kiasi ulichoweka.",
       "notifyEmailsLabel": "Anwani za kupokea arifa",
       "permissionDenied": "Huna ruhusa ya kusimamia arifa za bili.",
       "separateEmailsHint": "Tenganisha anwani za barua pepe kwa koma.",
@@ -3539,6 +3548,7 @@
       "truncated": "Saa hii ina maombi mengi kuliko yanayoonyeshwa kwenye orodha.",
       "emptyTitle": "Hakuna maombi katika saa hii",
       "emptyDescription": "Tumia Saa iliyotangulia ili kuona maombi ya awali.",
+      "emptyBoundDescription": "Kumbukumbu za maombi haziendi nyuma zaidi ya hapa.",
       "loadError": "Imeshindwa kupakia kumbukumbu za maombi.",
       "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi.",
       "tokens": "{{input}} ndani · {{output}} nje",
@@ -3772,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "Mfano huu unahitaji muunganisho wa intaneti. Unganisha kisha ujaribu tena, au ubadilishe utumie mfano ulio kwenye kifaa hiki.",
+    "connectionLost": "Muunganisho na mfano umekatika. Angalia muunganisho wako na ujaribu tena.",
     "empty": {
       "title": "Anza mazungumzo",
       "description": "Tuma ujumbe ili uongee na mfano."
@@ -4530,6 +4541,7 @@
     "empty": "Hakuna shughuli katika kipindi hiki cha ripoti",
     "emptyHint": "Vipindi vyako vya uandishi wa msimbo vya wingu na CLI huonekana hapa wakati ripoti iliyoratibiwa ina shughuli.",
     "loadError": "Imeshindwa kupakia ripoti",
+    "estimateLoadError": "Imeshindwa kupakia makadirio.",
     "view": "Soma ripoti",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4628,7 +4640,7 @@
     "topFeatures": "Vipengele vinavyoongoza",
     "emptyTitle": "Hakuna matumizi katika kipindi hiki",
     "unavailableTitle": "Matumizi hayapatikani",
-    "unavailableDescription": "Eneo hili la kazi haliripoti matumizi. Kujaribu tena hakutasaidia.",
+    "unavailableDescription": "Matumizi hayajawekwa kwa eneo hili la kazi. Wasiliana na timu ya usaidizi ikiwa unatarajia kuona matumizi hapa.",
     "orgSelfNotice": "Unaona matumizi yako mwenyewe katika shirika hili.",
     "viewDetails": "Angalia maelezo ya matumizi"
   },
@@ -4636,7 +4648,7 @@
     "title": "Miunganisho",
     "sectionTitle": "Huduma zilizounganishwa",
     "entrySubtitle": "GitHub, Slack, Linear na zaidi",
-    "subtitle": "Unganisha zana zako za usanidi na mitiririko yako ya kazi na Kilo",
+    "subtitle": "Unganisha zana zako za usanidi na mitiririko yako ya kazi na Kilo.",
     "disconnect": "Tenganisha",
     "disconnectTitle": "Ungependa kutenganisha {{provider}}?",
     "disconnectMessage": "Kilo itaacha kujibu kwenye {{provider}}. Unaweza kuunganisha tena wakati wowote.",
@@ -4708,7 +4720,6 @@
       "nameLocked": "Jina haiwezi kubadilika baada ya kichocheo kuundwa.",
       "repositoryLocked": "Hazina haiwezi kubadilika baada ya kichocheo kuundwa.",
       "environmentAutomatic": "Kiotomatiki kwa hazina",
-      "notSelected": "Haijachaguliwa",
       "profileDefaults": "Tumia chaguo-msingi",
       "profileHelp": "Mipangilio ya wasifu hutumika kichocheo kinapotekelezwa. Siri zake hutatuliwa wakati huo.",
       "customAgent": "Wakala maalum",
@@ -4936,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Kipengele cha biashara",
-    "enterpriseOnly": "Hiki ni kipengele cha biashara pekee.",
+    "enterpriseOnly": "Watoa huduma na modeli wanapatikana kwenye mpango wa Enterprise.",
     "readOnly": "Wamiliki na wasimamizi wa shirika pekee wanaweza kubadilisha mipangilio hii.",
     "loadError": "Watoa huduma na modeli hawakuweza kupakiwa",
     "tabModels": "Modeli",

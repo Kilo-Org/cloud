@@ -57,6 +57,7 @@
     "link": "weblink",
     "takingLonger": "Det tager længere tid end forventet. Du kan lukke denne skærm og tjekke igen senere.",
     "model": "AI-model",
+    "notSelected": "Ikke valgt",
     "accessDenied": "Adgang nægtet",
     "allRepositories": "Alle kodelagre",
     "personal": "Personlig",
@@ -147,6 +148,7 @@
     "performance": "Ydeevne",
     "preferences": "Indstillinger",
     "privacyPolicy": "Privatlivspolitik",
+    "termsOfService": "Tjenestevilkår",
     "profile": "Profil",
     "reactions": "Reaktioner",
     "recent": "Seneste",
@@ -217,8 +219,8 @@
     "verifyCode": "Bekræft kode",
     "resendCode": "Send kode igen",
     "termsPrefix": "Ved at fortsætte accepterer du vores ",
+    "termsInSentence": "Servicevilkår",
     "terms": "Vilkår",
-    "termsInSentence": "Vilkår",
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Flere muligheder for login",
@@ -763,7 +765,6 @@
       "replyPlaceholder": "Svar…",
       "replyBody": "Svartekst",
       "submitReply": "Send svar",
-      "termsTitle": "Tjenestevilkår",
       "termsCopy": "Du skal være mindst 13 år for at skrive kommentarer.",
       "termsAcceptRetry": "Vilkårene kunne ikke accepteres. Tjek din forbindelse, og prøv igen.",
       "viewTerms": "Se vilkår",
@@ -1026,7 +1027,10 @@
     "tabs": {
       "overview": "Oversigt",
       "files": "Filer",
-      "discussion": "Diskussion"
+      "discussion": "Diskussion",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentarer",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentarer"
     },
     "fileStatus": {
       "modified": "Ændret",
@@ -1132,16 +1136,16 @@
     },
     "category": {
       "agentAttentionTitle": "Agenten har brug for dig",
-      "agentAttentionSubtitle": "spørgsmål, anmodninger om tilladelse og behov for svar",
+      "agentAttentionSubtitle": "Spørgsmål, anmodninger om tilladelse og behov for svar",
       "agentUpdatesTitle": "Agentopdateringer",
-      "agentUpdatesSubtitle": "beskeder fra agenten under arbejdet",
+      "agentUpdatesSubtitle": "Beskeder fra agenten under arbejdet",
       "sessionStatusTitle": "Sessionsstatus",
-      "sessionStatusSubtitle": "afsluttet / mislykket / klar til styring",
-      "balanceAlertsSubtitle": "advarsler om lav saldo i organisationen",
+      "sessionStatusSubtitle": "Afsluttet / mislykket / klar til styring",
+      "balanceAlertsSubtitle": "Advarsler om lav saldo i organisationen",
       "balanceAlertsUnavailable": "Tilmeld dig en organisation for at få saldoadvarsler.",
-      "securityFindingsSubtitle": "nye fund og SLA-påmindelser",
+      "securityFindingsSubtitle": "Nye fund og SLA-påmindelser",
       "securityFindingsUnavailable": "Aktivér Kilo-sikkerhedsagenten på et område for at få sikkerhedsfund.",
-      "spendAlertsSubtitle": "grænseoverskridelser og spikes pr. time",
+      "spendAlertsSubtitle": "Grænseoverskridelser og spikes pr. time",
       "spendAlertsToggle": "Kategorien forbrugsadvarsler"
     },
     "history": {
@@ -1223,7 +1227,7 @@
     },
     "instructions": {
       "title": "Brugerdefinerede instruktioner",
-      "deprecation": "Brugerdefinerede instruktioner er planlagt til udfasning. Flyt i stedet retningslinjerne til en REVIEW.md-fil i dit kodelager.",
+      "deprecation": "Brugerdefinerede instruktioner bliver fjernet. Flyt i stedet retningslinjerne til en REVIEW.md-fil i dit kodelager.",
       "placeholder": "f.eks. overhold vores regler for fejlhåndtering…",
       "clearTitle": "Fjern brugerdefinerede instruktioner?",
       "clearMessage": "Når du gemmer et tomt felt, slettes de brugerdefinerede instruktioner, der er gemt for denne anmelder."
@@ -1389,6 +1393,7 @@
       "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",
       "description": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "descriptionReconnect": "Opret et nyt adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
+      "descriptionOverview": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det på næste skærm.",
       "scopes": "Konto: læse · Kodelagre: læse/skrive · Pull requests: læse · Webhooks: læse/skrive",
       "tokenPlaceholder": "Adgangstoken til arbejdsområdet",
       "tokenRefused": "Bitbucket accepterede ikke dette adgangstoken til arbejdsområdet. Kontroller, at det har tilladelserne ovenfor, og prøv derefter igen."
@@ -3021,6 +3026,7 @@
     "noSessions": "Ingen aktive sessioner",
     "noSessionsDescription": "Log ind med Kilo-appen på en anden enhed, så vises den her.",
     "signedIn": "Logget ind {{signedIn}} · Sidst set {{lastSeen}}",
+    "signedInThisDevice": "Logget ind {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Her vises login via Kilo-appen, Kilo CLI og en webbrowser. Login via kodeeditoren vises ikke.",
     "thisDevice": "Denne enhed",
     "viewProfile": "Vis profil",
@@ -3182,6 +3188,8 @@
     "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
     "endedOn": "Afsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgængeligt i appen.",
+    "notAvailableTitle": "Kilo Pass findes ikke i appen",
+    "noPassDescription": "Denne konto har ikke Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Prøveperiode",
     "statusPastDue": "Betaling forfalden",
@@ -3252,6 +3260,7 @@
     "revokeConsent": "Tilbagekald samtykke",
     "revokeConsentTitle": "Tilbagekald samtykke til datadeling?",
     "acceptAndContinue": "Acceptér og fortsæt",
+    "loadingConsentSettings": "Indlæser dine samtykkeindstillinger…",
     "decline": "Afvis",
     "declineAndSignOut": "Afvis og log ud",
     "declineTitle": "Afvis datadeling?",
@@ -3463,7 +3472,7 @@
       "retentionLimit": "Viser de seneste fakturaer."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktivér advarsel om lav saldo",
+      "subtitle": "Send en advarsel via e-mail til de adresser, du angiver, når organisationens saldo falder under det beløb, du har angivet.",
       "notifyEmailsLabel": "Modtagernes e-mailadresser",
       "permissionDenied": "Du har ikke tilladelse til at administrere advarsler om fakturering.",
       "separateEmailsHint": "Adskil e-mailadresser med kommaer.",
@@ -3539,6 +3548,7 @@
       "truncated": "Denne time har flere anmodninger, end listen viser.",
       "emptyTitle": "Ingen anmodninger i denne time",
       "emptyDescription": "Brug Forrige time for at se tidligere anmodninger.",
+      "emptyBoundDescription": "Anmodningsloggen går ikke længere tilbage.",
       "loadError": "Anmodningslogs kunne ikke indlæses.",
       "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs.",
       "tokens": "{{input}} ind · {{output}} ud",
@@ -3772,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "Denne model kræver en internetforbindelse. Opret forbindelse, og prøv igen, eller skift til en model på denne enhed.",
+    "connectionLost": "Forbindelsen til modellen blev afbrudt. Tjek din forbindelse og prøv igen.",
     "empty": {
       "title": "Start en chat",
       "description": "Send en besked for at tale med en model."
@@ -4530,6 +4541,7 @@
     "empty": "Ingen aktivitet i dette briefingvindue",
     "emptyHint": "Dine cloud- og CLI-kodesessioner vises her, når en planlagt briefing har aktivitet.",
     "loadError": "Kunne ikke indlæse briefinger",
+    "estimateLoadError": "Kunne ikke indlæse estimatet.",
     "view": "Læs briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4628,7 +4640,7 @@
     "topFeatures": "Mest brugte funktioner",
     "emptyTitle": "Intet forbrug i denne periode",
     "unavailableTitle": "Forbrug er ikke tilgængeligt",
-    "unavailableDescription": "Dette arbejdsområde rapporterer ikke forbrug. Det hjælper ikke at prøve igen.",
+    "unavailableDescription": "Forbrug er ikke sat op for dette arbejdsområde. Kontakt support, hvis du forventer at se forbrug her.",
     "orgSelfNotice": "Du ser dit eget forbrug i denne organisation.",
     "viewDetails": "Se forbrugsdetaljer"
   },
@@ -4636,7 +4648,7 @@
     "title": "Integrationer",
     "sectionTitle": "Forbundne tjenester",
     "entrySubtitle": "GitHub, Slack, Linear og flere",
-    "subtitle": "Forbind dine udviklingsværktøjer og arbejdsgange med Kilo",
+    "subtitle": "Forbind dine udviklingsværktøjer og arbejdsgange med Kilo.",
     "disconnect": "Afbryd forbindelse",
     "disconnectTitle": "Afbryd forbindelsen til {{provider}}?",
     "disconnectMessage": "Kilo holder op med at svare i {{provider}}. Du kan altid oprette forbindelsen igen.",
@@ -4708,7 +4720,6 @@
       "nameLocked": "Navnet kan ikke ændres, efter at udløseren er oprettet.",
       "repositoryLocked": "Kodelageret kan ikke ændres, efter at udløseren er oprettet.",
       "environmentAutomatic": "Automatisk ud fra kodelageret",
-      "notSelected": "Ikke valgt",
       "profileDefaults": "Brug standardindstillinger",
       "profileHelp": "Profilens indstillinger anvendes, når udløseren kører. Dens hemmeligheder slås op på det tidspunkt.",
       "customAgent": "Tilpasset agent",
@@ -4936,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise-funktion",
-    "enterpriseOnly": "Denne funktion er kun tilgængelig for Enterprise.",
+    "enterpriseOnly": "Udbydere og modeller er tilgængelige på Enterprise-planen.",
     "readOnly": "Kun organisationens ejere og administratorer kan ændre disse indstillinger.",
     "loadError": "Udbydere og modeller kunne ikke indlæses",
     "tabModels": "Modeller",

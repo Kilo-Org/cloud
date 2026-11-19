@@ -57,6 +57,7 @@
     "link": "saite",
     "takingLonger": "Tas aizņem vairāk laika, nekā gaidīts. Vari aizvērt šo ekrānu un pārbaudīt vēlreiz.",
     "model": "Modelis",
+    "notSelected": "Nav atlasīts",
     "accessDenied": "Piekļuve liegta",
     "allRepositories": "Visi repozitoriji",
     "personal": "Personīgais",
@@ -147,6 +148,7 @@
     "performance": "Veiktspēja",
     "preferences": "Lietotāja iestatījumi",
     "privacyPolicy": "Privātuma politika",
+    "termsOfService": "Lietošanas noteikumi",
     "profile": "Profils",
     "reactions": "Reakcijas",
     "recent": "Jaunākie",
@@ -217,8 +219,8 @@
     "verifyCode": "Pārbaudīt kodu",
     "resendCode": "Nosūtīt kodu vēlreiz",
     "termsPrefix": "Turpinot, tu piekrīti mūsu ",
+    "termsInSentence": "Pakalpojuma noteikumiem",
     "terms": "Noteikumiem",
-    "termsInSentence": "Noteikumiem",
     "termsConnector": " un ",
     "termsSuffix": ".",
     "moreSignInOptions": "Citas pierakstīšanās iespējas",
@@ -773,7 +775,6 @@
       "replyPlaceholder": "Atbilde…",
       "replyBody": "Atbildes teksts",
       "submitReply": "Nosūtīt atbildi",
-      "termsTitle": "Lietošanas noteikumi",
       "termsCopy": "Publicēt saturu drīkst no 13 gadu vecuma.",
       "termsAcceptRetry": "Neizdevās pieņemt noteikumus. Pārbaudi savienojumu un mēģini vēlreiz.",
       "viewTerms": "Skatīt noteikumus",
@@ -1048,7 +1049,11 @@
     "tabs": {
       "overview": "Pārskats",
       "files": "Faili",
-      "discussion": "Diskusija"
+      "discussion": "Diskusija",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentārs",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentāri",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentāri",
+      "discussionAccessibility_zero": "{{title}}: {{displayCount}} komentāru"
     },
     "fileStatus": {
       "modified": "Mainīts",
@@ -1155,16 +1160,16 @@
     },
     "category": {
       "agentAttentionTitle": "Aģents gaida tavu rīcību",
-      "agentAttentionSubtitle": "jautājumi, atļauju pieprasījumi un nepieciešamās atbildes",
+      "agentAttentionSubtitle": "Jautājumi, atļauju pieprasījumi un nepieciešamās atbildes",
       "agentUpdatesTitle": "Aģenta jaunumi",
-      "agentUpdatesSubtitle": "aģenta ziņojumi uzdevuma izpildes laikā",
+      "agentUpdatesSubtitle": "Aģenta ziņojumi uzdevuma izpildes laikā",
       "sessionStatusTitle": "Sesijas statuss",
-      "sessionStatusSubtitle": "sesija pabeigta / kļūda / gatava vadīšanai",
-      "balanceAlertsSubtitle": "brīdinājumi par mazu organizācijas kredītu atlikumu",
+      "sessionStatusSubtitle": "Sesija pabeigta / kļūda / gatava vadīšanai",
+      "balanceAlertsSubtitle": "Brīdinājumi par mazu organizācijas kredītu atlikumu",
       "balanceAlertsUnavailable": "Pievienojieties organizācijai, lai saņemtu bilances brīdinājumus.",
-      "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi",
+      "securityFindingsSubtitle": "Jaunas konstatētās problēmas un SLA atgādinājumi",
       "securityFindingsUnavailable": "Iespējojiet Kilo drošības aģentu tvērumā, lai saņemtu drošības konstatējumus.",
-      "spendAlertsSubtitle": "sliekšņu pārsniegumi un stundas lēcieni",
+      "spendAlertsSubtitle": "Sliekšņu pārsniegumi un stundas lēcieni",
       "spendAlertsToggle": "Izdevumu brīdinājumu kategorija"
     },
     "history": {
@@ -1246,7 +1251,7 @@
     },
     "instructions": {
       "title": "Pielāgoti norādījumi",
-      "deprecation": "Pielāgoto norādījumu funkcijas atbalstu plānots pārtraukt. Tā vietā pārvieto šos norādījumus uz REVIEW.md failu savā repozitorijā.",
+      "deprecation": "Pielāgotie norādījumi tiks noņemti. Tā vietā pārvieto šos norādījumus uz REVIEW.md failu savā repozitorijā.",
       "placeholder": "piemēram, ievērot mūsu kļūdu apstrādes noteikumus…",
       "clearTitle": "Noņemt pielāgotos norādījumus?",
       "clearMessage": "Saglabājot tukšu lauku, tiks dzēsti šim recenzentam saglabātie pielāgotie norādījumi."
@@ -1412,6 +1417,7 @@
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "descriptionReconnect": "Izveido jaunu darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
+      "descriptionOverview": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to nākamajā ekrānā.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
       "tokenPlaceholder": "Darbvietas piekļuves pilnvara",
       "tokenRefused": "Bitbucket nepieņēma šo darbvietas piekļuves pilnvaru. Pārbaudi, vai tai ir iepriekš norādītās atļaujas, un pēc tam mēģini vēlreiz."
@@ -3077,6 +3083,7 @@
     "noSessions": "Nav aktīvu sesiju",
     "noSessionsDescription": "Pieraksties Kilo lietotnē citā ierīcē, un tā būs redzama šeit.",
     "signedIn": "Pierakstīšanās: {{signedIn}} · Pēdējā aktivitāte: {{lastSeen}}",
+    "signedInThisDevice": "Pierakstīšanās: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Šeit ir redzamas Kilo lietotnes, Kilo CLI un tīmekļa pārlūka sesijas. Redaktora sesijas nav iekļautas.",
     "thisDevice": "Šī ierīce",
     "viewProfile": "Skatīt profilu",
@@ -3240,6 +3247,8 @@
     "retryHint": "Atkārtoti ielādē Kilo Pass stāvokli.",
     "endedOn": "Beidzies {{date}}",
     "notAvailableInApp": "Kilo Pass lietotnē nav pieejams.",
+    "notAvailableTitle": "Kilo Pass lietotnē netiek piedāvāts",
+    "noPassDescription": "Šim kontam nav Kilo Pass.",
     "statusActive": "Aktīvs",
     "statusTrialing": "Izmēģinājuma periods",
     "statusPastDue": "Maksājums nokavēts",
@@ -3310,6 +3319,7 @@
     "revokeConsent": "Atsaukt piekrišanu",
     "revokeConsentTitle": "Atsaukt piekrišanu datu kopīgošanai?",
     "acceptAndContinue": "Pieņemt un turpināt",
+    "loadingConsentSettings": "Notiek tavu piekrišanas iestatījumu ielāde…",
     "decline": "Noraidīt",
     "declineAndSignOut": "Noraidīt un izrakstīties",
     "declineTitle": "Noraidīt datu kopīgošanu?",
@@ -3521,7 +3531,7 @@
       "retentionLimit": "Tiek rādīti jaunākie rēķini."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Iespējot brīdinājumu par mazu atlikumu",
+      "subtitle": "Sūti brīdinājumu pa e-pastu uz norādītajām adresēm, kad šīs organizācijas atlikums nokrītas zem iestatītās summas.",
       "notifyEmailsLabel": "Paziņojumu saņēmēju e-pasta adreses",
       "permissionDenied": "Tev nav atļaujas pārvaldīt norēķinu brīdinājumus.",
       "separateEmailsHint": "Atdali vairākas e-pasta adreses ar komatiem.",
@@ -3597,6 +3607,7 @@
       "truncated": "Šajā stundā ir vairāk pieprasījumu, nekā parādīts sarakstā.",
       "emptyTitle": "Šajā stundā nav pieprasījumu",
       "emptyDescription": "Izmantojiet pogu „Iepriekšējā stunda”, lai apskatītu iepriekšējos pieprasījumus.",
+      "emptyBoundDescription": "Pieprasījumu žurnāli tālāk pagātnē nesniedzas.",
       "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
       "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
       "tokens": "{{input}} ievade · {{output}} izvade",
@@ -3832,6 +3843,7 @@
   },
   "modelChat": {
     "offlineFailure": "Šim modelim nepieciešams interneta savienojums. Izveido savienojumu un mēģini vēlreiz vai pārslēdzies uz modeli šajā ierīcē.",
+    "connectionLost": "Savienojums ar modeli tika pārtraukts. Pārbaudi savienojumu un mēģini vēlreiz.",
     "empty": {
       "title": "Sākt tērzēšanu",
       "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
@@ -4601,6 +4613,7 @@
     "empty": "Nav aktivitātes šajā atskaites periodā",
     "emptyHint": "Jūsu mākoņa un CLI kodēšanas sesijas parādīsies šeit, kad plānotajā atskaitē būs aktivitāte.",
     "loadError": "Neizdevās ielādēt atskaites",
+    "estimateLoadError": "Neizdevās ielādēt novērtējumu.",
     "view": "Lasīt atskaiti",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4703,7 +4716,7 @@
     "topFeatures": "Populārākās funkcijas",
     "emptyTitle": "Šajā periodā nav lietojuma",
     "unavailableTitle": "Lietojums nav pieejams",
-    "unavailableDescription": "Šī darbvieta neziņo par lietojumu. Atkārtots mēģinājums nepalīdzēs.",
+    "unavailableDescription": "Šai darbvietai lietojums nav iestatīts. Ja sagaidāt, ka šeit būs redzams lietojums, sazinieties ar atbalsta dienestu.",
     "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
     "viewDetails": "Skatīt lietojuma informāciju"
   },
@@ -4711,7 +4724,7 @@
     "title": "Integrācijas",
     "sectionTitle": "Pievienotie pakalpojumi",
     "entrySubtitle": "GitHub, Slack, Linear un citi",
-    "subtitle": "Savienojiet savus izstrādes rīkus un darbplūsmas ar Kilo",
+    "subtitle": "Savienojiet savus izstrādes rīkus un darbplūsmas ar Kilo.",
     "disconnect": "Atvienot",
     "disconnectTitle": "Vai atvienot {{provider}}?",
     "disconnectMessage": "Kilo vairs neatbildēs pakalpojumā {{provider}}. Savienojumu varat atjaunot jebkurā laikā.",
@@ -4783,7 +4796,6 @@
       "nameLocked": "Nosaukumu nevar mainīt pēc trigera izveides.",
       "repositoryLocked": "Repozitoriju nevar mainīt pēc trigera izveides.",
       "environmentAutomatic": "Automātiski pēc repozitorija",
-      "notSelected": "Nav atlasīts",
       "profileDefaults": "Izmantot noklusējumus",
       "profileHelp": "Profila iestatījumi tiek piemēroti, kad trigeris tiek palaists. Tad tiek atrisināti arī tā noslēpumi.",
       "customAgent": "Pielāgots aģents",
@@ -5011,7 +5023,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Uzņēmuma funkcija",
-    "enterpriseOnly": "Šī funkcija ir pieejama tikai uzņēmuma līmenī.",
+    "enterpriseOnly": "Nodrošinātāji un modeļi ir pieejami Enterprise plānā.",
     "readOnly": "Šos iestatījumus var mainīt tikai organizācijas īpašnieki un administratori.",
     "loadError": "Neizdevās ielādēt nodrošinātājus un modeļus",
     "tabModels": "Modeļi",

@@ -57,6 +57,7 @@
     "link": "لینک",
     "takingLonger": "دا له تمې ډېر وخت نیسي. تاسو یې تړلی شئ او بیا یې کتلی شئ.",
     "model": "ماډل",
+    "notSelected": "نه دی ټاکل شوی",
     "accessDenied": "د لاسرسي اجازه نشته.",
     "allRepositories": "ټول زېرمتونونه",
     "personal": "شخصي",
@@ -147,6 +148,7 @@
     "performance": "کارکردګي",
     "preferences": "غوره توبونه",
     "privacyPolicy": "د محرمیت تګلاره",
+    "termsOfService": "د خدمت شرایط",
     "profile": "پروفایل",
     "reactions": "غبرګونونه",
     "recent": "وروستي",
@@ -217,8 +219,8 @@
     "verifyCode": "کوډ تایید کړئ",
     "resendCode": "کوډ بیا ولېږئ",
     "termsPrefix": "په دوام ورکولو سره، تاسو زموږ دا موارد منئ: ",
+    "termsInSentence": "د خدمت شرایط",
     "terms": "شرایط",
-    "termsInSentence": "شرایط",
     "termsConnector": " او ",
     "termsSuffix": ".",
     "moreSignInOptions": "د ننوتلو نور غوراوي",
@@ -763,7 +765,6 @@
       "replyPlaceholder": "ځواب…",
       "replyBody": "د ځواب متن",
       "submitReply": "ځواب وسپارئ",
-      "termsTitle": "د خدمت شرایط",
       "termsCopy": "د خپرولو لپاره باید لږ تر لږه ۱۳ کلن یاست.",
       "termsAcceptRetry": "د شرایطو منل ناکام شو. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
       "viewTerms": "شرایط وګورئ",
@@ -1026,7 +1027,10 @@
     "tabs": {
       "overview": "عمومي کتنه",
       "files": "فایلونه",
-      "discussion": "بحث"
+      "discussion": "بحث",
+      "discussionAccessibility_one": "{{title}}: ۱ تبصره",
+      "discussionAccessibility": "{{title}}: {{displayCount}} تبصرې",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} تبصرې"
     },
     "fileStatus": {
       "modified": "بدل شوی",
@@ -1223,7 +1227,7 @@
     },
     "instructions": {
       "title": "ځانګړې لارښوونې",
-      "deprecation": "د ځانګړو لارښوونو د بندولو پلان شته. پر ځای یې دا لارښوونې په خپل زېرمتون کې د REVIEW.md فایل ته ولېږدوئ.",
+      "deprecation": "ځانګړې لارښوونې به لرې شي. پر ځای یې دا لارښوونې په خپل زېرمتون کې د REVIEW.md فایل ته ولېږدوئ.",
       "placeholder": "د بېلګې په توګه: د تېروتنو د سمبالولو زموږ اصول پلي کړئ…",
       "clearTitle": "ځانګړې لارښوونې لرې کړئ؟",
       "clearMessage": "د تش ډګر خوندي کول د دې بیاکتونکي لپاره ذخیره شوې ځانګړې لارښوونې له منځه وړي."
@@ -1389,6 +1393,7 @@
       "managedOnWeb": "د {{organization}} د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
       "description": "د کاري چاپېریال د لاسرسي ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
       "descriptionReconnect": "د کاري چاپېریال د لاسرسي یو نوی ټوکن {{organization}} لپاره جوړ کړئ او لاندې یې پیسټ کړئ.",
+      "descriptionOverview": "د کاري چاپېریال د لاسرسي ټوکن {{organization}} لپاره جوړ کړئ او بیا یې په راتلونکې پاڼه کې پیسټ کړئ.",
       "scopes": "حساب: لوستل · زېرمتونونه: لوستل/لیکل · PR: لوستل · وېب هوکونه: لوستل/لیکل",
       "tokenPlaceholder": "د کاري چاپېریال د لاسرسي ټوکن",
       "tokenRefused": "Bitbucket دا د کاري چاپېریال د لاسرسي ټوکن ونه منل. وګورئ چې پورتنۍ اجازې لري، بیاځلي هڅه وکړئ."
@@ -3022,6 +3027,7 @@
     "noSessionsDescription": "په بله وسیله کې د Kilo اپلیکیشن ته ننوځئ، ناسته به یې دلته ښکاره شي.",
     "signInScopeNote": "دلته د Kilo اپلیکیشن، Kilo CLI او وېب براوزر ننوتنې ښکاري. د کوډ سمونګر ننوتنې په لېست کې نه راځي.",
     "signedIn": "د ننوتلو وخت: {{signedIn}} · وروستی لیدل شوی وخت: {{lastSeen}}",
+    "signedInThisDevice": "د ننوتلو وخت: {{signedIn}} · {{thisDevice}}",
     "thisDevice": "دا وسیله",
     "viewProfile": "پروفایل وګورئ",
     "signOutThisDevice": "له دې وسیلې ووځئ",
@@ -3182,6 +3188,8 @@
     "retryHint": "د Kilo Pass د حالت ترلاسه کولو بیا هڅه کوي.",
     "endedOn": "په {{date}} پای ته رسېدلی",
     "notAvailableInApp": "Kilo Pass په اپ کې شتون نلري.",
+    "notAvailableTitle": "Kilo Pass په اپ کې نشته",
+    "noPassDescription": "دا حساب Kilo Pass نلري.",
     "statusActive": "فعال",
     "statusTrialing": "په آزموینه کې",
     "statusPastDue": "تادیه ناوخته شوې",
@@ -3252,6 +3260,7 @@
     "revokeConsent": "رضایت لرې کړئ",
     "revokeConsentTitle": "د معلوماتو د شریکولو رضایت لغوه کړم؟",
     "acceptAndContinue": "ومنئ او دوام ورکړئ",
+    "loadingConsentSettings": "ستاسو د رضایت تنظیمات بارېږي…",
     "decline": "رد کړئ",
     "declineAndSignOut": "رد کړئ او ووځئ",
     "declineTitle": "د معلوماتو شریکول رد کړم؟",
@@ -3463,7 +3472,7 @@
       "retentionLimit": "تر ټولو وروستي بلونه ښودل کېږي."
     },
     "lowBalanceAlert": {
-      "enableA11y": "د کم بیلانس خبرتیا فعاله کړئ",
+      "subtitle": "کله چې د دې سازمان بیلانس له هغې اندازې ښکته شي چې تاسو ټاکلې ده، هغو برېښنالیک پتو ته چې تاسو یې لیکئ خبرتیا ولېږه.",
       "notifyEmailsLabel": "د خبرتیا لپاره برېښنالیکونه",
       "permissionDenied": "تاسو د بلونو د خبرتیاوو د اداره کولو اجازه نه لرئ.",
       "separateEmailsHint": "د برېښنالیک پتې په کامو سره جلا کړئ.",
@@ -3539,6 +3548,7 @@
       "truncated": "په دې ساعت کې له ښودل شویو ډېرې غوښتنې شته.",
       "emptyTitle": "په دې ساعت کې غوښتنې نشته",
       "emptyDescription": "د پخوانیو غوښتنو لیدو لپاره «پخوانی ساعت» وکاروئ.",
+      "emptyBoundDescription": "د غوښتنو ثبت تر همدې وخته پورې شاته ځي.",
       "loadError": "د غوښتنو لاګونه بار نه شول.",
       "permissionDenied": "یوازې د سازمان مالک، اډمین یا د بیلنګ مدیر کولی شي د هغه د غوښتنو لاګونه ولولي.",
       "tokens": "{{input}} ننوتي · {{output}} وتلي",
@@ -3772,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "دا ماډل انټرنیټ اړیکې ته اړتیا لري. وصل شئ او بیا هڅه وکړئ، یا پدې وسیله کې یو ماډل ته واوړئ.",
+    "connectionLost": "له ماډل سره اړیکه پرې شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
     "empty": {
       "title": "خبرې اترې پیل کړئ",
       "description": "له ماډل سره د خبرو کولو لپاره پیغام ولېږئ."
@@ -4530,6 +4541,7 @@
     "empty": "د دې راپور په مهال کې هېڅ فعالیت نشته",
     "emptyHint": "کله چې یو مهالویش شوی راپور فعالیت ولري، ستاسو د کلاوډ او CLI د کوډ کولو ناستې به دلته ښکاره شي.",
     "loadError": "راپورونه پورته نه شول",
+    "estimateLoadError": "اټکل پورته نه شو.",
     "view": "راپور ولولئ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}، $t(agentBriefing.snapshotPullRequests) {{pullRequests}}، $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4628,7 +4640,7 @@
     "topFeatures": "مخکښې ځانګړنې",
     "emptyTitle": "په دې موده کې کارونه نشته",
     "unavailableTitle": "کارونه د لاسرسي وړ نه ده",
-    "unavailableDescription": "دا کار ځای کارونه راپور نه کوي. بیا هڅه کول به مرسته ونه کړي.",
+    "unavailableDescription": "د دې کار ځای لپاره کارونه نه ده تنظیم شوې. که تمه لرئ چې دلته کارونه ووینئ، له ملاتړ سره اړیکه ونیسئ.",
     "orgSelfNotice": "تاسو په دې سازمان کې خپله کارونه وینئ.",
     "viewDetails": "د کارونې جزئیات وګورئ"
   },
@@ -4636,7 +4648,7 @@
     "title": "ادغامونه",
     "sectionTitle": "نښلول شوي خدمتونه",
     "entrySubtitle": "GitHub، Slack، Linear او نور",
-    "subtitle": "خپل پراختیايي وسایل او کاري بهیرونه له Kilo سره ونښلوئ",
+    "subtitle": "خپل پراختیايي وسایل او کاري بهیرونه له Kilo سره ونښلوئ.",
     "disconnect": "اړیکه پرې کړئ",
     "disconnectTitle": "له {{provider}} سره اړیکه پرې کړئ؟",
     "disconnectMessage": "Kilo به نور په {{provider}} کې ځواب نه ورکوي. تاسو هر وخت بیا نښلولی شئ.",
@@ -4708,7 +4720,6 @@
       "nameLocked": "ټرېګر له جوړېدو وروسته نوم نه‌شي بدلېدای.",
       "repositoryLocked": "ټرېګر له جوړېدو وروسته مخزن نه‌شي بدلېدای.",
       "environmentAutomatic": "د مخزن له مخې اتومات",
-      "notSelected": "نه دی ټاکل شوی",
       "profileDefaults": "ذاتي تنظیمات وکاروئ",
       "profileHelp": "د پروفایل تنظیمات هغه وخت پلي کېږي چې ټرېګر چلېږي. پټ رازونه یې هغه وخت حل کېږي.",
       "customAgent": "ځانګړی ایجنټ",
@@ -4936,7 +4947,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "د شرکت ځانګړتیا",
-    "enterpriseOnly": "دا یوازې د سوداګریزې موسسې ځانګړتیا ده.",
+    "enterpriseOnly": "عرضه کوونکي او ماډلونه یوازې د Enterprise په پلان کې شته.",
     "readOnly": "یوازې د سازمان مالکین او مدیران کولی شي دا تنظیمات بدل کړي.",
     "loadError": "عرضه کوونکي او ماډلونه پورته نشول",
     "tabModels": "ماډلونه",

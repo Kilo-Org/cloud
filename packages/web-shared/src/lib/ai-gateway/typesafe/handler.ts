@@ -63,7 +63,7 @@ import { getEffectiveProviderPrivacy } from '../provider-privacy';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getOpenRouterModelsMetadataFromDatabase,
-  getOpenRouterSystemOneModelsFromDatabase,
+  getOpenRouterSystemOneModelIdsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { systemOneRequestCostBound } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
@@ -138,7 +138,7 @@ function errorResponse(message: string, error_type: ProxyErrorType, status: numb
 }
 
 async function isSystemOneModel(modelId: string) {
-  const systemOneModelIds = await getOpenRouterSystemOneModelsFromDatabase();
+  const systemOneModelIds = await getOpenRouterSystemOneModelIdsFromDatabase();
   if (systemOneModelIds.size === 0) {
     // OpenRouter's System One endpoint still rejects models it cannot serve.
     warnExceptInTest('[isSystemOneModel] no System One model metadata, assuming id is valid');

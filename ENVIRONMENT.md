@@ -183,6 +183,7 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `CHAT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for fresh chat resource issuance; requires the master and exact `true`. Validated modern devices retain chat/event-service/notifications issuance after rollback, capped by one hour and parent expiry. [SERVER]
 - `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, and attribution delegation, including the organization user-token resource route, and for the five-minute Pages-audience (`pages`, `pages-dev`) tokens from `POST /api/auth/resource-token`, which organization credentials cannot mint; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
 - `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` - Default-off family gate for server workflow gateway tokens; requires the master and exact `true`. [SERVER]
+- `ORG_PERMISSION_POLICY_WRITES_ENABLED` - Default-off web deployment gate for Enterprise organization permission policy writes. Set to exact `true` only after the web app and both Gateway regions can read both stored policy types and older operator-config writers are no longer serving. The organization must also be enabled for `org_permission_policy`. After enabling writes, retain compatible readers even if either gate is disabled. [SERVER]
 - `INTERNAL_BOT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for internal bot tokens from `POST /api/internal/bot-token`; requires the master and exact `true`. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
@@ -447,7 +448,7 @@ admission responses within the same slot and deadline.
   - After a declined charge commits to `bouncer_credit_event_outbox`, the webhook delivers that row immediately, then calls `charge-decide` with `stage: "failure"` and the charge id as `requestId`. An enforced verdict expires every open Checkout session of the declined charge's Stripe customer, in payment or subscription mode; a charge without a customer falls back to the open session behind its payment intent. A failed immediate delivery leaves the sessions alone and the cron drainer retries it. These steps are bounded and never fail the webhook; a redelivered second Stripe event for the same charge finds the row already delivered and changes nothing.
   - Bouncer enforces no charge block until `enforcement.enabled` is on and a reason is listed in `enforcement.chargeBlockReasons`, which ships empty; user and IP exemptions still apply.
   - Deploy Bouncer v2 before this cloud change. Bouncer retains v1 for the current cloud deployment; the new outbox sends only v2.
-- `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
+- `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. If the root `.env.local` value is blank, `pnpm dev:env` fills it with a generated value and copies it to `apps/web/.env.development.local`. `[SECRET]`
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `dispatch-bouncer-credit-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-credit-event-outbox`) that drains the Bouncer credit-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
 - `dispatch-bouncer-usage-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-usage-event-outbox`) that retries the Bouncer usage-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
@@ -633,6 +634,7 @@ Abrupt OOM/SIGKILL failures and synthetic session failure events are not capture
 
 - `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; `services/cloud-agent-next/scripts/dev.sh` maps it to `DOCKER_HOST` for local Wrangler. [SERVER]
 - `SECRET` - Generic secret env var used in `services/kiloclaw/src/auth/sandbox-id-adversarial.test.ts` for sandbox auth tests. `[SECRET]`
+- `SESSION_SHARE_JWT_SECRET_PROD` - Secrets Store binding of `services/session-ingest` that signs and verifies public session share tokens. Only that Worker reads it, so `pnpm dev:env` generates a random local value (`@dev-generate base64 32`) and no `.env.local` key is needed. `[SECRET]`
 
 ## Browser Extension (apps/extension)
 
@@ -647,7 +649,7 @@ Abrupt OOM/SIGKILL failures and synthetic session failure events are not capture
 - `WEB_BASE_URL` - Base HTTPS URL for the mobile in-app web views (e.g. `https://app.kilo.ai`). Bundled into the binary. [PUBLIC]
 - `CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming in the mobile app. Bundled into the binary. [PUBLIC]
 - `SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the mobile app. Bundled into the binary. [PUBLIC]
-- `EXPO_PUBLIC_SESSION_SYNC_URL` - Native remote preview relay URL for development bundles, inlined into the JS bundle. The preview requires `__DEV__` and an explicit isolated Worker URL, such as `http://localhost:8817`. Release bundles ignore this setting and expose neither the Profile entry nor the `/native-remote` screen. [PUBLIC]
+- `EXPO_PUBLIC_SESSION_SYNC_URL` - Native remote preview relay URL for development bundles, inlined into the JS bundle. The preview requires `__DEV__` and an explicit isolated Worker URL; `pnpm dev:env:mobile` writes the local session-sync Worker URL (`http://<host>:8817`), and `pnpm dev:start session-sync` starts that Worker. Release bundles ignore this setting and expose neither the Profile entry nor the `/native-remote` screen. [PUBLIC]
 - `APPSFLYER_DEV_KEY` - AppsFlyer development key for mobile attribution. Bundled into the binary (not secret — it's a device-level SDK key). [PUBLIC]
 - `APPSFLYER_APP_ID` - AppsFlyer app ID for mobile attribution tracking. [PUBLIC]
 - `EVENT_SERVICE_URL` - WebSocket URL for the event service from mobile. Bundled into the binary. [PUBLIC]

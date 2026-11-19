@@ -25,7 +25,6 @@ import {
   type Device,
   type RunOutcome,
 } from './capture';
-import { CAPTURE_ALIGNMENT_BUDGET_MS } from './capture-evidence';
 import type { ProbeClient, ProbeSample } from './cdp';
 import { matrixCells } from './matrix';
 import { normalize, type ProbeDump } from './tree';
@@ -1012,7 +1011,7 @@ test('capture retains a mismatched screenshot and reports inconclusive pixel ali
   assert.ok(fs.existsSync(path.join(ctx.out, screen.screenshot)));
 });
 
-test('capture marks slow bracketing reads inconclusive instead of certifying paint', async () => {
+test('capture keeps a bracket whose reads and screenshot are slow but adjacent', async () => {
   const calls: string[] = [];
   const state = probeState();
   const device = fakeDevice(calls, state);
@@ -1022,6 +1021,8 @@ test('capture marks slow bracketing reads inconclusive instead of certifying pai
   let captured = false;
   device.screenshot = file => {
     screenshot(file);
+    // An iOS simulator screenshot under load: the fake clock advances at once.
+    void ctx.clock.sleep(9_000);
     captured = true;
   };
   const originalDump = probe.dump;
@@ -1030,12 +1031,10 @@ test('capture marks slow bracketing reads inconclusive instead of certifying pai
     return originalDump();
   };
   const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
-  const screen = outcome.cells[0]?.screens[0];
-  assert.ok(screen?.capture);
-  const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
-  assert.equal(alignment.status, 'inconclusive');
-  assert.match(alignment.reason, /bounded alignment window/);
-  assert.ok(outcome.findings.some(finding => finding.rule === 'capture-alignment'));
+  const alignment = captureEvidence(ctx, outcome);
+  assert.equal(alignment.status, 'bracketed');
+  assert.equal(alignment.gapMs, 0);
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'capture-alignment'));
 });
 
 test('uniform captured content remains visible as possible blank-frame evidence without recapture', async () => {
@@ -1248,46 +1247,11 @@ test('a late arrival is timed with the spacing its samples report', () => {
   assert.match(shifts(undefined)[0]?.message ?? '', /within 500 ms after settling/u);
 });
 
-/** A probe whose reads the test can hold at a fixed cost per read. */
-function costingProbe(dumpMs: number) {
-  const calls: string[] = [];
-  const state = probeState();
-  const probe = fakeProbe(state);
-  const ctx = context(fakeDevice(calls, state), probe);
-  const originalDump = probe.dump;
-  probe.dump = async () => {
-    await ctx.clock.sleep(dumpMs);
-    return originalDump();
-  };
-  const logs: string[] = [];
-  ctx.log = line => logs.push(line);
-  return { ctx, logs, probe, state };
-}
-
 function captureEvidence(ctx: CaptureContext, outcome: { cells: RunOutcome['cells'] }) {
   const capture = outcome.cells[0]?.screens[0]?.capture;
   assert.ok(capture);
   return JSON.parse(fs.readFileSync(path.join(ctx.out, capture), 'utf8'));
 }
-
-test('the alignment window follows the measured dump cost and keeps the constant when cheap', async () => {
-  const slow = costingProbe(600);
-  const slowRun = await runMatrix(slow.ctx, matrixCells('android', 'base'), HOME);
-  // Two bracket reads of a 600 ms dump alone outlast the 2 s window, so the
-  // caller widens it by the same measurement the sampling cadence uses.
-  assert.equal(captureEvidence(slow.ctx, slowRun).budgetMs, 2_200);
-  assert.deepEqual(
-    slow.logs.filter(line => line.includes('alignment window')),
-    ['design-gate: home one dump costs 600ms; alignment window 2200ms']
-  );
-  const cheap = costingProbe(40);
-  const cheapRun = await runMatrix(cheap.ctx, matrixCells('android', 'base'), HOME);
-  assert.equal(captureEvidence(cheap.ctx, cheapRun).budgetMs, CAPTURE_ALIGNMENT_BUDGET_MS);
-  assert.deepEqual(
-    cheap.logs.filter(line => line.includes('alignment window')),
-    []
-  );
-});
 
 test('the bracket waits for a screen that changes once after sampling stops', async () => {
   const calls: string[] = [];

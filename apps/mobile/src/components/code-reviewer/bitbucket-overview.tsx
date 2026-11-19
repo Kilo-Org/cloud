@@ -56,11 +56,14 @@ export function BitbucketOverview({
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const readiness = useBitbucketReadiness(scope);
-  // Bitbucket is org-only, so the scope always names an organization, and the
-  // connect copy names it. Until the membership list resolves the name, the
-  // screen keeps its skeleton rather than painting an unfilled placeholder.
+  // Bitbucket is org-only, so the scope always names an organization, and both
+  // the header subtitle and the connect copy name it from this one read. Until
+  // the membership list resolves the name, the screen keeps its skeleton rather
+  // than painting an unfilled placeholder, and the subtitle holds the generic
+  // stand-in so the header keeps its line.
   const orgBoundary = useOrgBoundary(scope);
   const organizationName = orgBoundary.org?.organizationName;
+  const scopeTitle = organizationName ?? t('common.organization');
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
   const { reducedMotion } = useMotionPolicy();
@@ -80,7 +83,7 @@ export function BitbucketOverview({
   if (providerState.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <QueryError
           onRetry={() => {
             providerState.refetch();
@@ -102,7 +105,7 @@ export function BitbucketOverview({
   if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <QueryError
           variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
           onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
@@ -125,14 +128,16 @@ export function BitbucketOverview({
     const canConnect = canEdit && organizationName !== undefined;
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <EmptyState
           icon={GitMerge}
           iconSize={28}
           title={t('prReview.connect.bitbucketNotConnectedTitle')}
           description={
             canConnect && readinessData
-              ? t('codeReviewer.bitbucketConnect.description', { organization: organizationName })
+              ? t('codeReviewer.bitbucketConnect.descriptionOverview', {
+                  organization: organizationName,
+                })
               : t('codeReviewer.bitbucket.notConnectedReadOnly')
           }
           action={
@@ -195,7 +200,7 @@ export function BitbucketOverview({
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}

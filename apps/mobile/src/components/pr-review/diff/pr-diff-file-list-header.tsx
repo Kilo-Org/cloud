@@ -14,11 +14,12 @@ import { Rows3 } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { COMPACT_CONTROL_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -56,7 +57,7 @@ export function PrDiffFileListHeader({
   // bordered container would beat the className (inline style wins in React
   // Native) and swallow the gutter. Zero insets collapse the wrapper style to
   // `undefined`, so portrait pixels are byte-identical.
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
   const sideInsetStyle =
     insets.left > 0 || insets.right > 0
       ? {
@@ -79,15 +80,20 @@ export function PrDiffFileListHeader({
   }, [router, navigatorHref]);
 
   return (
-    <View className="border-b-[0.5px] border-hair-soft bg-background px-4 py-4">
-      <View className="flex-1 flex-row items-center justify-between" style={sideInsetStyle}>
+    // The vertical padding sits on the inner row, the parent the navigator
+    // entry touches in: Android delivers a touch only inside the parent view,
+    // so the entry's slop needs the padded row around it.
+    <View className="border-b-[0.5px] border-hair-soft bg-background px-4">
+      <View className="flex-1 flex-row items-center justify-between py-4" style={sideInsetStyle}>
         <Pressable
           onPress={handleOpenNavigator}
           accessibilityRole="button"
           accessibilityLabel={t('prReview.fileList.openNavigator')}
           testID="pr-files-summary"
           className="min-h-9 flex-row items-center gap-1.5 rounded-md px-2 active:opacity-70"
-          hitSlop={6}
+          // `min-h-9` measures 31.2 dp at NativeWind's 14pt rem: a 6 dp slop
+          // stopped at 43.2 dp, the compact control's slop reaches 47 dp.
+          hitSlop={COMPACT_CONTROL_HIT_SLOP}
         >
           <Rows3 size={14} color={colors.mutedForeground} />
           <Text className="text-xs font-medium text-foreground">

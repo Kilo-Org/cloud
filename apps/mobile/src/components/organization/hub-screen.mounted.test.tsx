@@ -154,6 +154,7 @@ const kiloPassRowState = vi.hoisted(() => ({
   current: null as null | {
     subtitle: string;
     attention: boolean;
+    tone: 'default' | 'muted' | 'warn';
     action: 'retry' | 'none';
     actionLabel: string | null;
     accessibilityHint: string | null;
@@ -761,6 +762,7 @@ describe('Organization hub Kilo Pass placeholder', () => {
   const loadingState = {
     subtitle: 'Loading…',
     attention: false,
+    tone: 'default',
     action: 'none',
     actionLabel: null,
     accessibilityHint: null,
@@ -831,6 +833,7 @@ describe('Organization hub Kilo Pass placeholder', () => {
     kiloPassRowState.current = {
       subtitle: 'Not subscribed',
       attention: false,
+      tone: 'muted',
       action: 'none',
       actionLabel: null,
       accessibilityHint: null,
@@ -1261,6 +1264,7 @@ describe('Organization hub Kilo Pass icon tile', () => {
     kiloPassRowState.current = {
       subtitle: 'Not subscribed',
       attention: false,
+      tone: 'muted',
       action: 'none',
       actionLabel: 'Set up',
       accessibilityHint: 'Opens Kilo Pass setup on web.',
@@ -1279,6 +1283,7 @@ describe('Organization hub Kilo Pass icon tile', () => {
     kiloPassRowState.current = {
       subtitle: 'Could not load status',
       attention: true,
+      tone: 'warn',
       action: 'retry',
       actionLabel: 'Retry',
       accessibilityHint: 'Retries loading Kilo Pass status.',

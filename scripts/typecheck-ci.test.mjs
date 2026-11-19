@@ -808,10 +808,28 @@ test('the required check fails on a shard or producer failure only when the suit
     'a reported build failure without a selected suite passes'
   );
   assert.equal(aggregate({}, { mobile: 'false' }), 0, 'a run without a selected suite passes');
-  assert.notEqual(
+  assert.equal(
     aggregate({ 'prepare-trpc': { result: 'failure', outputs: {} } }, { mobile: 'false' }),
     0,
-    'only the harness producer is exempt, not the declaration producer'
+    'the declaration producer starts beside detection, so its failure escapes an unselected run'
+  );
+  assert.notEqual(
+    aggregate({ 'prepare-trpc': { result: 'failure', outputs: {} } }),
+    0,
+    'a failed declaration producer fails the check when detection selected the suite'
+  );
+  assert.notEqual(
+    aggregate({ 'prepare-trpc': { result: 'success', outputs: { failed: 'true' } } }),
+    0,
+    'a reported declaration build failure fails the check when detection selected the suite'
+  );
+  assert.equal(
+    aggregate(
+      { 'prepare-trpc': { result: 'success', outputs: { failed: 'true' } } },
+      { mobile: 'false' }
+    ),
+    0,
+    'a reported declaration build failure without a selected suite passes'
   );
 });
 
@@ -933,12 +951,46 @@ test('kilo-app CI builds the tRPC declarations once and both checks download the
   assert.equal(uploads.length, 1, 'the producer uploads the declarations exactly once');
   assert.equal(
     jobs[trpcProducer].needs,
-    'mobile-changes',
-    'the declaration producer waits for change detection alone, not for the harness build'
+    undefined,
+    'the declaration producer starts beside change detection and waits for no job'
+  );
+  assert.equal(
+    jobs[trpcProducer].if,
+    undefined,
+    'the declaration producer starts beside change detection and reads no detection output'
   );
   assert.ok(installIndex >= 0 && actionIndex > installIndex, 'the producer builds after install');
   assert.ok(uploads[0].index > actionIndex, 'the producer uploads what it built');
   const upload = uploads[0].step;
+  // The declaration producer also starts beside change detection, so it runs on
+  // runs where no job reads its artifact. A failed job would fail such a run and
+  // the release reuses only a successful run, so the build step swallows its own
+  // failure, a mark step publishes it as an output, and the upload is skipped.
+  const trpcBuild = producerSteps.find(step => step.uses === trpcAction);
+  assert.equal(trpcBuild.id, 'build', 'the build step is addressable for the mark step');
+  assert.equal(
+    trpcBuild['continue-on-error'],
+    true,
+    'a failed declaration build must not fail the job, because a failed job fails a run the release reuses'
+  );
+  const trpcMark = producerSteps.find(step => step.name === 'Record a failed build');
+  assert.ok(trpcMark, 'a failed declaration build must publish the failure as an output');
+  assert.equal(
+    trpcMark.if,
+    "steps.build.outcome == 'failure'",
+    'the mark step records exactly a failed build outcome'
+  );
+  assert.match(trpcMark.run, /failed=true/, 'the mark step writes the failed output');
+  assert.equal(
+    upload.if,
+    "steps.build.outcome == 'success'",
+    'a failed declaration build publishes no artifact, so consumers fail on the missing artifact'
+  );
+  assert.equal(
+    jobs[trpcProducer].outputs.failed,
+    '${{ steps.mark.outputs.failed }}',
+    'the job output publishes the mark step output'
+  );
   assert.match(upload.uses, /^actions\/upload-artifact@[0-9a-f]{40}$/, 'immutable upload pin');
   assert.equal(upload.with.path, trpcDist, 'the artifact root is the dist directory');
   assert.equal(upload.with['retention-days'], 1);

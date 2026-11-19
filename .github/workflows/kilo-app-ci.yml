@@ -189,10 +189,14 @@ jobs:
   # both need packages/trpc/dist, they start together, and both used to run the
   # action, so on a cache miss they compiled the same declaration program twice
   # and raced to save the one key (the loser logged "Unable to reserve cache").
-  # Here the build happens once and both checks download the tree.
-  # `prepare-trpc` stays behind change detection because only `mobile-typecheck`
-  # and `mobile-lint` read its tree, and those two checks are not the workflow's
-  # critical path.
+  # Here the build happens once and both checks download the tree. Only
+  # `mobile-typecheck` and `mobile-lint` read that tree, and the build uses no
+  # change-detection output either, so this producer also starts beside change
+  # detection. The lint branch then ends at the declaration build plus the lint
+  # run, not after detection plus both. A run that detection marks
+  # `mobile=false` or `lint_only=true` pays this build for no consumer; that idle
+  # build is the price of the shorter branch, exactly as for the harness SDK
+  # producer above.
   #
   # The two producers are separate jobs, not two steps of one job, because
   # neither build reads the other's output: one job made every consumer wait for
@@ -257,10 +261,10 @@ jobs:
           if-no-files-found: error
 
   prepare-trpc:
-    needs: mobile-changes
-    if: needs.mobile-changes.outputs.mobile == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
+    outputs:
+      failed: ${{ steps.mark.outputs.failed }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
 
@@ -284,10 +288,23 @@ jobs:
         run: pnpm install --frozen-lockfile --filter '@kilocode/trpc...' --filter 'web...' --filter kilocode-monorepo
 
       - name: Restore or build tRPC declarations
+        id: build
         uses: ./.github/actions/trpc-declarations
+        continue-on-error: true
+
+      # The producer starts beside change detection, so it also runs on a change
+      # this suite does not cover, where no job reads its artifact. A failed job
+      # would fail that run, and the release reuses only a run that concluded
+      # successfully, so the failure is published as an output instead and the
+      # aggregator decides whether it counts, as for the harness SDK producer.
+      - name: Record a failed build
+        id: mark
+        if: steps.build.outcome == 'failure'
+        run: echo "failed=true" >> "$GITHUB_OUTPUT"
 
       # Same directory-root rule as the harness SDK artifact in the job above.
       - name: Upload the tRPC declarations
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: trpc-declarations
@@ -586,14 +603,15 @@ jobs:
   # belongs here too: its paths never select a shard, so without this needs
   # entry a failed audit would leave the required check green.
   #
-  # The harness SDK producer starts beside change detection, so it also runs on
-  # a change this suite does not cover, where no job reads its artifact. Two
-  # failures of that job can only come from that change: a failed build, which
-  # the producer reports as an output instead of failing its own job, because a
+  # Both producers start beside change detection, so they also run on a change
+  # this suite does not cover, where no job reads their artifacts. Two failures
+  # of such a job can only come from that change: a failed build, which the
+  # producer reports as an output instead of failing its own job, because a
   # failed job fails a run the release reuses; and a failed job step that is not
-  # the build. This job counts both only when detection reported a mobile
-  # change. A real build failure then fails this required check, while on other
-  # runs the missing artifact fails the jobs that need it.
+  # the build. This job counts either producer's job result and reported build
+  # failure only when detection reported a mobile change. A real build failure
+  # then fails this required check, while on other runs the missing artifact
+  # fails the jobs that need it.
   mobile-test-result:
     needs: [mobile-changes, prepare-harness-sdk, prepare-trpc, mobile-test, i18n-catalogs]
     if: ${{ !cancelled() }}
@@ -606,15 +624,16 @@ jobs:
           MOBILE: ${{ needs.mobile-changes.outputs.mobile }}
         run: |
           echo "$RESULTS"
-          # The harness producer starts beside change detection, so it also runs
-          # on a change this suite does not cover, where no job reads its
-          # artifact. Its job result and its reported build failure therefore
-          # count only when detection selected the suite: otherwise the failure
-          # cannot come from this change. Every other need always counts.
+          # Both producers start beside change detection, so they also run on a
+          # change this suite does not cover, where no job reads their
+          # artifacts. Each producer's job result and its reported build failure
+          # therefore count only when detection selected the suite: otherwise
+          # the failure cannot come from this change. Every other need always
+          # counts.
           if jq -e --arg mobile "$MOBILE" '
             [
               to_entries[]
-              | select(($mobile == "true") or (.key != "prepare-harness-sdk"))
+              | select(($mobile == "true") or (.key | test("^prepare-") | not))
               | if .value.outputs.failed == "true" then "failure" else .value.result end
             ]
             | any(.[]; . == "failure" or . == "cancelled")

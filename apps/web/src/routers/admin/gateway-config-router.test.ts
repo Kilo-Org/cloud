@@ -453,6 +453,7 @@ describe('adminGatewayConfigRouter', () => {
       await caller.admin.gatewayConfig.set(input);
       await caller.admin.gatewayConfig.setOrganizationFeatures({
         experimental_byok: [],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [],
         gateway_settings: [organizationId],
       });

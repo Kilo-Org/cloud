@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -20,6 +20,15 @@ export type DestructiveConfirmDialogProps = {
    * `onPress` runs once the dismissal finished.
    */
   extraAction?: { label: string; onPress: () => void };
+  /**
+   * Asks the dialog to dismiss itself with the safe choice, once, while the
+   * caller keeps rendering it: the caller's request lost its answer (an agent's
+   * interrupted call) and must go out the way a Cancel goes out. A choice the
+   * person already made wins — a pending action or a dismissal in flight is
+   * never overridden — and the sheet reports the finished dismissal through
+   * `onDismiss` as usual.
+   */
+  dismissRequested?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -58,12 +67,23 @@ export function DestructiveConfirmDialog({
   confirmLabel,
   cancelLabel,
   extraAction,
+  dismissRequested = false,
   onConfirm,
   onCancel,
 }: Readonly<DestructiveConfirmDialogProps>) {
   const { t } = useTranslation();
   const [visible, setVisible] = useState(true);
   const pendingAction = useRef<(() => void) | null>(null);
+
+  // The caller's one-shot "put it away" edge. `dismiss` is a no-op while an
+  // action or a dismissal is already pending, so this only ever starts the
+  // dismissal — it never overrides a choice the person made.
+  useEffect(() => {
+    if (dismissRequested) {
+      dismiss(onCancel);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a one-shot edge on the flag; dismiss and onCancel are bound to this request identity
+  }, [dismissRequested]);
 
   function dismiss(action: () => void) {
     if (pendingAction.current !== null) {

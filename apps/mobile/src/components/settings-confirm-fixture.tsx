@@ -60,21 +60,32 @@ export function SettingsConfirmFixture() {
     }
     setRunning(true);
     setOutcome({ kind: 'idle' });
-    const answered = await Effect.runPromise(
-      Effect.match(tool.run(SET_TRUSTED_HOSTS), {
-        // The refusal the tool writes for the model travels as a text `cause`.
-        onFailure: failure => {
-          const parsed = REFUSAL_CAUSE_SCHEMA.safeParse(failure.cause);
-          return {
-            kind: 'failed',
-            reason: parsed.success ? parsed.data : 'the tool refused without a reason',
-          } as const;
-        },
-        onSuccess: body => ({ kind: 'done', body }) as const,
-      })
-    );
-    setOutcome(answered);
-    setRunning(false);
+    try {
+      const answered = await Effect.runPromise(
+        Effect.match(tool.run(SET_TRUSTED_HOSTS), {
+          // The refusal the tool writes for the model travels as a text `cause`.
+          onFailure: failure => {
+            const parsed = REFUSAL_CAUSE_SCHEMA.safeParse(failure.cause);
+            return {
+              kind: 'failed',
+              reason: parsed.success ? parsed.data : 'the tool refused without a reason',
+            } as const;
+          },
+          onSuccess: body => ({ kind: 'done', body }) as const,
+        })
+      );
+      setOutcome(answered);
+    } catch (error) {
+      // A tool that defects, not fails, rejects the driver above; report the
+      // defect as the outcome so the button leaves the running state and the
+      // rejection is not unhandled.
+      setOutcome({
+        kind: 'failed',
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setRunning(false);
+    }
   }
 
   return (

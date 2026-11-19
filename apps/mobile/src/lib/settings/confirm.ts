@@ -6,11 +6,17 @@ export type SettingsConfirmRequest = {
   id: number;
   /** The change the person is asked to allow, already localized by the tool. */
   summary: string;
+  /**
+   * The tool call behind the request was interrupted: the request must never be
+   * answered, but it stays in the queue until the host has dismissed the sheet
+   * it was drawn on and reports it.
+   */
+  withdrawn: boolean;
 };
 
-// The module-level store. A request is removed only when it settles or is
-// withdrawn, so the head keeps its identity while nothing changes — the
-// `useSyncExternalStore` identity contract.
+// The module-level store. A request is removed when it is answered or forgotten
+// after its withdrawal, so the head keeps its identity while nothing changes —
+// the `useSyncExternalStore` identity contract.
 let requests: readonly SettingsConfirmRequest[] = [];
 let nextRequestId = 1;
 // Whether a host is mounted to draw the requests. Without one a destructive
@@ -25,8 +31,13 @@ export function getSettingsConfirmRequest(): SettingsConfirmRequest | undefined 
   return requests[0];
 }
 
-/** `useSyncExternalStore` subscribe. */
-function subscribeSettingsConfirm(listener: () => void): () => void {
+/**
+ * `useSyncExternalStore` subscribe: registers a listener with the store and
+ * removes its handle. The mounted host subscribes through
+ * `useSettingsConfirmRequest`. A test registers one to settle a request from
+ * inside the publish window.
+ */
+export function subscribeSettingsConfirm(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
@@ -52,11 +63,21 @@ export function setSettingsConfirmHostMounted(mounted: boolean): void {
 /**
  * Enqueues a request and returns its id. The host draws requests one at a
  * time, oldest first, so a second request waits behind the first.
+ *
+ * `answer` is the resolver for the one caller whose exact request this is; it
+ * is registered before the request is published, so a store listener that
+ * answers during the publish cannot fall into the gap between "the request is
+ * visible" and "the request can be answered" — the gap that would leave a tool
+ * call waiting forever.
  */
-export function requestSettingsConfirmChange(summary: string): number {
+export function requestSettingsConfirmChange(
+  summary: string,
+  answer: (confirmed: boolean) => void
+): number {
   const id = nextRequestId;
   nextRequestId += 1;
-  requests = [...requests, { id, summary }];
+  settleCallbacks.set(id, answer);
+  requests = [...requests, { id, summary, withdrawn: false }];
   notify();
   return id;
 }
@@ -71,25 +92,45 @@ function settle(id: number, confirmed: boolean): void {
 }
 
 /**
- * Answers the request with this id. A late answer for a request the caller
- * withdrew does nothing: only a request still waiting is settled.
+ * Answers the request with this id. A late answer — for a request that was
+ * answered, forgotten, or withdrawn — does nothing: only a request still
+ * waiting is settled, so a second press on the still-rendered sheet cannot
+ * answer twice.
  */
 export function answerSettingsConfirm(id: number, confirmed: boolean): void {
-  if (!requests.some(request => request.id === id)) {
+  const request = requests.find(item => item.id === id);
+  if (request === undefined || request.withdrawn) {
     return;
   }
-  requests = requests.filter(request => request.id !== id);
+  requests = requests.filter(item => item.id !== id);
   notify();
+  // Only settle's lookup can fire the resolver, so a request is answered once
+  // however the press races the dismissal report.
   settle(id, confirmed);
 }
 
-/** Removes the request without answering it, for an interrupted tool call. */
+/**
+ * Marks the request withdrawn for an interrupted tool call: its resolver is
+ * dropped, so it can never be answered, but it stays in the queue so the host
+ * keeps drawing the sheet it already presented. The host removes it with
+ * `forgetSettingsConfirm` once the sheet reports its dismissal.
+ */
 function withdrawSettingsConfirm(id: number): void {
   settleCallbacks.delete(id);
-  if (!requests.some(request => request.id === id)) {
+  requests = requests.map(item => (item.id === id ? { ...item, withdrawn: true } : item));
+  notify();
+}
+
+/**
+ * Removes the request with this id from the queue. The host calls it after a
+ * withdrawn request's sheet reported its dismissal; the head changes identity,
+ * so a new request waiting behind it can be drawn.
+ */
+export function forgetSettingsConfirm(id: number): void {
+  if (!requests.some(item => item.id === id)) {
     return;
   }
-  requests = requests.filter(request => request.id !== id);
+  requests = requests.filter(item => item.id !== id);
   notify();
 }
 
@@ -121,8 +162,10 @@ export function confirmSettingChange(summary: string): Effect.Effect<boolean> {
       resume(Effect.succeed(false));
       return Effect.void;
     }
-    const id = requestSettingsConfirmChange(summary);
-    settleCallbacks.set(id, confirmed => {
+    // Publish and register in one step: the resolver is already in place when
+    // the store's listeners hear about the request, so an answer given during
+    // the publish reaches the waiting tool call.
+    const id = requestSettingsConfirmChange(summary, confirmed => {
       resume(Effect.succeed(confirmed));
     });
     return Effect.sync(() => {

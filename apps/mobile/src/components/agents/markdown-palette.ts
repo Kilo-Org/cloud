@@ -53,16 +53,17 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
       codeTokenScheme: tokenSchemeForSurface(codeSurface),
     };
   }
+  // `muted` is authored opaque (`#F0EEE6` light, `#1F1F24` dark), but the
+  // diagram page paints this color directly, so keep the surface opaque even
+  // if the token ever becomes translucent.
+  const codeSurface = compositeOver(colors.muted, colors.card);
   return {
     textColor: colors.foreground,
     mutedTextColor: colors.mutedForeground,
     codeBackground: colors.muted,
-    // `muted` is authored opaque (`#F0EEE6` light, `#1F1F24` dark), but the
-    // diagram page paints this color directly, so keep the surface opaque even
-    // if the token ever becomes translucent.
-    codeSurface: compositeOver(colors.muted, colors.card),
+    codeSurface,
     borderColor: colors.border,
-    codeTokenScheme: tokenSchemeForSurface(colors.card),
+    codeTokenScheme: tokenSchemeForSurface(codeSurface),
   };
 }
 

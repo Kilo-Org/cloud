@@ -274,6 +274,29 @@ export function sameRouteBinding(
   );
 }
 
+/**
+ * Whether a re-prepare keeps the repositories the prepared route checked out.
+ * A root the route never prepared is not on disk, so the route is prepared
+ * again and each root is inspected, adopted or cloned.
+ */
+export function sameRouteRoots(
+  stored: ControlPlaneRouteSpec,
+  incoming: ControlPlaneRouteSpec
+): boolean {
+  const prepared = routeRoots(stored);
+  const asked = routeRoots(incoming);
+  if (prepared.length !== asked.length) return false;
+  return prepared.every((root, index) => {
+    const other = asked[index];
+    return (
+      other !== undefined &&
+      root.directory === other.directory &&
+      root.repoFullName === other.repoFullName &&
+      root.requestedBranch === other.requestedBranch
+    );
+  });
+}
+
 function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): boolean {
   return error instanceof Error && error.message === `${step} timed out`;
 }
@@ -1741,8 +1764,24 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         } else {
           // The binding matched, so the fast path serves exactly this runtime.
           owner.runtimeKey = route.key;
-          // The identity fields matched, but any other field of the incoming
-          // spec (roots, review target, …) is the binding the turn now runs.
+          // A root this route never prepared is not on disk, so the roots are
+          // inspected, adopted or cloned on the full path. The runtime and the
+          // acknowledgement stay the route's own.
+          const rootsAdded = !sameRouteRoots(route.spec, spec);
+          if (rootsAdded) {
+            log(
+              `control-plane re-prepare prepares new roots session=${spec.sessionId} directory=${route.directory}`
+            );
+            prepared.delete(spec.sessionId);
+            const running = runPrepare(spec, credentials, owner).finally(() =>
+              finalizePreparingOwner(owner, spec)
+            );
+            owner.promise = running;
+            preparing.set(spec.sessionId, owner);
+            return running;
+          }
+          // Any other field of the incoming spec (review target, platform
+          // origin, …) is the binding the turn now runs.
           route.spec = spec;
           const running = (async () => {
             if (credentials) {

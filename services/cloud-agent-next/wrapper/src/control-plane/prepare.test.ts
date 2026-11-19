@@ -2591,7 +2591,7 @@ describe('createPreparationManager', () => {
     });
   });
 
-  it('registers the incoming spec when the fast path re-prepares the same binding', async () => {
+  it('prepares the new roots when the re-prepare adds a repository', async () => {
     const harness = createHarness();
     const spec = routeSpec();
     await harness.manager.prepare(spec);
@@ -2600,12 +2600,6 @@ describe('createPreparationManager', () => {
 
     const app = path.join(spec.directory, 'app');
     const lib = path.join(spec.directory, 'lib');
-    const githubReviewTarget = {
-      repo: 'acme/widgets',
-      pullRequestNumber: 42,
-      appType: 'standard' as const,
-      botUserId: 'bot-1',
-    };
     const incoming: ControlPlaneRouteSpec = {
       ...spec,
       roots: [
@@ -2624,44 +2618,36 @@ describe('createPreparationManager', () => {
           branchMode: 'working',
         },
       ],
-      createdOnPlatform: 'code-review',
-      githubReviewTarget,
     };
 
     await harness.manager.prepare(incoming);
+
+    // A root this route never prepared is not on disk, so the full path runs
+    // and inspects, adopts or clones each root.
+    expect(harness.ensureCalls()).toBeGreaterThan(1);
+    expect(
+      harness.frames.filter(frame => frame.type === 'session.ready' && frame.workspace === 'same')
+    ).toHaveLength(0);
+    expect(harness.logs.some(line => line.includes('re-prepare prepares new roots'))).toBe(true);
+    expect(harness.preparedRoutes.at(-1)!.roots).toEqual(incoming.roots);
+  });
+
+  it('keeps the fast path for a re-prepare that names the same roots', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    harness.preparedRoutes.length = 0;
+
+    await harness.manager.prepare({
+      ...spec,
+      roots: spec.roots === undefined ? undefined : [...spec.roots],
+    });
 
     expect(harness.ensureCalls()).toBe(1);
     expect(
       harness.frames.filter(frame => frame.type === 'session.ready' && frame.workspace === 'same')
     ).toHaveLength(1);
     expect(harness.preparedRoutes).toHaveLength(1);
-    expect(harness.preparedRoutes[0]!.roots).toEqual(incoming.roots);
-    expect(harness.preparedRoutes[0]!.githubReviewTarget).toEqual(githubReviewTarget);
-  });
-
-  it('reports the incoming roots of a fast-path re-prepare on the prepared route', async () => {
-    const harness = createHarness();
-    const spec = routeSpec();
-    await harness.manager.prepare(spec);
-
-    const app = path.join(spec.directory, 'app');
-    await harness.manager.prepare({
-      ...spec,
-      roots: [
-        {
-          directory: app,
-          repoFullName: 'acme/app',
-          git: { url: 'https://github.com/acme/app.git', platform: 'github' },
-          branch: 'kilo/generated',
-          branchMode: 'working',
-        },
-      ],
-    });
-
-    expect(harness.ensureCalls()).toBe(1);
-    expect(harness.manager.preparedRoute(spec.sessionId)?.roots).toEqual([
-      { directory: app, repoFullName: 'acme/app', requestedBranch: undefined },
-    ]);
   });
 
   it('keeps the fast path and registers the incoming spec when only the attempt changes', async () => {

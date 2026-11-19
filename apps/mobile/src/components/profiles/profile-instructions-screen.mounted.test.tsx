@@ -192,14 +192,17 @@ function rowControls(root: ReactTestInstance): string[] {
   return findAll(root, 'Pressable').map(node => String(node.props.accessibilityLabel));
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  permission.value = 'allowed';
+  h.query.data = [testInstruction()];
+  h.query.isError = false;
+  h.query.isPending = false;
+  h.query.isRefetching = false;
+});
+
 describe('ProfileInstructionsScreen delete confirmation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    permission.value = 'allowed';
-    h.query.data = [testInstruction()];
-    h.query.isError = false;
-    h.query.isPending = false;
-    h.query.isRefetching = false;
     h.mutations.deleteInstruction.mutateAsync.mockReset();
     h.mutations.deleteInstruction.mutateAsync.mockResolvedValue({ success: true });
     h.mutations.setInstructionEnabled.mutate.mockReset();
@@ -301,14 +304,6 @@ describe('ProfileInstructionsScreen delete confirmation', () => {
 });
 
 describe('ProfileInstructionsScreen instruction cap', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    permission.value = 'allowed';
-    h.query.isError = false;
-    h.query.isPending = false;
-    h.query.isRefetching = false;
-  });
-
   it('names the cap above the disabled add control', async () => {
     const capCopy = i18n.t('profiles.instructionLimitReached', { max: MAX_PROFILE_INSTRUCTIONS });
     h.query.data = Array.from({ length: MAX_PROFILE_INSTRUCTIONS }, (_, index) =>
@@ -337,15 +332,6 @@ describe('ProfileInstructionsScreen instruction cap', () => {
 });
 
 describe('ProfileInstructionsScreen row controls', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    permission.value = 'allowed';
-    h.query.data = [testInstruction()];
-    h.query.isError = false;
-    h.query.isPending = false;
-    h.query.isRefetching = false;
-  });
-
   it('names the path it opens after the file name', async () => {
     const { renderer, unmount } = await mountScreen();
 
@@ -364,12 +350,7 @@ describe('ProfileInstructionsScreen row controls', () => {
 
 describe('ProfileInstructionsScreen read-only row', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     permission.value = 'read-only';
-    h.query.data = [testInstruction()];
-    h.query.isError = false;
-    h.query.isPending = false;
-    h.query.isRefetching = false;
   });
 
   it('drops the edit control and keeps the rules path readable', async () => {

@@ -121,6 +121,18 @@ const FAILURE_MESSAGE_BY_RESULT_CODE: Record<string, string> = {
   COMMAND_STALLED: 'Queued action did not finish in time. Retry action.',
   QUEUE_RETRIES_EXHAUSTED: 'Action could not be completed after several attempts. Retry action.',
   QUEUE_ADMISSION_FAILED: 'Queued action could not be admitted. Retry action.',
+  // Codes the security-sync and security-auto-analysis workers fail commands
+  // with; each carries the same curated sentence in the worker's
+  // lastErrorRedacted, so the table owns it here instead.
+  GITHUB_DISMISSAL_PERMISSION_REQUIRED:
+    'GitHub App needs write access to Dependabot alerts to dismiss this finding. Update its permissions, then retry.',
+  GITHUB_DISMISSAL_PERMISSION_DENIED:
+    'GitHub denied permission to dismiss this Dependabot alert. Verify the GitHub App can write vulnerability alerts, then retry.',
+  GITHUB_ALERT_UNAVAILABLE:
+    'GitHub could not find this Dependabot alert, or the GitHub App cannot access it. The finding was not dismissed locally. Refresh findings and repository access, then retry.',
+  GITHUB_DISMISSAL_REQUEST_REJECTED:
+    'GitHub rejected the Dependabot dismissal request. Refresh the finding, then retry.',
+  INSUFFICIENT_CREDITS: 'Not enough credits for this action. Add credits, then retry.',
 };
 
 export function getSecurityCommandFailureMessage(command: SecurityCommand): string {

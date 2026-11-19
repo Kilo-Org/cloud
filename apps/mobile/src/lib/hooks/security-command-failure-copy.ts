@@ -13,6 +13,15 @@ const FAILURE_MESSAGE_KEY_BY_RESULT_CODE = {
   INVALID_DISMISS_TARGET: 'securityAgent.commandFailure.invalidDismissTarget',
   COMMAND_STALLED: 'securityAgent.commandFailure.commandStalled',
   QUEUE_RETRIES_EXHAUSTED: 'securityAgent.commandFailure.queueRetriesExhausted',
+  // Codes the workers fail with whose curated sentence names the GitHub App
+  // authorization, a stale alert, or the credit balance: each reuses the
+  // closest existing catalog translation instead of adding a key that 86
+  // catalogs would have to translate for one code.
+  GITHUB_DISMISSAL_PERMISSION_REQUIRED: 'securityAgent.commandFailure.githubAuthInvalid',
+  GITHUB_DISMISSAL_PERMISSION_DENIED: 'securityAgent.commandFailure.githubAuthInvalid',
+  GITHUB_ALERT_UNAVAILABLE: 'securityAgent.commandFailure.findingUnavailable',
+  GITHUB_DISMISSAL_REQUEST_REJECTED: 'securityAgent.commandFailure.findingUnavailable',
+  INSUFFICIENT_CREDITS: 'agentChat.session.notEnoughCredits',
 } satisfies Record<string, string>;
 
 const QUEUE_ADMISSION_FAILED_KEY = 'securityAgent.commandFailure.queueAdmissionFailed';

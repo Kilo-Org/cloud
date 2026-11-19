@@ -79,4 +79,20 @@ describe('security agent command helpers', () => {
       )
     ).toBe('Queued action failed. Retry action.');
   });
+
+  it('curates the codes the workers emit with their own recovery steps', () => {
+    expect(
+      getSecurityCommandFailureMessage(
+        command({
+          resultCode: 'GITHUB_DISMISSAL_PERMISSION_REQUIRED',
+          lastErrorRedacted: 'unused worker copy',
+        })
+      )
+    ).toBe(
+      'GitHub App needs write access to Dependabot alerts to dismiss this finding. Update its permissions, then retry.'
+    );
+    expect(getSecurityCommandFailureMessage(command({ resultCode: 'INSUFFICIENT_CREDITS' }))).toBe(
+      'Not enough credits for this action. Add credits, then retry.'
+    );
+  });
 });

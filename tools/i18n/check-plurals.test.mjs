@@ -23,6 +23,7 @@ import {
   DYNAMIC_COUNTED_KEYS,
   findCountlessFamilies,
   findUnlistedDynamicCalls,
+  readEnglishCatalog,
 } from './check-plurals.mjs';
 
 // The checker parses with oxc through the shared scanner, so the command
@@ -171,6 +172,45 @@ test('accepts a healthy tree through the command', () => {
   const result = cli(root);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /check-plurals: every counted message declares a plural family/);
+});
+
+test('reports an unreadable English catalog and judges no family against it', () => {
+  const root = fixture(standardFiles({ source: "t('agents.liveCount', { count: 2 });" }));
+  const locales = join(root, 'apps/mobile/src/i18n/locales');
+  rmSync(join(locales, 'en.json'));
+  mkdirSync(join(locales, 'en.json'));
+  const read = readEnglishCatalog(locales);
+  assert.equal(read.catalog, null);
+  assert.equal(read.problems.length, 1, read.problems.join('\n'));
+  assert.match(read.problems[0], /^en: cannot audit catalog: EISDIR/);
+  // Without English there is no family to judge the key against, so the key
+  // must not be reported countless on top of the one line naming the cause.
+  const scan = auditCountedCalls(root);
+  assert.deepEqual(findCountlessFamilies(scan, read.catalog), []);
+});
+
+test('reports an unreadable English catalog through the command and keeps the scan findings', () => {
+  const root = cliFixture(standardFiles({ source: 't(dynamicKey, { count: 1 });' }));
+  const locales = join(root, 'apps/mobile/src/i18n/locales');
+  rmSync(join(locales, 'en.json'));
+  mkdirSync(join(locales, 'en.json'));
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^en: cannot audit catalog: EISDIR/m);
+  assert.match(result.stderr, /counted call with variable key "dynamicKey"/);
+  assert.doesNotMatch(result.stderr, /^\s+at /m);
+});
+
+test('reports a malformed English catalog through the command and keeps the scan findings', () => {
+  const root = cliFixture(standardFiles({ source: 't(dynamicKey, { count: 1 });' }));
+  writeFileSync(join(root, 'apps/mobile/src/i18n/locales/en.json'), '{"agents": ');
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^en: cannot audit catalog: /m);
+  assert.match(result.stderr, /counted call with variable key "dynamicKey"/);
+  // The JSON parse message itself reads "at position 12", so only a stack
+  // frame line is the symptom this case rules out.
+  assert.doesNotMatch(result.stderr, /^\s+at /m);
 });
 
 test('reports an unreadable file through the command and invents no key for it', context => {

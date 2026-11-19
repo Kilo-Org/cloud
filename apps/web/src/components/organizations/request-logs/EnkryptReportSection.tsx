@@ -97,14 +97,15 @@ function isPartialHit(scan: EnkryptInputScanReport): boolean {
 
 /**
  * Whether text that failed to scan was cached as allowed for a short while, so it is not rescanned
- * until then. `failed_calls_cached` counts calls eligible for that write, so it is `certain` unless
- * a write failed, which may have been one of theirs. A report without the count is `possible` when
+ * until then. `failed_calls_cached` counts calls eligible for that write, so it is `certain` only
+ * when the scan wrote entries: a failed write may have been one of theirs, and a skipped one found
+ * an existing entry, such as a longer allow or a block. A report without the count is `possible` when
  * a call failed and verdicts were stored. See `isFailedAllow` in the verdict cache.
  */
 function storedDespiteError(scan: EnkryptInputScanReport): 'certain' | 'possible' | null {
   if (scan.failed_calls_cached !== undefined) {
     if (scan.failed_calls_cached === 0) return null;
-    return scan.verdict_cache_write === 'failed' ? 'possible' : 'certain';
+    return scan.verdict_cache_write === 'written' ? 'certain' : 'possible';
   }
   const failed =
     scan.decision === 'error_fail_open' ||

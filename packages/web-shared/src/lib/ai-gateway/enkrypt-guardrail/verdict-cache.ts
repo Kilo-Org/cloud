@@ -646,8 +646,10 @@ async function planTools(
   const plans = toolUnits.map(({ tool, rendered, units: keyed }): ToolPlan => {
     const characters = joinSegments(rendered).length;
     const units = withVerdicts(keyed, verdicts);
-    const cached = cachedCoverage(rendered, units, characters);
-    const unitCounts = { totalUnits: cached.totalUnits, cachedUnits: cached.cachedUnits };
+    const unitCounts = {
+      totalUnits: units.length,
+      cachedUnits: units.filter(unit => unit.verdict).length,
+    };
     const block = cachedBlock(units);
     if (block) return { tool, characters, ...unitCounts, verdict: block };
     if (units.every(unit => unit.verdict === 'allow')) {
@@ -659,7 +661,7 @@ async function planTools(
       cache: status,
       totalCharacters: characters,
       totalSegments: tool.segments.length,
-      ...cached,
+      ...cachedCoverage(rendered, units, characters),
       omittedAttachments: 0,
     };
     return {

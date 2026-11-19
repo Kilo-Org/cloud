@@ -355,8 +355,11 @@ describe('app_startup validation', () => {
     expectTypeOf(buildProducerPayload()).toEqualTypeOf<AnalyticsEventMap['app_startup']>();
 
     // The closed schema type rejects a key the catalog does not define.
-    // @ts-expect-error `unknown_key` is not part of the strict app_startup schema
-    const withUnknownKey: AnalyticsEventMap['app_startup'] = { outcome: 'restore-error', unknown_key: 1 };
+    const withUnknownKey: AnalyticsEventMap['app_startup'] = {
+      outcome: 'restore-error',
+      // @ts-expect-error `unknown_key` is not part of the strict app_startup schema
+      unknown_key: 1,
+    };
     expect(withUnknownKey).toBeDefined();
   });
 

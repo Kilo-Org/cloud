@@ -212,7 +212,6 @@ beforeEach(() => {
 
 describe('ProfileInstructionsScreen delete confirmation', () => {
   beforeEach(() => {
-
     h.mutations.deleteInstruction.mutateAsync.mockReset();
     h.mutations.deleteInstruction.mutateAsync.mockResolvedValue({ success: true });
     h.mutations.setInstructionEnabled.mutate.mockReset();
@@ -314,7 +313,6 @@ describe('ProfileInstructionsScreen delete confirmation', () => {
 });
 
 describe('ProfileInstructionsScreen instruction cap', () => {
-
   it('names the cap above the disabled add control', async () => {
     const capCopy = i18n.t('profiles.instructionLimitReached', { max: MAX_PROFILE_INSTRUCTIONS });
     h.query.data = Array.from({ length: MAX_PROFILE_INSTRUCTIONS }, (_, index) =>

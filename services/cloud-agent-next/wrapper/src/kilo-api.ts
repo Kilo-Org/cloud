@@ -632,8 +632,8 @@ export function createWrapperKiloClient(
         { signal: lookupSignal }
       );
       // A record outside this directory is not this route's session. The
-      // native import re-points an existing record only when it is forced, so
-      // the mismatch case imports as-is; the absent case stays unforced.
+      // native import re-points a record it already holds only when the caller
+      // sets `force`, so the mismatch case sets it and the absent case does not.
       let rebind = false;
       let record: { title?: string; time?: { created: number; updated: number } } | undefined;
       if (existing.response?.status !== 404) {

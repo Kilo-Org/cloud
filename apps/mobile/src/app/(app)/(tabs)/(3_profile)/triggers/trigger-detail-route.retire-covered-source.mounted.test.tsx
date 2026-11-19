@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { waitFor } from '@/test/render-with-providers';
 
 // Static import: the route module is under test, and its `vi.mock`-ed
 // dependencies register before this import resolves.
@@ -24,7 +25,8 @@ const createMutation = vi.hoisted(() => ({ mutateAsync: vi.fn() }));
 
 type Nav = {
   state: State;
-  listeners: ((event?: unknown) => void)[];
+  /** Every live addListener registration, in registration order. */
+  listeners: { event: string; listener: (event?: unknown) => void }[];
 };
 
 const nav = vi.hoisted<Nav>(() => ({
@@ -39,10 +41,10 @@ vi.mock('expo-router', () => ({
   useNavigation: () => ({
     getState: () => nav.state,
     reset: resetMock,
-    addListener: (_event: string, listener: (event?: unknown) => void) => {
-      nav.listeners.push(listener);
+    addListener: (event: string, listener: (event?: unknown) => void) => {
+      nav.listeners.push({ event, listener });
       return () => {
-        nav.listeners = nav.listeners.filter(registered => registered !== listener);
+        nav.listeners = nav.listeners.filter(registered => registered.listener !== listener);
       };
     },
   }),
@@ -99,14 +101,24 @@ function setStack(routes: Route[], index: number) {
   nav.state = { routes, index };
 }
 
-/** Fire every registered listener: the navigator reporting its next end. */
-function endTransition() {
-  const listeners = nav.listeners;
+/**
+ * Fire one event type across the listeners the live renderers registered: the
+ * way the native stack reports a transition end to the screens still mounted.
+ * A screen the harness froze (unmounted, the covered create screen) cannot
+ * emit — its listener left the registry with its unmount cleanup, which is the
+ * device behaviour the suite pins.
+ */
+function fireNavigationEvent(event: string) {
+  const listeners = nav.listeners.filter(registered => registered.event === event);
   act(() => {
-    for (const listener of listeners) {
+    for (const { listener } of listeners) {
       listener();
     }
   });
+}
+
+function endTransition() {
+  fireNavigationEvent('transitionEnd');
 }
 
 const r = (key: string, name: string, params?: object): Route => ({ key, name, params });
@@ -120,10 +132,40 @@ beforeEach(() => {
 });
 
 describe('TriggerDetailRoute retire-covered-source', () => {
-  it('removes the create screen beneath the detail on the detail-first transition end', () => {
-    // The shape the create hand-off produces, past its push: the create screen
-    // still in the stack beneath the freshly pushed detail, the list beneath
-    // the form, and the detail focused.
+  it('retires the create screen from the transitionEnd listener, not only at mount', () => {
+    // The stack before the push settles: the create screen focused, no detail
+    // above it, so the mount-time judgment has no shape to remove — the reset
+    // can only come from the listener.
+    setStack([r(TABS, '(tabs)'), r('l', LIST), r('new', CREATE)], 2);
+    act(() => {
+      TestRenderer.create(createElement(TriggerDetailRoute));
+    });
+    expect(resetMock).not.toHaveBeenCalled();
+
+    // The create hand-off's push commits: the form is covered, the detail
+    // focused, the list beneath the form.
+    setStack(
+      [
+        r(TABS, '(tabs)'),
+        r('l', LIST),
+        r('new', CREATE),
+        r('d', DETAIL, { 'trigger-id': 'trigger-1', org: 'org-1' }),
+      ],
+      3
+    );
+    // The navigator reports the end of the push's transition.
+    endTransition();
+
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    const [nextState] = resetMock.mock.calls[0] as [State];
+    // The form is gone and the focused route is still the detail.
+    expect(nextState.routes.map(route => route.key)).toEqual([TABS, 'l', 'd']);
+    expect(nextState.index).toBe(2);
+  });
+
+  it('keeps judging at mount when the push ended before the route mounted', () => {
+    // The stack after the push settles, with the detail mounted on it: the
+    // mount-time judgment already sees the shape and performs the reset.
     setStack(
       [
         r(TABS, '(tabs)'),
@@ -137,9 +179,6 @@ describe('TriggerDetailRoute retire-covered-source', () => {
     act(() => {
       TestRenderer.create(createElement(TriggerDetailRoute));
     });
-
-    // The hand-off's push is over: report its end once.
-    endTransition();
 
     expect(resetMock).toHaveBeenCalledTimes(1);
     const [nextState] = resetMock.mock.calls[0] as [State];
@@ -253,11 +292,11 @@ describe('TriggerCreateScreen hand-off through the detail route', () => {
     editDraft(createRenderer);
     await submitForm(createRenderer);
 
-    // The guard's disarm render lands, then the leave dispatches the push.
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(pushMock).toHaveBeenCalledTimes(1);
+    // The guard's disarm render lands, then the leave dispatches the push from
+    // a `setTimeout(0)` macrotask (`useMetadataLeaveGuard`); the guard suite's
+    // own seam flushes it deterministically instead of trusting one `act` pass,
+    // which a loaded CI shard does not always give the timer.
+    await waitFor(() => pushMock.mock.calls.length === 1);
     expect(pushMock).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/triggers/trigger-new');
 
     // The navigator commits the push: the form is covered, the detail focused.

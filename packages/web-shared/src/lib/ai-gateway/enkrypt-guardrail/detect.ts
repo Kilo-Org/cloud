@@ -433,15 +433,15 @@ export async function scanRequest(
   }
 
   if (config.status === 'invalid') {
-    return failedVerdict([], scope, { error: 'invalid_config', latencyMs: 0 });
+    return failedVerdict([], noTextSent(scope), { error: 'invalid_config', latencyMs: 0 });
   }
 
   if (deps.signal.aborted) {
-    return failedVerdict([], scope, { error: 'client_aborted', latencyMs: 0 });
+    return failedVerdict([], noTextSent(scope), { error: 'client_aborted', latencyMs: 0 });
   }
 
   if (text.length > ENKRYPT_MAX_SCAN_CHARACTERS) {
-    return failedVerdict([], scope, {
+    return failedVerdict([], noTextSent(scope), {
       error: 'request_too_large',
       latencyMs: 0,
       closedVerdict: { action: 'block', message: REQUEST_TOO_LARGE_MESSAGE },
@@ -450,7 +450,7 @@ export async function scanRequest(
 
   const apiKey = deps.apiKey;
   if (!apiKey) {
-    return failedVerdict([], scope, { error: 'missing_api_key', latencyMs: 0 });
+    return failedVerdict([], noTextSent(scope), { error: 'missing_api_key', latencyMs: 0 });
   }
 
   const request = {

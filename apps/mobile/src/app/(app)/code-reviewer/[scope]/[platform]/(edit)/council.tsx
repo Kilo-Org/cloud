@@ -53,7 +53,9 @@ import {
   useCouncilGate,
 } from '@/lib/hooks/use-reviewer-council';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
+import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 import { useTRPC } from '@/lib/trpc';
 
 export default function CouncilRoute() {
@@ -69,6 +71,7 @@ function CouncilScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { t } = useTranslation();
+  const scopeTitle = useReviewerScopeTitle(scope);
   const trpc = useTRPC();
   // The same gate as the web page: an entitled organization behind the rollout
   // flag. A personal scope, an unentitled org, or a build older than the flag
@@ -142,10 +145,7 @@ function CouncilScreen({
     const refusalReason = gate.refusalReason ?? 'flagUnavailable';
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader
-          title={t('codeReviewer.council.title')}
-          eyebrow={t('common.codeReviewer')}
-        />
+        <ReviewerHeader title={t('codeReviewer.council.title')} subtitle={scopeTitle} />
         {surface === 'unavailable' ? (
           <CouncilRefusalScreen
             scope={scope}
@@ -170,6 +170,7 @@ function CouncilScreen({
     return (
       <ReviewerErrorScreen
         title={t('codeReviewer.council.title')}
+        subtitle={scopeTitle}
         variant={failure.variant}
         onRetry={() => {
           failure.onRetry();
@@ -228,7 +229,7 @@ function CouncilScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={t('codeReviewer.council.title')} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader title={t('codeReviewer.council.title')} subtitle={scopeTitle} />
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
         <Section>
           <RowGroup leadingTile>
@@ -310,6 +311,10 @@ function CouncilScreen({
         <Section label={t('codeReviewer.council.labels')}>
           <Input
             value={labelsText}
+            // A save/refetch rewrites the field's controlled value, so the
+            // framework suggestion popup stays off — it crashes against
+            // rewritten text (see REWRITTEN_INPUT_AUTO_CORRECT).
+            autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
             editable={!disabled}
             accessibilityLabel={t('codeReviewer.council.labels')}
             placeholder={t('codeReviewer.council.labelsPlaceholder')}

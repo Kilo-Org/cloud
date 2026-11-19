@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- The picker's search, empty-state and bottom-inset contracts share one mount harness. */
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactNode, useEffect } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
+import { useFocusEffect } from 'expo-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -127,8 +128,18 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: safeAreaInsets.bottom, left: 0, right: 0 }),
 }));
 vi.mock('@/components/picker-sheet', () => ({
-  PickerSheet: (props: { children?: ReactNode; headerContent?: ReactNode }) =>
-    createElement('PickerSheet', null, props.headerContent, props.children),
+  PickerSheet: (props: {
+    children?: ReactNode;
+    headerContent?: ReactNode;
+    onDone?: () => void;
+    onCancel?: () => void;
+  }) =>
+    createElement(
+      'PickerSheet',
+      { onDone: props.onDone, onCancel: props.onCancel },
+      props.headerContent,
+      props.children
+    ),
 }));
 // EmptyState renders its `action` node (as the real component does) so the
 // empty state's clear CTA is reachable from the tree; `title` stays a prop for
@@ -500,15 +511,15 @@ describe('ModelPickerContent deferred search', () => {
 
   it('lays the clear control out as its own target frame inside the field', async () => {
     const renderer = await mount();
-    // The rounded field row: its height comes from the input's own
-    // `min-h-[44px]`, so comparing the row's class list across states proves
-    // the control's reveal cannot move the field.
+    // The bordered field row (the shared `SearchField`): its height comes from
+    // the input's own `min-h-[44px]`, so comparing the row's class list across
+    // states proves the control's reveal cannot move the field.
     const emptyFieldRows = findByType(renderer.root, 'View').filter(node =>
-      String(node.props.className).includes('rounded-full')
+      String(node.props.className).includes('rounded-md')
     );
     expect(emptyFieldRows).toHaveLength(1);
     const emptyFieldClass = String(emptyFieldRows[0]?.props.className);
-    expect(emptyFieldClass).toContain('rounded-full');
+    expect(emptyFieldClass).not.toContain('rounded-full');
 
     // Nothing typed: no control. The frame an audit measures is a node's own
     // box, and `hitSlop` never grows it, so a typed query must render a control
@@ -546,10 +557,10 @@ describe('ModelPickerContent deferred search', () => {
     expect(box.height).toBeGreaterThanOrEqual(ICON_TARGET_DP);
     expect(box.width).toBeGreaterThanOrEqual(ICON_TARGET_DP);
 
-    // Placement is the call site's logical trailing margin, not a physical one:
-    // `-me-3` is the pill's own `px-3` (10.5pt at the app's 14pt rem), so the
-    // box's trailing edge lands on the pill's edge and the whole box stays
-    // inside the pill's frame, and RTL mirrors it with the row instead of
+    // Placement is the field's logical trailing margin, not a physical one:
+    // `-me-3` is the frame's own end inset (10.5pt at the app's 14pt rem), so
+    // the box's trailing edge lands on the frame's inner edge and the whole box
+    // stays inside the field, and RTL mirrors it with the row instead of
     // pushing the box onto the wrong side. `compiledDimensions` compiles only
     // `h` / `w` / `min-h` / `min-w`, so the margin is a class check.
     expect(clear.props.className).toContain('-me-3');
@@ -558,7 +569,7 @@ describe('ModelPickerContent deferred search', () => {
     // Same field row in both states: revealing the control leaves the class
     // list — and so the height the input's `min-h-[44px]` sets — untouched.
     const typedFieldRows = findByType(renderer.root, 'View').filter(node =>
-      String(node.props.className).includes('rounded-full')
+      String(node.props.className).includes('rounded-md')
     );
     expect(typedFieldRows).toHaveLength(1);
     expect(String(typedFieldRows[0]?.props.className)).toBe(emptyFieldClass);
@@ -782,6 +793,74 @@ describe('ModelPickerContent thinking effort availability', () => {
 
     act(() => {
       renderer.unmount();
+    });
+  });
+
+  // The sheet stays open after a tap on a model with several efforts, so that
+  // pick is pending until the sheet closes. The focus cleanup commits it only
+  // after Done; this block runs that cleanup for real to tell the exits apart.
+  describe('closing with a pending pick', () => {
+    const otherOption: SessionModelOption = { ...makeOption(1), id: 'other-model' };
+
+    beforeEach(() => {
+      vi.mocked(useFocusEffect).mockImplementation(effect => {
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- the mock runs the route's own memoized effect
+        useEffect(effect, [effect]);
+      });
+      slotState.bridge = {
+        ...makeBridge(),
+        options: [otherOption, effortOption],
+        currentValue: otherOption.id,
+        currentVariant: '',
+        acceptsVariant: true,
+      };
+    });
+
+    afterEach(() => {
+      vi.mocked(useFocusEffect).mockReset();
+    });
+
+    /** `null` leaves the way the sheet's own dismissals do: Android Back or an iOS swipe pops the route. */
+    async function pickEffortModelThen(header: 'onDone' | 'onCancel' | null) {
+      const bridge = slotState.bridge as ModelPickerBridge;
+      const renderer = await mount();
+      await act(async () => {
+        rowProps(modelRow(renderer)).onSelectModel(effortOption);
+        await Promise.resolve();
+      });
+      const sheet = findByType(renderer.root, 'PickerSheet')[0];
+      if (!sheet) {
+        throw new Error('the picker sheet was not rendered');
+      }
+      if (header !== null) {
+        act(() => {
+          (sheet.props[header] as () => void)();
+        });
+      }
+      act(() => {
+        renderer.unmount();
+      });
+      return bridge.onSelect;
+    }
+
+    it('keeps the pending pick when Done closes the sheet', async () => {
+      const onSelect = await pickEffortModelThen('onDone');
+
+      expect(routerBack).toHaveBeenCalledTimes(1);
+      expect(onSelect).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops the pending pick when Cancel closes the sheet', async () => {
+      const onSelect = await pickEffortModelThen('onCancel');
+
+      expect(routerBack).toHaveBeenCalledTimes(1);
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it('drops the pending pick when Back or a swipe closes the sheet', async () => {
+      const onSelect = await pickEffortModelThen(null);
+
+      expect(onSelect).not.toHaveBeenCalled();
     });
   });
 });

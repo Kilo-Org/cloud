@@ -68,6 +68,16 @@ export async function handleTrpcQueryError(error: unknown): Promise<void> {
   await unauthorizedPromise;
 }
 
+/**
+ * Resolves once the auth handler run in flight has settled, or at once when
+ * none is running. It never starts a run: a caller that saw a refused
+ * credential through the query client waits here for the run the cache
+ * started, then reads the auth epoch to learn whether the session ended.
+ */
+export async function settledTrpcUnauthorizedHandling(): Promise<void> {
+  await unauthorizedPromise;
+}
+
 async function runUnauthorizedHandler(handler: TrpcUnauthorizedHandler): Promise<void> {
   try {
     await handler();

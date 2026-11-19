@@ -70,6 +70,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronLeft: 'ChevronLeft',
   ChevronRight: 'ChevronRight',
   Search: 'Search',
+  X: 'X',
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({

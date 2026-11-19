@@ -35,5 +35,6 @@ export function checkKiloTokenAuthorityClaims(payload: JWTPayload): boolean {
 }
 
 export function assertKiloTokenIssuedAt(iat: unknown, nowSeconds: number): void {
-  if (typeof iat !== 'number' || iat > nowSeconds) throw new Error('Token issued in the future');
+  if (typeof iat !== 'number') throw new Error('Missing or invalid token issued-at');
+  if (iat > nowSeconds) throw new Error('Token issued in the future');
 }

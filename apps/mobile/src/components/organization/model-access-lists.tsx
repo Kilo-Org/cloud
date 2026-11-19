@@ -6,10 +6,10 @@ import { View, type ViewStyle } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { FilterChip } from '@/components/ui/filter-chip';
-import { Input } from '@/components/ui/input';
 import { SearchX } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
+import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import {
@@ -43,12 +43,10 @@ function ListHeader({
   return (
     <View className="gap-3 pt-3 pb-3">
       <Text variant="caption">{description}</Text>
-      <Input
+      <SearchField
         defaultValue={search}
         placeholder={searchPlaceholder}
-        accessibilityLabel={searchPlaceholder}
-        autoCapitalize="none"
-        autoCorrect={false}
+        hasText={search !== ''}
         onChangeText={onSearchChange}
       />
       <View className="flex-row flex-wrap items-center gap-2">

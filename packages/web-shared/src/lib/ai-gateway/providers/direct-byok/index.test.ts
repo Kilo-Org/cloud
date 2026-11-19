@@ -295,6 +295,19 @@ describe('getDirectByokModel', () => {
     expect(directByokProviders[1].models).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ['the provider prefix', 'CHUTES-BYOK/supported-model'],
+    ['the model id', 'chutes-byok/SUPPORTED-Model'],
+    ['both', 'Chutes-Byok/Supported-Model'],
+  ])('resolves an id that differs in %s', async (_, requestedModel) => {
+    const { getDirectByokModel } = await loadDirectByokModule();
+
+    const result = await getDirectByokModel(requestedModel);
+
+    expect(result?.model?.id).toBe('supported-model');
+    expect(result?.provider?.id).toBe('chutes-byok');
+  });
+
   test('advertises only the reasoning parameter for reasoning models', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
     const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');

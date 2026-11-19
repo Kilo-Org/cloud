@@ -262,7 +262,7 @@ export function OrganizationBillingScreen({
               label={t('common.status')}
               value={kiloPassRowState.subtitle}
               valueFace="text"
-              valueTone={kiloPassRowState.attention ? 'warn' : 'default'}
+              valueTone={kiloPassRowState.tone}
               trailing={
                 kiloPassRowState.action === 'retry' ? (
                   <Button

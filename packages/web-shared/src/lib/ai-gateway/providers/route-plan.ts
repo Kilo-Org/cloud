@@ -197,7 +197,7 @@ function createGatewayKeyDecider(
     if (!(await gatewayProviders).includes(providerId)) return 'model-unavailable';
     if (
       providerId === 'vercel-ai-gateway' &&
-      !(await canRouteToVercel(requestedModel, getRoutingProviderConfig))
+      !(await canRouteToVercel(requestedModel, await getRoutingProviderConfig()))
     ) {
       return 'provider-settings';
     }

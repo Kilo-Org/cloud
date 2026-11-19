@@ -57,6 +57,7 @@
     "link": "लिंक",
     "takingLonger": "यासाठी अपेक्षेपेक्षा जास्त वेळ लागत आहे. तुम्ही हे बंद करून पुन्हा तपासू शकता.",
     "model": "मॉडेल",
+    "notSelected": "निवडलेले नाही",
     "accessDenied": "प्रवेशास परवानगी नाही",
     "allRepositories": "सर्व रिपॉझिटरी",
     "personal": "वैयक्तिक",
@@ -147,6 +148,7 @@
     "performance": "कार्यक्षमता",
     "preferences": "प्राधान्ये",
     "privacyPolicy": "गोपनीयता धोरण",
+    "termsOfService": "सेवेच्या अटी",
     "profile": "प्रोफाइल",
     "reactions": "प्रतिक्रिया",
     "recent": "अलीकडील",
@@ -216,8 +218,8 @@
     "verifyCode": "कोडची पडताळणी करा",
     "resendCode": "कोड पुन्हा पाठवा",
     "termsPrefix": "पुढे गेल्याने तुम्ही खालील बाबींना सहमती देता: ",
+    "termsInSentence": "सेवेच्या अटी",
     "terms": "अटी",
-    "termsInSentence": "वापराच्या अटी",
     "termsConnector": " आणि ",
     "termsSuffix": ".",
     "moreSignInOptions": "साइन इन करण्याचे आणखी पर्याय",
@@ -762,7 +764,6 @@
       "replyPlaceholder": "उत्तर…",
       "replyBody": "उत्तराचा मजकूर",
       "submitReply": "उत्तर सादर करा",
-      "termsTitle": "सेवेच्या अटी",
       "termsCopy": "पोस्ट करण्यासाठी तुमचे वय किमान 13 वर्षे असणे आवश्यक आहे.",
       "termsAcceptRetry": "अटी स्वीकारता आल्या नाहीत. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
       "viewTerms": "अटी पहा",
@@ -1025,7 +1026,10 @@
     "tabs": {
       "overview": "आढावा",
       "files": "फाइल्स",
-      "discussion": "चर्चा"
+      "discussion": "चर्चा",
+      "discussionAccessibility_one": "{{title}}: 1 टिप्पणी",
+      "discussionAccessibility": "{{title}}: {{displayCount}} टिप्पण्या",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} टिप्पण्या"
     },
     "fileStatus": {
       "modified": "बदल केलेली",
@@ -1222,7 +1226,7 @@
     },
     "instructions": {
       "title": "सानुकूल सूचना",
-      "deprecation": "सानुकूल सूचनांची सुविधा बंद करण्याचे नियोजन आहे. त्याऐवजी ही मार्गदर्शक तत्त्वे तुमच्या रिपॉझिटरीतील REVIEW.md फाइलमध्ये ठेवा.",
+      "deprecation": "सानुकूल सूचनांची सुविधा काढून टाकली जाईल. त्याऐवजी ही मार्गदर्शक तत्त्वे तुमच्या रिपॉझिटरीतील REVIEW.md फाइलमध्ये ठेवा.",
       "placeholder": "उदा. त्रुटी हाताळण्यासाठीचे आमचे नियम पाळा…",
       "clearTitle": "सानुकूल सूचना काढून टाकायच्या?",
       "clearMessage": "रिक्त फील्ड जतन केल्यास या पुनरावलोककासाठी साठवलेल्या सानुकूल सूचना हटवल्या जातील."
@@ -1388,6 +1392,7 @@
       "managedOnWeb": "{{organization}} चे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
       "description": "{{organization}} साठी वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
       "descriptionReconnect": "{{organization}} साठी नवीन वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
+      "descriptionOverview": "{{organization}} साठी वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते पुढील स्क्रीनवर पेस्ट करा.",
       "scopes": "खाते: वाचन · रिपॉझिटरी: वाचन/लेखन · पुल रिक्वेस्ट: वाचन · वेबहूक: वाचन/लेखन",
       "tokenPlaceholder": "वर्कस्पेसचे प्रवेश टोकन",
       "tokenRefused": "Bitbucket ने हे वर्कस्पेस टोकन स्वीकारले नाही. त्यात वरील परवानग्या आहेत का ते तपासा आणि नंतर पुन्हा प्रयत्न करा."
@@ -3020,6 +3025,7 @@
     "noSessions": "सक्रिय सत्रे नाहीत",
     "noSessionsDescription": "दुसऱ्या डिव्हाइसवरील Kilo अ‍ॅपमध्ये साइन इन करा. ते सत्र येथे दिसेल.",
     "signedIn": "साइन इन: {{signedIn}} · शेवटचे सक्रिय: {{lastSeen}}",
+    "signedInThisDevice": "साइन इन: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Kilo अ‍ॅप, Kilo CLI आणि वेब ब्राउझरमधील साइन इन सत्रे येथे दिसतात. एडिटरमधील सत्रे या यादीत नाहीत.",
     "thisDevice": "हे डिव्हाइस",
     "viewProfile": "प्रोफाइल पहा",
@@ -3181,6 +3187,8 @@
     "retryHint": "Kilo Pass ची स्थिती पुन्हा मिळवण्याचा प्रयत्न करते.",
     "endedOn": "संपले {{date}}",
     "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही।",
+    "notAvailableTitle": "Kilo Pass ॲपमध्ये नाही",
+    "noPassDescription": "या खात्याकडे Kilo Pass नाही.",
     "statusActive": "सक्रिय",
     "statusTrialing": "चाचणीमध्ये",
     "statusPastDue": "पेमेंट थकीत",
@@ -3251,6 +3259,7 @@
     "revokeConsent": "संमती काढा",
     "revokeConsentTitle": "डेटा शेअर करण्याची संमती रद्द करायची?",
     "acceptAndContinue": "स्वीकारा आणि पुढे जा",
+    "loadingConsentSettings": "तुमच्या संमती सेटिंग्ज लोड होत आहेत…",
     "decline": "नकार द्या",
     "declineAndSignOut": "नकार द्या आणि साइन आउट करा",
     "declineTitle": "डेटा शेअर करण्यास नकार द्यायचा?",
@@ -3462,7 +3471,7 @@
       "retentionLimit": "सर्वात अलीकडची बिले दाखवली जात आहेत."
     },
     "lowBalanceAlert": {
-      "enableA11y": "शिल्लक कमी झाल्याची सूचना चालू करा",
+      "subtitle": "या संस्थेची शिल्लक तुम्ही सेट केलेल्या रकमेपेक्षा कमी झाल्यावर तुम्ही दिलेल्या पत्त्यांवर ईमेलद्वारे सूचना पाठवा.",
       "notifyEmailsLabel": "सूचना पाठवण्याचे ईमेल पत्ते",
       "permissionDenied": "तुम्हाला बिलिंगच्या सूचना व्यवस्थापित करण्याची परवानगी नाही.",
       "separateEmailsHint": "एकापेक्षा जास्त ईमेल पत्ते देताना त्यांच्यामध्ये स्वल्पविराम द्या.",
@@ -3538,6 +3547,7 @@
       "truncated": "या तासात यादीत दाखवलेल्यापेक्षा जास्त विनंत्या आहेत.",
       "emptyTitle": "या तासात कोणत्याही विनंत्या नाहीत",
       "emptyDescription": "आधीच्या विनंत्या पाहण्यासाठी 'मागील तास' वापरा.",
+      "emptyBoundDescription": "विनंत्यांच्या नोंदी इथपर्यंतच मागे उपलब्ध आहेत.",
       "loadError": "विनंती लॉग लोड करता आले नाहीत.",
       "permissionDenied": "संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो.",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
@@ -3772,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "या मॉडेलसाठी इंटरनेट कनेक्शन आवश्यक आहे. कनेक्ट करा आणि पुन्हा प्रयत्न करा, किंवा या डिव्हाइसवरील मॉडेलवर स्विच करा.",
+    "connectionLost": "मॉडेलशी असलेले कनेक्शन तुटले. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
     "empty": {
       "title": "चॅट सुरू करा",
       "description": "मॉडेलशी बोलण्यासाठी संदेश पाठवा."
@@ -4529,6 +4540,7 @@
     "empty": "या आढावा कालावधीत कोणताही क्रियाकलाप नाही",
     "emptyHint": "नियोजित आढाव्यात क्रियाकलाप असल्यास तुमची क्लाउड आणि CLI कोडिंग सत्रे येथे दिसतील.",
     "loadError": "आढावे लोड करता आले नाहीत",
+    "estimateLoadError": "अंदाज लोड करता आला नाही.",
     "view": "आढावा वाचा",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4627,7 +4639,7 @@
     "topFeatures": "आघाडीची वैशिष्ट्ये",
     "emptyTitle": "या कालावधीत कोणताही वापर नाही",
     "unavailableTitle": "वापर उपलब्ध नाही",
-    "unavailableDescription": "हे वर्कस्पेस वापराची नोंद देत नाही. पुन्हा प्रयत्न करूनही फायदा होणार नाही.",
+    "unavailableDescription": "या वर्कस्पेससाठी वापराची नोंद सुरू केलेली नाही. येथे वापर दिसणे अपेक्षित असल्यास सहाय्य विभागाशी संपर्क साधा.",
     "orgSelfNotice": "तुम्ही या संस्थेतील तुमचा स्वतःचा वापर पाहत आहात.",
     "viewDetails": "वापराचे तपशील पहा"
   },
@@ -4635,7 +4647,7 @@
     "title": "इंटिग्रेशन्स",
     "sectionTitle": "कनेक्ट केलेल्या सेवा",
     "entrySubtitle": "GitHub, Slack, Linear आणि इतर",
-    "subtitle": "तुमची डेव्हलपमेंट साधने आणि कार्यप्रवाह Kilo शी कनेक्ट करा",
+    "subtitle": "तुमची डेव्हलपमेंट साधने आणि कार्यप्रवाह Kilo शी कनेक्ट करा.",
     "disconnect": "डिस्कनेक्ट करा",
     "disconnectTitle": "{{provider}} डिस्कनेक्ट करायचे?",
     "disconnectMessage": "Kilo {{provider}} मध्ये प्रतिसाद देणे थांबवेल. तुम्ही कधीही पुन्हा कनेक्ट करू शकता.",
@@ -4707,7 +4719,6 @@
       "nameLocked": "ट्रिगर तयार झाल्यानंतर नाव बदलता येत नाही.",
       "repositoryLocked": "ट्रिगर तयार झाल्यानंतर रिपॉझिटरी बदलता येत नाही.",
       "environmentAutomatic": "रिपॉझिटरीनुसार स्वयंचलित",
-      "notSelected": "निवडलेले नाही",
       "profileDefaults": "डीफॉल्ट वापरा",
       "profileHelp": "ट्रिगर चालतो तेव्हा प्रोफाइलची सेटिंग्ज लागू होतात. त्याचे सीक्रेट्स तेव्हा रिझोल्व्ह होतात.",
       "customAgent": "सानुकूल एजंट",
@@ -4935,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "एंटरप्राइझ वैशिष्ट्य",
-    "enterpriseOnly": "हे केवळ एंटरप्राइझसाठीचे वैशिष्ट्य आहे.",
+    "enterpriseOnly": "प्रदाते आणि मॉडेल एंटरप्राइझ प्लॅनमध्ये उपलब्ध आहेत.",
     "readOnly": "केवळ संस्थेचे मालक आणि प्रशासक ही सेटिंग्ज बदलू शकतात.",
     "loadError": "प्रदाते आणि मॉडेल लोड होऊ शकले नाहीत",
     "tabModels": "मॉडेल",

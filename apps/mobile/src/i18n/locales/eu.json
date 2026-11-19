@@ -57,6 +57,7 @@
     "link": "esteka",
     "takingLonger": "Uste baino denbora gehiago behar da. Hau itxi eta geroago berriro begira dezakezu.",
     "model": "Eredua",
+    "notSelected": "Ez dago hautatuta",
     "accessDenied": "Sarbidea ukatu da.",
     "allRepositories": "Biltegi guztiak",
     "personal": "Pertsonala",
@@ -147,6 +148,7 @@
     "performance": "Errendimendua",
     "preferences": "Hobespenak",
     "privacyPolicy": "Pribatutasun-politika",
+    "termsOfService": "Zerbitzu-baldintzak",
     "profile": "Profila",
     "reactions": "Erreakzio",
     "recent": "Azkenak",
@@ -216,8 +218,8 @@
     "verifyCode": "Egiaztatu kodea",
     "resendCode": "Bidali kodea berriro",
     "termsPrefix": "Jarraitzean, onartzen dituzu gure ",
+    "termsInSentence": "Zerbitzu-baldintzak",
     "terms": "Baldintzak",
-    "termsInSentence": "Baldintzak",
     "termsConnector": " eta ",
     "termsSuffix": ".",
     "moreSignInOptions": "Saioa hasteko aukera gehiago",
@@ -762,7 +764,6 @@
       "replyPlaceholder": "Erantzuna…",
       "replyBody": "Erantzunaren testua",
       "submitReply": "Bidali erantzuna",
-      "termsTitle": "Zerbitzu-baldintzak",
       "termsCopy": "13 Urte edo gehiago izan behar dituzu argitaratzeko.",
       "termsAcceptRetry": "Ezin izan dira zerbitzu-baldintzak onartu. Egiaztatu konexioa eta saiatu berriro.",
       "viewTerms": "Ikusi baldintzak",
@@ -1025,7 +1026,10 @@
     "tabs": {
       "overview": "Ikuspegi orokorra",
       "files": "Fitxategiak",
-      "discussion": "Eztabaida"
+      "discussion": "Eztabaida",
+      "discussionAccessibility_one": "{{title}}: 1 iruzkin",
+      "discussionAccessibility": "{{title}}: {{displayCount}} iruzkin",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} iruzkin"
     },
     "fileStatus": {
       "modified": "Aldatuta",
@@ -1131,16 +1135,16 @@
     },
     "category": {
       "agentAttentionTitle": "Agenteak zure beharra du",
-      "agentAttentionSubtitle": "galderak, baimen-eskaerak eta zure erantzunaren beharra",
+      "agentAttentionSubtitle": "Galderak, baimen-eskaerak eta zure erantzunaren beharra",
       "agentUpdatesTitle": "Agentearen eguneratzeak",
-      "agentUpdatesSubtitle": "agenteak zeregin batean ari dela bidalitako mezuak",
+      "agentUpdatesSubtitle": "Agenteak zeregin batean ari dela bidalitako mezuak",
       "sessionStatusTitle": "Saioaren egoera",
-      "sessionStatusSubtitle": "amaituta / huts eginda / kontrolatzeko prest",
-      "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
+      "sessionStatusSubtitle": "Amaituta / huts eginda / kontrolatzeko prest",
+      "balanceAlertsSubtitle": "Erakundearen saldo baxuaren abisuak",
       "balanceAlertsUnavailable": "Egin bat erakunde batekin saldo-abisuak jasotzeko.",
-      "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak",
+      "securityFindingsSubtitle": "Aurkikuntza berriak eta SLAren gogorarazpenak",
       "securityFindingsUnavailable": "Gaitu Kilo segurtasun-agentea esparru batean segurtasun-aurkikuntzak jasotzeko.",
-      "spendAlertsSubtitle": "atalaseen gainditzeak eta orduko gorakadak",
+      "spendAlertsSubtitle": "Atalaseen gainditzeak eta orduko gorakadak",
       "spendAlertsToggle": "Gastu-alerten kategoria"
     },
     "history": {
@@ -1222,7 +1226,7 @@
     },
     "instructions": {
       "title": "Pertsonalizatutako argibideak",
-      "deprecation": "Argibide pertsonalizatuen aukera kentzea aurreikusten da. Eraman jarraibide hauek zure biltegiko REVIEW.md fitxategi batera.",
+      "deprecation": "Argibide pertsonalizatuen aukera kendu egingo da. Eraman jarraibide hauek zure biltegiko REVIEW.md fitxategi batera.",
       "placeholder": "adib.: gure errore-kudeaketako arauak betearaztea…",
       "clearTitle": "Kendu pertsonalizatutako argibideak?",
       "clearMessage": "Eremu huts bat gordetzen baduzu, berrikusle honentzat gordetako argibide pertsonalizatuak ezabatzen dira."
@@ -1388,6 +1392,7 @@
       "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
       "description": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi behean.",
       "descriptionReconnect": "Sortu lan-eremurako sarbide-token berri bat {{organization}}-rako eta itsatsi behean.",
+      "descriptionOverview": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi hurrengo pantailan.",
       "scopes": "Kontua: irakurtzea · Biltegiak: irakurtzea/idaztea · Bateratze-eskaerak: irakurtzea · Webhook-ak: irakurtzea/idaztea",
       "tokenPlaceholder": "Lan-eremurako sarbide-tokena",
       "tokenRefused": "Bitbucketek ez du lan-eremurako sarbide-token hau onartu. Egiaztatu goiko baimenak dituela, eta saiatu berriro."
@@ -3020,6 +3025,7 @@
     "noSessions": "Ez dago saio aktiborik",
     "noSessionsDescription": "Hasi saioa Kilo aplikazioarekin beste gailu batean, eta hemen agertuko da.",
     "signedIn": "Saio-hasiera: {{signedIn}} · Azken jarduera: {{lastSeen}}",
+    "signedInThisDevice": "Saio-hasiera: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Hemen Kilo aplikazioko, Kilo CLIko eta web-nabigatzaile bateko saio-hasierak agertzen dira. Editoreko saio-hasierak ez daude zerrendatuta.",
     "thisDevice": "Gailu hau",
     "viewProfile": "Ikusi profila",
@@ -3181,6 +3187,8 @@
     "retryHint": "Kilo Pass-en egoera berriro kargatzen saiatzen da.",
     "endedOn": "Amaituta {{date}}",
     "notAvailableInApp": "Kilo Pass ez dago aplikazioan erabilgarri.",
+    "notAvailableTitle": "Kilo Pass ez da aplikazioan eskaintzen",
+    "noPassDescription": "Kontu honek ez du Kilo Pass-ik.",
     "statusActive": "Aktibo",
     "statusTrialing": "Proba-aldian",
     "statusPastDue": "Ordainketa atzeratuta",
@@ -3251,6 +3259,7 @@
     "revokeConsent": "Baliogabetu baimena",
     "revokeConsentTitle": "Baliogabetu datuak partekatzeko baimena?",
     "acceptAndContinue": "Onartu eta jarraitu",
+    "loadingConsentSettings": "Zure baimen-ezarpenak kargatzen…",
     "decline": "Ukatu",
     "declineAndSignOut": "Ukatu eta itxi saioa",
     "declineTitle": "Ukatu datuak partekatzea?",
@@ -3462,7 +3471,7 @@
       "retentionLimit": "Azken fakturak erakusten dira."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Gaitu saldo baxuko alerta",
+      "subtitle": "Bidali alerta bat posta elektronikoz zerrendatzen dituzun helbideetara, erakunde honen saldoa ezartzen duzun zenbatekoaren azpitik jaisten denean.",
       "notifyEmailsLabel": "Jakinarazpenak jasotzeko helbide elektronikoak",
       "permissionDenied": "Ez duzu fakturazio-alertak kudeatzeko baimenik.",
       "separateEmailsHint": "Bereizi helbide elektronikoak komaz.",
@@ -3538,6 +3547,7 @@
       "truncated": "Ordu honetan zerrendak erakusten dituenak baino eskaera gehiago daude.",
       "emptyTitle": "Ordu honetan ez dago eskaerarik",
       "emptyDescription": "Erabili «Aurreko ordua» aurreko eskaerak ikusteko.",
+      "emptyBoundDescription": "Hemendik atzera ez dago eskaera-erregistrorik.",
       "loadError": "Ezin izan dira eskaeren erregistroak kargatu.",
       "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak.",
       "tokens": "{{input}} sarrera · {{output}} irteera",
@@ -3772,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "Modelo honek interneteko konexioa behar du. Konektatu eta saiatu berriro, edo aldatu gailu honetako modelo batera.",
+    "connectionLost": "Modeloarekiko konexioa galdu da. Egiaztatu konexioa eta saiatu berriro.",
     "empty": {
       "title": "Hasi txat bat",
       "description": "Bidali mezu bat modelo batekin hitz egiteko."
@@ -4529,6 +4540,7 @@
     "empty": "Ez dago jarduerarik txosten-tarte honetan",
     "emptyHint": "Zure hodeiko eta CLIko kodetze-saioak hemen agertuko dira programatutako txosten batek jarduera duenean.",
     "loadError": "Ezin izan dira txostenak kargatu",
+    "estimateLoadError": "Ezin izan da estimazioa kargatu.",
     "view": "Irakurri txostena",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4627,7 +4639,7 @@
     "topFeatures": "Funtzio erabilienak",
     "emptyTitle": "Ez dago erabilerarik aldi honetan",
     "unavailableTitle": "Erabilera ez dago erabilgarri",
-    "unavailableDescription": "Lan-eremu honek ez du erabilerarik jakinarazten. Berriro saiatzeak ez du lagunduko.",
+    "unavailableDescription": "Erabilera ez dago konfiguratuta lan-eremu honetan. Hemen erabilera ikusi beharko zenukeela uste baduzu, jarri harremanetan laguntza-zerbitzuarekin.",
     "orgSelfNotice": "Erakunde honetan zure erabilera ikusten ari zara.",
     "viewDetails": "Ikusi erabileraren xehetasunak"
   },
@@ -4635,7 +4647,7 @@
     "title": "Integrazioak",
     "sectionTitle": "Konektatutako zerbitzuak",
     "entrySubtitle": "GitHub, Slack, Linear eta gehiago",
-    "subtitle": "Konektatu zure garapen-tresnak eta lan-fluxuak Kilo aplikazioarekin",
+    "subtitle": "Konektatu zure garapen-tresnak eta lan-fluxuak Kilo aplikazioarekin.",
     "disconnect": "Deskonektatu",
     "disconnectTitle": "{{provider}} deskonektatu?",
     "disconnectMessage": "Kilo aplikazioak ez du gehiago erantzungo {{provider}} zerbitzuan. Edonoiz konekta dezakezu berriro.",
@@ -4707,7 +4719,6 @@
       "nameLocked": "Izena ezin da aldatu abiarazlea sortu ondoren.",
       "repositoryLocked": "Biltegia ezin da aldatu abiarazlea sortu ondoren.",
       "environmentAutomatic": "Automatikoa biltegiaren arabera",
-      "notSelected": "Ez dago hautatuta",
       "profileDefaults": "Erabili lehenetsiak",
       "profileHelp": "Profilaren ezarpenak abiarazlea exekutatzen denean aplikatzen dira. Bere sekretuak orduan ebazten dira.",
       "customAgent": "Agente pertsonalizatua",
@@ -4935,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise eginbidea",
-    "enterpriseOnly": "Enterprise planerako soilik den eginbidea da hau.",
+    "enterpriseOnly": "Hornitzaileak eta ereduak Enterprise planean daude erabilgarri.",
     "readOnly": "Erakundearen jabeek eta administratzaileek soilik alda ditzakete ezarpen hauek.",
     "loadError": "Ezin izan dira kargatu hornitzaileak eta ereduak",
     "tabModels": "Ereduak",

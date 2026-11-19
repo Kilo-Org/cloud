@@ -53,6 +53,7 @@ import {
   markNeedsInputPosted,
   needsInputSessionOfIdentifier,
   notificationIdentifierForSession,
+  retireNeedsInputReplyResult,
 } from './needs-input-presentation';
 
 /** The two raise kinds a cached row can be in. */
@@ -369,6 +370,10 @@ function reportFailure(operation: 'publish' | 'dismiss', error: unknown): void {
   });
 }
 
+const reportDismissFailure = (error: unknown): void => {
+  reportFailure('dismiss', error);
+};
+
 /**
  * Whether the OS lets the app post a notification now. The user can turn
  * notifications off in Settings at any time, and iOS then rejects every local
@@ -404,6 +409,9 @@ async function publishRow(
 ): Promise<boolean> {
   const data = pushDataForRow(row);
   const content = notificationContentForRow(row);
+  // A reply's result left under a push's identifier belongs to the raise this
+  // post replaces, so it goes before the new raise is shown beside it.
+  await retireNeedsInputReplyResult(row.sessionId, reportDismissFailure);
   try {
     await Notifications.scheduleNotificationAsync({
       identifier: notificationIdentifierForSession(row.sessionId),
@@ -433,6 +441,7 @@ async function dismissIdentifier(identifier: string): Promise<boolean> {
     const postedSession = needsInputSessionOfIdentifier(identifier);
     if (postedSession !== null) {
       clearPostedNeedsInputNotification(postedSession);
+      await retireNeedsInputReplyResult(postedSession, reportDismissFailure);
     }
     return true;
   } catch (error) {

@@ -18,7 +18,7 @@ import {
 } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
-import { useScreenInsets } from '@/lib/screen-insets';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 
 /**
  * The padding a sheet's first row takes when the native drag handle already
@@ -135,7 +135,7 @@ export function SheetHeader({
 }) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const insets = useScreenInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const surfaceRef = useRef<ViewInstance | null>(null);
   const closeOnly = variant === 'close';
   const resolvedDoneLabel = doneLabel ?? (closeOnly ? t('common.close') : t('common.done'));
@@ -154,11 +154,10 @@ export function SheetHeader({
   // helper the sheets that draw their own title row use.
   const underHandlePadding = sheetUnderHandlePaddingClass('header');
   const safeAreaStyle =
-    topInsetHeight > 0 || insets.left > 0 || insets.right > 0
+    topInsetHeight > 0 || sideInsetStyle !== undefined
       ? {
           ...(topInsetHeight > 0 ? { paddingTop: topInsetHeight } : undefined),
-          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
-          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
+          ...sideInsetStyle,
         }
       : undefined;
   // The busy mark takes the accent the label it replaces carried, so the frame

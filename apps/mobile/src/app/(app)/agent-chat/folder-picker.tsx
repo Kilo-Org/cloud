@@ -14,6 +14,7 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { type DirectoryEntry, useListDirectories } from '@/lib/hooks/use-list-directories';
 import { folderPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ export default function FolderPickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { t } = useTranslation();
   const [bridge] = useState(() => folderPickerSlot.get(UNFENCED_ROUTE_KEY));
   const bridgeRef = useRef(bridge);
@@ -182,7 +184,7 @@ export default function FolderPickerScreen() {
       ) : (
         <FlashList
           nestedScrollEnabled
-          style={[listStyle, { backgroundColor: colors.background }]}
+          style={[listStyle, { backgroundColor: colors.background }, sideInsetMarginStyle]}
           data={data}
           // FlashList stores its props during render and can index `data` past
           // its end for a render React discarded; the fallbacks are the ones

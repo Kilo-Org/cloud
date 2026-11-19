@@ -75,7 +75,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/agents/markdown-link-confirm.ts': 'hostname comparison',
   'components/agents/new-session-repository-state.ts': 'repository host comparison',
   'components/agents/new-session-prefill.ts': 'repo full-name comparison',
-  'components/agents/repo-selector.tsx': 'repo key normalization',
+  'components/agents/repo-sections.ts': 'repo key normalization',
   'components/agents/session-terminal-error.ts': 'service-message classification',
   'components/agents/tool-card-image-cache.ts': 'mime-subtype normalization',
   'components/agents/tool-list-model.ts': 'status-note comparison',

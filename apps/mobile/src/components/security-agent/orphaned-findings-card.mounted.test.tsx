@@ -23,7 +23,7 @@ const world = vi.hoisted(() => ({
   confirm: vi.fn<(request: ConfirmRequest) => void>(),
 }));
 
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, Pressable: 'Pressable', View: 'View' }));
 
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({
@@ -40,11 +40,6 @@ vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
 });
-
-vi.mock('@/lib/a11y/tap-target', () => ({
-  LINE_ACTION_BOX_CLASS: 'action-box',
-  LINE_ACTION_HIT_SLOP: 8,
-}));
 
 vi.mock('@/lib/format', () => ({ formatNumber: String }));
 

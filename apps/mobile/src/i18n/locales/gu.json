@@ -57,6 +57,7 @@
     "link": "લિંક",
     "takingLonger": "આમાં અપેક્ષા કરતાં વધુ સમય લાગી રહ્યો છે. તમે આ બંધ કરીને ફરી તપાસી શકો છો.",
     "model": "મોડેલ",
+    "notSelected": "પસંદ કરેલું નથી",
     "accessDenied": "પ્રવેશની મંજૂરી નથી.",
     "allRepositories": "બધી રિપોઝિટરીઓ",
     "personal": "વ્યક્તિગત",
@@ -147,6 +148,7 @@
     "performance": "કાર્યક્ષમતા",
     "preferences": "પસંદગીઓ",
     "privacyPolicy": "ગોપનીયતા નીતિ",
+    "termsOfService": "સેવાની શરતો",
     "profile": "પ્રોફાઇલ",
     "reactions": "પ્રતિક્રિયાઓ",
     "recent": "તાજેતરના",
@@ -216,8 +218,8 @@
     "verifyCode": "કોડ ચકાસો",
     "resendCode": "કોડ ફરી મોકલો",
     "termsPrefix": "આગળ વધીને તમે અમારી ",
+    "termsInSentence": "સેવાની શરતો",
     "terms": "શરતો",
-    "termsInSentence": "શરતો",
     "termsConnector": " અને ",
     "termsSuffix": "ને સ્વીકારો છો.",
     "moreSignInOptions": "સાઇન ઇન માટેના વધુ વિકલ્પો",
@@ -762,7 +764,6 @@
       "replyPlaceholder": "જવાબ…",
       "replyBody": "જવાબનું લખાણ",
       "submitReply": "જવાબ મોકલો",
-      "termsTitle": "સેવાની શરતો",
       "termsCopy": "પોસ્ટ કરવા માટે તમારી ઉંમર ઓછામાં ઓછી 13 વર્ષ હોવી જરૂરી છે.",
       "termsAcceptRetry": "શરતો સ્વીકારી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
       "viewTerms": "શરતો જુઓ",
@@ -1025,7 +1026,10 @@
     "tabs": {
       "overview": "ઝાંખી",
       "files": "ફાઇલો",
-      "discussion": "ચર્ચા"
+      "discussion": "ચર્ચા",
+      "discussionAccessibility_one": "{{title}}: 1 ટિપ્પણી",
+      "discussionAccessibility": "{{title}}: {{displayCount}} ટિપ્પણીઓ",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} ટિપ્પણીઓ"
     },
     "fileStatus": {
       "modified": "ફેરફાર કરેલી",
@@ -1222,7 +1226,7 @@
     },
     "instructions": {
       "title": "પોતાની સૂચનાઓ",
-      "deprecation": "કસ્ટમ સૂચનાઓની સુવિધા બંધ કરવાની યોજના છે. તેના બદલે આ માર્ગદર્શિકા તમારી રિપોઝિટરીની REVIEW.md ફાઇલમાં મૂકો.",
+      "deprecation": "કસ્ટમ સૂચનાઓની સુવિધા દૂર કરવામાં આવશે. તેના બદલે આ માર્ગદર્શિકા તમારી રિપોઝિટરીની REVIEW.md ફાઇલમાં મૂકો.",
       "placeholder": "દા.ત. ભૂલો સંભાળવાના અમારા નિયમોનું પાલન…",
       "clearTitle": "શું પોતાની સૂચનાઓ દૂર કરવી છે?",
       "clearMessage": "ખાલી ફીલ્ડ સાચવવાથી આ રિવ્યુઅર માટે સંગ્રહિત પોતાની સૂચનાઓ કાઢી નાખાય છે."
@@ -1388,6 +1392,7 @@
       "managedOnWeb": "{{organization}} નું Bitbucket કનેક્શન કમ્પ્યુટર પરથી વેબ પર મેનેજ કરવામાં આવે છે.",
       "description": "{{organization}} માટે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
       "descriptionReconnect": "{{organization}} માટે નવો વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
+      "descriptionOverview": "{{organization}} માટે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને પછીની સ્ક્રીન પર પેસ્ટ કરો.",
       "scopes": "એકાઉન્ટ: વાંચવાની · રિપોઝિટરીઓ: વાંચવાની/લખવાની · પુલ રિક્વેસ્ટ: વાંચવાની · વેબહુક: વાંચવાની/લખવાની પરવાનગી.",
       "tokenPlaceholder": "વર્કસ્પેસ ઍક્સેસ ટોકન",
       "tokenRefused": "Bitbucket એ આ વર્કસ્પેસ ઍક્સેસ ટોકન સ્વીકાર્યું નથી. ચકાસો કે તેમાં ઉપરની પરવાનગીઓ છે, પછી ફરી પ્રયાસ કરો."
@@ -3020,6 +3025,7 @@
     "noSessions": "કોઈ સક્રિય સત્ર નથી",
     "noSessionsDescription": "અન્ય ઉપકરણ પર Kilo એપમાં સાઇન ઇન કરો. તે ઉપકરણ અહીં દેખાશે.",
     "signedIn": "સાઇન ઇન: {{signedIn}} · છેલ્લે સક્રિય: {{lastSeen}}",
+    "signedInThisDevice": "સાઇન ઇન: {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "Kilo એપ, Kilo CLI અને વેબ બ્રાઉઝરમાંથી કરેલા સાઇન ઇન અહીં દેખાય છે. એડિટરમાંથી કરેલા સાઇન ઇન સૂચિબદ્ધ નથી.",
     "thisDevice": "આ ઉપકરણ",
     "viewProfile": "પ્રોફાઇલ જુઓ",
@@ -3181,6 +3187,8 @@
     "retryHint": "Kilo Pass ની સ્થિતિ ફરી મેળવવાનો પ્રયાસ કરે છે.",
     "endedOn": "{{date}}ના રોજ સમાપ્ત થયું",
     "notAvailableInApp": "Kilo Pass એપમાં ઉપલબ્ધ નથી.",
+    "notAvailableTitle": "Kilo Pass એપમાં નથી",
+    "noPassDescription": "આ એકાઉન્ટમાં કોઈ Kilo Pass નથી.",
     "statusActive": "સક્રિય",
     "statusTrialing": "ટ્રાયલ ચાલુ",
     "statusPastDue": "ચુકવણી મુદતવીતી",
@@ -3251,6 +3259,7 @@
     "revokeConsent": "સંમતિ દૂર કરો",
     "revokeConsentTitle": "ડેટા શેર કરવાની સંમતિ રદ કરવી છે?",
     "acceptAndContinue": "સ્વીકારો અને ચાલુ રાખો",
+    "loadingConsentSettings": "તમારી સંમતિનાં સેટિંગ્સ લોડ થઈ રહ્યાં છે…",
     "decline": "નકારો",
     "declineAndSignOut": "નકારો અને સાઇન આઉટ કરો",
     "declineTitle": "ડેટા શેર કરવાનું નકારવું છે?",
@@ -3462,7 +3471,7 @@
       "retentionLimit": "સૌથી તાજેતરના ઇનવોઇસ દર્શાવવામાં આવે છે."
     },
     "lowBalanceAlert": {
-      "enableA11y": "બેલેન્સ ઓછું થાય ત્યારે ચેતવણી ચાલુ કરો",
+      "subtitle": "આ સંસ્થાનું બેલેન્સ તમે નક્કી કરેલી રકમથી નીચે જાય ત્યારે તમે આપેલાં ઇમેઇલ સરનામાં પર ચેતવણી ઇમેઇલ મોકલો.",
       "notifyEmailsLabel": "ચેતવણી મેળવવાનાં ઇમેઇલ સરનામાં",
       "permissionDenied": "તમને બિલિંગની ચેતવણીઓનું સંચાલન કરવાની પરવાનગી નથી.",
       "separateEmailsHint": "એકથી વધુ ઇમેઇલ સરનામાં હોય, તો તેમને અલ્પવિરામથી અલગ કરો.",
@@ -3538,6 +3547,7 @@
       "truncated": "આ કલાકમાં સૂચિમાં બતાવેલી કરતાં વધુ રિક્વેસ્ટ છે.",
       "emptyTitle": "આ કલાકમાં કોઈ રિક્વેસ્ટ નથી",
       "emptyDescription": "પહેલાંના રિક્વેસ્ટ જોવા માટે ‘પહેલાંનો કલાક’નો ઉપયોગ કરો.",
+      "emptyBoundDescription": "રિક્વેસ્ટ લૉગ આનાથી વધુ પાછળ સુધી ઉપલબ્ધ નથી.",
       "loadError": "રિક્વેસ્ટ લૉગ લોડ કરી શકાયા નહીં.",
       "permissionDenied": "સંસ્થાના રિક્વેસ્ટ લૉગ ફક્ત તેના માલિક, એડમિન અથવા બિલિંગ મેનેજર જ જોઈ શકે છે.",
       "tokens": "{{input}} ઇનપુટ · {{output}} આઉટપુટ",
@@ -3772,6 +3782,7 @@
   },
   "modelChat": {
     "offlineFailure": "આ મોડેલને ઇન્ટરનેટ કનેક્શનની જરૂર છે. કનેક્ટ કરો અને ફરી પ્રયાસ કરો, અથવા આ ઉપકરણ પરના મોડેલ પર સ્વિચ કરો.",
+    "connectionLost": "મોડેલ સાથેનું કનેક્શન તૂટી ગયું. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
     "empty": {
       "title": "ચેટ શરૂ કરો",
       "description": "મોડેલ સાથે વાત કરવા સંદેશ મોકલો."
@@ -4529,6 +4540,7 @@
     "empty": "આ રિપોર્ટ વિન્ડોમાં કોઈ પ્રવૃત્તિ નથી",
     "emptyHint": "તમારા ક્લાઉડ અને CLI કોડિંગ સત્રો અહીં ત્યારે દેખાશે જ્યારે શેડ્યૂલ કરેલા રિપોર્ટમાં પ્રવૃત્તિ હોય.",
     "loadError": "રિપોર્ટ લોડ થઈ શક્યા નહીં",
+    "estimateLoadError": "અંદાજ લોડ થઈ શક્યો નહીં.",
     "view": "રિપોર્ટ વાંચો",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4627,7 +4639,7 @@
     "topFeatures": "ટોચની સુવિધાઓ",
     "emptyTitle": "આ સમયગાળામાં કોઈ વપરાશ નથી",
     "unavailableTitle": "વપરાશ ઉપલબ્ધ નથી",
-    "unavailableDescription": "આ વર્કસ્પેસ વપરાશની જાણ કરતું નથી. ફરી પ્રયાસ કરવાથી મદદ મળશે નહીં.",
+    "unavailableDescription": "આ વર્કસ્પેસ માટે વપરાશ ગોઠવાયેલ નથી. જો તમે અહીં વપરાશ જોવાની અપેક્ષા રાખતા હો, તો સપોર્ટનો સંપર્ક કરો.",
     "orgSelfNotice": "તમે આ સંસ્થામાં તમારો પોતાનો વપરાશ જોઈ રહ્યા છો.",
     "viewDetails": "વપરાશની વિગતો જુઓ"
   },
@@ -4635,7 +4647,7 @@
     "title": "ઇન્ટિગ્રેશન્સ",
     "sectionTitle": "કનેક્ટ કરેલી સેવાઓ",
     "entrySubtitle": "GitHub, Slack, Linear અને વધુ",
-    "subtitle": "તમારા ડેવલપમેન્ટ ટૂલ્સ અને વર્કફ્લોને Kilo સાથે કનેક્ટ કરો",
+    "subtitle": "તમારા ડેવલપમેન્ટ ટૂલ્સ અને વર્કફ્લોને Kilo સાથે કનેક્ટ કરો.",
     "disconnect": "ડિસ્કનેક્ટ કરો",
     "disconnectTitle": "{{provider}} ડિસ્કનેક્ટ કરીએ?",
     "disconnectMessage": "Kilo {{provider}}માં જવાબ આપવાનું બંધ કરશે. તમે ગમે ત્યારે ફરીથી કનેક્ટ કરી શકો છો.",
@@ -4707,7 +4719,6 @@
       "nameLocked": "ટ્રિગર બન્યા પછી નામ બદલી શકાતું નથી।",
       "repositoryLocked": "ટ્રિગર બન્યા પછી રિપોઝિટરી બદલી શકાતી નથી।",
       "environmentAutomatic": "રિપોઝિટરી મુજબ આપોઆપ",
-      "notSelected": "પસંદ કરેલું નથી",
       "profileDefaults": "ડિફૉલ્ટ્સ વાપરો",
       "profileHelp": "ટ્રિગર ચાલે ત્યારે પ્રોફાઇલની સેટિંગ્સ લાગુ થાય છે. તેના સીક્રેટ્સ ત્યારે ઉકેલાય છે।",
       "customAgent": "કસ્ટમ એજન્ટ",
@@ -4935,7 +4946,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "એન્ટરપ્રાઇઝ સુવિધા",
-    "enterpriseOnly": "આ ફક્ત એન્ટરપ્રાઇઝ માટેની સુવિધા છે.",
+    "enterpriseOnly": "પ્રદાતાઓ અને મોડેલો એન્ટરપ્રાઇઝ પ્લાન પર ઉપલબ્ધ છે.",
     "readOnly": "ફક્ત સંસ્થાના માલિકો અને એડમિન જ આ સેટિંગ્સ બદલી શકે છે.",
     "loadError": "પ્રદાતાઓ અને મોડેલો લોડ થઈ શક્યા નથી",
     "tabModels": "મોડેલો",

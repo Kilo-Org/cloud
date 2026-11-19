@@ -19,7 +19,7 @@ import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
 import { createNotFoundHandler } from '@kilocode/worker-utils';
 import { createWorkerErrorHandler } from './error-handler.js';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
-import type { CallbackJob } from './callbacks/index.js';
+import type { CallbackQueueJob } from './callbacks/types.js';
 import {
   CLOUD_AGENT_REPORT_QUEUE_NAMES,
   consumeCloudAgentReportBatch,
@@ -1038,7 +1038,7 @@ const worker = {
   async queue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
       const consumer = createCallbackQueueConsumer(env);
-      return consumer(batch as MessageBatch<CallbackJob>);
+      return consumer(batch as MessageBatch<CallbackQueueJob>);
     }
     if (CLOUD_AGENT_REPORT_QUEUE_NAMES.has(batch.queue)) {
       return consumeCloudAgentReportBatch(batch, env);

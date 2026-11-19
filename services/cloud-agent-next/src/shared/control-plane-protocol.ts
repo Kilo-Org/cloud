@@ -659,6 +659,7 @@ export const controlPlaneCredentialSourceSchema = z
     createdOnPlatform: z.string().max(100).optional(),
     /** Worker-owned origin; client platform claims do not select runtime harnesses. */
     billingOrigin: z.string().max(100).optional(),
+    allowSubagentSessions: z.boolean().optional(),
     repository: controlPlaneCredentialRepositorySchema.optional(),
     /**
      * Worker-encrypted `profile.mcpServers` snapshot. Persisted only inside this

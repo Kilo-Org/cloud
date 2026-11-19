@@ -1,5 +1,4 @@
 import catalogJson from '../catalog.json';
-import { cloudAgentAuthorityProcedures } from '../../../packages/worker-utils/src/cloud-agent-authority';
 import {
   CHILD_SESSION_INSTRUCTIONS,
   CHILD_SESSION_TOOL_NAMES,
@@ -500,8 +499,7 @@ async function runTool(
   ) {
     throw new JsonRpcFailure(UNAUTHORIZED, 'Cloud Agent authority has expired');
   }
-  // Running clients can retain the old tool list until their next MCP connection.
-  if (auth.cloudAgentAuthority && name !== 'search' && name !== 'call') {
+  if (auth.cloudAgentAuthority) {
     return toolResult(await runChildSessionTool({ name, args, auth, ...deps }));
   }
   if (name === 'search') {
@@ -528,12 +526,6 @@ async function runTool(
       // Fail-closed: only a grant that ticked the admin opt-in sees admin or
       // debug rows.
       includeGuarded: auth.adminEnabled === true,
-      ...(auth.cloudAgentAuthority
-        ? {
-            allowedPaths: cloudAgentAuthorityProcedures(auth.cloudAgentAuthority),
-            cloudAgentAuthority: auth.cloudAgentAuthority,
-          }
-        : {}),
     });
     // The query's shape only — never the raw text (it can carry personal data).
     analytics.searchPerformed({

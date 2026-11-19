@@ -15,7 +15,7 @@ import {
   createMcpHandler,
   resolveExternalToken,
 } from './index';
-import { searchCatalogDetailed } from './search';
+import { CHILD_SESSION_TOOL_NAMES } from './child-session-tools';
 import { JsonRpcFailure, type Catalog, type ForwardedAuth, type GrantProps } from './types';
 
 const scope: CloudAgentAuthority = {
@@ -161,7 +161,8 @@ describe('Cloud Agent MCP authority', () => {
     },
   ])('forwards normally-valid child options without additional restrictions: %j', async options => {
     const fetchImpl = upstream();
-    const input = { ...launch, ...options };
+    const { githubRepo: _repo, ...task } = launch;
+    const input = { ...(options.stackOnWorktreeId ? task : launch), ...options };
     await callCatalogEndpoint({
       catalog,
       path: 'cloudAgentNext.prepareSession',
@@ -176,8 +177,9 @@ describe('Cloud Agent MCP authority', () => {
 
   it('forwards an organization stacked launch without changing its organization', async () => {
     const fetchImpl = upstream();
+    const { githubRepo: _repo, ...task } = launch;
     const input = {
-      ...launch,
+      ...task,
       organizationId,
       stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
       operationKey: '33333333-3333-4333-8333-333333333333',
@@ -564,20 +566,6 @@ describe('Cloud Agent MCP authority', () => {
       },
     },
     {
-      path: 'cloudEnvironments.list',
-      input: { repository: { platform: 'gitlab', projectPath: 'group/project' } },
-    },
-    {
-      path: 'cloudEnvironments.list',
-      input: {
-        repository: {
-          platform: 'bitbucket',
-          workspaceUuid: organizationId,
-          repositoryUuid: organizationId,
-        },
-      },
-    },
-    {
       path: 'cloudEnvironments.listAll',
       input: { repository: { platform: 'github', fullName: 'acme/widgets' } },
     },
@@ -887,32 +875,20 @@ describe('Cloud Agent MCP authority', () => {
   });
 
   it.each([null, organizationId])(
-    'filters lexical and semantic search to lifecycle procedures with per-procedure schemas: %s',
+    'defines scoped procedure schemas independently of general catalog search: %s',
     async organizationIdValue => {
       const authority = organizationIdValue === null ? scope : organizationScope;
       const allowedPaths = cloudAgentAuthorityProcedures(authority);
-      const outcome = await searchCatalogDetailed('child session', {
-        catalog,
-        limit: 50,
-        allowedPaths,
-        cloudAgentAuthority: authority,
-        semanticCandidates: async () => [
-          ...allowedPaths.map(path => ({ path, score: 1 })),
-          { path: 'user.getMe', score: 1 },
-          { path: 'debug.getState', score: 1 },
-        ],
-      });
-      expect(outcome.results.map(row => row.path).sort()).toEqual([...allowedPaths].sort());
-      expect(outcome.hiddenGuardedMatches).toBe(false);
-      for (const result of outcome.results) {
-        expect(result.kind).toBe(cloudAgentAuthorityProcedureKind(result.path));
-        expect(result.inputSchema).toEqual(cloudAgentAuthorityInputSchema(authority, result.path));
+      expect(allowedPaths).not.toContain('user.getMe');
+      expect(allowedPaths).not.toContain('cloudAgentNext.listBitbucketRepositories');
+      for (const path of allowedPaths) {
+        expect(catalog[path]?.kind).toBe(cloudAgentAuthorityProcedureKind(path));
       }
 
       const prefix =
         organizationIdValue === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
       const schemaFor = (name: string) =>
-        outcome.results.find(result => result.path === `${prefix}.${name}`)!.inputSchema;
+        cloudAgentAuthorityInputSchema(authority, `${prefix}.${name}`);
       expect(schemaFor('listChildSessions')).toMatchObject({
         properties: { limit: { type: 'integer' }, cursor: { type: 'string' } },
         additionalProperties: false,
@@ -926,9 +902,7 @@ describe('Cloud Agent MCP authority', () => {
         properties: { sessionId: { type: 'string' } },
       });
       expect(schemaFor('sendMessage')).not.toHaveProperty('properties.payload.properties.command');
-      expect(schemaFor('sendMessage')).not.toHaveProperty(
-        'properties.payload.properties.attachments'
-      );
+      expect(schemaFor('sendMessage')).toHaveProperty('properties.payload.properties.attachments');
       expect(schemaFor('sendMessage')).not.toHaveProperty('properties.attachments');
       expect(schemaFor('prepareSession')).toMatchObject({
         properties: {
@@ -936,7 +910,7 @@ describe('Cloud Agent MCP authority', () => {
           model: { type: 'string' },
           stackOnWorktreeId: { type: 'string' },
         },
-        required: expect.arrayContaining(['githubRepo', 'model', 'autoInitiate']),
+        required: expect.arrayContaining(['model', 'autoInitiate']),
       });
       expect(schemaFor('prepareSession')).not.toHaveProperty(
         'properties.parentCloudAgentSessionId'
@@ -946,12 +920,13 @@ describe('Cloud Agent MCP authority', () => {
       expect(schemaFor('prepareSession')).not.toHaveProperty('properties.model.enum');
 
       if (organizationIdValue !== null) {
-        for (const result of outcome.results) {
-          if (result.path === 'models.list') {
-            expect(result.inputSchema).not.toHaveProperty('properties.organizationId');
+        for (const path of allowedPaths) {
+          const schema = cloudAgentAuthorityInputSchema(authority, path);
+          if (path === 'models.list') {
+            expect(schema).not.toHaveProperty('properties.organizationId');
             continue;
           }
-          expect(result.inputSchema).toMatchObject({
+          expect(schema).toMatchObject({
             properties: { organizationId: { const: organizationIdValue } },
             required: expect.arrayContaining(['organizationId']),
           });
@@ -983,44 +958,11 @@ describe('Cloud Agent MCP authority', () => {
         scopedAuth
       );
       const body = (await response.json()) as { result: { instructions: string } };
-      expect(body.result.instructions).toContain(
-        'It belongs to the workspace, not to the chat that invoked this tool'
-      );
-      expect(body.result.instructions).toContain(
-        "remains available after the workspace's first chat is deleted"
-      );
-      expect(body.result.instructions).toContain('only when the user explicitly asks');
-      expect(body.result.instructions).toContain('own sandbox and worktree');
-      expect(body.result.instructions).toContain('fan out independent tasks');
-      expect(body.result.instructions).toContain('callbackTarget: { url: "workspace:new-chat" }');
-      expect(body.result.instructions).toContain('Do not poll or wait in a tool for a callback');
+      expect(body.result.instructions).toContain('belongs to the workspace');
       expect(body.result.instructions).toContain('Prefer callbacks over polling');
-      expect(body.result.instructions).toContain('keep any status check bounded');
-      expect(body.result.instructions).toContain('direct child Cloud Agent sessions');
-      expect(body.result.instructions).toContain(
-        'list, inspect, check status, stop, send a follow-up to'
-      );
-      expect(body.result.instructions).toContain('must not access unrelated sessions');
-      expect(body.result.instructions).toContain(
-        'do not launch a child from a child session, and do not ask a child to launch one'
-      );
-      expect(body.result.instructions).toContain('spawn_session');
-      expect(body.result.instructions).toContain('search_models');
-      expect(body.result.instructions).toContain('generate_message_id');
-      expect(body.result.instructions).toContain('list_environments');
-      expect(body.result.instructions).toContain('requestedEnvironment');
-      expect(body.result.instructions).toContain('There is no implicit model default');
-      expect(body.result.instructions).toContain('follow-ups do not inherit it');
-      expect(body.result.instructions).toContain(
-        'never generate a replacement after an uncertain send'
-      );
-      expect(body.result.instructions).toContain('Example launch sequence:');
-      expect(body.result.instructions).toContain('Example follow-up sequence:');
-      expect(body.result.instructions).not.toContain('Search before every call');
-      expect(body.result.instructions).toContain('stackOnWorktreeId');
-      expect(body.result.instructions).toContain('A.worktreeId');
-      expect(body.result.instructions).toContain('callback target stays the orchestrator');
-      expect(body.result.instructions).toContain('Omit upstreamBranch for stacked launches');
+      expect(body.result.instructions).toContain('manages only its direct children');
+      expect(body.result.instructions).toContain('Each child can manage its own children');
+      expect(body.result.instructions).toContain('original operationKey and messageId');
     }
   );
 
@@ -1051,19 +993,9 @@ describe('Cloud Agent MCP authority', () => {
       const body = (await response.json()) as {
         result: { tools: Array<{ name: string; inputSchema: Record<string, unknown> }> };
       };
-      expect(body.result.tools.map(tool => tool.name)).toEqual([
-        'search_models',
-        'generate_message_id',
-        'list_environments',
-        'spawn_session',
-        'list_child_sessions',
-        'get_session',
-        'get_message_result',
-        'send_message',
-        'interrupt_session',
-        'list_folders',
-        'assign_workspace_to_folder',
-      ]);
+      expect(new Set(body.result.tools.map(tool => tool.name))).toEqual(
+        new Set(CHILD_SESSION_TOOL_NAMES)
+      );
       for (const tool of body.result.tools) {
         expect(tool.inputSchema).not.toHaveProperty('properties.parentCloudAgentSessionId');
         expect(tool.inputSchema).not.toHaveProperty('properties.organizationId');
@@ -1206,5 +1138,6 @@ describe('Cloud Agent MCP authority', () => {
     );
     const body = await response.text();
     expect(body).not.toContain('user.getMe');
+    expect(body).toContain('Unknown tool');
   });
 });

@@ -3,7 +3,10 @@ import {
   cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   MESSAGE_ID_PATTERN,
+  sessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
+import { AttachmentsSchema } from './cloud-agent-attachments';
+import { workspaceArtifactRelativePathSchema } from './cloud-agent-workspace-artifacts';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
 
 export const PARENT_WORKSPACE_CALLBACK_URL = 'workspace:new-chat';
@@ -11,7 +14,10 @@ export const WORKSPACE_SESSION_CALLBACK_PREFIX = 'workspace:';
 const WORKSPACE_SESSION_CALLBACK_URL_PATTERN =
   /^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const ParentWorkspaceCallbackTargetSchema = z
-  .object({ url: z.literal(PARENT_WORKSPACE_CALLBACK_URL) })
+  .object({
+    url: z.literal(PARENT_WORKSPACE_CALLBACK_URL),
+    launchingSessionId: cloudAgentSessionIdSchema.optional(),
+  })
   .strict()
   .describe(
     'Open a new chat in the spawning parent workspace and use this child result as its first message. Omit for no callback.'
@@ -118,9 +124,32 @@ export const requestedEnvironmentSchema = z
   })
   .strict();
 
+const repositoryName = z.string().regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/);
+const repositoryPlatform = z.enum(['github', 'gitlab', 'bitbucket']);
+const childTarget = z.object({ cloudAgentSessionId: cloudAgentSessionIdSchema }).strict();
+const childSessionTarget = z.object({ sessionId: cloudAgentSessionIdSchema }).strict();
+const discoveryInput = z.object({ forceRefresh: z.boolean().optional() }).strict();
+const nativeId = z.string().min(1).max(256);
+const branchOperationInput = childTarget.extend({
+  baseBranch: z.string().min(1).max(256).optional(),
+  upstreamSha: z
+    .string()
+    .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i)
+    .optional(),
+});
+
 const scopedPrepareSessionSchema = z
   .object({
-    githubRepo: z.string().regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/),
+    githubRepo: repositoryName.optional(),
+    gitlabProject: z
+      .string()
+      .regex(/^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+$/)
+      .optional(),
+    bitbucketRepo: z
+      .object({ fullName: repositoryName, workspaceUuid: z.uuid(), repositoryUuid: z.uuid() })
+      .strict()
+      .optional(),
+    publicRepoUrl: z.url({ protocol: /^https$/ }).optional(),
     model: z.string().min(1).max(200),
     mode: z.enum(['code', 'plan', 'debug', 'orchestrator', 'ask', 'build', 'architect']),
     prompt: z.string().min(1).max(100_000),
@@ -128,7 +157,7 @@ const scopedPrepareSessionSchema = z
     upstreamBranch: z.string().min(1).max(500).optional(),
     stackOnWorktreeId: cloudAgentWorktreeIdSchema
       .describe(
-        "Stack on a direct child's pushed worktree in the same repository. Use the worktreeId from spawn_session or list_child_sessions. Omit upstreamBranch."
+        "Use this workspace's or a direct child's worktree ID. The server resolves its pushed branch; omit other repository fields and upstreamBranch."
       )
       .optional(),
     autoCommit: z.boolean().optional(),
@@ -139,10 +168,24 @@ const scopedPrepareSessionSchema = z
       .describe('Use a fresh UUID for each child workspace. Reuse it only for the same launch.'),
     callbackTarget: ParentCallbackTargetSchema.optional(),
     requestedEnvironment: requestedEnvironmentSchema.optional(),
+    attachments: AttachmentsSchema.optional(),
   })
   .strict()
   // Callers add organizationId with extend(). Zod refuses to overwrite a key on a
   // refined object, so the base shape must not declare it.
+  .refine(
+    input =>
+      [
+        input.githubRepo,
+        input.gitlabProject,
+        input.bitbucketRepo,
+        input.publicRepoUrl,
+        input.stackOnWorktreeId,
+      ].filter(value => value !== undefined).length === 1,
+    {
+      message: 'Choose exactly one repository source or stack target',
+    }
+  )
   .refine(input => input.stackOnWorktreeId === undefined || input.upstreamBranch === undefined, {
     message: 'A stacked workspace cannot use an upstream branch',
     path: ['upstreamBranch'],
@@ -155,9 +198,13 @@ const modelsListInputSchema = z.object({}).strict();
 // The environment catalog route is shared by personal and organization scope
 // (there is no organizations.* mirror), so authority binding is enforced here.
 const CLOUD_ENVIRONMENTS_LIST_PROCEDURE = 'cloudEnvironments.list';
-const cloudEnvironmentRepositorySchema = z
-  .object({ platform: z.literal('github'), fullName: z.string().min(1).max(500) })
-  .strict();
+const cloudEnvironmentRepositorySchema = z.discriminatedUnion('platform', [
+  z.object({ platform: z.literal('github'), fullName: z.string().min(1).max(500) }).strict(),
+  z.object({ platform: z.literal('gitlab'), projectPath: z.string().min(1).max(500) }).strict(),
+  z
+    .object({ platform: z.literal('bitbucket'), workspaceUuid: z.uuid(), repositoryUuid: z.uuid() })
+    .strict(),
+]);
 const cloudEnvironmentsListInputSchema = z
   .object({ repository: cloudEnvironmentRepositorySchema })
   .strict();
@@ -171,7 +218,7 @@ const scopedChildOperations = {
   },
   getSession: {
     kind: 'query',
-    schema: z.object({ cloudAgentSessionId: cloudAgentSessionIdSchema }).strict(),
+    schema: childTarget.extend({ stackOnWorktreeId: cloudAgentWorktreeIdSchema.optional() }),
   },
   getMessageResult: {
     kind: 'query',
@@ -186,6 +233,89 @@ const scopedChildOperations = {
   interruptSession: {
     kind: 'mutation',
     schema: z.object({ sessionId: cloudAgentSessionIdSchema }).strict(),
+  },
+  getSessionMessagesPage: {
+    kind: 'query',
+    schema: childSessionTarget.extend({
+      cursor: z.string().min(1).max(2048).optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+      kiloSessionId: sessionIdSchema.optional(),
+      toolDisplay: z.enum(['full', 'preview']).optional(),
+    }),
+  },
+  getSessionToolPartDetail: {
+    kind: 'query',
+    schema: childSessionTarget.extend({
+      kiloSessionId: sessionIdSchema.optional(),
+      messageId: nativeId,
+      partId: nativeId,
+      callId: nativeId.optional(),
+    }),
+  },
+  getPendingInteractions: { kind: 'query', schema: childTarget },
+  answerQuestion: {
+    kind: 'mutation',
+    schema: childSessionTarget.extend({
+      questionId: z.string().min(1),
+      answers: z.array(z.array(z.string())),
+    }),
+  },
+  rejectQuestion: {
+    kind: 'mutation',
+    schema: childSessionTarget.extend({ questionId: z.string().min(1) }),
+  },
+  listWorkspaceArtifacts: { kind: 'query', schema: childTarget },
+  getWorkspaceArtifactDownloadUrl: {
+    kind: 'query',
+    schema: childTarget.extend({ relativePath: workspaceArtifactRelativePathSchema }),
+  },
+  cancelQueuedMessage: {
+    kind: 'mutation',
+    schema: childSessionTarget.extend({ messageId: z.string().regex(MESSAGE_ID_PATTERN) }),
+  },
+  createWorktreeChat: {
+    kind: 'mutation',
+    schema: childTarget.extend({
+      operationKey: z.uuid(),
+      kiloSessionId: sessionIdSchema.optional(),
+    }),
+  },
+  syncWorktreeBranch: { kind: 'mutation', schema: branchOperationInput },
+  restackWorktreeBranch: { kind: 'mutation', schema: branchOperationInput },
+  listGitHubRepositories: { kind: 'query', schema: discoveryInput },
+  listGitLabRepositories: { kind: 'query', schema: discoveryInput },
+  listBitbucketRepositories: { kind: 'query', schema: discoveryInput },
+  listRepositoryBranches: {
+    kind: 'query',
+    schema: z
+      .object({
+        platform: repositoryPlatform,
+        repository: z.object({ fullName: z.string().min(1).max(500) }).strict(),
+      })
+      .strict(),
+  },
+  getAttachmentUploadUrl: {
+    kind: 'mutation',
+    schema: z
+      .object({
+        messageUuid: z.uuid(),
+        attachmentId: z.uuid(),
+        contentType: z.string().min(1).max(128),
+        contentLength: z
+          .number()
+          .int()
+          .positive()
+          .max(20 * 1024 * 1024),
+        extension: z
+          .string()
+          .regex(/^[a-z0-9]{1,16}$/)
+          .optional(),
+      })
+      .strict(),
+  },
+  releasePendingUploads: {
+    kind: 'mutation',
+    schema: z.object({ objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(5) }).strict(),
   },
   sendMessage: {
     kind: 'mutation',
@@ -204,6 +334,7 @@ const scopedChildOperations = {
             mode: scopedPrepareSessionSchema.shape.mode,
             model: scopedPrepareSessionSchema.shape.model,
             variant: scopedPrepareSessionSchema.shape.variant,
+            attachments: AttachmentsSchema.optional(),
           })
           .strict(),
         autoCommit: z.boolean().optional(),
@@ -308,7 +439,9 @@ export function cloudAgentNextProcedurePrefix(
 export function cloudAgentAuthorityProcedures(authority: CloudAgentAuthority): string[] {
   const prefix = cloudAgentNextProcedurePrefix(authority);
   return [
-    ...Object.keys(scopedChildOperations).map(name => `${prefix}.${name}`),
+    ...Object.keys(scopedChildOperations)
+      .filter(name => name !== 'listBitbucketRepositories' || authority.organizationId !== null)
+      .map(name => `${prefix}.${name}`),
     MODELS_LIST_PROCEDURE,
     CLOUD_ENVIRONMENTS_LIST_PROCEDURE,
     ...Object.keys(scopedFolderOperations),
@@ -377,6 +510,13 @@ export function validateCloudAgentAuthorityRequest(
     .extend({ organizationId: requestOrganizationIdField(scope, isFolderProcedure(procedure)) })
     .parse(input);
   assertAuthorityOrganization(scope, procedure, request.organizationId);
+  if (
+    'bitbucketRepo' in request &&
+    request.bitbucketRepo !== undefined &&
+    scope.organizationId === null
+  ) {
+    throw new Error('Bitbucket requires an organization Cloud Agent workspace');
+  }
   return request;
 }
 

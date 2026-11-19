@@ -431,7 +431,6 @@ describe('prepareSession operation-ledger admission gate', () => {
 
   it.each([
     ['a target in another workspace', { worktreeId: 'worktree_other' }],
-    ['a child target', { parentId: WORKSPACE_PARENT_ID }],
     ['a target that cannot spawn children', { allowSubagentSessions: false }],
   ])('rejects a workspace session callback with %s', async (_label, override) => {
     useSessionMetadata([
@@ -443,7 +442,6 @@ describe('prepareSession operation-ledger admission gate', () => {
         WORKSPACE_TARGET_ID,
         callbackMetadata(WORKSPACE_TARGET_ID, {
           worktreeId: 'worktreeId' in override ? override.worktreeId : WORKSPACE_WORKTREE_ID,
-          parentId: 'parentId' in override ? override.parentId : undefined,
           allowSubagentSessions:
             'allowSubagentSessions' in override ? override.allowSubagentSessions : true,
         }),

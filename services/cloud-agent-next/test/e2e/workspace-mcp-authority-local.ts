@@ -7,16 +7,18 @@
  * The local Worker must run with `RUNTIME_AUTHORIZATION_LIFETIME_MS` in its
  * `.dev.vars` (for example 480000), so a runtime delegation expires within the
  * run. The script prints one JSON observation per step and never prints a
- * credential. It does not assert: compare the observations to the expected
- * behavior of the build under test.
+ * credential. Use WORKSPACE_MCP_STEPS=children to assert nested launch and
+ * management behavior on a local public repository.
  *
  *   WORKER_URL=http://localhost:8794 KILO_MCP_URL=http://localhost:8815/mcp \
  *     pnpm exec tsx services/cloud-agent-next/test/e2e/workspace-mcp-authority-local.ts
  */
 import { randomUUID } from 'node:crypto';
+import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { computeDatabaseUrl, createDrizzleClient, kilocode_users } from '@kilocode/db';
 import { createMessageId } from '../../src/shared/message-id.js';
@@ -180,7 +182,12 @@ async function listTools(url: string, token: string): Promise<McpListing> {
     : { httpStatus: listed.status, error: 'tools/list returned no tools' };
 }
 
-async function callTool(url: string, token: string, name: string, args: Record<string, unknown>) {
+async function requestTool(
+  url: string,
+  token: string,
+  name: string,
+  args: Record<string, unknown>
+) {
   const init = await mcpRequest(url, token, null, {
     jsonrpc: '2.0',
     id: 1,
@@ -209,11 +216,243 @@ async function callTool(url: string, token: string, name: string, args: Record<s
   return {
     httpStatus: called.status,
     isError: message?.result?.isError === true || message?.error !== undefined,
-    content: JSON.stringify(message?.result?.content ?? message?.error?.message ?? null).slice(
-      0,
-      240
-    ),
+    content: message?.result?.content ?? message?.error?.message ?? null,
   };
+}
+
+async function callTool(url: string, token: string, name: string, args: Record<string, unknown>) {
+  const { content, ...status } = await requestTool(url, token, name, args);
+  return { ...status, content: JSON.stringify(content ?? null).slice(0, 240) };
+}
+
+const childSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  kiloSessionId: z.string(),
+  worktreeId: z.string(),
+});
+
+async function toolData(url: string, token: string, name: string, args: Record<string, unknown>) {
+  const result = await requestTool(url, token, name, args);
+  assert.equal(result.httpStatus, 200, `${name}: MCP request failed`);
+  assert.ok(
+    !result.isError,
+    `${name}: ${typeof result.content === 'string' ? result.content : 'MCP tool failed'}`
+  );
+  const [part] = z
+    .array(z.object({ type: z.literal('text'), text: z.string() }))
+    .min(1)
+    .parse(result.content);
+  assert.ok(part);
+  return JSON.parse(part.text) as unknown;
+}
+
+async function exerciseChildren(config: DriverConfig, mcpUrl: string, root: Chat, token: string) {
+  const task = {
+    publicRepoUrl: config.gitUrl,
+    mode: 'code',
+    model: config.model,
+    autoCommit: false,
+  };
+  const child = childSchema.parse(
+    await toolData(mcpUrl, token, 'spawn_session', {
+      ...task,
+      operationKey: randomUUID(),
+      prompt: fakeDirective('echo:manual-child-ready'),
+    })
+  );
+  assert.equal(
+    await waitForTurn(config, child, await initialMessage(mcpUrl, token, child)),
+    'completed'
+  );
+  const transcript = await toolData(mcpUrl, token, 'get_session_messages', {
+    sessionId: child.cloudAgentSessionId,
+  });
+  assert.ok(JSON.stringify(transcript).includes('manual-child-ready'));
+  observe('child-transcript', { result: 'passed' });
+  const artifacts = await toolData(mcpUrl, token, 'list_child_artifacts', {
+    cloudAgentSessionId: child.cloudAgentSessionId,
+  });
+  assert.deepEqual(z.object({ entries: z.array(z.unknown()) }).parse(artifacts).entries, []);
+  observe('child-artifact-list', { result: 'passed' });
+
+  const childMcp = await inspectMcp(child, mcpUrl);
+  assert.ok(childMcp.token, 'child MCP credential unavailable');
+  const grandchild = childSchema.parse(
+    await toolData(mcpUrl, childMcp.token, 'spawn_session', {
+      ...task,
+      operationKey: randomUUID(),
+      prompt: fakeDirective('echo:manual-grandchild-ready'),
+      callbackTarget: { url: `workspace:${child.cloudAgentSessionId}` },
+    })
+  );
+  assert.equal(
+    await waitForTurn(config, grandchild, await initialMessage(mcpUrl, childMcp.token, grandchild)),
+    'completed'
+  );
+  const denied = await requestTool(mcpUrl, token, 'get_session_messages', {
+    sessionId: grandchild.cloudAgentSessionId,
+  });
+  assert.ok(denied.isError, 'root must not read a grandchild');
+  const listed = await toolData(mcpUrl, childMcp.token, 'list_child_sessions', {});
+  assert.ok(JSON.stringify(listed).includes(grandchild.cloudAgentSessionId));
+  observe('grandchild-lineage', { result: 'passed' });
+
+  const callbackDeadline = Date.now() + 30_000;
+  let callbackSeen = false;
+  while (Date.now() < callbackDeadline) {
+    const page = await toolData(mcpUrl, token, 'get_session_messages', {
+      sessionId: child.cloudAgentSessionId,
+    });
+    if (JSON.stringify(page).includes('manual-grandchild-ready')) {
+      callbackSeen = true;
+      break;
+    }
+    await sleep(2_000);
+  }
+  assert.ok(callbackSeen, 'grandchild callback did not appear in its parent chat');
+  observe('grandchild-callback', { result: 'passed' });
+
+  const sibling = childSchema.parse(
+    await toolData(mcpUrl, token, 'create_child_chat', {
+      cloudAgentSessionId: child.cloudAgentSessionId,
+      operationKey: randomUUID(),
+    })
+  );
+  assert.equal(sibling.worktreeId, child.worktreeId);
+  const { messageId } = z
+    .object({ messageId: z.string() })
+    .parse(await toolData(mcpUrl, token, 'generate_message_id', {}));
+  await toolData(mcpUrl, token, 'send_message', {
+    cloudAgentSessionId: sibling.cloudAgentSessionId,
+    messageId,
+    payload: {
+      type: 'prompt',
+      prompt: fakeDirective('echo:manual-child-chat'),
+      mode: 'code',
+      model: config.model,
+    },
+  });
+  assert.equal(await waitForTurn(config, sibling, messageId), 'completed');
+  const hidden = await requestTool(mcpUrl, token, 'search', { query: 'sessions' });
+  assert.ok(hidden.isError, 'scoped MCP must reject the hidden search tool');
+  const self = await requestTool(mcpUrl, token, 'get_session', {
+    cloudAgentSessionId: root.cloudAgentSessionId,
+  });
+  assert.ok(self.isError, 'scoped MCP must reject management of its own session');
+  observe('child-chat-and-refusals', { result: 'passed' });
+}
+
+async function initialMessage(url: string, token: string, child: Chat): Promise<string> {
+  const { sessions } = z
+    .object({
+      sessions: z.array(
+        z.object({ cloudAgentSessionId: z.string(), initialMessageId: z.string().optional() })
+      ),
+    })
+    .parse(await toolData(url, token, 'list_child_sessions', {}));
+  const messageId = sessions.find(
+    session => session.cloudAgentSessionId === child.cloudAgentSessionId
+  )?.initialMessageId;
+  assert.ok(messageId, 'child registry did not return the initial message ID');
+  return messageId;
+}
+
+async function exerciseQuestions(config: DriverConfig, url: string, root: Chat, token: string) {
+  const child = childSchema.parse(
+    await toolData(url, token, 'spawn_session', {
+      publicRepoUrl: config.gitUrl,
+      mode: 'code',
+      model: config.model,
+      operationKey: randomUUID(),
+      prompt: fakeDirective(`question:${randomUUID()}:Continue the local manual test?`),
+      callbackTarget: { url: `workspace:${root.cloudAgentSessionId}` },
+    })
+  );
+  const initialMessageId = await initialMessage(url, token, child);
+  const pendingSchema = z.object({ questions: z.array(z.object({ id: z.string() })) });
+  const deadline = Date.now() + 80_000;
+  let questionId: string | undefined;
+  while (Date.now() < deadline) {
+    const { questions } = pendingSchema.parse(
+      await toolData(url, token, 'get_pending_questions', {
+        cloudAgentSessionId: child.cloudAgentSessionId,
+      })
+    );
+    questionId = questions[0]?.id;
+    if (questionId) break;
+    const result = await getMessageResult(config, child.cloudAgentSessionId, initialMessageId);
+    assert.ok(
+      !['completed', 'failed', 'interrupted'].includes(result.status),
+      `Child turn settled before asking: ${result.status}`
+    );
+    await sleep(2_000);
+  }
+  assert.ok(questionId, 'child question did not become pending');
+
+  const callbackDeadline = Date.now() + 25_000;
+  let sawCallback = false;
+  while (Date.now() < callbackDeadline) {
+    const page = await trpcCall(
+      config,
+      'getSessionMessagesPage',
+      { sessionId: root.cloudAgentSessionId, limit: 5 },
+      { method: 'GET' }
+    );
+    if (JSON.stringify(page).includes(questionId)) {
+      sawCallback = true;
+      break;
+    }
+    await sleep(2_000);
+  }
+  assert.ok(sawCallback, 'question callback did not reach the parent transcript');
+  assert.deepEqual(
+    await toolData(url, token, 'answer_question', {
+      sessionId: child.cloudAgentSessionId,
+      questionId,
+      answers: [['Continue']],
+    }),
+    { success: true }
+  );
+  assert.equal(await waitForTurn(config, child, initialMessageId), 'completed');
+  observe('question-callback-and-answer', { result: 'passed' });
+  if (process.env.WORKSPACE_MCP_STEPS?.split(',').includes('queue')) {
+    const slowMessageId = createMessageId();
+    await sendMessage(config, {
+      cloudAgentSessionId: child.cloudAgentSessionId,
+      messageId: slowMessageId,
+      prompt: fakeDirective('slow:60:1000:16'),
+    });
+    const deadline = Date.now() + 15_000;
+    while (
+      (await getMessageResult(config, child.cloudAgentSessionId, slowMessageId)).status !==
+      'running'
+    ) {
+      assert.ok(Date.now() < deadline, 'paced turn did not start');
+      await sleep(500);
+    }
+    const { messageId } = z
+      .object({ messageId: z.string() })
+      .parse(await toolData(url, token, 'generate_message_id', {}));
+    await toolData(url, token, 'send_message', {
+      cloudAgentSessionId: child.cloudAgentSessionId,
+      messageId,
+      payload: {
+        type: 'prompt',
+        prompt: fakeDirective('echo:must-not-run'),
+        mode: 'code',
+        model: config.model,
+      },
+    });
+    const cancelInput = { sessionId: child.cloudAgentSessionId, messageId };
+    assert.deepEqual(await toolData(url, token, 'cancel_queued_message', cancelInput), {
+      dropped: true,
+    });
+    assert.deepEqual(await toolData(url, token, 'cancel_queued_message', cancelInput), {
+      dropped: false,
+    });
+    assert.equal(await waitForTurn(config, child, messageId), 'interrupted');
+    observe('queued-message-cancel', { result: 'passed' });
+  }
 }
 
 type Inspection = {
@@ -332,11 +571,40 @@ async function main(): Promise<void> {
     },
     { internalApiSecret: config.internalApiSecret }
   );
+  const rootTurn = await waitForTurn(config, root, rootMessageId);
   observe('root-created', {
     worktree: Boolean(root.worktreeId),
-    rootTurn: await waitForTurn(config, root, rootMessageId),
+    rootTurn,
   });
-  report('root-mcp', await inspectMcp(root, mcpUrl));
+  assert.equal(rootTurn, 'completed');
+  const rootMcp = await inspectMcp(root, mcpUrl);
+  report('root-mcp', rootMcp);
+  assert.equal(rootMcp.status, 'connected');
+  assert.equal(rootMcp.listing?.httpStatus, 200);
+  if (scenario.has('discovery')) {
+    assert.ok(rootMcp.token, 'root MCP credential unavailable');
+    for (const platform of ['github', 'gitlab']) {
+      const result = await toolData(mcpUrl, rootMcp.token, 'list_repositories', { platform });
+      z.object({ repositories: z.array(z.unknown()), integrationInstalled: z.boolean() }).parse(
+        result
+      );
+    }
+    const branchResult = await requestTool(mcpUrl, rootMcp.token, 'list_branches', {
+      platform: 'bitbucket',
+      repository: { fullName: 'example/repo' },
+    });
+    assert.ok(branchResult.isError);
+    assert.match(JSON.stringify(branchResult.content), /Bitbucket.*organization/i);
+    observe('repository-discovery', { result: 'passed' });
+  }
+  if (scenario.has('children')) {
+    assert.ok(rootMcp.token, 'root MCP credential unavailable');
+    await exerciseChildren(config, mcpUrl, root, rootMcp.token);
+  }
+  if (scenario.has('questions')) {
+    assert.ok(rootMcp.token, 'root MCP credential unavailable');
+    await exerciseQuestions(config, mcpUrl, root, rootMcp.token);
+  }
 
   if (scenario.has('expiry')) {
     await waitUntil(
@@ -349,7 +617,9 @@ async function main(): Promise<void> {
     sourceCloudAgentSessionId: root.cloudAgentSessionId,
     operationKey: randomUUID(),
   });
-  observe('sibling-created', { turn: await sendTurn(config, sibling, 'sibling-ready') });
+  const siblingTurn = await sendTurn(config, sibling, 'sibling-ready');
+  observe('sibling-created', { turn: siblingTurn });
+  assert.equal(siblingTurn.status, 'completed');
   report('sibling-mcp-before-root-expiry', await inspectMcp(sibling, mcpUrl));
 
   if (scenario.has('expiry')) {

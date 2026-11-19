@@ -439,7 +439,9 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           ? undefined
           : await resolveStackedWorkspaceSource({
               db,
-              client,
+              client: ctx.cloudAgentAuthority
+                ? { getSession: id => client.getSession(id, organizationId, stackOnWorktreeId) }
+                : client,
               userId: ctx.user.id,
               organizationId,
               worktreeId: stackOnWorktreeId,
@@ -642,6 +644,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         user: ctx.user,
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
         operationKey: input.operationKey,
         kiloSessionId: input.kiloSessionId,
         organizationId: input.organizationId,
@@ -922,6 +925,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         organizationId: input.organizationId,
         cloudAgentSessionId: input.cloudAgentSessionId,
         operation: 'sync',
+        scoped: Boolean(ctx.cloudAgentAuthority),
       });
     }),
 
@@ -942,6 +946,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         organizationId: input.organizationId,
         cloudAgentSessionId: input.cloudAgentSessionId,
         operation: 'restack',
+        scoped: Boolean(ctx.cloudAgentAuthority),
       });
     }),
 
@@ -960,7 +965,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         input.organizationId
       );
       const client = createCloudAgentNextClient(authToken);
-      return await client.listWorkspaceArtifacts(input.cloudAgentSessionId);
+      return await client.listWorkspaceArtifacts(
+        input.cloudAgentSessionId,
+        ctx.cloudAgentAuthority ? input.organizationId : undefined
+      );
     }),
 
   getWorkspaceArtifactDownloadUrl: organizationMemberProcedure
@@ -980,7 +988,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
       return await client.getWorkspaceArtifactDownloadUrl(
         input.cloudAgentSessionId,
-        input.relativePath
+        input.relativePath,
+        ctx.cloudAgentAuthority ? input.organizationId : undefined
       );
     }),
 
@@ -1316,7 +1325,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       );
       const client = createCloudAgentNextClient(authToken);
 
-      return await client.cancelQueuedMessage(input.sessionId, input.messageId);
+      return await client.cancelQueuedMessage(
+        input.sessionId,
+        input.messageId,
+        ctx.cloudAgentAuthority ? input.organizationId : undefined
+      );
     }),
 
   answerQuestion: organizationMemberMutationProcedure
@@ -1338,6 +1351,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         sessionId: input.sessionId,
         questionId: input.questionId,
         answers: input.answers,
+        organizationId: ctx.cloudAgentAuthority ? input.organizationId : undefined,
       });
     }),
 
@@ -1359,6 +1373,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       return await client.rejectQuestion({
         sessionId: input.sessionId,
         questionId: input.questionId,
+        organizationId: ctx.cloudAgentAuthority ? input.organizationId : undefined,
       });
     }),
 
@@ -1406,7 +1421,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         input.organizationId
       );
       const client = createCloudAgentNextClient(authToken);
-      return await client.getPendingInteractions(input.cloudAgentSessionId);
+      return await client.getPendingInteractions(
+        input.cloudAgentSessionId,
+        ctx.cloudAgentAuthority ? input.organizationId : undefined
+      );
     }),
 
   /**
@@ -1434,13 +1452,16 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           clock: ctx,
           message: SESSION_MESSAGES_UNAVAILABLE_MESSAGE,
           read: () =>
-            client.getSessionMessagesPage({
-              sessionId: input.sessionId,
-              kiloSessionId: input.kiloSessionId,
-              cursor: input.cursor,
-              limit: input.limit,
-              toolDisplay: input.toolDisplay,
-            }),
+            client.getSessionMessagesPage(
+              {
+                sessionId: input.sessionId,
+                kiloSessionId: input.kiloSessionId,
+                cursor: input.cursor,
+                limit: input.limit,
+                toolDisplay: input.toolDisplay,
+              },
+              ctx.cloudAgentAuthority ? input.organizationId : undefined
+            ),
         });
       } catch (error) {
         throw (
@@ -1491,13 +1512,16 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         ctx.headersList,
         input.organizationId
       );
-      return createCloudAgentNextClient(authToken).getSessionToolPartDetail({
-        sessionId: input.sessionId,
-        kiloSessionId: input.kiloSessionId,
-        messageId: input.messageId,
-        partId: input.partId,
-        callId: input.callId,
-      });
+      return createCloudAgentNextClient(authToken).getSessionToolPartDetail(
+        {
+          sessionId: input.sessionId,
+          kiloSessionId: input.kiloSessionId,
+          messageId: input.messageId,
+          partId: input.partId,
+          callId: input.callId,
+        },
+        ctx.cloudAgentAuthority ? input.organizationId : undefined
+      );
     }),
 
   getSession: organizationMemberProcedure

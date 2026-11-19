@@ -226,13 +226,12 @@ repository.
     by actual activity, and PR verification or other metadata writes MUST NOT
     move them or workspaces in activity order.
 11. A Cloud Agent permitted to launch child sessions MUST be able to orchestrate
-    stacked workspaces through its scoped launch tool when the user requests a
-    PR stack. Every new launch MUST use a fresh UUID `operationKey` and create a
+    stacked workspaces through its scoped launch tool. Every new launch MUST use a fresh UUID `operationKey` and create a
     registered workspace. The response MUST return its `worktreeId`, including
     on an identical retry. The orchestrator MAY launch worker A independently,
     then launch B with `stackOnWorktreeId` set to A's returned ID after A pushes.
-    The stack parent MAY be another owned worktree in the same personal or
-    organization scope. Completion callbacks MUST target the launching
+    The stack parent MUST be its own workspace or a direct child workspace.
+    Completion callbacks MUST target the launching
     orchestrator independently of the stack parent. The server MUST resolve the
     parent repository, branch, and pushed commit with the UI ownership checks.
     The agent MUST NOT select the resolved commit, override its lineage, or
@@ -578,20 +577,24 @@ repository.
     the worktree is created, MAY be restored when its runtime is rehydrated, and
     MUST be reused by later chats.
 15. A workspace's delegated Cloud Agent MCP connection MAY create independent
-    child sessions and list, inspect, check exact message results, interrupt, or
-    send prompt follow-ups to its direct children. Each management operation
+    child sessions from any origin with runtime authorization, including at
+    nested depth. It MAY list and inspect direct children, read their transcripts
+    and artifacts, answer questions, send follow-ups, cancel queued messages,
+    stop work, and sync or restack their branches. It MAY create a new chat in a
+    direct child's workspace. This chat MUST remain manageable by the caller;
+    creating it MUST NOT start a turn. Each management operation
     MUST check current canonical-parent authorization and persisted child
     lineage, owner and organization. It MUST NOT manage the parent itself,
     sibling chats or unrelated sessions. Child completion callbacks MUST target
     either a new chat created in the parent's workspace
     (`workspace:new-chat`) or one existing chat in that workspace
     (`workspace:<session-id>`). The server MUST verify that a session target is
-    a root or sibling chat with the same owner, organization and workspace, and
-    that it is still accessible; it MUST reject a target outside the spawning
-    parent's workspace or any target that is a child session. The target chat
+    accessible and has the same owner, organization and workspace. For a
+    standalone parent, it MUST target that session. The target chat
     learns its own session id from the `cloud-agent-context` line in its turns.
     A `workspace:new-chat` callback starts the new chat with the child result as
-    its first message, and every workspace callback MUST be idempotent for the
+    its first message. A pending child question MUST use a separate callback
+    from completion. Every workspace callback MUST be idempotent for the
     persisted callback message ID. A child completion callback MUST render as a
     distinct child session message that identifies the child session, shows its
     reported result or failure, and links to that session. It MUST NOT render

@@ -88,7 +88,6 @@ import {
   type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
 import { getWorkspaceStub } from '../workspace/workspace-stub.js';
-import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { getContainerCapacityFailureReason } from '../../container-concurrency.js';
 import {
   generateSandboxCredential,
@@ -3225,7 +3224,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private pinFromInput(
     input: EnsureAllocationInput,
     repositoryUrl?: string,
-    kiloToken?: string
+    kiloToken?: string,
+    cloudAgentMcp?: boolean
   ): StoredProviderPin {
     const policy = egressPolicySchema.safeParse(input);
     if (!policy.success) throw new ProviderCreationError('invalid_configuration');
@@ -3262,6 +3262,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
               env: this.env,
               repositoryUrl,
               kiloToken,
+              cloudAgentMcp,
             }),
           }),
       ...(input.byoc ? { byoc: input.byoc } : {}),
@@ -3570,7 +3571,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         selectedPin = this.pinFromInput(
           sandboxSelection,
           repository && repository.type !== 'github' ? repository.url : undefined,
-          source.kiloToken
+          source.kiloToken,
+          source.allowSubagentSessions
         );
       }
       if (
@@ -5410,12 +5412,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
    */
   private async refreshCloudAgentMcp(route: RouteRecord, state: AllocationState): Promise<void> {
     const binding = this.workspaceMcpBinding(route);
-    // Only interactive workspaces can launch children; automation never asks.
-    if (
-      binding === null ||
-      route.grant === null ||
-      !isInteractiveSessionOrigin(route.credentialSource?.createdOnPlatform)
-    ) {
+    if (binding === null || route.grant === null) {
       return;
     }
     const sent = this.sentCloudAgentMcpExpiresAt.get(binding.workspaceSessionId);

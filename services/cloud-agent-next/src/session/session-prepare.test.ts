@@ -4598,7 +4598,7 @@ describe('createSessionWithLedger admission ladder', () => {
     expect(markReconcilePendingMock).not.toHaveBeenCalled();
   });
 
-  it('registers an authenticated scoped child as a worktree workspace without spawn authority', async () => {
+  it('registers an authenticated scoped child as a worktree workspace with spawn authority', async () => {
     const doStub = makeDoStub();
     const ctx = modernContext(scopedChildContext(makeContext(doStub)));
     const expectedWorktreeId = `worktree_${SANDBOX_SESSION_ID.slice('workspace_'.length)}`;
@@ -4625,7 +4625,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const metadata = createdMetadata(doStub);
     expect(metadata).toMatchObject({
       parentCloudAgentSessionId: PARENT_SESSION_ID,
-      allowSubagentSessions: false,
+      allowSubagentSessions: true,
       identity: expect.objectContaining({ createdOnPlatform: 'cloud-agent-web' }),
       workspace: expect.objectContaining({
         worktreeId: expectedWorktreeId,

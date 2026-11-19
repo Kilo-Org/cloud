@@ -22,6 +22,17 @@ const MANAGEMENT_PROCEDURES = {
   getMessageResult: { base: 'getMessageResult', kind: 'query' },
   interruptSession: { base: 'interruptSession', kind: 'mutation' },
   sendMessageV2: { base: 'sendMessage', kind: 'mutation' },
+  getSessionMessagesPage: { base: 'getSessionMessagesPage', kind: 'query' },
+  getSessionToolPartDetail: { base: 'getSessionToolPartDetail', kind: 'query' },
+  getPendingInteractions: { base: 'getPendingInteractions', kind: 'query' },
+  answerQuestion: { base: 'answerQuestion', kind: 'mutation' },
+  rejectQuestion: { base: 'rejectQuestion', kind: 'mutation' },
+  listWorkspaceArtifacts: { base: 'listWorkspaceArtifacts', kind: 'query' },
+  getWorkspaceArtifactDownloadUrl: { base: 'getWorkspaceArtifactDownloadUrl', kind: 'query' },
+  cancelQueuedMessage: { base: 'cancelQueuedMessage', kind: 'mutation' },
+  createWorktreeChat: { base: 'createWorktreeChat', kind: 'mutation' },
+  syncWorktreeBranch: { base: 'syncWorktreeBranch', kind: 'mutation' },
+  restackWorktreeBranch: { base: 'restackWorktreeBranch', kind: 'mutation' },
 } as const;
 
 export type CloudAgentManagementPath = keyof typeof MANAGEMENT_PROCEDURES;
@@ -36,7 +47,16 @@ function forbidden(message: string): TRPCError {
 
 function targetFromRawInput(path: CloudAgentManagementPath, rawInput: unknown) {
   if (path === 'listChildSessions') return undefined;
-  if (path === 'interruptSession') {
+  if (
+    [
+      'interruptSession',
+      'getSessionMessagesPage',
+      'getSessionToolPartDetail',
+      'answerQuestion',
+      'rejectQuestion',
+      'cancelQueuedMessage',
+    ].includes(path)
+  ) {
     const parsed = z
       .object({ sessionId: z.string().min(1) })
       .passthrough()
@@ -156,12 +176,76 @@ export async function assertCloudAgentManagementRequest(input: {
     throw forbidden('Cloud Agent authority does not permit this procedure');
   }
   try {
-    validateCloudAgentAuthorityRequest(input.authority, procedure, input.rawInput);
+    const request =
+      input.path === 'createWorktreeChat'
+        ? z
+            .object({
+              sourceCloudAgentSessionId: z.string(),
+              operationKey: z.uuid(),
+              kiloSessionId: z.string().optional(),
+              kilocodeOrganizationId: z.string().optional(),
+            })
+            .parse(input.rawInput)
+        : undefined;
+    validateCloudAgentAuthorityRequest(
+      input.authority,
+      procedure,
+      request
+        ? {
+            cloudAgentSessionId: request.sourceCloudAgentSessionId,
+            operationKey: request.operationKey,
+            kiloSessionId: request.kiloSessionId,
+            organizationId: request.kilocodeOrganizationId,
+          }
+        : input.rawInput
+    );
   } catch {
     throw forbidden('Cloud Agent management exceeds its authority');
   }
   await assertParentAuthority(input.env, input.authority);
-  const target = targetFromRawInput(input.path, input.rawInput);
+  if (input.path === 'getSession') {
+    const stack = z
+      .object({
+        cloudAgentSessionId: z.string(),
+        stackOnWorktreeId: z.string().regex(/^worktree_/),
+      })
+      .safeParse(input.rawInput);
+    if (stack.success) {
+      await withDORetry(
+        () => getWorkspaceStub(input.env, input.authority.ownerId, input.authority.parentSessionId),
+        stub => stub.assertStackTarget(input.authority, stack.data.stackOnWorktreeId),
+        'assertStackTarget'
+      ).catch(error => {
+        throw forbidden(
+          error instanceof Error && error.message.includes('Stack target must be')
+            ? 'Stack target must be this workspace or a direct child workspace'
+            : CLOUD_AGENT_PARENT_AUTHORITY_DENIED
+        );
+      });
+      await requireCurrentSessionAccess({
+        env: input.env,
+        kiloUserId: input.authority.ownerId,
+        cloudAgentSessionId: stack.data.cloudAgentSessionId,
+        expectedOrganizationId: input.authority.organizationId,
+      });
+      const metadata = await withDORetry(
+        () =>
+          getSandboxSessionStub(input.env, input.authority.ownerId, stack.data.cloudAgentSessionId),
+        (stub): Promise<SessionMetadata | null> => stub.getMetadata(),
+        'getMetadata'
+      );
+      if (metadata?.workspace?.worktreeId !== stack.data.stackOnWorktreeId)
+        throw forbidden('Stack source chat does not belong to the target workspace');
+      return;
+    }
+  }
+  const target =
+    input.path === 'createWorktreeChat'
+      ? {
+          childSessionId: z.object({ sourceCloudAgentSessionId: z.string() }).parse(input.rawInput)
+            .sourceCloudAgentSessionId,
+        }
+      : targetFromRawInput(input.path, input.rawInput);
   if (target === undefined) {
     if (input.path === 'listChildSessions') return;
     throw forbidden('Cloud Agent management target is invalid');

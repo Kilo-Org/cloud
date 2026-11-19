@@ -338,11 +338,12 @@ export function createSessionManagementHandlers() {
      * the accepted/current run; a missing id or the accepted current message
      * returns `{ dropped: false }`.
      */
-    cancelQueuedMessage: protectedProcedure
+    cancelQueuedMessage: cloudAgentManagedProcedure
       .input(
         z.object({
           sessionId: sessionIdSchema.describe('Session ID owning the queued message'),
           messageId: MessageIdSchema.describe('Message ID to drop from the queue'),
+          organizationId: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -356,6 +357,7 @@ export function createSessionManagementHandlers() {
             env,
             kiloUserId: userId,
             cloudAgentSessionId: sessionId,
+            expectedOrganizationId: ctx.cloudAgentAuthority?.organizationId,
           });
 
           try {

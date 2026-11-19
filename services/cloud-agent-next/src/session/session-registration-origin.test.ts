@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  allowsSubagentSessions,
   isAuthenticatedChildWorktreeCreate,
   isEligibleFirstWorktreeSession,
   isTrustedWorktreeCreateOrigin,
@@ -304,39 +303,5 @@ describe('isAuthenticatedChildWorktreeCreate', () => {
         {}
       )
     ).toBe(false);
-  });
-});
-
-describe('allowsSubagentSessions', () => {
-  it.each(['cloud-agent-web', 'desktop', 'agent-manager'])(
-    'grants spawn permission to the interactive %s origin',
-    createdOnPlatform => {
-      expect(allowsSubagentSessions({ options: { createdOnPlatform } })).toBe(true);
-    }
-  );
-
-  it.each(['cloud-agent', 'slack', 'github', 'code-review', 'security-agent', undefined])(
-    'denies spawn permission to the non-interactive %s origin',
-    createdOnPlatform => {
-      expect(allowsSubagentSessions({ options: { createdOnPlatform } })).toBe(false);
-    }
-  );
-
-  it('denies spawned child sessions their own spawn permission', () => {
-    expect(
-      allowsSubagentSessions({
-        options: { createdOnPlatform: 'cloud-agent-web' },
-        parentCloudAgentSessionId: 'workspace_parent',
-      })
-    ).toBe(false);
-  });
-
-  it('allows spawn permission on an isolated allocation', () => {
-    expect(
-      allowsSubagentSessions({
-        options: { createdOnPlatform: 'cloud-agent-web' },
-        runtime: { sandboxAllocation: 'cloudflare-containers-standard-3' },
-      })
-    ).toBe(true);
   });
 });

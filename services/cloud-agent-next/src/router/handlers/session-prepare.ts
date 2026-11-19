@@ -88,9 +88,10 @@ async function validateCallbackTarget(
     });
   }
   const targetSessionId = parseWorkspaceSessionCallbackTarget(target.url);
-  if (targetSessionId === null) return { url: target.url };
+  const sessionId = targetSessionId ?? target.launchingSessionId;
+  if (sessionId === undefined) return { url: target.url };
   const [targetSession, workspace] = await Promise.all([
-    loadCallbackSession(ctx, authority.ownerId, targetSessionId),
+    loadCallbackSession(ctx, authority.ownerId, sessionId),
     withDORetry(
       () => getWorkspaceStub(ctx.env, authority.ownerId, authority.parentSessionId),
       stub => stub.describe(),
@@ -101,16 +102,19 @@ async function validateCallbackTarget(
     !targetSession ||
     workspace.state !== 'active' ||
     workspace.organizationId !== authority.organizationId ||
-    targetSession.identity.sessionId !== targetSessionId ||
+    targetSession.identity.sessionId !== sessionId ||
     targetSession.identity.userId !== authority.ownerId ||
     (targetSession.identity.orgId ?? null) !== authority.organizationId ||
-    targetSession.parentCloudAgentSessionId !== undefined ||
     targetSession.allowSubagentSessions !== true
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Callback session is not available' });
   }
   const worktreeId = workspace.worktreeId;
-  if (!worktreeId || targetSession.workspace?.worktreeId !== worktreeId) {
+  if (
+    worktreeId === null
+      ? sessionId !== authority.parentSessionId
+      : targetSession.workspace?.worktreeId !== worktreeId
+  ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Callback session is outside the child workspace',
@@ -119,11 +123,14 @@ async function validateCallbackTarget(
   await requireCurrentSessionAccess({
     env: ctx.env,
     kiloUserId: authority.ownerId,
-    cloudAgentSessionId: targetSessionId,
+    cloudAgentSessionId: sessionId,
     expectedOrganizationId: targetSession.identity.orgId ?? null,
     expectedKiloSessionId: targetSession.auth.kiloSessionId,
   });
-  return { url: target.url };
+  return {
+    url: target.url,
+    ...(targetSessionId === null ? { launchingSessionId: sessionId } : {}),
+  };
 }
 
 export function prepareInputToSessionCreateRequest(input: PrepareInput): SessionCreateRequest {
@@ -322,7 +329,11 @@ const prepareSessionHandler = internalApiProtectedProcedure
         botId: ctx.botId,
         cloudAgentAuthority: ctx.cloudAgentAuthority,
       };
-      const billingOrigin = { billingOrigin: requestWithProfile.options?.createdOnPlatform };
+      const billingOrigin = {
+        billingOrigin: ctx.cloudAgentAuthority
+          ? 'cloud-agent'
+          : requestWithProfile.options?.createdOnPlatform,
+      };
       // Admit into the operation ledger only when the client supplied an
       // `operationKey` AND the effective `autoInitiate` is true. Otherwise the
       // key is ignored and the legacy split-flow behavior is preserved.

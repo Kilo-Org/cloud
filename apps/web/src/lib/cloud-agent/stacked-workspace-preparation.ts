@@ -342,6 +342,12 @@ export async function resolveStackedWorkspaceSource(params: {
   try {
     metadata = await params.client.getSession(root.rootCloudAgentSessionId);
   } catch (error) {
+    if (error instanceof Error && error.message.includes('Stack target must be')) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Stack target must be this workspace or a direct child workspace',
+      });
+    }
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: 'Could not read the branch of that workspace. Try again.',

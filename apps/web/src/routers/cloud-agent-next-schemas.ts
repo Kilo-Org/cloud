@@ -647,12 +647,17 @@ export const baseRestackWorktreeBranchNextOutputSchema = worktreeBranchOperation
 
 export const baseCreateWorktreeChatNextSchema = z
   .object({
-    sourceKiloSessionId: kiloSessionIdSchema,
+    sourceKiloSessionId: kiloSessionIdSchema.optional(),
+    cloudAgentSessionId: controlPlaneSessionIdSchema().optional(),
     operationKey: z.uuid(),
     /** Client-proposed id for the new chat, so the client can show it before this returns. */
     kiloSessionId: clientKiloSessionIdSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    input => input.sourceKiloSessionId !== undefined || input.cloudAgentSessionId !== undefined,
+    'A source session is required'
+  );
 
 export const baseCreateWorktreeChatNextOutputSchema = z
   .object({

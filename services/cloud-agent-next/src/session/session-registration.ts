@@ -140,7 +140,6 @@ import {
   withSavedSandboxAllocation,
 } from './sandbox-allocation-resolution.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
-import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   egressRequestSupported,
@@ -154,24 +153,6 @@ import {
 } from '../shared/runtime-profile.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
-
-/**
- * Whether a create may launch child Cloud Agent sessions. The capability is not
- * caller-controlled: a session gets it when a person created it through an
- * interactive client and it is not itself a spawned child. Every sandbox serves
- * one workspace, so the sandbox never removes the capability.
- */
-export function allowsSubagentSessions(
-  input: Pick<
-    SessionRegistrationInput,
-    'options' | 'parentCloudAgentSessionId' | 'runtime' | 'savedSandboxAllocation'
-  >
-): boolean {
-  return (
-    input.parentCloudAgentSessionId === undefined &&
-    isInteractiveSessionOrigin(input.options?.createdOnPlatform)
-  );
-}
 
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
@@ -930,12 +911,20 @@ async function issueSessionRuntimeAuthorization(
     const authority = ctx.cloudAgentAuthority;
     const runtimeAuthorization = await withDORetry(
       () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
-      stub => stub.authorizeChild({ authority, childSessionId: cloudAgentSessionId }),
+      stub =>
+        stub.authorizeChild({
+          authority,
+          childSessionId: cloudAgentSessionId,
+          stackOnWorktreeId: input.parentWorktreeId,
+        }),
       'authorizeChild'
-    ).catch(() => {
+    ).catch((error: unknown) => {
       throw new TRPCError({
         code: 'FORBIDDEN',
-        message: 'Cloud Agent parent authorization unavailable',
+        message:
+          error instanceof Error && error.message.includes('Stack target must be')
+            ? 'Stack target must be this workspace or a direct child workspace'
+            : 'Cloud Agent parent authorization unavailable',
       });
     });
     await assertKiloModelAvailable({
@@ -1559,10 +1548,7 @@ function buildSessionRegistrationCommand(
 ) {
   return {
     generatedBranch: allocation.generatedBranch,
-    allowSubagentSessions:
-      allowsSubagentSessions(input) &&
-      isPolicyBearingAuthToken(ctx.authToken) &&
-      ctx.botId === undefined,
+    allowSubagentSessions: isPolicyBearingAuthToken(ctx.authToken),
     parentCloudAgentSessionId: input.parentCloudAgentSessionId,
     ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
     identity: {

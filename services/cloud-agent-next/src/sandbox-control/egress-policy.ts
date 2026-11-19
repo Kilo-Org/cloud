@@ -3,6 +3,7 @@ import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targe
 import { ProviderCreationError } from './provider.js';
 import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { egressDomainSchema } from '@kilocode/worker-utils/egress-allowlist';
+import { resolveCloudAgentMcpUrl } from '../cloud-agent-authority.js';
 
 /** The canonical effective allowlist of a sandbox, for every provider. */
 export const nativeEgressAllowlistSchema = z
@@ -38,9 +39,14 @@ const GIT_DOMAINS = [
 
 export function buildNativeEgressAllowlist(input: {
   allowlist: string[];
-  env: KiloTargetEnv & { WORKER_URL?: string };
+  env: KiloTargetEnv & {
+    WORKER_URL?: string;
+    CLOUD_AGENT_MCP_URL_OVERRIDE?: string;
+    R2_ENDPOINT?: string;
+  };
   kiloToken?: string;
   repositoryUrl?: string;
+  cloudAgentMcp?: boolean;
 }): string[] {
   const targets = deriveKiloSandboxTargets(input.env, input.kiloToken ?? '', {
     requireHttps: true,
@@ -67,6 +73,18 @@ export function buildNativeEgressAllowlist(input: {
       ...input.allowlist,
       ...GIT_DOMAINS,
       ...urls.map(url => url.hostname),
+      ...(input.cloudAgentMcp
+        ? [
+            resolveCloudAgentMcpUrl(input.env.CLOUD_AGENT_MCP_URL_OVERRIDE),
+            input.env.R2_ENDPOINT,
+          ].flatMap(value => {
+            if (!value) return [];
+            const url = new URL(value);
+            return url.protocol === 'https:' && url.port === '' && !url.username && !url.password
+              ? [url.hostname]
+              : [];
+          })
+        : []),
     ]);
   } catch {
     throw new ProviderCreationError('invalid_configuration');

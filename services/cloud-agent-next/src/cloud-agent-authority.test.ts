@@ -505,7 +505,10 @@ describe('scoped worker preparation', () => {
         operationKey: '33333333-3333-4333-8333-333333333333',
       })
     ).toEqual({
-      ...launch,
+      model: launch.model,
+      mode: launch.mode,
+      prompt: launch.prompt,
+      autoInitiate: true,
       stackOnWorktreeId: parentWorktreeId,
       operationKey: '33333333-3333-4333-8333-333333333333',
     });

@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
 import type { SessionId, Env } from '../../types.js';
 import { fetchSessionMetadata } from '../../session/metadata.js';
-import { protectedProcedure } from '../auth.js';
+import { cloudAgentManagedProcedure, protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
@@ -36,11 +36,12 @@ async function answerControlPlane(
 
 export function createSessionQuestionHandlers() {
   return {
-    answerQuestion: protectedProcedure
+    answerQuestion: cloudAgentManagedProcedure
       .input(
         z.object({
           sessionId: sessionIdSchema,
           questionId: z.string().min(1),
+          organizationId: z.string().optional(),
           answers: z.array(z.array(z.string())),
         })
       )
@@ -77,11 +78,12 @@ export function createSessionQuestionHandlers() {
         });
       }),
 
-    rejectQuestion: protectedProcedure
+    rejectQuestion: cloudAgentManagedProcedure
       .input(
         z.object({
           sessionId: sessionIdSchema,
           questionId: z.string().min(1),
+          organizationId: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -163,8 +165,10 @@ export function createSessionQuestionHandlers() {
      * session: an unauthorized read fails rather than reporting an empty pending
      * set.
      */
-    getPendingInteractions: protectedProcedure
-      .input(z.object({ cloudAgentSessionId: sessionIdSchema }))
+    getPendingInteractions: cloudAgentManagedProcedure
+      .input(
+        z.object({ cloudAgentSessionId: sessionIdSchema, organizationId: z.string().optional() })
+      )
       .output(
         z.object({
           questions: z.array(z.unknown()),
@@ -179,11 +183,13 @@ export function createSessionQuestionHandlers() {
           kiloUserId: userId,
           cloudAgentSessionId: sessionId,
         });
-        return await withDORetry(
+        const pending = await withDORetry(
           () => getSandboxSessionStub(env, userId, sessionId),
-          session => session.getPendingInteractions(),
+          (session): Promise<{ questions: unknown[]; permissions: unknown[] }> =>
+            session.getPendingInteractions(),
           'getPendingInteractions'
         );
+        return ctx.cloudAgentAuthority ? { ...pending, permissions: [] } : pending;
       }),
   };
 }

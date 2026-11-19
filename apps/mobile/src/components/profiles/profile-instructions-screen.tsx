@@ -69,11 +69,9 @@ function hasUsableMessage(error: unknown): boolean {
  * delete. The content is the edit action, so the row carries two trailing
  * controls instead of three. The row paints the name only: the path repeats
  * `.kilocode/rules/` and the name's own extension on every row, so it rides the
- * press's name instead of a second painted line. While the content opens the
- * form, the name is hidden from assistive technology because the press carries
- * both. A row without an edit handler has no content to open: it renders the
- * frame's static row, and the name stays a text stop of its own instead of
- * being hidden for a control that does not exist.
+ * row's spoken name instead of a second painted line — the content press while
+ * the row opens the form, the static row's own label when it does not, because
+ * a read-only row has no press to carry it.
  */
 function InstructionRow({
   instruction,
@@ -90,6 +88,9 @@ function InstructionRow({
   const contentAccessibilityLabel = contentIsPress
     ? [t('profiles.instructionEdit', { name: instruction.name }), rulesPath].join(', ')
     : undefined;
+  const rowAccessibilityLabel = contentIsPress
+    ? undefined
+    : [instruction.name, rulesPath].join(', ');
   const trailing: ReactNode[] = [
     <Fragment key="enable">
       {renderRowTrailing({
@@ -122,7 +123,12 @@ function InstructionRow({
       contentAccessibilityLabel={contentAccessibilityLabel}
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
-      <Text variant="mono" numberOfLines={1} {...nameLineA11y}>
+      <Text
+        variant="mono"
+        numberOfLines={1}
+        accessibilityLabel={rowAccessibilityLabel}
+        {...nameLineA11y}
+      >
         {instruction.name}
       </Text>
     </RowFrame>

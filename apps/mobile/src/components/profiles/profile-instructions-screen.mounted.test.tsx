@@ -358,18 +358,20 @@ describe('ProfileInstructionsScreen read-only row', () => {
     permission.value = 'read-only';
   });
 
-  it('drops the edit control and keeps the file name readable', async () => {
+  it('drops the edit control and keeps the file name and its path readable', async () => {
     const { renderer, unmount } = await mountScreen();
 
     // The content is the edit action, so a read-only profile renders no row
     // control at all — and, because there is no press to name the row, the
-    // painted file name stays a text stop instead of being hidden for that
-    // control.
+    // painted file name stays a text stop that carries the path itself.
     expect(rowControls(renderer.root)).not.toContain(
       i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME })
     );
     const nameLine = findAll(renderer.root, 'Text').find(
       node => node.props.children === INSTRUCTION_NAME
+    );
+    expect(nameLine?.props.accessibilityLabel).toBe(
+      [INSTRUCTION_NAME, `.kilocode/rules/${INSTRUCTION_NAME}.md`].join(', ')
     );
     expect(nameLine?.props.accessible).toBeUndefined();
     expect(nameLine?.props.importantForAccessibility).toBeUndefined();

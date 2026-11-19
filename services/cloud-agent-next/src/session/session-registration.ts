@@ -2813,7 +2813,17 @@ async function resumeFirstWorktreeCreate(
       throw error;
     }
 
-    if (ingestResult?.status === 'rejected') {
+    if (ingestResult === undefined) {
+      // The ingest outcome is unknown without the acknowledgement. Leave the
+      // recorded destination in place: a first worktree create copies nothing,
+      // and the create is idempotent for the recorded ids, so the destination
+      // is either absent or the row this session already owns. The ledger row
+      // stays non-terminal so a same-key retry re-issues the create and the
+      // typed unavailable error tells the caller to retry.
+      await hooks.onTransportFailure();
+      throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'session_clone_unavailable' });
+    }
+    if (ingestResult.status === 'rejected') {
       // A destination the ingest plane refuses must not be resumed: record
       // the IDs as retired so a same-key retry allocates fresh ones.
       if (ingestResult.code === 'session_retired') {
@@ -2825,7 +2835,7 @@ async function resumeFirstWorktreeCreate(
       await hooks.onFailure('ownership_row', ingestResult.code);
       throw ingestRejectionError(ingestResult.code);
     }
-    if (ingestResult?.status === 'in_progress') {
+    if (ingestResult.status === 'in_progress') {
       await hooks.onTransportFailure();
       throw creationInProgressError();
     }

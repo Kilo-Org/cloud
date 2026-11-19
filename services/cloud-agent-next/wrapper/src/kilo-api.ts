@@ -635,6 +635,7 @@ export function createWrapperKiloClient(
       // native import re-points an existing record only when it is forced, so
       // the mismatch case imports as-is; the absent case stays unforced.
       let rebind = false;
+      let record: { title?: string; time?: { created: number; updated: number } } | undefined;
       if (existing.response?.status !== 404) {
         const data = requireSdkData(existing, `Session get for ${sessionId}`);
         if (data.id !== sessionId) {
@@ -647,6 +648,7 @@ export function createWrapperKiloClient(
           return;
         }
         rebind = true;
+        record = { title: data.title, time: data.time };
       }
       const currentProject = await v2Client.project.current(
         { directory },
@@ -665,11 +667,12 @@ export function createWrapperKiloClient(
           id: sessionId,
           projectID: project.id,
           slug: sessionId.slice(0, 24),
-          title: 'New session - ' + new Date(now).toISOString(),
+          // A re-pointed record keeps the title and times it already has.
+          title: record?.title ?? 'New session - ' + new Date(now).toISOString(),
           version: KILO_CLI_VERSION,
           ...(rebind ? { force: true } : {}),
-          timeCreated: now,
-          timeUpdated: now,
+          timeCreated: record?.time?.created ?? now,
+          timeUpdated: record?.time?.updated ?? now,
         },
         { signal: signal ? AbortSignal.any([signal, importTimeout]) : importTimeout }
       );

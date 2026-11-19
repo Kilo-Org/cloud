@@ -886,12 +886,20 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         force?: boolean;
         directory?: string;
         projectID?: string;
+        title?: string;
+        timeCreated?: number;
+        timeUpdated?: number;
       };
     };
 
     function startEnsureSessionStub(
       sessionId: string,
-      record?: { id: string; directory: string }
+      record?: {
+        id: string;
+        directory: string;
+        title?: string;
+        time?: { created: number; updated: number };
+      }
     ): { url: string; imports: EnsureSessionImport[] } {
       const imports: EnsureSessionImport[] = [];
       const server = Bun.serve({
@@ -941,7 +949,13 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       const sessionId = 'ses_record_other_directory';
       const directory = temporaryDirectory('kilo-api-rebind-target-');
       const otherDirectory = temporaryDirectory('kilo-api-rebind-other-');
-      const stub = startEnsureSessionStub(sessionId, { id: sessionId, directory: otherDirectory });
+      const created = 1_700_000_000_000;
+      const stub = startEnsureSessionStub(sessionId, {
+        id: sessionId,
+        directory: otherDirectory,
+        title: 'keep this title',
+        time: { created, updated: created },
+      });
 
       await createClient(stub.url).ensureSession(sessionId, directory);
 
@@ -952,6 +966,10 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       expect(parameters.body.id).toBe(sessionId);
       expect(parameters.queryDirectory).toBe(directory);
       expect(parameters.body.directory).toBe(directory);
+      // The record keeps the title and times it already has.
+      expect(parameters.body.title).toBe('keep this title');
+      expect(parameters.body.timeCreated).toBe(created);
+      expect(parameters.body.timeUpdated).toBe(created);
     });
 
     it('imports an absent record without a force flag', async () => {

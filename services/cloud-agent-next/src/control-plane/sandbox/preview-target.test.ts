@@ -66,6 +66,7 @@ function route(
 function snapshot(overrides: Partial<PreviewTargetSnapshot> = {}): PreviewTargetSnapshot {
   return {
     allocationKind: 'connected',
+    allocationId: 'allocation-1',
     providerRef: 'allocation-ref',
     provider: 'cloudflare-containers',
     logicalSandboxId: 'workspace_11111111-1111-4111-8111-111111111111',
@@ -165,24 +166,56 @@ describe('resolvePreviewTarget', () => {
     });
   });
 
-  it('refuses vercel and the retired cloudflare runtime before returning coordinates', () => {
-    expect(
-      resolvePreviewTarget(snapshot({ provider: 'vercel', providerRef: 'vercel-ref' }))
-    ).toEqual({ status: 'unsupported_provider' });
+  it('refuses the retired cloudflare runtime before returning coordinates', () => {
     expect(
       resolvePreviewTarget(snapshot({ provider: 'cloudflare', providerRef: 'persisted-ref' }))
     ).toEqual({ status: 'unsupported_provider' });
     expect(
-      resolvePreviewTarget(
-        snapshot({
-          provider: 'vercel',
-          providerRef: 'vercel-ref',
-          allocationKind: 'stopped',
-        })
-      )
+      resolvePreviewTarget(snapshot({ provider: 'cloudflare', allocationKind: 'stopped' }))
     ).toEqual({ status: 'unsupported_provider' });
-    expect(resolvePreviewTarget(snapshot({ provider: 'vercel', providerRef: null }))).toEqual({
-      status: 'unsupported_provider',
+  });
+
+  describe('vercel', () => {
+    const vercel = (overrides: Partial<PreviewTargetSnapshot> = {}) =>
+      snapshot({ provider: 'vercel', providerRef: 'vercel-ref', ...overrides });
+
+    it('returns the wrapper tunnel with the allocation id as the fence', () => {
+      expect(
+        resolvePreviewTarget(vercel({ logicalSandboxId: 'sbx_abc', allocationId: 'alloc-7' }))
+      ).toEqual({
+        status: 'ok',
+        coordinates: {
+          transport: 'wrapper-tunnel',
+          provider: 'vercel',
+          logicalSandboxId: 'sbx_abc',
+          allocationRef: 'alloc-7',
+        },
+      });
+    });
+
+    it('needs no provider ref, because the tunnel is named by the allocation', () => {
+      expect(resolvePreviewTarget(vercel({ providerRef: null }))).toMatchObject({
+        status: 'ok',
+        coordinates: { transport: 'wrapper-tunnel', allocationRef: 'allocation-1' },
+      });
+    });
+
+    it('fails closed not_running without an allocation id', () => {
+      expect(resolvePreviewTarget(vercel({ allocationId: null }))).toEqual({
+        status: 'not_running',
+      });
+    });
+
+    it('maps a stopped allocation to not_running and a creating one to not_ready', () => {
+      expect(resolvePreviewTarget(vercel({ allocationKind: 'stopped' }))).toEqual({
+        status: 'not_running',
+      });
+      expect(resolvePreviewTarget(vercel({ allocationKind: 'stopping' }))).toEqual({
+        status: 'not_running',
+      });
+      expect(resolvePreviewTarget(vercel({ allocationKind: 'creating' }))).toEqual({
+        status: 'not_ready',
+      });
     });
   });
 
@@ -203,6 +236,7 @@ describe('resolvePreviewTarget', () => {
     ).toEqual({
       status: 'ok',
       coordinates: {
+        transport: 'durable-object',
         provider: 'cloudflare-containers',
         logicalSandboxId: 'workspace_abc',
         allocationRef: ref,

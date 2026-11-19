@@ -511,6 +511,34 @@ describe('builder setup environment', () => {
     });
   });
 
+  it('uses the platform home from the inherited and profile environments', () => {
+    const env = builderSetupEnvironment({
+      inherited: {
+        PATH: '/bin',
+        SESSION_HOME: '/tmp/other-home',
+        SESSION_ID: 'other-session',
+        pnpm_config_store_dir: '/tmp/store',
+        API_KEY: 'kept',
+      },
+      vars: {
+        FOO: 'bar',
+        SESSION_HOME: '/tmp/var-home',
+        SESSION_ID: 'var-session',
+        pnpm_config_store_dir: '/tmp/var-store',
+      },
+      home: '/home/abc',
+      directory: '/workspace/app',
+      isV2: false,
+    });
+
+    expect(env.HOME).toBe('/home/abc');
+    expect(env.API_KEY).toBe('kept');
+    expect(env).not.toHaveProperty('SESSION_HOME');
+    expect(env).not.toHaveProperty('SESSION_ID');
+    expect(env).not.toHaveProperty('pnpm_config_store_dir');
+    expect(env.FOO).toBe('bar');
+  });
+
   it('renders setup events without repeating command text', () => {
     expect(
       setupEventLine({

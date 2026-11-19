@@ -8,8 +8,11 @@ import {
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import { SelectableText } from '@/components/ui/selectable-text';
+import { codeFieldTextStyle, hasRtlScript, withoutMonoFamily } from '@/lib/rtl-text';
+import { cn } from '@/lib/utils';
 
 type SetupCommandFieldProps = Readonly<{
   /** The command the caller holds; seeds the field and sizes the hint. */
@@ -75,11 +78,17 @@ export function SetupCommandField({
       <View className="gap-1.5">
         <View className={gapClassName ?? 'gap-1.5'}>
           <FormFieldLabel label={label} />
-          <View className="min-h-[44px] justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
+          <View
+            className={cn(
+              INPUT_BOX_SHAPE_CLASS,
+              'justify-center rounded-md border border-input bg-background py-2.5 dark:bg-[#FFFFFF0A]'
+            )}
+          >
             <SelectableText
               accessibilityLabel={label}
               accessibilityHint={accessibilityHint}
-              className="text-sm leading-[1.25rem] text-foreground"
+              className="font-mono text-sm leading-[1.25rem] text-foreground"
+              style={codeFieldTextStyle()}
             >
               {command}
             </SelectableText>
@@ -94,6 +103,17 @@ export function SetupCommandField({
   // is none. At zero the count would only restate the sentence below it.
   const showsCounter = !disabled && remaining > 0 && remaining <= COMMAND_COUNTER_VISIBLE_REMAINING;
   const showsBound = !disabled && remaining <= 0;
+  // A shell command is code: mono, on its own left edge, whatever the interface
+  // direction. The mono family ships no right-to-left glyphs, so only the empty
+  // field's localized placeholder in that script keeps the interface font (the
+  // rule `Text` uses). A field holding a command keeps mono: the value is Latin
+  // code either way, and dropping the family for good left the command in the
+  // proportional face after the first keystroke.
+  const placeholder = t('profiles.commandPlaceholder');
+  const monoClass =
+    command.length === 0 && hasRtlScript(placeholder)
+      ? withoutMonoFamily('font-mono')
+      : 'font-mono';
 
   // The caller's gap lands only on the label-to-input pair inside `FormField`:
   // the block's own root keeps its compact `gap-1.5`, so the counter and the
@@ -105,8 +125,9 @@ export function SetupCommandField({
         label={label}
         gapClassName={gapClassName}
         defaultValue={command}
-        placeholder={t('profiles.commandPlaceholder')}
-        className="min-h-[44px] leading-[normal]"
+        placeholder={placeholder}
+        className={monoClass}
+        style={codeFieldTextStyle()}
         maxLength={MAX_SETUP_COMMAND_LENGTH}
         autoCapitalize="none"
         autoCorrect={false}

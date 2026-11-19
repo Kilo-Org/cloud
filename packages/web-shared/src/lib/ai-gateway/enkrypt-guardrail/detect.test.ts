@@ -8,8 +8,8 @@ import {
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
+  type EnkryptGuardrailScanResult,
 } from './detect';
-import { createEnkryptCallLimiter, type EnkryptCallLimiter } from './call-limiter';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/usage-contracts';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
@@ -1170,191 +1170,85 @@ describe('scanRequest', () => {
     });
   });
 
-  describe('with a call limiter', () => {
-    /** Wraps a real limiter, recording each acquire and release. */
-    function recordingLimiter(
-      events: string[],
-      limiter: EnkryptCallLimiter = createEnkryptCallLimiter()
-    ): EnkryptCallLimiter {
-      return {
-        async acquire(priority, signal) {
-          events.push(`acquire:${priority}`);
-          const slot = await limiter.acquire(priority, signal);
-          return (
-            slot &&
-            (() => {
-              events.push('release');
-              slot();
-            })
-          );
-        },
-      };
-    }
-
-    async function flush() {
-      await new Promise(resolve => setImmediate(resolve));
-    }
-
-    it('holds a slot for the call and releases it after', async () => {
-      const events: string[] = [];
-      const dependencies = deps(
-        async () => {
-          events.push('fetch');
-          return detectResponse({ summary: {} });
-        },
-        { limiter: recordingLimiter(events) }
-      );
-
-      const result = await scanRequest(makeScan(), dependencies);
-
-      expect(result.verdict).toEqual({ action: 'allow' });
-      expect(events).toEqual(['acquire:blocking', 'fetch', 'release']);
-    });
-
-    it('takes one slot for a failed call and does not retry it', async () => {
-      const events: string[] = [];
-      const responses = [
-        detectResponse({ summary: {} }, { status: 503 }),
-        detectResponse({ summary: {} }),
-      ];
-      const dependencies = deps(
-        async () => {
-          events.push('fetch');
-          return responses.shift() ?? Response.error();
-        },
-        { limiter: recordingLimiter(events) }
-      );
-
-      const result = await scanRequest(makeScan(), dependencies);
-
-      expect(result.verdict).toEqual({ action: 'fail_open' });
-      expect(events).toEqual(['acquire:blocking', 'fetch', 'release']);
-    });
-
-    it('asks for a log-only slot for a log-only scan', async () => {
-      const events: string[] = [];
-
-      await scanRequest(
-        makeScan({
-          config: {
-            status: 'ready',
-            detectors: { pii: { enabled: true, entities: ['secrets'] } },
-            blockingDetectors: [],
-          },
-        }),
-        deps(async () => detectResponse({ summary: {} }), { limiter: recordingLimiter(events) })
-      );
-
-      expect(events).toEqual(['acquire:log_only', 'release']);
-    });
-
-    it('releases the slot when the fetch rejects', async () => {
-      const events: string[] = [];
-      const dependencies = deps(
-        async () => {
-          events.push('fetch');
-          throw new TypeError('fetch failed');
-        },
-        { limiter: recordingLimiter(events) }
-      );
-
-      const result = await scanRequest(makeScan(), dependencies);
-
-      expect(result.verdict).toEqual({ action: 'fail_open' });
-      expect(events).toEqual(['acquire:blocking', 'fetch', 'release']);
-    });
-
-    it('releases the slot when the attempt throws unexpectedly', async () => {
-      const events: string[] = [];
-      const dependencies = deps(async () => detectResponse({ summary: {} }), {
-        limiter: recordingLimiter(events),
-        requestLog: {
-          guardrail: 'input',
-          capture: () => {
-            throw new Error('capture failed');
-          },
-        },
-      });
-
-      await expect(scanRequest(makeScan(), dependencies)).rejects.toThrow('capture failed');
-      expect(events).toEqual(['acquire:blocking', 'release']);
-    });
-
-    it.each([
-      ['the deadline passes', 'timeout', { action: 'fail_open' }, 'error_fail_open'],
+  describe('when the shared deadline passed before the call', () => {
+    it.each<[string, Partial<EnkryptGuardrailScan>, EnkryptGuardrailScanResult['verdict'], string]>(
       [
-        'the client disconnects',
-        'client_aborted',
-        { action: 'unavailable', reason: 'failed' },
-        'client_aborted',
-      ],
-    ] as const)(
-      'fails without a call or usage when %s while waiting for a slot',
-      async (_name, error, verdict, decision) => {
-        const limiter = createEnkryptCallLimiter(1);
-        const holder = await limiter.acquire('blocking', new AbortController().signal);
+        ['blocking', {}, { action: 'fail_open' }, 'error_fail_open'],
+        [
+          'log-only',
+          {
+            config: {
+              status: 'ready',
+              detectors: { pii: { enabled: true, entities: ['secrets'] } },
+              blockingDetectors: [],
+            },
+          },
+          { action: 'allow' },
+          'error_logged',
+        ],
+      ]
+    )(
+      'fails a %s scan as timed out, without a call, usage, or text sent, warning once',
+      async (_name, overrides, verdict, decision) => {
+        const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
         const deadline = new AbortController();
-        const client = new AbortController();
+        deadline.abort();
         const dependencies = deps(async () => detectResponse({ summary: {} }), {
-          limiter,
           deadline: deadline.signal,
-          signal: client.signal,
         });
 
-        const pending = scanRequest(makeScan(), dependencies);
-        await flush();
-        (error === 'timeout' ? deadline : client).abort();
-        const result = await pending;
+        const result = await scanRequest(makeScan(overrides), dependencies);
+        // Another scan of the same request, after the timeout was already reported.
+        await scanRequest(makeScan({ ...overrides, text: 'later output' }), dependencies);
 
+        expect(dependencies.fetch).not.toHaveBeenCalled();
+        expect(mockedWarnExceptInTest).toHaveBeenCalledTimes(1);
+        expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+          '[enkrypt-guardrail] decision',
+          expect.objectContaining({ error: 'timeout', attempts: 0 })
+        );
+        expect(debug).toHaveBeenCalledTimes(1);
+        expect(debug).toHaveBeenCalledWith(
+          '[enkrypt-guardrail] decision',
+          expect.objectContaining({ error: 'timeout', attempts: 0, scanned_characters: 0 })
+        );
         expect(result.verdict).toEqual(verdict);
         expect(result.usageRecords).toEqual([]);
-        expect(result.report).toMatchObject({ decision, error, attempts: 0, credits_cost: null });
-        expect(dependencies.fetch).not.toHaveBeenCalled();
-        // The abandoned wait took no slot.
-        holder?.();
-        expect(await limiter.acquire('blocking', new AbortController().signal)).not.toBeNull();
+        expect(result.report).toMatchObject({
+          decision,
+          error: 'timeout',
+          attempts: 0,
+          credits_cost: null,
+          latency_ms: 0,
+          scanned_characters: 0,
+        });
       }
     );
 
-    it('starts a second scan’s call only after the first scan’s call finished with one slot', async () => {
-      const limiter = createEnkryptCallLimiter(1);
-      const responses = [
-        Promise.withResolvers<Response>(),
-        Promise.withResolvers<Response>(),
-      ] as const;
-      let inFlight = 0;
-      let maxInFlight = 0;
-      let calls = 0;
+    it('does not warn again for calls after one the deadline cut short', async () => {
+      jest.spyOn(console, 'debug').mockImplementation(() => {});
+      const deadline = new AbortController();
       const dependencies = deps(
-        async () => {
-          const response = responses[calls++];
-          if (!response) throw new Error('unexpected call');
-          inFlight++;
-          maxInFlight = Math.max(maxInFlight, inFlight);
-          try {
-            return await response.promise;
-          } finally {
-            inFlight--;
-          }
-        },
-        { limiter }
+        (_url, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+              once: true,
+            });
+            deadline.abort();
+          }),
+        { deadline: deadline.signal }
       );
 
-      const first = scanRequest(makeScan(), dependencies);
-      const second = scanRequest(makeScan({ text: 'other output' }), dependencies);
-      await flush();
-      expect(calls).toBe(1);
+      const cutShort = await scanRequest(makeScan(), dependencies);
+      const notStarted = await scanRequest(makeScan({ text: 'later output' }), dependencies);
 
-      responses[0].resolve(detectResponse({ summary: {} }));
-      expect((await first).verdict).toEqual({ action: 'allow' });
-      await flush();
-      expect(calls).toBe(2);
-      responses[1].resolve(detectResponse({ summary: {} }));
-      expect((await second).verdict).toEqual({ action: 'allow' });
-      expect(maxInFlight).toBe(1);
-      expect(readJsonBody(fetchCalls(dependencies)[1][1].body)).toMatchObject({
-        text: 'other output',
-      });
+      expect(cutShort.report).toMatchObject({ error: 'timeout', attempts: 1 });
+      expect(notStarted.report).toMatchObject({ error: 'timeout', attempts: 0 });
+      expect(mockedWarnExceptInTest).toHaveBeenCalledTimes(1);
+      expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] decision',
+        expect.objectContaining({ attempts: 1 })
+      );
     });
   });
 

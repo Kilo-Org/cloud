@@ -539,7 +539,8 @@ export type RepositoryBranchesState = {
  * The query runs only when a repository is selected. Bitbucket is
  * organization-only, so a personal Bitbucket row never issues a request — the
  * server would refuse it with the org-only message, and the section explains
- * the restriction instead.
+ * the restriction instead. A disabled GitHub or GitLab row is quiet too: the
+ * section renders its own inactive note, not loading.
  *
  * The organization scope is the caller's `organizationId` PROP, not a value
  * read back from a store: the screen owns the route's scope, so passing it in

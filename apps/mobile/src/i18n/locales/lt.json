@@ -844,7 +844,19 @@
         "fileComment": "Failo komentaras",
         "outdatedOnPathLines": "Pasenęs komentaras: {{path}}, {{lines}}",
         "outdatedOnLines": "Pasenęs komentaras: {{lines}}",
-        "outdatedOnPath": "Pasenęs komentaras: {{path}}"
+        "outdatedOnPath": "Pasenęs komentaras: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Kairė pusė",
+        "sideRight": "Dešinė pusė",
+        "outdatedOnLinesSide": "Pasenęs komentaras: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Pasenęs komentaras: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Pasenęs ({{side}})",
+        "outdatedOnPathSide": "Pasenęs: {{path}} ({{side}})"
       },
       "deletedUser": "ištrintas naudotojas",
       "replyForbiddenTerm": "Neturi teisės atsakyti šioje diskusijoje ({{term}}).",
@@ -966,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
       "gitlabReconnectAdminOnlyDescription": "Paprašyk organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti iš naujo.",
       "bitbucketNotConnectedTitle": "Bitbucket neprijungtas",
-      "bitbucketAdminOnlyDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
+      "adminOnlyConnectDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
     },
@@ -1419,8 +1431,9 @@
       "notConnectedReadOnly": "Bitbucket neprijungtas. Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Šios organizacijos Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
-      "description": "Sukurk darbo srities prieigos raktą su reikiamomis teisėmis ir įklijuok jį žemiau.",
+      "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
+      "description": "Sukurk {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
+      "descriptionReconnect": "Sukurk naują {{organization}} darbo srities prieigos raktą ir įklijuok jį žemiau.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · Pakeitimų užklausos: skaityti · Webhook: skaityti / rašyti",
       "tokenPlaceholder": "Darbo srities prieigos raktas",
       "tokenRefused": "Bitbucket nepriėmė šio darbo srities prieigos rakto. Patikrink, ar jis turi aukščiau nurodytas teises, tada bandyk dar kartą."
@@ -2236,6 +2249,8 @@
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos",
+      "historyTooLarge": "Šios sesijos nuorašas per didelis, kad jį būtų galima įkelti.",
+      "historyUnavailable": "Šios sesijos nuorašo skaityti negalima.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
       "notEnoughCredits": "Nepakanka kreditų šiai užklausai. Papildykite kreditus ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar nebaigta. Šiek tiek palaukite.",
@@ -2312,6 +2327,7 @@
       "branchDefault": "Numatytoji",
       "branchAccessibility": "Šaka: {{label}}",
       "branchLoading": "Įkeliamos šakos",
+      "branchInactive": "Pasirinkite saugyklą, kad būtų įkeltos jos šakos.",
       "branchLoadError": "Nepavyko įkelti šakų",
       "branchUnavailable": "Šiai saugyklai šakos neprieinamos. Patikrinkite prieigos teises pas tiekėją ir pasirinkite kitą saugyklą.",
       "branchEmpty": "Nėra prieinamų šakų",
@@ -3138,7 +3154,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nepavyko įkelti sesijų",
-    "couldNotLoadActiveSessions": "Nepavyko įkelti aktyvių sesijų",
     "agentSessions": "Vyksta dabar",
     "newCodingTask": "Nauja programavimo užduotis",
     "newTaskFromPicture": "Nauja užduotis iš nuotraukos",
@@ -3521,7 +3536,8 @@
         "accounting_adjustment": "Apskaitos koregavimas",
         "credits_expired": "Kreditų galiojimas baigėsi"
       },
-      "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas."
+      "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas.",
+      "retentionLimit": "Rodomos naujausios kreditų operacijos."
     },
     "inviteMember": {
       "emailError": "Įveskite tinkamą el. pašto adresą",
@@ -3553,7 +3569,8 @@
         "void": "Anuliuota",
         "uncollectible": "Beviltiška skola"
       },
-      "truncated": "Galite peržiūrėti ankstesnes sąskaitas."
+      "truncated": "Galite peržiūrėti ankstesnes sąskaitas.",
+      "retentionLimit": "Rodomos naujausios sąskaitos."
     },
     "lowBalanceAlert": {
       "enableA11y": "Įjungti pranešimą apie mažą likutį",
@@ -3791,8 +3808,7 @@
     "imagesSectionEmpty": "Patikimų paveikslėlių svetainių nėra",
     "revoke": "Atšaukti pasitikėjimą svetaine {{host}}",
     "revokeMessage": "Nuorodos į šią svetainę vėl prašys patvirtinimo.",
-    "revokeImageMessage": "Šios svetainės paveikslėliai vėl prašys patvirtinimo.",
-    "backToPreferences": "Grįžti į nuostatas"
+    "revokeImageMessage": "Šios svetainės paveikslėliai vėl prašys patvirtinimo."
   },
   "glanceable": {
     "waiting": "Atnaujinami agentai",
@@ -4041,6 +4057,8 @@
       "downloading": "Atsisiunčiama: {{written}} iš {{total}}",
       "downloadingUnknown": "Atsisiunčiama: {{written}}",
       "paused": "Pristabdyta: {{written}} iš {{total}}",
+      "retrying": "Bandoma dar kartą: {{written}} iš {{total}}",
+      "retryingUnknown": "Bandoma dar kartą: {{written}}",
       "verifying": "Tikrinamas atsisiųstas failas…",
       "downloaded": "Atsisiųsta · {{size}}",
       "url": "Tiesioginė atsisiuntimo nuoroda",
@@ -4131,7 +4149,9 @@
         "androidModelUnavailable": "Šis įrenginys nepalaiko Gemini Nano, arba AICore sistemos programa dar ruošiama. Bandykite vėliau.",
         "aicoreUpdateRequired": "Norėdami naudoti šį modelį, atnaujinkite AICore programą ir sistemos programinę įrangą.",
         "downloadable": "Prieš naudojant šį modelį, jį reikia vieną kartą atsisiųsti.",
-        "downloading": "Modelis atsisiunčiamas. Jis bus paruoštas, kai atsisiuntimas baigsis."
+        "downloading": "Modelis atsisiunčiamas. Jis bus paruoštas, kai atsisiuntimas baigsis.",
+        "batteryQuota": "Įrenginio modelis šiuo metu jau išnaudojo leidžiamą baterijos kiekį. Bandykite vėliau.",
+        "checkFailed": "Programėlė negalėjo patikrinti šio modelio. Bandykite dar kartą."
       },
       "unavailable": "Įrenginio modelis šiuo metu nepasiekiamas. Patikrinkite jo būseną skiltyje $t(modelChat.backends.title).",
       "busy": "Įrenginio modelis užimtas kitu atsakymu. Bandykite dar kartą, kai jis baigs.",
@@ -4504,7 +4524,8 @@
       "purchaseFallback": "Kreditų pirkimas",
       "receipt": "Kvitas",
       "receiptA11y": "Atidaryti kvitą: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Šiam pirkimui kvito nėra."
+      "receiptUnavailable": "Šiam pirkimui kvito nėra.",
+      "retentionLimit": "Rodoma naujausia kreditų istorija."
     },
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",
@@ -4767,6 +4788,9 @@
     "couldNotLoad": "Nepavyko įkelti integracijų",
     "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
     "managedByOwner": "Paprašykite organizacijos savininko pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerOrAdmin": "Paprašykite organizacijos savininko ar administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerOrBilling": "Paprašykite organizacijos savininko ar atsiskaitymų administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerAdminOrBilling": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
     "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
   },
   "invoices": {
@@ -4803,7 +4827,7 @@
       "new": "Naujas trigeris",
       "create": "Sukurti trigerį",
       "emptyTitle": "Trigerių dar nėra",
-      "emptyDescription": "Sukurkite trigerį, kad Cloud Agent būtų paleistas pagal žiniatinklio kabliuko iškvietimą arba pagal grafiką.",
+      "emptyDescription": "Sukurkite savo pirmąjį trigerį.",
       "loadFailedTitle": "Nepavyko įkelti trigerių",
       "loadFailedDescription": "Bandykite dar kartą, kai turėsite ryšį.",
       "detailLoadFailedTitle": "Nepavyko įkelti šio trigerio",

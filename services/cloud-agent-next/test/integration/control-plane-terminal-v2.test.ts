@@ -449,6 +449,48 @@ describe('control-plane terminals on the Session DO (B10)', () => {
     wrapper.close();
   });
 
+  it('records a created terminal and its completion together', async () => {
+    const { sessionStub, wrapper } = await startTerminalSession();
+    const operationId = crypto.randomUUID();
+    const create = sessionStub.terminalCreate({ operationId });
+    const createFrame = await awaitFrame(wrapper, 'terminal.create');
+    await runInDurableObject(sessionStub, (_instance, state) => {
+      const storage: DurableObjectStorage = state.storage;
+      const put = storage.put.bind(storage);
+      let failed = false;
+      Object.assign(storage, {
+        put: (key: string, value: unknown) => {
+          if (!failed && key.startsWith('control_terminal:')) {
+            failed = true;
+            return Promise.reject(new Error('storage unavailable'));
+          }
+          return put(key, value);
+        },
+      });
+    });
+    wrapper.send({
+      type: 'terminal.result',
+      requestId: createFrame.requestId,
+      ok: true,
+      result: { pty: pty('pty_failed', createFrame.session.directory) },
+    });
+
+    const closeFrame = await awaitFrame(wrapper, 'terminal.close');
+    expect(closeFrame.payload).toEqual({ ptyId: 'pty_failed' });
+    wrapper.send({
+      type: 'terminal.result',
+      requestId: closeFrame.requestId,
+      ok: true,
+      result: { success: true },
+    });
+    await expect(create).resolves.toEqual({ success: false, error: 'storage unavailable' });
+    const keys = await runInDurableObject(sessionStub, (_instance, state) =>
+      state.storage.list({ prefix: 'control_terminal' })
+    );
+    expect([...keys.keys()]).toEqual([]);
+    wrapper.close();
+  });
+
   it('refuses a terminal before the route is ready', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);

@@ -820,7 +820,19 @@
         "fileComment": "Faallada faylka",
         "outdatedOnPathLines": "Duugoobay: {{path}} {{lines}}",
         "outdatedOnLines": "Duugoobay: {{lines}}",
-        "outdatedOnPath": "Duugoobay: {{path}}"
+        "outdatedOnPath": "Duugoobay: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Dhinaca bidix",
+        "sideRight": "Dhinaca midig",
+        "outdatedOnLinesSide": "Duugoobay {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Duugoobay {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Duugoobay ({{side}})",
+        "outdatedOnPathSide": "Duugoobay {{path}} ({{side}})"
       },
       "deletedUser": "isticmaale la tirtiray",
       "replyForbiddenTerm": "Ma haysatid oggolaansho aad uga jawaabto {{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Xisaabtan weli ma laha hay'ado. PR-yada Bitbucket waxaad eegi kartaa marka aad abuurto ama aad ku biirto hay'ad.",
       "gitlabReconnectAdminOnlyDescription": "Weydii mulkiile, maamule ama maareeyaha biilasha ururka si ay dib ugu xidhaan.",
       "bitbucketNotConnectedTitle": "Bitbucket kuma xidhna",
-      "bitbucketAdminOnlyDescription": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
+      "adminOnlyConnectDescription": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
       "contextLine": "{{organization}} u",
       "contextLinePersonal": "Akoonkaaga shakhsiyeed u"
     },
@@ -1373,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Xiriirka Bitbucket ee ururkan waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
-      "description": "Abuur summad gelitaan oo goobta shaqada ah oo leh oggolaanshaha loo baahan yahay, ka dibna hoos ku dheji.",
+      "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
+      "description": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
+      "descriptionReconnect": "Abuur summad gelitaan cusub oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
       "scopes": "Akoonka: akhrin · Kaydadka: akhrin/qorid · Codsiyada isku darka: akhrin · Ogeysiisyada shabakadda: akhrin/qorid",
       "tokenPlaceholder": "Summadda gelitaanka goobta shaqada",
       "tokenRefused": "Bitbucket ma aqbalin summaddan gelitaanka goobta shaqada. Hubi inay leedahay oggolaanshaha sare, ka dibna isku day mar kale."
@@ -2148,6 +2161,8 @@
       "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",
+      "historyTooLarge": "Qoralka kalfadhigan waa aad u weyn yahay si la soo shubo.",
+      "historyUnavailable": "Qoralka kalfadhigan lama akhriyi karo.",
       "cloneFailedRetry": "Kalfadhigan nuqul lagama samayn karin. Mar kale isku day.",
       "notEnoughCredits": "Lacagta isticmaalka kuma filna codsigan. Lacag ku dar oo mar kale isku day.",
       "previousTaskFinishing": "Hawshii hore weli waa la dhammaystirayaa. Fadlan wax yar sug.",
@@ -2224,6 +2239,7 @@
       "branchDefault": "Aasaasi",
       "branchAccessibility": "Laan: {{label}}",
       "branchLoading": "Laamaha soo dhacaya",
+      "branchInactive": "Dooro kayd si aad u soo dejiso laamihiisa.",
       "branchLoadError": "Laamaha lama soo dejin karin",
       "branchUnavailable": "Laamo kuma jiraan kaydkan. Xiriirkaaga bixiyaha hubi, kadibna dooro kayd kale.",
       "branchEmpty": "Laamo la heli karo ma jiraan",
@@ -3026,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kalfadhiyada lama soo dejin karin.",
-    "couldNotLoadActiveSessions": "Kalfadhiyada socda lama soo dejin karin.",
     "agentSessions": "Hadda socda",
     "newCodingTask": "Hawl cusub oo koodh qorista ah",
     "newTaskFromPicture": "Hawl cusub oo sawir laga bilaabo",
@@ -3405,7 +3420,8 @@
         "accounting_adjustment": "Hagaajinta xisaabta",
         "credits_expired": "Lacagta isticmaalka ee dhacday"
       },
-      "truncated": "Dhaqdhaqaaqii hore ee lacagta isticmaalka waa la heli karaa."
+      "truncated": "Dhaqdhaqaaqii hore ee lacagta isticmaalka waa la heli karaa.",
+      "retentionLimit": "Waxaa la muujinayaa dhaqdhaqaaqa lacagta isticmaalka ugu dambeeyay."
     },
     "inviteMember": {
       "emailError": "Geli cinwaan iimayl oo sax ah.",
@@ -3437,7 +3453,8 @@
         "void": "La buriyay",
         "uncollectible": "Lama soo xareyn karo"
       },
-      "truncated": "Qaansheegyada hore waa la heli karaa."
+      "truncated": "Qaansheegyada hore waa la heli karaa.",
+      "retentionLimit": "Waxaa la muujinayaa qaansheegyada ugu dambeeyay."
     },
     "lowBalanceAlert": {
       "enableA11y": "Daar digniinta hadhaaga yar",
@@ -3671,8 +3688,7 @@
     "imagesSectionEmpty": "Ma jiraan martigeliyeyaal sawir la aaminay",
     "revoke": "Ka noqo aaminaadda {{host}}",
     "revokeMessage": "Xiriiriyeyaasha martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
-    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
-    "backToPreferences": "Ku noqo doorashooyinka"
+    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin."
   },
   "glanceable": {
     "waiting": "Wakiillada ayaa la cusboonaysiinayaa",
@@ -3919,6 +3935,8 @@
       "downloading": "Soo dejinaya: {{written}} ka mid ah {{total}}",
       "downloadingUnknown": "Soo dejinaya: {{written}}",
       "paused": "La joojiyay: {{written}} ka mid ah {{total}}",
+      "retrying": "Waa la isku dayayaa: {{written}} ka mid ah {{total}}",
+      "retryingUnknown": "Waa la isku dayayaa: {{written}}",
       "verifying": "Waxaa la hubinayaa faylka la soo dejiyay…",
       "downloaded": "La soo dejiyay · {{size}}",
       "url": "Xiriirka soo dejinta ee tooska ah",
@@ -4009,7 +4027,9 @@
         "androidModelUnavailable": "Aaladdani ma taageerto Gemini Nano, ama barnaamijka nidaamka AICore weli waa la diyaarinayaa. Mar dambe isku day.",
         "aicoreUpdateRequired": "Cusboonaysii barnaamijka AICore iyo software-ka nidaamkaaga si aad u isticmaasho moodeelkan.",
         "downloadable": "Moodeelkan waxa uu u baahan yahay in hal mar la soo dejiyo ka hor intaadan isticmaalin.",
-        "downloading": "Moodeelka waa la soo dejinayaa. Wuxuu diyaar noqonayaa marka soo dejintu dhammaato."
+        "downloading": "Moodeelka waa la soo dejinayaa. Wuxuu diyaar noqonayaa marka soo dejintu dhammaato.",
+        "batteryQuota": "Moodeelka aaladda gudaheeda wuu isticmaalay qaybta batariga ee la oggolaaday. Mar dambe isku day.",
+        "checkFailed": "Abkani wuu hubi waayay moodeelkan. Mar kale isku day."
       },
       "unavailable": "Moodeelka aaladda gudaheeda hadda lama heli karo. Ka hubi xaaladdiisa $t(modelChat.backends.title).",
       "busy": "Moodeelka aaladda gudaheeda wuxuu ku mashquulsan yahay jawaab kale. Isku day marka uu dhammeeyo.",
@@ -4370,7 +4390,8 @@
       "purchaseFallback": "Iibsashada kiredit",
       "receipt": "Rasiid",
       "receiptA11y": "Fur rasiidka {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Iibsashadan rasiid looma hayo."
+      "receiptUnavailable": "Iibsashadan rasiid looma hayo.",
+      "retentionLimit": "Waxaa la muujinayaa taariikhda kireditka ugu dambeysa."
     },
     "title": "Iibso lacag adeeg",
     "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",
@@ -4617,6 +4638,9 @@
     "couldNotLoad": "Lama soo gelin karo isku-xidhka",
     "permissionDenied": "Ma haysatid ogolaansho aad ku maamusho isku-xidhkan.",
     "managedByOwner": "Weydii milkiilaha ururka si uu u beddelo isku-xidhka aadan beddeli karin.",
+    "managedByOwnerOrAdmin": "Weydii mulkiile ama maamule ururka si ay u beddelaan isku-xidhka aadan beddeli karin.",
+    "managedByOwnerOrBilling": "Weydii mulkiile ama maareeyaha biilasha ururka si ay u beddelaan isku-xidhka aadan beddeli karin.",
+    "managedByOwnerAdminOrBilling": "Weydii mulkiile, maamule ama maareeyaha biilasha ururka si ay u beddelaan isku-xidhka aadan beddeli karin.",
     "connectFailed": "Bogga isku-xidhka lama furi karo"
   },
   "invoices": {
@@ -4653,7 +4677,7 @@
       "new": "Kiciye cusub",
       "create": "Samee kiciye",
       "emptyTitle": "Weli kiciyeyaal ma jiraan",
-      "emptyDescription": "Samee kiciye si aad u bilowdo socodka Cloud Agent ee ka imanaya wicitaan web ama jadwal.",
+      "emptyDescription": "Samee kiciyahaaga ugu horreeya.",
       "loadFailedTitle": "Kiciyeyaal lama soo shubi karin",
       "loadFailedDescription": "Isku day mar kale marka aad xiriir haysato.",
       "detailLoadFailedTitle": "Kiciyahan lama soo shubi karin",

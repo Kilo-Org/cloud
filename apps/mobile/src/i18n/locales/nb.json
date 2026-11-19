@@ -820,7 +820,19 @@
         "fileComment": "Filkommentar",
         "outdatedOnPathLines": "Utdatert i {{path}}, {{lines}}",
         "outdatedOnLines": "Utdatert på {{lines}}",
-        "outdatedOnPath": "Utdatert i {{path}}"
+        "outdatedOnPath": "Utdatert i {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Venstre side",
+        "sideRight": "Høyre side",
+        "outdatedOnLinesSide": "Utdatert på {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Utdatert i {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Utdatert ({{side}})",
+        "outdatedOnPathSide": "Utdatert i {{path}} ({{side}})"
       },
       "deletedUser": "slettet bruker",
       "replyForbiddenTerm": "Du har ikke tillatelse til å svare på denne {{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne kontoen har ingen organisasjoner ennå. Du kan gå gjennom PR-er på Bitbucket når du oppretter eller blir med i en organisasjon.",
       "gitlabReconnectAdminOnlyDescription": "Be en eier, administrator eller faktureringsansvarlig i organisasjonen om å koble den til på nytt.",
       "bitbucketNotConnectedTitle": "Bitbucket er ikke tilkoblet",
-      "bitbucketAdminOnlyDescription": "Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen.",
+      "adminOnlyConnectDescription": "Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For personlig konto"
     },
@@ -1373,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket er ikke tilkoblet. Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Organisasjonens Bitbucket-tilkobling administreres på nettet fra en datamaskin.",
-      "description": "Opprett et tilgangstoken for arbeidsområdet med de nødvendige tillatelsene, og lim det inn nedenfor.",
+      "managedOnWeb": "Bitbucket-tilkoblingen for {{organization}} administreres på nettet fra en datamaskin.",
+      "description": "Opprett et tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
+      "descriptionReconnect": "Opprett et nytt tilgangstoken for arbeidsområdet til {{organization}}, og lim det inn nedenfor.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
       "tokenPlaceholder": "Tilgangstoken for arbeidsområdet",
       "tokenRefused": "Bitbucket godtok ikke dette tilgangstokenet for arbeidsområdet. Kontroller at det har tillatelsene ovenfor, og prøv deretter på nytt."
@@ -2148,6 +2161,8 @@
       "renameAccessibility": "Gi økten nytt navn: {{title}}",
       "cloningSession": "Kloner økten",
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten.",
+      "historyTooLarge": "Øktens logg er for stor til å laste inn.",
+      "historyUnavailable": "Øktens logg kan ikke leses.",
       "cloneFailedRetry": "Kunne ikke klone denne økten. Prøv igjen.",
       "notEnoughCredits": "Du har ikke nok kreditter til denne forespørselen. Fyll på kreditter og prøv igjen.",
       "previousTaskFinishing": "Den forrige oppgaven er ikke helt avsluttet ennå. Vent et øyeblikk.",
@@ -2224,6 +2239,7 @@
       "branchDefault": "Standard",
       "branchAccessibility": "Gren: {{label}}",
       "branchLoading": "Laster inn grener",
+      "branchInactive": "Velg et kodelager for å laste inn grenene.",
       "branchLoadError": "Kunne ikke laste inn grener",
       "branchUnavailable": "Ingen grener er tilgjengelige for dette kodelageret. Sjekk tilgangen din hos leverandøren og velg et annet kodelager.",
       "branchEmpty": "Ingen tilgjengelige grener",
@@ -3026,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kunne ikke laste inn øktene.",
-    "couldNotLoadActiveSessions": "Kunne ikke laste inn aktive økter.",
     "agentSessions": "Pågår nå",
     "newCodingTask": "Ny kodeoppgave",
     "newTaskFromPicture": "Ny oppgave fra et bilde",
@@ -3405,7 +3420,8 @@
         "accounting_adjustment": "Regnskapsjustering",
         "credits_expired": "Kreditter utløpt"
       },
-      "truncated": "Eldre kredittbevegelser er tilgjengelige."
+      "truncated": "Eldre kredittbevegelser er tilgjengelige.",
+      "retentionLimit": "Viser de nyeste kredittbevegelsene."
     },
     "inviteMember": {
       "emailError": "Angi en gyldig e-postadresse.",
@@ -3437,7 +3453,8 @@
         "void": "Annullert",
         "uncollectible": "Uinnkrevbar"
       },
-      "truncated": "Tidligere fakturaer er tilgjengelige."
+      "truncated": "Tidligere fakturaer er tilgjengelige.",
+      "retentionLimit": "Viser de nyeste fakturaene."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktiver varsel om lav saldo",
@@ -3671,8 +3688,7 @@
     "imagesSectionEmpty": "Ingen godkjente bildeverter",
     "revoke": "Trekk tilbake godkjenningen av {{host}}",
     "revokeMessage": "Lenker til denne verten vil igjen be om bekreftelse.",
-    "revokeImageMessage": "Bilder fra denne verten vil igjen be om bekreftelse.",
-    "backToPreferences": "Tilbake til innstillinger"
+    "revokeImageMessage": "Bilder fra denne verten vil igjen be om bekreftelse."
   },
   "glanceable": {
     "waiting": "Oppdaterer agenter",
@@ -3919,6 +3935,8 @@
       "downloading": "Laster ned: {{written}} av {{total}}",
       "downloadingUnknown": "Laster ned: {{written}}",
       "paused": "På pause: {{written}} av {{total}}",
+      "retrying": "Prøver på nytt: {{written}} av {{total}}",
+      "retryingUnknown": "Prøver på nytt: {{written}}",
       "verifying": "Sjekker den nedlastede filen …",
       "downloaded": "Lastet ned · {{size}}",
       "url": "Direkte nedlastingslenke",
@@ -4009,7 +4027,9 @@
         "androidModelUnavailable": "Denne enheten støtter ikke Gemini Nano, eller systemappen AICore klargjøres fortsatt. Prøv igjen senere.",
         "aicoreUpdateRequired": "Oppdater AICore-appen og systemprogramvaren for å bruke denne modellen.",
         "downloadable": "Denne modellen må lastes ned én gang før du kan bruke den.",
-        "downloading": "Modellen lastes ned. Den er klar når nedlastingen er fullført."
+        "downloading": "Modellen lastes ned. Den er klar når nedlastingen er fullført.",
+        "batteryQuota": "Modellen på enheten har brukt opp batterikvoten sin for nå. Prøv igjen senere.",
+        "checkFailed": "Appen kunne ikke sjekke denne modellen. Prøv igjen."
       },
       "unavailable": "Modellen på enheten er ikke tilgjengelig akkurat nå. Sjekk statusen i $t(modelChat.backends.title).",
       "busy": "Modellen på enheten er opptatt med et annet svar. Prøv igjen når den er ferdig.",
@@ -4370,7 +4390,8 @@
       "purchaseFallback": "Kjøp av kreditter",
       "receipt": "Kvittering",
       "receiptA11y": "Åpne kvitteringen for {{description}}, {{amount}}, fra {{date}}",
-      "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet."
+      "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet.",
+      "retentionLimit": "Viser den nyeste kreditthistorikken."
     },
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
@@ -4617,6 +4638,9 @@
     "couldNotLoad": "Kunne ikke laste inn integrasjoner",
     "permissionDenied": "Du har ikke tillatelse til å administrere disse integrasjonene.",
     "managedByOwner": "Be en eier i organisasjonen om å endre en tilkobling du ikke kan endre.",
+    "managedByOwnerOrAdmin": "Be en eier eller administrator i organisasjonen om å endre en tilkobling du ikke kan endre.",
+    "managedByOwnerOrBilling": "Be en eier eller faktureringsansvarlig i organisasjonen om å endre en tilkobling du ikke kan endre.",
+    "managedByOwnerAdminOrBilling": "Be en eier, administrator eller faktureringsansvarlig i organisasjonen om å endre en tilkobling du ikke kan endre.",
     "connectFailed": "Kunne ikke åpne tilkoblingssiden"
   },
   "invoices": {
@@ -4653,7 +4677,7 @@
       "new": "Ny trigger",
       "create": "Opprett trigger",
       "emptyTitle": "Ingen triggere ennå",
-      "emptyDescription": "Opprett en trigger for å starte en Cloud Agent-kjøring fra et webhook-kall eller etter en tidsplan.",
+      "emptyDescription": "Opprett din første trigger.",
       "loadFailedTitle": "Kunne ikke laste inn triggere",
       "loadFailedDescription": "Prøv igjen når du har forbindelse.",
       "detailLoadFailedTitle": "Kunne ikke laste inn denne triggeren",

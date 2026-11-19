@@ -844,7 +844,19 @@
         "fileComment": "Komentář k souboru",
         "outdatedOnPathLines": "Zastaralé: {{path}} {{lines}}",
         "outdatedOnLines": "Zastaralé: {{lines}}",
-        "outdatedOnPath": "Zastaralé: {{path}}"
+        "outdatedOnPath": "Zastaralé: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Levá strana",
+        "sideRight": "Pravá strana",
+        "outdatedOnLinesSide": "Zastaralé: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Zastaralé: {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Zastaralé ({{side}})",
+        "outdatedOnPathSide": "Zastaralé: {{path}} ({{side}})"
       },
       "deletedUser": "smazaný uživatel",
       "replyForbiddenTerm": "Nemáš oprávnění odpovídat v tomto {{term}}.",
@@ -966,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
       "gitlabReconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
       "bitbucketNotConnectedTitle": "Bitbucket není připojen",
-      "bitbucketAdminOnlyDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
+      "adminOnlyConnectDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
       "contextLine": "Pro {{organization}}",
       "contextLinePersonal": "Pro osobní účet"
     },
@@ -1419,8 +1431,9 @@
       "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Připojení Bitbucket této organizace se spravuje na webu z počítače.",
-      "description": "Vytvořte přístupový token pracovního prostoru s požadovanými oprávněními a vložte jej níže.",
+      "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
+      "description": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
+      "descriptionReconnect": "Vytvořte nový přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
       "tokenPlaceholder": "Přístupový token pracovního prostoru",
       "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
@@ -2236,6 +2249,8 @@
       "renameAccessibility": "Přejmenovat relaci: {{title}}",
       "cloningSession": "Klonování relace",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
+      "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
+      "historyUnavailable": "Přepis této relace nelze přečíst.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
       "notEnoughCredits": "Nemáte dost kreditů pro tento požadavek. Dobijte si kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úkol se ještě dokončuje. Chvíli prosím počkejte.",
@@ -2312,6 +2327,7 @@
       "branchDefault": "Výchozí",
       "branchAccessibility": "Větev: {{label}}",
       "branchLoading": "Načítání větví",
+      "branchInactive": "Vyberte repozitář, aby se načetly jeho větve.",
       "branchLoadError": "Větve se nepodařilo načíst",
       "branchUnavailable": "Pro tento repozitář nejsou větve dostupné. Zkontroluj svůj přístup u poskytovatele a vyber jiný repozitář.",
       "branchEmpty": "Žádné dostupné větve",
@@ -3138,7 +3154,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Relace se nepodařilo načíst.",
-    "couldNotLoadActiveSessions": "Aktivní relace se nepodařilo načíst.",
     "agentSessions": "Právě běží",
     "newCodingTask": "Nový programovací úkol",
     "newTaskFromPicture": "Nový úkol z obrázku",
@@ -3521,7 +3536,8 @@
         "accounting_adjustment": "Účetní úprava",
         "credits_expired": "Kredity s prošlou platností"
       },
-      "truncated": "K dispozici jsou i starší pohyby kreditů."
+      "truncated": "K dispozici jsou i starší pohyby kreditů.",
+      "retentionLimit": "Zobrazují se nejnovější pohyby kreditů."
     },
     "inviteMember": {
       "emailError": "Zadejte platnou e-mailovou adresu.",
@@ -3553,7 +3569,8 @@
         "void": "Stornováno",
         "uncollectible": "Nedobytné"
       },
-      "truncated": "Starší faktury jsou k dispozici."
+      "truncated": "Starší faktury jsou k dispozici.",
+      "retentionLimit": "Zobrazují se nejnovější faktury."
     },
     "lowBalanceAlert": {
       "enableA11y": "Povolit upozornění na nízký zůstatek",
@@ -3791,8 +3808,7 @@
     "imagesSectionEmpty": "Žádné důvěryhodné domény obrázků",
     "revoke": "Odebrat důvěru doméně {{host}}",
     "revokeMessage": "Odkazy na tuto doménu budou znovu vyžadovat potvrzení.",
-    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení.",
-    "backToPreferences": "Zpět na předvolby"
+    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení."
   },
   "glanceable": {
     "waiting": "Aktualizace agentů",
@@ -4041,6 +4057,8 @@
       "downloading": "Stahování: {{written}} z {{total}}",
       "downloadingUnknown": "Stahování: {{written}}",
       "paused": "Pozastaveno: {{written}} z {{total}}",
+      "retrying": "Nový pokus: {{written}} z {{total}}",
+      "retryingUnknown": "Nový pokus: {{written}}",
       "verifying": "Kontrola staženého souboru…",
       "downloaded": "Staženo · {{size}}",
       "url": "Přímý odkaz ke stažení",
@@ -4131,7 +4149,9 @@
         "androidModelUnavailable": "Toto zařízení nepodporuje Gemini Nano, nebo se systémová aplikace AICore ještě nastavuje. Zkuste to později.",
         "aicoreUpdateRequired": "Pokud chcete tento model používat, aktualizujte aplikaci AICore a systémový software.",
         "downloadable": "Před prvním použitím je potřeba tento model jednorázově stáhnout.",
-        "downloading": "Model se stahuje. Bude připraven, jakmile stahování skončí."
+        "downloading": "Model se stahuje. Bude připraven, jakmile stahování skončí.",
+        "batteryQuota": "Model v zařízení prozatím vyčerpal svůj limit baterie. Zkuste to znovu později.",
+        "checkFailed": "Aplikace tento model nemohla zkontrolovat. Zkuste to znovu."
       },
       "unavailable": "Model v zařízení teď není dostupný. Zkontrolujte jeho stav v sekci $t(modelChat.backends.title).",
       "busy": "Model v zařízení právě generuje jinou odpověď. Zkuste to znovu, až skončí.",
@@ -4504,7 +4524,8 @@
       "purchaseFallback": "Nákup kreditů",
       "receipt": "Účtenka",
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
-      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici."
+      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
+      "retentionLimit": "Zobrazuje se nejnovější historie kreditů."
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
@@ -4767,6 +4788,9 @@
     "couldNotLoad": "Integrace se nepodařilo načíst",
     "permissionDenied": "Nemáte oprávnění spravovat tyto integrace.",
     "managedByOwner": "Požádejte vlastníka organizace o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerOrAdmin": "Požádejte vlastníka organizace nebo správce o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerOrBilling": "Požádejte vlastníka organizace nebo správce fakturace o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerAdminOrBilling": "Požádejte vlastníka organizace, správce nebo správce fakturace o změnu připojení, které nemůžete změnit.",
     "connectFailed": "Stránku pro připojení se nepodařilo otevřít"
   },
   "invoices": {
@@ -4803,7 +4827,7 @@
       "new": "Nový spouštěč",
       "create": "Vytvořit spouštěč",
       "emptyTitle": "Zatím žádné spouštěče",
-      "emptyDescription": "Vytvořte spouštěč pro spuštění Cloud Agent voláním webhooku nebo podle plánu.",
+      "emptyDescription": "Vytvořte svůj první spouštěč.",
       "loadFailedTitle": "Spouštěče se nepodařilo načíst",
       "loadFailedDescription": "Zkuste to znovu, až budete mít připojení.",
       "detailLoadFailedTitle": "Tento spouštěč se nepodařilo načíst",

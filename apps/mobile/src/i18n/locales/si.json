@@ -820,7 +820,19 @@
         "fileComment": "ගොනුව පිළිබඳ අදහස",
         "outdatedOnPathLines": "{{path}} {{lines}} — යල් පැන ඇත",
         "outdatedOnLines": "{{lines}} — යල් පැන ඇත",
-        "outdatedOnPath": "{{path}} — යල් පැන ඇත"
+        "outdatedOnPath": "{{path}} — යල් පැන ඇත",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "වම් පැත්ත",
+        "sideRight": "දකුණු පැත්ත",
+        "outdatedOnLinesSide": "{{lines}} ({{side}}) — යල් පැන ඇත",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} ({{side}}) — යල් පැන ඇත",
+        "outdatedSide": "යල් පැන ඇත ({{side}})",
+        "outdatedOnPathSide": "{{path}} යල් පැන ඇත ({{side}})"
       },
       "deletedUser": "මකා දැමූ පරිශීලකයා",
       "replyForbiddenTerm": "මෙම {{term}}ට පිළිතුරු දීමට ඔබට අවසර නොමැත.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "මෙම ගිණුමට තවම සංවිධාන කිසිවක් නොමැත. සංවිධානයක් සෑදීමෙන් හෝ එකකට සම්බන්ධ වීමෙන් පසු Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කළ හැක.",
       "gitlabReconnectAdminOnlyDescription": "එය නැවත සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
       "bitbucketNotConnectedTitle": "Bitbucket සම්බන්ධ වී නොමැත",
-      "bitbucketAdminOnlyDescription": "එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
+      "adminOnlyConnectDescription": "එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
       "contextLine": "{{organization}} සඳහා",
       "contextLinePersonal": "ඔබේ පෞද්ගලික ගිණුම සඳහා"
     },
@@ -1373,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket සම්බන්ධ වී නොමැත. එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "මෙම සංවිධානයේ Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
-      "description": "අවශ්‍ය අවසර සහිත වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
+      "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "description": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
+      "descriptionReconnect": "{{organization}} සඳහා නව වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "scopes": "ගිණුම: කියවීම · ගබඩා: කියවීම/ලිවීම · PR: කියවීම · වෙබ්හුක්: කියවීම/ලිවීම",
       "tokenPlaceholder": "වැඩබිම් ප්‍රවේශ ටෝකනය",
       "tokenRefused": "Bitbucket මෙම වැඩබිම් ප්‍රවේශ ටෝකනය පිළිගත්තේ නැත. එහි ඉහත අවසර ඇත්දැයි පරීක්ෂා කර, නැවත උත්සාහ කරන්න."
@@ -2148,6 +2161,8 @@
       "renameAccessibility": "{{title}} සැසියේ නම වෙනස් කරන්න",
       "cloningSession": "සැසියේ පිටපතක් සාදමින්",
       "couldNotLoadThisSession": "මෙම සැසිය පූරණය කළ නොහැකි විය.",
+      "historyTooLarge": "මෙම සැසියේ සටහන පූරණය කිරීමට බොහෝ විශාලයි.",
+      "historyUnavailable": "මෙම සැසියේ සටහන කියවිය නොහැක.",
       "cloneFailedRetry": "මෙම සැසියේ පිටපතක් සෑදිය නොහැකි විය. නැවත උත්සාහ කරන්න.",
       "notEnoughCredits": "මෙම ඉල්ලීම සඳහා ප්‍රමාණවත් ක්‍රෙඩිට් නොමැත. ක්‍රෙඩිට් එක් කර නැවත උත්සාහ කරන්න.",
       "previousTaskFinishing": "පෙර කාර්යය තවමත් අවසන් වෙමින් පවතී. කරුණාකර මොහොතක් රැඳී සිටින්න.",
@@ -2224,6 +2239,7 @@
       "branchDefault": "පෙරනිමිය",
       "branchAccessibility": "ශාඛාව: {{label}}",
       "branchLoading": "ශාඛා පූරණය වෙමින්",
+      "branchInactive": "එහි ශාඛා පූරණය කිරීමට ගබඩාවක් තෝරන්න.",
       "branchLoadError": "ශාඛා පූරණය කළ නොහැකි විය",
       "branchUnavailable": "මෙම ගබඩාව සඳහා ශාඛා ලබා ගත නොහැක. සැපයුම්කරු සමඟ ඔබේ ප්‍රවේශය පරීක්ෂා කර, පසුව තවත් ගබඩාවක් තෝරන්න.",
       "branchEmpty": "ශාඛා නොමැත",
@@ -3026,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය.",
-    "couldNotLoadActiveSessions": "සක්‍රීය සැසි පූරණය කළ නොහැකි විය.",
     "agentSessions": "දැන් ක්‍රියාත්මකයි",
     "newCodingTask": "නව කේතීකරණ කාර්යය",
     "newTaskFromPicture": "පින්තූරයකින් නව කාර්යය",
@@ -3405,7 +3420,8 @@
         "accounting_adjustment": "ගිණුම්කරණ ගැළපීම",
         "credits_expired": "ක්‍රෙඩිට් කල් ඉකුත් වී ඇත"
       },
-      "truncated": "පෙර ක්‍රෙඩිට් ගනුදෙනු ද බැලිය හැක."
+      "truncated": "පෙර ක්‍රෙඩිට් ගනුදෙනු ද බැලිය හැක.",
+      "retentionLimit": "නවතම ක්‍රෙඩිට් ගනුදෙනු පෙන්වයි."
     },
     "inviteMember": {
       "emailError": "වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.",
@@ -3437,7 +3453,8 @@
         "void": "අවලංගු",
         "uncollectible": "අයකරගත නොහැකි"
       },
-      "truncated": "පෙර ඉන්වොයිසි ද බැලිය හැක."
+      "truncated": "පෙර ඉන්වොයිසි ද බැලිය හැක.",
+      "retentionLimit": "නවතම ඉන්වොයිසි පෙන්වයි."
     },
     "lowBalanceAlert": {
       "enableA11y": "ශේෂය අඩු වූ විට දැනුම්දීම සක්‍රීය කරන්න",
@@ -3671,8 +3688,7 @@
     "imagesSectionEmpty": "විශ්වාස කළ රූප ධාරක නැත",
     "revoke": "{{host}} වෙත දුන් විශ්වාසය ඉවත් කරන්න",
     "revokeMessage": "මෙම ධාරකයට ඇති සබැඳි නැවත තහවුරු කිරීම ඉල්ලා සිටී.",
-    "revokeImageMessage": "මෙම ධාරකයේ රූප නැවත තහවුරු කිරීම ඉල්ලා සිටී.",
-    "backToPreferences": "මනාප වෙත ආපසු යන්න"
+    "revokeImageMessage": "මෙම ධාරකයේ රූප නැවත තහවුරු කිරීම ඉල්ලා සිටී."
   },
   "glanceable": {
     "waiting": "නියෝජිතයන් යාවත්කාලීන කරමින්",
@@ -3919,6 +3935,8 @@
       "downloading": "බාගනිමින්: {{total}} න් {{written}}",
       "downloadingUnknown": "බාගනිමින්: {{written}}",
       "paused": "විරාමිතයි: {{total}} න් {{written}}",
+      "retrying": "නැවත උත්සාහ කරමින්: {{total}} න් {{written}}",
+      "retryingUnknown": "නැවත උත්සාහ කරමින්: {{written}}",
       "verifying": "බාගත කළ ගොනුව පරීක්ෂා කරමින්…",
       "downloaded": "බාගත කර ඇත · {{size}}",
       "url": "සෘජු බාගැනීම් සබැඳිය",
@@ -4009,7 +4027,9 @@
         "androidModelUnavailable": "මෙම උපාංගය Gemini Nano සඳහා සහාය නොදක්වයි, නැතහොත් AICore පද්ධති යෙදුම තවමත් සකසමින් පවතී. පසුව නැවත උත්සාහ කරන්න.",
         "aicoreUpdateRequired": "මෙම ආකෘතිය භාවිත කිරීමට AICore යෙදුම සහ ඔබගේ පද්ධති මෘදුකාංගය යාවත්කාලීන කරන්න.",
         "downloadable": "මෙම ආකෘතිය භාවිත කිරීමට පෙර එක් වරක් බාගත කළ යුතුය.",
-        "downloading": "ආකෘතිය බාගත වෙමින් පවතී. බාගැනීම අවසන් වූ පසු එය සූදානම් වනු ඇත."
+        "downloading": "ආකෘතිය බාගත වෙමින් පවතී. බාගැනීම අවසන් වූ පසු එය සූදානම් වනු ඇත.",
+        "batteryQuota": "උපාංගයේ ආකෘතිය දැනට එහි බැටරි වෙන්කළ ප්‍රමාණය භාවිත කර ඇත. පසුව නැවත උත්සාහ කරන්න.",
+        "checkFailed": "මෙම ආකෘතිය පරීක්ෂා කිරීමට යෙදුමට නොහැකි විය. නැවත උත්සාහ කරන්න."
       },
       "unavailable": "උපාංගයේ ආකෘතිය මේ මොහොතේ ලබා ගත නොහැක. එහි තත්ත්වය $t(modelChat.backends.title) තුළ පරීක්ෂා කරන්න.",
       "busy": "උපාංගයේ ආකෘතිය වෙනත් පිළිතුරක් සමඟ කාර්යබහුලයි. එය අවසන් වූ පසු නැවත උත්සාහ කරන්න.",
@@ -4370,7 +4390,8 @@
       "purchaseFallback": "ක්‍රෙඩිට් මිලදී ගැනීම",
       "receipt": "රිසිට්පත",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} සඳහා රිසිට්පත විවෘත කරන්න",
-      "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත."
+      "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත.",
+      "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි."
     },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",
@@ -4617,6 +4638,9 @@
     "couldNotLoad": "ඒකාබද්ධ කිරීම් පූරණය කළ නොහැකි විය",
     "permissionDenied": "මෙම ඒකාබද්ධ කිරීම් කළමනාකරණය කිරීමට ඔබට අවසර නැත.",
     "managedByOwner": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාවක් වෙනස් කිරීමට සංවිධානයේ හිමිකරුවෙකුගෙන් ඉල්ලා සිටින්න.",
+    "managedByOwnerOrAdmin": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාවක් වෙනස් කිරීමට සංවිධානයේ හිමිකරු හෝ පරිපාලකයෙකුගෙන් ඉල්ලා සිටින්න.",
+    "managedByOwnerOrBilling": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාවක් වෙනස් කිරීමට සංවිධානයේ හිමිකරු හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලා සිටින්න.",
+    "managedByOwnerAdminOrBilling": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාවක් වෙනස් කිරීමට සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලා සිටින්න.",
     "connectFailed": "සම්බන්ධතා පිටුව විවෘත කළ නොහැකි විය"
   },
   "invoices": {
@@ -4653,7 +4677,7 @@
       "new": "නව ට්‍රිගර්",
       "create": "ට්‍රිගර් සාදන්න",
       "emptyTitle": "තවම ට්‍රිගර් නැත",
-      "emptyDescription": "වෙබ්හුක් ඇමතුමකින් හෝ කාලසටහනකට අනුව Cloud Agent ධාවනයක් ආරම්භ කිරීමට ට්‍රිගර් එකක් සාදන්න෴",
+      "emptyDescription": "ඔබේ පළමු ට්‍රිගරය සාදන්න.",
       "loadFailedTitle": "ට්‍රිගර් පූරණය කළ නොහැකි විය",
       "loadFailedDescription": "සම්බන්ධතාවක් ඇති විට නැවත උත්සාහ කරන්න෴",
       "detailLoadFailedTitle": "මෙම ට්‍රිගර් පූරණය කළ නොහැකි විය",

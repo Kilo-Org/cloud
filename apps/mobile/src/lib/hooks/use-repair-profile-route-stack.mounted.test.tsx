@@ -3,6 +3,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useRepairProfileRouteStack } from './use-repair-profile-route-stack';
+import { resetPendingProfileRetirementsForTests } from '@/lib/profile-stack-retirement';
 
 type Route = { key: string; name: string; params?: object };
 type State = { routes: Route[]; index: number };
@@ -83,6 +84,7 @@ beforeEach(() => {
   resetMock.mockReset();
   nav.listeners.clear();
   nav.pathname = '/profile-management/profile-1/agents';
+  resetPendingProfileRetirementsForTests();
 });
 
 describe('useRepairProfileRouteStack', () => {
@@ -234,6 +236,65 @@ describe('useRepairProfileRouteStack', () => {
     endTransition();
 
     expect(resetMock).not.toHaveBeenCalled();
+  });
+
+  it('retires the original after the repairing screen is gone', () => {
+    // A native Stack unmounts the covered screen, so the repair outlives the
+    // screen that asked for it: the rebuilt copy is what finishes it. The
+    // original stayed in the stack for good when the removal lived on the
+    // repairing screen, and one Back then landed on that leftover copy, so the
+    // reader was pushed back into the section instead of leaving it.
+    setStack([r('tabs', '(tabs)'), r('a', AGENTS)], 1);
+    const repairing = mount();
+    expect(pushMock).toHaveBeenCalled();
+
+    act(() => {
+      repairing.unmount();
+    });
+    setStack(
+      [
+        r('tabs', '(tabs)'),
+        r('a', AGENTS),
+        r('l', LIST, { stackRebuilt: '1' }),
+        r('o', OVERVIEW, { stackRebuilt: '1' }),
+        r('a-rebuilt', AGENTS, { stackRebuilt: '1' }),
+      ],
+      4
+    );
+
+    mount();
+
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    const [nextState] = resetMock.mock.calls[0] as [State];
+    expect(nextState.routes.map(route => route.key)).toEqual(['tabs', 'l', 'o', 'a-rebuilt']);
+    expect(nextState.index).toBe(3);
+  });
+
+  it('retires an original recorded by another screen instance', () => {
+    // Two instances share the pending removal: the one that pushed does not have
+    // to be the one that sees the rebuilt copy land.
+    setStack([r('tabs', '(tabs)'), r('a', AGENTS)], 1);
+    mount();
+    setStack(
+      [
+        r('tabs', '(tabs)'),
+        r('a', AGENTS),
+        r('l', LIST, { stackRebuilt: '1' }),
+        r('o', OVERVIEW, { stackRebuilt: '1' }),
+        r('a-rebuilt', AGENTS, { stackRebuilt: '1' }),
+      ],
+      4
+    );
+
+    act(() => {
+      for (const listener of nav.listeners) {
+        listener();
+      }
+    });
+
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    const [nextState] = resetMock.mock.calls[0] as [State];
+    expect(nextState.routes.map(route => route.key)).toEqual(['tabs', 'l', 'o', 'a-rebuilt']);
   });
 
   it('builds the parents of a screen that is the only route of its Stack', () => {

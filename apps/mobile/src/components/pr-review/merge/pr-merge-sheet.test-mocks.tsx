@@ -142,3 +142,7 @@ vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000' }),
 }));
+// The delete-branch row is a PreferenceRow, whose pending state draws the
+// shared ActivityIndicator; that reads the reduced-motion policy, which loads
+// `expo-battery` and with it the Expo runtime Node has no `__DEV__` for.
+vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));

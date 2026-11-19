@@ -54,6 +54,7 @@ export function BodyEmpty({
         <View className="items-center gap-4">
           <QueryError
             placement="top"
+            inset="gutter"
             className="pt-0"
             message={
               isSearching

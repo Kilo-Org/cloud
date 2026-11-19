@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucket chưa được kết nối. Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Kết nối Bitbucket của tổ chức này được quản lý trên web từ máy tính.",
-      "description": "Tạo mã truy cập không gian làm việc với các quyền cần thiết rồi dán vào bên dưới.",
+      "managedOnWeb": "Kết nối Bitbucket của {{organization}} được quản lý trên web từ máy tính.",
+      "description": "Tạo mã truy cập không gian làm việc cho {{organization}} rồi dán vào bên dưới.",
+      "descriptionReconnect": "Tạo mã truy cập không gian làm việc mới cho {{organization}} rồi dán vào bên dưới.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
       "tokenPlaceholder": "Mã truy cập không gian làm việc",
       "tokenRefused": "Bitbucket không chấp nhận mã truy cập không gian làm việc này. Hãy kiểm tra rằng mã có các quyền ở trên, rồi thử lại."
@@ -1605,6 +1606,8 @@
       "renameAccessibility": "Đổi tên phiên: {{title}}",
       "cloningSession": "Đang sao chép phiên",
       "couldNotLoadThisSession": "Không thể tải phiên này.",
+      "historyTooLarge": "Kết xuất của phiên này quá lớn để tải.",
+      "historyUnavailable": "Không thể đọc kết xuất của phiên này.",
       "cloneFailedRetry": "Không thể sao chép phiên này. Hãy thử lại.",
       "notEnoughCredits": "Số dư không đủ cho yêu cầu này. Hãy nạp tiền và thử lại.",
       "previousTaskFinishing": "Tác vụ trước chưa hoàn tất. Vui lòng chờ một chút.",
@@ -1681,6 +1684,7 @@
       "branchDefault": "Mặc định",
       "branchAccessibility": "Nhánh: {{label}}",
       "branchLoading": "Đang tải các nhánh",
+      "branchInactive": "Chọn một kho mã để tải các nhánh của kho đó.",
       "branchLoadError": "Không tải được các nhánh",
       "branchUnavailable": "Không có nhánh khả dụng cho kho mã nguồn này. Kiểm tra quyền truy cập của bạn với nhà cung cấp, rồi chọn kho mã nguồn khác.",
       "branchEmpty": "Không có nhánh khả dụng",
@@ -2483,7 +2487,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Không thể tải danh sách phiên.",
-    "couldNotLoadActiveSessions": "Không thể tải các phiên đang hoạt động.",
     "agentSessions": "Đang hoạt động",
     "newCodingTask": "Tác vụ lập trình mới",
     "newTaskFromPicture": "Tác vụ mới từ hình ảnh",
@@ -2800,7 +2803,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tài khoản này chưa có tổ chức nào. Bạn có thể xem các PR Bitbucket sau khi tạo hoặc tham gia một tổ chức.",
       "gitlabReconnectAdminOnlyDescription": "Hãy yêu cầu Chủ sở hữu, Quản trị viên hoặc Người quản lý thanh toán của tổ chức kết nối lại.",
       "bitbucketNotConnectedTitle": "Bitbucket chưa được kết nối",
-      "bitbucketAdminOnlyDescription": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối.",
+      "adminOnlyConnectDescription": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối.",
       "contextLine": "Cho {{organization}}",
       "contextLinePersonal": "Cho tài khoản cá nhân"
     },
@@ -2897,7 +2900,19 @@
         "fileComment": "Bình luận về tệp",
         "outdatedOnPathLines": "Không còn cập nhật tại {{path}} {{lines}}",
         "outdatedOnLines": "Không còn cập nhật tại {{lines}}",
-        "outdatedOnPath": "Không còn cập nhật tại {{path}}"
+        "outdatedOnPath": "Không còn cập nhật tại {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Bên trái",
+        "sideRight": "Bên phải",
+        "outdatedOnLinesSide": "Không còn cập nhật tại {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Không còn cập nhật tại {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Không còn cập nhật ({{side}})",
+        "outdatedOnPathSide": "Không còn cập nhật tại {{path}} ({{side}})"
       },
       "deletedUser": "người dùng đã bị xóa",
       "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này.",
@@ -3397,7 +3412,8 @@
         "accounting_adjustment": "Điều chỉnh kế toán",
         "credits_expired": "Tiền trong số dư đã hết hạn"
       },
-      "truncated": "Còn các biến động số dư trước đó để xem."
+      "truncated": "Còn các biến động số dư trước đó để xem.",
+      "retentionLimit": "Đang hiển thị các biến động số dư gần đây nhất."
     },
     "hub": {
       "balance": "Số dư",
@@ -3442,7 +3458,8 @@
         "void": "Đã hủy",
         "uncollectible": "Không thể thu tiền"
       },
-      "truncated": "Còn các hóa đơn trước đó để xem."
+      "truncated": "Còn các hóa đơn trước đó để xem.",
+      "retentionLimit": "Đang hiển thị các hóa đơn gần đây nhất."
     },
     "lowBalanceAlert": {
       "enableA11y": "Bật cảnh báo số dư thấp",
@@ -3671,8 +3688,7 @@
     "imagesSectionEmpty": "Chưa có máy chủ hình ảnh được tin cậy",
     "revoke": "Bỏ tin cậy {{host}}",
     "revokeMessage": "Liên kết đến máy chủ này sẽ hỏi xác nhận lại.",
-    "revokeImageMessage": "Hình ảnh từ máy chủ này sẽ hỏi xác nhận lại.",
-    "backToPreferences": "Quay lại cài đặt"
+    "revokeImageMessage": "Hình ảnh từ máy chủ này sẽ hỏi xác nhận lại."
   },
   "glanceable": {
     "waiting": "Đang cập nhật tác nhân",
@@ -3919,6 +3935,8 @@
       "downloading": "Đang tải xuống: {{written}} / {{total}}",
       "downloadingUnknown": "Đang tải xuống: {{written}}",
       "paused": "Đã tạm dừng: {{written}} / {{total}}",
+      "retrying": "Đang thử lại: {{written}} / {{total}}",
+      "retryingUnknown": "Đang thử lại: {{written}}",
       "verifying": "Đang kiểm tra tệp đã tải xuống…",
       "downloaded": "Đã tải xuống · {{size}}",
       "url": "Liên kết tải xuống trực tiếp",
@@ -4009,7 +4027,9 @@
         "androidModelUnavailable": "Thiết bị này không hỗ trợ Gemini Nano hoặc ứng dụng hệ thống AICore vẫn đang thiết lập. Hãy thử lại sau.",
         "aicoreUpdateRequired": "Hãy cập nhật ứng dụng AICore và phần mềm hệ thống để sử dụng mô hình này.",
         "downloadable": "Mô hình này cần được tải xuống một lần trước khi sử dụng.",
-        "downloading": "Mô hình đang tải xuống và sẽ sẵn sàng khi tải xong."
+        "downloading": "Mô hình đang tải xuống và sẽ sẵn sàng khi tải xong.",
+        "batteryQuota": "Mô hình trên thiết bị đã dùng hết mức pin được phép trong lúc này. Hãy thử lại sau.",
+        "checkFailed": "Ứng dụng không thể kiểm tra mô hình này. Hãy thử lại."
       },
       "unavailable": "Mô hình trên thiết bị hiện không khả dụng. Hãy kiểm tra trạng thái trong $t(modelChat.backends.title).",
       "busy": "Mô hình trên thiết bị đang bận trả lời tin nhắn khác. Hãy thử lại khi hoàn tất.",
@@ -4370,7 +4390,8 @@
       "purchaseFallback": "Mua tín dụng",
       "receipt": "Biên lai",
       "receiptA11y": "Mở biên lai cho {{description}}, {{amount}}, từ {{date}}",
-      "receiptUnavailable": "Không có biên lai cho giao dịch mua này."
+      "receiptUnavailable": "Không có biên lai cho giao dịch mua này.",
+      "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất."
     },
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
@@ -4617,6 +4638,9 @@
     "couldNotLoad": "Không thể tải các tích hợp",
     "permissionDenied": "Bạn không có quyền quản lý các tích hợp này.",
     "managedByOwner": "Hãy yêu cầu chủ sở hữu của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
+    "managedByOwnerOrAdmin": "Hãy yêu cầu chủ sở hữu hoặc quản trị viên của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
+    "managedByOwnerOrBilling": "Hãy yêu cầu chủ sở hữu hoặc người quản lý thanh toán của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
+    "managedByOwnerAdminOrBilling": "Hãy yêu cầu chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
     "connectFailed": "Không thể mở trang kết nối"
   },
   "invoices": {
@@ -4653,7 +4677,7 @@
       "new": "Trình kích hoạt mới",
       "create": "Tạo trình kích hoạt",
       "emptyTitle": "Chưa có trình kích hoạt nào",
-      "emptyDescription": "Tạo trình kích hoạt để bắt đầu một lần chạy Cloud Agent từ lệnh gọi webhook hoặc theo lịch.",
+      "emptyDescription": "Tạo trình kích hoạt đầu tiên của bạn.",
       "loadFailedTitle": "Không thể tải trình kích hoạt",
       "loadFailedDescription": "Hãy thử lại khi bạn có kết nối.",
       "detailLoadFailedTitle": "Không thể tải trình kích hoạt này",

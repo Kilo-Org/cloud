@@ -5,7 +5,7 @@
 import { RequestDeadlineError } from '@kilocode/event-service';
 import { describe, expect, it } from 'vitest';
 
-import { selectTodoQueryErrorView } from './todo-query-error';
+import { selectTodoItemQueryErrorView, selectTodoQueryErrorView } from './todo-query-error';
 
 function makeTrpcError(code: string): unknown {
   return { data: { code } };
@@ -60,5 +60,28 @@ describe('selectTodoQueryErrorView', () => {
       showRetry: true,
     });
     expect(selectTodoQueryErrorView(null)).toEqual({ variant: 'server', showRetry: true });
+  });
+});
+
+describe('selectTodoItemQueryErrorView', () => {
+  it('reads the id the server refused as not-found without a retry', () => {
+    expect(selectTodoItemQueryErrorView(makeTrpcError('BAD_REQUEST'))).toEqual({
+      variant: 'not-found',
+      showRetry: false,
+    });
+  });
+
+  it('keeps an unknown but well-formed id on the shared not-found rule', () => {
+    expect(selectTodoItemQueryErrorView(makeTrpcError('NOT_FOUND'))).toEqual({
+      variant: 'not-found',
+      showRetry: false,
+    });
+  });
+
+  it('keeps a read that failed on the server retryable', () => {
+    expect(selectTodoItemQueryErrorView(makeTrpcError('INTERNAL_SERVER_ERROR'))).toEqual({
+      variant: 'server',
+      showRetry: true,
+    });
   });
 });

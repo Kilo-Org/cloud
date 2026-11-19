@@ -1,8 +1,8 @@
 /**
  * Runs the Enkrypt input guardrail against the real Enkrypt API with coding-agent requests, and
  * writes every Enkrypt request payload and scan report to an output directory. Each step runs like
- * the gateway does: the blocking and log-only detectors are scanned concurrently, sharing one call
- * limiter, and their verdicts are cached afterwards.
+ * the gateway does: the blocking detectors are scanned, then the log-only detectors, one call at a
+ * time under one shared deadline, and their verdicts are cached afterwards.
  *
  *   cd apps/web && pnpm exec tsx --env-file=../../.env.local --tsconfig tsconfig.scripts.json \
  *     src/scripts/enkrypt-guardrail-e2e.ts <output-dir>
@@ -20,10 +20,6 @@ import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
-import {
-  createEnkryptCallLimiter,
-  ENKRYPT_MAX_CONCURRENT_CALLS,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
 import { extractRequestParts } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import { scanUnits } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/scan-chunks';
 import {
@@ -439,9 +435,10 @@ const INJECTION =
 
 /**
  * About 250,000 characters: five sequential reads of about 48,000 characters each. Each read fits in
- * one call, so none is sliced, and uncached segments are packed into calls of up to
- * `ENKRYPT_MAX_SCAN_CHARACTERS`, so two reads share a call. Every read calls `read_file` with the
- * same arguments, and tool call ids are not scanned, so their tool calls are one unit, scanned once.
+ * one call, so none is sliced, and every uncached unit is scanned by a call of its own: 5 for
+ * `chatTurn1`, one for the reads' tool calls, and one per read, so 11 calls. Every read calls
+ * `read_file` with the same arguments, and tool call ids are not scanned, so their tool calls are
+ * one unit, scanned once.
  */
 const longConversation = [
   ...chatTurn1,
@@ -458,9 +455,8 @@ const MIDDLE_SLICE_HEADER = '[tool result, beginning and end omitted]';
 
 /**
  * One read of about 250,000 characters, too long for one call, so it is scanned in three
- * overlapping slices, each a unit of its own, with the injection in the middle of the middle slice,
- * outside the overlaps. The middle slice fills a call of its own; the first leaves room for the
- * overlap, so it is packed with the messages before it.
+ * overlapping slices, each a unit scanned by a call of its own, with the injection in the middle of
+ * the middle slice, outside the overlaps. With the user message and the tool call, that is 5 calls.
  */
 function injectionInSlice(): unknown[] {
   const filler = schemaSlice(0, 250_000);
@@ -485,8 +481,8 @@ function injectionInSlice(): unknown[] {
 const sliceInjectionConversation = injectionInSlice();
 
 /**
- * Like `longConversation`, with the injection in the last read, so in the last call, packed with
- * the fourth read.
+ * Like `longConversation`, with the injection in the last read, so in the last of 11 calls, each
+ * scanning one unit. The newest unit is scanned first, so that call is made first.
  */
 const fourReads = [0, 1, 2, 3].flatMap(index => readTurn([schemaSlice(index * 48_000, 48_000)]));
 
@@ -541,11 +537,12 @@ function both(parts: Partial<Record<Part, string>>): Expected {
 
 type StepResults = Record<ScanKind, EnkryptCachedScanResult[]>;
 
-/** Whether the blocking conversation scan caches a block for any of its units. */
-function conversationCachesBlock(results: StepResults): boolean {
+/** How many units the blocking conversation scan caches a block for. */
+function conversationCachedBlocks(results: StepResults): number {
   return results.blocking
     .filter(result => result.report?.part === 'conversation')
-    .some(result => result.cacheEntries.some(entry => entry.verdict !== 'allow'));
+    .flatMap(result => result.cacheEntries)
+    .filter(entry => entry.verdict !== 'allow').length;
 }
 
 type Step = {
@@ -555,8 +552,6 @@ type Step = {
   organizationId?: string;
   kiloUserId?: string;
   expected: Expected;
-  /** Whether the step has enough uncached scans to fill every call slot. */
-  saturates?: boolean;
   /** Further checks; returns the failures. */
   check?: (results: StepResults, logs: EnkryptRequestLog[]) => string[];
 };
@@ -574,7 +569,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/3 calls=3',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=5 chunks=5',
     }),
   },
   {
@@ -584,7 +579,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'hit allow tools=3/0 calls=0',
       system: 'hit allow calls=0',
-      conversation: 'hit allow calls=1',
+      conversation: 'hit allow calls=3 chunks=3',
     }),
   },
   {
@@ -625,16 +620,28 @@ const steps: Step[] = [
     request: chat(chatTurn3),
     store: chatStore,
     expected: {
+      // The tool result is the newest unit, so it is scanned first, and its block skips the
+      // tool call before it.
       blocking: {
         tools: 'hit allow tools=3/0 calls=0',
         system: 'hit allow calls=0',
-        conversation: 'hit block calls=1',
+        conversation: 'hit block calls=1 chunks=2',
       },
       log_only: {
         tools: 'hit allow tools=3/0 calls=0',
         system: 'hit allow calls=0',
-        conversation: 'hit allow calls=1',
+        conversation: 'hit allow calls=2 chunks=2',
       },
+    },
+    check: (results, logs) => {
+      const failures: string[] = [];
+      const fired = blockedCalls(logs);
+      if (fired.join() !== '1') failures.push(`injection fired in calls ${fired}, expected only 1`);
+      const cachedBlocks = conversationCachedBlocks(results);
+      if (cachedBlocks !== 1) {
+        failures.push(`${cachedBlocks} blocks cached, expected only the tool result's`);
+      }
+      return failures;
     },
   },
   {
@@ -646,7 +653,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'hit allow tools=3/0 calls=0',
       system: 'hit allow calls=0',
-      conversation: 'hit allow calls=1',
+      conversation: 'hit allow calls=2 chunks=2',
     }),
   },
   {
@@ -657,7 +664,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/3 calls=3',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=10 chunks=10',
     }),
   },
   {
@@ -667,7 +674,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/3 calls=3',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=5 chunks=5',
     }),
   },
   {
@@ -677,18 +684,17 @@ const steps: Step[] = [
     expected: both({
       tools: 'miss allow tools=0/3 calls=3',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=5 chunks=5',
     }),
   },
   {
     name: '11-mcp-tools-cold',
     request: chat(chatTurn1, hugeTools),
     store: mcpStore,
-    saturates: true,
     expected: both({
       tools: 'miss allow tools=0/60 calls=60',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=5 chunks=5',
     }),
     check: results => {
       const report = results.blocking.find(result => result.report?.part === 'tools')?.report;
@@ -712,11 +718,10 @@ const steps: Step[] = [
     name: '13-single-tool-over-limit',
     request: chat(chatTurn1, [...CHAT_TOOLS, giantTool]),
     store: memoryStore(),
-    saturates: true,
     expected: both({
       tools: 'miss allow tools=0/4 calls=5',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=1',
+      conversation: 'miss allow calls=5 chunks=5',
     }),
     check: (_results, logs) => {
       const giant = logs.filter(
@@ -731,11 +736,10 @@ const steps: Step[] = [
     name: '14-long-conversation-cold',
     request: chat(longConversation),
     store: longStore,
-    saturates: true,
     expected: both({
       tools: 'miss allow tools=0/3 calls=3',
       system: 'miss allow calls=1',
-      conversation: 'miss allow calls=3 chunks=3',
+      conversation: 'miss allow calls=11 chunks=11',
     }),
     check: results => {
       const total =
@@ -751,7 +755,7 @@ const steps: Step[] = [
     expected: both({
       tools: 'hit allow tools=3/0 calls=0',
       system: 'hit allow calls=0',
-      conversation: 'hit allow calls=3 chunks=3',
+      conversation: 'hit allow calls=5 chunks=5',
     }),
   },
   {
@@ -759,15 +763,17 @@ const steps: Step[] = [
     request: chat(sliceInjectionConversation),
     store: sliceStore,
     expected: {
+      // Scanned last unit first, so the middle slice is the second call, and its block skips
+      // the remaining conversation calls, the system prompt, and the tools.
       blocking: {
-        tools: 'miss allow tools=0/3 calls=3',
-        system: 'miss allow calls=1',
-        conversation: 'miss block calls=3 chunks=3',
+        tools: 'miss skip tools=0/0 calls=0',
+        system: 'miss skip calls=0',
+        conversation: 'miss block calls=2 chunks=5',
       },
       log_only: {
         tools: 'miss allow tools=0/3 calls=3',
         system: 'miss allow calls=1',
-        conversation: 'miss allow calls=3 chunks=3',
+        conversation: 'miss allow calls=5 chunks=5',
       },
     },
     check: (results, logs) => {
@@ -785,23 +791,25 @@ const steps: Step[] = [
       if (fired.length !== 1 || fired[0] !== sliceCall?.chunk?.index) {
         failures.push(`injection fired in calls ${fired}, expected ${sliceCall?.chunk?.index}`);
       }
-      if (!conversationCachesBlock(results)) {
-        failures.push('the block of a call of one slice was not cached');
+      const cachedBlocks = conversationCachedBlocks(results);
+      if (cachedBlocks !== 1) {
+        failures.push(`${cachedBlocks} blocks cached, expected only the slice's`);
       }
       return failures;
     },
   },
-  // The slice was the only unit of its call, so its block was cached and rejects the next request
-  // without a blocking call.
+  // The slice was scanned by a call of its own, so its block was cached and rejects the next
+  // request without a blocking call.
   {
     name: '17-slice-block-cached',
     request: chat([...sliceInjectionConversation, { role: 'user', content: 'Continue.' }]),
     store: sliceStore,
     expected: {
       blocking: {
-        tools: 'hit allow tools=3/0 calls=0',
-        system: 'hit allow calls=0',
-        conversation: 'hit block calls=0',
+        tools: 'miss skip tools=0/0 calls=0',
+        system: 'miss skip calls=0',
+        // The cached block skips the 4 units no cached verdict covers.
+        conversation: 'hit block calls=0 chunks=4',
       },
       log_only: {
         tools: 'hit allow tools=3/0 calls=0',
@@ -811,43 +819,47 @@ const steps: Step[] = [
     },
   },
   {
-    name: '18-injection-in-packed-call',
+    name: '18-injection-in-late-unit',
     request: chat(injectionInLateChunk),
     store: lateBlockStore,
     expected: {
+      // The last read is scanned first, so its block skips every other blocking call.
       blocking: {
-        tools: 'miss allow tools=0/3 calls=3',
-        system: 'miss allow calls=1',
-        conversation: 'miss block calls=3 chunks=3',
+        tools: 'miss skip tools=0/0 calls=0',
+        system: 'miss skip calls=0',
+        conversation: 'miss block calls=1 chunks=11',
       },
       log_only: {
         tools: 'miss allow tools=0/3 calls=3',
         system: 'miss allow calls=1',
-        conversation: 'miss allow calls=3 chunks=3',
+        conversation: 'miss allow calls=11 chunks=11',
       },
     },
     check: (results, logs) => {
       const failures: string[] = [];
       const fired = blockedCalls(logs);
-      if (fired.join() !== '2') failures.push(`injection fired in calls ${fired}, expected only 2`);
-      if (conversationCachesBlock(results)) {
-        failures.push('the block of a call of several units was cached');
+      if (fired.join() !== '10')
+        failures.push(`injection fired in calls ${fired}, expected only 10`);
+      const cachedBlocks = conversationCachedBlocks(results);
+      if (cachedBlocks !== 1) {
+        failures.push(`${cachedBlocks} blocks cached, expected only the last read's`);
       }
       return failures;
     },
   },
-  // Enkrypt does not say which unit of a packed call fired, so the block is not cached. The
-  // blocking scan rescans the units of that call, the fourth and fifth reads, with the new message;
-  // the log-only scan allowed every call, so it scans only the new message.
+  // Each unit is scanned by a call of its own, so the block of the last read was cached and rejects
+  // the next request without a blocking call; the log-only scan allowed every call, so it scans only
+  // the new message.
   {
-    name: '19-packed-block-rescanned',
+    name: '19-unit-block-cached',
     request: chat([...injectionInLateChunk, { role: 'user', content: 'Continue.' }]),
     store: lateBlockStore,
     expected: {
       blocking: {
-        tools: 'hit allow tools=3/0 calls=0',
-        system: 'hit allow calls=0',
-        conversation: 'hit block calls=1',
+        tools: 'miss skip tools=0/0 calls=0',
+        system: 'miss skip calls=0',
+        // The cached block skips the 11 units no cached verdict covers.
+        conversation: 'hit block calls=0 chunks=11',
       },
       log_only: {
         tools: 'hit allow tools=3/0 calls=0',
@@ -856,17 +868,18 @@ const steps: Step[] = [
       },
     },
   },
-  // The units of the allowed calls are cached, so with the injection removed the blocking scan
-  // rescans only the fourth read and the changed fifth, and the log-only scan only the fifth.
+  // The log-only scan cached the verdicts of the allowed units, so with the injection removed it
+  // rescans only the changed fifth read. The blocking scan stopped at the block, so it never scanned
+  // the other units, and scans them all now.
   {
     name: '20-allowed-calls-cached',
     request: chat([...chatTurn1, ...fourReads, ...readTurn([schemaSlice(192_000, 48_000)])]),
     store: lateBlockStore,
     expected: {
       blocking: {
-        tools: 'hit allow tools=3/0 calls=0',
-        system: 'hit allow calls=0',
-        conversation: 'hit allow calls=1',
+        tools: 'miss allow tools=0/3 calls=3',
+        system: 'miss allow calls=1',
+        conversation: 'miss allow calls=11 chunks=11',
       },
       log_only: {
         tools: 'hit allow tools=3/0 calls=0',
@@ -925,8 +938,8 @@ async function runStep(step: Step, key: string, dir: string): Promise<Summary> {
   calls.inFlight = 0;
   calls.maxInFlight = 0;
   calls.total = 0;
-  const limiter = createEnkryptCallLimiter();
   const signal = new AbortController().signal;
+  const deadline = AbortSignal.timeout(ENKRYPT_GUARDRAIL_TIMEOUT_MS);
   const parts = extractRequestParts(step.request);
   const logs: Promise<EnkryptRequestLog>[] = [];
   const scan = (kind: ScanKind) =>
@@ -944,14 +957,15 @@ async function runStep(step: Step, key: string, dir: string): Promise<Summary> {
         apiKey: key,
         fetch: countingFetch,
         timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
-        limiter,
+        deadline,
         signal,
         store: step.store,
         requestLog: { guardrail: 'input', capture: entry => logs.push(entry) },
       }
     );
   const startedAt = performance.now();
-  const [blocking, logOnly] = await Promise.all([scan('blocking'), scan('log_only')]);
+  const blocking = await scan('blocking');
+  const logOnly = await scan('log_only');
   const wallMs = Math.round(performance.now() - startedAt);
   const results: StepResults = { blocking, log_only: logOnly };
   await Promise.all(
@@ -1017,11 +1031,8 @@ async function runStep(step: Step, key: string, dir: string): Promise<Summary> {
       failures.push(`${log.scan} ${log.part}: sent ${log.request.text.length} characters`);
     }
   }
-  if (calls.maxInFlight > ENKRYPT_MAX_CONCURRENT_CALLS) {
-    failures.push(`max in flight ${calls.maxInFlight} > ${ENKRYPT_MAX_CONCURRENT_CALLS}`);
-  }
-  if (step.saturates && calls.maxInFlight !== ENKRYPT_MAX_CONCURRENT_CALLS) {
-    failures.push(`max in flight ${calls.maxInFlight}, expected ${ENKRYPT_MAX_CONCURRENT_CALLS}`);
+  if (calls.maxInFlight > 1) {
+    failures.push(`max in flight ${calls.maxInFlight}, expected one call at a time`);
   }
   failures.push(...(step.check?.(results, requestLogs) ?? []));
 

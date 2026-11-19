@@ -1,17 +1,23 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
+import type { SupportActionClass } from '@kilocode/web-shared/lib/admin/support-access';
 
 jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store') as object;
   return { ...actual, evaluateStepUp: jest.fn() };
 });
 
-import type { supportStepUpPort as SupportStepUpPortValue } from '@kilocode/web-shared/lib/admin/support-step-up';
+import type {
+  requireSupportWriteUseStepUp as RequireSupportWriteUseStepUpValue,
+  supportStepUpPort as SupportStepUpPortValue,
+} from '@kilocode/web-shared/lib/admin/support-step-up';
 
 let supportStepUpPort: typeof SupportStepUpPortValue;
+let requireSupportWriteUseStepUp: typeof RequireSupportWriteUseStepUpValue;
 beforeAll(async () => {
-  ({ supportStepUpPort } = await import('@kilocode/web-shared/lib/admin/support-step-up'));
+  ({ requireSupportWriteUseStepUp, supportStepUpPort } =
+    await import('@kilocode/web-shared/lib/admin/support-step-up'));
 });
 
 const mockedEvaluate = (
@@ -21,10 +27,15 @@ const mockedEvaluate = (
 ).evaluateStepUp;
 const originalAdminStepUp = process.env.ADMIN_STEP_UP_ENABLED;
 
-function requireFresh(credential?: 'session' | 'human_bearer') {
+function requireFresh(
+  credential?: 'session' | 'human_bearer',
+  actionClass: SupportActionClass = 'support_write'
+) {
   return supportStepUpPort.requireFresh({
     userId: 'user-1',
     action: 'support_write_request',
+    actionClass,
+    organizationId: 'organization-1',
     credential,
     webSessionId: 'session-1',
     route: 'admin.supportAccess.request',
@@ -70,6 +81,23 @@ describe('support step-up adapter', () => {
     expect(await stepUpCode(requireFresh('session'))).toBe('MFA_REQUIRED');
   });
 
+  test('binds the proof to the organization it acts on', async () => {
+    mockedEvaluate.mockResolvedValue({ state: { status: 'required' } } as never);
+    await stepUpCode(requireFresh('session'));
+
+    expect(mockedEvaluate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionClass: 'support_write',
+        operation: {
+          surface: 'trpc',
+          route: 'admin.supportAccess.request',
+          method: 'mutation',
+          target: { kind: 'organization', id: 'organization-1' },
+        },
+      })
+    );
+  });
+
   test('an evaluation failure fails closed as STEP_UP_UNAVAILABLE', async () => {
     mockedEvaluate.mockRejectedValue(new Error('db down'));
     expect(await stepUpCode(requireFresh('session'))).toBe('STEP_UP_UNAVAILABLE');
@@ -79,5 +107,83 @@ describe('support step-up adapter', () => {
     delete process.env.ADMIN_STEP_UP_ENABLED;
     expect(await stepUpCode(requireFresh('session'))).toBe('MFA_REQUIRED');
     expect(mockedEvaluate).not.toHaveBeenCalled();
+  });
+
+  test('step-up disabled skips the read-class requirement', async () => {
+    delete process.env.ADMIN_STEP_UP_ENABLED;
+    await expect(requireFresh('session', 'support_read')).resolves.toBeUndefined();
+    expect(mockedEvaluate).not.toHaveBeenCalled();
+  });
+
+  test('a read-class request needs only a session proof', async () => {
+    mockedEvaluate.mockResolvedValue({ state: { status: 'fresh' } } as never);
+    await expect(requireFresh('session', 'support_read')).resolves.toBeUndefined();
+    expect(mockedEvaluate).toHaveBeenCalledWith(
+      expect.objectContaining({ actionClass: 'support_read' })
+    );
+  });
+});
+
+describe('support write use', () => {
+  const freshUpstreamState = {
+    status: 'fresh' as const,
+    method: 'webauthn_uv' as const,
+    verifiedAt: '2026-01-01T00:00:00.000Z',
+    expiresAt: '2026-01-01T00:05:00.000Z',
+  };
+
+  beforeEach(() => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    mockedEvaluate.mockReset();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (originalAdminStepUp === undefined) delete process.env.ADMIN_STEP_UP_ENABLED;
+    else process.env.ADMIN_STEP_UP_ENABLED = originalAdminStepUp;
+  });
+
+  test('a support write use needs a decision for its own class and organization', async () => {
+    const requireFreshSpy = jest
+      .spyOn(supportStepUpPort, 'requireFresh')
+      .mockResolvedValue(undefined as never);
+
+    await requireSupportWriteUseStepUp({
+      userId: 'user-1',
+      organizationId: 'organization-1',
+      upstreamStepUpState: freshUpstreamState,
+      upstreamStepUpDecision: { actionClass: 'platform_write', target: { kind: 'none', id: null } },
+      credential: 'session',
+      webSessionId: 'session-1',
+    });
+
+    expect(requireFreshSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionClass: 'support_write',
+        organizationId: 'organization-1',
+      })
+    );
+  });
+
+  test('a matching support write decision is reused without a new evaluation', async () => {
+    const requireFreshSpy = jest
+      .spyOn(supportStepUpPort, 'requireFresh')
+      .mockResolvedValue(undefined as never);
+
+    await expect(
+      requireSupportWriteUseStepUp({
+        userId: 'user-1',
+        organizationId: 'organization-1',
+        upstreamStepUpState: freshUpstreamState,
+        upstreamStepUpDecision: {
+          actionClass: 'support_write',
+          target: { kind: 'organization', id: 'organization-1' },
+        },
+        credential: 'session',
+        webSessionId: 'session-1',
+      })
+    ).resolves.toBe(true);
+
+    expect(requireFreshSpy).not.toHaveBeenCalled();
   });
 });

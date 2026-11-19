@@ -96,13 +96,16 @@ vi.mock('@/components/screen-header', () => ({
   ScreenHeader: ({ headerRight }: { headerRight?: ReactNode }) => headerRight ?? null,
 }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LATIN_DISPLAY: 'uppercase' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/icons', () => ({
   Building2: 'Building2',
@@ -255,10 +258,12 @@ describe('ProfilesListScreen', () => {
     expect(personalRow.props.accessibilityLabel).toBe(
       'Personal profile, 2 MCP · 9 setup cmds, Default profile, Opens the profile'
     );
-    const star = personalRow.props.trailing as { type: string; props: object };
+    const star = personalRow.props.titleBadge as { type: string; props: object };
     expect(star.type).toBe('Star');
-    // The mark is inside the row's name, so it is not a control of its own.
+    // The mark is beside the name inside the row, so it is not a control of its
+    // own and the row keeps its chevron.
     expect(star.props).not.toHaveProperty('accessibilityLabel');
+    expect(personalRow.props.trailing).toBeUndefined();
 
     const orgRow = findAll(renderer.root, 'ConfigureRow').find(
       row => row.props.title === 'Org profile'

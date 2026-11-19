@@ -820,7 +820,19 @@
         "fileComment": "फाइलवरील टिप्पणी",
         "outdatedOnPathLines": "{{path}} {{lines}} वर कालबाह्य",
         "outdatedOnLines": "{{lines}} वर कालबाह्य",
-        "outdatedOnPath": "{{path}} वर कालबाह्य"
+        "outdatedOnPath": "{{path}} वर कालबाह्य",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "डावीकडची बाजू",
+        "sideRight": "उजवीकडची बाजू",
+        "outdatedOnLinesSide": "{{lines}} वर कालबाह्य ({{side}})",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} वर कालबाह्य ({{side}})",
+        "outdatedSide": "कालबाह्य ({{side}})",
+        "outdatedOnPathSide": "{{path}} वर कालबाह्य ({{side}})"
       },
       "deletedUser": "हटवलेला वापरकर्ता",
       "replyForbiddenTerm": "तुम्हाला या {{term}}ला उत्तर देण्याची परवानगी नाही.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "या खात्याशी अजून कोणतीही संस्था जोडलेली नाही. संस्था तयार केल्यानंतर किंवा त्यात सामील झाल्यानंतर तुम्ही Bitbucket पुल रिक्वेस्ट तपासू शकता.",
       "gitlabReconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
       "bitbucketNotConnectedTitle": "Bitbucket जोडलेले नाही",
-      "bitbucketAdminOnlyDescription": "केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
+      "adminOnlyConnectDescription": "केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
       "contextLine": "{{organization}} साठी",
       "contextLinePersonal": "तुमच्या वैयक्तिक खात्यासाठी"
     },
@@ -1373,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket जोडलेले नाही. केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "या संस्थेचे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
-      "description": "आवश्यक परवानग्यांसह वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
+      "managedOnWeb": "{{organization}} चे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
+      "description": "{{organization}} साठी वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
+      "descriptionReconnect": "{{organization}} साठी नवीन वर्कस्पेसचे प्रवेश टोकन तयार करा आणि ते खाली पेस्ट करा.",
       "scopes": "खाते: वाचन · रिपॉझिटरी: वाचन/लेखन · पुल रिक्वेस्ट: वाचन · वेबहूक: वाचन/लेखन",
       "tokenPlaceholder": "वर्कस्पेसचे प्रवेश टोकन",
       "tokenRefused": "Bitbucket ने हे वर्कस्पेस टोकन स्वीकारले नाही. त्यात वरील परवानग्या आहेत का ते तपासा आणि नंतर पुन्हा प्रयत्न करा."
@@ -2148,6 +2161,8 @@
       "renameAccessibility": "{{title}} या सत्राचे नाव बदला",
       "cloningSession": "सत्राची प्रत तयार होत आहे",
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही.",
+      "historyTooLarge": "या सत्राची ट्रान्सक्रिप्ट लोड करण्यासाठी खूप मोठी आहे.",
+      "historyUnavailable": "या सत्राची ट्रान्सक्रिप्ट वाचता येत नाही.",
       "cloneFailedRetry": "या सत्राची प्रत तयार करता आली नाही. पुन्हा प्रयत्न करा.",
       "notEnoughCredits": "या विनंतीसाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडून पुन्हा प्रयत्न करा.",
       "previousTaskFinishing": "मागील काम अजून पूर्ण झालेले नाही. कृपया थोडा वेळ थांबा.",
@@ -2224,6 +2239,7 @@
       "branchDefault": "डीफॉल्ट",
       "branchAccessibility": "ब्रँच: {{label}}",
       "branchLoading": "ब्रँच लोड होत आहेत",
+      "branchInactive": "त्याच्या ब्रँच लोड करण्यासाठी रिपॉझिटरी निवडा.",
       "branchLoadError": "ब्रँच लोड करता आल्या नाहीत",
       "branchUnavailable": "या रिपॉझिटरीसाठी ब्रँच उपलब्ध नाहीत. पुरवठादाराकडे तुमचा प्रवेश तपासा, मग दुसरी रिपॉझिटरी निवडा.",
       "branchEmpty": "कोणत्याही ब्रँच उपलब्ध नाहीत",
@@ -3026,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "सत्रे लोड करता आली नाहीत.",
-    "couldNotLoadActiveSessions": "सक्रिय सत्रे लोड करता आली नाहीत.",
     "agentSessions": "सध्या सुरू असलेली सत्रे",
     "newCodingTask": "नवीन कोडिंग काम",
     "newTaskFromPicture": "चित्रातून नवीन काम",
@@ -3405,7 +3420,8 @@
         "accounting_adjustment": "लेखा समायोजन",
         "credits_expired": "क्रेडिट कालबाह्य झाले"
       },
-      "truncated": "क्रेडिटचे जुने व्यवहार उपलब्ध आहेत."
+      "truncated": "क्रेडिटचे जुने व्यवहार उपलब्ध आहेत.",
+      "retentionLimit": "सर्वात अलीकडचे क्रेडिटचे व्यवहार दाखवले जात आहेत."
     },
     "inviteMember": {
       "emailError": "वैध ईमेल पत्ता द्या.",
@@ -3437,7 +3453,8 @@
         "void": "रद्द",
         "uncollectible": "वसूल करता न येणारे"
       },
-      "truncated": "जुनी बिले उपलब्ध आहेत."
+      "truncated": "जुनी बिले उपलब्ध आहेत.",
+      "retentionLimit": "सर्वात अलीकडची बिले दाखवली जात आहेत."
     },
     "lowBalanceAlert": {
       "enableA11y": "शिल्लक कमी झाल्याची सूचना चालू करा",
@@ -3671,8 +3688,7 @@
     "imagesSectionEmpty": "विश्वासार्ह प्रतिमा होस्ट नाहीत",
     "revoke": "{{host}} वरील विश्वास रद्द करा",
     "revokeMessage": "या होस्टच्या लिंक पुन्हा पुष्टी मागतील.",
-    "revokeImageMessage": "या होस्टवरील प्रतिमा पुन्हा पुष्टी मागतील.",
-    "backToPreferences": "प्राधान्यांवर परत जा"
+    "revokeImageMessage": "या होस्टवरील प्रतिमा पुन्हा पुष्टी मागतील."
   },
   "glanceable": {
     "waiting": "एजंट्सची माहिती अपडेट होत आहे",
@@ -3919,6 +3935,8 @@
       "downloading": "डाउनलोड होत आहे: {{total}} पैकी {{written}}",
       "downloadingUnknown": "डाउनलोड होत आहे: {{written}}",
       "paused": "थांबवले: {{total}} पैकी {{written}}",
+      "retrying": "पुन्हा प्रयत्न करत आहे: {{total}} पैकी {{written}}",
+      "retryingUnknown": "पुन्हा प्रयत्न करत आहे: {{written}}",
       "verifying": "डाउनलोड केलेली फाइल तपासत आहे…",
       "downloaded": "डाउनलोड झाले · {{size}}",
       "url": "थेट डाउनलोड लिंक",
@@ -4009,7 +4027,9 @@
         "androidModelUnavailable": "हे डिव्हाइस Gemini Nano ला सपोर्ट करत नाही, किंवा AICore सिस्टम ॲप अजून सेट अप होत आहे. नंतर पुन्हा प्रयत्न करा.",
         "aicoreUpdateRequired": "हे मॉडेल वापरण्यासाठी AICore ॲप आणि तुमचे सिस्टम सॉफ्टवेअर अपडेट करा.",
         "downloadable": "हे मॉडेल वापरण्यापूर्वी ते एकदा डाउनलोड करावे लागेल.",
-        "downloading": "मॉडेल डाउनलोड होत आहे. डाउनलोड पूर्ण झाल्यावर ते तयार होईल."
+        "downloading": "मॉडेल डाउनलोड होत आहे. डाउनलोड पूर्ण झाल्यावर ते तयार होईल.",
+        "batteryQuota": "डिव्हाइसवरील मॉडेलने सध्या त्याचा बॅटरी कोटा वापरून काढला आहे. नंतर पुन्हा प्रयत्न करा.",
+        "checkFailed": "ॲपला हे मॉडेल तपासता आले नाही. पुन्हा प्रयत्न करा."
       },
       "unavailable": "डिव्हाइसवरील मॉडेल सध्या उपलब्ध नाही. त्याची स्थिती $t(modelChat.backends.title) मध्ये तपासा.",
       "busy": "डिव्हाइसवरील मॉडेल दुसरे उत्तर देण्यात व्यस्त आहे. ते पूर्ण झाल्यावर पुन्हा प्रयत्न करा.",
@@ -4370,7 +4390,8 @@
       "purchaseFallback": "क्रेडिट खरेदी",
       "receipt": "पावती",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ची पावती उघडा",
-      "receiptUnavailable": "या खरेदीसाठी पावती उपलब्ध नाही."
+      "receiptUnavailable": "या खरेदीसाठी पावती उपलब्ध नाही.",
+      "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे."
     },
     "title": "क्रेडिट्स खरेदी करा",
     "description": "क्रेडिट्स ही Kilo App मध्ये AI कोडिंग सत्रे चालवण्यासाठी तुमच्या Kilo शिल्लकीत जोडली जाणारी एक-वेळची खरेदी आहे. स्टोअर तुमच्या खात्यातून शुल्क घेते आणि स्टोअर पेमेंटची पुष्टी केल्यानंतर क्रेडिट्स जोडली जातात.",
@@ -4617,6 +4638,9 @@
     "couldNotLoad": "इंटिग्रेशन्स लोड करता आली नाहीत",
     "permissionDenied": "तुम्हाला ही इंटिग्रेशन्स व्यवस्थापित करण्याची परवानगी नाही.",
     "managedByOwner": "जे कनेक्शन तुम्ही बदलू शकत नाही ते बदलण्यासाठी संस्थेच्या मालकाला विचारा.",
+    "managedByOwnerOrAdmin": "जे कनेक्शन तुम्ही बदलू शकत नाही ते बदलण्यासाठी संस्थेच्या मालक किंवा प्रशासकाला विचारा.",
+    "managedByOwnerOrBilling": "जे कनेक्शन तुम्ही बदलू शकत नाही ते बदलण्यासाठी संस्थेच्या मालक किंवा बिलिंग व्यवस्थापकाला विचारा.",
+    "managedByOwnerAdminOrBilling": "जे कनेक्शन तुम्ही बदलू शकत नाही ते बदलण्यासाठी संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला विचारा.",
     "connectFailed": "कनेक्शन पेज उघडता आले नाही"
   },
   "invoices": {
@@ -4653,7 +4677,7 @@
       "new": "नवीन ट्रिगर",
       "create": "ट्रिगर तयार करा",
       "emptyTitle": "अजून ट्रिगर नाहीत",
-      "emptyDescription": "वेबहूक कॉल किंवा वेळापत्रकावरून Cloud Agent रन सुरू करण्यासाठी ट्रिगर तयार करा.",
+      "emptyDescription": "तुमचा पहिला ट्रिगर तयार करा।",
       "loadFailedTitle": "ट्रिगर लोड करता आले नाहीत",
       "loadFailedDescription": "कनेक्शन असल्यावर पुन्हा प्रयत्न करा.",
       "detailLoadFailedTitle": "हा ट्रिगर लोड करता आला नाही",

@@ -820,7 +820,19 @@
         "fileComment": "Koment për skedarin",
         "outdatedOnPathLines": "I vjetëruar te {{path}} {{lines}}",
         "outdatedOnLines": "I vjetëruar te {{lines}}",
-        "outdatedOnPath": "I vjetëruar te {{path}}"
+        "outdatedOnPath": "I vjetëruar te {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Ana e majtë",
+        "sideRight": "Ana e djathtë",
+        "outdatedOnLinesSide": "I vjetëruar te {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "I vjetëruar te {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "I vjetëruar ({{side}})",
+        "outdatedOnPathSide": "I vjetëruar te {{path}} ({{side}})"
       },
       "deletedUser": "përdorues i fshirë",
       "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Kjo llogari nuk ka ende organizata. Kërkesat për bashkim në Bitbucket mund të rishikohen sapo të krijosh ose të bëhesh pjesë e një organizate.",
       "gitlabReconnectAdminOnlyDescription": "Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta rilidhë atë.",
       "bitbucketNotConnectedTitle": "Bitbucket nuk është i lidhur",
-      "bitbucketAdminOnlyDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
+      "adminOnlyConnectDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
       "contextLine": "Për {{organization}}",
       "contextLinePersonal": "Për llogarinë personale"
     },
@@ -1373,8 +1385,9 @@
       "notConnectedReadOnly": "Bitbucket nuk është i lidhur. Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Lidhja me Bitbucket e kësaj organizate menaxhohet në ueb nga një kompjuter.",
-      "description": "Krijo një token qasjeje për hapësirën e punës me lejet e nevojshme dhe ngjite më poshtë.",
+      "managedOnWeb": "Lidhja me Bitbucket e {{organization}} menaxhohet në ueb nga një kompjuter.",
+      "description": "Krijo një token qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite më poshtë.",
+      "descriptionReconnect": "Krijo një token të ri qasjeje për hapësirën e punës të organizatës {{organization}} dhe ngjite më poshtë.",
       "scopes": "Llogaria: lexim · Depot: lexim/shkrim · PR: lexim · Webhook-et: lexim/shkrim",
       "tokenPlaceholder": "Token qasjeje për hapësirën e punës",
       "tokenRefused": "Bitbucket nuk e pranoi këtë token qasjeje për hapësirën e punës. Kontrollo që ai t'i ketë lejet më sipër, pastaj provo përsëri."
@@ -2148,6 +2161,8 @@
       "renameAccessibility": "Riemërto seancën: {{title}}",
       "cloningSession": "Duke klonuar seancën",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
+      "historyTooLarge": "Transkripti i kësaj seance është shumë i madh për t'u ngarkuar.",
+      "historyUnavailable": "Transkripti i kësaj seance nuk mund të lexohet.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provo përsëri.",
       "notEnoughCredits": "Nuk ke mjaft kredite për këtë kërkesë. Shto kredite dhe provo përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme nuk ka përfunduar ende. Prit pak.",
@@ -2224,6 +2239,7 @@
       "branchDefault": "Parazgjedhje",
       "branchAccessibility": "Dega: {{label}}",
       "branchLoading": "Degët po ngarkohen",
+      "branchInactive": "Zgjidh një depo për të ngarkuar degët e tij.",
       "branchLoadError": "Degët nuk u ngarkuan dot",
       "branchUnavailable": "Nuk ka degë të disponueshme për këtë depo. Kontrollo aksesin tënd te ofruesi, pastaj përzgjidh një depo tjetër.",
       "branchEmpty": "Nuk ka degë të disponueshme",
@@ -3026,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nuk u ngarkuan sesionet.",
-    "couldNotLoadActiveSessions": "Nuk u ngarkuan sesionet aktive.",
     "agentSessions": "Aktive tani",
     "newCodingTask": "Detyrë e re kodimi",
     "newTaskFromPicture": "Detyrë e re nga një imazh",
@@ -3405,7 +3420,8 @@
         "accounting_adjustment": "Rregullim kontabël",
         "credits_expired": "Kredite të skaduara"
       },
-      "truncated": "Ka aktivitet të mëparshëm të krediteve."
+      "truncated": "Ka aktivitet të mëparshëm të krediteve.",
+      "retentionLimit": "Po shfaqet aktiviteti i krediteve më i fundit."
     },
     "inviteMember": {
       "emailError": "Shkruaj një adresë të vlefshme emaili.",
@@ -3437,7 +3453,8 @@
         "void": "E anuluar",
         "uncollectible": "E paarkëtueshme"
       },
-      "truncated": "Faturat më të vjetra janë të disponueshme."
+      "truncated": "Faturat më të vjetra janë të disponueshme.",
+      "retentionLimit": "Po shfaqen faturat më të fundit."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktivizo njoftimin për gjendje të ulët",
@@ -3671,8 +3688,7 @@
     "imagesSectionEmpty": "Nuk ka serverë të besuar të imazheve",
     "revoke": "Hiq besimin për {{host}}",
     "revokeMessage": "Lidhjet për këtë server do të kërkojnë përsëri konfirmim.",
-    "revokeImageMessage": "Imazhet nga ky server do të kërkojnë përsëri konfirmim.",
-    "backToPreferences": "Kthehu te preferencat"
+    "revokeImageMessage": "Imazhet nga ky server do të kërkojnë përsëri konfirmim."
   },
   "glanceable": {
     "waiting": "Po përditësohen agjentët",
@@ -3919,6 +3935,8 @@
       "downloading": "Duke shkarkuar: {{written}} nga {{total}}",
       "downloadingUnknown": "Duke shkarkuar: {{written}}",
       "paused": "Pauzuar: {{written}} nga {{total}}",
+      "retrying": "Duke riprovuar: {{written}} nga {{total}}",
+      "retryingUnknown": "Duke riprovuar: {{written}}",
       "verifying": "Duke kontrolluar skedarin e shkarkuar…",
       "downloaded": "Shkarkuar · {{size}}",
       "url": "Lidhje e drejtpërdrejtë shkarkimi",
@@ -4009,7 +4027,9 @@
         "androidModelUnavailable": "Kjo pajisje nuk e mbështet Gemini Nano, ose aplikacioni i sistemit AICore ende po konfigurohet. Provo përsëri më vonë.",
         "aicoreUpdateRequired": "Përditëso aplikacionin AICore dhe softuerin e sistemit për të përdorur këtë model.",
         "downloadable": "Ky model duhet shkarkuar një herë para se ta përdorësh.",
-        "downloading": "Modeli po shkarkohet. Do të jetë gati kur të përfundojë shkarkimi."
+        "downloading": "Modeli po shkarkohet. Do të jetë gati kur të përfundojë shkarkimi.",
+        "batteryQuota": "Modeli në pajisje ka përdorur kufirin e lejuar të baterisë për momentin. Provo përsëri më vonë.",
+        "checkFailed": "Aplikacioni nuk arriti ta kontrollojë këtë model. Provo përsëri."
       },
       "unavailable": "Modeli në pajisje nuk është i disponueshëm tani. Kontrollo gjendjen e tij te $t(modelChat.backends.title).",
       "busy": "Modeli në pajisje është i zënë me një përgjigje tjetër. Provo përsëri kur të mbarojë.",
@@ -4370,7 +4390,8 @@
       "purchaseFallback": "Blerje kredish",
       "receipt": "Dëftesë",
       "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
-      "receiptUnavailable": "Nuk ka dëftesë për këtë blerje."
+      "receiptUnavailable": "Nuk ka dëftesë për këtë blerje.",
+      "retentionLimit": "Po shfaqet historiku i kredive më i fundit."
     },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
@@ -4617,6 +4638,9 @@
     "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
     "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
     "managedByOwner": "Kërkoji një pronari të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerOrAdmin": "Kërkoji një pronari ose administratori të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerOrBilling": "Kërkoji një pronari ose menaxheri faturimi të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerAdminOrBilling": "Kërkoji një pronari, administratori ose menaxheri faturimi të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
     "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {
@@ -4653,7 +4677,7 @@
       "new": "Shkaktar i ri",
       "create": "Krijo shkaktar",
       "emptyTitle": "Nuk ka shkaktarë ende",
-      "emptyDescription": "Krijo një shkaktar për të nisur një ekzekutim të Cloud Agent nga një thirrje webhook ose sipas një planifikimi.",
+      "emptyDescription": "Krijo shkaktarin tënd të parë.",
       "loadFailedTitle": "Shkaktarët nuk mund të ngarkoheshin",
       "loadFailedDescription": "Provo përsëri kur të kesh lidhje.",
       "detailLoadFailedTitle": "Ky shkaktar nuk mund të ngarkohej",

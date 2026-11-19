@@ -137,6 +137,8 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain('## Code Review Summary');
     expect(prompt).toContain('### Files Reviewed');
     expect(prompt).toContain('### Issue Details');
+    expect(prompt).toContain('authored by this review');
+    expect(prompt).toContain('`user.kind` is `workspace_access_token`');
     expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatIssuesFound).not.toContain('<details>');
     expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatIssuesFound).not.toContain('<summary>');
     expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatIssuesFound).not.toContain('<b>');

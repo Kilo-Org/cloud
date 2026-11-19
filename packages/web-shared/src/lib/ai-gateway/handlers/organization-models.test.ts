@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { handleTRPCRequest } from '@kilocode/web-shared/lib/organizations/organization-settings-route-handler';
 import { handleOrganizationModelsRequest } from './organization-models';
 

@@ -30,7 +30,7 @@ export function RemoteSessionExitFailure({
 }: Readonly<RemoteSessionExitFailureProps>) {
   const { t } = useTranslation();
   return (
-    <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
+    <View className="gap-3 border-t-[0.5px] border-hair-soft bg-secondary px-4 py-3">
       <AccessibleStatus message={message} tone="error" className="text-center text-sm" />
       <Button
         variant="outline"

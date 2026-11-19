@@ -45,9 +45,19 @@ export const TERMINAL_SESSION_HISTORY_FAILURE_KINDS: readonly SessionHistoryFail
   'invalid_data',
 ];
 
-/** True when the failure kind is one a retry cannot recover. */
-export function isTerminalSessionHistoryFailure(kind: SessionHistoryFailureKind): boolean {
-  return TERMINAL_SESSION_HISTORY_FAILURE_KINDS.includes(kind);
+/** A kind a retry cannot recover. */
+export type TerminalSessionHistoryFailureKind =
+  (typeof TERMINAL_SESSION_HISTORY_FAILURE_KINDS)[number];
+
+/**
+ * True when the failure kind is one a retry cannot recover. A missing kind
+ * (`null`/`undefined`) is not one: the read never answered with a typed kind,
+ * so the transport store classifies its sentence instead.
+ */
+export function isTerminalSessionHistoryFailure(
+  kind: SessionHistoryFailureKind | null | undefined
+): kind is TerminalSessionHistoryFailureKind {
+  return kind != null && TERMINAL_SESSION_HISTORY_FAILURE_KINDS.includes(kind);
 }
 
 /**
@@ -57,7 +67,7 @@ export function isTerminalSessionHistoryFailure(kind: SessionHistoryFailureKind)
  * The English `message` stays the wire identity of the row itself.
  */
 export function sessionHistoryFailureCopyKey(
-  kind: SessionHistoryFailureKind
+  kind: TerminalSessionHistoryFailureKind
 ): 'agentChat.session.historyTooLarge' | 'agentChat.session.historyUnavailable' {
   return kind === 'too_large'
     ? 'agentChat.session.historyTooLarge'

@@ -3924,10 +3924,10 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith(
-      'Session history temporarily unavailable',
-      { kind: 'retryable_failure', message: 'Session history temporarily unavailable' }
-    );
+    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable', {
+      kind: 'retryable_failure',
+      message: 'Session history temporarily unavailable',
+    });
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     // No session.created was emitted because no successful page replayed.
     expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
@@ -3948,10 +3948,10 @@ describe('CliLiveTransport page-seam + reconnect', () => {
       transport.connect();
       await Promise.resolve();
       await Promise.resolve();
-      expect(onError).toHaveBeenCalledWith(
-        failure.expected,
-        { kind: failure.kind, message: failure.expected }
-      );
+      expect(onError).toHaveBeenCalledWith(failure.expected, {
+        kind: failure.kind,
+        message: failure.expected,
+      });
       expect(onInitialPageLoaded).not.toHaveBeenCalled();
       transport.destroy();
     }

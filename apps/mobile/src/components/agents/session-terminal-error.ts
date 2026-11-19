@@ -1,7 +1,4 @@
-import {
-  type SdkStatusMessageCode,
-  type SessionStatusIndicator,
-} from '@kilocode/cloud-agent-sdk';
+import { type SdkStatusMessageCode, type SessionStatusIndicator } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { type QueryErrorVariant } from '@/components/query-error';
@@ -402,9 +399,9 @@ export function describeSessionRuntimeFailure(message: string): SessionRuntimeFa
  * when there is nothing terminal to show (loading, empty, or a live session).
  *
  * Precedence: a populated transcript never shows a terminal error; a typed
- * transcript-read failure a retry cannot recover is terminal with the failure
- * kind's own copy; any other `errorAtom` value is a retryable server failure;
- * a lost agent transport is a retryable connection failure; any other
+ * transcript-read failure a retry cannot recover is terminal with its own
+ * copy; any other `errorAtom` value is a retryable server failure; a lost
+ * agent transport is a retryable connection failure; any other
  * `statusIndicator` of type `error` is classified by its message.
  *
  * A failed preparation row counts as content. A run whose sandbox preparation
@@ -417,7 +414,7 @@ export function describeSessionRuntimeFailure(message: string): SessionRuntimeFa
  * `connectionLost` is the app-wide transport leg's answer (`reconnectExhausted`)
  * for a session whose own status atom carries nothing yet. It only counts while
  * nothing has loaded: a transcript already on screen keeps its rows and its own
- * status line instead of being replaced by a full-screen error.
+ * status line.
  */
 export function resolveSessionTerminalError(input: {
   error: string | null;
@@ -441,19 +438,14 @@ export function resolveSessionTerminalError(input: {
   if (input.error !== null) {
     // The atom carries the transport's own English text: an SDK fixed string,
     // or a server failure the transport forwards. Show the reader translated
-    // copy and keep the original for the clipboard.
-    //
-    // The class decides the Retry for a transport failure. A typed transcript
-    // read that a retry cannot recover (the stored page is oversize or
-    // unreadable) is decided by its kind instead, ahead of the classification.
-    if (
-      input.historyFailureKind !== null &&
-      input.historyFailureKind !== undefined &&
-      isTerminalSessionHistoryFailure(input.historyFailureKind)
-    ) {
+    // copy and keep the original for the clipboard. The class decides the
+    // Retry for a transport failure; the typed transcript-read failure is
+    // decided by its kind instead, ahead of the classification.
+    const loadFailureTitle = i18n.t('agentChat.session.couldNotLoadThisSession');
+    if (isTerminalSessionHistoryFailure(input.historyFailureKind)) {
       return {
         variant: 'server',
-        title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+        title: loadFailureTitle,
         message: i18n.t(sessionHistoryFailureCopyKey(input.historyFailureKind)),
         retryable: false,
         retryWith: 'session',
@@ -473,7 +465,7 @@ export function resolveSessionTerminalError(input: {
     }
     return {
       variant: 'server',
-      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+      title: loadFailureTitle,
       message: i18n.t('agentChat.session.failedToLoadDetails'),
       retryable: true,
       retryWith: 'session',

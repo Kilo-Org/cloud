@@ -84,7 +84,9 @@ export type SessionSnapshotFailure = {
   message: string;
 };
 
-export function sessionSnapshotFailureMessage(kind: SessionSnapshotFailureKind): SessionSnapshotFailure {
+export function sessionSnapshotFailureMessage(
+  kind: SessionSnapshotFailureKind
+): SessionSnapshotFailure {
   switch (kind) {
     case 'retryable_failure':
       return { kind, message: SESSION_HISTORY_UNAVAILABLE_MESSAGE };

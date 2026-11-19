@@ -5,10 +5,10 @@ import { TELEMETRY_DESCRIPTION_KEY } from '@/lib/telemetry/error-sink';
 import {
   isTerminalSessionHistoryFailure,
   SESSION_HISTORY_FAILURES,
-  SessionHistoryFailureError,
   sessionHistoryFailureCopyKey,
-  TERMINAL_SESSION_HISTORY_FAILURE_KINDS,
+  SessionHistoryFailureError,
   type SessionHistoryFailureKind,
+  TERMINAL_SESSION_HISTORY_FAILURE_KINDS,
 } from './session-history-failures';
 
 function declaredTelemetry(error: Error): unknown {

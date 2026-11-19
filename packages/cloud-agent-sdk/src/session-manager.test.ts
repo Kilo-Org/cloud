@@ -10907,8 +10907,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
     await mgr.switchSession(kiloId('ses-1'));
 
-    expect(atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind))
-      .toEqual({ kind: 'too_large' });
+    expect(
+      atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind)
+    ).toEqual({ kind: 'too_large' });
     expect(atomValue<string | null>(config.store, mgr.atoms.error)).not.toBeNull();
   });
 
@@ -10921,13 +10922,15 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     const mgr = createSessionManager(config);
 
     await mgr.switchSession(kiloId('ses-1'));
-    expect(atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind))
-      .toEqual({ kind: 'too_large' });
+    expect(
+      atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind)
+    ).toEqual({ kind: 'too_large' });
 
     mgr.clearError();
 
-    expect(atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind))
-      .toBeNull();
+    expect(
+      atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind)
+    ).toBeNull();
     expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
   });
 
@@ -10940,13 +10943,15 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     const mgr = createSessionManager(config);
 
     await mgr.switchSession(kiloId('ses-1'));
-    expect(atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind))
-      .toBeNull();
+    expect(
+      atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind)
+    ).toBeNull();
 
     mockSessionCallbacks.onError?.('Connection to agent lost');
 
-    expect(atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind))
-      .toBeNull();
+    expect(
+      atomValue<SnapshotHistoryFailure | null>(config.store, mgr.atoms.failedHistoryKind)
+    ).toBeNull();
     expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
       'Connection to agent lost'
     );

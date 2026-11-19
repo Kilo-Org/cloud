@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Kont bloke",
-    "description": "Aksè ou ak sèvis nou yo limite."
+    "description": "Aksè ou ak sèvis nou yo limite.",
+    "contactSupport": "Kontakte ekip sipò a"
   },
   "addCredits": {
     "cta": "Ajoute kredi",

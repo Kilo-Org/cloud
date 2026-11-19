@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Hesab bloklanıb",
-    "description": "Xidmətlərimizə girişiniz məhdudlaşdırılıb."
+    "description": "Xidmətlərimizə girişiniz məhdudlaşdırılıb.",
+    "contactSupport": "Dəstək xidməti ilə əlaqə saxla"
   },
   "addCredits": {
     "cta": "Kredit əlavə et",

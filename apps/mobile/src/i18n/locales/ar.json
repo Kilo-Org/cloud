@@ -2580,7 +2580,8 @@
   },
   "accountBlocked": {
     "title": "الحساب محظور",
-    "description": "تم تقييد وصولك إلى خدماتنا."
+    "description": "تم تقييد وصولك إلى خدماتنا.",
+    "contactSupport": "التواصل مع الدعم"
   },
   "addCredits": {
     "cta": "شحن الرصيد",

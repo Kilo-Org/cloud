@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Kua aukatia te pūkete",
-    "description": "Kua whakawhāitihia tō āheinga ki ā mātou ratonga."
+    "description": "Kua whakawhāitihia tō āheinga ki ā mātou ratonga.",
+    "contactSupport": "Whakapā ki te rōpū tautoko"
   },
   "addCredits": {
     "cta": "Tāpirihia he moni tōmua",

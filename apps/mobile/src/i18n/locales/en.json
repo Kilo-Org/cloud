@@ -3057,7 +3057,8 @@
   },
   "accountBlocked": {
     "title": "Account blocked",
-    "description": "Your access to our services has been restricted."
+    "description": "Your access to our services has been restricted.",
+    "contactSupport": "Contact support"
   },
   "addCredits": {
     "cta": "Add credits",

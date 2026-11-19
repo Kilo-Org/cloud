@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Akaụntụ e gbochiri",
-    "description": "E gbochiri ohere gị ịnweta ọrụ anyị."
+    "description": "E gbochiri ohere gị ịnweta ọrụ anyị.",
+    "contactSupport": "Kpọtụrụ ndị nkwado"
   },
   "addCredits": {
     "cta": "Tinye ego ojiji",

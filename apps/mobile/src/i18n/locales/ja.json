@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "アカウントがブロックされています",
-    "description": "サービスへのアクセスが制限されています。"
+    "description": "サービスへのアクセスが制限されています。",
+    "contactSupport": "サポートに連絡"
   },
   "addCredits": {
     "cta": "クレジットを追加",

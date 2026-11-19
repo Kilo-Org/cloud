@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Akaunti imezuiwa",
-    "description": "Ufikiaji wako kwa huduma zetu umezuiwa."
+    "description": "Ufikiaji wako kwa huduma zetu umezuiwa.",
+    "contactSupport": "Wasiliana na timu ya usaidizi"
   },
   "addCredits": {
     "cta": "Ongeza salio",

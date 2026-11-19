@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "Akun diblokir",
-    "description": "Akses Anda ke layanan kami telah dibatasi."
+    "description": "Akses Anda ke layanan kami telah dibatasi.",
+    "contactSupport": "Hubungi tim dukungan"
   },
   "addCredits": {
     "cta": "Tambah kredit",

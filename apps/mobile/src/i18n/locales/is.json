@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Reikningur lokaður",
-    "description": "Aðgangur þinn að þjónustunni okkar hefur verið takmarkaður."
+    "description": "Aðgangur þinn að þjónustunni okkar hefur verið takmarkaður.",
+    "contactSupport": "Hafa samband við þjónustuver"
   },
   "addCredits": {
     "cta": "Bæta við inneign",

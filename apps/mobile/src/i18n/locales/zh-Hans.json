@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "账号已被封禁",
-    "description": "你使用我们各项服务的权限已受到限制。"
+    "description": "你使用我们各项服务的权限已受到限制。",
+    "contactSupport": "联系技术支持"
   },
   "addCredits": {
     "cta": "充值额度",

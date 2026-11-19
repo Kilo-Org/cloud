@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Akoonka waa xanniban yahay",
-    "description": "Helitaankaaga adeegyadeenna waa la xaddiday."
+    "description": "Helitaankaaga adeegyadeenna waa la xaddiday.",
+    "contactSupport": "La xiriir taageerada"
   },
   "addCredits": {
     "cta": "Ku dar lacagta isticmaalka",

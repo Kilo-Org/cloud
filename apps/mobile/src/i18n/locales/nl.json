@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "Account geblokkeerd",
-    "description": "Je toegang tot onze diensten is beperkt."
+    "description": "Je toegang tot onze diensten is beperkt.",
+    "contactSupport": "Contact opnemen met de helpdesk"
   },
   "addCredits": {
     "cta": "Tegoed aanvullen",

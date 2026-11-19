@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Kaonty voasakana",
-    "description": "Voafetra ny fidiranao amin'ny serivisintsika."
+    "description": "Voafetra ny fidiranao amin'ny serivisintsika.",
+    "contactSupport": "Mifandraisa amin'ny mpanohana"
   },
   "addCredits": {
     "cta": "Ampio kireditra",

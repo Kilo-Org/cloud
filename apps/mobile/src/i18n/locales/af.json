@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Rekening geblokkeer",
-    "description": "Jou toegang tot ons dienste is beperk."
+    "description": "Jou toegang tot ons dienste is beperk.",
+    "contactSupport": "Kontak ondersteuning"
   },
   "addCredits": {
     "cta": "Voeg krediete by",

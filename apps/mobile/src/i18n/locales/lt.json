@@ -3103,7 +3103,8 @@
   },
   "accountBlocked": {
     "title": "Paskyra užblokuota",
-    "description": "Jūsų prieiga prie mūsų paslaugų buvo apribota."
+    "description": "Jūsų prieiga prie mūsų paslaugų buvo apribota.",
+    "contactSupport": "Kreiptis į pagalbos tarnybą"
   },
   "addCredits": {
     "cta": "Papildyti kreditus",

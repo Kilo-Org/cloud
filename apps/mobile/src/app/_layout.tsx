@@ -1246,8 +1246,8 @@ function RootLayoutNav({
           <BootstrapErrorScreen
             title={t('accountBlocked.title')}
             description={t('accountBlocked.description')}
-            primaryLabel={t('codeReviewer.actionRequired.recoveryLabel')}
-            primaryAccessibilityLabel={t('codeReviewer.actionRequired.recoveryLabel')}
+            primaryLabel={t('accountBlocked.contactSupport')}
+            primaryAccessibilityLabel={t('accountBlocked.contactSupport')}
             onPrimaryPress={() => {
               void openExternalUrl(`mailto:${SUPPORT_EMAIL}`, { label: SUPPORT_EMAIL });
             }}

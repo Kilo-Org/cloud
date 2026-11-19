@@ -2410,7 +2410,8 @@
   },
   "accountBlocked": {
     "title": "Compte bloqué",
-    "description": "L'accès à nos services a été restreint."
+    "description": "L'accès à nos services a été restreint.",
+    "contactSupport": "Contacter l'assistance"
   },
   "addCredits": {
     "cta": "Ajouter des crédits",

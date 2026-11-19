@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "Tài khoản bị chặn",
-    "description": "Quyền truy cập dịch vụ của bạn đã bị hạn chế."
+    "description": "Quyền truy cập dịch vụ của bạn đã bị hạn chế.",
+    "contactSupport": "Liên hệ hỗ trợ"
   },
   "addCredits": {
     "cta": "Nạp tiền",

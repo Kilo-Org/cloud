@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "I-akhawunti ivinjiwe",
-    "description": "Ukufinyelela kwakho kumasevisi ethu kukhawulelwe."
+    "description": "Ukufinyelela kwakho kumasevisi ethu kukhawulelwe.",
+    "contactSupport": "Xhumana nethimba losizo"
   },
   "addCredits": {
     "cta": "Engeza amakhredithi",

@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Àkọọ́lẹ̀ rẹ ti dí",
-    "description": "A ti fi àǹfààní rẹ sí àwọn iṣẹ́ wa lẹ́wọ̀n."
+    "description": "A ti fi àǹfààní rẹ sí àwọn iṣẹ́ wa lẹ́wọ̀n.",
+    "contactSupport": "Kàn sí ẹgbẹ́ ìrànlọ́wọ́"
   },
   "addCredits": {
     "cta": "Fi kirẹ́dítì kún un",

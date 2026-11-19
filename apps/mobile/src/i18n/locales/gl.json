@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Conta bloqueada",
-    "description": "O acceso aos nosos servizos foi restrinxido."
+    "description": "O acceso aos nosos servizos foi restrinxido.",
+    "contactSupport": "Contactar coa asistencia"
   },
   "addCredits": {
     "cta": "Engadir créditos",

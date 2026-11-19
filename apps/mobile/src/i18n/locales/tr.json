@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "Hesap engellendi",
-    "description": "Hizmetlerimize erişiminiz kısıtlandı."
+    "description": "Hizmetlerimize erişiminiz kısıtlandı.",
+    "contactSupport": "Destekle iletişime geç"
   },
   "addCredits": {
     "cta": "Kredi ekle",

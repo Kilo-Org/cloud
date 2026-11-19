@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Hisob bloklangan",
-    "description": "Xizmatlarimizga kirish imkoniyatingiz cheklangan."
+    "description": "Xizmatlarimizga kirish imkoniyatingiz cheklangan.",
+    "contactSupport": "Yordam xizmatiga murojaat qilish"
   },
   "addCredits": {
     "cta": "Kreditlar qo'shish",

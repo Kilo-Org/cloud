@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Herregni cufame",
-    "description": "Tajaajila keenyaaf argamni kee daangeffameera."
+    "description": "Tajaajila keenyaaf argamni kee daangeffameera.",
+    "contactSupport": "Deeggarsa qunnami"
   },
   "addCredits": {
     "cta": "Kiriiditii dabali",

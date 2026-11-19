@@ -3047,7 +3047,8 @@
   },
   "accountBlocked": {
     "title": "Račun blokiran",
-    "description": "Vaš pristup našim uslugama je ograničen."
+    "description": "Vaš pristup našim uslugama je ograničen.",
+    "contactSupport": "Obrati se podršci"
   },
   "addCredits": {
     "cta": "Dodaj kredite",

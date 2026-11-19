@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "መለያ ታግዷል",
-    "description": "ወደ አገልግሎቶቻችን ያለዎት መዳረሻ ተገድቧል።"
+    "description": "ወደ አገልግሎቶቻችን ያለዎት መዳረሻ ተገድቧል።",
+    "contactSupport": "የድጋፍ ቡድኑን አግኝ"
   },
   "addCredits": {
     "cta": "ክሬዲት ያክሉ",

@@ -3159,7 +3159,8 @@
   },
   "accountBlocked": {
     "title": "Kont imblukkat",
-    "description": "L-aċċess tiegħek għas-servizzi tagħna ġie ristrett."
+    "description": "L-aċċess tiegħek għas-servizzi tagħna ġie ristrett.",
+    "contactSupport": "Ikkuntattja l-appoġġ"
   },
   "addCredits": {
     "cta": "Żid krediti",

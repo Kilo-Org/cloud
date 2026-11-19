@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Llogaria e bllokuar",
-    "description": "Aksesi juaj në shërbimet tona është kufizuar."
+    "description": "Aksesi juaj në shërbimet tona është kufizuar.",
+    "contactSupport": "Kontakto mbështetjen"
   },
   "addCredits": {
     "cta": "Shto kredite",

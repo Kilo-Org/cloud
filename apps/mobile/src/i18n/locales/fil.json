@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Na-block ang account",
-    "description": "Nilimitahan na ang access mo sa aming mga serbisyo."
+    "description": "Nilimitahan na ang access mo sa aming mga serbisyo.",
+    "contactSupport": "Makipag-ugnayan sa suporta"
   },
   "addCredits": {
     "cta": "Magdagdag ng kredito",

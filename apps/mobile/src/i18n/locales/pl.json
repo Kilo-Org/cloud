@@ -2514,7 +2514,8 @@
   },
   "accountBlocked": {
     "title": "Konto zablokowane",
-    "description": "Dostęp do naszych usług został ograniczony."
+    "description": "Dostęp do naszych usług został ograniczony.",
+    "contactSupport": "Skontaktuj się z pomocą techniczną"
   },
   "addCredits": {
     "cta": "Doładuj konto",

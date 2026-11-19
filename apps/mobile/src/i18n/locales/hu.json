@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Fiók letiltva",
-    "description": "A szolgáltatásainkhoz való hozzáférése korlátozva lett."
+    "description": "A szolgáltatásainkhoz való hozzáférése korlátozva lett.",
+    "contactSupport": "Kapcsolatfelvétel az ügyfélszolgálattal"
   },
   "addCredits": {
     "cta": "Egyenleg feltöltése",

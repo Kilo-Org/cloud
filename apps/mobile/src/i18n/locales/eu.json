@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Kontua blokeatuta",
-    "description": "Zure sarbidea gure zerbitzuetara mugatuta dago."
+    "description": "Zure sarbidea gure zerbitzuetara mugatuta dago.",
+    "contactSupport": "Jarri harremanetan laguntza-taldearekin"
   },
   "addCredits": {
     "cta": "Gehitu kredituak",

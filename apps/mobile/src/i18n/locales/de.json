@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "Konto gesperrt",
-    "description": "Der Zugang zu unseren Diensten wurde eingeschränkt."
+    "description": "Der Zugang zu unseren Diensten wurde eingeschränkt.",
+    "contactSupport": "Support kontaktieren"
   },
   "addCredits": {
     "cta": "Guthaben aufladen",

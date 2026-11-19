@@ -2481,7 +2481,8 @@
   },
   "accountBlocked": {
     "title": "החשבון חסום",
-    "description": "הגישה שלך לשירותים שלנו הוגבלה."
+    "description": "הגישה שלך לשירותים שלנו הוגבלה.",
+    "contactSupport": "פנייה לתמיכה"
   },
   "addCredits": {
     "cta": "הוספת קרדיטים",

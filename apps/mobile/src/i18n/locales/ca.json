@@ -3047,7 +3047,8 @@
   },
   "accountBlocked": {
     "title": "Compte bloquejat",
-    "description": "L'accés als nostres serveis s'ha restringit."
+    "description": "L'accés als nostres serveis s'ha restringit.",
+    "contactSupport": "Contacta amb l'equip de suport"
   },
   "addCredits": {
     "cta": "Afegeix crèdits",

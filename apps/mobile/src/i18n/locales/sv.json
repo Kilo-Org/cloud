@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Kontot blockerat",
-    "description": "Din åtkomst till våra tjänster har begränsats."
+    "description": "Din åtkomst till våra tjänster har begränsats.",
+    "contactSupport": "Kontakta supporten"
   },
   "addCredits": {
     "cta": "Fyll på krediter",

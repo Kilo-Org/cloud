@@ -3215,7 +3215,8 @@
   },
   "accountBlocked": {
     "title": "Cyfrif wedi'i rwystro",
-    "description": "Mae eich mynediad i'n gwasanaethau wedi'i gyfyngu."
+    "description": "Mae eich mynediad i'n gwasanaethau wedi'i gyfyngu.",
+    "contactSupport": "Cysylltu â'r tîm cymorth"
   },
   "addCredits": {
     "cta": "Ychwanegu credydau",

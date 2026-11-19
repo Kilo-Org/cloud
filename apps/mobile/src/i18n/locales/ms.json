@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Akaun disekat",
-    "description": "Akses anda kepada perkhidmatan kami telah dihadkan."
+    "description": "Akses anda kepada perkhidmatan kami telah dihadkan.",
+    "contactSupport": "Hubungi sokongan"
   },
   "addCredits": {
     "cta": "Tambah kredit",

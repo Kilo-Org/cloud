@@ -3047,7 +3047,8 @@
   },
   "accountBlocked": {
     "title": "Konts bloķēts",
-    "description": "Jūsu piekļuve mūsu pakalpojumiem ir ierobežota."
+    "description": "Jūsu piekļuve mūsu pakalpojumiem ir ierobežota.",
+    "contactSupport": "Sazināties ar atbalsta dienestu"
   },
   "addCredits": {
     "cta": "Papildināt kredītus",

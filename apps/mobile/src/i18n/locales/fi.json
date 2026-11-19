@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Tili estetty",
-    "description": "Pääsysi palveluihimme on rajoitettu."
+    "description": "Pääsysi palveluihimme on rajoitettu.",
+    "contactSupport": "Ota yhteyttä tukeen"
   },
   "addCredits": {
     "cta": "Lisää krediittejä",

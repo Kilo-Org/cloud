@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Kontoen er blokkert",
-    "description": "Tilgangen din til tjenestene våre er begrenset."
+    "description": "Tilgangen din til tjenestene våre er begrenset.",
+    "contactSupport": "Kontakt kundestøtte"
   },
   "addCredits": {
     "cta": "Fyll på kreditter",

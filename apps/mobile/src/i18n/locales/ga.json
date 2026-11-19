@@ -3159,7 +3159,8 @@
   },
   "accountBlocked": {
     "title": "Cuntas blocáilte",
-    "description": "Cuireadh srian ar do rochtain ar ár seirbhísí."
+    "description": "Cuireadh srian ar do rochtain ar ár seirbhísí.",
+    "contactSupport": "Déan teagmháil leis an bhfoireann tacaíochta"
   },
   "addCredits": {
     "cta": "Cuir creidmheasanna leis",

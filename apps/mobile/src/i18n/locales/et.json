@@ -2991,7 +2991,8 @@
   },
   "accountBlocked": {
     "title": "Konto blokeeritud",
-    "description": "Teie juurdepääs meie teenustele on piiratud."
+    "description": "Teie juurdepääs meie teenustele on piiratud.",
+    "contactSupport": "Võta ühendust toega"
   },
   "addCredits": {
     "cta": "Lisa krediiti",

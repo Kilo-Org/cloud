@@ -2448,7 +2448,8 @@
   },
   "accountBlocked": {
     "title": "帳號已封鎖",
-    "description": "您對我們服務的存取權限已受到限制。"
+    "description": "您對我們服務的存取權限已受到限制。",
+    "contactSupport": "聯絡客服"
   },
   "addCredits": {
     "cta": "加值點數",

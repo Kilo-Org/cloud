@@ -3047,7 +3047,8 @@
   },
   "accountBlocked": {
     "title": "Cont blocat",
-    "description": "Accesul tău la serviciile noastre a fost restricționat."
+    "description": "Accesul tău la serviciile noastre a fost restricționat.",
+    "contactSupport": "Contactează asistența"
   },
   "addCredits": {
     "cta": "Adaugă credite",

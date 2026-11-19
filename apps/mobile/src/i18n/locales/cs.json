@@ -3103,7 +3103,8 @@
   },
   "accountBlocked": {
     "title": "Účet zablokován",
-    "description": "Přístup k našim službám byl omezen."
+    "description": "Přístup k našim službám byl omezen.",
+    "contactSupport": "Kontaktovat podporu"
   },
   "addCredits": {
     "cta": "Dobít kredity",

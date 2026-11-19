@@ -138,8 +138,8 @@ export function MarkdownMermaid({
   selectable,
   onCopyCode,
 }: Readonly<MarkdownMermaidProps>) {
-  // The theme follows the diagram's own card, which the palette derives from the
-  // app scheme rather than from the bubble the diagram sits in, so the page
+  // The theme follows the diagram's own page, which the palette derives from the
+  // app scheme rather than from the bubble the diagram sits in, so the diagram
   // stays legible whatever the chat surface around it looks like.
   const dark = tokenSchemeForSurface(palette.diagramSurface) === 'onDark';
   // The page's imperative surface: `injectJavaScript` redraws the diagram in the

@@ -18,6 +18,7 @@ import {
   useSecurityDismissFailures,
 } from './use-security-dismiss-draft';
 import { flushDraft, resetDraftTimersForTests } from '@/lib/persist/drafts';
+import { TRIAL_ENDED_BILLING_COPY_KEY, TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
 
 // In-memory KV mirror, same shape as drafts.test.ts.
 const kvStore = new Map<string, { scope: string; k: string; v: string; updatedAt: number }>();
@@ -397,8 +398,45 @@ describe('useSecurityDismissFailures refresh', () => {
     if (!failure) {
       throw new Error('expected one stored failure');
     }
-    expect(securityDismissFailureCopy(failure)).toBe(
+    expect(securityDismissFailureCopy(failure, false)).toBe(
       i18n.t('securityAgent.mutations.syncInProgress')
+    );
+  });
+});
+
+describe('securityDismissFailureCopy stored refusal', () => {
+  // The stored key names which refusal the draft recorded, not which reader saw
+  // it, so the sentence follows the role of the reader rendering the draft.
+  const askAnOwnerDraft = {
+    lastError: i18n.t(TRIAL_ENDED_COPY_KEY),
+    lastErrorKey: TRIAL_ENDED_COPY_KEY,
+  };
+  const billingDraft = {
+    lastError: i18n.t(TRIAL_ENDED_BILLING_COPY_KEY),
+    lastErrorKey: TRIAL_ENDED_BILLING_COPY_KEY,
+  };
+
+  it('paints a stored ask-an-owner refusal as the billing sentence for a billing role', () => {
+    expect(askAnOwnerDraft.lastError).not.toBe(i18n.t(TRIAL_ENDED_BILLING_COPY_KEY));
+    expect(securityDismissFailureCopy(askAnOwnerDraft, true)).toBe(
+      i18n.t(TRIAL_ENDED_BILLING_COPY_KEY)
+    );
+  });
+
+  it('paints a stored billing refusal as the ask-an-owner sentence for a member', () => {
+    expect(billingDraft.lastError).not.toBe(i18n.t(TRIAL_ENDED_COPY_KEY));
+    expect(securityDismissFailureCopy(billingDraft, false)).toBe(i18n.t(TRIAL_ENDED_COPY_KEY));
+  });
+
+  it('keeps a non-refusal key and a legacy keyless sentence independent of the role', () => {
+    expect(
+      securityDismissFailureCopy(
+        { lastError: 'boom', lastErrorKey: 'securityAgent.mutations.actionBlocked' },
+        true
+      )
+    ).toBe(i18n.t('securityAgent.mutations.actionBlocked'));
+    expect(securityDismissFailureCopy({ lastError: 'boom', lastErrorKey: null }, true)).toBe(
+      'boom'
     );
   });
 });

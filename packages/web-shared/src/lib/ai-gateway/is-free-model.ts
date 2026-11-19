@@ -13,15 +13,14 @@ import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gatew
  * whose id matches it.
  */
 export function isFreeModel(model: string): boolean {
-  const modelId = model ?? '';
   return (
-    ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
+    ((isLocalFakeDeterministicModel(model) || isLocalFakeTranscriptionModel(model)) &&
       isLocalFakeLlmEnabled()) ||
-    modelId === KILO_AUTO_FREE_MODEL.id ||
-    modelId === 'openrouter/free' ||
-    modelId.endsWith(':free') ||
-    modelId.endsWith('-free') ||
-    modelId.startsWith('stealth/')
+    model === KILO_AUTO_FREE_MODEL.id ||
+    model === 'openrouter/free' ||
+    model.endsWith(':free') ||
+    model.endsWith('-free') ||
+    model.startsWith('stealth/')
   );
 }
 

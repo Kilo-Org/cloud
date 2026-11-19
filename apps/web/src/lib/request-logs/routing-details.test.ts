@@ -76,6 +76,27 @@ describe('parseRoutingDetails', () => {
     });
   });
 
+  test('keeps an Enkrypt report whose scan failed open', () => {
+    const record = JSON.parse(productionRecord) as Record<string, unknown>;
+    const failedOpen = {
+      ...expectedEnkrypt,
+      verdict: 'fail_open',
+      scans: [
+        {
+          ...expectedEnkrypt.scans[0],
+          decision: 'error_fail_open',
+          error: 'http_503',
+          detectors_fired: [],
+          credits_cost: null,
+        },
+      ],
+    };
+
+    const parsed = parseRoutingDetails(JSON.stringify({ ...record, enkrypt: failedOpen }));
+
+    expect(parsed?.enkrypt).toEqual(failedOpen);
+  });
+
   test('drops an Enkrypt report from before scans were split into parts', () => {
     const record = JSON.parse(productionRecord) as Record<string, unknown>;
     const scan: Record<string, unknown> = { ...expectedEnkrypt.scans[0] };
@@ -494,6 +515,7 @@ describe('requestNotSentReason', () => {
   test.each([
     ['block', 191, 'enkrypt-block'],
     ['unavailable', 5_000, 'enkrypt-unavailable'],
+    ['fail_open', 5_000, null],
     ['allow', 191, null],
     ['skip', 0, null],
     ['allow', null, 'rejected-before-guardrail'],

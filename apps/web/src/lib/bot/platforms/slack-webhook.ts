@@ -6,6 +6,7 @@ import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByTeamId } from '@/lib/integrations/slack-service';
 import { SLACK_SIGNING_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { WebhookBodyTooLargeError, readBoundedRawBody } from '@/lib/webhook-body';
 
 const SLACK_SIGNATURE_VERSION = 'v0';
 const SLACK_SIGNATURE_TOLERANCE_SECONDS = 60 * 5;
@@ -94,7 +95,15 @@ function cloneSlackRequest(request: Request, body: BodyInit): Request {
  */
 export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter) {
   return async (request: Request, options?: WebhookOptions): Promise<Response> => {
-    const body = await request.text();
+    let body: string;
+    try {
+      body = new TextDecoder().decode(await readBoundedRawBody(request));
+    } catch (error) {
+      if (error instanceof WebhookBodyTooLargeError) {
+        return new Response('Payload too large', { status: 413 });
+      }
+      throw error;
+    }
 
     if (!verifySlackSignature(body, request)) {
       return new Response('Invalid signature', { status: 401 });

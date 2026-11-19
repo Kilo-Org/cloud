@@ -3,6 +3,7 @@ import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -18,8 +19,12 @@ type Key = {
 };
 
 type MutationOptions = {
-  onSuccess?: (result: unknown, input: never) => void;
-  onError?: (error: Error) => void;
+  kind?: string;
+  onSuccess?: (
+    result: { outcome: string; provider?: string; model?: string; detail?: string },
+    input?: never
+  ) => void;
+  onError?: (error: unknown) => void;
 };
 
 const state = vi.hoisted(() => ({
@@ -159,6 +164,15 @@ function lastConfirm() {
   return call;
 }
 
+/** The key-test mutation the screen registered, whichever order it landed in. */
+function testMutation() {
+  const found = state.mutations.find(mutation => mutation.kind === 'test');
+  if (!found) {
+    throw new Error('the test mutation was never created');
+  }
+  return found;
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   state.keys = [
@@ -186,6 +200,8 @@ beforeEach(() => {
   state.mutate.mockClear();
   state.confirm.mockClear();
   state.push.mockClear();
+  vi.mocked(announcingToast.success).mockClear();
+  vi.mocked(announcingToast.error).mockClear();
 });
 
 afterEach(() => {
@@ -223,6 +239,68 @@ describe('ProviderKeysScreen', () => {
     });
 
     expect(state.mutate).toHaveBeenCalledWith({ id: 'key-1' });
+  });
+
+  it('reports the key test verdict in its own words', async () => {
+    await mount();
+
+    act(() => {
+      testMutation().onSuccess?.({ outcome: 'rejected' });
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledWith(
+      'The provider rejected this key. Check that it is correct and has not been revoked.'
+    );
+    expect(announcingToast.success).not.toHaveBeenCalled();
+
+    act(() => {
+      testMutation().onSuccess?.({
+        outcome: 'ok',
+        provider: 'Anthropic',
+        model: 'claude-sonnet-4',
+      });
+    });
+
+    expect(announcingToast.success).toHaveBeenCalledWith(
+      'Key works. Provider: Anthropic. Model: claude-sonnet-4.'
+    );
+  });
+
+  it('reports a failed test request in the same words', async () => {
+    await mount();
+
+    act(() => {
+      testMutation().onError?.(new Error('socket hang up'));
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledWith('The key test failed. Try again.');
+  });
+
+  it.each([
+    ['incomplete', 'The provider ended the test before it finished. Try again.'],
+    ['unsupported-provider', 'This provider is no longer supported. Remove the key.'],
+    ['unreadable-key', 'The stored key could not be read. Try again later.'],
+    ['deprecated-provider', 'This provider is deprecated, so its key cannot be tested.'],
+  ])('names the %s verdict in its own words', async (outcome, copy) => {
+    await mount();
+
+    act(() => {
+      testMutation().onSuccess?.({ outcome });
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledWith(copy);
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
+  it('answers a tap whose outcome this build does not know', async () => {
+    await mount();
+
+    act(() => {
+      testMutation().onSuccess?.({ outcome: 'rate-limited' });
+    });
+
+    expect(announcingToast.error).toHaveBeenCalledWith('The key test failed. Try again.');
+    expect(announcingToast.success).not.toHaveBeenCalled();
   });
 
   it('asks before removing a key and then deletes it', async () => {

@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { act } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
@@ -51,6 +52,9 @@ const popOnce = vi.hoisted(() => vi.fn());
 const backPress = vi.hoisted(() => ({ handler: undefined as (() => boolean) | undefined }));
 
 vi.mock('expo-router', () => ({
+  // The refusal's billing step reads the router when a role that can change the
+  // plan renders one; this suite never presses it.
+  useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
   useFocusEffect: (effect: () => void) => {
     if (!focus.effects.includes(effect)) {
       focus.effects.push(effect);
@@ -195,6 +199,14 @@ function inviteMessage(rendered: RenderWithProvidersResult): unknown {
   return statuses[1]?.props.message as unknown;
 }
 
+/** The labels of steps painted under a refusal line: the row's controls carry none. */
+function refusalStepLabels(rendered: RenderWithProvidersResult): string[] {
+  return rendered.renderer.root
+    .findAll(node => String(node.type) === 'Pressable')
+    .map(node => node.props.accessibilityLabel as string | undefined)
+    .filter((label): label is string => typeof label === 'string');
+}
+
 /** Run every focus effect the mounted sheet registered: a re-presented sheet. */
 function refocus() {
   act(() => {
@@ -320,6 +332,42 @@ describe('InviteMemberSheet reopen', () => {
     });
 
     expect(inviteMessage(rendered)).toBe(i18n.t('organization.inviteMember.pendingInvitation'));
+    rendered.unmount();
+  });
+
+  it('gives a billing role the plan refusal that offers the billing step', async () => {
+    const rendered = await openSheet();
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+    act(() => {
+      headerProps(rendered).onDone();
+    });
+    // The submit ran in this open, so its rejection belongs to this form.
+    invite.isError = true;
+    invite.error = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+    });
+    act(() => {
+      fieldProps(rendered).onChangeText('');
+    });
+    act(() => {
+      fieldProps(rendered).onChangeText('dev@example.com');
+    });
+
+    expect(inviteMessage(rendered)).toBe(i18n.t('common.organizationTrialEndedBilling'));
+    expect(refusalStepLabels(rendered)).toEqual([i18n.t('organization.hub.manageBilling')]);
+    rendered.unmount();
+  });
+
+  it('keeps a member out of the invite form, so no member reads the plan refusal here', async () => {
+    boundary.role = 'member';
+    const rendered = await openSheet();
+
+    expect(
+      rendered.renderer.root.findAll(node => String(node.type) === 'PermissionDenied')
+    ).toHaveLength(1);
+    expect(rendered.renderer.root.findAll(node => String(node.type) === 'Input')).toHaveLength(0);
     rendered.unmount();
   });
 

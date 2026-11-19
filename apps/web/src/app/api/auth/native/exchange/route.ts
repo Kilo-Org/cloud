@@ -89,10 +89,8 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 
-  // Bind the verified key in the same transaction that creates the device
-  // session, so a key id the client stored always names a server row. Android
-  // verification and the non-production sentinel carry no key id, so they
-  // persist nothing and take the plain session path.
+  // Android verification and the non-production sentinel carry no key id, so
+  // they persist nothing and take the plain session path.
   if (verification.keyId !== undefined) {
     try {
       const combined = await createDeviceSessionWithAttestedKey({

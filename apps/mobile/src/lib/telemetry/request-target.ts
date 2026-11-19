@@ -19,8 +19,6 @@ const URL_USERINFO_PATTERN = /^([a-z][\da-z+.-]*:\/\/)[^/?#]*@/iu;
  * and the authority's userinfo prefix. Fields built from this — the
  * `network.url` context, the synthesized message, the fingerprint path — carry
  * origin and path. Returns empty string on a non-string.
- * Total: a plain string walk, not `new URL`, whose React Native polyfill does
- * not implement every component.
  */
 export function stripQueryString(url: string): string {
   try {

@@ -24,12 +24,13 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 function printUsage(): void {
   console.log('Usage: pnpm dev:seed app:min-version-gate [--reset] [--version <v>]');
   console.log(`Seeds the local app_min_versions row at ${RAISED_VERSION} for both platforms.`);
-  console.log('--reset puts it back to ' + BASELINE_VERSION + ' (the column default).');
+  console.log(`--reset puts it back to ${BASELINE_VERSION} (the column default).`);
   console.log('--version <v> raises to another plain dotted version instead.');
-  console.log('Requires a loopback database. The next app start opens /force-update;');
-  console.log('a running app rechecks every 30 s, on foreground and after a refusal.');
-  console.log('The server reads the row through a per-instance cache: restart nextjs');
-  console.log('(pnpm dev:restart nextjs) when the change must be visible at once.');
+  console.log('Requires a loopback database. The app checks on cold start, on foreground,');
+  console.log('on network recovery and after a server refusal; there is no timer.');
+  console.log('The server reads the row through a per-instance cache and the REST check');
+  console.log('is cached for 300 s, so restart nextjs (pnpm dev:restart nextjs) and');
+  console.log('relaunch the app when the change must be visible at once.');
 }
 
 function readVersionArg(args: readonly string[]): string | null {
@@ -42,7 +43,10 @@ function readVersionArg(args: readonly string[]): string | null {
     return null;
   }
   const value = args[index + 1];
-  return value ?? null;
+  if (value === undefined || value.startsWith('--')) {
+    throw new Error('--version needs a value, such as --version 9.9.9.');
+  }
+  return value;
 }
 
 export async function run(...args: string[]): Promise<SeedResult | void> {
@@ -104,7 +108,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log(
     reset
       ? 'The next cold start leaves /force-update and resumes the app.'
-      : 'The next cold start (or the next 30 s recheck) blocks on /force-update.'
+      : 'The next cold start, foreground resume or server refusal blocks on /force-update.'
   );
   return {
     mode: reset ? 'reset' : 'raise',

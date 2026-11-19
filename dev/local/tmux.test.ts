@@ -364,9 +364,6 @@ test(
         }
         if (!clientReady) execFileSync('sleep', ['0.1']);
       }
-      if (!clientReady) {
-        clientProc.kill('SIGTERM');
-      }
       assert.ok(clientReady, 'decoy session must have an attached client');
 
       // Point child tmux commands at the decoy session.  The trailing colon

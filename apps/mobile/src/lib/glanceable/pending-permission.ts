@@ -94,9 +94,22 @@ export class PendingPermissionTimeoutError extends Error {
 }
 
 /**
+ * The control plane's pending-interaction projection could not be read. The ask
+ * may still be pending, so this failure is retryable. It is not the empty
+ * projection, which reads as no pending request.
+ */
+export class PendingPermissionUnreadableError extends Error {
+  constructor() {
+    super('The cloud-agent pending-interaction projection could not be read');
+    this.name = 'PendingPermissionUnreadableError';
+  }
+}
+
+/**
  * The pending permission ids the connected frame carries, in the projection's
- * order. A frame with no projection, or one this module cannot decode, reads as
- * no pending request: the caller then has nothing it may answer.
+ * order. A decodable frame with no projection, or with an empty list, reads as
+ * nothing pending. A frame this module cannot decode rejects with
+ * `PendingPermissionUnreadableError`, because the ask may still be pending.
  */
 function readPendingPermissionIds(
   input: PendingPermissionReadInput,
@@ -176,11 +189,13 @@ function readPendingPermissionIds(
             return;
           }
           const parsed = connectedInteractionsSchema.safeParse(event.data);
+          if (!parsed.success) {
+            // An unreadable projection is no proof that nothing is pending.
+            fail(new PendingPermissionUnreadableError());
+            return;
+          }
           settle(
-            parsed.success
-              ? (parsed.data.pendingInteractions?.permissions.map(permission => permission.id) ??
-                  [])
-              : []
+            parsed.data.pendingInteractions?.permissions.map(permission => permission.id) ?? []
           );
         },
         onConnected: () => undefined,

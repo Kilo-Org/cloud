@@ -71,7 +71,12 @@ type CliLiveTransportConfig = {
   onError?: ((message: string, failure?: SessionSnapshotFailure) => void) | undefined;
   onRemoteModelStateChange?: ((state: RemoteModelState) => void) | undefined;
   onRemoteCommandStateChange?: ((state: RemoteCommandState) => void) | undefined;
-  onCapabilityChange?: (() => void) | undefined;
+  /**
+   * Fired when composer readiness may have changed (owner presence gained,
+   * lost, or handed off, or an owner-fence failure). The session manager
+   * recomputes the canSend / canInterrupt gates.
+   */
+  onComposerCapabilityChange?: (() => void) | undefined;
   /**
    * Fired whenever the per-session capabilities advertised by the owning
    * CLI in `sessions.heartbeat` / `sessions.list` change (upgrade, downgrade,
@@ -81,7 +86,7 @@ type CliLiveTransportConfig = {
    * gate treats as supported. The session manager uses this to recompute the
    * `supportsAttachments` gate.
    */
-  onCapabilitiesChange?:
+  onCliCapabilitiesReported?:
     | ((capabilities: { attachments?: boolean | undefined } | undefined) => void)
     | undefined;
 };
@@ -187,7 +192,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       const nextAttachments = next?.attachments;
       if (previousAttachments === nextAttachments) return;
       currentCapabilities = next;
-      config.onCapabilitiesChange?.(next);
+      config.onCliCapabilitiesReported?.(next);
     }
     const modelDiscovery = createDiscoveryRequestSlot(
       () => ownerConnectionId,
@@ -329,7 +334,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       // sessions.list reports an explicit negative. Empty currentCapabilities
       // also drives the existing 'idle' reset on the consumer side.
       publishCapabilities(undefined);
-      config.onCapabilityChange?.();
+      config.onComposerCapabilityChange?.();
     }
 
     function setOwnerConnectionId(nextOwnerConnectionId: string | null): void {

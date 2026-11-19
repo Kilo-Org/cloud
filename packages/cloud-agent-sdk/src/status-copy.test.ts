@@ -6,8 +6,13 @@
 import { createStore } from 'jotai';
 import { createServiceState } from './service-state';
 import type { ServiceStateConfig } from './service-state';
-import { createSessionManager, formatError, formatErrorDetail } from './session-manager';
-import type { FetchedSessionData, SessionManagerConfig } from './session-manager';
+import {
+  createSessionManager,
+  formatError,
+  formatErrorDetail,
+  type SessionManagerConfig,
+} from './session-manager';
+import type { FetchedSessionData } from './types';
 import type {
   AgentStatus,
   CloudStatus,

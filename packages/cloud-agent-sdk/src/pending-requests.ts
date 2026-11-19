@@ -27,3 +27,16 @@ export function upsertByRequestId<T extends { requestId: string }>(
 ): readonly T[] {
   return upsertByKey(list, next, entry => entry.requestId);
 }
+
+/**
+ * Remove the entry for one requestId. A miss returns the same array, so
+ * callers keyed on list identity skip follow-up work without allocating.
+ */
+export function removePendingRequest<T extends { requestId: string }>(
+  list: readonly T[],
+  requestId: string
+): readonly T[] {
+  return list.some(entry => entry.requestId === requestId)
+    ? list.filter(entry => entry.requestId !== requestId)
+    : list;
+}

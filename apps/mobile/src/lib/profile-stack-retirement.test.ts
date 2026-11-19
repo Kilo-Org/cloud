@@ -70,9 +70,13 @@ describe('takeRetirableProfileRoutes', () => {
     notePendingProfileRetirement({ key: 'orig', stack: STACK, selfName: SECTION, now: NOW });
     const gone = [route('root', 'index'), route('rebuilt', SECTION)];
 
-    expect(takeRetirableProfileRoutes({ routes: gone, index: 1, now: NOW })).toBeNull();
+    expect(
+      takeRetirableProfileRoutes({ routes: gone, index: 1, stack: STACK, now: NOW })
+    ).toBeNull();
     // Recorded once, so a second look does not resurrect a removal either.
-    expect(takeRetirableProfileRoutes({ routes: gone, index: 1, now: NOW })).toBeNull();
+    expect(
+      takeRetirableProfileRoutes({ routes: gone, index: 1, stack: STACK, now: NOW })
+    ).toBeNull();
   });
 
   it('drops a removal the navigator never confirmed', () => {

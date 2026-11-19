@@ -5,6 +5,7 @@ import {
   ensureOrganizationAccessAndFetchOrg,
   ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
+  organizationMemberProcedure,
   requireLiveOrganizationForPlatformAdmin,
   resolveOrganizationAccess,
 } from './utils';
@@ -12,7 +13,11 @@ import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  createCallerFactory,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -1713,5 +1718,107 @@ describe('binary support organization access', () => {
     const event = events.find(event => event.kind === 'kilo_admin_elevation');
     expect(event).toMatchObject({ reason: 'organization_access' });
     expect(event).toMatchObject({ supportDecision: null });
+  });
+});
+
+describe('organizationMemberProcedure replica membership read', () => {
+  const router = createTRPCRouter({
+    ping: organizationMemberProcedure.query(({ ctx }) => ctx.user.id),
+  });
+  const createCaller = createCallerFactory(router);
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_memberships);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organizations);
+  });
+
+  function ctxFor(user: User, fromDb?: TRPCContext['fromDb']): TRPCContext {
+    return { user, authViaToken: false, tokenSource: null, ip: null, fromDb };
+  }
+
+  /** A read client whose every query chain resolves to the given rows, or throws on `select`. */
+  function fakeReplica(outcome: 'empty' | 'throws') {
+    const select = jest.fn(() => {
+      if (outcome === 'throws') throw new Error('replica unavailable');
+      const chain: unknown = new Proxy(() => chain, {
+        get: (_target, property) =>
+          property === 'then' ? (resolve: (rows: unknown[]) => void) => resolve([]) : () => chain,
+      });
+      return chain;
+    });
+    return { select, client: { select } as unknown as TRPCContext['fromDb'] };
+  }
+
+  async function member() {
+    const user = await insertTestUser({ is_admin: false });
+    const organization = await createTestOrganization(
+      `replica-member-${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    return { user, organization };
+  }
+
+  test('a granting replica read admits the member without reading the primary', async () => {
+    const { user, organization } = await member();
+    const select = db.select.bind(db);
+    const replicaSelect = jest.fn(select);
+    const primarySelect = jest.spyOn(db, 'select');
+    const fromDb = { select: replicaSelect } as unknown as TRPCContext['fromDb'];
+
+    await expect(
+      createCaller(ctxFor(user, fromDb)).ping({ organizationId: organization.id })
+    ).resolves.toBe(user.id);
+
+    expect(replicaSelect).toHaveBeenCalled();
+    expect(primarySelect).not.toHaveBeenCalled();
+  });
+
+  test('a replica read that grants no role falls back to the primary', async () => {
+    const { user, organization } = await member();
+    const replica = fakeReplica('empty');
+    const primarySelect = jest.spyOn(db, 'select');
+
+    await expect(
+      createCaller(ctxFor(user, replica.client)).ping({ organizationId: organization.id })
+    ).resolves.toBe(user.id);
+
+    expect(replica.select).toHaveBeenCalled();
+    expect(primarySelect).toHaveBeenCalled();
+  });
+
+  test('a failed replica read falls back to the primary', async () => {
+    const { user, organization } = await member();
+    const replica = fakeReplica('throws');
+
+    await expect(
+      createCaller(ctxFor(user, replica.client)).ping({ organizationId: organization.id })
+    ).resolves.toBe(user.id);
+
+    expect(replica.select).toHaveBeenCalled();
+  });
+
+  test('a non-member is still rejected when the replica returns no rows', async () => {
+    const { organization } = await member();
+    const outsider = await insertTestUser({ is_admin: false });
+    const replica = fakeReplica('empty');
+
+    await expect(
+      createCaller(ctxFor(outsider, replica.client)).ping({ organizationId: organization.id })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(replica.select).toHaveBeenCalled();
+  });
+
+  test('without a replica client the primary is read', async () => {
+    const { user, organization } = await member();
+    const primarySelect = jest.spyOn(db, 'select');
+
+    await expect(
+      createCaller(ctxFor(user)).ping({ organizationId: organization.id })
+    ).resolves.toBe(user.id);
+    expect(primarySelect).toHaveBeenCalled();
   });
 });

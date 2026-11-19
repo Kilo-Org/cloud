@@ -110,9 +110,10 @@ export type TRPCContext = {
   // as the shared auth read. Absent for web/CLI callers and test constructors.
   controlPlaneStartedAt?: number;
   /**
-   * Read client for model-stats snapshot loads. The gateway's REST facet sets
-   * `readDb` because its handlers run in `sfo1`; the web app leaves it unset and
-   * loads through the primary, which it must after a write invalidation.
+   * Read client for model-stats snapshot loads and the organization member gate's
+   * membership read. The gateway's REST facet sets `readDb` because its handlers
+   * run in `sfo1`; the web app leaves it unset and loads through the primary,
+   * which it must after a write invalidation.
    */
   fromDb?: ModelStatsLoadClient;
 };

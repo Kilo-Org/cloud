@@ -48,7 +48,7 @@ export function sourceFiles(dir, skip) {
 
 function collect(dir, skip, files) {
   const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
-    a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+    a.name < b.name ? -1 : a.name > b.name ? 1 : 0
   );
   for (const entry of entries) {
     const path = join(dir, entry.name);

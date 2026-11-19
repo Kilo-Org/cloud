@@ -107,6 +107,7 @@ describe('download tier choice', () => {
   const base = {
     approved: false,
     canDownload: true,
+    canIntercept: true,
     hasHold: true,
     hasPermission: true,
     needsTheFile: false,
@@ -119,6 +120,8 @@ describe('download tier choice', () => {
 
   it('intercepts only when the event exists and the permission is withheld, so the hold is never armed alone', () => {
     expect(downloadTierOf({ ...base, hasPermission: false })).toBe('intercept');
+    // A browser that cannot pause a response has nothing to fall back to.
+    expect(downloadTierOf({ ...base, canIntercept: false, hasPermission: false })).toBe('none');
   });
 
   it('keeps the legacy cancel-after-start guard on a browser with the permission but no event', () => {
@@ -127,10 +130,24 @@ describe('download tier choice', () => {
 
   it('names one tier per permission and browser combination, never two', () => {
     const tiers = [true, false].flatMap(hasHold =>
-      [true, false].map(hasPermission => downloadTierOf({ ...base, hasHold, hasPermission }))
+      [true, false].flatMap(hasPermission =>
+        [true, false].map(canIntercept =>
+          downloadTierOf({ ...base, canIntercept, hasHold, hasPermission })
+        )
+      )
     );
 
-    expect(tiers).toStrictEqual(['hold', 'intercept', 'legacy', 'none']);
+    // Every combination picks at most one tier: the hold wins with the permission, the interceptor only without it.
+    expect(tiers).toStrictEqual([
+      'hold',
+      'hold',
+      'intercept',
+      'none',
+      'legacy',
+      'legacy',
+      'intercept',
+      'none',
+    ]);
   });
 
   it('chooses no guard for a call that cannot start a download or already spent its token', () => {

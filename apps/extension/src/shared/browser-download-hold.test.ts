@@ -307,7 +307,7 @@ describe('navigate expectations', () => {
       attempt: 'attempt-1',
       session: 'session-1',
       tabId: 7,
-      until: Date.now() + 5_000,
+      until: Date.now() + 5000,
       url: attachment,
     });
 

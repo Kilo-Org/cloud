@@ -136,6 +136,7 @@ export type DownloadTier =
 export const downloadTierOf = ({
   approved,
   canDownload,
+  canIntercept,
   hasHold,
   hasPermission,
   needsTheFile,
@@ -145,6 +146,8 @@ export const downloadTierOf = ({
   readonly approved: boolean;
   /** Whether this call is an agent call that can start a download at all. */
   readonly canDownload: boolean;
+  /** Whether this tab can pause a response at all: a debugger backend, so Chrome and not Firefox. */
+  readonly canIntercept: boolean;
   /** Whether the browser raises `onDeterminingFilename`, so a hold can decide an item. */
   readonly hasHold: boolean;
   /** Whether the optional `downloads` permission is granted right now. */
@@ -159,8 +162,8 @@ export const downloadTierOf = ({
   }
 
   if (!hasPermission) {
-    // Chrome keeps its response interceptor; a browser without the permission API to grant it has no guard at all.
-    return hasHold ? 'intercept' : 'none';
+    // Without the permission the hold's event does not exist: the response is the only thing left to fail.
+    return canIntercept ? 'intercept' : 'none';
   }
 
   if (!hasHold) {

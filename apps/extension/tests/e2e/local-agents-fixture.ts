@@ -137,7 +137,7 @@ export const enableLocalAgents = async (sidePanel: Page, extensionId: string): P
   await seedExtensionAuth(sidePanel);
   await sidePanel.reload();
   // A page opened over CDP (`context.newPage()` after `connectOverCDP`) is a background tab, and Playwright's
-  // actionability waits for an animation frame that a hidden tab never runs, so the click below would hang.
+  // Actionability waits for an animation frame that a hidden tab never runs, so the click below would hang.
   // The panel is the page under test here: make it the active tab, as a user's open side panel is.
   await sidePanel.bringToFront();
   await sidePanel.getByLabel('Settings').click();

@@ -164,7 +164,7 @@ test('a guarded click cancels the download, and the approved retry keeps it', as
     expect(fixture.hits()).toBeGreaterThan(0);
 
     // The browser created the item and the guard stopped it before it settled, so nothing is in the folder, and
-    // nothing is still writing one. The request reaching the fixture is the proof the click ran the download.
+    // Nothing is still writing one. The request reaching the fixture is the proof the click ran the download.
     await expectNothingSaved(downloadsPath);
 
     // 2. The human approved: the identical call with the token runs with the guard off once.

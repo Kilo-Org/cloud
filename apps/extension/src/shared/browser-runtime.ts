@@ -3078,36 +3078,15 @@ export const createBrowserRuntime = ({
             (preflight !== undefined &&
               (preflight.class === 'act' || preflight.class === 'navigate')));
 
-        // The optional permission this call runs with, read at call time: it can be granted or revoked while the
-        // Worker lives, so every guard decision below reads the same answer once.
-        const downloadsPermission = downloadsApi?.();
-
-        // Which guard decides this call's downloads, chosen once from the live permission and the browser:
-        // A hold needs the permission to answer its event, an interceptor needs Chrome without it, and a browser
-        // With neither falls back to the legacy cancel-after-start guard. Never two at a time.
-        const downloadTier: DownloadTier = downloadTierOf({
-          approved: downloadApproved,
-          canDownload: agentContext !== undefined && downloadCapable && preflight !== undefined,
-          hasHold: downloadHold !== undefined,
-          hasPermission: downloadsPermission !== undefined,
-          needsTheFile: approvedNeeds.get(sessionKey) !== undefined,
-          sensitiveToken: preflight === undefined || preflight.sensitiveToken !== undefined,
-        });
-
-        // An act call runs guarded: an unapproved one denies downloads outright, and an approved one listens and
-        // Stops every download but the file its approval bought, so a second file is neither kept nor silent.
-        // An approved call guards nothing when its approval names no file: without a url there is nothing to exempt,
-        // And a guard that cannot tell the approved file from the rest would cancel it.
-        const guardDownloads = downloadTier === 'legacy';
-
-        // The hold decides every download of the profile, so a call has nothing to arm for it — but the tab
-        // Its step runs on has to be known before the step runs, or a download it starts is nobody's and passes.
-        const holdGuards = downloadTier === 'hold';
-
-        // Without the optional `downloads` permission nothing can hold or cancel an item, but the response that
-        // Would become a file can still be failed.
-        const interceptGuards = downloadTier === 'intercept';
-        const guarded = downloadTier !== 'none';
+        // Whether this call is one a guard applies to at all: an agent call that its step token does not already
+        // Cover, whose page action can start a download. Which guard that is — hold, intercept or legacy — is chosen
+        // Once, after the tab exists, from the live permission and the browser, because either can change while the
+        // Call runs (`browser_tabs new` opens its tab before the guard is armed).
+        const couldGuard =
+          agentContext !== undefined &&
+          downloadCapable &&
+          preflight !== undefined &&
+          preflight.sensitiveToken === undefined;
 
         // An approved repeat of a `browser_tabs new` download owns the tab that step opened: sending the tool again
         // Would open a second tab and download the file twice, and the kept file would go unreported. The repeat
@@ -3133,7 +3112,7 @@ export const createBrowserRuntime = ({
         // Without the optional `downloads` permission nothing can stop the file, so the step still runs and the
         // Announcement it produces is reported as possibly saved: a blank tab costs less than refusing every call.
         const opensGuardedTab =
-          guarded && !downloadApproved && toolName === 'browser_tabs' && stepOpensTab;
+          couldGuard && !downloadApproved && toolName === 'browser_tabs' && stepOpensTab;
 
         // A take-over may have arrived while this call resolved its step: opening a tab for a call that is already
         // Over would leave it behind.
@@ -3262,6 +3241,27 @@ export const createBrowserRuntime = ({
         if (downloadCapable) {
           takeOverDownloads(tabId);
         }
+
+        // The one guard this call runs, chosen once here — after the tab exists and before the tool runs — from the
+        // Live permission and the browser. A `browser_tabs new` opens its tab first, so reading the permission now
+        // Is what makes a revoke or grant during that open land on the guard that actually arms.
+        const downloadsPermission = downloadsApi?.();
+        const downloadTier: DownloadTier = downloadTierOf({
+          approved: downloadApproved,
+          canDownload: couldGuard,
+          canIntercept: debuggerApi !== undefined,
+          hasHold: downloadHold !== undefined,
+          hasPermission: downloadsPermission !== undefined,
+          needsTheFile: approvedNeeds.get(sessionKey) !== undefined,
+          sensitiveToken: false,
+        });
+        // An act call runs guarded: an unapproved one denies downloads outright, and an approved one listens and
+        // Stops every download but the file its approval bought, so a second file is neither kept nor silent.
+        const guardDownloads = downloadTier === 'legacy';
+        // The hold decides every download of the profile; the tab its step runs on has to be known before it runs.
+        const holdGuards = downloadTier === 'hold';
+        // Without the optional `downloads` permission the response that would become a file can still be failed.
+        const interceptGuards = downloadTier === 'intercept';
 
         // A file is about to start in the tab the step opened: that tab's earlier linger has to end too.
         if (runTabId !== tabId) {

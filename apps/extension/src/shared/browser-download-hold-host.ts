@@ -272,9 +272,7 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold =>
         url: report.url,
       }));
     },
-    escape: (download, session) => {
-      hold.escape(download, session);
-    },
+    escape: hold.escape,
     handle: (item: DownloadHoldItem, suggest: SuggestFilename) => hold.handle(item, suggest),
     navigate: navigation => {
       hold.navigate(navigation);

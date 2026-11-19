@@ -507,11 +507,9 @@ export const createDownloadHold = ({
     const unreferred = pageOf(item.referrer) === undefined;
 
     for (const [tabId, navigation] of navigations) {
-      if (navigation.until < at || !tabs.has(tabId)) {
-        continue;
-      }
+      const live = navigation.until >= at && tabs.has(tabId);
 
-      if (unreferred || named === undefined || pageOf(navigation.url) === named) {
+      if (live && (unreferred || named === undefined || pageOf(navigation.url) === named)) {
         return tabId;
       }
     }
@@ -960,6 +958,9 @@ export const createDownloadHold = ({
       });
     },
     handle,
+    navigate: navigation => {
+      navigations.set(navigation.tabId, navigation);
+    },
     needOf,
     settle: async (session, window) => {
       const until = window.since + window.timeoutMs;
@@ -993,9 +994,6 @@ export const createDownloadHold = ({
       }
 
       tabs.set(input.tabId, input);
-    },
-    navigate: navigation => {
-      navigations.set(navigation.tabId, navigation);
     },
     tracked: itemId => tracked.get(itemId),
   };

@@ -60,6 +60,16 @@ export function indicatorForStatus(s: AgentStatus): SessionStatusIndicator | nul
         timestamp: now,
         code: 'agent-connection-reconnecting',
       };
+    if (s.code === 'connection-lost') {
+      // The exhausted loss carries the classified connection copy, so the
+      // indicator and the error sink state the same message.
+      return {
+        type: 'error',
+        message: 'Connection lost. Please retry in a moment.',
+        timestamp: now,
+        code: s.code,
+      };
+    }
     return {
       type: 'error',
       message: 'Agent connection lost',

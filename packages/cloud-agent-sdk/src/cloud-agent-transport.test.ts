@@ -408,7 +408,7 @@ describe('CloudAgentTransport event routing', () => {
     // The first close is a drop the transport retries, so it reads as
     // reconnecting. The second close spends the retry budget on an auth
     // failure, which escalates to one terminal loss.
-    expect(state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(state.getStatus()).toEqual({ type: 'disconnected', code: 'connection-lost' });
     expect(stateNotifications).toHaveBeenCalledTimes(2);
     expect(stateErrors).toHaveBeenCalledWith('Connection lost. Please retry in a moment.');
     expect(stateErrors).not.toHaveBeenCalledWith('Historical overload');

@@ -382,8 +382,10 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         if (event.exhausted === true) {
           // The retry budget is spent, so the socket will not come back on its
           // own. This reads as a terminal loss and asks the reader to retry.
+          // The code carries the classified connection copy, so both the
+          // indicator and the error sink state one canonical message.
           terminated = true;
-          status = { type: 'disconnected' };
+          status = { type: 'disconnected', code: 'connection-lost' };
           if (!transportExhausted) {
             transportExhausted = true;
             config.onError?.('Connection lost. Please retry in a moment.');

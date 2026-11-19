@@ -158,7 +158,12 @@ export type AgentStatus =
     }
   | { type: 'error'; message: string; code?: SdkStatusMessageCode }
   /** `reconnecting` marks a self-recovering transport drop, not a terminal loss. */
-  | { type: 'disconnected'; reconnecting?: boolean | undefined }
+  | {
+      type: 'disconnected';
+      reconnecting?: boolean | undefined;
+      /** Set on the exhausted loss, so surfaces render one canonical copy. */
+      code?: SdkStatusMessageCode | undefined;
+    }
   | { type: 'interrupted' }
   /** Scheduled to wake later; does nothing now. `scheduledAt` is the ISO-8601 wake time when the CLI reported one. */
   | { type: 'scheduled'; scheduledAt?: string };

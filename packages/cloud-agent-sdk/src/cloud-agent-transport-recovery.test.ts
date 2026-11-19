@@ -173,7 +173,7 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
       { type: 'stopped', reason: 'transport-disconnected' },
       { type: 'stopped', reason: 'transport-disconnected', exhausted: true },
     ]);
-    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected', code: 'connection-lost' });
     const ticketCount = harness.getTicket.mock.calls.length;
 
     await expect(harness.submit()).resolves.toEqual({ accepted: true });

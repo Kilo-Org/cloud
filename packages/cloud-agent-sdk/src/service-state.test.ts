@@ -530,7 +530,7 @@ describe('createServiceState', () => {
       expect(onError).not.toHaveBeenCalled();
 
       state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
-      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected', code: 'connection-lost' });
       expect(onError).toHaveBeenCalledWith('Connection lost. Please retry in a moment.');
 
       // A live connection proves the loss is over: the status clears and a
@@ -550,7 +550,7 @@ describe('createServiceState', () => {
       state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
       state.process({ type: 'stopped', reason: 'transport-disconnected', exhausted: true });
 
-      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected', code: 'connection-lost' });
       expect(onError).toHaveBeenCalledTimes(1);
 
       // A reconnect clears the latch, so the next spent budget reports again.

@@ -109,6 +109,20 @@ const readPixel = (
     { dataUrl: input.dataUrl, x: input.x, y: input.y }
   );
 
+/** The image's own pixel size, so the capture can be checked against the CSS viewport it is of. */
+const readImageSize = (
+  extensionPage: Page,
+  dataUrl: string
+): Promise<{ readonly height: number; readonly width: number }> =>
+  extensionPage.evaluate(async source => {
+    const image = new Image();
+
+    image.src = source;
+    await image.decode();
+
+    return { height: image.height, width: image.width };
+  }, dataUrl);
+
 interface TabRow {
   readonly active: boolean;
   readonly id: number;
@@ -159,12 +173,15 @@ const runBackgroundTabScreenshot = async ({
   devicePixelRatio,
   extraLaunchArgs,
   label,
+  realViewport,
 }: {
   readonly cycles: number;
   readonly devicePixelRatio: number;
   readonly extraLaunchArgs: readonly string[] | undefined;
   /** The prefix of the line the measured numbers are printed under. */
   readonly label: string;
+  /** `true` drops Playwright's viewport emulation, so the browser renders at the scale it was launched with. */
+  readonly realViewport: boolean;
 }): Promise<void> => {
   // 127.0.0.2 is a different site from the page's 127.0.0.1, so Chromium renders the frame out of process.
   const inner = await startFixtureServer({
@@ -179,6 +196,7 @@ const runBackgroundTabScreenshot = async ({
   const hub = await startFakeHub();
   const { context, extensionId, userDataDir } = await launchExtensionContext({
     ...(extraLaunchArgs === undefined ? {} : { extraLaunchArgs }),
+    ...(realViewport ? { realViewport } : {}),
     // Measure the browser a user actually has: Playwright's defaults keep Chrome from throttling an
     // Inactive tab, which removes both the frame-rate limit and the capture wait this test is about.
     ignoreDefaultArgs: [
@@ -250,8 +268,22 @@ const runBackgroundTabScreenshot = async ({
     expect(agentTab?.id).not.toBe(userTabId);
     expect(await activeTabId(extensionPage)).toBe(userTabId);
 
+    const agentPage = context.pages().find(page => page.url().endsWith('/agent'));
+
+    if (agentPage === undefined) {
+      throw new Error('the agent tab is not among the context pages');
+    }
+
+    // The tab these images are of renders at the ratio the image is measured at, not just the user's page.
+    expect(await agentPage.evaluate('window.devicePixelRatio')).toBe(devicePixelRatio);
+    const cssViewport = await agentPage.evaluate(() => ({
+      height: window.innerHeight,
+      width: window.innerWidth,
+    }));
+
     const samples: number[] = [];
     let maskedFramePixel: number[] = [];
+    let imageSummary = 'image=unmeasured';
 
     for (let cycle = 0; cycle < cycles; cycle += 1) {
       // eslint-disable-next-line no-await-in-loop -- one click-then-shot cycle at a time
@@ -274,6 +306,21 @@ const runBackgroundTabScreenshot = async ({
       const dataUrl = screenshotDataUrl(shot);
 
       samples.push(elapsed);
+
+      if (cycle === 0) {
+        // The image is the viewport in device pixels, so its size is the CSS viewport times the ratio.
+        // eslint-disable-next-line no-await-in-loop -- one decode of the first image
+        const imageSize = await readImageSize(extensionPage, dataUrl);
+
+        expect(
+          imageSize,
+          `image ${String(imageSize.width)}x${String(imageSize.height)} for a ${String(cssViewport.width)}x${String(cssViewport.height)} viewport at ${String(devicePixelRatio)}x`
+        ).toEqual({
+          height: cssViewport.height * devicePixelRatio,
+          width: cssViewport.width * devicePixelRatio,
+        });
+        imageSummary = `image=${String(imageSize.width)}x${String(imageSize.height)} viewport=${String(cssViewport.width)}x${String(cssViewport.height)}`;
+      }
 
       // eslint-disable-next-line no-await-in-loop -- decoding one image at a time
       const pixel = await readPixel(extensionPage, {
@@ -301,7 +348,7 @@ const runBackgroundTabScreenshot = async ({
     }
 
     const fast = samples.filter(elapsed => elapsed < FAST_CAPTURE_MS).length;
-    const summary = `median=${String(median(samples))}ms fast=${String(fast)}/${String(cycles)} samples=${JSON.stringify(samples)}`;
+    const summary = `median=${String(median(samples))}ms fast=${String(fast)}/${String(cycles)} ${imageSummary} samples=${JSON.stringify(samples)}`;
 
     // eslint-disable-next-line no-console -- the numbers are what this test measures
     console.warn(`${label} ${summary}`);
@@ -328,6 +375,7 @@ test('a screenshot of the agent\u2019s own inactive tab is fresh and fast, and n
     devicePixelRatio: 1,
     extraLaunchArgs: undefined,
     label: 'background tab screenshot',
+    realViewport: false,
   });
 });
 
@@ -339,7 +387,10 @@ test('a screenshot stays fresh, fast and masked at device pixel ratio 2', async 
   await runBackgroundTabScreenshot({
     cycles: 5,
     devicePixelRatio: 2,
-    extraLaunchArgs: ['--force-device-scale-factor=2'],
+    // With no viewport emulation the window is the page: a pinned 800x520 holds the fixture's 720x380
+    // Frame box at ~800x433 css pixels, and keeps the size the same in a headed xvfb run and in headless ci.
+    extraLaunchArgs: ['--force-device-scale-factor=2', '--window-size=800,520'],
     label: 'dpr2 background tab screenshot',
+    realViewport: true,
   });
 });

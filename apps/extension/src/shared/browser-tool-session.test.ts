@@ -1553,6 +1553,20 @@ describe('background tab viewport capture', () => {
     await expect(session.captureViewportImage('png')).resolves.toBeUndefined();
   });
 
+  it('accepts the frame a plain capture of a DPR-2 viewport is, whatever the metadata reports', async () => {
+    // A DPR-2 renderer reports a layout viewport in device pixels and captures at that size, while the
+    // Screencast metadata stays in device-independent pixels, i.e. half of it. The image is the viewport,
+    // So a gate on the metadata would throw away the frame that matches the mask geometry exactly.
+    const layout = { clientHeight: 1114, clientWidth: 2000 };
+    const frame = pngOfSize(2000, 1114);
+    const { session } = createSession({
+      layoutViewport: layout,
+      screencast: { data: frame, deviceHeight: 557, deviceWidth: 1000 },
+    });
+
+    await expect(session.captureViewportImage('png')).resolves.toBe(frame);
+  });
+
   it('refuses a frame whose header it cannot read, rather than scale the mask onto a guess', async () => {
     const { session } = createSession({
       layoutViewport: LAYOUT,

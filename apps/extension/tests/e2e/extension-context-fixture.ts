@@ -211,6 +211,13 @@ export const launchExtensionContext = async (
      * background tab is throttled the way it is in the wild.
      */
     readonly ignoreDefaultArgs?: readonly string[];
+    /**
+     * Playwright emulates a 1280x720 viewport at device scale factor 1 on every
+     * page it opens, which overrides the scale a browser switch asks for. `true`
+     * launches with no viewport override, so the window's own size and scale
+     * apply — the state a real user's Chrome has.
+     */
+    readonly realViewport?: boolean;
   } = {}
 ): Promise<{
   context: BrowserContext;
@@ -243,6 +250,7 @@ export const launchExtensionContext = async (
     ...(executablePath === undefined ? { channel } : { executablePath }),
     headless: !isHeaded,
     ignoreDefaultArgs: ['--enable-automation', ...(options.ignoreDefaultArgs ?? [])],
+    ...(options.realViewport === true ? { viewport: null } : {}),
     userAgent: EXTENSION_E2E_USER_AGENT,
   });
 

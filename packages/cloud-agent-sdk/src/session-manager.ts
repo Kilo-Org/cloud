@@ -2653,17 +2653,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
 
         if (outcome.kind === 'success') {
-          // The replay itself isolates a row it cannot apply, but the page can
-          // still fail as a whole (a `messages` value the replay cannot
-          // iterate, or a row the retained-history bookkeeping cannot name).
-          // Keep the cursor and report a retryable failure instead of
-          // rejecting the load, so the header shows its Retry CTA.
+          // Read the page's ids before the page is applied: `applyPage`
+          // advances the cursor and clears the error, so anything that threw
+          // after it would report a failure for a page that was already
+          // applied, and Retry would fetch a different page — or nothing,
+          // when this was the last one. Both the ids and the apply run under
+          // this catch, so a throw here leaves the cursor where it was.
           try {
+            const messageIds = outcome.messages.map(m => m.info.id);
             if (applyPage(outcome, expectedGeneration)) {
-              retainedHistoryStack.push({
-                cursorBefore: cursor,
-                messageIds: outcome.messages.map(m => m.info.id),
-              });
+              retainedHistoryStack.push({ cursorBefore: cursor, messageIds });
             }
           } catch (error) {
             if (expectedGeneration !== loadOlderGeneration) return;

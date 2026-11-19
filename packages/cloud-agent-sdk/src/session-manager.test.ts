@@ -11372,6 +11372,52 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     }
   });
 
+  it('reports a page that throws while being applied without advancing the older cursor', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) =>
+        options.cursor
+          ? {
+              ...makePage({ kiloSessionId: 'ses-1', nextCursor: null }),
+              // Readable enough for the replay, but the apply itself throws: a
+              // row with no info passes the replay loop and fails when the page
+              // is applied, after the replay already accepted the other row.
+              messages: [
+                makePageMessage('msg-good', 'ses-1', 'good row'),
+                { parts: [] } as unknown as SessionSnapshotPage['messages'][number],
+              ],
+            }
+          : makePage({
+              messages: [makePageMessage('msg-initial', 'ses-1', 'initial row')],
+              nextCursor: 'cursor-A',
+            })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      await expect(mgr.loadOlderMessages()).resolves.toBeUndefined();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toEqual({ kind: 'retryable' });
+      // The page was not applied, so its cursor must not be consumed: a retry
+      // has to fetch this same page again rather than the next older one.
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
+
+      await expect(mgr.loadOlderMessages()).resolves.toBeUndefined();
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to apply an older page'),
+        expect.any(Error)
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it('does not let a late initial page from an earlier switchSession clobber the active session when both target the same session id', async () => {
     // Regression: the initial-page callback used to read `loadOlderGeneration`
     // at invocation time. A second `switchSession` to the same session id

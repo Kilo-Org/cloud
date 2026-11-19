@@ -38,8 +38,16 @@ const CHATS = [
 
 const database = vi.hoisted(() => ({ current: undefined as DatabaseSync | undefined }));
 const kv = vi.hoisted(() => new Map<string, string>());
-/** Makes the next write to this scope refuse, the way a full or closed store does. */
-const refuse = vi.hoisted((): { scope: string | null } => ({ scope: null }));
+/**
+ * Makes the next write to this scope refuse, the way a full or closed store
+ * does; `close` makes the chat's close refuse after it too.
+ */
+const refuse = vi.hoisted((): { scope: string | null; close: boolean } => ({
+  scope: null,
+  close: false,
+}));
+/** Refuses the next runtime read, which is the first step of closing a chat. */
+const backends = vi.hoisted(() => ({ refuseNext: false }));
 
 function sqlite(): DatabaseSync {
   if (database.current === undefined) {
@@ -68,6 +76,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   setItem: (scope: string, key: string, value: string) => {
     if (refuse.scope === scope) {
       refuse.scope = null;
+      backends.refuseNext = refuse.close;
       return Promise.reject(new Error('the store refused the write'));
     }
     kv.set(`${scope}:${key}`, value);
@@ -114,7 +123,13 @@ vi.mock('./remote-mcp', () => ({
 }));
 vi.mock('./backend-store', () => ({
   listChatBackends: () => [],
-  waitForChatBackends: () => Promise.resolve(),
+  waitForChatBackends: () => {
+    if (backends.refuseNext) {
+      backends.refuseNext = false;
+      return Promise.reject(new Error('the close was refused'));
+    }
+    return Promise.resolve();
+  },
 }));
 vi.mock('./local-models', () => ({ localModelProvider: () => undefined }));
 vi.mock('@/lib/config', () => ({ KILO_MCP_URL: undefined }));
@@ -177,12 +192,22 @@ describe('the chat fixture, opened by the chat route', () => {
     expect(transcriptFailure).toBe('common.somethingWentWrong');
   });
 
-  it('deletes the started chat when a record write fails, so Retry leaves no row behind', async () => {
-    const count = (table: 'chats' | 'sessions') =>
-      sqlite().prepare(`select count(*) as n from ${table}`).get();
-    const before = { chats: count('chats'), sessions: count('sessions') };
-    refuse.scope = 'chat-asked-target';
-    await expect(writeChatFixture(place, 'failed')).rejects.toThrow('the store refused the write');
-    expect({ chats: count('chats'), sessions: count('sessions') }).toEqual(before);
-  });
+  it.each([
+    ['the close succeeds', false],
+    ['the close is refused too', true],
+  ])(
+    'deletes the started chat when a record write fails and %s, so Retry leaves no row behind',
+    async (_case, refuseClose) => {
+      const count = (table: 'chats' | 'sessions') =>
+        sqlite().prepare(`select count(*) as n from ${table}`).get();
+      const before = { chats: count('chats'), sessions: count('sessions') };
+      refuse.scope = 'chat-asked-target';
+      refuse.close = refuseClose;
+      await expect(writeChatFixture(place, 'failed')).rejects.toThrow(
+        'the store refused the write'
+      );
+      expect(backends.refuseNext).toBe(false);
+      expect({ chats: count('chats'), sessions: count('sessions') }).toEqual(before);
+    }
+  );
 });

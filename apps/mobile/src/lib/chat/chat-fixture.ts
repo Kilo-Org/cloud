@@ -75,9 +75,33 @@ function keptQuestions(): Displaced[] {
 }
 
 /**
+ * Deletes a started chat the way the chat list deletes one. Each step runs
+ * whatever the one before it did: a close the store refused must not keep the
+ * row and the session it was meant to delete. The steps' own failures are left
+ * out, because the caller reports the write failure that started this.
+ */
+async function deleteStartedChat(sessionId: string): Promise<void> {
+  const steps = [
+    () => releaseChat(sessionId),
+    () => forgetQuestions(sessionId),
+    async () => {
+      deleteChat(await encryptedDatabase(), sessionId);
+    },
+  ];
+  for (const step of steps) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- the close runs before the deletes, as the chat list orders them
+      await step();
+    } catch {
+      // The next step still runs; the write failure is what the route shows.
+    }
+  }
+}
+
+/**
  * Starts the state's chat, writes its records, and answers the session the chat
- * route opens. A record write that fails deletes the started chat, the way the
- * chat list deletes one, so a failed attempt leaves no live session and no row.
+ * route opens. A record write that fails deletes the started chat, so a failed
+ * attempt leaves no live session and no row, and rethrows that failure.
  */
 export async function writeChatFixture(place: ChatPlace, state: ChatFixtureState): Promise<string> {
   const sessionId = await startChat(place, { model: FIXTURE_MODEL, effort: null });
@@ -95,9 +119,7 @@ export async function writeChatFixture(place: ChatPlace, state: ChatFixtureState
       });
     }
   } catch (error) {
-    await releaseChat(sessionId);
-    await forgetQuestions(sessionId);
-    deleteChat(await encryptedDatabase(), sessionId);
+    await deleteStartedChat(sessionId);
     throw error;
   }
   // The registry holds a started chat as it was started. Releasing it makes the

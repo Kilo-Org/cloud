@@ -20,3 +20,11 @@ export const SCREEN_SECTION_GAP_CLASS = 'gap-6';
 
 /** A scrolling screen body: 21pt between sections, 14pt gutter, 10.5pt top pad. */
 export const SCREEN_BODY_CLASS = 'gap-6 px-4 pt-3';
+
+/**
+ * The top offset a section keeps when it sits inside a tighter group whose gap
+ * already lands above it: the contract's 21pt section gap
+ * (`SCREEN_SECTION_GAP_CLASS`) less the 7pt the group's `gap-2` contributes.
+ * A nested section break then measures the same as a top-level one.
+ */
+export const NESTED_SECTION_GAP_CLASS = 'mt-4';

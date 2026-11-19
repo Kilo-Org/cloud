@@ -61,6 +61,7 @@ const focusEffect = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   // The header reads the window to decide whether its actions share the title
@@ -68,6 +69,7 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   Ban: 'Ban',
   ShieldOff: 'ShieldOff',
   ChevronDown: 'ChevronDown',
@@ -99,6 +101,7 @@ vi.mock('expo-router', () => ({
   useFocusEffect: focusEffect,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#666',
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
 }));
 // The refusal hooks read the reader's role through the organization query

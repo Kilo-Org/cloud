@@ -15,6 +15,7 @@ import {
   useReviewMemoryProposalEditor,
 } from '@/lib/hooks/use-review-memory-proposal-editor';
 import { proposalStatusLabel } from '@/lib/review-memory-proposals';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
   const { permission } = props;
@@ -83,7 +84,7 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
       />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
@@ -131,7 +132,7 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
               required
               multiline
               textAlignVertical="top"
-              className="min-h-[96px] leading-[20px]"
+              className="min-h-24"
               disabled={busy}
               onChangeText={value => {
                 changeField('rationale', value);
@@ -144,7 +145,7 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
               required
               multiline
               textAlignVertical="top"
-              className="min-h-[192px] font-mono leading-[20px]"
+              className="min-h-32 font-mono"
               autoCapitalize="none"
               autoCorrect={false}
               disabled={busy}
@@ -163,7 +164,7 @@ export function ReviewMemoryProposalSheet(props: ProposalEditorInput) {
               <Text className="font-medium">
                 {t('codeReviewer.overview.proposedReviewMdGuidance')}
               </Text>
-              <Text selectable className="font-mono text-sm leading-[20px]">
+              <Text selectable className="font-mono text-sm">
                 {record.proposed_markdown}
               </Text>
             </View>

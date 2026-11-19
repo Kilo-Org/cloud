@@ -106,6 +106,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: ({ title, action }: { title: string; action?: ReactNode }) =>
     createElement('EmptyState', { title }, action),
 }));

@@ -6,8 +6,8 @@ import { AGENT_CHAT_FIXTURE_SESSION_ID } from './agent-chat-fixture-session';
 export const PENDING_BASH_ASK: StandalonePermission = {
   requestId: 'per_designGateBash',
   permission: 'bash',
-  patterns: ['pnpm test'],
-  metadata: { command: 'pnpm test' },
+  patterns: ['pnpm test *'],
+  metadata: { command: 'pnpm test --filter api' },
   always: [],
 };
 
@@ -62,7 +62,11 @@ export const BLOCKED_BASH_COMMAND: StoredMessage = {
       type: 'tool',
       callID: 'call_designGateBlocked',
       tool: 'bash',
-      state: { status: 'running', input: { command: 'pnpm test' }, time: { start: 1 } },
+      state: {
+        status: 'running',
+        input: { command: 'pnpm test --filter api' },
+        time: { start: 1 },
+      },
     },
   ],
 };

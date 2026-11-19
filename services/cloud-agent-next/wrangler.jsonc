@@ -217,6 +217,10 @@
         "name": "SANDBOX_SESSION",
       },
       {
+        "class_name": "CloudAgentWorkspace",
+        "name": "CLOUD_AGENT_WORKSPACE",
+      },
+      {
         "class_name": "SandboxContainers",
         "name": "SANDBOX_CONTAINERS",
       },
@@ -227,6 +231,10 @@
       {
         "class_name": "VercelSnapshotBuild",
         "name": "VERCEL_SNAPSHOT_BUILD",
+      },
+      {
+        "class_name": "PreviewTunnel",
+        "name": "PREVIEW_TUNNEL",
       },
     ],
   },
@@ -300,6 +308,15 @@
         "SandboxCodeReview",
         "SandboxCodeReviewContainment",
       ],
+    },
+    {
+      "new_sqlite_classes": ["CloudAgentWorkspace"],
+      "tag": "v16",
+    },
+    // Cloudflare refuses `wrangler rollback` to a version before this migration.
+    {
+      "new_sqlite_classes": ["PreviewTunnel"],
+      "tag": "v17",
     },
   ],
   /**
@@ -462,6 +479,10 @@
             "name": "SANDBOX_SESSION",
           },
           {
+            "class_name": "CloudAgentWorkspace",
+            "name": "CLOUD_AGENT_WORKSPACE",
+          },
+          {
             "class_name": "SandboxContainers",
             "name": "SANDBOX_CONTAINERS",
           },
@@ -472,6 +493,10 @@
           {
             "class_name": "VercelSnapshotBuild",
             "name": "VERCEL_SNAPSHOT_BUILD",
+          },
+          {
+            "class_name": "PreviewTunnel",
+            "name": "PREVIEW_TUNNEL",
           },
         ],
       },

@@ -122,7 +122,7 @@ describe('ManualReviewPlatformPicker accessible name', () => {
 
     const [label, reason] = gitlab?.findAll(node => Object.is(node.type, 'Text')) ?? [];
     expect(label?.props.className).toContain('text-muted-foreground');
-    expect(reason?.props.className).toBe('text-xs');
+    expect(reason?.props.className).toContain('text-xs');
     expect(reason?.props.className).not.toContain('opacity');
 
     const [connectedLabel] = github?.findAll(node => Object.is(node.type, 'Text')) ?? [];

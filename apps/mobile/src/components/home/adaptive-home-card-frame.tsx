@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { DENSE_ROW_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -88,7 +89,9 @@ export function AdaptiveHomeCardFrame({
   showBriefing,
 }: Readonly<AdaptiveHomeCardFrameProps>) {
   return (
-    <View className="flex-row items-stretch overflow-hidden rounded-2xl border border-border bg-card">
+    // One padless card surface that holds two full-height layers: the layers
+    // own their rows' padding, so the surface carries none of its own.
+    <Card padding="none" className="flex-row items-stretch" testID="home-card-frame">
       <CardLayer reserved={showBriefing} className="w-full shrink-0">
         {live}
       </CardLayer>
@@ -109,11 +112,11 @@ export function AdaptiveHomeCardFrame({
             </View>
           ))}
         </View>
-        <View className="h-px bg-border" />
-        <View className="min-h-[68px] justify-center px-4 py-3">
+        <View className="h-px bg-hair-soft" />
+        <View className="min-h-20 justify-center px-4 py-3">
           <Text className="text-sm">{'\u200B\n\u200B'}</Text>
         </View>
       </View>
-    </View>
+    </Card>
   );
 }

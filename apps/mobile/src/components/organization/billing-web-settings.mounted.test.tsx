@@ -13,12 +13,25 @@ import '@/i18n';
 
 const storefront = vi.hoisted(() => ({ linkAllowed: false }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/text', async () => {
   const { createElement: h } = await import('react');
   return {
     Text: (props: Record<string, unknown> & { children?: unknown }) =>
       h('Text', props, props.children as never),
+  };
+});
+vi.mock('@/components/ui/section', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    Section: (props: Record<string, unknown> & { children?: unknown }) =>
+      h('Section', props, props.children as never),
+  };
+});
+vi.mock('@/components/ui/card', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    Card: (props: Record<string, unknown> & { children?: unknown }) =>
+      h('Card', props, props.children as never),
   };
 });
 vi.mock('@/lib/billing/external-purchase-link', () => ({
@@ -65,6 +78,7 @@ describe('BillingWebSettings', () => {
     const { renderer, unmount } = await renderSettings('Change plan');
 
     expect(renderer.root.findAllByType('ExternalBillingLink' as never)).toEqual([]);
+    expect(renderer.root.findAllByType('Section' as never)).toEqual([]);
     expect(texts(renderer)).toEqual(['The plan, seats and auto top-up are managed on the web.']);
     unmount();
   });
@@ -79,7 +93,8 @@ describe('BillingWebSettings', () => {
       { url: `${SUBSCRIPTIONS_URL}/seats`, label: 'Buy seats' },
       { url: AUTO_TOP_UP_URL, label: 'Manage auto top-up' },
     ]);
-    expect(texts(renderer)).toEqual(['Billing settings on the web']);
+    const [section] = renderer.root.findAllByType('Section' as never);
+    expect(section?.props.label).toBe('Billing settings on the web');
     unmount();
   });
 

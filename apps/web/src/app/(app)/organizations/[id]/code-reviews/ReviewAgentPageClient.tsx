@@ -42,6 +42,7 @@ type BitbucketView = 'config' | 'jobs';
 type ReviewAgentPageClientProps = {
   organizationId: string;
   organizationName: string;
+  canManageGitLab: boolean;
   successMessage?: string;
   errorMessage?: string;
   initialPlatform?: Platform;
@@ -53,6 +54,7 @@ type ReviewAgentPageClientProps = {
 export function ReviewAgentPageClient({
   organizationId,
   organizationName,
+  canManageGitLab,
   successMessage,
   errorMessage,
   initialPlatform = 'github',
@@ -368,12 +370,16 @@ export function ReviewAgentPageClient({
                   Connect your GitLab account to use Code Reviews for GitLab. You'll also need to
                   configure a webhook in your GitLab project settings.
                 </p>
-                <Link href={`/organizations/${organizationId}/integrations/gitlab`}>
-                  <Button variant="default" size="sm">
-                    Connect GitLab
-                    <ExternalLink className="ml-2 h-3 w-3" />
-                  </Button>
-                </Link>
+                {canManageGitLab ? (
+                  <Link href={`/organizations/${organizationId}/integrations/gitlab`}>
+                    <Button variant="default" size="sm">
+                      Connect GitLab
+                      <ExternalLink className="ml-2 h-3 w-3" />
+                    </Button>
+                  </Link>
+                ) : (
+                  <p>Only organization owners, admins, and billing managers can connect GitLab.</p>
+                )}
               </AlertDescription>
             </Alert>
           )}

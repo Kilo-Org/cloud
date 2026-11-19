@@ -9,6 +9,9 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Lock } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SEGMENTED_FRAME_HEIGHT_CLASS } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -20,8 +23,31 @@ import {
 import { useOrgBoundary, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
 import { organizationPlanRefusalFor } from '@/lib/organization/plan-refusal-copy';
 import { billingActionFor, billingHrefFor } from '@/lib/trial-refusal';
+import { cn } from '@/lib/utils';
 
 const TITLE_KEY = 'organization.settingsOnWeb.providersAndModels';
+
+/**
+ * The form's own loading frame: the segmented control's reserved height, the
+ * save row's buttons and the grouped rows the first tab lists, in the body's
+ * own spacing, so the swap to the form moves nothing.
+ */
+function ModelAccessSkeleton() {
+  return (
+    <View className="gap-3 px-4 pt-3">
+      <Skeleton className={cn(SEGMENTED_FRAME_HEIGHT_CLASS, 'w-full rounded-lg bg-muted-soft')} />
+      <View className="flex-row items-center justify-end gap-2">
+        <Skeleton className="h-9 w-20 rounded-md bg-muted-soft" />
+        <Skeleton className="h-9 w-16 rounded-md bg-muted-soft" />
+      </View>
+      <RowGroup>
+        {[0, 1, 2, 3, 4].map(index => (
+          <RowSkeleton key={index} subtitle trailing="switch" />
+        ))}
+      </RowGroup>
+    </View>
+  );
+}
 
 /**
  * The organization's providers and models, natively: the model allow/deny
@@ -73,10 +99,7 @@ export function OrganizationProvidersAndModelsScreen() {
             isRetrying={membership.isFetching}
           />
         ) : (
-          <View className="gap-3 px-4 pt-4">
-            <Skeleton className="h-10 w-full rounded-lg bg-muted-soft" />
-            <Skeleton className="h-64 w-full rounded-lg bg-muted-soft" />
-          </View>
+          <ModelAccessSkeleton />
         )}
       </View>
     );
@@ -86,10 +109,7 @@ export function OrganizationProvidersAndModelsScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t(TITLE_KEY)} />
-        <View className="gap-3 px-4 pt-4">
-          <Skeleton className="h-10 w-full rounded-lg bg-muted-soft" />
-          <Skeleton className="h-64 w-full rounded-lg bg-muted-soft" />
-        </View>
+        <ModelAccessSkeleton />
       </View>
     );
   }

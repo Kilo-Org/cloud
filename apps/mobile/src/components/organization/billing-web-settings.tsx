@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { ExternalBillingLink } from '@/components/organization/external-billing-link';
-import { SectionLabel } from '@/components/organization/section-label';
+import { Card } from '@/components/ui/card';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 
@@ -40,16 +40,11 @@ export function BillingWebSettings({
     // A footnote under the card, not a card: the statement has no control and no
     // heading, so it reads as the screen's closing sentence rather than a
     // settings block the storefront withheld.
-    return (
-      <Text className="text-sm text-muted-foreground">
-        {t('organization.billing.managedOnWeb')}
-      </Text>
-    );
+    return <Text variant="muted">{t('organization.billing.managedOnWeb')}</Text>;
   }
   return (
-    <View className="gap-2">
-      <SectionLabel>{t('organization.billing.manageOnWeb')}</SectionLabel>
-      <View className="gap-3 rounded-lg bg-secondary p-3">
+    <Section label={t('organization.billing.manageOnWeb')}>
+      <Card>
         {planLabel === null ? null : (
           <ExternalBillingLink url={subscriptionsUrl} label={planLabel} />
         )}
@@ -58,7 +53,7 @@ export function BillingWebSettings({
           label={t('organization.billing.buySeats')}
         />
         <ExternalBillingLink url={autoTopUpUrl} label={autoTopUpLabel} />
-      </View>
-    </View>
+      </Card>
+    </Section>
   );
 }

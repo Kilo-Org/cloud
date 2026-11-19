@@ -3,9 +3,6 @@ import { Switch as NativeSwitch, Platform, type SwitchProps, useColorScheme } fr
 import { TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-// A disabled Switch keeps its pair and dims the whole control instead.
-const DISABLED_OPACITY = 0.5;
-
 /**
  * The native `Switch`, painted with the app palette, with its disabled state
  * mirrored into `accessibilityState`.
@@ -29,19 +26,26 @@ const DISABLED_OPACITY = 0.5;
  * `mutedForeground` with a `foreground` grip in dark. A caller that wants
  * another pair still wins: its own props are applied last.
  *
- * A disabled switch keeps the pair for the position it still shows. Android
- * folds the colours into the track and thumb drawables and only sets
- * `isEnabled`, so the platform draws no unavailable appearance of its own.
- * Painting a muted pair in its place made the on and the off control one grey
- * pill in dark, so a disabled list could not say which items were on. The
- * control keeps the scheme's on and off pairs at a reduced opacity instead:
- * the two tracks stay apart and each grip stays on its own fill, which keeps
- * which way it points readable while the dimming marks it unavailable. A
- * caller's `style` is applied last, so its own opacity still wins.
+ * A disabled switch paints one muted pair, at the position it still shows.
+ * Android folds the colours into the track and thumb drawables and only sets
+ * `isEnabled`, so the platform draws no unavailable appearance of its own;
+ * without this pair a row whose title dims for "not available" keeps a
+ * full-strength accent track beside it and reads as both unavailable and on.
  *
- * iOS is left alone: it fades a disabled `UISwitch` itself, so the extra
- * opacity is Android's alone — the platform that draws no unavailable
- * appearance of its own.
+ * The pair is the same for on and off, and for light and dark: the mid-neutral
+ * `mutedSoft` track under the scheme's own ink `foreground`. A grey track with
+ * a contrasting thumb reads as a control that is not available in either
+ * scheme, while the thumb's position still says which way it points. The
+ * palette's disabled accent fill (`primaryDisabled`) made light's track a dark
+ * olive with a white thumb — at a glance an active switch — and dark's a light
+ * grey with a dark thumb — at a glance an off one, so one state read two ways
+ * across themes (`app-notifications` gate, 2026-11-18). `mutedSoft` clears a
+ * visible step on the row's `secondary` surface in both schemes (2.2:1 light,
+ * 2.2:1 dark), and `foreground` clears 6.6:1 against it in both.
+ *
+ * iOS is left alone: UIKit fades a disabled `UISwitch` itself, so painting the
+ * muted pair there would dim the control twice. Android is the platform that
+ * needs the pair, and only it takes it.
  *
  * Fabric derives the accessibility traits from the role and
  * `accessibilityState`, then assigns them to the native control, replacing the
@@ -53,10 +57,14 @@ const DISABLED_OPACITY = 0.5;
  * The control draws at the platform's own size — about 46.5x27dp on Android,
  * 51x31pt on iOS — which is under `DESIGN.md:364`'s 44pt touch target, and the
  * audit reads the control's own node rect, so a caller's row or `hitSlop` does
- * not lift it. Every caller gets the target here instead: the node renders at
- * least {@link TOUCH_TARGET_DP} on both axes and a caller's `style` is applied
- * last, so a row grows to the control it hosts rather than the control
- * shrinking to the row.
+ * not lift it. Every caller gets the target here: the node renders at least
+ * {@link TOUCH_TARGET_DP} on both axes (the Android gate measured 44.19dp), and
+ * a caller never shrinks it with a smaller `style` box. A row that must keep
+ * its 48pt frame cancels the excess instead: a negative vertical margin of
+ * {@link TOUCH_TARGET_OVERHANG_DP} a side makes the node contribute the row's
+ * 27pt content band to layout, and the row's 10.5pt padding keeps the node
+ * inside the row's bounds (Android delivers a touch only inside a parent
+ * view). `row-trailing.tsx` holds the one switch host that does this.
  */
 export function Switch({
   disabled,
@@ -70,25 +78,29 @@ export function Switch({
   const colors = useThemeColors();
   const dark = useColorScheme() === 'dark';
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
-  // Only Android needs the dim: iOS fades a disabled `UISwitch` itself.
+  // Only Android needs the muted pair: iOS fades a disabled `UISwitch` itself.
   const inactive = resolvedDisabled === true && Platform.OS === 'android';
   // The on pair is the olive accent at the luminance its grip needs: light
   // fills with `primary`, dark with the muted olive `selection`.
-  const onTrack = dark ? colors.selection : colors.primary;
-  const onGrip = dark ? colors.selectionForeground : colors.primaryForeground;
-  // The off pair follows the scheme as well: `mutedSoft` under a white grip in
-  // light, `mutedForeground` under a `foreground` grip in dark.
-  const offTrack = dark ? colors.mutedForeground : colors.mutedSoft;
-  const offGrip = dark ? colors.foreground : colors.primaryForeground;
+  const enabledOnTrack = dark ? colors.selection : colors.primary;
+  const enabledOnGrip = dark ? colors.selectionForeground : colors.primaryForeground;
+  const enabledOffGrip = dark ? colors.foreground : colors.primaryForeground;
+  const enabledOffTrack = dark ? colors.mutedForeground : colors.mutedSoft;
+  // The off grip sits on the off track. A control that cannot change paints
+  // one muted pair at the position it still shows: the mid-neutral track under
+  // the scheme's ink, so light and dark both read as unavailable instead of
+  // one reading active and the other off.
+  const disabledTrack = colors.mutedSoft;
+  const disabledGrip = colors.foreground;
+  const offGrip = inactive ? disabledGrip : enabledOffGrip;
+  const offTrack = inactive ? disabledTrack : enabledOffTrack;
+  const onTrack = inactive ? disabledTrack : enabledOnTrack;
+  const onGrip = inactive ? disabledGrip : enabledOnGrip;
 
   return (
     <NativeSwitch
       {...props}
-      style={[
-        { minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP },
-        inactive ? { opacity: DISABLED_OPACITY } : null,
-        style,
-      ]}
+      style={[{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]}
       value={value}
       trackColor={trackColor ?? { false: offTrack, true: onTrack }}
       thumbColor={thumbColor ?? (value ? onGrip : offGrip)}

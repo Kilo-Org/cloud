@@ -1,11 +1,15 @@
-import { characterCut } from '@kilocode/session-ingest-contracts/session-live-summary';
+import {
+  characterCut,
+  sessionLiveChangesSchema,
+  sessionLiveFailureSchema,
+  sessionLivePlanSchema,
+} from '@kilocode/session-ingest-contracts/session-live-summary';
 import { z } from 'zod';
 
 export const BRIEFING_MAX_SESSIONS = 32;
 export const BRIEFING_MAX_SOURCES = 256;
 export const BRIEFING_MAX_SOURCES_PER_SESSION = 32;
 export const BRIEFING_MAX_TITLE_LENGTH = 160;
-export const BRIEFING_FALLBACK_TITLE = 'Agent session';
 export const BRIEFING_MAX_URL_LENGTH = 2048;
 export const BRIEFING_MAX_EXCERPT_BYTES = 1024;
 export const BRIEFING_MAX_SNAPSHOT_BYTES = 48 * 1024;
@@ -15,11 +19,20 @@ export const briefingContextSchema = z.object({
   organizationId: z.string().nullable(),
   name: z.string(),
 });
+/**
+ * The structured session facts a captured artifact carries. Each member is absent
+ * when capture did not observe it, so a client renders only what exists.
+ */
+export const briefingSourceMetadataSchema = z.object({
+  plan: sessionLivePlanSchema.optional(),
+  changes: sessionLiveChangesSchema.optional(),
+  failure: sessionLiveFailureSchema.optional(),
+});
 export const briefingSourceSchema = z.object({
   id: z.string(),
   sessionId: z.string(),
   kind: z.enum(['activity', 'pull_request', 'blocker', 'artifact']),
-  title: z.string().max(BRIEFING_MAX_TITLE_LENGTH),
+  title: z.string().max(BRIEFING_MAX_TITLE_LENGTH).optional(),
   url: z.string().max(BRIEFING_MAX_URL_LENGTH),
   occurredAt: z.string().datetime(),
   excerpt: z
@@ -29,6 +42,7 @@ export const briefingSourceSchema = z.object({
       'Excerpt exceeds UTF-8 byte limit'
     )
     .optional(),
+  metadata: briefingSourceMetadataSchema.optional(),
 });
 export const briefingSummaryErrorSchema = z.enum([
   'model_pricing_unavailable',
@@ -85,7 +99,7 @@ export const briefingReportSchema = z.object({
     .array(
       z.object({
         sessionId: z.string(),
-        title: z.string().max(BRIEFING_MAX_TITLE_LENGTH),
+        title: z.string().max(BRIEFING_MAX_TITLE_LENGTH).optional(),
         url: z.string().max(BRIEFING_MAX_URL_LENGTH),
         status: z.string().nullable(),
         sources: z.array(briefingSourceSchema).max(BRIEFING_MAX_SOURCES_PER_SESSION),
@@ -124,6 +138,7 @@ export const briefingPreferencesSchema = z.object({
 });
 export type BriefingContext = z.infer<typeof briefingContextSchema>;
 export type BriefingSource = z.infer<typeof briefingSourceSchema>;
+export type BriefingSourceMetadata = z.infer<typeof briefingSourceMetadataSchema>;
 export type BriefingSummary = z.infer<typeof briefingSummarySchema>;
 export type BriefingScorecard = z.infer<typeof briefingScorecardSchema>;
 export type BriefingCoverage = z.infer<typeof briefingCoverageSchema>;
@@ -456,13 +471,16 @@ export function redactBriefingExcerptOrDrop(
 }
 
 /**
- * A title for a session or a source. The report schema requires one, so a title that
- * screening cannot clear, or one whose first character is wider than the cap and so
- * truncates to nothing, becomes a neutral fallback.
+ * A title for a session or a source. When screening cannot clear a title, or the
+ * UTF-8 cut leaves nothing, the title is absent, and the client shows the row's
+ * kind label instead of a server-composed one.
  */
-export function redactBriefingTitle(value: string, maxBytes = BRIEFING_MAX_TITLE_LENGTH): string {
+export function redactBriefingTitle(
+  value: string,
+  maxBytes = BRIEFING_MAX_TITLE_LENGTH
+): string | undefined {
   const title = redactBriefingExcerptOrDrop(value, maxBytes);
-  return title === undefined || title === '' ? BRIEFING_FALLBACK_TITLE : title;
+  return title === undefined || title === '' ? undefined : title;
 }
 
 export function truncateBriefingUtf8(value: string, maxBytes: number): string {

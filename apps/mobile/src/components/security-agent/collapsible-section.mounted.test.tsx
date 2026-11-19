@@ -56,8 +56,7 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: (ms: number) => ({ __linearTransition: ms }) },
 }));
 
-const OUTER_CLASSES = 'rounded-lg bg-secondary';
-const BODY_CLASSES = 'gap-2 px-3 pb-3';
+const BODY_CLASSES = 'gap-3 pt-3';
 const SECTION_BODY = 'section body';
 
 let mounted: ReactTestRenderer | undefined = undefined;
@@ -77,6 +76,16 @@ function mountSection(
     throw new Error('CollapsibleSection did not mount');
   }
   return mounted;
+}
+
+/** The section's own animated frame: `DisclosureLayout` wraps everything, so it
+ *  is the first `Animated.View` in the tree (the carat and body are inside). */
+function layoutView(renderer: ReactTestRenderer) {
+  const [first] = renderer.root.findAll(node => node.type === ('Animated.View' as ElementType));
+  if (!first) {
+    throw new Error('the section did not render its layout frame');
+  }
+  return first;
 }
 
 /** The single `Animated.View` rendered with the given resolved className. */
@@ -135,7 +144,7 @@ describe('CollapsibleSection reduce-motion gate', () => {
     policy.reducedMotion = true;
     const renderer = mountSection();
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toBeUndefined();
+    expect(layoutView(renderer).props.layout).toBeUndefined();
     expect(reanimated.withTiming).not.toHaveBeenCalled();
     expect(rotationValue()).toBe(0);
 
@@ -163,7 +172,7 @@ describe('CollapsibleSection reduce-motion gate', () => {
     policy.reducedMotion = false;
     const renderer = mountSection();
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toEqual({ __linearTransition: 200 });
+    expect(layoutView(renderer).props.layout).toEqual({ __linearTransition: 200 });
 
     toggle(renderer);
     expect(animatedView(renderer, BODY_CLASSES).props.entering).toEqual({ __fadeIn: 150 });
@@ -234,7 +243,7 @@ describe('CollapsibleSection controlled expanded state and class overrides', () 
     expect(title(renderer).props.className).toBe(
       'flex-1 text-sm font-medium text-base font-semibold'
     );
-    expect(animatedView(renderer, 'gap-2 px-3 pb-3 bg-card p-4 gap-3')).toBeDefined();
+    expect(animatedView(renderer, 'gap-3 pt-3 bg-card p-4 gap-3')).toBeDefined();
   });
 });
 
@@ -258,7 +267,7 @@ describe('CollapsibleSection animateLayout opt-out', () => {
     const onToggle = vi.fn<() => void>();
     const renderer = mountSection({ expanded: true, onToggle, animateLayout: false });
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toBeUndefined();
+    expect(layoutView(renderer).props.layout).toBeUndefined();
     expect(title(renderer).props.children).toBe('Source');
     expect(animatedViewCount(renderer, BODY_CLASSES)).toBe(1);
 
@@ -270,7 +279,7 @@ describe('CollapsibleSection animateLayout opt-out', () => {
   it('keeps the layout transition by default', () => {
     const renderer = mountSection();
 
-    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toEqual({ __linearTransition: 200 });
+    expect(layoutView(renderer).props.layout).toEqual({ __linearTransition: 200 });
   });
 });
 

@@ -4,7 +4,6 @@ import { partSettledAt } from '../part-utils';
 import { isPreviewOfStoredTool } from '../tool-detail-marker';
 import type { SessionSubscriptionKey } from './types';
 
-/** Sort key of a message id: the id is its own key. */
 function messageIdKey(value: string): string {
   return value;
 }
@@ -219,7 +218,6 @@ function upsertPartDroppingStaleSyntheticParts(
   evidence: PartOrderingEvidence,
   authoritative = false
 ): Part[] {
-  const nextPart = clonePart(part);
   const incomingIsSynthetic = Reflect.get(part, 'synthetic') === true;
   // A non-synthetic text or file part drops the synthetic placeholder parts of
   // the same type on its message: the optimistic text row and the optimistic
@@ -251,6 +249,9 @@ function upsertPartDroppingStaleSyntheticParts(
     // A later history page or replay may carry a bounded preview of a tool call
     // this storage already holds in full; keep the complete copy.
     if (existing !== undefined && isPreviewOfStoredTool(existing, part)) return arr;
+    // The rejection paths above drop the incoming part, so they must not pay
+    // for a copy of it.
+    const nextPart = clonePart(part);
     const nextArr = [...filtered];
     nextArr[idx] = nextPart;
     // Remember the ordering evidence the accepted update actually won on: its
@@ -265,6 +266,7 @@ function upsertPartDroppingStaleSyntheticParts(
     return nextArr;
   }
 
+  const nextPart = clonePart(part);
   rememberPartUpdateTime(evidence, nextPart, eventTime);
   return insertSortedBy(filtered, nextPart, partIdKey);
 }

@@ -117,7 +117,6 @@ vi.mock('@/components/ui/icons', () => ({
   Users: 'Users',
   Workflow: 'Workflow',
 }));
-vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
 vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));
 vi.mock('@/components/language-picker-sheet', () => ({
   LanguagePickerSheet: 'LanguagePickerSheet',

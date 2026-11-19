@@ -225,42 +225,25 @@ describe('disabled toolbar badge label contrast (WCAG AA text)', () => {
 });
 
 describe('disabled primary action fill contrast (WCAG AA text)', () => {
-  // A disabled default-variant Button paints its label on
-  // `--primary-disabled-action`: the palette's disabled primary under white in
-  // light, and a dim neutral under `--foreground` in dark. The dark plate must
-  // stay a visible object on the near-black page and stand off the outlined
-  // control beside it, while staying clearly below the enabled brand fill.
-  it('light theme: primaryForeground vs primaryDisabledAction >= 4.5:1', () => {
-    const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabledAction);
+  // A disabled default-variant Button paints its label on the palette's muted
+  // pair (`--muted` fill, `--muted-foreground` ink). Both schemes clear 4.5:1
+  // and the fill stays clearly below the enabled brand fill, so an inactive
+  // Start never reads as a second action colour.
+  it('light theme: mutedForeground vs muted >= 4.5:1', () => {
+    const ratio = contrastRatio(lightColors.mutedForeground, lightColors.muted);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
-  it('dark theme: foreground vs primaryDisabledAction >= 4.5:1', () => {
-    const ratio = contrastRatio(darkColors.foreground, darkColors.primaryDisabledAction);
+  it('dark theme: mutedForeground vs muted >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.mutedForeground, darkColors.muted);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
-  });
-
-  it('dark theme: the disabled plate stays a visible object on the page', () => {
-    // 2.6:1 off the page. The inactive icon surface (1.7:1) leaves a full-width
-    // plate without presence, so a disabled primary reads as a stray label.
-    expect(
-      contrastRatio(darkColors.primaryDisabledAction, darkColors.background)
-    ).toBeGreaterThanOrEqual(2);
-  });
-
-  it('dark theme: the disabled plate outranks the outlined control beside it', () => {
-    // The outline variant fills with `--secondary`; a disabled primary must
-    // still read as the stronger surface, not as a second outlined control.
-    expect(
-      contrastRatio(darkColors.primaryDisabledAction, darkColors.secondary)
-    ).toBeGreaterThanOrEqual(1.5);
   });
 
   it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
     // The plate must read as a superseded control next to the enabled brand
     // fill, not as a second brand colour, or a disabled Start would look
     // tappable and an enabled one would lose its emphasis.
-    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabledAction);
+    const separation = contrastRatio(darkColors.primary, darkColors.muted);
     expect(separation).toBeGreaterThanOrEqual(1.5);
   });
 });
@@ -310,6 +293,34 @@ describe('warn foreground token contrast (WCAG AA text)', () => {
     // Precomputed ≈ 9.29:1 for #1A1A10 on #F2B05F.
     const ratio = contrastRatio(darkColors.warnForeground, darkColors.warn);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+});
+
+describe('offline banner warn-solid pair contrast', () => {
+  it('light theme: warnSolidForeground vs warnSolid >= 4.5:1', () => {
+    // Precomputed ≈ 5.30:1 for #FFFFFF on #956011.
+    const ratio = contrastRatio(lightColors.warnSolidForeground, lightColors.warnSolid);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: warnSolidForeground vs warnSolid >= 4.5:1', () => {
+    // Precomputed ≈ 6.14:1 for #FFFFFF on #8A5614.
+    const ratio = contrastRatio(darkColors.warnSolidForeground, darkColors.warnSolid);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  // The band is a full-width surface, so WCAG 1.4.11 asks for 3:1 off the page
+  // it covers; below that it stops reading as a distinct surface.
+  it('light theme: warnSolid vs background >= 3:1', () => {
+    // Precomputed ≈ 5.08:1 for #956011 on #FBFAF5.
+    const ratio = contrastRatio(lightColors.warnSolid, lightColors.background);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+  });
+
+  it('dark theme: warnSolid vs background >= 3:1', () => {
+    // Precomputed ≈ 3.14:1 for #8A5614 on #0E0E10.
+    const ratio = contrastRatio(darkColors.warnSolid, darkColors.background);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
   });
 });
 
@@ -390,49 +401,73 @@ describe('idle composer control and ring track contrast (non-text)', () => {
   });
 });
 
-describe('switch pair contrast (non-text)', () => {
-  // The shared switch paints the scheme's enabled pair: the olive on track
-  // under the scheme's on ink, and an off pair whose grip stays readable on its
-  // own track. A disabled control keeps that pair and takes the shared opacity,
-  // so the separation is measured undimmed: dimming both tracks together
-  // leaves their ratio unchanged. The switch sits on a `secondary` row, so its
-  // on track is measured over that. Dark's pair separates by hue as much as by
-  // ratio, which is why the floor is a perception floor, not WCAG's 3:1.
-  const MIN_ON_TRACK_RATIO = 3;
-  const MIN_PAIR_SEPARATION_RATIO = 1.4;
-  // [theme, palette, the enabled on track, the enabled off track]. Light fills
-  // the on track with `primary`, dark with the muted olive `selection`: dark's
-  // `primary` is the brand yellow, which glares on the near-black page.
+describe('disabled switch pair contrast (non-text)', () => {
+  // The shared switch paints this pair for a disabled control on Android, in
+  // place of the brand on-track: `primary-disabled` under a grip that sits
+  // below it in strength for the on position, `muted-soft` with the mid neutral
+  // grip for the off one. iOS keeps the brand pair and fades it itself. The
+  // switch sits on a `secondary` row, so its tracks are measured over that. The
+  // floors are perception floors: the pair has to read as a control and the two
+  // positions have to stay apart. Light has no third neutral for the off track
+  // — `control-idle` equals `secondary` there — so the disabled off track is
+  // the same neutral as the enabled off track, and only its grip dims.
+  const MIN_VISIBLE_SURFACE_RATIO = 1.6;
+  // [theme, palette, the grip the switch paints on the on track]. The on grip
+  // is the one colour a disabled pair cannot share with its enabled one: the
+  // scheme's on ink is what marks a control that still works.
   const themes = [
-    ['light', lightColors, lightColors.primary, lightColors.mutedSoft],
-    ['dark', darkColors, darkColors.selection, darkColors.mutedForeground],
+    ['light', lightColors, lightColors.primaryForeground],
+    ['dark', darkColors, darkColors.mutedSoft],
   ] as const;
 
-  it('every theme: the on track reads on the row surface', () => {
-    for (const [themeName, colors, onTrack] of themes) {
+  it('every theme: the disabled off track reads on the row surface', () => {
+    for (const [themeName, colors] of themes) {
       expect(
-        contrastRatio(onTrack, colors.secondary),
-        `on track vs secondary (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_ON_TRACK_RATIO);
+        contrastRatio(colors.mutedSoft, colors.secondary),
+        `muted-soft vs secondary (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
     }
   });
 
-  it('every theme: the on track stays apart from the off track', () => {
-    for (const [themeName, , onTrack, offTrack] of themes) {
+  it('every theme: the disabled on track stays apart from the disabled off track', () => {
+    for (const [themeName, colors] of themes) {
       expect(
-        contrastRatio(onTrack, offTrack),
-        `on track vs off track (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_PAIR_SEPARATION_RATIO);
+        contrastRatio(colors.primaryDisabled, colors.mutedSoft),
+        `primary-disabled vs muted-soft (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
     }
   });
 
-  it('every theme: the off track reads on the row surface', () => {
-    for (const [themeName, colors, , offTrack] of themes) {
+  it('every theme: the disabled off grip reads on its own track', () => {
+    for (const [themeName, colors] of themes) {
       expect(
-        contrastRatio(offTrack, colors.secondary),
-        `off track vs secondary (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_PAIR_SEPARATION_RATIO);
+        contrastRatio(colors.mutedForeground, colors.mutedSoft),
+        `muted-foreground vs muted-soft (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
     }
+  });
+
+  it('every theme: the disabled on grip reads on its own track', () => {
+    for (const [themeName, colors, onGrip] of themes) {
+      expect(
+        contrastRatio(onGrip, colors.primaryDisabled),
+        `on grip vs primary-disabled (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+  });
+
+  // Regression: the disabled on grip once fell back to `primaryForeground` in
+  // both schemes, which dark defines as the near-black card colour. Android's
+  // thumb is wider than the track, so its outer arc lands on the row itself —
+  // 1.1:1 there, and the dark scheme draws no shadow to outline it, so what
+  // remained of the pill read as a blank grey bar. The dark grip is the mid
+  // neutral instead: darker than its fill, and still a visible step off the
+  // near-black row its arc sits on.
+  it('dark theme: the disabled on grip reads on the row its arc overhangs', () => {
+    expect(
+      contrastRatio(darkColors.mutedSoft, darkColors.secondary),
+      'muted-soft vs secondary (dark)'
+    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
   });
 });
 

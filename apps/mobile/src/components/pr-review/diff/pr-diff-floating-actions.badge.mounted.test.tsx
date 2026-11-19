@@ -46,6 +46,8 @@ vi.mock('react-native', () => ({
   Text: 'RNText',
   Platform: { OS: 'ios' },
   I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: false },
+  // The shared footer reads the live font scale off the window dimensions.
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText', View: 'SlotView' }));
 vi.mock('expo-router', () => ({

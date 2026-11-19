@@ -30,6 +30,8 @@ type CliHistoricalTransportConfig = {
    * user can load older pages later via the manager's `loadOlderMessages`.
    * The transport fires `onInitialPageLoaded` so the manager can record
    * the cursor.
+   *
+   * `null` represents an access-not-found outcome (worker returns 404).
    */
   fetchSnapshotPage?: (
     kiloSessionId: KiloSessionId,

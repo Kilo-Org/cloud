@@ -289,8 +289,8 @@ export function ModelAccessForm({
     <View className="flex-1">
       <View className="gap-3 px-4 pt-3">
         {catalogUnavailable ? (
-          <View className="flex-row items-center gap-3 rounded-lg bg-muted-soft px-3 py-2">
-            <Text className="flex-1 text-xs text-muted-foreground">
+          <View className="flex-row items-center gap-3 rounded-md bg-muted-soft px-3 py-2">
+            <Text variant="caption" className="flex-1">
               {t('organizationModelAccess.catalogUnavailable')}
             </Text>
             <Button
@@ -330,9 +330,7 @@ export function ModelAccessForm({
             so the step the screen resolved rides under it. */}
         {planEnded ? <OrganizationPlanRefusal message={planMessage} action={planAction} /> : null}
         {!canEdit && !planEnded ? (
-          <Text className="text-xs text-muted-foreground">
-            {t('organizationModelAccess.readOnly')}
-          </Text>
+          <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>
         ) : null}
         {/* The buttons keep their place while the draft is clean, so a save
             that settles never moves the list below them. A lapsed plan with a
@@ -385,7 +383,7 @@ export function ModelAccessForm({
       {activeTab === 'providers' ? (
         <View className="flex-1">
           {catalogUnavailable ? (
-            <Text className="px-4 pb-2 text-xs text-muted-foreground">
+            <Text variant="caption" className="px-4 pb-2">
               {t('organizationModelAccess.providersNeedCatalog')}
             </Text>
           ) : null}

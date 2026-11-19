@@ -149,6 +149,8 @@ export type ServiceEvent =
   | {
       type: 'stopped';
       reason: 'complete' | 'interrupted' | 'disconnected' | 'transport-disconnected' | 'error';
+      /** The transport spent its reconnect budget; only `transport-disconnected` sets it. */
+      exhausted?: boolean | undefined;
       branch?: string | undefined;
     }
   | { type: 'warning' }
@@ -264,16 +266,21 @@ export type ServiceEvent =
 
 export type NormalizedEvent = ChatEvent | ServiceEvent;
 
-const CHAT_EVENT_TYPES = new Set([
-  'message.updated',
-  'message.part.updated',
-  'message.part.delta',
-  'message.part.removed',
-  'message.removed',
-]);
+/**
+ * Every `ChatEvent` variant, declared once. `satisfies` makes a renamed, added or
+ * typo'd variant a compile error here, so this table cannot drift from the union
+ * that `isChatEvent` narrows to.
+ */
+const CHAT_EVENT_TYPES = {
+  'message.updated': true,
+  'message.part.updated': true,
+  'message.part.delta': true,
+  'message.part.removed': true,
+  'message.removed': true,
+} as const satisfies Record<ChatEvent['type'], true>;
 
 export function isChatEvent(event: NormalizedEvent): event is ChatEvent {
-  return CHAT_EVENT_TYPES.has(event.type);
+  return Object.hasOwn(CHAT_EVENT_TYPES, event.type);
 }
 
 /** Best-effort error message extraction from a loosely-typed error field. */

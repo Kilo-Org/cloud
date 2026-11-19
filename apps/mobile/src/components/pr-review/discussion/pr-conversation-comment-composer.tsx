@@ -28,6 +28,7 @@ import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/re
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
@@ -329,7 +330,7 @@ export function PrConversationCommentComposer({
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-4 px-6 pt-4">
+        <View className={SCREEN_BODY_CLASS}>
           {draft.settled ? (
             <CommentBodyField
               inputRef={bodyInputRef}

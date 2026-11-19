@@ -1,7 +1,7 @@
 import {
   buildGlanceableSnapshot,
-  type GlanceableAgentsSnapshotStatus,
   type GlanceableSessionRow,
+  type GlanceableSnapshotStatusOverride,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
@@ -38,7 +38,7 @@ const NOW = 1_750_000_000_000;
 
 function snapshot(
   overrides: {
-    status?: GlanceableAgentsSnapshotStatus;
+    status?: GlanceableSnapshotStatusOverride;
     sessions?: readonly GlanceableSessionRow[];
   } = {}
 ) {
@@ -177,11 +177,12 @@ describe('live-update widget snapshot handoff', () => {
     );
   });
 
-  it.each(['empty', 'stale'] as const)(
+  it.each([
+    ['empty', snapshot({ sessions: [] })],
+    ['stale', snapshot({ status: 'stale', sessions: [] })],
+  ] as const)(
     'persists a %s snapshot with no deadline unless it carries eligible work',
-    status => {
-      const ineligible = snapshot({ status, sessions: [] });
-
+    (_label, ineligible) => {
       setWidgetSnapshot(ineligible);
 
       expect(mocks.native.setWidgetSnapshot).toHaveBeenCalledWith(JSON.stringify(ineligible), 0);

@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/ui/accessible-status.mounted.test.tsx) */
 import { type ComponentProps, createElement, type ReactElement, useState } from 'react';
+import { type HostInstance } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,6 +12,7 @@ const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const rn = vi.hoisted(() => ({ os: 'ios', statusHeight: 0 }));
 
 vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -35,11 +37,14 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/icons', () => ({ Info: 'Info', Share: 'Share' }));
+vi.mock('@/components/ui/icons', () => ({ Info: 'Info', Share: 'Share', X: 'X' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ foreground: '#111827' }),
+  useThemeColors: () => ({ foreground: '#111827', primary: '#2563eb', mutedForeground: '#6b7280' }),
 }));
 
 async function mount(
@@ -205,6 +210,24 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
+  it('hands the title node to a titleRef so a sheet can restore focus to it', async () => {
+    const titleRef = { current: null as HostInstance | null };
+
+    const renderer = await mount({
+      title: 'Reactions',
+      onDone: () => undefined,
+      titleRef,
+    });
+
+    expect(titleRef.current).not.toBeNull();
+    const header = renderer.root.find(
+      node => String(node.type) === 'Text' && node.props.accessibilityRole === 'header'
+    );
+    expect(header.props.accessibilityLabel).toBe('Reactions');
+
+    renderer.unmount();
+  });
+
   it('keeps Cancel leading and Done trailing through native row direction', async () => {
     const renderer = await mount({
       title: 'report.pdf',
@@ -280,10 +303,17 @@ describe('SheetHeader', () => {
       expect(action?.props.className).toContain('rounded-md');
       expect(action?.props.className).not.toContain('rounded-full');
       expect(action?.props.className).not.toMatch(/(?:^|\s)bg-/);
-      expect(action?.props.className).toContain('px-2 py-2');
+      expect(action?.props.className).toContain('py-2');
       expect(action?.props.className).toContain('active:opacity-70');
       expect(action?.props.accessibilityRole).toBe('button');
     }
+    // Each label sits flush on the sheet's own gutter — Cancel on the start
+    // one, Done on the end one — so the header's first line of content starts
+    // where the body's does instead of 7pt inside a centred target.
+    expect(cancel?.props.className).toContain('items-start');
+    expect(cancel?.props.className).toContain('pe-2');
+    expect(done?.props.className).toContain('items-end');
+    expect(done?.props.className).toContain('ps-2');
     expect(done?.props.onPress).toBe(onDone);
     expect(cancel?.props.onPress).toBe(onCancel);
     const doneLabelClass = renderer.root.findByProps({ children: labels.doneLabel }).props
@@ -653,9 +683,10 @@ describe('SheetHeader', () => {
   });
 
   it('drops the top clearance for a bottom formSheet on Android when the window has one', async () => {
-    // The detent cap subtracts the window's top inset, so the sheet edge
-    // settles at the status bar on the first frame; padding the header would
-    // reserve a dead band and drop it once the sheet landed.
+    // The detent cap subtracts the window's top inset, so the surface settles
+    // at the status bar; the header only tops itself up once it can read where
+    // the platform laid its content out (`useSettledSheetHeaderTopClearance`),
+    // which reserves nothing from a first frame that has no measurement.
     rn.os = 'android';
     rn.statusHeight = 48;
     safeArea.top = 24;
@@ -906,4 +937,155 @@ describe('SheetHeader', () => {
       renderer.unmount();
     }
   );
+
+  it('draws a spinner, stops the control and announces busy while the commit is in flight', async () => {
+    const props = {
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    };
+    const renderer = await mount({ ...props, doneBusy: true });
+    const busyDone = pressablesByLabel(renderer.root, 'Done')[0];
+    const spinners = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'ActivityIndicator'
+    );
+
+    // The name stays on the control; the label is the progress mark now.
+    expect(busyDone?.props.disabled).toBe(true);
+    expect(busyDone?.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    expect(busyDone?.props.accessibilityLabel).toBe('Done');
+    expect(spinners).toHaveLength(1);
+    expect(spinners[0]?.props.color).toBe('#2563eb');
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'Text' &&
+          node.props.children === 'Done'
+      )
+    ).toHaveLength(0);
+    // Cancel is the only way out of a saving sheet, so it keeps working.
+    expect(pressablesByLabel(renderer.root, 'Cancel')[0]?.props.disabled).toBe(false);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(createElement(SheetHeader, { ...props, doneBusy: false }));
+    });
+    const settledDone = pressablesByLabel(renderer.root, 'Done')[0];
+    expect(settledDone?.props.disabled).toBe(false);
+    expect(settledDone?.props.accessibilityState).toEqual({ disabled: false, busy: false });
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'ActivityIndicator'
+      )
+    ).toHaveLength(0);
+    expect(renderer.root.findByProps({ children: 'Done' })).toBeDefined();
+
+    renderer.unmount();
+  });
+
+  it('draws the reference line under the title, centred with it', async () => {
+    const renderer = await mount({
+      title: 'Submit review',
+      eyebrow: 'kilo-org/cloud#128',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+    const eyebrow = renderer.root.findByProps({ children: 'kilo-org/cloud#128' });
+
+    // One line with a tail ellipsis: the reference is context, so it can never
+    // take a second line and move the sheet body.
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.props.ellipsizeMode).toBe('tail');
+    expect(String(eyebrow.props.className).split(' ')).toEqual(
+      expect.arrayContaining(['mt-0.5', 'text-center'])
+    );
+    // The title stays the sheet's heading and its accessible name.
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.children).toEqual(['Submit review']);
+    // The reference sits under it, in the same title column.
+    expect(eyebrow.parent).toBe(title.parent);
+
+    renderer.unmount();
+  });
+
+  it('leaves the reference leading when the title does, beside the close control', async () => {
+    const renderer = await mount({
+      title: 'Share session',
+      eyebrow: 'kilo-org/cloud#128',
+      onDone: () => undefined,
+      variant: 'close',
+    });
+    const eyebrow = renderer.root.findByProps({ children: 'kilo-org/cloud#128' });
+
+    expect(String(eyebrow.props.className)).not.toContain('text-center');
+
+    renderer.unmount();
+  });
+
+  it('draws one X control named Close for a sheet with nothing to commit', async () => {
+    const onDone = vi.fn<() => void>();
+    const renderer = await mount({
+      title: 'Share session',
+      onDone,
+      // The close variant owns the only control: a leading Cancel or Share in
+      // the caller's props cannot paint a second way out.
+      onCancel: () => undefined,
+      onShare: () => undefined,
+      variant: 'close',
+    });
+    const closes = pressablesByLabel(renderer.root, 'Close');
+
+    expect(closes).toHaveLength(1);
+    expect(closes[0]?.props.disabled).toBe(false);
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'Pressable'
+      )
+    ).toHaveLength(1);
+    expect(
+      renderer.root.findAll(node => typeof node.type === 'string' && (node.type as string) === 'X')
+    ).toHaveLength(1);
+    expect(pressablesByLabel(renderer.root, 'Cancel')).toHaveLength(0);
+    expect(pressablesByLabel(renderer.root, 'Done')).toHaveLength(0);
+    expect(renderer.root.findByProps({ accessibilityRole: 'header' }).children).toEqual([
+      'Share session',
+    ]);
+
+    await act(async () => {
+      await Promise.resolve();
+      (closes[0]?.props.onPress as (() => void) | undefined)?.();
+    });
+    expect(onDone).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('names the close control after the caller when it has its own verb', async () => {
+    const renderer = await mount({
+      title: 'Share session',
+      doneLabel: 'Dismiss',
+      onDone: () => undefined,
+      variant: 'close',
+    });
+
+    expect(pressablesByLabel(renderer.root, 'Dismiss')).toHaveLength(1);
+    expect(
+      renderer.root.findAll(node => typeof node.type === 'string' && (node.type as string) === 'X')
+    ).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('hands the title node to the caller that drives reading order', async () => {
+    const titleRef = vi.fn();
+    const renderer = await mount({ title: 'report.pdf', onDone: () => undefined, titleRef });
+
+    // React calls the ref with the painted node; the test renderer hands the
+    // host instance over, which is what a caller moves focus through.
+    expect(titleRef).toHaveBeenCalledTimes(1);
+    expect(titleRef.mock.calls[0]?.[0]).not.toBeNull();
+
+    renderer.unmount();
+  });
 });

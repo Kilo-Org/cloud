@@ -27,7 +27,7 @@ type SwitchFixture = {
   trackColor?: { false?: string; true?: string };
   thumbColor?: string;
   value?: boolean;
-  style?: { marginVertical?: number; opacity?: number };
+  style?: { marginVertical?: number };
 };
 
 function renderSwitch(props: SwitchFixture) {
@@ -152,82 +152,58 @@ describe('Switch', () => {
     native.os = 'android';
     const style = { marginVertical: 3 };
     const props = nativeProps(renderSwitch({ style }).root);
-    expect(props.style).toEqual([
-      { minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP },
-      null,
-      style,
-    ]);
+    expect(props.style).toEqual([{ minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP }, style]);
   });
 
-  it('keeps the enabled on pair on a disabled switch and dims the control', () => {
+  it('paints the muted pair on a disabled on switch and keeps it on', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     expect(props.value).toBe(true);
-    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
-    expect(props.thumbColor).toBe(lightColors.primaryForeground);
-    // The pair still marks the position; the dim is what marks it unavailable.
-    expect(props.style).toEqual([
-      { minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP },
-      { opacity: 0.5 },
-      undefined,
-    ]);
+    expect(props.trackColor).toEqual({
+      false: lightColors.mutedSoft,
+      true: lightColors.mutedSoft,
+    });
+    expect(props.thumbColor).toBe(lightColors.foreground);
+    expect(props.trackColor?.true).not.toBe(lightColors.primary);
   });
 
-  it('keeps the enabled off pair on a disabled off switch and dims the control', () => {
+  it('paints the same muted pair on a disabled off switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    expect(props.value).toBe(false);
-    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
-    expect(props.thumbColor).toBe(lightColors.primaryForeground);
-    expect(props.style).toEqual([
-      { minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP },
-      { opacity: 0.5 },
-      undefined,
-    ]);
+    expect(props.trackColor).toEqual({
+      false: lightColors.mutedSoft,
+      true: lightColors.mutedSoft,
+    });
+    expect(props.thumbColor).toBe(lightColors.foreground);
   });
 
-  it('keeps the dark pair apart on a disabled switch and dims the control', () => {
+  it('paints one disabled pair in dark mode too, off the brand accent', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    // The on track stays the muted olive and the off track the mid neutral, so
-    // a disabled list still shows which items are on.
     expect(on.trackColor).toEqual({
-      false: darkColors.mutedForeground,
-      true: darkColors.selection,
+      false: darkColors.mutedSoft,
+      true: darkColors.mutedSoft,
     });
-    expect(on.trackColor?.true).not.toBe(darkColors.primary);
-    expect(on.thumbColor).toBe(darkColors.selectionForeground);
+    // The thumb keeps the scheme's ink so the grey track still reads as a
+    // control in both themes; the position alone says on or off.
+    expect(on.thumbColor).toBe(darkColors.foreground);
+    // The dark scheme's ink and the accent's grip share one token, so the
+    // readable contrast is against the accent track, not the grip token.
+    expect(on.thumbColor).not.toBe(darkColors.selection);
     expect(off.trackColor).toEqual(on.trackColor);
-    expect(off.thumbColor).toBe(darkColors.foreground);
-    expect(on.style).toEqual([
-      { minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP },
-      { opacity: 0.5 },
-      undefined,
-    ]);
+    expect(off.thumbColor).toBe(on.thumbColor);
+    expect(on.trackColor?.true).not.toBe(darkColors.primary);
   });
 
-  it('dims the control when the accessibility state says disabled', () => {
+  it('takes the disabled state from the accessibility state', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ accessibilityState: { disabled: true } }).root);
-    expect(props.trackColor).toEqual({ false: lightColors.mutedSoft, true: lightColors.primary });
-    expect((props.style as unknown[])[1]).toEqual({ opacity: 0.5 });
-  });
-
-  it('lets a caller style overrule the dim on a disabled switch', () => {
-    native.os = 'android';
-    native.scheme = 'light';
-    const style = { opacity: 1 };
-    const props = nativeProps(renderSwitch({ disabled: true, style }).root);
-    expect(props.style).toEqual([
-      { minHeight: TOUCH_TARGET_DP, minWidth: TOUCH_TARGET_DP },
-      { opacity: 0.5 },
-      style,
-    ]);
+    expect(props.trackColor?.true).toBe(lightColors.mutedSoft);
   });
 
   it('leaves the pair to the platform on iOS, which fades a disabled switch itself', () => {

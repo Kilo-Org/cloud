@@ -7,8 +7,10 @@ import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Text } from '@/components/ui/text';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { REVIEW_FOCUS_AREAS, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   useReviewConfig,
   useReviewConfigCacheReader,
@@ -81,36 +83,34 @@ function FocusAreasScreen({
           isRetrying={failure.isRetrying}
         />
       ) : (
-        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-          <Text variant="muted" className="mb-2 text-xs">
-            {t('codeReviewer.focusAreas.hint')}
-          </Text>
-          {REVIEW_FOCUS_AREAS.map(area => (
-            <ChoiceRow
-              key={area}
-              label={t(areaLabels[area])}
-              multi
-              selected={selected.includes(area)}
-              disabled={disabled}
-              className="border-b-[0.5px] border-hair-soft"
-              onPress={() => {
-                toggleArea(area);
-              }}
-            />
-          ))}
-          {unknownAreas.map(area => (
-            <ChoiceRow
-              key={area}
-              label={t('codeReviewer.focusArea.unknown', { area })}
-              multi
-              selected
-              disabled={disabled}
-              className="border-b-[0.5px] border-hair-soft"
-              onPress={() => {
-                toggleArea(area);
-              }}
-            />
-          ))}
+        <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+          <Text variant="muted">{t('codeReviewer.focusAreas.hint')}</Text>
+          <RowGroup>
+            {REVIEW_FOCUS_AREAS.map(area => (
+              <ChoiceRow
+                key={area}
+                label={t(areaLabels[area])}
+                multi
+                selected={selected.includes(area)}
+                disabled={disabled}
+                onPress={() => {
+                  toggleArea(area);
+                }}
+              />
+            ))}
+            {unknownAreas.map(area => (
+              <ChoiceRow
+                key={area}
+                label={t('codeReviewer.focusArea.unknown', { area })}
+                multi
+                selected
+                disabled={disabled}
+                onPress={() => {
+                  toggleArea(area);
+                }}
+              />
+            ))}
+          </RowGroup>
         </TabScreenScrollView>
       )}
     </View>

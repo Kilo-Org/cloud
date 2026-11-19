@@ -738,6 +738,46 @@ describe('fetchNativeSnapshot', () => {
     expect(keptCalls).toHaveLength(1);
     expect(fetch).toHaveBeenCalledTimes(4);
   });
+
+  it('rejects when a stored attachment read fails with no value', async () => {
+    const firstHash = hashOf(0);
+    const secondHash = hashOf(1);
+    const thirdHash = hashOf(2);
+    const hashes = [firstHash, secondHash, thirdHash];
+    const message = native('msg_blob_unvalued', 'user', {
+      files: hashes.map(hash => ({
+        mime: 'image/png',
+        uri: `media:${hash}`,
+        source: { type: 'inline' },
+      })),
+    });
+    const entities = [
+      entity('session', sessionID, nativeSession),
+      entity('message', message.id, { seq: 0, message }),
+      ...hashes.map((hash, index) =>
+        entity('asset', `unvalued-asset-${index}`, {
+          entity: { kind: 'message', id: message.id },
+          pointer: `/message/files/${index}`,
+          reference: `media:${hash}`,
+          mime: 'image/png',
+          blob: { hash, bytes: 3 },
+        })
+      ),
+    ];
+    const { request } = snapshotFetch(entities);
+    const readAsset = jest.fn(async (path: string, _advertisedBytes: number) => {
+      if (path === `${sessionPath}/blobs/${firstHash}`) throw undefined;
+      return new Uint8Array([1, 2, 3]).buffer;
+    });
+    // A task that rejects with no value must reject the helper, not resolve a sparse result.
+    await expect(
+      fetchNativeSnapshot(request, sessionID, undefined, readAsset)
+    ).rejects.toBeUndefined();
+    expect(readAsset.mock.calls.map(([path]) => path)).toEqual([
+      `${sessionPath}/blobs/${firstHash}`,
+      `${sessionPath}/blobs/${secondHash}`,
+    ]);
+  });
 });
 
 test('cancels a non-cooperative snapshot request and fences its late continuation', async () => {

@@ -5,7 +5,11 @@ import {
   readKilo2Messages,
 } from './kilo2-source-messages';
 import type { NativeEvent, NativeSessionState } from './native-sync';
-import type { NativeSnapshotMessage, NativeSnapshotSession } from './native-sync-snapshot';
+import {
+  withDisplayLocation,
+  type NativeSnapshotMessage,
+  type NativeSnapshotSession,
+} from './native-sync-snapshot';
 import { upsertByRequestId } from './pending-requests';
 import { permissionAskedIdentitySchema } from './schemas';
 import type { SessionSnapshot, UnreadablePermissionState } from './types';
@@ -162,10 +166,7 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
       ...unresolved.map(item => item.message.id),
     ]),
   ];
-  const session = state.session && {
-    ...state.session,
-    location: { directory: state.session.origin.directory },
-  };
+  const session = state.session && withDisplayLocation(state.session);
   const last = state.messages.at(-1)?.message;
   let messages: SessionSnapshot['messages'] = [];
   let projectionError: string | undefined;

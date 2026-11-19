@@ -88,7 +88,8 @@ export const LocalAgentsSettings = (): JSX.Element => {
   const [pairingNotice, setPairingNotice] = useState<LocalAgentPairingNotice | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const [commandError, setCommandError] = useState<LocalAgentsCommand['kind'] | null>(null);
+  /* The command that failed; its line sits next to the button it retries and leaves with it. */
+  const [commandError, setCommandError] = useState<LocalAgentsCommand | null>(null);
   const saveChainRef = useRef(createSerialAsyncChain());
 
   const refresh = useCallback(async () => {
@@ -163,7 +164,7 @@ export const LocalAgentsSettings = (): JSX.Element => {
     setCommandError(null);
     void (async (): Promise<void> => {
       if (!(await sendLocalAgentCommand(command))) {
-        setCommandError(command.kind);
+        setCommandError(command);
       }
     })();
   }, []);
@@ -230,6 +231,11 @@ export const LocalAgentsSettings = (): JSX.Element => {
               {STOP_ALL_LABEL}
             </button>
           </div>
+          {commandError?.kind === 'stop_all' ? (
+            <p className="type-body mt-2 text-status-red-400">
+              {LOCAL_AGENTS_COMMAND_ERRORS.stop_all}
+            </p>
+          ) : null}
           <ul className="mt-2 flex flex-col gap-2">
             {view.controllerGroups.map(group => (
               <li
@@ -254,6 +260,12 @@ export const LocalAgentsSettings = (): JSX.Element => {
                     {DISCONNECT_LABEL}
                   </button>
                 </div>
+                {commandError?.kind === 'disconnect' &&
+                commandError.controllerId === group.controllerId ? (
+                  <p className="type-body mt-2 text-status-red-400">
+                    {LOCAL_AGENTS_COMMAND_ERRORS.disconnect}
+                  </p>
+                ) : null}
                 <ul className="mt-2 flex flex-col gap-1">
                   {group.agents.map(agent => (
                     <li className="min-w-0" key={agent.sessionHandle}>
@@ -272,12 +284,6 @@ export const LocalAgentsSettings = (): JSX.Element => {
           </ul>
         </>
       ) : null}
-
-      {commandError === null ? null : (
-        <p className="type-body mt-2 text-status-red-400">
-          {LOCAL_AGENTS_COMMAND_ERRORS[commandError]}
-        </p>
-      )}
     </section>
   );
 };

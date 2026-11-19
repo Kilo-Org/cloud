@@ -86,6 +86,7 @@ export type LocalAgentTabsApi = {
       ) => void
     ): void;
   };
+  get(tabId: number): Promise<{ url?: string }>;
   remove(tabId: number): Promise<void> | void;
 };
 
@@ -698,7 +699,7 @@ export const startLocalAgentsHost = (
   };
 
   /** A pairing link this extension cannot read: its tab closes and the notice says the link is invalid. */
-  const rejectBrokenPairing = (tabId: number): void => {
+  const rejectBrokenPairing = (tabId: number, url: string): void => {
     void (async (): Promise<void> => {
       // The switch value is unknown until the first settings read answers.
       await ready.promise;
@@ -708,7 +709,12 @@ export const startLocalAgentsHost = (
       }
 
       try {
-        await tabs?.remove(tabId);
+        // The tab may have moved on while the settings read was pending; only the broken page is closed.
+        const current = await tabs?.get(tabId);
+
+        if (current?.url === url) {
+          await tabs?.remove(tabId);
+        }
       } catch {
         // Already gone (the user closed it) — nothing to do.
       }
@@ -788,7 +794,7 @@ export const startLocalAgentsHost = (
 
     if (endpoint === null) {
       if (isBrokenPairingUrl(url)) {
-        rejectBrokenPairing(tabId);
+        rejectBrokenPairing(tabId, url);
       }
 
       return;

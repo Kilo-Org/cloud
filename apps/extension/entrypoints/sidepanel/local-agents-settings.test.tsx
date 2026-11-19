@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({
   items: new Map<string, unknown>(),
   sendMessage: vi.fn<(message: unknown) => Promise<unknown>>(),
+  watchers: new Set<() => void>(),
 }));
 
 vi.mock('#imports', () => ({
@@ -26,8 +27,10 @@ vi.mock('#imports', () => ({
 
       return Promise.resolve();
     },
-    watch: () => () => {
-      /* The fixture never changes storage behind the page's back. */
+    watch: (_key: string, listener: () => void) => {
+      fixture.watchers.add(listener);
+
+      return () => fixture.watchers.delete(listener);
     },
   },
 }));
@@ -110,6 +113,26 @@ describe('local agents settings', () => {
     await vi.waitFor(() => {
       expect(view.queryByText(STOP_ALL_FAILED)).toBeNull();
     });
+  });
+
+  it('drops a command error once the agent it was about is gone', async () => {
+    seedRunningAgent();
+    fixture.sendMessage.mockResolvedValue({ ok: false });
+    const view = render(<LocalAgentsSettings />);
+
+    fireEvent.click(await view.findByRole('button', { name: 'Disconnect 11111111' }));
+    await expect(view.findByText(DISCONNECT_FAILED)).resolves.toBeDefined();
+
+    // The CLI's connection ended: its row, and the Disconnect it failed, leave the list.
+    fixture.items.set('session:kiloLocalAgentControllers', { controllers: [] });
+    for (const notify of fixture.watchers) {
+      notify();
+    }
+
+    await vi.waitFor(() => {
+      expect(view.queryByText(DISCONNECT_FAILED)).toBeNull();
+    });
+    expect(view.queryByRole('button', { name: 'Stop all' })).toBeNull();
   });
 
   it('shows a paired CLI that cannot be reached instead of the native-host hint', async () => {

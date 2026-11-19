@@ -173,7 +173,14 @@ const createHarness = () => {
       },
     },
   };
+  /* What each tab shows now: the last committed navigation, unless a test moves the tab on. */
+  const tabUrls = new Map<number, string>();
   const tabs = {
+    get: (tabId: number) => {
+      const url = tabUrls.get(tabId);
+
+      return Promise.resolve(url === undefined ? {} : { url });
+    },
     onUpdated: {
       addListener: (
         listener: (
@@ -182,7 +189,13 @@ const createHarness = () => {
           tab: { openerTabId?: number; url?: string }
         ) => void
       ) => {
-        listeners.tabUpdated = listener;
+        listeners.tabUpdated = (tabId, changeInfo, tab) => {
+          if (changeInfo.url !== undefined) {
+            tabUrls.set(tabId, changeInfo.url);
+          }
+
+          listener(tabId, changeInfo, tab);
+        };
       },
     },
     remove: removeTab,
@@ -1183,6 +1196,32 @@ describe('broken pairing links', () => {
     expect(harness.removeTab).toHaveBeenCalledWith(90);
     expect(harness.sockets).toHaveLength(0);
     expect(harness.storage.items.get(LOCAL_AGENT_ENDPOINTS_STORAGE_KEY)).toBeUndefined();
+    host.stop();
+  });
+
+  it('leaves the tab alone when it moved on while the settings read was pending', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const settingsRead = Promise.withResolvers<void>();
+    harness.storage.getItem = async (key: LocalAgentStorageKey) => {
+      if (key === LOCAL_AGENT_SETTINGS_STORAGE_KEY) {
+        await settingsRead.promise;
+      }
+
+      return harness.storage.items.get(key) ?? null;
+    };
+    const host = startHost(harness);
+
+    harness.listeners.tabUpdated?.(95, { url: BROKEN_URL }, { url: BROKEN_URL });
+    // The broken page redirects before the extension knows the switch is on.
+    harness.listeners.tabUpdated?.(95, { url: 'https://example.com/' }, {});
+    settingsRead.resolve();
+    await host.ready;
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('invalid');
+    });
+    expect(harness.removeTab).not.toHaveBeenCalled();
     host.stop();
   });
 

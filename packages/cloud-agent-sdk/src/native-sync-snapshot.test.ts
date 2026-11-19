@@ -1216,7 +1216,7 @@ describe('native user file display fallbacks', () => {
       ],
     });
     // Empty bytes are absent bytes, so the reference is a real position: it waits on
-    // recovery, and until then the message keeps its text without a zero-byte part.
+    // recovery, and the display gate omits the message until then, so no text is shown.
     expect(hasUnresolvedKilo2Assets(message)).toBe(true);
     expect(readKilo2Messages(session, [message])[0]?.parts).toMatchObject([
       { id: kilo2PartId(message.id, 0), type: 'text' },

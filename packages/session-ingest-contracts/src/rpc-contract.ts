@@ -12,6 +12,20 @@ export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentW
 
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
+export const sessionTitleSchema = z.string().trim().min(1).max(200);
+
+const statusTransitionIdSchema = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
+
+/**
+ * The Session DO's projection of a Cloud Agent session into its `cli_sessions_v2` row. Kilo v2
+ * has no session-ingest client, so this is also how its transcript activity and native renames
+ * reach the row: `lastActivityAt` only moves forward, and `rename` is present only while a
+ * native rename is undelivered. A rename rides every publication from the first one that
+ * carried it, named by `rename.transitionId`, until one is delivered. Ingest applies it only
+ * while the stored status transition is older than `rename.transitionId`, so a late publication
+ * and a repeat after delivery cannot replace a newer title. A first delivery that has not landed
+ * still can, because a user rename carries no ordering signal.
+ */
 export const publishCloudAgentSessionStatusSchema = z
   .object({
     sessionId: sessionIdSchema,
@@ -19,7 +33,12 @@ export const publishCloudAgentSessionStatusSchema = z
     cloudAgentSessionId: cloudAgentSessionIdSchema,
     status: z.enum(['busy', 'retry', 'question', 'permission', 'idle', 'failed']),
     occurredAt: z.iso.datetime(),
-    transitionId: z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/),
+    transitionId: statusTransitionIdSchema,
+    lastActivityAt: z.iso.datetime().optional(),
+    rename: z
+      .object({ title: sessionTitleSchema, transitionId: statusTransitionIdSchema })
+      .strict()
+      .optional(),
   })
   .strict();
 export type PublishCloudAgentSessionStatusParams = z.infer<
@@ -47,8 +66,6 @@ export const CLI_SESSION_VERSION_BY_RUNTIME_HARNESS = {
   kilo: 1,
   kilo2: 2,
 } as const satisfies Record<RecordCloudAgentSessionHarnessParams['runtimeHarness'], number>;
-
-export const sessionTitleSchema = z.string().trim().min(1).max(200);
 
 const cloudAgentSessionTitleTargetSchema = z.object({
   sessionId: sessionIdSchema,

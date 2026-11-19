@@ -25,6 +25,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', X: 'X' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000', foreground: '#111111' }),
 }));
@@ -115,7 +116,8 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
     expect(String(fieldGutter(renderer).props.className).split(' ')).toContain('px-4');
     expect(fieldGutter(renderer).props.style).toBeUndefined();
     // The bordered field keeps its own inset, outside the page gutter.
-    expect(String(fieldRow(renderer).props.className).split(' ')).toContain('px-2');
+    expect(String(fieldRow(renderer).props.className).split(' ')).toContain('pl-3');
+    expect(String(fieldRow(renderer).props.className).split(' ')).toContain('pr-3');
     expect(String(fieldRow(renderer).props.className).split(' ')).not.toContain('px-4');
   });
 

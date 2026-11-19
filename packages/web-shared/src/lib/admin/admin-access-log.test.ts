@@ -362,6 +362,46 @@ describe('kilo admin elevation telemetry', () => {
       target: 'organization:org-1',
     });
   });
+
+  test('an explicit route on a REST context wins over the route from headers', async () => {
+    await recordKiloAdminElevation(
+      {
+        user: defineTestUser({ is_admin: true }),
+        auditSurface: 'rest',
+        auditMethod: 'GET',
+        auditRoute: '/admin/api/known-path',
+        headersList: new Headers({ 'x-pathname': '/admin/api/best-effort-path' }),
+      },
+      { reason: 'organization_access_rest', target: organizationTarget('org-1') }
+    );
+
+    expect(events[0]).toMatchObject({
+      surface: 'rest',
+      kind: 'kilo_admin_elevation',
+      route: '/admin/api/known-path',
+      method: 'GET',
+      reason: 'organization_access_rest',
+      target: 'organization:org-1',
+    });
+  });
+
+  test('a request without an explicit route still falls back to headers', async () => {
+    await recordKiloAdminElevationForRequest({
+      user: defineTestUser({ is_admin: true }),
+      surface: 'rest',
+      headersList: new Headers({ 'x-pathname': '/admin/api/best-effort-path' }),
+      reason: 'organization_access_rest',
+      target: organizationTarget('org-1'),
+    });
+
+    expect(events[0]).toMatchObject({
+      surface: 'rest',
+      kind: 'kilo_admin_elevation',
+      route: '/admin/api/best-effort-path',
+      reason: 'organization_access_rest',
+      target: 'organization:org-1',
+    });
+  });
 });
 
 describe('privileged access telemetry', () => {

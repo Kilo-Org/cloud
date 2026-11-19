@@ -26,6 +26,7 @@ import {
   reviewMemoryOwnerInput,
   useTriggerReviewMemoryAnalysis,
 } from '@/lib/hooks/use-review-memory';
+import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import {
   ACTIVE_PROPOSAL_STATUSES,
   proposalStatusLabel,
@@ -42,6 +43,7 @@ const listStyle = { flex: 1 } satisfies ViewStyle;
 export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();
   const { t } = useTranslation();
+  const scopeTitle = useReviewerScopeTitle(scope);
   const colors = useThemeColors();
   const paddingBottom = useTabBarBottomPadding();
   const ownerInput = reviewMemoryOwnerInput(scope);
@@ -255,10 +257,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader
-        title={t('codeReviewer.reviewMemory.title')}
-        eyebrow={t('common.codeReviewer')}
-      />
+      <ReviewerHeader title={t('codeReviewer.reviewMemory.title')} subtitle={scopeTitle} />
       {enabled ? (
         <View className={SCREEN_BODY_CLASS}>
           <ReviewMemoryToggleCard

@@ -7,7 +7,6 @@ import {
 } from '@/components/profiles/profile-bound-field';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
@@ -86,7 +85,7 @@ export function ProfileMetadataForm({
   };
 
   return (
-    <Card>
+    <>
       <ProfileNameField
         defaultValue={nameField.valueRef.current}
         error={nameField.error}
@@ -112,6 +111,6 @@ export function ProfileMetadataForm({
       <Button loading={isSaving} disabled={disabled || isSaving} onPress={submit}>
         <Text>{t(saveFailed ? 'common.retry' : 'common.save')}</Text>
       </Button>
-    </Card>
+    </>
   );
 }

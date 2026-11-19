@@ -160,9 +160,6 @@ export function ModelCatalogScreen() {
                 <Text variant="muted" className="text-xs">
                   {t('modelChat.catalog.recommendationsHelp')}
                 </Text>
-                <Text variant="muted" className="text-xs">
-                  {t('modelChat.catalog.quantizationsHelp')}
-                </Text>
                 {recommended.map(model => (
                   <RecommendedRow key={model.fileId} model={model} budget={budget} />
                 ))}

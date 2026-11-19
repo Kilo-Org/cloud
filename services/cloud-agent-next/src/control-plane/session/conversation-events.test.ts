@@ -59,8 +59,8 @@ async function fixture() {
   });
   return {
     queries,
-    publish: (event: SandboxControlSessionEventInput) =>
-      persistSessionEvent({ sessionId, queries, partText, event }),
+    publish: (event: SandboxControlSessionEventInput, seed = false) =>
+      persistSessionEvent({ sessionId, queries, partText, event, seed }),
   };
 }
 
@@ -123,6 +123,36 @@ it('answers with the last assistant message after a mid-turn synthetic message',
     })
   );
   publish(assistantUpdate('msg_assistant_2', 'Final answer', 'msg_synthetic'));
+  publish(
+    {
+      type: 'message.updated',
+      properties: {
+        info: {
+          id: 'msg_assistant_0',
+          sessionID: kiloSessionId,
+          role: 'assistant',
+          parentID: 'msg_older_prompt',
+          time: { created: 0 },
+        },
+      },
+    },
+    true
+  );
+  publish(
+    {
+      type: 'message.part.updated',
+      properties: {
+        part: {
+          id: 'prt_older_answer',
+          messageID: 'msg_assistant_0',
+          sessionID: kiloSessionId,
+          type: 'text',
+          text: 'Older answer from hydrated history',
+        },
+      },
+    },
+    true
+  );
 
   const answer = { text: 'Final answer', tools: [] };
   expect(queries.getAssistantAnswerForUserMessage(sessionId, kiloSessionId, userMessageId)).toEqual(
@@ -131,6 +161,53 @@ it('answers with the last assistant message after a mid-turn synthetic message',
   expect(
     queries.getRecentAssistantAnswersForUserMessage(sessionId, kiloSessionId, userMessageId)
   ).toEqual([{ text: 'Start Docker in the background.', tools: [] }, answer]);
+});
+
+it('fills recent activity past removed messages from legacy history', async () => {
+  const { queries, publish } = await fixture();
+  for (let index = 1; index <= 7; index++) {
+    const messageID = `msg_assistant_${index}`;
+    publish({
+      type: 'message.updated',
+      timestamp: new Date(2).toISOString(),
+      properties: {
+        info: {
+          id: messageID,
+          role: 'assistant',
+          sessionID: kiloSessionId,
+          parentID: userMessageId,
+          time: { created: 1 },
+        },
+      },
+    });
+    publish({
+      type: 'message.part.updated',
+      properties: {
+        part: {
+          id: `prt_${index}`,
+          messageID,
+          sessionID: kiloSessionId,
+          type: 'text',
+          text: `${index}`,
+        },
+      },
+    });
+  }
+  for (const index of [3, 6, 7]) {
+    queries.insert({
+      sessionId,
+      executionId: '',
+      streamEventType: 'kilocode',
+      payload: JSON.stringify({
+        event: 'message.removed',
+        properties: { sessionID: kiloSessionId, messageID: `msg_assistant_${index}` },
+      }),
+      timestamp: index === 3 ? 1 : 2,
+    });
+  }
+  expect(
+    queries.getRecentAssistantAnswersForUserMessage(sessionId, kiloSessionId, userMessageId)
+  ).toEqual(['1', '2', '3', '4', '5'].map(text => ({ text, tools: [] })));
 });
 
 it('does not inherit a callback parent from another Kilo session', async () => {

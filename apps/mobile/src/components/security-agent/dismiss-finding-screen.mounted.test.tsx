@@ -329,7 +329,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       const tree = renderScreen();
       expect(tree.root.findByType(ScrollView).props.style).toEqual([
         undefined,
-        { marginBottom: 883, marginLeft: 0, marginRight: 0 },
+        { marginBottom: 883 },
       ]);
     } finally {
       keyboard.height = 0;

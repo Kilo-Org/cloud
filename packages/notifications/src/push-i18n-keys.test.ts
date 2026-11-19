@@ -64,8 +64,12 @@ describe('security finding push keys', () => {
 
   it('translates the shared body sentence into the token language', () => {
     const bodyKey = pushBodyCatalogKey('internal.securityFindingSlaWarning');
-    expect(translatePush('es', bodyKey, FINDING_PARAMS)).toBe('XSS in admin en acme/api');
-    expect(translatePush('en', bodyKey, FINDING_PARAMS)).toBe('XSS in admin in acme/api');
+    expect(
+      translatePush('es', bodyKey, FINDING_PARAMS, '{{findingTitle}} in {{repoFullName}}')
+    ).toBe('XSS in admin en acme/api');
+    expect(
+      translatePush('en', bodyKey, FINDING_PARAMS, '{{findingTitle}} in {{repoFullName}}')
+    ).toBe('XSS in admin in acme/api');
   });
 });
 

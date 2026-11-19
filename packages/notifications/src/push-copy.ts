@@ -35,6 +35,15 @@ const GENERIC_BODY_LEAF_BY_TYPE: Record<PushData['type'], GenericBodyLeaf> = {
 };
 
 /**
+ * The content-free product name a push shows as its title, in `locale`. The
+ * English entry is the fallback, so a catalog that lost the entry shows the
+ * product name rather than a raw key.
+ */
+export function genericPushTitle(locale: string | null | undefined): string {
+  return translatePush(locale, GENERIC_PUSH_TITLE_KEY, undefined, en.generic.title);
+}
+
+/**
  * Content-free push copy for the `generic` preview mode. Never embeds a
  * session title, message body, org name, amount, or id — the OS lock-screen
  * text must not leak private content.
@@ -52,7 +61,7 @@ export function genericPushContentForPushData(
   // only the body's leaf differs.
   const leaf = GENERIC_BODY_LEAF_BY_TYPE[data.type];
   return {
-    title: translatePush(locale, GENERIC_PUSH_TITLE_KEY, undefined, en.generic.title),
+    title: genericPushTitle(locale),
     body: translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]),
   };
 }

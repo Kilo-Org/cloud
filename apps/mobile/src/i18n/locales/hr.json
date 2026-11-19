@@ -4813,7 +4813,7 @@
     "statusSaved": "Spremljeno",
     "statusFailed": "Spremanje nije uspjelo.",
     "inputTitle": "Ulazne zaštitne mjere",
-    "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Blokirajući detektor odbija zahtjev kada Enkrypt nije dostupan.",
+    "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Kada Enkrypt nije dostupan, zahtjevi se šalju bez skeniranja umjesto da budu odbijeni.",
     "outputTitle": "Izlazne zaštitne mjere",
     "outputDescription": "Skenira odgovore pomoću Enkrypt AI prije nego ih članovi prime. Isključene su osim ako ih uključite.",
     "detectorsHint": "Blokiranje odbija označeni zahtjev. Samo evidentiranje ga bilježi bez odgađanja zahtjeva.",

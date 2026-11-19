@@ -4742,7 +4742,7 @@
     "statusSaved": "Tallennettu",
     "statusFailed": "Tallennus epäonnistui.",
     "inputTitle": "Syötteen suojakaiteet",
-    "inputDescription": "Tarkistaa jokaisen syötteen Enkrypt AI:lla, myös työkalujen tulokset. Estävä tunnistin hylkää pyynnön, kun Enkrypt ei ole käytettävissä.",
+    "inputDescription": "Tarkistaa jokaisen syötteen Enkrypt AI:lla, myös työkalujen tulokset. Kun Enkrypt ei ole käytettävissä, pyynnöt lähetetään tarkistamatta sen sijaan, että ne hylättäisiin.",
     "outputTitle": "Tulosteen suojakaiteet",
     "outputDescription": "Tarkistaa vastaukset Enkrypt AI:lla ennen kuin jäsenet saavat ne. Ei käytössä, ellet ota sitä käyttöön.",
     "detectorsHint": "Estä hylkää merkityn pyynnön. Vain kirjaus tallentaa sen viivästyttämättä pyyntöä.",

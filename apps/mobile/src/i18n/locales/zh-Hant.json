@@ -4742,7 +4742,7 @@
     "statusSaved": "已儲存",
     "statusFailed": "無法儲存。",
     "inputTitle": "輸入護欄",
-    "inputDescription": "使用 Enkrypt AI 掃描每個輸入，包括工具結果。當 Enkrypt 無法使用時，封鎖型偵測器會拒絕請求。",
+    "inputDescription": "使用 Enkrypt AI 掃描每個輸入，包括工具結果。當 Enkrypt 無法使用時，請求不會被拒絕，而是在未經掃描的情況下傳送。",
     "outputTitle": "輸出護欄",
     "outputDescription": "在成員收到回應前，使用 Enkrypt AI 掃描回應。除非您開啟，否則為關閉狀態。",
     "detectorsHint": "封鎖會拒絕被標記的請求。僅記錄只會記錄該請求，不會延遲請求。",

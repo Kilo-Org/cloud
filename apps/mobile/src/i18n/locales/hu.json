@@ -4742,7 +4742,7 @@
     "statusSaved": "Mentve",
     "statusFailed": "Nem sikerült menteni.",
     "inputTitle": "Bemeneti őrkorlátok",
-    "inputDescription": "Minden bemenetet átvizsgál az Enkrypt AI segítségével, beleértve az eszközök eredményeit is. A blokkoló detektor elutasítja a kérést, ha az Enkrypt nem érhető el.",
+    "inputDescription": "Minden bemenetet átvizsgál az Enkrypt AI segítségével, beleértve az eszközök eredményeit is. Ha az Enkrypt nem érhető el, a kéréseket a rendszer elutasítás helyett átvizsgálás nélkül elküldi.",
     "outputTitle": "Kimeneti őrkorlátok",
     "outputDescription": "Az Enkrypt AI segítségével átvizsgálja a válaszokat, mielőtt a tagok megkapnák azokat. Kikapcsolva marad, hacsak be nem kapcsolja.",
     "detectorsHint": "A Blokkolás elutasítja a megjelölt kérést. A Csak naplózás rögzíti, anélkül hogy késleltetné a kérést.",

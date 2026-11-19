@@ -5841,35 +5841,27 @@ describe('Enkrypt output guardrail', () => {
     ]);
   });
 
-  it.each([
-    { stream: true, status: 200 },
-    { stream: false, status: 503 },
-  ])('withholds the response when Enkrypt fails (stream: $stream)', async ({ stream, status }) => {
-    setOrganization(outputGuardrailSettings('block'));
-    respondUpstream('chat_completions', stream);
-    enkryptAnswers({ detail: 'unavailable' }, 500);
+  it.each([{ stream: true }, { stream: false }])(
+    'releases the response unscanned when Enkrypt fails, without retrying (stream: $stream)',
+    async ({ stream }) => {
+      setOrganization(outputGuardrailSettings('block'));
+      respondUpstream('chat_completions', stream);
+      enkryptAnswers({ detail: 'unavailable' }, 500);
 
-    const response = await sendRequest('chat_completions', stream);
+      const response = await sendRequest('chat_completions', stream);
 
-    expect(response.status).toBe(status);
-    const text = await response.text();
-    expect(text).not.toContain(secret);
-    const message = expect.stringContaining("could not check the model's response");
-    if (stream) {
-      expect(sseEvents(afterKeepAlive(text))).toEqual(
-        expectedStreamErrorEvents('chat_completions', message, 'guardrail_unavailable')
-      );
-    } else {
-      expect(response.headers.get('retry-after')).toBe('1');
-      // The decline replaced an answer the gateway billed, so a caller must not
-      // repeat it, whatever its own retry advice says.
-      expect(response.headers.get(REPLACED_ANSWER_HEADER)).toBe('true');
-      expect(JSON.parse(text)).toEqual(
-        expectedErrorBody('chat_completions', message, 'guardrail_unavailable')
-      );
+      expect(response.status).toBe(200);
+      const text = await response.text();
+      expect(stream ? afterKeepAlive(text) : text).toBe(upstreamBody('chat_completions', stream));
+      expect(response.headers.get(REPLACED_ANSWER_HEADER)).toBeNull();
+      expect(enkryptRequestBodies()).toHaveLength(1);
+      expect(mockedRewriteModelResponse).toHaveBeenCalledTimes(1);
+      await runAfterTasks();
+      expect(mockedRecordEnkryptUsage.mock.calls).toEqual([
+        [expect.objectContaining({ decision: 'error', guardrail: 'output' })],
+      ]);
     }
-    expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
-  });
+  );
 
   it('marks no decline that an upstream error itself answers with', async () => {
     mockedUpstreamRequest.mockResolvedValue({
@@ -7316,18 +7308,34 @@ describe('Enkrypt input guardrail', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('rejects the request when Enkrypt is unavailable', async () => {
+  it.each([503, 429, 402])(
+    'sends the request upstream when Enkrypt fails with HTTP %i, without retrying',
+    async status => {
+      setOrganization({
+        enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
+      });
+      enkryptAnswers({ detail: 'unavailable' }, status);
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('retry-after')).toBeNull();
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+      expect(enkryptRequestBodies()).toHaveLength(1);
+    }
+  );
+
+  it('sends the request upstream when Enkrypt does not answer', async () => {
     setOrganization({
       enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
     });
-    enkryptAnswers({ detail: 'unavailable' }, 503);
+    fetchSpy.mockRejectedValue(new TypeError('fetch failed'));
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()));
 
-    expect(response.status).toBe(503);
-    expect(response.headers.get('retry-after')).toBe('1');
-    expect(await response.json()).toMatchObject({ error_type: 'guardrail_unavailable' });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   describe('log-only detectors', () => {
@@ -7543,9 +7551,9 @@ describe('Enkrypt input guardrail', () => {
         status: 400,
         error: 'guardrail_blocked',
       },
-      { summary: {}, scanStatus: 402, status: 503, error: 'guardrail_unavailable' },
+      { summary: {}, scanStatus: 402, status: 200, error: null },
     ])(
-      'keeps a blocking policy fail-closed when its scan returns $scanStatus',
+      'blocks a detected policy violation, but fails open when its scan returns $scanStatus',
       async ({ summary, scanStatus, status, error }) => {
         const detectors = createKiloDefaultEnkryptInputDetectors();
         detectors.injection_attack.enabled = false;
@@ -7564,8 +7572,12 @@ describe('Enkrypt input guardrail', () => {
         const response = await handleLlmProxyRequest(makeRequest(makeBody()));
 
         expect(response.status).toBe(status);
-        expect(await response.json()).toMatchObject({ error_type: error });
-        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+        if (error) {
+          expect(await response.json()).toMatchObject({ error_type: error });
+          expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+        } else {
+          expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+        }
         expect(enkryptRequestBodies().map(body => Object.keys(body.detectors))).toEqual([
           ['policy_violation'],
         ]);
@@ -7576,7 +7588,7 @@ describe('Enkrypt input guardrail', () => {
       }
     );
 
-    it('rejects the request when the blocking scan fails even if the log-only scan succeeds', async () => {
+    it('sends the request when the blocking scan fails even if the log-only scan succeeds', async () => {
       setBlockingInjectionAndLogOnlyPolicy();
       enkryptResponds(async detectors =>
         'policy_violation' in detectors
@@ -7586,9 +7598,8 @@ describe('Enkrypt input guardrail', () => {
 
       const response = await handleLlmProxyRequest(makeRequest(makeBody()));
 
-      expect(response.status).toBe(503);
-      expect(await response.json()).toMatchObject({ error_type: 'guardrail_unavailable' });
-      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -7674,7 +7685,8 @@ describe('Enkrypt input guardrail', () => {
         });
       }
 
-      function enkryptFailsOnce(response: Response) {
+      /** Fails the first call; a second call, which a retry would make, would succeed. */
+      function enkryptFails(response: Response) {
         let failed = false;
         fetchSpy.mockImplementation(async () => {
           if (!failed) {
@@ -7703,15 +7715,15 @@ describe('Enkrypt input guardrail', () => {
 
       it.each(
         ([null, 'errors_only'] as const).flatMap(mode =>
-          (['retry succeeds', 'log-only fails'] as const).map(outcome => ({ mode, outcome }))
+          (['blocking fails open', 'log-only fails'] as const).map(outcome => ({ mode, outcome }))
         )
       )(
         'does not read or persist a failed body when $outcome with mode $mode',
         async ({ mode, outcome }) => {
           mockedGetDynamicRequestLoggingMode.mockResolvedValue(mode);
-          configureGuardrail(outcome === 'retry succeeds' ? 'block' : 'log');
-          const failed = failedResponse(outcome === 'retry succeeds' ? 503 : 402);
-          enkryptFailsOnce(failed.response);
+          configureGuardrail(outcome === 'blocking fails open' ? 'block' : 'log');
+          const failed = failedResponse(outcome === 'blocking fails open' ? 503 : 402);
+          enkryptFails(failed.response);
           const actual = jest.requireActual<typeof RewriteModelResponseModule>(
             '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse'
           );
@@ -7732,7 +7744,7 @@ describe('Enkrypt input guardrail', () => {
               .mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
           );
 
-          expect(fetchSpy).toHaveBeenCalledTimes(outcome === 'retry succeeds' ? 2 : 1);
+          expect(fetchSpy).toHaveBeenCalledTimes(1);
           expect(failed.pull).not.toHaveBeenCalled();
           expect(failed.cancel).toHaveBeenCalledTimes(1);
           expect(send).not.toHaveBeenCalled();
@@ -7741,56 +7753,52 @@ describe('Enkrypt input guardrail', () => {
         }
       );
 
-      it.each([null, 'errors_only'] as const)(
-        'captures a gateway failure body only when opted in (mode %s)',
-        async mode => {
-          mockedGetDynamicRequestLoggingMode.mockResolvedValue(mode);
+      it.each([503, 402])(
+        'archives the body of a failed-open Enkrypt call once when all requests are logged (HTTP %i)',
+        async status => {
+          mockedGetDynamicRequestLoggingMode.mockResolvedValue('all');
           configureGuardrail('block');
-          const failed = failedResponse(402);
-          enkryptFailsOnce(failed.response);
+          const failed = failedResponse(status);
+          enkryptFails(failed.response);
+          const actual = jest.requireActual<typeof RewriteModelResponseModule>(
+            '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse'
+          );
+          mockedRewriteModelResponse.mockImplementationOnce(actual.rewriteModelResponse);
 
           const response = await handleLlmProxyRequest(
             makeRequest(makeBody(), { 'x-vercel-id': vercelRequestId })
           );
 
-          expect(response.status).toBe(503);
-          const body = await response.json();
-          expect(body).toMatchObject({ error_type: 'guardrail_unavailable' });
-          expect(failed.pull).not.toHaveBeenCalled();
+          expect(response.status).toBe(200);
+          expect(await response.json()).toMatchObject({
+            choices: [{ message: { content: 'hello back' } }],
+          });
           await Promise.all(
             jest
               .mocked(after)
               .mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
           );
 
-          if (mode === null) {
-            expect(failed.pull).not.toHaveBeenCalled();
-            expect(failed.cancel).toHaveBeenCalledTimes(1);
-            expect(send).not.toHaveBeenCalled();
-            expect(fakeR2.objects.size).toBe(0);
-            expect(await loggedRows()).toEqual([]);
-            return;
-          }
-
           const rows = await loggedRows();
           expect(rows).toHaveLength(1);
           const archived = archivedBlob(rows[0]);
           const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
-          expect(record.response).toBe(JSON.stringify(body));
           expect(record.enkrypt).toEqual([
             expect.objectContaining({
               guardrail,
               scan: 'blocking',
               part: guardrail === 'input' ? 'conversation' : 'response',
               response: failedBody,
-              status_code: 402,
-              error: 'http_402',
+              status_code: status,
+              error: `http_${status}`,
             }),
           ]);
           expect(fetchSpy).toHaveBeenCalledTimes(1);
           expect(failed.pull).toHaveBeenCalledTimes(1);
           expect(send).toHaveBeenCalledTimes(1);
           expect(fakeR2.objects.size).toBe(1);
+          expect(archived).not.toContain('test-enkrypt-key');
+          expect(archived).not.toContain('apikey');
         }
       );
     });
@@ -7798,23 +7806,23 @@ describe('Enkrypt input guardrail', () => {
     it.each([
       {
         verdict: 'block',
+        settings: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
         enkrypt: { body: injection, status: 200 },
         status: 400,
         errorType: 'guardrail_blocked',
       },
       {
         verdict: 'unavailable',
-        enkrypt: { body: { detail: 'unavailable' }, status: 503 },
+        settings: { input_guardrail: { enabled: true, detectors: { injection_attack: true } } },
+        enkrypt: null,
         status: 503,
         errorType: 'guardrail_unavailable',
       },
     ])(
       'logs a $verdict rejection with the guardrail marker and returns it unchanged',
-      async ({ verdict, enkrypt, status, errorType }) => {
-        setOrganization({
-          enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
-        });
-        enkryptAnswers(enkrypt.body, enkrypt.status);
+      async ({ verdict, settings, enkrypt, status, errorType }) => {
+        setOrganization({ enkrypt: settings });
+        enkryptAnswers(enkrypt?.body ?? {}, enkrypt?.status);
 
         const response = await handleLoggedRequest();
 
@@ -7836,28 +7844,32 @@ describe('Enkrypt input guardrail', () => {
         ]);
         const archived = archivedBlob(rows[0]);
         const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
-        const attempts = enkrypt.status >= 500 ? 2 : 1;
         expect(record).toMatchObject({
           version: 2,
           request: expect.objectContaining({ messages: [{ role: 'user', content: 'hello' }] }),
           response: JSON.stringify(body),
           error: { guardrail_rejection: verdict },
         });
-        expect(record.enkrypt).toEqual(
-          Array.from({ length: attempts }, () => ({
-            guardrail: 'input',
-            scan: 'blocking',
-            part: 'conversation',
-            chunk: { index: 0, count: 1 },
-            request: {
-              text: HELLO_SCAN_TEXT,
-              detectors: { injection_attack: { enabled: true, need_explanation: false } },
-              user_metadata: { organization_id: 'org-1' },
-            },
-            response: JSON.stringify(enkrypt.body),
-            status_code: enkrypt.status,
-            error: enkrypt.status >= 400 ? `http_${enkrypt.status}` : null,
-          }))
+        // An unreadable saved configuration is rejected without calling Enkrypt.
+        expect(record.enkrypt ?? []).toEqual(
+          enkrypt
+            ? [
+                {
+                  guardrail: 'input',
+                  scan: 'blocking',
+                  part: 'conversation',
+                  chunk: { index: 0, count: 1 },
+                  request: {
+                    text: HELLO_SCAN_TEXT,
+                    detectors: { injection_attack: { enabled: true, need_explanation: false } },
+                    user_metadata: { organization_id: 'org-1' },
+                  },
+                  response: JSON.stringify(enkrypt.body),
+                  status_code: enkrypt.status,
+                  error: null,
+                },
+              ]
+            : []
         );
         expect(send).toHaveBeenCalledTimes(1);
         expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
@@ -7866,63 +7878,6 @@ describe('Enkrypt input guardrail', () => {
         expect(archived).not.toContain('apikey');
       }
     );
-
-    it('archives a transient failed attempt and its blocking retry without a second PUT', async () => {
-      setOrganization({
-        enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
-      });
-      const failed = '{ "detail": "temporarily unavailable", "vendor_detail": "keep raw" }';
-      const blocked = '{ "summary": { "injection_attack": 1 }, "result_message": "blocked" }';
-      let blockingAttempts = 0;
-      fetchSpy.mockImplementation(async () => {
-        return blockingAttempts++ === 0
-          ? new Response(failed, { status: 503 })
-          : new Response(blocked);
-      });
-
-      const response = await handleLoggedRequest();
-
-      expect(response.status).toBe(400);
-      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-      const [row] = await loggedRows();
-      const archived = archivedBlob(row);
-      const record = apiRequestLogBlobSchema.parse(JSON.parse(archived));
-      const request = {
-        text: HELLO_SCAN_TEXT,
-        detectors: {
-          injection_attack: { enabled: true, need_explanation: false },
-        },
-        user_metadata: { organization_id: 'org-1' },
-      };
-      expect(record.enkrypt).toEqual([
-        {
-          guardrail: 'input',
-          scan: 'blocking',
-          part: 'conversation',
-          chunk: { index: 0, count: 1 },
-          request,
-          response: failed,
-          status_code: 503,
-          error: 'http_503',
-        },
-        {
-          guardrail: 'input',
-          scan: 'blocking',
-          part: 'conversation',
-          chunk: { index: 0, count: 1 },
-          request,
-          response: blocked,
-          status_code: 200,
-          error: null,
-        },
-      ]);
-      expect(fetchSpy).toHaveBeenCalledTimes(2);
-      expect(send).toHaveBeenCalledTimes(1);
-      expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
-      expect(fakeR2.objects.size).toBe(1);
-      expect(archived).not.toContain('test-enkrypt-key');
-      expect(archived).not.toContain('apikey');
-    });
 
     it('archives the call of each chunk of a long conversation with the chunk it scanned', async () => {
       setOrganization({

@@ -4742,7 +4742,7 @@
     "statusSaved": "Opgeslagen",
     "statusFailed": "Opslaan is mislukt.",
     "inputTitle": "Beveiligingsmaatregelen voor invoer",
-    "inputDescription": "Scant elke invoer met Enkrypt AI, inclusief resultaten van hulpmiddelen. Een blokkerende detector wijst een verzoek af wanneer Enkrypt niet beschikbaar is.",
+    "inputDescription": "Scant elke invoer met Enkrypt AI, inclusief resultaten van hulpmiddelen. Wanneer Enkrypt niet beschikbaar is, worden verzoeken ongescand verzonden in plaats van afgewezen.",
     "outputTitle": "Beveiligingsmaatregelen voor uitvoer",
     "outputDescription": "Scant antwoorden met Enkrypt AI voordat leden ze ontvangen. Staat uit tenzij u het inschakelt.",
     "detectorsHint": "Blokkeren wijst een gemarkeerd verzoek af. Alleen loggen registreert het zonder het verzoek te vertragen.",

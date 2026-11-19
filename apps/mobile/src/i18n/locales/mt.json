@@ -4955,7 +4955,7 @@
     "statusSaved": "Salvat",
     "statusFailed": "Ma setax jiġi salvat.",
     "inputTitle": "Gwardjani tad-dħul",
-    "inputDescription": "Jiskennja kull dħul b'Enkrypt AI, inklużi r-riżultati tal-għodod. Detettur li jimblokka jirrifjuta talba meta Enkrypt ma jkunx disponibbli.",
+    "inputDescription": "Jiskennja kull dħul b'Enkrypt AI, inklużi r-riżultati tal-għodod. Meta Enkrypt ma jkunx disponibbli, it-talbiet jintbagħtu mingħajr skennjar minflok ma jiġu rrifjutati.",
     "outputTitle": "Gwardjani tal-ħruġ",
     "outputDescription": "Jiskennja r-risposti b'Enkrypt AI qabel ma jirċevuhom il-membri. Mitfi sakemm ma tattivahx.",
     "detectorsHint": "Il-modalità Imblokka tirrifjuta talba mmarkata. Il-modalità Irreġistra biss tirreġistraha mingħajr ma tdewwem it-talba.",

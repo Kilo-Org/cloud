@@ -4742,7 +4742,7 @@
     "statusSaved": "Gestoor",
     "statusFailed": "Kon nie stoor nie.",
     "inputTitle": "Veiligheidsreëls vir invoer",
-    "inputDescription": "Skandeer elke invoer met Enkrypt AI, insluitend gereedskapresultate. 'n Blokkerende detektor verwerp 'n versoek wanneer Enkrypt nie beskikbaar is nie.",
+    "inputDescription": "Skandeer elke invoer met Enkrypt AI, insluitend gereedskapresultate. Wanneer Enkrypt nie beskikbaar is nie, word versoeke ongeskandeer gestuur in plaas daarvan om verwerp te word.",
     "outputTitle": "Veiligheidsreëls vir uitvoer",
     "outputDescription": "Skandeer antwoorde met Enkrypt AI voordat lede dit ontvang. Af tensy jy dit aanskakel.",
     "detectorsHint": "Blokkeer verwerp 'n gevlagde versoek. Slegs aanteken hou rekord daarvan sonder om die versoek te vertraag.",

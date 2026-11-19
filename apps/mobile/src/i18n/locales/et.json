@@ -4742,7 +4742,7 @@
     "statusSaved": "Salvestatud",
     "statusFailed": "Salvestamine ebaõnnestus.",
     "inputTitle": "Sisendi kaitsepiirangud",
-    "inputDescription": "Kontrollib Enkrypt AI abil iga sisendit, sh tööriistade tulemusi. Kui Enkrypt pole saadaval, lükkab blokeeriv detektor päringu tagasi.",
+    "inputDescription": "Kontrollib Enkrypt AI abil iga sisendit, sh tööriistade tulemusi. Kui Enkrypt pole saadaval, saadetakse päringud kontrollimata, mitte ei lükata neid tagasi.",
     "outputTitle": "Väljundi kaitsepiirangud",
     "outputDescription": "Kontrollib vastuseid Enkrypt AI abil enne, kui liikmed need kätte saavad. On välja lülitatud, kuni selle sisse lülitad.",
     "detectorsHint": "„Blokeeri” lükkab märgitud päringu tagasi. „Ainult logi” salvestab selle logisse päringut viivitamata.",

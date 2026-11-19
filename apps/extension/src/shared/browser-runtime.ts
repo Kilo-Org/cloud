@@ -111,6 +111,11 @@ export type BrowserToolRunOutcome =
       readonly kind: 'origin_changed';
       readonly result: EvalTabResult;
       readonly to: string;
+    }
+  // The transport maps this onto JSON-RPC -32005: this browser has no way to run the tool at all.
+  | {
+      readonly kind: 'unsupported';
+      readonly result: EvalTabResult;
     };
 
 export interface BrowserEvalRunInput {
@@ -2589,6 +2594,13 @@ export const createBrowserRuntime = ({
     // A session with nothing shared yet is refused too: no group means no reach.
     if (caller.kind === 'agent' && !groups.isTabAllowed(caller.sessionHandle, tabId)) {
       return { kind: 'result', result: { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false } };
+    }
+
+    // A tool the platform cannot express is answered before any lease, grant or permission: nothing could run it.
+    const unavailable = sessionFor(tabId).getToolUnavailableError(toolName);
+
+    if (unavailable !== undefined) {
+      return { kind: 'unsupported', result: { error: unavailable, ok: false } };
     }
 
     const lease = await leases.acquire(tabId, caller, {

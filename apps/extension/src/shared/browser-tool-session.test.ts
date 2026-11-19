@@ -1,5 +1,7 @@
 /* eslint-disable max-lines, max-classes-per-file, vitest/max-expects -- the page-global fakes below need several instanceof-identity classes in this one test file, and one contract is several assertions */
 import { describe, expect, it, vi } from 'vitest';
+// eslint-disable-next-line import/no-nodejs-modules -- the snapshot walker runs against a real DOM
+import { JSDOM } from 'jsdom';
 import {
   FIREFOX_PLATFORM_LIMIT,
   FIREFOX_UNSUPPORTED_BROWSER_TOOLS,
@@ -1443,6 +1445,38 @@ describe('browser tool session scripting backend', () => {
     expect(input.events.map(event => event.type)).toStrictEqual(['input', 'change']);
   });
 
+  it('renders the snapshot contract format: refs, label names and printed-ancestor depth', async () => {
+    const dom = new JSDOM(
+      '<body><h1>Parity</h1><p>idle</p>' +
+        '<label>Name <input id="name"></label>' +
+        '<label><input type="checkbox" checked> Agree</label>' +
+        '<label>Color <select><option>Red</option><option>Blue</option></select></label>' +
+        '<div><span id="caption">Send it</span><button aria-labelledby="caption">x</button></div>' +
+        '</body>'
+    );
+    const { session } = createExecutingScriptingSession();
+
+    await withPageGlobals(
+      { document: dom.window.document, location: dom.window.location, window: dom.window },
+      async () => {
+        await expect(session.callTool('browser_snapshot', {})).resolves.toStrictEqual({
+          ok: true,
+          value: [
+            '- heading "Parity"[level=1]',
+            '- paragraph "idle"',
+            '- textbox "Name" [ref=e1]',
+            '- checkbox "Agree" [ref=e2][checked]',
+            '- combobox "Color" [ref=e3]',
+            '  - option "Red" [ref=e4]',
+            '  - option "Blue" [ref=e5]',
+            '- text: Send it',
+            '- button "Send it" [ref=e6]',
+          ].join('\n'),
+        });
+      }
+    );
+  });
+
   it('types slowly character by character with key events through the injected code', async () => {
     const { session } = createExecutingScriptingSession();
     const { globals, input } = createFakePageGlobals();
@@ -1547,11 +1581,14 @@ describe('browser tool session scripting backend', () => {
     }
   );
 
-  it('names the upstream tool in the Firefox error and keeps it off the debugger backend', () => {
+  it('names the tool the way the caller called it and keeps it off the debugger backend', () => {
     const { session } = createScriptingSession();
 
     expect(getFirefoxUnsupportedToolError('browser_console_messages')).toBe(
-      `kilo_browser_console_messages is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
+      `browser_console_messages is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
+    );
+    expect(getFirefoxUnsupportedToolError('kilo_browser_drag')).toBe(
+      `kilo_browser_drag is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
     );
     expect(session.getToolUnavailableError('kilo_browser_console_messages')).toContain(
       FIREFOX_PLATFORM_LIMIT

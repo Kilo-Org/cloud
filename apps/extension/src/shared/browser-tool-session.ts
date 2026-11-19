@@ -50,13 +50,17 @@ export const MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH = 4000;
 
 /**
  * Why the debugger-only tools cannot run where `chrome.debugger` is missing.
- * Firefox exposes no CDP, so console, network, dialog, file-chooser and
- * model-authored Playwright-code tools have no scripting equivalent.
+ * Firefox exposes no CDP, so console, network, dialog, file-chooser,
+ * drag-and-drop and model-authored Playwright-code tools have no scripting
+ * equivalent. A drag needs trusted input: page-dispatched mouse events never
+ * start an HTML drag operation, so a scripted drag would report success with
+ * no effect.
  */
 export const FIREFOX_PLATFORM_LIMIT = 'this browser exposes no debugger protocol';
 
 const FIREFOX_UNSUPPORTED_BROWSER_TOOL_BASE_NAMES = [
   'browser_console_messages',
+  'browser_drag',
   'browser_network_requests',
   'browser_network_request',
   'browser_handle_dialog',
@@ -72,13 +76,14 @@ export const FIREFOX_UNSUPPORTED_BROWSER_TOOLS: readonly string[] =
  * The tool error the scripting backend returns for a tool the platform cannot
  * express, or `undefined` when the tool has a scripting implementation.
  * Accepts the model-facing `kilo_browser_*` name or the upstream `browser_*`
- * one, so both the executor and the wiring layer can call it.
+ * one and names the tool the way the caller did, so a CLI model reads the
+ * `browser_*` name it called.
  */
 export const getFirefoxUnsupportedToolError = (tool: string): string | undefined => {
   const name = tool.startsWith(KILO_BROWSER_TOOL_PREFIX) ? tool : toKiloBrowserToolName(tool);
 
-  return FIREFOX_UNSUPPORTED_BROWSER_TOOLS.some(candidate => candidate === name)
-    ? `${name} is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
+  return FIREFOX_UNSUPPORTED_BROWSER_TOOLS.includes(name)
+    ? `${tool} is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
     : undefined;
 };
 
@@ -729,14 +734,37 @@ const __role = (el) => {
   };
   return roles[tag] || '';
 };
+const __textOf = (el) => (el.textContent || '').replace(/\\s+/gu, ' ').trim();
+const __labelOf = (el) => {
+  const labelledBy = el.getAttribute('aria-labelledby');
+  if (labelledBy !== null && labelledBy.trim() !== '') {
+    const named = labelledBy.trim().split(/\\s+/u).map((id) => document.getElementById(id)).filter((node) => node !== null).map(__textOf).join(' ').trim();
+    if (named !== '') { return named; }
+  }
+  const labels = el.labels ? Array.from(el.labels) : [];
+  return labels.map((label) => {
+    const copy = label.cloneNode(true);
+    Array.from(copy.querySelectorAll('input, select, textarea, button')).forEach((control) => { control.remove(); });
+    return __textOf(copy);
+  }).filter((text) => text !== '').join(' ');
+};
 const __accessibleName = (el) => {
   const labelled = el.getAttribute('aria-label');
   if (labelled !== null && labelled.trim() !== '') { return labelled.trim(); }
+  const fromLabel = __labelOf(el);
+  if (fromLabel !== '') { return fromLabel; }
   const alt = el.getAttribute('alt');
   if (alt !== null && alt.trim() !== '') { return alt.trim(); }
-  const placeholder = el.getAttribute('placeholder');
-  if (placeholder !== null && placeholder.trim() !== '') { return placeholder.trim(); }
-  const text = (el.textContent || '').replace(/\\s+/gu, ' ').trim();
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+    const type = (el.getAttribute('type') || '').toLowerCase();
+    if (tag === 'input' && (type === 'button' || type === 'submit' || type === 'reset')) { return String(el.value || '').trim(); }
+    const placeholder = el.getAttribute('placeholder');
+    if (placeholder !== null && placeholder.trim() !== '') { return placeholder.trim(); }
+    const title = el.getAttribute('title');
+    return title === null ? '' : title.trim();
+  }
+  const text = __textOf(el);
   return text.length > 200 ? text.slice(0, 200) : text;
 };
 const __ariaAttributes = (el) => {
@@ -771,22 +799,24 @@ const __buildAria = (root, maxDepth, withBoxes, refStart) => {
     let refPart = '';
     if (interactiveRoles.indexOf(role) !== -1) {
       nextRef += 1;
-      refPart = 'e' + nextRef;
-      refs.push({ ref: refPart, selector: __selectorFor(el) });
+      refPart = ' [ref=e' + nextRef + ']';
+      refs.push({ ref: 'e' + nextRef, selector: __selectorFor(el) });
     }
     const attributes = __ariaAttributes(el).join('');
     let box = '';
     if (withBoxes) {
       const rect = el.getBoundingClientRect();
-      box = '[box=' + Math.round(rect.left) + ',' + Math.round(rect.top) + ',' + Math.round(rect.width) + ',' + Math.round(rect.height) + ']';
+      box = ' [box=' + Math.round(rect.left) + ',' + Math.round(rect.top) + ',' + Math.round(rect.width) + ',' + Math.round(rect.height) + ']';
     }
     const quoted = name === '' ? '' : ' "' + name.split('"').join('') + '"';
+    let printed = false;
     if (role !== '' && (name !== '' || interactiveRoles.indexOf(role) !== -1)) {
       lines.push('  '.repeat(depth) + '- ' + role + quoted + refPart + attributes + box);
+      printed = true;
     } else if (role === '' && name !== '' && children.length === 0) {
       lines.push('  '.repeat(depth) + '- text: ' + name);
     }
-    for (const child of children) { walk(child, depth + 1); }
+    for (const child of children) { walk(child, printed ? depth + 1 : depth); }
   };
   walk(root, 0);
   return { lines: lines, nextRef: nextRef, refs: refs };
@@ -1067,32 +1097,6 @@ __mouse(el, 'mouseenter', flags);
 __mouse(el, 'mousemove', flags);
 return __finish('Hovered over ' + ${scriptJson(selector)} + '.');`;
 
-const buildDragPageScript = ({
-  endSelector,
-  startSelector,
-}: {
-  readonly endSelector: string;
-  readonly startSelector: string;
-}): string =>
-  `${SCRIPTING_PAGE_PREAMBLE}
-const start = __element(${scriptJson(startSelector)});
-const end = __element(${scriptJson(endSelector)});
-start.scrollIntoView({ block: 'center', inline: 'center' });
-const startRect = start.getBoundingClientRect();
-const endRect = end.getBoundingClientRect();
-const from = { clientX: startRect.left + startRect.width / 2, clientY: startRect.top + startRect.height / 2 };
-const to = { clientX: endRect.left + endRect.width / 2, clientY: endRect.top + endRect.height / 2 };
-const base = Object.assign({ bubbles: true, cancelable: true }, __modifiers([]));
-__mouse(start, 'mousemove', Object.assign({}, base, from, { buttons: 0 }));
-__mouse(start, 'mousedown', Object.assign({}, base, from, { button: 0, buttons: 1 }));
-for (let step = 1; step <= 10; step += 1) {
-  const clientX = from.clientX + ((to.clientX - from.clientX) * step) / 10;
-  const clientY = from.clientY + ((to.clientY - from.clientY) * step) / 10;
-  __mouse(end, 'mousemove', Object.assign({}, base, { clientX: clientX, clientY: clientY, buttons: 1 }));
-}
-__mouse(end, 'mouseup', Object.assign({}, base, to, { button: 0, buttons: 0 }));
-return __finish('Dragged ' + ${scriptJson(startSelector)} + ' onto ' + ${scriptJson(endSelector)} + '.');`;
-
 const buildDropPageScript = ({
   data,
   paths,
@@ -1348,12 +1352,6 @@ const browserToolTypeArgsSchema = z.object({
   submit: z.boolean().optional(),
   target: z.string().min(1),
   text: z.string(),
-});
-const browserToolDragArgsSchema = z.object({
-  endElement: z.string().optional(),
-  endTarget: z.string().min(1),
-  startElement: z.string().optional(),
-  startTarget: z.string().min(1),
 });
 const browserToolDropArgsSchema = z.object({
   data: z.record(z.string(), z.string()).optional(),
@@ -2852,7 +2850,7 @@ export const createBrowserToolSession = ({
     const baseName = toolName.startsWith(KILO_BROWSER_TOOL_PREFIX)
       ? toolName.slice(KILO_BROWSER_TOOL_PREFIX.length)
       : toolName;
-    const firefoxUnsupported = getFirefoxUnsupportedToolError(baseName);
+    const firefoxUnsupported = getFirefoxUnsupportedToolError(toolName);
 
     if (firefoxUnsupported !== undefined) {
       return backend === 'scripting'
@@ -2882,30 +2880,6 @@ export const createBrowserToolSession = ({
             modifiers: parsed.data.modifiers ?? [],
             selector: resolved.selector,
           })
-        );
-      }
-
-      case 'browser_drag': {
-        const parsed = browserToolDragArgsSchema.safeParse(args);
-
-        if (!parsed.success) {
-          return { error: 'browser_drag needs startTarget and endTarget.', ok: false };
-        }
-
-        const start = resolveTargetArg(refs, parsed.data.startTarget);
-
-        if ('error' in start) {
-          return { error: start.error, ok: false };
-        }
-
-        const end = resolveTargetArg(refs, parsed.data.endTarget);
-
-        if ('error' in end) {
-          return { error: end.error, ok: false };
-        }
-
-        return runPageTool(
-          buildDragPageScript({ endSelector: end.selector, startSelector: start.selector })
         );
       }
 

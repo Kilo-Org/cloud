@@ -192,6 +192,24 @@ function renderPreviewBody(preview: TextPreviewState) {
   );
 }
 
+/**
+ * Apply the shared display cap to a preview and fold that cap's own flag into
+ * the preview's. One value then drives both the rendered body and the marker:
+ * a read that stops at the budget can still decode to more characters than it
+ * read (a multi-byte tail), and the cap must never cut the body silently.
+ */
+function boundPreviewText(preview: TextPreviewState): TextPreviewState {
+  const { displayText, isTruncated } = prepareMonoScrollContent(
+    preview.text,
+    TEXT_PREVIEW_MAX_CHARS
+  );
+  return {
+    mode: preview.mode,
+    text: displayText,
+    isTruncated: preview.isTruncated || isTruncated,
+  };
+}
+
 type AttachmentChipProps = {
   attachment: AgentAttachment;
   index: number;
@@ -498,6 +516,10 @@ const AttachmentChip = memo(function AttachmentChip({
     </View>
   );
 
+  // The sheet renders this, not the raw read: the body is always capped and the
+  // marker reflects either reason the shown text stops short.
+  const boundedPreview = textPreview === null ? null : boundPreviewText(textPreview);
+
   return (
     <>
       {/* Outer wrapper keeps the strip's horizontal spacing (mr-2) and anchors
@@ -624,7 +646,7 @@ const AttachmentChip = memo(function AttachmentChip({
         />
       ) : null}
 
-      {textPreview !== null ? (
+      {boundedPreview !== null ? (
         <SessionPageSheet
           dismissible
           visible
@@ -641,7 +663,7 @@ const AttachmentChip = memo(function AttachmentChip({
             doneLabel={t('common.done')}
             topInset="ios-page-sheet"
           />
-          {textPreview.text === '' ? (
+          {boundedPreview.text === '' ? (
             <CenteredState>
               <Text className="px-6 text-center text-xs text-muted-foreground">
                 {t('agentChat.filePart.fileEmpty')}
@@ -649,7 +671,7 @@ const AttachmentChip = memo(function AttachmentChip({
             </CenteredState>
           ) : (
             <>
-              {textPreview.isTruncated ? (
+              {boundedPreview.isTruncated ? (
                 // Above the body, not after it: a 50k-character preview never
                 // scrolls to a trailing marker in practice, so the notice the
                 // reader needs has to be visible on the first paint.
@@ -661,20 +683,7 @@ const AttachmentChip = memo(function AttachmentChip({
                 </Text>
               ) : null}
               <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-                {/* The read path already bounds the text to the budget; the
-                    prepare call is the shared cap-and-marker contract, so the
-                    sheet can never render an unbounded string. */}
-                {(() => {
-                  const { displayText } = prepareMonoScrollContent(
-                    textPreview.text,
-                    TEXT_PREVIEW_MAX_CHARS
-                  );
-                  return renderPreviewBody({
-                    mode: textPreview.mode,
-                    text: displayText,
-                    isTruncated: textPreview.isTruncated,
-                  });
-                })()}
+                {renderPreviewBody(boundedPreview)}
               </ScrollView>
               <View style={{ height: insets.bottom }} className="bg-background" />
             </>

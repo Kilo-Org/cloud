@@ -1621,8 +1621,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
 
     // The reset must not delete the picker-owned original; only the stripped
     // app-owned copy is deletable.
-    expect(hoisted.fileDelete).not.toHaveBeenCalledWith('file:///cache/IMG_0001.HEIC');
-
     await act(async () => {
       strip.resolve({ uri: 'file:///cache/stripped.jpg', width: 100, height: 100 });
       await addPromise;
@@ -1632,6 +1630,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     // The stale-generation discard deletes the app-owned stripped copy the
     // loop created: no orphaned cache file, no chip, no upload.
     expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/stripped.jpg');
+    expect(hoisted.fileDelete).not.toHaveBeenCalledWith('file:///cache/IMG_0001.HEIC');
     expect(hookApi().attachments).toHaveLength(0);
     expect(hoisted.uploadOne).not.toHaveBeenCalled();
     renderer.unmount();

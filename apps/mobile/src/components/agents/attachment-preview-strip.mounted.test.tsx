@@ -194,6 +194,10 @@ vi.mock('@expo/react-native-action-sheet', () => ({
 const { fileText } = expoFileSystemMock;
 const { showActionSheetWithOptions } = actionSheetMock;
 
+// Mirrors `attachment-preview-strip.tsx`'s module-local cap, so the bounded
+// read's byte count is pinned to the same budget the component gates on.
+const TEXT_PREVIEW_MAX_CHARS = 50_000;
+
 function makeAttachment(overrides: Partial<AgentAttachment>): AgentAttachment {
   return {
     id: 'a1',
@@ -668,6 +672,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     // The bounded path never runs the whole-file read.
     expect(fileText).not.toHaveBeenCalled();
     expect(expoFileSystemMock.readBytes).toHaveBeenCalledTimes(1);
+    expect(expoFileSystemMock.readBytes).toHaveBeenCalledWith(TEXT_PREVIEW_MAX_CHARS);
 
     const markdown = nodesByType(renderer.root, 'MarkdownText');
     expect(markdown).toHaveLength(1);
@@ -699,6 +704,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
 
     expect(fileText).not.toHaveBeenCalled();
     expect(expoFileSystemMock.readBytes).toHaveBeenCalledTimes(1);
+    expect(expoFileSystemMock.readBytes).toHaveBeenCalledWith(TEXT_PREVIEW_MAX_CHARS);
 
     renderer.unmount();
   });

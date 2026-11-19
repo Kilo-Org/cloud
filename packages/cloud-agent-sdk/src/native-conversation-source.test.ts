@@ -1,6 +1,10 @@
 import { kilo2AssetKey, readKilo2Messages } from './kilo2-source-messages';
 import { applyNativeEvent, applyNativeSessionEvent } from './native-conversation-reducer';
-import { readNativeConversation, reduceNativePendingRequests } from './native-conversation-source';
+import {
+  readNativeConversation,
+  reduceNativePendingRequests,
+  retryableGapCount,
+} from './native-conversation-source';
 import type { NativeEvent, NativeSessionState } from './native-sync';
 import type { NativeSnapshotMessage } from './native-sync-snapshot';
 
@@ -308,6 +312,18 @@ test('incomplete native values never become a complete empty transcript and rese
   expect(
     readNativeConversation({ ...state, connection: 'disconnected', error: 'forbidden' }).error
   ).toBe('forbidden');
+  // A projection failure is a real error and charges no gap count: Retry
+  // cannot fill parts a broken projection dropped, so the count stays at the
+  // genuinely incomplete identities. The split lives in retryableGapCount —
+  // the projector's throws are unreachable through this boundary (the
+  // unresolved-asset filter subsumes them), so the helper is pinned directly.
+  expect(
+    retryableGapCount([{ seq: 1, incomplete: true, message: { id: 'msg_a', type: 'assistant', time: { created: 1 } } }], ['msg_b'], new Set(['msg_c']), true)
+  ).toBe(2);
+  expect(retryableGapCount([], undefined, new Set(['msg_c']), true)).toBe(0);
+  expect(
+    retryableGapCount([{ seq: 1, incomplete: true, message: { id: 'msg_a', type: 'assistant', time: { created: 1 } } }], ['msg_b'], new Set(['msg_c']), false)
+  ).toBe(3);
 });
 
 test('authoritative content replacement retains metadata and resets only obsolete source ordinals', () => {
@@ -670,7 +686,7 @@ test('native inbox files and synthetic messages retain exact payloads and delive
     frame('session.inbox.cancelled', { inboxID: 'msg_synthetic' }, 5)
   );
   expect(messages.map(item => item.message.id)).toEqual(['msg_user']);
-  expect(readNativeConversation({ ...state, messages }).messages[0]?.parts[1]).toMatchObject({
+  const dbg = readNativeConversation({ ...state, messages }); console.log('DBG', JSON.stringify(dbg.nativeMessages.map(n => ({ id: n.message.id, inc: n.incomplete }))), 'gaps', dbg.recoveryGaps); expect(dbg.messages[0]?.parts[1]).toMatchObject({
     type: 'file',
     filename: 'file.txt',
   });

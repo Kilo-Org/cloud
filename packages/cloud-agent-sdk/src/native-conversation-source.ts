@@ -143,6 +143,34 @@ export function reduceNativePendingRequests(
   return pending;
 }
 
+/**
+ * Parts the recovery snapshot can still fill, deduplicated by identity. A
+ * projection failure changes nothing here: those parts leave the transcript
+ * through `error`, and counting them as gaps would promise a Retry the
+ * recovery loop cannot deliver.
+ */
+export function retryableGapCount(
+  messages: NativeSnapshotMessage[],
+  pendingSnapshotMessageIDs: string[] | undefined,
+  unresolvedMessageIDs: ReadonlySet<string>,
+  projectionFailed: boolean
+): number {
+  // The same identities the projector would have consumed: when the
+  // projection itself fails, none of them is a recoverable gap — recovery
+  // fills missing transports, not a broken projector.
+  if (projectionFailed) {
+    return new Set([
+      ...messages.filter(item => item.incomplete).map(item => item.message.id),
+      ...(pendingSnapshotMessageIDs ?? []),
+    ]).size;
+  }
+  return new Set([
+    ...messages.filter(item => item.incomplete).map(item => item.message.id),
+    ...(pendingSnapshotMessageIDs ?? []),
+    ...unresolvedMessageIDs,
+  ]).size;
+}
+
 /** Shared native display boundary. It never opens a socket or owns replay/recovery. */
 export function readNativeConversation(state: NativeSessionState): NativeConversation {
   const complete = state.messages.filter(item => !item.incomplete);
@@ -184,13 +212,12 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
   // Retryable gap count: parts the recovery snapshot can still fill. A
   // projection failure is a real error below, not more gaps to charge the
   // banner with.
-  const recoveryGaps = projectionError
-    ? new Set([
-        ...state.messages.filter(item => item.incomplete).map(item => item.message.id),
-        ...(state.pendingSnapshotMessageIDs ?? []),
-        ...unresolvedByProjection,
-      ]).size
-    : incompleteMessageIDs.length;
+  const recoveryGaps = retryableGapCount(
+    state.messages,
+    state.pendingSnapshotMessageIDs,
+    unresolvedByProjection,
+    projectionError !== undefined
+  );
   return {
     source: { version: 'v2' as const, runtime: 'native' as const },
     // Keep the exact canonical values available to details, usage and export consumers.

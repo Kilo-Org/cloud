@@ -199,4 +199,21 @@ describe('native remote entry', () => {
       renderer.unmount();
     });
   });
+
+  it('never serves a selected fixture in a production build', () => {
+    // Both carriers hold a state, and the production guard still refuses first.
+    mocks.fixture = 'gaps';
+    mocks.param = 'gaps';
+    mocks.token = undefined;
+    vi.stubGlobal('__DEV__', false);
+    const renderer = mount();
+    expect(mocks.redirect).toHaveBeenCalled();
+    expect(renderer.root.findAllByType('NativeRemoteTranscript')).toHaveLength(0);
+    expect(mocks.client).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+    mocks.fixture = undefined;
+    mocks.param = undefined;
+  });
 });

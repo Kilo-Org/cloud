@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Cloud, type LucideIcon, Monitor, Sparkles } from '@/components/ui/icons';
 import { IconTile } from '@/components/ui/icon-tile';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
@@ -60,7 +61,7 @@ function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionPro
       accessibilityLabel={title}
       // The body is the reason to pick this path, and the card's own text is
       // grouped into the one control, so the hint is where a reader hears it.
-      accessibilityHint={body}
+      accessibilityHint={stripInlineCodeMarkers(body)}
       onPress={() => {
         selectionHaptic();
         onPress();
@@ -71,7 +72,9 @@ function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionPro
         <IconTile icon={Icon} tint={NEUTRAL_TINT} />
         <View className="gap-1">
           <Text variant="heading">{title}</Text>
-          <Text variant="muted">{body}</Text>
+          {/* The computer card names `kilo remote`, so the command draws in
+              mono while the reason around it keeps the muted body style. */}
+          <InlineCodeText variant="muted" codeClassName="text-muted-foreground" value={body} />
         </View>
       </Card>
     </Pressable>
@@ -116,7 +119,7 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
         <ForkOption
           icon={Monitor}
           title={t('tour.remoteOptionTitle')}
-          body={stripInlineCodeMarkers(t('tour.remoteOptionBody'))}
+          body={t('tour.remoteOptionBody')}
           onPress={() => {
             onChoose('remote');
           }}

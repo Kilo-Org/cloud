@@ -28,6 +28,7 @@ import {
   gt,
   and,
   isNull,
+  isNotNull,
   inArray,
   sql,
   type SQL,
@@ -1343,9 +1344,12 @@ export const organizationAdminRouter = createTRPCRouter({
       // trial_active entitlement stage. Match the entitlement fallback for orgs
       // that never had free_trial_end_at persisted.
       if (trial_ending_in_future) {
-        // An organization created without a trial has no future trial window
-        // even when a stored date would otherwise match.
-        conditions.push(eq(organizations.trial_granted, true));
+        // An organization carries a trial when it was granted one or when an
+        // admin stored an explicit end date; the entitlement classifier honors
+        // either. An organization with neither stays out.
+        conditions.push(
+          or(eq(organizations.trial_granted, true), isNotNull(organizations.free_trial_end_at))
+        );
         conditions.push(
           sql`COALESCE(${organizations.free_trial_end_at}, ${organizations.created_at} + ${ORGANIZATION_TRIAL_DURATION_DAYS} * INTERVAL '1 day') >= NOW() + ${ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING} * INTERVAL '1 day'`
         );

@@ -1208,6 +1208,73 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(lastStatusUpdateBody(fetchMock)).not.toMatchObject({ status: 'failed' });
   });
 
+  it('keeps a cancellation that lands while the retry stops the replaced session', async () => {
+    const stub = getReviewStub();
+    const interruptStarted = deferredSignal();
+    const interruptRelease = deferredSignal();
+    let interruptCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-in-flight',
+          kiloSessionId: 'ses_in_flight',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcError(500, 'Container failed with internal server error status: 500');
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        interruptCalls += 1;
+        if (interruptCalls === 1) {
+          interruptStarted.resolve();
+          await interruptRelease.promise;
+        }
+        return trpcSuccess({ success: true });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+
+      const alarmRun = instance.alarm();
+      await interruptStarted.promise;
+      await expect(instance.cancel('superseded')).resolves.toBe(true);
+      interruptRelease.resolve();
+      await alarmRun;
+    });
+
+    const stored = await storedReview(stub);
+    expect(stored).toMatchObject({
+      status: 'cancelled',
+      errorMessage: 'Review cancelled: superseded',
+    });
+    expect(stored?.sandboxRetryAttempted).not.toBe(true);
+
+    const statusBodies = fetchCalls(fetchMock, '/api/internal/code-review-status/').map(
+      ([, init]) =>
+        JSON.parse(String((init as RequestInit | undefined)?.body)) as { status?: string }
+    );
+    const cancelledIndex = statusBodies.findIndex(body => body.status === 'cancelled');
+    expect(cancelledIndex).toBeGreaterThanOrEqual(0);
+    expect(
+      statusBodies.slice(cancelledIndex + 1).filter(body => body.status === 'queued')
+    ).toHaveLength(0);
+
+    const alarm = await storedAlarm(stub);
+    expect(alarm).toEqual(expect.any(Number));
+    if (alarm === null) {
+      throw new Error('Expected the cancellation cleanup alarm to stay scheduled');
+    }
+    expect(alarm).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
+  });
+
   it('fails the review when billing stays unavailable after the fresh-session retry', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {

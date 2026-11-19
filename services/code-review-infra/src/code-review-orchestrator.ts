@@ -514,38 +514,35 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     });
   }
 
+  /**
+   * The reason a fresh-session retry must not requeue the review, or undefined when it may.
+   * A concurrent cancel() sets the in-memory flag, interrupts the session, and records the
+   * terminal status, so the retry helper re-reads all three after any await.
+   */
+  private freshSessionRetrySkipReason(): string | undefined {
+    if (this.state.sandboxRetryAttempted === true) {
+      return 'retry_already_attempted';
+    }
+
+    if (this.cancelled) {
+      return 'review_cancelled';
+    }
+
+    if (isTerminalStatus(this.state.status)) {
+      return 'review_already_terminal';
+    }
+
+    return undefined;
+  }
+
   private async tryRetryFreshSessionAfterSandboxError(
     source: string,
     error: unknown,
     classification: CloudAgentNextFreshRetryClassification
   ): Promise<boolean> {
-    if (this.state.sandboxRetryAttempted === true) {
-      this.logCloudAgentNextFreshSessionRetrySkipped(
-        source,
-        error,
-        classification,
-        'retry_already_attempted'
-      );
-      return false;
-    }
-
-    if (this.cancelled) {
-      this.logCloudAgentNextFreshSessionRetrySkipped(
-        source,
-        error,
-        classification,
-        'review_cancelled'
-      );
-      return false;
-    }
-
-    if (isTerminalStatus(this.state.status)) {
-      this.logCloudAgentNextFreshSessionRetrySkipped(
-        source,
-        error,
-        classification,
-        'review_already_terminal'
-      );
+    const skipReason = this.freshSessionRetrySkipReason();
+    if (skipReason) {
+      this.logCloudAgentNextFreshSessionRetrySkipped(source, error, classification, skipReason);
       return false;
     }
 
@@ -556,6 +553,20 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     const previousSandboxId = this.state.sandboxId;
 
     await this.interruptDiscardedSessions(source, 'retry_replaces_session');
+
+    // The stop requests can overlap a cancellation that already owns the review: cancel()
+    // interrupts the session and records the terminal status while this wait is in flight, so
+    // requeueing here would resurrect a cancelled review after a Durable Object restart.
+    const interruptedSkipReason = this.freshSessionRetrySkipReason();
+    if (interruptedSkipReason) {
+      this.logCloudAgentNextFreshSessionRetrySkipped(
+        source,
+        error,
+        classification,
+        interruptedSkipReason
+      );
+      return false;
+    }
 
     this.state.sandboxRetryAttempted = true;
     this.state.previousCloudAgentSessionId = undefined;

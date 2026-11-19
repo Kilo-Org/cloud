@@ -5,6 +5,7 @@ import {
   briefingAccessDenied,
   briefingEstimateUnavailableKey,
   briefingReportMissing,
+  briefingSummaryStatusKey,
   briefingSyncDelayMs,
   canReadBriefingContext,
   parseBriefingSafeguardInput,
@@ -142,6 +143,33 @@ describe('briefingEstimateUnavailableKey', () => {
       'agentBriefing.estimateUnavailable'
     );
     expect(briefingEstimateUnavailableKey(null)).toBe('agentBriefing.estimateUnavailable');
+  });
+});
+
+describe('briefingSummaryStatusKey', () => {
+  it('names a skipped summary not_admitted instead of a generic failure', () => {
+    expect(briefingSummaryStatusKey('failed', 'not_admitted')).toBe(
+      'agentBriefing.summaryNotAdmitted'
+    );
+    expect(briefingSummaryStatusKey('unavailable', 'not_admitted')).toBe(
+      'agentBriefing.summaryNotAdmitted'
+    );
+  });
+
+  it('keeps a failed or timed-out summary a failure, and status alone unchanged', () => {
+    expect(briefingSummaryStatusKey('failed', 'time_limit')).toBe(
+      'agentBriefing.snapshotSummaryFailed'
+    );
+    expect(briefingSummaryStatusKey('failed')).toBe('agentBriefing.snapshotSummaryFailed');
+    expect(briefingSummaryStatusKey('failed', null)).toBe('agentBriefing.snapshotSummaryFailed');
+    expect(briefingSummaryStatusKey('unavailable')).toBe('agentBriefing.summaryUnavailable');
+    expect(briefingSummaryStatusKey('disabled')).toBe('agentBriefing.summaryUnavailable');
+    expect(briefingSummaryStatusKey('pending')).toBe('agentBriefing.summaryPending');
+    expect(briefingSummaryStatusKey('running')).toBe('agentBriefing.summaryPending');
+    expect(briefingSummaryStatusKey('ready')).toBe('agentBriefing.summary');
+    expect(briefingSummaryStatusKey('failed', 'gateway_declined')).toBe(
+      'agentBriefing.snapshotSummaryFailed'
+    );
   });
 });
 

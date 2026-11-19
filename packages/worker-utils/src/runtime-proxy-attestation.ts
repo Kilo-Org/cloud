@@ -1,7 +1,7 @@
 import { SignJWT } from 'jose';
 import { z } from 'zod';
 import { verifyKiloTokenSignature } from './kilo-token-verification';
-import { sha256Hex } from './sha256.js';
+import { sha256Hex } from './sha256';
 
 export const RUNTIME_PROXY_ATTESTATION_HEADER = 'X-Kilo-Runtime-Proxy-Attestation';
 export const RUNTIME_PROXY_ATTESTATION_ISSUER = 'kilocode-runtime-proxy';

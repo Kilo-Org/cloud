@@ -6,7 +6,9 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { trialRefusalMessage } from '@/lib/trial-refusal-copy';
+import { cn } from '@/lib/utils';
 
 // Development-only visual fixture, opened through the development fixture link.
 // Reproduces the low-balance alert sheet's form in the state a rejected save
@@ -31,7 +33,7 @@ export function LowBalanceAlertRefusalFixture({
       <ScreenHeader title={t('organization.lowBalanceAlert.title')} />
       <TabScreenScrollView
         className="flex-1 bg-background"
-        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
       >
         <View testID="low-balance-alert-refusal-status">
           <RefusalStatus

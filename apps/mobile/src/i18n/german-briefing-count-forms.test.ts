@@ -43,13 +43,22 @@ describe('German briefing metadata counts', () => {
   });
 
   it('keeps the singular plan step at one and inflects from two', () => {
+    // The screen passes `count: plan.total`, so the singular only ever appears
+    // for a one-step plan.
     expect(
       i18n.t('agentBriefing.metadataPlan', {
         count: 1,
         displayDone: counted(1),
+        displayTotal: counted(1),
+      })
+    ).toBe('Plan: 1 von 1 Schritt erledigt');
+    expect(
+      i18n.t('agentBriefing.metadataPlan', {
+        count: 3,
+        displayDone: counted(1),
         displayTotal: counted(3),
       })
-    ).toBe('Plan: 1 von 3 Schritt erledigt');
+    ).toBe('Plan: 1 von 3 Schritten erledigt');
     expect(
       i18n.t('agentBriefing.metadataPlan', {
         count: 12,

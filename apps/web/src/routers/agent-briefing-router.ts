@@ -113,7 +113,7 @@ export const agentBriefingRouter = createTRPCRouter({
           });
       }
       await db.transaction(async tx => {
-        if (input.enabled || input.language !== undefined) {
+        if (input.enabled) {
           const timezone = input.timezone ?? 'UTC';
           await tx
             .insert(agent_briefing_preferences)

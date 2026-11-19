@@ -832,6 +832,21 @@ it('atomically initializes a fresh enabled context schedule in the requested tim
   });
 });
 
+// A language-only update must not enroll a user who never enabled summaries:
+// the schedule row's NOT NULL next_run_at would put them in the daily sweep.
+it('leaves no schedule row when a context update only carries a language', async () => {
+  const user = await insertTestUser({ total_microdollars_acquired: 10_000_000 });
+  const caller = agentBriefingRouter.createCaller({ user });
+  await expect(
+    caller.updateContextPreferences({
+      enabled: false,
+      timezone: 'Europe/Berlin',
+      language: 'de',
+    })
+  ).resolves.toBeDefined();
+  expect(await db.select().from(agent_briefing_preferences)).toHaveLength(0);
+});
+
 function maintenanceSnapshot(
   userId: string,
   localDate: string

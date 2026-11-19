@@ -47,6 +47,6 @@ jobs:
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
       axiom_annotation_dataset: kilocode-app
-    secrets:
-      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    # The called workflow declares the production environment, which a calling
+    # job cannot; `inherit` is how its environment-scoped tokens reach it.
+    secrets: inherit

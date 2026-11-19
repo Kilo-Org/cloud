@@ -48,5 +48,8 @@ jobs:
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-secure-proxy.outputs.deployment_url }}
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    # The called workflow declares the production environment, which a calling
+    # job cannot; `inherit` is how its environment-scoped tokens reach it. The
+    # callee annotates only when its dataset input is set, which this call does
+    # not set, so the additional inherited names reach no step here.
+    secrets: inherit

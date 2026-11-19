@@ -682,10 +682,24 @@ test('ai-gateway deploys with each scheduled release and its promotion waits for
     axiom_annotation_dataset: 'vercel',
     axiom_expected_project: 'kilocode-ai-gateway',
   });
-  assert.equal(
-    promoteAiGateway.secrets.AXIOM_ANNOTATION_TOKEN,
-    '${{ secrets.AXIOM_ANNOTATION_TOKEN }}'
-  );
+
+  // The called workflow declares the production environment, so the tokens it
+  // reads resolve only when the calling job passes every secret it can see.
+  // A calling job cannot declare an environment itself.
+  for (const [file, deployment] of [
+    ['deploy-production.yml', production],
+    ['redeploy-web.yml', workflow('redeploy-web')],
+    ['deploy-ai-gateway-secure-proxy.yml', workflow('deploy-ai-gateway-secure-proxy')],
+  ]) {
+    const promotion = deployment.jobs['promote-app'] ?? deployment.jobs['promote-secure-proxy'];
+    assert.equal(promotion.secrets, 'inherit', `${file} must pass every secret to the promotion`);
+    assert.equal(
+      promotion.environment,
+      undefined,
+      `${file} promotion cannot declare an environment`
+    );
+  }
+  assert.equal(production.jobs['promote-ai-gateway'].secrets, 'inherit');
 
   const deployAiGateway = staging.jobs['deploy-ai-gateway'];
   assert.deepEqual(deployAiGateway.needs, ['verify-main', 'check-changes']);

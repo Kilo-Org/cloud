@@ -318,6 +318,350 @@ describe('session transport routing', () => {
       });
       expect(resolveSession).toHaveBeenCalledTimes(1);
     });
+
+    describe('with fake timers', () => {
+      // The historical transport has no internal timers, so fake timers only
+      // exercise the re-arm cool-down the watcher schedules after a
+      // stay-read-only re-resolve.
+      beforeEach(() => {
+        jest.useFakeTimers();
+      });
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      // The rearm path holds microtask+setTimeout flush semantics only — no
+      // real time is needed beyond jest's fake clock.
+      async function flushUpgradeResolution(): Promise<void> {
+        for (let i = 0; i < 10; i++) {
+          await Promise.resolve();
+        }
+      }
+
+      function heartbeatPayload(status: string) {
+        return {
+          connectionId: 'conn-1',
+          sessions: [{ id: SES_ID, status, title: 'Review' }],
+        };
+      }
+
+      it('keeps the historical transport when repeated heartbeats still resolve read-only', async () => {
+        const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+          Promise.resolve({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+        );
+        const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, [])));
+        const fake = makeFakeUserWebConnection();
+
+        const session = createCloudAgentSession({
+          kiloSessionId: kiloId(SES_ID),
+          resolveSession,
+          transport: {
+            fetchSnapshot,
+            userWebConnection: fake.connection,
+          },
+        });
+
+        session.connect();
+        await flushUpgradeResolution();
+
+        // Initial open: one resolve, one watcher arm.
+        expect(resolveSession).toHaveBeenCalledTimes(1);
+        expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+        expect(fake.connection.subscribeToCliSession).toHaveBeenCalledTimes(1);
+
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+
+        // Same-row re-resolve that stays read-only keeps the historical
+        // transport: no second fetch, and the watcher re-arms only after the
+        // 1s cool-down.
+        expect(resolveSession).toHaveBeenCalledTimes(2);
+        expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+        expect(fake.connection.subscribeToCliSession).toHaveBeenCalledTimes(1);
+
+        jest.advanceTimersByTime(1000);
+        expect(fake.connection.subscribeToCliSession).toHaveBeenCalledTimes(2);
+
+        // The re-arm cleared the last observed row, so the FIRST identical
+        // heartbeat after the cool-down is one inconclusive retry (bounded by
+        // the backoff, transport untouched, no refetch); heartbeats 3..5
+        // within the same interval are no-ops.
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        for (let i = 0; i < 4; i++) {
+          fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+          await flushUpgradeResolution();
+        }
+        expect(resolveSession).toHaveBeenCalledTimes(3);
+        expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+        expect(fake.connection.subscribeToCliSession).toHaveBeenCalledTimes(2);
+        expect(fake.subscribeRelease).toHaveBeenCalledTimes(2);
+        expect(fake.offSystemEvent).toHaveBeenCalledTimes(2);
+
+        // A pending cool-down must not outlive destroy: no re-arm, no extra
+        // resolve after the timer would have fired.
+        session.destroy();
+        jest.advanceTimersByTime(1000);
+        expect(resolveSession).toHaveBeenCalledTimes(3);
+        expect(fake.connection.subscribeToCliSession).toHaveBeenCalledTimes(2);
+      });
+
+      it('re-arms the watcher after the cool-down and upgrades when status changes', async () => {
+        const resolveSession = jest
+          .fn<Promise<ResolvedSession>, [unknown]>()
+          .mockResolvedValueOnce({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+          .mockResolvedValueOnce({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+          .mockResolvedValue({ type: 'remote', kiloSessionId: kiloId(SES_ID) });
+        const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, [])));
+        const fake = makeFakeUserWebConnection();
+
+        const remoteApi = {
+          send: jest.fn(() => Promise.resolve()),
+          interrupt: jest.fn(() => Promise.resolve()),
+          answer: jest.fn(() => Promise.resolve()),
+          reject: jest.fn(() => Promise.resolve()),
+          respondToPermission: jest.fn(() => Promise.resolve()),
+        };
+
+        const session = createCloudAgentSession({
+          kiloSessionId: kiloId(SES_ID),
+          resolveSession,
+          transport: {
+            fetchSnapshot,
+            userWebConnection: fake.connection,
+            api: remoteApi,
+          },
+        });
+
+        session.connect();
+        await flushUpgradeResolution();
+
+        // First heartbeat reaches the still-CLI session: one stay-read-only
+        // re-resolve while the transport stays historical.
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(2);
+        expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+
+        // After the cool-down the watcher re-arms; the changed row then
+        // drives a second re-resolve that comes back remote, so the session
+        // upgrades off the historical transport.
+        jest.advanceTimersByTime(1000);
+        expect(fake.connection.subscribeToCliSession).toHaveBeenCalledTimes(2);
+
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('idle'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(3);
+        // The transport was rebuilt on the remote resolution: the historical
+        // transport seeded once at open, and the live CLI transport seeds its
+        // own replay with the same fetchSnapshot config on attach.
+        expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+        expect(remoteApi.send).not.toHaveBeenCalled();
+        // The upgraded watcher life released the earlier one: one extra
+        // disarm pair on top of the initial teardown at the upgrade trigger.
+        expect(fake.offSystemEvent).toHaveBeenCalledTimes(2);
+        expect(fake.subscribeRelease).toHaveBeenCalledTimes(2);
+        expect(fake.connection.subscribeToCliSession).toHaveBeenCalledTimes(3);
+
+        session.destroy();
+      });
+
+      it('ignores heartbeats whose row is unchanged after an upgrade attempt', async () => {
+        const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+          Promise.resolve({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+        );
+        const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, [])));
+        const fake = makeFakeUserWebConnection();
+
+        const session = createCloudAgentSession({
+          kiloSessionId: kiloId(SES_ID),
+          resolveSession,
+          transport: {
+            fetchSnapshot,
+            userWebConnection: fake.connection,
+          },
+        });
+
+        session.connect();
+        await flushUpgradeResolution();
+
+        // First heartbeat is new evidence: one re-resolve that stays
+        // read-only.
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(2);
+        expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+
+        // Two more identical heartbeats carry no new evidence while the
+        // backoff is pending: no extra re-resolve, no extra refetch.
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+
+        expect(resolveSession).toHaveBeenCalledTimes(2);
+        expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+
+        session.destroy();
+      });
+
+      it('retries after a transient outage and recovers to remote on identical rows', async () => {
+        // Mirrors the web resolver's presence-outage path: a failed presence
+        // read resolves read-only, and the CLI stays idle emitting the same
+        // row. The watcher must still close the eventual-consistency window.
+        const resolveSession = jest
+          .fn<Promise<ResolvedSession>, [unknown]>()
+          .mockResolvedValueOnce({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+          .mockResolvedValueOnce({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+          .mockRejectedValueOnce(new Error('presence outage'))
+          .mockResolvedValue({ type: 'remote', kiloSessionId: kiloId(SES_ID) });
+        const onError = jest.fn();
+        const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, [])));
+        const fake = makeFakeUserWebConnection();
+
+        const remoteApi = {
+          send: jest.fn(() => Promise.resolve()),
+          interrupt: jest.fn(() => Promise.resolve()),
+          answer: jest.fn(() => Promise.resolve()),
+          reject: jest.fn(() => Promise.resolve()),
+          respondToPermission: jest.fn(() => Promise.resolve()),
+        };
+
+        const session = createCloudAgentSession({
+          kiloSessionId: kiloId(SES_ID),
+          resolveSession,
+          transport: {
+            fetchSnapshot,
+            userWebConnection: fake.connection,
+            api: remoteApi,
+          },
+          onError,
+        });
+
+        session.connect();
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(1);
+
+        // First identical row: new evidence, one stay-read-only resolve.
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(2);
+
+        // After the cool-down the retry fires; the resolver throws (presence
+        // outage). The historical transport is untouched and the error
+        // surfaces.
+        jest.advanceTimersByTime(1000);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(3);
+        expect(onError).toHaveBeenCalledWith('presence outage');
+        expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+
+        // The failed attempt re-arms with a doubled backoff (2s); the same
+        // row then retries and the resolver now answers remote: upgrade.
+        jest.advanceTimersByTime(2000);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(4);
+        // Three watcher arms happened (open + two retries); each attempt
+        // disarms its watcher, and the upgrade to remote stops the cycle. The
+        // live CLI transport adds its own session subscription on attach.
+        expect(fake.subscribeRelease).toHaveBeenCalledTimes(3);
+        expect(fake.connection.subscribeToCliSession).toHaveBeenCalledTimes(4);
+
+        session.destroy();
+      });
+
+      it('escalates the retry backoff across repeated inconclusive attempts', async () => {
+        const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+          Promise.resolve({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+        );
+        const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, [])));
+        const fake = makeFakeUserWebConnection();
+
+        const session = createCloudAgentSession({
+          kiloSessionId: kiloId(SES_ID),
+          resolveSession,
+          transport: {
+            fetchSnapshot,
+            userWebConnection: fake.connection,
+          },
+        });
+
+        session.connect();
+        await flushUpgradeResolution();
+
+        // Attempt 1 fires at 1s, attempt 2 at 2s, attempt 3 at 4s: the
+        // backoff survives each re-arm because the retried row is identical
+        // to the row the previous inconclusive attempt was based on.
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(2);
+
+        jest.advanceTimersByTime(1000);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(3);
+
+        // Attempt 2's timer is 2s out; 1999ms must not fire it.
+        jest.advanceTimersByTime(1999);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(3);
+
+        jest.advanceTimersByTime(1);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(4);
+
+        session.destroy();
+      });
+
+      it('resets the backoff when a changed row drives the next attempt', async () => {
+        const resolveSession = jest.fn((): Promise<ResolvedSession> =>
+          Promise.resolve({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+        );
+        const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, [])));
+        const fake = makeFakeUserWebConnection();
+
+        const session = createCloudAgentSession({
+          kiloSessionId: kiloId(SES_ID),
+          resolveSession,
+          transport: {
+            fetchSnapshot,
+            userWebConnection: fake.connection,
+          },
+        });
+
+        session.connect();
+        await flushUpgradeResolution();
+
+        // Attempt 1 (new evidence) at 1s, attempt 2 (same row) at 2s.
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(2);
+
+        jest.advanceTimersByTime(1000);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('busy'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(3);
+
+        // A changed row is genuinely new evidence, not a retry: it resets the
+        // backoff so the next inconclusive interval is 1s again. The pending
+        // 2s retry timer fires first (the watcher is disarmed until it does).
+        jest.advanceTimersByTime(2000);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('idle'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(4);
+
+        jest.advanceTimersByTime(1000);
+        fake.emitSystemEvent('sessions.heartbeat', heartbeatPayload('idle'));
+        await flushUpgradeResolution();
+        expect(resolveSession).toHaveBeenCalledTimes(5);
+
+        session.destroy();
+      });
+    });
   });
 
   // NOTE: The old "completed Cloud Agent session" case (cloudAgentSessionId present

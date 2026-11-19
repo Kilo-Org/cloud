@@ -295,7 +295,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
     expect(checkedChoice('Policy violation')).toBe('Off');
     expect(container.textContent).not.toContain('NSFW');
     expect(container.textContent).toContain(
-      'Blocking detectors reject requests if Enkrypt is unavailable.'
+      'If Enkrypt is unavailable, requests are sent unscanned rather than rejected.'
     );
     expect(container.textContent).toContain('MCP and skill guardrails');
     expect(mockUpdate).not.toHaveBeenCalled();

@@ -3,8 +3,9 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, gt, isNull, isNotNull, not, sql, type SQL } from 'drizzle-orm';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
-import { randomInt, createHash, randomBytes } from 'node:crypto';
+import { randomInt, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { hashOpaqueSecret } from '@/lib/auth/secret-hash';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { requestingClientOfRow, type RequestingClient } from './requesting-client';
 import {
@@ -149,7 +150,7 @@ export function generateDeviceSecret(): string {
  * The secret is already high-entropy, so a plain digest is sufficient.
  */
 export function hashDeviceSecret(secret: string): string {
-  return createHash('sha256').update(secret).digest('hex');
+  return hashOpaqueSecret(secret);
 }
 
 /**
@@ -198,9 +199,6 @@ export async function createDeviceAuthRequest(params: {
   try {
     return await db.transaction(async tx => {
       if (ipAddress) {
-        // One instant for both the live-row predicate and the retry advisory, so
-        // the counted rows and the reported wait always describe one set of rows.
-        const now = new Date().toISOString();
         await tx.execute(sql.raw(`SET LOCAL lock_timeout = '${DEVICE_AUTH_PENDING_LOCK_WAIT_MS}'`));
 
         // The count and the insert below are one serialized unit for this
@@ -209,6 +207,12 @@ export async function createDeviceAuthRequest(params: {
         await tx.execute(
           sql`SELECT pg_advisory_xact_lock(hashtext(${PENDING_LIMIT_LOCK_NAMESPACE}), hashtext(${ipAddress}))`
         );
+
+        // One instant for both the live-row predicate and the retry advisory,
+        // captured after the lock: taking the lock can wait up to
+        // DEVICE_AUTH_PENDING_LOCK_WAIT_MS, and rows that expire during that
+        // wait must not count as live, nor the advisory promise their time.
+        const now = new Date().toISOString();
 
         const [result] = await tx
           .select({

@@ -99,7 +99,7 @@ export const sessionAuthOptions = {
     async session({ session, token }) {
       const castToken = token as unknown as JWT;
       session.user.id = castToken.sub;
-      session.isAdmin = castToken.isAdmin || false; // Ensure isAdmin is always defined
+      session.isAdmin = castToken.isAdmin || false;
       session.kiloUserId = castToken.kiloUserId;
       session.webSessionPepper = castToken.webSessionPepper ?? castToken.pepper ?? null;
       session.webSessionId = castToken.webSessionId;
@@ -804,7 +804,6 @@ async function readActiveDeviceSession(
 export const uuidSchema = z.uuid();
 const uuid = uuidSchema;
 // Namespace UUID for generating UUIDs from legacy user IDs
-// This is a fixed UUID that serves as the namespace for all user ID conversions
 const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'; // DNS namespace UUID
 
 export function getUserUUID(user: User): string {

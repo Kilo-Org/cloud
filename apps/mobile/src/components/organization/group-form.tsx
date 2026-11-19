@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useNavigation, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -9,6 +9,7 @@ import {
   isOrgGroupFormDirty,
   ORG_GROUP_DESCRIPTION_MAX_LENGTH,
   ORG_GROUP_NAME_MAX_LENGTH,
+  orgGroupFormExit,
   orgGroupNameError,
   selectOrgGroupMemberPickerState,
   sortOrgGroupMemberIds,
@@ -31,11 +32,25 @@ import {
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { usePopOnce } from '@/lib/navigation/pop-once';
+import { armLeaveSettle } from '@/lib/navigation/leave-settle';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const GROUPS_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/groups' as const;
 const GROUP_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/group-form' as const;
+
+/**
+ * The route name the Groups list registers in the profile tab's Stack. Expo
+ * Router names a screen after its file below the declaring layout, the way the
+ * organization hub resolves its `index` name (`organization-navigation.ts`).
+ */
+const GROUPS_LIST_ROUTE_NAME = 'groups';
+
+/** The navigation object a screen of a Stack sees. */
+type StackNavigation = {
+  getState: () => { index: number; routes: { key: string; name: string }[] };
+  isFocused: () => boolean;
+};
 
 type GroupFormProps = Readonly<{
   organizationId: string;
@@ -57,6 +72,7 @@ type GroupFormProps = Readonly<{
  */
 export function GroupForm({ organizationId, group }: GroupFormProps) {
   const router = useRouter();
+  const navigation = useNavigation<StackNavigation>();
   const popOnce = usePopOnce();
   const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
@@ -101,7 +117,34 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
 
   const leaveToList = () => {
     guard.leaveWithoutAsking(() => {
-      if (router.canGoBack()) {
+      // A save can settle after the reader left for another tab, which keeps
+      // this stack mounted but blurred. Leaving then would arm the global
+      // one-Back window the blurred tab never spends and dismiss a route that
+      // is not the app's focused scene, swallowing the reader's Back; the
+      // group already landed, so the settle needs no navigation.
+      if (!navigation.isFocused()) {
+        return;
+      }
+      const state = navigation.getState();
+      const exit = orgGroupFormExit({
+        routes: state.routes,
+        currentIndex: state.index,
+        listRouteName: GROUPS_LIST_ROUTE_NAME,
+      });
+      // The save or delete landed, so the leave targets the list. A pop-to over
+      // the list beneath truncates every screen above it — including a create
+      // form this screen replaced on the first save, whose retire can be lost —
+      // so the reader never lands on a stale New-group form. The dismissal arms
+      // the same one-Back window a self-pop arms (`usePopOnce`), naming the
+      // list route the pop-to reveals: a press that lands while this pop
+      // animates belongs to the form that is leaving, so one Back still closes
+      // one screen.
+      if (exit.kind === 'list') {
+        armLeaveSettle(exit.listRouteKey);
+        router.dismissTo(GROUPS_LIST_PATH as Href);
+        return;
+      }
+      if (exit.kind === 'back') {
         popOnce();
         return;
       }

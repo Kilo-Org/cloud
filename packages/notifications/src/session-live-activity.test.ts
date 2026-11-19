@@ -303,6 +303,58 @@ describe('buildSessionLiveActivityContentState', () => {
     ).toBeNull();
   });
 
+  it('carries the remembered outcome into a finished row that states none', () => {
+    const pushed = buildSessionLiveActivityContentState(
+      { id: 'ses_f3', status: 'idle', outcome: 'pr_opened' },
+      options
+    );
+    expect(pushed).toMatchObject({ outcome: { kind: 'pr_opened' } });
+    const carriedOutcome = buildSessionLiveActivityContentState(
+      { id: 'ses_f3', status: 'idle' },
+      { ...options, previous: pushed }
+    );
+    expect(carriedOutcome.outcome).toEqual({ kind: 'pr_opened' });
+
+    // A row that omits the diff keeps the one the push delivered.
+    const diff = { files: 2, added: 5, removed: 1 };
+    const pushedChanges = buildSessionLiveActivityContentState(
+      { id: 'ses_f4', status: 'idle', changes: diff },
+      options
+    );
+    expect(pushedChanges).toMatchObject({ outcome: { kind: 'changes' } });
+    const rebuilt = buildSessionLiveActivityContentState(
+      { id: 'ses_f4', status: 'idle' },
+      { ...options, previous: pushedChanges }
+    );
+    expect(rebuilt.outcome).toEqual({ kind: 'changes' });
+    expect(rebuilt.changes).toEqual(diff);
+  });
+
+  it('re-derives the outcome when the row states that no pull request is open', () => {
+    const pushed = buildSessionLiveActivityContentState(
+      { id: 'ses_f5', status: 'idle', outcome: 'pr_opened' },
+      options
+    );
+    const rebuilt = buildSessionLiveActivityContentState(
+      { id: 'ses_f5', status: 'idle', prOpened: false },
+      { ...options, previous: pushed }
+    );
+    expect(rebuilt.outcome).toEqual({ kind: 'none' });
+  });
+
+  it('never carries a remembered outcome into a working row', () => {
+    const pushed = buildSessionLiveActivityContentState(
+      { id: 'ses_f3', status: 'idle', outcome: 'pr_opened' },
+      options
+    );
+    expect(
+      buildSessionLiveActivityContentState(
+        { id: 'ses_f6', status: 'busy' },
+        { ...options, previous: pushed }
+      ).outcome
+    ).toBeNull();
+  });
+
   it('keeps the failure only while the finished row shows it', () => {
     const reasoning = { id: 'ses_8', status: 'busy' };
     const failed = buildSessionLiveActivityContentState(

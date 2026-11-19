@@ -48,6 +48,17 @@ const h = vi.hoisted(() => {
     webSearch: { kind: 'saved', choice: true, application: 'current' },
     kiloTools: { kind: 'saved', choice: true, application: 'current' },
   };
+  /* The store refuses a URL another server already uses with the typed error
+     the real store throws; the mock mirrors it, so the sheet's toast handling
+     is mounted against the same refusal it sees in the app. */
+  class RemoteMcpStoreError extends Error {
+    readonly problem: 'duplicateUrl' | 'notFound';
+
+    constructor(problem: 'duplicateUrl' | 'notFound') {
+      super(problem);
+      this.problem = problem;
+    }
+  }
   return {
     group,
     servers,
@@ -60,6 +71,7 @@ const h = vi.hoisted(() => {
       confirmRequest.value = request;
     }),
     toastError: vi.fn(),
+    RemoteMcpStoreError,
     setSettingsToolsEnabled: vi.fn((next: boolean) => {
       group.value = next;
       emit('group');
@@ -69,10 +81,16 @@ const h = vi.hoisted(() => {
       emit('servers');
     }),
     addRemoteMcpServer: vi.fn((draft: RemoteMcpServerDraft) => {
+      if (servers.value.some(one => one.url === draft.url)) {
+        throw new RemoteMcpStoreError('duplicateUrl');
+      }
       servers.value = [...servers.value, { id: 'added', ...draft }];
       emit('servers');
     }),
     updateRemoteMcpServer: vi.fn((id: string, patch: RemoteMcpServerPatch) => {
+      if (servers.value.some(one => one.id !== id && one.url === patch.url)) {
+        throw new RemoteMcpStoreError('duplicateUrl');
+      }
       servers.value = servers.value.map(one => (one.id === id ? { ...one, ...patch } : one));
       emit('servers');
     }),
@@ -114,6 +132,11 @@ vi.mock('@/lib/chat/remote-mcp-store', () => ({
   addRemoteMcpServer: h.addRemoteMcpServer,
   updateRemoteMcpServer: h.updateRemoteMcpServer,
   deleteRemoteMcpServer: h.deleteRemoteMcpServer,
+  REMOTE_MCP_STORE_ERROR_KEYS: {
+    duplicateUrl: 'modelChat.mcp.duplicateUrl',
+    notFound: 'modelChat.mcp.serverNotFound',
+  },
+  RemoteMcpStoreError: h.RemoteMcpStoreError,
 }));
 
 vi.mock('@/lib/chat/remote-mcp-oauth', () => ({ signInRemoteMcpServer: vi.fn() }));
@@ -548,15 +571,22 @@ describe('the chat-tools sheet', () => {
     h.ensureRemoteMcp.mockReturnValue(pending.promise);
     await mount();
 
-    const retry = required(buttonFor('Retry'), 'Retry');
+    // The Kilo row also draws a Retry, so the server's button is read by its
+    // own label and not by the button text the two rows share.
+    const label = i18n.t('modelChat.mcp.retryServerA11y', { name: 'Server alpha' });
+    const serverRetry = (): TestRenderer.ReactTestInstance =>
+      required(
+        nodes('Button').find(button => button.props.accessibilityLabel === label),
+        'the server Retry'
+      );
     await act(async () => {
-      (retry.props.onPress as () => void)();
+      (serverRetry().props.onPress as () => void)();
       await Promise.resolve();
     });
 
     expect(h.ensureRemoteMcp).toHaveBeenCalledWith(place, { retry: true });
     // The busy flag is that row's, so the person can see the ask they made.
-    expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(true);
+    expect(serverRetry().props.loading).toBe(true);
 
     await act(async () => {
       pending.resolve([]);
@@ -564,7 +594,7 @@ describe('the chat-tools sheet', () => {
     });
     await flush();
 
-    expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(false);
+    expect(serverRetry().props.loading).toBe(false);
     // The chat's tool list has to move onto what the Retry just found.
     expect(h.refreshChatTools).toHaveBeenCalled();
   });
@@ -590,7 +620,13 @@ describe('the chat-tools sheet', () => {
       retry: true,
     });
     const label = i18n.t('modelChat.mcp.retryServerA11y', { name: 'Server alpha' });
-    expect(required(buttonFor('Retry'), 'Retry').props.accessibilityLabel).toBe(label);
+    // The Kilo row draws a Retry of its own, so the button is read by the
+    // per-server label and not by the button text both rows share.
+    const retry = required(
+      nodes('Button').find(button => button.props.accessibilityLabel === label),
+      'the server Retry'
+    );
+    expect(retry.props.accessibilityLabel).toBe(label);
   });
 
   it('turns a server off for the chats and tells the registry', async () => {
@@ -714,5 +750,35 @@ describe('the chat-tools sheet', () => {
     await flush();
 
     expect(h.deleteRemoteMcpServer).toHaveBeenCalledWith('alpha');
+  });
+
+  it('says the duplicate-URL copy when the save names a stored endpoint', async () => {
+    h.servers.value = [server('alpha')];
+    await mount();
+
+    await act(async () => {
+      (required(buttonFor('Add MCP server'), 'Add MCP server').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    const form = required(nodes('RemoteMcpServerForm')[0], 'RemoteMcpServerForm');
+    const draft: RemoteMcpServerDraft = {
+      name: 'Twin',
+      url: 'https://alpha.example/mcp',
+      auth: { type: 'none' },
+      enabled: true,
+    };
+    await act(async () => {
+      (form.props.onSave as (next: RemoteMcpServerDraft) => void)(draft);
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(h.addRemoteMcpServer).toHaveBeenCalledWith(draft);
+    // Refusals are said with catalog copy, in the reader's language — never
+    // the refusal's own message, which is a problem tag, not words to read.
+    expect(h.toastError).toHaveBeenCalledTimes(1);
+    expect(h.toastError).toHaveBeenCalledWith(i18n.t('modelChat.mcp.duplicateUrl'));
+    // The refusal keeps the form open, so the person can correct the URL.
+    expect(nodes('RemoteMcpServerForm')).toHaveLength(1);
   });
 });

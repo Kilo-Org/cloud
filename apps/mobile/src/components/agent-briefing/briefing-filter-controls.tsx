@@ -24,9 +24,9 @@ type BriefingFilterControlsProps = {
 
 /**
  * Available/History tabs and the context filter chips above the briefing list.
- * Both rows pick one option at a time, so every option carries
- * `accessibilityState.selected` for the active one; the tabs also announce as a
- * tablist instead of a loose pair of buttons.
+ * Both rows pick one option at a time, so every row announces as a tablist
+ * whose entries carry `accessibilityState.selected` for the active one, and
+ * each row carries the name that says what its options narrow.
  */
 export function BriefingFilterControls({
   history,
@@ -62,15 +62,19 @@ export function BriefingFilterControls({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerClassName="gap-2"
+        accessibilityRole="tablist"
+        accessibilityLabel={t('agentBriefing.filterByContext')}
       >
         <FilterChip
+          {...tabEntryA11y({ selected: organizationId === undefined })}
           selected={organizationId === undefined}
-          label={t('common.all')}
+          label={t('agentBriefing.contextAll')}
           onPress={() => {
             onSelectOrganization(undefined);
           }}
         />
         <FilterChip
+          {...tabEntryA11y({ selected: organizationId === null })}
           selected={organizationId === null}
           label={t('common.personal')}
           onPress={() => {
@@ -80,6 +84,7 @@ export function BriefingFilterControls({
         {organizations.map(organization => (
           <FilterChip
             key={organization.organizationId}
+            {...tabEntryA11y({ selected: organizationId === organization.organizationId })}
             selected={organizationId === organization.organizationId}
             label={organization.organizationName}
             onPress={() => {

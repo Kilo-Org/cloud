@@ -7,9 +7,9 @@ export type ToolDetailSummary = {
   summary?: string;
   /**
    * Whether `name` is a friendly known-tool label rather than a raw tool id or
-   * an `mcp` `server/tool` identifier. The label is English app prose (there is
-   * no catalog for a shared package), so a consumer that translates tool text
-   * must send it to the gateway; an identifier never is.
+   * an `mcp` `server/tool` identifier. `resolveName` produces only identifiers
+   * today, so this is always false; a consumer treats a true value as English
+   * app prose that must go to the gateway for translation.
    */
   nameIsLabel: boolean;
 };

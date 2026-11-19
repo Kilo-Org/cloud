@@ -3,10 +3,11 @@ import { type VoiceInputEngineName } from './voice-input-engine-mode';
 
 /**
  * Compose the OS recogniser and the gateway transcription engine behind the
- * single `VoiceInputNative` the controller consumes, routing every call to
- * the engine the user chose. The choice is read at `start()`; there is no
- * fallback, so exactly one engine owns a session for its whole life and the
- * other engine receives no call of any kind.
+ * single `VoiceInputNative` the controller consumes. `start()` reads the
+ * choice and pins the session to that engine: start, stop, abort and event
+ * forwarding stay with it for the session's whole life, and there is no
+ * fallback. The permission and capability probes take no session, so they
+ * follow the live preference and can reach the engine that does not own it.
  */
 export function createSelectingVoiceInputNative(
   engines: Record<VoiceInputEngineName, VoiceInputNative>,

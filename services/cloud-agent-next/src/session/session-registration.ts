@@ -113,6 +113,8 @@ import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
+import { runtimeAuthorizationLifetime } from './runtime-authorization-lifetime.js';
+import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
 import {
   createCloudAgentSessionReport,
   recordCloudAgentSandboxIdentity,
@@ -852,16 +854,16 @@ async function recordParentChildSession(
   if (parentSessionId === undefined) return;
   try {
     await withDORetry(
-      () => getSandboxSessionStub(ctx.env, ctx.userId, parentSessionId),
+      () => getWorkspaceStub(ctx.env, ctx.userId, parentSessionId),
       stub =>
-        stub.recordCloudAgentChildSession({
+        stub.recordChild({
           cloudAgentSessionId: child.cloudAgentSessionId,
           ...(child.initialMessageId === undefined
             ? {}
             : { initialMessageId: child.initialMessageId }),
           ...(child.worktreeId === undefined ? {} : { worktreeId: child.worktreeId }),
         }),
-      'recordCloudAgentChildSession'
+      'recordChild'
     );
   } catch (error) {
     logger
@@ -905,9 +907,9 @@ async function issueSessionRuntimeAuthorization(
   if (ctx.cloudAgentAuthority) {
     const authority = ctx.cloudAgentAuthority;
     const runtimeAuthorization = await withDORetry(
-      () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
-      stub => stub.authorizeCloudAgentChild({ authority, childSessionId: cloudAgentSessionId }),
-      'authorizeCloudAgentChild'
+      () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
+      stub => stub.authorizeChild({ authority, childSessionId: cloudAgentSessionId }),
+      'authorizeChild'
     ).catch(() => {
       throw new TRPCError({
         code: 'FORBIDDEN',
@@ -937,6 +939,7 @@ async function issueSessionRuntimeAuthorization(
       resourceKind: 'cloud-agent-next',
       resourceId: cloudAgentSessionId,
       environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      ...runtimeAuthorizationLifetime(ctx.env),
       onAdmissionRejected: reason =>
         logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
       ...(orgId ? { organizationId: orgId } : {}),

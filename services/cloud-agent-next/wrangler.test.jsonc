@@ -30,6 +30,10 @@
         "name": "SANDBOX_SESSION",
       },
       {
+        "class_name": "CloudAgentWorkspaceDO",
+        "name": "CLOUD_AGENT_WORKSPACE",
+      },
+      {
         "class_name": "PreviewPortTestDO",
         "name": "PREVIEW_PORT_TEST",
       },
@@ -68,6 +72,10 @@
     {
       "new_sqlite_classes": ["SandboxSessionV2"],
       "tag": "v10",
+    },
+    {
+      "new_sqlite_classes": ["CloudAgentWorkspaceDO"],
+      "tag": "v10-workspace",
     },
     {
       "new_classes": ["PreviewPortTestDO"],

@@ -239,6 +239,26 @@ describe('BitbucketConnectForm', () => {
     expect(onDirtyChange).toHaveBeenLastCalledWith(false);
   });
 
+  it('never reports a draft again once a connect accepted the token', async () => {
+    mutations.connect.mockResolvedValue({ integrationId: 'bitbucket-1' });
+    const onDirtyChange = vi.fn<(dirty: boolean) => void>();
+    const { root, onConnected } = await mount(null, vi.fn<() => void>(), onDirtyChange);
+
+    await edit(root, 'workspace-token');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+    await act(async () => {
+      (submitButton(root).props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    // The accepted token is not a draft any more. A later `true` here would
+    // re-arm the sheet's leave guard over the dismissal it just started.
+    expect(onConnected).toHaveBeenCalledTimes(1);
+    expect(onDirtyChange).not.toHaveBeenLastCalledWith(true);
+    expect(onDirtyChange.mock.calls.filter(([dirty]) => dirty)).toHaveLength(1);
+  });
+
   it('holds the token field still while the submitted token is in flight', async () => {
     const landing = Promise.withResolvers<unknown>();
     mutations.connect.mockImplementation(() => landing.promise);

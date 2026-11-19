@@ -917,7 +917,19 @@
         "fileComment": "File comment",
         "outdatedOnPathLines": "Outdated on {{path}} {{lines}}",
         "outdatedOnLines": "Outdated on {{lines}}",
-        "outdatedOnPath": "Outdated on {{path}}"
+        "outdatedOnPath": "Outdated on {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Left side",
+        "sideRight": "Right side",
+        "outdatedOnLinesSide": "Outdated on {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Outdated on {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Outdated ({{side}})",
+        "outdatedOnPathSide": "Outdated on {{path}} ({{side}})"
       },
       "deletedUser": "deleted user",
       "replyForbiddenTerm": "You don't have permission to reply to this {{term}}.",
@@ -1022,7 +1034,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
       "gitlabReconnectAdminOnlyDescription": "Ask an organization owner, admin, or billing manager to reconnect it.",
       "bitbucketNotConnectedTitle": "Bitbucket not connected",
-      "bitbucketAdminOnlyDescription": "Only organization owners, admins, and billing managers can connect it.",
+      "adminOnlyConnectDescription": "Only organization owners, admins, and billing managers can connect it.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For your personal account"
     },
@@ -2766,7 +2778,7 @@
       "subjectDoomLoop": "repeated tool calls",
       "subjectAgentManager": "agent management",
       "subjectSandboxEscalation": "host access",
-      "appliesTo": "Applies to:",
+      "appliesTo": "Applies to",
       "denyPermission": "Deny permission",
       "deny": "Deny",
       "allowOnce": "Allow Once",
@@ -3499,6 +3511,7 @@
       "title": "Credit activity",
       "transactionFallback": "Credit transaction",
       "truncated": "Older credit activity is available.",
+      "retentionLimit": "Showing the most recent credit activity.",
       "category": {
         "organization_custom": "Organization custom",
         "parent_to_child_transfer_in": "Parent to child transfer in",
@@ -3518,6 +3531,7 @@
       "sendInvite": "Send invite",
       "title": "Invite member",
       "alreadyInvited": "They're already invited or already a member.",
+      "organizationUnavailable": "This organization is no longer available.",
       "sendError": "Couldn't send the invite.",
       "pendingInvitation": "This email already has a pending invitation.",
       "alreadyMember": "This person is already a member of this organization.",
@@ -3531,6 +3545,7 @@
       "emptyTitle": "No invoices",
       "invoiceFallback": "Invoice",
       "truncated": "Older invoices are available.",
+      "retentionLimit": "Showing the most recent invoices.",
       "title": "Invoices",
       "downloadFailed": "Couldn't download invoice. Check your connection and try again.",
       "sharingUnavailable": "Sharing is not available on this device.",
@@ -4459,7 +4474,8 @@
       "purchaseFallback": "Credit purchase",
       "receipt": "Receipt",
       "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
-      "receiptUnavailable": "A receipt is not available for this purchase."
+      "receiptUnavailable": "A receipt is not available for this purchase.",
+      "retentionLimit": "Showing the most recent credit history."
     },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Could not load integrations",
     "permissionDenied": "You do not have permission to manage these integrations.",
     "managedByOwner": "Ask an organization owner to change connections you can't edit.",
+    "managedByOwnerOrAdmin": "Ask an organization owner or admin to change connections you can't edit.",
+    "managedByOwnerOrBilling": "Ask an organization owner or billing manager to change connections you can't edit.",
+    "managedByOwnerAdminOrBilling": "Ask an organization owner, admin, or billing manager to change connections you can't edit.",
     "connectFailed": "Could not open the connection page"
   },
   "invoices": {
-    "personalEmptyDescription": "Invoices for your own purchases will appear here once you are billed."
+    "personalPeriod": "Last 12 months",
+    "personalEmptyDescription": "Invoices for your own purchases appear here once you are billed. App Store and Google Play receipts are in Credit history."
   },
   "cloudAgent": {
     "compute": {

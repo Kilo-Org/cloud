@@ -2800,7 +2800,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tài khoản này chưa có tổ chức nào. Bạn có thể xem các PR Bitbucket sau khi tạo hoặc tham gia một tổ chức.",
       "gitlabReconnectAdminOnlyDescription": "Hãy yêu cầu Chủ sở hữu, Quản trị viên hoặc Người quản lý thanh toán của tổ chức kết nối lại.",
       "bitbucketNotConnectedTitle": "Bitbucket chưa được kết nối",
-      "bitbucketAdminOnlyDescription": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối.",
+      "adminOnlyConnectDescription": "Chỉ chủ sở hữu tổ chức, quản trị viên và người quản lý thanh toán mới có thể kết nối.",
       "contextLine": "Cho {{organization}}",
       "contextLinePersonal": "Cho tài khoản cá nhân"
     },
@@ -2897,7 +2897,19 @@
         "fileComment": "Bình luận về tệp",
         "outdatedOnPathLines": "Không còn cập nhật tại {{path}} {{lines}}",
         "outdatedOnLines": "Không còn cập nhật tại {{lines}}",
-        "outdatedOnPath": "Không còn cập nhật tại {{path}}"
+        "outdatedOnPath": "Không còn cập nhật tại {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Bên trái",
+        "sideRight": "Bên phải",
+        "outdatedOnLinesSide": "Không còn cập nhật tại {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Không còn cập nhật tại {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Không còn cập nhật ({{side}})",
+        "outdatedOnPathSide": "Không còn cập nhật tại {{path}} ({{side}})"
       },
       "deletedUser": "người dùng đã bị xóa",
       "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này.",
@@ -3397,7 +3409,8 @@
         "accounting_adjustment": "Điều chỉnh kế toán",
         "credits_expired": "Tiền trong số dư đã hết hạn"
       },
-      "truncated": "Còn các biến động số dư trước đó để xem."
+      "truncated": "Còn các biến động số dư trước đó để xem.",
+      "retentionLimit": "Đang hiển thị các biến động số dư gần đây nhất."
     },
     "hub": {
       "balance": "Số dư",
@@ -3420,6 +3433,7 @@
       "sendInvite": "Gửi lời mời",
       "title": "Mời thành viên",
       "alreadyInvited": "Địa chỉ email này đã được mời hoặc đã là thành viên.",
+      "organizationUnavailable": "Tổ chức này không còn khả dụng nữa.",
       "sendError": "Không gửi được lời mời.",
       "pendingInvitation": "Email này đã có lời mời đang chờ xử lý.",
       "alreadyMember": "Người này đã là thành viên của tổ chức này.",
@@ -3441,7 +3455,8 @@
         "void": "Đã hủy",
         "uncollectible": "Không thể thu tiền"
       },
-      "truncated": "Còn các hóa đơn trước đó để xem."
+      "truncated": "Còn các hóa đơn trước đó để xem.",
+      "retentionLimit": "Đang hiển thị các hóa đơn gần đây nhất."
     },
     "lowBalanceAlert": {
       "enableA11y": "Bật cảnh báo số dư thấp",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "Mua tín dụng",
       "receipt": "Biên lai",
       "receiptA11y": "Mở biên lai cho {{description}}, {{amount}}, từ {{date}}",
-      "receiptUnavailable": "Không có biên lai cho giao dịch mua này."
+      "receiptUnavailable": "Không có biên lai cho giao dịch mua này.",
+      "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất."
     },
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Không thể tải các tích hợp",
     "permissionDenied": "Bạn không có quyền quản lý các tích hợp này.",
     "managedByOwner": "Hãy yêu cầu chủ sở hữu của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
+    "managedByOwnerOrAdmin": "Hãy yêu cầu chủ sở hữu hoặc quản trị viên của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
+    "managedByOwnerOrBilling": "Hãy yêu cầu chủ sở hữu hoặc người quản lý thanh toán của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
+    "managedByOwnerAdminOrBilling": "Hãy yêu cầu chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",
     "connectFailed": "Không thể mở trang kết nối"
   },
   "invoices": {
-    "personalEmptyDescription": "Hóa đơn cho các giao dịch mua của riêng bạn sẽ hiển thị tại đây sau khi bạn được tính phí."
+    "personalEmptyDescription": "Hóa đơn cho các giao dịch mua của riêng bạn hiển thị tại đây sau khi bạn được tính phí. Biên lai từ App Store và Google Play có trong Lịch sử tín dụng.",
+    "personalPeriod": "12 tháng gần nhất"
   },
   "cloudAgent": {
     "compute": {

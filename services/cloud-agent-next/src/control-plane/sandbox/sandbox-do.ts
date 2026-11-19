@@ -7342,13 +7342,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
             ...(frame.subtype === undefined ? {} : { subtype: frame.subtype }),
           })
           .warn('Control-plane prepare failed');
-        if (frame.reason === 'workspace_setup_failed') {
+        if (frame.reason === 'workspace_setup_failed' && frame.step === 'restore') {
+          if (!current) return;
+          const route = await readRoute(this.db, frame.sessionId);
           const disk = readWorkspaceSnapshotAllocation(this.db);
           if (
+            route?.state === 'preparing' &&
             currentState.allocationId !== null &&
             disk?.allocationId === currentState.allocationId &&
-            disk.restore !== undefined &&
-            frame.step === 'restore'
+            disk.restore !== undefined
           ) {
             // A wrapper-side tail failure is permanent: the descriptor is kept
             // for an explicit "Start fresh" and this attempt never relaunches

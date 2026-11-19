@@ -856,7 +856,19 @@
         "fileComment": "Kumment dwar il-fajl",
         "outdatedOnPathLines": "Mhux aġġornat fuq {{path}} {{lines}}",
         "outdatedOnLines": "Mhux aġġornat fuq {{lines}}",
-        "outdatedOnPath": "Mhux aġġornat fuq {{path}}"
+        "outdatedOnPath": "Mhux aġġornat fuq {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Naħa xellugija",
+        "sideRight": "Naħa leminija",
+        "outdatedOnLinesSide": "Mhux aġġornat fuq {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Mhux aġġornat fuq {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Mhux aġġornat ({{side}})",
+        "outdatedOnPathSide": "Mhux aġġornat fuq {{path}} ({{side}})"
       },
       "deletedUser": "utent imħassar",
       "replyForbiddenTerm": "M'għandekx permess biex tirrispondi għal dan il-{{term}}.",
@@ -983,7 +995,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Dan il-kont m'għandux organizzazzjonijiet għadu. Tista' tirrevedi l-PRs Bitbucket ladarba toħloq organizzazzjoni jew tingħaqad ma' waħda.",
       "gitlabReconnectAdminOnlyDescription": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjaha.",
       "bitbucketNotConnectedTitle": "Bitbucket mhux konness",
-      "bitbucketAdminOnlyDescription": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
+      "adminOnlyConnectDescription": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet tal-organizzazzjoni biss jistgħu jikkonnettjawh.",
       "contextLine": "Għal {{organization}}",
       "contextLinePersonal": "Għall-kont personali tiegħek"
     },
@@ -3579,7 +3591,8 @@
         "accounting_adjustment": "Aġġustament tal-kontabilità",
         "credits_expired": "Krediti skaduti"
       },
-      "truncated": "Hemm attività tal-krediti ta' qabel disponibbli."
+      "truncated": "Hemm attività tal-krediti ta' qabel disponibbli.",
+      "retentionLimit": "Qed tintwera l-attività tal-krediti l-aktar reċenti."
     },
     "inviteMember": {
       "emailError": "Daħħal indirizz tal-posta elettronika validu.",
@@ -3589,6 +3602,7 @@
       "sendInvite": "Ibgħat stedina",
       "title": "Stieden membru",
       "alreadyInvited": "Din il-persuna diġà hija mistiedna jew diġà membru.",
+      "organizationUnavailable": "Din l-organizzazzjoni m'għadhiex disponibbli.",
       "sendError": "L-istedina ma setgħetx tintbagħat.",
       "pendingInvitation": "Dan l-indirizz tal-posta elettronika diġà għandu stedina pendenti.",
       "alreadyMember": "Din il-persuna diġà hija membru ta' din l-organizzazzjoni.",
@@ -3610,7 +3624,8 @@
         "void": "Annullata",
         "uncollectible": "Ma tistax tinġabar"
       },
-      "truncated": "Hemm fatturi ta' qabel disponibbli."
+      "truncated": "Hemm fatturi ta' qabel disponibbli.",
+      "retentionLimit": "Qed jintwerew il-fatturi l-aktar reċenti."
     },
     "lowBalanceAlert": {
       "enableA11y": "Attiva t-twissija ta' bilanċ baxx",
@@ -4570,7 +4585,8 @@
       "purchaseFallback": "Xiri ta' krediti",
       "receipt": "Irċevuta",
       "receiptA11y": "Iftaħ l-irċevuta għal {{description}}, {{amount}}, minn {{date}}",
-      "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri."
+      "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri.",
+      "retentionLimit": "Qed tintwera l-istorja tal-krediti l-aktar reċenti."
     },
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
@@ -4841,10 +4857,14 @@
     "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
     "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
     "managedByOwner": "Itlob lil sid tal-organizzazzjoni biex ibiddel konnessjoni li ma tistax tbiddel.",
+    "managedByOwnerOrAdmin": "Itlob lis-sid ta' organizzazzjoni jew lill-amministratur biex ibiddel konnessjoni li ma tistax tbiddel.",
+    "managedByOwnerOrBilling": "Itlob lis-sid ta' organizzazzjoni jew lill-maniġer tal-ħlasijiet biex ibiddel konnessjoni li ma tistax tbiddel.",
+    "managedByOwnerAdminOrBilling": "Itlob lis-sid ta' organizzazzjoni, lill-amministratur jew lill-maniġer tal-ħlasijiet biex ibiddel konnessjoni li ma tistax tbiddel.",
     "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ"
   },
   "invoices": {
-    "personalEmptyDescription": "Il-fatturi għax-xiri tiegħek stess se jidhru hawn ladarba tiġi ddebitat."
+    "personalEmptyDescription": "Il-fatturi għax-xiri tiegħek stess jidhru hawn ladarba tiġi ddebitat. L-irċevuti mill-App Store u minn Google Play jinsabu f'Storja tal-krediti.",
+    "personalPeriod": "L-aħħar 12 xahar"
   },
   "cloudAgent": {
     "compute": {

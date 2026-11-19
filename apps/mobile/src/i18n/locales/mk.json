@@ -820,7 +820,19 @@
         "fileComment": "Коментар за датотеката",
         "outdatedOnPathLines": "Застарено на {{path}} {{lines}}",
         "outdatedOnLines": "Застарено на {{lines}}",
-        "outdatedOnPath": "Застарено на {{path}}"
+        "outdatedOnPath": "Застарено на {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Лева страна",
+        "sideRight": "Десна страна",
+        "outdatedOnLinesSide": "Застарено на {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Застарено на {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Застарено ({{side}})",
+        "outdatedOnPathSide": "Застарено на {{path}} ({{side}})"
       },
       "deletedUser": "избришан корисник",
       "replyForbiddenTerm": "Немате дозвола за одговор на {{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Оваа сметка сè уште нема организации. Барањата за спојување на Bitbucket може да се прегледуваат откако ќе креирате организација или ќе се приклучите кон неа.",
       "gitlabReconnectAdminOnlyDescription": "Побарајте од Сопственик, Администратор или Одговорен за наплата на организацијата да ја поврзат повторно.",
       "bitbucketNotConnectedTitle": "Bitbucket не е поврзан",
-      "bitbucketAdminOnlyDescription": "Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат.",
+      "adminOnlyConnectDescription": "Само сопствениците на организацијата, администраторите и одговорните за наплата можат да го поврзат.",
       "contextLine": "За {{organization}}",
       "contextLinePersonal": "За вашиот личен простор"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "Сметководствена корекција",
         "credits_expired": "Истечени кредити"
       },
-      "truncated": "Достапни се и постари активности со кредити."
+      "truncated": "Достапни се и постари активности со кредити.",
+      "retentionLimit": "Се прикажуваат најновите активности со кредити."
     },
     "inviteMember": {
       "emailError": "Внеси важечка адреса за е-пошта.",
@@ -3415,6 +3428,7 @@
       "sendInvite": "Испрати покана",
       "title": "Покани член",
       "alreadyInvited": "Оваа адреса веќе е поканета или веќе припаѓа на член.",
+      "organizationUnavailable": "Оваа организација повеќе не е достапна.",
       "sendError": "Не успеа испраќањето на поканата.",
       "pendingInvitation": "Оваа е-пошта веќе има покана на чекање.",
       "alreadyMember": "Ова лице веќе е член на оваа организација.",
@@ -3436,7 +3450,8 @@
         "void": "Поништено",
         "uncollectible": "Ненаплатливо"
       },
-      "truncated": "Достапни се и постари фактури."
+      "truncated": "Достапни се и постари фактури.",
+      "retentionLimit": "Се прикажуваат најновите фактури."
     },
     "lowBalanceAlert": {
       "enableA11y": "Овозможи предупредување за ниска состојба",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "Купување кредити",
       "receipt": "Сметка",
       "receiptA11y": "Отвори ја сметката за {{description}}, {{amount}}, од {{date}}",
-      "receiptUnavailable": "Не е достапна сметка за ова купување."
+      "receiptUnavailable": "Не е достапна сметка за ова купување.",
+      "retentionLimit": "Се прикажува најновата историја на кредити."
     },
     "title": "Купи кредити",
     "description": "Кредитите се еднократна набавка што се додава на вашата Kilo состојба за извршување на AI сесии за кодирање во Kilo App. Продавницата ви го наплатува сметката и кредитите се додаваат откако продавницата ќе го потврди плаќањето.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Не може да се вчитаат интеграциите",
     "permissionDenied": "Немате дозвола за управување со овие интеграции.",
     "managedByOwner": "Побарајте од сопственик на организацијата да ја промени врската што не можете да ја промените.",
+    "managedByOwnerOrAdmin": "Побарајте од сопственик или администратор на организацијата да ја промени врската што не можете да ја промените.",
+    "managedByOwnerOrBilling": "Побарајте од сопственик или одговорен за наплата на организацијата да ја промени врската што не можете да ја промените.",
+    "managedByOwnerAdminOrBilling": "Побарајте од сопственик, администратор или одговорен за наплата на организацијата да ја промени врската што не можете да ја промените.",
     "connectFailed": "Не може да се отвори страницата за поврзување"
   },
   "invoices": {
-    "personalEmptyDescription": "Фактурите за вашите лични купувања ќе се појават тука откако ќе ви биде наплатено."
+    "personalEmptyDescription": "Фактурите за вашите лични купувања се појавуваат тука откако ќе ви биде наплатено. Сметките од App Store и Google Play се наоѓаат во Историја на кредити.",
+    "personalPeriod": "Последните 12 месеци"
   },
   "cloudAgent": {
     "compute": {

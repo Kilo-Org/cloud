@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { byok_api_keys, type User } from '@kilocode/db/schema';
-import type { CustomLlmDefinition, CustomPricingTiers } from '@kilocode/db/schema-types';
+import type {
+  CustomLlmDefinition,
+  CustomPricingTiers,
+  ReasoningEffort,
+} from '@kilocode/db/schema-types';
 import {
   getProvider,
   type GetProviderProviderResult,
@@ -492,6 +496,212 @@ describe('getProvider skips the partner', () => {
       { getAllowedProviders: async () => new Set(['other']) },
       'provider-settings'
     );
+  });
+
+  describe('for a reasoning effort the definition does not declare', () => {
+    const efforts = (...values: ReasoningEffort[]) => ({
+      opencode_settings: { reasoning_options: [{ type: 'effort', values }] },
+      api_kinds: ['chat_completions', 'messages', 'responses'],
+    });
+    const declared = efforts('none', 'low', 'high', 'xhigh', 'max') as Partial<CustomLlmDefinition>;
+
+    function request(kind: 'chat_completions' | 'messages' | 'responses', body: object) {
+      return { kind, body: { model: MODEL, ...body } } as GatewayRequest;
+    }
+
+    test.each<[string, GatewayRequest]>([
+      [
+        'chat reasoning.effort',
+        request('chat_completions', { messages: [], reasoning: { effort: 'medium' } }),
+      ],
+      [
+        'chat reasoning_effort',
+        request('chat_completions', { messages: [], reasoning_effort: 'minimal' }),
+      ],
+      [
+        'chat reasoning.effort over reasoning_effort',
+        request('chat_completions', {
+          messages: [],
+          reasoning: { effort: 'medium' },
+          reasoning_effort: 'high',
+        }),
+      ],
+      [
+        'responses reasoning.effort',
+        request('responses', { input: 'hi', reasoning: { effort: 'medium' } }),
+      ],
+      [
+        'messages output_config.effort',
+        request('messages', { messages: [], max_tokens: 1, output_config: { effort: 'medium' } }),
+      ],
+    ])('skips for %s', async (_name, gatewayRequest) => {
+      await insertPartner(declared);
+
+      await expectKiloRouteOnly({ request: gatewayRequest }, 'unsupported-reasoning-effort');
+    });
+
+    test.each<[string, GatewayRequest, Partial<CustomLlmDefinition>]>([
+      [
+        'chat reasoning.enabled false',
+        request('chat_completions', { messages: [], reasoning: { enabled: false } }),
+        efforts('low', 'high') as Partial<CustomLlmDefinition>,
+      ],
+      [
+        'chat enable_thinking false',
+        request('chat_completions', { messages: [], enable_thinking: false }),
+        efforts('low', 'high') as Partial<CustomLlmDefinition>,
+      ],
+      [
+        'responses effort none',
+        request('responses', { input: 'hi', reasoning: { effort: 'none' } }),
+        efforts('low', 'high') as Partial<CustomLlmDefinition>,
+      ],
+      [
+        'messages thinking disabled',
+        request('messages', { messages: [], max_tokens: 1, thinking: { type: 'disabled' } }),
+        efforts('low', 'high') as Partial<CustomLlmDefinition>,
+      ],
+      [
+        'a toggle that offers no other effort',
+        request('chat_completions', { messages: [], reasoning: { effort: 'low' } }),
+        { opencode_settings: { reasoning_options: [{ type: 'toggle' }] } },
+      ],
+    ])('skips for %s ', async (_name, gatewayRequest, overrides) => {
+      await insertPartner(overrides);
+
+      await expectKiloRouteOnly({ request: gatewayRequest }, 'unsupported-reasoning-effort');
+    });
+
+    test.each(['reasoning-content', 'reasoning'] as const)(
+      'does not read reasoning.enabled false as none under the %s transform',
+      async transform => {
+        await insertPartner({
+          ...(efforts('low', 'high') as Partial<CustomLlmDefinition>),
+          reasoning_details_transform: transform,
+        });
+
+        const { result } = await routeAndRecord({
+          request: request('chat_completions', { messages: [], reasoning: { enabled: false } }),
+        });
+
+        expect((await result.routes[0]()).provider.type).toBe('partner');
+      }
+    );
+
+    test.each([
+      ['reasoning-content', 'medium', 'high', true],
+      ['reasoning-content', 'high', 'medium', false],
+      ['reasoning-content', 'none', 'high', true],
+      ['reasoning', 'medium', 'high', true],
+      ['reasoning', 'high', 'medium', false],
+    ] as const)(
+      'under the %s transform, forwards the reasoning_effort that wins over reasoning.effort (%s, %s)',
+      async (transform, effort, reasoningEffort, served) => {
+        await insertPartner({
+          ...(efforts('low', 'high') as Partial<CustomLlmDefinition>),
+          reasoning_details_transform: transform,
+        });
+        const gatewayRequest = request('chat_completions', {
+          messages: [],
+          reasoning: { effort },
+          reasoning_effort: reasoningEffort,
+        });
+
+        if (!served) {
+          await expectKiloRouteOnly({ request: gatewayRequest }, 'unsupported-reasoning-effort');
+          return;
+        }
+        const { result } = await routeAndRecord({ request: gatewayRequest });
+        expect((await result.routes[0]()).provider.type).toBe('partner');
+      }
+    );
+
+    test('reads reasoning.enabled false as none under the mistral-thinking transform', async () => {
+      await insertPartner({
+        ...(efforts('low', 'high') as Partial<CustomLlmDefinition>),
+        reasoning_details_transform: 'mistral-thinking',
+      });
+
+      await expectKiloRouteOnly(
+        { request: request('chat_completions', { messages: [], reasoning: { enabled: false } }) },
+        'unsupported-reasoning-effort'
+      );
+    });
+
+    test.each<[string, GatewayRequest, Partial<CustomLlmDefinition>]>([
+      [
+        'a declared chat effort',
+        request('chat_completions', { messages: [], reasoning: { effort: 'xhigh' } }),
+        declared,
+      ],
+      [
+        'a declared responses effort',
+        request('responses', { input: 'hi', reasoning: { effort: 'max' } }),
+        declared,
+      ],
+      [
+        'a declared messages effort',
+        request('messages', { messages: [], max_tokens: 1, output_config: { effort: 'low' } }),
+        declared,
+      ],
+      [
+        'a disable when none is declared',
+        request('chat_completions', { messages: [], reasoning: { enabled: false } }),
+        declared,
+      ],
+      [
+        'a toggle on',
+        request('chat_completions', { messages: [], reasoning: { effort: 'high' } }),
+        { opencode_settings: { reasoning_options: [{ type: 'toggle' }] } },
+      ],
+      [
+        'a toggle off',
+        request('chat_completions', { messages: [], reasoning: { enabled: false } }),
+        { opencode_settings: { reasoning_options: [{ type: 'toggle' }] } },
+      ],
+      [
+        'a toggle alongside efforts',
+        request('chat_completions', { messages: [], reasoning: { effort: 'none' } }),
+        {
+          opencode_settings: {
+            reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['low', 'high'] }],
+          },
+        },
+      ],
+      ['a request without an effort', request('chat_completions', { messages: [] }), declared],
+      [
+        'a request with an enabled reasoning object only',
+        request('chat_completions', { messages: [], reasoning: { enabled: true } }),
+        declared,
+      ],
+      [
+        'a definition without reasoning options',
+        request('chat_completions', { messages: [], reasoning: { effort: 'medium' } }),
+        { opencode_settings: {} },
+      ],
+      [
+        'a definition with empty reasoning options',
+        request('chat_completions', { messages: [], reasoning: { effort: 'medium' } }),
+        { opencode_settings: { reasoning_options: [] } },
+      ],
+      [
+        'a definition without effort values',
+        request('chat_completions', { messages: [], reasoning: { effort: 'medium' } }),
+        {
+          opencode_settings: { reasoning_options: [{ type: 'effort', values: [null, 'default'] }] },
+        },
+      ],
+    ])('serves %s through the partner', async (_name, gatewayRequest, overrides) => {
+      await insertPartner({
+        api_kinds: ['chat_completions', 'messages', 'responses'],
+        ...overrides,
+      });
+
+      const { result } = await routeAndRecord({ request: gatewayRequest });
+
+      expect(result.routes).toHaveLength(2);
+      expect((await result.routes[0]()).provider.type).toBe('partner');
+    });
   });
 
   test('for a latest alias that points at the partner model', async () => {

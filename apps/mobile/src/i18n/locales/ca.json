@@ -832,7 +832,19 @@
         "fileComment": "Comentari sobre el fitxer",
         "outdatedOnPathLines": "Desactualitzat a {{path}} {{lines}}",
         "outdatedOnLines": "Desactualitzat a {{lines}}",
-        "outdatedOnPath": "Desactualitzat a {{path}}"
+        "outdatedOnPath": "Desactualitzat a {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Costat esquerre",
+        "sideRight": "Costat dret",
+        "outdatedOnLinesSide": "Desactualitzat a {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Desactualitzat a {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Desactualitzat ({{side}})",
+        "outdatedOnPathSide": "Desactualitzat a {{path}} ({{side}})"
       },
       "deletedUser": "usuari eliminat",
       "replyForbiddenTerm": "No tens permís per respondre a aquesta {{term}}.",
@@ -949,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
       "gitlabReconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
       "bitbucketNotConnectedTitle": "Bitbucket no està connectat",
-      "bitbucketAdminOnlyDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
+      "adminOnlyConnectDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"
     },
@@ -3463,7 +3475,8 @@
         "accounting_adjustment": "Ajust comptable",
         "credits_expired": "Crèdits caducats"
       },
-      "truncated": "Hi ha moviments de crèdits anteriors disponibles."
+      "truncated": "Hi ha moviments de crèdits anteriors disponibles.",
+      "retentionLimit": "Es mostren els moviments de crèdits més recents."
     },
     "inviteMember": {
       "emailError": "Introdueix una adreça de correu electrònic vàlida.",
@@ -3473,6 +3486,7 @@
       "sendInvite": "Envia la invitació",
       "title": "Convida un membre",
       "alreadyInvited": "Ja té una invitació pendent o ja és membre.",
+      "organizationUnavailable": "Aquesta organització ja no està disponible.",
       "sendError": "No s'ha pogut enviar la invitació.",
       "pendingInvitation": "Aquest correu electrònic ja té una invitació pendent.",
       "alreadyMember": "Aquesta persona ja és membre d'aquesta organització.",
@@ -3494,7 +3508,8 @@
         "void": "Anul·lada",
         "uncollectible": "Incobrable"
       },
-      "truncated": "Hi ha factures més antigues disponibles."
+      "truncated": "Hi ha factures més antigues disponibles.",
+      "retentionLimit": "Es mostren les factures més recents."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activa l'avís de saldo baix",
@@ -4436,7 +4451,8 @@
       "purchaseFallback": "Compra de crèdits",
       "receipt": "Rebut",
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
-      "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra."
+      "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
+      "retentionLimit": "Es mostra l'historial de crèdits més recent."
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
@@ -4691,10 +4707,14 @@
     "couldNotLoad": "No s'han pogut carregar les integracions",
     "permissionDenied": "No tens permís per gestionar aquestes integracions.",
     "managedByOwner": "Demana a un propietari de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerOrAdmin": "Demana a un propietari o administrador de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerOrBilling": "Demana a un propietari o gestor de facturació de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerAdminOrBilling": "Demana a un propietari, administrador o gestor de facturació de l'organització que canviï una connexió que no pots canviar.",
     "connectFailed": "No s'ha pogut obrir la pàgina de connexió"
   },
   "invoices": {
-    "personalEmptyDescription": "Les factures de les teves compres apareixeran aquí quan se't facturi."
+    "personalEmptyDescription": "Les factures de les teves compres apareixen aquí quan se't facturi. Els rebuts de l'App Store i de Google Play són a l'Historial de crèdits.",
+    "personalPeriod": "Últims 12 mesos"
   },
   "cloudAgent": {
     "compute": {

@@ -820,7 +820,19 @@
         "fileComment": "Komento sa file",
         "outdatedOnPathLines": "Luma na sa {{path}} {{lines}}",
         "outdatedOnLines": "Luma na sa {{lines}}",
-        "outdatedOnPath": "Luma na sa {{path}}"
+        "outdatedOnPath": "Luma na sa {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Kaliwang bahagi",
+        "sideRight": "Kanang bahagi",
+        "outdatedOnLinesSide": "Luma na sa {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Luma na sa {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Luma na ({{side}})",
+        "outdatedOnPathSide": "Luma na sa {{path}} ({{side}})"
       },
       "deletedUser": "binurang user",
       "replyForbiddenTerm": "Wala kang pahintulot na sumagot sa {{term}} na ito.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Wala pang mga organisasyon ang account na ito. Masusuri ang mga pull request sa Bitbucket kapag gumawa ka o sumali ka ng isang organisasyon.",
       "gitlabReconnectAdminOnlyDescription": "Hilingin sa isang may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na ikonekta itong muli.",
       "bitbucketNotConnectedTitle": "Hindi nakakonekta ang Bitbucket",
-      "bitbucketAdminOnlyDescription": "Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
+      "adminOnlyConnectDescription": "Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
       "contextLine": "Para sa {{organization}}",
       "contextLinePersonal": "Para sa pansariling account"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "Pagsasaayos sa talaan ng pananalapi",
         "credits_expired": "Kreditong nawalan ng bisa"
       },
-      "truncated": "May mas naunang aktibidad sa kredito na maaaring tingnan."
+      "truncated": "May mas naunang aktibidad sa kredito na maaaring tingnan.",
+      "retentionLimit": "Ipinapakita ang pinakabagong aktibidad sa kredito."
     },
     "inviteMember": {
       "emailError": "Maglagay ng wastong email address.",
@@ -3415,6 +3428,7 @@
       "sendInvite": "Ipadala ang imbitasyon",
       "title": "Mag-imbita ng miyembro",
       "alreadyInvited": "Imbitado na sila o miyembro na.",
+      "organizationUnavailable": "Hindi na available ang organisasyong ito.",
       "sendError": "Hindi naipadala ang imbitasyon.",
       "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
       "alreadyMember": "Miembro na ng organisasyong ito ang taong ito.",
@@ -3436,7 +3450,8 @@
         "void": "Walang bisa",
         "uncollectible": "Hindi masingil"
       },
-      "truncated": "May mas naunang mga talaan ng singil na maaaring tingnan."
+      "truncated": "May mas naunang mga talaan ng singil na maaaring tingnan.",
+      "retentionLimit": "Ipinapakita ang mga pinakabagong talaan ng singil."
     },
     "lowBalanceAlert": {
       "enableA11y": "Paganahin ang babala sa mababang balanse",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "Pagbili ng credit",
       "receipt": "Resibo",
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
-      "receiptUnavailable": "Walang available na resibo para sa pagbiling ito."
+      "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
+      "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit."
     },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Hindi ma-load ang mga integration",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga integration na ito.",
     "managedByOwner": "Hilingin sa isang may-ari ng organisasyon na baguhin ang isang koneksyong hindi mo mababago.",
+    "managedByOwnerOrAdmin": "Hilingin sa isang may-ari ng organisasyon o admin na baguhin ang isang koneksyong hindi mo mababago.",
+    "managedByOwnerOrBilling": "Hilingin sa isang may-ari ng organisasyon o tagapamahala ng pagsingil na baguhin ang isang koneksyong hindi mo mababago.",
+    "managedByOwnerAdminOrBilling": "Hilingin sa isang may-ari ng organisasyon, admin, o tagapamahala ng pagsingil na baguhin ang isang koneksyong hindi mo mababago.",
     "connectFailed": "Hindi mabuksan ang pahina ng koneksyon"
   },
   "invoices": {
-    "personalEmptyDescription": "Lalabas dito ang mga invoice ng sarili mong mga binili kapag nasingil ka na."
+    "personalEmptyDescription": "Lalabas dito ang mga invoice ng sarili mong mga binili kapag nasingil ka na. Ang mga resibo mula sa App Store at Google Play ay nasa Kasaysayan ng credit.",
+    "personalPeriod": "Huling 12 buwan"
   },
   "cloudAgent": {
     "compute": {

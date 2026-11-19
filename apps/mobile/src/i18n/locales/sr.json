@@ -832,7 +832,19 @@
         "fileComment": "Komentar o datoteci",
         "outdatedOnPathLines": "Zastarelo na {{path}} {{lines}}",
         "outdatedOnLines": "Zastarelo na {{lines}}",
-        "outdatedOnPath": "Zastarelo na {{path}}"
+        "outdatedOnPath": "Zastarelo na {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Leva strana",
+        "sideRight": "Desna strana",
+        "outdatedOnLinesSide": "Zastarelo na {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Zastarelo na {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Zastarelo ({{side}})",
+        "outdatedOnPathSide": "Zastarelo na {{path}} ({{side}})"
       },
       "deletedUser": "obrisani korisnik",
       "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}.",
@@ -949,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj nalog još nema organizacije. Zahteve za spajanje na Bitbucktu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "gitlabReconnectAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga ponovo poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
-      "bitbucketAdminOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
+      "adminOnlyConnectDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -3463,7 +3475,8 @@
         "accounting_adjustment": "Računovodstveno usklađivanje",
         "credits_expired": "Istekli krediti"
       },
-      "truncated": "Dostupne su i ranije promene kredita."
+      "truncated": "Dostupne su i ranije promene kredita.",
+      "retentionLimit": "Prikazuju se najnovije promene kredita."
     },
     "inviteMember": {
       "emailError": "Unesi važeću adresu e-pošte.",
@@ -3473,6 +3486,7 @@
       "sendInvite": "Pošalji pozivnicu",
       "title": "Pozovi člana",
       "alreadyInvited": "Korisnik je već pozvan ili je već član.",
+      "organizationUnavailable": "Ova organizacija više nije dostupna.",
       "sendError": "Pozivnicu nije moguće poslati.",
       "pendingInvitation": "Ova adresa e-pošte već ima pozivnicu na čekanju.",
       "alreadyMember": "Ova osoba je već član ove organizacije.",
@@ -3494,7 +3508,8 @@
         "void": "Stornirano",
         "uncollectible": "Nenaplativo"
       },
-      "truncated": "Starije fakture su dostupne."
+      "truncated": "Starije fakture su dostupne.",
+      "retentionLimit": "Prikazuju se najnovije fakture."
     },
     "lowBalanceAlert": {
       "enableA11y": "Omogući upozorenje o niskom saldu",
@@ -4430,6 +4445,7 @@
       "receipt": "Račun",
       "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Račun nije dostupan za ovu kupovinu.",
+      "retentionLimit": "Prikazuje se najnovija istorija kredita.",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Bez uticaja na stanje",
@@ -4691,10 +4707,14 @@
     "couldNotLoad": "Učitavanje integracija nije uspelo",
     "permissionDenied": "Nemate dozvolu da upravljate ovim integracijama.",
     "managedByOwner": "Zamolite vlasnika organizacije da promeni vezu koju ne možete da promenite.",
+    "managedByOwnerOrAdmin": "Zamolite vlasnika organizacije ili administratora da promeni vezu koju ne možete da promenite.",
+    "managedByOwnerOrBilling": "Zamolite vlasnika organizacije ili menadžera za naplatu da promeni vezu koju ne možete da promenite.",
+    "managedByOwnerAdminOrBilling": "Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da promeni vezu koju ne možete da promenite.",
     "connectFailed": "Otvaranje stranice za povezivanje nije uspelo"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakture za vaše lične kupovine pojaviće se ovde nakon prve naplate."
+    "personalEmptyDescription": "Fakture za vaše lične kupovine pojavljuju se ovde nakon prve naplate. Računi iz prodavnice App Store i Google Play nalaze se u Istoriji kredita.",
+    "personalPeriod": "Poslednjih 12 meseci"
   },
   "cloudAgent": {
     "compute": {

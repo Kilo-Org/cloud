@@ -820,7 +820,19 @@
         "fileComment": "Tsokacin fayil",
         "outdatedOnPathLines": "Bai dace da sabon yanayin {{path}} {{lines}} ba",
         "outdatedOnLines": "Bai dace da sabon yanayin {{lines}} ba",
-        "outdatedOnPath": "Bai dace da sabon yanayin {{path}} ba"
+        "outdatedOnPath": "Bai dace da sabon yanayin {{path}} ba",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Gefen hagu",
+        "sideRight": "Gefen dama",
+        "outdatedOnLinesSide": "Bai dace da sabon yanayin {{lines}} ba ({{side}})",
+        "outdatedOnPathLinesSide": "Bai dace da sabon yanayin {{path}} {{lines}} ba ({{side}})",
+        "outdatedSide": "Bai dace da sabon yanayin ba ({{side}})",
+        "outdatedOnPathSide": "Bai dace da sabon yanayin {{path}} ba ({{side}})"
       },
       "deletedUser": "mai amfani da aka share",
       "replyForbiddenTerm": "Ba ka da izinin amsa wannan {{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Wannan asusu ba shi da ƙungiyoyi har yanzu. Za a iya bita buƙatun haɗa canje-canje na Bitbucket idan ka ƙirƙiri ƙungiya ko ka shiga cikin wata.",
       "gitlabReconnectAdminOnlyDescription": "Nemi Mai ƙungiya, Mai gudanarwa, ko Manajan biyan kuɗi ya sake haɗa shi.",
       "bitbucketNotConnectedTitle": "Ba a haɗa Bitbucket ba",
-      "bitbucketAdminOnlyDescription": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
+      "adminOnlyConnectDescription": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
       "contextLine": "Don {{organization}}",
       "contextLinePersonal": "Don kashin kanka"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "Daidaitawar lissafin kuɗi",
         "credits_expired": "Wa'adin kuɗin amfani ya ƙare"
       },
-      "truncated": "Ana samun ma'amalolin kuɗin amfani na baya."
+      "truncated": "Ana samun ma'amalolin kuɗin amfani na baya.",
+      "retentionLimit": "Ana nuna ma'amalolin kuɗin amfani na baya-bayan nan."
     },
     "inviteMember": {
       "emailError": "Shigar da adireshin imel mai inganci.",
@@ -3415,6 +3428,7 @@
       "sendInvite": "Aika gayyata",
       "title": "Gayyaci memba",
       "alreadyInvited": "An riga an aika musu gayyata ko kuma sun riga zama memba.",
+      "organizationUnavailable": "Wannan ƙungiyar ba ta samuwa kuma.",
       "sendError": "Ba a iya aika gayyata ba.",
       "pendingInvitation": "Wannan adireshin imel ɗin ya riga yana da gayyata da ke jiran amsa.",
       "alreadyMember": "Wannan mutumin ya riga ya zama memba na wannan ƙungiyar.",
@@ -3436,7 +3450,8 @@
         "void": "An soke",
         "uncollectible": "Ba a iya karɓar kuɗin"
       },
-      "truncated": "Ana samun takardun biyan kuɗi na baya."
+      "truncated": "Ana samun takardun biyan kuɗi na baya.",
+      "retentionLimit": "Ana nuna takardun biyan kuɗi na baya-bayan nan."
     },
     "lowBalanceAlert": {
       "enableA11y": "Kunna faɗakarwar ƙarancin kuɗi",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "Sayen kiredit",
       "receipt": "Rasiti",
       "receiptA11y": "Buɗe rasitin {{description}}, {{amount}}, daga {{date}}",
-      "receiptUnavailable": "Babu rasiti don wannan sayayya."
+      "receiptUnavailable": "Babu rasiti don wannan sayayya.",
+      "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan."
     },
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Ba a iya loda haɗe-haɗe ba",
     "permissionDenied": "Ba ka da izinin sarrafa waɗannan haɗe-haɗe.",
     "managedByOwner": "Ka roƙi mamallakin ƙungiya ya canza haɗin da ba za ka iya canza ba.",
+    "managedByOwnerOrAdmin": "Ka roƙi Mai ƙungiya ko Mai gudanarwa ya canza haɗin da ba za ka iya canza ba.",
+    "managedByOwnerOrBilling": "Ka roƙi Mai ƙungiya ko Manajan biyan kuɗi ya canza haɗin da ba za ka iya canza ba.",
+    "managedByOwnerAdminOrBilling": "Ka roƙi Mai ƙungiya, Mai gudanarwa, ko Manajan biyan kuɗi ya canza haɗin da ba za ka iya canza ba.",
     "connectFailed": "Ba a iya buɗe shafin haɗi ba"
   },
   "invoices": {
-    "personalEmptyDescription": "Takardun kuɗi na sayayyarka za su bayyana a nan da zarar an caje ka."
+    "personalEmptyDescription": "Takardun kuɗi na sayayyarka suna bayyana a nan da zarar an caje ka. Rasiti daga App Store da Google Play suna cikin Tarihin kiredit.",
+    "personalPeriod": "Watanni 12 da suka gabata"
   },
   "cloudAgent": {
     "compute": {

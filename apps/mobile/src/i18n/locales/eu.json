@@ -820,7 +820,19 @@
         "fileComment": "Fitxategi-iruzkina",
         "outdatedOnPathLines": "Zaharkitua: {{path}} {{lines}}",
         "outdatedOnLines": "Zaharkitua: {{lines}}",
-        "outdatedOnPath": "Zaharkitua: {{path}}"
+        "outdatedOnPath": "Zaharkitua: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Ezkerraldea",
+        "sideRight": "Eskuinaldea",
+        "outdatedOnLinesSide": "Zaharkitua: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Zaharkitua: {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Zaharkitua ({{side}})",
+        "outdatedOnPathSide": "Zaharkitua: {{path}} ({{side}})"
       },
       "deletedUser": "erabiltzaile ezabatua",
       "replyForbiddenTerm": "Ez duzu baimenik {{term}} honi erantzuteko.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
       "gitlabReconnectAdminOnlyDescription": "Eskatu erakunde bateko jabeari, administratzaileari edo fakturazio-kudeatzaileari berriro konekta dezan.",
       "bitbucketNotConnectedTitle": "Bitbucket ez dago konektatuta",
-      "bitbucketAdminOnlyDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
+      "adminOnlyConnectDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
       "contextLine": "{{organization}}-rako",
       "contextLinePersonal": "Zure kontu pertsonalerako"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "Kontabilitate-doikuntza",
         "credits_expired": "Kredituak iraungita"
       },
-      "truncated": "Aurreko kreditu-jarduera eskuragarri dago."
+      "truncated": "Aurreko kreditu-jarduera eskuragarri dago.",
+      "retentionLimit": "Azken kreditu-jarduera erakusten da."
     },
     "inviteMember": {
       "emailError": "Sartu baliozko helbide elektroniko bat.",
@@ -3415,6 +3428,7 @@
       "sendInvite": "Bidali gonbidapena",
       "title": "Gonbidatu kidea",
       "alreadyInvited": "Dagoeneko gonbidatuta dago edo dagoeneko kidea da.",
+      "organizationUnavailable": "Erakunde hau ez dago jada erabilgarri.",
       "sendError": "Ezin izan da gonbidapena bidali.",
       "pendingInvitation": "Helbide elektroniko honek dagoeneko gonbidapen bat du zain.",
       "alreadyMember": "Pertsona hau dagoeneko erakunde honetako kidea da.",
@@ -3436,7 +3450,8 @@
         "void": "Baliogabetuta",
         "uncollectible": "Kobratu ezina"
       },
-      "truncated": "Aurreko fakturak eskuragarri daude."
+      "truncated": "Aurreko fakturak eskuragarri daude.",
+      "retentionLimit": "Azken fakturak erakusten dira."
     },
     "lowBalanceAlert": {
       "enableA11y": "Gaitu saldo baxuko alerta",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "Kreditu-erosketa",
       "receipt": "Ordainagiria",
       "receiptA11y": "Ireki honen ordainagiria: {{description}}, {{amount}}, {{date}}tik",
-      "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako."
+      "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako.",
+      "retentionLimit": "Azken kreditu-historia erakusten da."
     },
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Ezin izan dira integrazioak kargatu",
     "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
     "managedByOwner": "Eskatu erakundearen jabe bati aldatu ezin duzun konexio bat alda dezan.",
+    "managedByOwnerOrAdmin": "Eskatu erakundearen jabe edo administratzaile bati aldatu ezin duzun konexio bat alda dezan.",
+    "managedByOwnerOrBilling": "Eskatu erakundearen jabe edo fakturazio-kudeatzaile bati aldatu ezin duzun konexio bat alda dezan.",
+    "managedByOwnerAdminOrBilling": "Eskatu erakundearen jabe, administratzaile edo fakturazio-kudeatzaile bati aldatu ezin duzun konexio bat alda dezan.",
     "connectFailed": "Ezin izan da konexio-orria ireki"
   },
   "invoices": {
-    "personalEmptyDescription": "Zure erosketen fakturak hemen agertuko dira fakturatzen zaizunean."
+    "personalEmptyDescription": "Zure erosketen fakturak hemen agertzen dira fakturatzen zaizunean. App Store-ko eta Google Play-ko ordainagiriak Kredituen historian daude.",
+    "personalPeriod": "Azken 12 hilabeteak"
   },
   "cloudAgent": {
     "compute": {

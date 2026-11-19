@@ -38,23 +38,30 @@ export type DetailItem = {
   hint?: string;
 };
 
+/** An info button whose tooltip explains `label`. */
+export function LabelHint({ label, hint }: { label: string; hint: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={`About ${label.toLowerCase()}`}
+          className="hover:text-foreground focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <Info className="size-3" aria-hidden />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">{hint}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function DetailLabel({ label, hint }: Pick<DetailItem, 'label' | 'hint'>) {
   if (!hint) return <dt className="text-muted-foreground text-xs">{label}</dt>;
   return (
     <dt className="text-muted-foreground flex items-center gap-1 text-xs">
       {label}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            aria-label={`About ${label.toLowerCase()}`}
-            className="hover:text-foreground focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <Info className="size-3" aria-hidden />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs">{hint}</TooltipContent>
-      </Tooltip>
+      <LabelHint label={label} hint={hint} />
     </dt>
   );
 }

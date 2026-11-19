@@ -832,7 +832,19 @@
         "fileComment": "Komentārs par failu",
         "outdatedOnPathLines": "Novecojis: {{path}}, {{lines}}",
         "outdatedOnLines": "Novecojis: {{lines}}",
-        "outdatedOnPath": "Novecojis: {{path}}"
+        "outdatedOnPath": "Novecojis: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Kreisā puse",
+        "sideRight": "Labā puse",
+        "outdatedOnLinesSide": "Novecojis: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Novecojis: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Novecojis ({{side}})",
+        "outdatedOnPathSide": "Novecojis: {{path}} ({{side}})"
       },
       "deletedUser": "dzēsts lietotājs",
       "replyForbiddenTerm": "Tev nav atļaujas atbildēt uz {{term}}.",
@@ -949,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
       "gitlabReconnectAdminOnlyDescription": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
       "bitbucketNotConnectedTitle": "Bitbucket nav pievienots",
-      "bitbucketAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
+      "adminOnlyConnectDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "contextLine": "Priekš {{organization}}",
       "contextLinePersonal": "Priekš personīgā konta"
     },
@@ -3463,7 +3475,8 @@
         "accounting_adjustment": "Grāmatvedības korekcija",
         "credits_expired": "Kredītu derīguma termiņš beidzies"
       },
-      "truncated": "Ir pieejami arī iepriekšējie kredītu darījumi."
+      "truncated": "Ir pieejami arī iepriekšējie kredītu darījumi.",
+      "retentionLimit": "Tiek rādīti jaunākie kredītu darījumi."
     },
     "inviteMember": {
       "emailError": "Ievadi derīgu e-pasta adresi.",
@@ -3473,6 +3486,7 @@
       "sendInvite": "Nosūtīt uzaicinājumu",
       "title": "Uzaicināt dalībnieku",
       "alreadyInvited": "Šī e-pasta adrese jau ir uzaicināta vai jau pieder dalībniekam.",
+      "organizationUnavailable": "Šī organizācija vairs nav pieejama.",
       "sendError": "Neizdevās nosūtīt uzaicinājumu.",
       "pendingInvitation": "Šai e-pasta adresei jau ir gaidošs uzaicinājums.",
       "alreadyMember": "Šis cilvēks jau ir šīs organizācijas dalībnieks.",
@@ -3494,7 +3508,8 @@
         "void": "Anulēts",
         "uncollectible": "Nepiedzenams"
       },
-      "truncated": "Ir pieejami vecāki rēķini."
+      "truncated": "Ir pieejami vecāki rēķini.",
+      "retentionLimit": "Tiek rādīti jaunākie rēķini."
     },
     "lowBalanceAlert": {
       "enableA11y": "Iespējot brīdinājumu par mazu atlikumu",
@@ -4436,7 +4451,8 @@
       "purchaseFallback": "Kredītu pirkums",
       "receipt": "Kvīts",
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Šim pirkumam kvīts nav pieejama."
+      "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
+      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture."
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
@@ -4691,10 +4707,14 @@
     "couldNotLoad": "Neizdevās ielādēt integrācijas",
     "permissionDenied": "Jums nav atļaujas pārvaldīt šīs integrācijas.",
     "managedByOwner": "Lūdziet organizācijas īpašniekam mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerOrAdmin": "Lūdziet organizācijas īpašniekam vai administratoram mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerOrBilling": "Lūdziet organizācijas īpašniekam vai norēķinu pārvaldniekam mainīt savienojumu, kuru nevarat mainīt.",
+    "managedByOwnerAdminOrBilling": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam mainīt savienojumu, kuru nevarat mainīt.",
     "connectFailed": "Neizdevās atvērt savienojuma lapu"
   },
   "invoices": {
-    "personalEmptyDescription": "Rēķini par jūsu pirkumiem šeit parādīsies, kad jums tiks izrakstīts rēķins."
+    "personalEmptyDescription": "Rēķini par jūsu pirkumiem šeit parādās, kad jums tiks izrakstīts rēķins. Kvīti veikalā App Store un pakalpojumā Google Play atrodas sadaļā Kredītu vēsture.",
+    "personalPeriod": "Pēdējie 12 mēneši"
   },
   "cloudAgent": {
     "compute": {

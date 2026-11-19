@@ -4,7 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
-import { supportStepUpPort } from '@kilocode/web-shared/lib/admin/support-step-up';
+import { requireSupportWriteUseStepUp } from '@kilocode/web-shared/lib/admin/support-step-up';
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
@@ -137,7 +137,7 @@ async function selectCallerRoleRows(
 
 export function effectiveMembershipRole(
   rows: { role: OrganizationRole }[],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): OrganizationRole | null {
   const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
   return (
@@ -158,7 +158,7 @@ export function settle<T>(
 
 export async function observeMembershipRole(
   loader: () => Promise<{ role: OrganizationRole }[]>,
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<{
   membershipRole: OrganizationRole | null;
   wouldPassWithoutAdmin: boolean | null;
@@ -214,6 +214,9 @@ export type OrganizationAccessContext = Pick<
   | 'trpcPath'
   | 'trpcType'
   | 'webSessionId'
+  | 'adminStepUpState'
+  | 'adminStepUpDecision'
+  | 'stepUpClaims'
 > & {
   auditSurface?: 'trpc' | 'rest' | 'server-component';
   auditMethod?: string;
@@ -221,7 +224,7 @@ export type OrganizationAccessContext = Pick<
 };
 
 export type ResolveOrganizationAccessOptions = {
-  roles?: OrganizationRole[];
+  roles?: readonly OrganizationRole[];
   /** Exact REST route pattern or inventory key. Defaults to the tRPC path. */
   supportKey?: string | null;
   supportActionId?: string | null;
@@ -428,10 +431,15 @@ export async function resolveOrganizationAccess(
       const entry = key
         ? findSupportAllowEntry({ surface, key, actionClass: 'support_write' })
         : undefined;
+      let firstUseInRequest = true;
       if (entry?.stepUp === 'fresh') {
-        await supportStepUpPort.requireFresh({
+        firstUseInRequest = await requireSupportWriteUseStepUp({
           userId: ctx.user.id,
-          action: 'support_write_use',
+          organizationId,
+          upstreamStepUpState: ctx.adminStepUpState,
+          upstreamStepUpDecision: ctx.adminStepUpDecision,
+          claimStore: ctx.stepUpClaims,
+          claimKey: `${organizationId}:${surface}:${key ?? ''}`,
           credential: ctx.credential,
           webSessionId: ctx.webSessionId ?? null,
           route: ctx.trpcPath ?? null,
@@ -439,13 +447,15 @@ export async function resolveOrganizationAccess(
           surface,
         });
       }
-      await recordSupportWriteUse({
-        grantId: evaluation.access.grantId,
-        actorKiloUserId: ctx.user.id,
-        grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
-        targetOrganizationId: organizationId,
-        supportActionId: evaluation.access.supportActionId,
-      });
+      if (firstUseInRequest) {
+        await recordSupportWriteUse({
+          grantId: evaluation.access.grantId,
+          actorKiloUserId: ctx.user.id,
+          grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
+          targetOrganizationId: organizationId,
+          supportActionId: evaluation.access.supportActionId,
+        });
+      }
     }
     await recordKiloAdminElevation(ctx, {
       reason: options.auditReason ?? 'organization_access',
@@ -510,7 +520,7 @@ export function organizationAccessRole(
 export async function ensureOrganizationAccess(
   ctx: TRPCContext,
   organizationId: Organization['id'],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<OrganizationRole> {
   const access = await resolveOrganizationAccess(ctx, organizationId, { roles });
   const role = organizationAccessRole(ctx, access);
@@ -530,7 +540,7 @@ export async function ensureOrganizationAccess(
 export async function ensureMemberOrganizationAccess(
   user: { id: string },
   organizationId: Organization['id'],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<OrganizationRole> {
   const rows = await loadEffectiveMembershipRows(user.id, organizationId);
   const role = effectiveMembershipRole(rows, roles);
@@ -561,7 +571,7 @@ export async function requireLiveOrganization(organizationId: Organization['id']
 export async function requireLiveOrganizationForPlatformAdmin(
   ctx: TRPCContext,
   organizationId: Organization['id'],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<void> {
   await requireLiveOrganization(organizationId);
   const observation = await observeMembershipRole(
@@ -631,7 +641,7 @@ function groupRolesByOrganization(rows: CallerRoleRow[]): Map<string, Organizati
 export async function getOrganizationsAccessRoles(
   ctx: TRPCContext,
   organizationIds: Organization['id'][],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<Map<string, OrganizationRole>> {
   const uniqueIds = Array.from(new Set(organizationIds));
   const result = new Map<string, OrganizationRole>();
@@ -713,7 +723,7 @@ export async function getOrganizationsAccessRoles(
 export async function ensureOrganizationsAccess(
   ctx: TRPCContext,
   organizationIds: Organization['id'][],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<void> {
   const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds, roles);
   const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
@@ -731,7 +741,7 @@ export async function ensureOrganizationsAccess(
 export async function ensureOrganizationAccessAndFetchOrg(
   ctx: TRPCContext,
   organizationId: Organization['id'],
-  roles?: OrganizationRole[]
+  roles?: readonly OrganizationRole[]
 ): Promise<Organization> {
   if (ctx.user.is_admin && !isSupportAccessEnabled()) {
     const organizationResult = settle(

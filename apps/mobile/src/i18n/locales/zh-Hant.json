@@ -2800,7 +2800,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
       "gitlabReconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
       "bitbucketNotConnectedTitle": "尚未連結 Bitbucket",
-      "bitbucketAdminOnlyDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
+      "adminOnlyConnectDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
     },
@@ -2897,7 +2897,19 @@
         "fileComment": "檔案留言",
         "outdatedOnPathLines": "{{path}} {{lines}} 的留言已過時",
         "outdatedOnLines": "{{lines}} 的留言已過時",
-        "outdatedOnPath": "{{path}} 的留言已過時"
+        "outdatedOnPath": "{{path}} 的留言已過時",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "左側",
+        "sideRight": "右側",
+        "outdatedOnLinesSide": "{{lines}} ({{side}}) 的留言已過時",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} ({{side}}) 的留言已過時",
+        "outdatedSide": "({{side}}) 已過時",
+        "outdatedOnPathSide": "{{path}} ({{side}}) 已過時"
       },
       "deletedUser": "已刪除的使用者",
       "replyForbiddenTerm": "你沒有權限回覆此{{term}}。",
@@ -3397,7 +3409,8 @@
         "accounting_adjustment": "會計調整",
         "credits_expired": "點數已到期"
       },
-      "truncated": "還有更早的點數記錄可供查看。"
+      "truncated": "還有更早的點數記錄可供查看。",
+      "retentionLimit": "顯示最近的點數記錄。"
     },
     "hub": {
       "balance": "餘額",
@@ -3420,6 +3433,7 @@
       "sendInvite": "傳送邀請",
       "title": "邀請成員",
       "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
+      "organizationUnavailable": "此組織已無法使用。",
       "sendError": "無法傳送邀請。",
       "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
       "alreadyMember": "這個人已經是此組織的成員。",
@@ -3441,7 +3455,8 @@
         "void": "已作廢",
         "uncollectible": "無法收款"
       },
-      "truncated": "還有更早的發票可供查看。"
+      "truncated": "還有更早的發票可供查看。",
+      "retentionLimit": "顯示最近的發票。"
     },
     "lowBalanceAlert": {
       "enableA11y": "啟用餘額不足提醒",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "點數購買",
       "receipt": "收據",
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
-      "receiptUnavailable": "此筆購買沒有可用的收據。"
+      "receiptUnavailable": "此筆購買沒有可用的收據。",
+      "retentionLimit": "顯示最近的點數紀錄。"
     },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "無法載入整合",
     "permissionDenied": "您沒有管理這些整合的權限。",
     "managedByOwner": "請洽詢組織擁有者來變更您無法變更的連結。",
+    "managedByOwnerOrAdmin": "請洽詢組織擁有者或管理員來變更您無法變更的連結。",
+    "managedByOwnerOrBilling": "請洽詢組織擁有者或帳單管理員來變更您無法變更的連結。",
+    "managedByOwnerAdminOrBilling": "請洽詢組織擁有者、管理員或帳單管理員來變更您無法變更的連結。",
     "connectFailed": "無法開啟連結頁面"
   },
   "invoices": {
-    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。"
+    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。App Store 收據與 Google Play 收據都在點數紀錄中。",
+    "personalPeriod": "最近 12 個月"
   },
   "cloudAgent": {
     "compute": {

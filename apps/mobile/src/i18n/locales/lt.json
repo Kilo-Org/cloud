@@ -844,7 +844,19 @@
         "fileComment": "Failo komentaras",
         "outdatedOnPathLines": "Pasenęs komentaras: {{path}}, {{lines}}",
         "outdatedOnLines": "Pasenęs komentaras: {{lines}}",
-        "outdatedOnPath": "Pasenęs komentaras: {{path}}"
+        "outdatedOnPath": "Pasenęs komentaras: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Kairė pusė",
+        "sideRight": "Dešinė pusė",
+        "outdatedOnLinesSide": "Pasenęs komentaras: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Pasenęs komentaras: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Pasenęs ({{side}})",
+        "outdatedOnPathSide": "Pasenęs: {{path}} ({{side}})"
       },
       "deletedUser": "ištrintas naudotojas",
       "replyForbiddenTerm": "Neturi teisės atsakyti šioje diskusijoje ({{term}}).",
@@ -966,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
       "gitlabReconnectAdminOnlyDescription": "Paprašyk organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti iš naujo.",
       "bitbucketNotConnectedTitle": "Bitbucket neprijungtas",
-      "bitbucketAdminOnlyDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
+      "adminOnlyConnectDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
     },
@@ -3521,7 +3533,8 @@
         "accounting_adjustment": "Apskaitos koregavimas",
         "credits_expired": "Kreditų galiojimas baigėsi"
       },
-      "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas."
+      "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas.",
+      "retentionLimit": "Rodomos naujausios kreditų operacijos."
     },
     "inviteMember": {
       "emailError": "Įveskite tinkamą el. pašto adresą",
@@ -3531,6 +3544,7 @@
       "sendInvite": "Siųsti kvietimą",
       "title": "Pakviesti narį",
       "alreadyInvited": "Vartotojas jau pakviestas arba jau yra narys.",
+      "organizationUnavailable": "Ši organizacija nebeprieinama.",
       "sendError": "Nepavyko išsiųsti kvietimo.",
       "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
       "alreadyMember": "Šis asmuo jau yra šios organizacijos narys.",
@@ -3552,7 +3566,8 @@
         "void": "Anuliuota",
         "uncollectible": "Beviltiška skola"
       },
-      "truncated": "Galite peržiūrėti ankstesnes sąskaitas."
+      "truncated": "Galite peržiūrėti ankstesnes sąskaitas.",
+      "retentionLimit": "Rodomos naujausios sąskaitos."
     },
     "lowBalanceAlert": {
       "enableA11y": "Įjungti pranešimą apie mažą likutį",
@@ -4503,7 +4518,8 @@
       "purchaseFallback": "Kreditų pirkimas",
       "receipt": "Kvitas",
       "receiptA11y": "Atidaryti kvitą: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Šiam pirkimui kvito nėra."
+      "receiptUnavailable": "Šiam pirkimui kvito nėra.",
+      "retentionLimit": "Rodoma naujausia kreditų istorija."
     },
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",
@@ -4766,10 +4782,14 @@
     "couldNotLoad": "Nepavyko įkelti integracijų",
     "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
     "managedByOwner": "Paprašykite organizacijos savininko pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerOrAdmin": "Paprašykite organizacijos savininko ar administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerOrBilling": "Paprašykite organizacijos savininko ar atsiskaitymų administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
+    "managedByOwnerAdminOrBilling": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus pakeisti jungtį, kurios negalite pakeisti.",
     "connectFailed": "Nepavyko atidaryti prijungimo puslapio"
   },
   "invoices": {
-    "personalEmptyDescription": "Jūsų asmeninių pirkimų sąskaitos faktūros bus rodomos čia, kai jums bus išrašyta sąskaita."
+    "personalEmptyDescription": "Jūsų asmeninių pirkimų sąskaitos faktūros rodomos čia, kai jums bus išrašyta sąskaita. Kvitai iš App Store ir Google Play yra Kreditų istorijoje.",
+    "personalPeriod": "Paskutiniai 12 mėnesių"
   },
   "cloudAgent": {
     "compute": {

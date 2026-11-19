@@ -2839,7 +2839,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ce compte n'a encore aucune organisation. Les PR Bitbucket peuvent être examinées une fois que vous créez ou rejoignez une organisation.",
       "gitlabReconnectAdminOnlyDescription": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de la reconnecter.",
       "bitbucketNotConnectedTitle": "Bitbucket n'est pas connecté",
-      "bitbucketAdminOnlyDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
+      "adminOnlyConnectDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent établir la connexion.",
       "contextLine": "Pour {{organization}}",
       "contextLinePersonal": "Pour votre compte personnel"
     },
@@ -2938,7 +2938,19 @@
         "fileComment": "Commentaire sur le fichier",
         "outdatedOnPathLines": "Obsolète : {{path}}, {{lines}}",
         "outdatedOnLines": "Obsolète : {{lines}}",
-        "outdatedOnPath": "Obsolète : {{path}}"
+        "outdatedOnPath": "Obsolète : {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Côté gauche",
+        "sideRight": "Côté droit",
+        "outdatedOnLinesSide": "Obsolète : {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Obsolète : {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Obsolète ({{side}})",
+        "outdatedOnPathSide": "Obsolète : {{path}} ({{side}})"
       },
       "deletedUser": "utilisateur supprimé",
       "replyForbiddenTerm": "Vous n'avez pas l'autorisation de répondre ici ({{term}}).",
@@ -3455,7 +3467,8 @@
         "accounting_adjustment": "Ajustement comptable",
         "credits_expired": "Crédits expirés"
       },
-      "truncated": "Des mouvements de crédits plus anciens sont disponibles."
+      "truncated": "Des mouvements de crédits plus anciens sont disponibles.",
+      "retentionLimit": "Affichage des mouvements de crédits les plus récents."
     },
     "hub": {
       "balance": "Solde",
@@ -3478,6 +3491,7 @@
       "sendInvite": "Envoyer l'invitation",
       "title": "Inviter un membre",
       "alreadyInvited": "Cette adresse a déjà reçu une invitation ou son titulaire est déjà membre.",
+      "organizationUnavailable": "Cette organisation n'est plus disponible.",
       "sendError": "Impossible d'envoyer l'invitation.",
       "pendingInvitation": "Cette adresse e-mail a déjà une invitation en attente.",
       "alreadyMember": "Cette personne est déjà membre de cette organisation.",
@@ -3499,7 +3513,8 @@
         "void": "Annulée",
         "uncollectible": "Irrecouvrable"
       },
-      "truncated": "Des factures plus anciennes sont disponibles."
+      "truncated": "Des factures plus anciennes sont disponibles.",
+      "retentionLimit": "Affichage des factures les plus récentes."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activer l'alerte de solde faible",
@@ -4436,7 +4451,8 @@
       "purchaseFallback": "Achat de crédits",
       "receipt": "Reçu",
       "receiptA11y": "Ouvrir le reçu pour {{description}}, {{amount}}, du {{date}}",
-      "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat."
+      "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat.",
+      "retentionLimit": "Affichage de l'historique de crédits le plus récent."
     },
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
@@ -4691,10 +4707,14 @@
     "couldNotLoad": "Impossible de charger les intégrations",
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer ces intégrations.",
     "managedByOwner": "Demandez à un propriétaire de l'organisation de modifier une connexion que vous ne pouvez pas modifier.",
+    "managedByOwnerOrAdmin": "Demandez à un propriétaire de l'organisation ou à un administrateur de modifier une connexion que vous ne pouvez pas modifier.",
+    "managedByOwnerOrBilling": "Demandez à un propriétaire de l'organisation ou à un responsable de la facturation de modifier une connexion que vous ne pouvez pas modifier.",
+    "managedByOwnerAdminOrBilling": "Demandez à un propriétaire de l'organisation, à un administrateur ou à un responsable de la facturation de modifier une connexion que vous ne pouvez pas modifier.",
     "connectFailed": "Impossible d'ouvrir la page de connexion"
   },
   "invoices": {
-    "personalEmptyDescription": "Les factures de vos achats personnels apparaîtront ici dès votre première facturation."
+    "personalEmptyDescription": "Les factures de vos achats personnels apparaissent ici dès votre première facturation. Les reçus disponibles sur l'App Store et sur Google Play se trouvent dans l'Historique des crédits.",
+    "personalPeriod": "12 derniers mois"
   },
   "cloudAgent": {
     "compute": {

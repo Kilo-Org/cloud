@@ -844,7 +844,19 @@
         "fileComment": "Komentár k súboru",
         "outdatedOnPathLines": "Neaktuálne: {{path}}, {{lines}}",
         "outdatedOnLines": "Neaktuálne: {{lines}}",
-        "outdatedOnPath": "Neaktuálne: {{path}}"
+        "outdatedOnPath": "Neaktuálne: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Ľavá strana",
+        "sideRight": "Pravá strana",
+        "outdatedOnLinesSide": "Neaktuálne: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Neaktuálne: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Neaktuálne ({{side}})",
+        "outdatedOnPathSide": "Neaktuálne: {{path}} ({{side}})"
       },
       "deletedUser": "odstránený používateľ",
       "replyForbiddenTerm": "Nemáš oprávnenie odpovedať na tento {{term}}.",
@@ -966,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
       "gitlabReconnectAdminOnlyDescription": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby ho znova pripojil.",
       "bitbucketNotConnectedTitle": "Bitbucket nie je pripojený",
-      "bitbucketAdminOnlyDescription": "Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
+      "adminOnlyConnectDescription": "Pripojiť ho môžu iba vlastníci organizácie, správcovia a správcovia fakturácie.",
       "contextLine": "Pre {{organization}}",
       "contextLinePersonal": "Pre osobný účet"
     },
@@ -3521,7 +3533,8 @@
         "accounting_adjustment": "Účtovná úprava",
         "credits_expired": "Platnosť kreditov sa skončila"
       },
-      "truncated": "K dispozícii sú aj staršie pohyby kreditov."
+      "truncated": "K dispozícii sú aj staršie pohyby kreditov.",
+      "retentionLimit": "Zobrazujú sa najnovšie pohyby kreditov."
     },
     "inviteMember": {
       "emailError": "Zadaj platnú e-mailovú adresu.",
@@ -3531,6 +3544,7 @@
       "sendInvite": "Odoslať pozvánku",
       "title": "Pozvať člena",
       "alreadyInvited": "Táto osoba už bola pozvaná alebo už je členom.",
+      "organizationUnavailable": "Táto organizácia už nie je dostupná.",
       "sendError": "Pozvánku sa nepodarilo odoslať.",
       "pendingInvitation": "Táto e-mailová adresa už má čakajúcu pozvánku.",
       "alreadyMember": "Táto osoba je už členom tejto organizácie.",
@@ -3552,7 +3566,8 @@
         "void": "Stornovaná",
         "uncollectible": "Nevymožiteľná"
       },
-      "truncated": "Staršie faktúry sú k dispozícii."
+      "truncated": "Staršie faktúry sú k dispozícii.",
+      "retentionLimit": "Zobrazujú sa najnovšie faktúry."
     },
     "lowBalanceAlert": {
       "enableA11y": "Zapnúť upozornenie na nízky zostatok",
@@ -4503,7 +4518,8 @@
       "purchaseFallback": "Nákup kreditov",
       "receipt": "Doklad",
       "receiptA11y": "Otvoriť doklad za {{description}}, {{amount}}, z {{date}}",
-      "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad."
+      "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad.",
+      "retentionLimit": "Zobrazuje sa najnovšia história kreditov."
     },
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
@@ -4766,10 +4782,14 @@
     "couldNotLoad": "Integrácie sa nepodarilo načítať",
     "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
     "managedByOwner": "Požiadajte vlastníka organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+    "managedByOwnerOrAdmin": "Požiadajte vlastníka alebo správcu organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+    "managedByOwnerOrBilling": "Požiadajte vlastníka alebo správcu fakturácie organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
+    "managedByOwnerAdminOrBilling": "Požiadajte vlastníka, správcu alebo správcu fakturácie organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",
     "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktúry za vaše vlastné nákupy sa tu zobrazia po vyúčtovaní."
+    "personalEmptyDescription": "Faktúry za vaše vlastné nákupy sa tu zobrazia po vyúčtovaní. Doklady v obchode App Store a Google Play nájdete na obrazovke História kreditov.",
+    "personalPeriod": "Posledných 12 mesiacov"
   },
   "cloudAgent": {
     "compute": {

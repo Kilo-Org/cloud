@@ -820,7 +820,19 @@
         "fileComment": "ความคิดเห็นเกี่ยวกับไฟล์",
         "outdatedOnPathLines": "อ้างอิงโค้ดเก่าที่ {{path}} {{lines}}",
         "outdatedOnLines": "อ้างอิงโค้ดเก่าที่ {{lines}}",
-        "outdatedOnPath": "อ้างอิงโค้ดเก่าที่ {{path}}"
+        "outdatedOnPath": "อ้างอิงโค้ดเก่าที่ {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "ฝั่งซ้าย",
+        "sideRight": "ฝั่งขวา",
+        "outdatedOnLinesSide": "อ้างอิงโค้ดเก่าที่ {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "อ้างอิงโค้ดเก่าที่ {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "อ้างอิงโค้ดเก่า ({{side}})",
+        "outdatedOnPathSide": "อ้างอิงโค้ดเก่าที่ {{path}} ({{side}})"
       },
       "deletedUser": "ผู้ใช้ที่ถูกลบ",
       "replyForbiddenTerm": "คุณไม่มีสิทธิ์ตอบกลับใน {{term}} นี้",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "บัญชีนี้ยังไม่มีองค์กร คุณจะสามารถรีวิวพูลรีเควสต์บน Bitbucket ได้เมื่อสร้างหรือเข้าร่วมองค์กร",
       "gitlabReconnectAdminOnlyDescription": "ขอให้เจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเชื่อมต่อใหม่",
       "bitbucketNotConnectedTitle": "Bitbucket ยังไม่เชื่อมต่อ",
-      "bitbucketAdminOnlyDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
+      "adminOnlyConnectDescription": "เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเชื่อมต่อได้",
       "contextLine": "สำหรับ {{organization}}",
       "contextLinePersonal": "สำหรับบัญชีส่วนตัวของคุณ"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "การปรับปรุงบัญชี",
         "credits_expired": "เครดิตหมดอายุ"
       },
-      "truncated": "ยังมีรายการเครดิตก่อนหน้านี้ให้ดู"
+      "truncated": "ยังมีรายการเครดิตก่อนหน้านี้ให้ดู",
+      "retentionLimit": "กำลังแสดงรายการเครดิตล่าสุด"
     },
     "inviteMember": {
       "emailError": "ป้อนที่อยู่อีเมลที่ถูกต้อง",
@@ -3415,6 +3428,7 @@
       "sendInvite": "ส่งคำเชิญ",
       "title": "เชิญสมาชิก",
       "alreadyInvited": "ได้รับคำเชิญอยู่แล้วหรือเป็นสมาชิกอยู่แล้ว",
+      "organizationUnavailable": "องค์กรนี้ไม่พร้อมใช้งานแล้ว",
       "sendError": "ส่งคำเชิญไม่สำเร็จ",
       "pendingInvitation": "อีเมลนี้มีคำเชิญที่รอดำเนินการอยู่แล้ว",
       "alreadyMember": "บุคคลนี้เป็นสมาชิกขององค์กรนี้อยู่แล้ว",
@@ -3436,7 +3450,8 @@
         "void": "เป็นโมฆะ",
         "uncollectible": "เรียกเก็บไม่ได้"
       },
-      "truncated": "ยังมีใบแจ้งหนี้ก่อนหน้านี้ให้ดู"
+      "truncated": "ยังมีใบแจ้งหนี้ก่อนหน้านี้ให้ดู",
+      "retentionLimit": "กำลังแสดงใบแจ้งหนี้ล่าสุด"
     },
     "lowBalanceAlert": {
       "enableA11y": "เปิดใช้การแจ้งเตือนยอดคงเหลือต่ำ",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "การซื้อเครดิต",
       "receipt": "ใบเสร็จ",
       "receiptA11y": "เปิดใบเสร็จสำหรับ {{description}} จำนวน {{amount}} วันที่ {{date}}",
-      "receiptUnavailable": "ไม่มีใบเสร็จสำหรับการซื้อนี้"
+      "receiptUnavailable": "ไม่มีใบเสร็จสำหรับการซื้อนี้",
+      "retentionLimit": "กำลังแสดงประวัติเครดิตล่าสุด"
     },
     "title": "ซื้อเครดิต",
     "description": "เครดิตคือการซื้อครั้งเดียวที่เพิ่มเข้าสู่ยอดคงเหลือ Kilo ของคุณสำหรับการรันเซสชันการเขียนโค้ด AI ใน Kilo App สโตร์เรียกเก็บเงินจากบัญชีของคุณ และเครดิตจะถูกเพิ่มหลังจากที่สโตร์ยืนยันการชำระเงิน",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "ไม่สามารถโหลดการเชื่อมต่อได้",
     "permissionDenied": "คุณไม่มีสิทธิ์จัดการการเชื่อมต่อเหล่านี้",
     "managedByOwner": "โปรดขอให้เจ้าขององค์กรเปลี่ยนแปลงการเชื่อมต่อที่คุณไม่สามารถเปลี่ยนแปลงได้",
+    "managedByOwnerOrAdmin": "โปรดขอให้เจ้าของหรือผู้ดูแลระบบเปลี่ยนแปลงการเชื่อมต่อที่คุณไม่สามารถเปลี่ยนแปลงได้",
+    "managedByOwnerOrBilling": "โปรดขอให้เจ้าของหรือผู้ดูแลการเรียกเก็บเงินเปลี่ยนแปลงการเชื่อมต่อที่คุณไม่สามารถเปลี่ยนแปลงได้",
+    "managedByOwnerAdminOrBilling": "โปรดขอให้เจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินเปลี่ยนแปลงการเชื่อมต่อที่คุณไม่สามารถเปลี่ยนแปลงได้",
     "connectFailed": "ไม่สามารถเปิดหน้าการเชื่อมต่อได้"
   },
   "invoices": {
-    "personalEmptyDescription": "ใบแจ้งหนี้สำหรับการซื้อของคุณเองจะแสดงที่นี่เมื่อมีการเรียกเก็บเงิน"
+    "personalEmptyDescription": "ใบแจ้งหนี้สำหรับการซื้อของคุณเองจะแสดงที่นี่เมื่อมีการเรียกเก็บเงิน ใบเสร็จจาก App Store และใบเสร็จจาก Google Play อยู่ในประวัติเครดิต",
+    "personalPeriod": "ย้อนหลัง 12 เดือน"
   },
   "cloudAgent": {
     "compute": {

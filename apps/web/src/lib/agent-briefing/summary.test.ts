@@ -2,7 +2,7 @@ import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gate
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getRawOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';

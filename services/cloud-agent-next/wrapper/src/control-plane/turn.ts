@@ -69,6 +69,21 @@ function hasNativeDrain(runtime: TurnKiloRuntime | undefined): boolean {
   }
 }
 
+/** The runtime's client, or the reason its getter gave (`kilo-runtime.ts`). */
+function runtimeClient(runtime: TurnKiloRuntime | undefined): {
+  client: Harness | undefined;
+  unavailable: string | undefined;
+} {
+  try {
+    return { client: runtime?.client, unavailable: undefined };
+  } catch (error) {
+    return {
+      client: undefined,
+      unavailable: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -904,17 +919,30 @@ export function createTurnManager(deps: TurnManagerDeps) {
         controller.abort(new Error('finalization timed out'));
       }, DEFAULT_CONDENSE_TIMEOUT_MS);
       emitEvents(sessionId, [{ type: CONTROL_PLANE_WRAPPER_FINALIZING_EVENT, properties: {} }]);
+      const runtime = deps.runtimes.get(turn.route.runtimeKey);
+      const { client, unavailable } = runtimeClient(runtime);
+      let skipped: string | undefined = runtime === undefined ? 'no runtime' : unavailable;
       try {
-        const client = deps.runtimes.get(turn.route.runtimeKey)?.client;
         if (client) {
           await runAutoCommitStep(turn, client, controller.signal);
           await runCondenseStep(turn, client, controller.signal);
         }
+      } catch (error) {
+        skipped = error instanceof Error ? error.message : String(error);
       } finally {
         scheduler.clearTimeout(timer);
         turn.stepAbort = undefined;
       }
       if (turns.get(sessionId) !== turn) return;
+      if (
+        skipped !== undefined &&
+        turn.prompts.some(
+          entry =>
+            entry.payload.finalization?.autoCommit === true ||
+            entry.payload.finalization?.condenseOnComplete === true
+        )
+      )
+        emitWarning(sessionId, `Finalization steps skipped: ${skipped}`);
       if (hasUndispatchedPrompt(turn)) {
         turn.phase = 'busy';
         return;

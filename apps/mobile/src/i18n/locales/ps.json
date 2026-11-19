@@ -820,7 +820,19 @@
         "fileComment": "د فایل په اړه تبصره",
         "outdatedOnPathLines": "په {{path}} {{lines}} کې پخوانۍ تبصره",
         "outdatedOnLines": "په {{lines}} کې پخوانۍ تبصره",
-        "outdatedOnPath": "په {{path}} کې پخوانۍ تبصره"
+        "outdatedOnPath": "په {{path}} کې پخوانۍ تبصره",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "کیڼ اړخ",
+        "sideRight": "ښی اړخ",
+        "outdatedOnLinesSide": "په {{lines}} کې پخوانۍ تبصره ({{side}})",
+        "outdatedOnPathLinesSide": "په {{path}} {{lines}} کې پخوانۍ تبصره ({{side}})",
+        "outdatedSide": "پخوانۍ ({{side}})",
+        "outdatedOnPathSide": "په {{path}} کې پخوانۍ ({{side}})"
       },
       "deletedUser": "ړنګ شوی کارن",
       "replyForbiddenTerm": "تاسو دې {{term}} ته د ځواب ورکولو اجازه نه لرئ.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "دا حساب تر اوسه هېڅ سازمان نه لري. د Bitbucket پل ریکویسټونو بیاکتنه به وشي چې یو وخت تاسو یو سازمان جوړ کړئ یا یو سازمان ته ورشئ.",
       "gitlabReconnectAdminOnlyDescription": "له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا بیا ونښلوي.",
       "bitbucketNotConnectedTitle": "Bitbucket نښلول شوی نه دی",
-      "bitbucketAdminOnlyDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
+      "adminOnlyConnectDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
       "contextLine": "{{organization}} لپاره",
       "contextLinePersonal": "ستاسو د شخصي حساب لپاره"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "د محاسبې سمون",
         "credits_expired": "د کریډیټ موده پای ته رسېدلې"
       },
-      "truncated": "د کریډیټ پخوانی فعالیت هم شته."
+      "truncated": "د کریډیټ پخوانی فعالیت هم شته.",
+      "retentionLimit": "تر ټولو وروستی د کریډیټ فعالیت ښودل کېږي."
     },
     "inviteMember": {
       "emailError": "د برېښنالیک سمه پته ولیکئ.",
@@ -3415,6 +3428,7 @@
       "sendInvite": "بلنه واستوئ",
       "title": "غړي ته بلنه ورکړئ",
       "alreadyInvited": "هغوی ته دمخه بلنه ورکړل شوې یا دمخه غړی دی.",
+      "organizationUnavailable": "دا سازمان نور شتون نه لري.",
       "sendError": "بلنه ونه لېږل شوه.",
       "pendingInvitation": "دا برېښنالیک لا دمخه یوه په تمه بلنه لري.",
       "alreadyMember": "دا کس لا دمخه د دې سازمان غړی دی.",
@@ -3436,7 +3450,8 @@
         "void": "لغوه شوی",
         "uncollectible": "نه وصولېدونکی"
       },
-      "truncated": "پخواني بلونه هم شته."
+      "truncated": "پخواني بلونه هم شته.",
+      "retentionLimit": "تر ټولو وروستي بلونه ښودل کېږي."
     },
     "lowBalanceAlert": {
       "enableA11y": "د کم بیلانس خبرتیا فعاله کړئ",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "د کریډیټ پېرود",
       "receipt": "رسید",
       "receiptA11y": "د {{description}}، {{amount}}، {{date}} رسید پرانیزئ",
-      "receiptUnavailable": "د دې پېرود لپاره رسید نشته."
+      "receiptUnavailable": "د دې پېرود لپاره رسید نشته.",
+      "retentionLimit": "تر ټولو وروستې د کریډیټ تاریخچه ښودل کېږي."
     },
     "title": "کریډیټ وپېرئ",
     "description": "کریډیټ یو ځل پېرود دی چې ستاسو Kilo توازن ته په Kilo App کې د AI کوډ کولو ناستو چلولو لپاره زیاتېږي. پلورنځی ستاسو له حساب څخه پیسې اخلي او کریډیټ وروسته له هغه زیاتېږي چې پلورنځی تادیه تایید کړي.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "ادغامونه راوړل نه شول",
     "permissionDenied": "تاسو د دې ادغامونو د مدیریت اجازه نه لرئ.",
     "managedByOwner": "د سازمان له مالک څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",
+    "managedByOwnerOrAdmin": "د سازمان له مالک، یا مدیر څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",
+    "managedByOwnerOrBilling": "د سازمان له مالک، یا د بلونو مدیر څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",
+    "managedByOwnerAdminOrBilling": "د سازمان له مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",
     "connectFailed": "د نښلولو پاڼه پرانیستل نه شوه"
   },
   "invoices": {
-    "personalEmptyDescription": "کله چې درڅخه پیسې واخیستل شي، ستاسو د شخصي پېرودنو بلونه به دلته ښکاره شي."
+    "personalEmptyDescription": "کله چې درڅخه پیسې واخیستل شي، ستاسو د شخصي پېرودنو بلونه دلته ښکاره شي. له App Store او Google Play څخه رسیدونه د کریډیټ تاریخچه کې دي.",
+    "personalPeriod": "وروستۍ 12 میاشتې"
   },
   "cloudAgent": {
     "compute": {

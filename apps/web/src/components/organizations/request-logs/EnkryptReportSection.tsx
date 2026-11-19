@@ -36,6 +36,8 @@ const DECISIONS: Record<Scan['decision'], { label: string; tone: StepTone }> = {
   client_aborted: { label: 'Client aborted', tone: 'skipped' },
 };
 
+const SKIPPED = { label: 'Not scanned, request blocked', tone: 'skipped' } as const;
+
 const PART_LABELS: Record<Scan['part'], string | null> = {
   tools: 'Tool definitions',
   system: 'System prompt',
@@ -188,7 +190,7 @@ function charactersSent(scan: Scan): DetailItem {
   }
   return {
     label: 'Characters sent',
-    hint: 'Includes separators and slice headers, so it can exceed the total.',
+    hint: 'Includes slice headers and overlaps, so it can exceed the total.',
     value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
   };
 }
@@ -217,19 +219,48 @@ function attempts(scan: Scan): DetailItem {
   };
 }
 
+function callsSkipped(scan: EnkryptInputScanReport): DetailItem[] {
+  if (!scan.calls_skipped) return [];
+  return [
+    {
+      label: 'Calls skipped',
+      hint: 'Not made, since the request was already blocked. Not cached.',
+      value: formatCount(scan.calls_skipped),
+    },
+  ];
+}
+
+/** A part none of whose calls were made, since the request was already blocked. */
+function isSkipped(scan: Scan): boolean {
+  return (
+    scan.part !== 'response' &&
+    !!scan.calls_skipped &&
+    scan.attempts === 0 &&
+    scan.decision === 'allowed'
+  );
+}
+
+function toolsSummary(scan: EnkryptToolScanReport): string {
+  const skipped = scan.tools_total - scan.tools_cached - scan.tools_scanned;
+  return [
+    `${formatCount(scan.tools_total)} total`,
+    `${formatCount(scan.tools_cached)} cached`,
+    `${formatCount(scan.tools_scanned)} scanned`,
+    ...(skipped > 0 ? [`${formatCount(skipped)} skipped`] : []),
+  ].join(', ');
+}
+
 function scanItems(scan: Scan): DetailItem[] {
   switch (scan.part) {
     case 'tools':
       return [
-        {
-          label: 'Tools',
-          value: `${formatCount(scan.tools_total)} total, ${formatCount(scan.tools_cached)} cached, ${formatCount(scan.tools_scanned)} scanned`,
-        },
+        { label: 'Tools', value: toolsSummary(scan) },
         verdictCacheItem(scan),
         ...unitsCached(scan),
         charactersSent(scan),
         charactersCached(scan),
         attempts(scan),
+        ...callsSkipped(scan),
       ];
     case 'system':
     case 'conversation':
@@ -250,10 +281,14 @@ function scanItems(scan: Scan): DetailItem[] {
           : []),
         {
           label: 'Calls needed',
-          hint: 'Uncached units, packed into calls of up to 100k characters.',
+          hint:
+            scan.calls_skipped === undefined
+              ? 'Uncached units, packed into calls of up to 100k characters (older report).'
+              : 'One call per uncached unit.',
           value: formatCount(scan.chunks),
         },
         attempts(scan),
+        ...callsSkipped(scan),
       ];
     case 'response':
       return [charactersSent(scan), attempts(scan)];
@@ -262,7 +297,7 @@ function scanItems(scan: Scan): DetailItem[] {
 
 /** `failedOpen` hides the scan's note on failed content, which the report's notice already gives. */
 function ScanCard({ scan, failedOpen }: { scan: Scan; failedOpen: boolean }) {
-  const decision = DECISIONS[scan.decision];
+  const decision = isSkipped(scan) ? SKIPPED : DECISIONS[scan.decision];
   const part = PART_LABELS[scan.part];
   const stored = scan.part === 'response' || failedOpen ? null : storedDespiteError(scan);
   const storedNote = stored && STORED_DESPITE_ERROR_NOTES[stored];
@@ -302,6 +337,19 @@ function ScanCard({ scan, failedOpen }: { scan: Scan; failedOpen: boolean }) {
   );
 }
 
+/** Detectors that only log add no latency, so the report holds how long their scan ran instead. */
+function addedLatency(report: EnkryptGuardrailReport | EnkryptOutputGuardrailReport): DetailItem {
+  const value = formatDurationMs(report.added_latency_ms);
+  const detectors = report.settings?.detectors ?? [];
+  const logOnly = detectors.length > 0 && detectors.every(detector => detector.action === 'log');
+  if (!logOnly) return { label: 'Added latency', value };
+  return {
+    label: 'Log-only scan time',
+    hint: 'Log-only detectors add no latency. How long their scan ran after the point where a blocking scan would wait. Older reports show the actual wait instead: about 0 ms, or none.',
+    value,
+  };
+}
+
 type GuardrailReportBodyProps = {
   title: string;
   description: string;
@@ -330,7 +378,7 @@ function GuardrailReportBody({
             label: 'Verdict',
             value: <ToneBadge tone={verdictDetails.tone}>{verdictDetails.label}</ToneBadge>,
           },
-          { label: 'Added latency', value: formatDurationMs(report.added_latency_ms) },
+          addedLatency(report),
           ...(report.unavailable_reason
             ? [
                 {

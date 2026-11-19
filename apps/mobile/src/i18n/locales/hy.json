@@ -820,7 +820,19 @@
         "fileComment": "Մեկնաբանություն ֆայլի մասին",
         "outdatedOnPathLines": "Հնացած՝ {{path}}, {{lines}}",
         "outdatedOnLines": "Հնացած՝ {{lines}}",
-        "outdatedOnPath": "Հնացած՝ {{path}}"
+        "outdatedOnPath": "Հնացած՝ {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Ձախ կողմ",
+        "sideRight": "Աջ կողմ",
+        "outdatedOnLinesSide": "Հնացած՝ {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Հնացած՝ {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Հնացած ({{side}})",
+        "outdatedOnPathSide": "Հնացած՝ {{path}} ({{side}})"
       },
       "deletedUser": "ջնջված օգտատեր",
       "replyForbiddenTerm": "Այս {{term}}-ին պատասխանելու թույլտվություն չունես։",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Այս հաշիվն առայժմ չունի որեւէ կազմակերպություն։ Bitbucket-ի pull request-ները հնարավոր կլինի վերանայել, երբ ստեղծես կամ միանաս կազմակերպության։",
       "gitlabReconnectAdminOnlyDescription": "Խնդրիր կազմակերպության սեփականատերերին, ադմինիստրատորներին կամ վճարումների կառավարիչներին նորից միացնել այն։",
       "bitbucketNotConnectedTitle": "Bitbucket-ը միացված չէ",
-      "bitbucketAdminOnlyDescription": "Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
+      "adminOnlyConnectDescription": "Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
       "contextLine": "{{organization}}-ի համար",
       "contextLinePersonal": "Անձնական հաշվի համար"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "Հաշվապահական ճշգրտում",
         "credits_expired": "Ժամկետանց կրեդիտներ"
       },
-      "truncated": "Հասանելի են նաև կրեդիտներով նախորդ գործարքները։"
+      "truncated": "Հասանելի են նաև կրեդիտներով նախորդ գործարքները։",
+      "retentionLimit": "Ցուցադրվում են կրեդիտներով ամենավերջին գործարքները։"
     },
     "inviteMember": {
       "emailError": "Մուտքագրեք վավեր էլփոստի հասցե։",
@@ -3415,6 +3428,7 @@
       "sendInvite": "Ուղարկել հրավեր",
       "title": "Հրավիրել անդամ",
       "alreadyInvited": "Այս անձն արդեն հրավիրված է կամ արդեն անդամ է։",
+      "organizationUnavailable": "Այս կազմակերպությունն այլևս հասանելի չէ։",
       "sendError": "Չհաջողվեց ուղարկել հրավերը։",
       "pendingInvitation": "Այս էլփոստն արդեն ունի սպասող հրավեր։",
       "alreadyMember": "Այս անձն արդեն այս կազմակերպության անդամ է։",
@@ -3436,7 +3450,8 @@
         "void": "Չեղարկված",
         "uncollectible": "Անհավաքագրելի"
       },
-      "truncated": "Հասանելի են նաև նախորդ հաշիվ-ապրանքագրերը։"
+      "truncated": "Հասանելի են նաև նախորդ հաշիվ-ապրանքագրերը։",
+      "retentionLimit": "Ցուցադրվում են ամենավերջին հաշիվ-ապրանքագրերը։"
     },
     "lowBalanceAlert": {
       "enableA11y": "Միացնել ցածր մնացորդի զգուշացումը",
@@ -4363,6 +4378,7 @@
       "receipt": "Անդորրագիր",
       "receiptA11y": "Բացել անդորրագիրը՝ {{description}}, {{amount}}, {{date}}-ից",
       "receiptUnavailable": "Այս գնման համար անդորրագիր հասանելի չէ։",
+      "retentionLimit": "Ցուցադրվում է կրեդիտների ամենավերջին պատմությունը։",
       "kind": {
         "adjustment": "Ճշգրտում",
         "balanceNeutral": "Առանց հաշվեկշռի փոփոխության",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Չհաջողվեց բեռնել ինտեգրումները",
     "permissionDenied": "Դուք այս ինտեգրումները կառավարելու թույլտվություն չունեք։",
     "managedByOwner": "Խնդրեք կազմակերպության սեփականատիրոջը փոխել միացումը, որը չեք կարող փոխել։",
+    "managedByOwnerOrAdmin": "Խնդրեք կազմակերպության սեփականատիրոջը կամ ադմինիստրատորին փոխել միացումը, որը չեք կարող փոխել։",
+    "managedByOwnerOrBilling": "Խնդրեք կազմակերպության սեփականատիրոջը կամ վճարումների կառավարչին փոխել միացումը, որը չեք կարող փոխել։",
+    "managedByOwnerAdminOrBilling": "Խնդրեք կազմակերպության սեփականատիրոջը, ադմինիստրատորին կամ վճարումների կառավարչին փոխել միացումը, որը չեք կարող փոխել։",
     "connectFailed": "Չհաջողվեց բացել միացման էջը"
   },
   "invoices": {
-    "personalEmptyDescription": "Ձեր անձնական գնումների հաշիվ-ապրանքագրերը կհայտնվեն այստեղ, երբ ձեզնից գումար գանձվի։"
+    "personalEmptyDescription": "Ձեր անձնական գնումների հաշիվ-ապրանքագրերը հայտնվում են այստեղ, երբ ձեզնից գումար գանձվի։ App Store-ից և Google Play-ից անդորրագրերը գտնվում են Կրեդիտների պատմությունում։",
+    "personalPeriod": "Վերջին 12 ամիսները"
   },
   "cloudAgent": {
     "compute": {

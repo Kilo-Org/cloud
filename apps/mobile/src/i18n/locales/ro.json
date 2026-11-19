@@ -832,7 +832,19 @@
         "fileComment": "Comentariu la fișier",
         "outdatedOnPathLines": "Depășit: {{path}}, {{lines}}",
         "outdatedOnLines": "Depășit: {{lines}}",
-        "outdatedOnPath": "Depășit: {{path}}"
+        "outdatedOnPath": "Depășit: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Partea stângă",
+        "sideRight": "Partea dreaptă",
+        "outdatedOnLinesSide": "Depășit la {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Depășit la {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Depășit ({{side}})",
+        "outdatedOnPathSide": "Depășit la {{path}} ({{side}})"
       },
       "deletedUser": "utilizator șters",
       "replyForbiddenTerm": "Nu ai permisiunea să răspunzi la acest {{term}}.",
@@ -949,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Acest cont nu are încă nicio organizație. PR-urile Bitbucket pot fi revizuite după ce creezi o organizație sau te alături uneia.",
       "gitlabReconnectAdminOnlyDescription": "Cere unui proprietar de organizație, unui administrator sau unui manager de facturare să o reconecteze.",
       "bitbucketNotConnectedTitle": "Bitbucket nu este conectat",
-      "bitbucketAdminOnlyDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
+      "adminOnlyConnectDescription": "Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
       "contextLine": "Pentru {{organization}}",
       "contextLinePersonal": "Pentru contul personal"
     },
@@ -3463,7 +3475,8 @@
         "accounting_adjustment": "Ajustare contabilă",
         "credits_expired": "Credite expirate"
       },
-      "truncated": "Sunt disponibile operațiuni mai vechi cu credite."
+      "truncated": "Sunt disponibile operațiuni mai vechi cu credite.",
+      "retentionLimit": "Se afișează cele mai recente operațiuni cu credite."
     },
     "inviteMember": {
       "emailError": "Introdu o adresă de e-mail validă.",
@@ -3473,6 +3486,7 @@
       "sendInvite": "Trimite invitația",
       "title": "Invită un membru",
       "alreadyInvited": "Această persoană este deja invitată sau este deja membru.",
+      "organizationUnavailable": "Această organizație nu mai este disponibilă.",
       "sendError": "Invitația nu a putut fi trimisă.",
       "pendingInvitation": "Acest e-mail are deja o invitație în așteptare.",
       "alreadyMember": "Această persoană este deja membru al acestei organizații.",
@@ -3494,7 +3508,8 @@
         "void": "Anulată",
         "uncollectible": "Neîncasabilă"
       },
-      "truncated": "Sunt disponibile facturi mai vechi."
+      "truncated": "Sunt disponibile facturi mai vechi.",
+      "retentionLimit": "Se afișează cele mai recente facturi."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activează alerta de sold scăzut",
@@ -4436,7 +4451,8 @@
       "purchaseFallback": "Achiziție de credite",
       "receipt": "Chitanță",
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
-      "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție."
+      "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
+      "retentionLimit": "Se afișează cel mai recent istoric de credite."
     },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
@@ -4691,10 +4707,14 @@
     "couldNotLoad": "Integrările nu au putut fi încărcate",
     "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
     "managedByOwner": "Cere unui proprietar al organizației să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerOrAdmin": "Cere unui proprietar al organizației sau unui administrator să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerOrBilling": "Cere unui proprietar al organizației sau unui manager de facturare să modifice o conexiune pe care nu o poți modifica.",
+    "managedByOwnerAdminOrBilling": "Cere unui proprietar al organizației, unui administrator sau unui manager de facturare să modifice o conexiune pe care nu o poți modifica.",
     "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {
-    "personalEmptyDescription": "Facturile pentru achizițiile tale personale vor apărea aici după prima facturare."
+    "personalEmptyDescription": "Facturile pentru achizițiile tale personale apar aici după prima facturare. Chitanțele din App Store și din Google Play sunt în Istoric credite.",
+    "personalPeriod": "Ultimele 12 luni"
   },
   "cloudAgent": {
     "compute": {

@@ -820,7 +820,19 @@
         "fileComment": "Hevitra amin'ny rakitra",
         "outdatedOnPathLines": "Tsy mifanaraka intsony amin'ny {{path}} {{lines}}",
         "outdatedOnLines": "Tsy mifanaraka intsony amin'ny {{lines}}",
-        "outdatedOnPath": "Tsy mifanaraka intsony amin'ny {{path}}"
+        "outdatedOnPath": "Tsy mifanaraka intsony amin'ny {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Ankavia",
+        "sideRight": "Ankavanana",
+        "outdatedOnLinesSide": "Tsy mifanaraka intsony amin'ny {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Tsy mifanaraka intsony amin'ny {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Tsy mifanaraka intsony ({{side}})",
+        "outdatedOnPathSide": "Tsy mifanaraka intsony amin'ny {{path}} ({{side}})"
       },
       "deletedUser": "mpampiasa voafafa",
       "replyForbiddenTerm": "Tsy manana alalana hamaly ity {{term}} ity ianao.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Mbola tsy manana fikambanana ity kaonty ity. Azonao jerena ny fangatahana fampiraisana Bitbucket rehefa mamorona na miditra fikambanana.",
       "gitlabReconnectAdminOnlyDescription": "Mangataha ny Tompony, Mpitantana, na Mpitantana faktiora ao amin'ny fikambanana mba hampifandray azy indray.",
       "bitbucketNotConnectedTitle": "Tsy mifandray ny Bitbucket",
-      "bitbucketAdminOnlyDescription": "Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
+      "adminOnlyConnectDescription": "Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
       "contextLine": "Ho an'ny {{organization}}",
       "contextLinePersonal": "Ho an'ny kaontinao manokana"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "Fanitsiana kaonty",
         "credits_expired": "Lany daty ny kireditra"
       },
-      "truncated": "Misy hetsika taloha kokoa momba ny kireditra."
+      "truncated": "Misy hetsika taloha kokoa momba ny kireditra.",
+      "retentionLimit": "Aseho ny hetsika momba ny kireditra farany indrindra."
     },
     "inviteMember": {
       "emailError": "Mampidira adiresy mailaka manan-kery.",
@@ -3415,6 +3428,7 @@
       "sendInvite": "Alefaso ny fanasana",
       "title": "Manasà mpikambana",
       "alreadyInvited": "Efa voasa na efa mpikambana izy.",
+      "organizationUnavailable": "Tsy misy intsony ity fikambanana ity.",
       "sendError": "Tsy azo nalefa ny fanasana.",
       "pendingInvitation": "Efa manana fanasana miandry ity mailaka ity.",
       "alreadyMember": "Efa mpikambana ao amin'ity fikambanana ity ity olona ity.",
@@ -3436,7 +3450,8 @@
         "void": "Nofoanana",
         "uncollectible": "Tsy azo takina"
       },
-      "truncated": "Misy ny faktiora taloha kokoa."
+      "truncated": "Misy ny faktiora taloha kokoa.",
+      "retentionLimit": "Aseho ny faktiora farany indrindra."
     },
     "lowBalanceAlert": {
       "enableA11y": "Alefaso ny fampandrenesana rehefa kely ny ambim-bola",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "Fividianana kredita",
       "receipt": "Rosia",
       "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity."
+      "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity.",
+      "retentionLimit": "Aseho ny tantaran'ny kredita farany indrindra."
     },
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Tsy afaka nampiditra ireo fampifandraisana",
     "permissionDenied": "Tsy manana alalana hitantana ireo fampifandraisana ireo ianao.",
     "managedByOwner": "Angataho amin'ny tompon'ny fikambanana hanova fifandraisana izay tsy azonao ovaina.",
+    "managedByOwnerOrAdmin": "Angataho amin'ny tompon'ny fikambanana na mpitantana hanova fifandraisana izay tsy azonao ovaina.",
+    "managedByOwnerOrBilling": "Angataho amin'ny tompon'ny fikambanana na mpitantana faktiora hanova fifandraisana izay tsy azonao ovaina.",
+    "managedByOwnerAdminOrBilling": "Angataho amin'ny tompon'ny fikambanana, mpitantana, na mpitantana faktiora hanova fifandraisana izay tsy azonao ovaina.",
     "connectFailed": "Tsy afaka nanokatra ny pejy fampifandraisana"
   },
   "invoices": {
-    "personalEmptyDescription": "Hiseho eto ny faktioran'ny fividiananao manokana rehefa voaloa ianao."
+    "personalEmptyDescription": "Miseho eto ny faktioran'ny fividiananao manokana rehefa voaloa ianao. Ny rosia avy amin'ny App Store sy Google Play dia ao amin'ny Tantaran'ny kredita.",
+    "personalPeriod": "12 volana lasa izay"
   },
   "cloudAgent": {
     "compute": {

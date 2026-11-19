@@ -820,7 +820,19 @@
         "fileComment": "Lêerkommentaar",
         "outdatedOnPathLines": "Verouderd op {{path}} {{lines}}",
         "outdatedOnLines": "Verouderd op {{lines}}",
-        "outdatedOnPath": "Verouderd op {{path}}"
+        "outdatedOnPath": "Verouderd op {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Linkerkant",
+        "sideRight": "Regterkant",
+        "outdatedOnLinesSide": "Verouderd op {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Verouderd op {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Verouderd ({{side}})",
+        "outdatedOnPathSide": "Verouderd op {{path}} ({{side}})"
       },
       "deletedUser": "geskrapte gebruiker",
       "replyForbiddenTerm": "Jy het nie toestemming om op hierdie {{term}} te antwoord nie.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Hierdie rekening het nog geen organisasies nie. Bitbucket-trekversoeke kan hersien word sodra jy 'n organisasie skep of by een aansluit.",
       "gitlabReconnectAdminOnlyDescription": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om dit weer te koppel.",
       "bitbucketNotConnectedTitle": "Bitbucket is nie gekoppel nie",
-      "bitbucketAdminOnlyDescription": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
+      "adminOnlyConnectDescription": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
       "contextLine": "Vir {{organization}}",
       "contextLinePersonal": "Vir jou persoonlike rekening"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "Boekhoudkundige aanpassing",
         "credits_expired": "Krediete het verval"
       },
-      "truncated": "Ouer kredietaktiwiteit is beskikbaar."
+      "truncated": "Ouer kredietaktiwiteit is beskikbaar.",
+      "retentionLimit": "Die mees onlangse kredietaktiwiteit word gewys."
     },
     "inviteMember": {
       "emailError": "Voer 'n geldige e-posadres in.",
@@ -3415,6 +3428,7 @@
       "sendInvite": "Stuur uitnodiging",
       "title": "Nooi lid uit",
       "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
+      "organizationUnavailable": "Hierdie organisasie is nie meer beskikbaar nie.",
       "sendError": "Kon nie die uitnodiging stuur nie.",
       "pendingInvitation": "Hierdie e-posadres het reeds 'n hangende uitnodiging.",
       "alreadyMember": "Hierdie persoon is reeds 'n lid van hierdie organisasie.",
@@ -3436,7 +3450,8 @@
         "void": "Nietig",
         "uncollectible": "Oninbaar"
       },
-      "truncated": "Ouer fakture is beskikbaar."
+      "truncated": "Ouer fakture is beskikbaar.",
+      "retentionLimit": "Die mees onlangse fakture word gewys."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktiveer waarskuwing vir lae saldo",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "Kredietaankoop",
       "receipt": "Kwitansie",
       "receiptA11y": "Maak die kwitansie vir {{description}}, {{amount}}, vanaf {{date}} oop",
-      "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie."
+      "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie.",
+      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys."
     },
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Kon nie integrasies laai nie",
     "permissionDenied": "Jy het nie toestemming om hierdie integrasies te bestuur nie.",
     "managedByOwner": "Vra 'n eienaar van die organisasie om 'n koppeling te verander wat jy nie kan verander nie.",
+    "managedByOwnerOrAdmin": "Vra 'n organisasie-eienaar of administrateur om 'n koppeling te verander wat jy nie kan verander nie.",
+    "managedByOwnerOrBilling": "Vra 'n organisasie-eienaar of faktureringsbestuurder om 'n koppeling te verander wat jy nie kan verander nie.",
+    "managedByOwnerAdminOrBilling": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om 'n koppeling te verander wat jy nie kan verander nie.",
     "connectFailed": "Kon nie die koppelbladsy oopmaak nie"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakture vir jou eie aankope sal hier verskyn sodra jy gefaktureer is."
+    "personalEmptyDescription": "Fakture vir jou eie aankope verskyn hier sodra jy gefaktureer is. Kwitansies van die App Store en Google Play is in Kredietgeskiedenis.",
+    "personalPeriod": "Afgelope 12 maande"
   },
   "cloudAgent": {
     "compute": {

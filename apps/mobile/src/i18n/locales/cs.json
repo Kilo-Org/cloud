@@ -844,7 +844,19 @@
         "fileComment": "Komentář k souboru",
         "outdatedOnPathLines": "Zastaralé: {{path}} {{lines}}",
         "outdatedOnLines": "Zastaralé: {{lines}}",
-        "outdatedOnPath": "Zastaralé: {{path}}"
+        "outdatedOnPath": "Zastaralé: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Levá strana",
+        "sideRight": "Pravá strana",
+        "outdatedOnLinesSide": "Zastaralé: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Zastaralé: {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Zastaralé ({{side}})",
+        "outdatedOnPathSide": "Zastaralé: {{path}} ({{side}})"
       },
       "deletedUser": "smazaný uživatel",
       "replyForbiddenTerm": "Nemáš oprávnění odpovídat v tomto {{term}}.",
@@ -966,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
       "gitlabReconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
       "bitbucketNotConnectedTitle": "Bitbucket není připojen",
-      "bitbucketAdminOnlyDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
+      "adminOnlyConnectDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
       "contextLine": "Pro {{organization}}",
       "contextLinePersonal": "Pro osobní účet"
     },
@@ -3521,7 +3533,8 @@
         "accounting_adjustment": "Účetní úprava",
         "credits_expired": "Kredity s prošlou platností"
       },
-      "truncated": "K dispozici jsou i starší pohyby kreditů."
+      "truncated": "K dispozici jsou i starší pohyby kreditů.",
+      "retentionLimit": "Zobrazují se nejnovější pohyby kreditů."
     },
     "inviteMember": {
       "emailError": "Zadejte platnou e-mailovou adresu.",
@@ -3531,6 +3544,7 @@
       "sendInvite": "Odeslat pozvánku",
       "title": "Pozvat člena",
       "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
+      "organizationUnavailable": "Tato organizace již není k dispozici.",
       "sendError": "Pozvánku se nepodařilo odeslat.",
       "pendingInvitation": "Pro tento e-mail již existuje čekající pozvánka.",
       "alreadyMember": "Tato osoba je již členem této organizace.",
@@ -3552,7 +3566,8 @@
         "void": "Stornováno",
         "uncollectible": "Nedobytné"
       },
-      "truncated": "Starší faktury jsou k dispozici."
+      "truncated": "Starší faktury jsou k dispozici.",
+      "retentionLimit": "Zobrazují se nejnovější faktury."
     },
     "lowBalanceAlert": {
       "enableA11y": "Povolit upozornění na nízký zůstatek",
@@ -4503,7 +4518,8 @@
       "purchaseFallback": "Nákup kreditů",
       "receipt": "Účtenka",
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
-      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici."
+      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
+      "retentionLimit": "Zobrazuje se nejnovější historie kreditů."
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
@@ -4766,10 +4782,14 @@
     "couldNotLoad": "Integrace se nepodařilo načíst",
     "permissionDenied": "Nemáte oprávnění spravovat tyto integrace.",
     "managedByOwner": "Požádejte vlastníka organizace o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerOrAdmin": "Požádejte vlastníka organizace nebo správce o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerOrBilling": "Požádejte vlastníka organizace nebo správce fakturace o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerAdminOrBilling": "Požádejte vlastníka organizace, správce nebo správce fakturace o změnu připojení, které nemůžete změnit.",
     "connectFailed": "Stránku pro připojení se nepodařilo otevřít"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktury za vaše vlastní nákupy se zde zobrazí po vyúčtování."
+    "personalEmptyDescription": "Faktury za vaše vlastní nákupy se zde zobrazí po vyúčtování. Účtenky z App Store a Google Play jsou v Historii kreditů.",
+    "personalPeriod": "Posledních 12 měsíců"
   },
   "cloudAgent": {
     "compute": {

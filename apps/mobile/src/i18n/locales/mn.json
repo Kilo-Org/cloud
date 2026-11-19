@@ -820,7 +820,19 @@
         "fileComment": "Файлын сэтгэгдэл",
         "outdatedOnPathLines": "Хуучирсан: {{path}}, {{lines}}",
         "outdatedOnLines": "Хуучирсан: {{lines}}",
-        "outdatedOnPath": "Хуучирсан: {{path}}"
+        "outdatedOnPath": "Хуучирсан: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}}, L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}}, {{lineRange}} ({{side}})",
+        "sideLeft": "Зүүн тал",
+        "sideRight": "Баруун тал",
+        "outdatedOnLinesSide": "Хуучирсан: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Хуучирсан: {{path}}, {{lines}} ({{side}})",
+        "outdatedSide": "Хуучирсан ({{side}})",
+        "outdatedOnPathSide": "Хуучирсан: {{path}} ({{side}})"
       },
       "deletedUser": "устгагдсан хэрэглэгч",
       "replyForbiddenTerm": "Танд энэ {{term}}эд хариу бичих эрх байхгүй.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
       "gitlabReconnectAdminOnlyDescription": "Дахин холбуулахын тулд байгууллагын эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
       "bitbucketNotConnectedTitle": "Bitbucket холбогдоогүй байна",
-      "bitbucketAdminOnlyDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
+      "adminOnlyConnectDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
       "contextLine": "{{organization}}-ийн хувьд",
       "contextLinePersonal": "Хувийн дансны хувьд"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "Нягтлан бодох бүртгэлийн тохируулга",
         "credits_expired": "Кредитийн хугацаа дууссан"
       },
-      "truncated": "Өмнөх кредитийн гүйлгээг үзэх боломжтой."
+      "truncated": "Өмнөх кредитийн гүйлгээг үзэх боломжтой.",
+      "retentionLimit": "Хамгийн сүүлийн кредитийн гүйлгээг харуулж байна."
     },
     "inviteMember": {
       "emailError": "Зөв имэйл хаяг оруулна уу.",
@@ -3415,6 +3428,7 @@
       "sendInvite": "Урилга илгээх",
       "title": "Гишүүн урих",
       "alreadyInvited": "Уг хаяг дээр аль хэдийн урилга илгээгдсэн эсвэл аль хэдийн гишүүн байна.",
+      "organizationUnavailable": "Энэ байгууллага цаашид ашиглах боломжгүй болсон.",
       "sendError": "Урилгыг илгээж чадсангүй.",
       "pendingInvitation": "Энэ имэйл хаягт хүлээгдэж буй урилга аль хэдийн байна.",
       "alreadyMember": "Энэ хүн аль хэдийн энэ байгууллагын гишүүн байна.",
@@ -3436,7 +3450,8 @@
         "void": "Хүчингүй",
         "uncollectible": "Төлөгдөх боломжгүй"
       },
-      "truncated": "Өмнөх нэхэмжлэхүүдийг үзэх боломжтой."
+      "truncated": "Өмнөх нэхэмжлэхүүдийг үзэх боломжтой.",
+      "retentionLimit": "Хамгийн сүүлийн нэхэмжлэхүүдийг харуулж байна."
     },
     "lowBalanceAlert": {
       "enableA11y": "Үлдэгдэл багасах анхааруулгыг идэвхжүүлэх",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "Кредит худалдан авалт",
       "receipt": "Баримт",
       "receiptA11y": "Баримтыг нээх: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Энэ худалдан авалтад баримт байхгүй байна."
+      "receiptUnavailable": "Энэ худалдан авалтад баримт байхгүй байна.",
+      "retentionLimit": "Кредитийн хамгийн сүүлийн түүхийг харуулж байна."
     },
     "title": "Кредит худалдан авах",
     "description": "Кредит нь Kilo App дээр AI кодчилолын сессүүдийг ажиллуулахын тулд таны Kilo үлдэгдэлд нэмэгддэг нэг удаагийн худалдан авалт юм. Дэлгүүр таны данснаас төлбөр авч, дэлгүүр төлбөрийг баталгаажуулсны дараа кредит нэмэгдэнэ.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Интеграцуудыг ачаалж чадсангүй",
     "permissionDenied": "Танд эдгээр интеграцыг удирдах эрх байхгүй байна.",
     "managedByOwner": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг байгууллагын эзэмшигчээс хүснэ үү.",
+    "managedByOwnerOrAdmin": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг байгууллагын эзэмшигч эсвэл админаас хүснэ үү.",
+    "managedByOwnerOrBilling": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг байгууллагын эзэмшигч эсвэл төлбөрийн менежерээс хүснэ үү.",
+    "managedByOwnerAdminOrBilling": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг байгууллагын эзэмшигч, админ эсвэл төлбөрийн менеджерээс хүснэ үү.",
     "connectFailed": "Холболтын хуудсыг нээж чадсангүй"
   },
   "invoices": {
-    "personalEmptyDescription": "Төлбөр нэхэмжлэгдсэний дараа өөрийн худалдан авалтын нэхэмжлэхүүд энд харагдана."
+    "personalEmptyDescription": "Төлбөр нэхэмжлэгдсэний дараа өөрийн худалдан авалтын нэхэмжлэхүүд энд харагдана. App Store-ын болон Google Play-н баримт Кредитийн түүхэд байна.",
+    "personalPeriod": "Сүүлийн 12 сар"
   },
   "cloudAgent": {
     "compute": {

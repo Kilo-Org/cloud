@@ -47,7 +47,8 @@ type IntegrationProviderRowProps = Readonly<{
   disconnecting: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
-  onManageOnWeb: () => void;
+  /** Opens the provider's organization page on the web: its controls, or its details. */
+  onOpenOnWeb: () => void;
   /** Runs the read that names a connected row's connection again. */
   onRetryConnection: () => void;
   retryingConnection: boolean;
@@ -68,7 +69,7 @@ export function IntegrationProviderRow({
   disconnecting,
   onConnect,
   onDisconnect,
-  onManageOnWeb,
+  onOpenOnWeb,
   onRetryConnection,
   retryingConnection,
   last,
@@ -80,7 +81,6 @@ export function IntegrationProviderRow({
     scope,
     role,
     action: 'connect',
-    installed: row.installed,
   });
   const canDisconnect = canManageProvider({
     provider: row.provider,
@@ -105,9 +105,10 @@ export function IntegrationProviderRow({
 
   // The page behind "Manage on the web" is the same manager-only surface as
   // Disconnect, so it follows the disconnect roles; Connect follows the
-  // connect flow's own rule, which for GitLab admits any member. Retrying the
-  // read that names a connection only repairs the Disconnect it would show, so
-  // it follows the same roles.
+  // connect flow's own rule, and every organization GitLab connect asks for a
+  // billing role, so a member's GitLab row offers no control. Retrying the read
+  // that names a connection only repairs the Disconnect it would show, so it
+  // follows the same roles.
   let action: ReactNode = null;
   if (row.actionPending) {
     // The connections read that decides between Disconnect and the web page has
@@ -118,7 +119,7 @@ export function IntegrationProviderRow({
       <Button
         size="sm"
         variant="outline"
-        onPress={onManageOnWeb}
+        onPress={onOpenOnWeb}
         accessibilityLabel={namedAction(t('common.manageOnWeb'))}
       >
         <Text>{t('common.manageOnWeb')}</Text>
@@ -172,6 +173,18 @@ export function IntegrationProviderRow({
   // Where the body acts, the wrapper is the row's one control: it spans the row,
   // carries the action's name and busy state, and keeps the trailing button out
   // of the tree. Two stops would announce the same provider twice.
+  //
+  // A row the viewer's role leaves without a control still carries a press: it
+  // opens the provider's page, which shows the connection details and names the
+  // roles that can change them. That press leaves the app for the browser, as
+  // Connect already does, so the hub reads as a list of destinations rather than
+  // a list of labels. Its name repeats the subtitle, because the row's own name
+  // replaces its visible text. Bitbucket's page is the app's own connect sheet,
+  // so its name claims no browser trip.
+  const opensProviderPage = !rowStartsConnect && action === null && !row.actionPending;
+  const blockedRowName = (
+    row.provider === 'bitbucket' ? [label, subtitle] : [t('common.openInBrowser'), label, subtitle]
+  ).join(t('common.sentenceJoiner'));
   const configuredRow = (
     <ConfigureRow
       icon={PROVIDER_ICONS[row.provider]}
@@ -179,6 +192,8 @@ export function IntegrationProviderRow({
       subtitle={subtitle}
       subtitleNumberOfLines={1}
       trailing={action}
+      onPress={opensProviderPage ? onOpenOnWeb : undefined}
+      accessibilityLabel={opensProviderPage ? blockedRowName : undefined}
       last={last}
     />
   );

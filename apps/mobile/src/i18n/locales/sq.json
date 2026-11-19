@@ -820,7 +820,19 @@
         "fileComment": "Koment për skedarin",
         "outdatedOnPathLines": "I vjetëruar te {{path}} {{lines}}",
         "outdatedOnLines": "I vjetëruar te {{lines}}",
-        "outdatedOnPath": "I vjetëruar te {{path}}"
+        "outdatedOnPath": "I vjetëruar te {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Ana e majtë",
+        "sideRight": "Ana e djathtë",
+        "outdatedOnLinesSide": "I vjetëruar te {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "I vjetëruar te {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "I vjetëruar ({{side}})",
+        "outdatedOnPathSide": "I vjetëruar te {{path}} ({{side}})"
       },
       "deletedUser": "përdorues i fshirë",
       "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}.",
@@ -932,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Kjo llogari nuk ka ende organizata. Kërkesat për bashkim në Bitbucket mund të rishikohen sapo të krijosh ose të bëhesh pjesë e një organizate.",
       "gitlabReconnectAdminOnlyDescription": "Kërkoni nga një pronar, administrator ose menaxher faturimi i organizatës ta rilidhë atë.",
       "bitbucketNotConnectedTitle": "Bitbucket nuk është i lidhur",
-      "bitbucketAdminOnlyDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
+      "adminOnlyConnectDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund ta lidhin.",
       "contextLine": "Për {{organization}}",
       "contextLinePersonal": "Për llogarinë personale"
     },
@@ -3405,7 +3417,8 @@
         "accounting_adjustment": "Rregullim kontabël",
         "credits_expired": "Kredite të skaduara"
       },
-      "truncated": "Ka aktivitet të mëparshëm të krediteve."
+      "truncated": "Ka aktivitet të mëparshëm të krediteve.",
+      "retentionLimit": "Po shfaqet aktiviteti i krediteve më i fundit."
     },
     "inviteMember": {
       "emailError": "Shkruaj një adresë të vlefshme emaili.",
@@ -3415,6 +3428,7 @@
       "sendInvite": "Dërgo ftesën",
       "title": "Fto anëtar",
       "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
+      "organizationUnavailable": "Kjo organizatë nuk është më e disponueshme.",
       "sendError": "Ftesa nuk u dërgua.",
       "pendingInvitation": "Ky email ka tashmë një ftesë në pritje.",
       "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate.",
@@ -3436,7 +3450,8 @@
         "void": "E anuluar",
         "uncollectible": "E paarkëtueshme"
       },
-      "truncated": "Faturat më të vjetra janë të disponueshme."
+      "truncated": "Faturat më të vjetra janë të disponueshme.",
+      "retentionLimit": "Po shfaqen faturat më të fundit."
     },
     "lowBalanceAlert": {
       "enableA11y": "Aktivizo njoftimin për gjendje të ulët",
@@ -4369,7 +4384,8 @@
       "purchaseFallback": "Blerje kredish",
       "receipt": "Dëftesë",
       "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
-      "receiptUnavailable": "Nuk ka dëftesë për këtë blerje."
+      "receiptUnavailable": "Nuk ka dëftesë për këtë blerje.",
+      "retentionLimit": "Po shfaqet historiku i kredive më i fundit."
     },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
@@ -4616,10 +4632,14 @@
     "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
     "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
     "managedByOwner": "Kërkoji një pronari të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerOrAdmin": "Kërkoji një pronari ose administratori të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerOrBilling": "Kërkoji një pronari ose menaxheri faturimi të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
+    "managedByOwnerAdminOrBilling": "Kërkoji një pronari, administratori ose menaxheri faturimi të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",
     "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {
-    "personalEmptyDescription": "Faturat për blerjet e tua personale do të shfaqen këtu pasi të faturohesh."
+    "personalEmptyDescription": "Faturat për blerjet e tua personale shfaqen këtu pasi të faturohesh. Dëftesat nga App Store dhe Google Play janë në Historikun e kredive.",
+    "personalPeriod": "12 muajt e fundit"
   },
   "cloudAgent": {
     "compute": {

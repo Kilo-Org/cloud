@@ -849,7 +849,7 @@ test('rejects unknown placeholders in a locale-specific plural category', () => 
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(
     found.join('\n'),
-    /mobile\/ru: "agents\.liveCount_few" uses placeholder \{\{total\}\}, which the English family does not/
+    /mobile\/ru: "agents\.liveCount_few" placeholders differ from English \(count\)/
   );
 });
 
@@ -1236,7 +1236,7 @@ test('rejects a wrong placeholder in a locale-declared counted family', () => {
   assert.ok(found.length > 0, 'expected a problem');
   assert.match(
     found.join('\n'),
-    /mobile\/ru: "counts\.items_one" uses placeholder \{\{total\}\}, which the English family does not/
+    /mobile\/ru: "counts\.items_one" placeholders differ from English \(count\)/
   );
 });
 
@@ -2564,12 +2564,24 @@ test('reads the supported tags from the array literal, not from a comment inside
   assert.deepEqual(found, []);
 });
 
+/**
+ * The translated catalog with one mobile key removed, so a case that loses the
+ * tag list can show the audit still reports a finding of the catalog's own.
+ */
+function translatedWithGap() {
+  const translated = { agents: { ...TRANSLATED.agents } };
+  delete translated.agents.title;
+  return translated;
+}
+
 test('reports a SUPPORTED_LANGUAGES element that is not a string literal', () => {
   const found = run({
     extraFiles: {
       'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru', ...EXTRA_TAGS];`,
     },
   });
+  // One line: an unreadable element leaves the tag list unknown, and the
+  // membership rule stays off instead of calling every catalog unsupported.
   assert.deepEqual(found, [
     'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES has an element this check cannot read',
   ]);
@@ -2581,7 +2593,309 @@ test('reports a missing SUPPORTED_LANGUAGES declaration', () => {
       'apps/mobile/src/i18n/languages.ts': `export const OTHER_TAGS = ['en', 'ru'];`,
     },
   });
-  assert.ok(
-    found.includes('apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared')
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared',
+  ]);
+});
+
+test('reports an undeclared SUPPORTED_LANGUAGES once and still audits the catalogs', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const OTHER_TAGS = ['en', 'ru'];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not declared',
+    'mobile/ru: missing key "agents.title"',
+  ]);
+});
+
+test('reports a SUPPORTED_LANGUAGES initializer that is not an array literal once', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': [
+        `const TAGS = ['en', 'ru'];`,
+        `export const SUPPORTED_LANGUAGES = TAGS;`,
+      ].join('\n'),
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES is not an array literal',
+    'mobile/ru: missing key "agents.title"',
+  ]);
+});
+
+test('reports an unreadable SUPPORTED_LANGUAGES element once and still audits the catalogs', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru', ...EXTRA_TAGS];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'apps/mobile/src/i18n/languages.ts: SUPPORTED_LANGUAGES has an element this check cannot read',
+    'mobile/ru: missing key "agents.title"',
+  ]);
+});
+
+test('reports an unparseable SUPPORTED_LANGUAGES file as its parse error only', () => {
+  const found = run({
+    translated: translatedWithGap(),
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru'\n`,
+    },
+  });
+  // The parse error already names the cause, so "not declared" would repeat it,
+  // and the unknown tag list keeps the membership rule off. The tag-list reader
+  // and the mobile catalog's own source scan both parse this file, so the line
+  // is not counted here.
+  const text = found.join('\n');
+  assert.match(text, /apps\/mobile\/src\/i18n\/languages\.ts:2: cannot parse: /);
+  assert.doesNotMatch(text, /is not declared/);
+  assert.doesNotMatch(text, /is not a supported language/);
+  assert.match(text, /mobile\/ru: missing key "agents\.title"/);
+});
+
+test('reports a catalog file no supported language names in both catalogs', () => {
+  const found = run({
+    extraFiles: {
+      'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en'];`,
+    },
+  });
+  assert.deepEqual(found, [
+    'mobile: catalog "ru.json" is not a supported language',
+    'notifications: catalog "ru.json" is not a supported language',
+  ]);
+});
+
+// A catalog file for a tag the supported-language list does not name is the
+// membership rule's finding and nothing else: the locale audit never reads it,
+// so a stray file reports one line however broken its copy is.
+test('audits only the supported tags on disk', () => {
+  const found = run({
+    language: 'ru',
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/de.json': JSON.stringify({
+        agents: { title: 'Agenten', extra: 'stray' },
+      }),
+    },
+  });
+  const text = found.join('\n');
+  assert.match(text, /^mobile: catalog "de\.json" is not a supported language$/m);
+  assert.doesNotMatch(text, /mobile\/de:/);
+  assert.deepEqual(
+    found.filter(problem => !problem.startsWith('mobile: catalog "de.json" is not')),
+    []
   );
+});
+
+// `Intl.PluralRules('pt_BR')` refuses an underscore tag, and so would the
+// catalog's own uppercase comparison. One line names the tag; a stack trace
+// would not.
+test('reports a supported tag Intl refuses as one problem line', () => {
+  const found = run({
+    language: 'pt_BR',
+    extraFiles: {
+      'apps/mobile/src/i18n/locales/de.json': JSON.stringify({ agents: { title: 'Agenten' } }),
+    },
+  });
+  const text = found.join('\n');
+  assert.match(text, /^mobile\/pt_BR: cannot audit catalog: /m);
+  assert.doesNotMatch(text, /^\s+at /m);
+  assert.match(text, /^mobile: catalog "de\.json" is not a supported language$/m);
+  assert.ok(found.length > 0, 'expected a problem');
+});
+
+// A plural family the locale completes with categories English does not ship.
+// Each added form passes the same value rules as an English-keyed form, read
+// against the family's English reference for its category.
+const WINDOW_ENGLISH = {
+  agents: {
+    title: 'Agents',
+    window_one: '{{displayCount}} session since {{start}}',
+    window_other: '{{displayCount}} sessions since {{start}}',
+  },
+};
+const WINDOW_TRANSLATED = {
+  agents: {
+    title: 'Локальные агенты',
+    window_one: '{{displayCount}} сессия с {{start}}',
+    window_few: '{{displayCount}} сессии с {{start}}',
+    window_many: '{{displayCount}} сессий с {{start}}',
+    window_other: '{{displayCount}} сессии с {{start}}',
+  },
+};
+const WINDOW_SOURCE = "t('agents.title');\nt('agents.window', { count: 2 });";
+
+/** The window fixture with one added form replaced and extra keys merged in. */
+function runWindow(windowFew, extra = {}) {
+  return run({
+    language: 'ru',
+    english: WINDOW_ENGLISH,
+    translated: {
+      agents: { ...WINDOW_TRANSLATED.agents, window_few: windowFew, ...extra },
+    },
+    source: WINDOW_SOURCE,
+  });
+}
+
+test('accepts the added plural forms a locale completes', () => {
+  assert.deepEqual(runWindow(WINDOW_TRANSLATED.agents.window_few), []);
+});
+
+test('rejects an empty added plural form', () => {
+  const found = runWindow('');
+  assert.match(found.join('\n'), /^mobile\/ru: "agents\.window_few" is empty$/m);
+});
+
+test('rejects an added plural form that drops a placeholder English carries', () => {
+  const found = runWindow('{{displayCount}} сессии');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" placeholders differ from English \(displayCount,start\)$/m
+  );
+});
+
+test('rejects a changed $t() reference in an added plural form', () => {
+  const found = runWindow('{{displayCount}} сессии с {{start}} $t(common.back)');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" \$t\(\) references differ from English \(none\)$/m
+  );
+});
+
+test('rejects a changed $TOKEN token in an added plural form', () => {
+  const found = runWindow('{{displayCount}} сессии с {{start}} $ARGUMENTS');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" \$TOKEN expansion tokens differ from English \(none\)$/m
+  );
+});
+
+test('rejects a different leading space in an added plural form', () => {
+  const found = runWindow(' {{displayCount}} сессии с {{start}}');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" leading or trailing space differs from English$/m
+  );
+});
+
+test('rejects an added plural form that quotes the English label', () => {
+  const found = runWindow('{{displayCount}} сессии с {{start}} "Agents"');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" quotes the English label "Agents"; name its key with \$t\(\)$/m
+  );
+});
+
+// A zero category words its own answer — "none" beside a noun reads badly — so
+// it may drop the family's visible count without a review entry.
+test('accepts a zero added form that drops the visible count', () => {
+  const found = runWindow(WINDOW_TRANSLATED.agents.window_few, {
+    window_zero: 'нет сессий с {{start}}',
+  });
+  assert.deepEqual(found, []);
+});
+
+// Arabic names its dual with a word form, and the review names that key.
+test('accepts an added form the worded-count review names', () => {
+  const found = run({
+    language: 'ar',
+    english: WORDED_ENGLISH,
+    translated: {
+      securityAgent: {
+        dashboard: {
+          title: 'لوحة المعلومات',
+          daysOverdue_zero: 'لا تأخير',
+          daysOverdue_one: 'متأخرة يومًا واحدًا',
+          daysOverdue_two: 'متأخرة يومين',
+          daysOverdue_few: 'متأخرة {{displayCount}} أيام',
+          daysOverdue_many: 'متأخرة {{displayCount}} يومًا',
+          daysOverdue_other: 'متأخرة {{displayCount}} يوم',
+        },
+      },
+    },
+    source: WORDED_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a dropped count in an unreviewed added form', () => {
+  const found = runWindow('сессии с {{start}}');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "agents\.window_few" drops \{\{displayCount\}\} without a reviewed worded form \(WORDED_COUNTS\)$/m
+  );
+});
+
+// The registry diagnostics name the catalog they read instead of a hard-coded
+// `notifications:`, so a second catalog cannot inherit the wrong name.
+test('the registry diagnostics name the catalog', () => {
+  assert.doesNotMatch(CHECKER_SOURCE, /notifications: the push locale registry/);
+  const found = run({
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `const pushCatalogs = { 'en': en, 'ru': en, 'de': ru };`,
+      ].join('\n'),
+    },
+  });
+  const text = found.join('\n');
+  assert.match(
+    text,
+    /^notifications: the push locale registry names "de" with no catalog import$/m
+  );
+  assert.match(
+    text,
+    /^notifications: the push locale registry binds "ru" to "en" instead of the "ru" catalog import$/m
+  );
+});
+
+// A catalog file no supported language names is the membership rule's finding;
+// the registry owes it neither an import nor an entry.
+test('does not owe a push registry entry to an unsupported catalog file', () => {
+  const found = run({
+    extraFiles: { 'packages/notifications/src/locales/de.json': '{}' },
+  });
+  const text = found.join('\n');
+  assert.match(text, /^notifications: catalog "de\.json" is not a supported language$/m);
+  assert.doesNotMatch(text, /catalog "de\.json" has no import in/);
+  assert.doesNotMatch(text, /catalog "de\.json" has no push locale registry entry/);
+});
+
+// The count a form must show comes from the whole family, not from the one
+// English reference the form is read against: English's `_one` may spell its
+// numeral out while `_other` carries the placeholder, and a form that answers
+// to the reference with no numeral must still show the count.
+test('rejects an added form that drops the family count its reference lacks', () => {
+  const found = run({
+    language: 'ru',
+    english: {
+      agents: {
+        title: 'Agents',
+        items_one: 'one item',
+        items_other: '{{displayCount}} items',
+      },
+    },
+    translated: {
+      agents: {
+        title: 'Локальные агенты',
+        items_one: 'один элемент',
+        items_few: 'несколько элементов',
+        items_many: '{{displayCount}} элементов',
+        items_other: '{{displayCount}} элементов',
+      },
+    },
+    source: "t('agents.title');\nt('agents.items', { count: 2 });",
+  });
+  const text = found.join('\n');
+  assert.match(
+    text,
+    /^mobile\/ru: "agents\.items_few" drops \{\{displayCount\}\} without a reviewed worded form \(WORDED_COUNTS\)$/m
+  );
+  // One line for the value: the specific count message replaces the general one.
+  assert.doesNotMatch(text, /"agents\.items_few" placeholders differ from English/);
 });

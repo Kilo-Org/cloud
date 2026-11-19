@@ -2839,7 +2839,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
       "gitlabReconnectAdminOnlyDescription": "בקש מבעלים של הארגון, מנהל או מנהל חיובים לחבר אותו מחדש.",
       "bitbucketNotConnectedTitle": "Bitbucket לא מחובר",
-      "bitbucketAdminOnlyDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
+      "adminOnlyConnectDescription": "רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },
@@ -2938,7 +2938,19 @@
         "fileComment": "תגובה על הקובץ",
         "outdatedOnPathLines": "לא עדכני: {{path}} {{lines}}",
         "outdatedOnLines": "לא עדכני: {{lines}}",
-        "outdatedOnPath": "לא עדכני: {{path}}"
+        "outdatedOnPath": "לא עדכני: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "צד שמאל",
+        "sideRight": "צד ימין",
+        "outdatedOnLinesSide": "לא עדכני: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "לא עדכני: {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "לא עדכני ({{side}})",
+        "outdatedOnPathSide": "לא עדכני: {{path}} ({{side}})"
       },
       "deletedUser": "משתמש שנמחק",
       "replyForbiddenTerm": "אין לך הרשאה להשיב ל-{{term}} הזה.",
@@ -3455,7 +3467,8 @@
         "accounting_adjustment": "התאמה חשבונאית",
         "credits_expired": "פג תוקף הקרדיטים"
       },
-      "truncated": "יש תנועות קודמות בקרדיטים."
+      "truncated": "יש תנועות קודמות בקרדיטים.",
+      "retentionLimit": "מוצגות תנועות הקרדיטים העדכניות ביותר."
     },
     "hub": {
       "balance": "יתרה",
@@ -3478,6 +3491,7 @@
       "sendInvite": "שליחת הזמנה",
       "title": "הזמנת חבר לארגון",
       "alreadyInvited": "כתובת זו כבר הוזמנה או שהיא שייכת לחבר קיים בארגון.",
+      "organizationUnavailable": "הארגון הזה כבר אינו זמין.",
       "sendError": "שליחת ההזמנה נכשלה.",
       "pendingInvitation": "לכתובת דוא״ל זו כבר יש הזמנה ממתינה.",
       "alreadyMember": "אדם זה כבר חבר בארגון הזה.",
@@ -3499,7 +3513,8 @@
         "void": "בוטלה",
         "uncollectible": "לא ניתנת לגבייה"
       },
-      "truncated": "קיימות חשבוניות ישנות יותר."
+      "truncated": "קיימות חשבוניות ישנות יותר.",
+      "retentionLimit": "מוצגות החשבוניות העדכניות ביותר."
     },
     "lowBalanceAlert": {
       "enableA11y": "הפעלת התראה על יתרה נמוכה",
@@ -4436,7 +4451,8 @@
       "purchaseFallback": "רכישת קרדיטים",
       "receipt": "קבלה",
       "receiptA11y": "פתיחת הקבלה עבור {{description}}, {{amount}}, מתאריך {{date}}",
-      "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו."
+      "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו.",
+      "retentionLimit": "מוצגת היסטוריית הקרדיטים העדכנית ביותר."
     },
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
@@ -4691,10 +4707,14 @@
     "couldNotLoad": "לא ניתן לטעון את האינטגרציות",
     "permissionDenied": "אין לך הרשאה לנהל את האינטגרציות האלה.",
     "managedByOwner": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון.",
+    "managedByOwnerOrAdmin": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון או מנהל.",
+    "managedByOwnerOrBilling": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון או מנהל חיובים.",
+    "managedByOwnerAdminOrBilling": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון, מנהל או מנהל חיובים.",
     "connectFailed": "לא ניתן לפתוח את דף החיבור"
   },
   "invoices": {
-    "personalEmptyDescription": "חשבוניות על הרכישות האישיות שלך יופיעו כאן לאחר החיוב."
+    "personalEmptyDescription": "חשבוניות על הרכישות האישיות שלך יופיעו כאן לאחר החיוב. קבלות מ-App Store ומ-Google Play נמצאות בהיסטוריית קרדיטים.",
+    "personalPeriod": "12 החודשים האחרונים"
   },
   "cloudAgent": {
     "compute": {

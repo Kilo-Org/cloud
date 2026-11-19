@@ -21,10 +21,7 @@ import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
-import {
-  COMPACT_CONTROL_BOX_CLASS,
-  COMPACT_CONTROL_HIT_SLOP,
-} from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP } from '@/lib/a11y/tap-target';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { isReservedEnvironmentKey } from '@kilocode/cloud-agent-profile';
 import { Limits } from './schema.js';
+import { ISSUED_CREDENTIAL_ENV_KEYS } from './sandbox-control/session-credentials.js';
 import {
   CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  MAX_ATTACH_ENV_KEYS,
   MAX_PROFILE_ENV_VARS,
   RESERVED_ENV_VARS,
   RESERVED_ENV_VAR_PREFIXES,
@@ -17,6 +19,12 @@ import {
 describe('repository environment reserved keys', () => {
   it('caps a profile environment at the same count the worker schema allows', () => {
     expect(MAX_PROFILE_ENV_VARS).toBe(Limits.MAX_ENV_VARS);
+  });
+
+  it('leaves room for every credential name the preparation adds', () => {
+    const reserved = new Set<string>(RESERVED_ENV_VARS);
+    const added = ISSUED_CREDENTIAL_ENV_KEYS.filter(key => !reserved.has(key));
+    expect(MAX_ATTACH_ENV_KEYS).toBeGreaterThanOrEqual(MAX_PROFILE_ENV_VARS + added.length);
   });
 
   it('rejects every RESERVED_ENV_VARS entry', () => {

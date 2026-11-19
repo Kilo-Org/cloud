@@ -101,9 +101,25 @@ export function findReservedEnvVarName(names: Iterable<string>): string | undefi
  * Cap on the profile environment an attach payload may carry. Mirrors
  * `Limits.MAX_ENV_VARS` in `../../schema.ts`, which the wrapper cannot import:
  * that module reaches the Worker's Durable Object types, which the wrapper's
- * program does not declare. `session-attach-env.test.ts` holds the two equal.
+ * program does not declare. `src/reserved-env-vars.test.ts` holds the two
+ * equal.
  */
 export const MAX_PROFILE_ENV_VARS = 50;
+
+/**
+ * Credential and runtime names a prepared attach env adds beside the profile
+ * env: every `ISSUED_CREDENTIAL_ENV_KEYS` entry that is not reserved. Mirrored
+ * here for the same reason as `MAX_PROFILE_ENV_VARS`; the same test holds the
+ * two equal.
+ */
+const PLATFORM_ATTACH_ENV_KEY_COUNT = 13;
+
+/**
+ * Cap on an attach env once the credential preparation has added its keys. The
+ * producer starts from the profile env plus `KILOCODE_TOKEN` and adds the
+ * credential names above, so this is the largest frame the platform emits.
+ */
+export const MAX_ATTACH_ENV_KEYS = MAX_PROFILE_ENV_VARS + PLATFORM_ATTACH_ENV_KEY_COUNT;
 
 /**
  * Prefixes the sandbox runtime owns. `buildWorktreeKiloEnvironment` drops them

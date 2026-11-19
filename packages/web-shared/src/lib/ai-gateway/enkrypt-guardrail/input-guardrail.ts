@@ -31,8 +31,8 @@ export type EnkryptInputGuardrail = {
   /**
    * Await immediately before the upstream call. Never rejects. Waits only for the blocking
    * detectors' scan and, for a block, its cache write. The measured wait is the latency the
-   * guardrail added to the request, and is stored on one of the request's usage records. A
-   * guardrail that only logs stores the wait its scan would have added instead.
+   * guardrail added to the request, and is stored on one of the request's usage records and in
+   * the report. A guardrail that only logs stores the wait its scan would have added instead.
    */
   awaitVerdict(): Promise<EnkryptGuardrailVerdict>;
   /**
@@ -204,25 +204,31 @@ export function startEnkryptInputGuardrail(
   let waitStartedAt: number | null = null;
   let addedLatencyMs: number | null = null;
   const logOnlyFinishedAt = logOnlyResults.then(() => performance.now());
+  /**
+   * The wait the guardrail added. A guardrail that only logs adds none, so this is the wait it
+   * would have added had its detectors blocked: from when the request awaited the verdict until
+   * the log-only scan finished. Settles once every scan has.
+   */
+  const latencyMs = async (): Promise<number | null> => {
+    const [{ blocking, logOnly }, finishedAt] = await Promise.all([
+      scans.catch(() => ({ blocking: null, logOnly: null })),
+      logOnlyFinishedAt,
+      blockingResults,
+    ]);
+    return !blocking && logOnly && waitStartedAt !== null
+      ? Math.max(0, Math.round(finishedAt - waitStartedAt))
+      : addedLatencyMs;
+  };
   after(async () => {
-    const [{ blocking: blockingScan, logOnly: logOnlyScan }, blocking, logOnly, finishedAt] =
-      await Promise.all([
-        scans.catch(() => ({ blocking: null, logOnly: null })),
-        blockingResults,
-        logOnlyResults,
-        logOnlyFinishedAt,
-      ]);
-    // A guardrail that only logs adds no latency, so its usage records the latency it would have
-    // added had its detectors blocked: the wait from when the request awaited the verdict until
-    // the log-only scan finished.
-    const latencyMs =
-      !blockingScan && logOnlyScan && waitStartedAt !== null
-        ? Math.max(0, Math.round(finishedAt - waitStartedAt))
-        : addedLatencyMs;
+    const [blocking, logOnly, latency] = await Promise.all([
+      blockingResults,
+      logOnlyResults,
+      latencyMs(),
+    ]);
     const usageRecords = usageRecordsWithAddedLatency(
       blocking.flatMap(result => result.usageRecords),
       logOnly.flatMap(result => result.usageRecords),
-      latencyMs
+      latency
     );
     await recordEnkryptUsageRecords(usageRecords);
   });
@@ -241,12 +247,14 @@ export function startEnkryptInputGuardrail(
       return verdict;
     },
     async report() {
-      const [request, blocking, logOnly, [blockingWrites, logOnlyWrites]] = await Promise.all([
-        scan.catch(() => null),
-        blockingResults,
-        logOnlyResults,
-        Promise.all(cacheWrites),
-      ]);
+      const [request, blocking, logOnly, [blockingWrites, logOnlyWrites], latency] =
+        await Promise.all([
+          scan.catch(() => null),
+          blockingResults,
+          logOnlyResults,
+          Promise.all(cacheWrites),
+          latencyMs(),
+        ]);
       const verdict = mostSevereVerdict(blocking.map(result => result.verdict));
       const scanReports = (results: EnkryptCachedScanResult[], writes: VerdictCacheWrite[]) =>
         results.flatMap(({ report }, index) =>
@@ -261,7 +269,7 @@ export function startEnkryptInputGuardrail(
         settings: request && guardrailSettings(request.config),
         verdict: verdict.action,
         unavailable_reason: verdict.action === 'unavailable' ? verdict.reason : null,
-        added_latency_ms: addedLatencyMs,
+        added_latency_ms: latency,
         scans,
       };
     },

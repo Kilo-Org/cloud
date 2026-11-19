@@ -1351,7 +1351,8 @@ describe('guardEnkryptOutput', () => {
         not_scanned_reason: null,
         verdict: 'skip',
         unavailable_reason: null,
-        added_latency_ms: null,
+        // What a blocking scan would have added.
+        added_latency_ms: expect.any(Number),
         scans: [scanReport({ scan: 'log_only', detectors_blocking: [] })],
       });
     });

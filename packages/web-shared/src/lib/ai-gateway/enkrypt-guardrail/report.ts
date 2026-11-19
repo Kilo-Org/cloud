@@ -232,7 +232,12 @@ export const EnkryptGuardrailReportSchema = z.object({
    */
   verdict: VerdictSchema,
   unavailable_reason: UnavailableReasonSchema.nullable(),
-  /** How long the request waited for the verdict, or null when it never waited. */
+  /**
+   * How long the request waited for the verdict, or null when it never waited. Detectors that only
+   * log add no wait, so for them it is the wait they would have added had they blocked: from when
+   * the request awaited the verdict until the log-only scan finished. Reports written before that
+   * hold the actual wait, about 0 ms.
+   */
   added_latency_ms: z.number().nullable(),
   scans: z.array(EnkryptInputScanReportSchema),
 });
@@ -271,7 +276,12 @@ export const EnkryptOutputGuardrailReportSchema = z.object({
    */
   verdict: VerdictSchema,
   unavailable_reason: UnavailableReasonSchema.nullable(),
-  /** How long the held-back response waited for the verdict after the upstream response ended. */
+  /**
+   * How long the held-back response waited for the verdict after the upstream response ended.
+   * Detectors that only log hold nothing back, so for them it is the wait they would have added had
+   * they blocked: from the end of the upstream response until the log-only scan finished. Null in
+   * reports written before that.
+   */
   added_latency_ms: z.number().nullable(),
   scans: z.array(EnkryptOutputScanReportSchema),
 });

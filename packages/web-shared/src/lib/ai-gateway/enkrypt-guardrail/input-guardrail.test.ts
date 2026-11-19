@@ -672,8 +672,8 @@ describe('startEnkryptInputGuardrail', () => {
     expect(mockedRedisSet.mock.calls).toEqual(
       allowWrites(partKeys(logOnlyScan), ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS)
     );
-    // The report keeps the wait the request actually had.
-    expect((await guardrail.report())?.added_latency_ms).toBe(0);
+    // The report holds the same wait the usage records.
+    expect((await guardrail.report())?.added_latency_ms).toBe(451);
   });
 
   it('reports the settings, verdict, wait, and each scan with its cache write', async () => {

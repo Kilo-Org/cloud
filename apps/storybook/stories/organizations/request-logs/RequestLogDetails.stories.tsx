@@ -97,7 +97,7 @@ const directByokDetails: RequestLogDetails = {
         },
         verdict: 'skip',
         unavailable_reason: null,
-        added_latency_ms: 0,
+        added_latency_ms: 5_260,
         scans: [
           {
             scan: 'log_only',
@@ -450,7 +450,7 @@ const enkryptPartialCacheHitDetails: RequestLogDetails = {
         },
         verdict: 'skip',
         unavailable_reason: null,
-        added_latency_ms: 0,
+        added_latency_ms: 8_262,
         scans: [
           {
             scan: 'log_only',

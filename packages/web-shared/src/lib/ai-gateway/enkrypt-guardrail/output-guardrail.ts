@@ -387,6 +387,7 @@ export async function guardEnkryptOutput({
           // A guardrail that only logs adds no latency, so its usage records the latency it would
           // have added had its detectors blocked.
           const wouldBeLatencyMs = Math.round(performance.now() - waitStartedAt);
+          report.added_latency_ms = wouldBeLatencyMs;
           return outputUsageRecords([], result.usageRecords, wouldBeLatencyMs);
         } catch (error) {
           console.error('[enkrypt-guardrail] log-only output scan failed unexpectedly', {

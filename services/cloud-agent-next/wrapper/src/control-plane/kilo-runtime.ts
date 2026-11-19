@@ -7,6 +7,7 @@ import {
   GH_STACK_EXTENSION_NAME,
   GH_STACK_EXTENSIONS_ROOT,
 } from '../../../src/shared/runtime-distribution.js';
+import { GITHUB_REVIEW_TARGET_ENV } from '../../../src/shared/github-review-target.js';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
@@ -1302,6 +1303,15 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     ensure,
     isRetiredClient: candidate => retiredClients.has(candidate),
     async installCredentials(env, cloudAgentMcp): Promise<void> {
+      // The live environment is shared by every route on the key. Refuse a
+      // frame that would change the policy the siblings run under; credential
+      // rotation and the workspace MCP grant keep the policy and still apply.
+      if (
+        authorizationConfigurationSignature(options.env) !==
+        authorizationConfigurationSignature(env)
+      ) {
+        throw new KiloWorktreePolicyMismatchError();
+      }
       const installedHandle = options.env.KILOCODE_TOKEN;
       const incomingHandle = env.KILOCODE_TOKEN;
       const installedExp = proxyHandleExpiry(installedHandle);
@@ -1508,6 +1518,61 @@ function mcpConfigurationSignature(env: Record<string, string>): string {
   }
 }
 
+/** Stable JSON with sorted object keys, so equal content compares equal. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (typeof value === 'object' && value !== null) {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+/**
+ * The authorization content of the generated runtime configuration: the
+ * composed permission map (the platform baseline with the session command
+ * policy and the review publisher refusals) and the trusted review target.
+ * Credentials, provider endpoints and the workspace MCP grant rotate between
+ * routes on one key, so they are deliberately absent.
+ */
+function authorizationConfigurationSignature(env: Record<string, string>): string {
+  const raw = env.KILO_CONFIG_CONTENT;
+  let permission: unknown = null;
+  if (raw !== undefined) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        !Array.isArray(parsed) &&
+        'permission' in parsed
+      ) {
+        permission = parsed.permission ?? null;
+      }
+    } catch {
+      permission = null;
+    }
+  }
+  return canonicalJson({ permission, reviewTarget: env[GITHUB_REVIEW_TARGET_ENV] ?? null });
+}
+
+/**
+ * A route asked to reuse a warm shared runtime whose generated authorization
+ * policy differs from its own prepared policy. One runtime serves every route
+ * on its key, so reusing it would run the joining route under another
+ * session's policy. Non-retryable: the caller must not drop and recreate the
+ * runtime to "fix" it.
+ */
+export class KiloWorktreePolicyMismatchError extends Error {
+  constructor() {
+    super('Kilo worktree authorization policy mismatch');
+    this.name = 'KiloWorktreePolicyMismatchError';
+  }
+}
+
 /**
  * One Kilo runtime per directory.
  * A fresh `ensure` after the restart budget is spent replaces the runtime,
@@ -1537,6 +1602,15 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         // materialized servers are unchanged.
         if (mcpConfigurationSignature(existing.env) !== mcpConfigurationSignature(input.env)) {
           throw new KiloWorktreeMcpMismatchError();
+        }
+        // The generated authorization policy travels with the runtime process.
+        // A route whose prepared policy differs must fail instead of running
+        // under the policy of the route that started the runtime.
+        if (
+          authorizationConfigurationSignature(existing.env) !==
+          authorizationConfigurationSignature(input.env)
+        ) {
+          throw new KiloWorktreePolicyMismatchError();
         }
         return existing.ensure();
       }

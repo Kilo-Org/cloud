@@ -51,6 +51,7 @@ import { createSecretRedactor, redactSecrets } from '../redact-output.js';
 import {
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
+  KiloWorktreePolicyMismatchError,
 } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import type { RestoreRoots } from '../restore-roots.js';
@@ -375,7 +376,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       type: 'session.failed',
       sessionId,
       reason:
-        error instanceof RuntimeProfileMismatchError
+        error instanceof RuntimeProfileMismatchError ||
+        error instanceof KiloWorktreePolicyMismatchError
           ? 'invalid_configuration'
           : 'workspace_setup_failed',
       step,
@@ -1058,12 +1060,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       try {
         return await operation();
       } catch (error) {
-        // An MCP or credential-class drift against the shared runtime is permanent for this key;
-        // retrying would drop the existing runtime and accept the changed configuration.
+        // An MCP, credential-class, or authorization-policy drift against the shared runtime is
+        // permanent for this key; retrying would drop the existing runtime and accept the changed
+        // configuration.
         if (
           !isCurrent() ||
           error instanceof KiloWorktreeMcpMismatchError ||
-          error instanceof KiloWorktreeCredentialClassMismatchError
+          error instanceof KiloWorktreeCredentialClassMismatchError ||
+          error instanceof KiloWorktreePolicyMismatchError
         ) {
           throw error;
         }

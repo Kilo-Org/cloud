@@ -36,6 +36,7 @@ import {
   createKiloRuntimes,
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
+  KiloWorktreePolicyMismatchError,
   liveRuntimeClient,
   type KiloRuntime,
 } from './kilo-runtime.js';
@@ -1339,6 +1340,26 @@ describe('createPreparationManager', () => {
     expect(harness.ensureCalls()).toBe(1);
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
     expect(harness.frames.find(frame => frame.type === 'session.failed')).toBeDefined();
+  });
+
+  it('fails a shared-runtime route without retrying on an authorization-policy mismatch', async () => {
+    const harness = createHarness();
+    harness.setEnsureError(new KiloWorktreePolicyMismatchError());
+    const spec = routeSpec();
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
+    expect(
+      harness.frames.some(
+        frame => frame.type === 'session.ready' && frame.sessionId === spec.sessionId
+      )
+    ).toBe(false);
+    const failed = harness.frames.find(frame => frame.type === 'session.failed');
+    expect(failed?.type === 'session.failed' ? failed.reason : undefined).toBe(
+      'invalid_configuration'
+    );
   });
 
   it('suppresses failed and runtime retries after release during a rejected startup', async () => {

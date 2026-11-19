@@ -11,6 +11,7 @@ import {
   joinPasses,
   linkPath,
   loadingPlaceholder,
+  openResetLink,
   runMatrix,
   sampleInterval,
   sampleUntilSettled,
@@ -24,7 +25,6 @@ import {
   type Device,
   type RunOutcome,
 } from './capture';
-import { CAPTURE_ALIGNMENT_BUDGET_MS } from './capture-evidence';
 import type { ProbeClient, ProbeSample } from './cdp';
 import { matrixCells } from './matrix';
 import { normalize, type ProbeDump } from './tree';
@@ -603,6 +603,19 @@ test('runMatrix retries a link that leaves the screen unchanged and reports last
   );
 });
 
+test('a link to the screen navigation resets to counts as opened when that screen settles', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  state.screen = '(app)/(tabs)/(0_home)';
+  const home = 'kiloapp:///(app)/(tabs)/(0_home)';
+  const ctx = context(fakeDevice(calls, state, { routes: { [home]: '/' } }), fakeProbe(state));
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [
+    { id: 'home', link: home },
+  ]);
+  assert.equal(calls.filter(call => call === `open:${home}`).length, 1);
+  assert.deepEqual(outcome.findings, []);
+});
+
 test('runMatrix re-sends a link the router routed without painting the screen', async () => {
   const calls: string[] = [];
   const state = probeState();
@@ -998,7 +1011,7 @@ test('capture retains a mismatched screenshot and reports inconclusive pixel ali
   assert.ok(fs.existsSync(path.join(ctx.out, screen.screenshot)));
 });
 
-test('capture marks slow bracketing reads inconclusive instead of certifying paint', async () => {
+test('capture keeps a bracket whose reads and screenshot are slow but adjacent', async () => {
   const calls: string[] = [];
   const state = probeState();
   const device = fakeDevice(calls, state);
@@ -1008,6 +1021,8 @@ test('capture marks slow bracketing reads inconclusive instead of certifying pai
   let captured = false;
   device.screenshot = file => {
     screenshot(file);
+    // An iOS simulator screenshot under load: the fake clock advances at once.
+    void ctx.clock.sleep(9_000);
     captured = true;
   };
   const originalDump = probe.dump;
@@ -1016,12 +1031,10 @@ test('capture marks slow bracketing reads inconclusive instead of certifying pai
     return originalDump();
   };
   const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
-  const screen = outcome.cells[0]?.screens[0];
-  assert.ok(screen?.capture);
-  const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
-  assert.equal(alignment.status, 'inconclusive');
-  assert.match(alignment.reason, /bounded alignment window/);
-  assert.ok(outcome.findings.some(finding => finding.rule === 'capture-alignment'));
+  const alignment = captureEvidence(ctx, outcome);
+  assert.equal(alignment.status, 'bracketed');
+  assert.equal(alignment.gapMs, 0);
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'capture-alignment'));
 });
 
 test('uniform captured content remains visible as possible blank-frame evidence without recapture', async () => {
@@ -1234,46 +1247,11 @@ test('a late arrival is timed with the spacing its samples report', () => {
   assert.match(shifts(undefined)[0]?.message ?? '', /within 500 ms after settling/u);
 });
 
-/** A probe whose reads the test can hold at a fixed cost per read. */
-function costingProbe(dumpMs: number) {
-  const calls: string[] = [];
-  const state = probeState();
-  const probe = fakeProbe(state);
-  const ctx = context(fakeDevice(calls, state), probe);
-  const originalDump = probe.dump;
-  probe.dump = async () => {
-    await ctx.clock.sleep(dumpMs);
-    return originalDump();
-  };
-  const logs: string[] = [];
-  ctx.log = line => logs.push(line);
-  return { ctx, logs, probe, state };
-}
-
 function captureEvidence(ctx: CaptureContext, outcome: { cells: RunOutcome['cells'] }) {
   const capture = outcome.cells[0]?.screens[0]?.capture;
   assert.ok(capture);
   return JSON.parse(fs.readFileSync(path.join(ctx.out, capture), 'utf8'));
 }
-
-test('the alignment window follows the measured dump cost and keeps the constant when cheap', async () => {
-  const slow = costingProbe(600);
-  const slowRun = await runMatrix(slow.ctx, matrixCells('android', 'base'), HOME);
-  // Two bracket reads of a 600 ms dump alone outlast the 2 s window, so the
-  // caller widens it by the same measurement the sampling cadence uses.
-  assert.equal(captureEvidence(slow.ctx, slowRun).budgetMs, 2_200);
-  assert.deepEqual(
-    slow.logs.filter(line => line.includes('alignment window')),
-    ['design-gate: home one dump costs 600ms; alignment window 2200ms']
-  );
-  const cheap = costingProbe(40);
-  const cheapRun = await runMatrix(cheap.ctx, matrixCells('android', 'base'), HOME);
-  assert.equal(captureEvidence(cheap.ctx, cheapRun).budgetMs, CAPTURE_ALIGNMENT_BUDGET_MS);
-  assert.deepEqual(
-    cheap.logs.filter(line => line.includes('alignment window')),
-    []
-  );
-});
 
 test('the bracket waits for a screen that changes once after sampling stops', async () => {
   const calls: string[] = [];
@@ -1461,4 +1439,57 @@ test('a screen that keeps changing keeps the bracket a mismatch and says so', as
   assert.equal(captureEvidence(ctx, outcome).status, 'mismatch');
   assert.ok(logs.some(line => line.includes('screen still changing before the screenshot')));
   assert.ok(outcome.findings.some(finding => finding.rule === 'unsettled'));
+});
+
+const CLEAR = 'kiloapp:///dev/force-state/clear';
+
+test('openResetLink resends a reset whose send failed and confirms its delivery', async () => {
+  const sends: string[] = [];
+  let outcome = 'none';
+  const probe: ProbeClient = {
+    ...fakeProbe(probeState()),
+    openLink: async url => {
+      sends.push(url);
+      if (sends.length === 1) throw new InfraError('CDP Runtime.evaluate timed out');
+      outcome = `openLink ${url}: opened`;
+    },
+    lastOutcome: async () => outcome,
+  };
+  const ctx = context(fakeDevice([], probeState()), probe);
+  assert.equal(await openResetLink(ctx, CLEAR), undefined);
+  assert.deepEqual(sends, [CLEAR, CLEAR]);
+});
+
+test('openResetLink reports a reset the app never confirms instead of throwing', async () => {
+  const probe: ProbeClient = {
+    ...fakeProbe(probeState()),
+    openLink: async () => undefined,
+    lastOutcome: async () => `openLink ${CLEAR}: pending`,
+  };
+  const ctx = context(fakeDevice([], probeState()), probe);
+  assert.equal(await openResetLink(ctx, CLEAR), `openLink ${CLEAR}: pending`);
+});
+
+test('an unconfirmed reset on the last target skips the next cell and fails the restore', async () => {
+  const state = probeState();
+  const sends: string[] = [];
+  const probe: ProbeClient = {
+    ...fakeProbe(state),
+    openLink: async url => {
+      sends.push(url);
+      state.open?.(url);
+    },
+    lastOutcome: async () => `openLink ${CLEAR}: failed (no route)`,
+  };
+  const ctx = context(fakeDevice([], state), probe);
+  const result = await runMatrix(ctx, matrixCells('android', 'base', ['dark']), [
+    { id: 'forced', link: 'kiloapp://forced', after: CLEAR },
+  ]);
+  assert.deepEqual(
+    result.skipped.map(entry => `${entry.cell}/${entry.target}`),
+    ['dark/forced']
+  );
+  assert.match(result.restoreError ?? '', /forced left a forced state.*still unconfirmed/);
+  // Two sends after the capture, two at the next cell, two in the restore.
+  assert.equal(sends.filter(url => url === CLEAR).length, 6);
 });

@@ -16,8 +16,7 @@ import {
   sessionStatusUpdatedPayloadSchema,
 } from './schemas';
 import { stubUserMessage } from './test-helpers';
-import type { AssociatedPrData, FetchedSessionData } from './session-manager';
-import type { CloudSessionSnapshotPage } from './types';
+import type { AssociatedPrData, CloudSessionSnapshotPage, FetchedSessionData } from './types';
 
 describe('cloudSessionMetadataSchema', () => {
   it('preserves safe environment, PR, spend, and origin metadata without exposing unprojected fields', () => {

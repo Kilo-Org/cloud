@@ -177,11 +177,7 @@ type EntrySectionFamily = {
   target: ConfigSections['agentEntries'];
 };
 
-/**
- * Read one definition family: skip an absent key, report a section that is not
- * an object, and report each entry that is not an object. Every family reads the
- * same way, so the two families take the same path here.
- */
+/** Every family reads the same way, so the two families take the same path here. */
 function readEntrySection(
   parsed: Record<string, unknown>,
   state: ParseState,
@@ -268,8 +264,6 @@ export function readConfigSections(configEntry: ArchiveEntry, state: ParseState)
     instructionGlobs: [],
   };
 
-  // Checked before either parse, because the JSONC parser itself recurses per
-  // nesting level and would throw out of this function on a deep document.
   if (exceedsNestingDepth(configEntry.content, MAX_IMPORT_CONFIG_NESTING_DEPTH)) {
     state.issues.push(
       makeIssue(

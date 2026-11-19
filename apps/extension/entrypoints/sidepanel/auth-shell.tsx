@@ -34,8 +34,6 @@ import { useModalDialog } from './use-dismiss';
 import { WebMcpSettings } from './web-mcp-settings';
 import { WorkflowSettings } from './workflow-settings';
 
-const emptyOrganizationOptions: KiloOrganizationOption[] = [];
-
 const iconButtonClassName =
   'flex size-8 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background';
 
@@ -175,26 +173,21 @@ export const AnalyticsSettingsRow = ({
   );
 };
 
-const HeaderActions = ({
-  auth,
+const SettingsDialog = ({
   beforeSettings,
-  onOrganizationChange,
-  onSignOut,
-  organizationOptions,
-  selectedOrganizationId,
+  children,
+  isOpen,
+  setIsOpen,
 }: {
-  auth: StoredAuth;
   beforeSettings?: ReactNode;
-  onOrganizationChange: (organizationId: string) => void;
-  onSignOut: () => void;
-  organizationOptions: KiloOrganizationOption[];
-  selectedOrganizationId: string;
+  children: ReactNode;
+  isOpen: boolean;
+  setIsOpen: (update: (current: boolean) => boolean) => void;
 }): JSX.Element => {
-  const [isSettingsOpen, setIsSettingsOpen] = useAtom(settingsDialogOpenAtom);
   const closeSettings = (): void => {
-    setIsSettingsOpen(false);
+    setIsOpen(() => false);
   };
-  const settingsDialogRef = useModalDialog({ onClose: closeSettings, open: isSettingsOpen });
+  const settingsDialogRef = useModalDialog({ onClose: closeSettings, open: isOpen });
 
   return (
     <div className="relative flex shrink-0 items-center justify-end gap-2">
@@ -202,13 +195,13 @@ const HeaderActions = ({
       <IconButton
         ariaLabel="Settings"
         onClick={() => {
-          setIsSettingsOpen(current => !current);
+          setIsOpen(current => !current);
         }}
       >
         <Settings aria-hidden="true" className="size-4" />
       </IconButton>
 
-      {isSettingsOpen ? (
+      {isOpen ? (
         <div
           aria-label="Settings panel"
           aria-modal="true"
@@ -229,33 +222,7 @@ const HeaderActions = ({
             </button>
           </div>
           <div className="agent-conversation-scrollbar grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 py-4">
-            <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
-              <p className="type-label text-foreground-muted">Signed in</p>
-              <p className="type-body mt-1 truncate text-foreground">
-                {auth.userEmail ?? 'Kilo user'}
-              </p>
-            </div>
-            <MemorySettings />
-            <WorkflowSettings />
-            <OrganizationCreditAccountSelect
-              onChange={onOrganizationChange}
-              organizationOptions={organizationOptions}
-              selectedOrganizationId={selectedOrganizationId}
-            />
-            <WebMcpSettings />
-            <RemoteMcpSettings />
-            <LocalAgentsSettings />
-            <AnalyticsSettingsRow userEmail={auth.userEmail} />
-            <button
-              className="type-label h-9 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"
-              onClick={() => {
-                setIsSettingsOpen(false);
-                onSignOut();
-              }}
-              type="button"
-            >
-              Sign out
-            </button>
+            {children}
           </div>
         </div>
       ) : null}
@@ -263,67 +230,85 @@ const HeaderActions = ({
   );
 };
 
-const Header = ({
+export const SignedInHeaderActions = ({
   auth,
-  headerBeforeSettings,
+  beforeSettings,
   onOrganizationChange,
   onSignOut,
-  organizationOptions = emptyOrganizationOptions,
-  selectedOrganizationId = '',
+  organizationOptions,
+  selectedOrganizationId,
 }: {
-  auth?: StoredAuth | undefined;
-  headerBeforeSettings?: ReactNode;
-  onOrganizationChange?: ((organizationId: string) => void) | undefined;
-  onSignOut?: (() => void) | undefined;
-  organizationOptions?: KiloOrganizationOption[] | undefined;
-  selectedOrganizationId?: string | undefined;
-}): JSX.Element => (
+  auth: StoredAuth;
+  beforeSettings?: ReactNode;
+  onOrganizationChange: (organizationId: string) => void;
+  onSignOut: () => void;
+  organizationOptions: KiloOrganizationOption[];
+  selectedOrganizationId: string;
+}): JSX.Element => {
+  const [isSettingsOpen, setIsSettingsOpen] = useAtom(settingsDialogOpenAtom);
+
+  return (
+    <SettingsDialog
+      beforeSettings={beforeSettings}
+      isOpen={isSettingsOpen}
+      setIsOpen={setIsSettingsOpen}
+    >
+      <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
+        <p className="type-label text-foreground-muted">Signed in</p>
+        <p className="type-body mt-1 truncate text-foreground">{auth.userEmail ?? 'Kilo user'}</p>
+      </div>
+      <MemorySettings />
+      <WorkflowSettings />
+      <OrganizationCreditAccountSelect
+        onChange={onOrganizationChange}
+        organizationOptions={organizationOptions}
+        selectedOrganizationId={selectedOrganizationId}
+      />
+      <WebMcpSettings />
+      <RemoteMcpSettings />
+      <LocalAgentsSettings />
+      <AnalyticsSettingsRow userEmail={auth.userEmail} />
+      <button
+        className="type-label h-9 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"
+        onClick={() => {
+          setIsSettingsOpen(false);
+          onSignOut();
+        }}
+        type="button"
+      >
+        Sign out
+      </button>
+    </SettingsDialog>
+  );
+};
+
+/*
+ * Local agents need no Kilo account (SPEC D15), so their settings stay reachable
+ * before sign-in. The open state is local: the signed-in dialog's shared atom
+ * would otherwise open the full account settings right after sign-in.
+ */
+export const SignedOutHeaderActions = (): JSX.Element => {
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  return (
+    <SettingsDialog isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen}>
+      <LocalAgentsSettings />
+    </SettingsDialog>
+  );
+};
+
+export const ShellHeader = ({ children }: { children?: ReactNode }): JSX.Element => (
   <div className="border-b border-border bg-surface-background px-4 py-3">
     <div className="flex min-w-0 items-center justify-between gap-3">
       <KiloLogo className="size-8 shrink-0 text-brand-primary" />
       <span className="sr-only">Kilo</span>
-      {auth === undefined ||
-      onOrganizationChange === undefined ||
-      onSignOut === undefined ? null : (
-        <HeaderActions
-          auth={auth}
-          beforeSettings={headerBeforeSettings}
-          onOrganizationChange={onOrganizationChange}
-          onSignOut={onSignOut}
-          organizationOptions={organizationOptions}
-          selectedOrganizationId={selectedOrganizationId}
-        />
-      )}
+      {children}
     </div>
   </div>
 );
 
-export const Shell = ({
-  auth,
-  children,
-  headerBeforeSettings,
-  onOrganizationChange,
-  onSignOut,
-  organizationOptions = emptyOrganizationOptions,
-  selectedOrganizationId = '',
-}: {
-  auth?: StoredAuth | undefined;
-  children: ReactNode;
-  headerBeforeSettings?: ReactNode;
-  onOrganizationChange?: ((organizationId: string) => void) | undefined;
-  onSignOut?: (() => void) | undefined;
-  organizationOptions?: KiloOrganizationOption[] | undefined;
-  selectedOrganizationId?: string | undefined;
-}): JSX.Element => (
+export const Shell = ({ children }: { children: ReactNode }): JSX.Element => (
   <main className="flex h-dvh min-h-0 flex-col overflow-hidden bg-surface-background text-foreground">
-    <Header
-      auth={auth}
-      headerBeforeSettings={headerBeforeSettings}
-      onOrganizationChange={onOrganizationChange}
-      onSignOut={onSignOut}
-      organizationOptions={organizationOptions}
-      selectedOrganizationId={selectedOrganizationId}
-    />
     {children}
   </main>
 );

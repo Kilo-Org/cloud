@@ -4,7 +4,7 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { AppState, Keyboard, Pressable, View } from 'react-native';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 import { useTranslation } from 'react-i18next';
 import { Bot, History, SlidersHorizontal, X } from '@/components/ui/icons';
 
@@ -63,7 +63,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const navigation = useNavigation();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { left, right } = useSafeAreaInsets();
+  const { left, right } = useStyleSideInsets();
   // The tabs layout's width-aware label decision rides along, so this screen's
   // clearance (list frame, FAB and state-surface insets) tracks the bar height.
   const tabBarHeight = useEffectiveTabBarHeight();

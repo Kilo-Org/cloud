@@ -138,6 +138,11 @@ const SENTENCE_BREAK_PATTERN = new RegExp(
 );
 /** Thai writes no full stop, so a Thai sentence meets the next one at a space. */
 const THAI_BREAK_PATTERN = /^([\s\S]*?[\u0E00-\u0E7F])\s+([\s\S]+)$/u;
+/**
+ * The full stop that ends a headline's sentence, in every script the catalogs
+ * write one. A question or exclamation mark stays: it changes what the line says.
+ */
+const HEADLINE_FULL_STOP_PATTERN = /[.।॥۔։።။។៕。．]$/u;
 
 /**
  * Looks up a possibly-unknown key in a literal dictionary without widening its
@@ -196,14 +201,13 @@ type FailureHeadline = {
  * failed, the second what to do about it. A group with no failed stage titles
  * itself with the first, because that is the only thing that tells two
  * stage-less failures apart, and keeps the rest in the body. A one-sentence
- * cause yields no body text.
+ * cause yields no body text. The title drops its full stop, so it reads like
+ * every other group title ("Sandbox provisioning failed").
  */
 export function splitFailureSentence(text: string): FailureHeadline {
   const sentence = SENTENCE_BREAK_PATTERN.exec(text) ?? THAI_BREAK_PATTERN.exec(text);
-  if (sentence === null) {
-    return { title: text };
-  }
-  return { title: sentence[1] ?? text, detail: sentence[2] };
+  const title = (sentence?.[1] ?? text).replace(HEADLINE_FULL_STOP_PATTERN, '');
+  return sentence === null ? { title } : { title, detail: sentence[2] };
 }
 
 function resolvePreparationText(raw: string, t: TFunction): string | undefined {

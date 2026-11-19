@@ -11,7 +11,7 @@ import type {
   StandaloneQuestion,
   StandaloneSuggestion,
 } from '@kilocode/cloud-agent-sdk';
-import type { AssistantMessage } from '@/types/opencode.gen';
+import type { AssistantMessage } from '@/types/opencode';
 import type { Part, ReasoningPart, StoredMessage, TextPart, ToolPart } from './types';
 import type * as ToolCardShellModule from './ToolCardShell';
 import { useOptionalManager } from './CloudAgentProvider';

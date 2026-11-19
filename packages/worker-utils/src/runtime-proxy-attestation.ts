@@ -8,6 +8,8 @@ export const RUNTIME_PROXY_ATTESTATION_ISSUER = 'kilocode-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_TYPE = 'cloud-agent-next-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_VERSION = 1;
 export const RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS = 30;
+/** Sanity bound on the untrusted header value in characters, checked before any JWT parsing runs. */
+export const RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH = 4096;
 
 export const RuntimeProxyAttestationAudienceSchema = z.enum([
   'kilo-api',
@@ -56,7 +58,7 @@ function signingKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-export async function issueRuntimeProxyAttestation(input: {
+export type RuntimeProxyAttestationSubject = {
   secret: string;
   audience: RuntimeProxyAttestationAudience;
   userId: string;
@@ -64,7 +66,11 @@ export async function issueRuntimeProxyAttestation(input: {
   resourceId: string;
   bearer: string;
   now?: Date;
-}): Promise<string> {
+};
+
+export async function issueRuntimeProxyAttestation(
+  input: RuntimeProxyAttestationSubject
+): Promise<string> {
   const now = input.now ?? new Date();
   const issuedAt = Math.floor(now.getTime() / 1000);
   if (!Number.isSafeInteger(issuedAt) || issuedAt < 0)
@@ -83,24 +89,13 @@ export async function issueRuntimeProxyAttestation(input: {
   });
   return new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-    .setIssuedAt(claims.iat)
-    .setExpirationTime(claims.exp)
-    .setIssuer(claims.iss)
-    .setAudience(claims.aud)
     .sign(signingKey(input.secret));
 }
 
-export async function verifyRuntimeProxyAttestation(input: {
-  value: string | null | undefined;
-  secret: string;
-  audience: RuntimeProxyAttestationAudience;
-  userId: string;
-  authorizationId: string;
-  resourceId: string;
-  bearer: string;
-  now?: Date;
-}): Promise<boolean> {
-  if (!input.value || input.value.length > 4096) return false;
+export async function verifyRuntimeProxyAttestation(
+  input: RuntimeProxyAttestationSubject & { value: string | null | undefined }
+): Promise<boolean> {
+  if (!input.value || input.value.length > RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH) return false;
   try {
     const { payload } = await verifyKiloTokenSignature(input.value, input.secret, {
       issuer: RUNTIME_PROXY_ATTESTATION_ISSUER,

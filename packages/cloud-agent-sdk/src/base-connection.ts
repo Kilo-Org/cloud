@@ -69,6 +69,8 @@ export const MAX_RECONNECT_ATTEMPTS = 8;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
 export const DEFAULT_STALENESS_TIMEOUT_MS = 30_000;
+/** How long a resume trigger joins an in-flight auth refresh before starting over. */
+const REFRESH_JOIN_DEADLINE_MS = 15_000;
 
 function calculateBackoffDelay(attempt: number): number {
   const exponentialDelay = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * Math.pow(2, attempt));
@@ -94,7 +96,9 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   let hidden = false;
   let paused = false;
   let hiddenPauseTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  let preconnectAuthRefreshAttempted = false;
+  // Counted, not boolean: an abandoned refresh must not clear the gate that a
+  // newer refresh owns.
+  let preconnectRefreshes = 0;
   // Coalesce successful mutations into one retry budget at a time. A later mutation may
   // request another bounded cycle after that budget exhausts without any inbound event.
   let mutationRecovery: 'idle' | 'pending' | 'active' = 'idle';
@@ -137,12 +141,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
     clearReconnectTimer();
     clearStalenessTimeout();
-    const pausedWs = ws;
-    if (pausedWs !== null) {
-      if (!notifyReplacingConnection()) return;
-      ws = null;
-      pausedWs.close();
-    }
+    if (ws !== null && !closeCurrentSocket()) return;
     if (connected) {
       connected = false;
       config.onDisconnected();
@@ -156,9 +155,29 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
-  function notifyReplacingConnection(expectedGeneration = generation): boolean {
+  // Tell consumers the current route is going away before its socket is dropped.
+  // Callers notify first and then check the gate, so an aborted replacement still
+  // reports the route loss consumers already saw.
+  function notifyReplacingConnection(): void {
     config.onReplacingConnection?.();
+  }
+
+  function isConnectionReplacementAllowed(expectedGeneration = generation): boolean {
     return !destroyed && !intentionalDisconnect && expectedGeneration === generation;
+  }
+
+  // Single owner of the replacement order: notify route loss, then drop the
+  // old socket with its reference cleared first so its onclose is ignored.
+  // Callers decide whether the replacement also reports a disconnection.
+  function closeCurrentSocket(expectedGeneration = generation): boolean {
+    notifyReplacingConnection();
+    if (!isConnectionReplacementAllowed(expectedGeneration)) return false;
+    const staleWs = ws;
+    if (staleWs !== null) {
+      ws = null;
+      staleWs.close();
+    }
+    return true;
   }
 
   async function refreshAuthAndReconnect(expectedGeneration: number) {
@@ -166,7 +185,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       return;
     }
 
-    preconnectAuthRefreshAttempted = true;
+    preconnectRefreshes += 1;
 
     try {
       await config.refreshAuth();
@@ -182,15 +201,29 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       scheduleReconnect(reconnectAttempt, expectedGeneration);
     } finally {
       if (expectedGeneration === generation) {
-        preconnectAuthRefreshAttempted = false;
+        preconnectRefreshes -= 1;
       }
     }
   }
 
-  async function refreshAndConnect(expectedGeneration: number, attempt = 0): Promise<void> {
-    if (paused) return;
-    preconnectAuthRefreshAttempted = true;
+  // One resume can arrive from several triggers at once (NetInfo online, a
+  // visibility resume, a BFCache restore). The first starts the refresh; the
+  // rest join it, so one resume costs one ticket refresh and one socket.
+  type RefreshAttempt = {
+    generation: number;
+    promise: Promise<void>;
+    startedAt: number;
+    /** Cleared once this attempt gives its gate back, so it can never release another's. */
+    holdingGate: boolean;
+  };
+  let inflightRefresh: RefreshAttempt | null = null;
 
+  async function runRefreshAndConnect(
+    expectedGeneration: number,
+    attempt: number,
+    socketBeforeRefresh: WebSocket | null,
+    entry: RefreshAttempt
+  ): Promise<void> {
     try {
       if (config.refreshAuth) {
         try {
@@ -199,6 +232,10 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
           // Continue with existing auth — the old ticket might still work
         }
         if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+        // This attempt was abandoned: a newer one owns the connection state and
+        // its ticket, so opening a socket here would replace the socket that
+        // attempt is opening.
+        if (!entry.holdingGate || inflightRefresh !== entry) return;
         // The async refresh gap can let the in-flight socket finish its
         // handshake and receive its first message. If it did, there is nothing
         // to replace — reconnecting would close a healthy socket and open a
@@ -207,13 +244,63 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         // socket is still CONNECTING, but the socket establishes before the
         // refresh resolves.
         if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
+        // A socket that appeared during the gap belongs to another recovery
+        // path that is already opening it for this generation. Replacing it
+        // would report route loss for a connection this resume never
+        // superseded.
+        if (ws !== null && ws !== socketBeforeRefresh && ws.readyState === WebSocket.CONNECTING)
+          return;
       }
       connectInternal(attempt, expectedGeneration, true);
     } finally {
-      if (expectedGeneration === generation) {
-        preconnectAuthRefreshAttempted = false;
+      // An abandoned attempt already gave its gate back; releasing it again
+      // would open the gate a newer attempt owns.
+      if (entry.holdingGate && expectedGeneration === generation) {
+        entry.holdingGate = false;
+        preconnectRefreshes -= 1;
       }
     }
+  }
+
+  /** Give up the in-flight refresh so the next trigger starts a fresh attempt. */
+  function abandonInflightRefresh(): void {
+    const abandoned = inflightRefresh;
+    if (abandoned === null) return;
+    inflightRefresh = null;
+    if (abandoned.holdingGate) {
+      abandoned.holdingGate = false;
+      preconnectRefreshes -= 1;
+    }
+  }
+
+  function refreshAndConnect(expectedGeneration: number, attempt = 0): Promise<void> {
+    if (paused) return Promise.resolve();
+
+    const joined = inflightRefresh;
+    // A refresh that never settles must not wedge the generation: before this
+    // change every trigger started its own attempt, so a later trigger could
+    // recover from a hung one. Past the window a new trigger starts over.
+    if (
+      joined !== null &&
+      joined.generation === expectedGeneration &&
+      Date.now() - joined.startedAt < REFRESH_JOIN_DEADLINE_MS
+    ) {
+      return joined.promise;
+    }
+    abandonInflightRefresh();
+
+    const entry: RefreshAttempt = {
+      generation: expectedGeneration,
+      promise: Promise.resolve(),
+      startedAt: Date.now(),
+      holdingGate: true,
+    };
+    preconnectRefreshes += 1;
+    inflightRefresh = entry;
+    entry.promise = runRefreshAndConnect(expectedGeneration, attempt, ws, entry).finally(() => {
+      if (inflightRefresh === entry) inflightRefresh = null;
+    });
+    return entry.promise;
   }
 
   function scheduleReconnect(attempt: number, expectedGeneration: number) {
@@ -250,7 +337,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     // A pre-connect refresh is in flight: its completion opens the socket with
     // the refreshed ticket. Connecting now would present the pre-refresh
     // ticket that the refresh is replacing.
-    if (config.refreshAuth && !skipAuthRefresh && preconnectAuthRefreshAttempted) return;
+    if (config.refreshAuth && !skipAuthRefresh && preconnectRefreshes > 0) return;
 
     if (
       config.refreshAuth &&
@@ -269,12 +356,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
     // Close existing socket - clear reference first so onclose ignores it.
     // Notify route loss because onOpen consumers may already have sent commands.
-    const oldWs = ws;
-    if (oldWs !== null) {
-      if (!notifyReplacingConnection(expectedGeneration)) return;
-      ws = null;
-      oldWs.close();
-    }
+    if (ws !== null && !closeCurrentSocket(expectedGeneration)) return;
 
     const url = config.buildUrl();
 
@@ -361,7 +443,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       const isAuthFailure = config.isAuthFailure?.(event) ?? false;
 
       if (isAuthFailure && !authRefreshAttempted && config.refreshAuth) {
-        if (!notifyReplacingConnection(expectedGeneration)) return;
+        notifyReplacingConnection();
+        if (!isConnectionReplacementAllowed(expectedGeneration)) return;
         void refreshAuthAndReconnect(expectedGeneration);
         return;
       }
@@ -370,7 +453,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       // The current physical route is gone even though no new socket follows.
       if (isAuthFailure && authRefreshAttempted) {
         mutationRecovery = 'idle';
-        notifyReplacingConnection(expectedGeneration);
+        notifyReplacingConnection();
         if (exhaustionReason === null) {
           exhaustionReason = 'auth-failure';
           config.onReconnectExhaustionChange?.(true);
@@ -388,17 +471,12 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     };
   }
 
-  // Single owner of the replacement order: notify route loss, close the old
-  // socket, report the disconnection, then re-auth and open a fresh connection.
-  // Callers reset only the state that is specific to their recovery path.
+  // Notify route loss, report the disconnection, then re-auth and open a fresh
+  // connection. Callers reset only the state that is specific to their
+  // recovery path.
   function replaceSocketAndReconnect(expectedGeneration: number): void {
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
-    if (!notifyReplacingConnection(expectedGeneration)) return;
-    const staleWs = ws;
-    if (staleWs !== null) {
-      ws = null;
-      staleWs.close();
-    }
+    if (!closeCurrentSocket(expectedGeneration)) return;
     if (connected) {
       connected = false;
       config.onDisconnected();
@@ -507,7 +585,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     intentionalDisconnect = false;
     destroyed = false;
     authRefreshAttempted = false;
-    preconnectAuthRefreshAttempted = false;
+    preconnectRefreshes = 0;
     mutationRecovery = 'idle';
     connected = false;
     reconnectAttempt = 0;
@@ -515,6 +593,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     hasConnectedOnce = false;
     lastMessageTime = 0;
     generation += 1;
+    // A promise from the previous generation must never be joined by this one.
+    inflightRefresh = null;
     clearReconnectTimer();
     clearStalenessTimeout();
     clearHiddenPause();
@@ -525,7 +605,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   function disconnect() {
     intentionalDisconnect = true;
     generation += 1;
-    preconnectAuthRefreshAttempted = false;
+    preconnectRefreshes = 0;
+    inflightRefresh = null;
     mutationRecovery = 'idle';
 
     clearReconnectTimer();
@@ -560,6 +641,9 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     clearReconnectTimer();
     reconnectAttempt = 0;
     clearExhausted();
+    // An explicit retry is the escape from a refresh that never settled. It
+    // starts a fresh attempt instead of joining the one it is escaping.
+    abandonInflightRefresh();
     void refreshAndConnect(generation);
   }
 
@@ -583,7 +667,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   function destroy() {
     destroyed = true;
     generation += 1;
-    preconnectAuthRefreshAttempted = false;
+    preconnectRefreshes = 0;
+    inflightRefresh = null;
     mutationRecovery = 'idle';
 
     clearReconnectTimer();

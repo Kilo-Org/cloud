@@ -55,6 +55,8 @@ export type RewriteModelResponseParams = {
   customLlmPricing: CustomPricingTiers | null;
   logging: RequestLoggingParams;
   responseTransforms: ProviderResponseTransforms | null;
+  /** Only for the Cloud Agent runtime proxy caller; see `startFirstByteKeepAlive`. */
+  keepAliveUntilFirstByte?: boolean;
 };
 
 type CapturedResponseBody =
@@ -219,6 +221,7 @@ export async function rewriteModelResponse({
   customLlmPricing,
   logging,
   responseTransforms,
+  keepAliveUntilFirstByte,
 }: RewriteModelResponseParams): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, logging, null);
   const usageContext: ResponseUsageContext = {
@@ -242,6 +245,7 @@ export async function rewriteModelResponse({
       reasoningEffort,
       vercelRequestId,
       responseTransforms,
+      keepAliveUntilFirstByte,
     });
   }
   if (kind === 'responses') {
@@ -251,6 +255,7 @@ export async function rewriteModelResponse({
       capture,
       reasoningEffort,
       vercelRequestId,
+      keepAliveUntilFirstByte,
     });
   }
   if (kind === 'messages') {
@@ -260,6 +265,7 @@ export async function rewriteModelResponse({
       capture,
       reasoningEffort,
       vercelRequestId,
+      keepAliveUntilFirstByte,
     });
   }
 

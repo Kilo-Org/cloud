@@ -12,6 +12,10 @@ import type { LocalAgentStorageArea } from './storage';
  */
 
 export const LOCAL_AGENT_CONTROLLERS_STORAGE_KEY = 'session:kiloLocalAgentControllers';
+/** Enough disconnected controllers for every CLI the user could have running at once. */
+const REVOKED_CONTROLLER_LIMIT = 64;
+/** What a disconnected controller's calls answer, with the `user_stopped` code. */
+export const LOCAL_AGENT_DISCONNECTED_MESSAGE = 'The user disconnected this agent.';
 
 export type LocalAgentSessionInput = {
   sessionId: string;
@@ -50,6 +54,9 @@ const controllerSchema = z.object({
 export const localAgentControllersSchema = z
   .object({
     controllers: z.array(controllerSchema).default([]),
+    /* Controllers the user disconnected. The hub announces them again after every
+       reconnect, so they stay refused until their CLI connection ends. */
+    revoked: z.array(z.uuid()).default([]),
   })
   .strip();
 
@@ -57,32 +64,48 @@ export type LocalAgentSession = z.infer<typeof sessionSchema>;
 
 export type LocalAgentController = z.infer<typeof controllerSchema>;
 
+type LocalAgentRegistryState = z.infer<typeof localAgentControllersSchema>;
+
 export type LocalAgentControllerRegistry = {
   listControllers(): Promise<LocalAgentController[]>;
   listConnectedAgents(): Promise<LocalAgentConnectedAgent[]>;
+  /** False, and nothing recorded, for a controller the user disconnected. */
   registerController(input: {
     controllerId: string;
     transport: LocalAgentTransport;
     hubId?: string;
-  }): Promise<void>;
+  }): Promise<boolean>;
+  /** The controller's CLI connection ended: its row goes, and so does any refusal. */
   removeController(controllerId: string): Promise<LocalAgentController | null>;
+  /** The user disconnected the controller: its row goes and it is refused from now on. */
+  revokeController(controllerId: string): Promise<LocalAgentController | null>;
   openSession(
     controllerId: string,
     input: LocalAgentSessionInput
   ): Promise<{ sessionHandle: string }>;
   closeSession(controllerId: string, sessionHandle: string): Promise<boolean>;
+  /** The controller that opened a session; undefined when no row holds that handle. */
+  sessionOwner(sessionHandle: string): Promise<string | undefined>;
   /** Removes every session (and its controller) and reports what was revoked. */
   takeAllSessions(): Promise<{ controllerId: string; sessionHandle: string }[]>;
+};
+
+const loadRegistryState = async (
+  storage: LocalAgentStorageArea
+): Promise<LocalAgentRegistryState> => {
+  const parsed = localAgentControllersSchema.safeParse(
+    await storage.getItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY)
+  );
+
+  return parsed.success ? parsed.data : { controllers: [], revoked: [] };
 };
 
 export const loadLocalAgentControllers = async (
   storage: LocalAgentStorageArea
 ): Promise<LocalAgentController[]> => {
-  const parsed = localAgentControllersSchema.safeParse(
-    await storage.getItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY)
-  );
+  const { controllers } = await loadRegistryState(storage);
 
-  return parsed.success ? parsed.data.controllers : [];
+  return controllers;
 };
 
 const connectedAgentsOf = (controllers: LocalAgentController[]): LocalAgentConnectedAgent[] =>
@@ -125,19 +148,29 @@ export const createLocalAgentControllerRegistry = ({
 }): LocalAgentControllerRegistry => {
   const runExclusive = createSerialTaskQueue();
 
-  const readControllers = (): Promise<LocalAgentController[]> => loadLocalAgentControllers(storage);
-
-  const writeControllers = async (controllers: LocalAgentController[]): Promise<void> => {
-    await storage.setItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, { controllers });
+  const writeState = async (state: LocalAgentRegistryState): Promise<void> => {
+    await storage.setItem(LOCAL_AGENT_CONTROLLERS_STORAGE_KEY, state);
   };
 
-  const listControllers = (): Promise<LocalAgentController[]> => readControllers();
+  /** Drops the controller's row; `refuse` keeps it out until its CLI connection ends. */
+  const dropController = (controllerId: string, refuse: boolean) =>
+    runExclusive(async () => {
+      const state = await loadRegistryState(storage);
+      const revoked = state.revoked.filter(entry => entry !== controllerId);
+
+      await writeState({
+        controllers: state.controllers.filter(entry => entry.controllerId !== controllerId),
+        revoked: refuse ? [...revoked, controllerId].slice(-REVOKED_CONTROLLER_LIMIT) : revoked,
+      });
+
+      return state.controllers.find(entry => entry.controllerId === controllerId) ?? null;
+    });
 
   return {
     closeSession: (controllerId, sessionHandle) =>
       runExclusive(async () => {
-        const controllers = await readControllers();
-        const controller = controllers.find(entry => entry.controllerId === controllerId);
+        const state = await loadRegistryState(storage);
+        const controller = state.controllers.find(entry => entry.controllerId === controllerId);
         const remaining = controller?.sessions.filter(
           session => session.sessionHandle !== sessionHandle
         );
@@ -149,51 +182,63 @@ export const createLocalAgentControllerRegistry = ({
         const closed = remaining.length !== controller.sessions.length;
 
         if (closed) {
-          await writeControllers(
-            controllers.map(entry =>
+          await writeState({
+            ...state,
+            controllers: state.controllers.map(entry =>
               entry.controllerId === controllerId ? replaceSessions(entry, remaining) : entry
-            )
-          );
+            ),
+          });
         }
 
         return closed;
       }),
 
-    listConnectedAgents: async () => connectedAgentsOf(await readControllers()),
+    listConnectedAgents: async () => connectedAgentsOf(await loadLocalAgentControllers(storage)),
 
-    listControllers,
+    listControllers: () => loadLocalAgentControllers(storage),
 
     openSession: (controllerId, input) =>
       runExclusive(async () => {
-        const controllers = await readControllers();
-        const controller = controllers.find(entry => entry.controllerId === controllerId);
+        const state = await loadRegistryState(storage);
+        const controller = state.controllers.find(entry => entry.controllerId === controllerId);
 
         if (controller === undefined) {
-          throw new LocalAgentRpcError(
-            LOCAL_AGENT_ERROR_CODES.blocked,
-            'This controller is not connected.'
-          );
+          throw state.revoked.includes(controllerId)
+            ? new LocalAgentRpcError(
+                LOCAL_AGENT_ERROR_CODES.userStopped,
+                LOCAL_AGENT_DISCONNECTED_MESSAGE
+              )
+            : new LocalAgentRpcError(
+                LOCAL_AGENT_ERROR_CODES.blocked,
+                'This controller is not connected.'
+              );
         }
 
         const sessionHandle = createHandle();
-        await writeControllers(
-          controllers.map(entry =>
+        await writeState({
+          ...state,
+          controllers: state.controllers.map(entry =>
             entry.controllerId === controllerId
               ? replaceSessions(entry, [
                   ...entry.sessions,
                   { ...input, openedAt: now(), sessionHandle },
                 ])
               : entry
-          )
-        );
+          ),
+        });
 
         return { sessionHandle };
       }),
 
     registerController: input =>
       runExclusive(async () => {
-        const controllers = await readControllers();
-        const existing = controllers.find(entry => entry.controllerId === input.controllerId);
+        const state = await loadRegistryState(storage);
+
+        if (state.revoked.includes(input.controllerId)) {
+          return false;
+        }
+
+        const existing = state.controllers.find(entry => entry.controllerId === input.controllerId);
         const next: LocalAgentController = existing ?? {
           connectedAt: now(),
           controllerId: input.controllerId,
@@ -202,37 +247,41 @@ export const createLocalAgentControllerRegistry = ({
           ...(input.hubId === undefined ? {} : { hubId: input.hubId }),
         };
 
-        await writeControllers([
-          ...controllers.filter(entry => entry.controllerId !== input.controllerId),
-          next,
-        ]);
+        await writeState({
+          ...state,
+          controllers: [
+            ...state.controllers.filter(entry => entry.controllerId !== input.controllerId),
+            next,
+          ],
+        });
+
+        return true;
       }),
 
-    removeController: controllerId =>
+    removeController: controllerId => dropController(controllerId, false),
+
+    revokeController: controllerId => dropController(controllerId, true),
+
+    sessionOwner: sessionHandle =>
       runExclusive(async () => {
-        const controllers = await readControllers();
-        const removed = controllers.find(entry => entry.controllerId === controllerId);
+        const controllers = await loadLocalAgentControllers(storage);
 
-        if (removed === undefined) {
-          return null;
-        }
-
-        await writeControllers(controllers.filter(entry => entry.controllerId !== controllerId));
-
-        return removed;
+        return controllers.find(controller =>
+          controller.sessions.some(session => session.sessionHandle === sessionHandle)
+        )?.controllerId;
       }),
 
     takeAllSessions: () =>
       runExclusive(async () => {
-        const controllers = await readControllers();
-        const revoked = controllers.flatMap(controller =>
+        const state = await loadRegistryState(storage);
+        const revoked = state.controllers.flatMap(controller =>
           controller.sessions.map(session => ({
             controllerId: controller.controllerId,
             sessionHandle: session.sessionHandle,
           }))
         );
 
-        await writeControllers([]);
+        await writeState({ ...state, controllers: [] });
 
         return revoked;
       }),

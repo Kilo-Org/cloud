@@ -3697,6 +3697,7 @@
     "lastKnown": "最後已知",
     "awaitingUpdate": "等待更新",
     "nextRun": "下次執行",
+    "wasDue": "原定",
     "waitingForYou": "等待你回應",
     "nextScheduled": "下次排程",
     "answerNeeded": "等待回答",

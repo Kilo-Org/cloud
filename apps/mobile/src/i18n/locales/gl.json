@@ -3697,6 +3697,7 @@
     "lastKnown": "Último estado coñecido",
     "awaitingUpdate": "Agardando actualización",
     "nextRun": "Próxima execución",
+    "wasDue": "Estaba previsto",
     "waitingForYou": "Agardando por ti",
     "nextScheduled": "Próximas tarefas programadas",
     "answerNeeded": "Agardando resposta",

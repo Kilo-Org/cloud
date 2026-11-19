@@ -3817,6 +3817,7 @@
     "lastKnown": "Posledný známy stav",
     "awaitingUpdate": "Čaká na aktualizáciu",
     "nextRun": "Ďalšie spustenie",
+    "wasDue": "Očakávalo sa",
     "waitingForYou": "Čaká na vás",
     "nextScheduled": "Ďalšie naplánované",
     "answerNeeded": "Čaká na odpoveď",

@@ -3697,6 +3697,7 @@
     "lastKnown": "Последно известно",
     "awaitingUpdate": "Изчаква актуализация",
     "nextRun": "Следващо изпълнение",
+    "wasDue": "Очакваше се",
     "waitingForYou": "Очаква ви",
     "nextScheduled": "Следващи планирани",
     "answerNeeded": "Нужен е отговор",

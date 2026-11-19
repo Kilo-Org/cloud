@@ -3697,6 +3697,7 @@
     "lastKnown": "마지막 알려진 상태",
     "awaitingUpdate": "업데이트 대기",
     "nextRun": "다음 실행",
+    "wasDue": "예정이었음",
     "waitingForYou": "사용자 응답 대기",
     "nextScheduled": "다음 예약",
     "answerNeeded": "답변 필요",

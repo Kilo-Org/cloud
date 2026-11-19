@@ -294,6 +294,16 @@ describe('Home-only presentation and timeline', () => {
       primaryCount: 1,
       stale: true,
     });
+    // The update claim is bounded: past the retry deadline the wake stays a
+    // past instant, so the layout names the clock time that was due.
+    const afterRetry = buildGlanceableViewProps(
+      snapshot,
+      {},
+      translate,
+      data,
+      Date.parse(wake) + 16 * 60_000
+    );
+    expect(afterRetry.home).toMatchObject({ scheduledAt: wake, awaitingUpdate: false });
   });
 
   it('omits nested nulls at the UserDefaults boundary, without deleting list entries', () => {

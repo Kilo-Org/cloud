@@ -3697,6 +3697,7 @@
     "lastKnown": "Síðast þekkta staða",
     "awaitingUpdate": "Bíður eftir uppfærslu",
     "nextRun": "Næsta keyrsla",
+    "wasDue": "Átti að vera",
     "waitingForYou": "Bíður eftir þér",
     "nextScheduled": "Næst á dagskrá",
     "answerNeeded": "Bíður eftir svari",

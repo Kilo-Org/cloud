@@ -3697,6 +3697,7 @@
     "lastKnown": "Senast kända",
     "awaitingUpdate": "Väntar på uppdatering",
     "nextRun": "Nästa körning",
+    "wasDue": "Förväntades",
     "waitingForYou": "Väntar på dig",
     "nextScheduled": "Nästa schemalagda",
     "answerNeeded": "Väntar på svar",

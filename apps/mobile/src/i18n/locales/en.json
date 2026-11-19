@@ -3787,6 +3787,7 @@
     "lastKnown": "Last known",
     "awaitingUpdate": "Awaiting update",
     "nextRun": "Next run",
+    "wasDue": "Was due",
     "waitingForYou": "Waiting for you",
     "nextScheduled": "Next scheduled",
     "answerNeeded": "Answer needed",

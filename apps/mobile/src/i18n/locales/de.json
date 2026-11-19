@@ -3697,6 +3697,7 @@
     "lastKnown": "Zuletzt bekannt",
     "awaitingUpdate": "Aktualisierung ausstehend",
     "nextRun": "Nächste Ausführung",
+    "wasDue": "War fällig",
     "waitingForYou": "Wartet auf dich",
     "nextScheduled": "Als Nächstes geplant",
     "answerNeeded": "Antwort erforderlich",

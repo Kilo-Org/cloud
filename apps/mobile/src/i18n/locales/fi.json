@@ -3697,6 +3697,7 @@
     "lastKnown": "Viimeisin tiedossa oleva",
     "awaitingUpdate": "Odottaa päivitystä",
     "nextRun": "Seuraava ajo",
+    "wasDue": "Odotettiin",
     "waitingForYou": "Odottaa sinua",
     "nextScheduled": "Seuraavaksi ajastetut",
     "answerNeeded": "Odottaa vastausta",

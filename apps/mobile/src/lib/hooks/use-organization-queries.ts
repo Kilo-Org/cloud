@@ -126,10 +126,11 @@ export function useOrgParentLink(
   const reportedParentLink = listParentLink ?? membershipParentLink;
   const topLevelConfirmed = membershipParentLink === null;
   const parentLink = reportedParentLink ?? (topLevelConfirmed ? null : undefined);
-  // No membership payload and a failed or paused fetch: the payload that would
-  // settle anything waiting on it will not arrive on its own.
-  const membershipUnavailable =
-    membership.data == null && (membership.isError || membership.isPaused);
+  // No membership payload behind a failed fetch: the payload that would settle
+  // anything waiting on it will not arrive on its own. The read settles while
+  // offline too (`SETTLE_WHILE_OFFLINE`), so `isPaused` is no longer the pause
+  // signal it was; an offline confirmed device reads the failure here.
+  const membershipUnavailable = membership.data == null && membership.isError;
   return { membership, parentLink, membershipUnavailable };
 }
 

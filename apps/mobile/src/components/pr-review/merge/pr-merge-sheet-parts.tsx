@@ -310,9 +310,9 @@ export function MergeSheetFormBody(props: {
           onPress={onDismiss}
           disabled={isMutating}
           className="mt-2"
-          accessibilityLabel={t('common.cancel')}
+          accessibilityLabel={t('common.discard')}
         >
-          <Text>{t('common.cancel')}</Text>
+          <Text>{t('common.discard')}</Text>
         </Button>
       </PrFormSheetFooter>
     </>

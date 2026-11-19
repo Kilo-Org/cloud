@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
+import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { GitLabBranchesFetchError } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
@@ -104,6 +105,17 @@ function githubRefusal(status: number, message = 'GitHub refused the request') {
   return Object.assign(new Error(message), { status });
 }
 
+/** What `githubAppsService.listBranches` throws once its pagination budget trips. */
+function githubListingBudgetTrpcError() {
+  return new TRPCError({
+    code: 'PAYLOAD_TOO_LARGE',
+    message: GITHUB_LISTING_BUDGET_MESSAGE,
+    cause: new GitHubListingBudgetExceededError(
+      'GitHub pagination limit exceeded: branch listing returned more than 100 pages'
+    ),
+  });
+}
+
 describe('listProviderRepositoryBranches (github refusals)', () => {
   const githubIntegration = {
     ...integrationRow,
@@ -127,11 +139,7 @@ describe('listProviderRepositoryBranches (github refusals)', () => {
   });
 
   it('answers a listing past the pagination budget as PAYLOAD_TOO_LARGE', async () => {
-    mockListGitHubBranches.mockRejectedValue(
-      new GitHubListingBudgetExceededError(
-        'GitHub pagination limit exceeded: branch listing returned more than 100 pages'
-      )
-    );
+    mockListGitHubBranches.mockRejectedValue(githubListingBudgetTrpcError());
 
     await expect(
       listProviderRepositoryBranches({
@@ -415,11 +423,9 @@ describe('listProviderRepositoryBranches (organization github installations)', (
   });
 
   it('stops on an oversized listing instead of walking to another installation', async () => {
-    mockListGitHubBranches.mockRejectedValue(
-      new GitHubListingBudgetExceededError(
-        'GitHub pagination limit exceeded: branch listing returned more than 100 pages'
-      )
-    );
+    // The service layer raised this TRPCError, so the walk must not read it as
+    // an unreachable-repository refusal.
+    mockListGitHubBranches.mockRejectedValue(githubListingBudgetTrpcError());
 
     await expect(
       listProviderRepositoryBranches({

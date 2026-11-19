@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TestRenderer } from '@/test/renderer';
 
 import { CHIP_FRAME_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
@@ -528,5 +529,96 @@ describe('ModelSelector pill touch target', () => {
     expect(slop).not.toHaveProperty('right');
 
     renderer.unmount();
+  });
+});
+
+// A chip whose whole catalog was unavailable disabled itself and returned
+// before opening the picker, so the per-model reason only the sheet carries was
+// unreachable. The chip stays pressable and states the reason itself.
+describe('ModelSelector chip availability disclosure', () => {
+  function chip(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+    const [pressable] = renderer.root.findAllByType('Pressable');
+    if (!pressable) {
+      throw new Error('model chip not found');
+    }
+    return pressable;
+  }
+
+  it('keeps an every-unavailable chip pressable and opens the picker', () => {
+    routerPush.mockClear();
+    const option = cliCatalogOption({ unavailable: true });
+    const renderer = renderSelector({ value: option.id, options: [option] });
+    const pill = chip(renderer);
+
+    expect(pill.props.disabled).toBe(false);
+    expect(pill.props.accessibilityState).toEqual({ disabled: false });
+    expect(String(pill.props.accessibilityLabel)).toContain(
+      i18n.t('agentChat.modelSelector.unavailable')
+    );
+
+    TestRenderer.act(() => {
+      const press = pill.props.onPress as (() => void) | undefined;
+      press?.();
+    });
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a chip with no options disabled, so it never opens a blank picker', () => {
+    routerPush.mockClear();
+    const renderer = renderSelector({ value: 'missing-model', options: [] });
+    const pill = chip(renderer);
+
+    expect(pill.props.disabled).toBe(true);
+    expect(pill.props.accessibilityState).toEqual({ disabled: true });
+
+    TestRenderer.act(() => {
+      const press = pill.props.onPress as (() => void) | undefined;
+      press?.();
+    });
+
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it('reads a locked chip as one sentence with the lock reason', () => {
+    const option = cliCatalogOption();
+    const renderer = renderSelector({
+      value: option.id,
+      options: [option],
+      disabled: true,
+      lockLabel: 'Reviewer',
+    });
+    const label = String(chip(renderer).props.accessibilityLabel);
+    const lockedSentence = i18n.t('agentChat.modelSelector.lockedByAgent', { agent: 'Reviewer' });
+
+    expect(label).toBe(`${option.name}${i18n.t('common.sentenceJoiner')}${lockedSentence}`);
+  });
+
+  it('states availability for the model the chip names, not for the whole catalog', () => {
+    const unavailable = cliCatalogOption({ id: 'remote-model-gone', unavailable: true });
+    const available = cliCatalogOption({ id: 'remote-model-here' });
+    const mixed = renderSelector({ value: available.id, options: [unavailable, available] });
+    expect(String(chip(mixed).props.accessibilityLabel)).not.toContain(
+      i18n.t('agentChat.modelSelector.unavailable')
+    );
+
+    const selectedGone = renderSelector({
+      value: unavailable.id,
+      options: [unavailable, available],
+    });
+    expect(String(chip(selectedGone).props.accessibilityLabel)).toContain(
+      i18n.t('agentChat.modelSelector.unavailable')
+    );
+    expect(chip(selectedGone).props.disabled).toBe(false);
+  });
+
+  it('joins the model name and BYOK through the active locale list format', async () => {
+    await i18n.changeLanguage('de');
+    const option = cliCatalogOption({ hasUserByokAvailable: true });
+    const renderer = renderSelector({ value: option.id, options: [option] });
+    const label = String(chip(renderer).props.accessibilityLabel);
+
+    expect(label).toBe(formatList([option.name, BYOK_MODEL_LABEL], i18n.language));
+    expect(label).not.toContain(', ');
   });
 });

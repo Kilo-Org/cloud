@@ -127,6 +127,7 @@ vi.mock('@/lib/organization-context', () => ({
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ org: route.org }),
+  usePathname: () => '/organization/credit-activity',
   useRouter: () => route,
   useNavigation: () => navigation,
 }));

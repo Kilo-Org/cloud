@@ -313,7 +313,7 @@ export function PrDiffFileNavigator({
       <EmptyState
         icon={Search}
         title={t('prReview.noFilesChanged')}
-        description={t('prReview.noFilesChangedDescription')}
+        description={copy.noChangesDescription ?? t('prReview.noFilesChangedDescription')}
       />
     );
   } else if (filtered.length === 0) {

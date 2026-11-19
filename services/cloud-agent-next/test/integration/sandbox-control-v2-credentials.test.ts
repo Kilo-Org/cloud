@@ -2142,11 +2142,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
     };
     await runInDurableObject(stub, instance => {
-      const peerFor = instance.sessionPeerFor.bind(instance);
-      instance.sessionPeerFor = (ownerId, sessionId) => {
-        const peer = peerFor(ownerId, sessionId);
-        return peer ? { ...peer, issueCloudAgentMcpGrant: async () => mcpGrant } : null;
-      };
+      instance.cloudAgentMcpGrantFor = async () => mcpGrant;
     });
     const { wrapper } = await prepareWarmRoute(stub, provider);
     await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
@@ -2157,6 +2153,80 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(frame).toMatchObject({ type: 'session.credentials', cloudAgentMcp: mcpGrant });
     expect((await wrapper.next())?.type).toBe('session.prompt');
     expect(JSON.stringify(await readRouteRow(stub, SESSION))).not.toContain(mcpGrant.token);
+  });
+
+  it('does not ask for an MCP credential before prompts of a non-interactive workspace', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    const issueMcpGrant = vi.fn(async () => undefined);
+    await runInDurableObject(stub, instance => {
+      instance.cloudAgentMcpGrantFor = issueMcpGrant;
+    });
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    const atPrepare = issueMcpGrant.mock.calls.length;
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(issueMcpGrant).toHaveBeenCalledTimes(atPrepare);
+  });
+
+  it('offers a renewed workspace MCP credential before a prompt without re-issuing the route grant', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const expiring = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'expiring-workspace-mcp-grant',
+      expiresAt: nowSeconds + 60,
+    };
+    const renewed = {
+      ...expiring,
+      token: 'renewed-workspace-mcp-grant',
+      expiresAt: nowSeconds + 24 * 3600,
+    };
+    let current: typeof expiring | undefined = expiring;
+    const issueMcpGrant = vi.fn(async () => current);
+    await runInDurableObject(stub, instance => {
+      instance.cloudAgentMcpGrantFor = issueMcpGrant;
+    });
+    const { wrapper, prepareFrame } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, { ...credentialsSource(SESSION), createdOnPlatform: 'cloud-agent-web' })
+    );
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(prepareFrame.credentials?.cloudAgentMcp).toEqual(expiring);
+    const issuedBefore = broker.githubIssued();
+
+    // The workspace authority is unavailable: the prompt is delivered without a credentials frame.
+    current = undefined;
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+
+    // The owner renewed the workspace: the next prompt carries the new credential first.
+    current = renewed;
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
+      'sent'
+    );
+    expect(await wrapper.next()).toMatchObject({
+      type: 'session.credentials',
+      sessionId: SESSION,
+      cloudAgentMcp: renewed,
+    });
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(broker.githubIssued()).toBe(issuedBefore);
+
+    // A current credential is not offered again.
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m3')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(issueMcpGrant).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(await readRouteRow(stub, SESSION))).not.toContain(renewed.token);
   });
 
   it.each(['rejection', 'timeout'] as const)(
@@ -2181,11 +2251,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
       try {
         await runInDurableObject(stub, instance => {
-          const peerFor = instance.sessionPeerFor.bind(instance);
-          instance.sessionPeerFor = (ownerId, sessionId) => {
-            const peer = peerFor(ownerId, sessionId);
-            return peer ? { ...peer, issueCloudAgentMcpGrant: issueMcpGrant } : null;
-          };
+          instance.cloudAgentMcpGrantFor = issueMcpGrant;
           Object.assign(instance, { grantIssueTimeoutMs: () => 100 });
         });
         await setGrantExpiry(stub, SESSION, Date.now() - 1);
@@ -2209,7 +2275,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
         expect(fields).toHaveBeenCalledWith({
           sandboxId: SANDBOX_ID,
           sessionId: SESSION,
-          anchorSessionId: SESSION,
+          workspaceSessionId: SESSION,
         });
         expect(warn).toHaveBeenCalledWith(
           'Optional Cloud Agent MCP grant unavailable; continuing without it'

@@ -70,7 +70,6 @@ const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
 export const DEFAULT_STALENESS_TIMEOUT_MS = 30_000;
 
-// min(cap, base * 2^attempt) * (0.5 + random jitter)
 function calculateBackoffDelay(attempt: number): number {
   const exponentialDelay = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * Math.pow(2, attempt));
   const jitter = 0.5 + Math.random();
@@ -180,7 +179,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       console.error('[Connection] Failed to refresh auth:', err);
       if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
       config.onUnexpectedDisconnect?.();
-      scheduleReconnect(0, expectedGeneration);
+      scheduleReconnect(reconnectAttempt, expectedGeneration);
     } finally {
       if (expectedGeneration === generation) {
         preconnectAuthRefreshAttempted = false;
@@ -248,11 +247,15 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   function connectInternal(attempt = 0, expectedGeneration = generation, skipAuthRefresh = false) {
     if (destroyed || intentionalDisconnect || paused || expectedGeneration !== generation) return;
 
+    // A pre-connect refresh is in flight: its completion opens the socket with
+    // the refreshed ticket. Connecting now would present the pre-refresh
+    // ticket that the refresh is replacing.
+    if (config.refreshAuth && !skipAuthRefresh && preconnectAuthRefreshAttempted) return;
+
     if (
       config.refreshAuth &&
       (config.shouldRefreshAuthBeforeConnect?.() ?? false) &&
-      !skipAuthRefresh &&
-      !preconnectAuthRefreshAttempted
+      !skipAuthRefresh
     ) {
       void refreshAndConnect(expectedGeneration, attempt);
       return;

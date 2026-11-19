@@ -57,9 +57,14 @@ function renderHeader(
   return renderer;
 }
 
-/** The header's text lines, in the order the heading renders them. */
+/**
+ * The header's text lines, in the order the heading renders them. The heading
+ * only: the leading column lays a zero-ink twin of the subtitle line beside the
+ * title, and that twin is not a line any reader sees.
+ */
 function headerLines(renderer: TestRenderer.ReactTestRenderer): string[] {
   return renderer.root
+    .findByProps({ className: 'min-w-0 flex-1' })
     .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
     .map(node => String(node.props.children));
 }

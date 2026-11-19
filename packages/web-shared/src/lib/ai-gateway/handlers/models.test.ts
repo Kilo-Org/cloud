@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
 import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';

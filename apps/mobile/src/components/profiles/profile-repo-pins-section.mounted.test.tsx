@@ -3,6 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
+import {
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_FRAME_DP,
+  SECTION_ACTION_HIT_SLOP,
+  SECTION_ACTION_HIT_SLOP_DP,
+  SECTION_ACTION_ROW_CANCEL_CLASS,
+  SECTION_HEADER_ROW_PADDING_CLASS,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -68,7 +78,6 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -96,16 +105,6 @@ function pressPressable(root: ReactTestInstance, label: string): void {
   }
   act(() => {
     (pressable.props as { onPress: () => void }).onPress();
-  });
-}
-
-function pressButton(root: ReactTestInstance, label: string): void {
-  const button = findAll(root, 'Button').find(node => node.props.accessibilityLabel === label);
-  if (!button) {
-    throw new Error(`button ${label} was not rendered`);
-  }
-  act(() => {
-    (button.props as { onPress: () => void }).onPress();
   });
 }
 
@@ -209,7 +208,7 @@ describe('ProfileRepoPinsSection', () => {
 
     const { renderer, unmount } = await mountSection();
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
-    pressButton(renderer.root, 'Pin a repo');
+    pressPressable(renderer.root, 'Pin a repo');
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
     pressPressable(renderer.root, 'acme/infra');
 
@@ -222,6 +221,49 @@ describe('ProfileRepoPinsSection', () => {
 
     unmount();
   });
+
+  it('compact: the pin action renders on the section box inside a row that cancels its height', async () => {
+    Object.assign(h.bindingsQuery, { isLoading: false });
+
+    const { renderer, unmount } = await mountSection();
+
+    const action = findAll(renderer.root, 'Pressable').find(
+      node => node.props.accessibilityLabel === 'Pin a repo'
+    );
+    if (!action) {
+      throw new Error('the pin action was not rendered');
+    }
+    const actionClasses = String(action.props.className).split(/\s+/);
+    for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
+      expect(actionClasses).toContain(token);
+    }
+    expect(action.props.hitSlop).toEqual(SECTION_ACTION_HIT_SLOP);
+    expect(action.props.accessibilityState).toEqual({ disabled: false });
+
+    const headerRow = findAll(renderer.root, 'View').find(node =>
+      String(node.props.className).includes(SECTION_HEADER_ROW_PADDING_CLASS)
+    );
+    if (!headerRow) {
+      throw new Error('the header row was not rendered');
+    }
+    const rowClasses = String(headerRow.props.className).split(/\s+/);
+    for (const token of [
+      ...SECTION_HEADER_ROW_PADDING_CLASS.split(' '),
+      ...SECTION_ACTION_ROW_CANCEL_CLASS.split(' '),
+    ]) {
+      expect(rowClasses).toContain(token);
+    }
+
+    // The row gives back exactly what it reserves, so its bounds cannot drift
+    // from the slop they hold.
+    expect(SECTION_ACTION_ROW_CANCEL_CLASS).toBe(`-my-[${SECTION_ACTION_HIT_SLOP_DP}px]`);
+    expect(
+      tapTargetReachDp(SECTION_ACTION_FRAME_DP, SECTION_ACTION_HIT_SLOP_DP)
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+
+    unmount();
+  });
+
   it('names each pinned row and its own unbind control', async () => {
     Object.assign(h.bindingsQuery, {
       isLoading: false,
@@ -248,11 +290,12 @@ describe('ProfileRepoPinsSection', () => {
         .filter(node => node.props.accessibilityRole === 'text' && node.props.accessible === true)
         .map(node => node.props.accessibilityLabel)
     ).toEqual(['acme/api, GitHub', 'acme/infra, GitLab']);
+    // The header's own action leads the rows it sits above.
     expect(
       findAll(renderer.root, 'Pressable')
         .filter(node => node.props.accessibilityRole === 'button')
         .map(node => node.props.accessibilityLabel)
-    ).toEqual(['Unbind acme/api', 'Unbind acme/infra']);
+    ).toEqual(['Pin a repo', 'Unbind acme/api', 'Unbind acme/infra']);
 
     unmount();
   });
@@ -273,12 +316,9 @@ describe('ProfileRepoPinsSection', () => {
     const { renderer, unmount } = await mountSection('org-1', false);
 
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain('acme/api');
-    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
     expect(
-      findAll(renderer.root, 'Pressable').some(node =>
-        String(node.props.accessibilityLabel).startsWith('Unbind ')
-      )
-    ).toBe(false);
+      findAll(renderer.root, 'Pressable').filter(node => node.props.accessibilityRole === 'button')
+    ).toHaveLength(0);
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
 
     unmount();

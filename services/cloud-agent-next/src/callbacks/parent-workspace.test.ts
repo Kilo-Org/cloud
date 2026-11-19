@@ -11,16 +11,18 @@ import {
 } from './parent-workspace.js';
 import type { CallbackJob } from './types.js';
 
-const { getMetadata, assertAccess, authorizeSibling, createSession } = vi.hoisted(() => ({
+const { getMetadata, describeWorkspace, authorizeChat, createSession } = vi.hoisted(() => ({
   getMetadata: vi.fn(),
-  assertAccess: vi.fn(),
-  authorizeSibling: vi.fn(),
+  describeWorkspace: vi.fn(),
+  authorizeChat: vi.fn(),
   createSession: vi.fn(),
 }));
 vi.mock('../session/metadata.js', () => ({ fetchSessionMetadata: getMetadata }));
-vi.mock('../session-access.js', () => ({ requireCurrentSessionAccess: assertAccess }));
-vi.mock('../sandbox-session/session-stub.js', () => ({
-  getSandboxSessionStub: () => ({ authorizeCloudAgentWorkspaceSibling: authorizeSibling }),
+vi.mock('../control-plane/workspace/workspace-stub.js', () => ({
+  getWorkspaceStub: (_env: unknown, owner: string, workspaceSessionId: string) =>
+    owner === userId && workspaceSessionId === parentId
+      ? { describe: describeWorkspace, authorizeChat }
+      : { describe: async () => ({ state: 'unestablished' }), authorizeChat },
 }));
 vi.mock('../router/handlers/session-worktree.js', () => ({
   createWorkspaceCallbackSession: createSession,
@@ -29,10 +31,9 @@ vi.mock('../router/handlers/session-worktree.js', () => ({
 const env = {} as Env;
 const userId = 'oauth/owner';
 const childId = 'workspace_child';
-const parentId = 'workspace_parent';
-const worktreeId = 'worktree_parent';
+const parentId = 'workspace_12345678-1234-4234-8234-123456789abc';
+const worktreeId = 'worktree_12345678-1234-4234-8234-123456789abc';
 let child: SessionMetadata;
-let parent: SessionMetadata;
 let job: CallbackJob;
 
 beforeEach(() => {
@@ -43,14 +44,6 @@ beforeEach(() => {
     parentCloudAgentSessionId: parentId,
     auth: { kiloSessionId: 'ses_child' },
     lifecycle: { version: 1, timestamp: 1 },
-  };
-  parent = {
-    ...child,
-    identity: { userId, sessionId: parentId, orgId: 'org' },
-    auth: { kiloSessionId: 'ses_parent' },
-    parentCloudAgentSessionId: undefined,
-    allowSubagentSessions: true,
-    workspace: { worktreeId },
   };
   job = {
     target: { url: 'workspace:new-chat' },
@@ -65,16 +58,20 @@ beforeEach(() => {
     },
   };
   getMetadata.mockImplementation(async (_env, owner, sessionId) =>
-    owner === userId
-      ? sessionId === childId
-        ? child
-        : sessionId === parentId
-          ? parent
-          : null
-      : null
+    owner === userId && sessionId === childId ? child : null
   );
-  assertAccess.mockReset().mockResolvedValue(undefined);
-  authorizeSibling.mockReset().mockResolvedValue({ token: 'sibling-token', seal: 'sibling-seal' });
+  describeWorkspace.mockReset().mockResolvedValue({
+    state: 'active',
+    authorizationId: '32345678-1234-4234-8234-123456789abc',
+    worktreeId,
+    organizationId: 'org',
+  });
+  authorizeChat.mockReset().mockResolvedValue({
+    token: 'sibling-token',
+    seal: 'sibling-seal',
+    worktreeId,
+    organizationId: 'org',
+  });
   createSession.mockReset().mockImplementation(async input => ({
     cloudAgentSessionId: input.runtimeAuthorization
       ? (await callbackWorkspaceSessionIds(userId, job.payload, job.parentSession!.messageId))
@@ -93,7 +90,7 @@ describe('parent workspace callback delivery', () => {
       job.parentSession!.messageId
     );
     expect(await deliverParentWorkspaceCallback(env, job, 1)).toEqual({ type: 'success' });
-    expect(authorizeSibling).toHaveBeenCalledWith({ siblingSessionId: ids.siblingSessionId });
+    expect(authorizeChat).toHaveBeenCalledWith({ chatSessionId: ids.siblingSessionId });
     const [input] = createSession.mock.calls[0];
     expect(input).toMatchObject({
       userId,
@@ -110,13 +107,7 @@ describe('parent workspace callback delivery', () => {
       status: 'completed',
       result: 'Child result',
     });
-    expect(assertAccess).toHaveBeenCalledWith({
-      env,
-      kiloUserId: userId,
-      cloudAgentSessionId: parentId,
-      expectedOrganizationId: 'org',
-      expectedKiloSessionId: 'ses_parent',
-    });
+    expect(getMetadata).not.toHaveBeenCalledWith(env, userId, parentId);
   });
 
   it('keeps the operation and destination identity stable across queue retries', async () => {
@@ -138,22 +129,32 @@ describe('parent workspace callback delivery', () => {
   it.each([
     'missing lineage',
     'self',
-    'owner',
+    'another workspace',
     'organization',
-    'disabled',
-    'not anchor',
-    'no workspace',
-  ])('does not create a chat with invalid parent routing: %s', async condition => {
+    'unestablished',
+    'revoked',
+    'deleted',
+    'no worktree',
+  ])('does not create a chat with invalid workspace routing: %s', async condition => {
+    const described = await describeWorkspace();
     if (condition === 'missing lineage') delete child.parentCloudAgentSessionId;
     if (condition === 'self') child.parentCloudAgentSessionId = childId;
-    if (condition === 'owner') parent.identity.userId = 'another-user';
-    if (condition === 'organization') parent.identity.orgId = 'another-org';
-    if (condition === 'disabled') parent.allowSubagentSessions = false;
-    if (condition === 'not anchor') parent.workspace = { worktreeId: 'worktree_other' };
-    if (condition === 'no workspace') parent.workspace = undefined;
+    if (condition === 'another workspace')
+      child.parentCloudAgentSessionId = 'workspace_22345678-1234-4234-8234-123456789abc';
+    if (condition === 'organization') described.organizationId = 'another-org';
+    if (condition === 'unestablished' || condition === 'revoked' || condition === 'deleted') {
+      described.state = condition;
+    }
+    if (condition === 'no worktree') described.worktreeId = null;
+    describeWorkspace.mockResolvedValue(described);
     expect(await deliverParentWorkspaceCallback(env, job, 1)).toMatchObject({ type: 'failed' });
-    expect(authorizeSibling).not.toHaveBeenCalled();
+    expect(authorizeChat).not.toHaveBeenCalled();
     expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it('creates the chat after the chat that created the workspace was deleted', async () => {
+    expect(await deliverParentWorkspaceCallback(env, job, 1)).toEqual({ type: 'success' });
+    expect(createSession).toHaveBeenCalledOnce();
   });
 
   it('rejects callbacks without server-owned routing context', async () => {
@@ -162,14 +163,8 @@ describe('parent workspace callback delivery', () => {
     expect(getMetadata).not.toHaveBeenCalled();
   });
 
-  it('does not create a chat after access is revoked', async () => {
-    assertAccess.mockRejectedValue(new TRPCError({ code: 'FORBIDDEN' }));
-    expect(await deliverParentWorkspaceCallback(env, job, 1)).toMatchObject({ type: 'failed' });
-    expect(createSession).not.toHaveBeenCalled();
-  });
-
-  it('does not retry a revoked parent authority denial', async () => {
-    authorizeSibling.mockRejectedValue(new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED));
+  it('does not retry a revoked workspace authority denial', async () => {
+    authorizeChat.mockRejectedValue(new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED));
     expect(await deliverParentWorkspaceCallback(env, job, 1)).toMatchObject({ type: 'failed' });
     expect(createSession).not.toHaveBeenCalled();
   });

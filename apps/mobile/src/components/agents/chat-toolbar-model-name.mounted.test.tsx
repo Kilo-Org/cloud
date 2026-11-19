@@ -243,7 +243,11 @@ describe('ChatToolbar chip for a model the CLI catalogue cannot name', () => {
     const options = reportedRemoteOptions();
     const renderer = renderToolbar('remote-unavailable-model', options);
 
-    const modelChip = findPressable(renderer, label => label === 'DeepSeek V4.1 Flash 1017');
+    // The chip names the catalogue's model and states that it is unavailable;
+    // what matters here is that the raw reference never appears.
+    const modelChip = findPressable(renderer, label =>
+      label.startsWith('DeepSeek V4.1 Flash 1017')
+    );
     expect(modelChip).toBeDefined();
 
     const rawReference = renderer.root.findAll(

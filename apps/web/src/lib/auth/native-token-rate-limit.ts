@@ -59,9 +59,6 @@ export async function isNativeTokenAddressRateLimited(request: Request): Promise
     request,
     rateLimitKey: `${ADDRESS_RATE_LIMIT_ID}:${address}`,
   });
-  // Only a "not rate limited" answer permits the exchange. A rule that is not
-  // configured, or an answer the firewall blocks, refuses here, before the
-  // admission gate and its provider calls.
   if (error) {
     reportAddressRuleIssue(error);
     return true;

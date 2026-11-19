@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { formatClockTime } from '@/lib/format';
 import { act, TestRenderer } from '@/test/renderer';
 import { ScheduleSettings } from './briefing-schedule-settings';
 
@@ -10,7 +11,8 @@ vi.mock('react-native', () => ({ View: 'View', Platform: { OS: 'android' } }));
 vi.mock('@expo/ui/community/datetime-picker', () => ({ DateTimePicker: 'NativeDateTimePicker' }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string, values?: Record<string, unknown>) =>
+      values === undefined ? key : `${key}:${JSON.stringify(values)}`,
     i18n: { language: 'de', resolvedLanguage: 'de' },
   }),
 }));
@@ -141,6 +143,27 @@ describe('briefing schedule time rows', () => {
 });
 
 describe('briefing schedule validation', () => {
+  it('builds the time button name from one formatted value in the active language', () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles');
+    const renderer = mount();
+    press(row(renderer, 1));
+    choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 22, 0));
+    const label = row(renderer, 1).props.accessibilityLabel as string;
+    // The name interpolates the same formatted clock the row shows, in the
+    // picker's own locale convention.
+    const clock = formatClockTime(new Date(2000, 0, 1, 22, 0), 'de');
+    expect(label).toBe(
+      `agentBriefing.scheduleTimeLabel:${JSON.stringify({
+        label: 'agentBriefing.nightStart',
+        time: clock,
+      })}`
+    );
+    expect(renderedTexts(renderer)).toContain(clock);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('shows the time zone error inline and sends no mutation', () => {
     const renderer = mount();
     edit(first(renderer, 'FormField'), 'Mitteleuropa/Berlin');

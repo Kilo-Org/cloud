@@ -19,7 +19,9 @@
     "presenceStatus": "ჰოსტები: {{connection}}",
     "commandStatus": "ბრძანების მიწოდება: {{status}}",
     "delivered": "მიწოდებულია",
-    "expired": "ვადაგასულია"
+    "expired": "ვადაგასულია",
+    "recoveryGaps_one": "ამ ტრანსკრიპტის {{displayCount}} ნაწილი აკლია.",
+    "recoveryGaps_other": "ამ ტრანსკრიპტის {{displayCount}} ნაწილი აკლია."
   },
   "common": {
     "manageOnWeb": "ვებში მართვა",

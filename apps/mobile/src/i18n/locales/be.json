@@ -19,7 +19,11 @@
     "presenceStatus": "Хосты: {{connection}}",
     "commandStatus": "Дастаўка каманды: {{status}}",
     "delivered": "Дастаўлена",
-    "expired": "Тэрмін дзеяння скончыўся"
+    "expired": "Тэрмін дзеяння скончыўся",
+    "recoveryGaps_one": "{{displayCount}} частка гэтага транскрыпту адсутнічае.",
+    "recoveryGaps_few": "{{displayCount}} часткі гэтага транскрыпту адсутнічаюць.",
+    "recoveryGaps_many": "{{displayCount}} частак гэтага транскрыпту адсутнічае.",
+    "recoveryGaps_other": "{{displayCount}} часткі гэтага транскрыпту адсутнічаюць."
   },
   "common": {
     "manageOnWeb": "Кіраваць у вэб-версіі",

@@ -19,7 +19,9 @@
     "presenceStatus": "ഹോസ്റ്റുകൾ: {{connection}}",
     "commandStatus": "കമാൻഡ് ഡെലിവറി: {{status}}",
     "delivered": "ഡെലിവർ ചെയ്തു",
-    "expired": "കാലഹരണപ്പെട്ടു"
+    "expired": "കാലഹരണപ്പെട്ടു",
+    "recoveryGaps_one": "ഈ ട്രാൻസ്ക്രിപ്റ്റിന്റെ {{displayCount}} ഭാഗം കാണുന്നില്ല.",
+    "recoveryGaps_other": "ഈ ട്രാൻസ്ക്രിപ്റ്റിന്റെ {{displayCount}} ഭാഗങ്ങൾ കാണുന്നില്ല."
   },
   "common": {
     "manageOnWeb": "വെബിൽ നിയന്ത്രിക്കുക",

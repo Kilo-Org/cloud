@@ -19,7 +19,9 @@
     "presenceStatus": "Verter: {{connection}}",
     "commandStatus": "Kommandolevering: {{status}}",
     "delivered": "Levert",
-    "expired": "Utløpt"
+    "expired": "Utløpt",
+    "recoveryGaps_one": "{{displayCount}} del av denne transkripsjonen mangler.",
+    "recoveryGaps_other": "{{displayCount}} deler av denne transkripsjonen mangler."
   },
   "common": {
     "manageOnWeb": "Administrer på nettet",

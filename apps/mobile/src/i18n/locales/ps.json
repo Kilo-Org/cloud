@@ -19,7 +19,9 @@
     "presenceStatus": "کوربه‌ګان: {{connection}}",
     "commandStatus": "د قوماندې رسول: {{status}}",
     "delivered": "ورسول شو",
-    "expired": "مهلت یې تېر شو"
+    "expired": "مهلت یې تېر شو",
+    "recoveryGaps_one": "{{displayCount}} برخه د دې لیکنې ورکه ده.",
+    "recoveryGaps_other": "{{displayCount}} برخې د دې لیکنې ورکې دي."
   },
   "common": {
     "manageOnWeb": "په ویب کې یې اداره کړئ",

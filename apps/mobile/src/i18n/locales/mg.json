@@ -19,7 +19,9 @@
     "presenceStatus": "Milina: {{connection}}",
     "commandStatus": "Fanaterana baiko: {{status}}",
     "delivered": "Voatolotra",
-    "expired": "Lany fe-potoana"
+    "expired": "Lany fe-potoana",
+    "recoveryGaps_one": "Misy ampahany {{displayCount}} amin'ity fandikana ity tsy hita.",
+    "recoveryGaps_other": "Misy ampahany {{displayCount}} amin'ity fandikana ity tsy hita."
   },
   "common": {
     "manageOnWeb": "Tantano amin'ny tranonkala",

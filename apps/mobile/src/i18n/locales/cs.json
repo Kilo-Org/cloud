@@ -19,7 +19,11 @@
     "presenceStatus": "Hostitelé: {{connection}}",
     "commandStatus": "Doručení příkazu: {{status}}",
     "delivered": "Doručeno",
-    "expired": "Platnost vypršela"
+    "expired": "Platnost vypršela",
+    "recoveryGaps_one": "Chybí {{displayCount}} část tohoto přepisu.",
+    "recoveryGaps_few": "Chybí {{displayCount}} části tohoto přepisu.",
+    "recoveryGaps_many": "Chybí {{displayCount}} částí tohoto přepisu.",
+    "recoveryGaps_other": "Chybí {{displayCount}} části tohoto přepisu."
   },
   "common": {
     "manageOnWeb": "Spravovat na webu",

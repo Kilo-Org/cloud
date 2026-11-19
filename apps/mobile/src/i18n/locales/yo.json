@@ -19,7 +19,9 @@
     "presenceStatus": "Àwọn ẹ̀rọ agbàlejò: {{connection}}",
     "commandStatus": "Ìfiránṣẹ́ àṣẹ: {{status}}",
     "delivered": "Ti dé",
-    "expired": "Àkókò ti kọjá"
+    "expired": "Àkókò ti kọjá",
+    "recoveryGaps_one": "Ẹ̀yà {{displayCount}} nínú àkọsílẹ̀ yìí kò sí.",
+    "recoveryGaps_other": "Ẹ̀yà {{displayCount}} nínú àkọsílẹ̀ yìí kò sí."
   },
   "common": {
     "manageOnWeb": "Ṣàkóso lórí wẹ́ẹ̀bù",

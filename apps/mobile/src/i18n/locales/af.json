@@ -19,7 +19,9 @@
     "presenceStatus": "Gashere: {{connection}}",
     "commandStatus": "Bevelaflewering: {{status}}",
     "delivered": "Afgelewer",
-    "expired": "Verval"
+    "expired": "Verval",
+    "recoveryGaps_one": "{{displayCount}} deel van hierdie transkripsie ontbreek.",
+    "recoveryGaps_other": "{{displayCount}} dele van hierdie transkripsie ontbreek."
   },
   "common": {
     "manageOnWeb": "Bestuur op die web",

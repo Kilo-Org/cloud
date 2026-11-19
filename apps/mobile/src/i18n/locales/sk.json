@@ -19,7 +19,11 @@
     "presenceStatus": "Hostitelia: {{connection}}",
     "commandStatus": "Doručenie príkazu: {{status}}",
     "delivered": "Doručené",
-    "expired": "Platnosť vypršala"
+    "expired": "Platnosť vypršala",
+    "recoveryGaps_one": "Chýba {{displayCount}} časť tohto prepisu.",
+    "recoveryGaps_few": "Chýbajú {{displayCount}} časti tohto prepisu.",
+    "recoveryGaps_many": "Chýba {{displayCount}} častí tohto prepisu.",
+    "recoveryGaps_other": "Chýbajú {{displayCount}} časti tohto prepisu."
   },
   "common": {
     "manageOnWeb": "Spravovať na webe",

@@ -19,7 +19,11 @@
     "presenceStatus": "Hosty: {{connection}}",
     "commandStatus": "Dostarczenie polecenia: {{status}}",
     "delivered": "Dostarczono",
-    "expired": "Wygasło"
+    "expired": "Wygasło",
+    "recoveryGaps_one": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_few": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_many": "Brakuje {{displayCount}} części tego transkryptu.",
+    "recoveryGaps_other": "Brakuje {{displayCount}} części tego transkryptu."
   },
   "common": {
     "manageOnWeb": "Zarządzaj w przeglądarce",

@@ -19,7 +19,9 @@
     "presenceStatus": "Xostlar: {{connection}}",
     "commandStatus": "Buyruq yetkazilishi: {{status}}",
     "delivered": "Yetkazildi",
-    "expired": "Muddati tugagan"
+    "expired": "Muddati tugagan",
+    "recoveryGaps_one": "Ushbu transkriptning {{displayCount}} qismi yo'q.",
+    "recoveryGaps_other": "Ushbu transkriptning {{displayCount}} qismi yo'q."
   },
   "common": {
     "manageOnWeb": "Vebda boshqarish",

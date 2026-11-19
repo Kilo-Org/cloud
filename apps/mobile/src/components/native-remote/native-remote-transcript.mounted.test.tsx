@@ -86,9 +86,71 @@ it('reuses MessageBubble for files/tools/errors and keeps empty, incomplete and 
       messages: readySession.messages.map(item => ({ ...item, incomplete: true })),
     })
   );
-  expect(text(renderer.root)).toContain('Native transcript recovery is incomplete');
+  // A missing part reads as a localized gap banner, never as a raw id list.
+  expect(text(renderer.root)).toContain('nativeRemote.recoveryGaps');
+  expect(text(renderer.root)).toContain('common.retry');
+  expect(text(renderer.root)).not.toContain('msg_snapshot');
   expect(text(renderer.root)).not.toContain('agentChat.session.emptyTitle');
   expect(renderer.root.findAllByType('MessageBubble')).toHaveLength(0);
+});
+
+it('counts missing transcript parts and clears the banner through Retry', async () => {
+  const fixture = nativeRemoteFixture();
+  const renderer = await mount(fixture.client);
+  await press(renderer, 'ses-first');
+  const gap = (id: string, seq: number, complete = false) => ({
+    seq,
+    ...(complete ? {} : { incomplete: true }),
+    message: {
+      id,
+      type: 'assistant' as const,
+      time: { created: seq, ...(complete ? { completed: seq + 2 } : {}) },
+      content: complete ? [{ type: 'text' as const, text: `Recovered ${id}` }] : [],
+    },
+  });
+  await act(() =>
+    fixture.publishSession('ses-first', {
+      ...readySession,
+      messages: [...readySession.messages, gap('msg_gap_a', 2), gap('msg_gap_b', 3)],
+    })
+  );
+  const gaps = (node: { props: Record<string, unknown> }) =>
+    node.props.accessibilityRole === 'alert' &&
+    text(node as never).includes('nativeRemote.recoveryGaps');
+  expect(renderer.root.findAll(gaps)).toHaveLength(1);
+  expect(text(renderer.root)).toContain('Snapshot hello');
+  expect(text(renderer.root)).not.toContain('msg_gap_a');
+  const connection = fixture.connection('ses-first');
+  await press(renderer, 'common.retry');
+  expect(connection.requestRecovery).toHaveBeenCalledTimes(1);
+  await act(() =>
+    fixture.publishSession('ses-first', {
+      ...readySession,
+      messages: [...readySession.messages, gap('msg_gap_a', 2, true), gap('msg_gap_b', 3, true)],
+    })
+  );
+  expect(text(renderer.root)).not.toContain('nativeRemote.recoveryGaps');
+  expect(text(renderer.root)).toContain('Recovered msg_gap_a');
+});
+
+it('shows the loading skeleton while disconnected with no session', async () => {
+  const fixture = nativeRemoteFixture();
+  const renderer = await mount(fixture.client);
+  await press(renderer, 'ses-first');
+  await act(() =>
+    fixture.publishSession('ses-first', {
+      connection: 'disconnected',
+      runnerConnected: false,
+      messages: [],
+      pending: { permissions: [], questions: [], unreadablePermissions: [] },
+      events: [],
+      commands: {},
+    })
+  );
+  // No snapshot has arrived, so the screen owes a progress skeleton, not a blank body.
+  expect(renderer.root.findAllByType('Skeleton')).toHaveLength(1);
+  expect(text(renderer.root)).not.toContain('nativeRemote.recoveryGaps');
+  expect(text(renderer.root)).not.toContain('agentChat.session.emptyTitle');
 });
 
 it.each(['forbidden', 'session_deleted'])(

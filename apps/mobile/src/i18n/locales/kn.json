@@ -19,7 +19,9 @@
     "presenceStatus": "ಹೋಸ್ಟ್‌ಗಳು: {{connection}}",
     "commandStatus": "ಕಮಾಂಡ್ ವಿತರಣೆ: {{status}}",
     "delivered": "ತಲುಪಿಸಲಾಗಿದೆ",
-    "expired": "ಅವಧಿ ಮುಗಿದಿದೆ"
+    "expired": "ಅವಧಿ ಮುಗಿದಿದೆ",
+    "recoveryGaps_one": "ಈ ಪ್ರತಿಲೇಖನದ {{displayCount}} ಭಾಗ ಕಾಣೆಯಾಗಿದೆ.",
+    "recoveryGaps_other": "ಈ ಪ್ರತಿಲೇಖನದ {{displayCount}} ಭಾಗಗಳು ಕಾಣೆಯಾಗಿವೆ."
   },
   "common": {
     "manageOnWeb": "ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಿ",

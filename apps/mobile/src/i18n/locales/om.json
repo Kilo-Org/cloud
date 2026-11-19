@@ -19,7 +19,9 @@
     "presenceStatus": "Hoostota: {{connection}}",
     "commandStatus": "Ergaa ajajaa: {{status}}",
     "delivered": "Ga'eera",
-    "expired": "Yeroon isaa darbeera"
+    "expired": "Yeroon isaa darbeera",
+    "recoveryGaps_one": "{{displayCount}} kutaa barreeffama kanaa hin argamne.",
+    "recoveryGaps_other": "{{displayCount}} kutaan barreeffama kanaa hin argamne."
   },
   "common": {
     "manageOnWeb": "Weebii irratti bulchi",

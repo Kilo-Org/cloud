@@ -19,7 +19,9 @@
     "presenceStatus": "Host: {{connection}}",
     "commandStatus": "Παράδοση εντολής: {{status}}",
     "delivered": "Παραδόθηκε",
-    "expired": "Έληξε"
+    "expired": "Έληξε",
+    "recoveryGaps_one": "Λείπει {{displayCount}} τμήμα αυτού του μεταγραμμένου κειμένου.",
+    "recoveryGaps_other": "Λείπουν {{displayCount}} τμήματα αυτού του μεταγραμμένου κειμένου."
   },
   "common": {
     "manageOnWeb": "Διαχείριση στο web",

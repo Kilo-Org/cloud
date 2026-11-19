@@ -19,7 +19,9 @@
     "presenceStatus": "ہوسٹس: {{connection}}",
     "commandStatus": "کمانڈ کی ترسیل: {{status}}",
     "delivered": "پہنچا دیا گیا",
-    "expired": "میعاد ختم ہو گئی"
+    "expired": "میعاد ختم ہو گئی",
+    "recoveryGaps_one": "اس ٹرانسکرپٹ کا {{displayCount}} حصہ غائب ہے۔",
+    "recoveryGaps_other": "اس ٹرانسکرپٹ کے {{displayCount}} حصے غائب ہیں۔"
   },
   "common": {
     "manageOnWeb": "ویب پر منظم کریں",

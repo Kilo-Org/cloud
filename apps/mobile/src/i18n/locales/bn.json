@@ -19,7 +19,9 @@
     "presenceStatus": "হোস্ট: {{connection}}",
     "commandStatus": "কমান্ড ডেলিভারি: {{status}}",
     "delivered": "পৌঁছেছে",
-    "expired": "মেয়াদ শেষ"
+    "expired": "মেয়াদ শেষ",
+    "recoveryGaps_one": "এই ট্রান্সক্রিপ্টের {{displayCount}}টি অংশ অনুপস্থিত।",
+    "recoveryGaps_other": "এই ট্রান্সক্রিপ্টের {{displayCount}}টি অংশ অনুপস্থিত।"
   },
   "common": {
     "manageOnWeb": "ওয়েবে পরিচালনা করুন",

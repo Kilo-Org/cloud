@@ -19,7 +19,10 @@
     "presenceStatus": "מארחים: {{connection}}",
     "commandStatus": "מסירת הפקודה: {{status}}",
     "delivered": "נמסרה",
-    "expired": "פג התוקף"
+    "expired": "פג התוקף",
+    "recoveryGaps_one": "חסר חלק {{displayCount}} מתמלול זה.",
+    "recoveryGaps_two": "חסרים {{displayCount}} חלקים מתמלול זה.",
+    "recoveryGaps_other": "חסרים {{displayCount}} חלקים מתמלול זה."
   },
   "common": {
     "manageOnWeb": "ניהול באתר",

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatNumber } from '@/lib/format';
 import { transcriptText } from '@/lib/native-remote/projections';
 import { type NativeRemoteSession } from '@/lib/native-remote/use-native-session';
 import { NativeRemoteQuestion } from './native-remote-question';
@@ -30,7 +31,7 @@ export function NativeRemoteTranscript({
   sessionID: string;
   remote: NativeRemoteSession;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { state, conversation, pending, canControl } = remote;
   const commandStatus = state?.commands[remote.commandID];
   const loading = !state || conversation?.loading;
@@ -46,6 +47,19 @@ export function NativeRemoteTranscript({
         })}
       </Text>
       {loading && <Skeleton className="h-80 rounded-md" />}
+      {!loading && conversation && conversation.recoveryGaps > 0 ? (
+        <View className="gap-2 rounded-lg border border-border p-3">
+          <Text accessibilityRole="alert">
+            {t('nativeRemote.recoveryGaps', {
+              count: conversation.recoveryGaps,
+              displayCount: formatNumber(conversation.recoveryGaps, i18n.language),
+            })}
+          </Text>
+          <Button variant="outline" onPress={() => void remote.recover()}>
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        </View>
+      ) : null}
       {!loading &&
         conversation?.session &&
         (conversation.messages.length > 0 || conversation.incompleteMessageIDs.length === 0) && (

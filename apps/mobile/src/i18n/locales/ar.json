@@ -19,7 +19,13 @@
     "presenceStatus": "المضيفون: {{connection}}",
     "commandStatus": "تسليم الأمر: {{status}}",
     "delivered": "تم التسليم",
-    "expired": "انتهت الصلاحية"
+    "expired": "انتهت الصلاحية",
+    "recoveryGaps_zero": "لا توجد أجزاء مفقودة من هذا السجل.",
+    "recoveryGaps_one": "الجزء {{displayCount}} من هذا السجل مفقود.",
+    "recoveryGaps_two": "جزآن من هذا السجل مفقودان ({{displayCount}}).",
+    "recoveryGaps_few": "{{displayCount}} أجزاء من هذا السجل مفقودة.",
+    "recoveryGaps_many": "{{displayCount}} جزءًا من هذا السجل مفقود.",
+    "recoveryGaps_other": "{{displayCount}} جزء من هذا السجل مفقود."
   },
   "common": {
     "manageOnWeb": "الإدارة عبر الويب",

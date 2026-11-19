@@ -19,7 +19,10 @@
     "presenceStatus": "Hôtes : {{connection}}",
     "commandStatus": "Transmission de la commande : {{status}}",
     "delivered": "Transmise",
-    "expired": "Expirée"
+    "expired": "Expirée",
+    "recoveryGaps_one": "Il manque {{displayCount}} partie de cette transcription.",
+    "recoveryGaps_many": "Il manque {{displayCount}} parties de cette transcription.",
+    "recoveryGaps_other": "Il manque {{displayCount}} parties de cette transcription."
   },
   "common": {
     "manageOnWeb": "Gérer sur le web",

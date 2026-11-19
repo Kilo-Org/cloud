@@ -19,7 +19,9 @@
     "presenceStatus": "Ngā pūnaha hautū: {{connection}}",
     "commandStatus": "Tukunga whakahau: {{status}}",
     "delivered": "Kua tukuna",
-    "expired": "Kua pau te wā"
+    "expired": "Kua pau te wā",
+    "recoveryGaps_one": "Kei te ngaro te {{displayCount}} wāhanga o tēnei tuhinga.",
+    "recoveryGaps_other": "Kei te ngaro ngā wāhanga {{displayCount}} o tēnei tuhinga."
   },
   "common": {
     "manageOnWeb": "Whakahaerehia i te ipurangi",

@@ -85,7 +85,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Command delivery: {{status}}",
     "delivered": "Delivered",
-    "expired": "Expired"
+    "expired": "Expired",
+    "recoveryGaps_one": "{{displayCount}} part of this transcript is missing.",
+    "recoveryGaps_other": "{{displayCount}} parts of this transcript are missing."
   },
   "common": {
     "manageOnWeb": "Manage on the web",

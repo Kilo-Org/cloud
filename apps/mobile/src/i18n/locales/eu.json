@@ -19,7 +19,9 @@
     "presenceStatus": "Ostalariak: {{connection}}",
     "commandStatus": "Komandoen bidalketa: {{status}}",
     "delivered": "Entregatuta",
-    "expired": "Iraungita"
+    "expired": "Iraungita",
+    "recoveryGaps_one": "{{displayCount}} zati falta da transkripzio honetatik.",
+    "recoveryGaps_other": "{{displayCount}} zati falta dira transkripzio honetatik."
   },
   "common": {
     "manageOnWeb": "Kudeatu webean",

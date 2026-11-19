@@ -19,7 +19,9 @@
     "presenceStatus": "Hostlar: {{connection}}",
     "commandStatus": "Əmrin çatdırılması: {{status}}",
     "delivered": "Çatdırılıb",
-    "expired": "Müddəti bitib"
+    "expired": "Müddəti bitib",
+    "recoveryGaps_one": "Bu transkriptin {{displayCount}} hissəsi itib.",
+    "recoveryGaps_other": "Bu transkriptin {{displayCount}} hissəsi itib."
   },
   "common": {
     "manageOnWeb": "Vebdə idarə et",

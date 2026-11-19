@@ -19,7 +19,11 @@
     "presenceStatus": "Хости: {{connection}}",
     "commandStatus": "Доставка команди: {{status}}",
     "delivered": "Доставлено",
-    "expired": "Термін дії минув"
+    "expired": "Термін дії минув",
+    "recoveryGaps_one": "Відсутня {{displayCount}} частина цього транскрипту.",
+    "recoveryGaps_few": "Відсутні {{displayCount}} частини цього транскрипту.",
+    "recoveryGaps_many": "Відсутня {{displayCount}} частин цього транскрипту.",
+    "recoveryGaps_other": "Відсутні {{displayCount}} частини цього транскрипту."
   },
   "common": {
     "manageOnWeb": "Керувати у вебверсії",

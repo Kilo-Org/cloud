@@ -22,6 +22,8 @@ export type NativeRemoteSession = {
   run: (operation: (connection: NativeSessionConnection) => Promise<string>) => Promise<boolean>;
   send: (text: string, queue: boolean) => Promise<boolean>;
   clear: () => void;
+  /** Retries the missing parts of this transcript over the live connection. */
+  recover: () => Promise<void>;
 };
 
 export function useNativeSession(client: NativeRemoteClient, session?: NativeSessionSummary) {
@@ -131,5 +133,7 @@ export function useNativeSession(client: NativeRemoteClient, session?: NativeSes
       run(connection => sendNativePrompt(connection, text, queue)),
     // SDK clear hides transcript messages only; pending remote.state remains intact.
     clear: () => connectionRef.current?.clear(),
+    // Missing parts are fetched again over the live socket; nothing reconnects.
+    recover: () => connectionRef.current?.requestRecovery() ?? Promise.resolve(),
   };
 }

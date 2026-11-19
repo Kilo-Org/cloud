@@ -19,7 +19,9 @@
     "presenceStatus": "ହୋଷ୍ଟ: {{connection}}",
     "commandStatus": "କମାଣ୍ଡ ବିତରଣ: {{status}}",
     "delivered": "ବିତରିତ",
-    "expired": "ମିଆଦ ସମାପ୍ତ"
+    "expired": "ମିଆଦ ସମାପ୍ତ",
+    "recoveryGaps_one": "ଏହି ଟ୍ରାନ୍ସକ୍ରିପ୍ଟର {{displayCount}} ଅଂଶ ନାହିଁ।",
+    "recoveryGaps_other": "ଏହି ଟ୍ରାନ୍ସକ୍ରିପ୍ଟର {{displayCount}} ଅଂଶ ନାହିଁ।"
   },
   "common": {
     "manageOnWeb": "ୱେବରେ ପରିଚାଳନା କରନ୍ତୁ",

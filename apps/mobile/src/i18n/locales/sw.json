@@ -19,7 +19,9 @@
     "presenceStatus": "Vizio: {{connection}}",
     "commandStatus": "Uwasilishaji wa amri: {{status}}",
     "delivered": "Imewasilishwa",
-    "expired": "Muda wake umeisha"
+    "expired": "Muda wake umeisha",
+    "recoveryGaps_one": "Sehemu {{displayCount}} ya nakala hii haipo.",
+    "recoveryGaps_other": "Sehemu {{displayCount}} za nakala hii hazipo."
   },
   "common": {
     "manageOnWeb": "Dhibiti kwenye wavuti",

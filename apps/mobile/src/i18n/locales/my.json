@@ -19,7 +19,9 @@
     "presenceStatus": "ဟို့စ်များ: {{connection}}",
     "commandStatus": "အမိန့် ပေးပို့မှု: {{status}}",
     "delivered": "ပေးပို့ပြီး",
-    "expired": "သက်တမ်းကုန်ပြီ"
+    "expired": "သက်တမ်းကုန်ပြီ",
+    "recoveryGaps_one": "ဤစာသားမှတ်တမ်း၏ အပိုင်း {{displayCount}} ခု ပျောက်နေသည်။",
+    "recoveryGaps_other": "ဤစာသားမှတ်တမ်း၏ အပိုင်း {{displayCount}} ခု ပျောက်နေသည်။"
   },
   "common": {
     "manageOnWeb": "ဝဘ်ပေါ်တွင် စီမံပါ",

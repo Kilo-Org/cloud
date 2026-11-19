@@ -19,7 +19,9 @@
     "presenceStatus": "Host: {{connection}}",
     "commandStatus": "Pengiriman perintah: {{status}}",
     "delivered": "Terkirim",
-    "expired": "Kedaluwarsa"
+    "expired": "Kedaluwarsa",
+    "recoveryGaps_one": "{{displayCount}} bagian transkrip ini tidak ada.",
+    "recoveryGaps_other": "{{displayCount}} bagian transkrip ini tidak ada."
   },
   "common": {
     "manageOnWeb": "Kelola di web",

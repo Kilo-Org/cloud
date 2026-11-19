@@ -19,7 +19,12 @@
     "presenceStatus": "Óstaigh: {{connection}}",
     "commandStatus": "Seachadadh an ordaithe: {{status}}",
     "delivered": "Seachadta",
-    "expired": "Imithe in éag"
+    "expired": "Imithe in éag",
+    "recoveryGaps_one": "Tá {{displayCount}} chuid den tras-scríobh seo ar iarraidh.",
+    "recoveryGaps_two": "Tá {{displayCount}} chuid den tras-scríobh seo ar iarraidh.",
+    "recoveryGaps_few": "Tá {{displayCount}} chuid den tras-scríobh seo ar iarraidh.",
+    "recoveryGaps_many": "Tá {{displayCount}} gcuid den tras-scríobh seo ar iarraidh.",
+    "recoveryGaps_other": "Tá {{displayCount}} cuid den tras-scríobh seo ar iarraidh."
   },
   "common": {
     "manageOnWeb": "Bainistigh ar an ngréasán",

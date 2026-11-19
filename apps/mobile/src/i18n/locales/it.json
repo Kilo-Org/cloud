@@ -19,7 +19,10 @@
     "presenceStatus": "Host: {{connection}}",
     "commandStatus": "Consegna comando: {{status}}",
     "delivered": "Consegnato",
-    "expired": "Scaduto"
+    "expired": "Scaduto",
+    "recoveryGaps_one": "Manca {{displayCount}} parte di questa trascrizione.",
+    "recoveryGaps_many": "Mancano {{displayCount}} parti di questa trascrizione.",
+    "recoveryGaps_other": "Mancano {{displayCount}} parti di questa trascrizione."
   },
   "common": {
     "manageOnWeb": "Gestisci sul web",

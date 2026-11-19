@@ -19,7 +19,9 @@
     "presenceStatus": "Värdar: {{connection}}",
     "commandStatus": "Kommandoleverans: {{status}}",
     "delivered": "Levererat",
-    "expired": "Utgånget"
+    "expired": "Utgånget",
+    "recoveryGaps_one": "{{displayCount}} del av den här transkriptionen saknas.",
+    "recoveryGaps_other": "{{displayCount}} delar av den här transkriptionen saknas."
   },
   "common": {
     "manageOnWeb": "Hantera på webben",

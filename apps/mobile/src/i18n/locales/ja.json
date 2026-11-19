@@ -19,7 +19,9 @@
     "presenceStatus": "ホスト：{{connection}}",
     "commandStatus": "コマンドの配信：{{status}}",
     "delivered": "配信済み",
-    "expired": "期限切れ"
+    "expired": "期限切れ",
+    "recoveryGaps_one": "このトランスクリプトの{{displayCount}}件の部分が見つかりません。",
+    "recoveryGaps_other": "このトランスクリプトの{{displayCount}}件の部分が見つかりません。"
   },
   "common": {
     "manageOnWeb": "Webで管理",

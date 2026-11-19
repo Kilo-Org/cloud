@@ -19,7 +19,9 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Befehlszustellung: {{status}}",
     "delivered": "Zugestellt",
-    "expired": "Abgelaufen"
+    "expired": "Abgelaufen",
+    "recoveryGaps_one": "{{displayCount}} Teil dieses Transkripts fehlt.",
+    "recoveryGaps_other": "{{displayCount}} Teile dieses Transkripts fehlen."
   },
   "common": {
     "manageOnWeb": "Im Web verwalten",

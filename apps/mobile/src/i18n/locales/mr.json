@@ -19,7 +19,9 @@
     "presenceStatus": "होस्ट: {{connection}}",
     "commandStatus": "कमांड वितरण: {{status}}",
     "delivered": "वितरित",
-    "expired": "कालबाह्य"
+    "expired": "कालबाह्य",
+    "recoveryGaps_one": "या प्रतिलेखाचा {{displayCount}} भाग गहाळ आहे.",
+    "recoveryGaps_other": "या प्रतिलेखाचे {{displayCount}} भाग गहाळ आहेत."
   },
   "common": {
     "manageOnWeb": "वेबवर व्यवस्थापित करा",

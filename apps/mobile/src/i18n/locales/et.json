@@ -19,7 +19,9 @@
     "presenceStatus": "Hostid: {{connection}}",
     "commandStatus": "Käsu edastamine: {{status}}",
     "delivered": "Edastatud",
-    "expired": "Aegunud"
+    "expired": "Aegunud",
+    "recoveryGaps_one": "{{displayCount}} osa sellest transkriptsioonist on puudu.",
+    "recoveryGaps_other": "{{displayCount}} osa sellest transkriptsioonist on puudu."
   },
   "common": {
     "manageOnWeb": "Halda veebis",

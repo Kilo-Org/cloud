@@ -19,7 +19,12 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Twassil tal-kmand: {{status}}",
     "delivered": "Imwassal",
-    "expired": "Skada"
+    "expired": "Skada",
+    "recoveryGaps_one": "Nieqes {{displayCount}} parti min dan traskrizzjoni.",
+    "recoveryGaps_two": "Nieqes {{displayCount}} partijiet min dan traskrizzjoni.",
+    "recoveryGaps_few": "Nieqes {{displayCount}} partijiet min dan traskrizzjoni.",
+    "recoveryGaps_many": "Nieqes {{displayCount}} partijiet min dan traskrizzjoni.",
+    "recoveryGaps_other": "Nieqes {{displayCount}} partijiet min dan traskrizzjoni."
   },
   "common": {
     "manageOnWeb": "Immaniġġja fuq il-web",

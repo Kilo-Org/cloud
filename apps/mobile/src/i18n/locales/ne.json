@@ -19,7 +19,9 @@
     "presenceStatus": "होस्टहरू: {{connection}}",
     "commandStatus": "कमान्ड डेलिभरी: {{status}}",
     "delivered": "पुर्‍याइयो",
-    "expired": "म्याद सकियो"
+    "expired": "म्याद सकियो",
+    "recoveryGaps_one": "यो ट्रान्सक्रिप्टको {{displayCount}} भाग हराइरहेको छ।",
+    "recoveryGaps_other": "यो ट्रान्सक्रिप्टका {{displayCount}} भाग हराइरहेका छन्।"
   },
   "common": {
     "manageOnWeb": "वेबमा व्यवस्थापन गर्नुहोस्",

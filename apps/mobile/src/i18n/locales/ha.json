@@ -19,7 +19,9 @@
     "presenceStatus": "Na'urorin masauki: {{connection}}",
     "commandStatus": "Isar da umarni: {{status}}",
     "delivered": "An isar",
-    "expired": "Lokaci ya ƙare"
+    "expired": "Lokaci ya ƙare",
+    "recoveryGaps_one": "{{displayCount}} sashe na wannan rubutun ya ɓace.",
+    "recoveryGaps_other": "{{displayCount}} sassa na wannan rubutun sun ɓace."
   },
   "common": {
     "manageOnWeb": "Sarrafa a yanar gizo",

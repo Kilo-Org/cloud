@@ -16,9 +16,25 @@ const mocks = vi.hoisted(() => ({
   demo: vi.fn(() => null),
   redirect: vi.fn(() => null),
   credential: vi.fn(),
+  fixture: undefined as string | undefined,
 }));
 vi.mock('@kilocode/cloud-agent-sdk', () => ({ NativeSyncClient: mocks.client }));
-vi.mock('expo-router', () => ({ Redirect: mocks.redirect }));
+vi.mock('expo-router', () => ({
+  Redirect: mocks.redirect,
+  useLocalSearchParams: () => ({ nativeRemoteFixture: mocks.fixture }),
+}));
+vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+}));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/native-remote/native-remote-transcript', () => ({
+  NativeRemoteTranscript: 'NativeRemoteTranscript',
+}));
+vi.mock('@/lib/native-remote/use-native-session', () => ({
+  useNativeSession: () => ({ conversation: undefined }),
+}));
 vi.mock('@/components/native-remote/native-remote-demo', () => ({ NativeRemoteDemo: mocks.demo }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => mocks }));
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => mocks }));
@@ -39,6 +55,7 @@ beforeEach(() => {
   mocks.organizationId = null;
   mocks.isLoaded = true;
   mocks.url = 'http://localhost:8817';
+  mocks.fixture = undefined;
 });
 afterEach(() => {
   vi.clearAllMocks();
@@ -129,6 +146,32 @@ describe('native remote entry', () => {
       renderer.update(createElement(NativeRemoteEntryScreen));
     });
     expect(mocks.redirect).toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('serves a transcript fixture through the device listener while development builds allow it', () => {
+    mocks.fixture = 'gaps';
+    // A fixture needs no account token: it publishes its own state.
+    mocks.token = undefined;
+    const renderer = mount();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.client).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByType('NativeRemoteTranscript')).toHaveLength(1);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('never serves a fixture in a production build', () => {
+    mocks.fixture = 'gaps';
+    mocks.token = undefined;
+    vi.stubGlobal('__DEV__', false);
+    const renderer = mount();
+    expect(mocks.redirect).toHaveBeenCalled();
+    expect(renderer.root.findAllByType('NativeRemoteTranscript')).toHaveLength(0);
+    expect(mocks.client).not.toHaveBeenCalled();
     act(() => {
       renderer.unmount();
     });

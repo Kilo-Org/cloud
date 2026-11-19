@@ -109,6 +109,8 @@ export type NativeSessionConnection = {
   rejectQuestion(requestID: string): Promise<string>;
   sendCommand(command: string, args?: string): Promise<string>;
   getCommandStatus(commandID: string): Promise<'queued' | 'delivered' | 'expired'>;
+  /** Retries missing transcript parts over the live socket without reconnecting. */
+  requestRecovery(): Promise<void>;
   clear(): void;
   close(): void;
 };
@@ -733,8 +735,11 @@ export class NativeSyncClient {
       requirements: Map<number, NativeRecoveryRequirement>;
       completed: boolean;
       cancel: () => void;
+      /** Settles when this run stops, whether it recovered or gave up. */
+      done: Promise<void>;
     };
     let recovery: Recovery | undefined;
+    let liveEpoch: SocketEpoch | undefined;
     let integrityError: string | undefined;
     let failureError: string | undefined;
     let integrityGap = false;
@@ -799,11 +804,17 @@ export class NativeSyncClient {
       )
         return;
       const controller = new AbortController();
+      // ES2022/Hermes consumers do not provide Promise.withResolvers.
+      let settle: () => void = () => {};
+      const done = new Promise<void>(resolve => {
+        settle = resolve;
+      });
       const current: Recovery = {
         attempt: 0,
         replay: [],
         requirements: new Map(),
         completed: false,
+        done,
         cancel: () => {
           if (current.replay.length > 0) markGap();
           dispose();
@@ -820,6 +831,8 @@ export class NativeSyncClient {
         current.replay.length = 0;
         current.requirements.clear();
         if (recovery === current) recovery = undefined;
+        // A cancelled run still answers its caller; settling twice is a no-op.
+        settle();
       };
       epoch.signal.addEventListener('abort', current.cancel, { once: true });
       void (async () => {
@@ -934,6 +947,7 @@ export class NativeSyncClient {
           epoch.signal.removeEventListener('abort', current.cancel);
           if (!current.completed && current.replay.length > 0 && epoch.current()) markGap();
           dispose();
+          settle();
         });
     };
     const connection = this.socket(
@@ -941,6 +955,7 @@ export class NativeSyncClient {
       `${path}/live-ticket`,
       organizationID,
       async (frame, send, epoch, bytes) => {
+        liveEpoch = epoch;
         const body = record(frame.body);
         if (frame.channel === 'control') {
           if (frame.type === 'hello') {
@@ -1166,6 +1181,23 @@ export class NativeSyncClient {
         publish({ commands: { ...state.commands, [result.commandID]: result.status } });
         return result.status;
       },
+      requestRecovery: async () => {
+        if (closed) return;
+        // Already whole: nothing to fetch, so the retry resolves at once.
+        if (
+          state.session &&
+          !state.messages.some(
+            item => item.incomplete || hasUnresolvedKilo2Assets(item.message, state.assetURLs)
+          ) &&
+          !state.pendingSnapshotMessageIDs?.length
+        )
+          return;
+        const epoch = liveEpoch;
+        if (!epoch?.current()) return;
+        // Re-enters the recovery loop over the live socket; the socket stays open.
+        recoverIncomplete(epoch, true);
+        await recovery?.done;
+      },
       clear: () => {
         for (const item of state.messages) clearedIDs.add(item.message.id);
         publish({ messages: [] });
@@ -1188,6 +1220,7 @@ export class NativeSyncClient {
         clearedIDs.clear();
         remoteState = undefined;
         identity = undefined;
+        liveEpoch = undefined;
       },
     };
   }

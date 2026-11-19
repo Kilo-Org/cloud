@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { hasUnresolvedKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
 import type { NativeEvent, NativeSessionState } from './native-sync';
 import type { NativeSnapshotMessage, NativeSnapshotSession } from './native-sync-snapshot';
-import { upsertByRequestId } from './pending-requests';
+import { upsertByKey, upsertByRequestId } from './pending-requests';
 import { permissionAskedIdentitySchema } from './schemas';
 import type { SessionSnapshot, UnreadablePermissionState } from './types';
 
@@ -56,6 +56,8 @@ export type NativeConversation = {
   nativeMessages: NativeSnapshotMessage[];
   messages: SessionSnapshot['messages'];
   incompleteMessageIDs: string[];
+  /** Count of transcript parts still missing after recovery; zero when whole. */
+  recoveryGaps: number;
   pending: NativePendingRequests;
   loading: boolean;
   error: string | undefined;
@@ -98,7 +100,8 @@ export function reduceNativePendingRequests(
       const permission = parsed.data;
       return {
         ...pending,
-        permissions: [...pending.permissions.filter(item => item.id !== permission.id), permission],
+        // In place, so a replayed request keeps its place in the oldest-first list.
+        permissions: [...upsertByKey(pending.permissions, permission, item => item.id)],
         // A readable request supersedes an unreadable notice for the same id.
         unreadablePermissions: pending.unreadablePermissions.filter(
           item => item.requestId !== permission.id
@@ -131,7 +134,8 @@ export function reduceNativePendingRequests(
     if (form.success)
       return {
         ...pending,
-        questions: [...pending.questions.filter(item => item.id !== form.data.id), form.data],
+        // In place, so a replayed form keeps its place in the oldest-first list.
+        questions: [...upsertByKey(pending.questions, form.data, item => item.id)],
       };
   }
   if (event.type === 'form.replied' || event.type === 'form.cancelled')
@@ -181,17 +185,18 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
     nativeMessages: state.messages,
     messages,
     incompleteMessageIDs,
+    recoveryGaps: incompleteMessageIDs.length,
     pending: state.pending,
-    loading: !session && !state.snapshot && !state.error && state.connection !== 'disconnected',
+    // A disconnected pre-snapshot window still shows progress, not a blank screen.
+    loading: !session && !state.snapshot && !state.error,
+    // Only real failures: a missing transcript part is a recovery gap, not an error.
     error:
       state.error ??
       projectionError ??
-      (incompleteMessageIDs.length
-        ? `Native transcript recovery is incomplete: ${incompleteMessageIDs.join(', ')}.`
-        : !session && state.snapshot
-          ? 'The native snapshot has no session metadata.'
-          : last?.type === 'idle' && last.error
-            ? last.error.message
-            : undefined),
+      (!session && state.snapshot
+        ? 'The native snapshot has no session metadata.'
+        : last?.type === 'idle' && last.error
+          ? last.error.message
+          : undefined),
   };
 }

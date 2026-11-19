@@ -19,7 +19,9 @@
     "presenceStatus": "Gazdagépek: {{connection}}",
     "commandStatus": "Parancs kézbesítése: {{status}}",
     "delivered": "Kézbesítve",
-    "expired": "Lejárt"
+    "expired": "Lejárt",
+    "recoveryGaps_one": "{{displayCount}} rész hiányzik ebből az átiratból.",
+    "recoveryGaps_other": "{{displayCount}} rész hiányzik ebből az átiratból."
   },
   "common": {
     "manageOnWeb": "Kezelés a weben",

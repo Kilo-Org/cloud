@@ -19,7 +19,10 @@
     "presenceStatus": "Amfitrions: {{connection}}",
     "commandStatus": "Lliurament de l'ordre: {{status}}",
     "delivered": "Lliurada",
-    "expired": "Caducada"
+    "expired": "Caducada",
+    "recoveryGaps_one": "Falta {{displayCount}} part d'aquesta transcripció.",
+    "recoveryGaps_many": "Falten {{displayCount}} parts d'aquesta transcripció.",
+    "recoveryGaps_other": "Falten {{displayCount}} parts d'aquesta transcripció."
   },
   "common": {
     "manageOnWeb": "Gestiona-ho al web",

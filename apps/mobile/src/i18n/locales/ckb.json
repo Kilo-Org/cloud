@@ -19,7 +19,9 @@
     "presenceStatus": "هۆستەکان: {{connection}}",
     "commandStatus": "گەیاندنی فەرمان: {{status}}",
     "delivered": "گەیەندرا",
-    "expired": "بەسەرچوو"
+    "expired": "بەسەرچوو",
+    "recoveryGaps_one": "{{displayCount}} بەشی ئەم تۆمارە ونە.",
+    "recoveryGaps_other": "{{displayCount}} بەش لەم تۆمارە ونن."
   },
   "common": {
     "manageOnWeb": "لەسەر وێب بەڕێوەی ببە",

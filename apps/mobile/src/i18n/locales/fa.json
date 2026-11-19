@@ -19,7 +19,9 @@
     "presenceStatus": "میزبان‌ها: {{connection}}",
     "commandStatus": "تحویل فرمان: {{status}}",
     "delivered": "تحویل داده شد",
-    "expired": "منقضی شد"
+    "expired": "منقضی شد",
+    "recoveryGaps_one": "{{displayCount}} بخش از این رونوشت موجود نیست.",
+    "recoveryGaps_other": "{{displayCount}} بخش از این رونوشت موجود نیست."
   },
   "common": {
     "manageOnWeb": "مدیریت در وب",

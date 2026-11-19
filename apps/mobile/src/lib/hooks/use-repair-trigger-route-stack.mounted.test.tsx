@@ -138,4 +138,35 @@ describe('useRepairTriggerRouteStack', () => {
     expect(nextState.routes.map(route => route.key)).toEqual(['tabs', 'l', 'd-rebuilt']);
     expect(nextState.index).toBe(2);
   });
+
+  it('retires the original after the repairing screen is gone', () => {
+    // A native Stack unmounts the covered screen, so the repair outlives the
+    // screen that asked for it, and no state event reaches that screen once it
+    // is gone. Only the mount-time check of the next screen instance can finish
+    // the removal; without it the leftover original stays and one Back lands on
+    // it instead of leaving.
+    setStack([r('tabs', '(tabs)'), r('d', DETAIL)], 1);
+    const repairing = mount();
+    expect(pushMock).toHaveBeenCalled();
+
+    act(() => {
+      repairing.unmount();
+    });
+    setStack(
+      [
+        r('tabs', '(tabs)'),
+        r('d', DETAIL),
+        r('l', LIST, { stackRebuilt: '1' }),
+        r('d-rebuilt', DETAIL, { stackRebuilt: '1' }),
+      ],
+      3
+    );
+
+    mount();
+
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    const [nextState] = resetMock.mock.calls[0] as [State];
+    expect(nextState.routes.map(route => route.key)).toEqual(['tabs', 'l', 'd-rebuilt']);
+    expect(nextState.index).toBe(2);
+  });
 });

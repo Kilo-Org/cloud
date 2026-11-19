@@ -298,11 +298,13 @@ export async function waitForApp(
         // runtime after a cell's Activity recreation. Disabling LogBox's UI is
         // idempotent per runtime, so doing it here covers both without the caller
         // tracking reloads. A runtime that cannot disable it leaves the app
-        // running; the raw dump still reports any toast that then paints.
+        // running; the raw dump still reports any toast that then paints. The
+        // wait's own budget caps this probe call too, so a target that stops
+        // answering still fails within the declared time.
         const disable = probe.disableLogBox;
         if (!logBoxDisabled && disable !== undefined) {
           try {
-            await disable();
+            await disable(Math.max(0, deadline - clock.now()));
             logBoxDisabled = true;
           } catch {
             // Retried on the next pass, inside this wait's own budget.

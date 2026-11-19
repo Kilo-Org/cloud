@@ -78,9 +78,10 @@ export type ProbeClient = {
    * Disables LogBox's UI in the app runtime through every module exporting
    * `setDisabled`, and answers how many modules exposed it and how many the gate
    * has disabled. Idempotent per runtime, so every readiness wait calls it after
-   * a reload disables again.
+   * a reload disables again. `budgetMs` caps the probe calls, as it does on
+   * `ready` and `dump`.
    */
-  disableLogBox?: () => Promise<LogBoxDisable>;
+  disableLogBox?: (budgetMs?: number) => Promise<LogBoxDisable>;
   disconnect: () => void;
 };
 
@@ -483,8 +484,8 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
         })),
       };
     },
-    disableLogBox: async () => {
-      const payload = record(await call(logBoxDisableExpression()));
+    disableLogBox: async (budgetMs?: number) => {
+      const payload = record(await call(logBoxDisableExpression(), budgetMs));
       const exposing = payload?.exposing;
       const disabled = payload?.disabled;
       if (typeof exposing !== 'number' || typeof disabled !== 'number') {

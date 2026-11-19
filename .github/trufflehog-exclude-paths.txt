@@ -46,13 +46,13 @@ apps/web/src/app/api/organizations/\[id\]/guardrails/mcp-connections/route\.test
 # fixture path so the synthetic URI does not fail the scan.
 dev/seed/lib/db\.test\.ts
 
-# BYOK endpoint fixtures. schema-types.test.ts asserts that an endpoint base URL
+# BYOK private provider fixtures. schema-types.test.ts asserts that a private provider base URL
 # with embedded credentials ("user:pass@llm.acme.example") is rejected. Exclude
 # the fixture path so the synthetic credential URLs do not fail the scan.
 packages/db/src/schema-types\.test\.ts
 
 # Generated MCP catalog. catalog.json holds the JSON schemas of procedure inputs.
-# The BYOK endpoint credentials schema lists the field names of a Google service
+# The BYOK private provider credentials schema lists the field names of a Google service
 # account key ("type": "service_account", "private_key", ...) without values, which
 # the GCP detector reports. The file is generated from code and holds no values.
 services/kilo-mcp/catalog\.json

@@ -10,7 +10,7 @@ const deletedId = 'bbbbbbbb-2222-4222-8222-222222222222';
 const unknownId = 'cccccccc-3333-4333-8333-333333333333';
 const emptyFeatures: OrganizationFeatures = {
   experimental_byok: [],
-  byok_endpoints: [],
+  byok_private_providers: [],
   enkrypt_output_guardrail: [],
   gateway_settings: [],
 };
@@ -79,7 +79,7 @@ describe('OrganizationFeaturesContent', () => {
     Object.assign(mockConfigQuery, {
       data: {
         experimental_byok: [activeId],
-        byok_endpoints: [],
+        byok_private_providers: [],
         enkrypt_output_guardrail: [],
         gateway_settings: [],
       },
@@ -153,7 +153,7 @@ describe('OrganizationFeaturesContent', () => {
   it('shows organization names, IDs and admin links with deleted and unknown labels per feature', () => {
     mockConfigQuery.data = {
       experimental_byok: [activeId, unknownId],
-      byok_endpoints: [],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [activeId],
       gateway_settings: [deletedId, activeId],
     };
@@ -166,7 +166,7 @@ describe('OrganizationFeaturesContent', () => {
     const sections = Array.from(container.querySelectorAll('section'));
     expect(sections.map(section => section.querySelector('h3')?.textContent)).toEqual([
       'Direct Amazon Bedrock and Google Vertex AI BYOK (2)',
-      'BYOK endpoints (0)',
+      'BYOK private providers (0)',
       'Enkrypt output guardrails (1)',
       'Advanced policies (2)',
     ]);
@@ -206,7 +206,7 @@ describe('OrganizationFeaturesContent', () => {
 
     const input = {
       experimental_byok: [deletedId],
-      byok_endpoints: [],
+      byok_private_providers: [],
       enkrypt_output_guardrail: [deletedId],
       gateway_settings: [deletedId],
     };

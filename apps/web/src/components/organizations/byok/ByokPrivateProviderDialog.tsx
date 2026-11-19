@@ -5,10 +5,10 @@ import { useMutation } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Download, Eye, EyeOff, Info, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  BYOK_ENDPOINT_MAX_MODELS,
-  type ByokEndpointDefinition,
-  type ByokEndpointModel,
-  type ByokEndpointReasoningFormat,
+  BYOK_PRIVATE_PROVIDER_MAX_MODELS,
+  type ByokPrivateProviderDefinition,
+  type ByokPrivateModel,
+  type ByokPrivateProviderReasoningFormat,
   type CustomLlmApiKind,
   type CustomLlmProvider,
 } from '@kilocode/db/schema-types';
@@ -36,36 +36,36 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  EMPTY_ENDPOINT_CREDENTIALS_FORM,
-  ENDPOINT_API_KINDS,
-  ENDPOINT_CLIENT_PROVIDERS,
-  endpointClientProviderLabel,
-  ENDPOINT_CREDENTIALS_TYPE_LABELS,
-  ENDPOINT_REASONING_FORMAT_LABELS,
-  buildEndpointCredentials,
-  buildEndpointDefinition,
+  EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM,
+  PRIVATE_PROVIDER_API_KINDS,
+  PRIVATE_PROVIDER_CLIENT_PROVIDERS,
+  privateProviderClientProviderLabel,
+  PRIVATE_PROVIDER_CREDENTIALS_TYPE_LABELS,
+  PRIVATE_PROVIDER_REASONING_FORMAT_LABELS,
+  buildPrivateProviderCredentials,
+  buildPrivateProviderDefinition,
   getImportCapacity,
   mergeImportedModels,
   sendsPromptCacheKeyOver,
-  setEndpointModelFlag,
-  toEndpointForm,
-  toEndpointModelRow,
-  type ByokEndpointCredentialsType,
-  type EndpointCredentialsForm,
-  type EndpointForm,
-  type EndpointModelRow,
-} from '@/lib/byok/endpoint-form';
-import { endpointOriginChanged } from '@/lib/byok/endpoint-origin';
+  setPrivateModelFlag,
+  toPrivateProviderForm,
+  toPrivateModelRow,
+  type ByokPrivateProviderCredentialsType,
+  type PrivateProviderCredentialsForm,
+  type PrivateProviderForm,
+  type PrivateModelRow,
+} from '@/lib/byok/private-provider-form';
+import { privateProviderOriginChanged } from '@/lib/byok/private-provider-origin';
 import { API_KIND_LABELS } from '@/lib/api-kind-labels';
-import { ByokEndpointImportDialog } from './ByokEndpointImportDialog';
+import { ByokPrivateProviderImportDialog } from './ByokPrivateProviderImportDialog';
 import {
-  useEndpointCatalogModelIds,
-  type EndpointCatalogModelIds,
-} from './useEndpointCatalogModelIds';
+  usePrivateProviderCatalogModelIds,
+  type PrivateProviderCatalogModelIds,
+} from './usePrivateProviderCatalogModelIds';
 
-export type ByokEndpointDialogKey = {
+export type ByokPrivateProviderDialogKey = {
   id: string;
-  endpoint: ByokEndpointDefinition | null;
+  private_provider: ByokPrivateProviderDefinition | null;
   serve_catalog_models: boolean;
 };
 
@@ -73,7 +73,7 @@ const INHERIT = 'inherit';
 
 function toggleApiKind(kinds: CustomLlmApiKind[], kind: CustomLlmApiKind, checked: boolean) {
   const next = checked ? [...kinds, kind] : kinds.filter(k => k !== kind);
-  return ENDPOINT_API_KINDS.filter(k => next.includes(k));
+  return PRIVATE_PROVIDER_API_KINDS.filter(k => next.includes(k));
 }
 
 function ApiKindCheckboxes({
@@ -87,7 +87,7 @@ function ApiKindCheckboxes({
 }) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-2">
-      {ENDPOINT_API_KINDS.map(kind => (
+      {PRIVATE_PROVIDER_API_KINDS.map(kind => (
         <label
           key={kind}
           htmlFor={`${idPrefix}-${kind}`}
@@ -126,9 +126,9 @@ function ClientProviderSelect({
       </SelectTrigger>
       <SelectContent>
         {inheritLabel ? <SelectItem value={INHERIT}>{inheritLabel}</SelectItem> : null}
-        {ENDPOINT_CLIENT_PROVIDERS.map(provider => (
+        {PRIVATE_PROVIDER_CLIENT_PROVIDERS.map(provider => (
           <SelectItem key={provider} value={provider}>
-            {endpointClientProviderLabel(provider)}
+            {privateProviderClientProviderLabel(provider)}
           </SelectItem>
         ))}
       </SelectContent>
@@ -143,15 +143,15 @@ function ReasoningFormatSelect({
   inheritLabel,
 }: {
   id: string;
-  value: ByokEndpointReasoningFormat | null;
-  onChange: (value: ByokEndpointReasoningFormat | null) => void;
+  value: ByokPrivateProviderReasoningFormat | null;
+  onChange: (value: ByokPrivateProviderReasoningFormat | null) => void;
   inheritLabel?: string;
 }) {
   return (
     <Select
       value={value ?? INHERIT}
       onValueChange={next =>
-        onChange(next === INHERIT ? null : (next as ByokEndpointReasoningFormat))
+        onChange(next === INHERIT ? null : (next as ByokPrivateProviderReasoningFormat))
       }
     >
       <SelectTrigger id={id}>
@@ -159,7 +159,7 @@ function ReasoningFormatSelect({
       </SelectTrigger>
       <SelectContent>
         {inheritLabel ? <SelectItem value={INHERIT}>{inheritLabel}</SelectItem> : null}
-        {Object.entries(ENDPOINT_REASONING_FORMAT_LABELS).map(([format, label]) => (
+        {Object.entries(PRIVATE_PROVIDER_REASONING_FORMAT_LABELS).map(([format, label]) => (
           <SelectItem key={format} value={format}>
             {label}
           </SelectItem>
@@ -190,7 +190,7 @@ function PromptCacheKeySelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={INHERIT}>Endpoint setting</SelectItem>
+        <SelectItem value={INHERIT}>Private provider setting</SelectItem>
         <SelectItem value={SEND}>Send</SelectItem>
         <SelectItem value={OMIT}>Do not send</SelectItem>
       </SelectContent>
@@ -263,8 +263,8 @@ function CredentialsFields({
   notice,
   onKeepSaved,
 }: {
-  value: EndpointCredentialsForm;
-  onChange: (update: Partial<EndpointCredentialsForm>) => void;
+  value: PrivateProviderCredentialsForm;
+  onChange: (update: Partial<PrivateProviderCredentialsForm>) => void;
   /** Why the credentials must be entered, when they must. */
   notice?: ReactNode;
   /** Goes back to the saved credentials; absent when they cannot be kept. */
@@ -275,16 +275,16 @@ function CredentialsFields({
       <legend className="type-label mb-2">Credentials</legend>
       {notice}
       <div className="space-y-2">
-        <Label htmlFor="endpoint-credentials-type">Authentication</Label>
+        <Label htmlFor="private-provider-credentials-type">Authentication</Label>
         <Select
           value={value.type}
-          onValueChange={type => onChange({ type: type as ByokEndpointCredentialsType })}
+          onValueChange={type => onChange({ type: type as ByokPrivateProviderCredentialsType })}
         >
-          <SelectTrigger id="endpoint-credentials-type">
+          <SelectTrigger id="private-provider-credentials-type">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {Object.entries(ENDPOINT_CREDENTIALS_TYPE_LABELS).map(([type, label]) => (
+            {Object.entries(PRIVATE_PROVIDER_CREDENTIALS_TYPE_LABELS).map(([type, label]) => (
               <SelectItem key={type} value={type}>
                 {label}
               </SelectItem>
@@ -294,9 +294,9 @@ function CredentialsFields({
       </div>
       {value.type === 'api_key' || value.type === 'x-api-key' ? (
         <div className="space-y-2">
-          <Label htmlFor="endpoint-api-key">API key</Label>
+          <Label htmlFor="private-provider-api-key">API key</Label>
           <SecretInput
-            id="endpoint-api-key"
+            id="private-provider-api-key"
             value={value.api_key}
             onChange={api_key => onChange({ api_key })}
             placeholder="Enter API key"
@@ -311,43 +311,43 @@ function CredentialsFields({
       {value.type === 'aws_bedrock' ? (
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="endpoint-aws-region">Region</Label>
+            <Label htmlFor="private-provider-aws-region">Region</Label>
             <Input
-              id="endpoint-aws-region"
+              id="private-provider-aws-region"
               value={value.region}
               onChange={e => onChange({ region: e.target.value })}
               placeholder="us-east-1"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="endpoint-aws-access-key-id">Access key ID</Label>
+            <Label htmlFor="private-provider-aws-access-key-id">Access key ID</Label>
             <SecretInput
-              id="endpoint-aws-access-key-id"
+              id="private-provider-aws-access-key-id"
               value={value.access_key_id}
               onChange={access_key_id => onChange({ access_key_id })}
               placeholder="AKIA…"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="endpoint-aws-secret">Secret access key</Label>
+            <Label htmlFor="private-provider-aws-secret">Secret access key</Label>
             <SecretInput
-              id="endpoint-aws-secret"
+              id="private-provider-aws-secret"
               value={value.secret_access_key}
               onChange={secret_access_key => onChange({ secret_access_key })}
               placeholder="Secret access key"
             />
           </div>
           <p className="text-muted-foreground text-xs sm:col-span-3">
-            Requests are signed with AWS Signature Version 4, for Amazon Bedrock endpoints such as
-            bedrock-runtime or bedrock-mantle.
+            Requests are signed with AWS Signature Version 4, for Amazon Bedrock private providers
+            such as bedrock-runtime or bedrock-mantle.
           </p>
         </div>
       ) : null}
       {value.type === 'service_account' ? (
         <div className="space-y-2">
-          <Label htmlFor="endpoint-service-account">Service account key</Label>
+          <Label htmlFor="private-provider-service-account">Service account key</Label>
           <SecretInput
-            id="endpoint-service-account"
+            id="private-provider-service-account"
             value={value.service_account_json}
             onChange={service_account_json => onChange({ service_account_json })}
             placeholder='{"type": "service_account", "project_id": "...", ...}'
@@ -373,21 +373,23 @@ function CredentialsFields({
 
 function ModelOverrides({
   row,
-  endpointApiKinds,
+  privateProviderApiKinds,
   onChange,
 }: {
-  row: EndpointModelRow;
-  endpointApiKinds: CustomLlmApiKind[];
-  onChange: (update: Partial<EndpointModelRow>) => void;
+  row: PrivateModelRow;
+  privateProviderApiKinds: CustomLlmApiKind[];
+  onChange: (update: Partial<PrivateModelRow>) => void;
 }) {
-  const idPrefix = `endpoint-model-${row.rowKey}`;
+  const idPrefix = `private-model-${row.rowKey}`;
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       <div className="space-y-2">
         <label className="flex items-center gap-2 text-sm">
           <Checkbox
             checked={row.api_kinds !== null}
-            onCheckedChange={checked => onChange({ api_kinds: checked ? endpointApiKinds : null })}
+            onCheckedChange={checked =>
+              onChange({ api_kinds: checked ? privateProviderApiKinds : null })
+            }
           />
           Override supported APIs
         </label>
@@ -405,7 +407,7 @@ function ModelOverrides({
           id={`${idPrefix}-client`}
           value={row.client_provider}
           onChange={client_provider => onChange({ client_provider })}
-          inheritLabel="Endpoint setting"
+          inheritLabel="Private provider setting"
         />
       </div>
       <div className="space-y-2">
@@ -414,10 +416,10 @@ function ModelOverrides({
           id={`${idPrefix}-reasoning`}
           value={row.reasoning_format}
           onChange={reasoning_format => onChange({ reasoning_format })}
-          inheritLabel="Endpoint setting"
+          inheritLabel="Private provider setting"
         />
       </div>
-      {sendsPromptCacheKeyOver(row.api_kinds ?? endpointApiKinds) ? (
+      {sendsPromptCacheKeyOver(row.api_kinds ?? privateProviderApiKinds) ? (
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-prompt-cache-key`}>Prompt cache key</Label>
           <PromptCacheKeySelect
@@ -431,7 +433,7 @@ function ModelOverrides({
   );
 }
 
-function hasOverrides(row: EndpointModelRow) {
+function hasOverrides(row: PrivateModelRow) {
   return (
     row.api_kinds !== null ||
     row.client_provider !== null ||
@@ -442,18 +444,18 @@ function hasOverrides(row: EndpointModelRow) {
 
 function ModelsTable({
   rows,
-  endpointApiKinds,
+  privateProviderApiKinds,
   catalogModelIds,
   onChange,
 }: {
-  rows: EndpointModelRow[];
-  endpointApiKinds: CustomLlmApiKind[];
+  rows: PrivateModelRow[];
+  privateProviderApiKinds: CustomLlmApiKind[];
   /** Set in catalog mode, once looked up. */
-  catalogModelIds: EndpointCatalogModelIds | null;
-  onChange: (rows: EndpointModelRow[]) => void;
+  catalogModelIds: PrivateProviderCatalogModelIds | null;
+  onChange: (rows: PrivateModelRow[]) => void;
 }) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-  const update = (rowKey: string, change: Partial<EndpointModelRow>) =>
+  const update = (rowKey: string, change: Partial<PrivateModelRow>) =>
     onChange(rows.map(row => (row.rowKey === rowKey ? { ...row, ...change } : row)));
   const toggleExpanded = (rowKey: string) =>
     setExpanded(current => {
@@ -558,7 +560,7 @@ function ModelsTable({
                       checked={row.flags.includes('vision')}
                       onCheckedChange={checked =>
                         update(row.rowKey, {
-                          flags: setEndpointModelFlag(row.flags, 'vision', checked),
+                          flags: setPrivateModelFlag(row.flags, 'vision', checked),
                         })
                       }
                       aria-label={`${label} accepts images`}
@@ -569,7 +571,7 @@ function ModelsTable({
                       checked={row.flags.includes('reasoning')}
                       onCheckedChange={checked =>
                         update(row.rowKey, {
-                          flags: setEndpointModelFlag(row.flags, 'reasoning', checked),
+                          flags: setPrivateModelFlag(row.flags, 'reasoning', checked),
                         })
                       }
                       aria-label={`${label} supports reasoning`}
@@ -594,7 +596,7 @@ function ModelsTable({
                     <td colSpan={8} className="p-3">
                       <ModelOverrides
                         row={row}
-                        endpointApiKinds={endpointApiKinds}
+                        privateProviderApiKinds={privateProviderApiKinds}
                         onChange={change => update(row.rowKey, change)}
                       />
                     </td>
@@ -609,55 +611,62 @@ function ModelsTable({
   );
 }
 
-function ByokEndpointForm({
+function ByokPrivateProviderForm({
   organizationId,
   editingKey,
   onClose,
   onSaved,
 }: {
   organizationId: string;
-  editingKey: ByokEndpointDialogKey | null;
+  editingKey: ByokPrivateProviderDialogKey | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const trpc = useTRPC();
   const isEditing = editingKey !== null;
-  const [form, setForm] = useState<EndpointForm>(() =>
-    toEndpointForm(editingKey?.endpoint ?? null)
+  const [form, setForm] = useState<PrivateProviderForm>(() =>
+    toPrivateProviderForm(editingKey?.private_provider ?? null)
   );
-  const [credentials, setCredentials] = useState(EMPTY_ENDPOINT_CREDENTIALS_FORM);
+  const [credentials, setCredentials] = useState(EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM);
   const [replacingCredentials, setReplacingCredentials] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
-  const [importedModels, setImportedModels] = useState<ByokEndpointModel[] | null>(null);
-  const updateForm = (update: Partial<EndpointForm>) =>
+  const [importedModels, setImportedModels] = useState<ByokPrivateModel[] | null>(null);
+  const updateForm = (update: Partial<PrivateProviderForm>) =>
     setForm(current => ({ ...current, ...update }));
   // Saved credentials only go to the host they were saved for.
   const hostChanged = editingKey
-    ? !editingKey.endpoint || endpointOriginChanged(editingKey.endpoint.base_url, form.base_url)
+    ? !editingKey.private_provider ||
+      privateProviderOriginChanged(editingKey.private_provider.base_url, form.base_url)
     : false;
   const credentialsRequired = !isEditing || hostChanged;
   const showsCredentialInputs = credentialsRequired || replacingCredentials;
-  const catalogModelIds = useEndpointCatalogModelIds(
+  const catalogModelIds = usePrivateProviderCatalogModelIds(
     organizationId,
     form.models.map(row => row.id),
     editingKey?.serve_catalog_models ?? false
   );
-  const credentialsInput = showsCredentialInputs ? credentials : EMPTY_ENDPOINT_CREDENTIALS_FORM;
+  const credentialsInput = showsCredentialInputs
+    ? credentials
+    : EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM;
 
   const mutationOptions = {
     onSuccess: () => {
-      toast.success(isEditing ? 'Endpoint updated' : 'Endpoint added');
+      toast.success(isEditing ? 'Private provider updated' : 'Private provider added');
       onSaved();
     },
     onError: (error: { message: string }) => setErrors([error.message]),
   };
-  const createMutation = useMutation(trpc.byok.createEndpoint.mutationOptions(mutationOptions));
-  const updateMutation = useMutation(trpc.byok.updateEndpoint.mutationOptions(mutationOptions));
+  const createMutation = useMutation(
+    trpc.byok.createPrivateProvider.mutationOptions(mutationOptions)
+  );
+  const updateMutation = useMutation(
+    trpc.byok.updatePrivateProvider.mutationOptions(mutationOptions)
+  );
   const listModelsMutation = useMutation(
-    trpc.byok.listModelsFromEndpoint.mutationOptions({
+    trpc.byok.listModelsFromPrivateProvider.mutationOptions({
       onSuccess: ({ models }) => {
         if (models.length === 0) {
-          toast.error('The endpoint lists no chat models.');
+          toast.error('The private provider lists no chat models.');
           return;
         }
         setImportedModels(models);
@@ -668,7 +677,7 @@ function ByokEndpointForm({
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const handleImport = () => {
-    const builtCredentials = buildEndpointCredentials(credentialsInput, {
+    const builtCredentials = buildPrivateProviderCredentials(credentialsInput, {
       optional: !credentialsRequired,
     });
     if (!builtCredentials.success) {
@@ -686,8 +695,8 @@ function ByokEndpointForm({
   };
 
   const handleSave = () => {
-    const definition = buildEndpointDefinition(form);
-    const builtCredentials = buildEndpointCredentials(credentialsInput, {
+    const definition = buildPrivateProviderDefinition(form);
+    const builtCredentials = buildPrivateProviderCredentials(credentialsInput, {
       optional: !credentialsRequired,
     });
     const nextErrors = [
@@ -715,19 +724,19 @@ function ByokEndpointForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{isEditing ? 'Edit endpoint' : 'Add endpoint'}</DialogTitle>
+        <DialogTitle>{isEditing ? 'Edit private provider' : 'Add private provider'}</DialogTitle>
         <DialogDescription>
-          Route requests to your own OpenAI- or Anthropic-compatible API. Requests use your
-          endpoint&apos;s billing instead of your Kilo balance.
+          Route requests to your own OpenAI- or Anthropic-compatible API. Requests use your private
+          provider&apos;s billing instead of your Kilo balance.
         </DialogDescription>
       </DialogHeader>
 
       <div className="-mx-6 min-h-0 space-y-6 overflow-y-auto px-6 py-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="endpoint-name">Name</Label>
+            <Label htmlFor="private-provider-name">Name</Label>
             <Input
-              id="endpoint-name"
+              id="private-provider-name"
               value={form.name}
               onChange={e => updateForm({ name: e.target.value })}
               placeholder="Internal gateway"
@@ -735,9 +744,9 @@ function ByokEndpointForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="endpoint-base-url">Base URL</Label>
+            <Label htmlFor="private-provider-base-url">Base URL</Label>
             <Input
-              id="endpoint-base-url"
+              id="private-provider-base-url"
               value={form.base_url}
               onChange={e => updateForm({ base_url: e.target.value })}
               placeholder="https://api.example.com/v1"
@@ -769,7 +778,7 @@ function ByokEndpointForm({
             onKeepSaved={
               isEditing && !hostChanged
                 ? () => {
-                    setCredentials(EMPTY_ENDPOINT_CREDENTIALS_FORM);
+                    setCredentials(EMPTY_PRIVATE_PROVIDER_CREDENTIALS_FORM);
                     setReplacingCredentials(false);
                   }
                 : undefined
@@ -799,19 +808,19 @@ function ByokEndpointForm({
           <div className="space-y-2">
             <span className="text-sm">Supported APIs</span>
             <ApiKindCheckboxes
-              idPrefix="endpoint-api-kind"
+              idPrefix="private-provider-api-kind"
               value={form.api_kinds}
               onChange={api_kinds => updateForm({ api_kinds })}
             />
             <p className="text-muted-foreground text-xs">
-              The APIs the endpoint serves. Requests over other APIs are not sent to it.
+              The APIs the private provider serves. Requests over other APIs are not sent to it.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="endpoint-client-provider">Preferred client API</Label>
+              <Label htmlFor="private-provider-client-provider">Preferred client API</Label>
               <ClientProviderSelect
-                id="endpoint-client-provider"
+                id="private-provider-client-provider"
                 value={form.client_provider}
                 onChange={client_provider => client_provider && updateForm({ client_provider })}
               />
@@ -820,25 +829,25 @@ function ByokEndpointForm({
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="endpoint-reasoning-format">Reasoning format</Label>
+              <Label htmlFor="private-provider-reasoning-format">Reasoning format</Label>
               <ReasoningFormatSelect
-                id="endpoint-reasoning-format"
+                id="private-provider-reasoning-format"
                 value={form.reasoning_format}
                 onChange={reasoning_format => reasoning_format && updateForm({ reasoning_format })}
               />
               <p className="text-muted-foreground text-xs">
-                How the endpoint returns reasoning in Chat Completions responses.
+                How the private provider returns reasoning in Chat Completions responses.
               </p>
             </div>
           </div>
           {sendsPromptCacheKeyOver(form.api_kinds) ? (
             <div className="space-y-1">
               <label
-                htmlFor="endpoint-prompt-cache-key"
+                htmlFor="private-provider-prompt-cache-key"
                 className="flex items-center gap-2 text-sm"
               >
                 <Checkbox
-                  id="endpoint-prompt-cache-key"
+                  id="private-provider-prompt-cache-key"
                   checked={form.send_prompt_cache_key}
                   onCheckedChange={checked =>
                     updateForm({ send_prompt_cache_key: checked === true })
@@ -848,16 +857,16 @@ function ByokEndpointForm({
               </label>
               <p className="text-muted-foreground text-xs">
                 Sends <code>prompt_cache_key</code> with Chat Completions and Responses requests,
-                which helps the endpoint reuse cached prompts. Leave it off if the endpoint rejects
-                unknown fields.
+                which helps the private provider reuse cached prompts. Leave it off if the private
+                provider rejects unknown fields.
               </p>
             </div>
           ) : null}
         </fieldset>
 
-        <section className="space-y-3" aria-labelledby="endpoint-models-heading">
+        <section className="space-y-3" aria-labelledby="private-models-heading">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 id="endpoint-models-heading" className="type-label">
+            <h3 id="private-models-heading" className="type-label">
               Models{' '}
               <span className="text-muted-foreground font-normal">({form.models.length})</span>
             </h3>
@@ -876,8 +885,8 @@ function ByokEndpointForm({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => updateForm({ models: [...form.models, toEndpointModelRow()] })}
-                disabled={form.models.length >= BYOK_ENDPOINT_MAX_MODELS}
+                onClick={() => updateForm({ models: [...form.models, toPrivateModelRow()] })}
+                disabled={form.models.length >= BYOK_PRIVATE_PROVIDER_MAX_MODELS}
               >
                 <Plus />
                 Add model
@@ -889,21 +898,21 @@ function ByokEndpointForm({
             <AlertDescription className="space-y-1">
               {editingKey?.serve_catalog_models ? (
                 <p>
-                  This endpoint uses Kilo catalog model IDs: each model ID must be a Kilo catalog
-                  ID, such as <code>anthropic/claude-sonnet-4.5</code>, and requests for that
-                  catalog model are served by this endpoint with the upstream model ID. Organization
-                  model restrictions apply.
+                  This private provider uses Kilo catalog model IDs: each model ID must be a Kilo
+                  catalog ID, such as <code>anthropic/claude-sonnet-4.5</code>, and requests for
+                  that catalog model are served by this private provider with the upstream model ID.
+                  Organization model restrictions apply.
                 </p>
               ) : (
                 <>
                   <p>
-                    Clients select these models as <code>endpoint-…/&lt;model ID&gt;</code>. The
-                    upstream model ID is what the endpoint receives.
+                    Clients select these models as <code>private-provider-…/&lt;model ID&gt;</code>.
+                    The upstream model ID is what the private provider receives.
                   </p>
                   <p>
                     With Kilo catalog model IDs turned on in the key list, each model ID must
                     instead be a Kilo catalog ID, such as <code>anthropic/claude-sonnet-4.5</code>,
-                    and requests for that catalog model are served by this endpoint.
+                    and requests for that catalog model are served by this private provider.
                   </p>
                 </>
               )}
@@ -911,14 +920,14 @@ function ByokEndpointForm({
           </Alert>
           <ModelsTable
             rows={form.models}
-            endpointApiKinds={form.api_kinds}
+            privateProviderApiKinds={form.api_kinds}
             catalogModelIds={catalogModelIds}
             onChange={models => updateForm({ models })}
           />
         </section>
 
         {errors.length > 0 ? (
-          <Alert variant="destructive" id="endpoint-errors">
+          <Alert variant="destructive" id="private-provider-errors">
             <AlertDescription>
               <ul className="list-disc space-y-0.5 pl-4">
                 {errors.map(error => (
@@ -937,12 +946,12 @@ function ByokEndpointForm({
           Cancel
         </Button>
         <Button onClick={handleSave} disabled={isSaving}>
-          {isSaving ? 'Saving…' : isEditing ? 'Save endpoint' : 'Add endpoint'}
+          {isSaving ? 'Saving…' : isEditing ? 'Save private provider' : 'Add private provider'}
         </Button>
       </DialogFooter>
 
       {importedModels ? (
-        <ByokEndpointImportDialog
+        <ByokPrivateProviderImportDialog
           models={importedModels}
           listedInternalIds={new Set(form.models.map(row => row.internal_id.trim()))}
           capacity={getImportCapacity(form.models)}
@@ -960,7 +969,7 @@ function ByokEndpointForm({
   );
 }
 
-export function ByokEndpointDialog({
+export function ByokPrivateProviderDialog({
   organizationId,
   open,
   editingKey,
@@ -969,8 +978,8 @@ export function ByokEndpointDialog({
 }: {
   organizationId: string;
   open: boolean;
-  /** The endpoint key being edited, or null to add one. */
-  editingKey: ByokEndpointDialogKey | null;
+  /** The private provider key being edited, or null to add one. */
+  editingKey: ByokPrivateProviderDialogKey | null;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
@@ -978,7 +987,7 @@ export function ByokEndpointDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-5xl grid-rows-[auto_minmax(0,1fr)_auto]">
         {open ? (
-          <ByokEndpointForm
+          <ByokPrivateProviderForm
             key={editingKey?.id ?? 'new'}
             organizationId={organizationId}
             editingKey={editingKey}

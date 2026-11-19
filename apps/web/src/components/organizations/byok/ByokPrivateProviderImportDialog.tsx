@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { ByokEndpointModel } from '@kilocode/db/schema-types';
+import type { ByokPrivateModel } from '@kilocode/db/schema-types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -13,9 +13,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { addToImportSelection } from '@/lib/byok/endpoint-form';
+import { addToImportSelection } from '@/lib/byok/private-provider-form';
 
-function matchesSearch(model: ByokEndpointModel, search: string) {
+function matchesSearch(model: ByokPrivateModel, search: string) {
   const query = search.trim().toLowerCase();
   if (!query) return true;
   return [model.id, model.internal_id, model.name ?? ''].some(value =>
@@ -23,20 +23,20 @@ function matchesSearch(model: ByokEndpointModel, search: string) {
   );
 }
 
-export function ByokEndpointImportDialog({
+export function ByokPrivateProviderImportDialog({
   models,
   listedInternalIds,
   capacity,
   onAdd,
   onClose,
 }: {
-  /** The models the endpoint lists. */
-  models: ByokEndpointModel[];
-  /** Upstream ids the endpoint already has; they cannot be added twice. */
+  /** The models the private provider lists. */
+  models: ByokPrivateModel[];
+  /** Upstream ids the private provider already has; they cannot be added twice. */
   listedInternalIds: ReadonlySet<string>;
-  /** How many more models the endpoint can take. */
+  /** How many more models the private provider can take. */
   capacity: number;
-  onAdd: (models: ByokEndpointModel[]) => void;
+  onAdd: (models: ByokPrivateModel[]) => void;
   onClose: () => void;
 }) {
   const [search, setSearch] = useState('');
@@ -79,8 +79,9 @@ export function ByokEndpointImportDialog({
         <DialogHeader>
           <DialogTitle>Import models</DialogTitle>
           <DialogDescription>
-            The endpoint lists {models.length} model{models.length === 1 ? '' : 's'}. Select the
-            ones to add, then check their limits before saving. {remaining} of {capacity} model slot
+            The private provider lists {models.length} model{models.length === 1 ? '' : 's'}. Select
+            the ones to add, then check their limits before saving. {remaining} of {capacity} model
+            slot
             {capacity === 1 ? '' : 's'} left.
           </DialogDescription>
         </DialogHeader>

@@ -7,7 +7,7 @@ const NAMES: Record<string, string> = {
   bedrock: 'AWS Bedrock',
   openrouter: 'OpenRouter',
   openai: 'OpenAI API key',
-  'endpoint-a1b2c3d4e5': 'Acme',
+  'private-a1b2c3d4e5': 'Acme',
 };
 
 function getProviderName(providerId: string) {
@@ -35,26 +35,29 @@ describe('describeRouteStep', () => {
   });
 
   it.each([
-    ['unsupported-api-kind', 'Skipped: the endpoint serves this model over Chat Completions only.'],
-    ['disabled', 'Skipped: the endpoint is disabled.'],
+    [
+      'unsupported-api-kind',
+      'Skipped: the private provider serves this model over Chat Completions only.',
+    ],
+    ['disabled', 'Skipped: the private provider is disabled.'],
     [
       'not-catalog-mode',
-      'Skipped: the endpoint uses its own model IDs. Turn on Kilo catalog model IDs to use it for this model.',
+      'Skipped: the private provider uses its own model IDs. Turn on Kilo catalog model IDs to use it for this model.',
     ],
-  ] as const)('names an organization endpoint skipped as %s', (reason, detail) => {
+  ] as const)('names an organization private provider skipped as %s', (reason, detail) => {
     expect(
       describeRouteStep(
         {
           route: 'direct-byok',
           outcome: 'skipped',
-          providerId: 'endpoint-a1b2c3d4e5',
+          providerId: 'private-a1b2c3d4e5',
           reason,
           supportedApiKinds: ['chat_completions'],
         },
         getProviderName,
         true
       )
-    ).toEqual({ title: 'Acme endpoint', detail });
+    ).toEqual({ title: 'Acme private provider', detail });
   });
 
   it('names the key Vercel AI Gateway receives', () => {

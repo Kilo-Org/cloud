@@ -13,7 +13,7 @@ type ReorderInput = ListInput & { keyIds: string[] };
 
 const listKey = (input: ListInput) => ['byok', 'list', input];
 let mockKeys: BYOKApiKeyResponse[] = [];
-let mockByokEndpointsEnabled = false;
+let mockByokPrivateProvidersEnabled = false;
 /** The options the screen registered for the stored-key test, so a test can run its handlers. */
 let mockTestApiKeyOptions:
   | { onSuccess?: (result: unknown, variables: { id: string }) => void }
@@ -47,19 +47,19 @@ jest.mock('@/lib/trpc/utils', () => ({
         listCatalogModeSupportedModels: {
           queryOptions: () => ({ queryKey: ['byok', 'catalog-models'], queryFn: async () => ({}) }),
         },
-        listEndpointCatalogModelIds: {
+        listPrivateProviderCatalogModelIds: {
           queryOptions: (input: object) => ({
-            queryKey: ['byok', 'endpoint-catalog-models', input],
+            queryKey: ['byok', 'private-provider-catalog-models', input],
             queryFn: async () => [],
           }),
         },
         experimentalByokEnabled: {
           queryOptions: () => ({ queryKey: ['byok', 'experimental'], queryFn: async () => false }),
         },
-        byokEndpointsEnabled: {
+        privateProvidersEnabled: {
           queryOptions: (input: ListInput) => ({
-            queryKey: ['byok', 'endpoints-enabled', input],
-            queryFn: async () => mockByokEndpointsEnabled,
+            queryKey: ['byok', 'private providers-enabled', input],
+            queryFn: async () => mockByokPrivateProvidersEnabled,
           }),
         },
         previewRouting: { pathFilter: () => ({ queryKey: ['byok', 'previewRouting'] }) },
@@ -77,9 +77,9 @@ jest.mock('@/lib/trpc/utils', () => ({
             return { ...options, mutationFn: jest.fn() };
           },
         },
-        createEndpoint: mutation,
-        updateEndpoint: mutation,
-        listModelsFromEndpoint: mutation,
+        createPrivateProvider: mutation,
+        updatePrivateProvider: mutation,
+        listModelsFromPrivateProvider: mutation,
       },
     };
   },
@@ -189,7 +189,7 @@ describe('BYOK key priorities', () => {
     queryClient = undefined;
     mockReorder.mockClear();
     jest.mocked(toast.error).mockClear();
-    mockByokEndpointsEnabled = false;
+    mockByokPrivateProvidersEnabled = false;
   });
 
   async function mount(organizationId?: string, providers = ['anthropic', 'openrouter']) {
@@ -205,15 +205,15 @@ describe('BYOK key priorities', () => {
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
       created_by: 'test-user',
-      is_endpoint: false,
-      endpoint: null,
+      is_private_provider: false,
+      private_provider: null,
     }));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient = client;
     client.setQueryData(listKey(organizationId ? { organizationId } : {}), mockKeys);
     client.setQueryData(
-      ['byok', 'endpoints-enabled', organizationId ? { organizationId } : {}],
-      mockByokEndpointsEnabled
+      ['byok', 'private providers-enabled', organizationId ? { organizationId } : {}],
+      mockByokPrivateProvidersEnabled
     );
     const dom = installDom();
     root = createRoot(dom.container);
@@ -295,12 +295,14 @@ describe('BYOK key priorities', () => {
     [true, true],
     [false, false],
   ])(
-    'with BYOK endpoints enabled %s, shows the Add endpoint button: %s',
+    'with BYOK private providers enabled %s, shows the Add private provider button: %s',
     async (enabled, shown) => {
-      mockByokEndpointsEnabled = enabled;
+      mockByokPrivateProvidersEnabled = enabled;
       const container = await mount('test-org');
       const buttons = [...container.querySelectorAll('button')];
-      expect(buttons.some(button => button.textContent?.includes('Add endpoint'))).toBe(shown);
+      expect(buttons.some(button => button.textContent?.includes('Add private provider'))).toBe(
+        shown
+      );
     }
   );
 });
@@ -333,8 +335,8 @@ describe('BYOK stored-key test toasts', () => {
         created_at: '2026-01-01T00:00:00.000Z',
         updated_at: '2026-01-01T00:00:00.000Z',
         created_by: 'test-user',
-        is_endpoint: false,
-        endpoint: null,
+        is_private_provider: false,
+        private_provider: null,
       },
     ];
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

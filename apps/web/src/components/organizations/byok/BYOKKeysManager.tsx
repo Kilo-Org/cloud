@@ -67,10 +67,10 @@ import { cn } from '@/lib/utils';
 import type { BYOKKeyTestResult } from '@/lib/byok/types';
 import * as z from 'zod';
 import {
-  useEndpointCatalogModelIds,
-  type EndpointCatalogModelIds,
-} from './useEndpointCatalogModelIds';
-import { ByokEndpointDialog } from './ByokEndpointDialog';
+  usePrivateProviderCatalogModelIds,
+  type PrivateProviderCatalogModelIds,
+} from './usePrivateProviderCatalogModelIds';
+import { ByokPrivateProviderDialog } from './ByokPrivateProviderDialog';
 
 export {
   getStructuredCredentialKind,
@@ -86,31 +86,33 @@ function apiKeyObjectLabel(providerName: string): string {
   return providerName.endsWith('API key') ? providerName : `${providerName} API key`;
 }
 
-type NamedKey = Pick<BYOKApiKeyResponse, 'provider_id' | 'provider_name' | 'is_endpoint'>;
+type NamedKey = Pick<BYOKApiKeyResponse, 'provider_id' | 'provider_name' | 'is_private_provider'>;
 
-/** An endpoint is named by the organization; every other key by its provider. */
+/** A private provider is named by the organization; every other key by its provider. */
 function keyDisplayName(key: NamedKey): string {
-  return key.is_endpoint ? key.provider_name : getByokProviderDisplayName(key.provider_id);
+  return key.is_private_provider ? key.provider_name : getByokProviderDisplayName(key.provider_id);
 }
 
 function keyObjectLabel(key: NamedKey): string {
-  return key.is_endpoint ? `${key.provider_name} endpoint` : apiKeyObjectLabel(keyDisplayName(key));
+  return key.is_private_provider
+    ? `${key.provider_name} private provider`
+    : apiKeyObjectLabel(keyDisplayName(key));
 }
 
-function endpointModelLabels(key: BYOKApiKeyResponse): string[] {
-  return (key.endpoint?.models ?? []).map(model => {
+function privateModelLabels(key: BYOKApiKeyResponse): string[] {
+  return (key.private_provider?.models ?? []).map(model => {
     const id = key.serve_catalog_models ? model.id : `${key.provider_id}/${model.id}`;
     return model.name ? `${model.name} (${id})` : id;
   });
 }
 
-/** Warns about the models of a catalog-mode endpoint that no catalog id names, which it does not serve. */
-function EndpointCatalogModelWarning({
+/** Warns about the models of a catalog-mode private provider that no catalog id names, which it does not serve. */
+function PrivateProviderCatalogModelWarning({
   models,
   catalogModelIds,
 }: {
   models: string[];
-  catalogModelIds: EndpointCatalogModelIds | null;
+  catalogModelIds: PrivateProviderCatalogModelIds | null;
 }) {
   if (!catalogModelIds) return null;
   const unserved = models.filter(
@@ -121,8 +123,8 @@ function EndpointCatalogModelWarning({
   return (
     <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
       {all
-        ? 'None of this endpoint’s model IDs is a Kilo catalog model ID, so it serves no requests in catalog mode.'
-        : `${unserved.length} of this endpoint’s model IDs ${unserved.length === 1 ? 'is' : 'are'} not Kilo catalog model IDs and ${unserved.length === 1 ? 'is' : 'are'} not served in catalog mode: ${unserved.slice(0, 3).join(', ')}${unserved.length > 3 ? ', …' : ''}.`}
+        ? 'None of this private provider’s model IDs is a Kilo catalog model ID, so it serves no requests in catalog mode.'
+        : `${unserved.length} of this private provider’s model IDs ${unserved.length === 1 ? 'is' : 'are'} not Kilo catalog model IDs and ${unserved.length === 1 ? 'is' : 'are'} not served in catalog mode: ${unserved.slice(0, 3).join(', ')}${unserved.length > 3 ? ', …' : ''}.`}
     </p>
   );
 }
@@ -387,7 +389,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [reorderAnnouncement, setReorderAnnouncement] = useState('');
-  const [endpointDialog, setEndpointDialog] = useState<{
+  const [privateProviderDialog, setPrivateProviderDialog] = useState<{
     open: boolean;
     editingKeyId: string | null;
   }>({ open: false, editingKeyId: null });
@@ -411,8 +413,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const { data: experimentalByokEnabled = false } = useQuery(
     trpc.byok.experimentalByokEnabled.queryOptions(listQueryInput)
   );
-  const { data: byokEndpointsEnabled = false } = useQuery(
-    trpc.byok.byokEndpointsEnabled.queryOptions(listQueryInput)
+  const { data: privateProvidersEnabled = false } = useQuery(
+    trpc.byok.privateProvidersEnabled.queryOptions(listQueryInput)
   );
   const addableProviders = ADD_BYOK_PROVIDERS.filter(
     provider => experimentalByokEnabled || !isExperimentalByokProviderId(provider.id)
@@ -608,8 +610,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
   const handleEdit = (keyId: string) => {
     const key = keys?.find(k => k.id === keyId);
-    if (key?.is_endpoint) {
-      setEndpointDialog({ open: true, editingKeyId: keyId });
+    if (key?.is_private_provider) {
+      setPrivateProviderDialog({ open: true, editingKeyId: keyId });
       return;
     }
     setEditingKeyId(keyId);
@@ -722,14 +724,14 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   // it never appears here with edit, toggle, test or delete controls.
   const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
   const listedKeyIds = listedKeys?.map(key => key.id) ?? [];
-  const catalogModeEndpointModelIds =
+  const catalogModePrivateModelIds =
     listedKeys
-      ?.filter(key => key.is_endpoint && key.serve_catalog_models)
-      .flatMap(key => key.endpoint?.models.map(model => model.id) ?? []) ?? [];
-  const endpointCatalogModelIds = useEndpointCatalogModelIds(
+      ?.filter(key => key.is_private_provider && key.serve_catalog_models)
+      .flatMap(key => key.private_provider?.models.map(model => model.id) ?? []) ?? [];
+  const privateProviderCatalogModelIds = usePrivateProviderCatalogModelIds(
     organizationId ?? '',
-    catalogModeEndpointModelIds,
-    !!organizationId && catalogModeEndpointModelIds.length > 0
+    catalogModePrivateModelIds,
+    !!organizationId && catalogModePrivateModelIds.length > 0
   );
 
   if (keysLoading) {
@@ -777,14 +779,14 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
             <CardTitle>BYOK API Keys</CardTitle>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            {organizationId && byokEndpointsEnabled ? (
+            {organizationId && privateProvidersEnabled ? (
               <Button
-                onClick={() => setEndpointDialog({ open: true, editingKeyId: null })}
+                onClick={() => setPrivateProviderDialog({ open: true, editingKeyId: null })}
                 size="sm"
                 variant="outline"
               >
                 <Plus className="mr-2 size-4" />
-                Add endpoint
+                Add private provider
               </Button>
             ) : null}
             <Button onClick={() => setIsDialogOpen(true)} size="sm">
@@ -867,11 +869,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           )}
                         >
                           <div className="break-words">{displayName}</div>
-                          {key.is_endpoint ? (
+                          {key.is_private_provider ? (
                             <p className="text-muted-foreground mt-1 text-xs">
-                              Endpoint
-                              {key.endpoint
-                                ? ` · ${key.endpoint.models.length} model${key.endpoint.models.length === 1 ? '' : 's'}`
+                              Private provider
+                              {key.private_provider
+                                ? ` · ${key.private_provider.models.length} model${key.private_provider.models.length === 1 ? '' : 's'}`
                                 : ''}
                             </p>
                           ) : null}
@@ -882,15 +884,17 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           ) : null}
                           <SupportedModelsList
                             models={
-                              key.is_endpoint
-                                ? endpointModelLabels(key)
+                              key.is_private_provider
+                                ? privateModelLabels(key)
                                 : getProviderModels(key.provider_id, key.serve_catalog_models)
                             }
                           />
-                          {key.is_endpoint && key.serve_catalog_models && key.endpoint ? (
-                            <EndpointCatalogModelWarning
-                              models={key.endpoint.models.map(model => model.id)}
-                              catalogModelIds={endpointCatalogModelIds}
+                          {key.is_private_provider &&
+                          key.serve_catalog_models &&
+                          key.private_provider ? (
+                            <PrivateProviderCatalogModelWarning
+                              models={key.private_provider.models.map(model => model.id)}
+                              catalogModelIds={privateProviderCatalogModelIds}
                             />
                           ) : null}
                           {/* Shown while enabled so a key can leave catalog mode after its
@@ -1405,17 +1409,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           </DialogContent>
         </Dialog>
         {organizationId ? (
-          <ByokEndpointDialog
+          <ByokPrivateProviderDialog
             organizationId={organizationId}
-            open={endpointDialog.open}
+            open={privateProviderDialog.open}
             editingKey={
-              listedKeys?.find(key => key.id === endpointDialog.editingKeyId && key.is_endpoint) ??
-              null
+              listedKeys?.find(
+                key => key.id === privateProviderDialog.editingKeyId && key.is_private_provider
+              ) ?? null
             }
-            onOpenChange={open => setEndpointDialog(current => ({ ...current, open }))}
+            onOpenChange={open => setPrivateProviderDialog(current => ({ ...current, open }))}
             onSaved={() => {
               invalidateKeys();
-              setEndpointDialog({ open: false, editingKeyId: null });
+              setPrivateProviderDialog({ open: false, editingKeyId: null });
             }}
           />
         ) : null}

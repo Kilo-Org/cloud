@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { type IndexColumn } from 'drizzle-orm/pg-core';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb, type DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -33,14 +34,18 @@ const NO_USAGE_LIMIT = {
  *
  * One row per organization can also be the organization's shared-services
  * connection: it is connected by an organization owner, it is what the
- * platform's own callers use, and it belongs to no member.
+ * platform's own callers use, and it belongs to no member. The row stays the
+ * organization's and records the connector in `created_by`; a shared row whose
+ * connector is gone is not served by routing (the caller's own connection
+ * serves instead) and reads as needing a reconnect on the organization's
+ * settings.
  */
 
 /**
  * The account a connection belongs to. A member connection is the
  * `(kiloUserId, organizationId)` pair. The organization's shared-services
- * connection is its own single row, and no read depends on the person who
- * connected it.
+ * connection is its own single row, so no owner matches on the person who
+ * connected it; routing revalidates that person from the row's `created_by`.
  */
 export type OpenAiChatGptOwner =
   | { kiloUserId: string; organizationId: string | null; scope?: undefined }
@@ -61,21 +66,92 @@ export function openAiChatGptOwnerKey(owner: OpenAiChatGptOwner): string {
   return `${owner.kiloUserId}:${owner.organizationId ?? 'personal'}`;
 }
 
+/**
+ * What one owner shape contributes to the row predicate, the identity columns a
+ * save writes and the upsert target. All three describe the same shape, so they
+ * are returned together: a new shape that adds only some of them upserts
+ * through the wrong partial index while reads still match the old row.
+ */
+type OpenAiChatGptOwnerShape = {
+  /** Matches the owner's row for reads, updates and deletes. */
+  row: SQL | undefined;
+  /** The identity columns a save writes for this shape. */
+  identity: (createdBy: string) => {
+    kilo_user_id: string;
+    organization_id: string | null;
+    is_shared_services: boolean;
+  };
+  /** The partial unique index this shape upserts through. */
+  conflict: { target: IndexColumn[]; targetWhere: SQL };
+};
+
+/**
+ * Describes the owner shape once. The row predicate, the inserted identity
+ * columns and the conflict target must agree on which row a shape owns, so they
+ * are written next to each other instead of branching again at every call site.
+ */
+function openAiChatGptOwnerShape(owner: OpenAiChatGptOwner): OpenAiChatGptOwnerShape {
+  if (owner.scope === 'shared_services') {
+    const organizationId = owner.organizationId;
+    return {
+      row: and(
+        eq(openai_chatgpt_connections.organization_id, organizationId),
+        eq(openai_chatgpt_connections.is_shared_services, true)
+      ),
+      identity: createdBy => ({
+        kilo_user_id: createdBy,
+        organization_id: organizationId,
+        is_shared_services: true,
+      }),
+      conflict: {
+        target: [openai_chatgpt_connections.organization_id],
+        targetWhere: sql`${openai_chatgpt_connections.is_shared_services} = true`,
+      },
+    };
+  }
+
+  const kiloUserId = owner.kiloUserId;
+  if (owner.organizationId === null) {
+    return {
+      row: and(
+        eq(openai_chatgpt_connections.kilo_user_id, kiloUserId),
+        eq(openai_chatgpt_connections.is_shared_services, false),
+        isNull(openai_chatgpt_connections.organization_id)
+      ),
+      identity: () => ({
+        kilo_user_id: kiloUserId,
+        organization_id: null,
+        is_shared_services: false,
+      }),
+      conflict: {
+        target: [openai_chatgpt_connections.kilo_user_id],
+        targetWhere: sql`${openai_chatgpt_connections.organization_id} IS NULL`,
+      },
+    };
+  }
+
+  const organizationId = owner.organizationId;
+  return {
+    row: and(
+      eq(openai_chatgpt_connections.kilo_user_id, kiloUserId),
+      eq(openai_chatgpt_connections.is_shared_services, false),
+      eq(openai_chatgpt_connections.organization_id, organizationId)
+    ),
+    identity: () => ({
+      kilo_user_id: kiloUserId,
+      organization_id: organizationId,
+      is_shared_services: false,
+    }),
+    conflict: {
+      target: [openai_chatgpt_connections.kilo_user_id, openai_chatgpt_connections.organization_id],
+      targetWhere: sql`${openai_chatgpt_connections.organization_id} IS NOT NULL AND ${openai_chatgpt_connections.is_shared_services} = false`,
+    },
+  };
+}
+
 /** Matches the owner's row for reads, updates and deletes. */
 export function openAiChatGptOwnerWhere(owner: OpenAiChatGptOwner): SQL | undefined {
-  if (owner.scope === 'shared_services') {
-    return and(
-      eq(openai_chatgpt_connections.organization_id, owner.organizationId),
-      eq(openai_chatgpt_connections.is_shared_services, true)
-    );
-  }
-  return and(
-    eq(openai_chatgpt_connections.kilo_user_id, owner.kiloUserId),
-    eq(openai_chatgpt_connections.is_shared_services, false),
-    owner.organizationId === null
-      ? isNull(openai_chatgpt_connections.organization_id)
-      : eq(openai_chatgpt_connections.organization_id, owner.organizationId)
-  );
+  return openAiChatGptOwnerShape(owner).row;
 }
 
 /** Either the primary database or an open transaction. */
@@ -97,6 +173,7 @@ export async function readOpenAiChatGptConnectionRow(
     .select({
       encrypted_connection: openai_chatgpt_connections.encrypted_connection,
       is_enabled: openai_chatgpt_connections.is_enabled,
+      created_by: openai_chatgpt_connections.created_by,
     })
     .from(openai_chatgpt_connections)
     .where(openAiChatGptOwnerWhere(owner));
@@ -123,6 +200,12 @@ export function decryptOpenAiChatGptConnection(
   }
 }
 
+/**
+ * The stored payload alone, without the row's `is_enabled`. The status and
+ * reconnect-message path reads it: a disabled row must still report the stored
+ * status. Routing must use `getOpenAiChatGptStoredConnection` instead, because
+ * the ordinary BYOK toggle can disable the row without rewriting the payload.
+ */
 export async function getOpenAiChatGptConnection(
   owner: OpenAiChatGptOwner
 ): Promise<OpenAiChatGptConnection | null> {
@@ -134,6 +217,11 @@ export async function getOpenAiChatGptConnection(
 export type OpenAiChatGptStoredConnection = {
   connection: OpenAiChatGptConnection;
   isEnabled: boolean;
+  /**
+   * The person whose delegated ChatGPT account the row holds. The column is
+   * not nullable, so every row records a connector.
+   */
+  createdBy: string;
 };
 
 /**
@@ -145,14 +233,35 @@ export type OpenAiChatGptStoredConnection = {
  *
  * Reads the replica: it runs before inference on gateway requests, which also
  * execute in sfo1. Token refresh re-reads the row on the primary under a lock.
+ * A caller that reports state to a person must use
+ * `getOpenAiChatGptStoredConnectionFromPrimary` instead, so a just-reconnected
+ * row never reads as the connector it had a moment earlier.
  */
 export async function getOpenAiChatGptStoredConnection(
   owner: OpenAiChatGptOwner
 ): Promise<OpenAiChatGptStoredConnection | null> {
-  const row = await readOpenAiChatGptConnectionRow(readDb, owner);
+  return await getStoredConnection(readDb, owner);
+}
+
+/**
+ * The stored row as the primary holds it. A surface that tells a person what
+ * their connection is must read this, so the answer matches the payload the same
+ * page shows and a reconnect is visible at once.
+ */
+export async function getOpenAiChatGptStoredConnectionFromPrimary(
+  owner: OpenAiChatGptOwner
+): Promise<OpenAiChatGptStoredConnection | null> {
+  return await getStoredConnection(db, owner);
+}
+
+async function getStoredConnection(
+  fromDb: OpenAiChatGptDatabase,
+  owner: OpenAiChatGptOwner
+): Promise<OpenAiChatGptStoredConnection | null> {
+  const row = await readOpenAiChatGptConnectionRow(fromDb, owner);
   if (!row) return null;
   const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
-  return connection ? { connection, isEnabled: row.is_enabled } : null;
+  return connection ? { connection, isEnabled: row.is_enabled, createdBy: row.created_by } : null;
 }
 
 /**
@@ -173,43 +282,23 @@ export async function saveOpenAiChatGptConnection(
     error_at: undefined,
   };
   const encrypted_connection = encryptApiKey(JSON.stringify(stored), BYOK_ENCRYPTION_KEY);
-  // The shared-services row records the connecting person in `kilo_user_id`; its
-  // reads never match on that column.
+  const shape = openAiChatGptOwnerShape(owner);
+  // The shared-services row records the connecting person in `created_by`; its
+  // reads never match on `kilo_user_id`.
   const values = {
-    kilo_user_id: owner.scope === 'shared_services' ? createdBy : owner.kiloUserId,
-    organization_id: owner.organizationId,
-    is_shared_services: owner.scope === 'shared_services',
+    ...shape.identity(createdBy),
     encrypted_connection,
     is_enabled: true,
     created_by: createdBy,
     ...NO_USAGE_LIMIT,
   };
 
-  // Each owner shape upserts through its own partial unique index.
-  const conflict =
-    owner.scope === 'shared_services'
-      ? {
-          target: [openai_chatgpt_connections.organization_id],
-          targetWhere: sql`${openai_chatgpt_connections.is_shared_services} = true`,
-        }
-      : owner.organizationId === null
-        ? {
-            target: [openai_chatgpt_connections.kilo_user_id],
-            targetWhere: sql`${openai_chatgpt_connections.organization_id} IS NULL`,
-          }
-        : {
-            target: [
-              openai_chatgpt_connections.kilo_user_id,
-              openai_chatgpt_connections.organization_id,
-            ],
-            targetWhere: sql`${openai_chatgpt_connections.organization_id} IS NOT NULL AND ${openai_chatgpt_connections.is_shared_services} = false`,
-          };
-
   await db
     .insert(openai_chatgpt_connections)
     .values(values)
+    // Each owner shape upserts through its own partial unique index.
     .onConflictDoUpdate({
-      ...conflict,
+      ...shape.conflict,
       // A reconnect replaces the credential and the connector with it: the
       // shared-services row is the one place a conflict can change the person
       // recorded on the row, and it must name the person who connected the

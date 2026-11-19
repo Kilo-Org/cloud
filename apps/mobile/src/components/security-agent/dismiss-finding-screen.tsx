@@ -172,10 +172,10 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (notFound) {
     return (
       <DismissSheetFrame>
-        <EmptyState
-          icon={ShieldOff}
+        <QueryError
+          variant="not-found"
           title={t('securityAgent.dismiss.notFoundTitle')}
-          description={t('securityAgent.dismiss.notFoundDescription')}
+          message={t('securityAgent.dismiss.notFoundDescription')}
         />
       </DismissSheetFrame>
     );

@@ -23,6 +23,7 @@ import {
   DYNAMIC_COUNTED_KEYS,
   findCountlessFamilies,
   findUnlistedDynamicCalls,
+  readAuditedCatalog,
   readEnglishCatalog,
 } from './check-plurals.mjs';
 
@@ -187,6 +188,18 @@ test('reports an unreadable English catalog and judges no family against it', ()
   // must not be reported countless on top of the one line naming the cause.
   const scan = auditCountedCalls(root);
   assert.deepEqual(findCountlessFamilies(scan, read.catalog), []);
+});
+
+test('reports a locale catalog the per-locale loop cannot read in the same one line', () => {
+  // The loop reads every non-English catalog through the same audited step, so
+  // a refused or malformed locale gets the identical line the English read
+  // prints, with its own tag.
+  const root = fixture(standardFiles());
+  const locales = join(root, 'apps/mobile/src/i18n/locales');
+  writeFileSync(join(locales, 'ru.json'), '{"agents": ');
+  const read = readAuditedCatalog('ru', locales);
+  assert.equal(read.catalog, null);
+  assert.deepEqual(read.problems, ['ru: cannot audit catalog: Unexpected end of JSON input']);
 });
 
 test('reports an unreadable English catalog through the command and keeps the scan findings', () => {

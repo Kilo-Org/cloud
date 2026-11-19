@@ -21,6 +21,7 @@ import {
   scanRequestWithVerdictCache,
   type EnkryptCachedScanResult,
   type EnkryptGuardrailRequest,
+  type EnkryptVerdictCacheEntry,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
@@ -44,6 +45,9 @@ export type EnkryptInputGuardrail = {
 };
 
 type VerdictCacheWrite = EnkryptGuardrailReport['scans'][number]['verdict_cache_write'];
+
+/** The write of each cache entry a scan reported, by entry, started as its call finished. */
+type CacheWrites = Map<EnkryptVerdictCacheEntry, Promise<VerdictCacheWrite>>;
 
 /** For a result's cache entries: `failed` if any write failed, else `written` if any was written. */
 function combinedWrite(writes: VerdictCacheWrite[]): VerdictCacheWrite {
@@ -108,8 +112,9 @@ export async function recordEnkryptUsageRecords(
  *
  * Usage records are written in an `after()` callback registered now, so a request that returns
  * early still accounts for a scan Enkrypt performed. A request's verdict cache entries, each for
- * one segment or slice of one, are written as soon as the verdict is known, so the agent's next
- * step can already use them, and `after()` keeps the function alive until the writes finish.
+ * one segment or slice of one, are written as soon as the call that scanned it finishes, while the
+ * scan goes on, so concurrent requests of the organization and the agent's next step can already
+ * use them, and `after()` keeps the function alive until the writes finish.
  */
 export function startEnkryptInputGuardrail(
   scan: Promise<EnkryptGuardrailRequest | null>,
@@ -119,7 +124,8 @@ export function startEnkryptInputGuardrail(
   const captureResponse = Promise.withResolvers<boolean>();
   const runScan = async (
     resolved: EnkryptGuardrailRequest | null,
-    deadline: AbortSignal | null
+    deadline: AbortSignal | null,
+    writes: CacheWrites
   ): Promise<EnkryptCachedScanResult[]> =>
     resolved && deadline
       ? scanRequestWithVerdictCache(resolved, {
@@ -129,6 +135,7 @@ export function startEnkryptInputGuardrail(
           deadline,
           signal,
           store: redisClient,
+          onCacheEntry: entry => writes.set(entry, rememberRequestVerdict(entry, redisClient)),
           requestLog: {
             guardrail: 'input',
             capture: entry => requestLogs.push(entry),
@@ -140,8 +147,10 @@ export function startEnkryptInputGuardrail(
     ...splitScan(resolved),
     deadline: resolved && AbortSignal.timeout(ENKRYPT_GUARDRAIL_TIMEOUT_MS),
   }));
+  const blockingWrites: CacheWrites = new Map();
+  const logOnlyWrites: CacheWrites = new Map();
   const blockingResults = scans
-    .then(({ blocking, deadline }) => runScan(blocking, deadline))
+    .then(({ blocking, deadline }) => runScan(blocking, deadline, blockingWrites))
     .catch((error: unknown): EnkryptCachedScanResult[] => {
       console.error('[enkrypt-guardrail] scan failed unexpectedly; request rejected', {
         error: error instanceof Error ? error.message : String(error),
@@ -159,7 +168,7 @@ export function startEnkryptInputGuardrail(
     .then(
       async ({ logOnly, deadline }) => {
         await blockingResults;
-        return runScan(logOnly, deadline);
+        return runScan(logOnly, deadline, logOnlyWrites);
       },
       // The blocking result already logs and rejects a request whose scan could not be prepared.
       () => []
@@ -170,17 +179,28 @@ export function startEnkryptInputGuardrail(
       });
       return [];
     });
-  const cacheWrites = [blockingResults, logOnlyResults].map(results =>
-    results.then(each =>
-      Promise.all(
-        each.map(async ({ cacheEntries }) =>
-          combinedWrite(
-            await Promise.all(cacheEntries.map(entry => rememberRequestVerdict(entry, redisClient)))
-          )
+  /**
+   * The outcome of each result's cache writes, which started as each call finished. Settles once
+   * every write started, also when the scan threw after some had, so `after()` keeps them alive.
+   */
+  const resultWrites = async (
+    results: Promise<EnkryptCachedScanResult[]>,
+    writes: CacheWrites
+  ): Promise<VerdictCacheWrite[]> => {
+    const each = await results;
+    await Promise.all(writes.values());
+    return Promise.all(
+      each.map(async ({ cacheEntries }) =>
+        combinedWrite(
+          await Promise.all(cacheEntries.map(async entry => (await writes.get(entry)) ?? 'skipped'))
         )
       )
-    )
-  );
+    );
+  };
+  const cacheWrites = [
+    resultWrites(blockingResults, blockingWrites),
+    resultWrites(logOnlyResults, logOnlyWrites),
+  ];
   for (const cacheWrite of cacheWrites) after(cacheWrite);
   let waitStartedAt: number | null = null;
   let addedLatencyMs: number | null = null;

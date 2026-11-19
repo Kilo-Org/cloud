@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { BUILTIN_AGENT_MODES } from './agent-modes.js';
+import { BUILTIN_AGENT_MODES } from './agent-modes';
 
 export const RuntimeProfileLimits = {
   MAX_RUNTIME_INSTRUCTIONS: 50,

@@ -113,7 +113,17 @@ describe('resolveGatewayCaller', () => {
       user,
       organizationId: 'org-1',
       botId: 'bot-1',
+      cloudAgentRuntimeProxied: false,
     });
+  });
+
+  it('marks a caller whose runtime claim the Cloud Agent runtime proxy attested', () => {
+    const caller = resolveGatewayCaller(
+      { user, authFailedResponse: null, cloudAgentRuntimeProxied: true },
+      { allowAnonymous: true, ipAddress: '192.0.2.1' }
+    );
+
+    expect(caller).toMatchObject({ kind: 'signed-in', cloudAgentRuntimeProxied: true });
   });
 
   it.each([
@@ -411,7 +421,7 @@ describe('gatewayUsageContextBase', () => {
         'x-kilocode-taskid': 'task-1',
         'x-kilo-session': 'session-1',
       }),
-      { kind: 'signed-in', user, organizationId: 'org-1' },
+      { kind: 'signed-in', user, organizationId: 'org-1', cloudAgentRuntimeProxied: false },
       { requestStartedAt: 42 }
     );
 
@@ -466,7 +476,7 @@ describe('gatewayUsageContextBase', () => {
   ])('attributes a Kilo client from its own headers: %j', ({ headers, clientAttributed }) => {
     const base = gatewayUsageContextBase(
       request(headers),
-      { kind: 'signed-in', user, organizationId: undefined },
+      { kind: 'signed-in', user, organizationId: undefined, cloudAgentRuntimeProxied: false },
       { requestStartedAt: 0 }
     );
 
@@ -506,7 +516,12 @@ describe('gatewayAccountRateLimitRejection', () => {
 
 describe('freeModelRateLimitRejection', () => {
   const request = new NextRequest('http://localhost:3000/api/v1/embeddings', { method: 'POST' });
-  const signedIn = { kind: 'signed-in', user, organizationId: undefined } as const;
+  const signedIn = {
+    kind: 'signed-in',
+    user,
+    organizationId: undefined,
+    cloudAgentRuntimeProxied: false,
+  } as const;
   const anonymous = { kind: 'anonymous', user: createAnonymousContext('192.0.2.1') } as const;
 
   function reject(caller: typeof signedIn | typeof anonymous) {

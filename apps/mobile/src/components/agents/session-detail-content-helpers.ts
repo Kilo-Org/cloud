@@ -231,9 +231,14 @@ export function lastVisibleMessageFailure({
  * note. A delivery state on that row already states itself through the queued
  * badge or the failure footer, so it suppresses the note too.
  *
- * The merged transcript then has the last word on what sits below the prompt: a
- * preparation group triggered by it states the turn's own failure, and a prompt
- * the read-only transcript drops as unrenderable has no row to attach a note to.
+ * The turn's preparation then has its say: a failed preparation the prompt's own
+ * row draws (`failedPreparations`, keyed by the prompt that triggered it) states
+ * the turn's own failure, and so does a failed group the transcript still shows
+ * as its own item after the prompt.
+ *
+ * The merged transcript has the last word on what sits below the prompt: a
+ * prompt the read-only transcript drops as unrenderable has no row to attach a
+ * note to.
  *
  * Only a read-only session's record can be read this way. A stored user row
  * carries no delivery state, so the record cannot say whether the turn failed to
@@ -244,10 +249,15 @@ export function lastVisibleMessageFailure({
 export function unansweredPromptMessageId(
   messages: readonly StoredMessage[],
   transcript: readonly SessionTranscriptItem[],
-  deliveryStates: ReadonlyMap<string, MessageDeliveryState>
+  deliveryStates: ReadonlyMap<string, MessageDeliveryState>,
+  failedPreparations: ReadonlyMap<string, unknown>
 ): string | null {
   const lastMessage = messages.at(-1);
-  if (lastMessage?.info.role !== 'user' || deliveryStates.has(lastMessage.info.id)) {
+  if (
+    lastMessage?.info.role !== 'user' ||
+    deliveryStates.has(lastMessage.info.id) ||
+    failedPreparations.has(lastMessage.info.id)
+  ) {
     return null;
   }
   const lastItem = transcript.at(-1);

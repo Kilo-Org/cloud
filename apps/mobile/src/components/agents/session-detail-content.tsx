@@ -1786,7 +1786,12 @@ export function SessionDetailContent({
   // the kind turns out to be live after all.
   const unansweredPromptId =
     activeSessionType === 'read-only' && !isStreaming
-      ? unansweredPromptMessageId(displayedMessages, baseTranscript, pendingMessages)
+      ? unansweredPromptMessageId(
+          displayedMessages,
+          baseTranscript,
+          pendingMessages,
+          failedPreparationByTrigger
+        )
       : null;
 
   const renderItem = useCallback(

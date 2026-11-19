@@ -617,7 +617,7 @@ describe('github-integration-helpers', () => {
       });
     });
 
-    it('keeps the healthy installations\' repositories when only one exceeds the budget', async () => {
+    it("keeps the healthy installations' repositories when only one exceeds the budget", async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({
           id: 'integration-1',
@@ -631,7 +631,7 @@ describe('github-integration-helpers', () => {
         }),
       ]);
       mockFetchGitHubRepositories.mockImplementation(
-        jest.fn<(installationId: string) => Promise<unknown[]>>((installationId) =>
+        jest.fn<(installationId: string) => Promise<unknown[]>>(installationId =>
           installationId === 'installation-1'
             ? Promise.reject(
                 new GitHubListingBudgetExceededError(

@@ -80,6 +80,7 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
+  StatusBar: { currentHeight: 0 },
   Text: 'Text',
   View: 'View',
   useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 2 }),
@@ -254,7 +255,7 @@ describe('SettingsConfirmHost', () => {
     // The person presses Cancel: the dialog starts the dismissal with the
     // pre-withdrawal cancel answer held over for the sheet's report.
     act(() => {
-      const onPress = pressableWith(view.renderer, 'border-border').props.onPress as
+      const onPress = pressableWith(view.renderer, 'border-input').props.onPress as
         | (() => void)
         | undefined;
       onPress?.();

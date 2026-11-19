@@ -81,11 +81,17 @@ const acceptsPoolSetting: PoolConfigOption = {
 };
 // @ts-expect-error createDrizzleClient installs databaseTypeParsers on its pool.
 const poolTypes: PoolConfigOption = { types: databaseTypeParsers };
+// @ts-expect-error createDrizzleClient derives the connection fields from its `connectionString` argument.
+const poolConnectionString: PoolConfigOption = { connectionString: 'postgres://other.example/db' };
+// @ts-expect-error createDrizzleClient owns TLS; the dedicated `ssl` option replaces it.
+const poolSsl: PoolConfigOption = { ssl: { ca: 'ca' } };
 
 void acceptsWorkerSetting;
 void acceptsPoolSetting;
 void workerTypes;
 void poolTypes;
+void poolConnectionString;
+void poolSsl;
 
 describe('databaseTypeParsers', () => {
   it('reads int8 as BigInt', () => {

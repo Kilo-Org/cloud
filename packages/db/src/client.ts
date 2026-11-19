@@ -27,9 +27,12 @@ export type CreateDrizzleClientOptions = {
   /**
    * Pool settings this client does not derive itself. `types` is left out of the type because the
    * pool is created with the module's `databaseTypeParsers`, which raw results and the export paths
-   * expect. Like `GetWorkerDbOptions`, this is a type-level reservation.
+   * expect. `connectionString` and `ssl` are left out because the pool is built from this client's
+   * `connectionString` argument and from its dedicated `ssl` option, which stay authoritative.
+   * Like `GetWorkerDbOptions`, this is a type-level reservation: a value widened to
+   * `pg.PoolConfig` still assigns.
    */
-  poolConfig?: Omit<Partial<pg.PoolConfig>, 'types'>;
+  poolConfig?: Omit<Partial<pg.PoolConfig>, 'types' | 'connectionString' | 'ssl'>;
   logger?: boolean;
   /**
    * Replaces the TLS settings that `getDatabaseClientConfig` derives from the connection string

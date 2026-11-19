@@ -125,6 +125,10 @@ import {
 } from '@/lib/byok/private-provider-upstream';
 import { testByokPrivateProvider } from '@/lib/byok/private-provider-test';
 import { privateProviderOriginChanged } from '@/lib/byok/private-provider-origin';
+import {
+  byokPrivateProviderCredentialSecrets,
+  redactByokPrivateProviderSecrets,
+} from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/redaction';
 
 const KEYS_CHANGED_MESSAGE = 'Your API keys changed. Reload the page and try again.';
 const PRIVATE_PROVIDER_NOT_FOUND_MESSAGE = 'BYOK private provider not found';
@@ -392,6 +396,30 @@ function rejectPrivateProviderHostChange(
     throw new TRPCError({ code: 'BAD_REQUEST', message: PRIVATE_PROVIDER_HOST_CHANGED_MESSAGE });
   }
   return stored.base_url;
+}
+
+/**
+ * What may be logged about an unexpected failure while calling a private provider. Building the
+ * request's headers can fail on a credential value, and an error message may then quote it.
+ */
+function privateProviderFailureDiagnostics(
+  error: unknown,
+  credentials: ByokPrivateProviderCredentials | null
+): { errorType: string; message?: string } {
+  // Errors from Node's own fetch and Headers may come from another realm, missing `instanceof Error`.
+  const { name, message } = z
+    .object({ name: z.string(), message: z.string() })
+    .catch({ name: 'unknown', message: '' })
+    .parse(error);
+  // Unreadable credentials leave nothing to redact, so the message is withheld.
+  if (!credentials || !message) return { errorType: name };
+  return {
+    errorType: name,
+    message: redactByokPrivateProviderSecrets(
+      message,
+      byokPrivateProviderCredentialSecrets(credentials)
+    ).slice(0, 300),
+  };
 }
 
 async function decryptPrivateProviderCredentials(
@@ -1117,9 +1145,10 @@ export const byokRouter = createTRPCRouter({
             })
           );
         } catch (e) {
+          const credentials = parseByokPrivateProviderCredentials(decryptedKey.decryptedAPIKey);
           logByokWarning('BYOK private provider test request failed', {
             providerId: existingKey.provider_id,
-            message: e instanceof Error ? e.message : undefined,
+            ...privateProviderFailureDiagnostics(e, credentials),
           });
           return testResultWithLegacyCopy({ outcome: 'failed' });
         }
@@ -1407,9 +1436,10 @@ export const byokRouter = createTRPCRouter({
         if (e instanceof ByokPrivateProviderRequestError) {
           throw new TRPCError({ code: 'BAD_REQUEST', message: e.message });
         }
-        logByokWarning('BYOK private provider model import failed', {
-          message: e instanceof Error ? e.message : undefined,
-        });
+        logByokWarning(
+          'BYOK private provider model import failed',
+          privateProviderFailureDiagnostics(e, credentials)
+        );
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message:

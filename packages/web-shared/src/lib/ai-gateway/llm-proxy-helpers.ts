@@ -37,6 +37,7 @@ import type {
   PromptInfo,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@kilocode/web-shared/lib/ai-gateway/context-overflow';
+import { redactByokPrivateProviderSecrets } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/redaction';
 import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
@@ -372,7 +373,10 @@ const byokUpstreamErrorSchema = z.object({
   message: z.string().optional().catch(undefined),
 });
 
-async function readByokProviderMessage(response: Response): Promise<string | undefined> {
+async function readByokProviderMessage(
+  response: Response,
+  secrets: readonly string[] | null
+): Promise<string | undefined> {
   const body: unknown = await response
     .clone()
     .json()
@@ -380,9 +384,10 @@ async function readByokProviderMessage(response: Response): Promise<string | und
   const parsed = byokUpstreamErrorSchema.safeParse(body);
   if (!parsed.success) return undefined;
   const providerMessage = parsed.data.error?.message ?? parsed.data.message;
+  if (!providerMessage) return undefined;
   return (
-    providerMessage
-      ?.replace(/\p{Cc}/gu, ' ')
+    (secrets ? redactByokPrivateProviderSecrets(providerMessage, secrets) : providerMessage)
+      .replace(/\p{Cc}/gu, ' ')
       .trim()
       .slice(0, 300) || undefined
   );
@@ -401,19 +406,30 @@ function specificByokErrorMessage(
   return byokErrorMessages[status];
 }
 
+/**
+ * The BYOK error for an upstream failure. `privateProviderSecrets` are set for a route to an
+ * organization's private provider: its failures are always answered here, so its raw error body
+ * never reaches the caller, and the provider message omits those secrets.
+ */
 async function byokErrorMessage(
   response: Response,
-  userByokProviderIds: UserByokProviderId[]
+  userByokProviderIds: UserByokProviderId[],
+  privateProviderSecrets: readonly string[] | null
 ): Promise<string | undefined> {
   const specificMessage = specificByokErrorMessage(response.status, userByokProviderIds);
-  if (!specificMessage && (response.status < 400 || response.status >= 500)) return undefined;
+  if (
+    !specificMessage &&
+    (response.status < 400 || (response.status >= 500 && !privateProviderSecrets))
+  ) {
+    return undefined;
+  }
   if (isRejectedVercelAiGatewayKey(response.status, userByokProviderIds)) {
     return VERCEL_AI_GATEWAY_BYOK_KEY_REJECTED_MESSAGE;
   }
 
   // The provider's own explanation (for example an expired rather than revoked
   // key) is often more actionable than our status-based summary.
-  const providerMessage = await readByokProviderMessage(response);
+  const providerMessage = await readByokProviderMessage(response, privateProviderSecrets);
   if (specificMessage) {
     return providerMessage
       ? `${specificMessage} Provider message: ${providerMessage}`
@@ -498,6 +514,7 @@ export async function makeErrorReadable({
   request,
   response,
   userByokProviderIds,
+  privateProviderSecrets = null,
 }: {
   provider: ProviderType;
   requestedModel: string;
@@ -505,6 +522,8 @@ export async function makeErrorReadable({
   request: GatewayRequest | null;
   response: Response;
   userByokProviderIds: UserByokProviderId[] | null;
+  /** `byokPrivateProviderRouteSecrets` of the route; see `byokErrorMessage`. */
+  privateProviderSecrets?: readonly string[] | null;
 }) {
   if (response.status < 400) {
     return undefined;
@@ -526,7 +545,11 @@ export async function makeErrorReadable({
   }
 
   if (userByokProviderIds !== null) {
-    const byokMessage = await byokErrorMessage(response, userByokProviderIds);
+    const byokMessage = await byokErrorMessage(
+      response,
+      userByokProviderIds,
+      privateProviderSecrets
+    );
     if (byokMessage) {
       if (specificByokMessage !== undefined) {
         // Log only the fixed text so this line stays stable to search on;
@@ -892,6 +915,8 @@ export async function captureProxyError(params: {
   model: string;
   gatewayModel?: string;
   byokProviderIds?: ReadonlyArray<string> | null;
+  /** `byokPrivateProviderRouteSecrets` of the route, omitted from the logged response. */
+  privateProviderSecrets?: readonly string[] | null;
   trackInSentry: boolean;
 }) {
   const {
@@ -903,8 +928,11 @@ export async function captureProxyError(params: {
     model,
     gatewayModel,
     byokProviderIds,
+    privateProviderSecrets,
     trackInSentry,
   } = params;
+  const redact = (text: string) =>
+    privateProviderSecrets ? redactByokPrivateProviderSecrets(text, privateProviderSecrets) : text;
   after(
     (async () => {
       const extraErrorData: Record<string, string | number> = {
@@ -924,12 +952,15 @@ export async function captureProxyError(params: {
       const clonedReponse = response.clone();
       try {
         const responseText = await clonedReponse.text();
-        extraErrorData.first4kOfResponse = responseText.slice(0, 4096);
+        extraErrorData.first4kOfResponse = redact(responseText.slice(0, 4096));
         const parsed = parseJson(responseText.slice(0, 16 * 1024));
         if ('value' in parsed && isRecord(parsed.value) && isRecord(parsed.value.error)) {
           const { param, code } = parsed.value.error;
-          if (typeof param === 'string') extraErrorData.upstreamErrorParam = param.slice(0, 512);
-          if (typeof code === 'string') extraErrorData.upstreamErrorCode = code.slice(0, 512);
+          if (typeof param === 'string') {
+            extraErrorData.upstreamErrorParam = redact(param.slice(0, 512));
+          }
+          if (typeof code === 'string')
+            extraErrorData.upstreamErrorCode = redact(code.slice(0, 512));
         }
       } catch {
         // ignore errors when already handling errors...

@@ -14,6 +14,7 @@ type UpstreamErrorPolicyParams = {
   model: string;
   gatewayModel?: string;
   byokProviderIds?: ReadonlyArray<string> | null;
+  privateProviderSecrets?: readonly string[] | null;
 };
 
 /**

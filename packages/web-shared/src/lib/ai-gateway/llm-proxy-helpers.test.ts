@@ -2107,6 +2107,34 @@ describe('captureProxyError', () => {
     }
   );
 
+  it("omits a private provider's secrets from the logged response", async () => {
+    await captureProxyError({
+      errorMessage: 'direct-byok returned error 401',
+      user: { id: 'user-1' },
+      request: { model: 'coder' },
+      response: Response.json(
+        {
+          error: {
+            message: 'Invalid key sk-private-secret-value',
+            param: 'sk-private-secret-value',
+          },
+        },
+        { status: 401 }
+      ),
+      organizationId: 'org-1',
+      model: 'coder',
+      privateProviderSecrets: ['sk-private-secret-value'],
+      trackInSentry: false,
+    });
+
+    const logged = await capturedErrorData();
+    expect(JSON.stringify(logged)).not.toContain('secret-value');
+    expect(logged).toMatchObject({
+      first4kOfResponse: '{"error":{"message":"Invalid key [redacted]","param":"[redacted]"}}',
+      upstreamErrorParam: '[redacted]',
+    });
+  });
+
   it('logs the gateway model, BYOK providers, and request field names', async () => {
     await captureProxyError({
       errorMessage: 'direct-byok returned error 400',
@@ -2347,6 +2375,65 @@ describe('makeErrorReadable', () => {
       userByokProviderIds: null,
     });
     expect(result).toBeUndefined();
+  });
+
+  describe('for a private provider', () => {
+    const secret = 'sk-private-secret-value';
+    const privateProvider: Omit<Parameters<typeof makeErrorReadable>[0], 'response'> = {
+      provider: 'direct-byok',
+      requestedModel: 'private-a1b2c3d4e5/acme/coder',
+      request,
+      userByokProviderIds: ['private-a1b2c3d4e5'],
+      privateProviderSecrets: [secret],
+    };
+
+    it('omits the secrets an upstream echoes from the provider message', async () => {
+      const response = Response.json(
+        { error: { message: `Incorrect API key provided: ${secret.slice(0, 10)}...` } },
+        { status: 401 }
+      );
+
+      const result = await makeErrorReadable({ ...privateProvider, response });
+
+      expect(result?.status).toBe(401);
+      const body = await result?.json();
+      expect(JSON.stringify(body)).not.toContain(secret.slice(0, 10));
+      expect(body).toMatchObject({
+        error_type: 'byok_error',
+        message: expect.stringContaining(
+          'Provider message: Incorrect API key provided: [redacted]...'
+        ),
+      });
+    });
+
+    it('answers a server error itself instead of passing the raw body through', async () => {
+      const response = Response.json(
+        { error: { message: `upstream auth with ${secret} failed` }, debug: secret },
+        { status: 502 }
+      );
+
+      const result = await makeErrorReadable({ ...privateProvider, response });
+
+      expect(result?.status).toBe(502);
+      await expect(result?.json()).resolves.toEqual({
+        error: '[BYOK] upstream auth with [redacted] failed',
+        error_type: 'byok_error',
+        message: '[BYOK] upstream auth with [redacted] failed',
+      });
+    });
+
+    it('passes the server error of any other BYOK key through as before', async () => {
+      const response = Response.json({ error: { message: 'down' } }, { status: 502 });
+
+      const result = await makeErrorReadable({
+        ...privateProvider,
+        userByokProviderIds: ['synthetic'],
+        privateProviderSecrets: null,
+        response,
+      });
+
+      expect(result).toBeUndefined();
+    });
   });
 
   it('reports a rejected Vercel AI Gateway key without Vercel setup instructions', async () => {

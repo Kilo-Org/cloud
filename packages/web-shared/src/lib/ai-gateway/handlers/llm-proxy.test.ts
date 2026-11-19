@@ -57,6 +57,7 @@ import {
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   accountForMicrodollarUsage,
+  captureProxyError,
   INVALID_TOKEN_CODE,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
@@ -3863,6 +3864,41 @@ describe('kilo-auto/efficient classifier billing', () => {
       message:
         'This model does not support the chat_completions API through your Acme private provider, please use any of: messages',
     });
+  });
+
+  it("keeps a private provider's credentials out of its error response and logs", async () => {
+    const secret = 'sk-private-secret-value';
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider: { ...provider, type: 'direct-byok', apiKey: secret },
+        userByok: [
+          {
+            decryptedAPIKey: JSON.stringify({ type: 'api_key', api_key: secret }),
+            providerId: 'private-a1b2c3d4e5',
+          },
+        ],
+        isFree: false,
+        bypassAccessCheck: true,
+      })
+    );
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ error: { message: `Bad key ${secret}` } }, 401),
+    });
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('private-a1b2c3d4e5/acme/coder')) as never
+    );
+
+    expect(response.status).toBe(401);
+    const body = JSON.stringify(await response.json());
+    expect(body).toContain('Bad key [redacted]');
+    expect(body).not.toContain(secret);
+    expect(jest.mocked(captureProxyError)).toHaveBeenCalledWith(
+      expect.objectContaining({ privateProviderSecrets: [secret] })
+    );
   });
 
   it('names the BYOK key when it cannot serve the API kind', async () => {

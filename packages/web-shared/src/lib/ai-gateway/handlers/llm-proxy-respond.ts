@@ -6,6 +6,7 @@ import { REPLACED_ANSWER_HEADER } from '@kilocode/web-shared/lib/ai-gateway/repl
 import { recordBriefingUsage } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { byokPrivateProviderRouteSecrets } from '@kilocode/web-shared/lib/ai-gateway/byok-private-provider/redaction';
 import {
   accountForMicrodollarUsage,
   extractInferenceRegion,
@@ -87,6 +88,9 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
   usageContext.status_code = response.status;
   usageContext.inference_region = extractInferenceRegion(request.body);
   const userByokProviderIds = providerResult.userByok?.map(byok => byok.providerId) ?? null;
+  // An organization's private provider may echo its credentials in an error, which neither the
+  // caller, who may not manage the key, nor the logs may see.
+  const privateProviderSecrets = byokPrivateProviderRouteSecrets(providerResult);
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
     response,
@@ -98,6 +102,7 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     model: request.body.model ?? model,
     gatewayModel: model,
     byokProviderIds: userByokProviderIds,
+    privateProviderSecrets,
   });
   if (upstreamErrorResponse) {
     emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: metricsParams.ttfbMs });
@@ -155,6 +160,7 @@ export async function respondToUpstream(input: RespondInput): Promise<NextRespon
     request,
     response,
     userByokProviderIds,
+    privateProviderSecrets,
   });
   if (errorResponse) {
     await logUnrewrittenResponse({

@@ -14,6 +14,7 @@ import type {
   ByokPrivateProviderDefinition,
 } from '@kilocode/db/schema-types';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { captureMessage } from '@sentry/nextjs';
 import {
   isFakeByokKmsRequest,
   TEST_BYOK_DATA_KEY,
@@ -22,6 +23,11 @@ import {
 } from '@kilocode/web-shared/tests/helpers/byok-kms.helper';
 
 let afterPrivateProviderUrlCheck: (() => Promise<void>) | undefined;
+
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@sentry/nextjs'),
+  captureMessage: jest.fn(),
+}));
 
 jest.mock('@/lib/byok/private-provider-upstream', () => {
   const actual = jest.requireActual<typeof privateProviderUpstream>(
@@ -639,6 +645,26 @@ describe('BYOK private providers', () => {
       expect(upstream.calls).toHaveLength(0);
     });
 
+    test('logs an unexpected import failure without the credential it quotes', async () => {
+      const upstream = mockUpstream(() => Response.json(MODELS_RESPONSE));
+      restoreFetch = upstream.restore;
+      jest.mocked(captureMessage).mockClear();
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.byok.listModelsFromPrivateProvider({
+          organizationId: organization.id,
+          base_url: 'https://llm.example.com/v1',
+          credentials: { type: 'api_key', api_key: 'leaky-secret\nvalue' },
+        })
+      ).rejects.toThrow('The private provider models could not be imported.');
+
+      const logged = JSON.stringify(jest.mocked(captureMessage).mock.calls);
+      expect(logged).toContain('BYOK private provider model import failed');
+      expect(logged).toContain('[redacted]');
+      expect(logged).not.toContain('leaky-secret');
+    });
+
     test('signs AWS requests with SigV4', async () => {
       const upstream = mockUpstream(() => Response.json(MODELS_RESPONSE));
       restoreFetch = upstream.restore;
@@ -856,6 +882,30 @@ describe('BYOK private providers', () => {
         success: false,
         message: 'API key test failed: HTTP 401: Bad key sk-...[redacted]',
       });
+    });
+
+    test('logs a failure building the request without the credential it quotes', async () => {
+      const leakyKey = 'leaky-secret\nvalue';
+      const created = await createPrivateProvider(DEFINITION, {
+        type: 'api_key',
+        api_key: leakyKey,
+      });
+      const upstream = mockUpstream(() => Response.json({ choices: [] }));
+      restoreFetch = upstream.restore;
+      jest.mocked(captureMessage).mockClear();
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.byok.testApiKey({
+        organizationId: organization.id,
+        id: created.id,
+      });
+
+      expect(result).toMatchObject({ outcome: 'failed', success: false });
+      expect(upstream.calls).toHaveLength(0);
+      const logged = JSON.stringify(jest.mocked(captureMessage).mock.calls);
+      expect(logged).toContain('BYOK private provider test request failed');
+      expect(logged).toContain('[redacted]');
+      expect(logged).not.toContain('leaky-secret');
     });
 
     test('reports the upstream error', async () => {

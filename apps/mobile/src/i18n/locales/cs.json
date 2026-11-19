@@ -3531,6 +3531,7 @@
       "sendInvite": "Odeslat pozvánku",
       "title": "Pozvat člena",
       "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
+      "organizationUnavailable": "Tato organizace již není k dispozici.",
       "sendError": "Pozvánku se nepodařilo odeslat.",
       "pendingInvitation": "Pro tento e-mail již existuje čekající pozvánka.",
       "alreadyMember": "Tato osoba je již členem této organizace.",
@@ -4769,7 +4770,8 @@
     "connectFailed": "Stránku pro připojení se nepodařilo otevřít"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktury za vaše vlastní nákupy se zde zobrazí po vyúčtování."
+    "personalEmptyDescription": "Faktury za vaše vlastní nákupy se zde zobrazí po vyúčtování. Účtenky z App Store a Google Play jsou v Historii kreditů.",
+    "personalPeriod": "Posledních 12 měsíců"
   },
   "cloudAgent": {
     "compute": {

@@ -3415,6 +3415,7 @@
       "sendInvite": "Alefaso ny fanasana",
       "title": "Manasà mpikambana",
       "alreadyInvited": "Efa voasa na efa mpikambana izy.",
+      "organizationUnavailable": "Tsy misy intsony ity fikambanana ity.",
       "sendError": "Tsy azo nalefa ny fanasana.",
       "pendingInvitation": "Efa manana fanasana miandry ity mailaka ity.",
       "alreadyMember": "Efa mpikambana ao amin'ity fikambanana ity ity olona ity.",
@@ -4619,7 +4620,8 @@
     "connectFailed": "Tsy afaka nanokatra ny pejy fampifandraisana"
   },
   "invoices": {
-    "personalEmptyDescription": "Hiseho eto ny faktioran'ny fividiananao manokana rehefa voaloa ianao."
+    "personalEmptyDescription": "Miseho eto ny faktioran'ny fividiananao manokana rehefa voaloa ianao. Ny rosia avy amin'ny App Store sy Google Play dia ao amin'ny Tantaran'ny kredita.",
+    "personalPeriod": "12 volana lasa izay"
   },
   "cloudAgent": {
     "compute": {

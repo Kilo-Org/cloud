@@ -121,6 +121,7 @@ export const homeWidgetResponseSchema = homeWidgetDataSchema.extend({
 export type HomeWidgetResponse = z.infer<typeof homeWidgetResponseSchema>;
 export type HomeWidgetSessionRow = GlanceableSessionRow & {
   title?: string | null;
+  /** Raw candidate value; buildHomeWidgetDetails keeps it only when approvalKeySchema accepts it. */
   approvalKey?: string | null;
 };
 
@@ -193,14 +194,26 @@ export function buildHomeWidgetDetails(
   const byStatusUpdatedAt = compareSessionInstant(row => row.statusUpdatedAt, 'earliest');
   // One status predicate owns both membership and the kind, so a needs-input
   // row and the label drawn for it cannot disagree.
-  const waiting: { row: HomeWidgetSessionRow; kind: GlanceableNeedsInputKind }[] = [];
+  // The schema is the one representation every payload enforces, so a row's
+  // key counts as approvable only when it parses; anything else reads as none.
+  const waiting: {
+    row: HomeWidgetSessionRow;
+    kind: GlanceableNeedsInputKind;
+    approvalKey: string | null;
+  }[] = [];
   for (const row of sessions) {
     const kind = glanceableNeedsInputKind(row.status);
-    if (kind !== null) waiting.push({ row, kind });
+    if (kind !== null) {
+      waiting.push({
+        row,
+        kind,
+        approvalKey: approvalKeySchema.safeParse(row.approvalKey).data ?? null,
+      });
+    }
   }
   waiting.sort(
     (a, b) =>
-      Number(b.row.approvalKey != null) - Number(a.row.approvalKey != null) ||
+      Number(b.approvalKey !== null) - Number(a.approvalKey !== null) ||
       byStatusUpdatedAt(a.row, b.row)
   );
   const scheduled = sessions
@@ -218,7 +231,7 @@ export function buildHomeWidgetDetails(
   return {
     // The sort put the approvable row first, so the key belongs to the same
     // row the needs-input primary title reads.
-    approvalKey: waiting[0]?.row.approvalKey ?? null,
+    approvalKey: waiting[0]?.approvalKey ?? null,
     primaryKind: primaryKind ?? null,
     primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
     waitingAgents: waiting

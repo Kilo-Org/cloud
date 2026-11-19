@@ -3473,6 +3473,7 @@
       "sendInvite": "Trimite invitația",
       "title": "Invită un membru",
       "alreadyInvited": "Această persoană este deja invitată sau este deja membru.",
+      "organizationUnavailable": "Această organizație nu mai este disponibilă.",
       "sendError": "Invitația nu a putut fi trimisă.",
       "pendingInvitation": "Acest e-mail are deja o invitație în așteptare.",
       "alreadyMember": "Această persoană este deja membru al acestei organizații.",
@@ -4694,7 +4695,8 @@
     "connectFailed": "Pagina de conectare nu a putut fi deschisă"
   },
   "invoices": {
-    "personalEmptyDescription": "Facturile pentru achizițiile tale personale vor apărea aici după prima facturare."
+    "personalEmptyDescription": "Facturile pentru achizițiile tale personale apar aici după prima facturare. Chitanțele din App Store și din Google Play sunt în Istoric credite.",
+    "personalPeriod": "Ultimele 12 luni"
   },
   "cloudAgent": {
     "compute": {

@@ -3415,6 +3415,7 @@
       "sendInvite": "Senda boð",
       "title": "Bjóða meðlim að taka þátt",
       "alreadyInvited": "Tölvupóstfangið er þegar boðið eða meðlimurinn er þegar í félaginu.",
+      "organizationUnavailable": "Þetta fyrirtæki er ekki lengur í boði.",
       "sendError": "Ekki tókst að senda boðið.",
       "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
       "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki.",
@@ -4619,7 +4620,8 @@
     "connectFailed": "Ekki tókst að opna tengingarsíðuna"
   },
   "invoices": {
-    "personalEmptyDescription": "Reikningar fyrir þín eigin kaup birtast hér eftir fyrstu greiðslu."
+    "personalEmptyDescription": "Reikningar fyrir þín eigin kaup birtast hér eftir fyrstu greiðslu. Kvittanir frá App Store og Google Play eru í Inneignarferli.",
+    "personalPeriod": "Síðustu 12 mánuðir"
   },
   "cloudAgent": {
     "compute": {

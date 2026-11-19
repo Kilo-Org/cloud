@@ -3473,6 +3473,7 @@
       "sendInvite": "Pošalji pozivnicu",
       "title": "Pozovi člana",
       "alreadyInvited": "Osoba je već pozvana ili je već član.",
+      "organizationUnavailable": "Ova organizacija više nije dostupna.",
       "sendError": "Slanje pozivnice nije uspjelo.",
       "pendingInvitation": "Ova e-pošta već ima pozivnicu na čekanju.",
       "alreadyMember": "Ova osoba je već član ove organizacije.",
@@ -4694,7 +4695,8 @@
     "connectFailed": "Nije moguće otvoriti stranicu za povezivanje"
   },
   "invoices": {
-    "personalEmptyDescription": "Fakture za vaše lične kupovine pojavit će se ovdje nakon što vam se izvrši naplata."
+    "personalEmptyDescription": "Fakture za vaše lične kupovine pojavljuju se ovdje nakon što vam se izvrši naplata. Potvrde iz trgovine App Store i Google Play nalaze se u Historiji kredita.",
+    "personalPeriod": "Posljednjih 12 mjeseci"
   },
   "cloudAgent": {
     "compute": {

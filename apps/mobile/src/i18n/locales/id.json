@@ -3420,6 +3420,7 @@
       "sendInvite": "Kirim undangan",
       "title": "Undang anggota",
       "alreadyInvited": "Alamat email tersebut sudah diundang atau sudah menjadi anggota.",
+      "organizationUnavailable": "Organisasi ini sudah tidak tersedia lagi.",
       "sendError": "Tidak dapat mengirim undangan.",
       "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
       "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini.",
@@ -4619,7 +4620,8 @@
     "connectFailed": "Tidak dapat membuka halaman koneksi"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktur untuk pembelian pribadi Anda akan muncul di sini setelah Anda ditagih."
+    "personalEmptyDescription": "Faktur untuk pembelian pribadi Anda muncul di sini setelah Anda ditagih. Tanda terima dari App Store dan Google Play ada di Riwayat kredit.",
+    "personalPeriod": "12 Bulan Terakhir"
   },
   "cloudAgent": {
     "compute": {

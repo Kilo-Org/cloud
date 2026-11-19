@@ -3415,6 +3415,7 @@
       "sendInvite": "Enviar invitación",
       "title": "Convidar un membro",
       "alreadyInvited": "Xa está convidado ou xa é membro.",
+      "organizationUnavailable": "Esta organización xa non está dispoñible.",
       "sendError": "Non se puido enviar a invitación.",
       "pendingInvitation": "Este correo xa ten unha invitación pendente.",
       "alreadyMember": "Esta persoa xa é membro desta organización.",
@@ -4619,7 +4620,8 @@
     "connectFailed": "Non se puido abrir a páxina de conexión"
   },
   "invoices": {
-    "personalEmptyDescription": "As facturas das túas propias compras aparecerán aquí cando se che facture."
+    "personalEmptyDescription": "As facturas das túas propias compras aparecen aquí cando se che facture. Os recibos da App Store e de Google Play están no Historial de créditos.",
+    "personalPeriod": "Últimos 12 meses"
   },
   "cloudAgent": {
     "compute": {

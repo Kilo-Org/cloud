@@ -3652,6 +3652,7 @@
       "sendInvite": "إرسال الدعوة",
       "title": "دعوة عضو",
       "alreadyInvited": "سبق إرسال دعوة لهذا البريد الإلكتروني أو أنه يعود إلى عضو بالفعل.",
+      "organizationUnavailable": "لم تعد هذه المؤسسة متاحة.",
       "sendError": "تعذّر إرسال الدعوة.",
       "pendingInvitation": "توجد بالفعل دعوة معلّقة لهذا البريد الإلكتروني.",
       "alreadyMember": "هذا الشخص عضو بالفعل في هذه المؤسسة.",
@@ -4919,7 +4920,8 @@
     "connectFailed": "تعذّر فتح صفحة الاتصال"
   },
   "invoices": {
-    "personalEmptyDescription": "ستظهر هنا فواتير مشترياتك الشخصية بعد إصدار أول فاتورة لك."
+    "personalEmptyDescription": "تظهر هنا فواتير مشترياتك الشخصية بعد إصدار أول فاتورة لك. الإيصالات من App Store وGoogle Play موجودة في سجل الرصيد.",
+    "personalPeriod": "آخر 12 شهرًا"
   },
   "cloudAgent": {
     "compute": {

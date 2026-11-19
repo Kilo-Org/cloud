@@ -3415,6 +3415,7 @@
       "sendInvite": "Dërgo ftesën",
       "title": "Fto anëtar",
       "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
+      "organizationUnavailable": "Kjo organizatë nuk është më e disponueshme.",
       "sendError": "Ftesa nuk u dërgua.",
       "pendingInvitation": "Ky email ka tashmë një ftesë në pritje.",
       "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate.",
@@ -4619,7 +4620,8 @@
     "connectFailed": "Faqja e lidhjes nuk mund të hapej"
   },
   "invoices": {
-    "personalEmptyDescription": "Faturat për blerjet e tua personale do të shfaqen këtu pasi të faturohesh."
+    "personalEmptyDescription": "Faturat për blerjet e tua personale shfaqen këtu pasi të faturohesh. Dëftesat nga App Store dhe Google Play janë në Historikun e kredive.",
+    "personalPeriod": "12 muajt e fundit"
   },
   "cloudAgent": {
     "compute": {

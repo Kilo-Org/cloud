@@ -3415,6 +3415,7 @@
       "sendInvite": "Lähetä kutsu",
       "title": "Kutsu jäsen",
       "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
+      "organizationUnavailable": "Tämä organisaatio ei ole enää saatavilla.",
       "sendError": "Kutsun lähettäminen epäonnistui.",
       "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
       "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen.",
@@ -4619,7 +4620,8 @@
     "connectFailed": "Yhdistämissivua ei voitu avata"
   },
   "invoices": {
-    "personalEmptyDescription": "Omien ostojesi laskut näkyvät täällä, kun sinua on laskutettu."
+    "personalEmptyDescription": "Omien ostojesi laskut näkyvät täällä, kun sinua on laskutettu. Kuitti App Storessa ja Kuitti Google Playssa ovat Krediittihistoriassa.",
+    "personalPeriod": "Viimeiset 12 kuukautta"
   },
   "cloudAgent": {
     "compute": {

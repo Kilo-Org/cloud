@@ -305,15 +305,6 @@ function answer(
 }
 
 /**
- * Inference over a native on-device model. The harness still owns the
- * conversation: every request carries the full rendered history, and nothing
- * falls back to another model when this one is unavailable or busy.
- *
- * A model that runs tools keeps one generation open across a tool round. The
- * harness runs the calls, and its next request carries their results, which
- * resume that generation instead of starting a new one.
- */
-/**
  * The reason a restricted availability answer reads as at send time, when the
  * answer names none. Android's normal downloadable/downloading answer carries
  * no reason, so the status picks the same class its own reason would name; an
@@ -332,6 +323,15 @@ function reasonAtSendTime(availability: NativeAvailability): string {
   return 'model_unavailable';
 }
 
+/**
+ * Inference over a native on-device model. The harness still owns the
+ * conversation: every request carries the full rendered history, and nothing
+ * falls back to another model when this one is unavailable or busy.
+ *
+ * A model that runs tools keeps one generation open across a tool round. The
+ * harness runs the calls, and its next request carries their results, which
+ * resume that generation instead of starting a new one.
+ */
 export function nativeModelClient(bridge: NativeModelBridge): ModelClientService {
   const provider: Provider = openProvider(bridge);
   return {

@@ -674,6 +674,88 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  describe('Cloud Agent runtime proxy keep-alive', () => {
+    const runtimeToken = jwt.sign(
+      {
+        version: KILO_TOKEN_VERSION,
+        kiloUserId: 'user-123',
+        apiTokenPepper: 'test-pepper',
+        aud: KILO_GATEWAY_AUDIENCE,
+        runtimeAuthorization: {
+          id: '11111111-1111-4111-8111-111111111111',
+          resourceKind: 'cloud-agent-next',
+          resourceId: 'workspace_123',
+        },
+      },
+      NEXTAUTH_SECRET,
+      { algorithm: 'HS256' }
+    );
+    const user = { id: 'user-123', google_user_email: 'test@example.com' } as User;
+
+    /** Mirrors `getUserFromAuth`, which passes its attestation check to the token validation. */
+    function setRuntimeTokenAuth(runtimeProxyAttestationVerified: boolean) {
+      mockedGetUserFromAuth.mockImplementation(async options => {
+        const validation = validateAuthorizationHeader(
+          new Headers({ authorization: `Bearer ${runtimeToken}` }),
+          { expectedAudience: options.expectedAudience, runtimeProxyAttestationVerified }
+        );
+        if ('error' in validation) {
+          return {
+            user: null,
+            authFailedResponse: new Response(validation.error, { status: 401 }),
+            credentialsRejected: isRejectedCredentialReason(validation.reason),
+            organizationId: undefined,
+          } as AuthResult;
+        }
+        return {
+          user,
+          authFailedResponse: null,
+          cloudAgentRuntimeProxied: validation.cloudAgentRuntimeProxied,
+        };
+      });
+    }
+
+    async function send() {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      return handleLlmProxyRequest(
+        makeRequest(makeBody(), { authorization: `Bearer ${runtimeToken}` }) as never
+      );
+    }
+
+    it('rejects a runtime bearer without a verified attestation before any upstream call', async () => {
+      setRuntimeTokenAuth(false);
+
+      const response = await send();
+
+      expect(response.status).toBe(401);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedRewriteModelResponse).not.toHaveBeenCalled();
+    });
+
+    it('turns on the first-byte keep-alive for an attested runtime bearer', async () => {
+      setRuntimeTokenAuth(true);
+
+      const response = await send();
+
+      expect(response.status).toBe(200);
+      expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ keepAliveUntilFirstByte: true })
+      );
+    });
+
+    it('leaves the keep-alive off for every other caller', async () => {
+      setUserAuth();
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ keepAliveUntilFirstByte: false })
+      );
+    });
+  });
+
   it('retains verified gateway-token identity through the provider path', async () => {
     const authenticatedUser = {
       id: 'user-123',

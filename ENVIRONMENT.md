@@ -283,10 +283,6 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `DISCORD_OAUTH_CLIENT_SECRET` - Discord OAuth client secret for the bot/app. `[SECRET]`
 - `DISCORD_OAUTH_BOT_TOKEN` - Discord bot OAuth token (separate from standard bot token). `[SECRET]`
 - `DISCORD_SERVER_ID` - ID of the primary Discord guild/server. [SERVER]
-- `DOLTHUB_APP_CLIENT_ID` - DoltHub OAuth app client ID. `[PUBLIC]`
-- `DOLTHUB_APP_CLIENT_SECRET` - DoltHub OAuth app client secret. `[SECRET]`
-- `DOLTHUB_APP_DEV_CLIENT_ID` - Dev-only DoltHub OAuth client ID; used in `apps/web/.env.test`. `[PUBLIC]`
-- `DOLTHUB_APP_DEV_CLIENT_SECRET` - Dev-only DoltHub OAuth client secret; used in `apps/web/.env.test`. `[SECRET]`
 
 ### Billing & Stripe
 

@@ -125,7 +125,6 @@ exist as an org-scoped mirror under `organizations`, for example
 - `credits`
 - `debug`
 - `discord`
-- `dolthub`
 - `feedback`
 - `githubApps`
 - `githubPrReview`

@@ -2,7 +2,6 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 
 export const STANDARD_OAUTH_PLATFORMS = [
   PLATFORM.DISCORD,
-  PLATFORM.DOLTHUB,
   PLATFORM.GITLAB,
   PLATFORM.LINEAR,
   PLATFORM.SLACK,

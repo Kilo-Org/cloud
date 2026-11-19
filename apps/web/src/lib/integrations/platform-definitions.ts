@@ -1,14 +1,7 @@
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { PlatformIntegrationSetupStatus } from '@/lib/integrations/platform-integration-setup-status';
 
-export type PlatformType =
-  | 'github'
-  | 'gitlab'
-  | 'bitbucket'
-  | 'slack'
-  | 'discord'
-  | 'linear'
-  | 'dolthub';
+export type PlatformType = (typeof PLATFORM)[keyof typeof PLATFORM];
 
 export type PlatformStatus = 'installed' | 'not_installed' | 'coming_soon';
 
@@ -76,14 +69,6 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
     enabled: true,
     personalRoute: '/integrations/linear',
     orgRoute: organizationId => `/organizations/${organizationId}/integrations/linear`,
-  },
-  {
-    id: PLATFORM.DOLTHUB,
-    name: 'DoltHub',
-    description: 'Query Dolt-versioned data directly from your workspace',
-    enabled: true,
-    personalRoute: '/integrations/dolthub',
-    orgRoute: organizationId => `/organizations/${organizationId}/integrations/dolthub`,
   },
   {
     id: PLATFORM.BITBUCKET,

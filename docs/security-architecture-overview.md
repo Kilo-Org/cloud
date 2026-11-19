@@ -476,7 +476,6 @@ flowchart LR
 | Stytch | Feature-dependent | Device and fraud telemetry for abuse prevention |
 | GitHub Apps and GitHub APIs | Feature-dependent | Repository installation access, webhook handling, and repository-scoped automation |
 | GitLab APIs, including self-hosted GitLab support | Feature-dependent | Repository integration, webhook handling, and automation; customer-configured hosts expand the outbound trust boundary |
-| DoltHub | Feature-dependent | Specialized collaboration and workflow integration |
 | Google Web Risk | Feature-dependent | Deployment URL threat scanning |
 
 ### 9.4 AI, search, and customer-selected model providers

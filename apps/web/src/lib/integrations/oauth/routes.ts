@@ -32,15 +32,6 @@ const statefulOAuthConnectRouteConfigEntries = [
     },
   ],
   [
-    PLATFORM.DOLTHUB,
-    {
-      source: 'dolthub_oauth',
-      loadBuildOAuthUrl: async () =>
-        (await import('@/lib/integrations/dolthub-service')).getDoltHubOAuthUrl,
-      organizationRoles: ORGANIZATION_BILLING_ROLES,
-    },
-  ],
-  [
     PLATFORM.LINEAR,
     {
       source: 'linear_oauth',
@@ -187,10 +178,6 @@ export async function handlePlatformOAuthCallback(
       return (
         await import('@/lib/integrations/oauth/platforms/discord-callback')
       ).handleDiscordOAuthCallback(request);
-    case PLATFORM.DOLTHUB:
-      return (
-        await import('@/lib/integrations/oauth/platforms/dolthub-callback')
-      ).handleDoltHubOAuthCallback(request);
     case PLATFORM.GITLAB:
       return (
         await import('@/lib/integrations/oauth/platforms/gitlab-callback')

@@ -4,27 +4,31 @@ import { NextRequest } from 'next/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { getDoltHubOAuthUrl } from '@/lib/integrations/dolthub-service';
+import { getDiscordOAuthUrl } from '@/lib/integrations/discord-service';
+import { beginProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import { handlePlatformOAuthConnect } from '@/lib/integrations/oauth/routes';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
-jest.mock('@/lib/integrations/dolthub-service', () => ({
-  getDoltHubOAuthUrl: jest.fn(),
+jest.mock('@/lib/integrations/discord-service', () => ({
+  getDiscordOAuthUrl: jest.fn(),
+}));
+jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
+  beginProviderOAuthAttempt: jest.fn(),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
-const mockedGetDoltHubOAuthUrl = jest.mocked(getDoltHubOAuthUrl);
+const mockedGetDiscordOAuthUrl = jest.mocked(getDiscordOAuthUrl);
 
 const USER_ID = 'e0c2bd2a-4d1e-4c33-9a2f-6f0f2f3a5b11';
 const ORGANIZATION_ID = 'org-fixture-for-connect-route-test';
-const AUTHORIZE_URL = 'https://www.dolthub.com/oauth/authorize?client_id=client';
+const AUTHORIZE_URL = 'https://discord.com/oauth2/authorize?client_id=client';
 
 function connectRequest(query = ''): NextRequest {
-  return new NextRequest(`http://localhost:3000/api/integrations/dolthub/connect${query}`);
+  return new NextRequest(`http://localhost:3000/api/integrations/discord/connect${query}`);
 }
 
 function redirectPath(response: Response): string {
@@ -34,7 +38,7 @@ function redirectPath(response: Response): string {
   return `${url.pathname}${url.search}`;
 }
 
-describe('DoltHub OAuth connect route owner authorization', () => {
+describe('Discord OAuth connect route owner authorization', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedGetUserFromAuth.mockResolvedValue({
@@ -42,13 +46,13 @@ describe('DoltHub OAuth connect route owner authorization', () => {
       authFailedResponse: null,
     } as never);
     mockedEnsureOrganizationAccess.mockResolvedValue('owner');
-    mockedGetDoltHubOAuthUrl.mockReturnValue(AUTHORIZE_URL);
+    mockedGetDiscordOAuthUrl.mockReturnValue(AUTHORIZE_URL);
   });
 
   test('an organization connect checks the billing role that governs integrations', async () => {
     const response = await handlePlatformOAuthConnect(
       connectRequest(`?organizationId=${ORGANIZATION_ID}`),
-      'dolthub'
+      'discord'
     );
 
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
@@ -69,16 +73,17 @@ describe('DoltHub OAuth connect route owner authorization', () => {
 
     const response = await handlePlatformOAuthConnect(
       connectRequest(`?organizationId=${ORGANIZATION_ID}`),
-      'dolthub'
+      'discord'
     );
 
+    expect(beginProviderOAuthAttempt).not.toHaveBeenCalled();
     expect(redirectPath(response)).toBe(
-      `/organizations/${ORGANIZATION_ID}/integrations/dolthub?error=permission_required`
+      `/organizations/${ORGANIZATION_ID}/integrations/discord?error=permission_required`
     );
   });
 
   test('a personal connect never consults organization roles', async () => {
-    const response = await handlePlatformOAuthConnect(connectRequest(), 'dolthub');
+    const response = await handlePlatformOAuthConnect(connectRequest(), 'discord');
 
     expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
     expect(response.headers.get('location')).toContain(AUTHORIZE_URL);

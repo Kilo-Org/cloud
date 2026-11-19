@@ -44,7 +44,12 @@ export const BlacklistDomainsInputSchema = z.object({
  */
 export function normalizeSignupTlds(values: readonly string[]): string[] {
   const normalized = values
-    .map(value => value.trim().toLowerCase().replace(/^\.+|\.+$/g, ''))
+    .map(value =>
+      value
+        .trim()
+        .toLowerCase()
+        .replace(/^\.+|\.+$/g, '')
+    )
     .filter(Boolean);
   return [...new Set(normalized)];
 }

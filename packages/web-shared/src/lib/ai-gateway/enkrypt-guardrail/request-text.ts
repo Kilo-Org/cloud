@@ -77,11 +77,6 @@ function unrecognized(role: string | null, value: never): Piece[] {
   return [piece(role ? `${role} ${type}` : type, jsonTexts(value))];
 }
 
-/** A block type the SDK now models but whose fields carry no top-level text for `jsonTexts`. */
-function unscanned(role: string, type: string): Piece[] {
-  return [piece(`${role} ${type}`, [])];
-}
-
 function jsonType(value: JsonValue): string {
   return typeof value === 'object' &&
     value !== null &&
@@ -336,7 +331,12 @@ function anthropicToolResultPieces(content: AnthropicToolResultContent | undefin
       case 'tool_reference':
         return [];
       case 'browser_state':
-        return unscanned(header, part.type);
+        // Tab titles and URLs come from the pages the model browsed.
+        return [
+          piece(`${header} browser state`, [
+            jsonText({ tabs: part.tabs, state_changes: part.state_changes }),
+          ]),
+        ];
       default:
         return unrecognized(header, part);
     }
@@ -436,9 +436,15 @@ function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
     case 'fallback':
       return [];
     case 'mcp_tool_listing':
+      return block.tools.map(tool =>
+        toolDefinition(tool.name, [tool.description, jsonText(tool.input_schema)])
+      );
     case 'tool_addition':
+      return block.tool.type === 'tool_definition'
+        ? anthropicToolDefinitionPieces(block.tool.definition).pieces
+        : [];
     case 'tool_removal':
-      return unscanned(role, block.type);
+      return [];
     default:
       return unrecognized(role, block);
   }

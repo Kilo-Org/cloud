@@ -440,7 +440,7 @@ const PrepareSessionSharedFields = {
   envVars: z
     .record(z.string().max(256), z.string().max(256))
     .refine(envVars => Object.keys(envVars).length <= MAX_ENV_VARS, {
-      message: 'Maximum 50 environment variables allowed',
+      message: `Maximum ${MAX_ENV_VARS} environment variables allowed`,
     })
     .optional(),
   setupCommands: setupCommandsSchema.optional(),

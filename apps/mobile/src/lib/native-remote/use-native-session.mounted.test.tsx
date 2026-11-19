@@ -25,6 +25,7 @@ function fixture() {
     sendCommand: vi.fn<NativeSessionConnection['sendCommand']>(),
     getCommandStatus: vi.fn<NativeSessionConnection['getCommandStatus']>(),
     requestRecovery: vi.fn<NativeSessionConnection['requestRecovery']>(),
+    refresh: vi.fn(),
   };
   const client: NativeRemoteClient = {
     listSessions: vi.fn<NativeRemoteClient['listSessions']>(),

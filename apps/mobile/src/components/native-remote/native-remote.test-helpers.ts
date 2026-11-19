@@ -66,6 +66,7 @@ function sessionConnection() {
       .fn<NativeSessionConnection['requestRecovery']>()
       .mockResolvedValue(undefined),
     clear: vi.fn(),
+    refresh: vi.fn(),
     close: vi.fn(),
   };
 }

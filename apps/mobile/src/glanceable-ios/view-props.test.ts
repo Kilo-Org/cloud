@@ -2,6 +2,7 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
   type GlanceableSessionRow,
+  type GlanceableSnapshotStatusOverride,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { emptyHomeWidgetDetails, type HomeWidgetData } from '@kilocode/app-shared/home-widget';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -34,7 +35,7 @@ afterEach(() => {
 
 function snapshotFor(
   sessions: readonly GlanceableSessionRow[] = [],
-  status?: GlanceableAgentsSnapshot['status']
+  status?: GlanceableSnapshotStatusOverride
 ): GlanceableAgentsSnapshot {
   return buildGlanceableSnapshot({
     sessions,
@@ -88,9 +89,7 @@ describe('newestTitleFor', () => {
     // Empty offers no in-place action, so its slot stays blank rather than
     // carrying a stale title.
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
-    expect(
-      buildGlanceableViewProps(snapshotFor([], 'empty'), {}, translate).newestTitle
-    ).toBeNull();
+    expect(buildGlanceableViewProps(snapshotFor([]), {}, translate).newestTitle).toBeNull();
   });
 });
 

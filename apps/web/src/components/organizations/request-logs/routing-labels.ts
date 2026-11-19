@@ -132,9 +132,32 @@ function paidByLabel(result: RequestLogRoutingResult): string | null {
   }
 }
 
-function selectedProviderName(result: RequestLogRoutingResult): string | null {
+/** The partner a partner-first Kilo route sent the request to, from its `kilo` step. */
+export function partnerInferenceProviderOf(
+  steps: readonly RequestLogRoutingStep[]
+): string | undefined {
+  return steps.find(step => step.step === 'kilo')?.partner_inference_provider;
+}
+
+export function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The display name of a partner, or a generic label when the routing record does not name it.
+ * End users never see the word partner; the request log calls it a direct provider. */
+export function partnerName(partnerInferenceProvider: string | undefined): string {
+  return partnerInferenceProvider
+    ? inferenceProviderNames([partnerInferenceProvider])
+    : 'the direct provider';
+}
+
+function selectedProviderName(
+  result: RequestLogRoutingResult,
+  partnerInferenceProvider: string | undefined
+): string | null {
   const providerType = result.provider_type;
   if (!providerType) return null;
+  if (providerType === 'partner') return partnerName(partnerInferenceProvider);
   if (providerType === 'direct-byok') {
     const providerIds = result.byok_provider_ids ?? [];
     return providerIds.length > 0
@@ -144,8 +167,11 @@ function selectedProviderName(result: RequestLogRoutingResult): string | null {
   return lookup(SENT_TO_LABELS, providerType);
 }
 
-export function describeResult(result: RequestLogRoutingResult): DescribedResult {
-  const provider = selectedProviderName(result);
+export function describeResult(
+  result: RequestLogRoutingResult,
+  partnerInferenceProvider?: string
+): DescribedResult {
+  const provider = selectedProviderName(result, partnerInferenceProvider);
   return {
     title: provider ? `Sent to ${provider}` : 'Provider selected',
     paidBy: paidByLabel(result),
@@ -155,9 +181,10 @@ export function describeResult(result: RequestLogRoutingResult): DescribedResult
 /** Nothing was sent, so nobody paid; the detail names the provider Kilo had selected. */
 export function describeUnsentResult(
   result: RequestLogRoutingResult,
-  reason: RequestLogNotSentReason
+  reason: RequestLogNotSentReason,
+  partnerInferenceProvider?: string
 ): DescribedUnsentResult {
-  const provider = selectedProviderName(result);
+  const provider = selectedProviderName(result, partnerInferenceProvider);
   return {
     title: NOT_SENT_LABELS[reason],
     detail: provider ? `Would have been sent to ${provider}.` : null,
@@ -222,9 +249,34 @@ function describeByokKey(step: RequestLogRoutingStep, failedOver: boolean): stri
     : 'No BYOK key can serve this model.';
 }
 
+const PARTNER_SKIP_REASON_LABELS: Record<string, string> = {
+  'unsupported-api-kind': 'This API is not supported.',
+  'server-features': 'The request uses plugins or server tools, which only the gateway runs.',
+  'bounded-spending': 'The request carries a spend ceiling.',
+  'openrouter-disabled': 'Excluded by the organization gateway settings.',
+  'provider-settings': 'Excluded by provider settings.',
+};
+
+function describePartnerSkip(step: RequestLogRoutingStep): string {
+  const reason = step.reason ? lookup(PARTNER_SKIP_REASON_LABELS, step.reason) : '';
+  if (!step.partner_inference_provider) return reason;
+  const partner = inferenceProviderNames([step.partner_inference_provider]);
+  const lowered = reason.charAt(0).toLowerCase() + reason.slice(1);
+  return `${partner} was skipped: ${lowered}`;
+}
+
 function describeKilo(step: RequestLogRoutingStep): string {
   const gateway = (step.gateway ? gatewayName(step.gateway) : null) ?? 'a Kilo gateway';
+  if (step.partner_inference_provider) {
+    const partner = inferenceProviderNames([step.partner_inference_provider]);
+    return `Paid with Kilo credits, with ${partner} as the direct provider and ${gateway} as the fallback.`;
+  }
   return `Paid with Kilo credits and routed through ${gateway}.`;
+}
+
+/** A partner route failed over to Kilo's gateway route, which Kilo also pays for. */
+export function isPartnerFailover(attempts: readonly { provider_type?: string }[]): boolean {
+  return attempts[0]?.provider_type === 'partner';
 }
 
 export function inferenceProviderNames(providers: string[]): string {
@@ -277,6 +329,8 @@ export function describeStep(
         tone,
       };
     }
+    case 'partner':
+      return { title: 'Direct provider', detail: describePartnerSkip(step), tone };
     case 'kilo':
       return { title: 'Kilo credits', detail: describeKilo(step), tone };
     default:

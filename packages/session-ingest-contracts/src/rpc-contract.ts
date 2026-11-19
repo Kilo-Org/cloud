@@ -1369,9 +1369,10 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
 /**
  * Generic authorized paginated history request used by `cliSessionsV2` for any
  * Kilo session (root cloud-agent, child, or remote CLI) the user owns and
- * still has organization access to. Reuses the existing opaque cursor and
- * bounded DO reader so the new method is byte-identical to
- * `getCloudAgentRootSessionMessages` aside from the access-check boundary.
+ * still has organization access to. Reuses the opaque cursor codec and the
+ * bounded DO reader of `getCloudAgentRootSessionMessages`; the two request
+ * schemas differ in their `limit` bounds and in the `kiloSessionId` shape, as
+ * the paragraphs below state.
  *
  * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and must be
  * a positive integer; the schema applies `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE`

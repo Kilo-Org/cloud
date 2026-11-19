@@ -4,13 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "bash scripts/dev.sh",
-    "build": "node src/usage-queue/prepare.mjs && next build",
+    "build": "next build",
     "start": "next start",
     "typecheck": "GOMEMLIMIT=2GiB tsgo --noEmit",
-    "test:usage-queue": "node --test src/usage-queue/deployment.test.mjs"
+    "test:vercel-config": "node --test vercel.test.mjs"
   },
   "dependencies": {
-    "@kilocode/usage-queue": "workspace:*",
     "@kilocode/web-shared": "workspace:*",
     "@opentelemetry/api": "1.9.1",
     "@sentry/nextjs": "11.12.0",

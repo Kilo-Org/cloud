@@ -14,8 +14,7 @@ direct-accounting selector. This recipe does not provide a direct baseline;
 establish a separately agreed test setup before comparing direct and queued runs.
 
 For staging queued runs, keep `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` other
-than `production`. Use `USAGE_QUEUE_TRANSPORT=cloudflare` (or unset) for Cloudflare;
-exact `vercel` selects the [Vercel prototype](../../packages/usage-queue/README.md).
+than `production`. Staging queued runs always publish through Cloudflare.
 Production queues every request in any function region,
 without a regional or exposure control; the
 [rollout gates](eu-queues.md#production-merge-gate) still apply before
@@ -38,7 +37,7 @@ full-jitter waits, clipped to remaining budget; four full attempts and the maxim
 waits fit in under 38.5 seconds, so only a runtime delay shortens a later attempt)
 and runtime scheduling overhead, excluding subsequent Bouncer reporting, in
 accounting completion deadlines. Non-retry HTTP publication remains one
-two-second attempt; Vercel queue transport is unchanged. There is no durable recovery
+two-second attempt. There is no durable recovery
 for unaccepted events in this path; an ambiguous failure such as a timeout may
 still be followed by consumer persistence, so reconcile those IDs separately.
 

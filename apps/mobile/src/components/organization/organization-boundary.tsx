@@ -21,6 +21,13 @@ type OrganizationBoundaryProps = Readonly<{
   /** Full-screen callers pass a title for the `ScreenHeader`; sheets omit it and own no chrome. */
   title?: string;
   /**
+   * Hold the header's eyebrow line while the caller's real content has one to
+   * fill. The boundary paints no eyebrow itself, so this only reserves the
+   * band: the title keeps its height and the content below it does not move
+   * when the resolved screen swaps the label in.
+   */
+  reserveEyebrow?: boolean;
+  /**
    * Where the header's Back lands when the screen opens with no history to pop.
    * Every caller that passes a `title` names its own area's parent: the Profile
    * tab's root for that tab's children, the organization hub for the
@@ -44,8 +51,9 @@ type OrganizationBoundaryProps = Readonly<{
  *    doesn't resolve to a membership. Three settled states, mutually
  *    exclusive:
  *    - no memberships at all → the account has no organization; the action
- *      opens the web organizations page (create/join live there), and Back
- *      to profile stays as the plain exit.
+ *      opens the app's own create-organization flow, and Back to profile
+ *      stays as the plain exit. Joining one happens from the invitation
+ *      email the organization sent, not from a control on this screen.
  *    - memberships exist but nothing is selected → the action opens the
  *      context picker sheet, the same account switcher the composer uses.
  *    - a deep-link override absent from a non-empty member list is
@@ -58,6 +66,7 @@ type OrganizationBoundaryProps = Readonly<{
  */
 export function OrganizationBoundary({
   title,
+  reserveEyebrow,
   backFallback,
   organizationIdOverride,
   icon = Building2,
@@ -89,9 +98,9 @@ export function OrganizationBoundary({
     // whether the account has any memberships at all:
     // 1. no memberships — the account has no organization (nothing selected,
     //    a stale selection, or an absent deep-link override all look the
-    //    same here); the web organizations page owns create/join, so the
-    //    boundary sends the reader there instead of a profile control that
-    //    does not exist.
+    //    same here); the app's own create-organization flow is the action
+    //    this state can actually deliver, and an invitation is accepted from
+    //    its email, so the description names no control this state lacks.
     // 2. memberships exist but the resolved selection renders nothing —
     //    nothing selected or a stale persisted selection; open the context
     //    picker so the reader can actually make the choice.
@@ -161,7 +170,7 @@ export function OrganizationBoundary({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} backFallback={backFallback} />
+      <ScreenHeader title={title} reserveEyebrow={reserveEyebrow} backFallback={backFallback} />
       {content}
     </View>
   );

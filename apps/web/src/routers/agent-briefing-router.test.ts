@@ -87,6 +87,24 @@ it('disables only the chosen context and clears live excerpts without changing s
   expect(settings.find(setting => setting.context_key === org.id)?.enabled).toBe(true);
   expect(settings.find(setting => setting.context_key === 'personal')?.enabled).toBe(false);
 });
+it('persists the language sent with updateContextPreferences when the preferences row exists', async () => {
+  const user = await insertTestUser();
+  await db.insert(agent_briefing_preferences).values({
+    kilo_user_id: user.id,
+    timezone: 'UTC',
+    language: 'en',
+    next_run_at: new Date().toISOString(),
+  });
+  const preferences = await agentBriefingRouter
+    .createCaller({ user })
+    .updateContextPreferences({ organizationId: undefined, enabled: false, language: 'de' });
+  const [row] = await db
+    .select()
+    .from(agent_briefing_preferences)
+    .where(eq(agent_briefing_preferences.kilo_user_id, user.id));
+  expect(row?.language).toBe('de');
+  expect(preferences.language).toBe('de');
+});
 it('refuses context settings after membership revocation', async () => {
   const user = await insertTestUser();
   const org = await createTestOrganization('Revoked scope', user.id, 0);

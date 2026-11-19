@@ -91,6 +91,20 @@ describe('scanUnits', () => {
       }
     });
 
+    it('gives each slice the range of the body it holds, and a whole segment none', () => {
+      const ranges = units.map(unit => unit.bodyRange);
+      expect(ranges.every(range => range !== undefined)).toBe(true);
+      expect(ranges[0]?.start).toBe(0);
+      expect(ranges.at(-1)?.end).toBe(body.length);
+      units.forEach(({ text, bodyRange }) => {
+        expect(body.slice(bodyRange!.start, bodyRange!.end) === bodyOf(text)).toBe(true);
+      });
+      expect(scanUnits([segment('user', 'hello'), segment('user image', null)])).toEqual([
+        { text: '[user]\nhello', segment: 0 },
+        { text: '[user image omitted]', segment: 1 },
+      ]);
+    });
+
     it('has bodies that, without the overlap, concatenate back to the original body', () => {
       const rebuilt = bodies
         .map((text, index) => (index === 0 ? text : text.slice(ENKRYPT_SLICE_OVERLAP_CHARACTERS)))
@@ -153,6 +167,7 @@ describe('scanUnits', () => {
       const body = astral(prefix, 120_000);
       const units = scanUnits([segment('user', body)]);
       expect(units.length).toBeGreaterThan(2);
+      expect(units.map(unit => unit.bodyRange)).toEqual(bounds(body, units));
       for (const { text } of units) {
         expect(text).not.toMatch(SPLIT_PAIR);
         expect(text.length).toBeLessThanOrEqual(ENKRYPT_MAX_SCAN_CHARACTERS);

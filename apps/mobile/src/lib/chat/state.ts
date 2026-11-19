@@ -6,14 +6,6 @@ import { type LocalImage } from '@/lib/agent-attachments/local-image';
 import { type ChatFlag } from './chat-flag';
 import { type ChatRecord, NO_RECORD } from './store';
 
-/**
- * What a chat looks like to whoever is drawing it.
- *
- * A screen never holds this: it reads it. The conversation runs in the
- * registry whether or not a screen is mounted, and every change to one is
- * published to whoever is watching.
- */
-
 /** Something a person asked: the words and the images that go with them. */
 export type Question = {
   readonly text: string;

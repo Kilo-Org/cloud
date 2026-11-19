@@ -7522,6 +7522,63 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
     });
 
+    it('repaints the bottom bar from reconnecting warning to terminal loss and back', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // The recoverable drop paints the non-error reconnecting line.
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      mockSession.state.getStatus.mockReturnValue({
+        type: 'disconnected',
+        reconnecting: true,
+      });
+      notifyStateChange?.();
+
+      const warning = atomValue<{ type: string; message: string; code?: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(warning).toMatchObject({
+        type: 'warning',
+        code: 'agent-connection-reconnecting',
+      });
+
+      // The spent retry budget is the same `disconnected` type: the repaint
+      // gate must still re-project, so the reader gets the canonical loss
+      // line instead of an endless "Reconnecting…".
+      mockSession.state.getStatus.mockReturnValue({
+        type: 'disconnected',
+        code: 'connection-lost',
+      });
+      notifyStateChange?.();
+
+      const loss = atomValue<{ type: string; message: string; code?: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(loss).toMatchObject({
+        type: 'error',
+        code: 'connection-lost',
+      });
+
+      // A live connection is the one proof either state is over: the line
+      // clears and the stale error atom goes with it.
+      mockSessionCallbacks.onError?.('Connection lost. Please retry in a moment.');
+      mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.statusIndicator)).toBeNull();
+    });
+
     it('suppresses Aborted onError from the interrupted session so errorAtom stays clear', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

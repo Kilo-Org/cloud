@@ -77,6 +77,46 @@ describe('verifyAppleJwtWithJwks', () => {
     );
   });
 
+  it('treats a key set of the wrong shape as a refresh failure and does not cache it', async () => {
+    const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
+    let now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        // A 200 body whose entries omit kty, n, and e must not be treated as
+        // keys, and must not be cached as an empty set.
+        new Response(JSON.stringify({ keys: [{ kid: 'known-key' }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+      .mockResolvedValueOnce(jwksResponse([jwkForKey('known-key')]));
+    const token = signToken('known-key');
+
+    const rejected = await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp').catch(
+      (error: unknown) => error
+    );
+    expect(rejected).toBeInstanceOf(Error);
+    expect(rejected).not.toBeInstanceOf(AppleJwtClientError);
+    expect(rejected instanceof Error ? rejected.message : String(rejected)).toBe(
+      'Apple JWKS response has an unexpected shape'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Nothing was cached, and the recorded failure is still within the
+    // refresh cooldown, so the next call serves that failure without a fetch.
+    await expect(verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp')).rejects.toThrow(
+      'Apple JWKS response has an unexpected shape'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    now += 31_000;
+    const payload = await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
+    expect(payload.aud).toBe('com.kilocode.kiloapp');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects repeated unknown-kid tokens with a bounded number of key-set fetches', async () => {
     const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
     let now = 1_700_000_000_000;

@@ -4,7 +4,6 @@ import { captureMessage } from '@sentry/nextjs';
 import {
   GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME,
   GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS,
-  GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER,
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY,
 } from '@kilocode/web-shared/lib/config.server';
 
@@ -145,10 +144,9 @@ interface PlayIntegrityConfig {
 }
 
 function getPlayIntegrityConfig(): PlayIntegrityConfig | null {
-  const projectNumber = GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER;
   const serviceAccountKey = GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
 
-  if (!projectNumber || !serviceAccountKey || !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME) {
+  if (!serviceAccountKey || !GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME) {
     return null;
   }
 

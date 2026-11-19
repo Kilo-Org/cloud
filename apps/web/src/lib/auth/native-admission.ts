@@ -279,9 +279,14 @@ export type VerifyAdmissionOk = {
   existingKeyUserId?: string;
 };
 
+/** The one refusal code the admission verifiers return. */
+export const ADMISSION_REQUIRED = 'ADMISSION_REQUIRED' as const;
+export type AdmissionRefusalCode = typeof ADMISSION_REQUIRED;
+export type VerifyAdmissionRefused = { ok: false; errorCode: AdmissionRefusalCode };
+
 export async function verifyAdmissionAsync(
   admission: AdmissionPayload
-): Promise<VerifyAdmissionOk | { ok: false; errorCode: string }> {
+): Promise<VerifyAdmissionOk | VerifyAdmissionRefused> {
   // Atomically consume the challenge
   const now = new Date().toISOString();
   const [consumed] = await db
@@ -297,7 +302,7 @@ export async function verifyAdmissionAsync(
     .returning();
 
   if (!consumed) {
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return { ok: false, errorCode: ADMISSION_REQUIRED };
   }
 
   if (isDevSentinel(admission)) {
@@ -315,7 +320,7 @@ export async function verifyAdmissionAsync(
     return verifyAndroidAdmission(admission);
   }
 
-  return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+  return { ok: false, errorCode: ADMISSION_REQUIRED };
 }
 
 // ── Apple (iOS) admission ──────────────────────────────────────────────────
@@ -341,11 +346,11 @@ function findAttestedKey(
 
 async function verifyAppleAdmission(
   admission: AdmissionPayload
-): Promise<VerifyAdmissionOk | { ok: false; errorCode: string }> {
+): Promise<VerifyAdmissionOk | VerifyAdmissionRefused> {
   const { kind, challenge, payload, keyId } = admission;
 
   if (!keyId) {
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return { ok: false, errorCode: ADMISSION_REQUIRED };
   }
 
   if (kind === 'attestation') {
@@ -354,7 +359,7 @@ async function verifyAppleAdmission(
 
     if (!result.ok) {
       captureMessage(`apple_attestation_failed: ${result.error}`);
-      return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+      return { ok: false, errorCode: ADMISSION_REQUIRED };
     }
 
     // Check whether this keyId already exists — the caller uses this for
@@ -376,7 +381,7 @@ async function verifyAppleAdmission(
 
   if (!existingKey) {
     captureMessage('apple_assertion_unknown_key');
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return { ok: false, errorCode: ADMISSION_REQUIRED };
   }
 
   // Cross-user key collision: the caller must check ownership after settlement
@@ -390,7 +395,7 @@ async function verifyAppleAdmission(
 
   if (!assertionResult.ok) {
     captureMessage(`apple_assertion_failed: ${assertionResult.error}`);
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return { ok: false, errorCode: ADMISSION_REQUIRED };
   }
 
   // Atomic monotonic sign-count gate. The check and the update are a single
@@ -419,7 +424,7 @@ async function verifyAppleAdmission(
     captureMessage(
       `apple_assertion_stale_or_replayed: asserted ${assertionResult.signCount} rejected`
     );
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return { ok: false, errorCode: ADMISSION_REQUIRED };
   }
 
   return {
@@ -435,12 +440,12 @@ async function verifyAppleAdmission(
 
 async function verifyAndroidAdmission(
   admission: AdmissionPayload
-): Promise<VerifyAdmissionOk | { ok: false; errorCode: string }> {
+): Promise<VerifyAdmissionOk | VerifyAdmissionRefused> {
   const { kind, challenge, payload } = admission;
 
   // Android sends Play Integrity tokens with kind 'assertion' per the plan.
   if (kind !== 'assertion') {
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return { ok: false, errorCode: ADMISSION_REQUIRED };
   }
 
   // verifyPlayIntegrity throws on infrastructure faults — caller must
@@ -449,7 +454,7 @@ async function verifyAndroidAdmission(
 
   if (!result.ok) {
     captureMessage(`play_integrity_failed: ${result.error}`);
-    return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
+    return { ok: false, errorCode: ADMISSION_REQUIRED };
   }
 
   // Android Play Integrity tokens are per-request — no persistent key

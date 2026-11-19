@@ -458,8 +458,10 @@ export async function scanRequest(
   ]);
   const notStarted = abortError(signal, deps);
   if (notStarted) {
-    // Earlier calls of the request used up the shared deadline, so this one is not made.
-    return failedVerdict([], scope, { error: notStarted, latencyMs: 0 });
+    // Earlier calls of the request used up the shared deadline, so this one is not made. The call
+    // the deadline cut short already logged the timeout, so the calls after it log at debug level
+    // rather than adding a warning for every unit of a long conversation.
+    return failedVerdict([], scope, { error: notStarted, latencyMs: 0, quiet: true });
   }
   const startedAt = performance.now();
   const requestLog: EnkryptRequestLog | undefined = deps.requestLog
@@ -631,10 +633,10 @@ function scanReport(
   };
 }
 
-/** A client disconnect is not an Enkrypt failure, so it is logged at debug level. */
-function logDecision(scope: ScanScope, report: EnkryptScanReport): void {
+/** A client disconnect is not an Enkrypt failure, so it is logged at debug level, as is `quiet`. */
+function logDecision(scope: ScanScope, report: EnkryptScanReport, quiet = false): void {
   const fields = { ...scope.logFields, ...report };
-  const failed = report.error !== null && report.decision !== 'client_aborted';
+  const failed = !quiet && report.error !== null && report.decision !== 'client_aborted';
   if (failed) warnExceptInTest('[enkrypt-guardrail] decision', fields);
   else console.debug('[enkrypt-guardrail] decision', fields);
 }
@@ -684,6 +686,8 @@ function failedVerdict(
     latencyMs: number;
     closedVerdict?: EnkryptGuardrailVerdict;
     detectorsFired?: EnkryptDetectorId[];
+    /** Logs the decision at debug level, even when it failed. */
+    quiet?: boolean;
   }
 ): EnkryptGuardrailScanResult {
   const report = scanReport(scope, {
@@ -693,7 +697,7 @@ function failedVerdict(
     usageRecords,
     latencyMs: failure.latencyMs,
   });
-  logDecision(scope, report);
+  logDecision(scope, report, failure.quiet);
   return {
     verdict: failureVerdict(scope.report.scan, failure),
     usageRecords:

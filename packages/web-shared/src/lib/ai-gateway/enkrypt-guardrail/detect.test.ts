@@ -1188,8 +1188,9 @@ describe('scanRequest', () => {
         ],
       ]
     )(
-      'fails a %s scan as timed out, without a call or usage',
+      'fails a %s scan as timed out, without a call, usage, or warning',
       async (_name, overrides, verdict, decision) => {
+        const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
         const deadline = new AbortController();
         deadline.abort();
         const dependencies = deps(async () => detectResponse({ summary: {} }), {
@@ -1199,6 +1200,12 @@ describe('scanRequest', () => {
         const result = await scanRequest(makeScan(overrides), dependencies);
 
         expect(dependencies.fetch).not.toHaveBeenCalled();
+        // The call the deadline cut short already warned.
+        expect(mockedWarnExceptInTest).not.toHaveBeenCalled();
+        expect(debug).toHaveBeenCalledWith(
+          '[enkrypt-guardrail] decision',
+          expect.objectContaining({ error: 'timeout', attempts: 0 })
+        );
         expect(result.verdict).toEqual(verdict);
         expect(result.usageRecords).toEqual([]);
         expect(result.report).toMatchObject({

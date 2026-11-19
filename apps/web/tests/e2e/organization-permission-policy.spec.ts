@@ -6,7 +6,7 @@ test.describe('organization permission policy API', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test('authenticates before conditional policy validation', async ({ request }) => {
-    const response = await request.get(`/api/organizations/${organizationId}/permission-policy`, {
+    const response = await request.get(`/api/organizations/${organizationId}/policy/permission`, {
       headers: { 'If-None-Match': '*' },
     });
 

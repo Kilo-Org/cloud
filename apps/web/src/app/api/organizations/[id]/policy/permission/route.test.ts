@@ -116,7 +116,7 @@ function request(
   if (token !== undefined) headers.set('Authorization', `Bearer ${token}`);
   if (tag !== undefined) headers.set('If-None-Match', tag);
   return GET(
-    new NextRequest(`https://example.test/api/organizations/${id}/permission-policy`, { headers }),
+    new NextRequest(`https://example.test/api/organizations/${id}/policy/permission`, { headers }),
     {
       params: Promise.resolve({ id }),
     }

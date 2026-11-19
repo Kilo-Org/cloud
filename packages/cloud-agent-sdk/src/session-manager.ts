@@ -2525,9 +2525,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     });
   }
 
-  // Replay a `SessionSnapshotPageOutcome` into the active storage. Returns
-  // whether the page was applied (so the caller can also persist the cursor
-  // and atom updates). Generation-aware: a stale caller's result is
+  // Replay a `SessionSnapshotPageOutcome` into the active storage. Returns the
+  // ids of the rows the replay stored, or `null` when the page was not applied
+  // (a stale caller, a non-success outcome, or a page that does not belong to
+  // this session), so the caller can also persist the cursor and atom updates
+  // and name the stored rows. Generation-aware: a stale caller's result is
   // discarded silently. Used by both `switchSession` (initial page) and
   // `loadOlderMessages` (subsequent pages).
   //
@@ -2657,16 +2659,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
 
         if (outcome.kind === 'success') {
-          // Read the page's ids before the page is applied: `applyPage`
-          // advances the cursor and clears the error, so anything that threw
-          // after it would report a failure for a page that was already
-          // applied, and Retry would fetch a different page — or nothing,
-          // when this was the last one. Both the ids and the apply run under
-          // this catch, so a throw here leaves the cursor where it was.
+          // `applyPage` returns the ids of the rows it stored, and it is the
+          // last thing here that can fail: a throw leaves the cursor where it
+          // was, so Retry loads this same page. Naming the rows from the page
+          // instead would also read the rows the replay skipped.
           try {
-            // The ids of the rows the apply actually stored: a row the replay
-            // skipped must not be named here, or a page the transcript cannot
-            // describe would abort the whole load on every retry.
             const storedMessageIds = applyPage(outcome, expectedGeneration);
             if (storedMessageIds) {
               retainedHistoryStack.push({ cursorBefore: cursor, messageIds: storedMessageIds });

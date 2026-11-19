@@ -33,6 +33,7 @@ import {
 } from '@/components/pr-review/pr-review-tab-selector';
 import { ScreenHeader } from '@/components/screen-header';
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
+import { setDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import {
   pendingReviewDraftKey,
   PendingReviewProvider,
@@ -47,8 +48,10 @@ import { TRPCProvider } from '@/lib/trpc';
 // merge-request-missing,merge-request-error}.
 // The checks-not-available surface answers the checks read as not found, the
 // terminal that renders the section's unavailable message; the composer surface
-// mounts the comment composer on a line; the gate surfaces are
-// dev/pr-review-copy-fixture/gate-*.
+// mounts the comment composer on a line, with
+// dev/pr-review-copy-fixture/composer?side=LEFT reaching the deleted-line
+// (suggestions unavailable) state and composer?selected=1 the added line with a
+// seeded selection; the gate surfaces are dev/pr-review-copy-fixture/gate-*.
 // Uses the app's selected language without changing its preference.
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
 // Reads never invoke global fetch. The mutation cache rejects before any mutation
@@ -95,7 +98,14 @@ function ChecksSectionSurface() {
 }
 
 export function PrReviewCopyFixture() {
-  const { surface } = useLocalSearchParams<{ surface?: string }>();
+  const { surface, side, selected } = useLocalSearchParams<{
+    surface?: string;
+    side?: string;
+    selected?: string;
+  }>();
+  // The composer surface defaults to the added-line state; `side=LEFT` reaches
+  // the deleted-line state and `selected=1` seeds an added-line selection.
+  const fixtureSide = side === 'LEFT' ? 'LEFT' : 'RIGHT';
   const router = useRouter();
   const { t } = useTranslation();
   const [queryClient] = useState(
@@ -110,6 +120,23 @@ export function PrReviewCopyFixture() {
       })
   );
   const [client] = useState(() => createFixtureClient(surface));
+  // Seed the selection bridge once so the available state renders on a device
+  // too: the composer reads the bridge during render, and this initializer runs
+  // before its children mount.
+  useState(() => {
+    if (!__DEV__ || surface !== 'composer' || fixtureSide !== 'RIGHT' || selected !== '1') {
+      return;
+    }
+    setDiffSelection({
+      owner: triple.owner,
+      repo: triple.repo,
+      number: triple.number,
+      path: 'src/greeting.ts',
+      side: 'RIGHT',
+      line: 2,
+      selectedText: 'export function greet(): string { return "hello"; }',
+    });
+  });
   const [tab, setTab] = useState<PrReviewTabId>('files');
   const header = (
     <ScreenHeader title={t('prReview.fileNavigator.title')} eyebrow="sample/review-copy#1" />
@@ -212,7 +239,7 @@ export function PrReviewCopyFixture() {
           number={triple.number}
           mode={{ kind: 'create', headSha }}
           path="src/greeting.ts"
-          side="RIGHT"
+          side={fixtureSide}
           line={2}
           title={t('prReview.composer.addTitle')}
           eyebrow="sample/review-copy#1"

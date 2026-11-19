@@ -8,7 +8,7 @@
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { impactHaptic, notificationHaptic } from '@/lib/haptics';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, ScrollView, type ScrollViewInstance, type TextInput, View } from 'react-native';
 
@@ -406,6 +406,29 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const primaryDisabled =
     isSubmitting || (failure !== null && BLOCKING.has(failure.kind)) || (isEdit && !hasBody);
 
+  // The reason is non-null exactly when the Insert button cannot render, so the
+  // two never paint together and the copy never attaches to a hidden control.
+  let suggestionControl: ReactNode = null;
+  if (suggestionDisabledReason !== null) {
+    suggestionControl = (
+      <Text testID="pr-comment-suggestion-unavailable" className="text-xs text-muted-foreground">
+        {suggestionDisabledReason}
+      </Text>
+    );
+  } else if (showInsertSuggestion) {
+    suggestionControl = (
+      <Button
+        variant="ghost"
+        size="sm"
+        onPress={handleInsertSuggestion}
+        accessibilityLabel={t('prReview.composer.insertSuggestionA11y')}
+        className="self-start"
+      >
+        <Text>{t('prReview.composer.insertSuggestion')}</Text>
+      </Button>
+    );
+  }
+
   // PickerSheet invariant: [header, ScrollView] as direct children (no
   // wrapper View, no sticky-footer sibling). Footer is trailing scroll
   // content so the keyboard insets the scroll body and the comment CTA stays
@@ -450,18 +473,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
                 }
               />
             )}
-            {showInsertSuggestion ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onPress={handleInsertSuggestion}
-                accessibilityLabel={t('prReview.composer.insertSuggestionA11y')}
-                accessibilityHint={suggestionDisabledReason ?? undefined}
-                className="self-start"
-              >
-                <Text>{t('prReview.composer.insertSuggestion')}</Text>
-              </Button>
-            ) : null}
+            {suggestionControl}
           </View>
           <ComposerInlineError feedback={feedback} />
         </View>

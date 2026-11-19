@@ -395,13 +395,13 @@ export function createSecureStorePreference<T>(options: {
       // A clear before the initial load resolves must still win, even with
       // mergeOnLoad set.
       cleared = true;
-      emit();
-      // Recorded before clear() returns, so a read that starts right after it
-      // waits for the delete instead of reading the snapshot this clear
-      // removed. remove() never rejects, so the recorded promise is safe to
-      // hold.
+      // Recorded before emit() and before clear() returns: a listener that
+      // starts the read from the emit, or a caller that starts it right after
+      // the clear, must wait for the delete instead of reading the snapshot
+      // this clear removed. remove() never rejects, so holding it is safe.
       clearDeletion = remove();
       void clearDeletion;
+      emit();
       releaseDrainWaiters();
     },
   };

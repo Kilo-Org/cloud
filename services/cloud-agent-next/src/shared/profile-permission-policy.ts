@@ -205,10 +205,11 @@ function agentEntriesBroadestFirst(
   entries: Array<[string, PermissionAction]>
 ): Array<[string, PermissionAction]> {
   const wider: boolean[][] = entries.map(([broadPattern], broadIndex) =>
-    entries.map(([narrowPattern], narrowIndex) =>
-      broadIndex !== narrowIndex &&
-      patternIsCoveredBy(narrowPattern, broadPattern) &&
-      !patternIsCoveredBy(broadPattern, narrowPattern)
+    entries.map(
+      ([narrowPattern], narrowIndex) =>
+        broadIndex !== narrowIndex &&
+        patternIsCoveredBy(narrowPattern, broadPattern) &&
+        !patternIsCoveredBy(broadPattern, narrowPattern)
     )
   );
   const placed = new Set<number>();

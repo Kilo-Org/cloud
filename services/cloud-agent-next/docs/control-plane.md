@@ -2318,12 +2318,16 @@ client writes for Kilo v1. `lastActivityAt` is the receipt time of the latest ev
 that wrote the transcript (`TRANSCRIPT_EVENT_TYPES` in `list-status.ts`); ingest
 moves `cli_sessions_v2.last_activity_at` forward only, which keeps a working chat in
 the active-session list and dates its row. It rides status changes and busy/retry
-refreshes and never triggers a publication itself. `title` is a native rename of the
+refreshes and never triggers a publication itself. `rename` is a native rename of the
 root: a `conversation.source` whose session title differs from the stored source and
-is not a creation placeholder. A rename forces a snapshot, stays in newer snapshots
-until one is delivered, and is applied like a CLI rename report (it replaces a
-generated title) with a `session.updated` notification. Kilo v1 never sends
-`conversation.source`: its CLI keeps reporting its own titles.
+is not a creation placeholder. A rename forces a snapshot and stays in newer snapshots
+until one is delivered, naming the snapshot that first carried it. Ingest applies it
+like a CLI rename report (it replaces a generated title), with a `session.updated`
+notification, in the status transaction and only while the stored
+`status_transition_id` is older than that first snapshot: a late publication cannot
+replace a newer rename, and a repeat of a delivered rename cannot replace a later user
+rename. Kilo v1 never sends `conversation.source`: its CLI keeps reporting its own
+titles.
 
 Publication has one durable, coalescing latest-status obligation per Session DO.
 Its monotonic ULID cursor survives eviction and clock rollback. Each RPC has a

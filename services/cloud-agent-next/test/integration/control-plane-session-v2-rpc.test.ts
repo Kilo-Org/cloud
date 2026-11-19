@@ -508,7 +508,10 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       );
       // The rename forces its own snapshot and leaves the snapshots after its delivery.
       expect(published).toContainEqual(
-        expect.objectContaining({ sessionId: kiloId, title: 'Renamed by the agent' })
+        expect.objectContaining({
+          sessionId: kiloId,
+          rename: expect.objectContaining({ title: 'Renamed by the agent' }),
+        })
       );
       const latest = published.at(-1);
       expect(latest).toMatchObject({ sessionId: kiloId, status: 'idle' });

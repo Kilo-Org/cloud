@@ -91,7 +91,9 @@ export function createSessionListStatusOutbox(input: {
   /**
    * `activityAt` is the latest transcript activity the Session DO observed; it
    * rides every snapshot and never moves back. `title` is a native rename: it
-   * forces a snapshot, and stays in newer ones until a publication delivers it.
+   * forces a snapshot, and stays in newer ones until a publication delivers it,
+   * naming the snapshot that first carried it so ingest never applies a repeat
+   * of a rename it already applied.
    */
   function record(
     identity: Pick<
@@ -124,17 +126,23 @@ export function createSessionListStatusOutbox(input: {
         ? -Infinity
         : Date.parse(previous.update.lastActivityAt)
     );
-    const title = observed.title ?? (previous?.dueAt === null ? undefined : previous?.update.title);
+    const transitionId = ulid(at);
+    const rename =
+      observed.title === undefined
+        ? previous?.dueAt === null
+          ? undefined
+          : previous?.update.rename
+        : { title: observed.title, transitionId };
     const snapshot = storedStatusSchema.safeParse({
       update: {
         ...identity,
         status,
         occurredAt: new Date(at).toISOString(),
-        transitionId: ulid(at),
+        transitionId,
         ...(Number.isFinite(activityAt)
           ? { lastActivityAt: new Date(activityAt).toISOString() }
           : {}),
-        ...(title === undefined ? {} : { title }),
+        ...(rename === undefined ? {} : { rename }),
       },
       dueAt: now,
     });

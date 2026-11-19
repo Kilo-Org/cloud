@@ -173,13 +173,14 @@ describe('session-list status outbox', () => {
     outbox.record(identity, 'busy', 1001, { title: 'Renamed by the agent' });
     await outbox.repair(1001);
     expect(publish).toHaveBeenCalledTimes(2);
-    expect(publish.mock.calls[1]?.[0]).toMatchObject({
+    const renamed = publish.mock.calls[1]?.[0];
+    expect(renamed).toMatchObject({
       status: 'busy',
-      title: 'Renamed by the agent',
+      rename: { title: 'Renamed by the agent', transitionId: renamed?.transitionId },
     });
   });
 
-  it('keeps an undelivered rename in newer snapshots and drops it once delivered', async () => {
+  it('keeps an undelivered rename, named by its first snapshot, in newer snapshots and drops it once delivered', async () => {
     const { outbox, publish } = fixture();
     publish.mockRejectedValueOnce(new Error('unavailable'));
     outbox.record(identity, 'busy', 1000, { title: 'Renamed by the agent' });
@@ -188,9 +189,11 @@ describe('session-list status outbox', () => {
     await outbox.repair(2000);
     outbox.record(identity, 'busy', 3000);
     await outbox.repair(3000);
-    expect(publish.mock.calls.map(([update]) => [update.status, update.title])).toEqual([
-      ['busy', 'Renamed by the agent'],
-      ['idle', 'Renamed by the agent'],
+    const updates = publish.mock.calls.map(([update]) => update);
+    const rename = { title: 'Renamed by the agent', transitionId: updates[0]?.transitionId };
+    expect(updates.map(update => [update.status, update.rename])).toEqual([
+      ['busy', rename],
+      ['idle', rename],
       ['busy', undefined],
     ]);
   });

@@ -565,6 +565,13 @@ describe('narrowProfilePermission', () => {
     }) as PermissionMap;
     expect(askFirst['bash']).toEqual(expected);
     expect(refusalFirst['bash']).toEqual(expected);
+    // The session refuses every command and its refusal is carried after the
+    // asks, so it settles every command the asks reach, whatever their order.
+    for (const composed of [askFirst, refusalFirst]) {
+      expect(resolve(session, composed, 'bash', 'git log --oneline')).toBe('deny');
+      expect(resolve(session, composed, 'bash', 'git status')).toBe('deny');
+      expect(resolve(session, composed, 'bash', 'rm -rf /')).toBe('deny');
+    }
   });
 
   it('keeps the profile verdict for a pattern the profile decides when an ask covers it', () => {

@@ -46,7 +46,7 @@ export function anthropicUserProfileEmailHash(email: string, pepper: string): st
 
 export function anthropicUserProfileCreateParams(
   details: AnthropicUserProfileDetails,
-  hashPepper: string | undefined = getEnvVariable('ANTHROPIC_USER_PROFILE_HASH_PEPPER') || undefined
+  hashPepper: string | null = getEnvVariable('ANTHROPIC_USER_PROFILE_HASH_PEPPER') || null
 ): UserProfileCreateParams {
   const metadata = {
     [ANTHROPIC_USER_PROFILE_SOURCE_KEY]: ANTHROPIC_USER_PROFILE_SOURCE,

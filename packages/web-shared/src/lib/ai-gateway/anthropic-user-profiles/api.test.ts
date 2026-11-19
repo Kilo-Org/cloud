@@ -38,7 +38,7 @@ describe('anthropicUserProfileCreateParams', () => {
       createdAt: '2026-04-29T01:16:12.945Z',
     } as const;
     expect(
-      anthropicUserProfileCreateParams(details, undefined).external_user_details
+      anthropicUserProfileCreateParams(details, null).external_user_details
     ).not.toHaveProperty('email_hash');
   });
 

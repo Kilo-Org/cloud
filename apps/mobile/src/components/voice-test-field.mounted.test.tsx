@@ -213,7 +213,7 @@ describe('VoiceTestField', () => {
       message: "Couldn't reach the Kilo gateway. Check your connection and try again.",
       tone: 'error',
     });
-    expect(textValues(renderer)).not.toContain('Listening...');
+    expect(textValues(renderer)).not.toContain('Listening…');
   });
 
   it('leaves alert-backed feedback to its own surface', async () => {

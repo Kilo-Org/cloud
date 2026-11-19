@@ -7,7 +7,7 @@
 //   - EXPANDED: the root is a plain view. Only the header label row
 //     is pressable (collapse). The resolve toggle is its own nested
 //     pressable in both states.
-//   - The thread header shows the anchor label ("src/a.ts L10 (RIGHT)"
+//   - The thread header shows the anchor label ("src/a.ts L10 (Right side)"
 //     or "File comment on src/a.ts" or "Outdated on ..."). The anchor
 //     owns file-level and outdated metadata; the "Resolved" badge is
 //     the sole Resolved text indicator. The resolve control is an

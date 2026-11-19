@@ -1,8 +1,3 @@
-// The two windows in which a sheet's own window does not take touch: while it
-// opens, and while it dismisses. Each must arm its own hold, so a close that
-// lands while the open hold is still running keeps the gate shut, and a
-// dismissal long after the open hold ended arms a fresh one.
-
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

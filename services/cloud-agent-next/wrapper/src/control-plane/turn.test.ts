@@ -306,6 +306,7 @@ function createHarness(
   let clock = 0;
   let materializeCalls = 0;
   let observeDispatches = true;
+  let clientReadFailIn: number | undefined;
 
   const scheduler: TurnScheduler = {
     setInterval: () => 0 as unknown as ReturnType<typeof setInterval>,
@@ -376,6 +377,13 @@ function createHarness(
       directory: spec.directory,
       env: envs.get(key) as Record<string, string>,
       get client() {
+        if (clientReadFailIn !== undefined) {
+          if (clientReadFailIn === 0) {
+            clientReadFailIn = undefined;
+            throw new Error('Kilo runtime has not started');
+          }
+          clientReadFailIn -= 1;
+        }
         if (options.clientThrowsWhileRestarting && flags.get(key)?.restarting)
           throw new Error('Kilo runtime has not started');
         return clients.get(key)!.client;
@@ -419,6 +427,10 @@ function createHarness(
       clock += ms;
     },
     materializeCalls: () => materializeCalls,
+    /** Throw from the `.client` read after `skip` successful reads. */
+    failClientRead(skip = 0): void {
+      clientReadFailIn = skip;
+    },
     registerRoute(spec: ControlPlaneRouteSpec, withRuntime = true): void {
       if (withRuntime) ensureRuntime(spec);
       manager.registerRoute(spec);
@@ -2765,6 +2777,51 @@ describe('turn finalization', () => {
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'completed' });
   });
 
+  it('completes a turn while the client is unavailable', async () => {
+    const h = createHarness({ nativeDrain: false, clientThrowsWhileRestarting: true });
+    h.registerRoute(routeSpec());
+    h.manager.submit(
+      SESSION_ID,
+      promptPayload('m1', { finalization: { condenseOnComplete: true } })
+    );
+    await settle();
+    h.setFlags(routeSpec(), { restarting: true, suspected: true });
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+    expect(eventFrames(h.frames).filter(event => event.type === 'error')).toEqual([
+      {
+        type: 'error',
+        properties: {
+          error: 'Finalization steps skipped: Kilo runtime has not started',
+          fatal: false,
+        },
+      },
+    ]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+  });
+
+  it('completes a turn when the runtime client is not readable', async () => {
+    const h = createHarness({ nativeDrain: false });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+    await settle();
+    h.failClientRead(1);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+    expect(eventFrames(h.frames).filter(event => event.type === 'error')).toEqual([
+      {
+        type: 'error',
+        properties: {
+          error: 'Finalization steps skipped: Kilo runtime has not started',
+          fatal: false,
+        },
+      },
+    ]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+  });
+
   it('fails agent_restarted when a restart interrupts a finalization follow-up', async () => {
     let release: ((value: { wasAborted: boolean; success: boolean }) => void) | undefined;
     const h = createHarness({
@@ -3912,6 +3969,209 @@ describe('GitHub review publication recovery', () => {
       expect(h.client(spec).prompts).toHaveLength(1);
     }
   );
+
+  it.each(['none', 'older message update', 'older text delta'] as const)(
+    'completes after assistant recovery with late activity: %s',
+    async lateActivity => {
+      const h = createHarness();
+      const spec = reviewSpec();
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+
+      const errored = kilo2MessageActivity(
+        KILO_SESSION,
+        kilo2MessageSchema.parse({
+          id: 'msg_failed',
+          type: 'assistant',
+          time: { created: 1, completed: 2 },
+          error: { type: 'provider.unknown', message: 'Request failed', status: 200 },
+        })
+      );
+      const recovered = kilo2MessageActivity(
+        KILO_SESSION,
+        kilo2MessageSchema.parse({
+          id: 'msg_recovered',
+          type: 'assistant',
+          time: { created: 3, completed: 4 },
+        })
+      );
+      if (!errored || !recovered) throw new Error('Expected assistant activity');
+      h.manager.observeActivity({
+        activity: { type: 'message', message: errored },
+        nativeRuntimeId: 'rt',
+        runtimeKey: runtimeKey(spec),
+      });
+      h.manager.observeActivity({
+        activity: { type: 'message', message: recovered },
+        nativeRuntimeId: 'rt',
+        runtimeKey: runtimeKey(spec),
+      });
+      h.manager.observeActivity({
+        activity: {
+          type: 'part',
+          part: {
+            sessionId: KILO_SESSION,
+            messageId: 'msg_recovered',
+            id: 'prt_publication',
+            kind: 'tool',
+            tool: {
+              callId: 'call_publication',
+              name: 'code_review_publish_review_summary',
+              status: 'completed',
+              interactive: false,
+              output: '{"verified":true,"commentId":99}',
+            },
+          },
+        },
+        nativeRuntimeId: 'rt',
+        runtimeKey: runtimeKey(spec),
+      });
+      if (lateActivity === 'older message update') {
+        h.manager.observeActivity({
+          activity: {
+            type: 'message',
+            message: { ...errored, time: { created: 1, completed: 5 } },
+          },
+          nativeRuntimeId: 'rt',
+          runtimeKey: runtimeKey(spec),
+        });
+        h.manager.observeActivity({
+          activity: {
+            type: 'part',
+            part: {
+              sessionId: KILO_SESSION,
+              messageId: errored.id,
+              id: 'prt_failed_publication',
+              kind: 'tool',
+              tool: {
+                callId: 'call_failed_publication',
+                name: 'code_review_publish_review_summary',
+                status: 'error',
+                interactive: false,
+                error: 'unverified: publication not confirmed',
+              },
+            },
+          },
+          nativeRuntimeId: 'rt',
+          runtimeKey: runtimeKey(spec),
+        });
+      }
+      if (lateActivity === 'older text delta') {
+        h.manager.observeActivity({
+          activity: {
+            type: 'delta',
+            sessionId: KILO_SESSION,
+            messageId: errored.id,
+            partId: 'prt_failed_text',
+            text: 'The model reached its output limit. No actionable output was produced.',
+          },
+          nativeRuntimeId: 'rt',
+          runtimeKey: runtimeKey(spec),
+        });
+      }
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+
+      expect(h.client(spec).prompts).toHaveLength(1);
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+    }
+  );
+
+  it('still fails when the terminal assistant message carries the only error', async () => {
+    const h = createHarness();
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    const errored = kilo2MessageActivity(
+      KILO_SESSION,
+      kilo2MessageSchema.parse({
+        id: 'msg_failed',
+        type: 'assistant',
+        time: { created: 1, completed: 2 },
+        error: { type: 'provider.unknown', message: 'Request failed' },
+      })
+    );
+    if (!errored) throw new Error('Expected assistant activity');
+    h.manager.observeActivity({
+      activity: { type: 'message', message: errored },
+      nativeRuntimeId: 'rt',
+      runtimeKey: runtimeKey(spec),
+    });
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(h.client(spec).prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', assistantReason: 'provider_unavailable', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('keeps v1 finalization completing after an older completion-only error update', async () => {
+    const h = createHarness({ nativeDrain: false });
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const errored = {
+      sessionID: KILO_SESSION,
+      id: 'msg_failed',
+      role: 'assistant',
+      error: {
+        name: 'APIError',
+        data: { statusCode: 503, message: 'Assistant service is unavailable' },
+      },
+    };
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', { info: { ...errored, time: { created: 1 } } })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', {
+        info: {
+          sessionID: KILO_SESSION,
+          id: 'msg_assistant',
+          role: 'assistant',
+          time: { created: 2 },
+        },
+      })
+    );
+    h.manager.observeKiloEvent(
+      publicationPart({ status: 'completed', output: '{"verified":true,"commentId":99}' })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', { info: { ...errored, time: { completed: 3 } } })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+  });
+
+  it('keeps the output-limit failure when the same message is re-reported without an error', async () => {
+    const h = createHarness({ nativeDrain: false });
+    const spec = reviewSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(assistantMessage());
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.delta', {
+        sessionID: KILO_SESSION,
+        messageID: 'msg_assistant',
+        partID: 'text1',
+        delta: 'The model reached its output limit. No actionable output was produced.',
+      })
+    );
+    h.manager.observeKiloEvent(assistantMessage());
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(spec).prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', assistantReason: 'output_limit' },
+    ]);
+  });
 
   it('settles recovery only after native proof when its close precedes reconciliation', async () => {
     const h = createHarness();

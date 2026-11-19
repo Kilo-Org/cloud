@@ -11281,7 +11281,9 @@ export const enkrypt_usage = pgTable(
     // guardrail, and between the end of the upstream response and its release for the output
     // guardrail. Set only on the final call of the guardrail's blocking scan, or of its log-only
     // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
-    // on other calls or when the request returned before awaiting the verdict.
+    // on other calls or when the request returned before awaiting the verdict. A guardrail that only
+    // logs adds no wait, so it stores its log-only scan time: how long the scan ran past the point
+    // where a blocking scan would hold the request or response.
     added_latency_ms: integer(),
     // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
     guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),

@@ -68,10 +68,6 @@ export function buildStoredSessionsQueryOptions(
       staleTime: 30_000,
       enabled: options?.enabled,
       getNextPageParam: sessionNextPageParam,
-      // The hook owns the OS-foreground refresh through its `useAppLifecycle`
-      // edge (see `storedReconcile`), so the native window-focus refetch stays
-      // off by default: React Query's native path re-requests every retained
-      // page, which is exactly the burst the page-one reconcile replaces.
       refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     }
   );

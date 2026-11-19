@@ -49,7 +49,10 @@ import { isMarkdownPath } from '@/components/agents/read-tool-markdown';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { getDocumentPreviewTarget, previewLocalDocument } from '@/lib/document-preview';
-import { prepareMonoScrollContent } from '@/components/agents/mono-scroll-block-model';
+import {
+  prepareMonoScrollContent,
+  READ_CODE_CHARACTER_CAP,
+} from '@/components/agents/mono-scroll-block-model';
 
 type Props = {
   attachments: AgentAttachment[];
@@ -86,16 +89,6 @@ const LONG_PRESS_MS = 300;
 
 /** Inter-chip spacing, kept in sync with each chip's `mr-2` class. */
 const CHIP_GAP = 8;
-
-/**
- * Character budget for the chip's text/markdown preview sheet, matching the
- * read/write tool cards' code cap: a preview is an at-a-glance read, not a
- * file viewer. A file over this budget contributes a bounded prefix plus the
- * shared Truncated marker instead of a full-file decode and markdown parse on
- * the JS/UI path — attachments accept up to 20 MB, and `File.text()` always
- * reads the whole file.
- */
-const TEXT_PREVIEW_MAX_CHARS = 50_000;
 
 /**
  * Map a drag's horizontal translation to a target slot. Walks from the start
@@ -137,7 +130,7 @@ export function dragTargetIndex(
 
 /**
  * A chip's open-as-text/markdown preview. `text` is what the sheet renders —
- * already bounded to `TEXT_PREVIEW_MAX_CHARS`; `isTruncated` says the file
+ * already bounded to `READ_CODE_CHARACTER_CAP`; `isTruncated` says the file
  * continues past what the sheet shows.
  */
 type TextPreviewState = {
@@ -147,12 +140,13 @@ type TextPreviewState = {
 };
 
 /**
- * Read an attachment's preview text, bounded. The known/stored byte size
- * decides the path before anything decodes: under the budget the file reads
- * whole; over it a bounded prefix is read through a file handle, so a 20 MB
- * text attachment never decodes whole on this path. `File.text()` has no
- * bounded form — it always reads the whole file — so the prefix path is the
- * only way to keep the decode bounded.
+ * Read an attachment's preview text, bounded by the shared
+ * `READ_CODE_CHARACTER_CAP` — a preview is an at-a-glance read, not a file
+ * viewer. The known/stored byte size decides the path before anything decodes:
+ * under the budget the file reads whole; over it a bounded prefix is read
+ * through a file handle, so a 20 MB text attachment never decodes whole on this
+ * path. `File.text()` has no bounded form — it always reads the whole file — so
+ * the prefix path is the only way to keep the decode bounded.
  */
 async function readAttachmentTextPreview(attachment: AgentAttachment): Promise<TextPreviewState> {
   const mode = isMarkdownPath(attachment.filename) ? 'markdown' : 'text';
@@ -160,14 +154,14 @@ async function readAttachmentTextPreview(attachment: AgentAttachment): Promise<T
   // Restored chips report size 0; fall back to the file's own size so the
   // over-budget path still fires for them.
   const size = attachment.size > 0 ? attachment.size : file.size;
-  if (size > TEXT_PREVIEW_MAX_CHARS) {
+  if (size > READ_CODE_CHARACTER_CAP) {
     let handle: FileHandle | null = null;
     try {
       handle = file.open(FileMode.ReadOnly);
       // One bounded read at offset 0; the budget is bytes here and characters
       // in the sheet, and UTF-8 never expands, so one read cannot overshoot
       // the character budget.
-      const bytes = await handle.readBytes(TEXT_PREVIEW_MAX_CHARS);
+      const bytes = await handle.readBytes(READ_CODE_CHARACTER_CAP);
       return {
         mode,
         text: new TextDecoder('utf-8', { fatal: false }).decode(bytes),
@@ -201,7 +195,7 @@ function renderPreviewBody(preview: TextPreviewState) {
 function boundPreviewText(preview: TextPreviewState): TextPreviewState {
   const { displayText, isTruncated } = prepareMonoScrollContent(
     preview.text,
-    TEXT_PREVIEW_MAX_CHARS
+    READ_CODE_CHARACTER_CAP
   );
   return {
     mode: preview.mode,

@@ -43,12 +43,14 @@ describe('getWorkerDb', () => {
     const drizzleMock = jest.mocked(drizzle);
 
     expect(pg.Pool).toHaveBeenNthCalledWith(1, {
+      connectionTimeoutMillis: 15_000,
       connectionString: workerConnectionString,
       max: 1,
       maxUses: 1,
       types: databaseTypeParsers,
     });
     expect(pg.Pool).toHaveBeenNthCalledWith(2, {
+      connectionTimeoutMillis: 15_000,
       connectionString: workerConnectionString,
       max: 1,
       maxUses: 1,

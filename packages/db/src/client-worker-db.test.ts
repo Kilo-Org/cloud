@@ -14,6 +14,8 @@ class RecordingClient extends EventEmitter {
   static created: RecordingClient[] = [];
   /** Emitted on close, as the Workers socket does when pg closes it. */
   static closeError: Error | undefined;
+  /** Rejects statements that start with this text, as Hyperdrive does when its pool is full. */
+  static failingStatement: { prefix: string; error: Error } | undefined;
   readonly queries: string[] = [];
   ended = false;
   _queryable = true;
@@ -36,9 +38,11 @@ class RecordingClient extends EventEmitter {
     const text = typeof config === 'string' ? config : config.text;
     this.queries.push(text);
     const result = { command: 'SELECT', rowCount: 0, rows: [], fields: [] };
+    const failing = RecordingClient.failingStatement;
+    const error = failing && text.startsWith(failing.prefix) ? failing.error : null;
     const done = typeof values === 'function' ? (values as QueryCallback) : callback;
-    if (!done) return Promise.resolve(result);
-    queueMicrotask(() => done(null, result));
+    if (!done) return error ? Promise.reject(error) : Promise.resolve(result);
+    queueMicrotask(() => done(error, result));
     return undefined;
   }
 
@@ -60,6 +64,7 @@ function recordingWorkerDb() {
 beforeEach(() => {
   RecordingClient.created = [];
   RecordingClient.closeError = undefined;
+  RecordingClient.failingStatement = undefined;
 });
 
 describe('getWorkerDb transaction bounds', () => {
@@ -160,6 +165,36 @@ describe('getWorkerDb connection lifetime', () => {
     expect(db.$client.totalCount).toBe(0);
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it('releases the connection when BEGIN fails, so later queries on the client run', async () => {
+    const db = recordingWorkerDb();
+    const failure = new Error('Failed to acquire a connection from the pool.');
+    RecordingClient.failingStatement = { prefix: 'begin', error: failure };
+
+    await expect(db.transaction(async tx => tx.execute(sql`select 1`))).rejects.toMatchObject({
+      cause: failure,
+    });
+
+    expect(RecordingClient.created.map(client => client.ended)).toEqual([true]);
+    expect(db.$client.totalCount).toBe(0);
+
+    RecordingClient.failingStatement = undefined;
+    await db.execute(sql`select 2`);
+
+    expect(RecordingClient.created.map(client => client.queries)).toEqual([
+      [`begin; ${workerTransactionBoundsSql}`],
+      ['select 2'],
+    ]);
+    expect(db.$client.totalCount).toBe(0);
+  });
+
+  it('bounds the wait for a connection by default and lets the caller shorten it', () => {
+    expect(recordingWorkerDb().$client.options.connectionTimeoutMillis).toBe(15_000);
+    expect(
+      getWorkerDb('postgres://worker.example/db', { connectionTimeoutMillis: 2_500 }).$client
+        .options.connectionTimeoutMillis
+    ).toBe(2_500);
   });
 
   it('uses a new connection for each later query on the same client', async () => {

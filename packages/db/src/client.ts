@@ -62,8 +62,8 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
 
 /**
  * Bounds for every transaction that a Worker DB client starts. Hyperdrive pools in transaction
- * mode and resets `SET` state when it returns a connection to its pool, and its documentation does
- * not list settings sent at connection startup as supported. So the bounds are `SET LOCAL`
+ * mode and resets `SET` state when it returns a connection to its pool, and it does not apply
+ * settings sent at connection startup. So the bounds are `SET LOCAL`
  * statements in the same message as `BEGIN`, and a Worker that stops right after `BEGIN` still
  * leaves a transaction that PostgreSQL ends. `lock_timeout` bounds row-lock waits such as
  * `FOR UPDATE`. The idle bound stays above the longest awaited non-database step inside a Worker
@@ -94,11 +94,27 @@ function withTransactionBounds(config: unknown): unknown {
   return config;
 }
 
+function isPromise(value: unknown): value is Promise<unknown> {
+  return value instanceof Promise;
+}
+
+/**
+ * drizzle sends `BEGIN` before the `try` block that releases the connection, so a failed `BEGIN`
+ * leaves the pool's only connection checked out and every later query on the client waits for
+ * it. The forwarder releases the connection with the error, and the pool closes it.
+ */
 function boundTransactionStarts(client: pg.PoolClient): void {
   // pg types `query` as overloads. This forwarder changes only the text of a transaction start.
   const query = client.query.bind(client) as (config: unknown, ...rest: unknown[]) => unknown;
-  client.query = ((config: unknown, ...rest: unknown[]) =>
-    query(withTransactionBounds(config), ...rest)) as typeof client.query;
+  client.query = ((config: unknown, ...rest: unknown[]) => {
+    const boundedConfig = withTransactionBounds(config);
+    const result = query(boundedConfig, ...rest);
+    if (boundedConfig === config || !isPromise(result)) return result;
+    return result.catch((error: unknown) => {
+      client.release(error instanceof Error ? error : true);
+      throw error;
+    });
+  }) as typeof client.query;
 }
 
 /**
@@ -122,9 +138,9 @@ function reportConnectionErrors(pool: pg.Pool): void {
 
 /**
  * Settings `getWorkerDb` fixes for every pool it creates: the connection string, `max: 1` because
- * Hyperdrive owns pooling, `maxUses: 1` so a released connection closes instead of staying open
- * in a pool that nothing ends, and `types` because the pool is created with the module's int8
- * parser. The transaction bounds in `workerTransactionBoundsSql` replace the startup settings for
+ * Hyperdrive owns pooling, `maxUses: 1` so a released connection closes at once instead of
+ * staying open for the pool's idle timeout, which in a Durable Object can outlive the request,
+ * and `types` because the pool is created with the module's int8 parser. The transaction bounds in `workerTransactionBoundsSql` replace the startup settings for
  * lock and idle-in-transaction timeouts. The type reserves all of these, and `getWorkerDb` applies
  * its values after the caller's options.
  */
@@ -139,6 +155,13 @@ export type GetWorkerDbOptions = Omit<
 >;
 
 /**
+ * Default bound on the wait for the pool's only connection, including connection setup. It
+ * matches Hyperdrive's initial connection timeout. Without it a query that waits behind a
+ * connection that is never released waits forever. Callers can set a shorter bound.
+ */
+const workerConnectionTimeoutMillis = 15_000;
+
+/**
  * Convenience wrapper for Cloudflare Workers using Hyperdrive.
  * Hyperdrive handles connection pooling at the infrastructure level,
  * so we use max: 1 here. Pass env.HYPERDRIVE.connectionString directly.
@@ -147,6 +170,7 @@ export type GetWorkerDbOptions = Omit<
  */
 export function getWorkerDb(connectionString: string, options: GetWorkerDbOptions = {}) {
   const pool = new pg.Pool({
+    connectionTimeoutMillis: workerConnectionTimeoutMillis,
     ...options,
     connectionString,
     max: 1,

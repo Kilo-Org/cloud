@@ -457,9 +457,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
         allowNonMember: true,
         modelId: PAID_MODEL,
       });
-      const getRoutingProviderConfig = mockCanRouteToVercel.mock
-        .calls[0][1] as () => Promise<unknown>;
-      await expect(getRoutingProviderConfig()).resolves.toEqual({ only: ['groq'] });
+      expect(mockCanRouteToVercel).toHaveBeenCalledWith(PAID_MODEL, { only: ['groq'] });
     });
 
     it('does not count the key when routing would fall through to a Kilo-paid route', async () => {

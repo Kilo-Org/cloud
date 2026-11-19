@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
-import { ContextControl } from '@/components/context-control';
+import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { IconButton } from '@/components/ui/icon-button';
 import { Search } from '@/components/ui/icons';
@@ -60,9 +60,9 @@ export function SessionListHeader({
           </View>
         }
         allowInlineActionsStacking={false}
-        // The header action is one icon button, which cannot shrink; the
-        // account picker beside it truncates instead.
-        inlineActionsMinWidth={headerAction ? ICON_TARGET_DP : undefined}
+        // The header action is one icon button and the picker's chevron is a
+        // fixed glyph, so neither can shrink; the picker's label truncates.
+        inlineActionsMinWidth={(headerAction ? ICON_TARGET_DP : 0) + CONTEXT_CONTROL_INLINE_MIN_DP}
       />
       <View style={sideInsetStyle} className={SCREEN_GUTTER_CLASS}>
         <View

@@ -370,12 +370,12 @@ type ScreenHeaderProps = {
    */
   inlineActionsWidth?: number;
   /**
-   * Width, in dp, of the fixed-size controls inside a pinned `inlineActions`
+   * Width, in dp, of the fixed-size parts inside a pinned `inlineActions`
    * cluster (`allowInlineActionsStacking={false}`): an icon button beside the
-   * account picker. The pinned slot gives way before the title, so without
-   * this floor a large font scale could shrink it below an icon button that
-   * cannot shrink, and the button would paint past the header's edge. Omit it
-   * for a cluster whose every control truncates.
+   * account picker, and the picker's own chevron. The pinned slot gives way
+   * before the title, so without this floor a large font scale could shrink it
+   * below a part that cannot shrink, and that part would paint past the
+   * header's edge. Omit it for a cluster whose every part truncates.
    */
   inlineActionsMinWidth?: number;
   /**

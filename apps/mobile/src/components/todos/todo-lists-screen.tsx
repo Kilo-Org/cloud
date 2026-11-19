@@ -8,7 +8,7 @@ import { Pressable, View } from 'react-native';
 import Sortable, { type SortableGridRenderItemInfo } from 'react-native-sortables';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
-import { ContextControl } from '@/components/context-control';
+import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
 import { useLiveSessionContext } from '@/components/home/live-session-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -224,9 +224,9 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
           </View>
         }
         allowInlineActionsStacking={false}
-        // The history button cannot shrink; the account picker beside it
-        // truncates instead.
-        inlineActionsMinWidth={ICON_TARGET_DP}
+        // The history button and the picker's chevron cannot shrink; the
+        // picker's label truncates.
+        inlineActionsMinWidth={ICON_TARGET_DP + CONTEXT_CONTROL_INLINE_MIN_DP}
       />
       <View style={sideInsetStyle} className={SCREEN_GUTTER_CLASS}>
         <View

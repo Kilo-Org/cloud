@@ -98,6 +98,14 @@ export function findReservedEnvVarName(names: Iterable<string>): string | undefi
 }
 
 /**
+ * Cap on the profile environment an attach payload may carry. Mirrors
+ * `Limits.MAX_ENV_VARS` in `../../schema.ts`, which the wrapper cannot import:
+ * that module reaches the Worker's Durable Object types, which the wrapper's
+ * program does not declare. `session-attach-env.test.ts` holds the two equal.
+ */
+export const MAX_PROFILE_ENV_VARS = 50;
+
+/**
  * Prefixes the sandbox runtime owns. `buildWorktreeKiloEnvironment` drops them
  * from what reaches the Kilo process, and the profile package mirrors them for
  * write-time rejection because it cannot import from this service.

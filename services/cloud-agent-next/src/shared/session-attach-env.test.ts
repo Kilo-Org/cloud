@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { Limits } from '../schema.js';
 import { sessionAttachPayloadSchema } from './sandbox-control-protocol.js';
 import {
   isWrapperSessionReadyRequest,
   type WrapperSessionReadyRequest,
 } from './wrapper-bootstrap.js';
-import { RESERVED_ENV_VARS_MESSAGE } from './runtime-environment.js';
+import { MAX_PROFILE_ENV_VARS, RESERVED_ENV_VARS_MESSAGE } from './runtime-environment.js';
 
 function attach(env: Record<string, string>) {
   return sessionAttachPayloadSchema.safeParse({ env });
@@ -31,20 +30,20 @@ describe('sessionAttachPayloadSchema env', () => {
   });
 
   it('accepts the profile cap plus the platform token', () => {
-    expect(attach({ ...profileEnv(Limits.MAX_ENV_VARS), KILOCODE_TOKEN: 'token' }).success).toBe(
+    expect(attach({ ...profileEnv(MAX_PROFILE_ENV_VARS), KILOCODE_TOKEN: 'token' }).success).toBe(
       true
     );
   });
 
   it('rejects one key over the profile cap plus the platform token', () => {
     const result = attach({
-      ...profileEnv(Limits.MAX_ENV_VARS + 1),
+      ...profileEnv(MAX_PROFILE_ENV_VARS + 1),
       KILOCODE_TOKEN: 'token',
     });
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0]?.message).toBe(
-        `Maximum ${Limits.MAX_ENV_VARS + 1} environment variables allowed`
+        `Maximum ${MAX_PROFILE_ENV_VARS + 1} environment variables allowed`
       );
     }
   });

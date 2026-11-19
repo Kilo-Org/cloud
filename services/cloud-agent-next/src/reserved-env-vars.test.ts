@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { isReservedEnvironmentKey } from '@kilocode/cloud-agent-profile';
+import { Limits } from './schema.js';
 import {
   CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  MAX_PROFILE_ENV_VARS,
   RESERVED_ENV_VARS,
   RESERVED_ENV_VAR_PREFIXES,
 } from './shared/runtime-environment.js';
@@ -13,6 +15,10 @@ import {
  * every entry the runtime owns must also be rejected at environment write time.
  */
 describe('repository environment reserved keys', () => {
+  it('caps a profile environment at the same count the worker schema allows', () => {
+    expect(MAX_PROFILE_ENV_VARS).toBe(Limits.MAX_ENV_VARS);
+  });
+
   it('rejects every RESERVED_ENV_VARS entry', () => {
     for (const key of RESERVED_ENV_VARS) {
       expect(isReservedEnvironmentKey(key), `RESERVED_ENV_VARS entry ${key}`).toBe(true);

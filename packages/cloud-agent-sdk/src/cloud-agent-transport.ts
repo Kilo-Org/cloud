@@ -171,6 +171,10 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     // episode already reached the error callback (one report per episode).
     let snapshotRetryTimer: ReturnType<typeof setTimeout> | null = null;
     let snapshotFailureReported = false;
+    // Bumped whenever a snapshot catch-up is superseded (connect, disconnect,
+    // reconnect, destroy). A read dispatched under an older epoch is dropped
+    // when it settles, so it cannot replay a page over newer live state.
+    let snapshotCatchUpEpoch = 0;
     let initialSnapshotRead = config.initialSnapshotRead;
     let backgroundEnabled = false;
     const readActivity = config.api.getBackgroundActivity;
@@ -182,10 +186,22 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         })
       : undefined;
 
-    function cancelSnapshotRetry(): void {
+    /**
+     * Supersede the pending snapshot catch-up: clear the retry timer and
+     * invalidate any read it already dispatched. Reconnect, connect,
+     * disconnect, and destroy all cancel, so catch-up always restarts from the
+     * newest connection's own cursor.
+     */
+    function cancelSnapshotRetry(): boolean {
+      const wasScheduled = snapshotRetryTimer !== null;
       clearTimeout(snapshotRetryTimer ?? undefined);
       snapshotRetryTimer = null;
       snapshotFailureReported = false;
+      // Invalidate catch-up reads dispatched earlier: they settle into a void
+      // result instead of replaying a page over the new connection's state,
+      // and a superseded failure raises no duplicate error report.
+      snapshotCatchUpEpoch += 1;
+      return wasScheduled;
     }
     let lastUpdateCursor = 0;
     const eventVersions = new Map<number, number>();
@@ -510,9 +526,54 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     }
 
     /**
-     * Retry a failed snapshot read with bounded exponential backoff while the
-     * lifecycle generation stands. A newer retry chain (a reconnect catch-up)
-     * replaces the pending one, so the transport never keeps two in flight.
+     * Record a superseded snapshot page without replaying its message rows.
+     * A reconnect dropped the read that fetched this page, so its rows may be
+     * older than the live replay already delivered — but the manager still
+     * needs the page's metadata: seeding the first page sets the
+     * older-messages cursor and emits the queued and failed turns, which
+     * nothing else does for this connection.
+     */
+    function recordInitialPageOnly(page: SessionSnapshotPage): void {
+      backgroundEnabled = backgroundEnabled || page.sourceVersion === 'v2';
+      if (workspaceSession && page.updateCursor !== undefined) {
+        lastUpdateCursor = Math.max(lastUpdateCursor, page.updateCursor);
+      } else if (lastEventId === null && page.watermarkEventId != null) {
+        lastEventId = 0;
+      }
+      if (!initialPageRecorded) {
+        initialPageRecorded = true;
+        config.onInitialPageLoaded?.(page);
+        replayQueuedSnapshots(page.queuedMessages);
+      }
+    }
+
+    /**
+     * One best-effort page read for a reconnect whose cancel removed a still
+     * scheduled catch-up. The reconnect reached only this helper or the
+     * no-cursor fallback, so such a read always replays on a cursorless
+     * connect; here it is recorded without replaying bounded rows over the
+     * reconnect's live socket replay (which this connection owns), and a
+     * failed read arms a fresh retry chain.
+     */
+    function dispatchRetryRead(expectedGeneration: number): void {
+      const epoch = snapshotCatchUpEpoch;
+      void readSnapshot().then(read => {
+        if (expectedGeneration !== lifecycleGeneration) return;
+        // A newer reconnect superseded this read: record, same as below.
+        if (epoch !== snapshotCatchUpEpoch) {
+          if (read.kind === 'page') recordInitialPageOnly(read.page);
+          return;
+        }
+        if (!applySnapshotRead(read, recordInitialPageOnly, expectedGeneration)) {
+          scheduleSnapshotRetry(recordInitialPageOnly, expectedGeneration, 0);
+        }
+      });
+    }
+
+    /**
+     * Snapshot catch-up for the no-cursor reconnect fallback: read, replay,
+     * and retry as usual. A read that a newer reconnect superseded is dropped
+     * before it can replay rows.
      */
     function scheduleSnapshotRetry(
       onPage: (page: SessionSnapshotPage) => void,
@@ -525,8 +586,22 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         () => {
           snapshotRetryTimer = null;
           if (expectedGeneration !== lifecycleGeneration) return;
+          const epoch = snapshotCatchUpEpoch;
           void readSnapshot().then(read => {
             if (expectedGeneration !== lifecycleGeneration) return;
+            // A cancel that raced this read (superseded catch-up) wins: the
+            // page may predate the latest connection's live replay, so its
+            // bounded rows must not be re-emitted on top of that state. The
+            // manager still gets the page record — the first recorded page
+            // seeds the older-messages cursor and the queued-turn rows —
+            // but the message rows are skipped, and the chain ends because
+            // the superseding connection owns catch-up.
+            if (epoch !== snapshotCatchUpEpoch) {
+              if (read.kind === 'page' && onPage === replayInitialPage) {
+                recordInitialPageOnly(read.page);
+              }
+              return;
+            }
             if (applySnapshotRead(read, onPage, expectedGeneration)) return;
             scheduleSnapshotRetry(onPage, expectedGeneration, retry + 1);
           });
@@ -632,23 +707,36 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         },
         onReconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
+          // A reconnect owns catch-up: the socket replays from its cursor
+          // (fromId / afterCursor), or the no-cursor fallback below reads a
+          // fresh page. A retry armed by the initial read must not replay a
+          // snapshot page on top of that live state, and a catch-up read that
+          // is already in flight is dropped by the epoch bump.
+          const hadPendingCatchUp = cancelSnapshotRetry();
           startReplay();
           if (backgroundEnabled) background?.start();
-          if (workspaceSession) return;
-          // With a replay cursor the socket itself re-delivers everything
-          // missed while dead — replaying a (possibly stale) snapshot on top
-          // would overwrite newer parts. Only fall back to the snapshot when
-          // no cursor exists yet.
-          if (lastEventId !== null) return;
+          // The lost page seed applies to workspace sessions too, with the
+          // same row-replay best-effort skip (dispatchRetryRead).
+          const usesCursorOnlyReplay = workspaceSession || lastEventId !== null;
+          if (usesCursorOnlyReplay) {
+            if (hadPendingCatchUp) dispatchRetryRead(expectedGeneration);
+            return;
+          }
           // Reconnect replays use the bounded page fetch (newest 50) to
           // avoid overwriting older messages the user has already loaded via
           // `loadOlderMessages`. The manager already has the cursor from
           // the initial connect, so `replayInitialPage` only hands this page to
           // the manager when no page seeded the session yet — a reconnect must
           // never reset the user's older-pages cursor back to the latest 50.
-          cancelSnapshotRetry();
+          const epoch = snapshotCatchUpEpoch;
           void readSnapshot().then(read => {
             if (expectedGeneration !== lifecycleGeneration) return;
+            // A newer reconnect superseded this read: record its page
+            // without replaying bounded rows over the newer live replay.
+            if (epoch !== snapshotCatchUpEpoch) {
+              if (read.kind === 'page') recordInitialPageOnly(read.page);
+              return;
+            }
             if (!applySnapshotRead(read, replayInitialPage, expectedGeneration)) {
               scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);
             }

@@ -24,8 +24,8 @@ vi.mock('react-i18next', async importOriginal => {
   return {
     ...actual,
     useTranslation: () => {
-      const i18n = actual.getI18n();
-      return { t: i18n.t.bind(i18n), i18n };
+      const instance = actual.getI18n();
+      return { t: instance.t.bind(instance), i18n: instance };
     },
   };
 });
@@ -456,6 +456,31 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByComponent(footer, OrganizationPlanRefusal)).toBeNull();
   });
 
+  it('hands the plan refusal the billing step for a reader who may change the plan', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const onPress = (): void => undefined;
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: appI18n.t('common.organizationTrialEndedBilling'),
+      planRefusalAction: { label: appI18n.t('organization.hub.manageBilling'), onPress },
+    }) as Node;
+
+    // The caller owns the role read, so the block paints exactly the reader it
+    // is handed: the copy that offers the step, and the step itself.
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(findElementByComponent(scrollBody, OrganizationPlanRefusal)).toMatchObject({
+      message: appI18n.t('common.organizationTrialEndedBilling'),
+      action: { label: appI18n.t('organization.hub.manageBilling'), onPress },
+    });
+    // The pinned footer still takes no copy of the refusal.
+    const lift = findElementByType(element, 'KeyboardAvoidingView');
+    expect(findElementByComponent(lift, OrganizationPlanRefusal)).toBeNull();
+  });
+
   it('keeps the uploading-attachment reason in the pinned footer with Start', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
@@ -508,6 +533,25 @@ describe('NewSessionConfigureForm', () => {
       // These reasons are a wait or a file fix; neither needs a second control.
       startBlockedAction: null,
     });
+  });
+
+  it('keeps the plan refusal actionless for a reader who cannot change the plan', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: true,
+      planRefusal: appI18n.t('common.organizationTrialEnded'),
+    }) as Node;
+
+    const block = findElementByComponent(
+      findElement(element, 'ScrollView'),
+      OrganizationPlanRefusal
+    );
+    expect(block).toMatchObject({ message: appI18n.t('common.organizationTrialEnded') });
+    expect(block?.action).toBeUndefined();
   });
 
   // ── Case 1: Cloud, selector shown ──
@@ -954,18 +998,19 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Config needs attention')).toBe(true);
   });
 
-  it('keeps the environment row at reserved height with skeletons while loading', () => {
+  it('renders the loading environment row as its title line', () => {
     const element = renderRow({ isProfileLoading: true });
 
-    // The label stays mounted and skeletons hold the row's height, so the
-    // rows below never move when the query settles.
+    // No blank line is reserved while the query runs: the loading copy is the
+    // row's one line, so the card is as tall as what it shows.
     expect(findTextContent(element, t => t === 'Environment')).toBe(true);
-    expect(findElementByType(element, 'Skeleton')).not.toBeNull();
+    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(false);
+    expect(findElementByType(element, 'Skeleton')).toBeNull();
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
   });
 
-  it('keeps the summary slot when a resolved profile has nothing configured', () => {
+  it('renders no summary line when a resolved profile has nothing configured', () => {
     const element = renderRow({
       profile: {
         ...PROFILE,
@@ -978,14 +1023,13 @@ describe('NewSessionConfigureForm', () => {
       },
     });
 
-    // The empty count list keeps the two-line placeholder, so the card holds the
-    // height the loading state reserves instead of collapsing.
-    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(true);
+    // An empty count list renders the title alone instead of a blank slot.
+    expect(findTextContent(element, t => t === 'Production')).toBe(true);
+    expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(false);
     const slots = collectElementsByType(element, 'View').filter(
       view => view.importantForAccessibility === 'no-hide-descendants'
     );
-    expect(slots).toHaveLength(1);
-    expect(slots[0]?.accessibilityElementsHidden).toBe(true);
+    expect(slots).toHaveLength(0);
   });
 
   it('renders every Environment row state inside the same card', () => {
@@ -1037,7 +1081,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(loadingRow, t => t === 'Environment')).toBe(true);
     expect(findTextContent(loadingRow, t => t === 'Loading…')).toBe(true);
     expect(findTextContent(loadingRow, t => t === 'Default environment')).toBe(false);
-    expect(findElementByType(loadingRow, 'Skeleton')).not.toBeNull();
+    expect(findTextContent(loadingRow, t => t === '\u00A0\n\u00A0')).toBe(false);
     expect(findElementByType(element, 'NewSessionPrompt')?.isCreating).toBe(false);
     expect(findElementByType(element, 'NewSessionStartButton')?.isStartDisabled).toBe(true);
   });

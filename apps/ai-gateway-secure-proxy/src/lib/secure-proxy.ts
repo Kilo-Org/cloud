@@ -95,6 +95,10 @@ export async function handleSecureProxyRequest(request: Request): Promise<Respon
   const startedAt = performance.now();
   let response: Response;
   try {
+    // No SSRF check here on purpose: this is an internal service whose only
+    // caller is the gateway, which applies its upstream URL policy to
+    // `config.url` before relaying. The endpoint is publicly reachable and the
+    // shared secret is its only gate, so any other caller must run that check.
     response = await fetch(config.url, {
       method: 'POST',
       headers,

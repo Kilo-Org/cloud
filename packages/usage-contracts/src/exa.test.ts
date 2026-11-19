@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   EXA_ALLOWED_PATHS,
+  EXA_MAX_COST_MICRODOLLARS_PER_CALL,
   EXA_USAGE_FEATURE_ID_MAX_LENGTH,
   EXA_USAGE_TYPE_MAX_LENGTH,
   EXA_USAGE_WRITE_PATH,
@@ -154,9 +155,24 @@ describe('ExaUsageRecordSchema', () => {
     expect(ExaUsageRecordSchema.safeParse(recordWith({ costMicrodollars })).success).toBe(false);
   });
 
-  test('accepts the largest safe integer cost', () => {
+  test.each([
+    ['the per-call maximum', EXA_MAX_COST_MICRODOLLARS_PER_CALL],
+    ['a charge far below the per-call maximum', 1],
+    ['the largest real call', 30_300_000],
+  ])('accepts %s as costMicrodollars', (_label, costMicrodollars) => {
+    expect(ExaUsageRecordSchema.safeParse(recordWith({ costMicrodollars })).success).toBe(true);
+  });
+
+  test('rejects a cost one microdollar above the per-call maximum', () => {
+    const record = recordWith({
+      costMicrodollars: EXA_MAX_COST_MICRODOLLARS_PER_CALL + 1,
+    });
+    expect(ExaUsageRecordSchema.safeParse(record).success).toBe(false);
+  });
+
+  test('rejects the largest safe integer cost', () => {
     const record = recordWith({ costMicrodollars: Number.MAX_SAFE_INTEGER });
-    expect(ExaUsageRecordSchema.safeParse(record).success).toBe(true);
+    expect(ExaUsageRecordSchema.safeParse(record).success).toBe(false);
   });
 
   test('accepts a zero free allowance', () => {
@@ -215,7 +231,7 @@ describe('isExaAllowedPath', () => {
 describe('ExaUsageWriteResponseSchema', () => {
   const usageId = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
 
-  test.each(['recorded', 'duplicate'])('accepts %s', status => {
+  test.each(['recorded', 'duplicate', 'rejected'])('accepts %s', status => {
     expect(ExaUsageWriteResponseSchema.parse({ status, usageId })).toEqual({ status, usageId });
   });
 

@@ -26,6 +26,7 @@
     "creditHistory": "Historia ya salio",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Ghairi",
     "done": "Nimemaliza",
     "retry": "Jaribu tena",
@@ -175,7 +176,9 @@
     "durationHourShort": "saa",
     "changes": "Mabadiliko",
     "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
-    "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi"
+    "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi",
+    "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee.",
+    "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena."
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Thamani iliyohifadhiwa haiwezi kuonyeshwa. Weka mpya ili kuibadilisha.",
       "editKeyMappingsWarning": "Kubadilisha ufunguo pia hubadilisha ulinganishaji wa modeli uliohifadhiwa: weka tena kila ulinganishaji unaouhitaji.",
       "saveFailed": "Imeshindwa kuhifadhi ufunguo.",
-      "invalidCredentials": "Kagua vitambulisho kisha ujaribu tena.",
       "fieldRequired": "{{field}} inahitajika.",
+      "keyIncomplete": "Ufunguo hauna thamani inayohitajika.",
       "incompleteMapping": "Ulinganishaji {{number}} unahitaji slug ya modeli ya gateway na jina la deployment.",
       "apiKeyLabel": "Ufunguo wa API",
       "apiKeyPlaceholder": "Bandika ufunguo",
       "apiKeyRequired": "Weka ufunguo.",
+      "keyAlreadyExists": "Tayari unayo ufunguo wa mtoa huduma huyu. Ondoa ufunguo huo kabla ya kuongeza mwingine.",
+      "keyStoreFailed": "Ufunguo haukuweza kuhifadhiwa.",
+      "invalidCredentials": "Ufunguo huu haupo katika umbizo linalotarajiwa na mtoa huduma huyu. Angalia na ujaribu tena.",
+      "testSucceeded": "Ufunguo unafanya kazi. Mtoa huduma: {{provider}}. Modeli: {{model}}.",
+      "testRejected": "Mtoa huduma amekataa ufunguo huu. Angalia kwamba ufunguo ni sahihi na haujabatilishwa.",
+      "testIncomplete": "Mtoa huduma amemaliza jaribio kabla ya kukamilika. Jaribu tena.",
+      "testUnsupportedProvider": "Mtoa huduma huyu hauungwi mkono tena. Ondoa ufunguo.",
+      "testUnreadableKey": "Ufunguo uliohifadhiwa haukuweza kusomwa. Jaribu tena baadaye.",
+      "testDeprecatedProvider": "Mtoa huduma huyu amepitwa na wakati, kwa hivyo ufunguo wake hauwezi kujaribiwa.",
+      "keyManagedByCodingPlan": "Mpango wa uandishi wa msimbo unasimamia ufunguo wa mtoa huduma huyu, na ufunguo huo ni wa kusoma pekee. Ghairi mpango wa uandishi wa msimbo ili kuongeza ufunguo wako mwenyewe.",
+      "providerUnavailable": "Mtoa huduma huyu bado hapatikani, kwa hivyo huwezi kuongeza ufunguo wake.",
+      "testFailed": "Jaribio la ufunguo limeshindwa. Jaribu tena.",
       "authMethod": "Njia ya uthibitishaji",
       "authMethodAccessKeys": "Funguo za ufikiaji",
       "resourceName": "Jina la rasilimali ya Azure",
@@ -481,7 +496,14 @@
       "viewReceipt": "Angalia risiti"
     },
     "changelog": "Mapya",
-    "changelogVersionPending": "Maelezo ya toleo hili yatakuja na sasisho lijalo."
+    "changelogVersionPending": "Maelezo ya toleo {{version}} yatakuja na sasisho lijalo la programu.",
+    "changelogGroupNew": "Mpya",
+    "changelogFixesIn": "Marekebisho na maboresho katika {{areas}}.",
+    "changelogFixesPolish": "Marekebisho na maboresho katika programu nzima.",
+    "changelogAreas": {
+      "signIn": "Kuingia",
+      "profileOrganizations": "Wasifu na mashirika"
+    }
   },
   "preferences": {
     "general": "Jumla",
@@ -1466,13 +1488,25 @@
       "repositoryLine": "Ukaguzi: {{reviews}} · Matatizo: {{findings}}",
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
-      "off": "Takwimu zimezimwa kwa shirika hili.",
-      "couldNotLoad": "Imeshindwa kupakia takwimu"
+      "offTitle": "Takwimu zimezimwa kwa {{platform}}",
+      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na mameneja wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
+      "couldNotLoad": "Imeshindwa kupakia takwimu",
+      "trackedReviewsCaption": "Ukaguzi uliokamilika ulioisha katika kipindi hiki wakati takwimu zilikuwa zimewashwa. Ukaguzi unaoendelea na ulioshindikana hauhesabiwi kamwe.",
+      "trackedReviewsUncounted": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa.",
+      "trackedReviewsUncounted_one": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa.",
+      "trackedReviewsUncounted_other": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa."
     },
     "council": {
       "title": "Ukaguzi wa baraza",
       "subtitle": "Wataalamu kadhaa hukagua kila PR, na kura zao huunganika kuwa uamuzi mmoja.",
-      "unavailable": "Ukaguzi wa baraza haupatikani kwa shirika hili.",
+      "unavailablePersonallyTitle": "Inahitaji shirika la Enterprise",
+      "unavailablePersonally": "Ukaguzi wa baraza si sehemu ya akaunti ya binafsi.",
+      "unavailablePersonallyAction": "Unda shirika",
+      "unavailablePersonallySwitchAction": "Badilisha shirika",
+      "unavailableOrganizationTitle": "Ukaguzi wa baraza haupatikani",
+      "unavailableForOrganization": "Ukaguzi wa baraza unahitaji mpango wa Enterprise unaofanya kazi na usajili au kipindi cha majaribio. Shirika hili halina hiyo kwa sasa.",
+      "unavailableForOrganizationNeutral": "Ukaguzi wa baraza haupatikani kwa shirika hili kwa sasa. Jaribu tena baadaye.",
+      "unavailableOnBitbucket": "Ukaguzi wa baraza haupatikani kwa hazina za Bitbucket.",
       "noRepositories": "Hakuna hazina zilizochaguliwa bado. Chagua hazina katika mipangilio ya hazina kwanza.",
       "specialists": "Wataalamu",
       "labels": "Lebo zinazowasha ukaguzi wa baraza",
@@ -3123,7 +3157,6 @@
     "completingPurchase": "Inakamilisha ununuzi",
     "subscriptionLoading": "Usajili wa Kilo Pass unapakiwa",
     "retryHint": "Hujaribu kupakia hali ya Kilo Pass tena.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Imekwisha {{date}}",
     "notAvailableInApp": "Kilo Pass haipatikani kwenye programu.",
     "statusActive": "Inatumika",
@@ -3326,6 +3359,7 @@
       "manageOnWeb": "Mipangilio ya malipo kwenye wavuti",
       "changePlan": "Badilisha mpango",
       "buySeats": "Nunua nafasi",
+      "managedOnWeb": "Mpango, nafasi na kuongeza salio kiotomatiki vinasimamiwa kwenye wavuti.",
       "setupAutoTopUp": "Weka uongezaji salio kiotomatiki",
       "manageAutoTopUp": "Dhibiti uongezaji salio kiotomatiki",
       "opensOnWeb": "Hufunguka kwenye wavuti"
@@ -3474,12 +3508,11 @@
       "requestLogs": "Kumbukumbu za maombi"
     },
     "requestLogs": {
-      "hint": "Maombi ya saa moja kabla ya mwisho wa kipindi, mapya kwanza.",
       "older": "Saa iliyotangulia",
       "newer": "Saa inayofuata",
       "truncated": "Saa hii ina maombi mengi kuliko yanayoonyeshwa kwenye orodha.",
-      "emptyTitle": "Hakuna maombi",
-      "emptyDescription": "Hakuna maombi ya lango katika saa hii.",
+      "emptyTitle": "Hakuna maombi katika saa hii",
+      "emptyDescription": "Tumia Saa iliyotangulia ili kuona maombi ya awali.",
       "loadError": "Imeshindwa kupakia kumbukumbu za maombi.",
       "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi.",
       "tokens": "{{input}} ndani · {{output}} nje",
@@ -4283,8 +4316,7 @@
       "repoValue": "Hazina: {{name}}",
       "profileValue": "Wasifu: {{name}}",
       "profileUnavailable": "Wasifu huu haupatikani tena. Chagua mwingine.",
-      "pickerEmptyDescriptionOrganization": "Unda wasifu wa shirika ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Mmiliki au msimamizi wa shirika anaweza kuunda wasifu wa shirika."
+      "pickerEmptyDescriptionOrganization": "Unda wasifu wa shirika ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote."
     },
     "variablesDeleteFailed": "Haikuweza kufuta kigeu",
     "deleteVariable": "Futa kigeu {{key}}",
@@ -4470,7 +4502,6 @@
     "dismiss": "Puuza ripoti",
     "offline": "Nje ya mtandao · ripoti iliyohifadhiwa",
     "cached": "Ripoti iliyohifadhiwa · haiwezi kuonyeshwa upya",
-    "window": "{{start}} – {{end}}",
     "summary": "Muhtasari wa AI",
     "summaryPending": "Muhtasari wa AI unaandaliwa. Utaambatishwa hapa ukiwa tayari.",
     "summaryUnavailable": "Muhtasari wa AI haupatikani. Ripoti yako iliyopangwa bado inapatikana.",
@@ -4589,6 +4620,7 @@
       "title": "Vichocheo na ndoano za wavuti",
       "subtitle": "Endesha utekelezaji wa Cloud Agent kiotomatiki kutoka kwa mwito wa ndoano ya wavuti au kwa ratiba.",
       "new": "Kichocheo kipya",
+      "create": "Unda kichocheo",
       "emptyTitle": "Hakuna vichocheo bado",
       "emptyDescription": "Unda kichocheo ili kuanzisha utekelezaji wa Cloud Agent kutoka mwito wa ndoano ya wavuti au kwa ratiba.",
       "loadFailedTitle": "Imeshindwa kupakia vichocheo",
@@ -4642,6 +4674,8 @@
       "created": "Kichocheo kimeundwa",
       "saved": "Kichocheo kimehifadhiwa",
       "statusArrived": "Umefika",
+      "defaultPromptWebhook": "Eleza mwili wa ombi la mwito wa ndoano ya wavuti:\n\n{{body}}",
+      "defaultPromptScheduled": "Tekeleza kazi iliyoratibiwa. Ilianzishwa {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Weka jina.",
         "nameTooShort": "Tumia angalau herufi 8.",
@@ -4690,6 +4724,7 @@
     "superseded": "Kiungo hiki kilibadilishwa na kingine mahali pengine, kwa hivyo hakifanyi kazi tena."
   },
   "sharedSession": {
+    "startedAt": "Ilianza saa {{time}}",
     "title": "Kipindi kilichoshirikiwa",
     "someone": "Mtu fulani",
     "sharedBy": "Kimeshirikiwa na {{owner}}",
@@ -4845,6 +4880,8 @@
     "modelsDescription": "Zima modeli ili kuizuia kwa kila mwanachama. Modeli kutoka kwa watoa huduma walioruhusiwa huanza zikiwa zimewashwa.",
     "modelsDeniedOnly": "Zilizokataliwa pekee",
     "modelsEmpty": "Hakuna modeli zinazolingana na utafutaji huu.",
+    "modelsDeniedEmpty": "Hakuna modeli iliyokataliwa.",
+    "modelsDeniedSearchEmpty": "Hakuna modeli iliyokataliwa inayolingana na utafutaji huu.",
     "providersDescription": "Zima mtoa huduma ili kuzuia Kilo kupeleka maombi kwake kwa shirika hili.",
     "providersNeedCatalog": "Swichi za watoa huduma zitabaki za kusoma tu hadi orodha kamili ya miundo ipakie. Gusa Jaribu tena hapo juu ili kuzihariri.",
     "providersEmpty": "Hakuna watoa huduma wanaolingana na utafutaji huu.",

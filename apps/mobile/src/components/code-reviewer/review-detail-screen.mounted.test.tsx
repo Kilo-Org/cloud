@@ -35,6 +35,10 @@ const buttons = vi.hoisted(() => ({
   rendered: [] as { children?: unknown; onPress?: () => void }[],
 }));
 
+const screenHeaders = vi.hoisted(() => ({
+  rendered: [] as { eyebrow?: string; reserveEyebrow?: boolean; eyebrowPlaceholder?: unknown }[],
+}));
+
 const viewRenders = vi.hoisted(() => ({
   list: [] as { style?: unknown; className?: string; children?: unknown }[],
 }));
@@ -124,7 +128,7 @@ vi.mock('@kilocode/app-shared/code-review', () => ({
 vi.mock('@kilocode/app-shared/utils', () => ({
   fromMicrodollars: (value: unknown) => value,
 }));
-vi.mock('@/components/code-reviewer/review-list-screen', () => ({
+vi.mock('@/components/code-reviewer/review-list-rows', () => ({
   statusMeta: (status: string) => ({
     label: status === 'completed' ? 'Completed' : status,
     className: 'text-good',
@@ -143,7 +147,16 @@ vi.mock('@/components/query-error', () => ({
     return null;
   },
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: {
+    eyebrow?: string;
+    reserveEyebrow?: boolean;
+    eyebrowPlaceholder?: unknown;
+  }) => {
+    screenHeaders.rendered.push(props);
+    return null;
+  },
+}));
 vi.mock('@/components/ui/button', () => ({
   Button: (props: { children?: unknown; onPress?: () => void }) => {
     buttons.rendered.push(props);
@@ -322,6 +335,7 @@ beforeEach(() => {
   detail.refetch.mockClear();
   queryErrors.errors = [];
   buttons.rendered = [];
+  screenHeaders.rendered = [];
   viewRenders.list = [];
   reviewConfig.query = { isPending: false, data: undefined };
   reviewConfig.calls = [];
@@ -1020,6 +1034,58 @@ describe('ReviewDetailScreen error states', () => {
     expect(queryErrors.errors).toHaveLength(1);
     expect(queryErrors.errors[0]?.variant).toBe('server');
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
+  });
+
+  it('keeps the eyebrow line it reserved while loading through a failed read', () => {
+    detail.isError = true;
+    detail.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    detail.data = null;
+
+    renderScreen();
+
+    // A retry re-enters the loading state on this same line, so dropping it on
+    // the failure would move the title on the way in and on the way back out.
+    // Nothing paints over the line while no read runs, so the header stops
+    // pulsing as soon as the failure lands.
+    expect(screenHeaders.rendered).toHaveLength(1);
+    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
+    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+  });
+
+  it('reserves the line with the placeholder bar while the read runs', () => {
+    detail.isLoading = true;
+    detail.data = null;
+
+    renderScreen();
+
+    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
+    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeTruthy();
+  });
+
+  it('keeps the eyebrow line through a not-found answer', () => {
+    detail.isError = true;
+    detail.error = { data: { code: 'NOT_FOUND' } };
+    detail.data = null;
+
+    renderScreen();
+
+    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
+    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+  });
+
+  it('paints the review repository on the eyebrow line once the read answers', () => {
+    detail.data = {
+      success: true,
+      review: makeReview(),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen();
+
+    expect(screenHeaders.rendered[0]?.eyebrow).toBe('org/repo');
+    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(false);
   });
 });
 

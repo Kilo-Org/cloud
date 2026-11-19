@@ -79,6 +79,9 @@ const REVIEW_FIRST_PAGE_KEY = 'firstPage';
 
 type ReviewListPage = Awaited<ReturnType<typeof trpcClient.codeReviews.listForUser.query>>;
 
+/** One recent-review row the list renders, as the successful page shape carries it. */
+export type ReviewListItem = Extract<ReviewListPage, { success: true }>['reviews'][number];
+
 type ReviewListData = InfiniteData<ReviewListPage, number>;
 
 /** Fetch one page of the recent-reviews list at `offset` (personal or org scope). */

@@ -131,6 +131,7 @@ export async function renewStoredRuntimeAuthorization(input: {
   putAuthorization: (authorization: RuntimeAuthorization) => Promise<void>;
   getMetadata: () => Promise<SessionMetadata | null>;
   putMetadata: (metadata: SessionMetadata) => Promise<void>;
+  beforeRenew?: () => Promise<boolean>;
   renew: (authorization: RuntimeAuthorization) => Promise<{ token: string }>;
   now?: number;
 }): Promise<string | null> {
@@ -188,6 +189,7 @@ export async function renewStoredRuntimeAuthorization(input: {
   ) {
     return token ?? null;
   }
+  if (input.beforeRenew && !(await input.beforeRenew())) return null;
   let postRenewalStateChanged = false;
   try {
     const renewed = await input.renew(authorization.data);

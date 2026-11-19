@@ -220,6 +220,33 @@ describe('readStoredGatewayModels', () => {
     ]);
   });
 
+  it("keeps Vercel's context-length price tiers of an endpoint", async () => {
+    const pricing = {
+      prompt: '0.0000005',
+      prompt_tiers: [
+        { cost: '0.0000005', min: 0, max: 256000 },
+        { cost: '0.000002', min: 256000 },
+      ],
+      completion: '0.000003',
+      completion_tiers: [
+        { cost: '0.000003', min: 0, max: 256000 },
+        { cost: '0.000006', min: 256000 },
+      ],
+      image: '0',
+      discount: 0,
+    };
+    await storeList([{ id: 'vendor/tiered', name: 'Tiered' }]);
+    await storeRows([
+      endpointsRow('vendor/tiered', endpointsBody([{ provider_name: 'alibaba', pricing }])),
+    ]);
+
+    const stored = await read();
+
+    expect(storedEndpointsOf(stored)).toEqual(
+      new Map([['vendor/tiered', [{ provider_name: 'alibaba', pricing }]]])
+    );
+  });
+
   it('maps a stored missing endpoints resource to its marker', async () => {
     await storeList([{ id: 'vendor/a-batch', name: 'A batch' }]);
     await storeRows([endpointsRow('vendor/a-batch', { status: 404 })]);

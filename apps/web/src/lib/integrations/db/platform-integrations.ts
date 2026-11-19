@@ -1020,7 +1020,12 @@ export async function autoCompleteInstallation(
       )
       .limit(1);
     if (peer) return { ok: false, reason: 'installation_claimed' };
-    await tx
+    // The early read is only a fast path: a writer that does not hold this
+    // installation's advisory lock (an owner-scoped delete) can remove the
+    // pending row between the read and this update. Gate the outcome on the
+    // update itself so a vanished or already-resolved row is reported, not
+    // acknowledged as completed.
+    const [completedRow] = await tx
       .update(platform_integrations)
       .set({
         platform_installation_id: installationData.installation_id,
@@ -1043,7 +1048,9 @@ export async function autoCompleteInstallation(
           eq(platform_integrations.id, integrationId),
           eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING)
         )
-      );
+      )
+      .returning({ id: platform_integrations.id });
+    if (!completedRow) return { ok: false, reason: 'not_pending' };
     return { ok: true };
   };
   return await (transaction ? execute(transaction) : db.transaction(execute));

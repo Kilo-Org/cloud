@@ -40,6 +40,14 @@ export const GLANCEABLE_TERMINAL_MS = 8000;
  * update well inside the window, and an idle card is already gone by then.
  */
 export const GLANCEABLE_STALE_MS = 1_800_000;
+/**
+ * The one display-title cut every glanceable surface shares: a title is trimmed
+ * to a single line of what it draws, then capped at this many characters.
+ * `glanceableTitle` owns the cut; the Home widget's stored details and the
+ * session-card content schema bound their titles with this same value, so the
+ * cap cannot drift between the surfaces.
+ */
+export const GLANCEABLE_TITLE_LIMIT = 120;
 
 export const GLANCEABLE_SNAPSHOT_STATUSES = [
   'waiting',
@@ -67,9 +75,9 @@ export type GlanceableNeedsInputKind = (typeof GLANCEABLE_NEEDS_INPUT_STATUSES)[
 export const glanceableAgentsSnapshotSchema = z.object({
   schemaVersion: z.literal(GLANCEABLE_SNAPSHOT_SCHEMA_VERSION),
   revision: z.number().int().min(1),
-  /** ISO 8601 timestamp. */
+  /** Snapshot write time; producers emit the `epochMsToIso` UTC form. */
   updatedAt: z.string(),
-  /** ISO 8601 timestamp; `updatedAt + GLANCEABLE_SNAPSHOT_EXPIRY_MS`. */
+  /** When the snapshot stops being eligible work; `updatedAt + GLANCEABLE_SNAPSHOT_EXPIRY_MS`. */
   expiresAt: z.string(),
   /** Opaque scope key; never a raw user or organization id. */
   scopeKey: z.string().min(1),
@@ -180,16 +188,23 @@ export const NO_GLANCEABLE_WORK: Omit<GlanceableAgentsSnapshot, GlanceableFrameF
   scheduledAt: null,
 };
 
-/** One session row, as both producers read it from the active-sessions list. */
+/**
+ * One session row, as every producer reads it from the active-sessions list.
+ * The two timestamps share one absence policy: a row that does not carry the
+ * fact omits it, and a producer that serializes an absent value may carry an
+ * explicit `null` — the readers (`timestampMs`, the helpers below) treat
+ * `null`, absent and unparseable exactly the same, so a shape may widen in
+ * either direction without a branch at the read site.
+ */
 export type GlanceableSessionRow = {
   status: string;
   /** Backend timestamp; when this session's status last changed. Absent on old rows. */
-  statusUpdatedAt?: string;
+  statusUpdatedAt?: string | null;
   /**
    * Backend wake time. Only a `scheduled` row carries one, and even then the
    * CLI may omit it — `scheduled` with no time is representable.
    */
-  scheduledAt?: string;
+  scheduledAt?: string | null;
 };
 
 /**
@@ -285,7 +300,7 @@ export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow
  * `extremeTimestampRow` applies when it picks one winner.
  */
 export function compareSessionInstant<T extends GlanceableSessionRow>(
-  read: (row: T) => string | undefined,
+  read: (row: T) => string | null | undefined,
   extreme: 'earliest' | 'latest'
 ): (a: T, b: T) => number {
   return (a, b) => {
@@ -312,7 +327,7 @@ export function compareSessionInstant<T extends GlanceableSessionRow>(
 function extremeTimestampRow(
   sessions: readonly GlanceableSessionRow[],
   qualifies: (session: GlanceableSessionRow) => boolean,
-  readTimestamp: (session: GlanceableSessionRow) => string | undefined,
+  readTimestamp: (session: GlanceableSessionRow) => string | null | undefined,
   extreme: 'earliest' | 'latest'
 ): { at: number; session: GlanceableSessionRow } | null {
   let winner: { at: number; session: GlanceableSessionRow } | null = null;
@@ -500,8 +515,10 @@ export function isIdleOnlyGlanceableWork(snapshot: GlanceableAgentsSnapshot): bo
 
 /**
  * True when `incoming` must be discarded in favour of `current`: a strictly
- * lower revision, or the same revision with an older `updatedAt`. ISO 8601
- * strings from `epochMsToIso` compare correctly as strings.
+ * lower revision, or the same revision with an older `updatedAt`. The tie is
+ * settled on the parsed instants so any ISO 8601 form orders chronologically;
+ * when either instant does not parse, the raw strings decide, matching the
+ * behavior before instants were parsed.
  */
 export function shouldDiscardGlanceableRevision(
   incoming: GlanceableAgentsSnapshot,
@@ -511,6 +528,11 @@ export function shouldDiscardGlanceableRevision(
     return true;
   }
   if (incoming.revision === current.revision) {
+    const incomingAt = timestampMs(incoming.updatedAt);
+    const currentAt = timestampMs(current.updatedAt);
+    if (incomingAt !== null && currentAt !== null) {
+      return incomingAt < currentAt;
+    }
     return incoming.updatedAt < current.updatedAt;
   }
   return false;

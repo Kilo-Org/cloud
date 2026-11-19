@@ -26,6 +26,7 @@
     "creditHistory": "Historique des crédits",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annuler",
     "done": "Terminé",
     "retry": "Réessayer",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "Modifications",
     "organizationTrialEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai, puis réessayer.",
-    "privateRepositoryA11y": "{{name}}, dépôt privé"
+    "privateRepositoryA11y": "{{name}}, dépôt privé",
+    "legalDocumentEnglishOnly": "Ce document est disponible uniquement en anglais.",
+    "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer."
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -385,12 +388,24 @@
       "editKeyDescription": "La valeur enregistrée ne peut pas être affichée. Saisissez-en une nouvelle pour la remplacer.",
       "editKeyMappingsWarning": "Remplacer la clé remplace aussi les correspondances de modèles enregistrées : saisissez à nouveau chaque correspondance dont vous avez encore besoin.",
       "saveFailed": "Impossible d'enregistrer la clé.",
-      "invalidCredentials": "Vérifiez les identifiants et réessayez.",
       "fieldRequired": "Le champ {{field}} est obligatoire.",
+      "keyIncomplete": "Il manque une valeur obligatoire à la clé.",
       "incompleteMapping": "La correspondance {{number}} nécessite à la fois un slug du modèle de la passerelle et un nom de déploiement.",
       "apiKeyLabel": "Clé API",
       "apiKeyPlaceholder": "Collez la clé",
       "apiKeyRequired": "Saisissez la clé.",
+      "keyAlreadyExists": "Vous avez déjà une clé pour ce fournisseur. Supprimez-la avant d'en ajouter une autre.",
+      "keyStoreFailed": "La clé n'a pas pu être enregistrée.",
+      "invalidCredentials": "Cette clé n'est pas dans le format attendu par ce fournisseur. Vérifiez-la et réessayez.",
+      "testSucceeded": "La clé fonctionne. Fournisseur : {{provider}}. Modèle : {{model}}.",
+      "testRejected": "Le fournisseur a rejeté cette clé. Vérifiez qu'elle est correcte et qu'elle n'a pas été révoquée.",
+      "testIncomplete": "Le fournisseur a mis fin au test avant qu'il ne soit terminé. Réessayez.",
+      "testUnsupportedProvider": "Ce fournisseur n'est plus pris en charge. Supprimez la clé.",
+      "testUnreadableKey": "La clé stockée n'a pas pu être lue. Réessayez plus tard.",
+      "testDeprecatedProvider": "Ce fournisseur est obsolète, sa clé ne peut donc pas être testée.",
+      "keyManagedByCodingPlan": "Un forfait de code gère la clé de ce fournisseur, et cette clé est en lecture seule. Annulez le forfait de code pour ajouter votre propre clé.",
+      "providerUnavailable": "Ce fournisseur n'est pas encore disponible, vous ne pouvez donc pas ajouter de clé pour celui-ci.",
+      "testFailed": "Le test de la clé a échoué. Réessayez.",
       "authMethod": "Méthode d'authentification",
       "authMethodAccessKeys": "Clés d'accès",
       "resourceName": "Nom de la ressource Azure",
@@ -481,7 +496,14 @@
       "viewReceipt": "Voir l'accusé de réception"
     },
     "changelog": "Nouveautés",
-    "changelogVersionPending": "Les notes de cette version arriveront avec la prochaine mise à jour."
+    "changelogVersionPending": "Les notes de la version {{version}} arriveront avec la prochaine mise à jour de l'application.",
+    "changelogGroupNew": "Nouveautés",
+    "changelogFixesIn": "Corrections et améliorations dans les sections suivantes : {{areas}}.",
+    "changelogFixesPolish": "Corrections et améliorations dans toute l'application.",
+    "changelogAreas": {
+      "signIn": "Connexion",
+      "profileOrganizations": "Profil et organisations"
+    }
   },
   "notifications": {
     "channel": {
@@ -891,13 +913,26 @@
       "repositoryLine": "Revues : {{reviews}} · Signalements : {{findings}}",
       "empty": "Aucune revue avec statistiques pour l'instant",
       "emptyDescription": "Les statistiques enregistrent les revues terminées tant qu'elles sont activées pour l'organisation.",
-      "off": "Les statistiques sont désactivées pour cette organisation.",
-      "couldNotLoad": "Impossible de charger les statistiques"
+      "offTitle": "Les statistiques sont désactivées pour {{platform}}",
+      "offDescription": "Les rôles de facturation de l'organisation peuvent activer les statistiques dans les paramètres sur le web pour enregistrer les revues terminées.",
+      "couldNotLoad": "Impossible de charger les statistiques",
+      "trackedReviewsCaption": "Revues terminées qui se sont achevées au cours de cette période avec les statistiques activées. Les revues en cours et en échec ne sont jamais comptées.",
+      "trackedReviewsUncounted": "Non comptées : {{displayCount}} des {{displayTotal}} revues terminées de l’organisation sans résultat capturé.",
+      "trackedReviewsUncounted_many": "Non comptées : {{displayCount}} des {{displayTotal}} revues terminées de l’organisation sans résultat capturé.",
+      "trackedReviewsUncounted_one": "Non comptées : {{displayCount}} des {{displayTotal}} revues terminées de l’organisation sans résultat capturé.",
+      "trackedReviewsUncounted_other": "Non comptées : {{displayCount}} des {{displayTotal}} revues terminées de l’organisation sans résultat capturé."
     },
     "council": {
       "title": "Revue en conseil",
       "subtitle": "Plusieurs spécialistes examinent chaque pull request, et leurs votes sont combinés en une seule décision.",
-      "unavailable": "La revue en conseil n'est pas disponible pour cette organisation.",
+      "unavailablePersonallyTitle": "Nécessite une organisation Enterprise",
+      "unavailablePersonally": "La revue en conseil ne fait pas partie d'un compte personnel.",
+      "unavailablePersonallyAction": "Créer une organisation",
+      "unavailablePersonallySwitchAction": "Changer d'organisation",
+      "unavailableOrganizationTitle": "La revue en conseil n'est pas disponible pour le moment",
+      "unavailableForOrganization": "La revue en conseil nécessite le plan Enterprise avec un abonnement ou un essai actif. Cette organisation ne l'a pas actuellement.",
+      "unavailableForOrganizationNeutral": "La revue en conseil n'est pas disponible pour cette organisation pour le moment. Veuillez réessayer plus tard.",
+      "unavailableOnBitbucket": "La revue en conseil n'est pas disponible pour les dépôts Bitbucket.",
       "noRepositories": "Aucun dépôt sélectionné pour l'instant. Choisissez d'abord des dépôts dans les paramètres des dépôts.",
       "specialists": "Spécialistes",
       "labels": "Étiquettes qui déclenchent la revue en conseil",
@@ -2539,7 +2574,6 @@
     "completingPurchase": "Finalisation de l'achat…",
     "subscriptionLoading": "Chargement de l'abonnement Kilo Pass",
     "retryHint": "Actualise à nouveau l'état de Kilo Pass.",
-    "cardAccessibility": "{{title}} : {{description}}. {{actionLabel}}",
     "endedOn": "Terminé le {{date}}",
     "notAvailableInApp": "Kilo Pass n'est pas disponible dans l'application.",
     "statusActive": "Actif",
@@ -3375,6 +3409,7 @@
       "manageOnWeb": "Paramètres de facturation sur le web",
       "changePlan": "Changer de formule",
       "buySeats": "Acheter des licences",
+      "managedOnWeb": "La formule, les licences et la recharge automatique sont gérées sur le web.",
       "setupAutoTopUp": "Configurer la recharge automatique",
       "manageAutoTopUp": "Gérer la recharge automatique",
       "opensOnWeb": "S'ouvre sur le web"
@@ -3536,12 +3571,11 @@
       "requestLogs": "Journaux des requêtes"
     },
     "requestLogs": {
-      "hint": "Requêtes de l'heure précédant la fin de la plage, les plus récentes en premier.",
       "older": "Heure précédente",
       "newer": "Heure suivante",
       "truncated": "Cette heure compte plus de requêtes que la liste n'en affiche.",
-      "emptyTitle": "Aucune requête",
-      "emptyDescription": "Aucune requête de passerelle pendant cette heure.",
+      "emptyTitle": "Aucune requête pour cette heure",
+      "emptyDescription": "Utilisez Heure précédente pour voir les requêtes antérieures.",
       "loadError": "Impossible de charger les journaux des requêtes.",
       "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes.",
       "tokens": "{{input}} en entrée · {{output}} en sortie",
@@ -4349,8 +4383,7 @@
       "repoValue": "Dépôt : {{name}}",
       "profileValue": "Profil : {{name}}",
       "profileUnavailable": "Ce profil n'est plus disponible. Choisissez-en un autre.",
-      "pickerEmptyDescriptionOrganization": "Créez un profil d'organisation pour réutiliser les variables d'environnement, les commandes de configuration et les compétences au fil des sessions.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Un propriétaire ou un administrateur d'organisation peut créer un profil d'organisation."
+      "pickerEmptyDescriptionOrganization": "Créez un profil d'organisation pour réutiliser les variables d'environnement, les commandes de configuration et les compétences au fil des sessions."
     },
     "variablesDeleteFailed": "Impossible de supprimer la variable",
     "deleteVariable": "Supprimer la variable {{key}}",
@@ -4540,7 +4573,6 @@
     "dismiss": "Ignorer le briefing",
     "offline": "Hors ligne · briefing enregistré",
     "cached": "Rapport enregistré · actualisation indisponible",
-    "window": "{{start}} – {{end}}",
     "summary": "Résumé IA",
     "summaryPending": "Résumé IA en cours. Il s’affichera ici une fois prêt.",
     "summaryUnavailable": "Résumé IA indisponible. Votre rapport structuré reste disponible.",
@@ -4659,6 +4691,7 @@
       "title": "Déclencheurs et webhooks",
       "subtitle": "Automatisez les exécutions de Cloud Agent à partir d’un appel webhook ou d’une planification.",
       "new": "Nouveau déclencheur",
+      "create": "Créer un déclencheur",
       "emptyTitle": "Aucun déclencheur pour l’instant",
       "emptyDescription": "Créez un déclencheur pour lancer une exécution de Cloud Agent à partir d’un appel webhook ou selon une planification.",
       "loadFailedTitle": "Impossible de charger les déclencheurs",
@@ -4712,6 +4745,8 @@
       "created": "Déclencheur créé",
       "saved": "Déclencheur enregistré",
       "statusArrived": "Arrivée",
+      "defaultPromptWebhook": "Décrivez le corps de cette requête webhook :\n\n{{body}}",
+      "defaultPromptScheduled": "Exécutez la tâche planifiée. Déclenché à {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Saisissez un nom.",
         "nameTooShort": "Utilisez au moins 8 caractères.",
@@ -4760,6 +4795,7 @@
     "superseded": "Ce lien a été remplacé depuis un autre appareil et ne fonctionne plus."
   },
   "sharedSession": {
+    "startedAt": "Démarrée à {{time}}",
     "title": "Session partagée",
     "someone": "Quelqu’un",
     "sharedBy": "Partagée par {{owner}}",
@@ -4915,6 +4951,8 @@
     "modelsDescription": "Désactivez un modèle pour le bloquer pour tous les membres. Les modèles des fournisseurs autorisés sont activés par défaut.",
     "modelsDeniedOnly": "Refusés uniquement",
     "modelsEmpty": "Aucun modèle ne correspond à cette recherche.",
+    "modelsDeniedEmpty": "Aucun modèle n'est refusé.",
+    "modelsDeniedSearchEmpty": "Aucun modèle refusé ne correspond à cette recherche.",
     "providersDescription": "Désactivez un fournisseur pour que Kilo cesse de lui acheminer les requêtes de cette organisation.",
     "providersNeedCatalog": "Les interrupteurs des fournisseurs restent en lecture seule tant que le catalogue complet des modèles n'est pas chargé. Appuyez sur Réessayer ci-dessus pour les modifier.",
     "providersEmpty": "Aucun fournisseur ne correspond à cette recherche.",

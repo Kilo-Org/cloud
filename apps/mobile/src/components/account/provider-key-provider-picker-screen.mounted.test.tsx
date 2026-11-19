@@ -77,6 +77,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/a11y/tap-target', () => ({
   COMPACT_CONTROL_HIT_SLOP_DP: 8,
+  FIELD_CLEAR_BOX_CLASS: 'h-[48px] w-[48px] -my-[7px] items-center justify-center',
   ROW_TARGET_CLASS: 'min-h-11',
   STATE_ACTION_CLASS: '',
 }));
@@ -105,11 +106,19 @@ async function mount(organizationId?: string) {
   return view.renderer.root;
 }
 
-/** The provider rows: one pressable per provider, labelled with its name. */
+/** The provider rows: one pressable per provider, labelled with its name.
+ *
+ * Scoped to the mocked list so the row's own clear control — a labelled
+ * `Pressable` beside the input — never counts as a provider row. */
 function rowLabels(root: ReactTestRenderer['root']) {
-  return root.findAll(
-    node => Object.is(node.type, 'Pressable') && typeof node.props.accessibilityLabel === 'string'
-  );
+  return root
+    .findAll(node => Object.is(node.type, 'FlashList'))
+    .flatMap(list =>
+      list.findAll(
+        node =>
+          Object.is(node.type, 'Pressable') && typeof node.props.accessibilityLabel === 'string'
+      )
+    );
 }
 
 function row(root: ReactTestRenderer['root'], index: number) {
@@ -126,6 +135,16 @@ function searchInput(root: ReactTestRenderer['root']) {
     throw new Error('missing provider search input');
   }
   return input;
+}
+
+function clearControl(root: ReactTestRenderer['root']) {
+  const [control] = root.findAll(
+    node => Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Clear search'
+  );
+  if (!control) {
+    throw new Error('missing clear control');
+  }
+  return control;
 }
 
 beforeEach(() => {
@@ -189,6 +208,30 @@ describe('ProviderKeyProviderPickerScreen', () => {
     expect(
       root.findAll(node => Object.is(node.type, 'EmptyState')).map(node => node.props.title)
     ).toEqual(['No matching providers']);
+  });
+
+  it('clears the query from its own control and returns the full list', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('gpt');
+    });
+    expect(rowLabels(root)).toHaveLength(0);
+
+    act(() => {
+      (clearControl(root).props.onPress as () => void)();
+    });
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
+      'Anthropic',
+      'OpenAI',
+    ]);
+    expect(
+      root.findAll(
+        node =>
+          Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Clear search'
+      )
+    ).toHaveLength(0);
   });
 
   it('returns the full list from its first provider when the search clears', async () => {

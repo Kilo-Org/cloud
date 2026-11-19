@@ -26,6 +26,7 @@
     "creditHistory": "Kredithistorik",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annuller",
     "done": "Færdig",
     "retry": "Prøv igen",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "Ændringer",
     "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen.",
-    "privateRepositoryA11y": "{{name}}, privat repository"
+    "privateRepositoryA11y": "{{name}}, privat repository",
+    "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
+    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen."
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Den gemte værdi kan ikke vises. Angiv en ny for at erstatte den.",
       "editKeyMappingsWarning": "Når nøglen erstattes, erstattes de gemte modeltilknytninger også: angiv derfor alle de tilknytninger, du stadig har brug for.",
       "saveFailed": "Nøglen kunne ikke gemmes.",
-      "invalidCredentials": "Kontrollér legitimationsoplysningerne, og prøv igen.",
       "fieldRequired": "{{field}} er påkrævet.",
+      "keyIncomplete": "Nøglen mangler en påkrævet værdi.",
       "incompleteMapping": "Tilknytning {{number}} kræver både et slug for gateway-model og et deployment-navn.",
       "apiKeyLabel": "API-nøgle",
       "apiKeyPlaceholder": "Indsæt nøglen",
       "apiKeyRequired": "Angiv nøglen.",
+      "keyAlreadyExists": "Du har allerede en nøgle til denne udbyder. Fjern den, før du tilføjer en anden.",
+      "keyStoreFailed": "Nøglen kunne ikke gemmes.",
+      "invalidCredentials": "Denne nøgle er ikke i det format, som denne udbyder forventer. Kontrollér den og prøv igen.",
+      "testSucceeded": "Nøglen virker. Udbyder: {{provider}}. Model: {{model}}.",
+      "testRejected": "Udbyderen afviste denne nøgle. Kontrollér, at den er korrekt og ikke er blevet tilbagekaldt.",
+      "testIncomplete": "Udbyderen afsluttede testen, før den blev færdig. Prøv igen.",
+      "testUnsupportedProvider": "Denne udbyder understøttes ikke længere. Fjern nøglen.",
+      "testUnreadableKey": "Den gemte nøgle kunne ikke læses. Prøv igen senere.",
+      "testDeprecatedProvider": "Denne udbyder er forældet, så dens nøgle kan ikke testes.",
+      "keyManagedByCodingPlan": "Dit kodningsabonnement administrerer denne udbyders nøgle, og nøglen er skrivebeskyttet. Annullér kodningsabonnementet for at tilføje din egen nøgle.",
+      "providerUnavailable": "Denne udbyder er endnu ikke tilgængelig, så du kan ikke tilføje en nøgle til den.",
+      "testFailed": "Nøgletesten mislykkedes. Prøv igen.",
       "authMethod": "Godkendelsesmetode",
       "authMethodAccessKeys": "Adgangsnøgler",
       "resourceName": "Azure-ressourcenavn",
@@ -481,7 +496,14 @@
       "viewReceipt": "Se kvittering"
     },
     "changelog": "Nyheder",
-    "changelogVersionPending": "Noterne til denne version kommer med næste appopdatering."
+    "changelogVersionPending": "Noterne til version {{version}} kommer med næste appopdatering.",
+    "changelogGroupNew": "Nyt",
+    "changelogFixesIn": "Rettelser og forbedringer i {{areas}}.",
+    "changelogFixesPolish": "Rettelser og forbedringer i hele appen.",
+    "changelogAreas": {
+      "signIn": "Log-ind",
+      "profileOrganizations": "Profil og organisationer"
+    }
   },
   "preferences": {
     "general": "Generelt",
@@ -1466,13 +1488,25 @@
       "repositoryLine": "Gennemgange: {{reviews}} · Fund: {{findings}}",
       "empty": "Ingen gennemgange med analysedata endnu",
       "emptyDescription": "Analyse registrerer afsluttede gennemgange, mens funktionen er slået til for organisationen.",
-      "off": "Analyse er slået fra for denne organisation.",
-      "couldNotLoad": "Kunne ikke indlæse analysedata"
+      "offTitle": "Analyse er slået fra for {{platform}}",
+      "offDescription": "Organisationens faktureringsroller kan slå analysen til i organisationsindstillingerne på nettet for at registrere afsluttede gennemgange.",
+      "couldNotLoad": "Kunne ikke indlæse analysedata",
+      "trackedReviewsCaption": "Afsluttede gennemgange, der blev færdige i denne periode, mens analysen var slået til. Igangværende og mislykkede gennemgange tælles aldrig med.",
+      "trackedReviewsUncounted": "Ikke talt med: {{displayCount}} af organisationens {{displayTotal}} afsluttede gennemgange med uregistreret resultat.",
+      "trackedReviewsUncounted_one": "Ikke talt med: {{displayCount}} af organisationens {{displayTotal}} afsluttede gennemgange med uregistreret resultat.",
+      "trackedReviewsUncounted_other": "Ikke talt med: {{displayCount}} af organisationens {{displayTotal}} afsluttede gennemgange med uregistreret resultat."
     },
     "council": {
       "title": "Rådsgennemgang",
       "subtitle": "Flere specialister gennemgår hver pull request, og deres stemmer samles til én beslutning.",
-      "unavailable": "Rådsgennemgang er ikke tilgængelig for denne organisation.",
+      "unavailablePersonallyTitle": "Kræver en Enterprise-organisation",
+      "unavailablePersonally": "Rådsgennemgang er ikke en del af en personlig konto.",
+      "unavailablePersonallyAction": "Opret organisation",
+      "unavailablePersonallySwitchAction": "Skift organisation",
+      "unavailableOrganizationTitle": "Rådsgennemgang er ikke tilgængelig",
+      "unavailableForOrganization": "Rådsgennemgang kræver Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisation har det ikke lige nu.",
+      "unavailableForOrganizationNeutral": "Rådsgennemgang er ikke tilgængelig for denne organisation lige nu. Prøv igen senere.",
+      "unavailableOnBitbucket": "Rådsgennemgang er ikke tilgængelig for Bitbucket-kodelagre.",
       "noRepositories": "Der er endnu ikke valgt nogen kodelagre. Vælg først kodelagre i indstillingerne for kodelagre.",
       "specialists": "Specialister",
       "labels": "Etiketter, der udløser rådsgennemgang",
@@ -3123,7 +3157,6 @@
     "completingPurchase": "Fuldfører køb",
     "subscriptionLoading": "Indlæser Kilo Pass-abonnement",
     "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Afsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgængeligt i appen.",
     "statusActive": "Aktiv",
@@ -3326,6 +3359,7 @@
       "manageOnWeb": "Faktureringsindstillinger på nettet",
       "changePlan": "Skift plan",
       "buySeats": "Køb pladser",
+      "managedOnWeb": "Planen, pladserne og automatisk optankning administreres på nettet.",
       "setupAutoTopUp": "Konfigurer automatisk optankning",
       "manageAutoTopUp": "Administrer automatisk optankning",
       "opensOnWeb": "Åbner på nettet"
@@ -3474,12 +3508,11 @@
       "requestLogs": "Anmodningslogs"
     },
     "requestLogs": {
-      "hint": "Anmodninger fra timen op til vinduets sluttidspunkt, nyeste først.",
       "older": "Forrige time",
       "newer": "Næste time",
       "truncated": "Denne time har flere anmodninger, end listen viser.",
-      "emptyTitle": "Ingen anmodninger",
-      "emptyDescription": "Der er ingen gateway-anmodninger i denne time.",
+      "emptyTitle": "Ingen anmodninger i denne time",
+      "emptyDescription": "Brug Forrige time for at se tidligere anmodninger.",
       "loadError": "Anmodningslogs kunne ikke indlæses.",
       "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs.",
       "tokens": "{{input}} ind · {{output}} ud",
@@ -4283,8 +4316,7 @@
       "repoValue": "Lager: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Denne profil er ikke længere tilgængelig. Vælg en anden.",
-      "pickerEmptyDescriptionOrganization": "Opret en organisationsprofil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "En organisationsejer eller administrator kan oprette en organisationsprofil."
+      "pickerEmptyDescriptionOrganization": "Opret en organisationsprofil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner."
     },
     "variablesDeleteFailed": "Variablen kunne ikke slettes",
     "deleteVariable": "Slet variabel {{key}}",
@@ -4470,7 +4502,6 @@
     "dismiss": "Afvis briefing",
     "offline": "Offline · gemt briefing",
     "cached": "Gemt rapport · kan ikke opdateres",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-resumé",
     "summaryPending": "AI-resuméet er i gang. Det vises her, når det er klar.",
     "summaryUnavailable": "AI-resumé er ikke tilgængeligt. Din strukturerede rapport er stadig tilgængelig.",
@@ -4589,6 +4620,7 @@
       "title": "Udløsere og webhooks",
       "subtitle": "Automatiser Cloud Agent-kørsler fra et webhook-kald eller en tidsplan.",
       "new": "Ny udløser",
+      "create": "Opret udløser",
       "emptyTitle": "Ingen udløsere endnu",
       "emptyDescription": "Opret en udløser for at starte en Cloud Agent-kørsel fra et webhook-kald eller efter en tidsplan.",
       "loadFailedTitle": "Kunne ikke indlæse udløsere",
@@ -4642,6 +4674,8 @@
       "created": "Udløser oprettet",
       "saved": "Udløser gemt",
       "statusArrived": "Ankommet",
+      "defaultPromptWebhook": "Beskriv indholdet af denne webhook-anmodning:\n\n{{body}}",
+      "defaultPromptScheduled": "Kør den planlagte opgave. Udløst kl. {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Indtast et navn.",
         "nameTooShort": "Brug mindst 8 tegn.",
@@ -4690,6 +4724,7 @@
     "superseded": "Dette link blev erstattet et andet sted, så det virker ikke længere."
   },
   "sharedSession": {
+    "startedAt": "Startet kl. {{time}}",
     "title": "Delt session",
     "someone": "Nogen",
     "sharedBy": "Delt af {{owner}}",
@@ -4845,6 +4880,8 @@
     "modelsDescription": "Slå en model fra for at blokere den for alle medlemmer. Modeller fra tilladte udbydere er slået til fra start.",
     "modelsDeniedOnly": "Kun afviste",
     "modelsEmpty": "Ingen modeller matcher denne søgning.",
+    "modelsDeniedEmpty": "Ingen model er afvist.",
+    "modelsDeniedSearchEmpty": "Ingen afvist model matcher denne søgning.",
     "providersDescription": "Slå en udbyder fra for at forhindre, at Kilo dirigerer anmodninger til den for denne organisation.",
     "providersNeedCatalog": "Udbyderkontakterne er skrivebeskyttede, indtil hele modelkataloget er indlæst. Tryk på Prøv igen ovenfor for at redigere dem.",
     "providersEmpty": "Ingen udbydere matcher denne søgning.",

@@ -187,6 +187,8 @@ type ModelCatalogEndpoint = 'models' | 'org-defaults';
  */
 class ModelCatalogFetchError extends Error {
   readonly [TELEMETRY_DESCRIPTION_KEY]: TelemetryDescription;
+  /** The answer's HTTP status, so failure classifiers can name the server answer. */
+  readonly status: number;
 
   constructor(args: {
     endpoint: ModelCatalogEndpoint;
@@ -197,6 +199,7 @@ class ModelCatalogFetchError extends Error {
   }) {
     super(args.message);
     this.name = 'ModelCatalogFetchError';
+    this.status = args.status;
     const expected = isExpectedHttpStatus(args.status);
     this[TELEMETRY_DESCRIPTION_KEY] = {
       level: expected ? 'warning' : 'error',
@@ -304,15 +307,17 @@ export function useAvailableModels(
   audience: OrganizationModelAudience = 'member',
   options: { enabled?: boolean } = {}
 ) {
-  const { data, isLoading, isError, isFetching, isFetched, error, refetch } = useQuery({
-    queryKey: ['available-models', organizationId, audience] as const,
-    queryFn: fetchModels.bind(null, organizationId, audience),
-    enabled: options.enabled ?? true,
-    staleTime: 60_000,
-    // A paused catalogue read leaves the picker with no model to list, so
-    // auto-selection never resolves.
-    ...SETTLE_WHILE_OFFLINE,
-  });
+  const { data, isLoading, isError, isFetching, fetchStatus, isFetched, error, refetch } = useQuery(
+    {
+      queryKey: ['available-models', organizationId, audience] as const,
+      queryFn: fetchModels.bind(null, organizationId, audience),
+      enabled: options.enabled ?? true,
+      staleTime: 60_000,
+      // A paused catalogue read leaves the picker with no model to list, so
+      // auto-selection never resolves.
+      ...SETTLE_WHILE_OFFLINE,
+    }
+  );
 
   const models = useMemo(() => toModelOptions(data), [data]);
 
@@ -322,5 +327,5 @@ export function useAvailableModels(
   // least once, letting a caller keep the error state through a retry: v5
   // downgrades a no-data refetch back to pending and clears `error`, so
   // `isError` alone would drop the error block. See `use-current-user-id`.
-  return { models, isLoading, isError, isFetching, isFetched, error, refetch };
+  return { models, isLoading, isError, isFetching, fetchStatus, isFetched, error, refetch };
 }

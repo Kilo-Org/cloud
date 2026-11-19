@@ -47,19 +47,28 @@ export function TabBarButton({
   onPressIn,
   onPressOut,
   style,
+  hiddenFromA11y,
   'aria-selected': ariaSelected,
   ...props
-}: BottomTabBarButtonProps) {
+}: BottomTabBarButtonProps & { hiddenFromA11y?: boolean }) {
   const pressed = useRef(false);
   // The entry the user is already on opens no screen, and its scene stays
   // focused, so the input window cannot tell the two cases apart by focus. The
   // bar marks that entry as selected; the window is armed as a same-tab one so
   // the scene keeps the claim for its own bounded settle.
   const sameTab = ariaSelected === true;
+  const hidden = hiddenFromA11y === true;
   return (
     <Pressable
       {...props}
       aria-selected={ariaSelected}
+      // While a form sheet covers the tab's screen, the covered screen and the
+      // bar are hidden from screen readers as one presentation: the sheet's own
+      // content is what a reader reaches (see the tabs layout, which passes
+      // `hiddenFromA11y` while a form sheet route is presented). The entry keeps
+      // taking sighted touches — only the accessibility tree changes.
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
       onPressIn={event => {
         pressed.current = true;
         markTabSwitchPending(Date.now(), { sameTab });

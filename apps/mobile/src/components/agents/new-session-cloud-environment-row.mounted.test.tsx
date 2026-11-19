@@ -133,6 +133,15 @@ describe('NewSessionCloudEnvironmentRow picker entry', () => {
     expect(values).toContain(i18n.t('agentChat.environment.chooseEnvironmentDetail'));
   });
 
+  it('renders the loading state on its title line alone', () => {
+    const root = renderRow({ selection: { status: 'loading' } });
+
+    expect(renderedTexts(root)).toEqual([
+      i18n.t('agentChat.newSession.cloudEnvironment'),
+      i18n.t('agentChat.environment.loadingEnvironments'),
+    ]);
+  });
+
   it('shows the picked environment and its build line in the selected state', () => {
     const root = renderRow({ selection: SELECTED });
     const values = renderedTexts(root);

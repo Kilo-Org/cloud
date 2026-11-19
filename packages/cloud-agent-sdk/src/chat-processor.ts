@@ -70,11 +70,18 @@ function acceptVersion(sessionStorage: SessionStorage, event: ChatEvent): boolea
   if (current) {
     if (current.sourceId === version.sourceId) {
       if (version.cursor < current.cursor) return false;
-      const rowPresent =
-        partId === undefined
-          ? sessionStorage.getMessageInfo(messageId) !== undefined
-          : sessionStorage.getParts(messageId).some(value => value.id === partId);
-      if (version.cursor === current.cursor && (previous?.removed || rowPresent)) return false;
+      // Presence is only read here, so resolve it lazily: most events move the
+      // cursor and can never dedupe, and resolving it eagerly would read (and
+      // on the snapshot backends, rebuild) the message's whole part list per
+      // event.
+      if (version.cursor === current.cursor) {
+        if (previous?.removed) return false;
+        const rowPresent =
+          partId === undefined
+            ? sessionStorage.getMessageInfo(messageId) !== undefined
+            : sessionStorage.getPart(messageId, partId) !== undefined;
+        if (rowPresent) return false;
+      }
     } else if (current.eventId !== undefined && version.eventId === undefined) {
       return false;
     }
@@ -249,8 +256,7 @@ function createChatProcessor(
             stripped.text === '' &&
             !isSyntheticPart(stripped)
           ) {
-            const existingParts = sessionStorage.getParts(stripped.messageID);
-            const existing = existingParts.find(p => p.id === stripped.id);
+            const existing = sessionStorage.getPart(stripped.messageID, stripped.id);
             if (existing && hasTextField(existing) && existing.text.length > 0) {
               if (!event.version) break;
               stripped = { ...stripped, text: existing.text };

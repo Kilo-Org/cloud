@@ -147,7 +147,11 @@ export const CustomRouterEntryRefSchema = z.discriminatedUnion('kind', [
 ]);
 export type CustomRouterEntryRef = z.infer<typeof CustomRouterEntryRefSchema>;
 
-export function customRouterEntryRef(entry: CustomRouterEntryRef): CustomRouterEntryRef {
+// The ref keeps only what names the entry: it drops the fields that only the
+// full entry carries (`measuredAs`, `variants`, `capabilities`, `pricing`).
+export function toCustomRouterEntryRef(
+  entry: CustomRouterEntry | CustomRouterEntryRef
+): CustomRouterEntryRef {
   return entry.kind === 'gateway'
     ? { kind: 'gateway', model: entry.model }
     : { kind: 'client', provider: entry.provider, model: entry.model };
@@ -156,7 +160,7 @@ export function customRouterEntryRef(entry: CustomRouterEntryRef): CustomRouterE
 export function customRouterEntryKey(entry: CustomRouterEntryRef): string {
   return entry.kind === 'gateway'
     ? `gateway:${entry.model}`
-    : `client:${entry.provider}/${entry.model}`;
+    : `${CLIENT_CANDIDATE_PREFIX}${entry.provider}/${entry.model}`;
 }
 
 // Custom routing tables and decisions name a client entry `client:<provider>/<model>`, so policy
@@ -794,7 +798,6 @@ function addClientEvalEntryKeyIssues(
   ctx: z.RefinementCtx
 ): void {
   const entryKeys = new Set(context.entries.map(customRouterEntryKey));
-  const listed = new Set<string>();
   context.clientEvalEntryKeys.forEach((key, index) => {
     if (!entryKeys.has(key)) {
       ctx.addIssue({
@@ -802,15 +805,13 @@ function addClientEvalEntryKeyIssues(
         path: ['clientEvalEntryKeys', index],
         message: 'clientEvalEntryKeys must name a pool entry',
       });
-    } else if (listed.has(key)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['clientEvalEntryKeys', index],
-        message: `Duplicate client eval entry ${key}`,
-      });
     }
-    listed.add(key);
   });
+  addDuplicateKeyIssues(context.clientEvalEntryKeys, ctx, key => key, {
+    pathPrefix: ['clientEvalEntryKeys'],
+    message: key => `Duplicate client eval entry ${key}`,
+  });
+  const listed = new Set(context.clientEvalEntryKeys);
   context.entries.forEach((entry, index) => {
     if (entry.kind === 'client' && !listed.has(customRouterEntryKey(entry))) {
       ctx.addIssue({

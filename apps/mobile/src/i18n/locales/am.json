@@ -57,6 +57,7 @@
     "link": "አገናኝ",
     "takingLonger": "ይህ ከተጠበቀው በላይ ጊዜ እየወሰደ ነው። ይህን ዘግተህ እንደገና መፈተሽ ትችላለህ።",
     "model": "ሞዴል",
+    "notSelected": "አልተመረጠም",
     "accessDenied": "የመዳረስ ፈቃድ የለም።",
     "allRepositories": "ሁሉም ማከማቻዎች",
     "personal": "የግል",
@@ -147,6 +148,7 @@
     "performance": "አፈጻጸም",
     "preferences": "ምርጫዎች",
     "privacyPolicy": "የግላዊነት ፖሊሲ",
+    "termsOfService": "የአገልግሎት ውሎች",
     "profile": "መገለጫ",
     "reactions": "ምላሾች",
     "recent": "የቅርብ ጊዜ",
@@ -216,8 +218,8 @@
     "verifyCode": "ኮዱን ያረጋግጡ",
     "resendCode": "ኮዱን እንደገና ይላኩ",
     "termsPrefix": "ሲቀጥሉ የሚከተሉትን ይቀበላሉ፦ ",
+    "termsInSentence": "የአገልግሎት ውሎች",
     "terms": "ውሎች",
-    "termsInSentence": "ውሎች",
     "termsConnector": " እና ",
     "termsSuffix": "።",
     "moreSignInOptions": "ተጨማሪ የመግቢያ አማራጮች",
@@ -762,7 +764,6 @@
       "replyPlaceholder": "ምላሽ…",
       "replyBody": "የምላሽ ጽሑፍ",
       "submitReply": "ምላሹን ላክ",
-      "termsTitle": "የአገልግሎት ውሎች",
       "termsCopy": "ለመለጠፍ እድሜህ 13 ዓመት ወይም ከዚያ በላይ መሆን አለበት።",
       "termsAcceptRetry": "ውሎቹን መቀበል አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
       "viewTerms": "ውሎቹን እይ",
@@ -1025,7 +1026,10 @@
     "tabs": {
       "overview": "አጠቃላይ እይታ",
       "files": "ፋይሎች",
-      "discussion": "ውይይት"
+      "discussion": "ውይይት",
+      "discussionAccessibility_one": "{{title}}: 1 አስተያየት",
+      "discussionAccessibility": "{{title}}: {{displayCount}} አስተያየቶች",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} አስተያየቶች"
     },
     "fileStatus": {
       "modified": "ተቀይሯል",
@@ -3020,6 +3024,7 @@
     "noSessions": "ንቁ ክፍለ ጊዜዎች የሉም",
     "noSessionsDescription": "በሌላ መሣሪያ ላይ በKilo መተግበሪያ ይግቡ፤ እዚህ ይታያል።",
     "signedIn": "የገቡበት ጊዜ፦ {{signedIn}} · ለመጨረሻ ጊዜ የታየበት፦ {{lastSeen}}",
+    "signedInThisDevice": "የገቡበት ጊዜ፦ {{signedIn}} · {{thisDevice}}",
     "signInScopeNote": "የKilo መተግበሪያ፣ የKilo CLI እና የድር አሳሽ መግቢያዎች እዚህ ይታያሉ። የአርታዒ መግቢያዎች አይዘረዘሩም።",
     "thisDevice": "ይህ መሣሪያ",
     "webBrowser": "የድር አሳሽ",
@@ -3251,6 +3256,7 @@
     "revokeConsent": "ስምምነትዎን ይሰርዙ",
     "revokeConsentTitle": "ውሂብ ለማጋራት የሰጡትን ስምምነት መሰረዝ ይፈልጋሉ?",
     "acceptAndContinue": "ይቀበሉና ይቀጥሉ",
+    "loadingConsentSettings": "የስምምነት ቅንብሮችዎን በመጫን ላይ…",
     "decline": "ውድቅ ያድርጉ",
     "declineAndSignOut": "ውድቅ ያድርጉና ይውጡ",
     "declineTitle": "ውሂብ ማጋራትን ውድቅ ማድረግ ይፈልጋሉ?",
@@ -3538,6 +3544,7 @@
       "truncated": "በዚህ ሰዓት ዝርዝሩ ከሚያሳየው በላይ ጥያቄዎች አሉ።",
       "emptyTitle": "በዚህ ሰዓት ምንም ጥያቄዎች የሉም",
       "emptyDescription": "ያለፉ ጥያቄዎችን ለማየት ቀዳሚ ሰዓት የሚለውን ይጠቀሙ።",
+      "emptyBoundDescription": "የጥያቄ መዝገቦች ወደኋላ የሚደርሱት እስከዚህ ድረስ ብቻ ነው።",
       "loadError": "የጥያቄ መዝገቦችን መጫን አልተቻለም።",
       "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
       "tokens": "{{input}} ግብዓት · {{output}} ውጤት",
@@ -3772,6 +3779,7 @@
   },
   "modelChat": {
     "offlineFailure": "ይህ ሞዴል የበይነመረብ ግንኙነት ያስፈልገዋል። ይገናኙ እና እንደገና ይሞክሩ፣ ወይም በዚህ መሣሪያ ላይ ወዳለ ሞዴል ይቀይሩ።",
+    "connectionLost": "ከሞዴሉ ጋር ያለው ግንኙነት ተቋርጧል። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
     "empty": {
       "title": "ውይይት ጀምር",
       "description": "ከሞዴል ጋር ለመወያየት መልእክት ይላኩ።"
@@ -4627,7 +4635,7 @@
     "topFeatures": "ዋና ባህሪያት",
     "emptyTitle": "በዚህ ጊዜ ውስጥ ምንም አጠቃቀም የለም",
     "unavailableTitle": "አጠቃቀም አይገኝም",
-    "unavailableDescription": "ይህ የሥራ አካባቢ አጠቃቀምን አይመዘግብም። እንደገና መሞከር አይረዳም።",
+    "unavailableDescription": "ለዚህ የሥራ አካባቢ አጠቃቀም አልተዋቀረም። እዚህ አጠቃቀም ለማየት የሚጠብቁ ከሆነ ድጋፍን ያግኙ።",
     "orgSelfNotice": "በዚህ ድርጅት ውስጥ የራስዎን አጠቃቀም እያዩ ነው።",
     "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ"
   },
@@ -4635,7 +4643,7 @@
     "title": "ውህደቶች",
     "sectionTitle": "የተገናኙ አገልግሎቶች",
     "entrySubtitle": "GitHub፣ Slack፣ Linear እና ሌሎችም",
-    "subtitle": "የልማት መሣሪያዎችዎን እና የሥራ ሂደቶችዎን ከKilo ጋር ያገናኙ",
+    "subtitle": "የልማት መሣሪያዎችዎን እና የሥራ ሂደቶችዎን ከKilo ጋር ያገናኙ።",
     "disconnect": "ግንኙነት አቋርጥ",
     "disconnectTitle": "የ{{provider}} ግንኙነት ይቋረጥ?",
     "disconnectMessage": "Kilo በ{{provider}} ውስጥ ምላሽ መስጠት ያቆማል። በማንኛውም ጊዜ እንደገና ማገናኘት ይችላሉ።",
@@ -4707,7 +4715,6 @@
       "nameLocked": "ቀስቅሴው ከተፈጠረ በኋላ ስሙ ሊቀየር አይችልም።",
       "repositoryLocked": "ቀስቅሴው ከተፈጠረ በኋላ ማከማቻው ሊቀየር አይችልም።",
       "environmentAutomatic": "በማከማቻ መሠረት ራስ-ሰር",
-      "notSelected": "አልተመረጠም",
       "profileDefaults": "ነባሪዎችን ይጠቀሙ",
       "profileHelp": "የመገለጫው ቅንብሮች ቀስቅሴው ሲሠራ ይተገበራሉ። ምስጢሮቹ በዚያን ጊዜ ይፈታሉ።",
       "customAgent": "ብጁ ወኪል",

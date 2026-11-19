@@ -234,6 +234,40 @@ describe('createJotaiStorage', () => {
 
       expect(s.getParts('msg-1')[0]).toEqual(expect.objectContaining({ text: 'hello' }));
     });
+
+    test('rebuild after a delta reuses the views of unchanged parts', () => {
+      s.upsertPart('msg-1', makePart('a', 'msg-1', 'one'));
+      s.upsertPart('msg-1', makePart('b', 'msg-1', 'two'));
+      s.upsertPart('msg-1', makePart('c', 'msg-1', 'three'));
+
+      const before = s.getParts('msg-1');
+      s.applyPartDelta('msg-1', 'b', 'text', '!');
+      const after = s.getParts('msg-1');
+
+      expect(after[0]).toBe(before[0]);
+      expect(after[2]).toBe(before[2]);
+      expect(after[1]).not.toBe(before[1]);
+      expect(after[1]).toEqual(expect.objectContaining({ id: 'b', text: 'two!' }));
+    });
+
+    test('caches views per message', () => {
+      s.upsertPart('msg-1', makePart('a', 'msg-1', 'one'));
+      s.upsertPart('msg-1', makePart('b', 'msg-1', 'two'));
+      s.upsertPart('msg-2', makePart('a', 'msg-2', 'other'));
+
+      const oneBefore = s.getParts('msg-1');
+      const twoBefore = s.getParts('msg-2');
+
+      s.applyPartDelta('msg-1', 'a', 'text', '!');
+
+      const oneAfter = s.getParts('msg-1');
+      const twoAfter = s.getParts('msg-2');
+
+      expect(oneAfter[0]).not.toBe(oneBefore[0]);
+      expect(oneAfter[1]).toBe(oneBefore[1]);
+      expect(twoAfter[0]).toBe(twoBefore[0]);
+      expect(twoAfter[0]).toEqual(expect.objectContaining({ id: 'a', text: 'other' }));
+    });
   });
 
   describe('subscribe', () => {
@@ -498,12 +532,37 @@ describe('createJotaiStorage', () => {
       expect(cb).toHaveBeenCalled();
     });
 
-    test('messages atom gets new Map reference on each mutation', () => {
+    test('messagesRevision notifies and the messages map shows the upserted row', () => {
+      const cb = jest.fn();
+      store.sub(s.atoms.messagesRevision, cb);
+      s.upsertMessage(makeMsg('msg-1'));
+      expect(cb).toHaveBeenCalled();
+      expect(store.get(s.atoms.messages).get('msg-1')?.role).toBe('user');
+    });
+
+    test('messages atom keeps one Map reference and bumps messagesRevision', () => {
       s.upsertMessage(makeMsg('msg-1'));
       const first = store.get(s.atoms.messages);
+      const firstRev = store.get(s.atoms.messagesRevision);
       s.upsertMessage(makeMsg('msg-2'));
       const second = store.get(s.atoms.messages);
-      expect(first).not.toBe(second);
+      const secondRev = store.get(s.atoms.messagesRevision);
+      expect(first).toBe(second);
+      expect(secondRev).toBe(firstRev + 1);
+    });
+
+    test('a subscriber sees an existing row replaced in place', () => {
+      s.upsertMessage(makeMsg('msg-1', 'user'));
+      const seen: Array<'user' | 'assistant'> = [];
+      const unsub = store.sub(s.atoms.messagesRevision, () => {
+        const info = store.get(s.atoms.messages).get('msg-1');
+        if (info) seen.push(info.role);
+      });
+      s.upsertMessage(makeMsg('msg-1', 'assistant'));
+      unsub();
+      expect(seen).toContain('assistant');
+      expect(store.get(s.atoms.messages).get('msg-1')?.role).toBe('assistant');
+      expect(store.get(s.atoms.messageIds)).toEqual(['msg-1']);
     });
 
     test('parts atom keeps one Map reference and bumps partsRevision', () => {

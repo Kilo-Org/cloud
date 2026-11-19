@@ -14,7 +14,7 @@ import { useKeyboardState } from 'react-native-keyboard-controller';
 
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { scrollFocusedInputAboveKeyboard } from '@/lib/keyboard-reveal';
-import { useDetailScreenBottomPadding, useScreenInsets } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 
@@ -46,7 +46,7 @@ export function DetailScreenScrollView({
   ...props
 }: DetailScreenScrollViewProps) {
   const paddingBottom = useDetailScreenBottomPadding();
-  const { left, right } = useScreenInsets();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   // Native-inset callers rely on the scroll view's own focused-field reveal,
   // which runs on focus only. Two re-layouts leave the focused row parked
   // behind the IME: a rotation while the field stays focused, and the IME
@@ -123,8 +123,7 @@ export function DetailScreenScrollView({
           // padding while the keyboard is down, and the IME occlusion replaces
           // it while the keyboard is up.
           marginBottom: Math.max(keyboardOcclusion, 0),
-          ...(left > 0 ? { marginLeft: left } : undefined),
-          ...(right > 0 ? { marginRight: right } : undefined),
+          ...sideInsetMarginStyle,
         },
       ]}
     >

@@ -42,11 +42,19 @@ export interface ChromeDebuggerTargetInfo {
 
 export interface ChromeDebuggerTarget {
   readonly tabId: number;
+  /**
+   * A flattened child session of this tab — an out-of-process iframe, which
+   * `Target.setAutoAttach` attaches under the tab's one debugger. Absent for
+   * the tab's own session.
+   */
+  readonly sessionId?: string;
 }
 
 /** CDP events report which target they came from; a session filters on `tabId`. */
 export interface ChromeDebuggerEventSource {
   readonly tabId?: number;
+  /** Set when the event came from a flattened child session rather than the tab itself. */
+  readonly sessionId?: string;
 }
 
 export type ChromeDebuggerEventListener = (
@@ -88,6 +96,8 @@ export interface ChromeDebuggerApi {
 
 export interface BrowserTabInfo {
   readonly active?: boolean;
+  /** `chrome.tabGroups` id the tab is in; `-1` (or absent) when ungrouped. */
+  readonly groupId?: number;
   readonly id?: number;
   readonly title?: string;
   readonly url?: string;
@@ -96,6 +106,9 @@ export interface BrowserTabInfo {
 
 export interface BrowserTabCreatedApi {
   readonly addListener: (
+    listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+  ) => void;
+  readonly removeListener?: (
     listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
   ) => void;
 }
@@ -115,9 +128,31 @@ export interface BrowserTabsApi {
   /** `chrome.tabs.onCreated` — a tab opened from a session's tab joins that session. */
   readonly onCreated?: BrowserTabCreatedApi;
   readonly onRemoved?: BrowserTabRemovedApi;
+  /**
+   * `chrome.tabs.onUpdated` — the browser's own progress signal; a tab is
+   * inspectable only after its document commits.
+   */
+  readonly onUpdated?: {
+    readonly addListener: (
+      listener: (
+        tabId: number,
+        changeInfo: {
+          readonly pendingUrl?: string;
+          readonly status?: string;
+          readonly url?: string;
+        },
+        tab?: { readonly url?: string }
+      ) => void
+    ) => void;
+    readonly removeListener: (
+      listener: (tabId: number, changeInfo: never, tab?: never) => void
+    ) => void;
+  };
   readonly query: (
     queryInfo: Record<string, unknown>
   ) => Promise<BrowserTabInfo[]> | BrowserTabInfo[];
+  /** `chrome.tabs.remove` — a call that opened a tab and cannot use it closes it again. */
+  readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
   readonly update?: (
     tabId: number,
     updateProperties: { readonly active: boolean }

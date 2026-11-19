@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dismissAuthSession, dismissBrowser } from 'expo-web-browser';
 
-import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
+import { deviceAuthExpiresAt, startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import { type DeviceAuthState } from '@/lib/auth/device-auth-state';
 
 const platformMock = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
@@ -38,7 +38,7 @@ function pendingResponse() {
 }
 
 function makePoll(
-  overrides: { startedAt?: number; browserKind?: 'auth-session' | 'plain-browser' } = {}
+  overrides: { expiresAt?: number; browserKind?: 'auth-session' | 'plain-browser' } = {}
 ) {
   const setState = vi.fn<(updater: (prev: DeviceAuthState) => DeviceAuthState) => void>();
   const cleanup = vi.fn<() => void>();
@@ -49,6 +49,7 @@ function makePoll(
     setState,
     cleanup,
     browserKind: 'auth-session',
+    expiresAt: deviceAuthExpiresAt(Date.now(), 600),
     ...overrides,
   });
   return { poll, setState, cleanup };
@@ -118,14 +119,63 @@ describe('startDeviceAuthPoll', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('times out immediately when startedAt is already past the overall timeout', async () => {
-    const { setState, cleanup } = makePoll({
-      startedAt: Date.now() - 5 * 60 * 1000 - 1000,
-    });
-    await vi.advanceTimersByTimeAsync(3000);
-    expect(fetchMock).not.toHaveBeenCalled();
+  it('sends one final poll when the budget has already passed, then times out', async () => {
+    fetchMock.mockResolvedValue(pendingResponse());
+    const { setState, cleanup } = makePoll({ expiresAt: Date.now() - 1000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(cleanup).toHaveBeenCalled();
-    expect(setState).toHaveBeenCalled();
+    const next = setState.mock.calls.at(-1)?.[0]?.({
+      status: 'pending',
+      code: 'UC',
+      token: undefined,
+      refreshToken: undefined,
+      expiresIn: undefined,
+      error: undefined,
+      verificationUrl: undefined,
+    });
+    expect(next).toMatchObject({
+      status: 'error',
+      error: { kind: 'key', key: 'authErrors.signInTimedOut' },
+    });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('signs in on a foreground return after 5 minutes while the server code still lives', async () => {
+    // The browser approved the code while the app was in the background, where
+    // JS timers do not run. The server code lives 10 minutes.
+    fetchMock.mockResolvedValueOnce(pendingResponse());
+    const { poll, setState } = makePoll({ expiresAt: deviceAuthExpiresAt(Date.now(), 600) });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(Date.now() + 6 * 60 * 1000);
+    fetchMock.mockResolvedValueOnce(approvedResponse());
+    poll.pollNow();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const next = setState.mock.calls.at(-1)?.[0]?.({
+      status: 'pending',
+      code: 'UC',
+      token: undefined,
+      refreshToken: undefined,
+      expiresIn: undefined,
+      error: undefined,
+      verificationUrl: undefined,
+    });
+    expect(next).toMatchObject({ status: 'approved', token: 'access' });
+  });
+
+  it('derives the budget from the server code lifetime', async () => {
+    fetchMock.mockResolvedValue(pendingResponse());
+    const { cleanup } = makePoll({ expiresAt: deviceAuthExpiresAt(Date.now(), 600) });
+    // Still polling past the old fixed 5-minute budget.
+    await vi.advanceTimersByTimeAsync(6 * 60 * 1000);
+    expect(cleanup).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(4 * 60 * 1000);
+    expect(cleanup).toHaveBeenCalled();
   });
 
   it('honours a Retry-After longer than its own backoff on a throttled poll', async () => {
@@ -153,10 +203,8 @@ describe('startDeviceAuthPoll', () => {
         { status: 429, headers: { 'retry-after': '90' } }
       )
     );
-    // 10s of the 5-minute budget remain when the poll starts.
-    const { cleanup, setState } = makePoll({
-      startedAt: Date.now() - (5 * 60 * 1000 - 10_000),
-    });
+    // 10s of the budget remain when the poll starts.
+    const { cleanup, setState } = makePoll({ expiresAt: Date.now() + 10_000 });
     // The first scheduled tick at 3s is throttled with a 90s Retry-After.
     await vi.advanceTimersByTimeAsync(3000);
     expect(fetchMock).toHaveBeenCalledTimes(1);

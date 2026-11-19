@@ -2,11 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { paintSignature } from '../../../apps/mobile/src/lib/design-gate/paint-state';
-import {
-  CAPTURE_ALIGNMENT_BUDGET_MS,
-  captureAlignment,
-  screenshotObservation,
-} from './capture-evidence';
+import { CAPTURE_GAP_BUDGET_MS, captureAlignment, screenshotObservation } from './capture-evidence';
 import type { Rgba } from './pixels';
 import { dump } from './rules/test-dump';
 
@@ -105,26 +101,35 @@ test('transparent and wrong-sized screenshots never supply paint evidence', () =
   );
 });
 
-test('a bracket wider than the constant is bracketed only under a measured budget', () => {
-  const before = { startedMs: 0, completedMs: 1_500, dump: dump([]) };
-  const shot = { startedMs: 1_500, completedMs: 2_000 };
-  const after = { startedMs: 2_000, completedMs: 3_000, dump: dump([]) };
-  // Two full-tree reads around a screenshot cost more than 2 s on an expensive
-  // screen, so the constant alone calls a correct bracket inconclusive.
-  const tight = captureAlignment(before, shot, after, paintSignature, observation);
-  assert.equal(tight.status, 'inconclusive');
-  assert.equal(tight.budgetMs, CAPTURE_ALIGNMENT_BUDGET_MS);
-  const measured = captureAlignment(before, shot, after, paintSignature, observation, 4_000);
-  assert.equal(measured.status, 'bracketed');
-  assert.equal(measured.budgetMs, 4_000);
-  // A cheap bracket keeps the constant, and the evidence reports it.
-  const cheap = captureAlignment(
-    { startedMs: 0, completedMs: 100, dump: dump([]) },
-    { startedMs: 100, completedMs: 200 },
-    { startedMs: 200, completedMs: 300, dump: dump([]) },
+test('the gaps around the screenshot decide the bracket, not the span', () => {
+  const tree = dump([]);
+  // An iOS simulator screenshot under load: 8.7 s, with reads 40 ms and 152 ms
+  // away from it. The two matching reads still bracket it.
+  const slowShot = captureAlignment(
+    { startedMs: 0, completedMs: 900, dump: tree },
+    { startedMs: 940, completedMs: 9_603 },
+    { startedMs: 9_755, completedMs: 10_700, dump: tree },
     paintSignature,
     observation
   );
-  assert.equal(cheap.status, 'bracketed');
-  assert.equal(cheap.budgetMs, CAPTURE_ALIGNMENT_BUDGET_MS);
+  assert.equal(slowShot.status, 'bracketed');
+  assert.equal(slowShot.gapMs, 152);
+  const late = (beforeGap: number, afterGap: number) =>
+    captureAlignment(
+      { startedMs: 0, completedMs: 100, dump: tree },
+      { startedMs: 100 + beforeGap, completedMs: 200 + beforeGap },
+      {
+        startedMs: 200 + beforeGap + afterGap,
+        completedMs: 300 + beforeGap + afterGap,
+        dump: tree,
+      },
+      paintSignature,
+      observation
+    );
+  assert.equal(late(CAPTURE_GAP_BUDGET_MS, CAPTURE_GAP_BUDGET_MS).status, 'bracketed');
+  for (const evidence of [late(CAPTURE_GAP_BUDGET_MS + 1, 0), late(0, CAPTURE_GAP_BUDGET_MS + 1)]) {
+    assert.equal(evidence.status, 'inconclusive');
+    assert.equal(evidence.gapMs, CAPTURE_GAP_BUDGET_MS + 1);
+    assert.match(evidence.reason, /more than 250 ms apart from the screenshot/);
+  }
 });

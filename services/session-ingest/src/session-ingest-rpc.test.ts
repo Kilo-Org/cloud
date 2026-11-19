@@ -103,9 +103,16 @@ describe('publishCloudAgentSessionStatus', () => {
   const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
   const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } };
 
-  it('forwards only the validated status projection with an immutable runtime-owner fence', async () => {
+  it('forwards only the validated status projection, rename and live summary with an immutable runtime-owner fence', async () => {
     const rpc = new SessionIngestRPC(ctx, env as never);
-    await rpc.publishCloudAgentSessionStatus(input);
+    const rename = { title: 'Renamed by the agent', transitionId: input.transitionId };
+    const liveSummary = {
+      step: { verb: 'editing', target: 'index.ts' },
+      plan: null,
+      changes: null,
+      failure: null,
+    } as const;
+    await rpc.publishCloudAgentSessionStatus({ ...input, rename, liveSummary });
     expect(applyMetadataChanges).toHaveBeenCalledWith(
       env,
       input.kiloUserId,
@@ -116,7 +123,8 @@ describe('publishCloudAgentSessionStatus', () => {
         ['statusTransitionId', input.transitionId],
       ]),
       ctx,
-      input.cloudAgentSessionId
+      input.cloudAgentSessionId,
+      { rename, liveSummary }
     );
   });
 
@@ -125,6 +133,16 @@ describe('publishCloudAgentSessionStatus', () => {
     { transitionId: 'invalid' },
     { occurredAt: 'not-a-date' },
     { transcript: 'not metadata' },
+    { totalCostMicrodollars: -1 },
+    { totalCostMicrodollars: 1.5 },
+    {
+      liveSummary: {
+        step: { verb: 'dancing', target: null },
+        plan: null,
+        changes: null,
+        failure: null,
+      },
+    },
   ])('rejects invalid publication %j', async invalid => {
     const rpc = new SessionIngestRPC(ctx, env as never);
     await expect(

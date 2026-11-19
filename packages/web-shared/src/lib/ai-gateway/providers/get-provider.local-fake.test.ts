@@ -585,7 +585,7 @@ describe('getProvider gateway BYOK routing', () => {
       isFree: false,
       bypassAccessCheck: false,
     });
-    expect(canRouteToVercel).toHaveBeenCalledWith(model, expect.any(Function));
+    expect(canRouteToVercel).toHaveBeenCalledWith(model, undefined);
   });
 
   test('falls back to the OpenRouter key when Vercel cannot serve the request', async () => {
@@ -649,8 +649,7 @@ describe('getProvider gateway BYOK routing', () => {
     });
 
     expect(result.provider).toMatchObject({ type: 'vercel', apiKey: 'user-vercel-gateway-key' });
-    const getRoutingProviderConfig = jest.mocked(canRouteToVercel).mock.calls[0][1];
-    await expect(getRoutingProviderConfig()).resolves.toEqual(callerProvider);
+    expect(canRouteToVercel).toHaveBeenCalledWith(model, callerProvider);
   });
 
   test('applies Kilo provider exclusions to managed Vercel routing', async () => {

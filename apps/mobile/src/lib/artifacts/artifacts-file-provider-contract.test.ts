@@ -151,9 +151,11 @@ describe('artifacts File Provider extension contract', () => {
     // would refuse, so the two predicates have to hold the same set — and the
     // extension's own predicate asserts nothing about its numbers (the shape
     // test above pins only its signature), so this reads both sides.
-    const writerPredicate = /function isUnnameableCodePoint[\s\S]*?\n\}/u.exec(
-      manifestWriterSource
-    )?.[0];
+    const writerPredicate = /function isUnnameableCodePoint[\s\S]*?\n\}/u
+      .exec(manifestWriterSource)?.[0]
+      // The predicate may document a range inline, as the extension's own copy
+      // does; a comment's words are not constant names.
+      ?.replaceAll(/\/\/.*$/gmu, '');
     const swiftPredicate = extensionSource
       .slice(
         extensionSource.indexOf('private static func isUnnameableScalar'),

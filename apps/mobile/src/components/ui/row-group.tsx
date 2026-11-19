@@ -1,4 +1,4 @@
-import { Children, Fragment, isValidElement, type ReactElement, type ReactNode } from 'react';
+import { Fragment, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { cn } from '@/lib/utils';
@@ -58,9 +58,28 @@ type RowGroupProps = {
  * spelled them.
  */
 function groupRows(children: ReactNode): ReactNode[] {
-  return Children.toArray(children).flatMap(row =>
-    isFragmentElement(row) ? groupRows(row.props.children) : [row]
-  );
+  const rows: ReactNode[] = [];
+  collectRows(children, rows);
+  return rows;
+}
+
+/** Add one child to a group's rows, descending into arrays and fragments. */
+function collectRows(node: ReactNode, rows: ReactNode[]): void {
+  if (Array.isArray(node)) {
+    const nested: ReactNode[] = node;
+    for (const child of nested) {
+      collectRows(child, rows);
+    }
+    return;
+  }
+  if (isFragmentElement(node)) {
+    collectRows(node.props.children, rows);
+    return;
+  }
+  if (node === null || node === undefined || node === true || node === false) {
+    return;
+  }
+  rows.push(node);
 }
 
 function isFragmentElement(row: ReactNode): row is ReactElement<{ children?: ReactNode }> {

@@ -130,13 +130,20 @@ describe('AdminSlackNotificationError variants', () => {
     }
   });
 
-  it('rejects a status on the kinds that never carry one', () => {
+  it('does not type a status on the kinds that never carry one', () => {
+    // These cases exist for the compiler: the package typecheck fails if any of
+    // them stops being a type error. The runtime assertions only prove the
+    // class stays constructible when a JavaScript caller ignores the types.
     // @ts-expect-error configuration has no status
-    expect(() => new AdminSlackNotificationError('configuration', 500)).toBeDefined();
+    const configurationWithStatus = new AdminSlackNotificationError('configuration', 500);
     // @ts-expect-error network has no status
-    expect(() => new AdminSlackNotificationError('network', 500)).toBeDefined();
+    const networkWithStatus = new AdminSlackNotificationError('network', 500);
     // @ts-expect-error upstream requires its status
-    expect(() => new AdminSlackNotificationError('upstream')).toBeDefined();
+    const upstreamWithoutStatus = new AdminSlackNotificationError('upstream');
+
+    expect(configurationWithStatus.kind).toBe('configuration');
+    expect(networkWithStatus.kind).toBe('network');
+    expect(upstreamWithoutStatus.kind).toBe('upstream');
   });
 
   it('narrows the upstream status to a number', () => {

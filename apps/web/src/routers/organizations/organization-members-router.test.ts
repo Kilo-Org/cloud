@@ -232,6 +232,7 @@ describe('organizations members trpc router', () => {
       expect(activeMember).toBeDefined();
       expect(activeMember).not.toHaveProperty('dailyUsageLimitUsd');
       expect(activeMember).not.toHaveProperty('currentDailyUsageUsd');
+      expect(activeMember).not.toHaveProperty('childOrganizationMemberships');
       expect(invitedMember).not.toHaveProperty('inviteToken');
       expect(invitedMember).not.toHaveProperty('inviteId');
       expect(invitedMember).not.toHaveProperty('inviteUrl');

@@ -182,6 +182,7 @@ export const PublicInvitedOrganizationMemberSchema = InvitedOrganizationMemberSc
 export const PublicActiveOrganizationMemberSchema = ActiveOrganizationMemberSchema.omit({
   dailyUsageLimitUsd: true,
   currentDailyUsageUsd: true,
+  childOrganizationMemberships: true,
 });
 
 export const PublicOrganizationMemberSchema = z.discriminatedUnion('status', [

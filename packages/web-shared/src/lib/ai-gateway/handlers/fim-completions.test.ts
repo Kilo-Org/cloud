@@ -475,6 +475,31 @@ describe('POST /api/fim/completions', () => {
     );
   });
 
+  it.each([
+    ['mistral', 'codestral', 'https://api.mistral.ai/v1/fim/completions'],
+    ['codestral', 'mistral', 'https://codestral.mistral.ai/v1/fim/completions'],
+  ])(
+    'serves a codestral model with the first-ranked %s key over the %s key',
+    async (firstProviderId, secondProviderId, expectedUrl) => {
+      setOrganizationAuth();
+      mockedGetBYOKforOrganization.mockResolvedValue([
+        { providerId: firstProviderId, decryptedAPIKey: `${firstProviderId}-key` },
+        { providerId: secondProviderId, decryptedAPIKey: `${secondProviderId}-key` },
+      ] as never);
+      mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(
+        makeRequest('mistralai/codestral-2508') as never
+      );
+
+      expect(response.status).toBe(200);
+      const [url, init] = mockedFetch.mock.calls[0];
+      expect(url).toBe(expectedUrl);
+      expect(new Headers(init?.headers).get('authorization')).toBe(`Bearer ${firstProviderId}-key`);
+    }
+  );
+
   it('rejects an exhausted balance for other FIM models', async () => {
     setOrganizationAuth({ balance: 0 });
 

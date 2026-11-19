@@ -124,6 +124,15 @@ function createMemoryStorage(): SessionStorage {
       return snapshot;
     },
 
+    getPart(messageId, partId) {
+      const part = parts.get(messageId)?.find(item => item.id === partId);
+      return part ? createReadonlyPartView(part) : undefined;
+    },
+
+    getPartIds(messageId) {
+      return (parts.get(messageId) ?? []).map(p => p.id);
+    },
+
     subscribe: subscribers.subscribe,
 
     clear() {

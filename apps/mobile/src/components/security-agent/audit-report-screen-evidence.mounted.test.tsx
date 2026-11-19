@@ -2,7 +2,7 @@
 // confidence its events recorded, and every summary figure is one accessible
 // element whose label reads the count with what it counts.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -46,7 +46,10 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
-  CollapsibleSection: 'CollapsibleSection',
+  // The real section resolves a function child inside its expanded branch; this
+  // suite renders the body unconditionally so it can read the expanded rows.
+  CollapsibleSection: ({ children }: { children: ReactNode | (() => ReactNode) }) =>
+    typeof children === 'function' ? children() : children,
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

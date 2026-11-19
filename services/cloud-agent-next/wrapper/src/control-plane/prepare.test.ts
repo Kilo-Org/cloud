@@ -2297,6 +2297,15 @@ describe('createPreparationManager', () => {
     // history to restore, so the route creates the Kilo session.
     expect(harness.restoreCalls()).toBe(1);
     expect(harness.ensureSessionCalls()).toBe(1);
+    expect(harness.frames.filter(frame => frame.type === 'session.restore_attempt')).toEqual([
+      expect.objectContaining({
+        outcome: 'fallback',
+        reason: 'not_found',
+        durationMs: expect.any(Number),
+        attempt: 1,
+        willRetry: false,
+      }),
+    ]);
   });
 
   it('restores from the legacy ingest export when the session is missing', async () => {
@@ -2338,6 +2347,20 @@ describe('createPreparationManager', () => {
       subtype: 'kilo_import_failed',
     });
     expect(harness.ensureSessionCalls()).toBe(0);
+    expect(harness.frames.filter(frame => frame.type === 'session.restore_attempt')).toEqual([
+      expect.objectContaining({
+        outcome: 'failed',
+        reason: 'download',
+        attempt: 1,
+        willRetry: true,
+      }),
+      expect.objectContaining({
+        outcome: 'failed',
+        reason: 'download',
+        attempt: 2,
+        willRetry: false,
+      }),
+    ]);
   });
 
   it('creates the Kilo session when the ingest export is an empty snapshot', async () => {
@@ -2380,6 +2403,9 @@ describe('createPreparationManager', () => {
     expect(harness.logs).toContain(
       `bootstrap restore incomplete kiloSessionId=${spec.kiloSessionId} skipped=1 total=2 reasons=conflict paths=a.ts`
     );
+    expect(harness.frames.filter(frame => frame.type === 'session.restore_attempt')).toEqual([
+      expect.objectContaining({ outcome: 'partial', attempt: 1, willRetry: false }),
+    ]);
     expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
   });
 
@@ -2399,6 +2425,7 @@ describe('createPreparationManager', () => {
     await harness.manager.prepare(routeSpec());
 
     expect(restoreCalls).toBe(0);
+    expect(harness.frames.some(frame => frame.type === 'session.restore_attempt')).toBe(false);
     expect(harness.ensureSessionCalls()).toBe(0);
     expect(lastFrame(harness.frames)?.type).toBe('session.ready');
   });

@@ -23,7 +23,7 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** The mutation hook toasts `error.message`; the section supplies a fallback otherwise. */
@@ -149,7 +149,7 @@ export function ProfileRepoPinsSection({
           {pinned.map(binding => (
             <View
               key={`${binding.repoFullName}-${binding.platform}`}
-              className="min-h-11 flex-row items-center gap-2 rounded-md border border-border bg-background px-3 py-2"
+              className="min-h-11 flex-row items-center gap-2 rounded-md border border-border bg-background px-[16px] py-2"
             >
               <Link2 size={14} color={colors.mutedForeground} />
               {/* One identity element, first, as the profile's bindings rows read:
@@ -173,7 +173,12 @@ export function ProfileRepoPinsSection({
               </Text>
               {canManage ? (
                 <Pressable
-                  className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+                  className={cn(COMPACT_CONTROL_BOX_CLASS, '-me-[7px] active:opacity-70')}
+                  // Same compact-box geometry as the repository defaults rows:
+                  // the glyph ends 17 dp from the row's edge against the
+                  // leading icon's 16 dp inset, and the slop keeps the 48 dp
+                  // touch reach inside the row.
+                  hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
                   accessibilityRole="button"
                   accessibilityLabel={t('profiles.repoBindings.removeForRepo', {
                     repo: binding.repoFullName,

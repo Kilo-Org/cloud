@@ -95,6 +95,13 @@ export const COLLAPSED_CONNECT_CTAS_KEY = 'collapsed-connect-ctas';
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';
 /**
+ * Consecutive encrypted-store migration failures across launches, beside
+ * `PERSIST_DB_KEY`. Durable outside the database on purpose: the failing
+ * database cannot hold its own counter. A successful migration deletes the
+ * item; a threshold reached falls back to delete-and-recreate (DEC-01 step 4).
+ */
+export const PERSIST_MIGRATION_FAILURES_KEY = 'persist-db-migration-failures';
+/**
  * Identity hint for the cold-start read-cache restore (DEC-01). Class
  * `account-metadata`: written when the authenticated identity resolves and
  * deleted on sign-out via `deleteAccountMetadata`.
@@ -180,6 +187,14 @@ export const LAST_OPENED_SESSION_KEY = 'last-opened-session';
  * account never restores another account's route (see `lib/last-route.ts`).
  */
 export const LAST_ROUTE_KEY = 'last-route';
+
+/**
+ * The scope names the app last showed behind the Code Reviewer headers. Holds
+ * `{ version, userId, entries }`; the account id inside the record scopes it,
+ * so one account's names never paint under another account's header (see
+ * `lib/code-reviewer-scope-name.ts`).
+ */
+export const REVIEWER_SCOPE_NAMES_KEY = 'reviewer-scope-names';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,

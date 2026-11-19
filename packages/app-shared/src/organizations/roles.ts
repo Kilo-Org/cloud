@@ -5,6 +5,18 @@ export const ORGANIZATION_ROLES = ['owner', 'admin', 'member', 'billing_manager'
 export type OrganizationRole = (typeof ORGANIZATION_ROLES)[number];
 
 /**
+ * Precedence when a caller holds more than one role for the same organization,
+ * for example a direct `member` row and an `owner` row on the parent. The first
+ * matching role wins.
+ */
+export const ORGANIZATION_ROLE_PRIORITY = [
+  'owner',
+  'admin',
+  'billing_manager',
+  'member',
+] satisfies OrganizationRole[];
+
+/**
  * Roles with organization-management authority. `admin` matches `owner`
  * everywhere except owner management, which {@link canManageOrganizationOwners}
  * reserves for owners.
@@ -46,7 +58,7 @@ export const ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES = [
   'billing_manager',
 ] satisfies OrganizationRole[];
 
-export function canManageOrganization(role: string | undefined): boolean {
+export function canManageOrganization(role: OrganizationRole | undefined): boolean {
   return ORGANIZATION_MANAGE_ROLES.some(allowed => allowed === role);
 }
 
@@ -59,7 +71,7 @@ export function canManageOrganization(role: string | undefined): boolean {
  * apps/web/src/routers/organizations/organization-members-router.ts; keep the
  * two in sync so the UI does not offer actions the server rejects.
  */
-export function canManageOrganizationOwners(role: string | undefined): boolean {
+export function canManageOrganizationOwners(role: OrganizationRole | undefined): boolean {
   return role === 'owner';
 }
 
@@ -71,7 +83,7 @@ export function canManageOrganizationOwners(role: string | undefined): boolean {
  * identical `role === 'owner' || role === 'billing_manager'` check; `admin`
  * was added because admins hold the same authority as owners.
  */
-export function canManageOrganizationBilling(role: string | undefined): boolean {
+export function canManageOrganizationBilling(role: OrganizationRole | undefined): boolean {
   return ORGANIZATION_BILLING_ROLES.some(allowed => allowed === role);
 }
 

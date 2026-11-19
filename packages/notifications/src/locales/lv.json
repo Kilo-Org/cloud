@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA pārkāpums"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Drošības pārbaudei ir atjauninājums"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Tava Kilo sesija ir gatava vadīšanai no tālruņa"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

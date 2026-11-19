@@ -25,7 +25,7 @@ export {
 } from './organization-base-types';
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
-import { OrganizationSettingsSchema } from './organization-base-types';
+import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
 import { EnkryptPublishedBenchmarkSchema, OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
 export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);
@@ -82,7 +82,7 @@ export const OrganizationSchema = z.object({
   deleted_at: z.string().nullable(),
   sso_domain: z.string().nullable(),
   parent_organization_id: z.string().nullable(),
-  plan: z.enum(['teams', 'enterprise']),
+  plan: OrganizationPlanSchema,
   free_trial_end_at: z.string().nullable(),
   company_domain: z.string().nullable(),
 });

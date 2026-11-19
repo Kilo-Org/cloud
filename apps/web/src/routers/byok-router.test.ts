@@ -18,6 +18,15 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   };
 });
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models', () => ({
+  getKiloEmbeddingModelCatalogFromDatabase: jest.fn(async () => null),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),
+  getOpenRouterTranscriptionModels: jest.fn(async () => ({ data: [] })),
+}));
+
 import { createCallerForUser } from '@/routers/test-utils';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
@@ -25,6 +34,8 @@ import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
+import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
@@ -36,6 +47,10 @@ import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+} from '@kilocode/app-shared/byok-errors';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   ai_gateway_config,
@@ -822,6 +837,184 @@ describe('BYOK Router', () => {
       const keys = await caller.byok.list({ organizationId: organizationA.id });
       expect(keys).toHaveLength(2);
     });
+
+    test('create rejects a second key for the same provider with a clean conflict', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      // The caller throws the TRPCError itself, so this reads the code and
+      // message the client receives: no driver text, SQL or envelope may leak.
+      async function expectCleanConflict(call: () => Promise<unknown>) {
+        const error = await call().then(
+          () => {
+            throw new Error('expected the duplicate key create to be rejected');
+          },
+          (thrown: unknown) => thrown
+        );
+        if (
+          typeof error !== 'object' ||
+          error === null ||
+          !('code' in error) ||
+          !('message' in error) ||
+          typeof error.message !== 'string'
+        ) {
+          throw new Error('expected the duplicate key create to reject with a code and message');
+        }
+        expect(error.code).toBe('CONFLICT');
+        expect(error.message).toBe(
+          'A key for this provider already exists. Remove it before you add another.'
+        );
+        for (const leak of ['Failed query', 'insert into', 'iv', 'wrapped_dek', 'arn:']) {
+          expect(error.message).not.toContain(leak);
+        }
+      }
+
+      const personal = await caller.byok.create({
+        provider_id: 'anthropic',
+        api_key: 'personal-anthropic-first',
+      });
+      const [personalBefore] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, personal.id));
+
+      await expectCleanConflict(() =>
+        caller.byok.create({ provider_id: 'anthropic', api_key: 'personal-anthropic-second' })
+      );
+
+      const personalRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.kilo_user_id, ownerUser.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(personalRows).toEqual([personalBefore]);
+      expect(decryptStoredKey(personalRows[0])).toBe('personal-anthropic-first');
+
+      // A user key and an organization key have different owners, so the
+      // personal conflict does not block the organization key for the provider.
+      const organization = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'anthropic',
+        api_key: 'organization-anthropic-first',
+      });
+      const [organizationBefore] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, organization.id));
+      const logsBefore = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+
+      await expectCleanConflict(() =>
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'anthropic',
+          api_key: 'organization-anthropic-second',
+        })
+      );
+
+      const organizationRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.organization_id, organizationA.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(organizationRows).toEqual([organizationBefore]);
+      expect(decryptStoredKey(organizationRows[0])).toBe('organization-anthropic-first');
+      const logsAfter = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+      expect(logsAfter).toEqual(logsBefore);
+    });
+
+    test('create refuses a provider whose key the coding plan manages', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      // The installed key is a coding-plan row, so the owner cannot remove it to
+      // make room: the refusal must name the plan, not ask for a removal.
+      const [managed] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: ownerUser.id,
+          provider_id: 'anthropic',
+          encrypted_api_key_envelope: testByokEnvelope('coding-plan-anthropic-key'),
+          management_source: 'coding_plan',
+          created_by: ownerUser.id,
+        })
+        .returning();
+
+      await expect(
+        caller.byok.create({ provider_id: 'anthropic', api_key: 'personal-anthropic-key' })
+      ).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+      });
+
+      const personalRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.kilo_user_id, ownerUser.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(personalRows).toEqual([managed]);
+
+      const [managedOrganization] = await db
+        .insert(byok_api_keys)
+        .values({
+          organization_id: organizationA.id,
+          provider_id: 'anthropic',
+          encrypted_api_key_envelope: testByokEnvelope('coding-plan-organization-key'),
+          management_source: 'coding_plan',
+          created_by: ownerUser.id,
+        })
+        .returning();
+      const logsBefore = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'anthropic',
+          api_key: 'organization-anthropic-key',
+        })
+      ).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+      });
+
+      const organizationRows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.organization_id, organizationA.id),
+            eq(byok_api_keys.provider_id, 'anthropic')
+          )
+        );
+      expect(organizationRows).toEqual([managedOrganization]);
+      const logsAfter = await db
+        .select()
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id))
+        .orderBy(organization_audit_logs.id);
+      expect(logsAfter).toEqual(logsBefore);
+    });
   });
 
   describe('KMS envelope encryption', () => {
@@ -944,6 +1137,7 @@ describe('BYOK Router', () => {
       await expect(
         caller.byok.testApiKey({ organizationId: organizationA.id, id: created.id })
       ).resolves.toEqual({
+        outcome: 'unreadable-key',
         success: false,
         message: 'API key test failed: the stored key could not be read. Try again later.',
       });
@@ -1353,7 +1547,7 @@ describe('BYOK Router', () => {
       await expect(
         caller.byok.create({ ...scope, provider_id: 'bedrock', api_key })
       ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
+        code: 'UNPROCESSABLE_CONTENT',
         message: 'Invalid credentials for provider: bedrock',
       });
       const keysAfterCreate = await db
@@ -1364,7 +1558,7 @@ describe('BYOK Router', () => {
 
       await expect(caller.byok.update({ ...scope, id: created.id, api_key })).rejects.toMatchObject(
         {
-          code: 'BAD_REQUEST',
+          code: 'UNPROCESSABLE_CONTENT',
           message: 'Invalid credentials for provider: bedrock',
         }
       );
@@ -1767,8 +1961,12 @@ describe('BYOK Router', () => {
         );
 
       try {
-        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toMatchObject({
+        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+          outcome: 'ok',
+          provider: 'openrouter',
+          model: 'openai/gpt-5-nano',
           success: true,
+          message: 'API key test success. Provider: openrouter. Model: openai/gpt-5-nano.',
         });
 
         const upstreamCalls = fetchSpy.mock.calls.filter(([input]) =>
@@ -1804,6 +2002,7 @@ describe('BYOK Router', () => {
 
       try {
         await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+          outcome: 'rejected',
           success: false,
           message:
             'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.',
@@ -1813,6 +2012,37 @@ describe('BYOK Router', () => {
         )!;
         expect(String(url)).toMatch(/^https:\/\/ai-gateway\.vercel\.sh\//);
         expect(new Headers(init?.headers).get('authorization')).toBe('Bearer revoked-vercel-key');
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    test('a client that reads only the legacy pair still gets the old sentence', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const key = await caller.byok.create({
+        provider_id: 'vercel-ai-gateway',
+        api_key: 'revoked-legacy-vercel-key',
+      });
+      const fakeKms = globalThis.fetch;
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) =>
+        isFakeByokKmsRequest(input)
+          ? fakeKms(input, init)
+          : new Response(
+              JSON.stringify({
+                error: { message: 'Invalid API key', type: 'authentication_error' },
+              }),
+              { status: 401, headers: { 'content-type': 'application/json' } }
+            )
+      );
+
+      try {
+        const result = await caller.byok.testApiKey({ id: key.id });
+
+        expect(result.outcome).toBe('rejected');
+        expect(result.success).toBe(false);
+        expect(result.message).toBe(
+          'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.'
+        );
       } finally {
         fetchSpy.mockRestore();
       }
@@ -1897,6 +2127,137 @@ describe('BYOK Router', () => {
         );
       }
     });
+
+    describe('System One, embedding and transcription models', () => {
+      type Metadata = Awaited<ReturnType<typeof getOpenRouterModelsMetadataFromDatabase>>;
+      const decisions = { output_modalities: ['decisions'] };
+      const systemOne = { id: 'acme/system-one-fixture', name: 'System One Fixture' };
+      const systemOneOpen = { id: 'acme/system-one-open', name: 'System One Open' };
+      const embedding = { id: 'acme/embedding-fixture', name: 'Embedding Fixture' };
+      const transcription = { id: 'acme/transcription-fixture', name: 'Transcription Fixture' };
+      const systemOneEntry = 'System One Fixture, System One (acme/system-one-fixture)';
+      const systemOneOpenEntry = 'System One Open, System One (acme/system-one-open)';
+      const embeddingEntry = 'Embedding Fixture, embeddings (acme/embedding-fixture)';
+      const transcriptionEntry =
+        'Transcription Fixture, transcription (acme/transcription-fixture)';
+
+      // The catalog metadata is read through process-wide caches, so the metadata is stubbed to keep
+      // them unfilled for the test above.
+      beforeEach(() => {
+        const openRouterMetadata: Metadata = {
+          [systemOne.id]: { ...systemOne, architecture: decisions, endpoints: [] },
+          [systemOneOpen.id]: { ...systemOneOpen, architecture: decisions, endpoints: [] },
+          '~acme/system-one-alias': {
+            id: '~acme/system-one-alias',
+            name: 'System One Alias',
+            architecture: decisions,
+            endpoints: [],
+          },
+          'acme/system-one-free:free': {
+            id: 'acme/system-one-free:free',
+            name: 'System One Free',
+            architecture: decisions,
+            endpoints: [],
+          },
+        };
+        const vercelMetadata: Metadata = {
+          [systemOne.id]: {
+            ...systemOne,
+            type: 'evaluation',
+            endpoints: [{ provider_name: 'bedrock' }],
+          },
+          // Vercel serves this model as a language model, not as an evaluation model.
+          [systemOneOpen.id]: { ...systemOneOpen, type: 'language', endpoints: [] },
+          [embedding.id]: {
+            ...embedding,
+            type: 'embedding',
+            endpoints: [{ provider_name: 'openai' }],
+          },
+          [transcription.id]: { ...transcription, type: 'transcription', endpoints: [] },
+        };
+        jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(openRouterMetadata);
+        jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue(vercelMetadata);
+        jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set());
+        jest.mocked(getKiloEmbeddingModelCatalogFromDatabase).mockResolvedValue({
+          defaultModel: embedding.id,
+          models: [embedding, { id: 'acme/embedding-free:free', name: 'Embedding Free' }],
+          aliases: {},
+        } as Awaited<ReturnType<typeof getKiloEmbeddingModelCatalogFromDatabase>>);
+        jest.mocked(getOpenRouterTranscriptionModels).mockResolvedValue({
+          data: [transcription, { id: 'acme/transcription-free:free', name: 'Transcription Free' }],
+        } as Awaited<ReturnType<typeof getOpenRouterTranscriptionModels>>);
+      });
+
+      afterEach(() => {
+        const actual = jest.requireActual<typeof GatewayModelsCache>(
+          '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+        );
+        jest
+          .mocked(getOpenRouterModelsMetadataFromDatabase)
+          .mockImplementation(actual.getOpenRouterModelsMetadataFromDatabase);
+        jest
+          .mocked(getVercelModelsMetadataFromDatabase)
+          .mockImplementation(actual.getVercelModelsMetadataFromDatabase);
+        jest
+          .mocked(getVercelModelsFromDatabase)
+          .mockImplementation(actual.getVercelModelsFromDatabase);
+        jest.mocked(getKiloEmbeddingModelCatalogFromDatabase).mockResolvedValue(null);
+        jest.mocked(getOpenRouterTranscriptionModels).mockResolvedValue({ data: [] });
+      });
+
+      test('labels them by endpoint and lists them under the OpenRouter key', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.byok.listSupportedModels();
+
+        expect(result.openrouter).toEqual(
+          expect.arrayContaining([
+            systemOneEntry,
+            systemOneOpenEntry,
+            embeddingEntry,
+            transcriptionEntry,
+          ])
+        );
+      });
+
+      test('lists them under Vercel keys only when Vercel serves the matching model type', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.byok.listSupportedModels();
+
+        expect(result['vercel-ai-gateway']).toEqual(
+          expect.arrayContaining([systemOneEntry, embeddingEntry])
+        );
+        expect(result['vercel-ai-gateway']).not.toContain(systemOneOpenEntry);
+        expect(result['vercel-ai-gateway']).not.toContain(transcriptionEntry);
+        expect(result.bedrock).toContain(systemOneEntry);
+        expect(result.bedrock).not.toContain(embeddingEntry);
+        expect(result.openai).toContain(embeddingEntry);
+        expect(result.openai).not.toContain(systemOneEntry);
+        expect(result.openai).not.toContain(transcriptionEntry);
+      });
+
+      test('skips free models and aliases', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.byok.listSupportedModels();
+
+        const entries = Object.values(result).flat();
+        expect(entries.filter(entry => entry.includes('System One Alias, System One'))).toEqual([]);
+        expect(entries.filter(entry => entry.includes('System One Free, System One'))).toEqual([]);
+        expect(entries.filter(entry => entry.includes('Embedding Free'))).toEqual([]);
+        expect(entries.filter(entry => entry.includes('Transcription Free'))).toEqual([]);
+      });
+
+      test('lists the other models when the transcription models cannot be read', async () => {
+        jest
+          .mocked(getOpenRouterTranscriptionModels)
+          .mockRejectedValue(new Error('OpenRouter is down'));
+
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.byok.listSupportedModels();
+
+        expect(result.openrouter).toEqual(expect.arrayContaining([systemOneEntry, embeddingEntry]));
+        expect(result.openrouter).not.toContain(transcriptionEntry);
+      });
+    });
   });
 
   describe('direct cloud providers', () => {
@@ -1975,14 +2336,14 @@ describe('BYOK Router', () => {
           provider_id: 'bedrock-byok',
           api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
         })
-      ).rejects.toThrow('Provider bedrock-byok is not available yet.');
+      ).rejects.toThrow(BYOK_PROVIDER_UNAVAILABLE_MESSAGE);
       await expect(
         caller.byok.create({
           organizationId: organizationA.id,
           provider_id: 'bedrock-byok',
           api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
         })
-      ).rejects.toThrow('Provider bedrock-byok is not available yet.');
+      ).rejects.toThrow(BYOK_PROVIDER_UNAVAILABLE_MESSAGE);
       await expect(
         caller.byok.create({ provider_id: 'nvidia-byok', api_key: 'nvidia-key' })
       ).resolves.toMatchObject({ provider_id: 'nvidia-byok' });
@@ -1990,11 +2351,12 @@ describe('BYOK Router', () => {
   });
 
   describe('deprecated codestral provider', () => {
-    test('declines to test a legacy codestral key with a deprecation message', async () => {
+    test('declines to test a legacy codestral key as deprecated', async () => {
       const caller = await createCallerForUser(ownerUser.id);
       const key = await caller.byok.create({ provider_id: 'codestral', api_key: 'stored-secret' });
 
       await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+        outcome: 'deprecated-provider',
         success: false,
         message: 'Codestral is deprecated and its API key can no longer be tested.',
       });

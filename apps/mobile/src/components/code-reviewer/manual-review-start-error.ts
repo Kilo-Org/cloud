@@ -64,16 +64,19 @@ function manualReviewStartFailureKey(error: unknown): ManualReviewStartFailureKe
  * request).
  *
  * The organization trial gate refuses a start with `FORBIDDEN` and the
- * sentence `Organization trial has expired.`, which the app already explains
- * (`common.organizationTrialEnded`), so a recognized server sentence wins over
- * the code's generic line — the same rule `reviewerSaveFailure` applies to a
- * refused config save. A denial the app cannot explain keeps the code's copy,
- * and a terminal code drops the retry: resending the same request cannot make
- * a lapsed plan or a lost role valid.
+ * sentence `Organization trial has expired.`, which the app already explains,
+ * so a recognized server sentence wins over the code's generic line — the same
+ * rule `reviewerSaveFailure` applies to a refused config save. `canManageBilling`
+ * selects that sentence's reader: a billing role reads copy that offers the
+ * plan step, everyone else the copy that names the owner who can. A denial the
+ * app cannot explain keeps the code's copy, and a terminal code drops the
+ * retry: resending the same request cannot make a lapsed plan or a lost role
+ * valid.
  */
 export function manualReviewStartFailure(
   error: unknown,
-  platform: ManualReviewPlatform
+  platform: ManualReviewPlatform,
+  canManageBilling = false
 ): WatchedStartFailure {
   const variables = {
     provider: PLATFORM_CAPABILITIES[platform].label,
@@ -81,7 +84,8 @@ export function manualReviewStartFailure(
   };
   return {
     message:
-      knownServerErrorMessage(error) ?? i18n.t(manualReviewStartFailureKey(error), variables),
+      knownServerErrorMessage(error, canManageBilling) ??
+      i18n.t(manualReviewStartFailureKey(error), variables),
     retryable: !isTerminalTrpcCode(readTrpcErrorField(error, 'code')),
   };
 }

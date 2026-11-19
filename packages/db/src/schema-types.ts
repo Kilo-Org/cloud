@@ -1572,6 +1572,53 @@ export type OrganizationMcpConnectTarget =
 export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
+// How Kilo clients may drive a browser for this organization's members: anything the
+// member configured, the bundled Playwright browser only, or no browser tools at all.
+export const ORGANIZATION_BROWSER_CONTROL_MODES = ['allow', 'playwright_only', 'off'] as const;
+export const OrganizationBrowserControlSchema = z.enum(ORGANIZATION_BROWSER_CONTROL_MODES);
+export type OrganizationBrowserControl = z.infer<typeof OrganizationBrowserControlSchema>;
+
+export const MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS = 200;
+export const MAX_ORGANIZATION_BROWSER_ORIGIN_LENGTH = 2048;
+
+function parseHttpOrigin(value: string): URL | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return null;
+  }
+  if (url.username !== '' || url.password !== '' || url.search !== '' || url.hash !== '') {
+    return null;
+  }
+  if (url.pathname !== '/') {
+    return null;
+  }
+  return url;
+}
+
+/**
+ * The canonical origin for an allow-list entry, or null when the value is not a
+ * bare http(s) origin. Clients grant `<class>:<origin>`, so a path or query in a
+ * stored value would silently grant nothing usable.
+ */
+export function normalizeOrganizationBrowserOrigin(value: string): string | null {
+  return parseHttpOrigin(value.trim())?.origin ?? null;
+}
+
+export const OrganizationBrowserAllowedOriginSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_ORGANIZATION_BROWSER_ORIGIN_LENGTH)
+  .refine(
+    value => normalizeOrganizationBrowserOrigin(value) !== null,
+    'Expected an http or https origin such as https://example.com'
+  );
+
 const OrganizationSettingsSchema = z.object({
   // The default model and provider access for organization members. Group
   // policies set the access of their own members. Organization admins manage
@@ -1620,8 +1667,17 @@ const OrganizationSettingsSchema = z.object({
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
   guardrails: OrganizationGuardrailsSettingsSchema.optional(),
-  // These apply only while the `gateway_settings` organization feature is enabled in the gateway
-  // configuration. A null or absent data_region routes Vercel AI Gateway requests globally.
+  // Browser automation policy. Absent means `allow`, which leaves the choice of
+  // backend and origins to each member's client.
+  browserControl: OrganizationBrowserControlSchema.optional(),
+  // Origins every member's client treats as granted for browser read, act, and navigate.
+  browserAllowedOrigins: z
+    .array(OrganizationBrowserAllowedOriginSchema)
+    .max(MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS)
+    .optional(),
+  // Advanced policies. These apply only to an enterprise organization while the `gateway_settings`
+  // organization feature is enabled in the gateway configuration. A null or absent data_region
+  // routes Vercel AI Gateway requests globally; a set one also disables OpenRouter.
   disable_openrouter: z.boolean().optional(),
   data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
@@ -2528,11 +2584,36 @@ export type SecurityFindingAnalysis = {
 
 // --- OpenRouter types ---
 
+/**
+ * Time-of-day prices. OpenRouter lists the prices of each UTC window in `overrides`; Vercel AI
+ * Gateway multiplies its token prices by `peak_pricing.multiplier` during peak windows.
+ *
+ * An `overrides` entry with `min_prompt_tokens` is not a time-of-day window: it applies to requests
+ * whose prompt exceeds that many tokens (a long-context surcharge). Vercel's long-context prices
+ * are `EndpointPricingSchema`'s `*_tiers`; the base price fields are their first (short-context)
+ * tier.
+ */
+export const PriceOverrideSchema = z.looseObject({
+  min_prompt_tokens: z.number().optional().catch(undefined),
+  prompt: z.string().optional().catch(undefined),
+  completion: z.string().optional().catch(undefined),
+  input_cache_read: z.string().optional().catch(undefined),
+  input_cache_write: z.string().optional().catch(undefined),
+});
+
+export const PeakPricingSchema = z.looseObject({ multiplier: z.number() });
+
+const TimeOfDayPricingFields = {
+  overrides: z.array(PriceOverrideSchema).optional().catch(undefined),
+  peak_pricing: PeakPricingSchema.optional().catch(undefined),
+};
+
 export type OpenRouterPricing = z.infer<typeof OpenRouterPricing>;
 export const OpenRouterPricing = z.object({
   prompt: z.string(),
   completion: z.string(),
   discount: z.number().optional(),
+  ...TimeOfDayPricingFields,
 });
 
 export type OpenRouterBaseModel = z.infer<typeof OpenRouterBaseModel>;
@@ -3207,6 +3288,38 @@ export const VercelModelIdOverridesConfigSchema = z.object({
 
 export type VercelModelIdOverridesConfig = z.infer<typeof VercelModelIdOverridesConfigSchema>;
 
+export const LatestAliasTargetSchema = z.object({
+  alias: z.string().startsWith('~'),
+  target: z.string().min(1),
+  /** A newer target the alias switches to once `effective_at` passes. */
+  pending: z
+    .object({
+      target: z.string().min(1),
+      effective_at: z.iso.datetime(),
+    })
+    .optional(),
+});
+
+export type LatestAliasTarget = z.infer<typeof LatestAliasTargetSchema>;
+
+export const LatestAliasTargetsConfigSchema = z.object({
+  aliases: z.array(LatestAliasTargetSchema).superRefine((aliases, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, { alias }] of aliases.entries()) {
+      if (seen.has(alias)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate alias "${alias}"`,
+          path: [index, 'alias'],
+        });
+      }
+      seen.add(alias);
+    }
+  }),
+});
+
+export type LatestAliasTargetsConfig = z.infer<typeof LatestAliasTargetsConfigSchema>;
+
 export const PREFERRED_PROVIDER_ORDER_MAX_RULES = 200;
 export const PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS = 20;
 
@@ -3300,6 +3413,14 @@ export const CustomPricingConfigSchema = z.object({
           ctx.addIssue({
             code: 'custom',
             message: `Duplicate model "${model}"`,
+            path: [index, 'model'],
+          });
+        }
+        // A latest alias is billed at the custom pricing of the model it resolves to.
+        if (model.startsWith('~')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `"${model}" is a latest alias. Aliases are billed at their target model's custom pricing, so add an entry for the target model instead.`,
             path: [index, 'model'],
           });
         }
@@ -3403,6 +3524,15 @@ export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 
 export const VercelModelsSchema = z.object({ data: z.array(VercelModelSchema) });
 
+/**
+ * Vercel AI Gateway's context-length price tiers of one token price: the price per token for
+ * prompts of `min` up to `max` tokens. The first tier equals the base price field.
+ */
+export const PriceTiersSchema = z
+  .array(z.looseObject({ cost: z.string() }))
+  .optional()
+  .catch(undefined);
+
 export const EndpointPricingSchema = z.object({
   prompt: z.string(),
   completion: z.string(),
@@ -3413,6 +3543,11 @@ export const EndpointPricingSchema = z.object({
   web_search: z.string().optional(),
   internal_reasoning: z.string().optional(),
   discount: z.number().optional(),
+  prompt_tiers: PriceTiersSchema,
+  completion_tiers: PriceTiersSchema,
+  input_cache_read_tiers: PriceTiersSchema,
+  input_cache_write_tiers: PriceTiersSchema,
+  ...TimeOfDayPricingFields,
 });
 
 export const EndpointInferenceRegionSchema = z.object({

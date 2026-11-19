@@ -199,7 +199,11 @@ describe('device auth API client', () => {
   it('keeps the server refusal with a failed start', async () => {
     const fetch: FetchLike = () =>
       jsonResponse(
-        { error: 'Too many sign-in attempts from this network. Wait a few minutes and try again.' },
+        {
+          error: 'RATE_LIMITED',
+          message: 'Too many sign-in attempts from this network. Try again later.',
+          retryAfterSeconds: 600,
+        },
         { status: 429 }
       );
 
@@ -211,7 +215,8 @@ describe('device auth API client', () => {
     expect(failure).toBeInstanceOf(DeviceAuthHttpError);
     expect(failure).toMatchObject({
       body: {
-        error: 'Too many sign-in attempts from this network. Wait a few minutes and try again.',
+        error: 'RATE_LIMITED',
+        message: 'Too many sign-in attempts from this network. Try again later.',
       },
       status: 429,
     });

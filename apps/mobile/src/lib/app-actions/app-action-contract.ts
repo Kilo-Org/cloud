@@ -61,6 +61,10 @@ export type AppActionRequest =
 /**
  * What a run reports back to its caller. `message` is filled by the caller
  * from the existing catalog keys; this contract never carries copy.
+ *
+ * `trialRefusal` says the create was refused by the organization subscription
+ * gate, so a consumer whose toast can carry the plan step offers it to the role
+ * that can take it. It is absent on every other failure.
  */
 export type AppActionResult =
   | { ok: true; action: AppActionId; sessionId?: string; href?: string; message: string }
@@ -68,6 +72,7 @@ export type AppActionResult =
       ok: false;
       action: AppActionId;
       retryable: boolean;
+      trialRefusal?: boolean;
       code:
         | 'empty-prompt'
         | 'prompt-too-long'

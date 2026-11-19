@@ -37,40 +37,62 @@ function ActivityEntry({
   item: BackgroundActivityItem;
   onOpenChildSession: OpenChildSession;
 }) {
-  const label = item.kind === 'shell' ? item.title || item.command : item.description || item.agent;
+  const shellTitle = item.kind === 'shell' ? item.title?.trim() : undefined;
+  const showCommandBelow =
+    item.kind === 'shell' && shellTitle && shellTitle !== item.command.trim();
+  const label =
+    item.kind === 'shell'
+      ? showCommandBelow
+        ? shellTitle
+        : item.command
+      : item.description || item.agent;
+  const row = (
+    <>
+      <span
+        className={
+          item.kind === 'shell' && !showCommandBelow
+            ? 'max-h-24 min-w-0 flex-1 overflow-auto font-mono whitespace-pre-wrap break-all'
+            : 'min-w-0 flex-1 truncate'
+        }
+        title={item.descendant ? `${label} · From ${item.parentLabel}` : label}
+      >
+        {label}
+      </span>
+      {item.descendant && (
+        <span className="text-muted-foreground sr-only max-w-28 sm:not-sr-only sm:truncate">
+          From {item.parentLabel}
+        </span>
+      )}
+      <span className="text-muted-foreground shrink-0">
+        {item.waiting ? 'Needs input' : 'Running'}
+      </span>
+      <span className="text-muted-foreground shrink-0">
+        <ElapsedTime started={item.time.started} />
+      </span>
+    </>
+  );
   return (
-    <li className="space-y-1 py-2 text-xs">
-      <div className="flex items-start justify-between gap-2">
-        <span className="min-w-0 break-words" title={label}>
-          {label}
-        </span>
-        <span className="text-muted-foreground shrink-0">
-          <ElapsedTime started={item.time.started} />
-        </span>
-      </div>
-      <div className="text-muted-foreground flex flex-wrap items-center gap-x-2">
-        <span>{item.waiting ? 'Needs input' : 'Running'}</span>
-        {item.descendant && <span>From {item.parentLabel}</span>}
-        {item.kind === 'subagent' && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="ml-auto min-h-11 text-xs"
-            onClick={() =>
-              onOpenChildSession({
-                sessionId: item.childSessionID as KiloSessionId,
-                description: item.description,
-                agent: item.agent,
-              })
-            }
-          >
-            Open transcript
-          </Button>
-        )}
-      </div>
-      {item.kind === 'shell' && item.title && (
-        <pre className="max-h-24 overflow-auto font-mono text-xs whitespace-pre-wrap break-all">
+    <li className="py-0.5 text-xs">
+      {item.kind === 'subagent' ? (
+        <button
+          type="button"
+          className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left focus-visible:ring-2 focus-visible:outline-none pointer-coarse:min-h-11"
+          onClick={() =>
+            onOpenChildSession({
+              sessionId: item.childSessionID as KiloSessionId,
+              description: item.description,
+              agent: item.agent,
+            })
+          }
+        >
+          <span className="sr-only">Open transcript: </span>
+          {row}
+        </button>
+      ) : (
+        <div className="flex items-center gap-2 px-2 py-1">{row}</div>
+      )}
+      {item.kind === 'shell' && showCommandBelow && (
+        <pre className="max-h-24 overflow-auto px-2 font-mono text-xs whitespace-pre-wrap break-all">
           {item.command}
         </pre>
       )}
@@ -166,7 +188,7 @@ export function BackgroundActivityStrip({
                     aria-label={kind === 'subagent' ? 'Agents' : 'Shells'}
                     className="mb-2 last:mb-0"
                   >
-                    <h3 className="text-xs font-medium">
+                    <h3 className="mb-1 px-2 text-xs font-medium">
                       {kind === 'subagent' ? 'Agents' : 'Shells'}
                     </h3>
                     <ul>

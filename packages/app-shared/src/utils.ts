@@ -90,18 +90,38 @@ export function fromMicrodollars(microdollars: number): number {
   return microdollars / 1000000;
 }
 
+// en-US USD covers nearly every call (formatDollars and the default formatCents
+// argument), so it gets a direct module-level instance; other currencies are
+// memoized by code. Construction is deferred to the first call: mobile bundles
+// import this module before their Intl polyfill warm-up, and the native Intl
+// that exists at import time must not own the cached formatter.
+let usdNumberFormatValue: Intl.NumberFormat | null = null;
+const currencyNumberFormats = new Map<string, Intl.NumberFormat>();
+
+function currencyNumberFormat(currency: string): Intl.NumberFormat {
+  const code = currency.toUpperCase();
+  const cached = currencyNumberFormats.get(code);
+  if (cached) {
+    return cached;
+  }
+  const format = new Intl.NumberFormat('en-US', { style: 'currency', currency: code });
+  currencyNumberFormats.set(code, format);
+  return format;
+}
+
 export function formatDollars(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  // One owner of the en-US USD presentation: Intl derives USD's 2 minor-unit
+  // digits by default, so cents in, dollars out, same string.
+  return formatCents(amount * 100);
 }
 
 export function formatCents(amount: number, currency: string = 'USD') {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-  }).format(amount / 100);
+  let format: Intl.NumberFormat;
+  if (currency.toUpperCase() === 'USD') {
+    usdNumberFormatValue ??= new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+    format = usdNumberFormatValue;
+  } else {
+    format = currencyNumberFormat(currency);
+  }
+  return format.format(amount / 100);
 }

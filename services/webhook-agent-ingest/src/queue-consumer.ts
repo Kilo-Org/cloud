@@ -19,6 +19,7 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
 import { getSecretValue } from './util/secret';
+import { deliverExistingChatMessage, ExistingChatDeliveryError } from './existing-chat-delivery';
 
 // Token cache TTL: 30 minutes. Token validity is 1 hour, so 30 min gives safety margin.
 const TOKEN_CACHE_TTL_SECONDS = 30 * 60;
@@ -272,6 +273,7 @@ async function processWebhookMessage(
   let sessionCreated = false;
   let canRetryInitiate = false;
   let cloudAgentSessionId: string | null = null;
+  let isExistingChatDelivery = false;
 
   logger.info('Processing webhook delivery', {
     namespace: webhook.namespace,
@@ -324,6 +326,20 @@ async function processWebhookMessage(
           }),
         'updateRequest'
       );
+      message.ack();
+      return;
+    }
+
+    if (triggerConfig.targetType === 'cloud_agent_chat') {
+      isExistingChatDelivery = true;
+      if (request.processStatus === 'captured' || request.processStatus === 'inprogress') {
+        await deliverExistingChatMessage(
+          env,
+          () => env.TRIGGER_DO.get(doId),
+          request,
+          triggerConfig
+        );
+      }
       message.ack();
       return;
     }
@@ -633,17 +649,27 @@ async function processWebhookMessage(
         throw new Error(initiateAction.errorMessage);
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isUnexpectedChatError =
+      isExistingChatDelivery && !(error instanceof ExistingChatDeliveryError);
+    const errorMessage = isUnexpectedChatError
+      ? 'Could not confirm delivery to the target Cloud Agent chat. Check the chat before retrying.'
+      : error instanceof Error
+        ? error.message
+        : String(error);
     logger.error('Failed to process webhook', {
       requestId: webhook.requestId,
       namespace: webhook.namespace,
       triggerId: webhook.triggerId,
       error: errorMessage,
+      ...(isUnexpectedChatError && {
+        errorType: error instanceof Error ? error.name : typeof error,
+      }),
       attempts: message.attempts,
     });
 
     if (
       !(error instanceof CreatorExecutionAuthorizationError) &&
+      (!(error instanceof ExistingChatDeliveryError) || error.retryable) &&
       (!sessionCreated || canRetryInitiate) &&
       message.attempts < MAX_RETRY_ATTEMPTS
     ) {

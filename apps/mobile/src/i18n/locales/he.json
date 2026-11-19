@@ -26,6 +26,7 @@
     "creditHistory": "היסטוריית קרדיטים",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "ביטול",
     "done": "סיום",
     "retry": "ניסיון חוזר",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "שינויים",
     "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
-    "privateRepositoryA11y": "{{name}}, מאגר פרטי"
+    "privateRepositoryA11y": "{{name}}, מאגר פרטי",
+    "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד.",
+    "organizationTrialEndedBilling": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב, ואז לנסות שוב."
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -385,12 +388,24 @@
       "editKeyDescription": "לא ניתן להציג את הערך השמור. יש להזין ערך חדש כדי להחליף אותו.",
       "editKeyMappingsWarning": "החלפת המפתח מחליפה גם את מיפויי המודלים השמורים, ולכן יש להזין מחדש כל מיפוי שעדיין יש בו צורך.",
       "saveFailed": "לא ניתן לשמור את המפתח.",
-      "invalidCredentials": "יש לבדוק את פרטי הגישה ולנסות שוב.",
       "fieldRequired": "יש למלא את השדה {{field}}.",
+      "keyIncomplete": "המפתח חסר ערך נדרש.",
       "incompleteMapping": "במיפוי {{number}} יש למלא גם slug של מודל gateway וגם שם פריסה.",
       "apiKeyLabel": "מפתח API",
       "apiKeyPlaceholder": "הדבק את המפתח",
       "apiKeyRequired": "יש להזין את המפתח.",
+      "keyAlreadyExists": "כבר יש לך מפתח עבור הספק הזה. הסר אותו לפני שתוסיף מפתח אחר.",
+      "keyStoreFailed": "לא ניתן היה לשמור את המפתח.",
+      "invalidCredentials": "המפתח הזה אינו בפורמט שהספק הזה מצפה לו. בדוק אותו ונסה שוב.",
+      "testSucceeded": "המפתח עובד. ספק: {{provider}}. מודל: {{model}}.",
+      "testRejected": "הספק דחה את המפתח הזה. בדוק שהוא תקין ושהוא לא בוטל.",
+      "testIncomplete": "הספק סיים את הבדיקה לפני שהסתיימה. נסה שוב.",
+      "testUnsupportedProvider": "הספק הזה כבר לא נתמך. הסר את המפתח.",
+      "testUnreadableKey": "לא ניתן היה לקרוא את המפתח השמור. נסה שוב מאוחר יותר.",
+      "testDeprecatedProvider": "הספק הזה מיושן, ולכן לא ניתן לבדוק את המפתח שלו.",
+      "keyManagedByCodingPlan": "תוכנית הקידוד מנהלת את המפתח של הספק הזה, והמפתח הוא לקריאה בלבד. יש לבטל את תוכנית הקידוד כדי להוסיף מפתח משלך.",
+      "providerUnavailable": "הספק הזה עדיין לא זמין, ולכן לא ניתן להוסיף לו מפתח.",
+      "testFailed": "בדיקת המפתח נכשלה. נסה שוב.",
       "authMethod": "שיטת אימות",
       "authMethodAccessKeys": "מפתחות גישה",
       "resourceName": "שם משאב Azure",
@@ -481,7 +496,14 @@
       "viewReceipt": "הצגת האישור"
     },
     "changelog": "מה חדש",
-    "changelogVersionPending": "ההערות לגרסה זו יגיעו עם עדכון האפליקציה הבא."
+    "changelogVersionPending": "ההערות לגרסה {{version}} יגיעו עם עדכון האפליקציה הבא.",
+    "changelogGroupNew": "חדש",
+    "changelogFixesIn": "תיקונים ושיפורים בתחומים הבאים: {{areas}}.",
+    "changelogFixesPolish": "תיקונים ושיפורים בכל האפליקציה.",
+    "changelogAreas": {
+      "signIn": "התחברות",
+      "profileOrganizations": "פרופיל וארגונים"
+    }
   },
   "preferences": {
     "general": "כללי",
@@ -676,7 +698,8 @@
       "managedOnWeb": "החיבור של הארגון הזה ל-Bitbucket מנוהל באתר דרך מחשב.",
       "description": "צור אסימון גישה לסביבת העבודה עם ההרשאות הנדרשות והדבק אותו למטה.",
       "scopes": "חשבון: קריאה · מאגרים: קריאה/כתיבה · בקשות משיכה: קריאה · התראות אוטומטיות: קריאה/כתיבה",
-      "tokenPlaceholder": "אסימון גישה לסביבת העבודה"
+      "tokenPlaceholder": "אסימון גישה לסביבת העבודה",
+      "tokenRefused": "Bitbucket לא קיבל את אסימון הגישה לסביבת העבודה הזה. בדוק שיש לו את ההרשאות שלמעלה, ולאחר מכן נסה שוב."
     },
     "followReviewMd": "פעולה לפי REVIEW.md",
     "followReviewMdSubtitle": "שימוש בהוראות שבקובץ REVIEW.md בכל מאגר",
@@ -777,6 +800,7 @@
     },
     "reviewList": {
       "configureProvider": "הגדרת ספק",
+      "connectOwnerOnly": "בקש מבעלים של הארגון או מנהל לחבר ספק.",
       "couldNotLoad": "לא ניתן לטעון את הסקירות.",
       "noReviews": "אין עדיין סקירות",
       "noReviewsDescription": "סקירות יופיעו כאן לאחר שסוקר הקוד יסקור בקשת משיכה.",
@@ -922,13 +946,26 @@
       "repositoryLine": "סקירות: {{reviews}} · ממצאים: {{findings}}",
       "empty": "עדיין אין סקירות עם נתוני אנליטיקה",
       "emptyDescription": "האנליטיקה מתעדת סקירות שהושלמו כל עוד היא מופעלת עבור הארגון.",
-      "off": "האנליטיקה כבויה עבור הארגון הזה.",
-      "couldNotLoad": "לא ניתן לטעון את האנליטיקה"
+      "offTitle": "האנליטיקה כבויה עבור {{platform}}",
+      "offDescription": "תפקידי החיוב בארגון יכולים להפעיל את האנליטיקה בהגדרות הארגון באתר כדי לתעד סקירות שהושלמו.",
+      "couldNotLoad": "לא ניתן לטעון את האנליטיקה",
+      "trackedReviewsCaption": "סקירות שהושלמו והסתיימו בתקופה זו כשהאנליטיקה מופעלת. סקירות שמתנהלות או שנכשלו לעולם אינן נספרות.",
+      "trackedReviewsUncounted": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_one": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_other": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_two": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה."
     },
     "council": {
       "title": "סקירת מועצה",
       "subtitle": "כמה מומחים סוקרים כל בקשת משיכה, והקולות שלהם מצטרפים להחלטה אחת.",
-      "unavailable": "סקירת מועצה אינה זמינה עבור הארגון הזה.",
+      "unavailablePersonallyTitle": "נדרש ארגון Enterprise",
+      "unavailablePersonally": "סקירת מועצה אינה חלק מחשבון אישי.",
+      "unavailablePersonallyAction": "יצירת ארגון",
+      "unavailablePersonallySwitchAction": "החלף ארגון",
+      "unavailableOrganizationTitle": "סקירת מועצה אינה זמינה",
+      "unavailableForOrganization": "סקירת מועצה דורשת את תוכנית Enterprise עם מינוי פעיל או תקופת ניסיון. אין לארגון הזה אותה כרגע.",
+      "unavailableForOrganizationNeutral": "סקירת מועצה אינה זמינה לארגון הזה כרגע. נסו שוב מאוחר יותר.",
+      "unavailableOnBitbucket": "סקירת מועצה אינה זמינה עבור מאגרי Bitbucket.",
       "noRepositories": "עדיין לא נבחרו מאגרים. בחר קודם מאגרים בהגדרות המאגרים.",
       "specialists": "מומחים",
       "labels": "תוויות שמפעילות סקירת מועצה",
@@ -2462,6 +2499,7 @@
     "signOutThisDevice": "ניתוק המכשיר הזה מהחשבון",
     "signOutSessionLabel": "ניתוק {{device}} מהחשבון, מועד הכניסה: {{signedIn}}, פעילות אחרונה: {{lastSeen}}",
     "sessionSignedOut": "החיבור נותק.",
+    "sessionSignOutFailed": "לא ניתן לנתק את החיבור הזה. נסו שוב.",
     "signOutThisDeviceTitle": "להתנתק מהמכשיר הזה?",
     "signOutThisSessionTitle": "לנתק את החיבור הזה?",
     "signOutThisSessionMessage": "{{device}} ינותק מהחשבון. פעילות אחרונה: {{lastSeen}}. הגישה שלו ל-API יכולה להישאר פעילה למשך עד שעה.",
@@ -2587,12 +2625,14 @@
     "manage": {
       "billingHistory": "היסטוריית חיובים",
       "billingHistoryEmpty": "אין עדיין היסטוריית חיובים.",
+      "billingHistoryError": "לא ניתן לטעון את היסטוריית החיובים",
       "cancel": "ביטול המינוי",
       "cancelDescription": "ה-Kilo Pass שלך יישאר פעיל עד סוף תקופת החיוב ולא יתחדש.",
       "cancelScheduled": "יבוטל בתאריך {{date}}",
       "cancelScheduledChange": "ביטול השינוי המתוזמן",
       "cancelled": "המינוי בוטל",
       "creditHistoryEmpty": "עדיין אין קרדיטים מ-Kilo Pass.",
+      "creditHistoryError": "לא ניתן לטעון את היסטוריית הקרדיטים",
       "resume": "חידוש המינוי",
       "resumeCancelledDescription": "ה-Kilo Pass שלך יתחיל שוב להתחדש אוטומטית.",
       "resumePausedDescription": "ה-Kilo Pass שלך יחודש עכשיו, לפני מועד החידוש המתוזמן.",
@@ -2609,7 +2649,6 @@
     "completingPurchase": "הרכישה מתבצעת",
     "subscriptionLoading": "פרטי המינוי ל-Kilo Pass בטעינה",
     "retryHint": "טעינת המצב של Kilo Pass שוב.",
-    "cardAccessibility": "{{title}}. {{description}}. פעולה: {{actionLabel}}",
     "endedOn": "הסתיים ב-{{date}}",
     "notAvailableInApp": "Kilo Pass אינו זמין באפליקציה.",
     "statusActive": "פעיל",
@@ -3370,6 +3409,7 @@
       "manageOnWeb": "הגדרות חיוב באתר",
       "changePlan": "שינוי תוכנית",
       "buySeats": "רכישת רישיונות",
+      "managedOnWeb": "התוכנית, הרישיונות והטעינה האוטומטית מנוהלים באתר.",
       "setupAutoTopUp": "הגדרת טעינה אוטומטית",
       "manageAutoTopUp": "ניהול טעינה אוטומטית",
       "opensOnWeb": "נפתח באתר"
@@ -3387,7 +3427,7 @@
       "selectOrganization": "בחירת ארגון",
       "unavailableDescription": "הארגון הזה כבר אינו זמין. בחר ארגון אחר מהפרופיל שלך כדי להמשיך.",
       "unavailableSessionsDescription": "הארגון הזה כבר אינו זמין. לא ניתן לטעון את הסשנים שלו.",
-      "accessDeniedDescription": "אין לך גישה לארגון זה."
+      "accessDeniedDescription": "בקש מבעלים או מנהל של הארגון להעניק לך גישה."
     },
     "create": {
       "title": "יצירת ארגון",
@@ -3520,16 +3560,26 @@
     },
     "settingsOnWeb": {
       "title": "הגדרות הארגון באתר",
-      "integrations": "אינטגרציות באתר",
       "usageDetails": "פרטי שימוש",
       "providersAndModels": "ספקים ומודלים",
       "groups": "קבוצות",
       "guardrails": "מעקות בטיחות",
       "byok": "שימוש במפתח משלך",
+      "ssoAndDomain": "SSO ודומיין",
+      "dataCollection": "איסוף נתונים",
       "auditLogs": "יומני ביקורת",
-      "requestLogs": "יומני בקשות",
-      "subOrganizations": "ארגוני משנה",
-      "distributeFunds": "חלוקת כספים"
+      "requestLogs": "יומני בקשות"
+    },
+    "requestLogs": {
+      "older": "שעה קודמת",
+      "newer": "שעה הבאה",
+      "truncated": "בשעה הזו יש יותר בקשות ממה שמוצג ברשימה.",
+      "emptyTitle": "אין בקשות בשעה הזו",
+      "emptyDescription": "השתמשו ב-'שעה קודמת' כדי לראות בקשות קודמות.",
+      "loadError": "לא ניתן לטעון את יומני הבקשות.",
+      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו.",
+      "tokens": "קלט {{input}} · פלט {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",
@@ -4333,8 +4383,7 @@
       "repoValue": "מאגר: {{name}}",
       "profileValue": "פרופיל: {{name}}",
       "profileUnavailable": "הפרופיל הזה כבר לא זמין. בחר פרופיל אחר.",
-      "pickerEmptyDescriptionOrganization": "צור פרופיל ארגוני לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "בעלים של ארגון או מנהל יכולים ליצור פרופיל ארגוני."
+      "pickerEmptyDescriptionOrganization": "צור פרופיל ארגוני לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות."
     },
     "variablesDeleteFailed": "לא ניתן למחוק את המשתנה",
     "deleteVariable": "מחק את המשתנה {{key}}",
@@ -4381,7 +4430,7 @@
       },
       "purchaseFallback": "רכישת קרדיטים",
       "receipt": "קבלה",
-      "receiptA11y": "פתיחת הקבלה עבור {{description}}",
+      "receiptA11y": "פתיחת הקבלה עבור {{description}}, {{amount}}, מתאריך {{date}}",
       "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו."
     },
     "title": "קניית קרדיטים",
@@ -4524,7 +4573,6 @@
     "dismiss": "התעלמות מהדוח",
     "offline": "לא מקוון · דוח שמור",
     "cached": "דוח שמור · רענון לא זמין",
-    "window": "{{start}} – {{end}}",
     "summary": "סיכום AI",
     "summaryPending": "סיכום ה-AI בהכנה. הוא יצורף כאן כשיהיה מוכן.",
     "summaryUnavailable": "סיכום ה-AI אינו זמין. הדוח המובנה עדיין זמין.",
@@ -4591,6 +4639,8 @@
     "topModels": "מודלים מובילים",
     "topFeatures": "תכונות מובילות",
     "emptyTitle": "אין שימוש בתקופה זו",
+    "unavailableTitle": "השימוש אינו זמין",
+    "unavailableDescription": "סביבת העבודה הזו אינה מדווחת על שימוש. ניסיון חוזר לא יעזור.",
     "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
     "viewDetails": "הצגת פרטי השימוש"
   },
@@ -4641,6 +4691,7 @@
       "title": "טריגרים ווובהוקים",
       "subtitle": "אוטומציה של הרצות Cloud Agent מקריאת וובהוק או מלוח זמנים.",
       "new": "טריגר חדש",
+      "create": "צור טריגר",
       "emptyTitle": "אין טריגרים עדיין",
       "emptyDescription": "צרו טריגר כדי להתחיל הרצת Cloud Agent מקריאת וובהוק או לפי לוח זמנים.",
       "loadFailedTitle": "לא ניתן היה לטעון טריגרים",
@@ -4662,7 +4713,7 @@
       "fieldCron": "ביטוי קרון",
       "fieldCronHelp": "חמישה שדות: דקה, שעה, יום, חודש ויום בשבוע. המרווח הקצר ביותר הוא דקה.",
       "fieldTimezone": "אזור זמן",
-      "nameLocked": "השם הוא חלק מכתובת הוובהוק ולא ניתן לשנותו.",
+      "nameLocked": "לא ניתן לשנות את השם לאחר יצירת הטריגר.",
       "repositoryLocked": "לא ניתן לשנות את המאגר לאחר יצירת הטריגר.",
       "environmentAutomatic": "אוטומטי לפי המאגר",
       "notSelected": "לא נבחר",
@@ -4677,6 +4728,7 @@
       "authHeaderLabel": "שם הכותרת",
       "authSecretLabel": "סוד משותף",
       "authSecretKeep": "השאירו ריק כדי לשמור על הסוד השמור.",
+      "authSecretSet": "חובה. בחרו מחרוזת אקראית חזקה.",
       "authSecretCreator": "השתמשו בלפחות 16 תווים כשהטריגר פועל בזהות היוצר שלו.",
       "autoCommit": "בצעו קומיט לשינויים כשההרצה מסתיימת",
       "condenseOnComplete": "כווצו את ההקשר כשההרצה מסתיימת",
@@ -4687,11 +4739,14 @@
       "saveFailedTitle": "לא ניתן היה לשמור את הטריגר",
       "deleteTitle": "למחוק את הטריגר הזה?",
       "deleteMessage": "קריאות אל {{name}} ייכשלו. לא ניתן לבטל זאת.",
+      "deleteMessageScheduled": "הריצות המתוזמנות של {{name}} ייעצרו. לא ניתן לבטל זאת.",
       "runNow": "הרץ עכשיו",
       "runStarted": "ההרצה החלה",
       "created": "הטריגר נוצר",
       "saved": "הטריגר נשמר",
       "statusArrived": "הגיע",
+      "defaultPromptWebhook": "תארו את גוף בקשת הוובהוק הזו:\n\n{{body}}",
+      "defaultPromptScheduled": "הריצו את המשימה המתוזמנת. ההרצה החלה בשעה {{scheduledTime}}.",
       "problems": {
         "nameRequired": "הזינו שם.",
         "nameTooShort": "השתמשו בלפחות 8 תווים.",
@@ -4726,8 +4781,9 @@
     "create": "יצירת קישור",
     "createFailed": "לא ניתן היה ליצור את הקישור.",
     "existingTitle": "קישור קיים",
-    "existingDescription": "לסשן הזה כבר יש קישור שיתוף. יצירת קישור חדש תחליף אותו, והקישור הישן יפסיק לעבוד.",
+    "existingDescription": "לסשן הזה כבר יש קישור שיתוף. יצירת קישור חדש עם הגדרות אלה תחליף אותו, והקישור הישן יפסיק לעבוד.",
     "rotate": "יצירת קישור חדש",
+    "replacementSettings": "הגדרות אלה חלות על הקישור החדש.",
     "revoke": "הסרת הקישור",
     "revokeTitle": "לבטל את הקישור?",
     "revokeMessage": "הקישור הנוכחי יפסיק לעבוד מיד.",
@@ -4739,6 +4795,7 @@
     "superseded": "הקישור הזה הוחלף במכשיר אחר, ולכן הוא כבר לא עובד."
   },
   "sharedSession": {
+    "startedAt": "התחילה בשעה {{time}}",
     "title": "סשן משותף",
     "someone": "מישהו",
     "sharedBy": "שותף על ידי {{owner}}",
@@ -4746,5 +4803,177 @@
     "unavailableDescription": "תוקפו של קישור השיתוף הזה פג או שהוא בוטל.",
     "transcriptUnavailableTitle": "לא ניתן היה לטעון את התמליל",
     "transcriptUnavailableDescription": "הקישור עדיין פעיל. אפשר לנסות שוב בעוד רגע."
+  },
+  "organizationGuardrails": {
+    "title": "מעקות בטיחות לבינה מלאכותית",
+    "permissionDenied": "רק בעלי הארגון והמנהלים יכולים לנהל מעקות בטיחות לבינה מלאכותית.",
+    "unavailable": "מעקות בטיחות לבינה מלאכותית אינם זמינים עבור הארגון הזה.",
+    "loadError": "לא ניתן היה לטעון את מעקות הבטיחות לבינה מלאכותית",
+    "statusSaving": "שומר…",
+    "statusSaved": "נשמר",
+    "statusFailed": "לא ניתן היה לשמור.",
+    "inputTitle": "מעקות בטיחות לקלט",
+    "inputDescription": "סורק כל קלט עם Enkrypt AI, כולל תוצאות כלים. גלאי חוסם דוחה בקשה כאשר Enkrypt אינו זמין.",
+    "outputTitle": "מעקות בטיחות לפלט",
+    "outputDescription": "סורק תגובות עם Enkrypt AI לפני שחברי הארגון מקבלים אותן. כבוי אלא אם תפעיל אותו.",
+    "detectorsHint": "חסימה דוחה בקשה שסומנה. רישום בלבד מתעד אותה בלי לעכב את הבקשה.",
+    "detectorsHintOutput": "חסימה מכשילה תגובה שסומנה. רישום בלבד מתעד אותה בלי לעכב את התגובה.",
+    "choiceLog": "רישום בלבד",
+    "applyTo": "החל על",
+    "applyToAllMembers": "כל החברים",
+    "applyKiloDefault": "החל את ברירת המחדל של Kilo",
+    "invalidSavedTitle": "לא ניתן לקרוא את הגדרות גלאי הקלט השמורות",
+    "invalidSavedBody": "בקשות חסומות עד שגלאי הקלט יישמרו מחדש. הגלאים שלמטה מתחילים מברירת המחדל של Kilo.",
+    "invalidSavedOutputTitle": "לא ניתן לקרוא את הגדרות גלאי הפלט השמורות",
+    "invalidSavedOutputBody": "תגובות נחסמות עד שגלאי הפלט יישמרו מחדש. בחר גלאי פלט למטה.",
+    "blockingOutputNote": "גלאי פלט חוסם מעכב תגובה עד ש-Enkrypt יבדוק את כולה. השתמש ברישום בלבד כדי להימנע מהעיכוב.",
+    "inputDetectorRequired": "הפעל לפחות גלאי קלט אחד.",
+    "outputDetectorRequired": "הפעל לפחות גלאי פלט אחד.",
+    "rulesTooMany": "הוסף עד {{max}} כללים.",
+    "ruleIdRequired": "הזן מזהה כלל.",
+    "ruleIdInvalid": "מזהה כלל יכול להשתמש רק באותיות, מספרים, נקודות, מקפים וקווים תחתונים.",
+    "ruleTextRequired": "תאר מה הכלל אוסר או מחייב.",
+    "keywordTooLong": "כל מילת מפתח יכולה להיות באורך של עד {{max}} תווים.",
+    "topicTooLong": "כל נושא יכול להיות באורך של עד {{max}} תווים.",
+    "keywordsTooMany": "הוסף עד {{max}} מילות מפתח.",
+    "topicsTooMany": "הוסף עד {{max}} נושאים.",
+    "piiEntityRequired": "בחר לפחות סוג נתונים אחד לזיהוי.",
+    "keywordRequired": "הוסף לפחות מילת מפתח אחת.",
+    "topicRequired": "הוסף לפחות נושא אחד.",
+    "policyTextRequired": "הזן את טקסט המדיניות.",
+    "ruleRequired": "הוסף לפחות כלל אחד.",
+    "ruleIdDuplicate": "כל כלל צריך מזהה כלל משלו.",
+    "piiEntities": "נתונים לזיהוי",
+    "keywordsLabel": "מילות מפתח",
+    "keywordsHint": "מילת מפתח אחת בכל שורה.",
+    "topicsHint": "נושא אחד בכל שורה.",
+    "policyFormat": "פורמט מדיניות",
+    "policyFormatRules": "כללים מובנים",
+    "policyFormatRulesDescription": "כלל אחד לכל דרישה, עם קטגוריה וחומרה. מומלץ.",
+    "policyFormatText": "טקסט מדיניות",
+    "policyFormatTextDescription": "הדבק מדיניות קיימת כטקסט פשוט.",
+    "rulesEmpty": "אין כללים עדיין. כל כלל מתאר דבר אחד שאסור שקלטים יכילו או יבקשו.",
+    "addRule": "הוסף כלל",
+    "ruleNumber": "כלל {{number}}",
+    "ruleRemove": "הסר כלל {{number}}",
+    "ruleIdLabel": "מזהה כלל",
+    "ruleNameLabel": "שם (אופציונלי)",
+    "ruleTextLabel": "כלל",
+    "ruleRiskCategory": "קטגוריית סיכון",
+    "ruleApplicability": "היקף",
+    "ruleFrameworks": "מסגרות",
+    "detector": {
+      "promptInjection": {
+        "label": "הזרקת פרומפט",
+        "description": "מזהה ניסיונות לעקוף הוראות או לפרוץ את המודל."
+      },
+      "policyViolation": {
+        "label": "הפרת מדיניות",
+        "description": "מסמן קלטים שמפרים את מדיניות הארגון שלך, שנכתבה כטקסט או ככללים.",
+        "descriptionOutput": "מסמן תגובות שמפרות את מדיניות הארגון שלך, שנכתבה כטקסט או ככללים."
+      },
+      "pii": {
+        "label": "PII וסודות",
+        "description": "מזהה נתונים אישיים, אישורי גישה, כתובות IP וכתובות URL."
+      },
+      "keywords": {
+        "label": "מילות מפתח אסורות",
+        "descriptionOutput": "מזהה תגובות שמכילות מילת מפתח כלשהי שתפרט."
+      },
+      "topics": {
+        "label": "נושאים",
+        "descriptionOutput": "מסמן תגובות בנושא כלשהו שתפרט."
+      },
+      "toxicity": {
+        "label": "רעילות",
+        "description": "מזהה שפה רעילה, מעליבה, מאיימת או שנאתית."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "מזהה תוכן מיני או תוכן שאינו בטוח לעבודה."
+      },
+      "bias": {
+        "label": "הטיה",
+        "description": "מזהה שפה מוטה או מפלה."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "נתונים אישיים",
+        "description": "שמות, כתובות דואר אלקטרוני ומספרי טלפון."
+      },
+      "secrets": {
+        "label": "סודות",
+        "description": "מפתחות API, אסימונים וסיסמאות."
+      },
+      "ipAddress": {
+        "label": "כתובות IP",
+        "description": "כתובות IPv4 ו-IPv6."
+      },
+      "url": {
+        "label": "כתובות URL",
+        "description": "כתובות אינטרנט."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "אבטחה והונאה",
+      "safetyHarm": "בטיחות ונזק",
+      "privacyDataProtection": "פרטיות והגנת מידע",
+      "brandReputationTrust": "מותג ומוניטין",
+      "biasFairnessEthical": "הטיה והגינות",
+      "legalIpLiability": "אחריות משפטית וקניין רוחני",
+      "productMisuse": "שימוש לרעה במוצר",
+      "performanceQuality": "ביצועים ואיכות"
+    },
+    "applicability": {
+      "user": "קלט משתמש",
+      "userAssistant": "קלט משתמש ותגובות"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "עשרת המובילים של OWASP LLM (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "חוק הבינה המלאכותית של האיחוד האירופי",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "תכונת ארגונים",
+    "enterpriseOnly": "זוהי תכונה לארגונים בלבד.",
+    "readOnly": "רק בעלי הארגון והמנהלים יכולים לשנות הגדרות אלה.",
+    "loadError": "לא ניתן היה לטעון ספקים ומודלים",
+    "tabModels": "מודלים",
+    "tabProviders": "ספקים",
+    "tabGateways": "שערים",
+    "modelsDescription": "כבה מודל כדי לחסום אותו עבור כל חבר. מודלים מספקים מורשים מופעלים כברירת מחדל.",
+    "modelsDeniedOnly": "רק חסומים",
+    "modelsEmpty": "אין מודלים שמתאימים לחיפוש הזה.",
+    "modelsDeniedEmpty": "אין מודלים חסומים.",
+    "modelsDeniedSearchEmpty": "אין מודלים חסומים שמתאימים לחיפוש הזה.",
+    "providersDescription": "כבה ספק כדי למנוע מ-Kilo לנתב אליו בקשות עבור הארגון הזה.",
+    "providersNeedCatalog": "מתגי הספקים יישארו לקריאה בלבד עד שקטלוג המודלים המלא ייטען. לחץ על ניסיון חוזר למעלה כדי לערוך אותם.",
+    "providersEmpty": "אין ספקים שמתאימים לחיפוש הזה.",
+    "allowAllShown": "אשר את כל המוצגים",
+    "denyAllShown": "חסום את כל המוצגים",
+    "gatewaysDescription": "Kilo מנתב בקשות מודל דרך Vercel AI Gateway או OpenRouter. שער מושבת מכשיל את הבקשות האלה.",
+    "emptyProviderList": "יש לאפשר לפחות ספק אחד. רשימה ריקה חוסמת את כל נתיבי המודלים של Kilo.",
+    "gatewaysUnavailable": "הגדרות השערים אינן זמינות עבור הארגון הזה.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "בקשות OpenRouter אינן מוצמדות לאזור.",
+    "inferenceRegion": "אזור הסקה",
+    "inferenceRegionDescription": "מצמיד בקשות של Vercel AI Gateway לאזור הזה. מודל שאינו זמין שם ייכשל.",
+    "disableOpenrouterNote": "השבתת OpenRouter חוסמת גם מפתחות BYOK שמנתבים בקשות דרכו.",
+    "emptyModelList": "יש להשאיר לפחות מודל אחד מופעל. חסימת כל המודלים משאירה את החברים ללא שום דבר לשימוש.",
+    "catalogUnavailable": "קטלוג המודלים המלא לא נטען, ולכן מוצגות רק הרשימות השמורות שלך. יש לנסות שוב כדי לטעון את כל המודלים.",
+    "region": {
+      "global": "עולמי",
+      "us": "ארצות הברית",
+      "eu": "האיחוד האירופי",
+      "au": "אוסטרליה",
+      "jp": "יפן"
+    }
   }
 }

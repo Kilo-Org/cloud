@@ -36,6 +36,7 @@ const query = vi.hoisted(() => ({
     | undefined,
   isLoading: false,
   isPending: false,
+  isPaused: false,
   isError: false,
   isFetching: false,
   refetch: vi.fn(),
@@ -94,7 +95,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => boundary,
   useOrgWithMembers: () => query,
   isActiveOrgMember: (member: { status: string }) => member.status === 'active',
-  isMoneyRole: (role: string) => role === 'owner' || role === 'billing_manager',
+  isMoneyRole: (role: string) => role === 'owner' || role === 'admin' || role === 'billing_manager',
 }));
 const mutations = vi.hoisted(() => {
   const updateMember = {
@@ -124,6 +125,7 @@ beforeEach(() => {
   query.data = undefined;
   query.isLoading = false;
   query.isPending = false;
+  query.isPaused = false;
   query.isError = false;
   query.refetch.mockClear();
   updateMember.mutate.mockClear();
@@ -282,16 +284,31 @@ describe('MemberLimitSheet error copy', () => {
       .map(node => propsOf(node).message as string | null);
   }
 
-  it('explains a lapsed organization plan instead of echoing the server sentence', async () => {
-    updateMember.isError = true;
-    updateMember.error = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+  /** The labels of the steps painted under a refusal line, in screen order. */
+  function stepLabels(renderer: TestRenderer.ReactTestRenderer): string[] {
+    return renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .map(node => propsOf(node).accessibilityLabel as string | undefined)
+      .filter((label): label is string => typeof label === 'string');
+  }
+
+  const trialRefusal = () =>
+    Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
       data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
     });
+
+  it('explains a lapsed organization plan instead of echoing the server sentence', async () => {
+    updateMember.isError = true;
+    updateMember.error = trialRefusal();
     const { renderer, unmount } = await mountLimitForm(1200);
 
     const messages = accessibleStatusMessages(renderer);
-    expect(messages).toContain(i18n.t('common.organizationTrialEnded'));
+    // An owner may change the plan, so the copy offers the step and the sheet
+    // paints it under the line.
+    expect(messages).toContain(i18n.t('common.organizationTrialEndedBilling'));
+    expect(messages).not.toContain(i18n.t('common.organizationTrialEnded'));
     expect(messages).not.toContain(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+    expect(stepLabels(renderer)).toEqual([i18n.t('organization.hub.manageBilling')]);
     unmount();
   });
 
@@ -305,6 +322,30 @@ describe('MemberLimitSheet error copy', () => {
     const messages = accessibleStatusMessages(renderer);
     expect(messages).toContain(i18n.t('common.couldNotSaveSetting'));
     expect(messages).not.toContain('Failed to update user role');
+    // A failure that is not the plan refusal offers no step.
+    expect(stepLabels(renderer)).toEqual([]);
+    unmount();
+  });
+});
+
+describe('MemberLimitSheet pending membership read', () => {
+  // A pending (not fetching yet, no data) read with no cached payload must
+  // reach the skeleton, not the member-not-found state: the sheet had no
+  // answer yet.
+  it('shows the skeleton, not member-not-found, while the read is pending and unfetched', async () => {
+    query.isPending = true;
+    query.isLoading = false;
+    query.data = undefined;
+
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(MemberLimitSheet, { memberId: 'member-1' })
+    );
+
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     unmount();
   });
 });

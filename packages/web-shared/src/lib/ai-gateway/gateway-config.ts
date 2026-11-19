@@ -83,9 +83,9 @@ export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
       'Lets the organization configure Enkrypt output guardrails in AI Guardrails. Existing output guardrails keep running when this feature is removed.',
   },
   gateway_settings: {
-    label: 'Gateway settings',
+    label: 'Advanced policies',
     description:
-      'Lets the organization turn off OpenRouter, and pin Vercel AI Gateway requests to a region, on its Providers & Models page.',
+      'Lets an enterprise organization turn off OpenRouter and pin requests paid with Kilo credits to a Vercel AI Gateway inference region, on the Advanced policies tab of its Providers & Models page. The policies stop applying if the organization leaves the enterprise plan.',
   },
 } as const satisfies Record<OrganizationFeature, { label: string; description: string }>;
 

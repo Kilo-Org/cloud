@@ -30,3 +30,8 @@ const PROBLEM_KEYS = {
 export function triggerProblemMessage(problem: TriggerProblem): string {
   return i18n.t(PROBLEM_KEYS[problem]);
 }
+
+/** The message for a problem a field may not have, or `undefined` when it has none. */
+export function triggerProblemText(problem: TriggerProblem | undefined): string | undefined {
+  return problem === undefined ? undefined : triggerProblemMessage(problem);
+}

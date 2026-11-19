@@ -174,6 +174,101 @@ test('preparation rejects symbolic refs, unrelated histories and unsafe executab
       .success,
     false
   );
+  // A presentation the app does not have must be refused, not silently ignored:
+  // the capture would then measure a sheet header at the window origin.
+  assert.equal(
+    ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...TARGET, diagnostic: { component: PRODUCT, presentation: 'dialog' } }],
+    }).success,
+    false
+  );
+});
+
+test('preparation refuses a tracked product file at a generated picker-sheet route', async t => {
+  const fixture = syntheticRepo(
+    t,
+    ProofManifestSchema.parse({
+      version: 1,
+      targets: [
+        {
+          ...TARGET,
+          screen: '(app)/design-proof-card',
+          diagnostic: { component: PRODUCT, presentation: 'picker-sheet' },
+        },
+      ],
+    })
+  );
+  const tracked = path.join(fixture.repo, 'apps/mobile/src/app/(app)/design-proof-card.tsx');
+  fs.mkdirSync(path.dirname(tracked), { recursive: true });
+  fs.writeFileSync(tracked, 'export default function Real() { return "product"; }\n');
+  fixture.git('add', '.');
+  fixture.git('commit', '-m', 'tracked product file at the generated route');
+  await assert.rejects(
+    () =>
+      prepareProof({
+        ...fixture,
+        head: fixture.git('rev-parse', 'HEAD'),
+      }),
+    /would overwrite existing product source/
+  );
+  assert.equal(fs.existsSync(path.join(fixture.out, 'preparation.json')), false);
+});
+
+test('a picker-sheet diagnostic presents the screen the way the app presents that route', async t => {
+  const fixture = syntheticRepo(
+    t,
+    ProofManifestSchema.parse({
+      version: 1,
+      targets: [
+        {
+          ...TARGET,
+          screen: '(app)/design-proof-card',
+          diagnostic: { component: PRODUCT, presentation: 'picker-sheet' },
+        },
+      ],
+    })
+  );
+  const preparation = await prepareProof(fixture);
+  // The route lives in the signed-in shell, where the picker routes live and
+  // where the sheet is pushed over the tabs.
+  const route = fs.readFileSync(
+    path.join(preparation.base.directory, 'apps/mobile/src/app/(app)/design-proof-card.tsx'),
+    'utf8'
+  );
+  // The screen registers its own sheet options and only opens warm.
+  assert.match(route, /import \{ useFormSheetScreenOptions \} from '@\/lib\/form-sheet'/);
+  assert.match(route, /React\.createElement\(Stack\.Screen, \{ options \}\)/);
+  assert.match(route, /sheetAllowedDetents: \[0\.5\]/);
+  const intent = fs.readFileSync(
+    path.join(preparation.base.directory, 'apps/mobile/src/app/+native-intent.tsx'),
+    'utf8'
+  );
+  assert.match(intent, /!initial &&/);
+});
+
+test('a painted diagnostic pads the screen with the top safe-area inset', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const route = fs.readFileSync(
+    path.join(preparation.base.directory, 'apps/mobile/src/app/(auth)/design-proof-card.tsx'),
+    'utf8'
+  );
+  // The hook runs before the __DEV__ early return so it always runs, and the
+  // component is wrapped in a view whose pad keeps top text clear of the
+  // status-bar inset the safe-area rule measures against.
+  assert.match(route, /import \{ useSafeAreaInsets \} from 'react-native-safe-area-context'/);
+  assert.match(route, /const insets = useSafeAreaInsets\(\);/);
+  const hookAt = route.indexOf('const insets = useSafeAreaInsets();');
+  const earlyAt = route.indexOf('if (!__DEV__) return');
+  assert.ok(
+    hookAt !== -1 && earlyAt !== -1 && hookAt < earlyAt,
+    'hook runs before the early return'
+  );
+  assert.match(
+    route,
+    /React\.createElement\(\n {6}View,\n {6}\{ style: \{ flex: 1, paddingTop: insets\.top \} \},\n {6}React\.createElement\(Component, JSON\.parse\("\{\\"title\\":\\"Diagnostic data\\"\}"\)\)\n {4}\)/u
+  );
 });
 
 test('diagnostic prerequisite must exist on base, never copied from head', async t => {
@@ -1070,11 +1165,14 @@ test('prepared source validation rejects symlink ancestors even when the externa
   const fixture = syntheticRepo(t);
   const preparation = await prepareProof(fixture);
   const base = preparation.base.directory;
-  const auth = path.join(base, 'apps/mobile/src/app/(auth)');
+  const generated = path.join(base, 'apps/mobile/src/app/(auth)/design-proof-card.tsx');
   const outside = path.join(fixture.root, 'external-matching-fixture');
   fs.mkdirSync(outside);
-  const text = fs.readFileSync(path.join(auth, 'design-proof-card.tsx'), 'utf8');
+  const text = fs.readFileSync(generated, 'utf8');
   fs.writeFileSync(path.join(outside, 'design-proof-card.tsx'), text);
+  // A symlinked ancestor hides where the generated leaf really lives; the leaf
+  // alone would match, so the ancestor is what the containment check must catch.
+  const auth = path.join(base, 'apps/mobile/src/app/(auth)');
   fs.renameSync(auth, `${auth}-original`);
   fs.symlinkSync(outside, auth);
   assert.throws(

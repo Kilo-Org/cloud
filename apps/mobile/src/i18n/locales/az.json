@@ -26,6 +26,7 @@
     "creditHistory": "Kredit tarixçəsi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Ləğv et",
     "done": "Hazır",
     "retry": "Yenidən cəhd et",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "Dəyişikliklər",
     "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
-    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya"
+    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya",
+    "legalDocumentEnglishOnly": "Bu sənəd yalnız ingilis dilində mövcuddur.",
+    "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz."
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Saxlanılan dəyər göstərilə bilməz. Onu əvəz etmək üçün yenisini daxil et.",
       "editKeyMappingsWarning": "Açarın əvəz edilməsi saxlanılan model uyğunlaşdırmalarını da əvəz edir: hələ lazım olan hər bir uyğunlaşdırmanı yenidən daxil et.",
       "saveFailed": "Açarı saxlamaq mümkün olmadı.",
-      "invalidCredentials": "Etimadnamələri yoxla və yenidən cəhd et.",
       "fieldRequired": "{{field}} tələb olunur.",
+      "keyIncomplete": "Açarda tələb olunan dəyər yoxdur.",
       "incompleteMapping": "Uyğunlaşdırma {{number}} üçün həm gateway modelinin slug-ı, həm də deployment adı tələb olunur.",
       "apiKeyLabel": "API açarı",
       "apiKeyPlaceholder": "Açarı yapışdır",
       "apiKeyRequired": "Açarı daxil et.",
+      "keyAlreadyExists": "Bu provayder üçün artıq açarın var. Başqa bir açar əlavə etməzdən əvvəl onu sil.",
+      "keyStoreFailed": "Açar yadda saxlanıla bilmədi.",
+      "invalidCredentials": "Bu açar bu provayderin gözlədiyi formatda deyil. Onu yoxla və yenidən cəhd et.",
+      "testSucceeded": "Açar işləyir. Provayder: {{provider}}. Model: {{model}}.",
+      "testRejected": "Provayder bu açarı rədd etdi. Açarın düzgün olduğunu və ləğv edilmədiyini yoxla.",
+      "testIncomplete": "Provayder yoxlamanı bitməzdən əvvəl dayandırdı. Yenidən cəhd et.",
+      "testUnsupportedProvider": "Bu provayder artıq dəstəklənmir. Açarı sil.",
+      "testUnreadableKey": "Saxlanılan açar deşifrə edilib oxuna bilmədi. Sonra yenidən cəhd et.",
+      "testDeprecatedProvider": "Bu provayder köhnəlmişdir, buna görə də onun açarı yoxlana bilməz.",
+      "keyManagedByCodingPlan": "Bu provayderin açarı kodlaşdırma planı tərəfindən idarə olunur və açar yalnız oxumaq üçündür. Öz açarını əlavə etmək üçün kodlaşdırma planını ləğv et.",
+      "providerUnavailable": "Bu provayder hələ istifadəyə verilməyib, ona görə də onun üçün açar əlavə edə bilməzsən.",
+      "testFailed": "Açar yoxlaması uğursuz oldu. Yenidən cəhd et.",
       "authMethod": "Autentifikasiya üsulu",
       "authMethodAccessKeys": "Giriş açarları",
       "resourceName": "Azure resurs adı",
@@ -481,7 +496,14 @@
       "viewReceipt": "Qəbzə bax"
     },
     "changelog": "Yeniliklər",
-    "changelogVersionPending": "Bu versiyanın qeydləri tətbiqin növbəti yeniləməsi ilə gələcək."
+    "changelogVersionPending": "{{version}} versiyasının qeydləri tətbiqin növbəti yeniləməsi ilə gələcək.",
+    "changelogGroupNew": "Yeni",
+    "changelogFixesIn": "{{areas}} bölmələrində düzəlişlər və təkmilləşdirmələr.",
+    "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
+    "changelogAreas": {
+      "signIn": "Giriş",
+      "profileOrganizations": "Profil və təşkilatlar"
+    }
   },
   "preferences": {
     "general": "Ümumi",
@@ -1354,7 +1376,8 @@
       "managedOnWeb": "Bu təşkilatın Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
       "description": "Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
-      "tokenPlaceholder": "İş sahəsinin giriş tokeni"
+      "tokenPlaceholder": "İş sahəsinin giriş tokeni",
+      "tokenRefused": "Bitbucket bu iş sahəsi tokenini qəbul etmədi. Yuxarıdakı icazələrin olduğunu yoxla, sonra yenidən cəhd et."
     },
     "scopeList": {
       "personalStillAvailable": "Şəxsi repozitoriyalar aşağıda hələ də əlçatandır.",
@@ -1366,7 +1389,8 @@
       "noReviews": "Hələ kod yoxlaması yoxdur",
       "noReviewsDescription": "Kod yoxlayıcısı PR-i yoxladıqdan sonra kod yoxlamaları burada görünəcək.",
       "startManualReview": "Əl ilə yoxlamaya başla",
-      "configureProvider": "Provayderi tənzimlə"
+      "configureProvider": "Provayderi tənzimlə",
+      "connectOwnerOnly": "Provayderi qoşmaq üçün təşkilat sahibindən və ya inzibatçıdan xahiş edin."
     },
     "platformList": {
       "checking": "Yoxlanılır…",
@@ -1464,13 +1488,25 @@
       "repositoryLine": "Yoxlamalar: {{reviews}} · Tapıntılar: {{findings}}",
       "empty": "Analitikası olan yoxlama hələ yoxdur",
       "emptyDescription": "Analitika təşkilat üçün aktiv olduğu müddətdə tamamlanmış yoxlamaları qeydə alır.",
-      "off": "Bu təşkilat üçün analitika deaktivdir.",
-      "couldNotLoad": "Analitikanı yükləmək mümkün olmadı"
+      "offTitle": "{{platform}} üçün analitika deaktivdir",
+      "offDescription": "Təşkilatın ödəniş rolları analitikanı vebdəki tənzimləmələrdə aktivləşdirib tamamlanmış yoxlamaları qeydə ala bilər.",
+      "couldNotLoad": "Analitikanı yükləmək mümkün olmadı",
+      "trackedReviewsCaption": "Bu dövrdə analitika aktiv olduğu halda tamamlanmış yoxlamalar. Davam edən və uğursuz yoxlamalar heç vaxt hesaba alınmır.",
+      "trackedReviewsUncounted": "Hesaba alınmır: təşkilatın {{displayTotal}} tamamlanmış yoxlamasından {{displayCount}} ədədinin nəticəsi qeyd olunmayıb.",
+      "trackedReviewsUncounted_one": "Hesaba alınmır: təşkilatın {{displayTotal}} tamamlanmış yoxlamasından {{displayCount}} ədədinin nəticəsi qeyd olunmayıb.",
+      "trackedReviewsUncounted_other": "Hesaba alınmır: təşkilatın {{displayTotal}} tamamlanmış yoxlamasından {{displayCount}} ədədinin nəticəsi qeyd olunmayıb."
     },
     "council": {
       "title": "Şura yoxlaması",
       "subtitle": "Hər pull request-i bir neçə mütəxəssis yoxlayır və onların səsləri vahid qərarda birləşir.",
-      "unavailable": "Şura yoxlaması bu təşkilat üçün əlçatan deyil.",
+      "unavailablePersonallyTitle": "Enterprise təşkilatı tələb olunur",
+      "unavailablePersonally": "Şura yoxlaması şəxsi hesabın bir hissəsi deyil.",
+      "unavailablePersonallyAction": "Təşkilat yarat",
+      "unavailablePersonallySwitchAction": "Təşkilatı dəyişdir",
+      "unavailableOrganizationTitle": "Şura yoxlaması mövcud deyil",
+      "unavailableForOrganization": "Şura yoxlaması aktiv abunəlik və ya sınaq dövrü olan Enterprise plan tələb edir. Bu təşkilatda hazırda bu yoxdur.",
+      "unavailableForOrganizationNeutral": "Şura yoxlaması hazırda bu təşkilat üçün mövcud deyil. Daha sonra yenidən cəhd edin.",
+      "unavailableOnBitbucket": "Şura yoxlaması Bitbucket repozitoriyaları üçün əlçatan deyil.",
       "noRepositories": "Hələ heç bir repozitoriya seçilməyib. Əvvəlcə repozitoriya ayarlarında repozitoriyaları seç.",
       "specialists": "Mütəxəssislər",
       "labels": "Şura yoxlamasını işə salan etiketlər",
@@ -2974,6 +3010,7 @@
     "signOutThisDevice": "Bu cihazdan çıxış et",
     "signOutSessionLabel": "{{device}} cihazından çıxış et, Giriş: {{signedIn}}, Son fəaliyyət: {{lastSeen}}",
     "sessionSignedOut": "Sessiyadan çıxıldı.",
+    "sessionSignOutFailed": "Bu sessiyadan çıxış etmək mümkün olmadı. Yenidən cəhd edin.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
     "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Son fəaliyyət: {{lastSeen}}. Cihazın API-yə girişi bir saata qədər davam edə bilər.",
@@ -3096,12 +3133,14 @@
     "manage": {
       "billingHistory": "Ödəniş tarixçəsi",
       "billingHistoryEmpty": "Hələ ödəniş tarixçəsi yoxdur.",
+      "billingHistoryError": "Ödəniş tarixçəsi yüklənə bilmədi",
       "cancel": "Abunəliyi ləğv et",
       "cancelDescription": "Kilo Pass ödəniş dövrünün sonunadək aktiv qalacaq və yenilənməyəcək.",
       "cancelScheduled": "{{date}} tarixində ləğv olunur",
       "cancelScheduledChange": "Planlaşdırılmış dəyişikliyi ləğv et",
       "cancelled": "Abunəlik ləğv edildi",
       "creditHistoryEmpty": "Hələ Kilo Pass krediti yoxdur.",
+      "creditHistoryError": "Kredit tarixçəsi yüklənə bilmədi",
       "resume": "Abunəliyi bərpa et",
       "resumeCancelledDescription": "Kilo Pass yenidən avtomatik yenilənməyə başlayacaq.",
       "resumePausedDescription": "Kilo Pass planlaşdırılmış bərpa tarixindən əvvəl, indi bərpa olunacaq.",
@@ -3118,7 +3157,6 @@
     "completingPurchase": "Alış tamamlanır",
     "subscriptionLoading": "Kilo Pass abunəliyi yüklənir",
     "retryHint": "Kilo Pass-ın vəziyyətini yenidən yoxlayır.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "{{date}} tarixində bitdi",
     "notAvailableInApp": "Kilo Pass tətbiqdə əlçatan deyil.",
     "statusActive": "Aktiv",
@@ -3321,6 +3359,7 @@
       "manageOnWeb": "Vebdə ödənişlər ayarları",
       "changePlan": "Planı dəyiş",
       "buySeats": "İstifadəçi yerləri al",
+      "managedOnWeb": "Plan, istifadəçi yerləri və avtomatik artırma vebdə idarə olunur.",
       "setupAutoTopUp": "Avtomatik artırmanı qur",
       "manageAutoTopUp": "Avtomatik artırmanı idarə et",
       "opensOnWeb": "Vebdə açılır"
@@ -3338,7 +3377,7 @@
       "selectOrganization": "Təşkilat seç",
       "unavailableDescription": "Bu təşkilat artıq əlçatan deyil. Davam etmək üçün profilindən başqa təşkilat seç.",
       "unavailableSessionsDescription": "Bu təşkilat artıq əlçatan deyil. Onun sessiyalarını yükləmək mümkün deyil.",
-      "accessDeniedDescription": "Bu təşkilata giriş icazən yoxdur."
+      "accessDeniedDescription": "Təşkilat sahibindən və ya inzibatçısından sənə giriş icazəsi verməsini xahiş et."
     },
     "create": {
       "title": "Təşkilat yarat",
@@ -3458,16 +3497,26 @@
     },
     "settingsOnWeb": {
       "title": "Vebdə təşkilat ayarları",
-      "integrations": "Vebdə inteqrasiyalar",
       "usageDetails": "İstifadə təfərrüatları",
       "providersAndModels": "Provayderlər və modellər",
       "groups": "Qruplar",
       "guardrails": "Qoruyucu qaydalar",
       "byok": "Öz açarınızdan istifadə edin",
+      "ssoAndDomain": "SSO və domen",
+      "dataCollection": "Məlumat toplanması",
       "auditLogs": "Audit jurnalları",
-      "requestLogs": "Sorğu jurnalları",
-      "subOrganizations": "Alt təşkilatlar",
-      "distributeFunds": "Vəsaitləri bölüşdür"
+      "requestLogs": "Sorğu jurnalları"
+    },
+    "requestLogs": {
+      "older": "Əvvəlki saat",
+      "newer": "Sonrakı saat",
+      "truncated": "Bu saatda siyahıda göstəriləndən daha çox sorğu var.",
+      "emptyTitle": "Bu saatda sorğu yoxdur",
+      "emptyDescription": "Əvvəlki sorğuları görmək üçün «Əvvəlki saat» düyməsindən istifadə edin.",
+      "loadError": "Sorğu jurnallarını yükləmək mümkün olmadı.",
+      "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər.",
+      "tokens": "{{input}} giriş · {{output}} çıxış",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",
@@ -4267,8 +4316,7 @@
       "repoValue": "Repozitoru: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Bu profil artıq mövcud deyil. Başqa profil seçin.",
-      "pickerEmptyDescriptionOrganization": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün təşkilat profili yaradın.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Təşkilat sahibi və ya administratoru təşkilat profili yarada bilər."
+      "pickerEmptyDescriptionOrganization": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün təşkilat profili yaradın."
     },
     "variablesDeleteFailed": "Dəyişəni silmək mümkün olmadı",
     "deleteVariable": "{{key}} dəyişənini sil",
@@ -4315,7 +4363,7 @@
       },
       "purchaseFallback": "Kredit alışı",
       "receipt": "Qəbz",
-      "receiptA11y": "{{description}} üçün qəbzi açın",
+      "receiptA11y": "{{description}} üçün {{amount}}, {{date}} tarixli qəbzi açın",
       "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil."
     },
     "title": "Kredit al",
@@ -4454,7 +4502,6 @@
     "dismiss": "Hesabatı rədd et",
     "offline": "Oflayn · saxlanmış hesabat",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
-    "window": "{{start}} – {{end}}",
     "summary": "AI xülasəsi",
     "summaryPending": "AI xülasəsi hazırlanır. Hazır olanda bura əlavə ediləcək.",
     "summaryUnavailable": "AI xülasəsi əlçatan deyil. Strukturlu hesabatınız hələ də mövcuddur.",
@@ -4521,6 +4568,8 @@
     "topModels": "Əsas modellər",
     "topFeatures": "Əsas funksiyalar",
     "emptyTitle": "Bu dövrdə istifadə yoxdur",
+    "unavailableTitle": "İstifadə mövcud deyil",
+    "unavailableDescription": "Bu iş sahəsi istifadə barədə məlumat vermir. Yenidən cəhd etmək kömək etməyəcək.",
     "orgSelfNotice": "Bu təşkilatda öz istifadənizi görürsünüz.",
     "viewDetails": "İstifadə təfərrüatlarına baxın"
   },
@@ -4571,6 +4620,7 @@
       "title": "Tətikləyicilər və vebhuklar",
       "subtitle": "Cloud Agent icralarını vebhuk çağırışı və ya cədvəl vasitəsilə avtomatlaşdırın.",
       "new": "Yeni tətikləyici",
+      "create": "Tətikləyici yaradın",
       "emptyTitle": "Hələ tətikləyici yoxdur",
       "emptyDescription": "Cloud Agent icrasını vebhuk çağırışı və ya cədvəl üzrə başlatmaq üçün tətikləyici yaradın.",
       "loadFailedTitle": "Tətikləyicilər yüklənə bilmədi",
@@ -4592,7 +4642,7 @@
       "fieldCron": "Kron ifadəsi",
       "fieldCronHelp": "Beş sahə: dəqiqə, saat, gün, ay və həftənin günü. Ən qısa interval bir dəqiqədir.",
       "fieldTimezone": "Saat qurşağı",
-      "nameLocked": "Ad vebhuk URL-in bir hissəsidir və dəyişdirilə bilməz.",
+      "nameLocked": "Tətikləyici yaradıldıqdan sonra ad dəyişdirilə bilməz.",
       "repositoryLocked": "Tətikləyici yaradıldıqdan sonra repozitoriya dəyişdirilə bilməz.",
       "environmentAutomatic": "Repozitoriyaya görə avtomatik",
       "notSelected": "Seçilməyib",
@@ -4607,6 +4657,7 @@
       "authHeaderLabel": "Başlıq adı",
       "authSecretLabel": "Ortaq sirr",
       "authSecretKeep": "Yadda saxlanmış sirri saxlamaq üçün boş buraxın.",
+      "authSecretSet": "Məcburi. Güclü təsadüfi sətir seçin.",
       "authSecretCreator": "Tətikləyici yaradıcısı kimi işləyərkən ən azı 16 simvol istifadə edin.",
       "autoCommit": "İcra bitdikdə dəyişiklikləri qeyd edin",
       "condenseOnComplete": "İcra bitdikdə konteksti yığcamlaşdırın",
@@ -4617,11 +4668,14 @@
       "saveFailedTitle": "Tətikləyici yadda saxlanıla bilmədi",
       "deleteTitle": "Bu tətikləyici silinsin?",
       "deleteMessage": "{{name}} ünvanına edilən çağırışlar uğursuz olacaq. Bu əməliyyat geri qaytarıla bilməz.",
+      "deleteMessageScheduled": "{{name}} tətikləyicisinin planlaşdırılıb icra olunan çağırışları dayanacaq. Bu əməliyyat geri qaytarıla bilməz.",
       "runNow": "İndi işlət",
       "runStarted": "İcra başladı",
       "created": "Tətikləyici yaradıldı",
       "saved": "Tətikləyici yadda saxlanıldı",
       "statusArrived": "Gəldi",
+      "defaultPromptWebhook": "Bu vebhuk sorğusunun gövdəsini təsvir edin:\n\n{{body}}",
+      "defaultPromptScheduled": "Planlaşdırılmış tapşırığı icra edin. Tetiklənmə vaxtı: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ad daxil edin.",
         "nameTooShort": "Ən azı 8 simvol istifadə edin.",
@@ -4656,8 +4710,9 @@
     "create": "Link yarat",
     "createFailed": "Linki yaratmaq alınmadı.",
     "existingTitle": "Mövcud link",
-    "existingDescription": "Bu sessiyanın artıq paylaşım linki var. Yenisini yaratsanız, o köhnəsini əvəz edəcək və köhnə link işləməyəcək.",
+    "existingDescription": "Bu sessiyanın artıq paylaşım linki var. Bu parametrlərlə yenisini yaratsanız, o köhnəsini əvəz edəcək və köhnə link işləməyəcək.",
     "rotate": "Yeni link yarat",
+    "replacementSettings": "Bu parametrlər yeni linkə aiddir.",
     "revoke": "Linki sil",
     "revokeTitle": "Link ləğv edilsin?",
     "revokeMessage": "Cari link dərhal işləməyi dayandırır.",
@@ -4669,6 +4724,7 @@
     "superseded": "Bu link başqa yerdə əvəzləndiyi üçün artıq işləmir."
   },
   "sharedSession": {
+    "startedAt": "Başlama vaxtı {{time}}",
     "title": "Paylaşılan sessiya",
     "someone": "Kimsə",
     "sharedBy": "Paylaşan: {{owner}}",
@@ -4676,5 +4732,177 @@
     "unavailableDescription": "Bu paylaşım linkinin müddəti bitib və ya o ləğv edilib.",
     "transcriptUnavailableTitle": "Bu transkripti yükləmək alınmadı",
     "transcriptUnavailableDescription": "Link hələ də işləyir. Bir az sonra yenidən cəhd edin."
+  },
+  "organizationGuardrails": {
+    "title": "Süni intellekt qoruyucu qaydaları",
+    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və adminlər idarə edə bilər.",
+    "unavailable": "Süni intellekt qoruyucu qaydaları bu təşkilat üçün əlçatan deyil.",
+    "loadError": "Süni intellekt qoruyucu qaydaları yüklənmədi",
+    "statusSaving": "Yadda saxlanılır…",
+    "statusSaved": "Yadda saxlanıldı",
+    "statusFailed": "Yadda saxlamaq alınmadı.",
+    "inputTitle": "Giriş üçün qoruyucu qaydalar",
+    "inputDescription": "Alət nəticələri daxil olmaqla hər girişi Enkrypt AI ilə yoxlayır. Enkrypt əlçatan olmadıqda bloklayan detektor sorğunu rədd edir.",
+    "outputTitle": "Çıxış üçün qoruyucu qaydalar",
+    "outputDescription": "Cavabları üzvlərə çatmazdan əvvəl Enkrypt AI ilə yoxlayır. Siz aktivləşdirməyincə söndürülüdür.",
+    "detectorsHint": "\"Blokla\" işarələnmiş sorğunu rədd edir. \"Yalnız qeydə al\" sorğunu ləngitmədən onu sadəcə qeydə alır.",
+    "detectorsHintOutput": "\"Blokla\" işarələnmiş cavabı uğursuz edir. \"Yalnız qeydə al\" cavabı ləngitmədən onu sadəcə qeydə alır.",
+    "choiceLog": "Yalnız qeydə al",
+    "applyTo": "Kimlərə tətbiq olunur",
+    "applyToAllMembers": "Bütün üzvlər",
+    "applyKiloDefault": "Kilo standartını tətbiq et",
+    "invalidSavedTitle": "Giriş detektorlarının yadda saxlanılmış ayarlarını oxumaq mümkün deyil",
+    "invalidSavedBody": "Giriş detektorları yenidən yadda saxlanılana qədər sorğular bloklanır. Aşağıdakı detektorlar Kilo standartı ilə başlayır.",
+    "invalidSavedOutputTitle": "Çıxış detektorlarının yadda saxlanılmış ayarlarını oxumaq mümkün deyil",
+    "invalidSavedOutputBody": "Çıxış detektorları yenidən yadda saxlanılana qədər cavablar verilmir. Aşağıda çıxış detektorlarını seçin.",
+    "blockingOutputNote": "Bloklayan çıxış detektoru Enkrypt cavabın hamısını yoxlayana qədər onu saxlayır. Gecikmənin qarşısını almaq üçün \"Yalnız qeydə al\" seçin.",
+    "inputDetectorRequired": "Ən azı bir giriş detektorunu aktivləşdirin.",
+    "outputDetectorRequired": "Ən azı bir çıxış detektorunu aktivləşdirin.",
+    "rulesTooMany": "Ən çoxu {{max}} qayda əlavə edin.",
+    "ruleIdRequired": "Qayda ID-sini daxil edin.",
+    "ruleIdInvalid": "Qayda ID-si yalnız hərflərdən, rəqəmlərdən, nöqtələrdən, defislərdən və alt xətlərdən ibarət ola bilər.",
+    "ruleTextRequired": "Qaydanın nəyi qadağan etdiyini və ya tələb etdiyini təsvir edin.",
+    "keywordTooLong": "Hər açar söz ən çoxu {{max}} simvoldan ibarət ola bilər.",
+    "topicTooLong": "Hər mövzu ən çoxu {{max}} simvoldan ibarət ola bilər.",
+    "keywordsTooMany": "Ən çoxu {{max}} açar söz əlavə edin.",
+    "topicsTooMany": "Ən çoxu {{max}} mövzu əlavə edin.",
+    "piiEntityRequired": "Aşkarlanacaq ən azı bir məlumat növü seçin.",
+    "keywordRequired": "Ən azı bir açar söz əlavə edin.",
+    "topicRequired": "Ən azı bir mövzu əlavə edin.",
+    "policyTextRequired": "Siyasət mətnini daxil edin.",
+    "ruleRequired": "Ən azı bir qayda əlavə edin.",
+    "ruleIdDuplicate": "Hər qaydanın öz qayda ID-si olmalıdır.",
+    "piiEntities": "Aşkarlanacaq məlumatlar",
+    "keywordsLabel": "Açar sözlər",
+    "keywordsHint": "Hər sətirdə bir açar söz.",
+    "topicsHint": "Hər sətirdə bir mövzu.",
+    "policyFormat": "Siyasət formatı",
+    "policyFormatRules": "Strukturlaşdırılmış qaydalar",
+    "policyFormatRulesDescription": "Hər tələb üçün kateqoriya və ciddilik dərəcəsi olan bir qayda. Tövsiyə olunur.",
+    "policyFormatText": "Siyasət mətni",
+    "policyFormatTextDescription": "Mövcud siyasəti sadə mətn kimi yapışdırın.",
+    "rulesEmpty": "Hələ qayda yoxdur. Hər qayda girişlərdə olmamalı və ya onların istəməməli olduğu bir şeyi təsvir edir.",
+    "addRule": "Qayda əlavə et",
+    "ruleNumber": "Qayda {{number}}",
+    "ruleRemove": "{{number}} nömrəli qaydanı sil",
+    "ruleIdLabel": "Qayda ID-si",
+    "ruleNameLabel": "Ad (istəyə bağlı)",
+    "ruleTextLabel": "Qayda",
+    "ruleRiskCategory": "Risk kateqoriyası",
+    "ruleApplicability": "Əhatə dairəsi",
+    "ruleFrameworks": "Çərçivələr",
+    "detector": {
+      "promptInjection": {
+        "label": "Prompt inyeksiyası",
+        "description": "Təlimatları ləğv etmək və ya modelin məhdudiyyətlərini aşmaq (jailbreak) cəhdlərini aşkarlayır."
+      },
+      "policyViolation": {
+        "label": "Siyasət pozuntusu",
+        "description": "Təşkilatınızın mətn və ya qaydalar şəklində yazılmış siyasətini pozan girişləri işarələyir.",
+        "descriptionOutput": "Təşkilatınızın mətn və ya qaydalar şəklində yazılmış siyasətini pozan cavabları işarələyir."
+      },
+      "pii": {
+        "label": "PII və məxfi məlumatlar",
+        "description": "Şəxsi məlumatları, giriş məlumatlarını, IP ünvanlarını və URL-ləri aşkarlayır."
+      },
+      "keywords": {
+        "label": "Qadağan olunmuş açar sözlər",
+        "descriptionOutput": "Siyahıya aldığınız hər hansı açar sözü ehtiva edən cavabları aşkarlayır."
+      },
+      "topics": {
+        "label": "Mövzular",
+        "descriptionOutput": "Siyahıya aldığınız hər hansı mövzuya aid cavabları işarələyir."
+      },
+      "toxicity": {
+        "label": "Toksiklik",
+        "description": "Toksik, təhqiramiz, təhdidedici və ya nifrət dolu dili aşkarlayır."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Cinsi və ya başqa səbəbdən iş mühiti üçün uyğun olmayan məzmunu aşkarlayır."
+      },
+      "bias": {
+        "label": "Qərəzlilik",
+        "description": "Qərəzli və ya ayrı-seçkilik edən dili aşkarlayır."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Şəxsi məlumatlar",
+        "description": "Adlar, e-poçt ünvanları, telefon nömrələri."
+      },
+      "secrets": {
+        "label": "Məxfi məlumatlar",
+        "description": "API açarları, tokenlər, parollar."
+      },
+      "ipAddress": {
+        "label": "IP ünvanları",
+        "description": "IPv4 və IPv6 ünvanları."
+      },
+      "url": {
+        "label": "URL-lər",
+        "description": "Veb ünvanlar."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Kibertəhlükəsizlik və fırıldaqçılıq",
+      "safetyHarm": "Təhlükəsizlik və zərər",
+      "privacyDataProtection": "Məxfilik və məlumatların qorunması",
+      "brandReputationTrust": "Brend və reputasiya",
+      "biasFairnessEthical": "Qərəzlilik və ədalətlilik",
+      "legalIpLiability": "Hüquqi və əqli mülkiyyət məsuliyyəti",
+      "productMisuse": "Məhsuldan sui-istifadə",
+      "performanceQuality": "Performans və keyfiyyət"
+    },
+    "applicability": {
+      "user": "İstifadəçi girişi",
+      "userAssistant": "İstifadəçi girişi və cavablar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Aİ Süni İntellekt Aktı",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise funksiyası",
+    "enterpriseOnly": "Bu funksiya yalnız Enterprise üçündür.",
+    "readOnly": "Bu ayarları yalnız təşkilat sahibləri və adminlər dəyişə bilər.",
+    "loadError": "Provayderlər və modellər yüklənmədi",
+    "tabModels": "Modellər",
+    "tabProviders": "Provayderlər",
+    "tabGateways": "Şlüzlər",
+    "modelsDescription": "Modeli bütün üzvlər üçün bloklamaq üçün onu söndürün. İcazə verilən provayderlərin modelləri standart olaraq aktivdir.",
+    "modelsDeniedOnly": "Yalnız qadağan olunanlar",
+    "modelsEmpty": "Bu axtarışa uyğun model yoxdur.",
+    "modelsDeniedEmpty": "Qadağan olunan model yoxdur.",
+    "modelsDeniedSearchEmpty": "Bu axtarışa uyğun qadağan olunan model yoxdur.",
+    "providersDescription": "Kilo-nun bu təşkilat üçün sorğuları provayderə yönləndirməsini dayandırmaq üçün onu söndürün.",
+    "providersNeedCatalog": "Provayder açarları tam model kataloqu yüklənənə qədər yalnız oxunuş rejimində qalır. Onları redaktə etmək üçün yuxarıdakı Yenidən cəhd et düyməsinə toxunun.",
+    "providersEmpty": "Bu axtarışa uyğun provayder yoxdur.",
+    "allowAllShown": "Göstərilənlərin hamısına icazə ver",
+    "denyAllShown": "Göstərilənlərin hamısını qadağan et",
+    "gatewaysDescription": "Kilo model sorğularını Vercel AI Gateway və ya OpenRouter vasitəsilə yönləndirir. Şlüz deaktiv edilərsə, həmin sorğular uğursuz olur.",
+    "emptyProviderList": "Ən azı bir provayderə icazə verin. Boş siyahı bütün Kilo model yönləndirmələrini bloklayır.",
+    "gatewaysUnavailable": "Şlüz ayarları bu təşkilat üçün əlçatan deyil.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter sorğuları regiona bağlanmır.",
+    "inferenceRegion": "İnferens regionu",
+    "inferenceRegionDescription": "Vercel AI Gateway sorğularını bu regiona bağlayır. Orada əlçatan olmayan modelə sorğular uğursuz olur.",
+    "disableOpenrouterNote": "OpenRouter deaktiv edildikdə, sorğuları onun vasitəsilə yönləndirən BYOK açarları da bloklanır.",
+    "emptyModelList": "Ən azı bir modeli aktiv saxlayın. Bütün modelləri rədd etsəniz, üzvlərin istifadə edəcəyi heç nə qalmaz.",
+    "catalogUnavailable": "Tam model kataloqu yüklənmədi, buna görə yalnız yadda saxlanmış siyahılarınız göstərilir. Bütün modelləri yükləmək üçün yenidən cəhd edin.",
+    "region": {
+      "global": "Qlobal",
+      "us": "Amerika Birləşmiş Ştatları",
+      "eu": "Avropa İttifaqı",
+      "au": "Avstraliya",
+      "jp": "Yaponiya"
+    }
   }
 }

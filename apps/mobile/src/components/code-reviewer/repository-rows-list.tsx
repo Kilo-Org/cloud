@@ -23,9 +23,11 @@ import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
 export type RepositoryRow = { id: number | string; fullName: string; private?: boolean };
 
 // `FlashList` takes styles, not classes: the content inset the scroll body used
-// to carry as `px-6 pt-4`, in pixels, and a list that fills its frame.
+// to carry as `px-6 pt-4`, in pixels. NativeWind's native rem is 14, so px-6 is
+// 21 dp and pt-4 is 14 dp; 24/16 is the web rem and leaves the rows and the
+// search field 3 dp inside the column the rest of the app paints at 21.
 const LIST_STYLE = { flex: 1 } satisfies ViewStyle;
-const LIST_CONTENT_STYLE = { paddingHorizontal: 24, paddingTop: 16 } satisfies ViewStyle;
+const LIST_CONTENT_STYLE = { paddingHorizontal: 21, paddingTop: 14 } satisfies ViewStyle;
 
 function repositoryKey(repository: RepositoryRow): string {
   return String(repository.id);

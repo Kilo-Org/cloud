@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA 违约"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "安全检查有更新"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "您的 Kilo 会话已就绪，可从手机控制"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

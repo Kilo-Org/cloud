@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-brot"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Öryggisathugun hefur uppfærslu"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Kilo-lotan þín er tilbúin til stjórnunar úr símanum þínum"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

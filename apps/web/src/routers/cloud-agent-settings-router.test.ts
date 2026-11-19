@@ -76,6 +76,33 @@ describe('cloud-agent-settings router', () => {
   let otherUser: User;
   let organization: Organization;
 
+  test('persists a web search provider or opt-out for the signed-in user only', async () => {
+    const owner = await createCallerForUser(ownerUser.id);
+    const member = await createCallerForUser(memberUser.id);
+    await expect(owner.cloudAgentSettings.getWebSearch()).resolves.toEqual({ provider: 'default' });
+    for (const provider of ['parallel', 'off', 'default'] as const) {
+      await expect(owner.cloudAgentSettings.setWebSearch({ provider })).resolves.toEqual({
+        provider,
+      });
+      await expect(owner.cloudAgentSettings.getWebSearch()).resolves.toEqual({ provider });
+    }
+    await expect(member.cloudAgentSettings.getWebSearch()).resolves.toEqual({
+      provider: 'default',
+    });
+  });
+
+  test('degrades an unknown stored web search provider to the default', async () => {
+    const owner = await createCallerForUser(ownerUser.id);
+    await owner.cloudAgentSettings.setWebSearch({ provider: 'parallel' });
+    await db
+      .update(cloud_agent_user_settings)
+      .set({ web_search_provider: 'retired-provider' })
+      .where(eq(cloud_agent_user_settings.kilo_user_id, ownerUser.id));
+    await expect(owner.cloudAgentSettings.getWebSearch()).resolves.toEqual({
+      provider: 'default',
+    });
+  });
+
   beforeAll(async () => {
     ({ createCallerForUser } = await import('@/routers/test-utils'));
     ownerUser = await insertTestUser({ google_user_email: 'settings-owner@example.com' });
@@ -304,6 +331,50 @@ describe('cloud-agent-settings router', () => {
       await expect(
         caller.cloudAgentSettings.setBuiltinAgents({ agents: { code: { disable: true } } })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    test('sets user-scoped model context limits', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const saved = await caller.cloudAgentSettings.setModelContextLimits({
+        limits: { 'kilo/openai/gpt-6.1-sol': 300_000 },
+      });
+
+      expect(saved.limits).toEqual({ 'openai/gpt-6.1-sol': 300_000 });
+      expect((await caller.cloudAgentSettings.get({})).modelContextLimits).toEqual(saved.limits);
+      expect(await caller.cloudAgentSettings.getModelContextLimits()).toEqual(saved.limits);
+    });
+
+    test('model context limits stay user-scoped in an organization context', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+      await caller.cloudAgentSettings.setModelContextLimits({
+        limits: { 'openai/gpt-6.1-sol': 300_000 },
+      });
+
+      const result = await caller.cloudAgentSettings.get({ organizationId: organization.id });
+      expect(result.modelContextLimits).toEqual({ 'openai/gpt-6.1-sol': 300_000 });
+
+      const otherCaller = await createCallerForUser(otherUser.id);
+      expect((await otherCaller.cloudAgentSettings.get({})).modelContextLimits).toEqual({});
+    });
+
+    test('rejects model context limits outside the token bounds', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await expect(
+        caller.cloudAgentSettings.setModelContextLimits({
+          limits: { 'openai/gpt-6.1-sol': 10 },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    test('clears model context limits with an empty record', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      await caller.cloudAgentSettings.setModelContextLimits({
+        limits: { 'openai/gpt-6.1-sol': 300_000 },
+      });
+      const saved = await caller.cloudAgentSettings.setModelContextLimits({ limits: {} });
+      expect(saved.limits).toEqual({});
+      expect((await caller.cloudAgentSettings.get({})).modelContextLimits).toEqual({});
     });
 
     test('rejects an allocation the owner is not offered', async () => {

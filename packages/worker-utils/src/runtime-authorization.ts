@@ -1,13 +1,16 @@
 import { getWorkerDb, kilocode_users, organization_memberships, organizations } from '@kilocode/db';
+import { liveDeviceSessionCondition } from '@kilocode/db/device-session-condition';
+import { device_sessions } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 import { signModernKiloToken, verifyKiloTokenForPolicy } from './kilo-token-policy.js';
 import { sha256Hex } from './sha256.js';
-import type { RuntimeAuthorization } from './runtime-authorization-contract.js';
+import type { RuntimeAuthorization, RuntimeEnvironment } from './runtime-authorization-contract.js';
 import {
   RuntimeAuthorizationSchema,
   runtimeAuthorizationMaximumLifetimeMs,
+  RuntimeEnvironmentSchema,
   RuntimeResourceKindSchema,
 } from './runtime-authorization-contract.js';
 export { RuntimeAuthorizationSchema };
@@ -39,6 +42,11 @@ export type RuntimeAuthorizationAdapters = {
     userId: string;
     organizationId: string;
   }) => Promise<RuntimeAuthorizationMembership | null>;
+  isDeviceSessionActive?: (input: {
+    connectionString: string;
+    deviceSessionId: string;
+    userId: string;
+  }) => Promise<boolean>;
 };
 
 export type RuntimeAuthorizationBindingRejectionReason =
@@ -48,10 +56,22 @@ export type RuntimeAuthorizationBindingRejectionReason =
   | 'membership_missing'
   | 'organization_deleted'
   | 'membership_role_invalid'
-  | 'membership_changed';
+  | 'membership_changed'
+  | 'device_session_inactive';
 
 type BindingDiagnostics = {
   onBindingRejected?: (reason: RuntimeAuthorizationBindingRejectionReason) => void;
+};
+
+/**
+ * Admission refusal reasons a runtime operator must be able to tell apart from
+ * a generic refusal, because they report a deployment configuration problem
+ * rather than a bad credential.
+ */
+export type RuntimeAuthorizationAdmissionRejectionReason = 'environment_mismatch';
+
+type AdmissionDiagnostics = {
+  onAdmissionRejected?: (reason: RuntimeAuthorizationAdmissionRejectionReason) => void;
 };
 
 type CommonInput = {
@@ -145,6 +165,47 @@ async function getMembership(
   return row ? membershipSchema.parse(row) : null;
 }
 
+const deviceSessionIdShape = z.string().uuid();
+
+/**
+ * Whether the device session that admitted a credential can still act for its
+ * owner. Ids that are not UUIDs cannot name a row, so they are inactive; that
+ * matches the HTTP path, which refuses the same credential rather than falling
+ * back to an unbound request.
+ */
+async function readDeviceSessionActive(
+  input: CommonInput,
+  deviceSessionId: string,
+  userId: string
+): Promise<boolean> {
+  if (!deviceSessionIdShape.safeParse(deviceSessionId).success) return false;
+  if (input.adapters?.isDeviceSessionActive) {
+    return await input.adapters.isDeviceSessionActive({
+      connectionString: input.connectionString,
+      deviceSessionId,
+      userId,
+    });
+  }
+  const db = getWorkerDb(input.connectionString);
+  const [row] = await db
+    .select({ id: device_sessions.id })
+    .from(device_sessions)
+    .where(liveDeviceSessionCondition({ deviceSessionId, userId }));
+  return row !== undefined;
+}
+
+function rejectBinding(
+  input: BindingDiagnostics,
+  reason: RuntimeAuthorizationBindingRejectionReason
+): never {
+  try {
+    input.onBindingRejected?.(reason);
+  } catch {
+    // Diagnostics must not replace the authorization rejection.
+  }
+  throw new RuntimeAuthorizationRevokedError();
+}
+
 async function requireBindings(
   input: CommonInput & BindingDiagnostics,
   record: RuntimeAuthorization
@@ -154,21 +215,14 @@ async function requireBindings(
 }> {
   const user = await getPrincipal(input, record.userId);
   const authorizationUser = await getPrincipal(input, record.authorizationUserId);
-  const reject = (reason: RuntimeAuthorizationBindingRejectionReason): never => {
-    try {
-      input.onBindingRejected?.(reason);
-    } catch {
-      // Diagnostics must not replace the authorization rejection.
-    }
-    throw new RuntimeAuthorizationRevokedError();
-  };
-  if (user === null || authorizationUser === null) return reject('principal_missing');
-  if (isBlocked(user) || isBlocked(authorizationUser)) return reject('principal_blocked');
+  if (user === null || authorizationUser === null) return rejectBinding(input, 'principal_missing');
+  if (isBlocked(user) || isBlocked(authorizationUser))
+    return rejectBinding(input, 'principal_blocked');
   if (
     (await digest(user.apiTokenPepper)) !== record.bindings.userPepperDigest ||
     (await digest(authorizationUser.apiTokenPepper)) !== record.bindings.authorizationPepperDigest
   )
-    return reject('pepper_changed');
+    return rejectBinding(input, 'pepper_changed');
   if (record.organizationId) {
     const userMembership = await getMembership(input, user.id, record.organizationId);
     const authorizationMembership = await getMembership(
@@ -177,37 +231,52 @@ async function requireBindings(
       record.organizationId
     );
     if (userMembership === null || authorizationMembership === null)
-      return reject('membership_missing');
+      return rejectBinding(input, 'membership_missing');
     if (
       userMembership.organizationDeletedAt !== null ||
       authorizationMembership.organizationDeletedAt !== null
     )
-      return reject('organization_deleted');
+      return rejectBinding(input, 'organization_deleted');
     if (
       !membershipRole.safeParse(userMembership.role).success ||
       !membershipRole.safeParse(authorizationMembership.role).success
     )
-      return reject('membership_role_invalid');
+      return rejectBinding(input, 'membership_role_invalid');
     if (
       userMembership.id !== record.bindings.userMembershipId ||
       authorizationMembership.id !== record.bindings.authorizationUserMembershipId
     )
-      return reject('membership_changed');
+      return rejectBinding(input, 'membership_changed');
+  }
+  // A delegation that recorded the device session which admitted it renews
+  // only while that session is still live. A record minted without the field
+  // keeps its own lifetime.
+  if (record.bindings.deviceSessionId !== undefined) {
+    const active = await readDeviceSessionActive(
+      input,
+      record.bindings.deviceSessionId,
+      record.userId
+    );
+    if (!active) return rejectBinding(input, 'device_session_inactive');
   }
   return { user, authorizationUser };
 }
 
 export async function createRuntimeAuthorization(
-  input: CommonInput & {
-    token: string;
-    resourceKind: RuntimeAuthorization['resourceKind'];
-    resourceId: string;
-    organizationId?: string;
-    now?: Date;
-  }
+  input: CommonInput &
+    AdmissionDiagnostics &
+    BindingDiagnostics & {
+      token: string;
+      resourceKind: RuntimeAuthorization['resourceKind'];
+      resourceId: string;
+      environment: RuntimeEnvironment;
+      organizationId?: string;
+      now?: Date;
+    }
 ): Promise<{ authorization: RuntimeAuthorization; token: string; expiresAt: string }> {
   const resourceKind = RuntimeResourceKindSchema.parse(input.resourceKind);
   const resourceId = z.string().min(1).parse(input.resourceId);
+  const environment = RuntimeEnvironmentSchema.parse(input.environment);
   const auth = await verifyKiloTokenForPolicy(input.token, input.secret, {
     audience: resourceKind,
     mode: 'allow-legacy',
@@ -235,6 +304,17 @@ export async function createRuntimeAuthorization(
     input.organizationId !== claims.organizationId
   )
     throw new Error('Invalid runtime admission');
+  // The token names another deployment environment. That is a configuration
+  // mismatch rather than a bad credential, so it reports a distinct diagnostic
+  // while the public error stays generic.
+  if (claims.env !== environment) {
+    try {
+      input.onAdmissionRejected?.('environment_mismatch');
+    } catch {
+      // Diagnostics must not replace the authorization rejection.
+    }
+    throw new Error('Invalid runtime admission');
+  }
   const user = await getPrincipal(input, claims.kiloUserId);
   const authorizationUser = await getPrincipal(input, admission.authorizationUserId);
   if (
@@ -247,6 +327,16 @@ export async function createRuntimeAuthorization(
     (user.id !== authorizationUser.id && (admission.source !== 'automation' || !user.isBot))
   )
     throw new Error('Invalid runtime admission');
+  // A credential bound to a device session may only mint a delegation while
+  // that session can still act for its owner, and the delegation records the
+  // session so every renewal re-checks the same fact. A `device-access`
+  // admission always carries one; the HTTP path refuses one that does not.
+  if (claims.tokenPurpose === 'device-access' && claims.deviceSessionId === undefined)
+    throw new Error('Invalid runtime admission');
+  if (claims.deviceSessionId !== undefined) {
+    const active = await readDeviceSessionActive(input, claims.deviceSessionId, user.id);
+    if (!active) rejectBinding(input, 'device_session_inactive');
+  }
   let userMembershipId: string | undefined;
   let authorizationUserMembershipId: string | undefined;
   if (input.organizationId) {
@@ -287,6 +377,7 @@ export async function createRuntimeAuthorization(
       authorizationPepperDigest: await digest(authorizationUser.apiTokenPepper),
       userMembershipId,
       authorizationUserMembershipId,
+      ...(claims.deviceSessionId === undefined ? {} : { deviceSessionId: claims.deviceSessionId }),
     },
     source: {
       tokenSource: claims.tokenSource,
@@ -294,7 +385,7 @@ export async function createRuntimeAuthorization(
       createdOnPlatform: claims.createdOnPlatform,
       admissionSource: admission.source,
     },
-    env: claims.env,
+    env: environment,
   });
   const signed = await issueRuntimeToken(authorization, user.apiTokenPepper, input.secret, now);
   return { authorization, ...signed };

@@ -146,6 +146,9 @@ export function CreateOrganizationScreen() {
     onError: (error: unknown) => {
       submitLockedRef.current = false;
       setSettling(false);
+      // A create runs outside any organization, so the reader holds no role in
+      // one: the copy names the owner who can change its plan, and the line
+      // offers no step of its own.
       setMessage({ text: organizationErrorMessage(error), tone: 'error' });
     },
   });

@@ -16,7 +16,6 @@ import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { invalidateTodoQueries, useSessionTodo, useTodoCandidates } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useOrganization } from '@/lib/organization-context';
 import { todoItemPath } from '@/lib/todos/todo-routes';
 import { type TodoCandidate } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
@@ -77,8 +76,7 @@ function SessionTodoCandidatesSheet({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { bottom } = useSafeAreaInsets();
-  const { organizationId } = useOrganization();
-  const candidates = useTodoCandidates(sessionId, organizationId, visible);
+  const candidates = useTodoCandidates(sessionId, visible);
   const linkSession = useMutation(
     trpc.todos.items.linkSession.mutationOptions({
       onError: error => {
@@ -155,7 +153,8 @@ function SessionTodoCandidatesSheet({
       dismissGestures={false}
       snapPoints={['70%']}
     >
-      <View className="flex-1 pt-4">
+      {/* The title row takes the under-handle padding itself. */}
+      <View className="flex-1">
         <SheetTitleRow title={t('todos.linkToTodo')} onClose={onClose} />
         <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
           {body}

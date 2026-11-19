@@ -32,12 +32,14 @@ import type { ControlPlanePromptPayload } from '../shared/control-plane-protocol
 import { preflightExistingPromptModel, preflightSessionRuntime } from './model-preflight.js';
 import {
   createRuntimeAuthorization,
+  RuntimeAuthorizationRevokedError,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import { resolveSecret } from '../auth.js';
 import { fetchSessionMetadata } from './metadata.js';
 import jwt from 'jsonwebtoken';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 
 /** Retryable error codes that should map to 503 Service Unavailable. */
 const RETRYABLE_CODES: readonly RetryableResultCode[] = [
@@ -176,7 +178,17 @@ export async function preflightRuntimeAuthorizationRecovery(
     connectionString: ctx.env.HYPERDRIVE.connectionString,
     resourceKind: 'cloud-agent-next',
     resourceId: metadata.identity.sessionId,
+    environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+    onAdmissionRejected: reason =>
+      logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
     ...(metadata.identity.orgId ? { organizationId: metadata.identity.orgId } : {}),
+    onBindingRejected: reason =>
+      logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'preflight', reason),
+  }).catch((error: unknown) => {
+    if (error instanceof RuntimeAuthorizationRevokedError) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+    }
+    throw error;
   });
   const runtimeAuthorizationSeal = await sealRuntimeAuthorization(created.authorization, secret);
   const result = await withDORetry(

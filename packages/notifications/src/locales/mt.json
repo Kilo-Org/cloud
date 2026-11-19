@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Ksur tal-SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Verifika tas-sigurtà għandha aġġornament"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Is-sessjoni ta' Kilo tiegħek hi lesta biex tikkontrollaha mit-telefon tiegħek"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

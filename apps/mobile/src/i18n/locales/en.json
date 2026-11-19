@@ -14,7 +14,6 @@
     "dismiss": "Dismiss brief",
     "offline": "Offline · saved brief",
     "cached": "Saved report · refresh unavailable",
-    "window": "{{start}} – {{end}}",
     "summary": "AI summary",
     "summaryPending": "AI summary is in progress. It will attach here when ready.",
     "summaryUnavailable": "AI summary unavailable. Your structured report is still available.",
@@ -93,6 +92,7 @@
     "creditHistory": "Credit history",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancel",
     "done": "Done",
     "retry": "Retry",
@@ -242,7 +242,9 @@
     "durationHourShort": "h",
     "changes": "Changes",
     "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
-    "privateRepositoryA11y": "{{name}}, private repository"
+    "privateRepositoryA11y": "{{name}}, private repository",
+    "legalDocumentEnglishOnly": "This document is available in English only.",
+    "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again."
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -452,12 +454,24 @@
       "editKeyDescription": "The stored value cannot be shown. Enter a new one to replace it.",
       "editKeyMappingsWarning": "Replacing the key also replaces the saved model mappings: re-enter every mapping you still need.",
       "saveFailed": "Could not save the key.",
-      "invalidCredentials": "Check the credentials and try again.",
       "fieldRequired": "{{field}} is required.",
+      "keyIncomplete": "The key is missing a required value.",
       "incompleteMapping": "Mapping {{number}} needs both a gateway model slug and a deployment name.",
       "apiKeyLabel": "API key",
       "apiKeyPlaceholder": "Paste the key",
       "apiKeyRequired": "Enter the key.",
+      "keyAlreadyExists": "You already have a key for this provider. Remove it before you add another.",
+      "keyStoreFailed": "The key could not be saved.",
+      "invalidCredentials": "This key is not in the format this provider expects. Check it and try again.",
+      "testSucceeded": "Key works. Provider: {{provider}}. Model: {{model}}.",
+      "testRejected": "The provider rejected this key. Check that it is correct and has not been revoked.",
+      "testIncomplete": "The provider ended the test before it finished. Try again.",
+      "testUnsupportedProvider": "This provider is no longer supported. Remove the key.",
+      "testUnreadableKey": "The stored key could not be read. Try again later.",
+      "testDeprecatedProvider": "This provider is deprecated, so its key cannot be tested.",
+      "keyManagedByCodingPlan": "A coding plan manages this provider's key, and the key is read-only. Cancel the coding plan to add your own.",
+      "providerUnavailable": "This provider is not available yet, so you cannot add a key for it.",
+      "testFailed": "The key test failed. Try again.",
       "authMethod": "Authentication method",
       "authMethodAccessKeys": "Access keys",
       "resourceName": "Azure resource name",
@@ -548,7 +562,14 @@
       "viewReceipt": "View receipt"
     },
     "changelog": "What's New",
-    "changelogVersionPending": "The notes for this version arrive with the next app update."
+    "changelogGroupNew": "New",
+    "changelogFixesIn": "Fixes and improvements in {{areas}}.",
+    "changelogFixesPolish": "Bug fixes and polish.",
+    "changelogAreas": {
+      "signIn": "Sign-in",
+      "profileOrganizations": "Profile and organizations"
+    },
+    "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },
   "preferences": {
     "biometricUnlock": "Unlock with biometrics",
@@ -1421,7 +1442,8 @@
       "managedOnWeb": "This organization's Bitbucket connection is managed on the web from a computer.",
       "description": "Create a Workspace Access Token with the required scopes and paste it below.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
-      "tokenPlaceholder": "Workspace access token"
+      "tokenPlaceholder": "Workspace access token",
+      "tokenRefused": "Bitbucket did not accept this workspace token. Check that it has the scopes above, then try again."
     },
     "scopeList": {
       "personalStillAvailable": "Personal repositories are still available below.",
@@ -1433,7 +1455,8 @@
       "noReviews": "No reviews yet",
       "noReviewsDescription": "Reviews appear here once the Code Reviewer runs on a pull request.",
       "startManualReview": "Start a manual review",
-      "configureProvider": "Configure provider"
+      "configureProvider": "Configure provider",
+      "connectOwnerOnly": "Ask an organization owner or admin to connect a provider."
     },
     "platformList": {
       "checking": "Checking…",
@@ -1525,19 +1548,31 @@
     "analytics": {
       "title": "Analytics",
       "trackedReviews": "Reviews tracked",
+      "trackedReviewsCaption": "Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.",
+      "trackedReviewsUncounted": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
+      "trackedReviewsUncounted_one": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
+      "trackedReviewsUncounted_other": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
       "findingsRaised": "Findings raised",
       "highImpactChanges": "High-impact changes",
       "impactPoints": "Impact points",
       "repositoryLine": "Reviews: {{reviews}} · Findings: {{findings}}",
       "empty": "No reviews with analytics yet",
       "emptyDescription": "Analytics records completed reviews while it is enabled for the organization.",
-      "off": "Analytics is off for this organization.",
+      "offTitle": "Analytics is off for {{platform}}",
+      "offDescription": "Organization billing roles can turn analytics on in the settings on the web to record completed reviews.",
       "couldNotLoad": "Could not load analytics"
     },
     "council": {
       "title": "Council review",
       "subtitle": "Several specialists review each pull request, and their votes combine into one decision.",
-      "unavailable": "Council review is not available for this organization.",
+      "unavailablePersonallyTitle": "Needs an Enterprise organization",
+      "unavailablePersonally": "Council review is not part of a personal account.",
+      "unavailablePersonallyAction": "Create an organization",
+      "unavailablePersonallySwitchAction": "Switch organization",
+      "unavailableOrganizationTitle": "Council review is unavailable",
+      "unavailableForOrganization": "Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now.",
+      "unavailableForOrganizationNeutral": "Council review is not available for this organization right now. Try again later.",
+      "unavailableOnBitbucket": "Council review is not available for Bitbucket repositories.",
       "noRepositories": "No repositories selected yet. Choose repositories in the repository settings first.",
       "specialists": "Specialists",
       "labels": "Labels that trigger council review",
@@ -3040,6 +3075,7 @@
     "signOutThisDevice": "Sign out this device",
     "signOutSessionLabel": "Sign out {{device}}, signed in {{signedIn}}, last seen {{lastSeen}}",
     "sessionSignedOut": "Session signed out.",
+    "sessionSignOutFailed": "Could not sign out this session. Try again.",
     "signOutThisDeviceTitle": "Sign out this device?",
     "signOutThisSessionTitle": "Sign out this session?",
     "signOutThisSessionMessage": "{{device}} will be signed out. Last seen {{lastSeen}}. It can keep API access for up to an hour.",
@@ -3176,12 +3212,14 @@
     "manage": {
       "billingHistory": "Billing history",
       "billingHistoryEmpty": "No billing history yet.",
+      "billingHistoryError": "Couldn't load billing history",
       "cancel": "Cancel subscription",
       "cancelDescription": "Your Kilo Pass stays active until the end of the billing period and will not renew.",
       "cancelScheduled": "Cancels on {{date}}",
       "cancelScheduledChange": "Cancel scheduled change",
       "cancelled": "Cancelled subscription",
       "creditHistoryEmpty": "No Kilo Pass credits yet.",
+      "creditHistoryError": "Couldn't load credit history",
       "resume": "Resume subscription",
       "resumeCancelledDescription": "Your Kilo Pass starts renewing automatically again.",
       "resumePausedDescription": "Your Kilo Pass resumes now, before its scheduled resume date.",
@@ -3198,7 +3236,6 @@
     "completingPurchase": "Completing purchase",
     "subscriptionLoading": "Kilo Pass subscription loading",
     "retryHint": "Retries Kilo Pass state.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Ended {{date}}",
     "notAvailableInApp": "Kilo Pass isn't available in the app.",
     "statusActive": "Active",
@@ -3401,12 +3438,13 @@
       "manageOnWeb": "Billing settings on the web",
       "changePlan": "Change plan",
       "buySeats": "Buy seats",
+      "managedOnWeb": "The plan, seats and auto top-up are managed on the web.",
       "setupAutoTopUp": "Set up auto top-up",
       "manageAutoTopUp": "Manage auto top-up",
       "opensOnWeb": "Opens on the web"
     },
     "boundary": {
-      "accessDeniedDescription": "You do not have access to this organization.",
+      "accessDeniedDescription": "Ask an organization owner or admin to grant you access.",
       "backToProfile": "Back to profile",
       "chooseAccount": "Choose an account",
       "loadErrorMessage": "Check your connection and try again.",
@@ -3538,16 +3576,26 @@
     },
     "settingsOnWeb": {
       "title": "Organization settings on the web",
-      "integrations": "Integrations on the web",
       "usageDetails": "Usage details",
       "providersAndModels": "Providers and models",
       "groups": "Groups",
       "guardrails": "Guardrails",
       "byok": "Bring your own key",
+      "ssoAndDomain": "SSO and domain",
+      "dataCollection": "Data collection",
       "auditLogs": "Audit logs",
-      "requestLogs": "Request logs",
-      "subOrganizations": "Sub-organizations",
-      "distributeFunds": "Distribute funds"
+      "requestLogs": "Request logs"
+    },
+    "requestLogs": {
+      "older": "Older hour",
+      "newer": "Newer hour",
+      "truncated": "This hour has more requests than the list shows.",
+      "emptyTitle": "No requests in this hour",
+      "emptyDescription": "Use Older hour to see earlier requests.",
+      "loadError": "Couldn't load request logs.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
+      "tokens": "{{input}} in · {{output}} out",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
@@ -4334,8 +4382,7 @@
       "repoValue": "Repository: {{name}}",
       "profileValue": "Profile: {{name}}",
       "profileUnavailable": "This profile is no longer available. Choose another one.",
-      "pickerEmptyDescriptionOrganization": "Create an organization profile to reuse environment variables, setup commands, and skills across sessions.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "An organization owner or admin can create an organization profile."
+      "pickerEmptyDescriptionOrganization": "Create an organization profile to reuse environment variables, setup commands, and skills across sessions."
     },
     "variablesDeleteFailed": "Couldn't delete variable",
     "deleteVariable": "Delete variable {{key}}",
@@ -4382,7 +4429,7 @@
       },
       "purchaseFallback": "Credit purchase",
       "receipt": "Receipt",
-      "receiptA11y": "Open the receipt for {{description}}",
+      "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
       "receiptUnavailable": "A receipt is not available for this purchase."
     },
     "title": "Buy credits",
@@ -4521,6 +4568,8 @@
     "topModels": "Top models",
     "topFeatures": "Top features",
     "emptyTitle": "No usage in this period",
+    "unavailableTitle": "Usage is unavailable",
+    "unavailableDescription": "This workspace isn't reporting usage. Retrying won't help.",
     "orgSelfNotice": "You're seeing your own usage in this organization.",
     "viewDetails": "View usage details"
   },
@@ -4571,6 +4620,7 @@
       "title": "Triggers & webhooks",
       "subtitle": "Automate Cloud Agent runs from a webhook call or a schedule.",
       "new": "New trigger",
+      "create": "Create trigger",
       "emptyTitle": "No triggers yet",
       "emptyDescription": "Create a trigger to start a Cloud Agent run from a webhook call or on a schedule.",
       "loadFailedTitle": "Couldn't load triggers",
@@ -4592,7 +4642,7 @@
       "fieldCron": "Cron expression",
       "fieldCronHelp": "Five fields: minute, hour, day, month and weekday. The shortest interval is one minute.",
       "fieldTimezone": "Time zone",
-      "nameLocked": "The name is part of the webhook URL and cannot change.",
+      "nameLocked": "The name cannot change after the trigger is created.",
       "repositoryLocked": "The repository cannot change after the trigger is created.",
       "environmentAutomatic": "Automatic by repository",
       "notSelected": "Not selected",
@@ -4607,6 +4657,7 @@
       "authHeaderLabel": "Header name",
       "authSecretLabel": "Shared secret",
       "authSecretKeep": "Leave blank to keep the saved secret.",
+      "authSecretSet": "Required. Choose a strong random string.",
       "authSecretCreator": "Use at least 16 characters when the trigger runs as its creator.",
       "autoCommit": "Commit changes when the run finishes",
       "condenseOnComplete": "Condense the context when the run finishes",
@@ -4617,11 +4668,14 @@
       "saveFailedTitle": "Couldn't save the trigger",
       "deleteTitle": "Delete this trigger?",
       "deleteMessage": "Calls to {{name}} will fail. This cannot be undone.",
+      "deleteMessageScheduled": "Scheduled runs of {{name}} stop. This cannot be undone.",
       "runNow": "Run now",
       "runStarted": "Run started",
       "created": "Trigger created",
       "saved": "Trigger saved",
       "statusArrived": "Arrived",
+      "defaultPromptWebhook": "Describe this webhook request payload:\n\n{{body}}",
+      "defaultPromptScheduled": "Run the scheduled task. Triggered at {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Enter a name.",
         "nameTooShort": "Use at least 8 characters.",
@@ -4656,7 +4710,8 @@
     "create": "Create link",
     "createFailed": "Couldn't create the link.",
     "existingTitle": "Existing link",
-    "existingDescription": "This session already has a share link. Creating a new one replaces it and stops the old link from working.",
+    "existingDescription": "This session already has a share link. Creating a new link with these settings replaces it and stops the old link from working.",
+    "replacementSettings": "These settings apply to the new link.",
     "rotate": "Create a new link",
     "revoke": "Revoke link",
     "revokeTitle": "Revoke link?",
@@ -4672,9 +4727,182 @@
     "title": "Shared session",
     "someone": "Someone",
     "sharedBy": "Shared by {{owner}}",
+    "startedAt": "Started at {{time}}",
     "unavailableTitle": "Link unavailable",
     "unavailableDescription": "This share link has expired or been revoked.",
     "transcriptUnavailableTitle": "Couldn't load this transcript",
     "transcriptUnavailableDescription": "The link still works. Try again in a moment."
+  },
+  "organizationGuardrails": {
+    "title": "AI Guardrails",
+    "permissionDenied": "Only organization owners and admins can manage AI Guardrails.",
+    "unavailable": "AI Guardrails is not available for this organization.",
+    "loadError": "AI Guardrails couldn't load",
+    "statusSaving": "Saving…",
+    "statusSaved": "Saved",
+    "statusFailed": "Couldn't save.",
+    "inputTitle": "Input guardrails",
+    "inputDescription": "Check every input with Enkrypt AI, including tool results such as file reads and command output. Blocking detectors reject requests if Enkrypt is unavailable.",
+    "outputTitle": "Output guardrails",
+    "outputDescription": "Check model responses with Enkrypt AI before your members receive them. Off unless you turn it on, separately from input guardrails.",
+    "detectorsHint": "Block stops a flagged request. Log only records detections without delaying the request.",
+    "detectorsHintOutput": "Block replaces a flagged response with an error. Log only records detections without delaying the response.",
+    "choiceLog": "Log only",
+    "applyTo": "Apply to",
+    "applyToAllMembers": "All members",
+    "applyKiloDefault": "Apply Kilo Default",
+    "invalidSavedTitle": "Saved input detector settings can't be read",
+    "invalidSavedBody": "Requests are blocked until the input detectors are saved again. Review the detectors below, which start from Kilo Default.",
+    "invalidSavedOutputTitle": "Saved output detector settings can't be read",
+    "invalidSavedOutputBody": "Responses are withheld until the output detectors are saved again. Choose output detectors below.",
+    "blockingOutputNote": "With a blocking output detector, members see nothing until the model has finished the whole response and Enkrypt has checked it. Use Log only to monitor without the delay.",
+    "inputDetectorRequired": "Turn on at least one input detector.",
+    "outputDetectorRequired": "Turn on at least one output detector.",
+    "rulesTooMany": "Add up to {{max}} rules.",
+    "ruleIdRequired": "Enter a rule ID.",
+    "ruleIdInvalid": "A rule ID can only contain letters, numbers, dots, dashes, and underscores.",
+    "ruleTextRequired": "Describe what the rule forbids or requires.",
+    "keywordTooLong": "Each keyword can be up to {{max}} characters.",
+    "keywordsTooMany": "Add up to {{max}} keywords.",
+    "topicTooLong": "Each topic can be up to {{max}} characters.",
+    "topicsTooMany": "Add up to {{max}} topics.",
+    "piiEntityRequired": "Select at least one type of data to detect.",
+    "keywordRequired": "Add at least one keyword.",
+    "topicRequired": "Add at least one topic.",
+    "policyTextRequired": "Enter the policy text.",
+    "ruleRequired": "Add at least one rule.",
+    "ruleIdDuplicate": "Each rule needs its own rule ID.",
+    "piiEntities": "Data to detect",
+    "keywordsLabel": "Keywords",
+    "keywordsHint": "One keyword per line.",
+    "topicsHint": "One topic per line.",
+    "policyFormat": "Policy format",
+    "policyFormatRules": "Structured rules",
+    "policyFormatRulesDescription": "One rule per requirement, with a category and severity. Recommended.",
+    "policyFormatText": "Policy text",
+    "policyFormatTextDescription": "Paste an existing policy as plain text.",
+    "rulesEmpty": "No rules yet. Each rule describes one thing members' inputs must not contain or ask for.",
+    "addRule": "Add rule",
+    "ruleNumber": "Rule {{number}}",
+    "ruleRemove": "Remove rule {{number}}",
+    "ruleIdLabel": "Rule ID",
+    "ruleNameLabel": "Name (optional)",
+    "ruleTextLabel": "Rule",
+    "ruleRiskCategory": "Risk category",
+    "ruleApplicability": "Scope",
+    "ruleFrameworks": "Frameworks",
+    "detector": {
+      "promptInjection": {
+        "label": "Prompt injection",
+        "description": "Detects attempts to override instructions or jailbreak the model."
+      },
+      "policyViolation": {
+        "label": "Policy violation",
+        "description": "Flags inputs that break your organization policy, written as text or rules.",
+        "descriptionOutput": "Flags responses that break your organization policy, written as text or rules."
+      },
+      "pii": {
+        "label": "PII and secrets",
+        "description": "Detects personal data, credentials, IP addresses, and URLs."
+      },
+      "keywords": {
+        "label": "Banned keywords",
+        "descriptionOutput": "Detects responses that contain any keyword you list."
+      },
+      "topics": {
+        "label": "Topics",
+        "descriptionOutput": "Flags responses about any topic you list."
+      },
+      "toxicity": {
+        "label": "Toxicity",
+        "description": "Detects toxic, insulting, threatening, or hateful language."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detects sexual or otherwise not-safe-for-work content."
+      },
+      "bias": {
+        "label": "Bias",
+        "description": "Detects biased or discriminatory language."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Personal data",
+        "description": "Names, email addresses, phone numbers."
+      },
+      "secrets": {
+        "label": "Secrets",
+        "description": "API keys, tokens, passwords."
+      },
+      "ipAddress": {
+        "label": "IP addresses",
+        "description": "IPv4 and IPv6 addresses."
+      },
+      "url": {
+        "label": "URLs",
+        "description": "Web addresses."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Security and fraud",
+      "safetyHarm": "Safety and harm",
+      "privacyDataProtection": "Privacy and data protection",
+      "brandReputationTrust": "Brand and reputation",
+      "biasFairnessEthical": "Bias and fairness",
+      "legalIpLiability": "Legal and IP liability",
+      "productMisuse": "Product misuse",
+      "performanceQuality": "Performance and quality"
+    },
+    "applicability": {
+      "user": "User input",
+      "userAssistant": "User input and responses"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI Act",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Enterprise feature",
+    "enterpriseOnly": "This is an enterprise only feature.",
+    "readOnly": "Only organization owners and admins can change these settings.",
+    "loadError": "Providers and models couldn't load",
+    "tabModels": "Models",
+    "tabProviders": "Providers",
+    "tabGateways": "Gateways",
+    "modelsDescription": "Turn a model off to block it for every member. Models from allowed providers are on by default.",
+    "modelsDeniedOnly": "Denied only",
+    "modelsEmpty": "No models match this search.",
+    "modelsDeniedEmpty": "No model is denied.",
+    "modelsDeniedSearchEmpty": "No denied model matches this search.",
+    "providersDescription": "Turn a provider off to stop Kilo routing to it for this organization.",
+    "providersNeedCatalog": "Provider switches stay read-only until the full model catalog loads. Retry above to edit them.",
+    "providersEmpty": "No providers match this search.",
+    "allowAllShown": "Allow all shown",
+    "denyAllShown": "Deny all shown",
+    "emptyProviderList": "Allow at least one provider. An empty list blocks every Kilo model route.",
+    "emptyModelList": "Leave at least one model on. Denying every model leaves members with nothing to use.",
+    "catalogUnavailable": "The full model catalog didn't load, so only your saved lists are shown. Retry to load every model.",
+    "gatewaysDescription": "Kilo routes model requests through the Vercel AI Gateway or OpenRouter. Requests that end up on a disabled gateway fail with an error.",
+    "gatewaysUnavailable": "Gateway settings aren't available for this organization.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter requests are not pinned to a region.",
+    "inferenceRegion": "Inference region",
+    "inferenceRegionDescription": "Pins requests routed through the Vercel AI Gateway to this region. Requests for a model that is not available in the region fail with an error.",
+    "disableOpenrouterNote": "Disabling OpenRouter also blocks BYOK keys that route requests through it.",
+    "region": {
+      "global": "Global",
+      "us": "United States",
+      "eu": "European Union",
+      "au": "Australia",
+      "jp": "Japan"
+    }
   }
 }

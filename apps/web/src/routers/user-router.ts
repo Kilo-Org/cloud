@@ -63,7 +63,6 @@ import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema, isAccountLinkingProvider } from '@/lib/auth/provider-metadata';
 import { classifyDeviceSessionClient } from '@/lib/auth/device-session-client';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession, getStripeInvoicesPage } from '@/lib/stripe';
@@ -679,6 +678,12 @@ async function runWithPasskeyManagement(
   }
 }
 
+// The `uuid` column stores any 8-4-4-4-12 hex value, so the version-strict
+// RFC validator `z.uuid()` refuses ids the database can hold. `z.guid()`
+// matches the column, so the device-session list and revoke agree on the same
+// ids.
+const DeviceSessionIdSchema = z.guid();
+
 export const userRouter = createTRPCRouter({
   getPaidCreditPolicy: baseProcedure.query(() =>
     getPaidCreditPolicyPresentation(PAID_CREDIT_EXPIRATION_EFFECTIVE_AT)
@@ -825,15 +830,6 @@ export const userRouter = createTRPCRouter({
           message: 'This sign-in method cannot be added to an account.',
         });
       }
-      if (
-        input.provider === 'claude' &&
-        !(await isClaudePlatformOAuthEnabled(ctx.user.google_user_email))
-      ) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'This sign-in method cannot be added to an account.',
-        });
-      }
       // An organization-scoped link records the organization on the linking
       // session so the callback can store the BYOK connection for it. Only the
       // OpenAI (ChatGPT) provider has an organization-scoped connection, so any
@@ -918,7 +914,7 @@ export const userRouter = createTRPCRouter({
       .orderBy(desc(device_sessions.last_seen_at));
 
     return rows.map(row => ({
-      id: row.id,
+      id: DeviceSessionIdSchema.parse(row.id),
       ...classifyDeviceSessionClient(row.user_agent),
       // Normalize PostgreSQL timestamp text (e.g. `2026-04-29 01:16:12.945+00`)
       // to UTC ISO before returning it over the tRPC JSON boundary.
@@ -929,7 +925,7 @@ export const userRouter = createTRPCRouter({
   }),
 
   revokeDeviceSessionById: baseProcedure
-    .input(z.object({ sessionId: z.uuid() }))
+    .input(z.object({ sessionId: DeviceSessionIdSchema }))
     .mutation(async ({ ctx, input }) => {
       await revokeOwnedDeviceSession(input.sessionId, ctx.user.id, 'user_revoked');
       return successResult();

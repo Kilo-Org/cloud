@@ -67,7 +67,13 @@ export function BitbucketConnectForm({
         }
       } catch (error) {
         if (attempt.owns()) {
-          attempt.fail(bitbucketConnectionFailure(error, t));
+          attempt.fail(
+            bitbucketConnectionFailure(
+              error,
+              t,
+              integrationId === null ? 'first-connect' : 'replace-token'
+            )
+          );
         }
       }
     })();
@@ -87,18 +93,19 @@ export function BitbucketConnectForm({
         <Text variant="muted" className="text-sm">
           {t('codeReviewer.bitbucketConnect.scopes')}
         </Text>
-        <Button
-          variant="outline"
-          size="sm"
-          onPress={() => {
-            void openExternalUrl(CREATE_WORKSPACE_TOKEN_URL, {
-              label: t('common.openInBrowser'),
-            });
-          }}
-        >
-          <Text>{t('common.openInBrowser')}</Text>
-        </Button>
       </View>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onPress={() => {
+          void openExternalUrl(CREATE_WORKSPACE_TOKEN_URL, {
+            label: t('common.openInBrowser'),
+          });
+        }}
+      >
+        <Text>{t('common.openInBrowser')}</Text>
+      </Button>
 
       <FormField
         label={t('codeReviewer.bitbucketConnect.tokenPlaceholder')}

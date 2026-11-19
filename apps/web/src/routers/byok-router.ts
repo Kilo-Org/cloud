@@ -6,6 +6,11 @@ import {
   type OrganizationRole,
 } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+  MANAGED_KEY_READ_ONLY_MESSAGE,
+} from '@kilocode/app-shared/byok-errors';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -28,8 +33,12 @@ import {
   TestBYOKKeyInputSchema,
   PreviewBYOKRoutingInputSchema,
   BYOKApiKeyResponseSchema,
+  BYOKKeyTestResultSchema,
   type BYOKApiKeyResponse,
+  type BYOKKeyTestResult,
 } from '@/lib/byok/types';
+import { isUniqueViolation } from '@/lib/db-errors';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import {
   GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
@@ -42,6 +51,7 @@ import {
 import {
   getVercelModelsMetadataFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
+  getSystemOneModelIds,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -56,6 +66,7 @@ import {
   decryptByokRow,
   getByokKmsContext,
   getModelGatewayUserByokProviders,
+  isGatewayUserByokEligibleModel,
   servesCatalogModels,
   type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -71,6 +82,9 @@ import {
   getVercelOnlyModelName,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
+import type { NonChatVercelModelType } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
+import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
+import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
@@ -85,15 +99,71 @@ import { ADD_BYOK_PROVIDERS, getByokProviderDisplayName } from '@/lib/byok/provi
 import { sortByokKeysInRouteOrder } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 
-const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
-const KEY_DECRYPTION_FAILURE_MESSAGE =
-  'API key test failed: the stored key could not be read. Try again later.';
-const VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE =
-  'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
 const KEYS_CHANGED_MESSAGE = 'Your API keys changed. Reload the page and try again.';
-const MANAGED_KEY_READ_ONLY_MESSAGE =
-  'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
+const logByokWriteWarning = sentryLogger('byok-key-write', 'warning');
+
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+type BYOKKeyTestOutcome = DistributiveOmit<BYOKKeyTestResult, 'success' | 'message'>;
+
+/**
+ * `success` and `message` are legacy: installed app builds predate the outcome
+ * union and read only these two fields, so they receive the sentence those
+ * builds showed before the union existed. Remove the pair with the next
+ * release train.
+ */
+function testResultWithLegacyCopy(
+  result: BYOKKeyTestOutcome,
+  context: { providerId?: string; finishReason?: string } = {}
+): BYOKKeyTestResult {
+  switch (result.outcome) {
+    case 'ok':
+      return {
+        ...result,
+        success: true,
+        message: `API key test success. Provider: ${result.provider}. Model: ${result.model}.`,
+      };
+    case 'incomplete':
+      return {
+        ...result,
+        success: false,
+        message: `API key test failed: ${context.finishReason}`,
+      };
+    case 'unsupported-provider':
+      return {
+        ...result,
+        success: false,
+        message: `Provider ${context.providerId} is no longer supported.`,
+      };
+    case 'unreadable-key':
+      return {
+        ...result,
+        success: false,
+        message: 'API key test failed: the stored key could not be read. Try again later.',
+      };
+    case 'deprecated-provider':
+      return {
+        ...result,
+        success: false,
+        message: 'Codestral is deprecated and its API key can no longer be tested.',
+      };
+    case 'rejected':
+      return {
+        ...result,
+        success: false,
+        message:
+          'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.',
+      };
+    case 'failed':
+      return {
+        ...result,
+        success: false,
+        message: result.detail
+          ? `API key test failed: ${result.detail}`
+          : 'API key test failed. Check the credential and try again.',
+      };
+  }
+}
 
 const EXPERIMENTAL_BYOK_CREDENTIAL_PARSERS = {
   'bedrock-byok': parseAwsBedrockCredentials,
@@ -118,7 +188,7 @@ function validateUserByokCredential(providerId: string, credential: string) {
     }
   } catch {
     throw new TRPCError({
-      code: 'BAD_REQUEST',
+      code: 'UNPROCESSABLE_CONTENT',
       message: `Invalid credentials for provider: ${providerId}`,
     });
   }
@@ -202,9 +272,13 @@ async function rejectUnavailableExperimentalProvider(
     isExperimentalByokProviderId(providerId) &&
     !(await isExperimentalByokEnabled(organizationId))
   ) {
+    logByokWriteWarning('BYOK key write refused: provider is not available for this account', {
+      providerId,
+      organizationId: organizationId ?? null,
+    });
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: `Provider ${providerId} is not available yet.`,
+      message: BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
     });
   }
 }
@@ -278,9 +352,13 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     }
   };
 
+  // System One models are listed with their label below.
+  const systemOneModelIds = new Set(getSystemOneModelIds(openRouterModelMetadata));
   const openRouterModels = Object.values(openRouterModelMetadata);
   for (const openRouterModel of openRouterModels) {
-    if (isAutoSmallFreeModel(openRouterModel.id)) continue;
+    if (isAutoSmallFreeModel(openRouterModel.id) || systemOneModelIds.has(openRouterModel.id)) {
+      continue;
+    }
     await addGatewayModel(openRouterModel);
   }
 
@@ -296,6 +374,43 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
       id: vercelOnlyModel.id,
       name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
     });
+  }
+
+  // Embeddings and System One use the OpenRouter key, the Vercel AI Gateway key, and provider keys
+  // sent through Vercel, but only for OpenRouter catalog ids Vercel serves under the mapped id.
+  // Direct BYOK keys never serve them. Transcriptions use only the OpenRouter key.
+  const addNonChatModel = async (
+    model: { id: string; name: string },
+    endpoint: { label: string; vercelType?: NonChatVercelModelType }
+  ) => {
+    if (!isGatewayUserByokEligibleModel(model.id)) return;
+    const labelled = { id: model.id, name: `${model.name}, ${endpoint.label}` };
+    addSupportedModel('openrouter', labelled);
+    if (!endpoint.vercelType) return;
+    const vercelModel = vercelModelMetadata[await mapModelIdToVercel(model.id)];
+    if (vercelModel?.type !== endpoint.vercelType) return;
+    addSupportedModel('vercel-ai-gateway', labelled);
+    for (const vercelEndpoint of vercelModel.endpoints) {
+      const providerId = getVercelUserByokProviderIdForEndpoint(
+        vercelEndpoint.provider_name ?? vercelEndpoint.tag
+      );
+      if (providerId) addSupportedModel(providerId, labelled);
+    }
+  };
+  for (const modelId of systemOneModelIds) {
+    if (modelId.startsWith('~')) continue;
+    const model = openRouterModelMetadata[modelId];
+    await addNonChatModel(
+      { id: modelId, name: model?.name ?? modelId },
+      { label: 'System One', vercelType: 'evaluation' }
+    );
+  }
+  for (const model of (await getKiloEmbeddingModelCatalogFromDatabase())?.models ?? []) {
+    await addNonChatModel(model, { label: 'embeddings', vercelType: 'embedding' });
+  }
+  const transcriptionModels = await getOpenRouterTranscriptionModels().catch(() => null);
+  for (const model of transcriptionModels?.data ?? []) {
+    await addNonChatModel(model, { label: 'transcription' });
   }
 
   for (const provider of DIRECT_BYOK_PROVIDERS) {
@@ -474,17 +589,69 @@ export const byokRouter = createTRPCRouter({
       });
 
       // Insert into database - either org-owned or user-owned
-      const [newKey] = await db
-        .insert(byok_api_keys)
-        .values({
-          id: keyId,
-          organization_id: organizationId ?? null,
-          kilo_user_id: organizationId ? null : ctx.user.id,
-          provider_id,
-          encrypted_api_key_envelope: envelope,
-          created_by: ctx.user.id,
-        })
-        .returning(BYOK_KEY_COLUMNS);
+      let newKey: BYOKKeyRow;
+      try {
+        [newKey] = await db
+          .insert(byok_api_keys)
+          .values({
+            id: keyId,
+            organization_id: organizationId ?? null,
+            kilo_user_id: organizationId ? null : ctx.user.id,
+            provider_id,
+            encrypted_api_key_envelope: envelope,
+            created_by: ctx.user.id,
+          })
+          .returning(BYOK_KEY_COLUMNS);
+      } catch (error) {
+        // A second key for the same owner and provider violates the unique
+        // constraint. The driver error carries the SQL, its parameters and the
+        // envelope, so neither it nor its message may reach the client.
+        if (isUniqueViolation(error)) {
+          // A coding-plan row owns the provider for this owner, so the refusal
+          // names the plan instead of asking for a removal the owner cannot do.
+          // This lookup can fail on its own, and a failure here would put the
+          // driver's message on the wire, so it answers the generic sentence.
+          let existingKey: { management_source: string } | undefined;
+          try {
+            [existingKey] = await db
+              .select({ management_source: byok_api_keys.management_source })
+              .from(byok_api_keys)
+              .where(
+                and(
+                  ownedKeys(byokOwner(ctx.user.id, organizationId)),
+                  eq(byok_api_keys.provider_id, provider_id)
+                )
+              );
+          } catch (lookupError) {
+            logByokWriteWarning('BYOK key conflict lookup failed', {
+              providerId: provider_id,
+              message: sanitizeErrorForTelemetry(lookupError).message,
+            });
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'The key could not be stored. Try again.',
+            });
+          }
+          if (existingKey?.management_source === 'coding_plan') {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: MANAGED_KEY_PROVIDER_OCCUPIED_MESSAGE,
+            });
+          }
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'A key for this provider already exists. Remove it before you add another.',
+          });
+        }
+        logByokWriteWarning('BYOK key create failed', {
+          providerId: provider_id,
+          message: sanitizeErrorForTelemetry(error).message,
+        });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'The key could not be stored. Try again.',
+        });
+      }
 
       // Create audit log only for organization keys
       if (organizationId) {
@@ -560,11 +727,27 @@ export const byokRouter = createTRPCRouter({
         context: getByokKmsContext(existingKey),
         actorUserId: ctx.user.id,
       });
-      const [updatedKey] = await db
-        .update(byok_api_keys)
-        .set({ encrypted_api_key_envelope: envelope })
-        .where(eq(byok_api_keys.id, id))
-        .returning(BYOK_KEY_COLUMNS);
+      // The update never writes the owner or provider columns, so neither unique
+      // (owner, provider) constraint can fire here and there is no conflict
+      // branch. Any other driver error must not reach the client with its SQL
+      // or parameters.
+      let updatedKey: BYOKKeyRow;
+      try {
+        [updatedKey] = await db
+          .update(byok_api_keys)
+          .set({ encrypted_api_key_envelope: envelope })
+          .where(eq(byok_api_keys.id, id))
+          .returning(BYOK_KEY_COLUMNS);
+      } catch (error) {
+        logByokWriteWarning('BYOK key update failed', {
+          providerId: existingKey.provider_id,
+          message: sanitizeErrorForTelemetry(error).message,
+        });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'The key could not be saved. Try again.',
+        });
+      }
 
       if (!updatedKey) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
@@ -712,8 +895,8 @@ export const byokRouter = createTRPCRouter({
 
   testApiKey: baseProcedure
     .input(TestBYOKKeyInputSchema)
-    .output(z.object({ success: z.boolean(), message: z.string() }))
-    .mutation(async ({ input, ctx }) => {
+    .output(BYOKKeyTestResultSchema)
+    .mutation(async ({ input, ctx }): Promise<BYOKKeyTestResult> => {
       const { organizationId, id } = input;
 
       if (organizationId) {
@@ -748,10 +931,10 @@ export const byokRouter = createTRPCRouter({
 
       const providerId = UserByokProviderIdSchema.safeParse(existingKey.provider_id);
       if (!providerId.success) {
-        return {
-          success: false,
-          message: `Provider ${existingKey.provider_id} is no longer supported.`,
-        };
+        return testResultWithLegacyCopy(
+          { outcome: 'unsupported-provider' },
+          { providerId: existingKey.provider_id }
+        );
       }
 
       let decryptedKey: Awaited<ReturnType<typeof decryptByokRow>>;
@@ -762,17 +945,14 @@ export const byokRouter = createTRPCRouter({
           providerId: existingKey.provider_id,
           message: e instanceof Error ? e.message : undefined,
         });
-        return { success: false, message: KEY_DECRYPTION_FAILURE_MESSAGE };
+        return testResultWithLegacyCopy({ outcome: 'unreadable-key' });
       }
 
       // Codestral is deprecated and its key only authenticates against codestral.mistral.ai,
       // which the gateway test path below cannot reach (it routes codestral to api.mistral.ai).
       // Decline to test it rather than returning a misleading failure for a still-valid key.
       if (decryptedKey.providerId === 'codestral') {
-        return {
-          success: false,
-          message: 'Codestral is deprecated and its API key can no longer be tested.',
-        };
+        return testResultWithLegacyCopy({ outcome: 'deprecated-provider' });
       }
 
       async function setup() {
@@ -842,17 +1022,24 @@ export const byokRouter = createTRPCRouter({
           logByokWarning('BYOK key test returned an unsuccessful completion', {
             providerId: decryptedKey.providerId,
           });
-          return { success: false, message: `API key test failed: ${output.finishReason}` };
+          return testResultWithLegacyCopy(
+            { outcome: 'incomplete' },
+            { finishReason: output.finishReason }
+          );
         }
 
         const metadata = output.providerMetadata?.gateway?.routing as
           | { originalModelId?: string; finalProvider?: string }
           | undefined;
 
-        return {
-          success: true,
-          message: `API key test success. Provider: ${metadata?.finalProvider ?? finalProvider}. Model: ${metadata?.originalModelId ?? model.modelId}.`,
-        };
+        const testedProvider = metadata?.finalProvider ?? finalProvider;
+        const testedModel = metadata?.originalModelId ?? model.modelId;
+
+        return testResultWithLegacyCopy({
+          outcome: 'ok',
+          provider: testedProvider,
+          model: testedModel,
+        });
       } catch (e) {
         const message = e instanceof Error ? e.message : undefined;
         logByokWarning('BYOK key test request failed', {
@@ -863,12 +1050,11 @@ export const byokRouter = createTRPCRouter({
           decryptedKey.providerId === GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway'] &&
           GatewayAuthenticationError.isInstance(e)
         ) {
-          return { success: false, message: VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE };
+          return testResultWithLegacyCopy({ outcome: 'rejected' });
         }
-        return {
-          success: false,
-          message: message ? `API key test failed: ${message}` : GENERIC_TEST_FAILURE_MESSAGE,
-        };
+        return testResultWithLegacyCopy(
+          message ? { outcome: 'failed', detail: message } : { outcome: 'failed' }
+        );
       }
     }),
 

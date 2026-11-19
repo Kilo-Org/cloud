@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Uç nokta istekleri sınırlıyor. Kısa bir süre bekleyip tekrar deneyin.",
       "requestUnavailable": "Uç nokta şu anda kullanılamıyor. Birazdan tekrar deneyin.",
       "requestUnreachable": "Uç noktaya ulaşılamadı. API kök adresini ve bağlantınızı kontrol edin.",
-      "discoveryInvalidResponse": "Uç nokta model listesi olmayan bir yanıt verdi. API kök adresinin ve protokolün sunucuyla eşleştiğini kontrol edin.",
+      "requestInvalidResponse": "Uç nokta beklenen biçimde yanıt vermedi. API kök adresinin ve protokolün sunucuyla eşleştiğini kontrol edin, ardından yeniden deneyin.",
       "discoveryNoModels": "Uç nokta hiçbir model listelemedi. Modelleri elle girin.",
       "connectionIncomplete": "Model yanıt verdi ancak tamamlamadı. Tekrar deneyin veya model ID'sini ve protokolü kontrol edin.",
       "invalidInput": "Bir arka uç adı, geçerli başlıklar ve benzersiz bir ID'ye ve ada sahip en az bir model girin. Belirteç sınırları pozitif tam sayılar olmalıdır.",

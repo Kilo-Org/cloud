@@ -3890,7 +3890,7 @@
       "requestRateLimited": "The endpoint is limiting requests. Wait a moment and try again.",
       "requestUnavailable": "The endpoint is unavailable right now. Try again in a moment.",
       "requestUnreachable": "The endpoint could not be reached. Check the API root and your connection.",
-      "discoveryInvalidResponse": "The endpoint answered with something that is not a model list. Check that the API root and protocol match the server.",
+      "requestInvalidResponse": "The endpoint did not answer in the expected format. Check the API root and protocol match the server, then try again.",
       "discoveryNoModels": "The endpoint listed no models. Enter models manually.",
       "connectionIncomplete": "The model answered but did not finish. Try again, or check the model ID and protocol.",
       "invalidInput": "Enter a backend name, valid headers, and at least one model with a unique ID and name. Token limits must be positive whole numbers.",

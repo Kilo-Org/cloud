@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Ebe njikọ ahụ na-egbochi arịrịọ. Chere ntakịrị ma nwaa ọzọ.",
       "requestUnavailable": "Ebe njikọ adịghị ugbu a. Nwaa ọzọ n'oge na-adịghị anya.",
       "requestUnreachable": "Enweghị ike iru ebe njikọ ahụ. Lelee mgbọrọgwụ API na njikọ gị.",
-      "discoveryInvalidResponse": "Ebe njikọ ahụ zara ihe na-abụghị ndepụta ihe nlereanya. Lelee na mgbọrọgwụ API na usoro kwekọrọ na sava ahụ.",
+      "requestInvalidResponse": "Ebe njikọ ahụ azaghị n'usoro a tụrụ anya. Lelee na mgbọrọgwụ API na usoro kwekọrọ na sava ahụ, wee nwaa ọzọ.",
       "discoveryNoModels": "Ebe njikọ ahụ edepụtaghị ihe nlereanya ọ bụla. Tinye ihe nlereanya ji aka.",
       "connectionIncomplete": "Ihe nlereanya ahụ zara mana emezughị. Nwaa ọzọ, ma ọ bụ lelee ID ihe nlereanya na usoro.",
       "invalidInput": "Tinye aha sava, nkụnye ziri ezi, na opekata mpe otu ihe nlereanya nwere ID na aha pụrụ iche. Oke iberibe ederede ga-abụ ọnụọgụgụ zuru ezu karịrị efu.",

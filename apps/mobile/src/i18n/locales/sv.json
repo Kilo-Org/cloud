@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Slutpunkten begränsar antalet förfrågningar. Vänta ett ögonblick och försök igen.",
       "requestUnavailable": "Slutpunkten är inte tillgänglig just nu. Försök igen om en stund.",
       "requestUnreachable": "Det gick inte att nå slutpunkten. Kontrollera API-roten och din anslutning.",
-      "discoveryInvalidResponse": "Slutpunkten svarade med något som inte är en modellista. Kontrollera att API-roten och protokollet matchar servern.",
+      "requestInvalidResponse": "Slutpunkten svarade inte i det förväntade formatet. Kontrollera att API-roten och protokollet matchar servern och försök igen.",
       "discoveryNoModels": "Slutpunkten listade inga modeller. Ange modeller manuellt.",
       "connectionIncomplete": "Modellen svarade men slutförde inte. Försök igen eller kontrollera modell-ID:t och protokollet.",
       "invalidInput": "Ange ett backendnamn, giltiga headers och minst en modell med unikt ID och namn. Tokengränser måste vara positiva heltal.",

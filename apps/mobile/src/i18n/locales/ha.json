@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Wurin haɗi yana iyakance buƙatu. Jira kaɗan ka sake gwadawa.",
       "requestUnavailable": "Wurin haɗi ba ya samuwa a yanzu. Sake gwadawa nan da wani ɗan lokaci.",
       "requestUnreachable": "Ba a iya isa wurin haɗi ba. Duba tushen API da haɗin ka.",
-      "discoveryInvalidResponse": "Wurin haɗi ya amsa da wani abu da ba jerin samfura ba ne. Tabbatar cewa tushen API da ƙa'idar sun dace da uwar garke.",
+      "requestInvalidResponse": "Wurin haɗi bai amsa da tsarin da ake tsammani ba. Tabbatar cewa tushen API da ƙa'idar sun dace da uwar garke, sannan ka sake gwadawa.",
       "discoveryNoModels": "Wurin haɗi bai lissafa wani samfuri ba. Shigar da samfura da hannu.",
       "connectionIncomplete": "Samfurin ya amsa amma bai kammala ba. Sake gwadawa, ko duba ID na samfurin da ƙa'idar.",
       "invalidInput": "Shigar da sunan uwar garke, ingantattun kanun buƙata, da aƙalla samfurin guda ɗaya mai ID da suna da ba a maimaita ba. Iyakokin gutsuren rubutu dole ne su zama cikakkun lambobi masu girma fiye da sifili.",

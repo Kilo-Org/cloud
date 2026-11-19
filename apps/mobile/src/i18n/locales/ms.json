@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Titik akhir sedang mengehadkan permintaan. Tunggu sebentar dan cuba lagi.",
       "requestUnavailable": "Titik akhir tidak tersedia buat masa ini. Cuba lagi sebentar lagi.",
       "requestUnreachable": "Titik akhir tidak dapat dihubungi. Periksa URL akar API dan sambungan anda.",
-      "discoveryInvalidResponse": "Titik akhir menjawab dengan sesuatu yang bukan senarai model. Pastikan URL akar API dan protokol sepadan dengan pelayan.",
+      "requestInvalidResponse": "Titik akhir menjawab dengan format yang tidak dijangka. Periksa URL akar API dan protokol sepadan dengan pelayan, kemudian cuba lagi.",
       "discoveryNoModels": "Titik akhir tidak menyenaraikan sebarang model. Masukkan model secara manual.",
       "connectionIncomplete": "Model menjawab tetapi tidak selesai. Cuba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama sistem pelayan, pengepala yang sah dan sekurang-kurangnya satu model dengan ID dan nama yang unik. Had token mestilah nombor bulat positif.",

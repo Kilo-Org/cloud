@@ -4012,7 +4012,7 @@
       "requestRateLimited": "Punkt końcowy ogranicza liczbę żądań. Odczekaj chwilę i spróbuj ponownie.",
       "requestUnavailable": "Punkt końcowy jest teraz niedostępny. Spróbuj ponownie za chwilę.",
       "requestUnreachable": "Nie udało się połączyć z punktem końcowym. Sprawdź główny adres API i połączenie.",
-      "discoveryInvalidResponse": "Punkt końcowy odpowiedział czymś, co nie jest listą modeli. Sprawdź, czy główny adres API i protokół są zgodne z serwerem.",
+      "requestInvalidResponse": "Punkt końcowy odpowiedział w nieoczekiwanym formacie. Sprawdź, czy główny adres API i protokół są zgodne z serwerem, a następnie spróbuj ponownie.",
       "discoveryNoModels": "Punkt końcowy nie zwrócił żadnych modeli. Wprowadź modele ręcznie.",
       "connectionIncomplete": "Model odpowiedział, ale nie ukończył żądania. Spróbuj ponownie lub sprawdź ID modelu i protokół.",
       "invalidInput": "Wprowadź nazwę backendu, prawidłowe nagłówki i co najmniej jeden model z unikalnym ID i nazwą. Limity tokenów muszą być dodatnimi liczbami całkowitymi.",

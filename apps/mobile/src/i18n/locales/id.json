@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Titik akhir membatasi permintaan. Tunggu sebentar dan coba lagi.",
       "requestUnavailable": "Titik akhir tidak tersedia saat ini. Coba lagi sebentar lagi.",
       "requestUnreachable": "Titik akhir tidak dapat dijangkau. Periksa URL dasar API dan koneksi Anda.",
-      "discoveryInvalidResponse": "Titik akhir menjawab dengan sesuatu yang bukan daftar model. Periksa apakah URL dasar API dan protokol cocok dengan server.",
+      "requestInvalidResponse": "Titik akhir tidak menjawab dalam format yang diharapkan. Periksa apakah URL dasar API dan protokol cocok dengan server, lalu coba lagi.",
       "discoveryNoModels": "Titik akhir tidak mencantumkan model apa pun. Masukkan model secara manual.",
       "connectionIncomplete": "Model menjawab tetapi tidak menyelesaikan permintaan. Coba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama layanan, tajuk yang valid, dan setidaknya satu model dengan ID dan nama yang unik. Batas token harus berupa bilangan bulat positif.",

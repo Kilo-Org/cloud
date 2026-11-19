@@ -3951,7 +3951,7 @@
       "requestRateLimited": "L'indirizzo di accesso sta limitando le richieste. Attendi un momento e riprova.",
       "requestUnavailable": "L'indirizzo di accesso non è disponibile in questo momento. Riprova tra un momento.",
       "requestUnreachable": "Impossibile raggiungere l'indirizzo di accesso. Controlla l'URL di base dell'API e la tua connessione.",
-      "discoveryInvalidResponse": "L'indirizzo di accesso ha risposto con qualcosa che non è un elenco di modelli. Controlla che l'URL di base dell'API e il protocollo corrispondano al server.",
+      "requestInvalidResponse": "L'indirizzo di accesso non ha risposto nel formato previsto. Controlla che l'URL di base dell'API e il protocollo corrispondano al server, poi riprova.",
       "discoveryNoModels": "L'indirizzo di accesso non ha elencato alcun modello. Inserisci i modelli manualmente.",
       "connectionIncomplete": "Il modello ha risposto ma non ha completato la richiesta. Riprova, oppure controlla l'ID del modello e il protocollo.",
       "invalidInput": "Inserisci un nome per il servizio, intestazioni valide e almeno un modello con ID e nome univoci. I limiti dei token devono essere numeri interi positivi.",

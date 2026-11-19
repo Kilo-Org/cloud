@@ -3890,7 +3890,7 @@
       "requestRateLimited": "O punto de acceso está a limitar as peticións. Agarda un momento e téntao de novo.",
       "requestUnavailable": "O punto de acceso non está dispoñible agora mesmo. Téntao de novo nun momento.",
       "requestUnreachable": "Non se puido acceder ao punto de acceso. Comproba o URL raíz da API e a túa conexión.",
-      "discoveryInvalidResponse": "O punto de acceso respondeu con algo que non é unha lista de modelos. Comproba que o URL raíz da API e o protocolo coinciden co servidor.",
+      "requestInvalidResponse": "O punto de acceso non respondeu no formato esperado. Comproba que o URL raíz da API e o protocolo coinciden co servidor e téntao de novo.",
       "discoveryNoModels": "O punto de acceso non listou ningún modelo. Introduce os modelos manualmente.",
       "connectionIncomplete": "O modelo respondeu pero non rematou. Téntao de novo ou comproba o ID do modelo e o protocolo.",
       "invalidInput": "Introduce un nome de servizo, cabeceiras válidas e polo menos un modelo cun ID único e un nome. Os límites de tókens deben ser números enteiros positivos.",

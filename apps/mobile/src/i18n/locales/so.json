@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Barta adeegga codsiyada way ku xaddaysaa. Sug waqti gaaban, isku dayna mar kale.",
       "requestUnavailable": "Barta adeegga hadda ma heli karo. Isku day mar kale waqti gaaban kadib.",
       "requestUnreachable": "Barta adeegga lama gaari karin. Hubi URL-ka asalka API iyo xiriirkaaga.",
-      "discoveryInvalidResponse": "Jawaabta barta adeeggu ma aha liiska moodeellada. Hubi in URL-ka asalka API iyo hab-maamuusku ay u dhigmaan kuwa adeegga.",
+      "requestInvalidResponse": "Jawaabta barta adeeggu ma aha qaabka la filayay, marka lama isticmaali karo. Hubi in URL-ka asalka API iyo hab-maamuusku ay u dhigmaan kuwa adeegga, ka dibna isku day mar kale.",
       "discoveryNoModels": "Liiska barta adeegga ma ku jirin moodeellada. Moodeellada gacanta ku geli.",
       "connectionIncomplete": "Moodeelka jawaabu wuu bixiyay, laakiin waanu dhammeeyn. Isku dayna mar kale, ama hubi aqoonsiga moodeelka iyo hab-maamuuska.",
       "invalidInput": "Geli magaca adeegga gadaale, madaxyo sax ah, iyo ugu yaraan hal moodeel oo leh aqoonsi iyo magac u gaar ah. Xaddidaadaha unugyada qoraalku waa inay noqdaan tirooyin dhan oo ka weyn eber.",

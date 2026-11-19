@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Mampetra ny fangatahana ny adiresy fifandraisana. Andraso kely dia andramo indray.",
       "requestUnavailable": "Tsy misy amin'izao fotoana izao ny adiresy fifandraisana. Andramo indray rahoway kely.",
       "requestUnreachable": "Tsy tratra ny adiresy fifandraisana. Hamarino ny fototry ny API sy ny fifandraisanao.",
-      "discoveryInvalidResponse": "Namaly zavatra tsy lisitry ny modely ny adiresy fifandraisana. Hamarino fa mifanaraka amin'ny servera ny fototry ny API sy ny fitsipika fifandraisana.",
+      "requestInvalidResponse": "Tsy namaly araka ny endrika nantenaina ny adiresy fifandraisana. Hamarino fa mifanaraka amin'ny servera ny fototry ny API sy ny fitsipika fifandraisana, ary avereno indray.",
       "discoveryNoModels": "Tsy nisy modely notanisain'ny adiresy fifandraisana. Ampidiro amin'ny tanana ny modely.",
       "connectionIncomplete": "Namaly ny modely fa tsy nahavita. Andramo indray, na hamarino ny famantarana ny modely sy ny fitsipika fifandraisana.",
       "invalidInput": "Ampidiro ny anaran'ny rafitra mpizara, ny sahan-doha manan-kery ary modely iray farafahakeliny manana famantarana sy anarana tsy miverina. Tsy maintsy isa manontolo miabo ny fetran'ny singa lahatsoratra.",

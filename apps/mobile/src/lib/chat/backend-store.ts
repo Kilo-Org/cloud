@@ -83,7 +83,7 @@ export const BACKEND_REQUEST_ERROR_KEYS = {
   rateLimited: 'modelChat.backends.requestRateLimited',
   unavailable: 'modelChat.backends.requestUnavailable',
   unreachable: 'modelChat.backends.requestUnreachable',
-  invalidResponse: 'modelChat.backends.discoveryInvalidResponse',
+  invalidResponse: 'modelChat.backends.requestInvalidResponse',
   noModels: 'modelChat.backends.discoveryNoModels',
   incomplete: 'modelChat.backends.connectionIncomplete',
 } as const satisfies Record<Exclude<BackendRequestProblem, 'cancelled'>, string>;

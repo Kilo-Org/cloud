@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Amaiera-puntua eskaerak mugatzen ari da. Itxaron une bat eta saiatu berriro.",
       "requestUnavailable": "Amaiera-puntua ez dago erabilgarri une honetan. Saiatu berriro une bat barru.",
       "requestUnreachable": "Ezin izan da amaiera-puntura iritsi. Egiaztatu APIaren erroa eta zure konexioa.",
-      "discoveryInvalidResponse": "Amaiera-puntuak modelo-zerrenda ez den zerbait erantzun du. Egiaztatu APIaren erroa eta protokoloa zerbitzariarekin bat datozela.",
+      "requestInvalidResponse": "Amaiera-puntuak erantzun du, baina ez espero zen formatuan. Egiaztatu APIaren erroa eta protokoloa zerbitzariarekin bat datozela, eta saiatu berriro.",
       "discoveryNoModels": "Amaiera-puntuak ez du modelorik zerrendatu. Sartu modeloak eskuz.",
       "connectionIncomplete": "Modeloak erantzun du, baina ez du amaitu. Saiatu berriro, edo egiaztatu modeloaren IDa eta protokoloa.",
       "invalidInput": "Sartu atzeko zerbitzuaren izena, baliozko goiburuak eta gutxienez ID eta izen bakarrak dituen modelo bat. Tokenen mugek zenbaki oso positiboak izan behar dute.",

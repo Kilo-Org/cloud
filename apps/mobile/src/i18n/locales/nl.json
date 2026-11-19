@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Het eindpunt beperkt het aantal verzoeken. Wacht even en probeer het opnieuw.",
       "requestUnavailable": "Het eindpunt is op dit moment niet beschikbaar. Probeer het zo opnieuw.",
       "requestUnreachable": "Het eindpunt kon niet worden bereikt. Controleer de API-basis-URL en je verbinding.",
-      "discoveryInvalidResponse": "Het eindpunt antwoordde met iets dat geen modellenlijst is. Controleer of de API-basis-URL en het protocol bij de server passen.",
+      "requestInvalidResponse": "Het eindpunt antwoordde niet in het verwachte formaat. Controleer of de API-basis-URL en het protocol bij de server passen en probeer het daarna opnieuw.",
       "discoveryNoModels": "Het eindpunt gaf geen modellen. Voer modellen handmatig in.",
       "connectionIncomplete": "Het model heeft geantwoord maar is niet klaar. Probeer het opnieuw of controleer de model-ID en het protocol.",
       "invalidInput": "Voer een naam voor de chatserver, geldige verzoekheaders en minstens één model met een unieke ID en naam in. Tokenlimieten moeten positieve gehele getallen zijn.",

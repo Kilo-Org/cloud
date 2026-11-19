@@ -4134,7 +4134,7 @@
       "requestRateLimited": "Mae'r pwynt terfyn yn cyfyngu ceisiadau. Arhoswch eiliad a rhowch gynnig arall arni.",
       "requestUnavailable": "Nid yw'r pwynt terfyn ar gael ar hyn o bryd. Rhowch gynnig arall arni mewn eiliad.",
       "requestUnreachable": "Ni ellid cyrraedd y pwynt terfyn. Gwiriwch wraidd yr API a'ch cysylltiad.",
-      "discoveryInvalidResponse": "Atebodd y pwynt terfyn gyda rhywbeth nad yw'n rhestr modelau. Gwiriwch fod gwraidd yr API a'r protocol yn cyfateb i'r gweinydd.",
+      "requestInvalidResponse": "Ni atebodd y pwynt terfyn yn y fformat a ddisgwylid. Gwiriwch fod gwraidd yr API a'r protocol yn cyfateb i'r gweinydd, ac yna ceisiwch eto.",
       "discoveryNoModels": "Ni restrir unrhyw fodelau gan y pwynt terfyn. Rhowch fodelau i mewn â llaw.",
       "connectionIncomplete": "Atebodd y model ond ni orffennodd. Rhowch gynnig arall arni, neu gwiriwch ID y model a'r protocol.",
       "invalidInput": "Rhowch enw ôl-ben, penawdau dilys ac o leiaf un model ag ID ac enw unigryw. Rhaid i derfynau tocynnau fod yn gyfanrifau positif.",

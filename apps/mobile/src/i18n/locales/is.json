@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Endapunkturinn takmarkar beiðnir. Bíddu aðeins og reyndu aftur.",
       "requestUnavailable": "Endapunkturinn er ekki í boði núna. Reyndu aftur eftir smástund.",
       "requestUnreachable": "Ekki náðist samband við endapunktinn. Athugaðu grunnslóð API og tenginguna þína.",
-      "discoveryInvalidResponse": "Endapunkturinn svaraði með einhverju öðru en lista yfir líkön. Athugaðu að grunnslóð API og samskiptaregla séu í samræmi við þjóninn.",
+      "requestInvalidResponse": "Endapunkturinn svaraði ekki í væntu sniði. Athugaðu að grunnslóð API og samskiptaregla séu í samræmi við þjóninn og reyndu aftur.",
       "discoveryNoModels": "Endapunkturinn skilaði engum líkönum. Sláðu inn líkön handvirkt.",
       "connectionIncomplete": "Líkanið svaraði en lauk ekki. Reyndu aftur, eða athugaðu auðkenni líkans og samskiptareglu.",
       "invalidInput": "Sláðu inn heiti bakenda, gilda hausa og að minnsta kosti eitt líkan með einkvæmu auðkenni og heiti. Táknamörk verða að vera jákvæðar heiltölur.",

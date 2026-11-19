@@ -3890,7 +3890,7 @@
       "requestRateLimited": "A végpont korlátozza a kéréseket. Várj egy kicsit, és próbáld újra.",
       "requestUnavailable": "A végpont jelenleg nem érhető el. Próbáld újra egy pillanat múlva.",
       "requestUnreachable": "A végpontot nem sikerült elérni. Ellenőrizd az API alap-URL-címét és a kapcsolatot.",
-      "discoveryInvalidResponse": "A végpont olyan választ adott, amely nem modelllista. Ellenőrizd, hogy az API alap-URL-címe és a protokoll illeszkedik-e a szerverhez.",
+      "requestInvalidResponse": "A végpont nem a várt formátumban válaszolt. Ellenőrizd, hogy az API alap-URL-címe és a protokoll illeszkedik-e a szerverhez, majd próbáld újra.",
       "discoveryNoModels": "A végpont nem sorolt fel modelleket. Add meg a modelleket kézzel.",
       "connectionIncomplete": "A modell válaszolt, de nem fejezte be. Próbáld újra, vagy ellenőrizd a modellazonosítót és a protokollt.",
       "invalidInput": "Adj meg egy háttérrendszernevet, érvényes fejléceket és legalább egy modellt egyedi azonosítóval és névvel. A tokenkorlátoknak pozitív egész számoknak kell lenniük.",

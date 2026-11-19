@@ -4012,7 +4012,7 @@
       "requestRateLimited": "Končna točka omejuje zahteve. Počakaj trenutek in poskusi znova.",
       "requestUnavailable": "Končna točka trenutno ni na voljo. Poskusi znova čez trenutek.",
       "requestUnreachable": "Končne točke ni bilo mogoče doseči. Preveri osnovni URL API in povezavo.",
-      "discoveryInvalidResponse": "Končna točka je odgovorila z nečim, kar ni seznam modelov. Preveri, ali se osnovni URL API in protokol ujemata s strežnikom.",
+      "requestInvalidResponse": "Končna točka ni odgovorila v pričakovani obliki. Preveri, ali se osnovni URL API in protokol ujemata s strežnikom, in poskusi znova.",
       "discoveryNoModels": "Končna točka ni navedla nobenega modela. Modele vnesi ročno.",
       "connectionIncomplete": "Model je odgovoril, vendar ni dokončal. Poskusi znova ali preveri ID modela in protokol.",
       "invalidInput": "Vnesi ime zaledja, veljavne glave in vsaj en model z edinstvenim ID in imenom. Omejitve števila žetonov morajo biti pozitivna cela števila.",

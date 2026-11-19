@@ -3890,7 +3890,7 @@
       "requestRateLimited": "엔드포인트가 요청을 제한하고 있습니다. 잠시 기다린 후 다시 시도하세요.",
       "requestUnavailable": "엔드포인트를 지금 사용할 수 없습니다. 잠시 후 다시 시도하세요.",
       "requestUnreachable": "엔드포인트에 연결할 수 없습니다. API 루트와 연결을 확인하세요.",
-      "discoveryInvalidResponse": "엔드포인트가 모델 목록이 아닌 응답을 반환했습니다. API 루트와 프로토콜이 서버와 일치하는지 확인하세요.",
+      "requestInvalidResponse": "엔드포인트가 예상한 형식이 아닌 응답을 반환했습니다. API 루트와 프로토콜이 서버와 일치하는지 확인한 후 다시 시도하세요.",
       "discoveryNoModels": "엔드포인트에 모델이 없습니다. 모델을 직접 입력하세요.",
       "connectionIncomplete": "모델이 응답했지만 완료하지 못했습니다. 다시 시도하거나 모델 ID와 프로토콜을 확인하세요.",
       "invalidInput": "백엔드 이름, 유효한 헤더, 고유한 ID와 이름이 있는 모델을 하나 이상 입력하세요. 토큰 한도는 양의 정수여야 합니다.",

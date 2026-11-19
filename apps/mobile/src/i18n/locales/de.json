@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Der Endpunkt begrenzt Anfragen. Warte einen Moment und versuche es erneut.",
       "requestUnavailable": "Der Endpunkt ist derzeit nicht verfügbar. Versuche es gleich noch einmal.",
       "requestUnreachable": "Der Endpunkt konnte nicht erreicht werden. Prüfe die API-Basis-URL und deine Verbindung.",
-      "discoveryInvalidResponse": "Der Endpunkt hat mit etwas geantwortet, das keine Modellliste ist. Prüfe, ob API-Basis-URL und Protokoll zum Server passen.",
+      "requestInvalidResponse": "Der Endpunkt hat nicht im erwarteten Format geantwortet. Prüfe, ob API-Basis-URL und Protokoll zum Server passen, und versuche es dann erneut.",
       "discoveryNoModels": "Der Endpunkt hat keine Modelle aufgelistet. Gib Modelle manuell ein.",
       "connectionIncomplete": "Das Modell hat geantwortet, aber nicht abgeschlossen. Versuche es erneut oder prüfe die Modell-ID und das Protokoll.",
       "invalidInput": "Gib einen Backend-Namen, gültige Header und mindestens ein Modell mit eindeutiger ID und eindeutigem Namen ein. Token-Limits müssen positive ganze Zahlen sein.",

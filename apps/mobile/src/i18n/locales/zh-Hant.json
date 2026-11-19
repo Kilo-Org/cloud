@@ -3890,7 +3890,7 @@
       "requestRateLimited": "端點正在限制請求。請稍候片刻再試一次。",
       "requestUnavailable": "端點目前無法使用。請稍後再試一次。",
       "requestUnreachable": "無法連線至端點。請檢查 API 根 URL 與網路連線。",
-      "discoveryInvalidResponse": "端點回應的內容不是模型清單。請確認 API 根 URL 與協定符合該伺服器。",
+      "requestInvalidResponse": "端點回應的格式不符預期，無法使用。請確認 API 根 URL 與協定符合該伺服器，然後再試一次。",
       "discoveryNoModels": "端點未列出任何模型。請手動輸入模型。",
       "connectionIncomplete": "模型已回應但未完成。請再試一次，或檢查模型 ID 與協定。",
       "invalidInput": "請輸入後端名稱、有效的標頭，以及至少一個具有唯一 ID 和名稱的模型。詞元上限必須為正整數。",

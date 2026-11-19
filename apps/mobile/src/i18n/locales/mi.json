@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Kei te whakawhāiti te pūwāhi i ngā tono. Tatari mō tētahi wā poto, kātahi ka ngana anō.",
       "requestUnavailable": "Kāore te pūwāhi e wātea ana ināianei. Ngana anō ā tētahi wā poto.",
       "requestUnreachable": "Kāore i taea te toro atu ki te pūwāhi. Tirohia te pūtake API me tō hononga.",
-      "discoveryInvalidResponse": "Ehara te whakautu a te pūwāhi i te rārangi tauira. Tirohia mēnā e hāngai ana te pūtake API me te kawa ki te tūmau.",
+      "requestInvalidResponse": "Ehara te whakautu a te pūwāhi i te rārangi tauira i tūmanakohia. Tirohia mēnā e hāngai ana te pūtake API me te kawa ki te tūmau, kātahi ka whakamātau anō.",
       "discoveryNoModels": "Kāore te pūwāhi i whakarārangi tauira. Whakaurua ā-ringa ngā tauira.",
       "connectionIncomplete": "I whakautu te tauira, engari kāore i oti te tono. Ngana anō, tirohia rānei te tautuhi tauira me te kawa.",
       "invalidInput": "Whakaurua he ingoa pūnaha tuarā, he pane tika, me tētahi tauira neke atu rānei, he tautuhi me te ingoa ahurei tō ia tauira. Me tau tōpū nui ake i te kore ngā tepe waeine kupu.",

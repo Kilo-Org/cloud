@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Endepunktet begrænser forespørgsler. Vent et øjeblik, og prøv igen.",
       "requestUnavailable": "Endepunktet er utilgængeligt lige nu. Prøv igen om et øjeblik.",
       "requestUnreachable": "Der kunne ikke opnås forbindelse til endepunktet. Tjek API-roden og din forbindelse.",
-      "discoveryInvalidResponse": "Endepunktet svarede med noget, der ikke er en modelliste. Tjek, at API-roden og protokollen svarer til serveren.",
+      "requestInvalidResponse": "Endepunktet svarede ikke i det forventede format. Tjek, at API-roden og protokollen svarer til serveren, og prøv igen.",
       "discoveryNoModels": "Endepunktet angav ingen modeller. Tilføj modeller manuelt.",
       "connectionIncomplete": "Modellen svarede, men blev ikke færdig. Prøv igen, eller tjek model-ID'et og protokollen.",
       "invalidInput": "Indtast et servernavn, gyldige headere og mindst én model med et entydigt ID og navn. Tokengrænser skal være positive heltal.",

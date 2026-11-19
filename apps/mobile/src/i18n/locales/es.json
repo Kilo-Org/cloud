@@ -3951,7 +3951,7 @@
       "requestRateLimited": "El punto de acceso está limitando las solicitudes. Espera un momento y vuelve a intentarlo.",
       "requestUnavailable": "El punto de acceso no está disponible en este momento. Vuelve a intentarlo en un momento.",
       "requestUnreachable": "No se ha podido alcanzar el punto de acceso. Comprueba la URL raíz de la API y tu conexión.",
-      "discoveryInvalidResponse": "El punto de acceso ha respondido con algo que no es una lista de modelos. Comprueba que la URL raíz de la API y el protocolo coincidan con los del servidor.",
+      "requestInvalidResponse": "El punto de acceso no ha respondido en el formato esperado. Comprueba que la URL raíz de la API y el protocolo coincidan con los del servidor y vuelve a intentarlo.",
       "discoveryNoModels": "El punto de acceso no ha listado ningún modelo. Introduce los modelos manualmente.",
       "connectionIncomplete": "El modelo ha respondido pero no ha terminado. Vuelve a intentarlo o comprueba el ID del modelo y el protocolo.",
       "invalidInput": "Introduce un nombre de servicio, cabeceras válidas y al menos un modelo con un ID único y un nombre. Los límites de tokens deben ser números enteros positivos.",

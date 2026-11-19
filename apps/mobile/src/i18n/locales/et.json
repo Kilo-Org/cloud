@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Lõpp-punkt piirab päringuid. Oota hetk ja proovi uuesti.",
       "requestUnavailable": "Lõpp-punkt pole praegu saadaval. Proovi hetke pärast uuesti.",
       "requestUnreachable": "Lõpp-punktini ei õnnestunud jõuda. Kontrolli API juur-URL-i ja ühendust.",
-      "discoveryInvalidResponse": "Lõpp-punkt vastas millegagi, mis pole mudelite loend. Kontrolli, et API juur-URL ja protokoll vastaksid serverile.",
+      "requestInvalidResponse": "Lõpp-punkti vastus ei olnud oodatud vormingus. Kontrolli, et API juur-URL ja protokoll vastaksid serverile, ja proovi seejärel uuesti.",
       "discoveryNoModels": "Lõpp-punkt ei loetlenud ühtki mudelit. Sisesta mudelid käsitsi.",
       "connectionIncomplete": "Mudel vastas, kuid ei lõpetanud. Proovi uuesti või kontrolli mudeli ID-d ja protokolli.",
       "invalidInput": "Sisesta taustsüsteemi nimi, kehtivad päised ja vähemalt üks kordumatu ID ja nimega mudel. Tokenite piirangud peavad olema positiivsed täisarvud.",

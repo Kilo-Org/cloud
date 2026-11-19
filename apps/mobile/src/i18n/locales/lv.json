@@ -3951,7 +3951,7 @@
       "requestRateLimited": "Galapunkts ierobežo pieprasījumus. Nogaidi brīdi un mēģini vēlreiz.",
       "requestUnavailable": "Galapunkts šobrīd nav pieejams. Mēģini vēlreiz pēc brīža.",
       "requestUnreachable": "Galapunkts nav sasniedzams. Pārbaudi API sakni un savienojumu.",
-      "discoveryInvalidResponse": "Galapunkts atbildēja ar kaut ko, kas nav modeļu saraksts. Pārbaudi, vai API sakne un protokols atbilst serverim.",
+      "requestInvalidResponse": "Galapunkts neatbildēja paredzētajā formātā. Pārbaudi, vai API sakne un protokols atbilst serverim, un mēģini vēlreiz.",
       "discoveryNoModels": "Galapunkts neuzrādīja nevienu modeli. Ievadi modeļus manuāli.",
       "connectionIncomplete": "Modelis atbildēja, bet nepabeidza pieprasījumu. Mēģini vēlreiz vai pārbaudi modeļa ID un protokolu.",
       "invalidInput": "Ievadi aizmugursistēmas nosaukumu, derīgas galvenes un vismaz vienu modeli ar unikālu ID un nosaukumu. Tokenu ierobežojumiem jābūt pozitīviem veseliem skaitļiem.",

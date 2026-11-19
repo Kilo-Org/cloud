@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Bakki walqunnamtii gaaffiiwwan daangessaa jira. Yeroo gabaabaa eegii irra deebi'ii yaali.",
       "requestUnavailable": "Bakki walqunnamtii amma argamuu hin danda'u. Yeroo gabaabaa booda irra deebi'ii yaali.",
       "requestUnreachable": "Bakka walqunnamtiitti bira ga'uun hin danda'amne. Hundee API fi walqunnamtii kee ilaali.",
-      "discoveryInvalidResponse": "Bakki walqunnamtii waan tarree moodeelaa hin taane deebise. Hundee API fi pirootokooliin sarvii kanaa wajjin tokko ta'uu mirkaneessi.",
+      "requestInvalidResponse": "Bakki walqunnamtii boca eegamaatiin hin deebine. Hundee API fi pirootokooliin sarvii wajjin tokko ta'uu mirkaneessi, sana booda irra deebi'ii yaali.",
       "discoveryNoModels": "Bakki walqunnamtii moodeela tokkoon iyyuu hin tarreessine. Moodeelota harkaan galchi.",
       "connectionIncomplete": "Moodeelli deebii kenneera garuu hin xumurre. Irra deebi'ii yaali, ykn ID moodeelaa fi pirootokoolii ilaali.",
       "invalidInput": "Maqaa sirna duubaa, matadureewwan sirrii fi yoo xiqqaate moodeela tokko ID fi maqaa adda ta'e qabu galchi. Daangaawwan tokanootaa lakkoofsota guutuu zeeroo caalan ta'uu qabu.",

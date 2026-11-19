@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Pwen aksè a ap limite demann yo. Tann yon ti moman epi eseye ankò.",
       "requestUnavailable": "Pwen aksè a pa disponib kounye a. Eseye ankò nan yon ti moman.",
       "requestUnreachable": "Pa t kapab rive jwenn pwen aksè a. Verifye rasin API a ak koneksyon ou.",
-      "discoveryInvalidResponse": "Pwen aksè a reponn ak yon bagay ki pa yon lis modèl. Verifye ke rasin API a ak pwotokòl la koresponn ak sèvè a.",
+      "requestInvalidResponse": "Pwen aksè a pa t reponn nan fòma espere a. Verifye ke rasin API a ak pwotokòl la koresponn ak sèvè a, epi eseye ankò.",
       "discoveryNoModels": "Pwen aksè a pa t bay okenn modèl. Antre modèl yo alamen.",
       "connectionIncomplete": "Modèl la reponn men li pa t fini. Eseye ankò, oswa verifye ID modèl la ak pwotokòl la.",
       "invalidInput": "Antre yon non sèvis, antèt ki valab ak omwen yon modèl ki gen yon ID ak yon non ki pa repete. Limit jeton yo dwe nonb antye ki pi gran pase zewo.",

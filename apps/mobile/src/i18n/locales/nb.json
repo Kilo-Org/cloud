@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Endepunktet begrenser antall forespørsler. Vent litt og prøv igjen.",
       "requestUnavailable": "Endepunktet er utilgjengelig akkurat nå. Prøv igjen om et øyeblikk.",
       "requestUnreachable": "Det var ikke mulig å nå endepunktet. Sjekk API-rotadressen og tilkoblingen.",
-      "discoveryInvalidResponse": "Endepunktet svarte med noe som ikke er en modelliste. Sjekk at API-rotadressen og protokollen stemmer med serveren.",
+      "requestInvalidResponse": "Endepunktet svarte, men svaret var ikke i forventet format. Sjekk at API-rotadressen og protokollen stemmer med serveren, og prøv igjen.",
       "discoveryNoModels": "Endepunktet listet ingen modeller. Legg inn modeller manuelt.",
       "connectionIncomplete": "Modellen svarte, men fullførte ikke. Prøv igjen, eller sjekk modell-ID-en og protokollen.",
       "invalidInput": "Skriv inn et navn på baksystemet, gyldige meldingshoder og minst én modell med unik ID og unikt navn. Tokengrensene må være positive heltall.",

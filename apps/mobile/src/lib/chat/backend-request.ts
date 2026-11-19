@@ -231,13 +231,10 @@ export async function checkBackendConnection(
   // A holder for the same reason as discovery's: repeated truthiness reads of
   // `signal.aborted` narrow to false and the checker calls the later ones dead.
   const cancelState = { aborted: false };
-  signal.addEventListener(
-    'abort',
-    () => {
-      cancelState.aborted = true;
-    },
-    { once: true }
-  );
+  const cancel = () => {
+    cancelState.aborted = true;
+  };
+  signal.addEventListener('abort', cancel, { once: true });
   if (signal.aborted) {
     cancelState.aborted = true;
   }
@@ -297,5 +294,7 @@ export async function checkBackendConnection(
     // Provider text can echo authorization headers or API keys, so only the
     // problem class speaks.
     throw new BackendRequestError('unreachable');
+  } finally {
+    signal.removeEventListener('abort', cancel);
   }
 }

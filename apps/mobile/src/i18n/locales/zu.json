@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Indawo yokuxhumana inciphisa izicelo. Linda isikhashana bese uzama futhi.",
       "requestUnavailable": "Indawo yokuxhumana ayitholakali okwamanje. Zama futhi ngemva kwesikhashana.",
       "requestUnreachable": "Akukwazekanga ukufinyelela endaweni yokuxhumana. Hlola i-URL eyisisekelo ye-API nokuxhumana kwakho.",
-      "discoveryInvalidResponse": "Indawo yokuxhumana iphendule ngokungeluhlu lwamamodeli. Hlola ukuthi i-URL eyisisekelo ye-API nephrothokholi ziyafana neseva.",
+      "requestInvalidResponse": "Indawo yokuxhumana ayiphendulanga ngendlela elindelekile, ngakho uhlelo lokusebenza alukwazi ukuyisebenzisa. Hlola ukuthi i-URL eyisisekelo ye-API nephrothokholi ziyafana neseva, bese uzama futhi.",
       "discoveryNoModels": "Indawo yokuxhumana ayibonisanga mamodeli. Faka amamodeli ngokwakho.",
       "connectionIncomplete": "Imodeli iphendulile kodwa ayiqedanga. Zama futhi, noma uhlole i-ID yemodeli nephrothokholi.",
       "invalidInput": "Faka igama lohlelo olungemuva, izihloko ezivumelekile, kanye nemodeli okungenani eyodwa ene-ID negama okungaphindiwe. Imikhawulo yamathokheni kufanele ibe izinombolo eziphelele ezingaphezu kukaqanda.",

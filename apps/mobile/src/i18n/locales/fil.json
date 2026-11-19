@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Nililimitahan ng endpoint ang mga kahilingan. Maghintay sandali at subukang muli.",
       "requestUnavailable": "Hindi available ang endpoint sa ngayon. Subukang muli sa ilang sandali.",
       "requestUnreachable": "Hindi maabot ang endpoint. Suriin ang pangunahing URL ng API at ang iyong koneksyon.",
-      "discoveryInvalidResponse": "Sumagot ang endpoint ng isang bagay na hindi listahan ng modelo. Tiyakin na tumutugma ang pangunahing URL ng API at protocol sa server.",
+      "requestInvalidResponse": "Sumagot ang endpoint, ngunit hindi sa inaasahang format ang sagot. Tiyakin na tumutugma ang pangunahing URL ng API at protocol sa server, pagkatapos ay subukan muli.",
       "discoveryNoModels": "Walang nakalista na modelo ang endpoint. Maglagay ng mga modelo nang manu-mano.",
       "connectionIncomplete": "Sumagot ang modelo ngunit hindi natapos. Subukang muli, o suriin ang ID ng modelo at protocol.",
       "invalidInput": "Maglagay ng pangalan ng sistema, mga wastong header, at kahit isang modelo na may natatanging ID at pangalan. Ang mga limitasyon sa token ay dapat mga positibong buong bilang.",

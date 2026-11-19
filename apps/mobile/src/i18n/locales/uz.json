@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Ulanish manzili soʻrovlarni cheklayapti. Biroz kuting va qaytadan urinib koʻring.",
       "requestUnavailable": "Ulanish manzili hozir mavjud emas. Birozdan soʻng qaytadan urinib koʻring.",
       "requestUnreachable": "Ulanish manziliga yetib boʻlmadi. API asosiy manzili va internet aloqasini tekshiring.",
-      "discoveryInvalidResponse": "Ulanish manzili model roʻyxati boʻlmagan javob qaytardi. API asosiy manzili va protokol serverga mos kelishini tekshiring.",
+      "requestInvalidResponse": "Ulanish manzili kutilgan formatda javob qaytarmadi. API asosiy manzili va protokol serverga mos kelishini tekshirib, qayta urinib koʻring.",
       "discoveryNoModels": "Ulanish manzili hech qanday model koʻrsatmadi. Modellarni qoʻlda kiriting.",
       "connectionIncomplete": "Model javob berdi, lekin tugatmadi. Qaytadan urinib koʻring yoki model ID si va protokolni tekshiring.",
       "invalidInput": "Server nomi, yaroqli sarlavhalar va takrorlanmaydigan ID hamda nomga ega kamida bitta modelni kiriting. Token chegaralari musbat butun sonlar boʻlishi kerak.",

@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Son nöqtə sorğuları məhdudlaşdırır. Bir az gözləyin və yenidən cəhd edin.",
       "requestUnavailable": "Son nöqtə hazırda əlçatan deyil. Bir azdan yenidən cəhd edin.",
       "requestUnreachable": "Son nöqtə ilə əlaqə qurula bilmədi. API-nin kök ünvanını və bağlantınızı yoxlayın.",
-      "discoveryInvalidResponse": "Son nöqtə model siyahısı olmayan cavab qaytardı. API-nin kök ünvanının və protokolun serverə uyğun olduğunu yoxlayın.",
+      "requestInvalidResponse": "Son nöqtə gözlənilən formatda cavab qaytarmadı. API-nin kök ünvanının və protokolun serverə uyğun olduğunu yoxlayın, sonra yenidən cəhd edin.",
       "discoveryNoModels": "Son nöqtə heç bir model siyahılamadı. Modelləri əl ilə daxil edin.",
       "connectionIncomplete": "Model cavab verdi, lakin tamamlamadı. Yenidən cəhd edin və ya model ID-sini və protokolu yoxlayın.",
       "invalidInput": "Arxa xidmətin adını, etibarlı başlıqları və unikal ID-si və adı olan ən azı bir modeli daxil edin. Token limitləri müsbət tam ədədlər olmalıdır.",

@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Ibi ìsopọ̀ ń dín àwọn ìbéèrè kù. Dúró díẹ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "requestUnavailable": "Ibi ìsopọ̀ kò sí lárọ̀ọ́wọ́tó báyìí. Gbìyànjú lẹ́ẹ̀kan sí i ní kété.",
       "requestUnreachable": "A kò lè dé ibi ìsopọ̀. Ṣàyẹ̀wò ìpìlẹ̀ API àti ìsopọ̀ rẹ.",
-      "discoveryInvalidResponse": "Ibi ìsopọ̀ dáhùn pẹ̀lú nǹkan tí kì í ṣe àkójọ awoṣe. Ṣàyẹ̀wò pé ìpìlẹ̀ API àti ìlànà bá sérífà náà mu.",
+      "requestInvalidResponse": "Ibi ìsopọ̀ kò dáhùn ní ọ̀nà tí a retí. Ṣàyẹ̀wò pé ìpìlẹ̀ API àti ìlànà bá sérífà náà mu, kí o sì tún gbìyànjú.",
       "discoveryNoModels": "Ibi ìsopọ̀ kò ṣe àkójọ awoṣe kankan. Tẹ àwọn awoṣe sí fúnra rẹ.",
       "connectionIncomplete": "Awoṣe náà dáhùn ṣùgbọ́n kò parí. Gbìyànjú lẹ́ẹ̀kan sí i, tàbí ṣàyẹ̀wò ID awoṣe àti ìlànà.",
       "invalidInput": "Tẹ orúkọ ètò ẹ̀yìn, àwọn akọlé tó tọ́, àti ó kéré tán awoṣe kan tí ó ní ID àti orúkọ tí kò tún ara wọn ṣe sí. Ààlà iye àwọn àmì gbọ́dọ̀ jẹ́ odindi nọ́ńbà tí ó tóbi ju òdo lọ.",

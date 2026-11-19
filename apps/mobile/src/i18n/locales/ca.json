@@ -3951,7 +3951,7 @@
       "requestRateLimited": "El punt de connexió està limitant les sol·licituds. Espera un moment i torna-ho a provar.",
       "requestUnavailable": "El punt de connexió no està disponible ara mateix. Torna-ho a provar d'aquí a un moment.",
       "requestUnreachable": "No s'ha pogut arribar al punt de connexió. Comprova l'arrel de l'API i la teva connexió.",
-      "discoveryInvalidResponse": "El punt de connexió ha respost amb una cosa que no és una llista de models. Comprova que l'arrel de l'API i el protocol coincideixin amb el servidor.",
+      "requestInvalidResponse": "El punt de connexió no ha respost en el format esperat. Comprova que l'arrel de l'API i el protocol coincideixin amb el servidor i torna-ho a provar.",
       "discoveryNoModels": "El punt de connexió no ha llistat cap model. Introdueix els models manualment.",
       "connectionIncomplete": "El model ha respost però no ha acabat. Torna-ho a provar o comprova l'ID del model i el protocol.",
       "invalidInput": "Introdueix un nom de servidor, capçaleres vàlides i almenys un model amb un ID i un nom únics. Els límits de tòkens han de ser nombres enters positius.",

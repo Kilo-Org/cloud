@@ -3951,7 +3951,7 @@
       "requestRateLimited": "Le point de terminaison limite les requêtes. Patientez un instant, puis réessayez.",
       "requestUnavailable": "Le point de terminaison est actuellement indisponible. Réessayez dans un instant.",
       "requestUnreachable": "Le point de terminaison n'a pas pu être joint. Vérifiez l'URL racine de l'API et votre connexion.",
-      "discoveryInvalidResponse": "Le point de terminaison a renvoyé une réponse qui n'est pas une liste de modèles. Vérifiez que l'URL racine de l'API et le protocole correspondent au serveur.",
+      "requestInvalidResponse": "Le point de terminaison n'a pas répondu dans le format attendu. Vérifiez que l'URL racine de l'API et le protocole correspondent au serveur, puis réessayez.",
       "discoveryNoModels": "Le point de terminaison n'a listé aucun modèle. Saisissez les modèles manuellement.",
       "connectionIncomplete": "Le modèle a commencé à répondre, mais n'a pas terminé. Réessayez, ou vérifiez l'identifiant du modèle et le protocole.",
       "invalidInput": "Saisissez un nom de service, des en-têtes valides et au moins un modèle avec un identifiant unique et un nom. Les limites de jetons doivent être des nombres entiers strictement positifs.",

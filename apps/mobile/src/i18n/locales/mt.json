@@ -4073,7 +4073,7 @@
       "requestRateLimited": "Il-punt ta' aċċess qed jillimita t-talbiet. Stenna ftit u erġa' pprova.",
       "requestUnavailable": "Il-punt ta' aċċess mhux disponibbli bħalissa. Erġa' pprova fi ftit ħin.",
       "requestUnreachable": "Il-punt ta' aċċess ma setax jintlaħaq. Iċċekkja l-URL bażi tal-API u l-konnessjoni tiegħek.",
-      "discoveryInvalidResponse": "Il-punt ta' aċċess wieġeb b'xi ħaġa li mhijiex lista ta' mudelli. Iċċekkja li l-URL bażi tal-API u l-protokoll jaqblu mas-server.",
+      "requestInvalidResponse": "Il-punt ta' aċċess wieġeb b'xi ħaġa li mhijiex fil-format mistenni. Iċċekkja li l-URL bażi tal-API u l-protokoll jaqblu mas-server, imbagħad erġa' pprova.",
       "discoveryNoModels": "Il-punt ta' aċċess ma llista l-ebda mudell. Daħħal il-mudelli manwalment.",
       "connectionIncomplete": "Il-mudell wieġeb iżda ma lestiex. Erġa' pprova, jew iċċekkja l-ID tal-mudell u l-protokoll.",
       "invalidInput": "Daħħal isem għas-servizz, intestaturi validi u mill-inqas mudell wieħed b'ID u isem uniċi. Il-limiti tal-unitajiet tat-test iridu jkunu numri sħaħ pożittivi.",

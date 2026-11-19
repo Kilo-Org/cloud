@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Sehemu ya muunganisho inaweka kikomo kwa maombi. Subiri kidogo kisha ujaribu tena.",
       "requestUnavailable": "Sehemu ya muunganisho haipatikani kwa sasa. Jaribu tena baada ya muda mfupi.",
       "requestUnreachable": "Sehemu ya muunganisho haikuweza kufikiwa. Angalia URL ya msingi ya API na muunganisho wako.",
-      "discoveryInvalidResponse": "Sehemu ya muunganisho ilijibu kwa kitu ambacho si orodha ya modeli. Angalia kwamba URL ya msingi ya API na itifaki zinaoana na seva.",
+      "requestInvalidResponse": "Sehemu ya muunganisho ilijibu kwa muundo ambao haukutarajiwa. Angalia kwamba URL ya msingi ya API na itifaki zinaoana na seva, kisha ujaribu tena.",
       "discoveryNoModels": "Sehemu ya muunganisho haikuorodhesha modeli yoyote. Ingiza modeli mwenyewe.",
       "connectionIncomplete": "Modeli ilijibu lakini haikukamilisha. Jaribu tena, au angalia kitambulisho cha modeli na itifaki.",
       "invalidInput": "Weka jina la huduma, vichwa halali na angalau modeli moja yenye kitambulisho na jina la kipekee. Vikomo vya tokeni lazima viwe namba kamili kubwa kuliko sifuri.",

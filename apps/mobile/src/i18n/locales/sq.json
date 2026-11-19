@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Pika fundore po kufizon kërkesat. Prit një çast dhe provo sërish.",
       "requestUnavailable": "Pika fundore nuk është e disponueshme tani. Provo sërish pas një çasti.",
       "requestUnreachable": "Pika fundore nuk u arrit dot. Kontrollo URL-në bazë të API-së dhe lidhjen.",
-      "discoveryInvalidResponse": "Pika fundore u përgjigj me diçka që nuk është listë modelesh. Kontrollo që URL-ja bazë e API-së dhe protokolli të përputhen me serverin.",
+      "requestInvalidResponse": "Pika fundore u përgjigj, por jo në formatin e pritur. Kontrollo që URL-ja bazë e API-së dhe protokolli të përputhen me serverin, pastaj provo përsëri.",
       "discoveryNoModels": "Pika fundore nuk renditi asnjë model. Fut modelet manualisht.",
       "connectionIncomplete": "Modeli u përgjigj, por nuk përfundoi. Provo sërish, ose kontrollo ID-në e modelit dhe protokollin.",
       "invalidInput": "Fut një emër për shërbimin mbështetës, kryefusha të vlefshme dhe të paktën një model me ID dhe emër unik. Kufijtë e tokenëve duhet të jenë numra të plotë pozitivë.",

@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Die eindpunt beperk versoeke. Wag 'n oomblik en probeer weer.",
       "requestUnavailable": "Die eindpunt is tans onbeskikbaar. Probeer oor 'n oomblik weer.",
       "requestUnreachable": "Die eindpunt kon nie bereik word nie. Kontroleer die API-basis-URL en jou verbinding.",
-      "discoveryInvalidResponse": "Die eindpunt het geantwoord met iets wat nie 'n modellys is nie. Kontroleer dat die API-basis-URL en protokol by die bediener pas.",
+      "requestInvalidResponse": "Die eindpunt het nie in die verwagte formaat geantwoord nie. Kontroleer dat die API-wortel en protokol by die bediener pas, en probeer dan weer.",
       "discoveryNoModels": "Die eindpunt het geen modelle gelys nie. Voer modelle handmatig in.",
       "connectionIncomplete": "Die model het geantwoord maar nie klaargemaak nie. Probeer weer of kontroleer die model-ID en protokol.",
       "invalidInput": "Voer 'n agtergrondstelselnaam, geldige kopvelde en minstens een model met 'n unieke ID en naam in. Die perke vir tekseenhede moet positiewe heelgetalle wees.",

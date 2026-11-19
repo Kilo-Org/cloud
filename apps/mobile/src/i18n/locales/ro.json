@@ -3951,7 +3951,7 @@
       "requestRateLimited": "Endpointul limitează cererile. Așteaptă puțin și încearcă din nou.",
       "requestUnavailable": "Endpointul este indisponibil acum. Încearcă din nou în câteva momente.",
       "requestUnreachable": "Endpointul nu a putut fi contactat. Verifică rădăcina API și conexiunea.",
-      "discoveryInvalidResponse": "Endpointul a răspuns cu ceva care nu este o listă de modele. Verifică dacă rădăcina API și protocolul corespund serverului.",
+      "requestInvalidResponse": "Endpointul nu a răspuns în formatul așteptat. Verifică dacă rădăcina API și protocolul corespund serverului, apoi încearcă din nou.",
       "discoveryNoModels": "Endpointul nu a listat niciun model. Introdu modelele manual.",
       "connectionIncomplete": "Modelul a răspuns, dar nu a terminat. Încearcă din nou sau verifică ID-ul modelului și protocolul.",
       "invalidInput": "Introdu un nume de backend, antete valide și cel puțin un model cu ID și nume unice. Limitele de tokenuri trebuie să fie numere întregi pozitive.",

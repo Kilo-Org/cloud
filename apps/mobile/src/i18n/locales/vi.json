@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Điểm cuối đang giới hạn yêu cầu. Đợi một lát rồi thử lại.",
       "requestUnavailable": "Điểm cuối hiện không khả dụng. Hãy thử lại sau một lát.",
       "requestUnreachable": "Không thể kết nối tới điểm cuối. Kiểm tra URL gốc của API và kết nối của bạn.",
-      "discoveryInvalidResponse": "Điểm cuối trả về nội dung không phải danh sách mô hình. Kiểm tra xem URL gốc của API và giao thức có khớp với máy chủ không.",
+      "requestInvalidResponse": "Điểm cuối trả về nội dung không đúng định dạng mong đợi. Kiểm tra xem URL gốc của API và giao thức có khớp với máy chủ không, sau đó thử lại.",
       "discoveryNoModels": "Điểm cuối không liệt kê mô hình nào. Hãy nhập mô hình thủ công.",
       "connectionIncomplete": "Mô hình đã phản hồi nhưng không hoàn tất. Hãy thử lại, hoặc kiểm tra ID mô hình và giao thức.",
       "invalidInput": "Nhập tên máy chủ, các trường tiêu đề hợp lệ và ít nhất một mô hình có ID và tên không trùng lặp. Giới hạn token phải là số nguyên dương.",

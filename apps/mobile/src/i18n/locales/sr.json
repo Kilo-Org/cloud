@@ -3951,7 +3951,7 @@
       "requestRateLimited": "Krajnja tačka ograničava zahteve. Sačekaj trenutak i pokušaj ponovo.",
       "requestUnavailable": "Krajnja tačka je trenutno nedostupna. Pokušaj ponovo za koji trenutak.",
       "requestUnreachable": "Nije moguće povezati se sa krajnjom tačkom. Proveri osnovni URL API-ja i vezu.",
-      "discoveryInvalidResponse": "Krajnja tačka je odgovorila nečim što nije lista modela. Proveri da se osnovni URL API-ja i protokol poklapaju sa serverom.",
+      "requestInvalidResponse": "Krajnja tačka nije odgovorila u očekivanom formatu. Proveri da se osnovni URL API-ja i protokol poklapaju sa serverom, pa pokušaj ponovo.",
       "discoveryNoModels": "Krajnja tačka nije prikazala nijedan model. Unesi modele ručno.",
       "connectionIncomplete": "Model je odgovorio, ali nije završio. Pokušaj ponovo ili proveri ID modela i protokol.",
       "invalidInput": "Unesi ime pozadinskog servisa, važeća zaglavlja i bar jedan model sa jedinstvenim ID-jem i imenom. Ograničenja broja tokena moraju biti pozitivni celi brojevi.",

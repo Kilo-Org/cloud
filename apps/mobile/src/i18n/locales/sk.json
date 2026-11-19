@@ -4012,7 +4012,7 @@
       "requestRateLimited": "Koncový bod obmedzuje požiadavky. Chvíľu počkajte a skúste to znova.",
       "requestUnavailable": "Koncový bod je teraz nedostupný. Skúste to o chvíľu znova.",
       "requestUnreachable": "Koncový bod sa nepodarilo dosiahnuť. Skontrolujte základnú URL API a pripojenie.",
-      "discoveryInvalidResponse": "Koncový bod odpovedal obsahom, ktorý nie je zoznam modelov. Skontrolujte, či základná URL API a protokol zodpovedajú serveru.",
+      "requestInvalidResponse": "Koncový bod neodpovedal v očakávanom formáte. Skontrolujte, či základná URL API a protokol zodpovedajú serveru, a skúste to znova.",
       "discoveryNoModels": "Koncový bod neuviedol žiadne modely. Zadajte modely ručne.",
       "connectionIncomplete": "Model odpovedal, ale nedokončil odpoveď. Skúste to znova alebo skontrolujte ID modelu a protokol.",
       "invalidInput": "Zadajte názov servera, platné hlavičky a aspoň jeden model s jedinečným ID a názvom. Limity tokenov musia byť kladné celé čísla.",

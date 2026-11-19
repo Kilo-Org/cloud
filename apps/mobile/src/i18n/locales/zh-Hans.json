@@ -3890,7 +3890,7 @@
       "requestRateLimited": "端点正在限制请求。请稍等片刻后重试。",
       "requestUnavailable": "端点当前不可用。请稍后重试。",
       "requestUnreachable": "无法连接到端点。请检查 API 根地址和网络连接。",
-      "discoveryInvalidResponse": "端点返回的内容不是模型列表。请确认 API 根地址和协议与服务器匹配。",
+      "requestInvalidResponse": "端点返回的内容格式不符合预期。请检查 API 根地址和协议是否与服务器匹配，然后重试。",
       "discoveryNoModels": "端点未列出任何模型。请手动输入模型。",
       "connectionIncomplete": "模型已响应但未完成。请重试，或检查模型 ID 和协议。",
       "invalidInput": "请输入后端名称、有效的请求头，以及至少一个具有唯一 ID 和名称的模型。词元数限制必须为正整数。",

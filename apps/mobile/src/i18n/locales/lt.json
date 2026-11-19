@@ -4012,7 +4012,7 @@
       "requestRateLimited": "Prieigos taškas riboja užklausas. Palaukite akimirką ir bandykite dar kartą.",
       "requestUnavailable": "Prieigos taškas šiuo metu nepasiekiamas. Bandykite dar kartą po akimirkos.",
       "requestUnreachable": "Nepavyko pasiekti prieigos taško. Patikrinkite bazinį API URL ir ryšį.",
-      "discoveryInvalidResponse": "Prieigos taškas grąžino ne modelių sąrašą. Patikrinkite, ar bazinis API URL ir protokolas atitinka serverį.",
+      "requestInvalidResponse": "Prieigos taškas grąžino netinkamo formato atsakymą. Patikrinkite, ar bazinis API URL ir protokolas atitinka serverį, tada bandykite dar kartą.",
       "discoveryNoModels": "Prieigos taškas nepateikė nė vieno modelio. Įveskite modelius rankiniu būdu.",
       "connectionIncomplete": "Modelis atsakė, bet nebaigė. Bandykite dar kartą arba patikrinkite modelio ID ir protokolą.",
       "invalidInput": "Įveskite serverio pavadinimą, galiojančias antraštes ir bent vieną modelį su unikaliu ID ir pavadinimu. Žetonų skaičiaus ribos turi būti teigiami sveikieji skaičiai.",

@@ -3890,7 +3890,7 @@
       "requestRateLimited": "Päätepiste rajoittaa pyyntöjä. Odota hetki ja yritä uudelleen.",
       "requestUnavailable": "Päätepiste ei ole juuri nyt käytettävissä. Yritä uudelleen hetken kuluttua.",
       "requestUnreachable": "Päätepisteeseen ei saatu yhteyttä. Tarkista API:n juuriosoite ja yhteytesi.",
-      "discoveryInvalidResponse": "Päätepiste vastasi jollakin, joka ei ole malliluettelo. Tarkista, että API:n juuriosoite ja protokolla vastaavat palvelinta.",
+      "requestInvalidResponse": "Päätepiste vastasi, mutta vastaus ei ole odotetussa muodossa. Tarkista, että API:n juuriosoite ja protokolla vastaavat palvelinta, ja yritä uudelleen.",
       "discoveryNoModels": "Päätepiste ei luetellut malleja. Lisää mallit käsin.",
       "connectionIncomplete": "Malli vastasi mutta ei suorittanut pyyntöä loppuun. Yritä uudelleen tai tarkista mallin tunniste ja protokolla.",
       "invalidInput": "Anna taustapalvelun nimi, kelvolliset otsakkeet ja vähintään yksi malli, jolla on yksilöllinen tunniste ja nimi. Tokenrajojen on oltava positiivisia kokonaislukuja.",

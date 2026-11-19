@@ -40,6 +40,13 @@ vi.mock('expo-router', () => ({
   usePreventRemove: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// The refuse-facing hooks read the reader's role through the organization query
+// chain, which pulls the Expo runtime this harness cannot load. This suite only
+// reads the two labels, and neither reader's copy is under test here.
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  isMoneyRole: () => false,
+  useOrgBoundary: () => ({ role: undefined }),
+}));
 vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff', Check: 'Check' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',

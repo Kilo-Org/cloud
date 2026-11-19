@@ -21,6 +21,13 @@ type OrganizationBoundaryProps = Readonly<{
   /** Full-screen callers pass a title for the `ScreenHeader`; sheets omit it and own no chrome. */
   title?: string;
   /**
+   * Hold the header's eyebrow line while the caller's real content has one to
+   * fill. The boundary paints no eyebrow itself, so this only reserves the
+   * band: the title keeps its height and the content below it does not move
+   * when the resolved screen swaps the label in.
+   */
+  reserveEyebrow?: boolean;
+  /**
    * Where the header's Back lands when the screen opens with no history to pop.
    * Every caller that passes a `title` names its own area's parent: the Profile
    * tab's root for that tab's children, the organization hub for the
@@ -58,6 +65,7 @@ type OrganizationBoundaryProps = Readonly<{
  */
 export function OrganizationBoundary({
   title,
+  reserveEyebrow,
   backFallback,
   organizationIdOverride,
   icon = Building2,
@@ -161,7 +169,7 @@ export function OrganizationBoundary({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} backFallback={backFallback} />
+      <ScreenHeader title={title} reserveEyebrow={reserveEyebrow} backFallback={backFallback} />
       {content}
     </View>
   );

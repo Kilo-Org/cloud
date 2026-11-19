@@ -1,14 +1,12 @@
-import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
 import type * as SurfaceFeedbackModule from '@/lib/surface-feedback';
-
 import { i18n } from '@/i18n';
 import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
-import { type TodoList } from '@/lib/todos/todo-types';
-import { act, TestRenderer } from '@/test/renderer';
+import { act } from '@/test/renderer';
 
-import { type StartTodoControls, useStartTodo } from './use-start-todo';
+import { createHarness, LIST, TODO } from './use-start-todo.mounted.test-helpers';
 
 const state = vi.hoisted(() => ({
   startAgent: vi.fn(),
@@ -18,6 +16,8 @@ const state = vi.hoisted(() => ({
   push: vi.fn(),
   toastError: vi.fn(),
   focusEffects: [] as (() => void)[],
+  // The memberships the hook resolves the list's role from.
+  orgs: [] as { organizationId: string; role?: string }[],
 }));
 
 vi.mock('expo-router', () => ({
@@ -27,6 +27,11 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('sonner-native', () => ({ toast: { error: state.toastError } }));
+// The toast adapter announces through `react-native`'s AccessibilityInfo,
+// which this harness does not build.
+vi.mock('react-native', () => ({
+  AccessibilityInfo: { announceForAccessibility: () => undefined },
+}));
 vi.mock('expo-haptics', () => ({
   notificationAsync: async () => {
     await Promise.resolve();
@@ -43,6 +48,18 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 }));
 vi.mock('@/lib/trpc', () => ({ useTRPC: () => ({}) }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
+// The hook resolves the list's role from the shared membership list through
+// the organization query chain, which this harness does not mount. The real
+// `isMoneyRole` rule is applied to whatever role a case sets.
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ orgs: state.orgs }),
+  };
+});
 
 /** The one part of a surface store a case can read from outside the hook. */
 type RecordedSnapshot = { readonly states: ReadonlyMap<string, unknown> };
@@ -63,29 +80,10 @@ vi.mock('@/lib/surface-feedback', async importOriginal => {
   };
 });
 
-const todo = { id: 'todo-1', title: 'Ship the fix', notes: null };
-const list: Pick<TodoList, 'organizationId' | 'gitUrl' | 'mode' | 'model' | 'variant'> = {
-  organizationId: 'organization-1',
-  gitUrl: 'test/project',
-  mode: null,
-  model: null,
-  variant: null,
-};
-
-function Probe({ holder }: Readonly<{ holder: { current: StartTodoControls | null } }>) {
-  holder.current = useStartTodo();
-  return null;
-}
-
-let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-const holder: { current: StartTodoControls | null } = { current: null };
-
-function mounted() {
-  if (!holder.current) {
-    throw new Error('useStartTodo has not mounted');
-  }
-  return holder.current;
-}
+const todo = TODO;
+const list = LIST;
+const harness = createHarness();
+const { mounted, start, rerender } = harness;
 
 beforeEach(async () => {
   const environment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
@@ -98,26 +96,17 @@ beforeEach(async () => {
   state.navigate.mockReset();
   state.push.mockReset();
   state.toastError.mockReset();
+  state.orgs = [];
   state.link.mockResolvedValue(undefined);
   state.invalidate.mockResolvedValue(undefined);
   stores.all.length = 0;
-  act(() => {
-    renderer = TestRenderer.create(createElement(Probe, { holder }));
-  });
+  harness.mount();
 });
 
 afterEach(() => {
-  renderer?.unmount();
-  renderer = undefined;
-  holder.current = null;
+  harness.unmount();
   vi.restoreAllMocks();
 });
-
-async function start(startList: typeof list = list) {
-  await act(async () => {
-    await mounted().startNow(todo, startList);
-  });
-}
 
 describe('useStartTodo start now', () => {
   it('opens the started session when the link fails', async () => {
@@ -151,8 +140,63 @@ describe('useStartTodo start now', () => {
     await start();
 
     expect(state.navigate).not.toHaveBeenCalled();
-    expect(state.toastError).toHaveBeenCalledExactlyOnceWith('No credits left');
+    // The adapter forwards the options argument, so a refusal with no step is
+    // still this call reaching the toast.
+    expect(state.toastError).toHaveBeenCalledExactlyOnceWith('No credits left', undefined);
     expect(mounted().isStarting(todo.id)).toBe(false);
+  });
+
+  it('offers the plan step with the trial refusal to a role that can change the plan', async () => {
+    state.orgs = [{ organizationId: 'organization-1', role: 'owner' }];
+    rerender();
+    state.startAgent.mockResolvedValue({
+      ok: false,
+      message: i18n.t('common.organizationTrialEndedBilling'),
+      trialRefusal: true,
+    });
+
+    await start();
+
+    expect(state.startAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ canManageBilling: true })
+    );
+    expect(state.toastError).toHaveBeenCalledExactlyOnceWith(
+      i18n.t('common.organizationTrialEndedBilling'),
+      { action: { label: i18n.t('organization.hub.manageBilling'), onClick: expect.any(Function) } }
+    );
+    // The role was read for the list's organization, so the step opens that
+    // organization's billing rather than the device's selection.
+    const [, options] = state.toastError.mock.calls.at(-1) as [
+      string,
+      { action: { onClick: () => void } } | undefined,
+    ];
+    options?.action.onClick();
+    expect(state.push).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/organization/billing?org=organization-1'
+    );
+    expect(state.navigate).not.toHaveBeenCalled();
+    expect(mounted().isStarting(todo.id)).toBe(false);
+  });
+
+  it('keeps the owner-naming refusal and no step for a role that cannot change the plan', async () => {
+    state.orgs = [{ organizationId: 'organization-1', role: 'member' }];
+    rerender();
+    state.startAgent.mockResolvedValue({
+      ok: false,
+      message: i18n.t('common.organizationTrialEnded'),
+      trialRefusal: true,
+    });
+
+    await start();
+
+    expect(state.startAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ canManageBilling: false })
+    );
+    expect(state.toastError).toHaveBeenCalledExactlyOnceWith(
+      i18n.t('common.organizationTrialEnded'),
+      undefined
+    );
+    expect(state.navigate).not.toHaveBeenCalled();
   });
 
   it('reports a thrown start instead of rejecting', async () => {

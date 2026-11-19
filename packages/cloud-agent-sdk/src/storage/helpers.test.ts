@@ -479,6 +479,49 @@ describe('tool part lifecycle ordering', () => {
     expect(result).toBe(arr);
   });
 
+  test('drops a rejected update without reading its payload and copies an accepted one', () => {
+    // The accept path owns the copy. A copy reads every own enumerable
+    // property, so a counting getter on a bulky payload shows whether a
+    // dropped update is read at all.
+    const arr = upsert([], makeToolPart('p-1', 'completed'), 200);
+    let payloadReads = 0;
+    const withPayload = (part: Part): Part => {
+      Object.defineProperty(part, 'text', {
+        get() {
+          payloadReads += 1;
+          return 'x'.repeat(1_024);
+        },
+        enumerable: true,
+        configurable: true,
+      });
+      return part;
+    };
+
+    const stale = upsert(arr, withPayload(makeToolPart('p-1', 'running')), 100);
+    expect(stale).toBe(arr);
+    expect(payloadReads).toBe(0);
+
+    const preview = withPayload(makeToolPart('p-1', 'completed'));
+    Object.defineProperty(preview, 'cloudDetail', {
+      value: {
+        version: 1,
+        revision: 1,
+        omitted: ['state.output'],
+        omittedCount: 1,
+        omittedBytes: 64,
+      },
+      enumerable: true,
+    });
+    const bounded = upsert(arr, preview, 300);
+    expect(bounded).toBe(arr);
+    expect(payloadReads).toBe(0);
+
+    const accepted = upsert(arr, withPayload(makeToolPart('p-2', 'running')), 300);
+    expect(accepted).not.toBe(arr);
+    expect(payloadReads).toBe(1);
+    expect(JSON.stringify(accepted.find(part => part.id === 'p-2'))).toContain('xxxxxxxxxx');
+  });
+
   test('drops a terminal update that carries no ordering evidence over a live running task', () => {
     const arr = [makeToolPart('p-1', 'running', { start: 1 })];
     const result = upsert(arr, makeCompactedToolPart('p-1', 'completed'));

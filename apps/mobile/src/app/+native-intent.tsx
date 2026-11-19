@@ -115,8 +115,22 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/preparation-copy-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/preparation-copy-fixture';
     }
-    if (/(?:^|\/)dev\/new-session-plan-refusal-fixture\/?(?:[?#].*)?$/.test(path)) {
-      return '/(app)/new-session-plan-refusal-fixture';
+    // Dev-only plan refusal at the new-session composer. The optional query
+    // picks the reader's state (`?billing=1` is the role that may change the
+    // plan), so it is forwarded.
+    const planRefusalFixture = /(?:^|\/)dev\/new-session-plan-refusal-fixture\/?(\?.*)?$/.exec(
+      path
+    );
+    if (planRefusalFixture) {
+      return `/(app)/new-session-plan-refusal-fixture${planRefusalFixture[1] ?? ''}`;
+    }
+    // Dev-only plan refusal on the low-balance alert sheet's form. The same
+    // optional query picks the reader's state (`?billing=1` is the role that
+    // may change the plan), so it is forwarded the same way.
+    const lowBalanceRefusalFixture =
+      /(?:^|\/)dev\/low-balance-alert-refusal-fixture\/?(\?.*)?$/.exec(path);
+    if (lowBalanceRefusalFixture) {
+      return `/(app)/low-balance-alert-refusal-fixture${lowBalanceRefusalFixture[1] ?? ''}`;
     }
     if (/(?:^|\/)dev\/transcript-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-failure-fixture';

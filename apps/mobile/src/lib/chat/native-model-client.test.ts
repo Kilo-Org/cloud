@@ -73,8 +73,16 @@ describe('native on-device model client', () => {
       'modelChat.localModels.reasons.appleIntelligenceDisabled',
     ],
     // Android's normal restricted answers carry no reason; the status picks the class.
-    ['downloadable', { ...AVAILABLE, status: 'downloadable' }, 'modelChat.localModels.reasons.downloadable'],
-    ['downloading', { ...AVAILABLE, status: 'downloading' }, 'modelChat.localModels.reasons.downloading'],
+    [
+      'downloadable',
+      { ...AVAILABLE, status: 'downloadable' },
+      'modelChat.localModels.reasons.downloadable',
+    ],
+    [
+      'downloading',
+      { ...AVAILABLE, status: 'downloading' },
+      'modelChat.localModels.reasons.downloading',
+    ],
   ] as const)('fails explicitly when the model is %s at send time', async (_label, answer, key) => {
     const { bridge } = fakeBridge(() => undefined);
     bridge.availability.mockResolvedValue(answer);

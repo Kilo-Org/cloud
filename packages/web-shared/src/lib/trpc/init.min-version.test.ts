@@ -109,10 +109,8 @@ describe('minimumVersionMiddleware', () => {
     limitMock.mockResolvedValue([]);
 
     await expect(ping(mobileHeaders('1.0.5'))).resolves.toBe('ok');
+    await expect(ping(mobileHeaders('1.0.5'))).resolves.toBe('ok');
 
-    expect(
-      errorCode(await ping(mobileHeaders('1.0.5')).catch((caught: unknown) => caught))
-    ).toBeUndefined();
     expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
   });
 

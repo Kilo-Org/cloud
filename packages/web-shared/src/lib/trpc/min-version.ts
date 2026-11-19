@@ -17,9 +17,9 @@ import { isVersionBelow } from '@kilocode/app-shared/app-version';
 export type MinimumVersions = { ios: string; android: string };
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
-// A "no row" read is a fail-closed verdict, so it must not outlive a fix to the
-// configuration by the full TTL. One re-read per window still keeps the SELECT
-// off every mobile request.
+// A "no row" read is a missing configuration, so it must not outlive a fix to
+// the configuration by the full TTL. One re-read per window still keeps the
+// SELECT off every mobile request.
 export const NO_ROW_CACHE_TTL_MS = 30 * 1000;
 // The gate runs in front of every mobile procedure, so a read that never settles
 // must not be awaited by all of them for their whole budget. Bound how long a
@@ -169,8 +169,8 @@ function waitForRead(read: Promise<void>): Promise<boolean> {
  * Read the configured minimum versions with an in-process cache.
  *
  * A successful read is cached — for `CACHE_TTL_MS` when it returned a row, and
- * for the shorter `NO_ROW_CACHE_TTL_MS` when it found none, so a fail-closed
- * verdict follows a configuration fix quickly. Callers share one read at a
+ * for the shorter `NO_ROW_CACHE_TTL_MS` when it found none, so the served
+ * behavior follows a configuration fix quickly. Callers share one read at a
  * time, so a cold instance or an expired entry never issues more than one
  * `SELECT`. A read that runs past `READ_MAX_AGE_MS` is abandoned rather than
  * joined, so one query that never settles cannot keep the gate from reading the

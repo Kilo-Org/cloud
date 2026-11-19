@@ -358,6 +358,7 @@ describe('local agents host over a loopback endpoint', () => {
       console: true,
       dialogs: true,
       fileUpload: true,
+      keepalive: true,
       network: false,
       tabGroups: false,
       trustedInput: false,

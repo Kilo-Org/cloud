@@ -27,6 +27,8 @@ export type LocalAgentCapabilities = {
   dialogs: boolean;
   fileUpload: boolean;
   tabGroups: boolean;
+  /** The loopback hub may send `hub.keepalive`; an extension that omits it drops the connection over that frame. */
+  keepalive: boolean;
 };
 
 export type LocalAgentExtensionHello = {
@@ -65,6 +67,7 @@ const capabilitiesSchema = z.object({
   console: z.boolean(),
   dialogs: z.boolean(),
   fileUpload: z.boolean(),
+  keepalive: z.boolean(),
   network: z.boolean(),
   tabGroups: z.boolean(),
   trustedInput: z.boolean(),

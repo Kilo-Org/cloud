@@ -271,15 +271,18 @@ describe('review list under a forced state', () => {
     expect(nodes(root, 'ReviewRow')).toHaveLength(1);
   });
 
-  it('pauses the read offline and commits the offline banner state, then recovers on clear', async () => {
+  it('commits the offline banner before the screen opens, pauses the read, then recovers on clear', async () => {
     force('offline');
+    // The banner commits with the link itself, not 5 s later, so the next
+    // screen lays out under it from its first frame.
+    expect(getCommittedConnectivityStatus()).toBe('offline');
     const root = await mount();
 
     expect(onlineManager.isOnline()).toBe(false);
     expect(queryError(root).props.variant).toBe('offline');
-    expect(getCommittedConnectivityStatus()).toBe('online');
     await advanceBy(5000);
     expect(getCommittedConnectivityStatus()).toBe('offline');
+    expect(queryError(root).props.variant).toBe('offline');
     expect(transport).not.toHaveBeenCalled();
 
     force('clear');

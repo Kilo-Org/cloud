@@ -20,7 +20,8 @@
  *   context-level `authRequired` refusal, so it never signs the user out.
  * - `offline`: every connectivity subscription reports no network and the
  *   backend probe fails, so `onlineManager` pauses queries at once and the
- *   offline banner commits after its usual 5 s confirmation. A request that
+ *   offline banner commits at once, before `next` opens (no 5 s confirmation:
+ *   the network is known to be gone). A request that
  *   still runs fails the way React Native's fetch does without a network.
  *
  * The mode applies to tRPC requests only, mutations included, so a forced
@@ -121,7 +122,8 @@ function setState(next: ForceState): void {
   }
 }
 
-function subscribeForceState(listener: () => void): () => void {
+/** Fires on every mode change, for app-lifetime dev wiring. */
+export function subscribeForceState(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);

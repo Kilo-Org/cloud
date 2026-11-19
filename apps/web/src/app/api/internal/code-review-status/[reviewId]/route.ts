@@ -406,6 +406,7 @@ function getActionRequiredTerminalReason(
   return classifyCodeReviewActionRequiredFailure(errorMessage);
 }
 
+const MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY = 100_000;
 const MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY = 200_000;
 
 // Pre-dispatch codes that only mean the session never reached the agent: the
@@ -488,10 +489,15 @@ function isInfraRetryAttempt(attempt: CloudAgentCodeReviewAttempt): boolean {
 
 type FailedSessionUsage = NonNullable<Awaited<ReturnType<typeof getSessionUsageFromBilling>>>;
 
-// Cache-heavy sessions can read millions of cached input tokens for a few cents,
-// so only the measured cost bounds the single infra retry.
+function failedSessionTokenCount(usage: FailedSessionUsage): number {
+  return usage.totalTokensIn + usage.totalTokensOut;
+}
+
 function canRetryFailedSessionUsage(usage: FailedSessionUsage): boolean {
-  return usage.totalCostMusd < MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY;
+  return (
+    usage.totalCostMusd < MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY &&
+    failedSessionTokenCount(usage) < MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY
+  );
 }
 
 async function shouldSkipAutoRetryForFailedSessionUsage(params: {
@@ -502,7 +508,7 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
   failure?: CloudAgentSafeFailure;
 }): Promise<boolean> {
   if (!params.failedCliSessionId) {
-    logExceptInTest('[code-review-status] Auto-retry cost guard could not measure usage', {
+    logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
       reviewId: params.reviewId,
       failedAttemptId: params.failedAttemptId,
       reason: 'missing_cli_session_id',
@@ -520,7 +526,7 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
       params.failure?.stage === 'pre_dispatch' &&
       !!failureCode &&
       SESSIONLESS_PRE_DISPATCH_FAILURE_CODES.has(failureCode);
-    logExceptInTest('[code-review-status] Auto-retry cost guard could not measure usage', {
+    logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
       reviewId: params.reviewId,
       failedAttemptId: params.failedAttemptId,
       cliSessionId: params.failedCliSessionId,
@@ -532,6 +538,7 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
     return !allowUnavailableUsage;
   }
 
+  const failedSessionTokens = failedSessionTokenCount(usage);
   if (canRetryFailedSessionUsage(usage)) {
     return false;
   }
@@ -543,7 +550,9 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
     totalTokensIn: usage.totalTokensIn,
     totalTokensOut: usage.totalTokensOut,
     totalCostMusd: usage.totalCostMusd,
+    failedSessionTokens,
     maxFailedSessionCostMusdForAutoRetry: MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY,
+    maxFailedSessionTokensForAutoRetry: MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY,
   });
   return true;
 }

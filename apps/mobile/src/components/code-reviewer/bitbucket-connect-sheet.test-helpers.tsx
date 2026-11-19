@@ -237,9 +237,7 @@ export async function leave(type = 'GO_BACK'): Promise<{ repeat: () => void }> {
 
 /** Mount the sheet with no scope, the state that renders the boundary. */
 export function mountWithoutScope(): Promise<ReactTestRenderer['root']> {
-  return renderWithProviders(
-    createElement(BitbucketConnectSheet, { scope: undefined })
-  ).then(
+  return renderWithProviders(createElement(BitbucketConnectSheet, { scope: undefined })).then(
     view => view.renderer.root
   );
 }

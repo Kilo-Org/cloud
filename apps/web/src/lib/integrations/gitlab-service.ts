@@ -76,25 +76,10 @@ import {
   type GitLabCredentialBrokerResult,
 } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 
-/**
- * GitLab Integration Service
- *
- * Provides business logic for GitLab OAuth integrations.
- * Handles token refresh, repository listing, and integration management.
- */
-
-/**
- * Normalizes a GitLab instance URL for comparison.
- * Strips trailing slashes, lowercases, and treats undefined/empty as gitlab.com.
- */
 export function normalizeInstanceUrl(url?: string): string {
   return normalizeGitLabInstanceUrl(url || DEFAULT_GITLAB_INSTANCE_URL);
 }
 
-/**
- * Returns true if the GitLab instance URL has changed between
- * the existing integration and the new connection.
- */
 export function instanceUrlChanged(existingUrl: string | undefined, newUrl: string): boolean {
   const normalizedNewUrl = normalizeInstanceUrl(newUrl);
   try {
@@ -146,9 +131,6 @@ function requireGitLabProjectId(projectId: string | number): string {
   return value;
 }
 
-/**
- * Get GitLab integration for an owner
- */
 export async function getGitLabIntegration(owner: Owner): Promise<PlatformIntegration | null> {
   const ownershipCondition = ownerCondition(owner);
 
@@ -213,9 +195,6 @@ export async function isGitLabCredentialConnected(
   }
 }
 
-/**
- * Resolve a GitLab credential through the private-key holding token service.
- */
 function requireAvailableGitLabCredential(
   result: GitLabCredentialBrokerResult,
   expectedInstanceUrl: string
@@ -760,27 +739,17 @@ export async function regenerateWebhookSecret(owner: Owner): Promise<{ webhookSe
   return { webhookSecret: newWebhookSecret };
 }
 
-// ============================================================================
-// Project Access Token (PrAT) Management
-// ============================================================================
-
 /** Legacy plaintext project credential retained only until backfill and scrub. */
 export type StoredProjectAccessToken = {
-  /** GitLab token ID (for rotation/revocation) */
   token_id: number;
   /** The token value retained only during the migration window. */
   token: string;
   /** Expiration date in YYYY-MM-DD format */
   expires_at: string;
-  /** When the token was created */
   created_at: string;
-  /** Token name for identification */
   name: string;
 };
 
-/**
- * GitLab integration metadata type with PrAT support
- */
 export type GitLabIntegrationMetadata = {
   access_token?: string;
   refresh_token?: string;
@@ -798,13 +767,9 @@ export type GitLabIntegrationMetadata = {
       created_at: string;
     }
   >;
-  /** Project Access Tokens per project (keyed by project ID) */
   project_tokens?: Record<string, StoredProjectAccessToken>;
 };
 
-/**
- * Default name for Kilo Code Review Bot tokens
- */
 const KILO_BOT_TOKEN_NAME = 'Kilo Code Review Bot';
 
 /** The only field of a legacy metadata entry that can still revoke its token. */
@@ -828,7 +793,6 @@ function readLegacyProjectTokenId(metadata: unknown, projectId: string): number 
   return parsedEntry.success ? parsedEntry.data.token_id : null;
 }
 
-/** True when the integration still carries any metadata entry for the project. */
 function hasLegacyProjectTokenEntry(metadata: unknown, projectId: string): boolean {
   const parsedMetadata = GitLabProjectTokenMetadataSchema.safeParse(metadata);
   if (!parsedMetadata.success) return false;
@@ -912,20 +876,8 @@ async function validateStoredProjectAccessToken(
 }
 
 /**
- * Gets or creates a Project Access Token for a GitLab project
- *
- * This function:
- * 1. Checks if an encrypted PrAT credential already exists for the project
- * 2. If exists and not expiring soon, returns it
- * 3. If exists but expiring soon, rotates it
- * 4. If doesn't exist, creates a new one
- *
  * Validation is best effort for transient provider failures; explicit denials
  * require replacement. Invalid instance configuration is reported to the caller.
- *
- * @param integration - The GitLab integration record
- * @param projectId - GitLab project ID
- * @returns The Project Access Token to use for API calls
  */
 export async function getOrCreateProjectAccessToken(
   integration: PlatformIntegration,
@@ -966,7 +918,6 @@ export async function getOrCreateProjectAccessToken(
   }
 
   if (storedCredential) {
-    // Check if token is expiring soon (within 7 days)
     const isExpiringSoon = isProjectAccessTokenExpiringSoon(storedCredential.expiresAt, 7);
 
     if (!isExpiringSoon) {
@@ -998,7 +949,6 @@ export async function getOrCreateProjectAccessToken(
         return projectToken;
       }
 
-      // Token is denied or revoked, remove from storage and create a new one
       logExceptInTest(
         '[getOrCreateProjectAccessToken] Stored token is unusable, creating new one',
         {
@@ -1009,15 +959,12 @@ export async function getOrCreateProjectAccessToken(
         }
       );
 
-      // Remove the invalid token from storage and skip to creating a new one
       await deleteStoredProjectCredential({
         integrationId: integration.id,
         projectId: projectIdStr,
         credential: storedCredential,
       });
-      // Don't try to rotate - fall through to create new token below
     } else {
-      // Token is expiring soon, try to rotate it
       logExceptInTest('[getOrCreateProjectAccessToken] Token expiring soon, rotating', {
         projectId,
         tokenId: storedCredential.tokenId,
@@ -1026,7 +973,6 @@ export async function getOrCreateProjectAccessToken(
 
       let rotatedToken: GitLabProjectAccessToken | null = null;
       try {
-        // Get a valid user token for the rotation API call
         const userToken = await getValidGitLabToken(integration, actor);
         const newExpiresAt = calculateProjectAccessTokenExpiry(365);
 
@@ -1046,7 +992,6 @@ export async function getOrCreateProjectAccessToken(
           });
         }
       } catch (error) {
-        // If rotation fails, try to create a new token
         logExceptInTest('[getOrCreateProjectAccessToken] Rotation failed, creating new token', {
           projectId,
           error: error instanceof Error ? error.message : String(error),
@@ -1068,7 +1013,6 @@ export async function getOrCreateProjectAccessToken(
     }
   }
 
-  // No existing token or rotation failed, create a new one
   logExceptInTest('[getOrCreateProjectAccessToken] Creating new token', {
     projectId,
   });
@@ -1395,13 +1339,6 @@ export async function importExistingProjectAccessToken(
   return existingToken;
 }
 
-// ============================================================================
-// Personal Access Token (PAT) Connection
-// ============================================================================
-
-/**
- * Re-export validatePersonalAccessToken for use in tRPC router
- */
 export { validatePersonalAccessToken, type GitLabPATValidationResult };
 
 const GITLAB_REPOSITORY_SYNC_WARNING =
@@ -1513,7 +1450,6 @@ export async function connectWithPAT(
     });
   }
 
-  // 1. Validate the PAT
   const validation = await validatePersonalAccessToken(token, normalizedInstanceUrl);
 
   if (!validation.valid || !validation.user) {
@@ -1530,7 +1466,6 @@ export async function connectWithPAT(
     expiresOn: validation.tokenInfo?.expiresAt ?? undefined,
   });
 
-  // 2. Check for existing integration - update it instead of creating new
   const existingIntegration = await getGitLabIntegration(owner);
 
   if (existingIntegration) {
@@ -1749,10 +1684,8 @@ export async function connectWithPAT(
     };
   }
 
-  // 3. No existing integration - create new one with fresh webhook secret
   const webhookSecret = randomBytes(32).toString('hex');
 
-  // 4. Prepare metadata
   const metadata: GitLabIntegrationMetadata = {
     // No refresh_token for PAT (PATs don't refresh)
     gitlab_instance_url: normalizedInstanceUrl,
@@ -1773,7 +1706,6 @@ export async function connectWithPAT(
     credentialVersion,
   });
 
-  // 5. Create the parent and encrypted credential atomically.
   const integration = await db.transaction(async tx => {
     const [createdIntegration] = await tx
       .insert(platform_integrations)

@@ -18,12 +18,6 @@ export type GitHubAppCredentials = {
   webhookSecret: string;
 };
 
-/**
- * Determines which GitHub App to use based on organization settings.
- *
- * @param organizationId - The organization ID to check, or null for user-level integrations
- * @returns The app type to use ('standard' or 'lite')
- */
 export async function getGitHubAppTypeForOrganization(
   organizationId: string | null
 ): Promise<GitHubAppType> {

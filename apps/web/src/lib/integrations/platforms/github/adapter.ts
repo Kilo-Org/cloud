@@ -384,9 +384,6 @@ export async function addReactionToPR(
   });
 }
 
-/**
- * Creates a new top-level comment on a PR (issue comment).
- */
 export async function createPRComment(
   installationId: string,
   owner: string,

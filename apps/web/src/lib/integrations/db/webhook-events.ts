@@ -73,9 +73,6 @@ export async function logWebhookEvent(data: {
   }
 }
 
-/**
- * Updates webhook event processing status
- */
 export async function updateWebhookEvent(
   eventId: string,
   updates: {
@@ -96,9 +93,6 @@ export async function updateWebhookEvent(
     .where(eq(webhook_events.id, eventId));
 }
 
-/**
- * Gets recent webhook events for an owner (organization or user)
- */
 export async function getRecentWebhookEvents(owner: Owner, limit: number = 100) {
   const ownerCondition =
     owner.type === 'user'
@@ -113,9 +107,6 @@ export async function getRecentWebhookEvents(owner: Owner, limit: number = 100) 
     .limit(limit);
 }
 
-/**
- * Gets unprocessed webhook events
- */
 export async function getUnprocessedWebhookEvents(limit: number = 100) {
   return await db
     .select()

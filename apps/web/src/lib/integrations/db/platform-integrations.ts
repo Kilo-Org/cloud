@@ -321,10 +321,6 @@ export async function getGitHubIntegrationById(owner: Owner, integrationId: stri
   return integration ?? null;
 }
 
-/**
- * Creates or updates a platform integration using atomic upsert
- * @param data - Integration data with required platformInstallationId
- */
 export async function upsertPlatformIntegration(data: {
   organizationId: string;
   platform: string;
@@ -431,9 +427,6 @@ export async function updateIntegrationRepositories(
   }
 }
 
-/**
- * Updates repository list for an integration by integration ID
- */
 export async function updateRepositoriesForIntegration(
   integrationId: string,
   repositories: PlatformRepository[]
@@ -846,8 +839,6 @@ export async function findPendingInstallations() {
       )
     );
 
-  // Filter to only return those with proper pending_approval metadata using Zod for safe parsing
-  // Only return 'awaiting_installation' status (simplified flow - no more ambiguous)
   return results.filter(integration => {
     const parseResult = PendingInstallationMetadataWrapperSchema.safeParse(integration.metadata);
     return (
@@ -955,7 +946,6 @@ export async function autoCompleteInstallation(
   transaction?: DrizzleTransaction
 ): Promise<AutoCompleteInstallationOutcome> {
   // Keep requester info for historical purposes, but clear pending_approval since it's complete
-  // Use Zod to safely parse the existing metadata
   const parseResult = PendingInstallationMetadataWrapperSchema.safeParse(existingMetadata);
   const pendingApproval = parseResult.success ? parseResult.data.pending_approval : undefined;
 
@@ -1055,10 +1045,6 @@ export async function autoCompleteInstallation(
   };
   return await (transaction ? execute(transaction) : db.transaction(execute));
 }
-
-/**
- * Owner-aware functions for dual user/organization support
- */
 
 /**
  * Selection order for a personal owner's GitHub associations, shared by the
@@ -1291,7 +1277,6 @@ export async function upsertPlatformIntegrationForOwner(
     now
   );
 
-  // Build values object used for both insert paths.
   const values = {
     owned_by_user_id: owner.type === 'user' ? owner.id : null,
     owned_by_organization_id: owner.type === 'org' ? owner.id : null,
@@ -1419,7 +1404,6 @@ export async function upsertPlatformIntegrationForOwner(
     return transaction ? execute(transaction) : db.transaction(execute);
   }
 
-  // Non-GitHub platforms use the existing per-owner pattern.
   const ownershipCondition = ownerCondition(owner);
 
   const [existing] = await db

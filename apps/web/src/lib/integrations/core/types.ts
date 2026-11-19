@@ -1,4 +1,3 @@
-// Core types for the integrations system
 import type { PlatformRepository } from '@kilocode/db/schema-types';
 
 export type { IntegrationPermissions, PlatformRepository } from '@kilocode/db/schema-types';
@@ -44,10 +43,6 @@ export function shouldSyncProviderRepositories({
   return cachedRepositories.length === 0 && repositoriesSyncedAt === null;
 }
 
-/**
- * Represents ownership of an integration
- * Can be either a user or an organization
- */
 export type Owner = { type: 'user'; id: string } | { type: 'org'; id: string };
 
 export type WebhookEvent = {

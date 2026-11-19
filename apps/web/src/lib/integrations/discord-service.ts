@@ -18,7 +18,6 @@ import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 
-// Discord OAuth2 scopes for the bot integration
 // 'bot' scope is needed for the bot to join servers
 // 'guilds' scope allows reading basic guild info
 const DISCORD_SCOPES = ['bot', 'guilds', 'applications.commands'];
@@ -56,9 +55,6 @@ export class DiscordGuildRebindNotAllowedError extends Error {
   }
 }
 
-/**
- * Discord OAuth2 token response shape
- */
 export type DiscordOAuth2Response = {
   access_token: string;
   token_type: string;
@@ -84,9 +80,6 @@ function getOwnershipConditions(owner: Owner) {
       ];
 }
 
-/**
- * Get Discord OAuth URL for initiating the OAuth flow
- */
 export function getDiscordOAuthUrl(state: string): string {
   if (!DISCORD_CLIENT_ID) {
     throw new Error('DISCORD_CLIENT_ID is not configured');
@@ -104,9 +97,6 @@ export function getDiscordOAuthUrl(state: string): string {
   return `https://discord.com/oauth2/authorize?${params.toString()}`;
 }
 
-/**
- * Exchange OAuth code for access token
- */
 export async function exchangeDiscordCode(code: string): Promise<DiscordOAuth2Response> {
   if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
     throw new Error('Discord OAuth credentials are not configured');
@@ -140,9 +130,6 @@ export async function exchangeDiscordCode(code: string): Promise<DiscordOAuth2Re
   return data;
 }
 
-/**
- * Get Discord installation for an owner
- */
 export async function getInstallation(
   owner: Owner,
   database: typeof db | DrizzleTransaction = db
@@ -283,9 +270,6 @@ function isOwnedByAnotherOwner(owner: Owner) {
     : sql`NOT (${platform_integrations.owned_by_organization_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_user_id} IS NULL)`;
 }
 
-/**
- * Get the owner information from a Discord installation
- */
 export function getOwnerFromInstallation(integration: PlatformIntegration): Owner | null {
   if (integration.owned_by_organization_id) {
     return { type: 'org', id: integration.owned_by_organization_id };
@@ -349,7 +333,6 @@ export async function upsertDiscordInstallation(
   // All bot API calls use the DISCORD_BOT_TOKEN env var instead.
 
   if (existing) {
-    // Preserve existing model_slug when re-authorizing
     const existingMetadata = existing.metadata || {};
     const updatedMetadata = {
       ...existingMetadata,
@@ -410,9 +393,6 @@ export async function upsertDiscordInstallation(
   return created;
 }
 
-/**
- * Uninstall Discord integration for an owner
- */
 export async function uninstallApp(owner: Owner) {
   const integration = await getInstallation(owner);
 
@@ -477,7 +457,6 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
   }
 
   try {
-    // Verify the bot can access this guild
     const response = await fetch(buildDiscordApiUrl(['guilds', validatedGuildId]), {
       headers: {
         Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
@@ -524,16 +503,11 @@ export async function getModel(owner: Owner): Promise<string | null> {
     });
   }
 
-  // Pre-existing installation without a stored model — resolve a default
   return owner.type === 'org'
     ? getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
     : DEFAULT_BOT_MODEL;
 }
 
-/**
- * Update the model for a Discord integration.
- * For organization-owned integrations, validates the model against org access policy.
- */
 export async function updateModel(
   owner: Owner,
   modelSlug: string

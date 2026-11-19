@@ -85,9 +85,6 @@ function getOwnershipConditions(owner: Owner) {
       ];
 }
 
-/**
- * Get Slack OAuth URL for initiating the OAuth flow
- */
 export function getSlackOAuthUrl(state: string): string {
   if (!SLACK_CLIENT_ID) {
     throw new Error('SLACK_CLIENT_ID is not configured');
@@ -156,9 +153,6 @@ export async function exchangeSlackOAuthCode(code: string): Promise<SlackOAuthEx
   };
 }
 
-/**
- * Revoke Slack access token
- */
 export async function revokeSlackToken(accessToken: string): Promise<boolean> {
   const client = new WebClient(accessToken);
 
@@ -303,9 +297,6 @@ function isSlackWorkspaceUniqueViolation(error: unknown): boolean {
   );
 }
 
-/**
- * Get the owner information from a Slack installation
- */
 export function getOwnerFromInstallation(integration: PlatformIntegration): Owner | null {
   if (integration.owned_by_organization_id) {
     return { type: 'org', id: integration.owned_by_organization_id };
@@ -526,9 +517,6 @@ export async function upsertSlackInstallation(
   }
 }
 
-/**
- * Uninstall Slack integration for an owner
- */
 export async function uninstallApp(owner: Owner, options: SlackUninstallOptions = {}) {
   const integration = await getInstallation(owner);
 
@@ -542,7 +530,6 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   const shouldDeleteSlackInstallation =
     integration.integration_status === INTEGRATION_STATUS.ACTIVE;
 
-  // Revoke the stored credential if we have one
   const botToken = await getSlackBotToken(integration);
   if (shouldDeleteSlackInstallation && botToken) {
     try {
@@ -612,9 +599,6 @@ export async function removeDbRowOnly(owner: Owner) {
   return { success: true };
 }
 
-/**
- * Test Slack connection by calling auth.test
- */
 export async function testConnection(owner: Owner): Promise<{ success: boolean; error?: string }> {
   const integration = await getInstallation(owner);
 
@@ -643,10 +627,6 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
   }
 }
 
-/**
- * Update the model for a Slack integration.
- * For organization-owned integrations, validates the model against org access policy.
- */
 export async function updateModel(
   owner: Owner,
   modelSlug: string
@@ -703,9 +683,6 @@ export async function getModel(owner: Owner): Promise<string | null> {
   });
 }
 
-/*
- * Slack message posting params
- */
 export type PostSlackMessageParams = {
   channel: string;
   text: string;
@@ -713,18 +690,12 @@ export type PostSlackMessageParams = {
   blocks?: Array<{ type: string; text?: { type: string; text: string } }>;
 };
 
-/**
- * Slack message posting response
- */
 export type SlackPostMessageResponse = {
   ok: boolean;
   ts?: string;
   error?: string;
 };
 
-/**
- * Post a message to Slack using an access token directly
- */
 export async function postSlackMessageByAccessToken(
   accessToken: string,
   params: PostSlackMessageParams
@@ -750,17 +721,11 @@ export async function postSlackMessageByAccessToken(
   }
 }
 
-/**
- * Slack reaction response
- */
 export type SlackReactionResponse = {
   ok: boolean;
   error?: string;
 };
 
-/**
- * Add a reaction to a message using an access token directly
- */
 export async function addSlackReactionByAccessToken(
   accessToken: string,
   params: { channel: string; timestamp: string; name: string }
@@ -785,9 +750,6 @@ export async function addSlackReactionByAccessToken(
   }
 }
 
-/**
- * Remove a reaction from a message using an access token directly
- */
 export async function removeSlackReactionByAccessToken(
   accessToken: string,
   params: { channel: string; timestamp: string; name: string }

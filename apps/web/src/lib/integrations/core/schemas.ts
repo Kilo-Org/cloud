@@ -1,6 +1,3 @@
-/**
- * Zod schemas for runtime validation of integration metadata
- */
 import * as z from 'zod';
 import type { PlatformRepository } from '@kilocode/db/schema-types';
 import { PENDING_APPROVAL_STATUS } from './constants';
@@ -33,9 +30,6 @@ export function parsePlatformRepositoryCache(
   return parsed.data ?? [];
 }
 
-/**
- * GitHub requester schema
- */
 export const GitHubRequesterSchema = z.object({
   id: z.string(),
   login: z.string(),
@@ -44,9 +38,6 @@ export const GitHubRequesterSchema = z.object({
 /** The persisted GitHub requester shape. Its runtime schema is the single declaration. */
 export type GitHubRequester = z.infer<typeof GitHubRequesterSchema>;
 
-/**
- * Kilo User requester schema
- */
 export const KiloRequesterSchema = z.object({
   kilo_user_id: z.string(),
   kilo_user_email: z.string(),
@@ -57,9 +48,6 @@ export const KiloRequesterSchema = z.object({
 /** The persisted Kilo requester shape. Its runtime schema is the single declaration. */
 export type KiloRequester = z.infer<typeof KiloRequesterSchema>;
 
-/**
- * Pending approval metadata schema
- */
 export const PendingApprovalMetadataSchema = z.object({
   status: z.enum([PENDING_APPROVAL_STATUS.AWAITING_INSTALLATION]),
   requester: KiloRequesterSchema.optional(),
@@ -73,25 +61,16 @@ export const PendingApprovalMetadataSchema = z.object({
  */
 export type PendingApprovalMetadata = z.infer<typeof PendingApprovalMetadataSchema>;
 
-/**
- * Completed installation metadata schema
- */
 export const CompletedInstallationMetadataSchema = z.object({
   requester: KiloRequesterSchema.optional(),
   github_requester: GitHubRequesterSchema.optional(),
   completed_at: z.string(),
 });
 
-/**
- * Full metadata wrapper schema for pending installations
- */
 export const PendingInstallationMetadataWrapperSchema = z.object({
   pending_approval: PendingApprovalMetadataSchema,
 });
 
-/**
- * Full metadata wrapper schema for completed installations
- */
 export const CompletedInstallationMetadataWrapperSchema = z.object({
   completed_installation: CompletedInstallationMetadataSchema,
 });

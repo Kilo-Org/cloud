@@ -31,10 +31,6 @@ import {
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
-/**
- * List all integrations for an owner
- * Only returns GitHub integrations to prevent errors with non-GitHub platforms
- */
 export async function listIntegrations(owner: Owner) {
   const ownershipCondition = ownerCondition(owner);
 
@@ -106,9 +102,6 @@ export async function listNativelyUninstallableIds(
   );
 }
 
-/**
- * Get GitHub App installation status for an owner
- */
 export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
   const ownershipCondition = ownerCondition(owner);
 
@@ -130,9 +123,6 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
   return integration || null;
 }
 
-/**
- * Check if user has a pending installation in any context
- */
 export async function checkUserPendingInstallation(userId: string) {
   const pendingInstallation = await findPendingInstallationByKiloUserId(userId);
   return pendingInstallation;
@@ -148,7 +138,6 @@ export async function checkUserPendingInstallation(userId: string) {
  *   proves nothing about the installation, so it is not "gone".
  */
 export function isInstallationGoneError(error: unknown): boolean {
-  // Octokit errors carry the HTTP status.
   if (!error || typeof error !== 'object' || !('status' in error)) return false;
   const status = error.status;
   if (typeof status !== 'number') return false;
@@ -156,9 +145,6 @@ export function isInstallationGoneError(error: unknown): boolean {
   return status === 404 || status === 401;
 }
 
-/**
- * Uninstall GitHub App for an owner
- */
 export async function uninstallApp(
   owner: Owner,
   integrationId: string | undefined,
@@ -330,7 +316,6 @@ export async function cancelPendingInstallation(owner: Owner, integrationId: str
     });
   }
 
-  // Delete the pending installation record
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 
   // TODO: Add audit log when integration audit actions are defined

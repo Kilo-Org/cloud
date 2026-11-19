@@ -265,6 +265,7 @@
     "generating": "Generating…",
     "working": "Working",
     "yourOwnRepositories": "Your own repositories",
+    "organizationRepositories": "Organization repositories",
     "dismissed": "Dismissed",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
@@ -3658,9 +3659,9 @@
       "byok": "BYOK"
     },
     "usageStats": {
-      "inputTokens": "Input Tokens",
+      "inputTokens": "Input tokens",
       "orgLast30Days": "All members · Last 30 days",
-      "outputTokens": "Output Tokens",
+      "outputTokens": "Output tokens",
       "requests": "Requests"
     },
     "modes": {
@@ -3722,8 +3723,7 @@
       "renameTitle": "Rename organization",
       "renamePlaceholder": "Enter organization name",
       "balance": "Balance",
-      "organizationSeats": "Organization seats",
-      "plan": "Organization plan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Lapsed",
@@ -3757,7 +3757,8 @@
     "signupStepUp": "To finish creating your account, use '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "To finish creating your account, use '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "To finish creating your account, use '$t(login.signInWithGoogle)'.",
-    "invalidCode": "That code is incorrect. Please try again.",
+    "signupStepUpBack": "To finish creating your account, go back and use '$t(login.moreSignInOptions)'.",
+    "invalidCode": "That code is incorrect or expired. Try again or use '$t(login.resendCode)'.",
     "codeInProgress": "Your code is being processed. Wait a moment and try again.",
     "tooManyAttempts": "Too many attempts. Please request a new code.",
     "invalidToken": "Sign-in failed. Please try again.",
@@ -3946,6 +3947,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sends a short inference request to this endpoint using the selected protocol and model. The provider may charge for it.",
       "connectionSucceeded": "The model completed a request using this protocol.",
       "connectionFailed": "The model could not complete a request. Check the API root, protocol, credentials, and model ID.",
+      "requestTimedOut": "The endpoint did not answer in time. Check the API root and your connection, then try again.",
+      "requestUnauthorized": "The endpoint refused the credentials. Check the API key and custom headers, then try again.",
+      "requestNotFound": "The endpoint or model was not found. Check the API root and the model ID.",
+      "requestRateLimited": "The endpoint is limiting requests. Wait a moment and try again.",
+      "requestUnavailable": "The endpoint is unavailable right now. Try again in a moment.",
+      "requestUnreachable": "The endpoint could not be reached. Check the API root and your connection.",
+      "requestInvalidResponse": "The endpoint did not answer in the expected format. Check the API root and protocol match the server, then try again.",
+      "discoveryNoModels": "The endpoint listed no models. Enter models manually.",
+      "connectionIncomplete": "The model answered but did not finish. Try again, or check the model ID and protocol.",
       "invalidInput": "Enter a backend name, valid headers, and at least one model with a unique ID and name. Token limits must be positive whole numbers.",
       "invalidUrl": "Enter an HTTP or HTTPS API root without credentials, a query, or a fragment.",
       "publicHttp": "Public HTTP endpoints are not allowed. Use HTTPS, or a private local endpoint.",
@@ -4152,7 +4162,11 @@
       "signInA11y": "Sign in to this server: {{name}}",
       "signInFailed": "Couldn't sign in to {{name}}. Try again."
     },
-    "creditsRequired": "Not enough credits to send this message."
+    "creditsRequired": "Not enough credits to send this message.",
+    "providerKeyRefused": "The provider refused the credentials. Check its API key, then send again.",
+    "providerModelMissing": "This backend no longer serves this model. Choose another.",
+    "providerRateLimited": "The provider is limiting requests. Wait a moment and send again.",
+    "providerUnavailable": "The provider is unavailable right now. Send again shortly."
   },
   "settingsTools": {
     "confirmTitle": "Confirm this change?"
@@ -4527,6 +4541,7 @@
     "pickPackToBuyAgain": "Choose a pack above to start a new purchase.",
     "purchasePending": "The store is still processing this payment. Your credits arrive once it approves the charge.",
     "buyAgain": "Buy again",
+    "checkPurchase": "Check purchase",
     "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
     "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."
   },
@@ -4620,7 +4635,9 @@
     },
     "saveSheet": {
       "title": "Save to list",
-      "saved": "Saved to {{list}}"
+      "saved": "Saved to {{list}}",
+      "saveFailed": "Couldn’t save the to-do. Check your connection and try again.",
+      "saveRefused": "Couldn’t save the to-do to this list. Choose another list."
     }
   },
   "systemSearch": {

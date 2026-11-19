@@ -172,6 +172,7 @@
     "generating": "Membuat…",
     "working": "Bekerja",
     "yourOwnRepositories": "Repositori milikmu",
+    "organizationRepositories": "Repositori organisasi",
     "dismissed": "Diabaikan",
     "agent": "Agen",
     "durationMinuteShort": "min",
@@ -3432,8 +3433,7 @@
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Di bawah {{amount}}",
-      "organizationSeats": "Lisensi pengguna organisasi",
-      "plan": "Paket organisasi",
+      "plan": "Paket",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Berakhir",
@@ -3653,7 +3653,8 @@
     "signupStepUp": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Kode tersebut salah. Coba lagi.",
+    "signupStepUpBack": "Untuk menyelesaikan pembuatan akunmu, kembali lalu gunakan '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Kode tersebut salah atau sudah kedaluwarsa. Coba lagi atau gunakan '$t(login.resendCode)'.",
     "codeInProgress": "Kodemu sedang diproses. Tunggu sebentar dan coba lagi.",
     "tooManyAttempts": "Terlalu banyak percobaan. Silakan minta kode baru.",
     "invalidToken": "Gagal masuk. Coba lagi.",
@@ -3922,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) mengirim permintaan inferensi singkat ke titik akhir ini menggunakan protokol dan model yang dipilih. Penyedia mungkin mengenakan biaya untuk permintaan ini.",
       "connectionSucceeded": "Model berhasil menyelesaikan permintaan menggunakan protokol ini.",
       "connectionFailed": "Model tidak dapat menyelesaikan permintaan. Periksa URL dasar API, protokol, kredensial, dan ID model.",
+      "requestTimedOut": "Titik akhir tidak menjawab tepat waktu. Periksa URL dasar API dan koneksi Anda, lalu coba lagi.",
+      "requestUnauthorized": "Titik akhir menolak kredensial. Periksa kunci API dan tajuk kustom, lalu coba lagi.",
+      "requestNotFound": "Titik akhir atau model tidak ditemukan. Periksa URL dasar API dan ID model.",
+      "requestRateLimited": "Titik akhir membatasi permintaan. Tunggu sebentar dan coba lagi.",
+      "requestUnavailable": "Titik akhir tidak tersedia saat ini. Coba lagi sebentar lagi.",
+      "requestUnreachable": "Titik akhir tidak dapat dijangkau. Periksa URL dasar API dan koneksi Anda.",
+      "requestInvalidResponse": "Titik akhir tidak menjawab dalam format yang diharapkan. Periksa apakah URL dasar API dan protokol cocok dengan server, lalu coba lagi.",
+      "discoveryNoModels": "Titik akhir tidak mencantumkan model apa pun. Masukkan model secara manual.",
+      "connectionIncomplete": "Model menjawab tetapi tidak menyelesaikan permintaan. Coba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama layanan, tajuk yang valid, dan setidaknya satu model dengan ID dan nama yang unik. Batas token harus berupa bilangan bulat positif.",
       "invalidUrl": "Masukkan URL dasar API HTTP atau HTTPS tanpa kredensial, kueri, atau fragmen.",
       "publicHttp": "Titik akhir HTTP publik tidak diizinkan. Gunakan HTTPS atau titik akhir lokal privat.",
@@ -4060,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
     },
-    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini."
+    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini.",
+    "providerKeyRefused": "Penyedia menolak kredensial. Periksa kunci API-nya, lalu kirim lagi.",
+    "providerModelMissing": "Layanan ini tidak lagi menyediakan model ini. Pilih yang lain.",
+    "providerRateLimited": "Penyedia membatasi permintaan. Tunggu sebentar dan kirim lagi.",
+    "providerUnavailable": "Penyedia tidak tersedia saat ini. Kirim lagi sebentar lagi."
   },
   "settingsTools": {
     "confirmTitle": "Konfirmasi perubahan ini?"
@@ -4435,6 +4449,7 @@
     "pickPackToBuyAgain": "Pilih paket di atas untuk memulai pembelian baru.",
     "purchasePending": "Toko masih memproses pembayaran ini. Kredit Anda akan masuk setelah toko menyetujui tagihannya.",
     "buyAgain": "Beli lagi",
+    "checkPurchase": "Periksa pembelian",
     "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."
   },
@@ -4528,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "Simpan ke daftar",
-      "saved": "Disimpan ke {{list}}"
+      "saved": "Disimpan ke {{list}}",
+      "saveFailed": "Tidak dapat menyimpan tugas. Periksa koneksi Anda dan coba lagi.",
+      "saveRefused": "Tidak dapat menyimpan tugas ke daftar ini. Pilih daftar lain."
     }
   },
   "agentBriefing": {

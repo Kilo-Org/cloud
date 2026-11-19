@@ -19,6 +19,9 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
+vi.mock('@/components/ui/icons', () => ({ PlugZap: 'PlugZap', RotateCcw: 'RotateCcw' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 vi.mock('@/lib/trpc', () => ({
@@ -55,18 +58,21 @@ async function mount(scope: ProviderPrScope) {
   return mounted;
 }
 
-type ButtonInstance = {
+type ActionInstance = {
+  type: unknown;
   props: {
     onPress: () => void;
     variant?: string;
-    children: { props: { children: string } };
+    label?: string;
+    accessibilityLabel?: string;
   };
 };
 
+/** The state's recovery actions in render order: the retry, then the check. */
 function findButtons(renderer: { root: { findAll: (f: (n: unknown) => boolean) => unknown[] } }) {
-  return renderer.root.findAll(
-    node => String((node as { type: unknown }).type) === 'Button'
-  ) as ButtonInstance[];
+  return renderer.root.findAll(node =>
+    ['StateAction', 'Button'].includes(String((node as { type: unknown }).type))
+  ) as ActionInstance[];
 }
 
 describe('PrReviewUnavailableActions', () => {
@@ -82,16 +88,14 @@ describe('PrReviewUnavailableActions', () => {
     if (!retryButton || !checkButton) {
       throw new Error('the two recovery buttons did not render');
     }
-    expect(retryButton.props.children.props.children).toBe('Retry');
-    expect(checkButton.props.children.props.children).toBe('Check connection');
-    // One filled primary carries the recovery; the provider check stays the
-    // outlined secondary under it, so the state does not offer two equal
-    // choices.
-    expect(retryButton.props.variant ?? 'default').toBe('default');
+    // The retry is the shared state action, the one primary that carries the
+    // recovery; the provider check stays the outlined secondary under it, so
+    // the state does not offer two equal choices.
+    expect(String(retryButton.type)).toBe('StateAction');
+    expect(retryButton.props.label).toBe('Retry');
+    expect(String(checkButton.type)).toBe('Button');
+    expect(checkButton.props.accessibilityLabel).toBe('Check connection');
     expect(checkButton.props.variant).toBe('outline');
-    expect(
-      buttons.filter(button => (button.props.variant ?? 'default') === 'default')
-    ).toHaveLength(1);
     act(() => {
       retryButton.props.onPress();
     });

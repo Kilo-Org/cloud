@@ -172,6 +172,7 @@
     "generating": "Luodaan…",
     "working": "Työn alla",
     "yourOwnRepositories": "Omat koodivarastosi",
+    "organizationRepositories": "Organisaation koodivarastot",
     "dismissed": "Sivuutettu",
     "agent": "Agentti",
     "durationMinuteShort": "min",
@@ -3618,8 +3619,7 @@
       "renameTitle": "Nimeä organisaatio uudelleen",
       "renamePlaceholder": "Organisaation nimi",
       "balance": "Saldo",
-      "organizationSeats": "Organisaation käyttäjäpaikat",
-      "plan": "Organisaation paketti",
+      "plan": "Paketti",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Päättynyt",
@@ -3653,7 +3653,8 @@
     "signupStepUp": "Viimeistele tilin luominen valitsemalla ”$t(login.moreSignInOptions)”.",
     "signupStepUpApple": "Viimeistele tilin luominen valitsemalla ”$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Viimeistele tilin luominen valitsemalla ”$t(login.signInWithGoogle)”.",
-    "invalidCode": "Koodi on virheellinen. Yritä uudelleen.",
+    "signupStepUpBack": "Palaa takaisin ja viimeistele tilin luominen valitsemalla ”$t(login.moreSignInOptions)”.",
+    "invalidCode": "Koodi on virheellinen tai vanhentunut. Yritä uudelleen tai valitse ”$t(login.resendCode)”.",
     "codeInProgress": "Koodiasi käsitellään. Odota hetki ja yritä uudelleen.",
     "tooManyAttempts": "Liian monta yritystä. Pyydä uusi koodi.",
     "invalidToken": "Kirjautuminen epäonnistui. Yritä uudelleen.",
@@ -3922,6 +3923,15 @@
       "checkHelp": "Painike ”$t(modelChat.backends.checkConnection)” lähettää tähän päätepisteeseen lyhyen päättelypyynnön valittua protokollaa ja mallia käyttäen. Palveluntarjoaja saattaa veloittaa siitä.",
       "connectionSucceeded": "Malli suoritti pyynnön tällä protokollalla.",
       "connectionFailed": "Malli ei voinut suorittaa pyyntöä. Tarkista API:n juuriosoite, protokolla, tunnistetiedot ja mallin tunniste.",
+      "requestTimedOut": "Päätepiste ei vastannut ajoissa. Tarkista API:n juuriosoite ja yhteytesi ja yritä sitten uudelleen.",
+      "requestUnauthorized": "Päätepiste hylkäsi tunnistetiedot. Tarkista API-avain ja mukautetut otsakkeet ja yritä sitten uudelleen.",
+      "requestNotFound": "Päätepistettä tai mallia ei löytynyt. Tarkista API:n juuriosoite ja mallin tunniste.",
+      "requestRateLimited": "Päätepiste rajoittaa pyyntöjä. Odota hetki ja yritä uudelleen.",
+      "requestUnavailable": "Päätepiste ei ole juuri nyt käytettävissä. Yritä uudelleen hetken kuluttua.",
+      "requestUnreachable": "Päätepisteeseen ei saatu yhteyttä. Tarkista API:n juuriosoite ja yhteytesi.",
+      "requestInvalidResponse": "Päätepiste vastasi, mutta vastaus ei ole odotetussa muodossa. Tarkista, että API:n juuriosoite ja protokolla vastaavat palvelinta, ja yritä uudelleen.",
+      "discoveryNoModels": "Päätepiste ei luetellut malleja. Lisää mallit käsin.",
+      "connectionIncomplete": "Malli vastasi mutta ei suorittanut pyyntöä loppuun. Yritä uudelleen tai tarkista mallin tunniste ja protokolla.",
       "invalidInput": "Anna taustapalvelun nimi, kelvolliset otsakkeet ja vähintään yksi malli, jolla on yksilöllinen tunniste ja nimi. Tokenrajojen on oltava positiivisia kokonaislukuja.",
       "invalidUrl": "Anna API:n HTTP- tai HTTPS-juuriosoite ilman tunnistetietoja, kyselyä tai fragmenttia.",
       "publicHttp": "Julkisia HTTP-päätepisteitä ei sallita. Käytä HTTPS-yhteyttä tai yksityistä paikallista päätepistettä.",
@@ -4060,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
     },
-    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen."
+    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen.",
+    "providerKeyRefused": "Palveluntarjoaja hylkäsi tunnistetiedot. Tarkista sen API-avain ja lähetä sitten uudelleen.",
+    "providerModelMissing": "Tämä taustapalvelu ei enää tarjoa tätä mallia. Valitse toinen.",
+    "providerRateLimited": "Palveluntarjoaja rajoittaa pyyntöjä. Odota hetki ja lähetä uudelleen.",
+    "providerUnavailable": "Palveluntarjoaja ei ole juuri nyt käytettävissä. Lähetä uudelleen pian."
   },
   "settingsTools": {
     "confirmTitle": "Vahvistetaanko tämä muutos?"
@@ -4435,6 +4449,7 @@
     "pickPackToBuyAgain": "Aloita uusi osto valitsemalla paketti yläpuolelta.",
     "purchasePending": "Kauppa käsittelee tätä maksua vielä. Krediitit saapuvat, kun kauppa hyväksyy veloituksen.",
     "buyAgain": "Osta uudelleen",
+    "checkPurchase": "Tarkista osto",
     "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille.",
     "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille."
   },
@@ -4528,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "Tallenna listalle",
-      "saved": "Tallennettu listalle {{list}}"
+      "saved": "Tallennettu listalle {{list}}",
+      "saveFailed": "Tehtävää ei voitu tallentaa. Tarkista yhteytesi ja yritä uudelleen.",
+      "saveRefused": "Tehtävää ei voitu tallentaa tälle listalle. Valitse toinen lista."
     }
   },
   "agentBriefing": {

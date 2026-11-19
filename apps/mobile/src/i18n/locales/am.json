@@ -172,6 +172,7 @@
     "generating": "በማመንጨት ላይ…",
     "working": "በመሥራት ላይ",
     "yourOwnRepositories": "የራስህ ማከማቻዎች",
+    "organizationRepositories": "የድርጅቱ ማከማቻዎች",
     "dismissed": "ተወግዷል",
     "agent": "ወኪል",
     "durationMinuteShort": "min",
@@ -3618,8 +3619,7 @@
       "renameTitle": "የድርጅቱን ስም ይቀይሩ",
       "renamePlaceholder": "የድርጅት ስም",
       "balance": "ቀሪ ሂሳብ",
-      "organizationSeats": "የድርጅት የተጠቃሚ ፈቃዶች",
-      "plan": "የድርጅት ዕቅድ",
+      "plan": "ዕቅድ",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · አልቋል",
@@ -3653,7 +3653,8 @@
     "signupStepUp": "መለያህን መፍጠር ለመጨረስ '$t(login.moreSignInOptions)'ን ተጠቀም።",
     "signupStepUpApple": "መለያህን መፍጠር ለመጨረስ '$t(login.signInWithApple)'ን ተጠቀም።",
     "signupStepUpGoogle": "መለያህን መፍጠር ለመጨረስ '$t(login.signInWithGoogle)'ን ተጠቀም።",
-    "invalidCode": "ያ ኮድ ትክክል አይደለም። እንደገና ሞክር።",
+    "signupStepUpBack": "መለያህን መፍጠር ለመጨረስ ወደ ኋላ ተመለስና '$t(login.moreSignInOptions)'ን ተጠቀም።",
+    "invalidCode": "ያ ኮድ ትክክል አይደለም ወይም ጊዜው አልፎበታል። እንደገና ሞክር ወይም '$t(login.resendCode)'ን ተጠቀም።",
     "codeInProgress": "ኮድህ እየተሠራበት ነው። ትንሽ ጠብቅና እንደገና ሞክር።",
     "tooManyAttempts": "በጣም ብዙ ሙከራዎች ተደርገዋል። አዲስ ኮድ ጠይቅ።",
     "invalidToken": "መግባት አልተሳካም። እባክህ እንደገና ሞክር።",
@@ -3922,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) የተመረጡትን ፕሮቶኮል እና ሞዴል በመጠቀም ወደዚህ የግንኙነት ነጥብ አጭር የምላሽ ማመንጨት ጥያቄ ይልካል። አቅራቢው ለዚህ ክፍያ ሊያስከፍል ይችላል።",
       "connectionSucceeded": "ሞዴሉ ይህን ፕሮቶኮል በመጠቀም ጥያቄን አጠናቋል።",
       "connectionFailed": "ሞዴሉ ጥያቄውን ማጠናቀቅ አልቻለም። የAPI ሥር አድራሻን፣ ፕሮቶኮሉን፣ የመግቢያ መረጃውን እና የሞዴሉን መለያ ያረጋግጡ።",
+      "requestTimedOut": "የግንኙነት ነጥቡ በሰዓቱ ምላሽ አልሰጠም። የAPI ሥር አድራሻውን እና ግንኙነትዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።",
+      "requestUnauthorized": "የግንኙነት ነጥቡ የመግቢያ መረጃውን አልተቀበለም። የAPI ቁልፉን እና ልዩ ራስጌዎችን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።",
+      "requestNotFound": "የግንኙነት ነጥቡ ወይም ሞዴሉ አልተገኘም። የAPI ሥር አድራሻውን እና የሞዴሉን መለያ ያረጋግጡ።",
+      "requestRateLimited": "የግንኙነት ነጥቡ ጥያቄዎችን እየገደበ ነው። ትንሽ ይጠብቁ እና እንደገና ይሞክሩ።",
+      "requestUnavailable": "የግንኙነት ነጥቡ አሁን አይገኝም። በአጭር ጊዜ ውስጥ እንደገና ይሞክሩ።",
+      "requestUnreachable": "የግንኙነት ነጥቡ ሊደረስበት አልተቻለም። የAPI ሥር አድራሻውን እና ግንኙነትዎን ያረጋግጡ።",
+      "requestInvalidResponse": "የግንኙነት ነጥቡ በሚጠበቀው ቅርጸት ምላሽ አልሰጠም። የAPI ሥር አድራሻው እና ፕሮቶኮሉ ከአገልጋዩ ጋር የሚመሳሰሉ መሆናቸውን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።",
+      "discoveryNoModels": "የግንኙነት ነጥቡ ምንም ሞዴል አልዘረዘረም። ሞዴሎችን በእጅ ያስገቡ።",
+      "connectionIncomplete": "ሞዴሉ ምላሽ ሰጠ ነገር ግን አልጨረሰም። እንደገና ይሞክሩ፣ ወይም የሞዴሉን መለያ እና ፕሮቶኮሉን ያረጋግጡ።",
       "invalidInput": "የጀርባ አገልግሎት ስም፣ ትክክለኛ ራስጌዎች እና ቢያንስ አንድ ልዩ መለያ እና ስም ያለው ሞዴል ያስገቡ። የቶከን ገደቦች ከዜሮ በላይ የሆኑ ሙሉ ቁጥሮች መሆን አለባቸው።",
       "invalidUrl": "የመግቢያ መረጃ፣ የመጠይቅ ክፍል ወይም የቁራጭ ክፍል የሌለው የHTTP ወይም የHTTPS የAPI ሥር አድራሻ ያስገቡ።",
       "publicHttp": "ይፋዊ የHTTP የግንኙነት ነጥቦች አይፈቀዱም። HTTPS ወይም የግል አካባቢያዊ የግንኙነት ነጥብ ይጠቀሙ።",
@@ -4060,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "ይህ ሞዴል የማሰብ ጥረትን ይደግፋል"
     },
-    "creditsRequired": "ይህን መልዕክት ለመላክ በቂ ክሬዲት የለም።"
+    "creditsRequired": "ይህን መልዕክት ለመላክ በቂ ክሬዲት የለም።",
+    "providerKeyRefused": "አቅራቢው የመግቢያ መረጃውን አልተቀበለም። የአቅራቢውን የAPI ቁልፍ ያረጋግጡ፣ ከዚያ በድጋሚ ይላኩ።",
+    "providerModelMissing": "ይህ የጀርባ አገልግሎት ይህን ሞዴል ከእንግዲህ አያቀርብም። ሌላ ይምረጡ።",
+    "providerRateLimited": "አቅራቢው ጥያቄዎችን እየገደበ ነው። ትንሽ ይጠብቁ እና በድጋሚ ይላኩ።",
+    "providerUnavailable": "አቅራቢው አሁን አይገኝም። በአጭር ጊዜ ውስጥ በድጋሚ ይላኩ።"
   },
   "settingsTools": {
     "confirmTitle": "ይህን ለውጥ ያረጋግጡ?"
@@ -4435,6 +4449,7 @@
     "pickPackToBuyAgain": "አዲስ ግዢ ለመጀመር ከላይ ካሉት ጥቅሎች አንዱን ይምረጡ።",
     "purchasePending": "መደብሩ ይህን ክፍያ አሁንም በማስኬድ ላይ ነው። ክፍያውን ካጸደቀ በኋላ ክሬዲቶችዎ ይደርሳሉ።",
     "buyAgain": "እንደገና ይግዙ",
+    "checkPurchase": "ግዢውን ያረጋግጡ",
     "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው ክሬዲት የሌላ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።",
     "purchaseOwnedByAnotherAccountPlay": "በዚህ Google Play መለያ ላይ ያለው ክሬዲት የተለየ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።"
   },
@@ -4528,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "በዝርዝር ውስጥ አስቀምጥ",
-      "saved": "በ{{list}} ውስጥ ተቀምጧል"
+      "saved": "በ{{list}} ውስጥ ተቀምጧል",
+      "saveFailed": "ተግባሩን ማስቀመጥ አልተቻለም። ግንኙነትህን ፍተሽ እና እንደገና ሞክር።",
+      "saveRefused": "ተግባሩን በዚህ ዝርዝር ውስጥ ማስቀመጥ አልተቻለም። ሌላ ዝርዝር ምረጥ።"
     }
   },
   "agentBriefing": {

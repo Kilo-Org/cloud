@@ -172,6 +172,7 @@
     "generating": "Genererer…",
     "working": "I gang",
     "yourOwnRepositories": "Dine egne kodelagre",
+    "organizationRepositories": "Organisationens kodelagre",
     "dismissed": "Afvist",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -3618,8 +3619,7 @@
       "renameTitle": "Omdøb organisation",
       "renamePlaceholder": "Organisationens navn",
       "balance": "Saldo",
-      "organizationSeats": "Pladser i organisationen",
-      "plan": "Organisationsplan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Udløbet",
@@ -3653,7 +3653,8 @@
     "signupStepUp": "Brug '$t(login.moreSignInOptions)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpApple": "Brug '$t(login.signInWithApple)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpGoogle": "Brug '$t(login.signInWithGoogle)' for at færdiggøre oprettelsen af din konto.",
-    "invalidCode": "Koden er forkert. Prøv igen.",
+    "signupStepUpBack": "Gå tilbage og brug '$t(login.moreSignInOptions)' for at færdiggøre oprettelsen af din konto.",
+    "invalidCode": "Koden er forkert eller udløbet. Prøv igen eller brug '$t(login.resendCode)'.",
     "codeInProgress": "Din kode behandles. Vent et øjeblik, og prøv igen.",
     "tooManyAttempts": "For mange forsøg. Bed om en ny kode.",
     "invalidToken": "Det lykkedes ikke at logge ind. Prøv igen.",
@@ -3922,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sender en kort inferensforespørgsel til dette endepunkt med den valgte protokol og model. Udbyderen kan opkræve betaling for det.",
       "connectionSucceeded": "Modellen gennemførte en forespørgsel med denne protokol.",
       "connectionFailed": "Modellen kunne ikke gennemføre en forespørgsel. Tjek API-roden, protokollen, loginoplysningerne og model-ID'et.",
+      "requestTimedOut": "Endepunktet svarede ikke i tide. Tjek API-roden og din forbindelse, og prøv igen.",
+      "requestUnauthorized": "Endepunktet afviste loginoplysningerne. Tjek API-nøglen og de tilpassede headere, og prøv igen.",
+      "requestNotFound": "Endepunktet eller modellen blev ikke fundet. Tjek API-roden og model-ID'et.",
+      "requestRateLimited": "Endepunktet begrænser forespørgsler. Vent et øjeblik, og prøv igen.",
+      "requestUnavailable": "Endepunktet er utilgængeligt lige nu. Prøv igen om et øjeblik.",
+      "requestUnreachable": "Der kunne ikke opnås forbindelse til endepunktet. Tjek API-roden og din forbindelse.",
+      "requestInvalidResponse": "Endepunktet svarede ikke i det forventede format. Tjek, at API-roden og protokollen svarer til serveren, og prøv igen.",
+      "discoveryNoModels": "Endepunktet angav ingen modeller. Tilføj modeller manuelt.",
+      "connectionIncomplete": "Modellen svarede, men blev ikke færdig. Prøv igen, eller tjek model-ID'et og protokollen.",
       "invalidInput": "Indtast et servernavn, gyldige headere og mindst én model med et entydigt ID og navn. Tokengrænser skal være positive heltal.",
       "invalidUrl": "Indtast en HTTP- eller HTTPS-API-rod uden loginoplysninger, forespørgselsparametre eller et fragment.",
       "publicHttp": "Offentlige HTTP-endepunkter er ikke tilladt. Brug HTTPS eller et privat lokalt endepunkt.",
@@ -4060,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"
     },
-    "creditsRequired": "Ikke nok kreditter til at sende denne besked."
+    "creditsRequired": "Ikke nok kreditter til at sende denne besked.",
+    "providerKeyRefused": "Udbyderen afviste loginoplysningerne. Tjek dens API-nøgle, og send igen.",
+    "providerModelMissing": "Denne server leverer ikke længere denne model. Vælg en anden.",
+    "providerRateLimited": "Udbyderen begrænser forespørgsler. Vent et øjeblik, og send igen.",
+    "providerUnavailable": "Udbyderen er utilgængelig lige nu. Send igen om kort tid."
   },
   "settingsTools": {
     "confirmTitle": "Bekræft denne ændring?"
@@ -4435,6 +4449,7 @@
     "pickPackToBuyAgain": "Vælg en pakke ovenfor for at starte et nyt køb.",
     "purchasePending": "Butikken behandler stadig denne betaling. Dine kreditter kommer, så snart den godkender opkrævningen.",
     "buyAgain": "Køb igen",
+    "checkPurchase": "Tjek købet",
     "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."
   },
@@ -4528,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "Gem på liste",
-      "saved": "Gemt på {{list}}"
+      "saved": "Gemt på {{list}}",
+      "saveFailed": "Kunne ikke gemme opgaven. Tjek din forbindelse, og prøv igen.",
+      "saveRefused": "Kunne ikke gemme opgaven på denne liste. Vælg en anden liste."
     }
   },
   "agentBriefing": {

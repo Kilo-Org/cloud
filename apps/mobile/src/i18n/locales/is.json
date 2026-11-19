@@ -172,6 +172,7 @@
     "generating": "Bý til…",
     "working": "Í vinnslu",
     "yourOwnRepositories": "Þín eigin kóðasöfn",
+    "organizationRepositories": "Kóðasöfn fyrirtækisins",
     "dismissed": "Vísað frá",
     "agent": "Umboðsmaður",
     "durationMinuteShort": "min",
@@ -3618,8 +3619,7 @@
       "renameTitle": "Endurnefna félag",
       "renamePlaceholder": "Nafn félags",
       "balance": "Inneign",
-      "organizationSeats": "Notendasæti félagsins",
-      "plan": "Áætlun fyrirtækis",
+      "plan": "Áætlun",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Lokið",
@@ -3653,7 +3653,8 @@
     "signupStepUp": "Veldu „$t(login.moreSignInOptions)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpApple": "Veldu „$t(login.signInWithApple)“ til að ljúka við að stofna reikninginn þinn.",
     "signupStepUpGoogle": "Veldu „$t(login.signInWithGoogle)“ til að ljúka við að stofna reikninginn þinn.",
-    "invalidCode": "Þessi kóði er rangur. Reyndu aftur.",
+    "signupStepUpBack": "Farðu til baka og veldu „$t(login.moreSignInOptions)“ til að ljúka við að stofna reikninginn þinn.",
+    "invalidCode": "Þessi kóði er rangur eða útrunninn. Reyndu aftur eða veldu „$t(login.resendCode)“.",
     "codeInProgress": "Kóðinn þinn er í vinnslu. Bíddu í smá stund og reyndu aftur.",
     "tooManyAttempts": "Of margar tilraunir. Biddu um nýjan kóða.",
     "invalidToken": "Innskráning mistókst. Reyndu aftur.",
@@ -3922,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sendir stutta ályktunarbeiðni á þennan endapunkt með valinni samskiptareglu og líkani. Þjónustuveitandinn gæti rukkað fyrir hana.",
       "connectionSucceeded": "Líkanið afgreiddi beiðni með þessari samskiptareglu.",
       "connectionFailed": "Líkanið gat ekki afgreitt beiðni. Athugaðu grunnslóð API, samskiptareglu, auðkenningarupplýsingar og auðkenni líkans.",
+      "requestTimedOut": "Endapunkturinn svaraði ekki í tæka tíð. Athugaðu grunnslóð API og tenginguna þína, og reyndu aftur.",
+      "requestUnauthorized": "Endapunkturinn hafnaði auðkenningarupplýsingunum. Athugaðu API-lykilinn og sérsniðna hausa, og reyndu aftur.",
+      "requestNotFound": "Endapunkturinn eða líkanið fannst ekki. Athugaðu grunnslóð API og auðkenni líkans.",
+      "requestRateLimited": "Endapunkturinn takmarkar beiðnir. Bíddu aðeins og reyndu aftur.",
+      "requestUnavailable": "Endapunkturinn er ekki í boði núna. Reyndu aftur eftir smástund.",
+      "requestUnreachable": "Ekki náðist samband við endapunktinn. Athugaðu grunnslóð API og tenginguna þína.",
+      "requestInvalidResponse": "Endapunkturinn svaraði ekki í væntu sniði. Athugaðu að grunnslóð API og samskiptaregla séu í samræmi við þjóninn og reyndu aftur.",
+      "discoveryNoModels": "Endapunkturinn skilaði engum líkönum. Sláðu inn líkön handvirkt.",
+      "connectionIncomplete": "Líkanið svaraði en lauk ekki. Reyndu aftur, eða athugaðu auðkenni líkans og samskiptareglu.",
       "invalidInput": "Sláðu inn heiti bakenda, gilda hausa og að minnsta kosti eitt líkan með einkvæmu auðkenni og heiti. Táknamörk verða að vera jákvæðar heiltölur.",
       "invalidUrl": "Sláðu inn HTTP- eða HTTPS-grunnslóð API án auðkenningarupplýsinga, fyrirspurnarhluta eða brotahluta.",
       "publicHttp": "Opinberir HTTP-endapunktar eru ekki leyfðir. Notaðu HTTPS eða einkarekinn endapunkt á staðarneti.",
@@ -4060,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"
     },
-    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð."
+    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð.",
+    "providerKeyRefused": "Þjónustuveitandinn hafnaði auðkenningarupplýsingunum. Athugaðu API-lykil hans og sendu aftur.",
+    "providerModelMissing": "Þessi bakendi þjónar ekki lengur þessu líkani. Veldu annað.",
+    "providerRateLimited": "Þjónustuveitandinn takmarkar beiðnir. Bíddu aðeins og sendu aftur.",
+    "providerUnavailable": "Þjónustuveitandinn er ekki í boði núna. Sendu aftur eftir smástund."
   },
   "settingsTools": {
     "confirmTitle": "Staðfesta þessa breytingu?"
@@ -4435,6 +4449,7 @@
     "pickPackToBuyAgain": "Veldu pakka hér fyrir ofan til að hefja ný kaup.",
     "purchasePending": "Verslunin er enn að vinna úr þessari greiðslu. Inneignin þín berst um leið og hún samþykkir færsluna.",
     "buyAgain": "Kaupa aftur",
+    "checkPurchase": "Athuga kaupin",
     "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
     "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."
   },
@@ -4528,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "Vista á lista",
-      "saved": "Vistað á {{list}}"
+      "saved": "Vistað á {{list}}",
+      "saveFailed": "Gat ekki vistað verkefnið. Athugaðu nettenginguna þína og reyndu aftur.",
+      "saveRefused": "Gat ekki vistað verkefnið á þennan lista. Veldu annan lista."
     }
   },
   "agentBriefing": {

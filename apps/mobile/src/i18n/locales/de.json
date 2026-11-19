@@ -172,6 +172,7 @@
     "generating": "Wird generiert…",
     "working": "In Bearbeitung",
     "yourOwnRepositories": "Deine eigenen Code-Repositories",
+    "organizationRepositories": "Code-Repositories der Organisation",
     "dismissed": "Verworfen",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -3432,8 +3433,7 @@
     "hub": {
       "balance": "Guthaben",
       "lowBalanceBelow": "Unter {{amount}}",
-      "organizationSeats": "Nutzerplätze der Organisation",
-      "plan": "Organisationsplan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Beendet",
@@ -3653,7 +3653,8 @@
     "signupStepUp": "Wähle „$t(login.moreSignInOptions)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpApple": "Wähle „$t(login.signInWithApple)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpGoogle": "Wähle „$t(login.signInWithGoogle)“, um die Erstellung deines Kontos abzuschließen.",
-    "invalidCode": "Dieser Code ist falsch. Bitte versuche es erneut.",
+    "signupStepUpBack": "Um die Erstellung deines Kontos abzuschließen, geh zurück und wähle „$t(login.moreSignInOptions)“.",
+    "invalidCode": "Dieser Code ist falsch oder abgelaufen. Versuche es erneut oder wähle „$t(login.resendCode)“.",
     "codeInProgress": "Dein Code wird verarbeitet. Warte einen Moment und versuche es erneut.",
     "tooManyAttempts": "Du hast zu viele Versuche unternommen. Bitte fordere einen neuen Code an.",
     "invalidToken": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
@@ -3922,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sendet eine kurze Inferenzanfrage mit dem ausgewählten Protokoll und Modell an diesen Endpunkt. Der Anbieter kann dafür Gebühren berechnen.",
       "connectionSucceeded": "Das Modell hat eine Anfrage mit diesem Protokoll erfolgreich ausgeführt.",
       "connectionFailed": "Das Modell konnte eine Anfrage nicht ausführen. Prüfe die API-Basis-URL, das Protokoll, die Zugangsdaten und die Modell-ID.",
+      "requestTimedOut": "Der Endpunkt hat nicht rechtzeitig geantwortet. Prüfe die API-Basis-URL und deine Verbindung und versuche es dann erneut.",
+      "requestUnauthorized": "Der Endpunkt hat die Zugangsdaten abgelehnt. Prüfe den API-Schlüssel und die benutzerdefinierten Header und versuche es dann erneut.",
+      "requestNotFound": "Der Endpunkt oder das Modell wurde nicht gefunden. Prüfe die API-Basis-URL und die Modell-ID.",
+      "requestRateLimited": "Der Endpunkt begrenzt Anfragen. Warte einen Moment und versuche es erneut.",
+      "requestUnavailable": "Der Endpunkt ist derzeit nicht verfügbar. Versuche es gleich noch einmal.",
+      "requestUnreachable": "Der Endpunkt konnte nicht erreicht werden. Prüfe die API-Basis-URL und deine Verbindung.",
+      "requestInvalidResponse": "Der Endpunkt hat nicht im erwarteten Format geantwortet. Prüfe, ob API-Basis-URL und Protokoll zum Server passen, und versuche es dann erneut.",
+      "discoveryNoModels": "Der Endpunkt hat keine Modelle aufgelistet. Gib Modelle manuell ein.",
+      "connectionIncomplete": "Das Modell hat geantwortet, aber nicht abgeschlossen. Versuche es erneut oder prüfe die Modell-ID und das Protokoll.",
       "invalidInput": "Gib einen Backend-Namen, gültige Header und mindestens ein Modell mit eindeutiger ID und eindeutigem Namen ein. Token-Limits müssen positive ganze Zahlen sein.",
       "invalidUrl": "Gib eine HTTP- oder HTTPS-API-Basis-URL ohne Zugangsdaten, Abfrageparameter oder Fragment ein.",
       "publicHttp": "Öffentliche HTTP-Endpunkte sind nicht erlaubt. Verwende HTTPS oder einen privaten lokalen Endpunkt.",
@@ -4060,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
     },
-    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden."
+    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden.",
+    "providerKeyRefused": "Der Anbieter hat die Zugangsdaten abgelehnt. Prüfe dessen API-Schlüssel und sende dann erneut.",
+    "providerModelMissing": "Dieses Backend stellt dieses Modell nicht mehr bereit. Wähle ein anderes.",
+    "providerRateLimited": "Der Anbieter begrenzt Anfragen. Warte einen Moment und sende dann erneut.",
+    "providerUnavailable": "Der Anbieter ist derzeit nicht verfügbar. Sende in Kürze erneut."
   },
   "settingsTools": {
     "confirmTitle": "Diese Änderung bestätigen?"
@@ -4435,6 +4449,7 @@
     "pickPackToBuyAgain": "Wähle oben ein Paket aus, um einen neuen Kauf zu starten.",
     "purchasePending": "Der Store verarbeitet diese Zahlung noch. Deine Credits werden gutgeschrieben, sobald er die Belastung genehmigt.",
     "buyAgain": "Erneut kaufen",
+    "checkPurchase": "Kauf prüfen",
     "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
     "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."
   },
@@ -4528,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "In Liste speichern",
-      "saved": "In {{list}} gespeichert"
+      "saved": "In {{list}} gespeichert",
+      "saveFailed": "Aufgabe konnte nicht gespeichert werden. Prüfe deine Verbindung und versuche es erneut.",
+      "saveRefused": "Aufgabe konnte nicht in dieser Liste gespeichert werden. Wähle eine andere Liste."
     }
   },
   "agentBriefing": {

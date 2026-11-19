@@ -1,16 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Newspaper } from '@/components/ui/icons';
+import { Bell, Newspaper } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
-import { RowSkeleton, SwitchPlaceholder } from '@/components/ui/row-skeleton';
-import { renderRowTrailing } from '@/components/ui/row-trailing';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
@@ -75,33 +73,41 @@ function useBriefingNotificationSwitch() {
  * The notification switch for the agent brief on its own settings screen, plus
  * the way to the device's notification permission.
  *
- * While the preferences read is pending the value is unknown, so the switch's
- * slot holds the shared `SwitchPlaceholder` and the row does not shift when the
- * value arrives. The switch contributes its host frame to the row's layout, so
- * the placeholder takes that host and paints the control's own pill shape
- * inside it.
+ * While the preferences read is pending the value is unknown, so the switch
+ * row is the shared row skeleton with its switch slot: the row the value lands
+ * in keeps the height already on screen, and assistive tech never meets a
+ * switch nothing has read yet.
  */
 export function BriefingNotificationToggle() {
   const router = useRouter();
   const { t } = useTranslation();
   const { preferences, value, unavailable, loading, setEnabled } = useBriefingNotificationSwitch();
   return (
-    <Card>
-      <View className="flex-row items-center gap-3">
-        <Text className="min-w-0 flex-1">{t('agentBriefing.title')}</Text>
+    <>
+      <RowGroup>
         {loading ? (
-          <SwitchPlaceholder />
+          <RowSkeleton subtitle trailing="switch" />
         ) : (
-          renderRowTrailing({
-            kind: 'switch',
-            accessibilityLabel: t('agentBriefing.title'),
-            value,
-            disabled: unavailable,
-            onValueChange: setEnabled,
-          })
+          <PreferenceRow
+            title={t('agentBriefing.title')}
+            subtitle={t('agentBriefing.notificationsHint')}
+            value={value}
+            disabled={unavailable}
+            onValueChange={setEnabled}
+          />
         )}
-      </View>
-      <Text variant="caption">{t('agentBriefing.notificationsHint')}</Text>
+        {/* The permission sentence is a notice, so it is the row's subtitle
+            under a title that names where it leads. As the last button's label
+            it was prose drawn bold and centered, which read as a heading. */}
+        <ConfigureRow
+          icon={Bell}
+          title={t('common.notifications')}
+          subtitle={t('agentBriefing.notificationPermission')}
+          onPress={() => {
+            router.push('/(app)/notifications' as Href);
+          }}
+        />
+      </RowGroup>
       {preferences.isError ? (
         <Button
           variant="ghost"
@@ -112,16 +118,7 @@ export function BriefingNotificationToggle() {
           <Text>{t('common.retry')}</Text>
         </Button>
       ) : null}
-      <Button
-        variant="ghost"
-        size="sm"
-        onPress={() => {
-          router.push('/(app)/notifications' as Href);
-        }}
-      >
-        <Text>{t('agentBriefing.notificationPermission')}</Text>
-      </Button>
-    </Card>
+    </>
   );
 }
 

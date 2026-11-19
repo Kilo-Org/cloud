@@ -109,8 +109,10 @@ export function PrDiffFloatingActions({
   }
 
   return (
-    <ScreenFooter edge="background" keyboard="host">
-      <View className="w-full gap-2 rounded-xl border border-border bg-background px-3 py-3 shadow-lg shadow-[#0000001A]">
+    // The shared pinned bar as it is: its hairline separates it from the list
+    // above, so it draws no card, border or shadow of its own.
+    <ScreenFooter keyboard="host">
+      <View className="gap-2">
         {showSelectionAction ? (
           <View className="flex-row items-center gap-2">
             <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>

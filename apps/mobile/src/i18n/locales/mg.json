@@ -172,6 +172,7 @@
     "generating": "Mamokatra…",
     "working": "Miasa",
     "yourOwnRepositories": "Ny tahirin-kaodinao manokana",
+    "organizationRepositories": "Tahirin-kaodin'ny fikambanana",
     "dismissed": "Nesorina",
     "agent": "mpandraharaha",
     "durationMinuteShort": "min",
@@ -3618,8 +3619,7 @@
       "renameTitle": "Ovao ny anaran'ny fikambanana",
       "renamePlaceholder": "Anaran'ny fikambanana",
       "balance": "Ambim-bola",
-      "organizationSeats": "Toerana ho an'ny mpikambana",
-      "plan": "Drafitry ny fikambanana",
+      "plan": "Drafitra",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Lany",
@@ -3653,7 +3653,8 @@
     "signupStepUp": "Ampiasao ny '$t(login.moreSignInOptions)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpApple": "Ampiasao ny '$t(login.signInWithApple)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpGoogle": "Ampiasao ny '$t(login.signInWithGoogle)' hamitana ny famoronana ny kaontinao.",
-    "invalidCode": "Diso io kaody io. Andramo indray azafady.",
+    "signupStepUpBack": "Mba hamitana ny famoronana ny kaontinao, miverena any aoriana ary ampiasao ny '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Andramo indray na ampiasao ny '$t(login.resendCode)'.",
     "codeInProgress": "Mbola karakaraina ny kaodinao. Miandrasa kely ary andramo indray.",
     "tooManyAttempts": "Betsaka loatra ny andrana. Mangataha kaody vaovao azafady.",
     "invalidToken": "Tsy nahomby ny fidirana. Andramo indray azafady.",
@@ -3922,6 +3923,15 @@
       "checkHelp": "Mandefa fangatahana fohy hamokarana valiny amin'ity adiresy fifandraisana ity ny $t(modelChat.backends.checkConnection), amin'ny alalan'ny fitsipika fifandraisana sy ny modely voafidy. Mety hampandoa vola amin'izany ny mpamatsy.",
       "connectionSucceeded": "Nahavita fangatahana tamin'ity fitsipika fifandraisana ity ny modely.",
       "connectionFailed": "Tsy nahavita fangatahana ny modely. Hamarino ny fototry ny API, ny fitsipika fifandraisana, ny mombamomba ny fidirana ary ny famantarana ny modely.",
+      "requestTimedOut": "Tsy namaly ara-potoana ny adiresy fifandraisana. Hamarino ny fototry ny API sy ny fifandraisanao, dia andramo indray.",
+      "requestUnauthorized": "Nolavin'ny adiresy fifandraisana ny mombamomba ny fidirana. Hamarino ny lakile API sy ny lohapejy namboarinao, dia andramo indray.",
+      "requestNotFound": "Tsy hita ny adiresy fifandraisana na ny modely. Hamarino ny fototry ny API sy ny famantarana ny modely.",
+      "requestRateLimited": "Mampetra ny fangatahana ny adiresy fifandraisana. Andraso kely dia andramo indray.",
+      "requestUnavailable": "Tsy misy amin'izao fotoana izao ny adiresy fifandraisana. Andramo indray rahoway kely.",
+      "requestUnreachable": "Tsy tratra ny adiresy fifandraisana. Hamarino ny fototry ny API sy ny fifandraisanao.",
+      "requestInvalidResponse": "Tsy namaly araka ny endrika nantenaina ny adiresy fifandraisana. Hamarino fa mifanaraka amin'ny servera ny fototry ny API sy ny fitsipika fifandraisana, ary avereno indray.",
+      "discoveryNoModels": "Tsy nisy modely notanisain'ny adiresy fifandraisana. Ampidiro amin'ny tanana ny modely.",
+      "connectionIncomplete": "Namaly ny modely fa tsy nahavita. Andramo indray, na hamarino ny famantarana ny modely sy ny fitsipika fifandraisana.",
       "invalidInput": "Ampidiro ny anaran'ny rafitra mpizara, ny sahan-doha manan-kery ary modely iray farafahakeliny manana famantarana sy anarana tsy miverina. Tsy maintsy isa manontolo miabo ny fetran'ny singa lahatsoratra.",
       "invalidUrl": "Ampidiro ny fototry ny API mampiasa HTTP na HTTPS, tsy misy mombamomba ny fidirana, masontsivana fikarohana na sombin'ny URL.",
       "publicHttp": "Tsy azo ampiasaina ny adiresy fifandraisana HTTP ho an'ny daholobe. Mampiasà HTTPS na adiresy fifandraisana eo an-toerana tsy azon'ny daholobe idirana.",
@@ -4060,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
     },
-    "creditsRequired": "Tsy ampy kireditra handefasana ity hafatra ity."
+    "creditsRequired": "Tsy ampy kireditra handefasana ity hafatra ity.",
+    "providerKeyRefused": "Nolavin'ny mpamatsy ny mombamomba ny fidirana. Hamarino ny lakile API an'ny mpamatsy, dia alefaso indray.",
+    "providerModelMissing": "Tsy manolotra ity modely ity intsony ity backend ity. Misafidiana hafa.",
+    "providerRateLimited": "Mampetra ny fangatahana ny mpamatsy. Andraso kely dia alefaso indray.",
+    "providerUnavailable": "Tsy misy amin'izao fotoana izao ny mpamatsy. Alefaso indray rahoway kely."
   },
   "settingsTools": {
     "confirmTitle": "Hamafiso ity fanovana ity?"
@@ -4435,6 +4449,7 @@
     "pickPackToBuyAgain": "Misafidiana fonosana iray etsy ambony mba hanombohana fividianana vaovao.",
     "purchasePending": "Mbola karakarain'ny fivarotana ity fandoavam-bola ity. Ho tonga ny kredinao rehefa ankatoaviny ny fandoavana.",
     "buyAgain": "Hividy indray",
+    "checkPurchase": "Hamarino ny fividianana",
     "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
     "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."
   },
@@ -4528,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "Tehirizo ao amin'ny lisitra",
-      "saved": "Voatahiry ao amin'ny {{list}}"
+      "saved": "Voatahiry ao amin'ny {{list}}",
+      "saveFailed": "Tsy azo notahirizina ny asa hatao. Jereo ny fifandraisanao ary andramo indray.",
+      "saveRefused": "Tsy azo notahirizina ao amin'ity lisitra ity ny asa hatao. Misafidiana lisitra hafa."
     }
   },
   "agentBriefing": {

@@ -69,6 +69,8 @@ export function ScopeListScreen() {
                   key={org.organizationId}
                   icon={Building2}
                   title={org.organizationName}
+                  // Every scope row says what it covers, as Personal does.
+                  subtitle={t('common.organizationRepositories')}
                   onPress={() => {
                     openScope(org.organizationId);
                   }}
@@ -79,7 +81,7 @@ export function ScopeListScreen() {
               land in, so the rows replace them inside one surface instead of
               a second card appearing and disappearing below it. */}
           {orgsBody.status === 'loading'
-            ? [0, 1].map(index => <RowSkeleton key={index} tile />)
+            ? [0, 1].map(index => <RowSkeleton key={index} tile subtitle />)
             : null}
         </RowGroup>
 

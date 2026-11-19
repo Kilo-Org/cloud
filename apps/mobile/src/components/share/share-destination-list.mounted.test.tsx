@@ -257,7 +257,7 @@ describe('ShareDestinationList surface states', () => {
     // The mock renders `SearchField` as a bare TextInput; this is its only prop
     // surface, so naming the probe shape here is the whole contract.
     const input = renderer.root.find(node => String(node.type) === 'TextInput');
-    const searchField: { onChangeText: (text: string) => void } = input.props;
+    const searchField = input.props as { onChangeText: (text: string) => void };
     act(() => {
       searchField.onChangeText('revisao');
     });

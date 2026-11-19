@@ -539,9 +539,7 @@ function makeToken(payload: Record<string, unknown>): string {
 }
 
 /** Load the auth-context module from a fresh module registry so
- *  module-level state (preloadedToken) is clean. Returns the module
- *  and a helper to extract the context value from a mounted tree. */
-// oxlint-disable-next-line require-await -- dynamic import is awaited
+ *  module-level state (preloadedToken) is clean. */
 async function loadAuthModule() {
   vi.resetModules();
   const mod = await import('./auth-context');
@@ -688,9 +686,7 @@ describe('sign-out teardown ordering', () => {
       await ctx.signOut();
     });
 
-    // clearTelemetryDecision must be called
     expect(hoisted.controller.clearTelemetryDecision).toHaveBeenCalled();
-    // Sentry.setUser must be called
     expect(hoisted.sentry.setUser).toHaveBeenCalledWith(null);
 
     const capture = invocationOrder(hoisted.posthog.captureEvent);
@@ -749,11 +745,8 @@ describe('sign-out teardown ordering', () => {
       await ctx.signOut();
     });
 
-    // resetAppsFlyerState must be called
     expect(hoisted.appsflyer.resetAppsFlyerState).toHaveBeenCalled();
-    // discardPostHog must be called
     expect(hoisted.posthog.discardPostHog).toHaveBeenCalled();
-    // purgePostHogPersistence must be called
     expect(hoisted.posthogStorage.purgePostHogPersistence).toHaveBeenCalled();
 
     // SDK teardown calls must appear before any SecureStore delete.
@@ -1330,7 +1323,6 @@ describe('stale sign-in continuation', () => {
   /** Mount the provider with a consumer that re-captures the context on
    *  every render, and resolve the preload effect. getCtx reads the latest
    *  captured value so a test can assert post-operation state. */
-  // oxlint-disable-next-line require-await -- dynamic import is awaited
   async function mountStaleTest(): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;
@@ -2292,7 +2284,6 @@ describe('reactive auth epoch', () => {
 
   /** Mount the provider with a consumer that re-captures the context on every
    *  render, so the test can read the epoch after sign-in or sign-out moved it. */
-  // oxlint-disable-next-line require-await -- dynamic import is awaited
   async function mountEpochTest(withConnection = false): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;

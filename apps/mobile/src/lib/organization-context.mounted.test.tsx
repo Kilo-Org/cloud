@@ -186,22 +186,25 @@ describe('OrganizationProvider default organization', () => {
     expect(publications.some(value => value.loaded && value.id === null)).toBe(true);
   });
 
-  it('resolves to Personal while the list is paused offline, then applies the default when it arrives', async () => {
+  it('keeps the provider resolving while the offline list fetch is still running', async () => {
+    // The list read carries `SETTLE_WHILE_OFFLINE`, so a fetch the manager went
+    // offline during still runs and settles (answer or deadline failure); the
+    // provider waits for that settled snapshot instead of publishing Personal
+    // from a paused read.
     onlineManager.setOnline(false);
     const names = Promise.withResolvers<OrgEntry[]>();
     list.mockReturnValue(names.promise);
     await mount();
-    // A paused list may never fetch: waiting on it would leave the provider
-    // unresolved forever, so the app settles on Personal and stays usable.
-    await waitFor(() => scope().isLoaded);
-    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
-    // Back online the default still resolves from the list.
-    onlineManager.setOnline(true);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: false, error: null });
+    // The fetch settles by failing (the deadline/transport deadline path): the
+    // restore error is the only offline outcome the provider publishes.
     await act(() => {
-      names.resolve([orgA]);
+      names.reject(new Error('offline'));
     });
-    await waitFor(() => scope().organizationId === 'org-a');
-    expect(scope()).toMatchObject({ isLoaded: true, error: null });
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: 'restore' });
+    onlineManager.setOnline(true);
+    // Recovery through Retry is covered by the failure test above.
   });
 
   it('re-resolves the default through Retry after a list failure', async () => {

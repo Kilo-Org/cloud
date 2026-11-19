@@ -5,7 +5,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isDeniedByProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
@@ -109,31 +109,37 @@ export async function deniedAutoRoutingCandidates(
   return deniedModelIdsForCandidates(policy, uniqueCandidates, modelId => allowed.has(modelId));
 }
 
+/** `zdr` also denies every custom LLM; see `isDeniedByProviderPrivacy`. */
 async function dataCollectionRequiredCandidates(
   candidateIds: ReadonlyArray<string>,
-  dataCollectionRequiredModelIds: ReadonlySet<string>
+  dataCollectionRequiredModelIds: ReadonlySet<string>,
+  zdr: boolean
 ): Promise<string[]> {
+  const privacy = zdr ? { zdr } : { data_collection: 'deny' as const };
   const requiresDataCollection = await Promise.all(
     candidateIds.map(
       async modelId =>
         dataCollectionRequiredModelIds.has(modelId) ||
-        (await hasBestEffortGuessDataCollectionRequirement(modelId))
+        (await isDeniedByProviderPrivacy(modelId, privacy))
     )
   );
   return candidateIds.filter((_modelId, index) => requiresDataCollection[index]);
 }
 
 export async function dataCollectionRequiredAutoRoutingCandidates(
-  candidateIds: ReadonlyArray<string>
+  candidateIds: ReadonlyArray<string>,
+  { zdr = false }: { zdr?: boolean } = {}
 ): Promise<string[]> {
   return await dataCollectionRequiredCandidates(
     candidateIds,
-    await getDataCollectionRequiredModelIds()
+    await getDataCollectionRequiredModelIds(),
+    zdr
   );
 }
 
 export async function collectDataCollectionRequiredAutoRoutingModelIds(
-  router: AutoRouter
+  router: AutoRouter,
+  { zdr = false }: { zdr?: boolean } = {}
 ): Promise<string[]> {
   const [table, dataCollectionRequiredModelIds] = await Promise.all([
     getCachedRoutingTable(router),
@@ -141,7 +147,8 @@ export async function collectDataCollectionRequiredAutoRoutingModelIds(
   ]);
   return dataCollectionRequiredCandidates(
     candidateModelIdsFromTable(table),
-    dataCollectionRequiredModelIds
+    dataCollectionRequiredModelIds,
+    zdr
   );
 }
 

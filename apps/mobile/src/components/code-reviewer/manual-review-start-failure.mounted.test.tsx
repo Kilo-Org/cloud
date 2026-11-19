@@ -33,6 +33,12 @@ const startMutation = vi.hoisted(() => ({
 // may take the plan step a trial refusal offers.
 const orgState = vi.hoisted(() => ({ role: 'member' as string | undefined }));
 
+// The header's scope subtitle reads the membership list; this suite tests the
+// failure copy, so the subtitle is a fixed name for each kind of scope.
+vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
+  useReviewerScopeTitle: (scope: string) => (scope === 'personal' ? 'Personal' : 'Drain Labs'),
+}));
+
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility: vi.fn(), setAccessibilityFocus: vi.fn() },
   Platform: {
@@ -86,7 +92,10 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({}),
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));

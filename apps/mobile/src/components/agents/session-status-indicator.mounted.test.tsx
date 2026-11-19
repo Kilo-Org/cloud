@@ -141,6 +141,25 @@ describe('SessionStatusIndicator mounted', () => {
     expect(texts.join(' ')).not.toContain('Service Unavailable');
   });
 
+  // A transport drop the SDK recovers from on its own carries its own code, so
+  // the warning reads as a reconnect instead of a provider retry.
+  it('renders the reconnecting copy for the reconnecting warning code', async () => {
+    await expect(
+      textNodes({
+        type: 'warning',
+        message: 'Reconnecting…',
+        code: 'agent-connection-reconnecting',
+        timestamp: 0,
+      })
+    ).resolves.toEqual([en.agentChat.sessionConnection.reconnecting]);
+  });
+
+  it('keeps the retry copy for any other warning code', async () => {
+    await expect(
+      textNodes({ type: 'warning', message: 'Retrying…', code: 'generic-error', timestamp: 0 })
+    ).resolves.toEqual([en.agentChat.permissionCard.retrying]);
+  });
+
   // A coded progress line renders catalog copy; a code-less line (autocommit
   // event text) keeps the message the SDK forwarded.
   it('renders catalog copy for a coded progress line', async () => {

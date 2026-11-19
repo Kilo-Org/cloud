@@ -90,8 +90,10 @@ vi.mock('react-native', () => ({
     },
   },
   Pressable: 'Pressable',
+  StatusBar: { currentHeight: 0 },
   Text: 'Text',
   View: 'View',
+  useColorScheme: () => 'light',
   // Sheet registers the app-level Android Back listener while it is visible.
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Keyboard: { dismiss: keyboardDismissMock },

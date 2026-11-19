@@ -9,9 +9,6 @@ import { announceForA11y } from './announce';
 //     announces the text natively when it changes.
 //   - iOS: there is no live-region concept, so `useStatusAnnouncement`
 //     announces imperatively through `announceForA11y`.
-// `nextAnnouncement` dedupes the transition so a re-render with the same
-// message never re-announces, a cleared status stays silent, and a genuinely
-// new message is spoken exactly once.
 
 /**
  * Return the announcement to speak for the status transition `prev -> next`.

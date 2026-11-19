@@ -72,14 +72,18 @@ export type SessionLiveActivityBuildOptions = {
   previous?: Partial<SessionLiveActivityContentState> | undefined;
 };
 
-/** The larger of the stored and the new cost, so a local update never lowers it. */
+/**
+ * The larger of the new and the stored cost, so a local update never lowers
+ * it. The arguments take the order of `carried` below: the row's own value
+ * first and the remembered one second.
+ */
 function maxCost(
-  previous: number | null | undefined,
-  next: number | null | undefined
+  next: number | null | undefined,
+  previous: number | null | undefined
 ): number | null {
   if (next === null || next === undefined) return previous ?? null;
   if (previous === null || previous === undefined) return next;
-  return Math.max(previous, next);
+  return Math.max(next, previous);
 }
 
 /**
@@ -94,13 +98,19 @@ function carried<T>(value: T | undefined, previous: T | null | undefined): T | n
   return value === undefined ? (previous ?? null) : value;
 }
 
-/** How a finished session ended: the PR it opened, its diff, or nothing. */
+/**
+ * How a finished session ended: the PR it opened, its diff, or nothing. A row
+ * that states neither fact keeps the outcome the card already shows; an
+ * explicit `prOpened: false` is a stated fact, so it re-derives instead.
+ */
 function outcomeKind(
   row: SessionLiveActivityRow,
-  changes: SessionLiveChanges | null
+  changes: SessionLiveChanges | null,
+  previous: SessionLiveOutcomeKind | undefined
 ): SessionLiveOutcomeKind {
   if (row.outcome !== undefined) return row.outcome;
   if (row.prOpened === true) return 'pr_opened';
+  if (row.prOpened === undefined && previous !== undefined) return previous;
   return changes === null ? 'none' : 'changes';
 }
 
@@ -116,7 +126,12 @@ function outcomeKind(
  * - One absence policy covers every optional fact: a row that does not carry
  *   a fact omits it, and the card keeps the value it already shows. A tray row
  *   carries no step, plan, diff or outcome, so a local update must not wipe
- *   the ones a push delivered.
+ *   the ones a push delivered. The outcome follows that order: the row's own
+ *   outcome first, then an opened pull request, then the remembered outcome,
+ *   and the diff derivation last.
+ * - `prOpened: false` is a stated fact, not an absent one: it reports that no
+ *   pull request is open, so it does not carry the remembered outcome forward.
+ *   Only a row that omits `prOpened` entirely keeps it.
  * - `failure` is the one exception to that policy. A finished row with a
  *   failure reads as the `failed` kind, which the layout draws as a stopped
  *   turn. A row that carries `failure: null` reports no failure and clears the
@@ -161,8 +176,8 @@ export function buildSessionLiveActivityContentState(
       approvalKey === null ? null : sessionLiveText(command, SESSION_LIVE_COMMAND_LIMIT),
     changes,
     lastActivityAt: timestampToIso(row.lastActivityAt) ?? previous?.lastActivityAt ?? null,
-    costMicrodollars: maxCost(previous?.costMicrodollars, row.costMicrodollars),
-    outcome: finished ? { kind: outcomeKind(row, changes) } : null,
+    costMicrodollars: maxCost(row.costMicrodollars, previous?.costMicrodollars),
+    outcome: finished ? { kind: outcomeKind(row, changes, previous?.outcome?.kind) } : null,
     failure: failure === null || statusKind !== 'failed' ? null : { kind: failure },
     startedAt: timestampToIso(row.startedAt) ?? previous?.startedAt ?? null,
   };

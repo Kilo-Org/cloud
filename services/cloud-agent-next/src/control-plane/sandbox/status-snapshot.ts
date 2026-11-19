@@ -8,6 +8,7 @@
  */
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../../sandbox-containers/instance-size.js';
+import { PROVIDER_DESCRIPTORS } from '../../shared/sandbox-provider.js';
 import {
   getSandboxProviderLabel,
   type SandboxRuntimeMetadata,
@@ -66,7 +67,7 @@ export function projectAllocationStatusSnapshot(
     observedAt,
     inactivityTimeoutMs,
     estimatedSleepAt: null,
-    ...(allocation?.provider === 'cloudflare-containers' || allocation?.provider === 'vercel'
+    ...(allocation !== null && !PROVIDER_DESCRIPTORS[allocation.provider].retired
       ? { runtime: observedRuntime(allocation, runtimeIdentity) }
       : {}),
   };

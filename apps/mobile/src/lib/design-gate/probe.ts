@@ -56,6 +56,15 @@ type ProbeSource = Readonly<{
   route: () => string;
   screen: () => string;
   safeArea: () => Insets;
+  /**
+   * Installs the design gate's marker-gated LogBox filters (see
+   * `design-gate-probe.tsx`). The prepared receipt is written at the end of
+   * `+native-intent.tsx` and can be evaluated after the root layout's mount
+   * effect, so `ready()` and `dump()` call this first: LogBox re-filters the
+   * logs it already holds when a pattern is added, which removes a
+   * notification shown earlier. Idempotent — LogBox dedupes patterns.
+   */
+  ensureLogFilters?: () => void;
 }>;
 
 function environment(source: ProbeSource): ProbeEnv {
@@ -105,6 +114,9 @@ export function createDesignGateApi(source: ProbeSource): DesignGateApi {
     }
   };
   const snapshot = (): ProbeDump => {
+    // The receipt module can be evaluated after the root layout's mount
+    // effect skipped the ignore; LogBox re-filters logs it already holds.
+    source.ensureLogFilters?.();
     const document = source.document();
     return {
       version: 1,
@@ -114,7 +126,12 @@ export function createDesignGateApi(source: ProbeSource): DesignGateApi {
   };
   const sampler = createSampler(snapshot);
   return {
-    ready: () => source.document() !== null,
+    ready: () => {
+      // The runner calls `ready` before every capture; install the filters as
+      // early as the receipt allows (see `ensureLogFilters` on `ProbeSource`).
+      source.ensureLogFilters?.();
+      return source.document() !== null;
+    },
     dump: () => JSON.stringify(snapshot()),
     startSampling: (intervalMs, maxMs) => {
       // One in-app sample walks and serializes the whole document twice.

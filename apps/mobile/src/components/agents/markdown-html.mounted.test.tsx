@@ -95,6 +95,7 @@ vi.mock('@/components/ui/directional-icons', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
 }));
 vi.mock('./markdown-image', () => ({ MarkdownImage: 'MarkdownImage' }));
 vi.mock('./markdown-link-confirm', () => ({
@@ -109,6 +110,8 @@ const palette: MarkdownPalette = {
   textColor: '#111111',
   mutedTextColor: '#666666',
   codeBackground: '#eeeeee',
+  codeSurface: '#eeeeee',
+  diagramSurface: '#eeeeee',
   borderColor: '#cccccc',
 };
 
@@ -237,6 +240,14 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string {
 }
 
 describe('MarkdownHtml details', () => {
+  /** Republishes one HTML source through the mounted renderer, settled. */
+  async function republish(renderer: TestRenderer.ReactTestRenderer, html: string): Promise<void> {
+    await act(async () => {
+      renderer.update(createElement(MarkdownHtml, { html, palette, selectable: true }));
+      await Promise.resolve();
+    });
+  }
+
   it('starts collapsed and expands its body when the summary row is pressed', async () => {
     const renderer = await mountHtml(
       '<details><summary>More <b>info</b></summary><p>Hidden body</p></details>'
@@ -245,7 +256,7 @@ describe('MarkdownHtml details', () => {
 
     expect(row.props.accessibilityRole).toBe('button');
     expect(row.props.accessibilityState).toEqual({ expanded: false });
-    expect(renderer.root.findAllByType('DirectionalChevronRight' as never)).toHaveLength(1);
+    expect(renderer.root.findAllByType('ChevronDown' as never)).toHaveLength(1);
     expect(allText(renderer)).toContain('More info');
     expect(allText(renderer)).not.toContain('Hidden body');
 
@@ -257,7 +268,7 @@ describe('MarkdownHtml details', () => {
     expect(renderer.root.findByType('Pressable' as never).props.accessibilityState).toEqual({
       expanded: true,
     });
-    expect(renderer.root.findAllByType('ChevronDown' as never)).toHaveLength(1);
+    expect(renderer.root.findAllByType('ChevronUp' as never)).toHaveLength(1);
     expect(allText(renderer)).toContain('Hidden body');
   });
 
@@ -266,6 +277,46 @@ describe('MarkdownHtml details', () => {
 
     expect(allText(renderer)).toContain('common.details');
     expect(allText(renderer)).toContain('Visible body');
+  });
+
+  it('re-syncs the expanded state when the node\u2019s open attribute arrives in a streaming publish', async () => {
+    const renderer = await mountHtml(
+      '<details><summary>More</summary><p>Hidden body</p></details>'
+    );
+    const row = renderer.root.findByType('Pressable' as never);
+
+    expect(row.props.accessibilityState).toEqual({ expanded: false });
+    expect(allText(renderer)).not.toContain('Hidden body');
+
+    await republish(renderer, '<details open><summary>More</summary><p>Hidden body</p></details>');
+
+    expect(renderer.root.findByType('Pressable' as never).props.accessibilityState).toEqual({
+      expanded: true,
+    });
+    expect(allText(renderer)).toContain('Hidden body');
+  });
+
+  it('keeps a reader expansion across streaming publishes of the same source', async () => {
+    const renderer = await mountHtml(
+      '<details><summary>More</summary><p>Hidden body</p></details>'
+    );
+    const row = renderer.root.findByType('Pressable' as never);
+    await act(async () => {
+      (row.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(row.props.accessibilityState).toEqual({ expanded: true });
+
+    // A later publish re-parses the same source into a new node without the
+    // `open` attribute; the reader's own expansion is not the attribute's
+    // state, so it must survive.
+    await republish(renderer, '<details><summary>More</summary><p>Hidden body</p></details>');
+
+    expect(renderer.root.findByType('Pressable' as never).props.accessibilityState).toEqual({
+      expanded: true,
+    });
+    expect(allText(renderer)).toContain('Hidden body');
   });
 });
 

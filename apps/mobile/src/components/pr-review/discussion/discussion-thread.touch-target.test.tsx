@@ -105,11 +105,12 @@ describe('DiscussionThread resolve toggle touch target', () => {
     expect(resolveButton.props.hitSlop).toBeUndefined();
     expect(ICON_TARGET_DP).toBeGreaterThanOrEqual(48);
 
-    // The visible circle keeps its compact 28pt size inside the frame.
-    const circle = resolveButton.find(
-      node =>
-        typeof node.type === 'string' && String(node.props.className).includes('h-[28px] w-[28px]')
-    );
+    // The visible circle keeps its compact 28pt size inside the frame; one
+    // spacing step is 3.5pt at NativeWind's 14pt rem.
+    const circle = resolveButton.find(node => {
+      const match = /\bh-(\d+) w-(\d+)\b/.exec(String(node.props.className ?? ''));
+      return match !== null && match[1] === match[2] && Number(match[1]) * 3.5 === 28;
+    });
     expect(circle).toBeDefined();
 
     renderer.unmount();

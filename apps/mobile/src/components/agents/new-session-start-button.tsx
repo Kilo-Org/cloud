@@ -54,14 +54,13 @@ export function NewSessionStartButton({
   const { t } = useTranslation();
 
   const reason = (
-    <AccessibleStatus message={startBlockedReason} tone="status" className="mt-6 text-sm" />
+    <AccessibleStatus message={startBlockedReason} tone="status" className="text-sm" />
   );
   const action =
     startBlockedReason !== null && startBlockedAction !== null ? (
       <Button
         variant="outline"
         size="sm"
-        className="mt-3"
         onPress={() => {
           startBlockedAction.onPress();
         }}
@@ -84,13 +83,7 @@ export function NewSessionStartButton({
       <>
         {reason}
         {action}
-        <Button
-          size="lg"
-          className="mt-6"
-          disabled={isStartDisabled}
-          loading={isStarting}
-          onPress={onStartSession}
-        >
+        <Button size="lg" disabled={isStartDisabled} loading={isStarting} onPress={onStartSession}>
           <Text>{label}</Text>
         </Button>
       </>
@@ -101,13 +94,7 @@ export function NewSessionStartButton({
     <>
       {reason}
       {action}
-      <Button
-        size="lg"
-        className="mt-6"
-        disabled={isStartDisabled}
-        loading={isStarting}
-        onPress={onStartSession}
-      >
+      <Button size="lg" disabled={isStartDisabled} loading={isStarting} onPress={onStartSession}>
         <Text>{isStarting ? t('common.starting') : t('agentChat.newSession.startSession')}</Text>
       </Button>
     </>

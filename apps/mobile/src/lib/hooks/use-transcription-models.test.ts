@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 
 import { TELEMETRY_DESCRIPTION_KEY } from '@/lib/telemetry/error-sink';
 
+import { sortModelOptions } from './use-available-models';
 import { fetchTranscriptionModels } from './use-transcription-models';
 
 // Stub native/expo modules so pure-node Vitest can resolve the
@@ -91,6 +92,30 @@ describe('fetchTranscriptionModels', () => {
 
     expect(models.map(model => model.id)).toEqual(['a/first', 'a/second']);
     expect(models[0]?.isPreferred).toBe(true);
+  });
+
+  it('re-sorts the cached list on the handed language without a refetch', async () => {
+    // The picker reads a `sortModelOptions` re-run over the cached rows, not a
+    // refetch: the two catalog names below disagree between `en` and `cs`
+    // collation (Czech treats the "ch" digraph in Schematron as a letter after
+    // "h", so "Seed" moves ahead), which is the observable shape of the
+    // language-switch re-sort on the mounted picker.
+    fetchMock.mockResolvedValue(
+      Response.json({
+        data: [
+          { id: 'c/schematron', name: 'Schematron V2 Turbo' },
+          { id: 'c/seed', name: 'Seed 2.1 Turbo' },
+        ],
+      })
+    );
+
+    const models = await fetchTranscriptionModels();
+    expect(models.map(model => model.id)).toEqual(['c/schematron', 'c/seed']);
+
+    const sorted = sortModelOptions([...models], 'cs');
+    expect(sorted.map(model => model.id)).toEqual(['c/seed', 'c/schematron']);
+    // The cached list itself is untouched: the sort works on a copy.
+    expect(models.map(model => model.id)).toEqual(['c/schematron', 'c/seed']);
   });
 
   it('sends the auth token and the organization header only when set', async () => {

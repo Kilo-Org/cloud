@@ -3,9 +3,17 @@ import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 const mockReadDb = {
   select: jest.fn(),
 };
+const mockCaptureMessage = jest.fn();
 const limitMock = jest.fn<() => Promise<unknown>>();
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: mockReadDb }));
+// Partial: init composes `trpcMiddleware()` into `baseProcedure`, so the real
+// implementation must stay; only the capture functions are replaced.
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureMessage: mockCaptureMessage,
+  setTag: jest.fn(),
+}));
 
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type * as InitModule from './init';
@@ -95,5 +103,46 @@ describe('minimumVersionMiddleware', () => {
     await expect(ping(new Headers({ 'x-kilo-app-version': '1.0.5' }))).resolves.toBe('ok');
 
     expect(limitMock).not.toHaveBeenCalled();
+  });
+
+  test('serves a mobile caller when no minimum-version row is configured', async () => {
+    limitMock.mockResolvedValue([]);
+
+    await expect(ping(mobileHeaders('1.0.5'))).resolves.toBe('ok');
+    await expect(ping(mobileHeaders('1.0.5'))).resolves.toBe('ok');
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+  });
+
+  test('reports the missing row once per no-row cache window', async () => {
+    limitMock.mockResolvedValue([]);
+    const start = Date.now();
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(start);
+
+    try {
+      await ping(mobileHeaders('1.0.5'));
+      await ping(mobileHeaders('1.0.5'));
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+
+      nowSpy.mockReturnValue(start + 30_000);
+      await ping(mobileHeaders('1.0.5'));
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  test('still refuses an unparseable mobile version with the app-update verdict', async () => {
+    limitMock.mockResolvedValue([{ ios: '1.0.4', android: '1.0.5' }]);
+
+    const malformed = new Headers({
+      'x-kilo-client': 'mobile',
+      'x-kilo-app-platform': 'android',
+      'x-kilo-app-version': 'not-a-version',
+    });
+    const error = await ping(malformed).catch((caught: unknown) => caught);
+
+    expect(errorCode(error)).toBe('FORBIDDEN');
+    expect(upstreamCode(error)).toBe('app_update_required');
   });
 });

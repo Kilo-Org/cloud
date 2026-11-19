@@ -1,4 +1,4 @@
-import type { AssistantMessage } from '@/types/opencode.gen';
+import type { AssistantMessage } from '@/types/opencode';
 import type { Part, StoredMessage, TextPart, ToolPart } from '@/components/cloud-agent-next/types';
 import {
   groupAssistantParts,

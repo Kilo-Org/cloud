@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { ORGANIZATION_MODEL_AUDIENCES } from '@kilocode/app-shared/organizations';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { getPersonalModelList } from '@kilocode/web-shared/lib/ai-gateway/handlers/models';
 import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';

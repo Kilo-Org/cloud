@@ -7,12 +7,13 @@ import { Pressable, View } from 'react-native';
 import { BriefingScorecard } from './briefing-card';
 import { BriefingFilterControls } from './briefing-filter-controls';
 import { BriefingPeriodLabel } from './briefing-period-label';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
-import { Newspaper } from '@/components/ui/icons';
-import { RefreshControl } from '@/components/ui/refresh-control';
+import { Card } from '@/components/ui/card';
+import { IconButton } from '@/components/ui/icon-button';
+import { Newspaper, Settings } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -23,17 +24,20 @@ import {
   useBriefingPreferences,
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied } from '@/lib/agent-briefing-state';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useBriefingListFilters } from '@/lib/hooks/use-briefing-list-filters';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 
 export function BriefingListScreen() {
   const trpc = useTRPC();
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const access = useBriefingAccess();
   const offline = useOfflineBannerState();
   const { history, setHistory, organizationId, setOrganizationId } = useBriefingListFilters();
@@ -94,7 +98,6 @@ export function BriefingListScreen() {
     listEmpty && !emptySettingsAction
       ? t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')
       : undefined;
-  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
   let footer = <View className="h-8" />;
   if (query.isFetchNextPageError) {
     footer = (
@@ -108,7 +111,7 @@ export function BriefingListScreen() {
       </Button>
     );
   } else if (query.isFetchingNextPage) {
-    footer = <Skeleton className="mx-4 h-20 rounded-2xl" />;
+    footer = <Skeleton className="mx-4 h-20 rounded-xl" />;
   }
   return (
     <View className="flex-1 bg-background">
@@ -118,115 +121,121 @@ export function BriefingListScreen() {
         backFallback={'/(app)/(tabs)/(0_home)' as Href}
         headerRight={
           emptySettingsAction ? undefined : (
-            <Button
-              variant="ghost"
-              size="sm"
+            <IconButton
+              accessibilityLabel={t('agentBriefing.settings')}
               onPress={() => {
                 router.push(`${BRIEFING_PATH}/settings` as Href);
               }}
             >
-              <Text>{t('agentBriefing.settings')}</Text>
-            </Button>
+              <Settings size={20} color={colors.mutedForeground} />
+            </IconButton>
           )
         }
       />
-      <View className="gap-3 px-4 pb-3">
-        <BriefingFilterControls
-          history={history}
-          onSelectHistory={setHistory}
-          organizationId={organizationId}
-          organizations={memberships.data?.filter(org => access.canRead(org.organizationId)) ?? []}
-          onSelectOrganization={setOrganizationId}
-        />
-        {/* The empty state carries the hint when it prints one, so the same
-            sentence is not shown twice on one screen. */}
-        {emptyDescription === undefined ? (
-          <Text className="text-xs text-muted-foreground">
-            {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.allContexts')}
-          </Text>
-        ) : null}
-        {offline || (query.isError && reports.length > 0) ? (
-          <Text className="text-xs text-muted-foreground">
-            {t(offline ? 'agentBriefing.offline' : 'agentBriefing.cached')}
-          </Text>
-        ) : null}
-      </View>
-      {loading && (
-        <View className="gap-4 px-4">
-          <Skeleton className="h-48 rounded-2xl" />
-          <Skeleton className="h-48 rounded-2xl" />
+      <View className="flex-1" style={sideInsetStyle}>
+        <View className="gap-3 px-4 pt-3 pb-3">
+          <BriefingFilterControls
+            history={history}
+            onSelectHistory={setHistory}
+            organizationId={organizationId}
+            organizations={
+              memberships.data?.filter(org => access.canRead(org.organizationId)) ?? []
+            }
+            onSelectOrganization={setOrganizationId}
+          />
+          {/* The empty state carries the hint when it prints one, so the same
+              sentence is not shown twice on one screen. */}
+          {emptyDescription === undefined ? (
+            <Text variant="caption">
+              {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.allContexts')}
+            </Text>
+          ) : null}
+          {offline || (query.isError && reports.length > 0) ? (
+            <Text variant="caption">
+              {t(offline ? 'agentBriefing.offline' : 'agentBriefing.cached')}
+            </Text>
+          ) : null}
         </View>
-      )}
-      {failure && (
-        <QueryError
-          title={t('agentBriefing.loadError')}
-          onRetry={() => {
-            void query.refetch();
-          }}
-        />
-      )}
-      {/* The empty state owns the body so the shared centered form measures the
-          band the header and the filters leave, instead of sitting at the top
-          of a list that has nothing to scroll. */}
-      {listEmpty && (
-        <EmptyState
-          icon={Newspaper}
-          title={t(emptyLabel)}
-          description={emptyDescription}
-          refreshControl={refreshControl}
-          action={
-            emptySettingsAction ? (
-              <Button
-                className={STATE_ACTION_CLASS}
-                variant="outline"
+        {loading && (
+          <View className="gap-3 px-4">
+            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-48 rounded-xl" />
+          </View>
+        )}
+        {failure && (
+          <QueryError
+            title={t('agentBriefing.loadError')}
+            onRetry={() => {
+              void query.refetch();
+            }}
+          />
+        )}
+        {/* The empty state rides in the list so it sits under the controls it
+            follows and keeps the list's pull-to-refresh gesture. */}
+        {!loading && !failure && (
+          <FlashList
+            data={reports}
+            keyExtractor={report => report.id}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            ListEmptyComponent={
+              <EmptyState
+                placement="top"
+                inset="gutter"
+                icon={Newspaper}
+                title={t(emptyLabel)}
+                description={emptyDescription}
+                action={
+                  emptySettingsAction ? (
+                    <StateAction
+                      label={t('agentBriefing.settings')}
+                      icon={Settings}
+                      onPress={() => {
+                        router.push(`${BRIEFING_PATH}/settings` as Href);
+                      }}
+                    />
+                  ) : undefined
+                }
+              />
+            }
+            onEndReached={() => {
+              // Once the next page has failed, auto-loading re-fires on every
+              // content-size change (the footer grows/shrinks as the fetch flips
+              // between loading and error), so the retry footer never settles.
+              // Leave recovery to the retry tap until a fetch succeeds.
+              if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) {
+                void query.fetchNextPage();
+              }
+            }}
+            renderItem={({ item }) => (
+              <Pressable
+                className="px-4 pb-3 active:opacity-70"
+                accessibilityRole="button"
                 onPress={() => {
-                  router.push(`${BRIEFING_PATH}/settings` as Href);
+                  router.push(`${BRIEFING_PATH}/${item.id}` as Href);
                 }}
               >
-                <Text>{t('agentBriefing.settings')}</Text>
-              </Button>
-            ) : undefined
-          }
-        />
-      )}
-      {!loading && !failure && reports.length > 0 && (
-        <FlashList
-          data={reports}
-          keyExtractor={report => report.id}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          onEndReached={() => {
-            // Once the next page has failed, auto-loading re-fires on every
-            // content-size change (the footer grows/shrinks as the fetch flips
-            // between loading and error), so the retry footer never settles.
-            // Leave recovery to the retry tap until a fetch succeeds.
-            if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) {
-              void query.fetchNextPage();
-            }
-          }}
-          renderItem={({ item }) => (
-            <Pressable
-              className="mx-4 mb-3 overflow-hidden rounded-2xl border border-border bg-card active:opacity-70"
-              accessibilityRole="button"
-              onPress={() => {
-                router.push(`${BRIEFING_PATH}/${item.id}` as Href);
-              }}
-            >
-              <View className="gap-1 px-4 pt-3">
-                <Text>
-                  {item.context.organizationId === null ? t('common.personal') : item.context.name}
-                </Text>
-                <BriefingPeriodLabel report={item} />
-                {item.dismissedAt || dismissals.data?.some(entry => entry.reportId === item.id) ? (
-                  <Text className="text-xs text-muted-foreground">{t('common.dismissed')}</Text>
-                ) : null}
-              </View>
-              <BriefingScorecard report={item} />
-            </Pressable>
-          )}
-          ListFooterComponent={footer}
-        />
-      )}
+                <Card>
+                  <View className="gap-1">
+                    <Text>
+                      {item.context.organizationId === null
+                        ? t('common.personal')
+                        : item.context.name}
+                    </Text>
+                    <BriefingPeriodLabel report={item} />
+                    {item.dismissedAt ||
+                    dismissals.data?.some(entry => entry.reportId === item.id) ? (
+                      <Text variant="caption">{t('common.dismissed')}</Text>
+                    ) : null}
+                  </View>
+                  <BriefingScorecard report={item} />
+                </Card>
+              </Pressable>
+            )}
+            ListFooterComponent={footer}
+          />
+        )}
+      </View>
     </View>
   );
 }

@@ -1,7 +1,7 @@
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   buildAutoModelCatalogEntry,
   getEnhancedOpenRouterModels,

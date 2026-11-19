@@ -24,9 +24,9 @@ import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
-import { GitBranch } from '@/components/ui/icons';
-import { Text } from '@/components/ui/text';
+import { GitBranch, Plus } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui/icon-button';
+import { RowGroup } from '@/components/ui/row-group';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import {
@@ -34,6 +34,8 @@ import {
   useRepoBindings,
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
 import { type ProfileExternalOpener } from '@/lib/profile-route-stack';
 
@@ -69,6 +71,7 @@ export function RepoBindingsScreen({
 }>) {
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const bindingsQuery = useRepoBindings(organizationId);
   const { bind, unbind } = useRepoBindingMutations(organizationId);
   const profileList = useAgentProfileList(organizationId);
@@ -176,97 +179,113 @@ export function RepoBindingsScreen({
     toast.success(t('profiles.repoBindings.removedToast', { repo: repoFullName }));
   };
 
+  const isEmpty =
+    !bindingsQuery.isError && !bindingsQuery.isLoading && bindingsQuery.bindings.length === 0;
+  // An empty list with no form open is the whole surface: its own state carries
+  // the Add action, and a member's state says why it has none instead of a
+  // second sentence under the copy.
+  const emptySurface = isEmpty && !isAdding;
+  // A read-only viewer is told the rule instead of an action the screen withholds.
+  const readOnlyDescription =
+    profilePermission === 'read-only' ? t('profiles.organizationRoleRequired') : undefined;
+
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.repoBindings.title')} backFallback={backFallback} />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {bindingsQuery.isError ? (
-          <QueryError
-            variant="server"
-            placement="top"
-            title={t('profiles.loadFailed')}
-            onRetry={() => void bindingsQuery.refetch()}
-            isRetrying={bindingsQuery.isRefetching}
-          />
-        ) : null}
-
-        {!bindingsQuery.isError && bindingsQuery.isLoading ? <RepoBindingsSkeleton /> : null}
-
-        {!bindingsQuery.isError &&
-        !bindingsQuery.isLoading &&
-        bindingsQuery.bindings.length === 0 ? (
-          <EmptyState
-            icon={GitBranch}
-            title={t('profiles.repoBindings.empty')}
-            // The empty state must not name an action the screen withholds: a
-            // member cannot add a default, so it states only the rule.
-            description={canManage ? t('profiles.repoBindings.emptyDescription') : null}
-            placement="top"
-          />
-        ) : null}
-
-        {!bindingsQuery.isError && !bindingsQuery.isLoading && bindingsQuery.bindings.length > 0 ? (
-          <View className="gap-2">
-            {bindingsQuery.bindings.map(binding => (
-              <RepoBindingRow
-                key={`${binding.platform}:${binding.repoFullName}`}
-                repoFullName={binding.repoFullName}
-                platform={binding.platform}
-                profileName={binding.profileName}
-                isRemoving={unbind.isPending}
-                {...(canManage
-                  ? {
-                      onRemove: () =>
-                        void handleUnbind(
-                          binding.repoFullName,
-                          binding.platform as RepoBindingPlatform
-                        ),
-                    }
-                  : {})}
-              />
-            ))}
-          </View>
-        ) : null}
-
-        {/* The Add form and its trigger are one action, so they share the slot:
-            a member sees the sentence where the trigger would be, and a manager
-            sees the same place. */}
-        <ProfileManageSlot permission={profilePermission}>
-          {isAdding ? (
-            <RepoBindingsAddForm
-              chosenRepo={chosenRepo}
-              chosenProfile={chosenProfile}
-              isPending={bind.isPending}
-              canAdd={canAdd}
-              onPickRepo={() => {
-                setRepoPickerOpen(true);
-              }}
-              onPickProfile={() => {
-                setProfilePickerOpen(true);
-              }}
-              onCancel={resetAdd}
-              onAdd={() => {
-                void handleAdd();
-              }}
-            />
-          ) : (
-            <Button
+      <ScreenHeader
+        title={t('profiles.repoBindings.title')}
+        backFallback={backFallback}
+        headerRight={
+          canManage ? (
+            <IconButton
               accessibilityLabel={t('profiles.repoBindings.add')}
               onPress={() => {
                 setIsAdding(true);
               }}
             >
-              <Text>{t('profiles.repoBindings.add')}</Text>
-            </Button>
-          )}
-        </ProfileManageSlot>
-      </TabScreenScrollView>
+              <Plus size={22} color={colors.foreground} />
+            </IconButton>
+          ) : undefined
+        }
+      />
+      {emptySurface ? (
+        <EmptyState
+          icon={GitBranch}
+          title={t('profiles.repoBindings.empty')}
+          // The empty state must not name an action the screen withholds: a
+          // member cannot add a default, so its state names the role instead.
+          description={
+            canManage ? t('profiles.repoBindings.emptyDescription') : readOnlyDescription
+          }
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {bindingsQuery.isError ? (
+            <QueryError
+              variant="server"
+              placement="top"
+              title={t('profiles.loadFailed')}
+              onRetry={() => void bindingsQuery.refetch()}
+              isRetrying={bindingsQuery.isRefetching}
+            />
+          ) : null}
+
+          {!bindingsQuery.isError && bindingsQuery.isLoading ? <RepoBindingsSkeleton /> : null}
+
+          {!bindingsQuery.isError &&
+          !bindingsQuery.isLoading &&
+          bindingsQuery.bindings.length > 0 ? (
+            <RowGroup leadingTile>
+              {bindingsQuery.bindings.map(binding => (
+                <RepoBindingRow
+                  key={`${binding.platform}:${binding.repoFullName}`}
+                  repoFullName={binding.repoFullName}
+                  platform={binding.platform}
+                  profileName={binding.profileName}
+                  isRemoving={unbind.isPending}
+                  {...(canManage
+                    ? {
+                        onRemove: () =>
+                          void handleUnbind(
+                            binding.repoFullName,
+                            binding.platform as RepoBindingPlatform
+                          ),
+                      }
+                    : {})}
+                />
+              ))}
+            </RowGroup>
+          ) : null}
+
+          {/* The form opens from the header's create control, so the slot holds
+              the form or the sentence that names who may add one. */}
+          <ProfileManageSlot permission={profilePermission}>
+            {isAdding ? (
+              <RepoBindingsAddForm
+                chosenRepo={chosenRepo}
+                chosenProfile={chosenProfile}
+                isPending={bind.isPending}
+                canAdd={canAdd}
+                onPickRepo={() => {
+                  setRepoPickerOpen(true);
+                }}
+                onPickProfile={() => {
+                  setProfilePickerOpen(true);
+                }}
+                onCancel={resetAdd}
+                onAdd={() => {
+                  void handleAdd();
+                }}
+              />
+            ) : null}
+          </ProfileManageSlot>
+        </TabScreenScrollView>
+      )}
 
       {repoPickerOpen ? (
         <RepoPickerSheet

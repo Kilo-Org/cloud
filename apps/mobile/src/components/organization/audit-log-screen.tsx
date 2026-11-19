@@ -12,6 +12,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ChevronDown, ChevronUp, ScrollText } from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,13 +26,13 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { parseTimestamp } from '@/lib/utils';
 
-// FlashList takes `contentContainerStyle` (no className), so the skeleton's and
-// the empty and footer blocks' `px-6 pt-4` inset is spelled in pixels here.
-// NativeWind's native rem is 14, which makes px-6 21 dp and pt-4 14 dp; 24/16 is
-// the web rem and leaves the rows 3 dp inside those blocks. The tab
-// bar's own bottom padding rides on the footer, which `gap` would not cover.
+// The cards carry the page gutter themselves. The tab bar's own bottom padding
+// rides on the footer, which `gap` would not cover, and the body's top pad sits
+// on a header component because a FlashList cannot take a class on its content
+// container.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { paddingHorizontal: 21, paddingTop: 14 } satisfies ViewStyle;
+
+const ListTopPad = () => <View className="pt-3" />;
 
 const AUDIT_DATE = { year: 'numeric', month: 'short', day: 'numeric' } as const;
 
@@ -39,10 +40,10 @@ const RowSeparator = () => <View className="h-3" />;
 
 function RowSkeleton() {
   return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
+    <Card className="mx-4">
       <Skeleton className="h-4 w-3/4 rounded bg-muted-soft" />
       <Skeleton className="h-3 w-1/3 rounded bg-muted-soft" />
-    </View>
+    </Card>
   );
 }
 
@@ -81,12 +82,12 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
           // RN defaults `flexShrink` to 0; `min-w-0 shrink` lets the long
           // repeated email give up width and truncate instead of pushing the
           // time off the line.
-          <Text className="min-w-0 shrink text-xs text-muted-foreground" numberOfLines={1}>
+          <Text variant="caption" className="min-w-0 shrink" numberOfLines={1}>
             {actor}
           </Text>
         ) : null}
         {time ? (
-          <Text className="shrink-0 text-xs text-muted-foreground" numberOfLines={1}>
+          <Text variant="caption" className="shrink-0" numberOfLines={1}>
             {time}
           </Text>
         ) : null}
@@ -94,10 +95,10 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
     ) : null;
   if (!showsDetail) {
     return (
-      <View className="gap-1 rounded-lg bg-secondary p-3">
+      <Card className="mx-4">
         <Text className="text-sm font-medium text-foreground">{eventName}</Text>
         {metaLine}
-      </View>
+      </Card>
     );
   }
   // The message runs past two lines for most events, and nothing else in the
@@ -118,20 +119,22 @@ const AuditLogRow = memo(function AuditLogRow({ entry }: Readonly<{ entry: OrgAu
         .filter(Boolean)
         .join('. ')}
       accessibilityState={{ expanded }}
-      className="gap-1 rounded-lg bg-secondary p-3 active:opacity-70"
+      className="mx-4 active:opacity-70"
     >
-      <View className="flex-row items-center gap-2">
-        {expanded ? (
-          <ChevronUp size={16} color={colors.mutedForeground} />
-        ) : (
-          <ChevronDown size={16} color={colors.mutedForeground} />
-        )}
-        <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
-      </View>
-      <Text className="text-xs text-muted-foreground" numberOfLines={expanded ? undefined : 2}>
-        {entry.message}
-      </Text>
-      {metaLine}
+      <Card>
+        <View className="flex-row items-center gap-2">
+          {expanded ? (
+            <ChevronUp size={16} color={colors.mutedForeground} />
+          ) : (
+            <ChevronDown size={16} color={colors.mutedForeground} />
+          )}
+          <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{eventName}</Text>
+        </View>
+        <Text variant="caption" numberOfLines={expanded ? undefined : 2}>
+          {entry.message}
+        </Text>
+        {metaLine}
+      </Card>
     </Pressable>
   );
 });
@@ -182,7 +185,10 @@ export function OrganizationAuditLogScreen() {
           title={t('organization.auditLog.title')}
           backFallback={ORGANIZATION_HUB_PATH}
         />
-        <PermissionDenied description={t('organization.auditLog.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.auditLog.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }
@@ -196,7 +202,7 @@ export function OrganizationAuditLogScreen() {
   let body: ReactNode = null;
   if (query.isPending) {
     body = (
-      <View className="gap-3 px-6 pt-4">
+      <View className="gap-3 pt-3">
         <RowSkeleton />
         <RowSkeleton />
         <RowSkeleton />
@@ -217,8 +223,8 @@ export function OrganizationAuditLogScreen() {
     const footer = (
       <View className="pt-3">
         {hasMore && !isLaterPageError ? (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('organization.auditLog.truncated')}
             </Text>
             <Button
@@ -233,8 +239,8 @@ export function OrganizationAuditLogScreen() {
           </View>
         ) : null}
         {isLaterPageError ? (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('common.couldnTLoadMore')}
             </Text>
             <Button
@@ -260,7 +266,7 @@ export function OrganizationAuditLogScreen() {
         renderItem={renderItem}
         getItemType={() => 'auditLog'}
         ItemSeparatorComponent={RowSeparator}
-        contentContainerStyle={listContentContainerStyle}
+        ListHeaderComponent={<ListTopPad />}
         refreshControl={refreshControl}
         ListFooterComponent={footer}
       />

@@ -192,6 +192,8 @@ function detectMessagesSseErrors(
   const toolSchemaByName = new Map<string, unknown>();
   const knownToolNames = new Set<string>();
   for (const tool of tools ?? []) {
+    // Toolsets (browser, computer) have no name of their own
+    if (!('name' in tool)) continue;
     knownToolNames.add(tool.name);
     // Anthropic.Tool has input_schema; server tools (BashTool, TextEditorTool, etc.) do not
     if ('input_schema' in tool) {

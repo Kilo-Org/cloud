@@ -6,10 +6,10 @@ import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Bot, History } from '@/components/ui/icons';
+import { Bot, History, SlidersHorizontal, X } from '@/components/ui/icons';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
@@ -29,7 +29,7 @@ import { useLiveSessionQuery } from '@/components/agents/use-live-session-query'
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { SessionListFab } from '@/components/agents/session-list-fab';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
-import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import { FAB_MARGIN, FAB_SIZE } from '@/components/ui/fab';
 import {
   useAgentsBottomBands,
   useSessionListInsets,
@@ -38,11 +38,10 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
 import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
-import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { IconButton } from '@/components/ui/icon-button';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { STATE_ACTION_CLASS, textActionTargetClass } from '@/lib/a11y/tap-target';
+import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { holdSessionListTouch } from '@/lib/session-list-touch-gate';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
@@ -371,26 +370,20 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const noMatchActions = (
     <View className="flex-row flex-wrap items-center justify-center gap-2">
       {isSearching ? (
-        <Button
-          variant="outline"
-          size={compactEmptyState ? 'sm' : 'default'}
+        <StateAction
+          label={t('common.clearSearch')}
+          icon={X}
           testID="agents-clear-search"
           onPress={clearNoMatchSearch}
-          className={STATE_ACTION_CLASS}
-        >
-          <Text>{t('common.clearSearch')}</Text>
-        </Button>
+        />
       ) : null}
       {filtersNarrow ? (
-        <Button
-          variant="outline"
-          size={compactEmptyState ? 'sm' : 'default'}
+        <StateAction
+          label={t('common.clearFilters')}
+          icon={SlidersHorizontal}
           testID="agents-clear-filters"
           onPress={clearNoMatchFilters}
-          className={STATE_ACTION_CLASS}
-        >
-          <Text>{t('common.clearFilters')}</Text>
-        </Button>
+        />
       ) : null}
     </View>
   );
@@ -526,7 +519,6 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
               showSearchBusy={false}
               onChangeText={query.handleSearchChange}
               defaultValue={query.searchQuery}
-              compact
               onClearSearch={query.handleClearSearch}
               onFocus={keyboard.handleInputFocus}
               onBlur={keyboard.handleInputBlur}

@@ -56,7 +56,7 @@ export function RepositorySyncFooter({
           // into the count itself. The 44dp reach comes from the box plus its
           // slop, and the minimum width keeps a short label from shrinking the
           // target in another language.
-          className={cn(LINE_ACTION_BOX_CLASS, 'min-w-[36px] px-0')}
+          className={cn(LINE_ACTION_BOX_CLASS, 'min-w-10 px-0')}
           hitSlop={LINE_ACTION_HIT_SLOP}
           loading={refreshing}
           disabled={refreshing}

@@ -10,7 +10,7 @@ import { announceForA11y } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
-import { useScreenInsets } from '@/lib/screen-insets';
+import { useScreenInsets, useStyleSideInsets } from '@/lib/screen-insets';
 
 /**
  * Publishes the banner's visibility to every pinned `ScreenHeader`. Mounted by
@@ -31,7 +31,8 @@ export function OfflineBannerSpaceGate({ children }: Readonly<{ children: ReactN
  */
 export function OfflineBanner() {
   const isOffline = useOfflineBannerState();
-  const insets = useScreenInsets();
+  const { top } = useScreenInsets();
+  const { left, right } = useStyleSideInsets();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const prevRef = useRef<boolean | null>(null);
@@ -54,22 +55,20 @@ export function OfflineBanner() {
   return (
     // Dynamic safe-area values cannot be Tailwind classes; same inline-style
     // exception as `ScreenHeader` (style={{ paddingTop }}).
-    <View
-      pointerEvents="none"
-      className="absolute inset-x-0"
-      style={{ top: insets.top, left: insets.left, right: insets.right }}
-    >
+    <View pointerEvents="none" className="absolute inset-x-0" style={{ top, left, right }}>
       <Animated.View
         entering={FadeIn.duration(200)}
         exiting={FadeOut.duration(150)}
         accessible
         accessibilityRole="alert"
         accessibilityLabel={t('offline.noInternet')}
-        className="flex-row items-center justify-center gap-2 bg-warn px-4"
+        className="flex-row items-center justify-center gap-2 bg-warn-solid px-4"
         style={{ height: OFFLINE_BANNER_HEIGHT }}
       >
-        <WifiOff size={14} color={colors.warnForeground} />
-        <Text className="text-sm font-medium text-warn-foreground">{t('offline.noInternet')}</Text>
+        <WifiOff size={14} color={colors.warnSolidForeground} />
+        <Text className="text-sm font-medium text-warn-solid-foreground">
+          {t('offline.noInternet')}
+        </Text>
       </Animated.View>
     </View>
   );

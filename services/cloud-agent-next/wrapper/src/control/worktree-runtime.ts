@@ -21,7 +21,7 @@ import {
 import {
   CLOUD_WEB_SEARCH_DISABLED_ENV,
   CLOUD_WEB_SEARCH_PROVIDER_ENV,
-  CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  RESERVED_ENV_VARS,
   RESERVED_ENV_VAR_PREFIXES,
   SYSTEM_GIT_CONFIG_ENV,
   isStrippedGitConfigEnvVar,
@@ -113,11 +113,11 @@ export function buildWorktreeKiloEnvironment(
   }
 ): Record<string, string> {
   const env: Record<string, string> = {};
-  const reserved = new Set<string>(CONTROL_RUNTIME_RESERVED_ENV_VARS);
+  // The platform sets the control-runtime and session-identity names, and
+  // supplies its own HOME and XDG paths below.
+  const reserved = new Set<string>(RESERVED_ENV_VARS);
   const isRuntimeOwned = (name: string): boolean =>
-    reserved.has(name) ||
-    name === 'HOME' ||
-    RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
+    reserved.has(name) || RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
 
   for (const [name, value] of Object.entries(inherited)) {
     if (
@@ -130,8 +130,10 @@ export function buildWorktreeKiloEnvironment(
     }
   }
   for (const [name, value] of Object.entries(environment)) {
+    const runtimeOwned =
+      reserved.has(name) || RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
     if (
-      (!isRuntimeOwned(name) || BITBUCKET_METADATA_ENV_VARS.has(name)) &&
+      (!runtimeOwned || BITBUCKET_METADATA_ENV_VARS.has(name)) &&
       !isStrippedGitConfigEnvVar(name)
     ) {
       env[name] = value;

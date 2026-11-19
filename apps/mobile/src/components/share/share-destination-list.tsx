@@ -1,5 +1,5 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { Search, Share2, Terminal } from '@/components/ui/icons';
+import { Share2, Terminal } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -8,15 +8,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { CenteredState } from '@/components/centered-state';
-import { DestinationOptionRow } from '@/components/destination-option-row';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { ConfigureRow } from '@/components/ui/configure-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -33,8 +33,6 @@ type ShareDestinationListProps = {
   destinations: readonly ShareDestinationRow[];
   onSelect: (row: ShareDestinationRow) => void;
   onRetry: () => void;
-  /** The stale share's only way out: close the sheet and drop its staged id. */
-  onDismiss: () => void;
   instances: readonly ShareCliSpawnRow[];
   spawningConnectionId: string | null;
   instanceRowsDisabled: boolean;
@@ -42,35 +40,11 @@ type ShareDestinationListProps = {
   onSpawnInstance: (row: ShareCliSpawnRow) => void;
 };
 
-function DestinationSearch({ onChange }: { onChange: (next: string) => void }) {
-  const colors = useThemeColors();
-  const { t } = useTranslation();
-  return (
-    <View className="mx-4 mb-3 mt-1 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-      <Search size={18} color={colors.mutedForeground} />
-      <Input
-        placeholder={t('share.searchPlaceholder')}
-        placeholderTextColor={colors.mutedForeground}
-        autoCapitalize="none"
-        autoCorrect={false}
-        clearButtonMode="while-editing"
-        returnKeyType="search"
-        className="flex-1 pl-0 pr-0 text-base text-foreground"
-        style={{ color: colors.foreground }}
-        onChangeText={onChange}
-        accessibilityLabel={t('share.searchPlaceholder')}
-      />
-    </View>
-  );
-}
-
 function SkeletonRows() {
   return (
     <View>
       {Array.from({ length: SKELETON_COUNT }, (_, i) => (
-        <View key={i} className="py-1.5">
-          <Skeleton className="mx-[22px] h-[76px] rounded-none" />
-        </View>
+        <RowSkeleton key={i} variant="session" subtitle last={i === SKELETON_COUNT - 1} />
       ))}
     </View>
   );
@@ -78,7 +52,7 @@ function SkeletonRows() {
 
 function EmptyMessage({ message }: { message: string }) {
   return (
-    <View className="items-center px-6 pt-8">
+    <View className="items-center px-4 pt-3">
       <Text className="text-center text-sm text-muted-foreground">{message}</Text>
     </View>
   );
@@ -96,6 +70,7 @@ function CliInstanceRows({
   onSpawnInstance: (row: ShareCliSpawnRow) => void;
 }) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   return (
     <View>
       <SessionListSectionHeader
@@ -107,20 +82,29 @@ function CliInstanceRows({
           displayCount: formatNumber(instances.length, i18n.language),
         })}
       />
-      {instances.map(row => (
-        <DestinationOptionRow
-          key={row.connectionId}
-          icon={Terminal}
-          title={row.name}
-          subtitle={row.projectName}
-          accessibilityLabel={t('share.newSessionOn', { name: row.name })}
-          disabled={instanceRowsDisabled}
-          busy={spawningConnectionId === row.connectionId}
-          onPress={() => {
-            onSpawnInstance(row);
-          }}
-        />
-      ))}
+      <View className="px-4 pt-3">
+        <RowGroup leadingTile>
+          {instances.map(row => (
+            <ConfigureRow
+              key={row.connectionId}
+              icon={Terminal}
+              title={row.name}
+              subtitle={row.projectName}
+              variant="action"
+              disabled={instanceRowsDisabled}
+              accessibilityLabel={t('share.newSessionOn', { name: row.name })}
+              trailing={
+                spawningConnectionId === row.connectionId ? (
+                  <ActivityIndicator size="small" color={colors.mutedForeground} />
+                ) : undefined
+              }
+              onPress={() => {
+                onSpawnInstance(row);
+              }}
+            />
+          ))}
+        </RowGroup>
+      </View>
     </View>
   );
 }
@@ -131,7 +115,6 @@ export function ShareDestinationList({
   destinations,
   onSelect,
   onRetry,
-  onDismiss,
   instances,
   spawningConnectionId,
   instanceRowsDisabled,
@@ -195,27 +178,19 @@ export function ShareDestinationList({
   let body: ReactNode = null;
 
   if (state.kind === 'stale-share') {
+    // The sheet's header already closes it, so the state repeats no Close
+    // action of its own.
     body = (
       <EmptyState
         className="bg-background"
         icon={Share2}
         title={t('share.staleTitle')}
         description={state.message}
-        action={
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
-            onPress={onDismiss}
-            accessibilityLabel={t('common.close')}
-          >
-            <Text>{t('common.close')}</Text>
-          </Button>
-        }
       />
     );
   } else if (state.kind === 'non-retryable-classification') {
     body = (
-      <CenteredState className="bg-background" contentContainerClassName="px-6">
+      <CenteredState className="bg-background" contentContainerClassName="px-4">
         <Text className="text-center text-sm text-muted-foreground">{state.message}</Text>
       </CenteredState>
     );
@@ -226,7 +201,7 @@ export function ShareDestinationList({
     (state.kind === 'empty' || (state.kind === 'happy' && filtered.length === 0))
   ) {
     body = (
-      <CenteredState className="bg-background" contentContainerClassName="px-6">
+      <CenteredState className="bg-background" contentContainerClassName="px-4">
         <Text className="text-center text-sm text-muted-foreground">
           {state.kind === 'empty' ? state.message : t('share.noMatchingSessions')}
         </Text>
@@ -237,7 +212,9 @@ export function ShareDestinationList({
     if (state.kind === 'loading') {
       emptyContent = <SkeletonRows />;
     } else if (state.kind === 'retryable') {
-      emptyContent = <QueryError message={state.message} onRetry={onRetry} placement="top" />;
+      emptyContent = (
+        <QueryError message={state.message} onRetry={onRetry} placement="top" inset="gutter" />
+      );
     } else if (state.kind === 'empty') {
       emptyContent = <EmptyMessage message={state.message} />;
     } else if (search.trim()) {
@@ -274,7 +251,14 @@ export function ShareDestinationList({
     <>
       <View collapsable={false} className="bg-background">
         {headerContent}
-        {showSearch ? <DestinationSearch onChange={setSearch} /> : null}
+        {showSearch ? (
+          <SearchField
+            className="mx-4 mb-3 mt-1"
+            placeholder={t('share.searchPlaceholder')}
+            hasText={search !== ''}
+            onChangeText={setSearch}
+          />
+        ) : null}
       </View>
       {body}
     </>

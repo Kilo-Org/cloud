@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { ShieldAlert } from '@/components/ui/icons';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import { useKeyedSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import {
@@ -78,7 +78,7 @@ export function OrphanedFindingsCard({
 
   return (
     <>
-      <View className="mt-4 gap-2 rounded-lg bg-warn-tile-bg p-4">
+      <View className="gap-3 rounded-xl bg-warn-tile-bg p-4">
         <View className="flex-row items-center gap-2">
           <ShieldAlert size={16} color={colors.foreground} />
           <Text className="flex-1 text-sm font-medium">
@@ -88,12 +88,15 @@ export function OrphanedFindingsCard({
         <Text variant="muted" className="text-xs">
           {t('securityAgent.orphanedFindings.description')}
         </Text>
-        {orphans.data.map(repository => {
+        {orphans.data.map((repository, index) => {
           const busy = removals.snapshot.states.get(repository.repoFullName)?.status === 'pending';
           return (
             <View
               key={repository.repoFullName}
-              className="flex-row items-center gap-3 border-t border-hair-soft pt-2"
+              className={cn(
+                'flex-row items-center gap-3',
+                index > 0 && 'border-t-[0.5px] border-hair-soft pt-2'
+              )}
             >
               <View className="min-w-0 flex-1 py-1">
                 <Text className="text-sm" numberOfLines={1}>
@@ -105,27 +108,22 @@ export function OrphanedFindingsCard({
                   })}
                 </Text>
               </View>
-              <Pressable
-                className={cn(
-                  LINE_ACTION_BOX_CLASS,
-                  'justify-center px-2 active:opacity-70',
-                  (!canManage || busy) && 'opacity-60'
-                )}
-                hitSlop={LINE_ACTION_HIT_SLOP}
-                disabled={!canManage || busy}
-                accessibilityRole="button"
-                accessibilityLabel={t('securityAgent.orphanedFindings.clearLabel', {
-                  repository: repository.repoFullName,
-                })}
-                accessibilityState={{ disabled: !canManage || busy }}
-                onPress={() => {
+              {/* The row's clear is the shared trailing action cell, the way
+                  every other row offers a text action: 11pt mono in the accent,
+                  on the platform's own target, so it reads as the control it is
+                  instead of underlined muted text. */}
+              {renderRowTrailing({
+                kind: 'action',
+                label: t('prReview.floatingActions.clear'),
+                onPress: () => {
                   confirmRemove(repository);
-                }}
-              >
-                <Text variant="muted" className="text-xs underline">
-                  {t('prReview.floatingActions.clear')}
-                </Text>
-              </Pressable>
+                },
+                disabled: !canManage || busy,
+                accessibilityLabel: t('securityAgent.orphanedFindings.clearLabel', {
+                  repository: repository.repoFullName,
+                }),
+                accessibilityState: { disabled: !canManage || busy, busy },
+              })}
             </View>
           );
         })}

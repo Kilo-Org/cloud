@@ -149,8 +149,8 @@ export async function getViewedFiles(ref: ViewedFilesRef, headSha: string): Prom
 }
 
 /**
- * Toggle a single file path in the viewed set for a PR. The record is keyed
- * by `owner/repo#number`; when the incoming `headSha` differs from the
+ * Toggle a single file path in the viewed set for a PR; the record's key is the
+ * one `viewedFilesKey` builds for the ref. When the incoming `headSha` differs from the
  * stored one the viewedPaths are reset (file paths from a previous SHA are
  * almost certainly stale and shouldn't be re-marked). The map itself is
  * LRU-trimmed to VIEWED_FILES_PR_LIMIT PRs by most-recently-touched.

@@ -27,21 +27,21 @@ const ACTIVE_STATUSES = new Set<VercelSandboxSession['status']>([
 ]);
 const TERMINAL_STATUSES = new Set<VercelSandboxSession['status']>(['stopped', 'failed', 'aborted']);
 
-const providerRefSchema = z
-  .object({
-    sandboxName: z.string().min(1),
-    sessionId: z.string().min(1),
-    startSource: z.literal('repository').optional(),
-    metadata: z
-      .object({
-        region: z.string().min(1).max(128),
-        sourceSnapshotId: z.string().min(1).max(128).optional(),
-        instanceType: z.enum(['small', 'large']).optional(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
+// Not strict: a stored ref outlives a deploy. A Worker that is rolled back must still decode a ref
+// that a newer Worker wrote, or it cannot stop, lease or admit that allocation. Unknown fields are
+// dropped, and the adapter trusts only the fields below.
+const providerRefSchema = z.object({
+  sandboxName: z.string().min(1),
+  sessionId: z.string().min(1),
+  startSource: z.literal('repository').optional(),
+  metadata: z
+    .object({
+      region: z.string().min(1).max(128),
+      sourceSnapshotId: z.string().min(1).max(128).optional(),
+      instanceType: z.enum(['small', 'large']).optional(),
+    })
+    .optional(),
+});
 
 export type VercelProviderRef = z.infer<typeof providerRefSchema>;
 

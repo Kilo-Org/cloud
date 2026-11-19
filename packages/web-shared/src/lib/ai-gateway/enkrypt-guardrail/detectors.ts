@@ -54,26 +54,47 @@ export function enkryptSummaryDetectorId(name: string): EnkryptDetectorId | unde
   return ENKRYPT_SUMMARY_DETECTOR_BY_NAME.get(name);
 }
 
+type EnkryptSharedDetectorDefaults = {
+  [Id in EnkryptOutputDetectorId]: Omit<EnkryptOutputDetectors[Id], 'action'>;
+};
+
 /**
- * Kilo Default: prompt injection is logged, not blocked. Detectors without input controls stay off;
- * see `enforcedEnkryptInputDetectors`.
+ * Per-detector settings that the Kilo Default input detectors and the empty output detectors share,
+ * so a default lives in one place. A new output detector fails the typecheck here. A fresh object
+ * per call: callers set a detector on the result, and two calls must not share one.
  */
-export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors {
+function enkryptDetectorDefaults(): EnkryptSharedDetectorDefaults {
   return {
-    injection_attack: { enabled: true, action: 'log' },
-    pii: { enabled: false, action: 'log', entities: ['secrets'] },
-    keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
+    pii: { enabled: false, entities: ['secrets'] },
+    keyword_detector: { enabled: false, banned_keywords: [] },
     topic_detector: { enabled: false, topic: [] },
     policy_violation: {
       enabled: false,
-      action: 'block',
       format: 'rules',
       policy_text: '',
       rules: [],
     },
     toxicity: { enabled: false },
     nsfw: { enabled: false },
-    bias: { enabled: false, action: 'log' },
+    bias: { enabled: false },
+  };
+}
+
+/**
+ * Kilo Default: prompt injection is logged, not blocked. Detectors without input controls stay off;
+ * see `enforcedEnkryptInputDetectors`.
+ */
+export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors {
+  const defaults = enkryptDetectorDefaults();
+  return {
+    injection_attack: { enabled: true, action: 'log' },
+    pii: { ...defaults.pii, action: 'log' },
+    keyword_detector: { ...defaults.keyword_detector, action: 'block' },
+    topic_detector: { ...defaults.topic_detector },
+    policy_violation: { ...defaults.policy_violation, action: 'block' },
+    toxicity: { ...defaults.toxicity },
+    nsfw: { ...defaults.nsfw },
+    bias: { ...defaults.bias, action: 'log' },
     sponge_attack: { enabled: false },
   };
 }
@@ -125,7 +146,6 @@ export function enabledEnkryptDetectorIds(detectors: EnkryptInputDetectors): Enk
   return ENKRYPT_DETECTOR_IDS.filter(id => detectors[id].enabled);
 }
 
-/** Enabled configurable detectors whose detection blocks the request. */
 export function blockingEnkryptDetectorIds(detectors: EnkryptInputDetectors): EnkryptDetectorId[] {
   return ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.filter(id => {
     const detector = detectors[id];
@@ -133,22 +153,17 @@ export function blockingEnkryptDetectorIds(detectors: EnkryptInputDetectors): En
   });
 }
 
-/** Output scanning has no Kilo Default, so every output detector starts off. */
+/** Output scanning has no Kilo Default, so every output detector starts off and blocks. */
 export function createEmptyEnkryptOutputDetectors(): EnkryptOutputDetectors {
+  const defaults = enkryptDetectorDefaults();
   return {
-    pii: { enabled: false, action: 'block', entities: ['secrets'] },
-    keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
-    topic_detector: { enabled: false, action: 'block', topic: [] },
-    policy_violation: {
-      enabled: false,
-      action: 'block',
-      format: 'rules',
-      policy_text: '',
-      rules: [],
-    },
-    toxicity: { enabled: false, action: 'block' },
-    nsfw: { enabled: false, action: 'block' },
-    bias: { enabled: false, action: 'block' },
+    pii: { ...defaults.pii, action: 'block' },
+    keyword_detector: { ...defaults.keyword_detector, action: 'block' },
+    topic_detector: { ...defaults.topic_detector, action: 'block' },
+    policy_violation: { ...defaults.policy_violation, action: 'block' },
+    toxicity: { ...defaults.toxicity, action: 'block' },
+    nsfw: { ...defaults.nsfw, action: 'block' },
+    bias: { ...defaults.bias, action: 'block' },
   };
 }
 
@@ -158,7 +173,6 @@ export function enabledEnkryptOutputDetectorIds(
   return ENKRYPT_OUTPUT_DETECTOR_IDS.filter(id => detectors[id].enabled);
 }
 
-/** Enabled output detectors whose detection blocks the response. */
 export function blockingEnkryptOutputDetectorIds(
   detectors: EnkryptOutputDetectors
 ): EnkryptOutputDetectorId[] {

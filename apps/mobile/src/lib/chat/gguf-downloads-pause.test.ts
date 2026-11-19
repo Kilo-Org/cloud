@@ -51,6 +51,27 @@ describe('pausing one download', () => {
     expect(h.files.size).toBe(0);
   });
 
+  it('says the download is retrying when a resume starts it from zero again', async () => {
+    const h = harness();
+    h.store.start(CATALOG);
+    taskAt(h.tasks, 0).progress({ bytesWritten: 400, totalBytes: 1000 });
+    h.store.pause('small');
+    taskAt(h.tasks, 0).settle(null);
+    await flush();
+    expect(h.store.snapshot().download).toMatchObject({ phase: 'paused', retrying: false });
+    h.store.resume('small');
+    // The server refuses the continuation, so the fresh resume task rejects:
+    // the store drops the partial and starts again from zero. The retry is
+    // what tells the person the counter is about to drop.
+    taskAt(h.tasks, 0).fail();
+    await flush();
+    expect(h.store.snapshot().download).toMatchObject({ phase: 'downloading', retrying: true });
+    await finish(taskAt(h.tasks, 1), 1000);
+    expect(h.store.snapshot().download).toBeNull();
+    expect(h.store.snapshot().failure).toBeNull();
+    expect(h.store.model('small')).toMatchObject({ sizeBytes: 1000 });
+  });
+
   it('reports the space failure when a stated length arrives while the pause is landing', async () => {
     const h = harness({ freeBytes: 2_000_000_000, cancelRacesPause: true });
     h.store.start({

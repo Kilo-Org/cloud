@@ -22,7 +22,6 @@ import { SessionContextMetrics } from '@/components/agents/session-context-metri
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { useSessionSlowLoadPhase } from '@/components/agents/session-slow-load';
 import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
-import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { SessionPermanentError } from '@/components/agents/session-permanent-error';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -284,7 +283,6 @@ export default function SessionDetailScreen() {
             </View>
           }
           headerRightShrinks
-          className="pb-1"
         />
         <SessionSkeletonMessages sessionId={sessionId} />
         {isPendingWritable ? <SessionComposerSkeleton /> : <SessionReadOnlyFooterPlaceholder />}
@@ -360,7 +358,6 @@ export default function SessionDetailScreen() {
       variant = 'permission';
     }
     const retry = identityFailed ? confirmation.retry : () => void sessionQuery.refetch();
-    const copyText = buildTerminalErrorCopyText({ sessionId, title, message });
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -368,7 +365,6 @@ export default function SessionDetailScreen() {
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
           backFallback={AGENTS_SESSIONS_HREF}
-          className="pb-1"
         />
         <SessionPermanentError
           variant={variant}
@@ -376,7 +372,6 @@ export default function SessionDetailScreen() {
           message={message}
           retry={notFound || unauthorized ? undefined : retry}
           isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
-          copyText={copyText}
           restoredRouteOpen={restoredOpen && (notFound || unauthorized)}
         />
       </View>

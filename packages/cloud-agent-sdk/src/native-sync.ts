@@ -6,6 +6,7 @@ import {
   type NativeSnapshotSession,
 } from './native-sync-snapshot';
 import { applyNativeEvent, applyNativeSessionEvent } from './native-conversation-reducer';
+import { messageIDFromEventID } from './message-id';
 import {
   reduceNativePendingRequests,
   type NativePendingRequests,
@@ -17,6 +18,7 @@ import {
   readKilo2FileReferences,
   type Kilo2FileReference,
 } from './kilo2-source-messages';
+import { NATIVE_SYNC_RETAINED_WORK_BYTES, NATIVE_SYNC_RETAINED_WORK_FRAMES } from './limits';
 
 const tenantSchema = z.object({ type: z.enum(['user', 'organization']), id: z.string() });
 const envelopeSchema = z.object({
@@ -31,6 +33,7 @@ const envelopeSchema = z.object({
 const ticketSchema = z.object({ ticket: z.string(), expiresAt: z.iso.datetime() });
 const grantSchema = z.object({ token: z.string(), expiresAt: z.iso.datetime() });
 const commandStatusSchema = z.enum(['queued', 'delivered', 'expired']);
+const commandAckSchema = z.object({ commandID: z.string(), status: commandStatusSchema });
 const instanceSchema = z.object({
   instanceID: z.string(),
   tenant: tenantSchema,
@@ -76,8 +79,13 @@ export type NativeSessionState = {
   messages: NativeSnapshotMessage[];
   pending: NativePendingRequests;
   events: NativeEvent[];
-  commands: Record<string, 'queued' | 'delivered' | 'expired'>;
+  commands: Record<string, z.infer<typeof commandStatusSchema>>;
   error?: string | undefined;
+  /**
+   * Set when automatic transcript reads stopped after repeated failures. The transport does
+   * not reconnect until `refresh()` asks for one read cycle again.
+   */
+  snapshotFailure?: { error: string } | undefined;
 };
 export type NativeInstanceReply = {
   commandID: string;
@@ -108,8 +116,10 @@ export type NativeSessionConnection = {
   replyQuestion(requestID: string, answers: string[][]): Promise<string>;
   rejectQuestion(requestID: string): Promise<string>;
   sendCommand(command: string, args?: string): Promise<string>;
-  getCommandStatus(commandID: string): Promise<'queued' | 'delivered' | 'expired'>;
+  getCommandStatus(commandID: string): Promise<z.infer<typeof commandStatusSchema>>;
   clear(): void;
+  /** Retry the transcript after a latched snapshot failure with one fresh read cycle. */
+  refresh(): void;
   close(): void;
 };
 export type NativeSocket = {
@@ -148,15 +158,21 @@ const reason = (error: unknown) =>
 /**
  * Authorization failures and deleted sessions cannot recover by reconnecting. A 404 stays
  * retryable: a just-created session is briefly unknown until its runner registers it.
+ * `snapshot_unavailable` is the latched transcript failure: only an explicit refresh retries.
  */
 const isPermanent = (error: unknown) =>
   (error instanceof NativeSyncError && (error.status === 401 || error.status === 403)) ||
-  (error instanceof Error && 'code' in error && error.code === 'session_deleted');
+  (error instanceof Error &&
+    'code' in error &&
+    (error.code === 'session_deleted' || error.code === 'snapshot_unavailable'));
 
 // Count UTF-16 storage conservatively for raw frames and retained parsed replay.
 const liveFrameBytes = 512 * 1024;
-const liveBacklogBytes = 4 * 1024 * 1024;
-const liveBacklogCount = 1024;
+const SNAPSHOT_FAILURE_LIMIT = 3;
+// Bounds for a connect that never reaches hello: a failing ticket mint, an offline fetch, or an
+// immediate close.
+const connectBackoffFloorMs = 1000;
+const connectBackoffCeilMs = 60_000;
 type SocketEpoch = {
   signal: AbortSignal;
   current: () => boolean;
@@ -232,20 +248,29 @@ function snapshotCoversLiveGap(
   return true;
 }
 
+/** First snapshot entry per message id, matching the first-match semantics of Array.find. */
+function indexNativeMessages(
+  messages: NativeSnapshotMessage[]
+): Map<string, NativeSnapshotMessage> {
+  const byID = new Map<string, NativeSnapshotMessage>();
+  for (const item of messages) if (!byID.has(item.message.id)) byID.set(item.message.id, item);
+  return byID;
+}
+
 /** Non-content-addressed native files need fresh authorization after their content is replaced. */
 function nativeAssetURLsAfterMessages(
-  previous: NativeSnapshotMessage[],
+  previousByID: ReadonlyMap<string, NativeSnapshotMessage>,
   messages: NativeSnapshotMessage[],
   assetURLs: Readonly<Record<string, string>> | undefined
 ) {
   if (!assetURLs) return assetURLs;
   let changed: Record<string, string> | undefined;
   for (const item of messages) {
-    const before = previous.find(candidate => candidate.message.id === item.message.id);
+    const before = previousByID.get(item.message.id);
     if (before?.message === item.message) continue;
     for (const file of readKilo2FileReferences(item.message)) {
       const key = kilo2AssetKey(file.id, file.uri, file.mime);
-      if (/^(media:|data:|https?:\/\/)/.test(file.uri) || assetURLs[key] === undefined) continue;
+      if (/^(media:|data:)/.test(file.uri) || assetURLs[key] === undefined) continue;
       const replaced =
         file.contentIndex === undefined
           ? before?.message.files !== item.message.files
@@ -258,6 +283,97 @@ function nativeAssetURLsAfterMessages(
   }
   return changed ?? assetURLs;
 }
+
+/**
+ * Snapshot items whose content the current frame cannot certify, in messages order. A
+ * replaced asset URL set invalidates keys shared by otherwise unchanged messages, so the
+ * caller retries them too.
+ */
+function nativeGapMessages(
+  messages: NativeSnapshotMessage[],
+  previousByID: ReadonlyMap<string, NativeSnapshotMessage>,
+  assetURLs: Readonly<Record<string, string>> | undefined,
+  pendingIDs: ReadonlySet<string>,
+  recheckUnchanged: boolean
+): NativeSnapshotMessage[] {
+  const gaps: NativeSnapshotMessage[] = [];
+  for (const item of messages) {
+    const previous = previousByID.get(item.message.id);
+    const missingDependency =
+      item.incomplete &&
+      (!previous?.incomplete || (item !== previous && item.message === previous.message));
+    if (missingDependency) {
+      gaps.push(item);
+      continue;
+    }
+    if (!recheckUnchanged && previous?.message === item.message) continue;
+    if (
+      !item.incomplete &&
+      hasUnresolvedKilo2Assets(item.message, assetURLs) &&
+      !pendingIDs.has(item.message.id)
+    )
+      gaps.push(item);
+  }
+  return gaps;
+}
+
+/** A transcript entry the client can certify: complete, and every private asset resolved. */
+function certifiedTranscriptEntry(
+  item: NativeSnapshotMessage,
+  assetURLs: Readonly<Record<string, string>> | undefined
+): boolean {
+  return !item.incomplete && !hasUnresolvedKilo2Assets(item.message, assetURLs);
+}
+
+/**
+ * Pending identities a snapshot still owes. An identity is settled by a certified message with the
+ * same id, unless a live replay still requires it; one with no certified message stays owed.
+ */
+function owedPendingSnapshotIDs(
+  pendingIDs: readonly string[] | undefined,
+  messages: NativeSnapshotMessage[],
+  assetURLs: Readonly<Record<string, string>> | undefined,
+  liveRequirementIDs?: ReadonlySet<string>
+): string[] | undefined {
+  return pendingIDs?.filter(
+    id =>
+      liveRequirementIDs?.has(id) === true ||
+      !messages.some(item => item.message.id === id && certifiedTranscriptEntry(item, assetURLs))
+  );
+}
+
+type NativeTranscriptFacts = {
+  session: NativeSnapshotSession | undefined;
+  messages: NativeSnapshotMessage[];
+  assetURLs: Readonly<Record<string, string>> | undefined;
+  pendingSnapshotMessageIDs: readonly string[] | undefined;
+  quarantinedFrames: number;
+};
+
+/**
+ * Whether the transcript still has unrecovered content. Every recovery decision uses this one
+ * rule: recovery starts, recovery completes, pending identities are pruned, and the integrity
+ * notice clears only while it reports no gap.
+ *
+ * A gap is any of: no session yet, a frame the client could not project, a listed pending
+ * identity, an incomplete message, or a private asset with no authorized bytes. An unresolved
+ * asset is a gap because the transcript cannot render that reference until its bytes arrive.
+ *
+ * `integrityGap` is deliberately not an input: it means live replay was lost, which only a
+ * canonical snapshot read can repair, so it never blocks a recovery. Callers apply it where it
+ * matters, as the reason the notice is not cleared.
+ */
+function transcriptHasGap(facts: NativeTranscriptFacts): boolean {
+  if (facts.session === undefined || facts.quarantinedFrames > 0) return true;
+  if (facts.messages.some(item => !certifiedTranscriptEntry(item, facts.assetURLs))) return true;
+  // Every listed identity renders as pending in the shared projection until a snapshot or its
+  // live replay settles it, so the list itself is the gap signal; `owedPendingSnapshotIDs`
+  // decides which entries may leave it.
+  return (facts.pendingSnapshotMessageIDs?.length ?? 0) > 0;
+}
+
+const projectedFrameGap =
+  'Native live sync skipped an event it could not read and is restoring the transcript from a canonical snapshot.';
 
 /** Native v2 only. The legacy session-ingest/cloud-agent transport is deliberately unchanged. */
 export class NativeSyncClient {
@@ -426,6 +542,8 @@ export class NativeSyncClient {
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let renewalTimer: ReturnType<typeof setTimeout> | undefined;
     let reconnectAfterMs = 1000;
+    let connectBackoffMs = connectBackoffFloorMs;
+    let greeted = false;
     let generation = 0;
     let retire: (() => void) | undefined;
     const send = (value: unknown) => {
@@ -483,11 +601,14 @@ export class NativeSyncClient {
       }
       clearTimeout(reconnectTimer);
       const retry = error instanceof NativeSyncError ? error['retryAfterMs'] : 0;
+      const delay = Math.max(retry, reconnectAfterMs, connectBackoffMs);
+      // Without hello there is no server retry budget to honour, so each miss doubles the wait.
+      if (!greeted) connectBackoffMs = Math.min(connectBackoffCeilMs, connectBackoffMs * 2);
       reconnectTimer = setTimeout(
         () => {
           void connect();
         },
-        Math.max(retry, reconnectAfterMs) + Math.random() * reconnectAfterMs
+        delay + Math.random() * reconnectAfterMs
       );
     };
     const connect = async () => {
@@ -504,8 +625,8 @@ export class NativeSyncClient {
         retain: bytes => {
           if (
             !epoch.current() ||
-            retainedCount >= liveBacklogCount ||
-            retainedBytes + bytes > liveBacklogBytes
+            retainedCount >= NATIVE_SYNC_RETAINED_WORK_FRAMES ||
+            retainedBytes + bytes > NATIVE_SYNC_RETAINED_WORK_BYTES
           )
             return false;
           retainedCount++;
@@ -525,6 +646,7 @@ export class NativeSyncClient {
         queue.length = 0;
         controller.abort();
       };
+      greeted = false;
       onConnection('connecting');
       try {
         const ticket = await mint();
@@ -549,6 +671,8 @@ export class NativeSyncClient {
                 if (frame.type === 'hello') {
                   if (typeof body['reconnectAfterMs'] === 'number')
                     reconnectAfterMs = Math.min(60_000, Math.max(1000, body['reconnectAfterMs']));
+                  greeted = true;
+                  connectBackoffMs = connectBackoffFloorMs;
                   onConnection('connected');
                   scheduleRenewal(body);
                 }
@@ -593,6 +717,18 @@ export class NativeSyncClient {
     void connect();
     return {
       send,
+      restart: () => {
+        stopped = false;
+        generation++;
+        connectBackoffMs = connectBackoffFloorMs;
+        retire?.();
+        retire = undefined;
+        clearTimeout(reconnectTimer);
+        clearTimeout(renewalTimer);
+        socket?.close();
+        socket = undefined;
+        void connect();
+      },
       close: () => {
         stopped = true;
         generation++;
@@ -737,7 +873,10 @@ export class NativeSyncClient {
     let recovery: Recovery | undefined;
     let integrityError: string | undefined;
     let failureError: string | undefined;
+    let snapshotFailures = 0;
+    let snapshotFailure: string | undefined;
     let integrityGap = false;
+    let quarantined: { seq: number; position: number }[] = [];
     let remoteState: NativeEvent | undefined;
     const clearedIDs = new Set<string>();
     const publish = (patch: Partial<NativeSessionState>) => {
@@ -749,6 +888,12 @@ export class NativeSyncClient {
           : (integrityError ?? failureError);
       state = { ...state, ...patch, error };
       listener(state);
+    };
+    const recordCommandStatus = (
+      commandID: string,
+      status: z.infer<typeof commandStatusSchema>
+    ) => {
+      publish({ commands: { ...state.commands, [commandID]: status } });
     };
     const visible = (messages: NativeSnapshotMessage[]) =>
       clearedIDs.size === 0 ? messages : messages.filter(item => !clearedIDs.has(item.message.id));
@@ -767,37 +912,79 @@ export class NativeSyncClient {
       const next = await readSnapshot(epoch);
       if (!epoch.current() || next.position < snapshotPosition) return;
       snapshotPosition = next.position;
+      pruneQuarantined(next.position);
+      integrityError =
+        quarantined.length === 0 && integrityError === projectedFrameGap
+          ? undefined
+          : integrityError;
       publish({
         session: next.session,
         snapshot: { position: next.position, revision: next.revision },
         messages: visible(next.messages),
         assetURLs: next.assetURLs,
-        pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs?.filter(
-          id =>
-            !next.messages.some(
-              item =>
-                item.message.id === id &&
-                !item.incomplete &&
-                !hasUnresolvedKilo2Assets(item.message, next.assetURLs)
-            )
+        pendingSnapshotMessageIDs: owedPendingSnapshotIDs(
+          state.pendingSnapshotMessageIDs,
+          next.messages,
+          next.assetURLs
         ),
       });
     };
     const markGap = () => {
+      if (snapshotFailure) return;
       integrityGap = true;
       integrityError = 'Native transcript may be incomplete because live replay is unavailable.';
       publish({});
     };
-    const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
+    /**
+     * One failed snapshot cycle. At the limit this returns the permanent error that settles
+     * the connection, and `refresh()` starts the streak again.
+     */
+    const noteSnapshotFailure = (error: unknown) => {
+      if (isPermanent(error)) return undefined;
+      if (error instanceof NativeSyncError && error.status === 404) return undefined;
+      // A canceled read says nothing about the transcript, whichever signal canceled it.
       if (
-        recovery ||
-        !epoch.current() ||
-        (!force &&
-          state.session &&
-          !state.messages.some(message => message.incomplete) &&
-          !state.pendingSnapshotMessageIDs?.length)
+        (error instanceof NativeSyncError && error.code === 'request_canceled') ||
+        (error instanceof Error && error.name === 'AbortError')
       )
-        return;
+        return undefined;
+      snapshotFailures =
+        error instanceof Error && 'code' in error && error.code === 'native_asset_not_found'
+          ? SNAPSHOT_FAILURE_LIMIT
+          : snapshotFailures + 1;
+      if (snapshotFailures < SNAPSHOT_FAILURE_LIMIT) return undefined;
+      const cause = reason(error);
+      const message = `Native transcript is unavailable: ${/[.!?]$/.test(cause) ? cause : `${cause}.`} Open the session again to retry.`;
+      snapshotFailure = message;
+      integrityError = undefined;
+      publish({ snapshotFailure: { error: message }, error: message });
+      return Object.assign(new Error(message), { code: 'snapshot_unavailable' });
+    };
+    const pruneQuarantined = (position: number) => {
+      quarantined = quarantined.filter(entry => entry.position > position);
+    };
+    /** The live transcript facts every recovery decision shares. */
+    const transcriptFacts = (): NativeTranscriptFacts => ({
+      session: state.session,
+      messages: state.messages,
+      assetURLs: state.assetURLs,
+      pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs,
+      quarantinedFrames: quarantined.length,
+    });
+    /**
+     * A snapshot cycle is successful only when nothing it could not certify remains: a read
+     * that returns, yet still leaves a gap, is a failure cycle.
+     */
+    const transcriptSettled = () => !transcriptHasGap(transcriptFacts());
+    /** A settled transcript owns no terminal failure, so the published marker goes with it. */
+    const settleSnapshotStreak = () => {
+      snapshotFailures = 0;
+      if (snapshotFailure === undefined) return;
+      snapshotFailure = undefined;
+      publish({ snapshotFailure: undefined, error: undefined });
+    };
+    const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
+      if (recovery || !epoch.current() || (!force && !transcriptHasGap(transcriptFacts()))) return;
       const controller = new AbortController();
       const current: Recovery = {
         attempt: 0,
@@ -840,6 +1027,11 @@ export class NativeSyncClient {
               return;
             }
             if (current.attempt >= 4) {
+              const stop = noteSnapshotFailure(error);
+              if (stop) {
+                epoch.fail(stop);
+                return;
+              }
               integrityError = `Native transcript recovery is incomplete: ${reason(error)}`;
               publish({});
               return;
@@ -873,27 +1065,28 @@ export class NativeSyncClient {
               continue;
             const previous = messages;
             messages = applyNativeEvent(messages, item.frame, session);
-            assetURLs = nativeAssetURLsAfterMessages(previous, messages, assetURLs);
+            assetURLs = nativeAssetURLsAfterMessages(
+              indexNativeMessages(previous),
+              messages,
+              assetURLs
+            );
             session = applyNativeSessionEvent(session, item.frame);
           }
           if (!stale) {
             snapshotPosition = next.position;
+            const requiredMessageIDs = new Set(
+              [...current.requirements.values()].map(requirement => requirement.messageID)
+            );
             publish({
               session,
               snapshot: { position: next.position, revision: next.revision },
               messages: visible(messages),
               assetURLs,
-              pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs?.filter(
-                id =>
-                  [...current.requirements.values()].some(
-                    requirement => requirement.messageID === id
-                  ) ||
-                  !next.messages.some(
-                    item =>
-                      item.message.id === id &&
-                      !item.incomplete &&
-                      !hasUnresolvedKilo2Assets(item.message, next.assetURLs)
-                  )
+              pendingSnapshotMessageIDs: owedPendingSnapshotIDs(
+                state.pendingSnapshotMessageIDs,
+                next.messages,
+                next.assetURLs,
+                requiredMessageIDs
               ),
             });
           }
@@ -905,22 +1098,27 @@ export class NativeSyncClient {
               epoch.release(item.bytes);
               return false;
             });
+            pruneQuarantined(next.position);
           }
-          if (
-            state.session &&
-            !state.messages.some(
-              item => item.incomplete || hasUnresolvedKilo2Assets(item.message, state.assetURLs)
-            ) &&
-            !state.pendingSnapshotMessageIDs?.length
-          ) {
+          if (!transcriptHasGap(transcriptFacts())) {
+            // A snapshot read cannot prove live replay loss is repaired, so the notice stays
+            // until `refresh()` reads the transcript again.
             if (!integrityGap) {
               integrityError = undefined;
               publish({ error: undefined });
             }
             current.completed = true;
+            if (transcriptSettled()) settleSnapshotStreak();
             return;
           }
           if (current.attempt >= 4) {
+            const stop = noteSnapshotFailure(
+              new Error('Native transcript recovery is incomplete.')
+            );
+            if (stop) {
+              epoch.fail(stop);
+              return;
+            }
             integrityError = 'Native transcript recovery is incomplete.';
             publish({});
             return;
@@ -946,8 +1144,16 @@ export class NativeSyncClient {
           if (frame.type === 'hello') {
             publish({ runnerConnected: body['runnerConnected'] === true });
             if (lastSeq === undefined) {
-              await snapshot(epoch);
+              try {
+                await snapshot(epoch);
+              } catch (error) {
+                // A read the retiring socket canceled never described the transcript.
+                if (!epoch.current()) throw error;
+                throw noteSnapshotFailure(error) ?? error;
+              }
               if (!epoch.current()) return;
+              // A read that still leaves an uncertified gap has not settled the transcript.
+              if (transcriptSettled()) settleSnapshotStreak();
               lastSeq = frame.seq;
             }
             send({ type: 'subscribe', afterSeq: lastSeq });
@@ -956,8 +1162,14 @@ export class NativeSyncClient {
           if (frame.type === 'reset_required') {
             markGap();
             recovery?.cancel();
-            await snapshot(epoch);
+            try {
+              await snapshot(epoch);
+            } catch (error) {
+              if (!epoch.current()) throw error;
+              throw noteSnapshotFailure(error) ?? error;
+            }
             if (!epoch.current()) return;
+            if (transcriptSettled()) settleSnapshotStreak();
             lastSeq = typeof body['seq'] === 'number' ? body['seq'] : frame.seq;
             send({ type: 'subscribe', afterSeq: lastSeq });
             recoverIncomplete(epoch);
@@ -966,8 +1178,7 @@ export class NativeSyncClient {
             frame.type === 'subscribed' &&
             state.session &&
             !integrityGap &&
-            !state.messages.some(message => message.incomplete) &&
-            !state.pendingSnapshotMessageIDs?.length
+            !transcriptHasGap(transcriptFacts())
           ) {
             integrityError = undefined;
             publish({ error: undefined });
@@ -977,9 +1188,11 @@ export class NativeSyncClient {
             publish({ runnerConnected: body['runnerConnected'] === true });
           }
           if (frame.type === 'command_status' && typeof body['commandID'] === 'string') {
-            const parsed = commandStatusSchema.safeParse(body['status']);
-            if (parsed.success)
-              publish({ commands: { ...state.commands, [body['commandID']]: parsed.data } });
+            const parsed = commandAckSchema.safeParse({
+              commandID: body['commandID'],
+              status: body['status'],
+            });
+            if (parsed.success) recordCommandStatus(parsed.data.commandID, parsed.data.status);
           }
           if (frame.type === 'error')
             publish({
@@ -988,42 +1201,85 @@ export class NativeSyncClient {
           return;
         }
         if (frame.channel !== 'events' || (lastSeq !== undefined && frame.seq <= lastSeq)) return;
-        // Validate/project before accepting the relay cursor. A malformed native
-        // value must not acknowledge an event that this client failed to retain.
-        const messages = beyond(frame, snapshotPosition)
-          ? visible(applyNativeEvent(state.messages, frame, state.session))
-          : state.messages;
-        const pending = reduceNativePendingRequests(state.pending, frame);
-        const session = applyNativeSessionEvent(state.session, frame);
-        const assetURLs = nativeAssetURLsAfterMessages(state.messages, messages, state.assetURLs);
-        const newGaps = messages.filter(item => {
-          const previous = state.messages.find(previous => previous.message.id === item.message.id);
-          const missingDependency =
-            item.incomplete &&
-            (!previous?.incomplete || (item !== previous && item.message === previous.message));
-          return (
-            missingDependency ||
-            (!item.incomplete &&
-              hasUnresolvedKilo2Assets(item.message, assetURLs) &&
-              !state.pendingSnapshotMessageIDs?.includes(item.message.id))
+        // A frame this client cannot project is retained as an integrity-gap record
+        // before its cursor advances; the transcript is repaired from a canonical snapshot.
+        const projectEventsFrame = () => {
+          const messages = beyond(frame, snapshotPosition)
+            ? visible(applyNativeEvent(state.messages, frame, state.session))
+            : state.messages;
+          const pending = reduceNativePendingRequests(state.pending, frame);
+          const session = applyNativeSessionEvent(state.session, frame);
+          const previousByID = indexNativeMessages(state.messages);
+          const assetURLs = nativeAssetURLsAfterMessages(previousByID, messages, state.assetURLs);
+          const pendingIDs = new Set(state.pendingSnapshotMessageIDs ?? []);
+          const newGaps = nativeGapMessages(
+            messages,
+            previousByID,
+            assetURLs,
+            pendingIDs,
+            assetURLs !== state.assetURLs
           );
-        });
-        let pendingSnapshotMessageIDs = state.pendingSnapshotMessageIDs;
-        if (newGaps.length)
-          pendingSnapshotMessageIDs = [
-            ...new Set([
-              ...(pendingSnapshotMessageIDs ?? []),
-              ...newGaps.map(item => item.message.id),
-            ]),
-          ];
-        if (frame.type === 'session.moved') {
-          const eventID = z.string().startsWith('evt_').parse(record(body['data'])['id']);
-          const messageID = `msg_${eventID.slice(4)}`;
-          if (!messages.some(item => item.message.id === messageID && !item.incomplete))
+          let pendingSnapshotMessageIDs = state.pendingSnapshotMessageIDs;
+          if (newGaps.length)
             pendingSnapshotMessageIDs = [
-              ...new Set([...(pendingSnapshotMessageIDs ?? []), messageID]),
+              ...new Set([
+                ...(pendingSnapshotMessageIDs ?? []),
+                ...newGaps.map(item => item.message.id),
+              ]),
             ];
-        }
+          if (frame.type === 'session.moved') {
+            const messageID = messageIDFromEventID(record(body['data'])['id']);
+            if (!messages.some(item => item.message.id === messageID && !item.incomplete))
+              pendingSnapshotMessageIDs = [
+                ...new Set([...(pendingSnapshotMessageIDs ?? []), messageID]),
+              ];
+          }
+          const recent =
+            frame.type === 'remote.state'
+              ? []
+              : state.events.filter(event => event['type'] !== 'remote.state').slice(-498);
+          const events =
+            frame.type === 'remote.state'
+              ? [frame]
+              : [...(remoteState ? [remoteState] : []), ...recent, frame];
+          return {
+            messages,
+            pending,
+            session,
+            assetURLs,
+            newGaps,
+            pendingSnapshotMessageIDs,
+            events,
+          };
+        };
+        const projected = (() => {
+          try {
+            return projectEventsFrame();
+          } catch {
+            quarantined.push({
+              seq: frame.seq,
+              position:
+                typeof body['syncPosition'] === 'number'
+                  ? body['syncPosition']
+                  : snapshotPosition + 1,
+            });
+            lastSeq = frame.seq;
+            integrityError = projectedFrameGap;
+            publish({});
+            if (!recovery) recoverIncomplete(epoch, true);
+            return undefined;
+          }
+        })();
+        if (!projected) return;
+        const {
+          messages,
+          pending,
+          session,
+          assetURLs,
+          newGaps,
+          pendingSnapshotMessageIDs,
+          events,
+        } = projected;
         if (!recovery && (!session || newGaps.length || pendingSnapshotMessageIDs?.length))
           recoverIncomplete(epoch, true);
         if (recovery) {
@@ -1042,21 +1298,15 @@ export class NativeSyncClient {
               files: readKilo2FileReferences(item.message),
             });
         }
-        lastSeq = frame.seq;
         if (typeof body['incarnation'] === 'string')
           identity = {
             incarnation: body['incarnation'],
             ...(typeof body['runID'] === 'string' ? { runID: body['runID'] } : {}),
           };
         if (frame.type === 'remote.state') remoteState = frame;
-        const recent =
-          frame.type === 'remote.state'
-            ? []
-            : state.events.filter(event => event['type'] !== 'remote.state').slice(-498);
-        const events =
-          frame.type === 'remote.state'
-            ? [frame]
-            : [...(remoteState ? [remoteState] : []), ...recent, frame];
+        // The frame is retained: acknowledge the cursor before notifying a consumer, so a
+        // throwing listener cannot replay the same sequence for ever.
+        lastSeq = frame.seq;
         publish({
           events,
           session,
@@ -1102,7 +1352,7 @@ export class NativeSyncClient {
       if (options.liveOnly && (state.connection !== 'connected' || !state.runnerConnected))
         throw new NativeSyncError('runner_offline');
       const commandID = cloudAgentSdkRuntime.randomUUID();
-      const result = z.object({ commandID: z.string(), status: commandStatusSchema }).parse(
+      const result = commandAckSchema.parse(
         await this.request(
           `${path}/commands`,
           {
@@ -1112,7 +1362,7 @@ export class NativeSyncClient {
           organizationID
         )
       );
-      publish({ commands: { ...state.commands, [result.commandID]: result.status } });
+      recordCommandStatus(result.commandID, result.status);
       return result.commandID;
     };
     const live = (type: string, body: Record<string, unknown> = {}) => {
@@ -1154,21 +1404,37 @@ export class NativeSyncClient {
         );
       },
       getCommandStatus: async (commandID: string) => {
-        const result = z
-          .object({ commandID: z.string(), status: commandStatusSchema })
-          .parse(
-            await this.request(
-              `${path}/commands/${encodeURIComponent(commandID)}`,
-              undefined,
-              organizationID
-            )
-          );
-        publish({ commands: { ...state.commands, [result.commandID]: result.status } });
+        const result = commandAckSchema.parse(
+          await this.request(
+            `${path}/commands/${encodeURIComponent(commandID)}`,
+            undefined,
+            organizationID
+          )
+        );
+        recordCommandStatus(result.commandID, result.status);
         return result.status;
       },
       clear: () => {
         for (const item of state.messages) clearedIDs.add(item.message.id);
         publish({ messages: [] });
+      },
+      refresh: () => {
+        if (closed) return;
+        // Retire any in-flight recovery first: its cancel path publishes the replay-loss notice,
+        // which this reset then supersedes instead of leaving it set behind the retry.
+        recovery?.cancel();
+        snapshotFailures = 0;
+        snapshotFailure = undefined;
+        lastSeq = undefined;
+        snapshotPosition = -1;
+        integrityGap = false;
+        // A frame the client could not project keeps its warning until a snapshot read covers it.
+        integrityError ??= quarantined.length === 0 ? undefined : projectedFrameGap;
+        publish({ snapshotFailure: undefined, error: undefined });
+        // A retry is a clean read of the authoritative transcript: the next hello reads it
+        // again instead of resuming from the cursor that preceded the failure, and a reset
+        // transcript at a lower position is accepted.
+        connection.restart();
       },
       close: () => {
         closed = true;
@@ -1184,6 +1450,7 @@ export class NativeSyncClient {
           pending: { permissions: [], questions: [], unreadablePermissions: [] },
           events: [],
           commands: {},
+          snapshotFailure: undefined,
         };
         clearedIDs.clear();
         remoteState = undefined;

@@ -7,6 +7,9 @@ import {
 } from './session-detail-skeleton';
 
 const platform = vi.hoisted(() => ({ os: 'android', fontScale: 1 }));
+const sideInsets = vi.hoisted(() => ({
+  style: undefined as { paddingLeft?: number; paddingRight?: number } | undefined,
+}));
 
 // Vitest hoists these above the component import, which is what keeps the real
 // skeleton and blur bar out of this suite.
@@ -26,6 +29,9 @@ vi.mock('@/lib/font-scale/system-font-scale-context', () => ({
 }));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The suite calls the skeletons as plain functions, outside a React render, so
+// the side-inset hook is served from the suite's own state.
+vi.mock('@/lib/screen-insets', () => ({ useSideInsetStyle: () => sideInsets.style }));
 
 function walk(node: unknown, visit: (el: React.ReactElement) => void): void {
   if (node == null || typeof node === 'string' || typeof node === 'number') {
@@ -61,9 +67,13 @@ describe('SessionReadOnlyFooterPlaceholder', () => {
 
     const containers = classNameOf(root).split(/\s+/);
     expect(containers).toContain('bg-secondary');
-    expect(containers).toContain('border-t');
-    expect(containers).toContain('px-4');
-    expect(containers).toContain('py-3');
+    expect(containers).toContain('border-t-[0.5px]');
+    expect(containers).toContain('border-hair-soft');
+    // The gutter sits on the content inside the fill, beside the side insets.
+    const content = (root.props as { children: React.ReactElement }).children;
+    const gutter = classNameOf(content).split(/\s+/);
+    expect(gutter).toContain('px-4');
+    expect(gutter).toContain('py-3');
 
     const bars: React.ReactElement[] = [];
     walk(root, el => {
@@ -74,10 +84,10 @@ describe('SessionReadOnlyFooterPlaceholder', () => {
     expect(bars).toHaveLength(2);
     // The footer note's line box, centred, then its action button's floor.
     const [noteBar, buttonBar] = bars.map(bar => classNameOf(bar));
-    expect(noteBar).toContain('h-[17.5px]');
+    expect(noteBar).toContain('h-5');
     expect(noteBar).toContain('w-40');
     expect(noteBar).toContain('mx-auto');
-    expect(buttonBar).toContain('h-[48px]');
+    expect(buttonBar).toContain('min-h-[48px]');
 
     for (const bar of bars) {
       const tokens = classNameOf(bar).split(/\s+/);
@@ -85,6 +95,19 @@ describe('SessionReadOnlyFooterPlaceholder', () => {
       // The collision: bare `bg-muted` is the fill this footer already paints.
       expect(tokens).not.toContain('bg-muted');
     }
+  });
+
+  // The live read-only footer pads its content by the landscape side insets,
+  // so the placeholder it replaces must too, or the footer jumps sideways.
+  it('clears the landscape side insets the live footer clears', () => {
+    sideInsets.style = { paddingLeft: 47, paddingRight: 59 };
+    // eslint-disable-next-line new-cap
+    const root = SessionReadOnlyFooterPlaceholder() as React.ReactElement;
+    sideInsets.style = undefined;
+    expect((root.props as { style?: unknown }).style).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
   });
 });
 
@@ -126,7 +149,10 @@ describe('SessionComposerSkeleton', () => {
       const bars = skeletonBars(platformOs);
       expect(bars).toHaveLength(3);
       const [field = [], voice = [], send = []] = bars.map(className => className.split(/\s+/));
-      expect(field).toEqual(expect.arrayContaining(['h-full', 'w-full', 'rounded-[20px]']));
+      // The field stands in on the composer's own control radius: the skeleton
+      // paints the `INPUT_FRAME_CLASS` corner the live composer field carries,
+      // so the two boxes read as the same rounded field.
+      expect(field).toEqual(expect.arrayContaining(['h-full', 'w-full', 'rounded-md']));
       for (const trailing of [voice, send]) {
         expect(trailing).toEqual(expect.arrayContaining(['h-[48px]', 'w-[48px]']));
         expect(trailing).toContain('ms-3');
@@ -146,5 +172,19 @@ describe('SessionComposerSkeleton', () => {
     // slot must follow it or the row clips its text.
     expect(fieldBoxHeight(1)).toBe(46);
     expect(fieldBoxHeight(1.3)).toBeCloseTo(20 * 1.3 + 24 + 2);
+  });
+
+  // The composer pads its content by the landscape side insets; the slot that
+  // holds its place must clear the same insets.
+  it('clears the landscape side insets the composer clears', () => {
+    sideInsets.style = { paddingLeft: 47, paddingRight: 59 };
+    // eslint-disable-next-line new-cap
+    const root = SessionComposerSkeleton() as React.ReactElement;
+    sideInsets.style = undefined;
+    const content = (root.props as { children: React.ReactElement }).children;
+    expect((content.props as { style?: unknown }).style).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
   });
 });

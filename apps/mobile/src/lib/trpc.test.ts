@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
+import { QueryClient } from '@tanstack/react-query';
 import { type TelemetryBreadcrumb, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const httpLinkMock = vi.hoisted(() => vi.fn());
@@ -790,6 +791,28 @@ describe('latency wiring', () => {
 
     expect(condition({ path: 'kiloPass.getState', context: { skipBatch: true } })).toBe(true);
     expect(condition({ path: 'user.getMe', context: { skipBatch: true } })).toBe(true);
+  });
+
+  // A dev-only forced data state answers in the shared fetch, so the split
+  // must send a forced procedure to the single link, and the bootstrap reads
+  // stay where they were.
+  it('routes a procedure to the single link while a dev forced state holds it', async () => {
+    const { condition } = await loadLatencyLinks();
+    // The registry is reset after each test, so only a dynamic import here
+    // returns the instance trpc.ts just loaded.
+    const { applyForceStatePath, resetForceStateForTests } =
+      await import('@/lib/force-state-fixture');
+    const path = 'kiloPass.getState';
+    expect(condition({ path, context: {} })).toBe(false);
+
+    applyForceStatePath('kiloapp:///dev/force-state/retryable', new QueryClient());
+    try {
+      expect(condition({ path, context: {} })).toBe(true);
+      expect(condition({ path: 'organizations.list', context: {} })).toBe(false);
+    } finally {
+      resetForceStateForTests();
+    }
+    expect(condition({ path, context: {} })).toBe(false);
   });
 
   it('gives the single and batch links the same latency-wrapped fetch', async () => {

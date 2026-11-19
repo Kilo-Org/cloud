@@ -81,7 +81,7 @@ export class AttachmentChipErrorBoundary extends Component<Props, State> {
               this.props.onRemove(this.props.attachmentId);
             }}
           >
-            <Text numberOfLines={2} className="text-center text-[10px] text-destructive">
+            <Text numberOfLines={2} variant="caption" className="text-center text-destructive">
               {i18n.t('chat.attachment.attachFailed')}
             </Text>
           </Pressable>

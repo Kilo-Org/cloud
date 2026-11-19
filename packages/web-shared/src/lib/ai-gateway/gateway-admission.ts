@@ -14,9 +14,10 @@ import {
   type BalanceAndOrgSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
-  hasBestEffortGuessDataCollectionRequirement,
+  isDeniedByProviderPrivacy,
   isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type {
   OrganizationPlan,
   OrganizationSettings,
@@ -26,16 +27,14 @@ import {
   composeProviderPreferences,
   getEffectiveProviderPrivacy,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import {
-  isDataCollectionExplicitlyDisallowed,
-  type OpenRouterProviderConfig,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
   accountFreeModelLimitResponse,
   anonymousFreeModelLimitResponse,
   creditsBlockedResponse,
   dataCollectionRequiredResponse,
+  zeroDataRetentionUnavailableResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   gatewayAccountRateLimitResponse,
@@ -72,6 +71,8 @@ export type SignedInGatewayCaller = {
   user: User;
   organizationId: string | undefined;
   botId?: string;
+  /** The request came through the Cloud Agent runtime credential proxy (verified attestation). */
+  cloudAgentRuntimeProxied: boolean;
 };
 export type AnonymousGatewayCaller = { kind: 'anonymous'; user: AnonymousUserContext };
 export type RejectedGatewayCaller = { kind: 'rejected'; response: NextResponse };
@@ -188,6 +189,7 @@ export function resolveGatewayCaller(
       user: auth.user,
       organizationId: auth.organizationId,
       botId: auth.botId,
+      cloudAgentRuntimeProxied: auth.cloudAgentRuntimeProxied === true,
     };
   }
   if (auth.rejectionReason === 'empty_organization_context') {
@@ -270,15 +272,16 @@ export function organizationProviderPreferences(params: {
   return { kind: 'allowed', provider: composed.provider };
 }
 
-/** Rejects a model that requires data collection under the effective provider privacy policy. */
+/** Rejects a model the effective provider privacy policy rules out; see `isDeniedByProviderPrivacy`. */
 export async function dataCollectionPolicyRejection(
   model: string,
   effectiveProviderPolicy: OpenRouterProviderConfig | undefined
 ): Promise<NextResponse | null> {
-  if (
-    (await hasBestEffortGuessDataCollectionRequirement(model)) &&
-    isDataCollectionExplicitlyDisallowed(effectiveProviderPolicy)
-  ) {
+  // Kilo does not vouch for zero data retention on any custom LLM.
+  if (effectiveProviderPolicy?.zdr === true && (await isCustomLlm(model))) {
+    return zeroDataRetentionUnavailableResponse();
+  }
+  if (await isDeniedByProviderPrivacy(model, effectiveProviderPolicy)) {
     return dataCollectionRequiredResponse();
   }
   return null;

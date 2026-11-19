@@ -140,7 +140,17 @@ function observeActiveSessionsQueryOutcomes(queryCache: QueryCache): void {
       return;
     }
     const previous = getActiveSessionsQueryMetadata(query);
-    if (event.type === 'removed') {
+    // A query reset to its initial state (`resetQueries`) holds no answer at
+    // all, so it keeps no provenance either: a surface must load again rather
+    // than present the reset cache as an accepted empty result.
+    const resetToInitial =
+      event.type === 'updated' &&
+      event.action.type === 'setState' &&
+      activeSessionsMetadata.has(query) &&
+      query.state.status === 'pending' &&
+      query.state.dataUpdatedAt === 0 &&
+      query.state.errorUpdatedAt === 0;
+    if (event.type === 'removed' || resetToInitial) {
       activeSessionsMetadata.delete(query);
     } else if (
       event.type === 'updated' &&
@@ -279,11 +289,7 @@ export function createKiloAppQueryClient(): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        // Keep the persisted-cache first paint: cached rows are fresh for the
-        // default window, so a mount or focus regain does not immediately
-        // re-request what is already on screen. Every explicit invalidation path
-        // (invalidateQueries, refetchQueries, refetchInterval, pull-to-refresh)
-        // still refetches, and call sites that pass `staleTime: 0` still override.
+        // Every explicit invalidation path (invalidateQueries, refetchQueries, refetchInterval, pull-to-refresh) still refetches.
         staleTime: DEFAULT_QUERY_STALE_TIME_MS,
         // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also refetched unfocused tabs.
         refetchOnWindowFocus: false,

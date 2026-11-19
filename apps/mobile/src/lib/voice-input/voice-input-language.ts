@@ -236,12 +236,7 @@ export async function resolveVoiceInputSessionLanguageTag(
     return resolveVoiceInputStartLanguageTag(appLanguage);
   }
 
-  // Gateway mode never fetches the device's locales: it reconciles against the
-  // static app list only.
   const deviceLocales = mode === 'device' ? await getVoiceRecognitionLocales() : null;
-  // A failed or empty device answer cannot prove the tag wrong, so it wins:
-  // discarding an explicit choice on a probe that returned nothing would
-  // silently drop the user's selection.
   if (mode === 'device' && (deviceLocales === null || deviceLocales.locales.length === 0)) {
     return storedTag;
   }

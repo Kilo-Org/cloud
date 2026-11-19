@@ -159,3 +159,14 @@ describe('NavigatorFileRow diff stats under an RTL interface', () => {
     expect(deletions?.props.className).toContain('text-xs');
   });
 });
+
+describe('NavigatorFileRow mark-viewed toggle', () => {
+  it('sits directly in the padded row, so its slop is inside the parent view', () => {
+    mountRow('src/greeting.ts');
+    const toggle = renderer?.root.find(node => Object.is(node.type, 'MarkViewedToggle'));
+    const parentClass = String(toggle?.parent?.props.className);
+
+    expect(parentClass).toContain('py-2.5');
+    expect(parentClass).toContain('flex-row');
+  });
+});

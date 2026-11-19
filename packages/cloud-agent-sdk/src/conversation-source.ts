@@ -8,9 +8,8 @@ import { normalize, type ChatEvent, type NormalizedEvent } from './normalizer';
 import { setBounded } from './bounded-map';
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import {
-  hasUnresolvedKilo2Assets,
+  projectKilo2Message,
   readKilo2ContentLayout,
-  readKilo2Messages,
   isCompactionSummaryPart,
   type Kilo2ContentLayout,
 } from './kilo2-source-messages';
@@ -102,25 +101,11 @@ export function createConversationSourceReader() {
         }
       }
       setBounded(layouts, message.id, readKilo2ContentLayout(message), MAX_TRACKED_MESSAGES);
-      // An attachment without an authorized URL has no display; omit only this
-      // message and keep the rest of the event batch, as history pages do.
-      if (hasUnresolvedKilo2Assets(message)) return [];
-      // A live event must never throw into the socket handler: degrade this
-      // message instead of losing the surrounding event batch.
-      let display: SessionSnapshot['messages'][number] | undefined;
-      try {
-        display = readKilo2Messages(source.session, [message])[0];
-      } catch (error) {
-        console.error(
-          `[ConversationSource] Native message ${message.id} projection failed:`,
-          error
-        );
-        display = undefined;
-      }
+      // A live event must never throw into the socket handler: omit only the message
+      // that cannot display and keep the rest of the event batch.
+      const display = projectKilo2Message(source.session, message, parentID);
       if (!display) return [];
       observeReasoning(message.id, display.parts);
-      if (display.info.role === 'assistant' && parentID !== undefined)
-        display.info.parentID = parentID;
       return [
         { type: 'message.updated', info: display.info },
         ...display.parts.map((part): ChatEvent => ({ type: 'message.part.updated', part })),

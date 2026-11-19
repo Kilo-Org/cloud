@@ -425,7 +425,6 @@ async function doRefresh(): Promise<RefreshOutcome> {
 
     const parsed = parseTokenPair(successBody);
 
-    // A refresh response must include a full token pair with expiry.
     if (!parsed?.refreshToken || !parsed.expiresIn) {
       return { kind: 'transient' };
     }

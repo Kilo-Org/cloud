@@ -85,9 +85,7 @@ export type AgentAttachmentSubmissionPayload = {
  * 408/429/5xx, generic PUT failure) is retryable.
  */
 export function classifyUploadFailure(error: unknown) {
-  // The mutation throws `TRPCClientError<AppRouterException>` for
-  // BAD_REQUEST / FORBIDDEN / UNPROCESSABLE_CONTENT — those are TERMINAL.
-  // Any other thrown object (network, timeout, expiry, etc.) is RETRYABLE.
+  // The mutation throws `TRPCClientError<AppRouterException>`.
   const code = (error as { data?: { code?: string; message?: string } } | null)?.data?.code;
   const dataMessage = (error as { data?: { code?: string; message?: string } } | null)?.data
     ?.message;
@@ -109,7 +107,7 @@ export function classifyUploadFailure(error: unknown) {
     }
     if (/status \d{3}/.test(error.message)) {
       // Any other HTTP error (4xx other than the terminal codes above,
-      // 5xx, etc.) is retryable — the plan pins PUT failures as retryable.
+      // 5xx, etc.) is retryable.
       return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
     }
     return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
@@ -136,12 +134,8 @@ export function buildWirePayload(
 }
 
 /**
- * Build the S2 submission payload from the current attachments. `wire` is
- * the existing `{path, files}` shape; `messageUuid` and the per-file
- * descriptor are new in S2 and are what S3b consumes to materialize the
- * cloud `{path, files}` materialization. There is NO `mime` field on the
- * descriptor — every consumer derives MIME from the validated `remoteName`
- * extension. Pure: the hook is just a memoized wrapper.
+ * Build the S2 submission payload from the current attachments. Pure: the
+ * hook is just a memoized wrapper.
  */
 export function buildSubmissionPayload(
   attachments: AgentAttachment[],

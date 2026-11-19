@@ -122,12 +122,11 @@ export function parseSourceEntry(dir, root, file, text) {
 
 /**
  * Every source file below `dir`, read and parsed once, one file at a time, each
- * as one `parseSourceEntry`: its absolute path `file`, the normalised path
- * `path` a diagnostic names it by, its `text`, its syntax tree `program`, the
- * `lineOf` lookup, and one `problems` line per parse error.
+ * as one `parseSourceEntry`.
  *
  * The walk is a generator, so a caller's `for … of` holds one file's text and
- * one syntax tree at a time and peak memory does not grow with the tree.
+ * one syntax tree at a time. The matched path list is collected before the
+ * first yield, so memory is the parsed file plus that list.
  *
  * A file the parser refused has an empty tree, so the keys or calls it holds
  * would leave an audit without a word. `problems` says what the parser stopped
@@ -139,13 +138,14 @@ export function parseSourceEntry(dir, root, file, text) {
  * it could not read rather than drop it, and one refusal must not discard the
  * findings the walk already collected.
  *
- * Paths are named from `root`. A file outside it — a fixture tree in a
- * temporary directory — is named from `dir`, so it still reads from its own
- * root.
+ * The walk reads through `read`, which defaults to `readFileSync`, so a caller
+ * can supply the read itself and a test can fail one file without the
+ * filesystem's help. A throw from it is reported exactly like a throw from the
+ * filesystem, so the contract has one name whichever reader refused.
  */
-export function* parseSourceTree(dir, root, skip) {
+export function* parseSourceTree(dir, root, skip, read = readFileSync) {
   for (const file of sourceFiles(dir, skip)) {
-    yield readSourceEntry(dir, root, file);
+    yield readSourceEntry(dir, root, file, read);
   }
 }
 
@@ -153,11 +153,15 @@ export function* parseSourceTree(dir, root, skip) {
  * One walked file read and parsed. A refused read still yields the entry's
  * shared shape — the path, an empty text, and an empty tree — so the caller
  * meets one problem line where it would have read the file's own findings.
+ *
+ * The text comes from `read`, which defaults to `readFileSync`, so a caller can
+ * supply the read itself. A throw from it lands in the same catch as one from
+ * the filesystem, so a failure reports the same single problem line either way.
  */
-function readSourceEntry(dir, root, file) {
+export function readSourceEntry(dir, root, file, read = readFileSync) {
   let text;
   try {
-    text = readFileSync(file, 'utf8');
+    text = read(file, 'utf8');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const entry = parseSourceEntry(dir, root, file, '');

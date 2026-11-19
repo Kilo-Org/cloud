@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { type ConnectivityState, connectivityStatus, isOnline } from '@/lib/connectivity-online';
+import { subscribeConnectivityWithForceState } from '@/lib/force-state-fixture';
 import {
   getCommittedConnectivityStatus,
   subscribeCommittedConnectivityStatus,
@@ -35,7 +36,10 @@ const nativeLifecycleSources: QueryClientLifecycleSources = {
       subscription.remove();
     };
   },
-  onConnectivityChange: listener => addEventListener(listener),
+  onConnectivityChange: listener =>
+    __DEV__
+      ? subscribeConnectivityWithForceState(addEventListener, listener)
+      : addEventListener(listener),
   onCommittedConnectivityChange: subscribeCommittedConnectivityStatus,
 };
 

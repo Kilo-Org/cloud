@@ -1,11 +1,15 @@
-import { jwtVerify, SignJWT } from 'jose';
+import { SignJWT } from 'jose';
 import { z } from 'zod';
+import { verifyKiloTokenSignature } from './kilo-token-verification';
+import { sha256Hex } from './sha256';
 
 export const RUNTIME_PROXY_ATTESTATION_HEADER = 'X-Kilo-Runtime-Proxy-Attestation';
 export const RUNTIME_PROXY_ATTESTATION_ISSUER = 'kilocode-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_TYPE = 'cloud-agent-next-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_VERSION = 1;
 export const RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS = 30;
+/** Sanity bound on the untrusted header value in characters, checked before any JWT parsing runs. */
+export const RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH = 4096;
 
 export const RuntimeProxyAttestationAudienceSchema = z.enum([
   'kilo-api',
@@ -50,16 +54,11 @@ const runtimeProxyAttestationClaims = z
 
 export type RuntimeProxyAttestationClaims = z.infer<typeof runtimeProxyAttestationClaims>;
 
-async function bearerDigest(bearer: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(bearer));
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
 function signingKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-export async function issueRuntimeProxyAttestation(input: {
+export type RuntimeProxyAttestationSubject = {
   secret: string;
   audience: RuntimeProxyAttestationAudience;
   userId: string;
@@ -67,7 +66,11 @@ export async function issueRuntimeProxyAttestation(input: {
   resourceId: string;
   bearer: string;
   now?: Date;
-}): Promise<string> {
+};
+
+export async function issueRuntimeProxyAttestation(
+  input: RuntimeProxyAttestationSubject
+): Promise<string> {
   const now = input.now ?? new Date();
   const issuedAt = Math.floor(now.getTime() / 1000);
   if (!Number.isSafeInteger(issuedAt) || issuedAt < 0)
@@ -80,33 +83,21 @@ export async function issueRuntimeProxyAttestation(input: {
     userId: input.userId,
     authorizationId: input.authorizationId,
     resourceId: input.resourceId,
-    bearerDigest: await bearerDigest(input.bearer),
+    bearerDigest: await sha256Hex(input.bearer),
     iat: issuedAt,
     exp: issuedAt + RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS,
   });
   return new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-    .setIssuedAt(claims.iat)
-    .setExpirationTime(claims.exp)
-    .setIssuer(claims.iss)
-    .setAudience(claims.aud)
     .sign(signingKey(input.secret));
 }
 
-export async function verifyRuntimeProxyAttestation(input: {
-  value: string | null | undefined;
-  secret: string;
-  audience: RuntimeProxyAttestationAudience;
-  userId: string;
-  authorizationId: string;
-  resourceId: string;
-  bearer: string;
-  now?: Date;
-}): Promise<boolean> {
-  if (!input.value || input.value.length > 4096) return false;
+export async function verifyRuntimeProxyAttestation(
+  input: RuntimeProxyAttestationSubject & { value: string | null | undefined }
+): Promise<boolean> {
+  if (!input.value || input.value.length > RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH) return false;
   try {
-    const { payload } = await jwtVerify(input.value, signingKey(input.secret), {
-      algorithms: ['HS256'],
+    const { payload } = await verifyKiloTokenSignature(input.value, input.secret, {
       issuer: RUNTIME_PROXY_ATTESTATION_ISSUER,
       audience: input.audience,
       currentDate: input.now,
@@ -117,7 +108,7 @@ export async function verifyRuntimeProxyAttestation(input: {
       claims.userId === input.userId &&
       claims.authorizationId === input.authorizationId &&
       claims.resourceId === input.resourceId &&
-      claims.bearerDigest === (await bearerDigest(input.bearer))
+      claims.bearerDigest === (await sha256Hex(input.bearer))
     );
   } catch {
     return false;

@@ -32,6 +32,8 @@ function createAttachment(name: string, contents: string): Attachment {
     type: 'file',
     name,
     mimeType: 'text/plain',
+    // A platform states a size with a body it lets the adapter fetch whole.
+    size: Buffer.byteLength(contents),
     fetchData: jest.fn(async () => Buffer.from(contents)),
   };
 }
@@ -93,8 +95,20 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
 
     const result = await extractAndUploadAttachments(
       createMessage([
-        { type: 'file', name: 'notes.md', mimeType: 'text/plain', fetchData: notesFetch },
-        { type: 'file', name: 'more.txt', mimeType: 'text/plain', fetchData: moreFetch },
+        {
+          type: 'file',
+          name: 'notes.md',
+          mimeType: 'text/plain',
+          size: 5,
+          fetchData: notesFetch,
+        },
+        {
+          type: 'file',
+          name: 'more.txt',
+          mimeType: 'text/plain',
+          size: 4,
+          fetchData: moreFetch,
+        },
       ]),
       kiloUserId
     );
@@ -131,7 +145,9 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
 
     await discardUploadedAttachments(kiloUserId, uploaded);
 
-    expect((await rowsFor(kiloUserId)).map(row => row.status)).toEqual(['reaped', 'reaped']);
+    // The released claim keeps each key until the presigned URL expires, so a
+    // late object stays attributable and the reaper deletes it afterwards.
+    expect((await rowsFor(kiloUserId)).map(row => row.status)).toEqual(['released', 'released']);
     const deletedKeys = mockSend.mock.calls
       .filter(([command]) => command.name === 'DeleteObjectCommand')
       .map(([command]) => command.input.Key)

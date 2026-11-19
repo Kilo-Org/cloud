@@ -35,6 +35,7 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   background: (style: unknown) => ({ $type: 'background', args: style }),
   buttonStyle: mockModifier('buttonStyle'),
   cornerRadius: mockModifier('cornerRadius'),
+  dynamicTypeSize: mockModifier('dynamicTypeSize'),
   environment: mockModifier('environment'),
   fixedSize: mockModifier('fixedSize'),
   font: mockModifier('font'),
@@ -575,6 +576,29 @@ describe('session card layout: Lock Screen budget', () => {
         expect(modifiers.find(modifier => modifier.$type === 'lineLimit')?.args).toBe(1);
       }
       expect(collect(banner).length).toBeLessThanOrEqual(LOCK_SCREEN_ELEMENTS);
+    });
+  }
+});
+
+describe('session card layout: Dynamic Type', () => {
+  const textSize = (node: unknown) =>
+    ((element(node)?.props.modifiers ?? []) as { $type: string; args?: unknown }[]).find(
+      modifier => modifier.$type === 'dynamicTypeSize'
+    )?.args;
+
+  for (const [name, state] of BUDGET_CASES) {
+    it(`grows a ${name} Lock Screen card up to xLarge and keeps the island at the default size`, () => {
+      const layout = render(state);
+      expect(textSize(layout.banner)).toEqual({ max: 'xLarge' });
+      expect(textSize(layout.bannerSmall)).toBe('large');
+      expect(textSize(layout.compactTrailing)).toBe('large');
+      expect(textSize(layout.expandedBottom)).toBe('large');
+      for (const textItem of collect(layout.banner).filter(item => item.kind === 'Text')) {
+        const modifiers = (textItem.props.modifiers ?? []) as { $type: string; args?: unknown }[];
+        expect(modifiers.find(modifier => modifier.$type === 'font')?.args).toHaveProperty(
+          'textStyle'
+        );
+      }
     });
   }
 });

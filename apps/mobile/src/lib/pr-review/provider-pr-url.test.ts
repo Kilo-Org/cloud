@@ -24,6 +24,74 @@ describe('parseProviderPrUrl — GitHub', () => {
   it('rejects a GitHub Enterprise host — the GitHub App serves github.com only', () => {
     expect(parseProviderPrUrl('https://github.example.com/octocat/hello-world/pull/42')).toBeNull();
   });
+
+  it('tolerates a trailing sentence period', () => {
+    expect(parseProviderPrUrl('https://github.com/octocat/hello-world/pull/42.')).toEqual({
+      platform: 'github',
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('tolerates a trailing comma', () => {
+    expect(parseProviderPrUrl('https://github.com/octocat/hello-world/pull/42,')).toEqual({
+      platform: 'github',
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('tolerates an angle-wrapped URL', () => {
+    expect(parseProviderPrUrl('<https://github.com/octocat/hello-world/pull/42>')).toEqual({
+      platform: 'github',
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('tolerates a markdown-link URL, dropping the title', () => {
+    expect(parseProviderPrUrl('[PR 42](https://github.com/octocat/hello-world/pull/42)')).toEqual({
+      platform: 'github',
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('tolerates a paren-wrapped angle-wrapped URL', () => {
+    expect(parseProviderPrUrl('(<https://github.com/octocat/hello-world/pull/42>)')).toEqual({
+      platform: 'github',
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('tolerates a paren-wrapped URL', () => {
+    expect(parseProviderPrUrl('(https://github.com/octocat/hello-world/pull/42)')).toEqual({
+      platform: 'github',
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('tolerates a single-quoted URL', () => {
+    expect(parseProviderPrUrl("'https://github.com/octocat/hello-world/pull/42'")).toEqual({
+      platform: 'github',
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('still rejects a non-review GitHub URL inside wrappers', () => {
+    // Tidying may not promote a URL the checker would refuse unwrapped.
+    expect(parseProviderPrUrl('[diff](https://github.com/o/r/blob/branch/path.md)')).toBeNull();
+  });
 });
 
 describe('parseProviderPrUrl — GitLab', () => {
@@ -212,6 +280,20 @@ describe('findFirstProviderPrUrl', () => {
     expect(
       findFirstProviderPrUrl('https://bitbucket.org/acme/api/pull-requests/42/overview')
     ).toEqual({ platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 });
+  });
+
+  it('finds a wrapper-decorated URL after the plain candidates fail', () => {
+    // The markdown title holds the only whitespace, so no whitespace token
+    // parses; only the tidy retry on the WHOLE text peels the wrapper.
+    expect(
+      findFirstProviderPrUrl('[PR 42](https://github.com/octocat/hello-world/pull/42)')
+    ).toEqual({ platform: 'github', owner: 'octocat', repo: 'hello-world', number: 42 });
+  });
+
+  it('finds a quoted URL beside prose through the tidied-token retry', () => {
+    expect(
+      findFirstProviderPrUrl("look at 'https://github.com/octocat/hello-world/pull/42'")
+    ).toEqual({ platform: 'github', owner: 'octocat', repo: 'hello-world', number: 42 });
   });
 
   it('returns the first review URL when several are present', () => {

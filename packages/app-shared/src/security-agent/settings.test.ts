@@ -107,8 +107,23 @@ describe('parseDayCount', () => {
     expect(parseDayCount('30')).toBe(30);
   });
 
+  it('parses keypad digit systems to the same integers as ASCII', () => {
+    // Arabic-Indic U+0660-0669, Persian U+06F0-06F9, Devanagari U+0966-096F,
+    // fullwidth U+FF10-FF19.
+    expect(parseDayCount('٣٢')).toBe(32);
+    expect(parseDayCount('۳۶۵')).toBe(365);
+    expect(parseDayCount('१२')).toBe(12);
+    expect(parseDayCount('１２')).toBe(12);
+    expect(parseDayCount(' ٣ ')).toBe(3);
+  });
+
   it('rejects non-digit input', () => {
     expect(Number.isNaN(parseDayCount('abc'))).toBe(true);
+  });
+
+  it('rejects mixed digit-script and letter input', () => {
+    expect(Number.isNaN(parseDayCount('١a'))).toBe(true);
+    expect(Number.isNaN(parseDayCount('١.5'))).toBe(true);
   });
 
   it('rejects empty input', () => {

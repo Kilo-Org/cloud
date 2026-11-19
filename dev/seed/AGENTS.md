@@ -61,6 +61,7 @@ Topic files MUST NOT:
 - `getSeedDb()`: lazy singleton drizzle client, safe from any topic; pool cap 1.
 - `assertLocalSeedDatabase(fixture)`: refuses the topic unless the database `getSeedDb()` connects to is loopback, and returns its hostname. A fixture that creates users, organizations, memberships or agent configuration calls it before its first statement that reads or writes.
 - `createByokEnvelope(context, plaintext)` (`lib/byok.ts`): wraps a key through the local `byok-kms` service (`pnpm dev:start` or `pnpm dev:byok-kms` must be running). It reads `BYOK_KMS_SERVICE_URL`/`_TOKEN`, falling back to `localByokKmsServiceConfig()` from `dev/local/infra-env.ts` when blank; never send the dev token to a non-loopback URL.
+- `fakeGitLabOAuthCredential(input)` (`lib/gitlab-credential.ts`): a personal GitLab OAuth credential row with placeholder tokens, encrypted with the platform-credential key in `.env.local` (`pnpm dev:setup-env`). The local `git-token-service` resolves it as `available`, so a GitLab status read reports connected; a GitLab call with it fails.
 - `closeSeedDb()`: runner calls in `finally`; topics should not.
 - `createSeedStripeCustomer({ email, name, kiloUserId })`: creates real Stripe test-mode customer with `metadata: { kiloUserId, source: 'dev-seed' }`.
 - `deleteSeedStripeCustomer(id)`: rollback helper; swallows "no such customer".

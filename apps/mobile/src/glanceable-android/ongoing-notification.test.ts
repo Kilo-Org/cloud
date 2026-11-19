@@ -1,6 +1,5 @@
 import {
   buildGlanceableSnapshot,
-  type GlanceableAgentsSnapshot,
   type GlanceableSessionRow,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { describe, expect, it } from 'vitest';
@@ -35,16 +34,12 @@ const FORMAT: NotificationFormat = {
 };
 const IDLE: NotificationAction = { approving: false, failure: null };
 
-function snapshotFor(
-  sessions: GlanceableSessionRow[],
-  status?: GlanceableAgentsSnapshot['status']
-) {
+function snapshotFor(sessions: GlanceableSessionRow[]) {
   return buildGlanceableSnapshot({
     sessions,
     userId: 'u1',
     organizationId: null,
     now: NOW,
-    ...(status === undefined ? {} : { status }),
   });
 }
 const MIXED = snapshotFor([

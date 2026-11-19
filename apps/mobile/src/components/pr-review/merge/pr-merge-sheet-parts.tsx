@@ -7,11 +7,16 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type AllowedMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
@@ -45,8 +50,11 @@ function CommitTitleField({
         onChangeText={value => {
           titleRef.current = value;
         }}
+        // `min-h-11` measured 38.9 dp at NativeWind's 14pt rem; the explicit
+        // 44 dp floor is the target it meant.
         className={cn(
-          'min-h-11 rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
+          TOUCH_TARGET_CLASS,
+          'rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring'
         )}
         multiline
@@ -116,15 +124,18 @@ function DeleteBranchToggle({
     return null;
   }
   return (
-    <View className="flex-row items-center justify-between rounded-lg bg-secondary px-4 py-3">
-      <Text className="flex-1 pr-3 text-sm font-medium">{t('prReview.merge.deleteBranch')}</Text>
-      <Switch
-        accessibilityLabel={t('prReview.merge.deleteBranchAfterMerge')}
+    // The body already carries the page gutter, so the row is a grouped row
+    // like every other switch row: the group draws its own surface and the
+    // primitive owns the switch's haptic and 48pt target.
+    <RowGroup>
+      <PreferenceRow
+        title={t('prReview.merge.deleteBranch')}
         value={value}
         disabled={isDisabled}
         onValueChange={onChange}
+        accessibilityLabel={t('prReview.merge.deleteBranchAfterMerge')}
       />
-    </View>
+    </RowGroup>
   );
 }
 
@@ -144,7 +155,7 @@ export function MergeSheetFormSkeleton(props: {
 }): ReactNode {
   return (
     <>
-      <View className="gap-4 px-6 pt-4">
+      <View className={SCREEN_BODY_CLASS}>
         <View className="gap-1.5">
           <Skeleton className="h-5 w-16" />
           {props.methodOptions.length === 0 ? (
@@ -152,7 +163,10 @@ export function MergeSheetFormSkeleton(props: {
           ) : (
             <View className="flex-row flex-wrap gap-2">
               {props.methodOptions.map(option => (
-                <Skeleton key={option.value} className="h-11 w-20 rounded-full" />
+                <Skeleton
+                  key={option.value}
+                  className={cn(TOUCH_TARGET_CLASS, 'w-20 rounded-full')}
+                />
               ))}
             </View>
           )}
@@ -160,7 +174,7 @@ export function MergeSheetFormSkeleton(props: {
         {props.showTitle ? (
           <View className="gap-1.5">
             <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-11" />
+            <Skeleton className={TOUCH_TARGET_CLASS} />
           </View>
         ) : null}
         <View className="gap-1.5">
@@ -168,14 +182,14 @@ export function MergeSheetFormSkeleton(props: {
           <Skeleton className="h-24" />
         </View>
         {props.showDeleteBranchToggle ? (
-          <View className="rounded-lg bg-secondary px-4 py-3">
-            <Skeleton className="h-[44px]" />
-          </View>
+          <RowGroup>
+            <RowSkeleton trailing="switch" />
+          </RowGroup>
         ) : null}
       </View>
       <PrFormSheetFooter>
-        <Skeleton className="h-[44px]" />
-        <Skeleton className="mt-2 h-[44px]" />
+        <Skeleton className="h-11" />
+        <Skeleton className="mt-2 h-11" />
       </PrFormSheetFooter>
     </>
   );
@@ -236,15 +250,15 @@ export function MergeSheetFormBody(props: {
 
   return (
     <>
-      <View className="gap-4 px-6 pt-4">
+      <View className={SCREEN_BODY_CLASS}>
         {noMethodsAllowed ? (
-          <View className="rounded-md border border-border bg-secondary p-3">
+          <Card className="gap-2">
             <AccessibleStatus
               message={t('prReview.merge.noEnabledMethods')}
               tone="status"
               className="text-sm"
             />
-          </View>
+          </Card>
         ) : (
           <MethodPicker
             methodOptions={methodOptions}

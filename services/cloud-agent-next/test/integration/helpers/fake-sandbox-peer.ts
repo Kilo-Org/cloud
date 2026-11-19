@@ -175,6 +175,7 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   previewTargetResult: PreviewTargetResult = {
     status: 'ok',
     coordinates: {
+      transport: 'durable-object',
       provider: 'cloudflare-containers',
       logicalSandboxId: 'sbx',
       allocationRef: 'sbx',

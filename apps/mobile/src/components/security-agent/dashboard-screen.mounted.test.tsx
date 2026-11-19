@@ -201,9 +201,12 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
   Platform: { OS: 'android' },
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({
+  FolderGit2: 'FolderGit2',
   RefreshCw: 'RefreshCw',
   Settings: 'Settings',
   ShieldAlert: 'ShieldAlert',
@@ -318,12 +321,12 @@ vi.mock('@/lib/utils', () => ({
   parseTimestamp: (value: string) => value,
   timeAgo: () => 'recently',
 }));
-// The header the dashboard paints: its title names the scope, the eyebrow the
-// product. Captured per render so a test can assert what a reader reads.
+// The header the dashboard paints: its title names the product, the subtitle
+// the scope. Captured per render so a test can assert what a reader reads.
 const headers = vi.hoisted(() => ({
   props: [] as {
     title?: string;
-    eyebrow?: string;
+    subtitle?: string;
     headerRight?: unknown;
     headerRightWidth?: number;
   }[],
@@ -331,7 +334,7 @@ const headers = vi.hoisted(() => ({
 // The shared membership list the scope title resolves from. The title never
 // fetches it, so the mock only needs the cache key it reads.
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string }) => {
+  ScreenHeader: (props: { title?: string; subtitle?: string }) => {
     headers.props.push(props);
     return null;
   },
@@ -546,24 +549,24 @@ describe('DashboardScreen names the scope it acts on', () => {
       { organizationId: 'org_123', organizationName: 'Drain Labs', role: 'owner' },
     ]);
     const header = headers.props.at(-1);
-    expect(header?.title).toBe('Drain Labs');
-    expect(header?.eyebrow).toBe('Security Agent');
+    expect(header?.title).toBe('Security Agent');
+    expect(header?.subtitle).toBe('Drain Labs');
   });
 
   it('names the personal scope', () => {
     headers.props = [];
     renderScreen('personal');
     const header = headers.props.at(-1);
-    expect(header?.title).toBe('Personal');
-    expect(header?.eyebrow).toBe('Security Agent');
+    expect(header?.title).toBe('Security Agent');
+    expect(header?.subtitle).toBe('Personal');
   });
 
   it('keeps the header line while the membership list loads', () => {
     headers.props = [];
     renderScreen('org_123');
     const header = headers.props.at(-1);
-    expect(header?.title).toBe('Organization');
-    expect(header?.eyebrow).toBe('Security Agent');
+    expect(header?.title).toBe('Security Agent');
+    expect(header?.subtitle).toBe('Organization');
   });
 });
 
@@ -1978,7 +1981,7 @@ describe('DashboardScreen pending stats', () => {
         n =>
           typeof n.type === 'string' &&
           (n.type as string) === 'View' &&
-          String(n.props.className ?? '').includes('rounded-lg bg-secondary p-3')
+          String(n.props.className ?? '').includes('basis-2/5')
       )
       .map(n => String(n.props.className));
   }
@@ -2163,19 +2166,19 @@ describe('DashboardLoadingView frame', () => {
       .map(action => (action ? action.props.accessibilityLabel : undefined))
       .filter((label): label is string => label !== undefined);
 
-    expect(header.eyebrow).toBe(i18n.t('common.securityAgent'));
+    expect(header.title).toBe(i18n.t('common.securityAgent'));
     expect(labels).toEqual([i18n.t('common.findings'), i18n.t('securityAgent.dashboard.settings')]);
     expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
     expect(findSyncButton(root.root).props.disabled).toBe(true);
     const skeletons = root.root.findAll(
       n => typeof n.type === 'string' && (n.type as string) === 'Skeleton'
     );
-    // Four tile slots on the loaded card's own class, each with the card's three
+    // Four tile slots on the loaded card's own frame, each with the card's three
     // line boxes (label, value, detail), plus the status line's placeholder,
     // which keeps that line's height until the read lands.
     expect(
       root.root.findAll(
-        n => typeof n.type === 'string' && String(n.props.className).includes('w-[47%]')
+        n => typeof n.type === 'string' && String(n.props.className).includes('basis-2/5')
       )
     ).toHaveLength(4);
     expect(skeletons).toHaveLength(13);

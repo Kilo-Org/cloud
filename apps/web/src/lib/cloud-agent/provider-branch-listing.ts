@@ -195,6 +195,10 @@ const githubBranchesUnavailableMessage = 'GitHub did not answer the branch list.
  * repository refusal. The callers handle 403 and 404 themselves, because only
  * they know whether another installation may still see the repository.
  *
+ * The service layer already classified an oversized listing as
+ * `PAYLOAD_TOO_LARGE`, and this mapper returns an already-classified
+ * `TRPCError` unchanged.
+ *
  * A 5xx is provider-side and stays retryable; Octokit also reports a request
  * that got no response as a 500. A 401 is the installation credential itself
  * being refused, which a reconnect fixes; a 451 is GitHub blocking the

@@ -24,7 +24,10 @@ type DiagnosticReason =
   | 'renewal_revoked'
   | 'renewal_failed'
   | 'revocation_persisted'
-  | 'recovery_denied';
+  | 'recovery_denied'
+  | 'workspace_unestablished'
+  | 'workspace_deleted'
+  | 'workspace_mismatch';
 
 export function logRuntimeAuthorizationDiagnostic(
   sessionId: string | undefined,
@@ -35,7 +38,8 @@ export function logRuntimeAuthorizationDiagnostic(
     | 'binding_check'
     | 'recovery'
     | 'admission'
-    | 'mcp_grant',
+    | 'mcp_grant'
+    | 'workspace_authority',
   reason: DiagnosticReason
 ): void {
   try {

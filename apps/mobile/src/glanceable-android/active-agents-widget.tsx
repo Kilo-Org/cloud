@@ -81,7 +81,7 @@ function copyFor(props: AndroidWidgetProps): Copy {
     emptyShort: props.statusLine ?? '',
     title: null,
     wake: null,
-    wakeOverdue: false,
+    wakePassed: false,
     footer: null,
     actionLine: null,
     approveFailed: '',

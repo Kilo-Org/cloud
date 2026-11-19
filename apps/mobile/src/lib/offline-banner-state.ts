@@ -38,6 +38,13 @@ export type OfflineBannerStore = {
   state: () => BannerState;
   /** The phase behind the painted state, for the write gates. */
   phase: () => ConnectivityPhase;
+  /**
+   * Commit offline now, without the confirmation window: for a caller that
+   * already knows the network is gone. A pending confirmation or an in-flight
+   * probe is dropped so it cannot publish over it; the next source report
+   * decides again as usual.
+   */
+  confirmOffline: () => void;
   destroy: () => void;
 };
 
@@ -172,6 +179,15 @@ export function createOfflineBannerStore(options: {
 
   const getPhase = (): ConnectivityPhase => phase;
 
+  const confirmOffline = (): void => {
+    if (destroyed) {
+      return;
+    }
+    generation += 1;
+    cancelPending();
+    commit({ kind: 'offline' });
+  };
+
   const destroy = (): void => {
     destroyed = true;
     generation += 1;
@@ -180,5 +196,5 @@ export function createOfflineBannerStore(options: {
     listeners.clear();
   };
 
-  return { subscribe, isOffline, state: getState, phase: getPhase, destroy };
+  return { subscribe, isOffline, state: getState, phase: getPhase, confirmOffline, destroy };
 }

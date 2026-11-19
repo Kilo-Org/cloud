@@ -57,7 +57,7 @@ const IsoTimestampSchema = z.string().datetime({ offset: true });
 const OperationalIdentifierSchema = z.string().min(1).max(MAX_OPERATIONAL_IDENTIFIER_LENGTH);
 export const CloudAgentRunContainerSchema = z
   .object({
-    provider: z.enum(['cloudflare', 'vercel', 'cloudflare-containers']),
+    provider: z.enum(['cloudflare', 'vercel', 'cloudflare-containers', 'aws']),
     sandboxId: OperationalIdentifierSchema,
     allocationId: OperationalIdentifierSchema.optional(),
     instanceId: OperationalIdentifierSchema.optional(),

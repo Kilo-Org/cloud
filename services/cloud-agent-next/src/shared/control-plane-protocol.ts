@@ -1,3 +1,4 @@
+import { AGENT_SANDBOX_PROVIDERS } from './sandbox-provider.js';
 import { environmentSetupCommandCountSchema, setupCommandsSchema } from './setup-script.js';
 import {
   RuntimeSkillsSchema,
@@ -208,7 +209,12 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'prompt_failed',
   'sandbox_stopped',
   'execution_limit',
+  'provider_lifetime_exhausted',
+  'provider_cleanup_required',
   'byoc_credential_missing',
+  'byoc_aws_not_ready',
+  'byoc_aws_forbidden',
+  'byoc_aws_stack_outdated',
   'byoc_vercel_not_ready',
   'byoc_vercel_forbidden',
   'byoc_vercel_capacity',
@@ -304,11 +310,8 @@ export const controlPlaneWorkspaceFailureSubtypeSchema = z.enum(
 // Bounded run-container facts are duplicated locally (type-only import above)
 // so the standalone wrapper bundle never contains worker-utils. The drift
 // guards below and control-plane-run-container.test.ts contain the drift risk.
-export const CONTROL_PLANE_RUN_CONTAINER_PROVIDERS = [
-  'cloudflare',
-  'vercel',
-  'cloudflare-containers',
-] as const satisfies readonly CloudAgentRunContainer['provider'][];
+export const CONTROL_PLANE_RUN_CONTAINER_PROVIDERS =
+  AGENT_SANDBOX_PROVIDERS satisfies readonly CloudAgentRunContainer['provider'][];
 
 const controlPlaneRunContainerIdentifierSchema = z.string().min(1).max(128);
 

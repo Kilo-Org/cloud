@@ -30,6 +30,36 @@ const RETIRED = 'The retired runtime starts no new compute.';
  */
 const PROVIDER_GAPS: readonly ProviderGap[] = [
   {
+    provider: 'aws',
+    feature: 'workspaceSnapshots',
+    class: 'gap',
+    reason: 'AWS workspace archives are outside the MVP.',
+  },
+  {
+    provider: 'aws',
+    feature: 'environmentSnapshots',
+    class: 'gap',
+    reason: 'Prepared environment archive capture and restore are not wired yet.',
+  },
+  {
+    provider: 'aws',
+    feature: 'egressProxy',
+    class: 'gap',
+    reason: 'The forced proxy and verified allocation admission are not wired yet.',
+  },
+  {
+    provider: 'aws',
+    feature: 'egressProxySeesAll',
+    class: 'gap',
+    reason: 'The forced proxy and tunnel audit are not wired yet.',
+  },
+  {
+    provider: 'aws',
+    feature: 'meteredBilling',
+    class: 'intentional',
+    reason: 'The customer pays AWS; Kilo does not meter BYOC compute.',
+  },
+  {
     provider: 'vercel',
     feature: 'workspaceSnapshots',
     class: 'gap',

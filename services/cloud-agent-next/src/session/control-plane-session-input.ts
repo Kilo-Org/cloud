@@ -185,7 +185,7 @@ export function buildControlPlaneSandboxSelection(
   const sandboxKind = metadata.workspace?.sandboxKind;
   const binding = metadata.workspace?.sandboxProviderBinding;
   const byoc =
-    binding?.kind === 'vercel' && binding.source.kind === 'byoc'
+    (binding?.kind === 'vercel' || binding?.kind === 'aws') && binding.source.kind === 'byoc'
       ? { ...byocVercelOwnerFields(binding.source), credentialId: binding.source.credentialId }
       : undefined;
   if (provider === 'vercel') {
@@ -196,6 +196,24 @@ export function buildControlPlaneSandboxSelection(
       configuration: resources === undefined ? { provider } : { provider, resources },
       byoc,
       ...(sandboxKind ? { sandboxKind } : {}),
+    };
+  }
+  if (provider === 'aws') {
+    if (!byoc) throw new ControlPlaneRegistrationError('AWS requires a customer connection');
+    return {
+      provider,
+      configuration: { provider },
+      byoc,
+      ...(sandboxKind ? { sandboxKind } : {}),
+      ...(metadata.workspace?.egressMode === undefined
+        ? {}
+        : { egressMode: metadata.workspace.egressMode }),
+      ...(metadata.workspace?.egressAllowlist === undefined
+        ? {}
+        : { egressAllowlist: metadata.workspace.egressAllowlist }),
+      ...(metadata.workspace?.egressAudit === undefined
+        ? {}
+        : { egressAudit: metadata.workspace.egressAudit }),
     };
   }
   const billing = buildSandboxBillingInput(metadata, sandboxId);

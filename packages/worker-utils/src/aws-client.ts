@@ -51,7 +51,7 @@ export function createAwsClient(input: {
       try {
         const request = await signer.sign(url.toString(), {
           ...init,
-          redirect: 'error',
+          redirect: 'manual',
           signal: init.signal
             ? AbortSignal.any([init.signal, AbortSignal.timeout(15_000)])
             : AbortSignal.timeout(15_000),

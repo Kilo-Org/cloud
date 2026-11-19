@@ -133,6 +133,8 @@ export type AllocationEvent =
       origin: 'peer' | 'heartbeat_timeout';
     }
   | { type: 'provider-gone'; at: number }
+  /** A permanent provider failure must settle pending work before cleanup. */
+  | { type: 'provider-failed'; at: number; reason: ControlPlaneFailureReason }
   /** `reason` is why the caller stops the sandbox; every stop must name one. */
   | {
       type: 'stop-requested';
@@ -410,6 +412,15 @@ export function reduceAllocation(
         return { state: { ...state, unconfirmedProviderRef: null }, effects: NO_EFFECTS };
       }
       return { state: initialAllocationState(), effects: NO_EFFECTS };
+    }
+
+    case 'provider-failed': {
+      if (state.kind === 'stopped' || state.kind === 'stopping')
+        return { state, effects: NO_EFFECTS };
+      return {
+        ...enterStopping(state, event.at, timers, event.reason),
+        routeFailure: event.reason,
+      };
     }
 
     case 'stop-requested': {

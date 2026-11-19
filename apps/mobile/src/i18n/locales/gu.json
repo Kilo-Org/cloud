@@ -178,7 +178,8 @@
     "organizationTrialEnded": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. સંસ્થાનો માલિક kilo.ai પર બિલિંગ અપડેટ કરી શકે છે, પછી ફરીથી પ્રયાસ કરો.",
     "privateRepositoryA11y": "{{name}}, ખાનગી રિપોઝિટરી",
     "legalDocumentEnglishOnly": "આ દસ્તાવેજ ફક્ત અંગ્રેજીમાં ઉપલબ્ધ છે.",
-    "organizationTrialEndedBilling": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. તમે બિલિંગ અપડેટ કરી શકો છો, પછી ફરીથી પ્રયાસ કરો."
+    "organizationTrialEndedBilling": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. તમે બિલિંગ અપડેટ કરી શકો છો, પછી ફરીથી પ્રયાસ કરો.",
+    "viewOnGitHub": "GitHub પર PR જુઓ"
   },
   "language": {
     "restarting": "ભાષા લાગુ કરવા ઍપ ફરી શરૂ થઈ રહી છે",
@@ -743,6 +744,9 @@
       "comment_one": "1 ટિપ્પણી",
       "comment": "{{displayCount}} ટિપ્પણીઓ",
       "comment_other": "{{displayCount}} ટિપ્પણીઓ",
+      "conversationTruncated": "ફક્ત પહેલી {{displayCount}} ટિપ્પણીઓ દેખાય છે.",
+      "conversationTruncated_one": "ફક્ત પહેલી {{displayCount}} ટિપ્પણીઓ દેખાય છે.",
+      "conversationTruncated_other": "ફક્ત પહેલી {{displayCount}} ટિપ્પણીઓ દેખાય છે.",
       "startedRelative": " · {{relative}} શરૂ થયો",
       "couldNotLoadMore": "વધુ ટિપ્પણીઓ લોડ કરી શકાઈ નહીં.",
       "retryLoadingMore": "વધુ ટિપ્પણીઓ લોડ કરવાનો ફરી પ્રયત્ન કરો",
@@ -865,7 +869,6 @@
       "noAccess": "તમને આ રિપોઝિટરીની તપાસો જોવાની પરવાનગી નથી.",
       "couldNotLoad": "તપાસો લોડ કરી શકાઈ નહીં.",
       "retryChecks": "તપાસો ફરી લોડ કરવાનો પ્રયત્ન કરો",
-      "viewOnGitHub": "GitHub પર PR જુઓ",
       "noChecksReported": "કોઈ તપાસ નોંધાઈ નથી",
       "passed": "{{displayCount}} સફળ",
       "passed_one": "{{displayCount}} સફળ",

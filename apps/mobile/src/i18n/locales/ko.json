@@ -178,7 +178,8 @@
     "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요.",
     "privateRepositoryA11y": "{{name}}, 비공개 저장소",
     "legalDocumentEnglishOnly": "이 문서는 영어로만 제공됩니다.",
-    "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다."
+    "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
+    "viewOnGitHub": "GitHub에서 PR 보기"
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -2757,7 +2758,6 @@
       "skipped_one": "{{displayCount}}개 건너뜀",
       "skipped_other": "{{displayCount}}개 건너뜀",
       "title": "검사",
-      "viewOnGitHub": "GitHub에서 PR 보기",
       "checkDetails": "검사 세부 정보"
     },
     "composer": {
@@ -2818,6 +2818,9 @@
       "commentActions": "댓글 작업",
       "comment": "댓글 {{displayCount}}개",
       "comment_other": "댓글 {{displayCount}}개",
+      "conversationTruncated": "처음 {{displayCount}}개의 댓글만 표시합니다.",
+      "conversationTruncated_other": "처음 {{displayCount}}개의 댓글만 표시합니다.",
+      "conversationTruncated_one": "처음 {{displayCount}}개의 댓글만 표시합니다.",
       "couldNotLoad": "토론을 불러오지 못했습니다.",
       "couldNotLoadMore": "댓글을 더 불러오지 못했습니다.",
       "loadMoreComments": "댓글 더 불러오기",

@@ -53,6 +53,7 @@ const hoisted = vi.hoisted(() => ({
     },
     threads: [] as unknown[],
     conversation: [] as unknown[],
+    conversationTruncated: false,
     firstPageErrorState: null as { kind: string } | null,
     laterPageError: false,
   },
@@ -202,6 +203,7 @@ export function resetState(): void {
   discussionState.query.isFetchingNextPage = false;
   discussionState.threads = [];
   discussionState.conversation = [];
+  discussionState.conversationTruncated = false;
   discussionState.firstPageErrorState = null;
   discussionState.laterPageError = false;
   hoisted.connectivity.value = 'online';

@@ -178,7 +178,8 @@
     "organizationTrialEnded": "ការសាកល្បងរបស់ស្ថាប័នបានបញ្ចប់ ហើយវាមិនមានគម្រោងសកម្មទេ។ ម្ចាស់ស្ថាប័នអាចធ្វើបច្ចុប្បន្នភាពវិក្កយបត្រនៅ kilo.ai បន្ទាប់មកព្យាយាមម្តងទៀត។",
     "privateRepositoryA11y": "{{name}}, ឃ្លាំងកូដឯកជន",
     "legalDocumentEnglishOnly": "ឯកសារនេះអាចរកបានតែជាភាសាអង់គ្លេសប៉ុណ្ណោះ។",
-    "organizationTrialEndedBilling": "ការសាកល្បងរបស់ស្ថាប័នបានបញ្ចប់ ហើយវាមិនមានគម្រោងសកម្មទេ។ អ្នកអាចធ្វើបច្ចុប្បន្នភាពវិក្កយបត្រ បន្ទាប់មកព្យាយាមម្តងទៀត។"
+    "organizationTrialEndedBilling": "ការសាកល្បងរបស់ស្ថាប័នបានបញ្ចប់ ហើយវាមិនមានគម្រោងសកម្មទេ។ អ្នកអាចធ្វើបច្ចុប្បន្នភាពវិក្កយបត្រ បន្ទាប់មកព្យាយាមម្តងទៀត។",
+    "viewOnGitHub": "មើល PR នៅលើ GitHub"
   },
   "language": {
     "restarting": "កំពុងចាប់ផ្តើមឡើងវិញដើម្បីប្រើភាសាដែលបានជ្រើសរើស",
@@ -743,6 +744,9 @@
       "comment_one": "មតិយោបល់ 1",
       "comment": "មតិយោបល់ {{displayCount}}",
       "comment_other": "មតិយោបល់ {{displayCount}}",
+      "conversationTruncated": "បង្ហាញតែមតិយោបល់ {{displayCount}} ដំបូងប៉ុណ្ណោះ។",
+      "conversationTruncated_other": "បង្ហាញតែមតិយោបល់ {{displayCount}} ដំបូងប៉ុណ្ណោះ។",
+      "conversationTruncated_one": "បង្ហាញតែមតិយោបល់ {{displayCount}} ដំបូងប៉ុណ្ណោះ។",
       "startedRelative": " · បានចាប់ផ្តើម {{relative}}",
       "couldNotLoadMore": "មិនអាចផ្ទុកមតិយោបល់បន្ថែមបានទេ។",
       "retryLoadingMore": "ព្យាយាមផ្ទុកមតិយោបល់បន្ថែមម្តងទៀត",
@@ -865,7 +869,6 @@
       "noAccess": "អ្នកគ្មានសិទ្ធិចូលប្រើការត្រួតពិនិត្យសម្រាប់ឃ្លាំងកូដនេះទេ។",
       "couldNotLoad": "មិនអាចផ្ទុកការត្រួតពិនិត្យបានទេ។",
       "retryChecks": "ព្យាយាមផ្ទុកការត្រួតពិនិត្យម្តងទៀត",
-      "viewOnGitHub": "មើល PR នៅលើ GitHub",
       "noChecksReported": "មិនទាន់មានរបាយការណ៍ត្រួតពិនិត្យ",
       "passed": "ជោគជ័យ {{displayCount}}",
       "passed_one": "ជោគជ័យ {{displayCount}}",

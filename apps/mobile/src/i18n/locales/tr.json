@@ -141,6 +141,7 @@
     "online": "Çevrimiçi",
     "open": "{{name}} öğesini aç",
     "openPullRequest": "Açık çekme isteği",
+    "viewOnGitHub": "PR'ı GitHub'da görüntüle",
     "completed": "Tamamlandı",
     "pending": "Bekliyor",
     "running": "Çalışıyor",
@@ -2757,7 +2758,6 @@
       "skipped_one": "{{displayCount}} atlandı",
       "skipped_other": "{{displayCount}} atlandı",
       "title": "Kontroller",
-      "viewOnGitHub": "PR'ı GitHub'da görüntüle",
       "checkDetails": "kontrol ayrıntıları"
     },
     "composer": {
@@ -2821,6 +2821,9 @@
       "couldNotLoad": "Tartışma yüklenemedi.",
       "couldNotLoadMore": "Daha fazla yorum yüklenemedi.",
       "loadMoreComments": "Daha fazla yorum yükle",
+      "conversationTruncated": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
+      "conversationTruncated_one": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
+      "conversationTruncated_other": "Yalnızca ilk {{displayCount}} yorum gösteriliyor.",
       "loading": "Tartışma yükleniyor",
       "moderation": {
         "block": {

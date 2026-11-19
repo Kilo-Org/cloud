@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali.",
     "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa",
     "legalDocumentEnglishOnly": "Dokumentiin kun Afaan Ingiliffaan qofa argama.",
-    "organizationTrialEndedBilling": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii haaromsuu danda'aa, sana booda irra deebi'ii yaali."
+    "organizationTrialEndedBilling": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii haaromsuu danda'aa, sana booda irra deebi'ii yaali.",
+    "viewOnGitHub": "PR GitHub irratti ilaali"
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "Yaadota dabalataa fe'uu hin danda'amne.",
       "retryLoadingMore": "Yaadota dabalataa fe'uuf irra deebi'ii yaali",
       "loadMoreComments": "Yaadota dabalataa fe'i",
+      "conversationTruncated": "Yaadota {{displayCount}} jalqabaa qofa agarsiisaa jirra.",
+      "conversationTruncated_one": "Yaadota {{displayCount}} jalqabaa qofa agarsiisaa jirra.",
+      "conversationTruncated_other": "Yaadota {{displayCount}} jalqabaa qofa agarsiisaa jirra.",
       "addReaction": "Mallattoo miiraa dabali",
       "reactionPill": "Mallattoo miiraa {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "mallattoo miiraa",
@@ -865,7 +869,6 @@
       "noAccess": "Qorannoowwan kuusaa koodii kanaa ilaaluuf hayyama hin qabdu.",
       "couldNotLoad": "Qorannoowwan fe'uu hin danda'amne.",
       "retryChecks": "Qorannoowwan irra deebi'ii yaali",
-      "viewOnGitHub": "PR GitHub irratti ilaali",
       "noChecksReported": "Qorannoon gabaafame hin jiru",
       "passed": "{{displayCount}} darban",
       "passed_one": "{{displayCount}} darban",

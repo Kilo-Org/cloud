@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
     "privateRepositoryA11y": "{{name}}, privatni repozitorij",
     "legalDocumentEnglishOnly": "Ovaj je dokument dostupan samo na engleskom jeziku.",
-    "organizationTrialEndedBilling": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu i zatim pokušati ponovno."
+    "organizationTrialEndedBilling": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu i zatim pokušati ponovno.",
+    "viewOnGitHub": "Pogledaj PR na GitHubu"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",
@@ -753,6 +754,10 @@
       "comment_one": "{{displayCount}} komentar",
       "comment": "{{displayCount}} komentara",
       "comment_other": "{{displayCount}} komentara",
+      "conversationTruncated": "Prikazuje se samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_one": "Prikazuje se samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_few": "Prikazuje se samo prvih {{displayCount}} komentara.",
+      "conversationTruncated_other": "Prikazuje se samo prvih {{displayCount}} komentara.",
       "startedRelative": " · započeto {{relative}}",
       "couldNotLoadMore": "Nije moguće učitati dodatne komentare.",
       "retryLoadingMore": "Pokušaj ponovno učitati dodatne komentare",
@@ -878,7 +883,6 @@
       "noAccess": "Nemaš pristup provjerama za ovaj repozitorij.",
       "couldNotLoad": "Nije moguće učitati provjere.",
       "retryChecks": "Pokušaj ponovno učitati provjere",
-      "viewOnGitHub": "Pogledaj PR na GitHubu",
       "noChecksReported": "Nema prijavljenih provjera",
       "passed": "uspješno: {{displayCount}}",
       "passed_one": "uspješno: {{displayCount}}",

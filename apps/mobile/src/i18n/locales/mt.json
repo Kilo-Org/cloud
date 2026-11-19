@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova.",
     "privateRepositoryA11y": "{{name}}, repositorju privat",
     "legalDocumentEnglishOnly": "Dan id-dokument huwa disponibbli bl-Ingliż biss.",
-    "organizationTrialEndedBilling": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni, imbagħad terġa' tipprova."
+    "organizationTrialEndedBilling": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni, imbagħad terġa' tipprova.",
+    "viewOnGitHub": "Ara l-PR fuq GitHub"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -777,6 +778,12 @@
       "couldNotLoadMore": "Ma setgħux jitgħabbew aktar kummenti.",
       "retryLoadingMore": "Erġa' pprova tgħabbi aktar kummenti",
       "loadMoreComments": "Għabbi aktar kummenti",
+      "conversationTruncated": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_one": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_two": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_few": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_many": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
+      "conversationTruncated_other": "Qed jintwerew l-ewwel {{displayCount}} kummenti biss.",
       "addReaction": "Żid reazzjoni",
       "reactionPill": "reazzjoni {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reazzjoni",
@@ -904,7 +911,6 @@
       "noAccess": "M'għandekx aċċess għall-kontrolli ta' dan ir-repożitorju.",
       "couldNotLoad": "Ma setgħux jitgħabbew il-kontrolli.",
       "retryChecks": "Erġa' pprova tgħabbi l-kontrolli",
-      "viewOnGitHub": "Ara l-PR fuq GitHub",
       "noChecksReported": "L-ebda kontroll irrapportat",
       "passed": "{{displayCount}} għaddew",
       "passed_one": "{{displayCount}} għaddew",

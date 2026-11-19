@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen.",
     "privateRepositoryA11y": "{{name}}, privat repository",
     "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
-    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen."
+    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen.",
+    "viewOnGitHub": "Vis PR på GitHub"
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "Kunne ikke indlæse flere kommentarer.",
       "retryLoadingMore": "Prøv at indlæse flere kommentarer igen",
       "loadMoreComments": "Indlæs flere kommentarer",
+      "conversationTruncated": "Kun de første {{displayCount}} kommentarer vises.",
+      "conversationTruncated_one": "Kun de første {{displayCount}} kommentarer vises.",
+      "conversationTruncated_other": "Kun de første {{displayCount}} kommentarer vises.",
       "addReaction": "Tilføj reaktion",
       "reactionPill": "Reaktion: {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktion",
@@ -865,7 +869,6 @@
       "noAccess": "Du har ikke adgang til kontroller for dette kodelager.",
       "couldNotLoad": "Kunne ikke indlæse kontroller.",
       "retryChecks": "Prøv at indlæse kontrollerne igen",
-      "viewOnGitHub": "Vis PR på GitHub",
       "noChecksReported": "Ingen kontroller rapporteret",
       "passed": "{{displayCount}} bestået",
       "passed_one": "{{displayCount}} bestået",

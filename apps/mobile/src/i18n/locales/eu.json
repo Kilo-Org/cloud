@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu.",
     "privateRepositoryA11y": "{{name}}, biltegi pribatua",
     "legalDocumentEnglishOnly": "Dokumentu hau ingelesez bakarrik dago eskuragarri.",
-    "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu."
+    "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu.",
+    "viewOnGitHub": "Ikusi PR-a GitHub-en"
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "Ezin izan dira iruzkin gehiago kargatu.",
       "retryLoadingMore": "Saiatu iruzkin gehiago berriro kargatzen",
       "loadMoreComments": "Kargatu iruzkin gehiago",
+      "conversationTruncated": "Lehenengo {{displayCount}} iruzkinak soilik erakusten dira.",
+      "conversationTruncated_one": "Lehenengo {{displayCount}} iruzkinak soilik erakusten dira.",
+      "conversationTruncated_other": "Lehenengo {{displayCount}} iruzkinak soilik erakusten dira.",
       "addReaction": "Gehitu erreakzioa",
       "reactionPill": "{{emoji}} erreakzioa, {{displayCount}} {{countLabel}}",
       "reaction_one": "erreakzio",
@@ -865,7 +869,6 @@
       "noAccess": "Ez duzu sarbiderik biltegi honen egiaztapenetara.",
       "couldNotLoad": "Ezin izan dira egiaztapenak kargatu.",
       "retryChecks": "Saiatu egiaztapenak berriro kargatzen",
-      "viewOnGitHub": "Ikusi PR-a GitHub-en",
       "noChecksReported": "Ez da egiaztapenik jakinarazi",
       "passed": "{{displayCount}} gaindituta",
       "passed_one": "{{displayCount}} gaindituta",

@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
     "privateRepositoryA11y": "{{name}}, repository privato",
     "legalDocumentEnglishOnly": "Questo documento è disponibile solo in inglese.",
-    "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova."
+    "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova.",
+    "viewOnGitHub": "Visualizza la PR su GitHub"
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -2796,7 +2797,6 @@
       "skipped_other": "{{displayCount}} saltati",
       "skipped_many": "{{displayCount}} saltati",
       "title": "Controlli",
-      "viewOnGitHub": "Visualizza la PR su GitHub",
       "checkDetails": "dettagli del controllo"
     },
     "composer": {
@@ -2857,6 +2857,10 @@
       "commentActions": "Azioni sul commento",
       "comment": "{{displayCount}} commenti",
       "comment_other": "{{displayCount}} commenti",
+      "conversationTruncated": "Sono visualizzati solo i primi {{displayCount}} commenti.",
+      "conversationTruncated_one": "Sono visualizzati solo i primi {{displayCount}} commenti.",
+      "conversationTruncated_many": "Sono visualizzati solo i primi {{displayCount}} commenti.",
+      "conversationTruncated_other": "Sono visualizzati solo i primi {{displayCount}} commenti.",
       "couldNotLoad": "Impossibile caricare la discussione.",
       "couldNotLoadMore": "Impossibile caricare altri commenti.",
       "loadMoreComments": "Carica altri commenti",

@@ -685,4 +685,23 @@ describe('buildReviewThreadsResult', () => {
       },
     ]);
   });
+
+  it('carries conversationTruncated onto the result only when true', () => {
+    const args = {
+      page: 1,
+      hasNextPage: false,
+      endCursor: null,
+      threads: [],
+      conversation: [],
+    };
+
+    const truncated = buildReviewThreadsResult({ ...args, conversationTruncated: true });
+    expect(truncated.truncated).toBe(true);
+
+    // A complete listing keeps the shape it has always had: no key at all.
+    expect(Object.hasOwn(buildReviewThreadsResult(args), 'truncated')).toBe(false);
+    expect(buildReviewThreadsResult({ ...args, conversationTruncated: false })).not.toHaveProperty(
+      'truncated'
+    );
+  });
 });

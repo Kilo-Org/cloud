@@ -178,7 +178,8 @@
     "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
     "privateRepositoryA11y": "{{name}}, magán adattár",
     "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el.",
-    "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra."
+    "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra.",
+    "viewOnGitHub": "PR megtekintése a GitHubon"
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -743,6 +744,9 @@
       "comment_one": "1 hozzászólás",
       "comment": "{{displayCount}} hozzászólás",
       "comment_other": "{{displayCount}} hozzászólás",
+      "conversationTruncated": "Csak az első {{displayCount}} hozzászólás látható.",
+      "conversationTruncated_one": "Csak az első {{displayCount}} hozzászólás látható.",
+      "conversationTruncated_other": "Csak az első {{displayCount}} hozzászólás látható.",
       "startedRelative": " · kezdődött: {{relative}}",
       "couldNotLoadMore": "Nem sikerült betölteni a további hozzászólásokat.",
       "retryLoadingMore": "További hozzászólások betöltésének megismétlése",
@@ -865,7 +869,6 @@
       "noAccess": "Nincs hozzáférésed a tároló ellenőrzéseihez.",
       "couldNotLoad": "Nem sikerült betölteni az ellenőrzéseket.",
       "retryChecks": "Ellenőrzések betöltésének megismétlése",
-      "viewOnGitHub": "PR megtekintése a GitHubon",
       "noChecksReported": "Még nincs ellenőrzési eredmény",
       "passed": "{{displayCount}} sikeres",
       "passed_one": "{{displayCount}} sikeres",

@@ -178,7 +178,8 @@
     "organizationTrialEnded": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. خاوەنێکی ڕێکخراو دەتوانێت لە kilo.ai پارەدان نوێ بکاتەوە، پاشان دووبارە هەوڵ بداتەوە.",
     "privateRepositoryA11y": "{{name}}، کۆگای تایبەت",
     "legalDocumentEnglishOnly": "ئەم بەڵگەنامەیە تەنها بە زمانی ئینگلیزی بەردەستە.",
-    "organizationTrialEndedBilling": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. دەتوانیت پارەدان نوێ بکەیتەوە، پاشان دووبارە هەوڵ بدەیتەوە."
+    "organizationTrialEndedBilling": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. دەتوانیت پارەدان نوێ بکەیتەوە، پاشان دووبارە هەوڵ بدەیتەوە.",
+    "viewOnGitHub": "PR لە GitHub ببینە"
   },
   "language": {
     "restarting": "بۆ جێبەجێکردنی گۆڕینی زمان، دووبارە دەست پێ دەکاتەوە",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "نەتوانرا بۆچوونی زیاتر بار بکرێت.",
       "retryLoadingMore": "دووبارە هەوڵی بارکردنی بۆچوونی زیاتر بدەوە",
       "loadMoreComments": "بۆچوونی زیاتر بار بکە",
+      "conversationTruncated": "تەنها یەکەم {{displayCount}} بۆچوون پیشان دەدرێت.",
+      "conversationTruncated_one": "تەنها یەکەم {{displayCount}} بۆچوون پیشان دەدرێت.",
+      "conversationTruncated_other": "تەنها یەکەم {{displayCount}} بۆچوون پیشان دەدرێت.",
       "addReaction": "کاردانەوە زیاد بکە",
       "reactionPill": "کاردانەوەی {{emoji}}، {{displayCount}} {{countLabel}}",
       "reaction_one": "کاردانەوە",
@@ -865,7 +869,6 @@
       "noAccess": "دەستت بە پشکنینەکانی ئەم ڕێپۆیە ناگات.",
       "couldNotLoad": "نەتوانرا پشکنینەکان بار بکرێن.",
       "retryChecks": "دووبارە هەوڵی پشکنینەکان بدەوە",
-      "viewOnGitHub": "PR لە GitHub ببینە",
       "noChecksReported": "هیچ پشکنینێک ڕاپۆرت نەکراوە",
       "passed": "{{displayCount}} سەرکەوتوو",
       "passed_one": "{{displayCount}} سەرکەوتوو",

@@ -141,6 +141,7 @@
     "online": "在线",
     "open": "打开 {{name}}",
     "openPullRequest": "打开拉取请求",
+    "viewOnGitHub": "在 GitHub 上查看 PR",
     "completed": "已完成",
     "pending": "待处理",
     "running": "运行中",
@@ -2757,7 +2758,6 @@
       "skipped_one": "{{displayCount}} 项已跳过",
       "skipped_other": "{{displayCount}} 项已跳过",
       "title": "检查",
-      "viewOnGitHub": "在 GitHub 上查看 PR",
       "checkDetails": "检查详情"
     },
     "composer": {
@@ -2821,6 +2821,9 @@
       "couldNotLoad": "无法加载讨论",
       "couldNotLoadMore": "无法加载更多评论。",
       "loadMoreComments": "加载更多评论",
+      "conversationTruncated": "仅显示前 {{displayCount}} 条评论。",
+      "conversationTruncated_one": "仅显示前 {{displayCount}} 条评论。",
+      "conversationTruncated_other": "仅显示前 {{displayCount}} 条评论。",
       "loading": "正在加载讨论",
       "moderation": {
         "block": {

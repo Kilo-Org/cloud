@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer.",
     "privateRepositoryA11y": "{{name}}, privaat bewaarplek",
     "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar.",
-    "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer."
+    "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer.",
+    "viewOnGitHub": "Bekyk PR op GitHub"
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "Kon nie meer kommentare laai nie.",
       "retryLoadingMore": "Probeer weer om meer kommentare te laai",
       "loadMoreComments": "Laai meer kommentare",
+      "conversationTruncated": "Slegs die eerste {{displayCount}} kommentare word vertoon.",
+      "conversationTruncated_one": "Slegs die eerste {{displayCount}} kommentare word vertoon.",
+      "conversationTruncated_other": "Slegs die eerste {{displayCount}} kommentare word vertoon.",
       "addReaction": "Voeg reaksie by",
       "reactionPill": "{{emoji}}-reaksie, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksie",
@@ -865,7 +869,6 @@
       "noAccess": "Jy het nie toegang tot kontroles vir hierdie bewaarplek nie.",
       "couldNotLoad": "Kon nie die kontroles laai nie.",
       "retryChecks": "Probeer die kontroles weer",
-      "viewOnGitHub": "Bekyk PR op GitHub",
       "noChecksReported": "Geen kontroles gerapporteer nie",
       "passed": "{{displayCount}} geslaag",
       "passed_one": "{{displayCount}} geslaag",

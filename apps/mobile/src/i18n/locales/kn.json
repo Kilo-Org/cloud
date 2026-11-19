@@ -178,7 +178,8 @@
     "organizationTrialEnded": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ. ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು kilo.ai ನಲ್ಲಿ ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬಹುದು, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "privateRepositoryA11y": "{{name}}, ಖಾಸಗಿ ರೆಪೊಸಿಟರಿ",
     "legalDocumentEnglishOnly": "ಈ ದಾಖಲೆ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಮಾತ್ರ ಲಭ್ಯವಿದೆ.",
-    "organizationTrialEndedBilling": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ. ನೀವು ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬಹುದು, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    "organizationTrialEndedBilling": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ. ನೀವು ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬಹುದು, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "viewOnGitHub": "GitHubನಲ್ಲಿ PR ವೀಕ್ಷಿಸಿ"
   },
   "language": {
     "restarting": "ಆಯ್ಕೆ ಮಾಡಿದ ಭಾಷೆಯನ್ನು ಅನ್ವಯಿಸಲು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
@@ -743,6 +744,9 @@
       "comment_one": "1 ಕಾಮೆಂಟ್",
       "comment": "{{displayCount}} ಟಿಪ್ಪಣಿಗಳು",
       "comment_other": "{{displayCount}} ಟಿಪ್ಪಣಿಗಳು",
+      "conversationTruncated": "ಕೇವಲ ಮೊದಲ {{displayCount}} ಟಿಪ್ಪಣಿಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.",
+      "conversationTruncated_one": "ಕೇವಲ ಮೊದಲ {{displayCount}} ಟಿಪ್ಪಣಿಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.",
+      "conversationTruncated_other": "ಕೇವಲ ಮೊದಲ {{displayCount}} ಟಿಪ್ಪಣಿಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.",
       "startedRelative": " · {{relative}} ಪ್ರಾರಂಭವಾಗಿದೆ",
       "couldNotLoadMore": "ಇನ್ನಷ್ಟು ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retryLoadingMore": "ಇನ್ನಷ್ಟು ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
@@ -865,7 +869,6 @@
       "noAccess": "ಈ ರೆಪೊಸಿಟರಿಯ ತಪಾಸಣೆಗಳನ್ನು ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "couldNotLoad": "ತಪಾಸಣೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retryChecks": "ತಪಾಸಣೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
-      "viewOnGitHub": "GitHubನಲ್ಲಿ PR ವೀಕ್ಷಿಸಿ",
       "noChecksReported": "ಯಾವುದೇ ತಪಾಸಣೆಗಳು ವರದಿಯಾಗಿಲ್ಲ",
       "passed": "{{displayCount}} ಯಶಸ್ವಿ",
       "passed_one": "{{displayCount}} ಯಶಸ್ವಿ",

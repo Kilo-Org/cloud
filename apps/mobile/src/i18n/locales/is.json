@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
     "privateRepositoryA11y": "{{name}}, einkakóðasafn",
     "legalDocumentEnglishOnly": "Þetta skjal er aðeins tiltækt á ensku.",
-    "organizationTrialEndedBilling": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar og reynir síðan aftur."
+    "organizationTrialEndedBilling": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar og reynir síðan aftur.",
+    "viewOnGitHub": "Skoða PR á GitHub"
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -743,6 +744,9 @@
       "comment_one": "{{displayCount}} athugasemd",
       "comment": "{{displayCount}} athugasemdir",
       "comment_other": "{{displayCount}} athugasemdir",
+      "conversationTruncated": "Aðeins fyrstu {{displayCount}} athugasemdirnar eru sýndar.",
+      "conversationTruncated_one": "Aðeins fyrstu {{displayCount}} athugasemdirnar eru sýndar.",
+      "conversationTruncated_other": "Aðeins fyrstu {{displayCount}} athugasemdirnar eru sýndar.",
       "startedRelative": " · hófst {{relative}}",
       "couldNotLoadMore": "Ekki tókst að hlaða fleiri athugasemdum.",
       "retryLoadingMore": "Reyna aftur að hlaða fleiri athugasemdum",
@@ -865,7 +869,6 @@
       "noAccess": "Þú hefur ekki aðgang að athugunum fyrir þessa kóðageymslu.",
       "couldNotLoad": "Ekki tókst að hlaða athugunum.",
       "retryChecks": "Reyna aftur að hlaða athugunum",
-      "viewOnGitHub": "Skoða PR á GitHub",
       "noChecksReported": "Engar athuganir hafa verið tilkynntar",
       "passed": "staðist: {{displayCount}}",
       "passed_one": "staðist: {{displayCount}}",

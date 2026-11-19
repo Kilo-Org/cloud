@@ -178,7 +178,8 @@
     "organizationTrialEnded": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਸੰਸਥਾ ਦਾ ਮਾਲਕ kilo.ai 'ਤੇ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦਾ ਹੈ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "privateRepositoryA11y": "{{name}}, ਨਿਜੀ ਰਿਪੋਜ਼ਟਰੀ",
     "legalDocumentEnglishOnly": "ਇਹ ਦਸਤਾਵੇਜ਼ ਸਿਰਫ਼ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਉਪਲਬਧ ਹੈ।",
-    "organizationTrialEndedBilling": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਤੁਸੀਂ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦੇ ਹੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+    "organizationTrialEndedBilling": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਤੁਸੀਂ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦੇ ਹੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "viewOnGitHub": "GitHub 'ਤੇ PR ਵੇਖੋ"
   },
   "language": {
     "restarting": "ਭਾਸ਼ਾ ਲਾਗੂ ਕਰਨ ਲਈ ਮੁੜ ਚਾਲੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "ਹੋਰ ਟਿੱਪਣੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
       "retryLoadingMore": "ਹੋਰ ਟਿੱਪਣੀਆਂ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "loadMoreComments": "ਹੋਰ ਟਿੱਪਣੀਆਂ ਲੋਡ ਕਰੋ",
+      "conversationTruncated": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਟਿੱਪਣੀਆਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।",
+      "conversationTruncated_one": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਟਿੱਪਣੀਆਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।",
+      "conversationTruncated_other": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਟਿੱਪਣੀਆਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।",
       "addReaction": "ਪ੍ਰਤੀਕਿਰਿਆ ਜੋੜੋ",
       "reactionPill": "{{emoji}} ਪ੍ਰਤੀਕਿਰਿਆ, {{displayCount}} {{countLabel}}",
       "reaction_one": "ਪ੍ਰਤੀਕਿਰਿਆ",
@@ -865,7 +869,6 @@
       "noAccess": "ਤੁਹਾਡੇ ਕੋਲ ਇਸ ਰਿਪੋਜ਼ਿਟਰੀ ਦੀਆਂ ਜਾਂਚਾਂ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੈ।",
       "couldNotLoad": "ਜਾਂਚਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
       "retryChecks": "ਜਾਂਚਾਂ ਦੁਬਾਰਾ ਅਜ਼ਮਾਓ",
-      "viewOnGitHub": "GitHub 'ਤੇ PR ਵੇਖੋ",
       "noChecksReported": "ਕਿਸੇ ਜਾਂਚ ਦੀ ਰਿਪੋਰਟ ਨਹੀਂ ਮਿਲੀ",
       "passed": "{{displayCount}} ਸਫਲ",
       "passed_one": "{{displayCount}} ਸਫਲ",

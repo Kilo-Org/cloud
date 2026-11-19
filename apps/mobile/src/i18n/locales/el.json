@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Ένας ιδιοκτήτης οργανισμού μπορεί να ενημερώσει τη χρέωση στο kilo.ai και μετά να δοκιμάσει ξανά.",
     "privateRepositoryA11y": "{{name}}, ιδιωτικό αποθετήριο",
     "legalDocumentEnglishOnly": "Αυτό το έγγραφο είναι διαθέσιμο μόνο στα αγγλικά.",
-    "organizationTrialEndedBilling": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Μπορείτε να ενημερώσετε τη χρέωση και μετά να δοκιμάσετε ξανά."
+    "organizationTrialEndedBilling": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Μπορείτε να ενημερώσετε τη χρέωση και μετά να δοκιμάσετε ξανά.",
+    "viewOnGitHub": "Προβολή PR στο GitHub"
   },
   "language": {
     "restarting": "Επανεκκίνηση για εφαρμογή της νέας γλώσσας",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "Δεν ήταν δυνατή η φόρτωση περισσότερων σχολίων.",
       "retryLoadingMore": "Νέα προσπάθεια φόρτωσης περισσότερων σχολίων",
       "loadMoreComments": "Φόρτωση περισσότερων σχολίων",
+      "conversationTruncated": "Εμφανίζονται μόνο τα πρώτα {{displayCount}} σχόλια.",
+      "conversationTruncated_one": "Εμφανίζονται μόνο τα πρώτα {{displayCount}} σχόλια.",
+      "conversationTruncated_other": "Εμφανίζονται μόνο τα πρώτα {{displayCount}} σχόλια.",
       "addReaction": "Προσθήκη αντίδρασης",
       "reactionPill": "αντίδραση {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "αντίδραση",
@@ -865,7 +869,6 @@
       "noAccess": "Δεν έχεις πρόσβαση στους ελέγχους αυτού του αποθετηρίου.",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των ελέγχων.",
       "retryChecks": "Νέα προσπάθεια φόρτωσης ελέγχων",
-      "viewOnGitHub": "Προβολή PR στο GitHub",
       "noChecksReported": "Δεν αναφέρθηκαν έλεγχοι",
       "passed": "{{displayCount}} επιτυχείς",
       "passed_one": "{{displayCount}} επιτυχής",

@@ -244,7 +244,8 @@
     "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
     "privateRepositoryA11y": "{{name}}, private repository",
     "legalDocumentEnglishOnly": "This document is available in English only.",
-    "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again."
+    "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
+    "viewOnGitHub": "View PR on GitHub"
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -813,6 +814,9 @@
       "couldNotLoadMore": "Could not load more comments.",
       "retryLoadingMore": "Retry loading more comments",
       "loadMoreComments": "Load more comments",
+      "conversationTruncated": "Only the first {{displayCount}} comments are shown.",
+      "conversationTruncated_one": "Only the first {{displayCount}} comment is shown.",
+      "conversationTruncated_other": "Only the first {{displayCount}} comments are shown.",
       "addReaction": "Add reaction",
       "reactionPill": "{{emoji}} reaction, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaction",
@@ -931,7 +935,6 @@
       "noAccess": "You don't have access to checks for this repository.",
       "couldNotLoad": "Couldn't load checks.",
       "retryChecks": "Retry checks",
-      "viewOnGitHub": "View PR on GitHub",
       "noChecksReported": "No checks reported",
       "passed": "{{displayCount}} passed",
       "passed_one": "{{displayCount}} passed",

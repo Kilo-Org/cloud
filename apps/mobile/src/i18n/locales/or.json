@@ -178,7 +178,8 @@
     "organizationTrialEnded": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଜଣେ ସଂଗଠନ ମାଲିକ kilo.ai ରେ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
     "privateRepositoryA11y": "{{name}}, ବ୍ୟକ୍ତିଗତ ରିପୋଜିଟୋରୀ",
     "legalDocumentEnglishOnly": "ଏହି ଦସ୍ତାବେଜଟି କେବଳ ଇଂରାଜୀରେ ଉପଲବ୍ଧ।",
-    "organizationTrialEndedBilling": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।"
+    "organizationTrialEndedBilling": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ। ଆପଣ ବିଲିଂ ଅପଡେଟ୍ କରିପାରିବେ, ତାପରେ ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ"
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryLoadingMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରିବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
       "loadMoreComments": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରନ୍ତୁ",
+      "conversationTruncated": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
+      "conversationTruncated_one": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
+      "conversationTruncated_other": "କେବଳ ପ୍ରଥମ {{displayCount}} ମନ୍ତବ୍ୟ ଦେଖାଯାଉଛି।",
       "addReaction": "ପ୍ରତିକ୍ରିୟା ଯୋଡ଼ନ୍ତୁ",
       "reactionPill": "{{emoji}} ପ୍ରତିକ୍ରିୟା, {{displayCount}} {{countLabel}}",
       "reaction_one": "ପ୍ରତିକ୍ରିୟା",
@@ -865,7 +869,6 @@
       "noAccess": "ଏହି ରିପୋଜିଟୋରିର ଯାଞ୍ଚ ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "couldNotLoad": "ଯାଞ୍ଚ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryChecks": "ଯାଞ୍ଚ ପାଇଁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
-      "viewOnGitHub": "GitHub ରେ PR ଦେଖନ୍ତୁ",
       "noChecksReported": "କୌଣସି ଯାଞ୍ଚ ରିପୋର୍ଟ ହୋଇନାହିଁ",
       "passed": "{{displayCount}} ସଫଳ",
       "passed_one": "{{displayCount}} ସଫଳ",

@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa.",
     "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri",
     "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai.",
-    "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa."
+    "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa.",
+    "viewOnGitHub": "Duba PR a GitHub"
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -743,6 +744,9 @@
       "comment_one": "tsokaci 1",
       "comment": "tsokace-tsokace {{displayCount}}",
       "comment_other": "tsokace-tsokace {{displayCount}}",
+      "conversationTruncated": "Ana nuna tsokace-tsokace {{displayCount}} na farko kawai.",
+      "conversationTruncated_one": "Ana nuna tsokace-tsokace {{displayCount}} na farko kawai.",
+      "conversationTruncated_other": "Ana nuna tsokace-tsokace {{displayCount}} na farko kawai.",
       "startedRelative": " · an fara {{relative}}",
       "couldNotLoadMore": "Ba a iya loda ƙarin tsokaci ba.",
       "retryLoadingMore": "Sake gwada loda ƙarin tsokaci",
@@ -865,7 +869,6 @@
       "noAccess": "Ba ka da damar duba gwaje-gwajen wannan ma'ajiyar lamba.",
       "couldNotLoad": "Ba a iya loda gwaje-gwaje ba.",
       "retryChecks": "Sake gwada gwaje-gwajen",
-      "viewOnGitHub": "Duba PR a GitHub",
       "noChecksReported": "Ba a bayar da rahoton gwaje-gwaje ba",
       "passed": "{{displayCount}} sun yi nasara",
       "passed_one": "{{displayCount}} sun yi nasara",

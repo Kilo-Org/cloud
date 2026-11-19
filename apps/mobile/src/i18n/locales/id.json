@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
     "privateRepositoryA11y": "{{name}}, repositori pribadi",
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggris.",
-    "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi."
+    "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi.",
+    "viewOnGitHub": "Lihat PR di GitHub"
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -2757,7 +2758,6 @@
       "skipped_one": "{{displayCount}} dilewati",
       "skipped_other": "{{displayCount}} dilewati",
       "title": "Pemeriksaan",
-      "viewOnGitHub": "Lihat PR di GitHub",
       "checkDetails": "detail pemeriksaan"
     },
     "composer": {
@@ -2818,6 +2818,9 @@
       "commentActions": "Tindakan pada komentar",
       "comment": "{{displayCount}} komentar",
       "comment_other": "{{displayCount}} komentar",
+      "conversationTruncated": "Hanya {{displayCount}} komentar pertama yang ditampilkan.",
+      "conversationTruncated_other": "Hanya {{displayCount}} komentar pertama yang ditampilkan.",
+      "conversationTruncated_one": "Hanya {{displayCount}} komentar pertama yang ditampilkan.",
       "couldNotLoad": "Tidak dapat memuat diskusi.",
       "couldNotLoadMore": "Tidak dapat memuat komentar lainnya.",
       "loadMoreComments": "Muat komentar lainnya",

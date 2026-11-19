@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Пробны перыяд арганізацыі скончыўся, і ў яе няма актыўнага плана. Уладальнік арганізацыі можа абнавіць плацежныя даныя на kilo.ai, а затым паспрабаваць яшчэ раз.",
     "privateRepositoryA11y": "{{name}}, прыватны рэпазітар",
     "legalDocumentEnglishOnly": "Гэты дакумент даступны толькі на англійскай мове.",
-    "organizationTrialEndedBilling": "Пробны перыяд арганізацыі скончыўся, і ў яе няма актыўнага плана. Вы можаце абнавіць плацежныя даныя, а затым паспрабаваць яшчэ раз."
+    "organizationTrialEndedBilling": "Пробны перыяд арганізацыі скончыўся, і ў яе няма актыўнага плана. Вы можаце абнавіць плацежныя даныя, а затым паспрабаваць яшчэ раз.",
+    "viewOnGitHub": "Прагледзець PR на GitHub"
   },
   "language": {
     "restarting": "Перазапуск для змены мовы",
@@ -767,6 +768,11 @@
       "couldNotLoadMore": "Не атрымалася загрузіць астатнія каментары.",
       "retryLoadingMore": "Паўтарыць загрузку астатніх каментароў",
       "loadMoreComments": "Загрузіць яшчэ каментары",
+      "conversationTruncated": "Паказаны толькі першыя {{displayCount}} каментары.",
+      "conversationTruncated_one": "Паказаны толькі першыя {{displayCount}} каментары.",
+      "conversationTruncated_few": "Паказаны толькі першыя {{displayCount}} каментары.",
+      "conversationTruncated_many": "Паказаны толькі першыя {{displayCount}} каментары.",
+      "conversationTruncated_other": "Паказаны толькі першыя {{displayCount}} каментары.",
       "addReaction": "Дадаць рэакцыю",
       "reactionPill": "рэакцыя {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "рэакцыя",
@@ -891,7 +897,6 @@
       "noAccess": "У цябе няма доступу да праверак гэтага рэпазіторыя.",
       "couldNotLoad": "Не атрымалася загрузіць праверкі.",
       "retryChecks": "Паўтарыць праверкі",
-      "viewOnGitHub": "Прагледзець PR на GitHub",
       "noChecksReported": "Звестак пра праверкі няма",
       "passed": "паспяхова: {{displayCount}}",
       "passed_one": "паспяхова: {{displayCount}}",

@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
     "privateRepositoryA11y": "{{name}}, repòsitwa prive",
     "legalDocumentEnglishOnly": "Dokiman sa a disponib nan lang angle sèlman.",
-    "organizationTrialEndedBilling": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon, epi eseye ankò."
+    "organizationTrialEndedBilling": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon, epi eseye ankò.",
+    "viewOnGitHub": "Gade PR a sou GitHub"
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -743,6 +744,9 @@
       "comment_one": "1 kòmantè",
       "comment": "{{displayCount}} kòmantè",
       "comment_other": "{{displayCount}} kòmantè",
+      "conversationTruncated": "Se premye {{displayCount}} kòmantè yo sèlman ki parèt.",
+      "conversationTruncated_one": "Se premye {{displayCount}} kòmantè yo sèlman ki parèt.",
+      "conversationTruncated_other": "Se premye {{displayCount}} kòmantè yo sèlman ki parèt.",
       "startedRelative": " · kòmanse {{relative}}",
       "couldNotLoadMore": "Pa t ka chaje plis kòmantè.",
       "retryLoadingMore": "Eseye chaje plis kòmantè ankò",
@@ -865,7 +869,6 @@
       "noAccess": "Ou pa gen aksè ak verifikasyon pou depo sa a.",
       "couldNotLoad": "Pa t ka chaje verifikasyon yo.",
       "retryChecks": "Eseye verifikasyon yo ankò",
-      "viewOnGitHub": "Gade PR a sou GitHub",
       "noChecksReported": "Pa gen verifikasyon ki rapòte",
       "passed": "{{displayCount}} reyisi",
       "passed_one": "{{displayCount}} reyisi",

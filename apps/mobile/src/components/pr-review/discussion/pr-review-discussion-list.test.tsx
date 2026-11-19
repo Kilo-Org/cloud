@@ -7,6 +7,7 @@ import {
   type DiscussionListItem,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import { ProviderPrWebUrlProvider } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewDiscussionList } from './pr-review-discussion-list';
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -36,6 +37,17 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insetsState,
 }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    // The count-bearing notice spells out both numbers it is handed, so the
+    // test proves the caller passes i18next the raw count for the plural form
+    // and the formatted one for display.
+    t: (key: string, options?: Record<string, unknown>) =>
+      options && 'count' in options
+        ? `${key}=${String(options.displayCount)}/${String(options.count)}`
+        : key,
+  }),
+}));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     moderation: { listHiddenUsers: { queryOptions: () => ({}) } },
@@ -45,7 +57,16 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
+vi.mock('@/components/ui/icons', () => ({
+  ExternalLink: 'ExternalLink',
+  MessageSquarePlus: 'MessageSquarePlus',
+}));
+vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/format', () => ({ formatNumber: String }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: 'black' }),
+}));
 vi.mock('@/components/pr-review/discussion/comment-row', () => ({ CommentRow: 'CommentRow' }));
 vi.mock('@/components/pr-review/discussion/discussion-thread', () => ({
   DiscussionThread: 'DiscussionThread',
@@ -69,12 +90,15 @@ const BASE_PROPS: ComponentProps<typeof PrReviewDiscussionList> = {
 };
 
 function mountList(
-  overrides: Partial<ComponentProps<typeof PrReviewDiscussionList>> = {}
+  overrides: Partial<ComponentProps<typeof PrReviewDiscussionList>> = {},
+  webUrl: string | null = null
 ): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
-      createElement(PrReviewDiscussionList, { ...BASE_PROPS, ...overrides })
+      <ProviderPrWebUrlProvider value={webUrl}>
+        <PrReviewDiscussionList {...BASE_PROPS} {...overrides} />
+      </ProviderPrWebUrlProvider>
     );
   });
   const renderer = ref.current;

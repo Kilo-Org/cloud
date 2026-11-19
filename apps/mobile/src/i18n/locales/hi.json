@@ -178,7 +178,8 @@
     "organizationTrialEnded": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। एक संगठन मालिक kilo.ai पर बिलिंग अपडेट कर सकता है, फिर दोबारा प्रयास करें।",
     "privateRepositoryA11y": "{{name}}, निजी रिपॉज़िटरी",
     "legalDocumentEnglishOnly": "यह दस्तावेज़ केवल अंग्रेज़ी में उपलब्ध है।",
-    "organizationTrialEndedBilling": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। आप बिलिंग अपडेट कर सकते हैं, फिर दोबारा प्रयास करें।"
+    "organizationTrialEndedBilling": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। आप बिलिंग अपडेट कर सकते हैं, फिर दोबारा प्रयास करें।",
+    "viewOnGitHub": "GitHub पर PR देखें"
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -2757,7 +2758,6 @@
       "skipped_one": "{{displayCount}} छोड़ी गईं",
       "skipped_other": "{{displayCount}} छोड़ी गईं",
       "title": "जाँचें",
-      "viewOnGitHub": "GitHub पर PR देखें",
       "checkDetails": "जाँच का विवरण"
     },
     "composer": {
@@ -2818,6 +2818,9 @@
       "commentActions": "टिप्पणी के विकल्प",
       "comment": "{{displayCount}} टिप्पणियाँ",
       "comment_other": "{{displayCount}} टिप्पणियाँ",
+      "conversationTruncated": "केवल पहली {{displayCount}} टिप्पणियाँ दिखाई जा रही हैं।",
+      "conversationTruncated_one": "केवल पहली {{displayCount}} टिप्पणियाँ दिखाई जा रही हैं।",
+      "conversationTruncated_other": "केवल पहली {{displayCount}} टिप्पणियाँ दिखाई जा रही हैं।",
       "couldNotLoad": "चर्चा लोड नहीं हो सकी।",
       "couldNotLoadMore": "और टिप्पणियाँ लोड नहीं हो सकीं।",
       "loadMoreComments": "और टिप्पणियाँ लोड करें",

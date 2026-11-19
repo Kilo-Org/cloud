@@ -178,7 +178,8 @@
     "organizationTrialEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. د سازمان مالک کولی شي په kilo.ai کې بیلنګ تازه کړي، بیا یو ځل بیا هڅه وکړي.",
     "privateRepositoryA11y": "{{name}}، شخصي زېرمتون",
     "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی.",
-    "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ."
+    "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
+    "viewOnGitHub": "PR په GitHub کې وګورئ"
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "نورې تبصرې بار نه شوې.",
       "retryLoadingMore": "د نورو تبصرو د بارولو بیا هڅه وکړئ",
       "loadMoreComments": "نورې تبصرې بار کړئ",
+      "conversationTruncated": "یوازې لومړنۍ {{displayCount}} تبصرې ښودل کېږي.",
+      "conversationTruncated_one": "یوازې لومړنۍ {{displayCount}} تبصرې ښودل کېږي.",
+      "conversationTruncated_other": "یوازې لومړنۍ {{displayCount}} تبصرې ښودل کېږي.",
       "addReaction": "غبرګون ورزیات کړئ",
       "reactionPill": "{{emoji}} غبرګون، {{displayCount}} {{countLabel}}",
       "reaction_one": "غبرګون",
@@ -865,7 +869,6 @@
       "noAccess": "تاسو د دې زېرمتون ازموینو ته لاسرسی نه لرئ.",
       "couldNotLoad": "ازموینې بار نه شوې.",
       "retryChecks": "ازموینې بیا هڅه کړئ",
-      "viewOnGitHub": "PR په GitHub کې وګورئ",
       "noChecksReported": "د هېڅ ازموینې راپور نشته",
       "passed": "{{displayCount}} بریالۍ",
       "passed_one": "{{displayCount}} بریالۍ",

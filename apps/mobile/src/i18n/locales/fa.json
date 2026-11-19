@@ -178,7 +178,8 @@
     "organizationTrialEnded": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. مالک سازمان می‌تواند صورتحساب را در kilo.ai به‌روزرسانی کند و سپس دوباره تلاش کند.",
     "privateRepositoryA11y": "{{name}}، مخزن خصوصی",
     "legalDocumentEnglishOnly": "این سند تنها به زبان انگلیسی در دسترس است.",
-    "organizationTrialEndedBilling": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را به‌روزرسانی کنید و سپس دوباره تلاش کنید."
+    "organizationTrialEndedBilling": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را به‌روزرسانی کنید و سپس دوباره تلاش کنید.",
+    "viewOnGitHub": "مشاهدهٔ PR در GitHub"
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "بارگذاری نظرات بیشتر ممکن نشد.",
       "retryLoadingMore": "تلاش مجدد برای بارگذاری نظرات بیشتر",
       "loadMoreComments": "بارگذاری نظرات بیشتر",
+      "conversationTruncated": "فقط {{displayCount}} نظر اول نمایش داده می‌شود.",
+      "conversationTruncated_one": "فقط {{displayCount}} نظر اول نمایش داده می‌شود.",
+      "conversationTruncated_other": "فقط {{displayCount}} نظر اول نمایش داده می‌شود.",
       "addReaction": "افزودن واکنش",
       "reactionPill": "واکنش {{emoji}}، {{displayCount}} {{countLabel}}",
       "reaction_one": "واکنش",
@@ -865,7 +869,6 @@
       "noAccess": "شما به بررسی‌های این مخزن دسترسی ندارید.",
       "couldNotLoad": "بارگذاری بررسی‌ها ممکن نشد.",
       "retryChecks": "تلاش مجدد برای بارگذاری بررسی‌ها",
-      "viewOnGitHub": "مشاهدهٔ PR در GitHub",
       "noChecksReported": "هیچ بررسی‌ای گزارش نشده است",
       "passed": "{{displayCount}} موفق",
       "passed_one": "{{displayCount}} موفق",

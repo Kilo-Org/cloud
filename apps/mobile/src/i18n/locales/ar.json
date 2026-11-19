@@ -178,7 +178,8 @@
     "organizationTrialEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكن لمالك المؤسسة تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
     "privateRepositoryA11y": "{{name}}، مستودع خاص",
     "legalDocumentEnglishOnly": "هذا المستند متوفر باللغة الإنجليزية فقط.",
-    "organizationTrialEndedBilling": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكنك تحديث الفوترة، ثم المحاولة مرة أخرى."
+    "organizationTrialEndedBilling": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكنك تحديث الفوترة، ثم المحاولة مرة أخرى.",
+    "viewOnGitHub": "عرض PR على GitHub"
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -2913,7 +2914,6 @@
       "skipped_few": "تم تخطيها: {{displayCount}}",
       "skipped_many": "تم تخطيها: {{displayCount}}",
       "title": "الفحوصات",
-      "viewOnGitHub": "عرض PR على GitHub",
       "checkDetails": "تفاصيل الفحص"
     },
     "composer": {
@@ -2977,6 +2977,13 @@
       "couldNotLoad": "تعذّر تحميل المناقشة.",
       "couldNotLoadMore": "تعذّر تحميل المزيد من التعليقات.",
       "loadMoreComments": "تحميل المزيد من التعليقات",
+      "conversationTruncated": "تُعرض أول {{displayCount}} تعليقات فقط.",
+      "conversationTruncated_zero": "تُعرض أول {{displayCount}} تعليقات فقط.",
+      "conversationTruncated_one": "تُعرض أول {{displayCount}} تعليقات فقط.",
+      "conversationTruncated_two": "تُعرض أول {{displayCount}} تعليقات فقط.",
+      "conversationTruncated_few": "تُعرض أول {{displayCount}} تعليقات فقط.",
+      "conversationTruncated_many": "تُعرض أول {{displayCount}} تعليقات فقط.",
+      "conversationTruncated_other": "تُعرض أول {{displayCount}} تعليقات فقط.",
       "loading": "جارٍ تحميل المناقشة",
       "moderation": {
         "block": {

@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray.",
     "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana",
     "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy.",
-    "organizationTrialEndedBilling": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ianao, ary hanandrana indray."
+    "organizationTrialEndedBilling": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ianao, ary hanandrana indray.",
+    "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR"
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "Tsy tafiditra ny hevitra fanampiny.",
       "retryLoadingMore": "Andramo ampidirina indray ny hevitra fanampiny",
       "loadMoreComments": "Ampidiro ny hevitra fanampiny",
+      "conversationTruncated": "Ny fanehoan-kevitra {{displayCount}} voalohany ihany no aseho.",
+      "conversationTruncated_one": "Ny fanehoan-kevitra {{displayCount}} voalohany ihany no aseho.",
+      "conversationTruncated_other": "Ny fanehoan-kevitra {{displayCount}} voalohany ihany no aseho.",
       "addReaction": "Ampio fanehoan-kevitra",
       "reactionPill": "fanehoan-kevitra {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "fanehoan-kevitra",
@@ -865,7 +869,6 @@
       "noAccess": "Tsy manana alalana hijery ny fanamarinana ho an'ity tahirin-kaody ity ianao.",
       "couldNotLoad": "Tsy tafiditra ny fanamarinana.",
       "retryChecks": "Andramo indray ny fanamarinana",
-      "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR",
       "noChecksReported": "Tsy misy fanamarinana notaterina",
       "passed": "{{displayCount}} nahomby",
       "passed_one": "{{displayCount}} nahomby",

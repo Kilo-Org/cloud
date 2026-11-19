@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
     "privateRepositoryA11y": "{{name}}, privat repository",
     "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk.",
-    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen."
+    "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen.",
+    "viewOnGitHub": "Vis PR på GitHub"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "Kunne ikke laste inn flere kommentarer.",
       "retryLoadingMore": "Prøv å laste inn flere kommentarer på nytt",
       "loadMoreComments": "Last inn flere kommentarer",
+      "conversationTruncated": "Viser bare de første {{displayCount}} kommentarene.",
+      "conversationTruncated_one": "Viser bare de første {{displayCount}} kommentarene.",
+      "conversationTruncated_other": "Viser bare de første {{displayCount}} kommentarene.",
       "addReaction": "Legg til reaksjon",
       "reactionPill": "{{emoji}}-reaksjon, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksjon",
@@ -865,7 +869,6 @@
       "noAccess": "Du har ikke tilgang til sjekkene for dette kodelageret.",
       "couldNotLoad": "Kunne ikke laste inn sjekkene.",
       "retryChecks": "Prøv å laste inn sjekkene på nytt",
-      "viewOnGitHub": "Vis PR på GitHub",
       "noChecksReported": "Ingen sjekker rapportert",
       "passed": "{{displayCount}} bestått",
       "passed_one": "{{displayCount}} bestått",

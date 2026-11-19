@@ -178,7 +178,8 @@
     "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
     "privateRepositoryA11y": "{{name}}, ຄັງໂຄ້ດສ່ວນຕົວ",
     "legalDocumentEnglishOnly": "ເອກະສານນີ້ມີໃຫ້ໃນພາສາອັງກິດເທົ່ານັ້ນ.",
-    "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ."
+    "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ.",
+    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "ບໍ່ສາມາດໂຫຼດຄຳເຫັນເພີ່ມເຕີມໄດ້.",
       "retryLoadingMore": "ລອງໂຫຼດຄຳເຫັນເພີ່ມເຕີມອີກຄັ້ງ",
       "loadMoreComments": "ໂຫຼດຄຳເຫັນເພີ່ມເຕີມ",
+      "conversationTruncated": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
+      "conversationTruncated_one": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
+      "conversationTruncated_other": "ສະແດງພຽງ {{displayCount}} ຄຳເຫັນທຳອິດເທົ່ານັ້ນ.",
       "addReaction": "ເພີ່ມການຕອບສະໜອງ",
       "reactionPill": "ການຕອບສະໜອງ {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "ການຕອບສະໜອງ",
@@ -865,7 +869,6 @@
       "noAccess": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງການກວດສອບຂອງຄັງໂຄດນີ້.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການກວດສອບໄດ້.",
       "retryChecks": "ລອງໂຫຼດການກວດສອບອີກຄັ້ງ",
-      "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub",
       "noChecksReported": "ຍັງບໍ່ມີລາຍງານຜົນການກວດສອບ",
       "passed": "ຜ່ານ {{displayCount}}",
       "passed_one": "ຜ່ານ {{displayCount}}",

@@ -125,7 +125,17 @@ vi.mock('@/components/pr-review/discussion/discussion-thread', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
+vi.mock('@/components/ui/icons', () => ({
+  ExternalLink: 'ExternalLink',
+  MessageSquarePlus: 'MessageSquarePlus',
+}));
+// Opening the pull request is the notice's only side effect, and the real
+// module imports `expo-web-browser`, which no Node project can load.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/format', () => ({ formatNumber: String }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: 'black' }),
+}));
 vi.mock('@/lib/screen-insets', () => ({ useDetailScreenBottomPadding: () => 0 }));
 
 function noop(): void {

@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Կազմակերպության սեփականատերը կարող է թարմացնել վճարումները kilo.ai-ում, ապա կրկին փորձել։",
     "privateRepositoryA11y": "{{name}}, մասնավոր պահեստ",
     "legalDocumentEnglishOnly": "Այս փաստաթուղթը հասանելի է միայն անգլերեն։",
-    "organizationTrialEndedBilling": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Դուք կարող եք թարմացնել վճարումները, ապա կրկին փորձել։"
+    "organizationTrialEndedBilling": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։ Դուք կարող եք թարմացնել վճարումները, ապա կրկին փորձել։",
+    "viewOnGitHub": "Դիտել PR-ը GitHub-ում"
   },
   "language": {
     "restarting": "Վերագործարկվում է՝ լեզվի փոփոխությունը կիրառելու համար",
@@ -743,6 +744,9 @@
       "comment_one": "1 մեկնաբանություն",
       "comment": "{{displayCount}} մեկնաբանություն",
       "comment_other": "{{displayCount}} մեկնաբանություն",
+      "conversationTruncated": "Ցուցադրվում են միայն առաջին {{displayCount}} մեկնաբանությունները։",
+      "conversationTruncated_one": "Ցուցադրվում են միայն առաջին {{displayCount}} մեկնաբանությունները։",
+      "conversationTruncated_other": "Ցուցադրվում են միայն առաջին {{displayCount}} մեկնաբանությունները։",
       "startedRelative": " · սկսվել է {{relative}}",
       "couldNotLoadMore": "Չհաջողվեց բեռնել հավելյալ մեկնաբանությունները։",
       "retryLoadingMore": "Կրկին փորձել բեռնել հավելյալ մեկնաբանությունները",
@@ -865,7 +869,6 @@
       "noAccess": "Այս պահոցի ստուգումները դիտելու թույլտվություն չունես։",
       "couldNotLoad": "Չհաջողվեց բեռնել ստուգումները։",
       "retryChecks": "Կրկին փորձել բեռնել ստուգումները",
-      "viewOnGitHub": "Դիտել PR-ը GitHub-ում",
       "noChecksReported": "Ստուգումների մասին տվյալներ չկան",
       "passed": "{{displayCount}} հաջողված",
       "passed_one": "{{displayCount}} հաջողված",

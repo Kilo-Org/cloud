@@ -178,7 +178,8 @@
     "organizationTrialEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai, puis réessayer.",
     "privateRepositoryA11y": "{{name}}, dépôt privé",
     "legalDocumentEnglishOnly": "Ce document est disponible uniquement en anglais.",
-    "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer."
+    "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer.",
+    "viewOnGitHub": "Voir la PR sur GitHub"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -2796,7 +2797,6 @@
       "skipped_other": "{{displayCount}} ignorées",
       "skipped_many": "{{displayCount}} ignorées",
       "title": "Vérifications",
-      "viewOnGitHub": "Voir la PR sur GitHub",
       "checkDetails": "détails de la vérification"
     },
     "composer": {
@@ -2857,6 +2857,10 @@
       "commentActions": "Actions du commentaire",
       "comment": "{{displayCount}} commentaires",
       "comment_other": "{{displayCount}} commentaires",
+      "conversationTruncated": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
+      "conversationTruncated_one": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
+      "conversationTruncated_many": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
+      "conversationTruncated_other": "Seuls les {{displayCount}} premiers commentaires sont affichés.",
       "couldNotLoad": "Impossible de charger les échanges",
       "couldNotLoadMore": "Impossible de charger d'autres commentaires.",
       "loadMoreComments": "Charger d'autres commentaires",

@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Ұйым иесі kilo.ai сайтында төлем ақпаратын жаңартып, содан кейін қайталап көре алады.",
     "privateRepositoryA11y": "{{name}}, жеке репозиторий",
     "legalDocumentEnglishOnly": "Бұл құжат тек ағылшын тілінде қолжетімді.",
-    "organizationTrialEndedBilling": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Төлем ақпаратын жаңартып, содан кейін қайталап көре аласыз."
+    "organizationTrialEndedBilling": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Төлем ақпаратын жаңартып, содан кейін қайталап көре аласыз.",
+    "viewOnGitHub": "PR-ді GitHub-та қарау"
   },
   "language": {
     "restarting": "Тілді қолдану үшін қайта іске қосылуда",
@@ -743,6 +744,9 @@
       "comment_one": "1 пікір",
       "comment": "{{displayCount}} пікір",
       "comment_other": "{{displayCount}} пікір",
+      "conversationTruncated": "Тек алғашқы {{displayCount}} пікір көрсетіледі.",
+      "conversationTruncated_one": "Тек алғашқы {{displayCount}} пікір көрсетіледі.",
+      "conversationTruncated_other": "Тек алғашқы {{displayCount}} пікір көрсетіледі.",
       "startedRelative": " · {{relative}} басталды",
       "couldNotLoadMore": "Қосымша пікірлерді жүктеу мүмкін болмады.",
       "retryLoadingMore": "Қосымша пікірлерді қайта жүктеу",
@@ -865,7 +869,6 @@
       "noAccess": "Бұл репозиторийдің тексерулерін көруге рұқсатыңыз жоқ.",
       "couldNotLoad": "Тексерулерді жүктеу мүмкін болмады.",
       "retryChecks": "Тексерулерді қайталау",
-      "viewOnGitHub": "PR-ді GitHub-та қарау",
       "noChecksReported": "Тексеру нәтижелері жоқ",
       "passed": "{{displayCount}} өтті",
       "passed_one": "{{displayCount}} өтті",

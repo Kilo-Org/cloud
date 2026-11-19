@@ -178,7 +178,8 @@
     "organizationTrialEnded": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। संस्थाको मालिकले kilo.ai मा बिलिङ अद्यावधिक गर्न सक्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
     "privateRepositoryA11y": "{{name}}, निजी रिपोजिटरी",
     "legalDocumentEnglishOnly": "यो कागजात अङ्ग्रेजीमा मात्र उपलब्ध छ।",
-    "organizationTrialEndedBilling": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।"
+    "organizationTrialEndedBilling": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+    "viewOnGitHub": "GitHub मा PR हेर्नुहोस्"
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "थप टिप्पणीहरू लोड गर्न सकिएन।",
       "retryLoadingMore": "थप टिप्पणीहरू लोड गर्न पुनः प्रयास गर्नुहोस्",
       "loadMoreComments": "थप टिप्पणीहरू लोड गर्नुहोस्",
+      "conversationTruncated": "सुरुका {{displayCount}} टिप्पणी मात्र देखाइएका छन्।",
+      "conversationTruncated_one": "सुरुका {{displayCount}} टिप्पणी मात्र देखाइएका छन्।",
+      "conversationTruncated_other": "सुरुका {{displayCount}} टिप्पणी मात्र देखाइएका छन्।",
       "addReaction": "प्रतिक्रिया थप्नुहोस्",
       "reactionPill": "{{emoji}} प्रतिक्रिया, {{displayCount}} {{countLabel}}",
       "reaction_one": "प्रतिक्रिया",
@@ -865,7 +869,6 @@
       "noAccess": "तपाईंसँग यो रिपोजिटरीका जाँचहरू हेर्ने अनुमति छैन।",
       "couldNotLoad": "जाँचहरू लोड गर्न सकिएन।",
       "retryChecks": "जाँचहरू लोड गर्न पुनः प्रयास गर्नुहोस्",
-      "viewOnGitHub": "GitHub मा PR हेर्नुहोस्",
       "noChecksReported": "कुनै जाँचको नतिजा आएको छैन",
       "passed": "{{displayCount}} सफल",
       "passed_one": "{{displayCount}} सफल",

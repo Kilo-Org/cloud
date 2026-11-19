@@ -141,6 +141,7 @@
     "online": "В сети",
     "open": "Открыть {{name}}",
     "openPullRequest": "Открыть pull request",
+    "viewOnGitHub": "Открыть PR на GitHub",
     "completed": "Завершено",
     "pending": "Ожидание",
     "running": "В работе",
@@ -2835,7 +2836,6 @@
       "skipped_few": "пропущено: {{displayCount}}",
       "skipped_many": "пропущено: {{displayCount}}",
       "title": "Проверки",
-      "viewOnGitHub": "Открыть PR на GitHub",
       "checkDetails": "сведения о проверке"
     },
     "composer": {
@@ -2899,6 +2899,11 @@
       "couldNotLoad": "Не удалось загрузить обсуждение.",
       "couldNotLoadMore": "Не удалось загрузить остальные комментарии.",
       "loadMoreComments": "Загрузить ещё комментарии",
+      "conversationTruncated": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_one": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_other": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_few": "Показаны только первые {{displayCount}} комментариев.",
+      "conversationTruncated_many": "Показаны только первые {{displayCount}} комментариев.",
       "loading": "Загрузка обсуждения",
       "moderation": {
         "block": {

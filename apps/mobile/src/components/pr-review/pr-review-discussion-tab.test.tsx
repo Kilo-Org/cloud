@@ -242,6 +242,32 @@ describe('PrReviewDiscussionTab full-body states', () => {
     expect(list.props.emptyState).toBeDefined();
   });
 
+  it('hands the list the loaded conversation count when the server cut it', () => {
+    discussionState.conversation = [{ nodeId: 'c1' }, { nodeId: 'c2' }];
+    discussionState.conversationTruncated = true;
+    const list = mountTab().root.find(node => String(node.type) === 'PrReviewDiscussionList');
+
+    expect(list.props.truncatedConversationCount).toBe(2);
+  });
+
+  it('hands the list no truncation count for a complete conversation', () => {
+    discussionState.conversation = [{ nodeId: 'c1' }];
+    const list = mountTab().root.find(node => String(node.type) === 'PrReviewDiscussionList');
+
+    expect(list.props.truncatedConversationCount).toBeNull();
+  });
+
+  it('hands the list no truncation count when the cut conversation has no comments left', () => {
+    // Deleting the last conversation comment empties a cut discussion: a
+    // notice counting nothing would contradict the body it sits under. A
+    // review thread keeps the body on the list so the prop is observable.
+    discussionState.threads = [{ threadId: 'T1', isResolved: false, comments: [] }];
+    discussionState.conversationTruncated = true;
+    const list = mountTab().root.find(node => String(node.type) === 'PrReviewDiscussionList');
+
+    expect(list.props.truncatedConversationCount).toBeNull();
+  });
+
   it('renders the comment CTA bar on the empty view and opens the composer', () => {
     const renderer = mountTab();
     expect(renderer.root.find(node => String(node.type) === 'EmptyState')).toBeDefined();

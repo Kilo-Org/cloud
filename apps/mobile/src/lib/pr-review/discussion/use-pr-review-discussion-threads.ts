@@ -107,11 +107,13 @@ export function usePrReviewDiscussionThreads(args: {
   // we read `pages[0]` directly. While page one is loaded it is the truth
   // (including an empty one, so a deleted last comment empties the
   // discussion); once it is evicted, the module-level store keeps the last
-  // first-page value across both the trim and the tab's unmount/remount cycle.
+  // first-page entry across both the trim and the tab's unmount/remount cycle.
   // The key carries the signed-in account and organization as well as the ref,
   // so a remount can only ever be served the conversation its own tenant read;
   // while the account is still unknown the store is neither read nor written.
-  const conversation = retainConversationAcrossMounts(
+  // The entry carries the server's truncation marker with the comments, so the
+  // Discussion still says its conversation was cut after the trim.
+  const conversationEntry = retainConversationAcrossMounts(
     userId === undefined
       ? null
       : conversationRetentionKey({ userId, organizationId: scope.organizationId, ref: scope.ref }),
@@ -122,7 +124,8 @@ export function usePrReviewDiscussionThreads(args: {
   return {
     query,
     threads,
-    conversation,
+    conversation: conversationEntry.comments,
+    conversationTruncated: conversationEntry.truncated,
     firstPageErrorState,
     laterPageError,
   };

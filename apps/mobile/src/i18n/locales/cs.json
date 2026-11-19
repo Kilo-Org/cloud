@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
     "privateRepositoryA11y": "{{name}}, soukromý repozitář",
     "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
-    "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu."
+    "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu.",
+    "viewOnGitHub": "Zobrazit PR na GitHubu"
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -767,6 +768,11 @@
       "couldNotLoadMore": "Další komentáře se nepodařilo načíst.",
       "retryLoadingMore": "Znovu načíst další komentáře",
       "loadMoreComments": "Načíst další komentáře",
+      "conversationTruncated": "Zobrazuje se jen prvních {{displayCount}} komentářů.",
+      "conversationTruncated_one": "Zobrazuje se jen prvních {{displayCount}} komentářů.",
+      "conversationTruncated_few": "Zobrazuje se jen prvních {{displayCount}} komentářů.",
+      "conversationTruncated_many": "Zobrazuje se jen prvních {{displayCount}} komentářů.",
+      "conversationTruncated_other": "Zobrazuje se jen prvních {{displayCount}} komentářů.",
       "addReaction": "Přidat reakci",
       "reactionPill": "reakce {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakce",
@@ -891,7 +897,6 @@
       "noAccess": "Nemáš přístup ke kontrolám tohoto repozitáře.",
       "couldNotLoad": "Kontroly se nepodařilo načíst.",
       "retryChecks": "Znovu načíst kontroly",
-      "viewOnGitHub": "Zobrazit PR na GitHubu",
       "noChecksReported": "Zatím žádné výsledky kontrol",
       "passed": "úspěšné: {{displayCount}}",
       "passed_one": "úspěšné: {{displayCount}}",

@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e te rangatira o te rōpū te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
     "privateRepositoryA11y": "{{name}}, tahua tūmataiti",
     "legalDocumentEnglishOnly": "E wātea ana tēnei tuhinga i te reo Ingarihi anake.",
-    "organizationTrialEndedBilling": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama, kātahi ka whakamātau anō."
+    "organizationTrialEndedBilling": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama, kātahi ka whakamātau anō.",
+    "viewOnGitHub": "Tirohia te PR i GitHub"
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "Kāore i taea te uta i ētahi atu kōrero.",
       "retryLoadingMore": "Whakamātau anō ki te uta i ētahi atu kōrero",
       "loadMoreComments": "Utaina ētahi atu kōrero",
+      "conversationTruncated": "E whakaaturia ana ngā kōrero {{displayCount}} tuatahi anake.",
+      "conversationTruncated_one": "E whakaaturia ana ngā kōrero {{displayCount}} tuatahi anake.",
+      "conversationTruncated_other": "E whakaaturia ana ngā kōrero {{displayCount}} tuatahi anake.",
       "addReaction": "Tāpirihia he urupare",
       "reactionPill": "Urupare {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "urupare",
@@ -865,7 +869,6 @@
       "noAccess": "Kāore koe e whakaaetia kia uru ki ngā arowhai mō tēnei pātaka waehere.",
       "couldNotLoad": "Kāore i taea te uta i ngā arowhai.",
       "retryChecks": "Whakamātau anō i ngā arowhai",
-      "viewOnGitHub": "Tirohia te PR i GitHub",
       "noChecksReported": "Kāore he arowhai i pūrongotia",
       "passed": "{{displayCount}} kua tutuki",
       "passed_one": "{{displayCount}} kua tutuki",

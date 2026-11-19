@@ -178,7 +178,8 @@
     "organizationTrialEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Um proprietário da organização pode atualizar o faturamento em kilo.ai e tentar novamente.",
     "privateRepositoryA11y": "{{name}}, repositório privado",
     "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês.",
-    "organizationTrialEndedBilling": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Você pode atualizar o faturamento e tentar novamente."
+    "organizationTrialEndedBilling": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Você pode atualizar o faturamento e tentar novamente.",
+    "viewOnGitHub": "Ver PR no GitHub"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -2802,7 +2803,6 @@
       "skipped_other": "{{displayCount}} ignoradas",
       "skipped_many": "{{displayCount}} ignoradas",
       "title": "Verificações",
-      "viewOnGitHub": "Ver PR no GitHub",
       "checkDetails": "detalhes da verificação"
     },
     "composer": {
@@ -2863,6 +2863,10 @@
       "commentActions": "Ações do comentário",
       "comment": "{{displayCount}} comentários",
       "comment_other": "{{displayCount}} comentários",
+      "conversationTruncated": "Exibindo apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_one": "Exibindo apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_many": "Exibindo apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_other": "Exibindo apenas os primeiros {{displayCount}} comentários.",
       "couldNotLoad": "Não foi possível carregar a discussão.",
       "couldNotLoadMore": "Não foi possível carregar mais comentários.",
       "loadMoreComments": "Carregar mais comentários",

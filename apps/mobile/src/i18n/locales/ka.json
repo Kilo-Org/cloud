@@ -178,7 +178,8 @@
     "organizationTrialEnded": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს. ორგანიზაციის მფლობელს შეუძლია განაახლოს ბილინგი kilo.ai-ზე, შემდეგ კი ხელახლა სცადოს.",
     "privateRepositoryA11y": "{{name}}, პირადი რეპოზიტორია",
     "legalDocumentEnglishOnly": "ეს დოკუმენტი ხელმისაწვდომია მხოლოდ ინგლისურ ენაზე.",
-    "organizationTrialEndedBilling": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს. შეგიძლიათ განაახლოთ ბილინგი, შემდეგ კი ხელახლა სცადოთ."
+    "organizationTrialEndedBilling": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს. შეგიძლიათ განაახლოთ ბილინგი, შემდეგ კი ხელახლა სცადოთ.",
+    "viewOnGitHub": "PR-ის ნახვა GitHub-ზე"
   },
   "language": {
     "restarting": "ენის შესაცვლელად აპი ხელახლა იტვირთება",
@@ -743,6 +744,9 @@
       "comment_one": "1 კომენტარი",
       "comment": "{{displayCount}} კომენტარი",
       "comment_other": "{{displayCount}} კომენტარი",
+      "conversationTruncated": "ნაჩვენებია მხოლოდ პირველი {{displayCount}} კომენტარი.",
+      "conversationTruncated_one": "ნაჩვენებია მხოლოდ პირველი {{displayCount}} კომენტარი.",
+      "conversationTruncated_other": "ნაჩვენებია მხოლოდ პირველი {{displayCount}} კომენტარი.",
       "startedRelative": " · დაიწყო {{relative}}",
       "couldNotLoadMore": "დამატებითი კომენტარების ჩატვირთვა ვერ მოხერხდა.",
       "retryLoadingMore": "დამატებითი კომენტარების ჩატვირთვის ხელახლა ცდა",
@@ -865,7 +869,6 @@
       "noAccess": "ამ საცავის შემოწმებებზე წვდომა არ გაქვს.",
       "couldNotLoad": "შემოწმებების ჩატვირთვა ვერ მოხერხდა.",
       "retryChecks": "შემოწმებების ხელახლა ცდა",
-      "viewOnGitHub": "PR-ის ნახვა GitHub-ზე",
       "noChecksReported": "შემოწმებების მონაცემები არ არის",
       "passed": "{{displayCount}} წარმატებულია",
       "passed_one": "{{displayCount}} წარმატებულია",

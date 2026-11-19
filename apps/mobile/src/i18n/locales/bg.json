@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Пробният период на организацията е приключил и тя няма активен план. Собственик на организацията може да актуализира фактурирането на kilo.ai и след това да опита отново.",
     "privateRepositoryA11y": "{{name}}, частно хранилище",
     "legalDocumentEnglishOnly": "Този документ е достъпен само на английски.",
-    "organizationTrialEndedBilling": "Пробният период на организацията е приключил и тя няма активен план. Можете да актуализирате фактурирането и след това да опитате отново."
+    "organizationTrialEndedBilling": "Пробният период на организацията е приключил и тя няма активен план. Можете да актуализирате фактурирането и след това да опитате отново.",
+    "viewOnGitHub": "Прегледай PR в GitHub"
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "Не можахме да заредим още коментари.",
       "retryLoadingMore": "Опитай отново да заредиш още коментари",
       "loadMoreComments": "Зареди още коментари",
+      "conversationTruncated": "Показват се само първите {{displayCount}} коментара.",
+      "conversationTruncated_one": "Показват се само първите {{displayCount}} коментара.",
+      "conversationTruncated_other": "Показват се само първите {{displayCount}} коментара.",
       "addReaction": "Добави реакция",
       "reactionPill": "реакция {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакция",
@@ -865,7 +869,6 @@
       "noAccess": "Нямаш достъп до проверките за това хранилище.",
       "couldNotLoad": "Не можахме да заредим проверките.",
       "retryChecks": "Зареди проверките отново",
-      "viewOnGitHub": "Прегледай PR в GitHub",
       "noChecksReported": "Няма данни за проверки",
       "passed": "успешни: {{displayCount}}",
       "passed_one": "успешни: {{displayCount}}",

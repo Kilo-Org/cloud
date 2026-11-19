@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
     "privateRepositoryA11y": "{{name}}, privāts repozitorijs",
     "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā.",
-    "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz."
+    "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz.",
+    "viewOnGitHub": "Skatīt PR GitHub"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -757,6 +758,10 @@
       "couldNotLoadMore": "Neizdevās ielādēt vairāk komentāru.",
       "retryLoadingMore": "Mēģināt ielādēt vairāk komentāru vēlreiz",
       "loadMoreComments": "Ielādēt vairāk komentāru",
+      "conversationTruncated": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
+      "conversationTruncated_zero": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
+      "conversationTruncated_one": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
+      "conversationTruncated_other": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
       "addReaction": "Pievienot reakciju",
       "reactionPill": "{{emoji}} reakcija, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcija",
@@ -878,7 +883,6 @@
       "noAccess": "Tev nav piekļuves šī repozitorija pārbaudēm.",
       "couldNotLoad": "Neizdevās ielādēt pārbaudes.",
       "retryChecks": "Mēģināt vēlreiz ielādēt pārbaudes",
-      "viewOnGitHub": "Skatīt PR GitHub",
       "noChecksReported": "Nav informācijas par pārbaudēm",
       "passed": "sekmīgas: {{displayCount}}",
       "passed_one": "sekmīgas: {{displayCount}}",

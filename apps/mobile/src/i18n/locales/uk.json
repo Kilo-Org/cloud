@@ -141,6 +141,7 @@
     "online": "У мережі",
     "open": "Відкрити {{name}}",
     "openPullRequest": "Відкрити запит на злиття",
+    "viewOnGitHub": "Переглянути PR на GitHub",
     "completed": "Завершено",
     "pending": "Очікує",
     "running": "Виконується",
@@ -2835,7 +2836,6 @@
       "skipped_few": "пропущено: {{displayCount}}",
       "skipped_many": "пропущено: {{displayCount}}",
       "title": "Перевірки",
-      "viewOnGitHub": "Переглянути PR на GitHub",
       "checkDetails": "відомості про перевірку"
     },
     "composer": {
@@ -2899,6 +2899,11 @@
       "couldNotLoad": "Не вдалося завантажити обговорення.",
       "couldNotLoadMore": "Не вдалося завантажити наступні коментарі.",
       "loadMoreComments": "Завантажити ще коментарі",
+      "conversationTruncated": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_one": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_other": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_few": "Показано лише перші {{displayCount}} коментарів.",
+      "conversationTruncated_many": "Показано лише перші {{displayCount}} коментарів.",
       "loading": "Завантаження обговорення",
       "moderation": {
         "block": {

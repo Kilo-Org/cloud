@@ -178,7 +178,8 @@
     "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
     "privateRepositoryA11y": "{{name}}、プライベートリポジトリ",
     "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。",
-    "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。"
+    "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。",
+    "viewOnGitHub": "GitHubでPRを表示"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -2757,7 +2758,6 @@
       "skipped_one": "{{displayCount}}件スキップ",
       "skipped_other": "{{displayCount}}件スキップ",
       "title": "チェック",
-      "viewOnGitHub": "GitHubでPRを表示",
       "checkDetails": "チェックの詳細"
     },
     "composer": {
@@ -2818,6 +2818,9 @@
       "commentActions": "コメントの操作",
       "comment": "{{displayCount}}件のコメント",
       "comment_other": "{{displayCount}}件のコメント",
+      "conversationTruncated": "最初の{{displayCount}}件のコメントのみを表示しています。",
+      "conversationTruncated_other": "最初の{{displayCount}}件のコメントのみを表示しています。",
+      "conversationTruncated_one": "最初の{{displayCount}}件のコメントのみを表示しています。",
       "couldNotLoad": "ディスカッションを読み込めませんでした。",
       "couldNotLoadMore": "追加のコメントを読み込めませんでした。",
       "loadMoreComments": "さらにコメントを読み込む",

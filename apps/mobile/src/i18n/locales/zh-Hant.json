@@ -141,6 +141,7 @@
     "online": "在線上",
     "open": "開啟 {{name}}",
     "openPullRequest": "開啟提取要求",
+    "viewOnGitHub": "在 GitHub 上檢視 PR",
     "completed": "已完成",
     "pending": "待處理",
     "running": "執行中",
@@ -2757,7 +2758,6 @@
       "skipped_one": "{{displayCount}} 項略過",
       "skipped_other": "{{displayCount}} 項略過",
       "title": "檢查",
-      "viewOnGitHub": "在 GitHub 上檢視 PR",
       "checkDetails": "檢查詳細資料"
     },
     "composer": {
@@ -2821,6 +2821,9 @@
       "couldNotLoad": "無法載入討論。",
       "couldNotLoadMore": "無法載入更多留言。",
       "loadMoreComments": "載入更多留言",
+      "conversationTruncated": "僅顯示前 {{displayCount}} 則留言。",
+      "conversationTruncated_one": "僅顯示前 {{displayCount}} 則留言。",
+      "conversationTruncated_other": "僅顯示前 {{displayCount}} 則留言。",
       "loading": "正在載入討論",
       "moderation": {
         "block": {

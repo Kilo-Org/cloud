@@ -178,7 +178,8 @@
     "organizationTrialEnded": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. संस्थेचा मालक kilo.ai वर बिलिंग अपडेट करू शकतो, त्यानंतर पुन्हा प्रयत्न करा.",
     "privateRepositoryA11y": "{{name}}, खाजगी रेपॉजिटरी",
     "legalDocumentEnglishOnly": "हा दस्तऐवज फक्त इंग्रजीत उपलब्ध आहे.",
-    "organizationTrialEndedBilling": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा."
+    "organizationTrialEndedBilling": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा.",
+    "viewOnGitHub": "GitHub वर PR पहा"
   },
   "language": {
     "restarting": "निवडलेली भाषा लागू करण्यासाठी पुन्हा सुरू होत आहे",
@@ -747,6 +748,9 @@
       "couldNotLoadMore": "आणखी टिप्पण्या लोड करता आल्या नाहीत.",
       "retryLoadingMore": "आणखी टिप्पण्या लोड करण्याचा पुन्हा प्रयत्न करा",
       "loadMoreComments": "आणखी टिप्पण्या लोड करा",
+      "conversationTruncated": "फक्त पहिल्या {{displayCount}} टिप्पण्या दाखवल्या आहेत.",
+      "conversationTruncated_one": "फक्त पहिल्या {{displayCount}} टिप्पण्या दाखवल्या आहेत.",
+      "conversationTruncated_other": "फक्त पहिल्या {{displayCount}} टिप्पण्या दाखवल्या आहेत.",
       "addReaction": "प्रतिक्रिया जोडा",
       "reactionPill": "{{emoji}} प्रतिक्रिया, {{displayCount}} {{countLabel}}",
       "reaction_one": "प्रतिक्रिया",
@@ -865,7 +869,6 @@
       "noAccess": "तुम्हाला या रेपॉझिटरीच्या तपासण्या पाहण्याची परवानगी नाही.",
       "couldNotLoad": "तपासण्या लोड करता आल्या नाहीत.",
       "retryChecks": "तपासण्या लोड करण्याचा पुन्हा प्रयत्न करा",
-      "viewOnGitHub": "GitHub वर PR पहा",
       "noChecksReported": "कोणत्याही तपासण्यांची नोंद नाही",
       "passed": "{{displayCount}} यशस्वी",
       "passed_one": "{{displayCount}} यशस्वी",

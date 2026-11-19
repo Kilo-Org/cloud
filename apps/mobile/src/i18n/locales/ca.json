@@ -178,7 +178,8 @@
     "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar.",
     "privateRepositoryA11y": "{{name}}, repositori privat",
     "legalDocumentEnglishOnly": "Aquest document només està disponible en anglès.",
-    "organizationTrialEndedBilling": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació i tornar-ho a provar."
+    "organizationTrialEndedBilling": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació i tornar-ho a provar.",
+    "viewOnGitHub": "Mostra la PR a GitHub"
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -757,6 +758,10 @@
       "couldNotLoadMore": "No s'han pogut carregar més comentaris.",
       "retryLoadingMore": "Torna a carregar més comentaris",
       "loadMoreComments": "Carrega més comentaris",
+      "conversationTruncated": "Només es mostren els primers {{displayCount}} comentaris.",
+      "conversationTruncated_one": "Només es mostren els primers {{displayCount}} comentaris.",
+      "conversationTruncated_many": "Només es mostren els primers {{displayCount}} comentaris.",
+      "conversationTruncated_other": "Només es mostren els primers {{displayCount}} comentaris.",
       "addReaction": "Afegeix una reacció",
       "reactionPill": "reacció {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reacció",
@@ -878,7 +883,6 @@
       "noAccess": "No tens accés a les comprovacions d'aquest repositori.",
       "couldNotLoad": "No s'han pogut carregar les comprovacions.",
       "retryChecks": "Torna a comprovar",
-      "viewOnGitHub": "Mostra la PR a GitHub",
       "noChecksReported": "No s'ha informat de cap comprovació",
       "passed": "{{displayCount}} superades",
       "passed_one": "{{displayCount}} superades",

@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
     "privateRepositoryA11y": "{{name}}, stór príobháideach",
     "legalDocumentEnglishOnly": "Tá an doiciméad seo ar fáil i mBéarla amháin.",
-    "organizationTrialEndedBilling": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú agus ansin triail a bhaint as arís."
+    "organizationTrialEndedBilling": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú agus ansin triail a bhaint as arís.",
+    "viewOnGitHub": "Féach ar an PR ar GitHub"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -773,6 +774,12 @@
       "comment_one": "1 trácht",
       "comment": "{{displayCount}} trácht",
       "comment_other": "{{displayCount}} trácht",
+      "conversationTruncated": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_one": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_two": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_few": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_many": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
+      "conversationTruncated_other": "Ní thaispeántar ach na chéad {{displayCount}} thrácht.",
       "startedRelative": " · tosaithe {{relative}}",
       "couldNotLoadMore": "Níorbh fhéidir tuilleadh tráchtanna a lódáil.",
       "retryLoadingMore": "Bain triail as tuilleadh tráchtanna a lódáil arís",
@@ -904,7 +911,6 @@
       "noAccess": "Níl rochtain agat ar sheiceálacha an stóir seo.",
       "couldNotLoad": "Níorbh fhéidir na seiceálacha a lódáil.",
       "retryChecks": "Bain triail as na seiceálacha arís",
-      "viewOnGitHub": "Féach ar an PR ar GitHub",
       "noChecksReported": "Níor tuairiscíodh aon seiceáil",
       "passed": "{{displayCount}} rathúil",
       "passed_one": "{{displayCount}} rathúil",

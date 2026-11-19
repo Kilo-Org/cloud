@@ -178,7 +178,8 @@
     "organizationTrialEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Onye nwe òtù nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ.",
     "privateRepositoryA11y": "{{name}}, ebe nchekwa koodu nkeonwe",
     "legalDocumentEnglishOnly": "Akwụkwọ a dị naanị n'asụsụ Bekee.",
-    "organizationTrialEndedBilling": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ, wee nwaa ọzọ."
+    "organizationTrialEndedBilling": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ, wee nwaa ọzọ.",
+    "viewOnGitHub": "Lelee PR na GitHub"
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -743,6 +744,9 @@
       "comment_one": "okwu 1",
       "comment": "okwu {{displayCount}}",
       "comment_other": "okwu {{displayCount}}",
+      "conversationTruncated": "A na-egosi naanị okwu {{displayCount}} mbụ.",
+      "conversationTruncated_other": "A na-egosi naanị okwu {{displayCount}} mbụ.",
+      "conversationTruncated_one": "A na-egosi naanị okwu {{displayCount}} mbụ.",
       "startedRelative": " · malitere {{relative}}",
       "couldNotLoadMore": "Enweghị ike ibudata okwu ndị ọzọ.",
       "retryLoadingMore": "Nwaa ọzọ ibudata okwu ndị ọzọ",
@@ -865,7 +869,6 @@
       "noAccess": "Ị nweghị ikike ilele nnwale maka ebe nchekwa a.",
       "couldNotLoad": "Enweghị ike ibudata nnwale.",
       "retryChecks": "Nwaa nnwale ọzọ",
-      "viewOnGitHub": "Lelee PR na GitHub",
       "noChecksReported": "Enweghị nnwale akọọrọ",
       "passed": "{{displayCount}} gafere",
       "passed_one": "{{displayCount}} gafere",

@@ -160,12 +160,18 @@ export function PrReviewDiscussionTab({
   number,
   onRequestFiles,
 }: PrReviewDiscussionTabProps) {
-  const { query, threads, conversation, firstPageErrorState, laterPageError } =
-    usePrReviewDiscussionThreads({
-      owner,
-      repo,
-      number,
-    });
+  const {
+    query,
+    threads,
+    conversation,
+    conversationTruncated,
+    firstPageErrorState,
+    laterPageError,
+  } = usePrReviewDiscussionThreads({
+    owner,
+    repo,
+    number,
+  });
 
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -580,6 +586,9 @@ export function PrReviewDiscussionTab({
         hasNextPage={query.hasNextPage}
         isFetchingNextPage={query.isFetchingNextPage}
         laterPageError={laterPageError || retainedContentError}
+        truncatedConversationCount={
+          conversationTruncated && conversation.length > 0 ? conversation.length : null
+        }
         onLoadMore={() => {
           void query.fetchNextPage();
         }}

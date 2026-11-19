@@ -178,7 +178,8 @@
     "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
     "privateRepositoryA11y": "{{name}}, מאגר פרטי",
     "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד.",
-    "organizationTrialEndedBilling": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב, ואז לנסות שוב."
+    "organizationTrialEndedBilling": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב, ואז לנסות שוב.",
+    "viewOnGitHub": "הצגת ה-PR ב-GitHub"
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -2796,7 +2797,6 @@
       "skipped_other": "דילוג על {{displayCount}}",
       "skipped_two": "דילוג על {{displayCount}}",
       "title": "בדיקות",
-      "viewOnGitHub": "הצגת ה-PR ב-GitHub",
       "checkDetails": "פרטי בדיקה"
     },
     "composer": {
@@ -2857,6 +2857,10 @@
       "commentActions": "פעולות בתגובה",
       "comment": "{{displayCount}} תגובות",
       "comment_other": "{{displayCount}} תגובות",
+      "conversationTruncated": "מוצגות רק {{displayCount}} התגובות הראשונות.",
+      "conversationTruncated_one": "מוצגות רק {{displayCount}} התגובות הראשונות.",
+      "conversationTruncated_two": "מוצגות רק {{displayCount}} התגובות הראשונות.",
+      "conversationTruncated_other": "מוצגות רק {{displayCount}} התגובות הראשונות.",
       "couldNotLoad": "לא ניתן היה לטעון את הדיון.",
       "couldNotLoadMore": "לא ניתן היה לטעון עוד תגובות.",
       "loadMoreComments": "טעינת תגובות נוספות",

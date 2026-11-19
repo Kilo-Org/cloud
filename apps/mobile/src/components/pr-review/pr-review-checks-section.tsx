@@ -301,7 +301,7 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
 
   const viewOnProviderLabel =
     queries.platform === 'github'
-      ? t('prReview.checks.viewOnGitHub')
+      ? t('common.viewOnGitHub')
       : t('prReview.terms.viewOnProvider', { provider: reviewerPlatformLabel(queries.platform) });
 
   const data = checks.data;

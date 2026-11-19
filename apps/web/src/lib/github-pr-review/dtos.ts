@@ -193,6 +193,9 @@ export const GitHubPrReviewReviewThreadsResultSchema = z
     threads: z.array(GitHubPrReviewReviewThreadSchema),
     conversation: z.array(GitHubPrReviewReviewCommentSchema),
     nextCursor: z.string().nullable(),
+    // Present only when the result is partial; omitted for complete listings
+    // so PRs under the ceiling keep the existing result shape.
+    truncated: z.boolean().optional(),
   })
   .strict();
 export type GitHubPrReviewReviewThreadsResult = z.infer<
@@ -242,7 +245,7 @@ export const REVIEW_THREADS_PAGE_SIZE = 50;
 export const REVIEW_THREAD_COMMENTS_PAGE_SIZE = 50;
 // Conversation (issue) comments on the first listReviewThreads page only.
 // Page size 100, at most 5 pages — same ceiling spirit as bot review-comment
-// pagination (bot/platforms/github.ts). Past the cap, remaining pages are
-// dropped and whatever was collected is returned (silent truncation).
+// pagination (bot/platforms/github.ts). Past the cap, the result carries
+// `truncated: true` instead of the remaining pages.
 export const CONVERSATION_COMMENTS_PAGE_SIZE = 100;
 export const CONVERSATION_COMMENTS_MAX_PAGES = 5;

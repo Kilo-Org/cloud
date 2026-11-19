@@ -108,6 +108,7 @@ import {
   type BriefingExcerpt,
 } from '../ingest/briefing-excerpt';
 import { laterLastActivityAt } from '../ingest/last-activity';
+import { higherTotalCostMicrodollars } from '../ingest/total-cost';
 import {
   SHARE_INFO_KEY_PREFIX,
   shareInfoKey,
@@ -390,13 +391,7 @@ export async function persistLiveSessionColumns(
   } = {};
 
   if (columns.costMicrodollars !== undefined) {
-    const cost = columns.costMicrodollars;
-    set.total_cost_microdollars = sql`CASE
-      WHEN ${cli_sessions_v2.total_cost_microdollars} IS NULL
-        OR ${cli_sessions_v2.total_cost_microdollars} < ${cost}
-      THEN ${cost}
-      ELSE ${cli_sessions_v2.total_cost_microdollars}
-    END`;
+    set.total_cost_microdollars = higherTotalCostMicrodollars(columns.costMicrodollars);
   }
 
   if (columns.lastActivityAtIso !== undefined) {

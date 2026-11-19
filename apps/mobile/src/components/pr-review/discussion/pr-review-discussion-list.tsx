@@ -25,7 +25,7 @@ import {
 import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
-import { useDetailScreenBottomPadding, useStyleSideInsets } from '@/lib/screen-insets';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 
 const noopReactionToggle = () => {

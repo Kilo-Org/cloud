@@ -2,7 +2,7 @@
 import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import {
   getShareRemoteFileReason,
@@ -20,30 +20,39 @@ const expoFileSystemMock = vi.hoisted(() => {
     await Promise.resolve();
     return '# Hello';
   });
+  // Bounded prefix read (FileHandle.readBytes): tests switch the verdict per case.
+  const readBytes = vi.fn(() => Promise.resolve(new TextEncoder().encode('# Hello')));
+  const handle = { readBytes, close: vi.fn() };
   // The native preview flow: a test switches the verdict per case.
   const previewBehavior = {
     canPreview: true,
     previewError: null as Error | null,
     exists: true,
+    size: 1024,
   };
-  const instances: {
+  type FileInstance = {
     uri: string;
-    canPreview: ReturnType<typeof vi.fn>;
-    preview: ReturnType<typeof vi.fn>;
-    copy: ReturnType<typeof vi.fn>;
-    delete: ReturnType<typeof vi.fn>;
-  }[] = [];
+    canPreview: Mock;
+    preview: Mock;
+    copy: Mock;
+    delete: Mock;
+  };
+  const instances: FileInstance[] = [];
   const File = vi.fn(function FileMock(uri: string) {
     const instance = {
       uri,
       get exists() {
         return previewBehavior.exists;
       },
+      get size() {
+        return previewBehavior.size;
+      },
       get extension() {
         const dot = uri.lastIndexOf('.');
         return dot === -1 ? '' : uri.slice(dot);
       },
       text: fileText,
+      open: vi.fn(() => handle),
       canPreview: vi.fn(() => Promise.resolve(previewBehavior.canPreview)),
       preview: vi.fn(() =>
         previewBehavior.previewError !== null
@@ -53,10 +62,10 @@ const expoFileSystemMock = vi.hoisted(() => {
       copy: vi.fn(() => Promise.resolve()),
       delete: vi.fn(),
     };
-    instances.push(instance as unknown as (typeof instances)[number]);
+    instances.push(instance as FileInstance);
     return instance;
   });
-  return { fileText, File, previewBehavior, instances };
+  return { fileText, readBytes, handle, File, previewBehavior, instances };
 });
 
 const actionSheetMock = vi.hoisted(() => {
@@ -164,6 +173,7 @@ vi.mock('expo-file-system', () => ({
     return { create: vi.fn() };
   }),
   File: expoFileSystemMock.File,
+  FileMode: { ReadOnly: 'r' },
   Paths: { cache: 'file:///cache' },
 }));
 vi.mock('@/lib/share-remote-file', () => ({
@@ -363,13 +373,14 @@ async function chooseSheetOptionByLabel(
   });
 }
 
-function markdownAttachment(): AgentAttachment {
+function markdownAttachment(overrides: Partial<AgentAttachment> = {}): AgentAttachment {
   return makeAttachment({
     filename: 'notes.md',
     kind: 'document',
     extension: 'md',
     mimeType: 'text/plain',
     localUri: 'file:///cache/notes.md',
+    ...overrides,
   });
 }
 
@@ -378,9 +389,13 @@ beforeEach(() => {
   gestureHandlerMock.reset();
   a11yMock.requestA11yFocus.mockReset();
   fileText.mockResolvedValue('# Hello');
+  expoFileSystemMock.readBytes.mockReset();
+  expoFileSystemMock.readBytes.mockResolvedValue(new TextEncoder().encode('# Hello'));
+  expoFileSystemMock.handle.close.mockReset();
   expoFileSystemMock.previewBehavior.canPreview = true;
   expoFileSystemMock.previewBehavior.previewError = null;
   expoFileSystemMock.previewBehavior.exists = true;
+  expoFileSystemMock.previewBehavior.size = 1024;
   expoFileSystemMock.instances.length = 0;
   reactNativeMock.Platform.OS = 'ios';
   reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 844 });
@@ -639,6 +654,72 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
 
     expect(toast.error).toHaveBeenCalledWith('Failed to open file. Please try again.');
     expect(nodesByType(renderer.root, 'MarkdownText')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
+  it('reads an over-budget file as a bounded prefix and shows the Truncated marker', async () => {
+    // The chip's stored size drives the gate before anything decodes.
+    expoFileSystemMock.readBytes.mockResolvedValue(new TextEncoder().encode('# Head'));
+    const renderer = await mount([markdownAttachment({ size: 60_000 })]);
+
+    await pressBody(renderer.root);
+
+    // The bounded path never runs the whole-file read.
+    expect(fileText).not.toHaveBeenCalled();
+    expect(expoFileSystemMock.readBytes).toHaveBeenCalledTimes(1);
+
+    const markdown = nodesByType(renderer.root, 'MarkdownText');
+    expect(markdown).toHaveLength(1);
+    expect(markdown[0]?.props.value).toBe('# Head');
+
+    // The marker sits above the body, visible on the first paint: a 50k-char
+    // preview never scrolls to a trailing notice.
+    const texts = nodesByType(renderer.root, 'Text');
+    expect(
+      texts.some(
+        node =>
+          node.props.accessibilityLabel === 'Content truncated' &&
+          node.props.children === 'Truncated'
+      )
+    ).toBe(true);
+
+    // The handle closes, so the file's later delete is never blocked.
+    expect(expoFileSystemMock.handle.close).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('falls back to the file size for a restored chip whose stored size is 0', async () => {
+    expoFileSystemMock.previewBehavior.size = 60_000;
+    expoFileSystemMock.readBytes.mockResolvedValue(new TextEncoder().encode('# Head'));
+    const renderer = await mount([markdownAttachment({ size: 0 })]);
+
+    await pressBody(renderer.root);
+
+    expect(fileText).not.toHaveBeenCalled();
+    expect(expoFileSystemMock.readBytes).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('ignores a second tap while the first preview read is in flight', async () => {
+    // Hold the first read's promise so a second tap lands while it is pending.
+    const read = Promise.withResolvers<string>();
+    fileText.mockReturnValueOnce(read.promise);
+    const renderer = await mount([markdownAttachment()]);
+
+    await pressBody(renderer.root);
+    // A second tap while the read is pending starts nothing.
+    await pressBody(renderer.root);
+
+    read.resolve('# Hello');
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fileText).toHaveBeenCalledTimes(1);
+    expect(nodesByType(renderer.root, 'MarkdownText')).toHaveLength(1);
 
     renderer.unmount();
   });

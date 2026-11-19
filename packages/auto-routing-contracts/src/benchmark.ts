@@ -297,13 +297,24 @@ export const BenchmarkRunSchema = z.object({
   completedAt: z.string().nullable(),
   error: z.string().nullable(),
   // Optional so run payloads persisted before the field existed still parse.
-  // Omitted for terminal runs, whose counts are already final in `summaries`.
+  // Omitted for terminal runs, whose counts are already final in their summaries.
   progress: BenchmarkRunProgressSchema.optional(),
-  summaries: z.array(BenchmarkModelSummarySchema),
 });
 export type BenchmarkRun = z.infer<typeof BenchmarkRunSchema>;
 
-export const BenchmarkRunsResponseSchema = z.object({ runs: z.array(BenchmarkRunSchema) });
+export const BenchmarkRunsResponseSchema = z.object({
+  runs: z.array(BenchmarkRunSchema),
+  // Whether any run of the requested router is running, whatever the list
+  // filter, so one request per poll both lists runs and decides whether to
+  // keep polling. Absent from workers that predate it; readers then fall back
+  // to the listed runs.
+  hasRunningRun: z.boolean().optional(),
+});
+export type BenchmarkRunsResponse = z.infer<typeof BenchmarkRunsResponseSchema>;
+export const BenchmarkRunSummariesResponseSchema = z.object({
+  summaries: z.array(BenchmarkModelSummarySchema),
+});
+export type BenchmarkRunSummariesResponse = z.infer<typeof BenchmarkRunSummariesResponseSchema>;
 // config is null until an admin saves one — the worker never fabricates a
 // default config, and runs cannot start without a saved one.
 export const BenchmarkConfigResponseSchema = z.object({

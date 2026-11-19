@@ -27,7 +27,8 @@ import {
   resolvePolicySettings,
   resolveEffectivePolicy,
   StartBenchmarkRunRequestSchema,
-  type BenchmarkRun,
+  type BenchmarkRunsResponse,
+  type BenchmarkRunSummariesResponse,
   type BenchmarkSchedulerConfigResponse,
   type BenchmarkRunProgress,
   type CustomRoutingTableResponse,
@@ -60,9 +61,11 @@ import {
 } from './run';
 import {
   countCurrentProfilesByStatus,
+  existsRunningRun,
   listCurrentPlatformProfileStatuses,
   getClassifierWinner,
   getLatestRoutingTable,
+  getRunSummariesForRouter,
   listRuns,
   requeueFailedCurrentProfiles,
 } from './db';
@@ -124,6 +127,31 @@ function withLegacyAdminConfigFields(
   };
 }
 
+async function syncRegistryAfterConfigSave(env: Env, router: AutoRouter): Promise<void> {
+  try {
+    await syncPlatformRegistry(env, fetch, router);
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'platform_registry_sync_failed',
+        afterConfigSave: true,
+        router,
+        ...formatError(error),
+      })
+    );
+    return;
+  }
+  await publishPlatformRoutingTable(env, fetch, router).catch(error => {
+    console.warn(
+      JSON.stringify({
+        event: 'routing_table_publish_skipped',
+        afterConfigSave: true,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
+  });
+}
+
 export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   // Every /admin/* route below requires the worker-wide authMiddleware
   // (./auth), which src/index.ts mounts with app.use('*', ...) before it calls
@@ -177,16 +205,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         { ...body, router, deciderModels },
         updatedBy
       );
-      await syncPlatformRegistry(c.env, fetch, router);
-      await publishPlatformRoutingTable(c.env, fetch, router).catch(error => {
-        console.warn(
-          JSON.stringify({
-            event: 'routing_table_publish_skipped',
-            afterConfigSave: true,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        );
-      });
+      // Respond once the config is saved: the registry sync and table publish
+      // call the catalog and subscription services for seconds, and the
+      // scheduled platform sync converges the registry if this one fails.
+      c.executionCtx.waitUntil(syncRegistryAfterConfigSave(c.env, router));
       return c.json({
         config: withLegacyAdminConfigFields(saved),
         policySettings: resolvePolicySettings(saved),
@@ -227,11 +249,16 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     const limit = Math.min(Number(c.req.query('limit') ?? 20) || 20, 100);
     const kind = BenchmarkKindSchema.safeParse(c.req.query('kind'));
     const purpose = BenchmarkRunPurposeSchema.safeParse(c.req.query('purpose'));
-    const runs: BenchmarkRun[] = await listRuns(c.env.BENCH_DB, limit, {
-      kind: kind.success ? kind.data : undefined,
-      purpose: purpose.success ? purpose.data : undefined,
-      router: kind.success && kind.data === 'classifier' ? DEFAULT_AUTO_ROUTER : requestRouter(c),
-    });
+    const listRouter =
+      kind.success && kind.data === 'classifier' ? DEFAULT_AUTO_ROUTER : requestRouter(c);
+    const [runs, hasRunningRun] = await Promise.all([
+      listRuns(c.env.BENCH_DB, limit, {
+        kind: kind.success ? kind.data : undefined,
+        purpose: purpose.success ? purpose.data : undefined,
+        router: listRouter,
+      }),
+      existsRunningRun(c.env.BENCH_DB, requestRouter(c)),
+    ]);
     // Progress is display-only: a failed count query must not hide the run list.
     const progressByRunId = await loadRunProgress(
       c.env.BENCH_DB,
@@ -247,7 +274,18 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         const progress = progressByRunId.get(run.id);
         return progress ? { ...run, progress } : run;
       }),
-    });
+      hasRunningRun,
+    } satisfies BenchmarkRunsResponse);
+  });
+
+  app.get('/admin/runs/:runId/summaries', async c => {
+    const summaries = await getRunSummariesForRouter(
+      c.env.BENCH_DB,
+      c.req.param('runId'),
+      requestRouter(c)
+    );
+    if (summaries === null) return c.json({ error: 'Run not found' }, 404);
+    return c.json({ summaries } satisfies BenchmarkRunSummariesResponse);
   });
 
   app.post(

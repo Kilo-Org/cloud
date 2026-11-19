@@ -15,6 +15,7 @@ import type * as ExecutableModelsModule from './executable-models';
 import type * as ProfilesModule from './profiles';
 import type * as SchedulerModule from './scheduler';
 import { claimScheduledChunks, recoverChunks, scheduleRunChunks } from './scheduler';
+import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { computeEngineIdentity } from './run';
@@ -94,6 +95,7 @@ vi.mock('./db', async importOriginal => {
     getConfigRows: vi.fn(),
     replaceConfig: vi.fn(),
     listRuns: vi.fn(),
+    existsRunningRun: vi.fn(),
     listRunProgressCounts: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     getClassifierWinner: vi.fn(),
@@ -152,6 +154,7 @@ import {
   listCurrentPlatformProfileStatuses,
   countCurrentProfilesByStatus,
   listRuns,
+  existsRunningRun,
   listRunProgressCounts,
   listStaleRunningDeciderRuns,
   markStaleRunsFailed,
@@ -209,8 +212,13 @@ const env = {
   KILO_WEB_API_BASE_URL: 'https://app.test',
 } as unknown as Env;
 
+// Background work a route hands to waitUntil; settled before the database closes.
+const backgroundTasks: Promise<unknown>[] = [];
+
 const executionCtx = {
-  waitUntil: () => {},
+  waitUntil: (task: Promise<unknown>) => {
+    backgroundTasks.push(task);
+  },
   passThroughOnException: () => {},
 } as unknown as ExecutionContext;
 
@@ -242,7 +250,8 @@ function authedPut(path: string, body: unknown, extraHeaders: Record<string, str
   });
 }
 
-afterEach(() => {
+afterEach(async () => {
+  await Promise.allSettled(backgroundTasks.splice(0));
   vi.unstubAllGlobals();
   sqlite.close();
 });
@@ -310,6 +319,7 @@ beforeEach(() => {
   });
   vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
+  vi.mocked(existsRunningRun).mockResolvedValue(false);
   vi.mocked(listRunProgressCounts).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getClassifierWinner).mockResolvedValue(null);
@@ -627,6 +637,35 @@ describe('PUT /admin/config', () => {
     expect(router).toBe('efficient');
   });
 
+  it('responds before the registry sync finishes and finishes it in the background', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    const sync = Promise.withResolvers<void>();
+    vi.mocked(syncPlatformRegistryRows).mockReturnValue(sync.promise);
+
+    const res = await authedPut('/admin/config', TEST_CONFIG);
+
+    expect(res.status).toBe(200);
+    expect(backgroundTasks).toHaveLength(1);
+    sync.resolve();
+    await Promise.all(backgroundTasks);
+    expect(syncPlatformRegistryRows).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a saved config when the background registry sync fails, and logs it', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    vi.mocked(syncPlatformRegistryRows).mockRejectedValue(new Error('D1 overloaded'));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await authedPut('/admin/config', TEST_CONFIG);
+    await Promise.all(backgroundTasks);
+
+    expect(res.status).toBe(200);
+    expect(replaceConfig).toHaveBeenCalledOnce();
+    expect(logged.mock.calls.map(([line]) => JSON.parse(String(line)).event)).toContain(
+      'platform_registry_sync_failed'
+    );
+  });
+
   it('keeps the previous release’s admin config fields on the resolved policy values', async () => {
     // The stored legacy columns are stale; the previous web release still
     // requires the fields, so they must carry the canonical policy value.
@@ -720,7 +759,7 @@ describe('GET /admin/runs', () => {
   it('returns an empty runs array when the table is empty', async () => {
     const res = await authedGet('/admin/runs');
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ runs: [] });
+    await expect(res.json()).resolves.toEqual({ runs: [], hasRunningRun: false });
   });
 
   it('sweeps stale runs before listing so a wedged run is recovered', async () => {
@@ -739,7 +778,6 @@ describe('GET /admin/runs', () => {
       startedAt: '2026-06-15T00:00:00.000Z',
       completedAt: null,
       error: null,
-      summaries: [],
     };
     const completed: BenchmarkRun = {
       ...running,
@@ -785,7 +823,6 @@ describe('GET /admin/runs', () => {
       startedAt: '2026-06-15T00:00:00.000Z',
       completedAt: null,
       error: null,
-      summaries: [],
     };
     vi.mocked(listRuns).mockResolvedValue([running]);
     vi.mocked(listRunProgressCounts).mockRejectedValue(new Error('D1 overloaded'));
@@ -797,6 +834,118 @@ describe('GET /admin/runs', () => {
     const body = (await res.json()) as { runs: BenchmarkRun[] };
     expect(body.runs.map(run => run.id)).toEqual([running.id]);
     expect(body.runs[0].progress).toBeUndefined();
+  });
+});
+
+describe('run list and per-run summaries against D1', () => {
+  const RUN_COLUMNS =
+    'id, router, kind, purpose, status, started_at, min_accuracy, switch_cost_factor, max_concurrency';
+
+  function seedRun(run: {
+    id: string;
+    router: 'efficient' | 'frontier';
+    kind: 'classifier' | 'decider';
+    status: 'running' | 'completed';
+    startedAt: string;
+  }) {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (${RUN_COLUMNS}) VALUES (?, ?, ?, 'platform', ?, ?, 0.7, 3, 4)`
+      )
+      .run(run.id, run.router, run.kind, run.status, run.startedAt);
+  }
+
+  function seedSummary(runId: string, model: string, routeKey: string) {
+    sqlite
+      .prepare(
+        `INSERT INTO model_summaries (run_id, model, route_key, accuracy, avg_latency_ms, cases, errors)
+         VALUES (?, ?, ?, 0.8, 1000, 10, 0)`
+      )
+      .run(runId, model, routeKey);
+  }
+
+  beforeEach(async () => {
+    const actual = await vi.importActual<typeof DbModule>('./db');
+    vi.mocked(listRuns).mockImplementation(actual.listRuns);
+    vi.mocked(existsRunningRun).mockImplementation(actual.existsRunningRun);
+    sqlite.close();
+    sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    env.BENCH_DB = sqliteD1(sqlite);
+
+    seedRun({
+      id: 'decider-efficient',
+      router: 'efficient',
+      kind: 'decider',
+      status: 'completed',
+      startedAt: '2026-06-02T00:00:00.000Z',
+    });
+    seedRun({
+      id: 'decider-frontier',
+      router: 'frontier',
+      kind: 'decider',
+      status: 'running',
+      startedAt: '2026-06-03T00:00:00.000Z',
+    });
+    seedRun({
+      id: 'classifier-shared',
+      router: 'efficient',
+      kind: 'classifier',
+      status: 'completed',
+      startedAt: '2026-06-01T00:00:00.000Z',
+    });
+    seedSummary('decider-efficient', 'a/model', 'debugging/bug_fixing');
+    seedSummary('decider-efficient', 'b/model', 'debugging/bug_fixing');
+    seedSummary('decider-efficient', 'a/model', 'investigation/repo_exploration');
+    seedSummary('decider-frontier', 'c/model', 'debugging/bug_fixing');
+    seedSummary('classifier-shared', 'classifier/model', '*');
+  });
+
+  it('lists runs without their summaries', async () => {
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: Record<string, unknown>[]; hasRunningRun: boolean };
+    expect(body.runs.map(run => run.id)).toEqual(['decider-efficient', 'classifier-shared']);
+    for (const run of body.runs) expect(run).not.toHaveProperty('summaries');
+    // Only the frontier router has a running run.
+    expect(body.hasRunningRun).toBe(false);
+  });
+
+  it('reports a running run of the router even when the filter hides it', async () => {
+    const res = await authedGet('/admin/runs?router=frontier&kind=classifier');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: { id: string }[]; hasRunningRun: boolean };
+    expect(body.runs.map(run => run.id)).toEqual(['classifier-shared']);
+    expect(body.hasRunningRun).toBe(true);
+  });
+
+  it('returns one run’s summaries', async () => {
+    const res = await authedGet('/admin/runs/decider-efficient/summaries');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { summaries: { model: string; routeKey: string }[] };
+    expect(body.summaries.map(summary => `${summary.model} ${summary.routeKey}`).sort()).toEqual([
+      'a/model debugging/bug_fixing',
+      'a/model investigation/repo_exploration',
+      'b/model debugging/bug_fixing',
+    ]);
+  });
+
+  it('serves classifier summaries to every router but keeps decider runs router-scoped', async () => {
+    const classifier = await authedGet('/admin/runs/classifier-shared/summaries?router=frontier');
+    expect(classifier.status).toBe(200);
+    await expect(classifier.json()).resolves.toMatchObject({
+      summaries: [{ model: 'classifier/model', routeKey: '*' }],
+    });
+
+    const otherRouter = await authedGet('/admin/runs/decider-efficient/summaries?router=frontier');
+    expect(otherRouter.status).toBe(404);
+
+    const missing = await authedGet('/admin/runs/no-such-run/summaries');
+    expect(missing.status).toBe(404);
+    await expect(missing.json()).resolves.toEqual({ error: 'Run not found' });
   });
 });
 

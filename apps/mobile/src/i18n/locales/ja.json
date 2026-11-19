@@ -2800,7 +2800,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
       "gitlabReconnectAdminOnlyDescription": "組織のオーナー、管理者、または請求管理者に再接続を依頼してください。",
       "bitbucketNotConnectedTitle": "Bitbucketが接続されていません",
-      "bitbucketAdminOnlyDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
+      "adminOnlyConnectDescription": "接続できるのは組織のオーナー、管理者、請求管理者のみです。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },
@@ -4629,6 +4629,9 @@
     "couldNotLoad": "連携を読み込めませんでした",
     "permissionDenied": "これらの連携を管理する権限がありません。",
     "managedByOwner": "変更できない接続については、組織のオーナーに変更を依頼してください。",
+    "managedByOwnerOrAdmin": "変更できない接続については、組織のオーナー、または管理者に変更を依頼してください。",
+    "managedByOwnerOrBilling": "変更できない接続については、組織のオーナー、または請求管理者に変更を依頼してください。",
+    "managedByOwnerAdminOrBilling": "変更できない接続については、組織のオーナー、管理者、または請求管理者に変更を依頼してください。",
     "connectFailed": "接続ページを開けませんでした"
   },
   "invoices": {

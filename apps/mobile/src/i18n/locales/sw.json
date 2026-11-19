@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Akaunti hii haina shirika lolote kwa sasa. Unaweza kukagua maombi ya kuunganisha kwenye Bitbucket mara tu unapounda au kujiunga na shirika.",
       "gitlabReconnectAdminOnlyDescription": "Omba mmiliki wa shirika, msimamizi, au msimamizi wa bili aiunganishe upya.",
       "bitbucketNotConnectedTitle": "Bitbucket haijaunganishwa",
-      "bitbucketAdminOnlyDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
+      "adminOnlyConnectDescription": "Wamiliki, wasimamizi, na wasimamizi wa bili wa shirika pekee wanaweza kuiunganisha.",
       "contextLine": "Kwa {{organization}}",
       "contextLinePersonal": "Kwa akaunti yako binafsi"
     },
@@ -4629,6 +4629,9 @@
     "couldNotLoad": "Imeshindwa kupakia miunganisho",
     "permissionDenied": "Huna ruhusa ya kudhibiti miunganisho hii.",
     "managedByOwner": "Mwombe mmiliki wa shirika abadilishe muunganisho ambao huwezi kubadilisha.",
+    "managedByOwnerOrAdmin": "Mwombe mmiliki wa shirika au msimamizi abadilishe muunganisho ambao huwezi kubadilisha.",
+    "managedByOwnerOrBilling": "Mwombe mmiliki wa shirika au msimamizi wa bili abadilishe muunganisho ambao huwezi kubadilisha.",
+    "managedByOwnerAdminOrBilling": "Mwombe mmiliki wa shirika, msimamizi, au msimamizi wa bili abadilishe muunganisho ambao huwezi kubadilisha.",
     "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha"
   },
   "invoices": {

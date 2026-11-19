@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tällä tilillä ei ole vielä organisaatioita. Voit katselmoida Bitbucket-muutospyyntöjä, kun luot organisaation tai liityt sellaiseen.",
       "gitlabReconnectAdminOnlyDescription": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
       "bitbucketNotConnectedTitle": "Bitbucketia ei ole yhdistetty",
-      "bitbucketAdminOnlyDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
+      "adminOnlyConnectDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
       "contextLine": "{{organization}}-organisaatiolle",
       "contextLinePersonal": "Henkilökohtaiselle tilillesi"
     },
@@ -4629,6 +4629,9 @@
     "couldNotLoad": "Integraatioita ei voitu ladata",
     "permissionDenied": "Sinulla ei ole oikeutta hallita näitä integraatioita.",
     "managedByOwner": "Pyydä organisaation omistajaa muuttamaan yhteyttä, jota et voi muuttaa.",
+    "managedByOwnerOrAdmin": "Pyydä organisaation omistajaa tai ylläpitäjää muuttamaan yhteyttä, jota et voi muuttaa.",
+    "managedByOwnerOrBilling": "Pyydä organisaation omistajaa tai laskutusvastaavaa muuttamaan yhteyttä, jota et voi muuttaa.",
+    "managedByOwnerAdminOrBilling": "Pyydä organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa muuttamaan yhteyttä, jota et voi muuttaa.",
     "connectFailed": "Yhdistämissivua ei voitu avata"
   },
   "invoices": {

@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Hierdie rekening het nog geen organisasies nie. Bitbucket-trekversoeke kan hersien word sodra jy 'n organisasie skep of by een aansluit.",
       "gitlabReconnectAdminOnlyDescription": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om dit weer te koppel.",
       "bitbucketNotConnectedTitle": "Bitbucket is nie gekoppel nie",
-      "bitbucketAdminOnlyDescription": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
+      "adminOnlyConnectDescription": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
       "contextLine": "Vir {{organization}}",
       "contextLinePersonal": "Vir jou persoonlike rekening"
     },
@@ -4629,6 +4629,9 @@
     "couldNotLoad": "Kon nie integrasies laai nie",
     "permissionDenied": "Jy het nie toestemming om hierdie integrasies te bestuur nie.",
     "managedByOwner": "Vra 'n eienaar van die organisasie om 'n koppeling te verander wat jy nie kan verander nie.",
+    "managedByOwnerOrAdmin": "Vra 'n organisasie-eienaar of administrateur om 'n koppeling te verander wat jy nie kan verander nie.",
+    "managedByOwnerOrBilling": "Vra 'n organisasie-eienaar of faktureringsbestuurder om 'n koppeling te verander wat jy nie kan verander nie.",
+    "managedByOwnerAdminOrBilling": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om 'n koppeling te verander wat jy nie kan verander nie.",
     "connectFailed": "Kon nie die koppelbladsy oopmaak nie"
   },
   "invoices": {

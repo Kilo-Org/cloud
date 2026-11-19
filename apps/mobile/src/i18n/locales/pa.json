@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਸੰਗਠਨ ਨਹੀਂ ਹੈ। ਇੱਕ ਸੰਗਠਨ ਬਣਾਉਣ ਜਾਂ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਤੋਂ ਬਾਅਦ ਹੀ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
       "gitlabReconnectAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
       "bitbucketNotConnectedTitle": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
-      "bitbucketAdminOnlyDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
+      "adminOnlyConnectDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
       "contextLine": "{{organization}} ਲਈ",
       "contextLinePersonal": "ਤੁਹਾਡੇ ਨਿੱਜੀ ਖਾਤੇ ਲਈ"
     },
@@ -4629,6 +4629,9 @@
     "couldNotLoad": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
     "permissionDenied": "ਤੁਹਾਡੇ ਕੋਲ ਇਹਨਾਂ ਇੰਟੀਗ੍ਰੇਸ਼ਨਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
     "managedByOwner": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਨੂੰ ਕਹੋ।",
+    "managedByOwnerOrAdmin": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਜਾਂ ਐਡਮਿਨ ਨੂੰ ਕਹੋ।",
+    "managedByOwnerOrBilling": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਕਹੋ।",
+    "managedByOwnerAdminOrBilling": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਕਹੋ।",
     "connectFailed": "ਕਨੈਕਸ਼ਨ ਪੰਨਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
   },
   "invoices": {

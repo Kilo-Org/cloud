@@ -978,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
       "gitlabReconnectAdminOnlyDescription": "Prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja, da jo ponovno poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket ni povezan",
-      "bitbucketAdminOnlyDescription": "Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
+      "adminOnlyConnectDescription": "Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osebni račun"
     },
@@ -4779,6 +4779,9 @@
     "couldNotLoad": "Integracij ni bilo mogoče naložiti",
     "permissionDenied": "Nimate dovoljenja za upravljanje teh integracij.",
     "managedByOwner": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije.",
+    "managedByOwnerOrAdmin": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije ali skrbnika.",
+    "managedByOwnerOrBilling": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije ali skrbnika obračunavanja.",
+    "managedByOwnerAdminOrBilling": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije, skrbnika ali skrbnika obračunavanja.",
     "connectFailed": "Strani za povezavo ni bilo mogoče odpreti"
   },
   "invoices": {

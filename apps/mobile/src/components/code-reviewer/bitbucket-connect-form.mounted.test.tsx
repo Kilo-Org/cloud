@@ -133,14 +133,14 @@ describe('BitbucketConnectForm', () => {
     await submit(root, 'workspace-token');
 
     expect(onConnected).not.toHaveBeenCalled();
-    expect(statusMessage(root)).toBe(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    expect(statusMessage(root)).toBe(i18n.t('prReview.connect.adminOnlyConnectDescription'));
     expect(submitButton(root).props.disabled).toBe(true);
 
     // A lost role is not a token problem, so a new token neither clears the
     // sentence nor re-enables the submit that would be refused again.
     await edit(root, 'another-token');
 
-    expect(statusMessage(root)).toBe(i18n.t('prReview.connect.bitbucketAdminOnlyDescription'));
+    expect(statusMessage(root)).toBe(i18n.t('prReview.connect.adminOnlyConnectDescription'));
     expect(submitButton(root).props.disabled).toBe(true);
   });
 

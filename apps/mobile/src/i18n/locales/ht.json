@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Kont sa a pa gen òganizasyon pou kounye a. Ou ka revize demann fizyon Bitbucket lè w kreye yon òganizasyon oswa rantre nan yon sèl.",
       "gitlabReconnectAdminOnlyDescription": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan òganizasyon an pou rekonekte l.",
       "bitbucketNotConnectedTitle": "Bitbucket pa konekte",
-      "bitbucketAdminOnlyDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
+      "adminOnlyConnectDescription": "Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
       "contextLine": "Pou {{organization}}",
       "contextLinePersonal": "Pou kont pèsonèl ou"
     },
@@ -4629,6 +4629,9 @@
     "couldNotLoad": "Pa t ka chaje entegrasyon yo",
     "permissionDenied": "Ou pa gen pèmisyon pou jere entegrasyon sa yo.",
     "managedByOwner": "Mande yon pwopriyetè òganizasyon pou chanje yon koneksyon ou pa ka chanje.",
+    "managedByOwnerOrAdmin": "Mande yon pwopriyetè òganizasyon oswa yon administratè pou chanje yon koneksyon ou pa ka chanje.",
+    "managedByOwnerOrBilling": "Mande yon pwopriyetè òganizasyon oswa yon responsab faktirasyon pou chanje yon koneksyon ou pa ka chanje.",
+    "managedByOwnerAdminOrBilling": "Mande yon pwopriyetè òganizasyon, yon administratè, oswa yon responsab faktirasyon pou chanje yon koneksyon ou pa ka chanje.",
     "connectFailed": "Pa t ka louvri paj koneksyon an"
   },
   "invoices": {

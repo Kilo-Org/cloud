@@ -15,6 +15,7 @@ import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -49,8 +50,11 @@ function CommitTitleField({
         onChangeText={value => {
           titleRef.current = value;
         }}
+        // `min-h-11` measured 38.9 dp at NativeWind's 14pt rem; the explicit
+        // 44 dp floor is the target it meant.
         className={cn(
-          'min-h-11 rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
+          TOUCH_TARGET_CLASS,
+          'rounded-md border border-input bg-background text-sm leading-[1.25rem] text-foreground',
           'focus:border-ring'
         )}
         multiline
@@ -159,7 +163,10 @@ export function MergeSheetFormSkeleton(props: {
           ) : (
             <View className="flex-row flex-wrap gap-2">
               {props.methodOptions.map(option => (
-                <Skeleton key={option.value} className="h-11 w-20 rounded-full" />
+                <Skeleton
+                  key={option.value}
+                  className={cn(TOUCH_TARGET_CLASS, 'w-20 rounded-full')}
+                />
               ))}
             </View>
           )}
@@ -167,7 +174,7 @@ export function MergeSheetFormSkeleton(props: {
         {props.showTitle ? (
           <View className="gap-1.5">
             <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-11" />
+            <Skeleton className={TOUCH_TARGET_CLASS} />
           </View>
         ) : null}
         <View className="gap-1.5">

@@ -17,7 +17,7 @@ const ALPHA_AUTH: StoredAuth = { token: 'token-a', userEmail: 'first@example.tes
 const BETA_AUTH: StoredAuth = { token: 'token-b', userEmail: 'second@example.test' };
 
 const authMocks = vi.hoisted(() => ({
-  clearStoredSession: vi.fn<(storage: unknown) => Promise<void>>(),
+  clearAccountStorage: vi.fn<(storage: unknown) => Promise<void>>(),
   createDeviceAuthRequest: vi.fn<() => Promise<unknown>>(),
   loadStoredAuth: vi.fn<() => Promise<unknown>>(),
   persistApprovedDeviceAuth: vi.fn<(storage: unknown, auth: unknown) => Promise<unknown>>(),
@@ -36,8 +36,11 @@ vi.mock('#imports', () => ({
   storage: { getItem: vi.fn(), removeItem: vi.fn(), setItem: vi.fn() },
 }));
 
+vi.mock('@/src/shared/account-storage', () => ({
+  clearAccountStorage: (storage: unknown) => authMocks.clearAccountStorage(storage),
+}));
+
 vi.mock('@/src/shared/auth', () => ({
-  clearStoredSession: (storage: unknown) => authMocks.clearStoredSession(storage),
   createDeviceAuthRequest: () => authMocks.createDeviceAuthRequest(),
   getKiloApiBaseUrl: () => 'https://app.kilo.test',
   loadStoredAuth: () => authMocks.loadStoredAuth(),
@@ -125,7 +128,7 @@ describe('side panel identity transitions clear the agents cache', () => {
   // eslint-disable-next-line jest/no-hooks -- module mocks need a clean slate per test
   beforeEach(() => {
     vi.clearAllMocks();
-    authMocks.clearStoredSession.mockResolvedValue();
+    authMocks.clearAccountStorage.mockResolvedValue();
     authMocks.loadStoredAuth.mockResolvedValue(ALPHA_AUTH);
     authMocks.resetAnalyticsUser.mockResolvedValue();
     authMocks.saveStoredAuth.mockResolvedValue();
@@ -156,6 +159,8 @@ describe('side panel identity transitions clear the agents cache', () => {
     expect(queryClient.getQueryData(['side-panel', 'tabs'])).toStrictEqual([{ title: 'kept' }]);
     // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
     expect(draftMocks.clearStoredDrafts).toHaveBeenCalledOnce();
+    // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
+    expect(authMocks.clearAccountStorage).toHaveBeenCalledOnce();
   });
 
   it('clears the agents cache when the stored session is rejected', async () => {
@@ -175,6 +180,8 @@ describe('side panel identity transitions clear the agents cache', () => {
     ]);
     // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
     expect(draftMocks.clearStoredDrafts).toHaveBeenCalledOnce();
+    // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
+    expect(authMocks.clearAccountStorage).toHaveBeenCalledOnce();
   });
 
   it('clears the agents cache on device-auth sign-in', async () => {

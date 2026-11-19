@@ -589,6 +589,12 @@ export async function preflightSessionCreation(
   );
   await validateEndpoint?.(resolvedRequest);
 
+  // Only a model the caller's organization catalogue makes available may serve a
+  // session. This create-time check answers that for a prompt turn. A policy-bearing
+  // bearer is checked in `issueSessionRuntimeAuthorization`, once the runtime
+  // authorization exists. The AI gateway enforces the same requirement for the
+  // session at inference time (`resolveProviderAndPolicy` ->
+  // `getEffectiveModelDecision`).
   if (resolvedRequest.initialTurn?.type === 'prompt' && !isPolicyBearingAuthToken(ctx.authToken)) {
     await assertKiloModelAvailable({
       env: ctx.env,

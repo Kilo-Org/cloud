@@ -67,7 +67,6 @@ export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
  */
 type VerifyCertificateSslmode = 'prefer' | 'require' | 'no-verify' | 'verify-ca' | 'verify-full';
 
-/** Every sslmode that encrypts, mapped to whether it also verifies the server certificate. */
 const VERIFY_CERTIFICATE_BY_SSLMODE: Record<VerifyCertificateSslmode, boolean> = {
   prefer: false,
   require: false,
@@ -76,10 +75,7 @@ const VERIFY_CERTIFICATE_BY_SSLMODE: Record<VerifyCertificateSslmode, boolean> =
   'verify-full': true,
 };
 
-/**
- * Narrows a lowercased `sslmode` to a mode the map handles. `Object.hasOwn` so inherited keys like
- * `constructor` never resolve to a mode.
- */
+/** `Object.hasOwn` so inherited keys like `constructor` never resolve to a mode. */
 function isVerifyCertificateSslmode(value: string): value is VerifyCertificateSslmode {
   return Object.hasOwn(VERIFY_CERTIFICATE_BY_SSLMODE, value);
 }

@@ -44,6 +44,7 @@ import {
   notificationIdentifierForSession,
 } from './needs-input-presentation';
 import { type NotificationPreviews } from './needs-input-notification';
+import { finishHandlingNotificationResponse } from './notification-response-completion';
 
 /** Register one category per (raise kind × hasPr) descriptor. */
 export async function registerNeedsInputCategories(): Promise<void> {
@@ -133,6 +134,11 @@ export type NeedsInputActionDeps = {
    * which was produced under the choice at that moment.
    */
   readPreviews?: () => NotificationPreviews | undefined;
+  /**
+   * Defaults to the native report that ends the response on iOS (see
+   * `notification-response-completion.ts`); called once the dispatch settles.
+   */
+  finishHandlingResponse?: (key: string) => void;
 };
 
 /** The shape of the s4 entry point, kept as an annotation on the lazy load. */
@@ -190,6 +196,10 @@ const headlessStringDataSchema = z.string();
  * twice. Concurrent dispatches of one response share the first one — an action
  * answers once, and a body tap stashes its destination once; once it settles, a
  * later tap — on the replaced result notification — is answered again.
+ *
+ * When the shared dispatch settles, with a result or an error, the response is
+ * reported finished: iOS keeps the app running for a background action only
+ * until then.
  */
 // eslint-disable-next-line promise-function-async -- passthrough dispatch: one interaction per tap shares an in-flight promise
 export function handleNeedsInputNotificationResponse(
@@ -201,7 +211,11 @@ export function handleNeedsInputNotificationResponse(
   if (inFlight) {
     return inFlight;
   }
-  const dispatch = trackDispatch(key, dispatchNeedsInputResponse(response, deps));
+  const dispatch = trackDispatch(
+    key,
+    dispatchNeedsInputResponse(response, deps),
+    deps.finishHandlingResponse ?? finishHandlingNotificationResponse
+  );
   inFlightDispatches.set(key, dispatch);
   return dispatch;
 }
@@ -215,15 +229,20 @@ function responseDispatchKey(response: Notifications.NotificationResponse): stri
   return `${response.notification.request.identifier}:${response.actionIdentifier}`;
 }
 
-/** Forget the in-flight dispatch once it settles, without disturbing its result. */
-async function trackDispatch(key: string, dispatch: Promise<boolean>): Promise<boolean> {
+/**
+ * Forget the in-flight dispatch once it settles, without disturbing its result,
+ * and report the response finished.
+ */
+async function trackDispatch(
+  key: string,
+  dispatch: Promise<boolean>,
+  finishHandlingResponse: (key: string) => void
+): Promise<boolean> {
   try {
-    const result = await dispatch;
+    return await dispatch;
+  } finally {
     inFlightDispatches.delete(key);
-    return result;
-  } catch (error) {
-    inFlightDispatches.delete(key);
-    throw error;
+    finishHandlingResponse(key);
   }
 }
 

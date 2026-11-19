@@ -108,6 +108,12 @@ interface TargetFrame {
   /** The target sits in a child frame, not the tab's top-level document. */
   readonly frame: boolean;
   readonly origin: string;
+  /**
+   * The document holding a targeted frame element: a tool on an `<iframe>`
+   * runs in, reads or captures its owner's document, so the call needs that
+   * document's grant as well as the hosted frame's.
+   */
+  readonly owner?: { readonly frame: boolean; readonly origin: string };
 }
 
 /**
@@ -290,8 +296,17 @@ const targetFrameOf = async (
   if ((nodeName === 'FRAME' || nodeName === 'IFRAME') && ownerBackendNodeId !== undefined) {
     const hosted = await frameWithOwnerNode(session, frames, ownerBackendNodeId);
 
+    const owning = await frameOwningNode(session, frames, ownerBackendNodeId);
+
     // A frame owner whose frame this tab cannot see (an out-of-process iframe, a frame still loading) has no origin the gate can judge.
-    return { frame: true, origin: hosted?.origin ?? OPAQUE_ORIGIN };
+    return {
+      frame: true,
+      origin: hosted?.origin ?? OPAQUE_ORIGIN,
+      owner:
+        owning === undefined
+          ? { frame: true, origin: OPAQUE_ORIGIN }
+          : { frame: owning.parentId !== undefined, origin: owning.origin },
+    };
   }
 
   // A selector is answered by the tab's own document root, so it can only name a node there.
@@ -599,9 +614,12 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
       : { frame: primaryTargetFrame.frame, origin: primaryTargetFrame.origin };
   const origin = destinationOrigin ?? targetFrame?.origin ?? mainOrigin;
   const targetOriginFrame = grantClass !== 'navigate' && targetFrame?.frame === true;
-  // Every named target's frame needs the grant, not only the tab's top-level origin.
-  const requiredOrigins = new Set<string>(targetFrames.map(frame => frame.origin));
-  const frameByOrigin = new Map(targetFrames.map(frame => [frame.origin, frame.frame]));
+  // Every named target's frame needs the grant, not only the tab's top-level origin, and so does the document a tool on a frame element runs in.
+  const requiredFrames = targetFrames.flatMap(frame =>
+    frame.owner === undefined ? [frame] : [frame.owner, frame]
+  );
+  const requiredOrigins = new Set<string>(requiredFrames.map(frame => frame.origin));
+  const frameByOrigin = new Map(requiredFrames.map(frame => [frame.origin, frame.frame]));
 
   if (requiredOrigins.size === 0) {
     requiredOrigins.add(origin);

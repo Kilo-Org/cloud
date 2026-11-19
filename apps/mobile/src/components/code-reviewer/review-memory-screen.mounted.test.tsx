@@ -20,6 +20,12 @@ import { collectAccessibilityLabels, collectText } from './review-memory-screen.
 // primitive's own contract, tested beside it.
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn(), notificationAsync: vi.fn() }));
 
+// The header's scope subtitle reads the membership list; this suite tests the
+// memory body, so the subtitle is a fixed name.
+vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
+  useReviewerScopeTitle: () => 'Personal',
+}));
+
 vi.mock('@/components/code-reviewer/review-memory-analyze-section', () => ({
   ReviewMemoryAnalyzeSection: 'ReviewMemoryAnalyzeSection',
 }));

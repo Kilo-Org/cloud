@@ -36,6 +36,12 @@ const queryError = vi.hoisted(() => ({
 }));
 const skeletonRenders = vi.hoisted(() => ({ count: 0 }));
 
+// The header's scope subtitle reads the membership list; this suite tests the
+// Bitbucket body, so the subtitle is a fixed name.
+vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
+  useReviewerScopeTitle: () => 'Personal',
+}));
+
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   useColorScheme: () => 'light',

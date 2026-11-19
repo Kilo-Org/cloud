@@ -36,6 +36,7 @@ import {
   type useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
+import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 
 const capabilities = PLATFORM_CAPABILITIES.bitbucket;
 
@@ -54,6 +55,7 @@ export function BitbucketOverview({
 }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
+  const scopeTitle = useReviewerScopeTitle(scope);
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
@@ -74,7 +76,7 @@ export function BitbucketOverview({
   if (providerState.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <QueryError
           onRetry={() => {
             providerState.refetch();
@@ -95,7 +97,7 @@ export function BitbucketOverview({
   if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <QueryError
           variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
           onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
@@ -114,7 +116,7 @@ export function BitbucketOverview({
     const repair = readinessData === undefined ? null : bitbucketRepair(readinessData);
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
         <EmptyState
           icon={GitMerge}
           iconSize={28}
@@ -184,7 +186,7 @@ export function BitbucketOverview({
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}

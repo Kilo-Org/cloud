@@ -46,6 +46,12 @@ const h = vi.hoisted(() => {
 // `__DEV__` in this harness. The haptic is the primitive's own contract.
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn(), notificationAsync: vi.fn() }));
 
+// The header's scope subtitle reads the membership list; this suite tests the
+// proposals, so the subtitle is a fixed name.
+vi.mock('@/lib/hooks/use-reviewer-scope-title', () => ({
+  useReviewerScopeTitle: () => 'Personal',
+}));
+
 vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',

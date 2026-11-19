@@ -21,15 +21,16 @@ import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
  */
 export function ScopeAccessDeniedScreen({
   title,
-  eyebrow,
+  subtitle,
   kind,
   onRetry,
   isRetrying = false,
   backFallback,
 }: Readonly<{
-  /** ScreenHeader's title: the product name, or the organization's name. */
+  /** ScreenHeader's title: the product's name. */
   title: string;
-  eyebrow?: string;
+  /** The line under the title: the organization the reader may not see. */
+  subtitle?: string;
   /** `'not-found'` for an organization that no longer exists. */
   kind: Exclude<OrganizationScopeAccess, 'granted'>;
   onRetry: () => void;
@@ -44,7 +45,7 @@ export function ScopeAccessDeniedScreen({
   return (
     <PlatformErrorScreen
       title={title}
-      eyebrow={eyebrow}
+      subtitle={subtitle}
       backFallback={backFallback}
       variant={notFound ? 'not-found' : 'permission'}
       message={t(

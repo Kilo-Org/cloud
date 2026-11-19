@@ -36,7 +36,11 @@ const buttons = vi.hoisted(() => ({
 }));
 
 const screenHeaders = vi.hoisted(() => ({
-  rendered: [] as { eyebrow?: string; reserveEyebrow?: boolean; eyebrowPlaceholder?: unknown }[],
+  rendered: [] as {
+    subtitle?: string;
+    reserveSubtitle?: boolean;
+    subtitlePlaceholder?: unknown;
+  }[],
 }));
 
 const viewRenders = vi.hoisted(() => ({
@@ -149,9 +153,9 @@ vi.mock('@/components/query-error', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: {
-    eyebrow?: string;
-    reserveEyebrow?: boolean;
-    eyebrowPlaceholder?: unknown;
+    subtitle?: string;
+    reserveSubtitle?: boolean;
+    subtitlePlaceholder?: unknown;
   }) => {
     screenHeaders.rendered.push(props);
     return null;
@@ -1036,7 +1040,7 @@ describe('ReviewDetailScreen error states', () => {
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
   });
 
-  it('keeps the eyebrow line it reserved while loading through a failed read', () => {
+  it('keeps the subtitle line it reserved while loading through a failed read', () => {
     detail.isError = true;
     detail.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     detail.data = null;
@@ -1048,9 +1052,9 @@ describe('ReviewDetailScreen error states', () => {
     // Nothing paints over the line while no read runs, so the header stops
     // pulsing as soon as the failure lands.
     expect(screenHeaders.rendered).toHaveLength(1);
-    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.subtitle).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(screenHeaders.rendered[0]?.subtitlePlaceholder).toBeUndefined();
   });
 
   it('reserves the line with the placeholder bar while the read runs', () => {
@@ -1059,23 +1063,23 @@ describe('ReviewDetailScreen error states', () => {
 
     renderScreen();
 
-    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeTruthy();
+    expect(screenHeaders.rendered[0]?.subtitle).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(screenHeaders.rendered[0]?.subtitlePlaceholder).toBeTruthy();
   });
 
-  it('keeps the eyebrow line through a not-found answer', () => {
+  it('keeps the subtitle line through a not-found answer', () => {
     detail.isError = true;
     detail.error = { data: { code: 'NOT_FOUND' } };
     detail.data = null;
 
     renderScreen();
 
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(screenHeaders.rendered[0]?.subtitlePlaceholder).toBeUndefined();
   });
 
-  it('paints the review repository on the eyebrow line once the read answers', () => {
+  it('paints the review repository on the subtitle line once the read answers', () => {
     detail.data = {
       success: true,
       review: makeReview(),
@@ -1084,8 +1088,8 @@ describe('ReviewDetailScreen error states', () => {
 
     renderScreen();
 
-    expect(screenHeaders.rendered[0]?.eyebrow).toBe('org/repo');
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(false);
+    expect(screenHeaders.rendered[0]?.subtitle).toBe('org/repo');
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
   });
 });
 

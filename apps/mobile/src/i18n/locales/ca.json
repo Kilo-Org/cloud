@@ -3047,8 +3047,7 @@
   },
   "accountBlocked": {
     "title": "Compte bloquejat",
-    "description": "Kilo ha bloquejat aquest compte i tornar a iniciar sessió no el desbloquejarà. L'equip de suport pot revisar el bloqueig si ho sol·licites.",
-    "contactSupport": "Contacta amb l'equip de suport"
+    "description": "Kilo ha bloquejat aquest compte i tornar a iniciar sessió no el desbloquejarà. L'equip de suport pot revisar el bloqueig si ho sol·licites."
   },
   "addCredits": {
     "cta": "Afegeix crèdits",

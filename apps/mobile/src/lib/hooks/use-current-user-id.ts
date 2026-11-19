@@ -18,7 +18,7 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     listener => onlineManager.subscribe(listener),
     () => onlineManager.isOnline()
   );
-  const { data, error, isLoading, isError, isFetched, refetch } = useQuery({
+  const { data, error, isLoading, isError, isFetched, isFetching, refetch } = useQuery({
     ...trpc.user.getMe.queryOptions(),
     enabled: options.enabled ?? true,
     // Every surface gated on the identity waits on this read.
@@ -44,6 +44,8 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     // verdict from it (a blocked account) rather than only "the read failed".
     error,
     isLoading,
+    // True while an attempt is in flight: a retry is running.
+    isFetching,
     isError: data === undefined && (isError || (isLoading && isFetched)),
     // True when the latest attempt failed even though a cached identity is
     // still present. `isError` deliberately stays false there (a refetch

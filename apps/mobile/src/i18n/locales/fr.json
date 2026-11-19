@@ -2410,8 +2410,7 @@
   },
   "accountBlocked": {
     "title": "Compte bloqué",
-    "description": "Kilo a bloqué ce compte, et une nouvelle connexion ne lèvera pas le blocage. L'assistance peut examiner le blocage sur demande.",
-    "contactSupport": "Contacter l'assistance"
+    "description": "Kilo a bloqué ce compte, et une nouvelle connexion ne lèvera pas le blocage. L'assistance peut examiner le blocage sur demande."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",

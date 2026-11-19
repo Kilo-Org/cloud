@@ -3215,8 +3215,7 @@
   },
   "accountBlocked": {
     "title": "Cyfrif wedi'i rwystro",
-    "description": "Mae Kilo wedi rhwystro'r cyfrif hwn, ac ni fydd mewngofnodi eto yn ei glirio. Gall y tîm cymorth adolygu'r rhwystr ar gais.",
-    "contactSupport": "Cysylltu â'r tîm cymorth"
+    "description": "Mae Kilo wedi rhwystro'r cyfrif hwn, ac ni fydd mewngofnodi eto yn ei glirio. Gall y tîm cymorth adolygu'r rhwystr ar gais."
   },
   "addCredits": {
     "cta": "Ychwanegu credydau",

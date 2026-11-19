@@ -3047,8 +3047,7 @@
   },
   "accountBlocked": {
     "title": "Konts bloķēts",
-    "description": "Kilo ir bloķējis šo kontu, un atkārtota pieteikšanās to neatbloķēs. Atbalsta dienests var pārskatīt bloķējumu pēc pieprasījuma.",
-    "contactSupport": "Sazināties ar atbalsta dienestu"
+    "description": "Kilo ir bloķējis šo kontu, un atkārtota pieteikšanās to neatbloķēs. Atbalsta dienests var pārskatīt bloķējumu pēc pieprasījuma."
   },
   "addCredits": {
     "cta": "Papildināt kredītus",

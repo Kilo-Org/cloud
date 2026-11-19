@@ -2991,8 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Fiók letiltva",
-    "description": "A Kilo letiltotta ezt a fiókot, és az újabb bejelentkezés nem oldja fel a tiltást. Az ügyfélszolgálat kérésre felülvizsgálhatja a tiltást.",
-    "contactSupport": "Kapcsolatfelvétel az ügyfélszolgálattal"
+    "description": "A Kilo letiltotta ezt a fiókot, és az újabb bejelentkezés nem oldja fel a tiltást. Az ügyfélszolgálat kérésre felülvizsgálhatja a tiltást."
   },
   "addCredits": {
     "cta": "Egyenleg feltöltése",

@@ -47,6 +47,7 @@ import { toast } from 'sonner-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
+import { BlockedAccountSurface } from '@/components/blocked-account-surface';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { DesignGateProbe } from '@/components/design-gate-probe';
@@ -58,14 +59,12 @@ import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useBlockedAccountFromAccountRead } from '@/lib/auth/account-blocked-read';
 import {
   isBlockedAccountActive,
   setBlockedAccountActive,
   subscribeBlockedAccount,
 } from '@/lib/auth/blocked-account-state';
-import { isAccountBlockedTrpcError } from '@/lib/trpc-error';
-import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
-import { openExternalUrl } from '@/lib/external-link';
 import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
@@ -285,6 +284,7 @@ function RootLayoutNav({
     isError: userIdError,
     error: userIdQueryError,
     isUnreachable: userIdUnreachable,
+    isFetching: userIdFetching,
     refetch: refetchUserId,
   } = useCurrentUserId({ enabled: token != null });
   // A cold start that cannot reach the API has no confirmed account once the
@@ -312,13 +312,16 @@ function RootLayoutNav({
   // The current-user read is the first authenticated call a restored account
   // makes, so a blocked account's context-level refusal lands on it: the
   // envelope carries `accountBlocked`, which turns the generic "could not load
-  // your account" surface into the block explanation. Read the raw query error,
-  // not the derived boolean: only the error object carries the flag.
-  useEffect(() => {
-    if (isAccountBlockedTrpcError(userIdQueryError)) {
-      setBlockedAccountActive(true);
-    }
-  }, [userIdQueryError]);
+  // your account" surface into the block explanation. The same read is how the
+  // explanation leaves again: a later attempt that reaches the account clears
+  // it, and the overlay's Retry is exactly such an attempt. The hook reads the
+  // raw query error, not the derived boolean: only the error object carries
+  // the flag.
+  useBlockedAccountFromAccountRead({
+    error: userIdQueryError,
+    userId,
+    enabled: token != null,
+  });
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
   const [optionalConsent, setOptionalConsentState] = useState(false);
@@ -1107,8 +1110,15 @@ function RootLayoutNav({
   // restore surface — never an early return — because the flag outlives the
   // refresh-path teardown that clears the token, and the bootstrap decision
   // that then settles (redirect-login) must be able to land in a mounted Slot.
-  // Its Sign out is the explicit escape hatch: it clears the explanation and
-  // reveals whatever the tree has settled on (login when signed out).
+  //
+  // Two things dismiss it. While the session lives — the current-user read was
+  // refused, so the session is still there — the overlay's Retry re-reads the
+  // account, and an attempt that reaches it clears the explanation (a block
+  // lifted server-side needs no sign-out). The refresh route's raise has no
+  // session behind it, so no read can answer for it: Sign out is then the only
+  // exit, and it clears the explanation and reveals whatever the tree has
+  // settled on (login when signed out). A new sign-in clears it too, since
+  // that is the one event that proves the block no longer applies.
   const showBlockedAccountError = blockedAccountActive && bootstrapErrorOwnsScreen;
 
   // The wait surface (or the held restore or blocked surface) covers the tree:
@@ -1243,17 +1253,14 @@ function RootLayoutNav({
       ) : null}
       {showBlockedAccountError ? (
         <View className="absolute inset-0">
-          <BootstrapErrorScreen
-            title={t('accountBlocked.title')}
-            description={t('accountBlocked.description')}
-            primaryLabel={t('accountBlocked.contactSupport')}
-            primaryAccessibilityLabel={t('accountBlocked.contactSupport')}
-            onPrimaryPress={() => {
-              void openExternalUrl(`mailto:${SUPPORT_EMAIL}`, { label: SUPPORT_EMAIL });
-            }}
-            secondaryLabel={t('common.signOut')}
-            secondaryAccessibilityLabel={t('common.signOut')}
-            onSecondaryPress={() => {
+          <BlockedAccountSurface
+            // A live token means the session that was refused is still there,
+            // so the retry has an account to re-read. Without one the refresh
+            // route's refusal already tore the session down.
+            canRetry={token != null}
+            retrying={userIdFetching}
+            onRetry={refetchUserId}
+            onSignOut={() => {
               // The escape hatch must actually reach the login screen: the
               // flag outlives a refresh-path teardown, so this explicit
               // sign-out is what clears the explanation and reveals the

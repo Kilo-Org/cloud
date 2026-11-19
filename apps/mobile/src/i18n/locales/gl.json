@@ -2991,8 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Conta bloqueada",
-    "description": "Kilo bloqueou esta conta e volver iniciar sesión non a desbloqueará. A asistencia pode revisar o bloqueo se o solicitas.",
-    "contactSupport": "Contactar coa asistencia"
+    "description": "Kilo bloqueou esta conta e volver iniciar sesión non a desbloqueará. A asistencia pode revisar o bloqueo se o solicitas."
   },
   "addCredits": {
     "cta": "Engadir créditos",

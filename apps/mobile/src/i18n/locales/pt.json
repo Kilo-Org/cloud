@@ -3053,8 +3053,7 @@
   },
   "accountBlocked": {
     "title": "Conta bloqueada",
-    "description": "O Kilo bloqueou esta conta e iniciar sessão novamente não vai desfazer o bloqueio. O suporte pode rever o bloqueio a pedido.",
-    "contactSupport": "Contactar o suporte"
+    "description": "O Kilo bloqueou esta conta e iniciar sessão novamente não vai desfazer o bloqueio. O suporte pode rever o bloqueio a pedido."
   },
   "addCredits": {
     "cta": "Adicionar créditos",

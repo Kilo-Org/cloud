@@ -3057,8 +3057,7 @@
   },
   "accountBlocked": {
     "title": "Account blocked",
-    "description": "Kilo blocked this account, and signing in again will not clear it. Support can review the block on request.",
-    "contactSupport": "Contact support"
+    "description": "Kilo blocked this account, and signing in again will not clear it. Support can review the block on request."
   },
   "addCredits": {
     "cta": "Add credits",

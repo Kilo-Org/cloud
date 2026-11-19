@@ -2991,8 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Na-block ang account",
-    "description": "Na-block ng Kilo ang account na ito, at hindi ito maaalis kahit mag-sign in muli. Maaaring suriin ng suporta ang pag-block kapag hiniling.",
-    "contactSupport": "Makipag-ugnayan sa suporta"
+    "description": "Na-block ng Kilo ang account na ito, at hindi ito maaalis kahit mag-sign in muli. Maaaring suriin ng suporta ang pag-block kapag hiniling."
   },
   "addCredits": {
     "cta": "Magdagdag ng kredito",

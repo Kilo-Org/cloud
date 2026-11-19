@@ -2991,8 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Kont bloke",
-    "description": "Kilo bloke kont sa a, epi rekonekte p ap retire blokaj la. Ekip sipò a ka revize blokaj la sou demann.",
-    "contactSupport": "Kontakte ekip sipò a"
+    "description": "Kilo bloke kont sa a, epi rekonekte p ap retire blokaj la. Ekip sipò a ka revize blokaj la sou demann."
   },
   "addCredits": {
     "cta": "Ajoute kredi",

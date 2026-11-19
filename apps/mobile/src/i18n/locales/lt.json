@@ -3103,8 +3103,7 @@
   },
   "accountBlocked": {
     "title": "Paskyra užblokuota",
-    "description": "Kilo užblokavo šią paskyrą, ir pakartotinis prisijungimas blokavimo nepanaikins. Pagalbos tarnyba gali patikrinti blokavimą gavusi prašymą.",
-    "contactSupport": "Kreiptis į pagalbos tarnybą"
+    "description": "Kilo užblokavo šią paskyrą, ir pakartotinis prisijungimas blokavimo nepanaikins. Pagalbos tarnyba gali patikrinti blokavimą gavusi prašymą."
   },
   "addCredits": {
     "cta": "Papildyti kreditus",

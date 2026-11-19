@@ -3159,8 +3159,7 @@
   },
   "accountBlocked": {
     "title": "Kont imblukkat",
-    "description": "Kilo imblokka dan il-kont u d-dħul mill-ġdid ma jneħħix l-imblokk. L-appoġġ jista' jirrevedi l-imblokk fuq talba.",
-    "contactSupport": "Ikkuntattja l-appoġġ"
+    "description": "Kilo imblokka dan il-kont u d-dħul mill-ġdid ma jneħħix l-imblokk. L-appoġġ jista' jirrevedi l-imblokk fuq talba."
   },
   "addCredits": {
     "cta": "Żid krediti",

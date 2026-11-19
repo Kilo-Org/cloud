@@ -2481,8 +2481,7 @@
   },
   "accountBlocked": {
     "title": "Cuenta bloqueada",
-    "description": "Kilo ha bloqueado esta cuenta y volver a iniciar sesión no lo desbloqueará. El soporte técnico puede revisar el bloqueo si lo solicitas.",
-    "contactSupport": "Contactar con soporte técnico"
+    "description": "Kilo ha bloqueado esta cuenta y volver a iniciar sesión no lo desbloqueará. El soporte técnico puede revisar el bloqueo si lo solicitas."
   },
   "addCredits": {
     "cta": "Añadir créditos",

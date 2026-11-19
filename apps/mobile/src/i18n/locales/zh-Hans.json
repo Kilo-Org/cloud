@@ -2448,8 +2448,7 @@
   },
   "accountBlocked": {
     "title": "账号已被封禁",
-    "description": "Kilo 已封禁此账号，重新登录也不会解除封禁。如有请求，技术支持可以复核封禁。",
-    "contactSupport": "联系技术支持"
+    "description": "Kilo 已封禁此账号，重新登录也不会解除封禁。如有请求，技术支持可以复核封禁。"
   },
   "addCredits": {
     "cta": "充值额度",

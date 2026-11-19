@@ -2991,8 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Tili estetty",
-    "description": "Kilo esti tämän tilin, eikä uudelleenkirjautuminen poista estoa. Tuki voi tarkistaa eston pyynnöstä.",
-    "contactSupport": "Ota yhteyttä tukeen"
+    "description": "Kilo esti tämän tilin, eikä uudelleenkirjautuminen poista estoa. Tuki voi tarkistaa eston pyynnöstä."
   },
   "addCredits": {
     "cta": "Lisää krediittejä",

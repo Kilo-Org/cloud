@@ -2991,8 +2991,7 @@
   },
   "accountBlocked": {
     "title": "Akoonka waa xanniban yahay",
-    "description": "Kilo waa xannibay akoonkan, oo mar kale soo galid ma tirtirto xannibaadda. Taageerada ayaa codsi ku eegi kartaa xannibaadda.",
-    "contactSupport": "La xiriir taageerada"
+    "description": "Kilo waa xannibay akoonkan, oo mar kale soo galid ma tirtirto xannibaadda. Taageerada ayaa codsi ku eegi kartaa xannibaadda."
   },
   "addCredits": {
     "cta": "Ku dar lacagta isticmaalka",

@@ -14,6 +14,7 @@ import type * as ReactI18nextModule from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { SettingsRecoveryStatus } from './settings-recovery-status';
 import { FindingDetailsPanel } from './finding-details-panel';
@@ -504,6 +505,11 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     );
   }
 
+  /** Whether the one rendered header keeps its subtitle line reserved. */
+  function reservesSubtitle(tree: R): boolean {
+    return tree.root.findByType(ScreenHeader).props.reserveSubtitle === true;
+  }
+
   it('keeps Back available during loading without offering Retry', () => {
     finding.isLoading = true;
     finding.isFetching = true;
@@ -512,6 +518,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
 
     // Four body skeletons plus the bar on the header's reserved subtitle line.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
+    expect(reservesSubtitle(tree)).toBe(true);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
     expectSafeBack(tree);
@@ -527,6 +534,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     // The header keeps the subtitle line it reserved while loading, and no bar
     // paints over it once the read has failed: this state leaves no skeleton.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+    expect(reservesSubtitle(tree)).toBe(true);
     expectSafeBack(tree);
   });
 
@@ -616,6 +624,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     // keeps the line it reserved then instead of pulling the title up — held
     // blank, because no read is running to fill it.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+    expect(reservesSubtitle(tree)).toBe(true);
     expectSafeBack(tree);
   });
 });

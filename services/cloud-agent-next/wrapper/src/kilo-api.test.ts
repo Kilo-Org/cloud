@@ -981,6 +981,38 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
       expect(stub.imports).toHaveLength(0);
     });
+
+    it('imports when the record carries no directory to match', async () => {
+      const sessionId = 'ses_record_without_directory';
+      const directory = temporaryDirectory('kilo-api-missing-directory-');
+      const imports: EnsureSessionImport[] = [];
+      const server = Bun.serve({
+        port: 0,
+        async fetch(request) {
+          const url = new URL(request.url);
+          if (url.pathname === '/project/current') {
+            return Response.json({ id: 'proj', worktree: url.searchParams.get('directory') });
+          }
+          if (request.method === 'GET' && url.pathname === `/session/${sessionId}`) {
+            return Response.json({ id: sessionId, title: 'no directory field' });
+          }
+          if (request.method === 'POST' && url.pathname === '/kilocode/session-import/session') {
+            imports.push({
+              queryDirectory: url.searchParams.get('directory'),
+              body: await request.json(),
+            });
+            return Response.json({ ok: true, id: sessionId });
+          }
+          return new Response(null, { status: 404 });
+        },
+      });
+      startedServers.push(server);
+
+      await createClient(server.url.toString()).ensureSession(sessionId, directory);
+
+      expect(imports).toHaveLength(1);
+      expect(imports[0]?.body).toMatchObject({ id: sessionId, directory, force: true });
+    });
   });
 
   it.each(

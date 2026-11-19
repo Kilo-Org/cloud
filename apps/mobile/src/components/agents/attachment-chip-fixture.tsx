@@ -17,14 +17,16 @@ const FIXTURE_FILENAME = 'quarterly-revenue-forecast-northern-region-2026-q4-fin
 const FIXTURE_BYTES = 564;
 
 /**
- * A markdown chip over the preview budget: the sheet must show a bounded
- * prefix and the Truncated marker instead of rendering the whole file.
- * Deterministic content, so every capture of this fixture shows the same text.
+ * A markdown chip over the preview's byte budget: the sheet must show a bounded
+ * prefix and the Truncated marker instead of rendering the whole file. The
+ * budget is four bytes per capped character, so a 60k-character file would now
+ * read whole; this stays above it. Deterministic content, so every capture of
+ * this fixture shows the same text.
  */
 const FIXTURE_MD_FILENAME = 'oversized-notes.md';
 const FIXTURE_MD_PARAGRAPH =
   'This paragraph exists only to push the attachment preview past its bound.';
-const FIXTURE_MD_CHARS = 60_000;
+const FIXTURE_MD_CHARS = 400_000;
 // ASCII, one byte per character.
 const FIXTURE_MD_BYTES = FIXTURE_MD_CHARS;
 

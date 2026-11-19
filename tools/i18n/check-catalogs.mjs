@@ -1411,7 +1411,7 @@ function checkCatalogMembership({ catalogName, tags, present, dir }) {
 /**
  * The `.json`-named entries of `dir` that are not regular files, sorted.
  *
- * Deliberately wider than the tag set `catalogTags` builds: this names
+ * Deliberately different from the tag set `catalogTags` builds: this names
  * 'unreadable' and 'other' entries, while the tag set keeps 'file' and
  * 'unreadable'. So a directory named like a catalog is reported here instead
  * of vanishing from `present` without a trace.

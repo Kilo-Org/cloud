@@ -239,7 +239,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     // length comes from the address, since the sentence around it is fixed.
     {
       action: 'organization.member.change_role' as const,
-      message: `${LONG_MEMBER_EMAIL} was made a billing manager for the quarterly close`,
+      message: `${LONG_MEMBER_EMAIL} was made an admin for the quarterly close`,
       actor_email: ownerEmail,
       actor_name: 'Org admin lab owner',
       details: {

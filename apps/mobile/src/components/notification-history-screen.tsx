@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one screen: the paged list, its state scroller with the refresh band, the chip filter and the push banner share the read state */
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
@@ -12,6 +13,7 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { BellOff } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -319,13 +321,14 @@ export function NotificationHistoryScreen() {
           ) : null}
 
           {failure || (!loading && !hasListContent) ? (
-            // A state's full stack is taller than a landscape window's body, so
-            // it scrolls like the list and ends clear of the tab bar as the
-            // list's footer does.
+            // A state's stack outgrows a landscape body, so it scrolls like the
+            // list, ends clear of the tab bar, and draws its own refresh band
+            // (the app control hides the native spinner under reduced motion).
             <ScrollView
               refreshControl={refreshControl}
               contentContainerStyle={{ paddingBottom: paddingBottom + FOOTER_BOTTOM_GAP }}
             >
+              <RefreshProgress refreshControl={refreshControl} />
               {failure ? (
                 <QueryError
                   placement="top"

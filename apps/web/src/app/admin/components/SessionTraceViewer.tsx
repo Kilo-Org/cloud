@@ -256,7 +256,9 @@ export function SessionTraceViewer() {
 
   const messageCount = isV2 ? v2Messages.length : v1Messages.length;
   const incompleteMessageCount =
-    messagesQuery.data?.format === 'v2' ? (messagesQuery.data.incompleteMessageCount ?? 0) : 0;
+    messagesQuery.data && 'incompleteMessageCount' in messagesQuery.data
+      ? (messagesQuery.data.incompleteMessageCount ?? 0)
+      : 0;
 
   const v2SummaryModel = useMemo(() => {
     for (let index = v2Messages.length - 1; index >= 0; index -= 1) {

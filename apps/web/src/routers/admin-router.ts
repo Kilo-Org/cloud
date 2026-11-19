@@ -2782,8 +2782,9 @@ export const adminRouter = createTRPCRouter({
                 transcript?.source === 'ingest'
                   ? sortSessionMessagesForDisplay(transcript.messages)
                   : (transcript?.messages ?? []),
-              incompleteMessageCount:
-                transcript?.source === 'sync' ? transcript.incompleteMessageCount : 0,
+              ...(transcript?.source === 'sync' && transcript.incompleteMessageCount > 0
+                ? { incompleteMessageCount: transcript.incompleteMessageCount }
+                : {}),
               format: 'v2' as const,
             };
           } catch (error) {
@@ -2791,7 +2792,7 @@ export const adminRouter = createTRPCRouter({
               sessionId: input.session_id,
               error,
             });
-            return { messages: [], incompleteMessageCount: 0, format: 'v2' as const };
+            return { messages: [], format: 'v2' as const };
           }
         }
 

@@ -81,9 +81,9 @@ it('keeps the retry out of reach while the session cannot run recovery', async (
       messages: [...readySession.messages, gap('msg_gap_a', 2)],
     })
   );
-  const retry = renderer.root.findAllByType('Button').filter(
-    (node: { props: Record<string, unknown> }) => text(node as never) === 'common.retry'
-  );
+  const retry = renderer.root
+    .findAllByType('Button')
+    .filter((node: { props: Record<string, unknown> }) => text(node as never) === 'common.retry');
   expect(retry).toHaveLength(1);
   // Recovery reads the snapshot over the socket, so only the relay outage
   // disables it; a runner restart keeps the action runnable.

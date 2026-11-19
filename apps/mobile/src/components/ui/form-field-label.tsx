@@ -1,28 +1,18 @@
-import { type ReactNode } from 'react';
-import { View } from 'react-native';
-
 import { Text } from '@/components/ui/text';
 
 type FormFieldLabelProps = Readonly<{
   /** The label, which is also the accessible name of the value it names. */
   label: string;
-  /** Controls that belong to the field's own row, at the end of its label line. */
-  labelAccessory?: ReactNode;
 }>;
 
 /**
- * A form field's visible label, with the caller's own row controls at the end
- * of its line. Shared so a read-only value keeps the label its editable
- * sibling has, and so those controls stay out of the value's accessible name.
+ * A form field's visible label. Shared so a read-only value keeps the label
+ * its editable sibling has. A screen's own row controls do not render here:
+ * React Native confines a control's touch area to its parent's bounds, so a
+ * control on this one-text-line row cannot reach a taller touch target — such
+ * controls are the screen card's own overlay band
+ * ({@link ProfileCommandRowControls}), not this row's children.
  */
-export function FormFieldLabel({ label, labelAccessory }: Readonly<FormFieldLabelProps>) {
-  if (labelAccessory === undefined) {
-    return <Text className="text-sm font-medium text-foreground">{label}</Text>;
-  }
-  return (
-    <View className="flex-row items-center gap-2">
-      <Text className="min-w-0 flex-1 text-sm font-medium text-foreground">{label}</Text>
-      {labelAccessory}
-    </View>
-  );
+export function FormFieldLabel({ label }: Readonly<FormFieldLabelProps>) {
+  return <Text className="text-sm font-medium text-foreground">{label}</Text>;
 }

@@ -1239,5 +1239,16 @@ describe('prepareSession config caps', () => {
     expect(perValue.length * 21).toBeGreaterThan(MAX_MCP_PLAINTEXT_BYTES);
     expect(MetadataSchema.safeParse(metadataWith(recordWith(19))).success).toBe(true);
     expect(MetadataSchema.safeParse(metadataWith(recordWith(21))).success).toBe(false);
+
+    // Escaped bytes count, because the attach schema measures the serialized JSON.
+    const control = String.fromCharCode(1).repeat(perValue.length);
+    const escaped = Array.from({ length: 19 }, (_, index) => [`KEY_${index}`, control]);
+    expect(
+      MetadataSchema.safeParse(
+        metadataWith({
+          local: { type: 'local', command: ['node'], environment: Object.fromEntries(escaped) },
+        })
+      ).success
+    ).toBe(false);
   });
 });

@@ -1348,6 +1348,10 @@ describe('basePrepareSessionNextSchema config caps', () => {
     expect(perValue.length * 21).toBeGreaterThan(MAX_MCP_PLAINTEXT_BYTES);
     expect(accepts(withLocalServer({ environment: envWith(19, perValue) }))).toBe(true);
     expect(accepts(withLocalServer({ environment: envWith(21, perValue) }))).toBe(false);
+
+    // Escaped bytes count, because the attach schema measures the serialized JSON.
+    const control = String.fromCharCode(1).repeat(perValue.length);
+    expect(accepts(withLocalServer({ environment: envWith(19, control) }))).toBe(false);
   });
 
   it('caps encrypted envelope strings', () => {

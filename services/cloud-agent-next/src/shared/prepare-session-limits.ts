@@ -88,12 +88,19 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
- * Plaintext byte count of a secret value, without decrypting it. A GCM
- * ciphertext is exactly as long as its plaintext, and base64 is four thirds of
- * the ciphertext, so the submitted length bounds the plaintext.
+ * Bytes a secret value contributes to the materialized configuration, without
+ * decrypting it. A plain value is charged its JSON-escaped size, exactly as the
+ * attach schema measures it. A GCM ciphertext is exactly as long as its
+ * plaintext and base64 is four thirds of the ciphertext, so an envelope is
+ * charged its decoded byte count: escaping depends on content that is not
+ * readable here, and the budget bounds the decrypted work rather than the exact
+ * serialized size.
  */
 const secretPlaintextBytes = (value: unknown): number => {
-  if (typeof value === 'string') return new TextEncoder().encode(value).byteLength;
+  if (typeof value === 'string') {
+    // Two quotes are already in the frame, so charge the escaped content only.
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength - 2;
+  }
   if (!isRecord(value)) return 0;
   const data = value.encryptedData;
   if (typeof data !== 'string') return 0;

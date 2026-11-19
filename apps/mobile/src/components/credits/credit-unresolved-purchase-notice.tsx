@@ -88,7 +88,9 @@ function NoticeCopy({
   const reconcile = (
     <Button
       key="reconcile"
-      accessibilityLabel={[t('credits.checkPurchase'), ...packCopy].join(', ')}
+      // The check is about the earlier charge, never the pack picked for a new
+      // purchase, so its name carries no pack or price.
+      accessibilityLabel={t('credits.checkPurchase')}
       accessibilityState={{ disabled: actionsDisabled }}
       disabled={actionsDisabled}
       onPress={onReconcile}

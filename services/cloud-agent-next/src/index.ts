@@ -5,6 +5,7 @@ import { CloudAgentWorkspaceDO } from './control-plane/workspace/workspace-do.js
 import { SandboxContainers as SandboxContainersBase } from './sandbox-containers/SandboxContainers.js';
 import { StreamTicketNonceDO as StreamTicketNonceDOBase } from './persistence/StreamTicketNonceDO.js';
 import { UserKiloFacade as UserKiloFacadeBase } from './kilo-facade/user-kilo-facade.js';
+import { PreviewTunnel as PreviewTunnelBase } from './preview-tunnel/preview-tunnel-do.js';
 
 export { default } from './server.js';
 export { SandboxContainment, SandboxSmallContainment } from './legacy-runtime-tombstones.js';
@@ -38,3 +39,5 @@ export const StreamTicketNonceDO = instrumentCloudAgentDurableObject(
 export type StreamTicketNonceDO = StreamTicketNonceDOBase;
 export const UserKiloFacade = instrumentCloudAgentDurableObject(UserKiloFacadeBase, 'kilo-facade');
 export type UserKiloFacade = UserKiloFacadeBase;
+export const PreviewTunnel = instrumentCloudAgentDurableObject(PreviewTunnelBase, 'preview-tunnel');
+export type PreviewTunnel = PreviewTunnelBase;

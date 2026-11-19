@@ -36,22 +36,6 @@ const FILE_PROVIDER_DOMAIN_IDENTIFIER = 'com.kilocode.kiloapp.artifacts';
 // Read-only: no write, delete or rename capability, and no write entry point.
 const REFUSED_ENTRY_POINTS = ['createItem(', 'modifyItem(', 'deleteItem('];
 const WRITE_CAPABILITIES = ['allowsWriting', 'allowsDeleting', 'allowsRenaming'];
-// The bidi code points the manifest writer names through constants; its
-// predicate's ranges are declared in decimal (oxfmt normalizes hex literals).
-const CODE_POINT_CONSTANTS = [
-  'ARABIC_LETTER_MARK_CODE_POINT',
-  'LEFT_TO_RIGHT_MARK_CODE_POINT',
-  'RIGHT_TO_LEFT_MARK_CODE_POINT',
-  'BIDI_EMBEDDING_CODE_POINT_MIN',
-  'BIDI_EMBEDDING_CODE_POINT_MAX',
-  'BIDI_ISOLATE_CODE_POINT_MIN',
-  'BIDI_ISOLATE_CODE_POINT_MAX',
-  'C0_CONTROL_CODE_POINT_MAX',
-  'DELETE_CODE_POINT',
-  'C1_CONTROL_CODE_POINT_MIN',
-  'C1_CONTROL_CODE_POINT_MAX',
-];
-
 // The helpers expo-widgets' `ExpoWidgetsTarget` is composed from; the plugin
 // composes its target the same way instead of writing pbxproj by hand.
 const XCODE_HELPERS = [
@@ -176,8 +160,10 @@ describe('artifacts File Provider extension contract', () => {
         extensionSource.indexOf('private static func splitExtension')
       )
       .replaceAll(/\/\/.*$/gmu, '');
-    expect(writerPredicate).toBeDefined();
     expect(swiftPredicate).toContain('isUnnameableScalar');
+    if (writerPredicate === undefined) {
+      throw new Error('the manifest writer has no isUnnameableCodePoint predicate');
+    }
     // The type name carries its own digits; read only the body's comparison
     // values, never the signature.
     const swiftValues = [
@@ -185,15 +171,22 @@ describe('artifacts File Provider extension contract', () => {
         [...swiftPredicate.slice(swiftPredicate.indexOf('{')).matchAll(/\d+/gu)].map(m => m[0])
       ),
     ];
-    // The writer names its bounds through constants; read their values so a
-    // range change on either side fails here.
-    const writerValues = CODE_POINT_CONSTANTS.map(name => {
+    // The writer names its bounds through constants; resolve every constant
+    // the predicate references, so a range added there under a new name is a
+    // value the Swift side must also carry.
+    const writerValues = [
+      ...new Set([...writerPredicate.matchAll(/\b([A-Z][A-Z0-9_]+)\b/gu)].map(m => m[1])),
+    ].map(name => {
       const value = new RegExp(String.raw`const ${name} = (\d+);`, 'u').exec(
         manifestWriterSource
       )?.[1];
-      expect(value, `${name} must be a plain decimal constant`).toBeDefined();
-      return value as string;
+      if (value === undefined) {
+        throw new Error(`${name} is not a plain decimal constant in the manifest writer`);
+      }
+      return value;
     });
+    // A predicate that reads no constant would compare two empty sets.
+    expect(writerValues.length).toBeGreaterThan(0);
     expect(new Set(swiftValues)).toEqual(new Set(writerValues));
     // The joiners shape an RTL name's letters, so both sides keep them.
     expect(swiftPredicate).not.toMatch(/\b(?:8204|8205)\b/u);

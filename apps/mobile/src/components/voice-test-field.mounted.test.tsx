@@ -130,6 +130,10 @@ describe('VoiceTestField', () => {
     // Uncontrolled on iOS: text flows through the native draft writes, never a
     // controlled `value` prop.
     expect(input.props.value).toBeUndefined();
+    // Dictation rewrites the live text, which Android answers by attaching a
+    // suggestion popup whose pending spans no longer fit; only Android turns
+    // suggestions off, so iOS keeps the framework default.
+    expect(input.props.autoCorrect).toBe(true);
   });
 
   it('starts and stops the shared voice session from the mic button', async () => {

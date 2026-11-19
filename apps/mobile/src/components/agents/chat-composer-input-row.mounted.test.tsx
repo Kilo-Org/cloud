@@ -1,13 +1,11 @@
-import { type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   findAllByType,
   findByAccessibilityLabel,
   findTextInput,
-  makeProps,
-  type RenderProps,
   renderRow,
+  renderRowAfterPlatformFlip,
 } from './chat-composer-input-row.mounted.test-helpers';
 
 const platformOS = vi.hoisted(() => ({ os: 'ios' }));
@@ -180,46 +178,54 @@ describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
 
   it('sizes the send and stop pressables to the 48dp Android hit target', async () => {
     platformOS.os = 'android';
-    // `CONTROL_HIT_TARGET` is a module-level constant, so the row must be
-    // re-imported after the platform flips to pick up the Android size. The
-    // persistent `vi.mock` factory is cached, so `doMock` re-registers it for
-    // the fresh import and `resetModules` clears the module cache.
-    vi.doMock('react-native', reactNativeMock);
-    vi.resetModules();
-    const { ChatComposerInputRow: AndroidRow } = await import('./chat-composer-input-row');
-    const { createElement: createElementAndroid } = await import('react');
-    const { TestRenderer: Renderer, act: actFresh } = await import('@/test/renderer');
 
-    const renderAndroid = async (props: RenderProps): Promise<TestRenderer.ReactTestRenderer> => {
-      const holder: { current?: TestRenderer.ReactTestRenderer } = {};
-      await actFresh(async () => {
-        await Promise.resolve();
-        holder.current = Renderer.create(createElementAndroid(AndroidRow, makeProps(props)));
-      });
-      if (!holder.current) {
-        throw new Error('renderer was not created');
-      }
-      return holder.current;
-    };
-
-    const sendRenderer = await renderAndroid({ inputEditable: true });
+    const sendRenderer = await renderRowAfterPlatformFlip({ inputEditable: true }, reactNativeMock);
     const send = findByAccessibilityLabel(sendRenderer.root, 'Send message');
     const sendStyle = send?.props.style as { height: number; width: number } | undefined;
     expect(sendStyle?.height).toBe(48);
     expect(sendStyle?.width).toBe(48);
     sendRenderer.unmount();
 
-    const stopRenderer = await renderAndroid({
-      inputEditable: true,
-      isStreaming: true,
-      canSend: false,
-      hasSendableContent: false,
-    });
+    const stopRenderer = await renderRowAfterPlatformFlip(
+      {
+        inputEditable: true,
+        isStreaming: true,
+        canSend: false,
+        hasSendableContent: false,
+      },
+      reactNativeMock
+    );
     const stop = findByAccessibilityLabel(stopRenderer.root, 'Stop generating');
     const stopStyle = stop?.props.style as { height: number; width: number } | undefined;
     expect(stopStyle?.height).toBe(48);
     expect(stopStyle?.width).toBe(48);
     stopRenderer.unmount();
+  });
+});
+
+describe('ChatComposerInputRow mounted — framework suggestions', () => {
+  // Android attaches a `SuggestionSpan` only for an input type that allows
+  // suggestions, and its pending popup re-applies span bounds against the
+  // text after the app replaces it (`setNativeProps({text})` paste, voice
+  // draft, clear-on-send), which throws on the main thread. The composer is
+  // rewritten this way, so Android must ask for no suggestions; iOS keeps the
+  // framework's suggestions because it has no such popup.
+  it('asks Android for no suggestions on the rewritten composer', async () => {
+    platformOS.os = 'android';
+
+    const renderer = await renderRowAfterPlatformFlip({ inputEditable: true }, reactNativeMock);
+
+    expect(findTextInput(renderer.root).props.autoCorrect).toBe(false);
+
+    renderer.unmount();
+  });
+
+  it('keeps the framework suggestions on iOS', async () => {
+    const renderer = await renderRow({ inputEditable: true });
+
+    expect(findTextInput(renderer.root).props.autoCorrect).toBe(true);
+
+    renderer.unmount();
   });
 });
 

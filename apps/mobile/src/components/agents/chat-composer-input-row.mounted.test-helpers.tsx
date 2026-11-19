@@ -5,6 +5,8 @@
 // fixed-part-row.mounted.test-helpers.tsx).
 
 import { createElement } from 'react';
+import { vi } from 'vitest';
+
 import { act, TestRenderer } from '@/test/renderer';
 
 import { ChatComposerInputRow } from './chat-composer-input-row';
@@ -87,6 +89,33 @@ export async function renderRow(props: RenderProps): Promise<TestRenderer.ReactT
   await act(async () => {
     await Promise.resolve();
     holder.current = TestRenderer.create(createElement(ChatComposerInputRow, makeProps(props)));
+  });
+  const renderer = holder.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+/**
+ * Mount the row after `platformOS` changed, so a module-level constant that
+ * reads the platform is resolved again. Only the row is re-imported: the
+ * persisted `vi.mock('react-native')` factory is cached, so `doMock`
+ * re-registers it for the fresh module graph and `resetModules` clears that
+ * graph. The import cannot be static because it must resolve after the flip.
+ */
+export async function renderRowAfterPlatformFlip(
+  props: RenderProps,
+  reactNativeMock: () => Record<string, unknown>
+): Promise<TestRenderer.ReactTestRenderer> {
+  vi.doMock('react-native', reactNativeMock);
+  vi.resetModules();
+  const { ChatComposerInputRow: FreshRow } = await import('./chat-composer-input-row');
+
+  const holder: { current?: TestRenderer.ReactTestRenderer } = {};
+  await act(async () => {
+    await Promise.resolve();
+    holder.current = TestRenderer.create(createElement(FreshRow, makeProps(props)));
   });
   const renderer = holder.current;
   if (!renderer) {

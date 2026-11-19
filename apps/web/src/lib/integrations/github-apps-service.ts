@@ -24,6 +24,8 @@ import {
   deleteGitHubInstallation,
   fetchGitHubBranches,
   fetchGitHubRepositories,
+  GITHUB_LISTING_BUDGET_MESSAGE,
+  GitHubListingBudgetExceededError,
   GitHubRateLimitError,
   isGitHubRateLimitError,
   toGitHubRateLimitError,
@@ -230,6 +232,27 @@ export async function uninstallApp(
 }
 
 /**
+ * Runs one provider listing read, answering a listing that passed the
+ * adapter's pagination budget as `PAYLOAD_TOO_LARGE`: it is oversized rather
+ * than unavailable, so the caller cannot retry its way out. Every other error
+ * is rethrown unchanged.
+ */
+async function readListingWithinBudget<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof GitHubListingBudgetExceededError) {
+      throw new TRPCError({
+        code: 'PAYLOAD_TOO_LARGE',
+        message: GITHUB_LISTING_BUDGET_MESSAGE,
+        cause: error,
+      });
+    }
+    throw error;
+  }
+}
+
+/**
  * List repositories accessible by an integration
  * Returns the cached snapshot by default, including an empty one that has
  * already synced; reads the provider when the row has no snapshot yet or when
@@ -280,11 +303,9 @@ export async function listRepositories(
     })
   ) {
     const appType = integration.github_app_type || 'standard';
-    const repos = await fetchGitHubRepositories(
-      integration.platform_installation_id,
-      appType,
-      integration.id,
-      'management'
+    const installationId = integration.platform_installation_id;
+    const repos = await readListingWithinBudget(() =>
+      fetchGitHubRepositories(installationId, appType, integration.id, 'management')
     );
     await updateRepositoriesForIntegration(integrationId, repos);
     return {
@@ -377,12 +398,9 @@ export async function listBranches(
   }
 
   const appType = integration.github_app_type || 'standard';
-  const branches = await fetchGitHubBranches(
-    integration.platform_installation_id,
-    repositoryFullName,
-    appType,
-    integration.id,
-    purpose
+  const installationId = integration.platform_installation_id;
+  const branches = await readListingWithinBudget(() =>
+    fetchGitHubBranches(installationId, repositoryFullName, appType, integration.id, purpose)
   );
 
   return { branches };

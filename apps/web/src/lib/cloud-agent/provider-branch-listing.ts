@@ -29,7 +29,11 @@ import {
 } from '@/lib/integrations/db/platform-integrations';
 import * as githubAppsService from '@/lib/integrations/github-apps-service';
 import { fetchGitHubBranchHead } from '@/lib/cloud-agent/github-branch-ops';
-import { isGitHubRateLimitError } from '@/lib/integrations/platforms/github/adapter';
+import {
+  GITHUB_LISTING_BUDGET_MESSAGE,
+  GitHubListingBudgetExceededError,
+  isGitHubRateLimitError,
+} from '@/lib/integrations/platforms/github/adapter';
 import {
   fetchGitLabBranchHead,
   fetchGitLabBranches,
@@ -195,6 +199,8 @@ const githubBranchesUnavailableMessage = 'GitHub did not answer the branch list.
  * repository refusal. The callers handle 403 and 404 themselves, because only
  * they know whether another installation may still see the repository.
  *
+ * A listing that passed the adapter's pagination budget is oversized, which
+ * no retry or other installation can fix, so it answers `PAYLOAD_TOO_LARGE`.
  * A 5xx is provider-side and stays retryable; Octokit also reports a request
  * that got no response as a 500. A 401 is the installation credential itself
  * being refused, which a reconnect fixes; a 451 is GitHub blocking the
@@ -203,6 +209,16 @@ const githubBranchesUnavailableMessage = 'GitHub did not answer the branch list.
  * rethrown unchanged so it is not presented as a provider state.
  */
 function githubBranchesErrorToTrpcError(error: unknown): unknown {
+  // An oversized listing is a permanent refusal: no retry, and no other
+  // installation, can return fewer rows, so it is never a candidate-continue
+  // failure.
+  if (error instanceof GitHubListingBudgetExceededError) {
+    return new TRPCError({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: GITHUB_LISTING_BUDGET_MESSAGE,
+      cause: error,
+    });
+  }
   // The list call's own refusals (a vanished integration, an incomplete
   // installation) are already classified and keep their specific code.
   if (error instanceof TRPCError) return error;

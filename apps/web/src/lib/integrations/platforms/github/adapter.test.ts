@@ -2,6 +2,10 @@ const mockGetAuthenticated = jest.fn();
 const mockPullsGet = jest.fn();
 const mockPullsListCommits = jest.fn();
 const mockReposGetCollaboratorPermissionLevel = jest.fn();
+const mockReposGet = jest.fn();
+const mockReposListBranches = jest.fn();
+const mockListReposAccessibleToInstallation = jest.fn();
+const mockListInstallationRequests = jest.fn();
 const mockPaginate = jest.fn();
 const mockInstallationAuth = jest.fn();
 const mockOctokitRequest = jest.fn();
@@ -9,7 +13,15 @@ const mockOctokitRequest = jest.fn();
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation(() => ({
     rest: { users: { getAuthenticated: mockGetAuthenticated } },
-    repos: { getCollaboratorPermissionLevel: mockReposGetCollaboratorPermissionLevel },
+    apps: {
+      listReposAccessibleToInstallation: mockListReposAccessibleToInstallation,
+      listInstallationRequestsForAuthenticatedApp: mockListInstallationRequests,
+    },
+    repos: {
+      get: mockReposGet,
+      getCollaboratorPermissionLevel: mockReposGetCollaboratorPermissionLevel,
+      listBranches: mockReposListBranches,
+    },
     pulls: { get: mockPullsGet, listCommits: mockPullsListCommits },
     paginate: mockPaginate,
     request: mockOctokitRequest,
@@ -36,11 +48,17 @@ jest.mock('./app-selector', () => ({
 
 import {
   exchangeGitHubOAuthCode,
+  fetchGitHubBranches,
+  fetchGitHubInstallationRequests,
+  fetchGitHubRepositories,
   fetchPullRequestByNumber,
   getCollaboratorPermissionLevel,
+  GITHUB_LISTING_TIMEOUT_MS,
   GitHubCredentialRejectionError,
+  GitHubListingBudgetExceededError,
   GitHubRateLimitError,
   isGitHubCredentialRejection,
+  MAX_GITHUB_LISTING_BYTES,
   toGitHubRateLimitError,
 } from './adapter';
 import { verifySessionPullRequestLink } from './pr-link-identity';
@@ -55,6 +73,25 @@ function requestBody(fetchMock: jest.SpiedFunction<typeof fetch>): Record<string
   const [, init] = fetchMock.mock.calls[0] ?? [];
   if (!init || typeof init.body !== 'string') throw new Error('Expected a JSON request body');
   return JSON.parse(init.body);
+}
+
+/**
+ * A page request that settles only when its budget aborts it, rejecting with the shape
+ * @octokit/request's fetch wrapper produces for an abort: a `RequestError` 500 whose message is
+ * the abort reason's and whose `cause` is that reason. The adapter must still report the typed
+ * deadline error, whatever wrapper Octokit applies.
+ */
+function abortAsWrappedRequestError(signal: AbortSignal): Promise<never> {
+  const { promise, reject } = Promise.withResolvers<never>();
+  const abort = () => {
+    const requestError = new Error(String(signal.reason?.message ?? 'Internal Server Error'));
+    requestError.name = 'HttpError';
+    Object.assign(requestError, { status: 500, cause: signal.reason });
+    reject(requestError);
+  };
+  if (signal.aborted) abort();
+  else signal.addEventListener('abort', abort, { once: true });
+  return promise;
 }
 
 describe('exchangeGitHubOAuthCode', () => {
@@ -638,5 +675,505 @@ describe('fetchPullRequestByNumber', () => {
         pullRequest: fetched!,
       })
     ).toEqual({ verified: false, reason: 'head_repo_mismatch' });
+  });
+});
+
+type GitHubRepositoryRow = {
+  id: number;
+  name: string;
+  full_name: string;
+  private: boolean;
+  created_at?: string;
+  archived?: boolean;
+};
+
+function repositoryRow(id: number, overrides: Partial<GitHubRepositoryRow> = {}) {
+  return {
+    id,
+    name: `repo-${id}`,
+    full_name: `kilo/repo-${id}`,
+    private: false,
+    created_at: '2026-01-01T00:00:00Z',
+    archived: false,
+    ...overrides,
+  };
+}
+
+describe('fetchGitHubRepositories', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockInstallationAuth.mockReset().mockResolvedValue({
+      token: 'installation-token',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('keeps the projection, the archived filter and the page walk for an ordinary installation', async () => {
+    const firstPage = Array.from({ length: 100 }, (_value, index) => repositoryRow(index));
+    firstPage[1] = repositoryRow(1, { archived: true });
+    firstPage[5] = repositoryRow(5, { created_at: undefined });
+    mockListReposAccessibleToInstallation
+      .mockResolvedValueOnce({ data: { total_count: 150, repositories: firstPage } })
+      .mockResolvedValueOnce({
+        data: {
+          total_count: 150,
+          repositories: Array.from({ length: 50 }, (_value, index) =>
+            repositoryRow(100 + index, { private: true })
+          ),
+        },
+      });
+
+    const repositories = await fetchGitHubRepositories('5001');
+
+    expect(mockListReposAccessibleToInstallation).toHaveBeenCalledTimes(2);
+    expect(mockListReposAccessibleToInstallation).toHaveBeenLastCalledWith({
+      per_page: 100,
+      page: 2,
+      request: { signal: expect.any(AbortSignal) },
+    });
+    // One archived row is dropped and nothing else changes.
+    expect(repositories).toHaveLength(149);
+    expect(repositories[0]).toEqual({
+      id: 0,
+      name: 'repo-0',
+      full_name: 'kilo/repo-0',
+      private: false,
+      created_at: '2026-01-01T00:00:00Z',
+    });
+    expect(repositories.some(repository => repository.id === 1)).toBe(false);
+    expect(repositories.find(repository => repository.id === 5)?.created_at).toMatch(
+      /^\d{4}-\d{2}-\d{2}T/
+    );
+    expect(repositories[148]).toEqual({
+      id: 149,
+      name: 'repo-149',
+      full_name: 'kilo/repo-149',
+      private: true,
+      created_at: '2026-01-01T00:00:00Z',
+    });
+  });
+
+  it('rejects a listing whose full pages pass the page cap', async () => {
+    mockListReposAccessibleToInstallation.mockResolvedValue({
+      data: {
+        total_count: 1_000_000,
+        repositories: Array.from({ length: 100 }, (_value, index) => repositoryRow(index)),
+      },
+    });
+
+    const thrown: unknown = await fetchGitHubRepositories('5001').catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      'GitHub pagination limit exceeded: repository listing returned more than 100 pages'
+    );
+    expect(mockListReposAccessibleToInstallation).toHaveBeenCalledTimes(100);
+  });
+
+  it('rejects a listing that returns more items than the item cap', async () => {
+    mockListReposAccessibleToInstallation.mockResolvedValue({
+      data: {
+        total_count: 10_001,
+        repositories: Array.from({ length: 10_001 }, (_value, index) => repositoryRow(index)),
+      },
+    });
+
+    const thrown: unknown = await fetchGitHubRepositories('5001').catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      'GitHub pagination limit exceeded: repository listing returned more than 10000 items'
+    );
+    expect(mockListReposAccessibleToInstallation).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops a read that exceeds the cumulative byte budget', async () => {
+    const padding = 'x'.repeat(20_000);
+    mockListReposAccessibleToInstallation.mockResolvedValue({
+      data: {
+        total_count: 1_000_000,
+        repositories: Array.from({ length: 100 }, (_value, index) => ({
+          ...repositoryRow(index),
+          description: padding,
+        })),
+      },
+    });
+
+    const thrown: unknown = await fetchGitHubRepositories('5001').catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      `GitHub pagination limit exceeded: repository listing returned more than ${MAX_GITHUB_LISTING_BYTES / (1024 * 1024)} MiB`
+    );
+    expect(mockListReposAccessibleToInstallation).toHaveBeenCalledTimes(9);
+  });
+
+  it('covers every page of one read with the same deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      mockListReposAccessibleToInstallation.mockImplementation(
+        (params: { request: { signal: AbortSignal } }) => {
+          const { signal } = params.request;
+          signals.push(signal);
+          if (signals.length === 1) {
+            return Promise.resolve({
+              data: {
+                total_count: 200,
+                repositories: Array.from({ length: 100 }, (_value, index) => repositoryRow(index)),
+              },
+            });
+          }
+          const { promise, reject } = Promise.withResolvers<never>();
+          const abort = () => reject(signal.reason);
+          if (signal.aborted) {
+            abort();
+            return promise;
+          }
+          signal.addEventListener('abort', abort, { once: true });
+          return promise;
+        }
+      );
+
+      const read = fetchGitHubRepositories('5001');
+      const settled = read.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: repository listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      expect(signals).toHaveLength(2);
+      expect(signals.every(signal => signal.aborted)).toBe(true);
+      // The abort reason is named AbortError so Octokit's fetch wrapper rethrows it, and it
+      // carries the typed error the loops report.
+      const [{ reason }] = signals;
+      expect(reason.name).toBe('AbortError');
+      expect(reason.message).toBe(
+        `GitHub pagination limit exceeded: repository listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      expect(reason.cause).toBeInstanceOf(GitHubListingBudgetExceededError);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('reports the typed deadline error when Octokit wraps the aborted request', async () => {
+    jest.useFakeTimers();
+    try {
+      mockListReposAccessibleToInstallation.mockImplementation(
+        (params: { request: { signal: AbortSignal } }) =>
+          abortAsWrappedRequestError(params.request.signal)
+      );
+
+      const read = fetchGitHubRepositories('5001');
+      const settled = read.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: repository listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('rethrows a page failure that is not the deadline unchanged', async () => {
+    const failure = Object.assign(new Error('Not Found'), { name: 'HttpError', status: 404 });
+    mockListReposAccessibleToInstallation.mockRejectedValue(failure);
+
+    const thrown: unknown = await fetchGitHubRepositories('5001').catch((error: unknown) => error);
+
+    expect(thrown).toBe(failure);
+    expect(mockListReposAccessibleToInstallation).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('fetchGitHubBranches', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockInstallationAuth.mockReset().mockResolvedValue({
+      token: 'installation-token',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+    mockReposGet.mockResolvedValue({ data: { default_branch: 'main' } });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  function branchNames(count: number, offset = 0) {
+    return Array.from({ length: count }, (_value, index) => ({
+      name: `branch-${offset + index}`,
+    }));
+  }
+
+  it('marks the default branch and walks every page', async () => {
+    mockReposListBranches
+      .mockResolvedValueOnce({ data: [{ name: 'main' }, ...branchNames(99, 1)] })
+      .mockResolvedValueOnce({ data: branchNames(20, 100) });
+
+    const branches = await fetchGitHubBranches('5001', 'kilo/repo');
+
+    expect(branches).toHaveLength(120);
+    expect(branches[0]).toEqual({ name: 'main', isDefault: true });
+    expect(branches[1]).toEqual({ name: 'branch-1', isDefault: false });
+    expect(mockReposListBranches).toHaveBeenLastCalledWith({
+      owner: 'kilo',
+      repo: 'repo',
+      per_page: 100,
+      page: 2,
+      request: { signal: expect.any(AbortSignal) },
+    });
+  });
+
+  it('rejects a listing whose full pages pass the page cap', async () => {
+    mockReposListBranches.mockResolvedValue({ data: branchNames(100) });
+
+    const thrown: unknown = await fetchGitHubBranches('5001', 'kilo/repo').catch(
+      (error: unknown) => error
+    );
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      'GitHub pagination limit exceeded: branch listing returned more than 100 pages'
+    );
+    expect(mockReposListBranches).toHaveBeenCalledTimes(100);
+  });
+
+  it('rejects a listing that returns more items than the item cap', async () => {
+    mockReposListBranches.mockResolvedValue({ data: branchNames(10_001) });
+
+    const thrown: unknown = await fetchGitHubBranches('5001', 'kilo/repo').catch(
+      (error: unknown) => error
+    );
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      'GitHub pagination limit exceeded: branch listing returned more than 10000 items'
+    );
+    expect(mockReposListBranches).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops a read that exceeds the cumulative byte budget', async () => {
+    const padding = 'x'.repeat(20_000);
+    mockReposListBranches.mockResolvedValue({
+      data: branchNames(100).map(branch => ({ ...branch, protection: { padding } })),
+    });
+
+    const thrown: unknown = await fetchGitHubBranches('5001', 'kilo/repo').catch(
+      (error: unknown) => error
+    );
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      `GitHub pagination limit exceeded: branch listing returned more than ${MAX_GITHUB_LISTING_BYTES / (1024 * 1024)} MiB`
+    );
+    expect(mockReposListBranches).toHaveBeenCalledTimes(9);
+  });
+
+  it('covers every page of one read with the same deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      mockReposListBranches.mockImplementation((params: { request: { signal: AbortSignal } }) => {
+        const { signal } = params.request;
+        signals.push(signal);
+        if (signals.length === 1) {
+          return Promise.resolve({ data: branchNames(100) });
+        }
+        const { promise, reject } = Promise.withResolvers<never>();
+        const abort = () => reject(signal.reason);
+        if (signal.aborted) {
+          abort();
+          return promise;
+        }
+        signal.addEventListener('abort', abort, { once: true });
+        return promise;
+      });
+
+      const read = fetchGitHubBranches('5001', 'kilo/repo');
+      const settled = read.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: branch listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      expect(signals).toHaveLength(2);
+      expect(signals.every(signal => signal.aborted)).toBe(true);
+      const [{ reason }] = signals;
+      expect(reason.name).toBe('AbortError');
+      expect(reason.message).toBe(
+        `GitHub pagination limit exceeded: branch listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      expect(reason.cause).toBeInstanceOf(GitHubListingBudgetExceededError);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('reports the typed deadline error when Octokit wraps the aborted request', async () => {
+    jest.useFakeTimers();
+    try {
+      mockReposListBranches.mockImplementation((params: { request: { signal: AbortSignal } }) =>
+        abortAsWrappedRequestError(params.request.signal)
+      );
+
+      const read = fetchGitHubBranches('5001', 'kilo/repo');
+      const settled = read.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: branch listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe('fetchGitHubInstallationRequests', () => {
+  function requestRow(id: number, overrides: Record<string, unknown> = {}) {
+    return {
+      id,
+      account: { id: 900 + id, login: `account-${id}` },
+      requester: { id: 700 + id, login: `requester-${id}` },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockInstallationAuth.mockReset().mockResolvedValue({
+      token: 'app-token',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('maps every pending request across pages', async () => {
+    mockListInstallationRequests
+      .mockResolvedValueOnce({
+        data: Array.from({ length: 100 }, (_value, index) => requestRow(index)),
+      })
+      .mockResolvedValueOnce({
+        data: [requestRow(100, { account: { id: 5, slug: 'from-a-slug' }, requester: null })],
+      });
+
+    const requests = await fetchGitHubInstallationRequests();
+
+    expect(requests).toHaveLength(101);
+    expect(requests[0]).toEqual({
+      id: '0',
+      accountId: '900',
+      accountLogin: 'account-0',
+      requesterId: '700',
+      requesterLogin: 'requester-0',
+    });
+    expect(requests[100]).toEqual({
+      id: '100',
+      accountId: '5',
+      accountLogin: 'from-a-slug',
+      requesterId: null,
+      requesterLogin: null,
+    });
+    expect(mockListInstallationRequests).toHaveBeenLastCalledWith({
+      per_page: 100,
+      page: 2,
+      request: { signal: expect.any(AbortSignal) },
+    });
+  });
+
+  it('rejects a listing whose full pages pass the page cap', async () => {
+    mockListInstallationRequests.mockResolvedValue({
+      data: Array.from({ length: 100 }, (_value, index) => requestRow(index)),
+    });
+
+    const thrown: unknown = await fetchGitHubInstallationRequests().catch(
+      (error: unknown) => error
+    );
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      'GitHub pagination limit exceeded: installation request listing returned more than 100 pages'
+    );
+    expect(mockListInstallationRequests).toHaveBeenCalledTimes(100);
+  });
+
+  it('reports the typed deadline error when the read runs out of time', async () => {
+    jest.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      mockListInstallationRequests.mockImplementation(
+        (params: { request: { signal: AbortSignal } }) => {
+          const { signal } = params.request;
+          signals.push(signal);
+          if (signals.length === 1) {
+            return Promise.resolve({ data: Array.from({ length: 100 }, (_v, i) => requestRow(i)) });
+          }
+          const { promise, reject } = Promise.withResolvers<never>();
+          const abort = () => reject(signal.reason);
+          if (signal.aborted) {
+            abort();
+            return promise;
+          }
+          signal.addEventListener('abort', abort, { once: true });
+          return promise;
+        }
+      );
+
+      const read = fetchGitHubInstallationRequests();
+      const settled = read.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: installation request listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      expect(signals).toHaveLength(2);
+      const [{ reason }] = signals;
+      expect(reason.name).toBe('AbortError');
+      expect(reason.cause).toBeInstanceOf(GitHubListingBudgetExceededError);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('reports the typed deadline error when Octokit wraps the aborted request', async () => {
+    jest.useFakeTimers();
+    try {
+      mockListInstallationRequests.mockImplementation(
+        (params: { request: { signal: AbortSignal } }) =>
+          abortAsWrappedRequestError(params.request.signal)
+      );
+
+      const read = fetchGitHubInstallationRequests();
+      const settled = read.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: installation request listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

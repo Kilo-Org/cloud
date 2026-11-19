@@ -9,8 +9,8 @@ import { useCallback, useRef, useState } from 'react';
  * not idle and has no data). Cancel first, then bypass the online manager for
  * this deliberate attempt only: the read either answers or fails instead of
  * waiting for connectivity. The original options go back in `finally`, so a
- * failed attempt cannot leave the forced policy behind, and the rejection
- * reaches the caller — the read keeps its own error state.
+ * failed attempt cannot leave the forced policy behind; the rejection reaches
+ * the caller, which settles it and leaves the read's own error state intact.
  */
 export async function retryPausedRead(queryClient: QueryClient, queryKey: QueryKey): Promise<void> {
   const query = queryClient.getQueryCache().find({ queryKey, exact: true });

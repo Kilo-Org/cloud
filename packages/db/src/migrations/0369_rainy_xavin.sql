@@ -1,0 +1,4 @@
+ALTER TABLE "cloud_agent_pending_uploads" DROP CONSTRAINT "cloud_agent_pending_uploads_status_check";--> statement-breakpoint
+DROP INDEX "IDX_cloud_agent_pending_uploads_expired";--> statement-breakpoint
+CREATE INDEX "IDX_cloud_agent_pending_uploads_expired" ON "cloud_agent_pending_uploads" USING btree ("expires_at") WHERE "cloud_agent_pending_uploads"."status" IN ('pending', 'released');--> statement-breakpoint
+ALTER TABLE "cloud_agent_pending_uploads" ADD CONSTRAINT "cloud_agent_pending_uploads_status_check" CHECK ("cloud_agent_pending_uploads"."status" IN ('pending', 'linked', 'released', 'reaped'));

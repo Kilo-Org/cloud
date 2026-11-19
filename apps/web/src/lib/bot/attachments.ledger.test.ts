@@ -32,6 +32,7 @@ function createAttachment(name: string, contents: string): Attachment {
     type: 'file',
     name,
     mimeType: 'text/plain',
+    size: Buffer.byteLength(contents),
     fetchData: jest.fn(async () => Buffer.from(contents)),
   };
 }
@@ -85,7 +86,7 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
     mockSend.mockResolvedValue({});
   });
 
-  it('refuses a bot upload once the account holds its live-upload ceiling', async () => {
+  it('bot ledger case 1', async () => {
     const kiloUserId = `bot-user-${crypto.randomUUID()}`;
     await seedPendingRows(kiloUserId, CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT);
     const notesFetch = jest.fn(async () => Buffer.from('notes'));
@@ -93,8 +94,20 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
 
     const result = await extractAndUploadAttachments(
       createMessage([
-        { type: 'file', name: 'notes.md', mimeType: 'text/plain', fetchData: notesFetch },
-        { type: 'file', name: 'more.txt', mimeType: 'text/plain', fetchData: moreFetch },
+        {
+          type: 'file',
+          name: 'notes.md',
+          mimeType: 'text/plain',
+          size: Buffer.byteLength('notes'),
+          fetchData: notesFetch,
+        },
+        {
+          type: 'file',
+          name: 'more.txt',
+          mimeType: 'text/plain',
+          size: Buffer.byteLength('more'),
+          fetchData: moreFetch,
+        },
       ]),
       kiloUserId
     );
@@ -103,8 +116,6 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
       objectKeys: [],
       declinedFilenames: ['notes.md', 'more.txt'],
     });
-    // Nothing is retrieved and nothing reaches the bucket: the ceiling answer
-    // arrives before any body work, and the existing rows are untouched.
     expect(notesFetch).not.toHaveBeenCalled();
     expect(moreFetch).not.toHaveBeenCalled();
     expect(mockSend).not.toHaveBeenCalled();
@@ -112,7 +123,7 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
     expect((await rowsFor(kiloUserId)).every(row => row.status === 'pending')).toBe(true);
   });
 
-  it('admits a bot message below the ceiling and deletes what no session took', async () => {
+  it('bot ledger case 2', async () => {
     const kiloUserId = `bot-user-${crypto.randomUUID()}`;
 
     const uploaded = await extractAndUploadAttachments(
@@ -131,7 +142,7 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
 
     await discardUploadedAttachments(kiloUserId, uploaded);
 
-    expect((await rowsFor(kiloUserId)).map(row => row.status)).toEqual(['reaped', 'reaped']);
+    expect((await rowsFor(kiloUserId)).map(row => row.status)).toEqual(['released', 'released']);
     const deletedKeys = mockSend.mock.calls
       .filter(([command]) => command.name === 'DeleteObjectCommand')
       .map(([command]) => command.input.Key)
@@ -139,7 +150,7 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
     expect(deletedKeys).toEqual([...uploaded!.objectKeys].sort());
   });
 
-  it('keeps the rows a session linked out of the run-level cleanup', async () => {
+  it('bot ledger case 3', async () => {
     const kiloUserId = `bot-user-${crypto.randomUUID()}`;
 
     const uploaded = await extractAndUploadAttachments(
@@ -159,7 +170,7 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
     );
   });
 
-  it('does not let a linked message keep counting against the ceiling', async () => {
+  it('bot ledger case 4', async () => {
     const kiloUserId = `bot-user-${crypto.randomUUID()}`;
 
     const first = await extractAndUploadAttachments(
@@ -186,5 +197,32 @@ describe('bot attachment uploads against the pending-upload ledger', () => {
           )
         )
     ).toEqual([{ count: CLOUD_AGENT_PENDING_UPLOADS_MAX_PER_ACCOUNT }]);
+  });
+
+  it('bot ledger case 5', async () => {
+    const kiloUserId = `bot-user-${crypto.randomUUID()}`;
+    const mysteryFetch = jest.fn(async () => Buffer.from('tiny body'));
+
+    const uploaded = await extractAndUploadAttachments(
+      createMessage([
+        {
+          type: 'file',
+          name: 'mystery.txt',
+          mimeType: 'text/plain',
+          fetchData: mysteryFetch,
+        },
+      ]),
+      kiloUserId
+    );
+
+    expect(mysteryFetch).not.toHaveBeenCalled();
+    expect(uploaded).toEqual({ objectKeys: [], declinedFilenames: ['mystery.txt'] });
+    const deletes = mockSend.mock.calls.filter(
+      ([command]) => command.name === 'DeleteObjectCommand'
+    );
+    expect(deletes).toHaveLength(1);
+    expect(await rowsFor(kiloUserId)).toEqual([
+      { object_key: deletes[0]?.[0].input.Key, status: 'released', byte_size: 20971520 },
+    ]);
   });
 });

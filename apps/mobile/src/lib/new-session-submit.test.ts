@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveContinueStartDisabled,
   resolveNewSessionConnectProvider,
+  resolveNewSessionProfileGate,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
   resolveNewSessionSubmitDisabled,
@@ -151,23 +152,42 @@ describe('resolveNewSessionSubmitDisabled', () => {
 describe('resolveNewSessionStartDisabled', () => {
   function startInput(
     overrides: Partial<Parameters<typeof resolveNewSessionStartDisabled>[0]> = {}
-  ) {
+  ): Parameters<typeof resolveNewSessionStartDisabled>[0] {
     return {
       ...validInput(),
       selectedRepositoryResolved: true,
-      isProfileLoading: false,
+      profileGate: { kind: 'ready' },
       ...overrides,
     };
   }
 
-  it('is enabled when every precondition is satisfied and the profile is settled', () => {
-    // A failed profile query must not disable Start: the form shows an inline
-    // error + Retry and submits with no effective profile id.
+  it('is enabled when every precondition is satisfied and the profile read settled', () => {
+    // A read that failed with no pick is `ready`: the create submits no profile
+    // id and the server applies its default, so the failure is not a blocker.
     expect(resolveNewSessionStartDisabled(startInput())).toBe(false);
   });
 
   it('blocks Start while the profile query is loading', () => {
-    expect(resolveNewSessionStartDisabled(startInput({ isProfileLoading: true }))).toBe(true);
+    expect(resolveNewSessionStartDisabled(startInput({ profileGate: { kind: 'loading' } }))).toBe(
+      true
+    );
+  });
+
+  it('blocks Start when a picked profile could not be read, even with a repository selected', () => {
+    expect(
+      resolveNewSessionStartDisabled(startInput({ profileGate: { kind: 'override-error' } }))
+    ).toBe(true);
+    expect(
+      resolveNewSessionStartDisabled(
+        startInput({ selectedRepo: '', profileGate: { kind: 'override-error' } })
+      )
+    ).toBe(true);
+  });
+
+  it('enables Start again once the retried profile read resolves the pick', () => {
+    expect(resolveNewSessionStartDisabled(startInput({ profileGate: { kind: 'ready' } }))).toBe(
+      false
+    );
   });
   it('non-clone empty prompt stays disabled through the ordinary gate', () => {
     expect(resolveNewSessionStartDisabled(startInput({ hasPrompt: false }))).toBe(true);
@@ -187,6 +207,38 @@ describe('resolveNewSessionStartDisabled', () => {
         startInput({ selectedRepo: 'github:owner/repo', selectedRepositoryResolved: true })
       )
     ).toBe(false);
+  });
+});
+
+describe('resolveNewSessionProfileGate', () => {
+  it('lets loading outrank a settled error, because a retry keeps the error status', () => {
+    expect(
+      resolveNewSessionProfileGate({ isLoading: true, isError: true, hasOverride: true })
+    ).toEqual({ kind: 'loading' });
+    expect(
+      resolveNewSessionProfileGate({ isLoading: true, isError: false, hasOverride: false })
+    ).toEqual({ kind: 'loading' });
+  });
+
+  it('reads an error with no pick as ready, so the create falls to the server default', () => {
+    expect(
+      resolveNewSessionProfileGate({ isLoading: false, isError: true, hasOverride: false })
+    ).toEqual({ kind: 'ready' });
+  });
+
+  it('reports an error with a pick as needing the pick confirmed by a retry', () => {
+    expect(
+      resolveNewSessionProfileGate({ isLoading: false, isError: true, hasOverride: true })
+    ).toEqual({ kind: 'override-error' });
+  });
+
+  it('reads any settled success as ready, with or without a pick', () => {
+    expect(
+      resolveNewSessionProfileGate({ isLoading: false, isError: false, hasOverride: true })
+    ).toEqual({ kind: 'ready' });
+    expect(
+      resolveNewSessionProfileGate({ isLoading: false, isError: false, hasOverride: false })
+    ).toEqual({ kind: 'ready' });
   });
 });
 
@@ -313,14 +365,12 @@ describe('resolveContinueStartDisabled', () => {
   });
 });
 
-function newSessionGate(
-  overrides: Partial<
-    Omit<
-      Parameters<typeof resolveNewSessionStartDisabled>[0],
-      'selectedRepo' | 'selectedRepositoryResolved'
-    >
-  > = {}
-) {
+type NewSessionGateInput = Omit<
+  Parameters<typeof resolveNewSessionStartDisabled>[0],
+  'selectedRepo' | 'selectedRepositoryResolved'
+>;
+
+function newSessionGate(overrides: Partial<NewSessionGateInput> = {}): NewSessionGateInput {
   return {
     attachmentsHasFailed: false,
     attachmentsIsUploading: false,
@@ -329,7 +379,7 @@ function newSessionGate(
     isRemoteTargetSelected: false,
     isSubmitting: false,
     model: 'claude-opus-4-7',
-    isProfileLoading: false,
+    profileGate: { kind: 'ready' },
     ...overrides,
   };
 }
@@ -584,7 +634,7 @@ describe('resolveNewSessionStartBlockedReason', () => {
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
           selectedRepo: 'org/repo',
-          gate: newSessionGate({ isProfileLoading: true }),
+          gate: newSessionGate({ profileGate: { kind: 'loading' } }),
         })
       )
     ).toBe('profile-loading');
@@ -597,7 +647,7 @@ describe('resolveNewSessionStartBlockedReason', () => {
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
           selectedRepo: 'org/repo',
-          gate: newSessionGate({ hasPrompt: false, isProfileLoading: true }),
+          gate: newSessionGate({ hasPrompt: false, profileGate: { kind: 'loading' } }),
         })
       )
     ).toBe('profile-loading');
@@ -609,6 +659,46 @@ describe('resolveNewSessionStartBlockedReason', () => {
         })
       )
     ).toBe('model-missing');
+  });
+
+  it('names the failed profile read for a pick once the repository and prompt are set', () => {
+    // The pick cannot be confirmed while the read is in error, so Start waits
+    // for the retry the Environment row and the footer both offer.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ profileGate: { kind: 'override-error' } }),
+        })
+      )
+    ).toBe('profile-error');
+  });
+
+  it('names the failed profile read for a pick before any repository is chosen', () => {
+    // With no repository selected the pick is still the blocker: re-evaluating
+    // the gate against a synthetic repository stays disabled, so the missing
+    // repository is not what the footer names.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          hasRepositories: true,
+          gate: newSessionGate({ hasPrompt: false, profileGate: { kind: 'override-error' } }),
+        })
+      )
+    ).toBe('profile-error');
+  });
+
+  it('stops naming the profile failure once a retried read resolves the pick', () => {
+    // Recovery: the same picker, with the read settled, leaves the profile out
+    // of the reason and names the one precondition still missing.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ hasPrompt: false, profileGate: { kind: 'ready' } }),
+        })
+      )
+    ).toBe('enter-prompt');
   });
 
   it('names the stale selection instead of the prompt for a repository that no longer resolves', () => {
@@ -689,7 +779,7 @@ describe('resolveNewSessionStartBlockedReason', () => {
     // with a repository supplied, so the footer names the wait or the fix.
     expect(
       resolveNewSessionStartBlockedReason(
-        newSessionReasonInput({ gate: newSessionGate({ isProfileLoading: true }) })
+        newSessionReasonInput({ gate: newSessionGate({ profileGate: { kind: 'loading' } }) })
       )
     ).toBe('profile-loading');
     expect(
@@ -728,7 +818,7 @@ describe('resolveNewSessionStartBlockedReason', () => {
       resolveNewSessionStartBlockedReason(
         newSessionReasonInput({
           selectedRepo: 'org/repo',
-          gate: newSessionGate({ isProfileLoading: true, model: '' }),
+          gate: newSessionGate({ profileGate: { kind: 'loading' }, model: '' }),
         })
       )
     ).toBe('profile-loading');
@@ -751,7 +841,10 @@ describe('resolveNewSessionStartBlockedReason', () => {
         newSessionReasonInput({
           selectedRepo: 'org/repo',
           selectedRepositoryResolved: false,
-          gate: newSessionGate({ attachmentsIsUploading: true, isProfileLoading: true }),
+          gate: newSessionGate({
+            attachmentsIsUploading: true,
+            profileGate: { kind: 'loading' },
+          }),
         })
       )
     ).toBe('stale-selection');

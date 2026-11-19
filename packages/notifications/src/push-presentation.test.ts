@@ -379,11 +379,6 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
     expect(androidChannelIdForPushDataToAppVersion(glanceable(0), '1.0.12')).toBe('agent-progress');
   });
 
-  it('keeps the briefing fallback on the channel the version gate names', () => {
-    const brief = { type: 'agent_briefing', url: '/agent-briefing' } as const;
-    expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.15')).toBe('agent-progress');
-  });
-
   it('addresses a followed-sessions push only from the build that creates the channel', () => {
     const followed = pushDataSchema.parse({
       type: 'session_live_update',

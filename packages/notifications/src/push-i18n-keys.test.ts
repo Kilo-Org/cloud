@@ -21,20 +21,11 @@ const SECURITY_FINDING_KINDS =
 
 const FINDING_PARAMS = { findingTitle: 'XSS in admin', repoFullName: 'acme/api' };
 
-const FINDING_PUSH_KEYS_BY_KIND = {
-  new_finding: {
-    i18nKey: 'internal.securityFindingNew',
-    titleKey: 'internal.securityFindingNew.title',
-  },
-  sla_warning: {
-    i18nKey: 'internal.securityFindingSlaWarning',
-    titleKey: 'internal.securityFindingSlaWarning.title',
-  },
-  sla_breach: {
-    i18nKey: 'internal.securityFindingSlaBreach',
-    titleKey: 'internal.securityFindingSlaBreach.title',
-  },
-} as const;
+const FINDING_PUSH_KEYS_BY_KIND = [
+  ['new_finding', 'internal.securityFindingNew', 'internal.securityFindingNew.title'],
+  ['sla_warning', 'internal.securityFindingSlaWarning', 'internal.securityFindingSlaWarning.title'],
+  ['sla_breach', 'internal.securityFindingSlaBreach', 'internal.securityFindingSlaBreach.title'],
+] as const;
 
 function catalogEntry(key: string): unknown {
   let entry: unknown = en;
@@ -52,9 +43,9 @@ describe('security finding push keys', () => {
     );
   });
 
-  it.each(Object.entries(FINDING_PUSH_KEYS_BY_KIND))(
+  it.each(FINDING_PUSH_KEYS_BY_KIND)(
     'routes the %s push title to %s and its body to the shared sentence',
-    (_kind, { i18nKey, titleKey }) => {
+    (_kind, i18nKey, titleKey) => {
       expect(pushTitleCatalogKey(i18nKey)).toBe(titleKey);
       expect(pushBodyCatalogKey(i18nKey)).toBe('internal.securityFinding.body');
     }

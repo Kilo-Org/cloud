@@ -1350,6 +1350,31 @@ describe('binary support organization access', () => {
     });
   });
 
+  test('ON denies an owner-only read when the grant cannot stand in for the role', async () => {
+    setSupportEnabled(true);
+    const { organization, admin } = await orgAndAdmin();
+    const grant = await insertGrant({
+      actorKiloUserId: admin.id,
+      organizationId: organization.id,
+      actionClass: 'support_read',
+    });
+
+    // The `organizations.usageStats` allow-list entry stands in for `member`,
+    // which cannot satisfy an owner-only role set.
+    await expect(
+      ensureOrganizationAccess(readCtx(admin), organization.id, ['owner'])
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      cause: expect.objectContaining({ supportAccessReason: 'support_access_action_class' }),
+    });
+
+    expect(events.find(event => event.kind === 'kilo_admin_elevation')).toMatchObject({
+      supportDecision: 'deny_actor_permission',
+      supportGrantId: grant.id,
+      supportInheritedFromOrganizationId: null,
+    });
+  });
+
   test('ON admits an allowlisted read on a child through a grant on its parent', async () => {
     setSupportEnabled(true);
     const admin = await insertTestUser({ is_admin: true });

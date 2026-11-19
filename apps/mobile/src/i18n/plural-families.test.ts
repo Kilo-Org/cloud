@@ -48,7 +48,7 @@ describe('plural families', () => {
     const scan = auditCountedCalls();
     // A non-trivial scan, so the assertion below cannot pass by finding nothing.
     expect(collectCountedKeys(scan).length).toBeGreaterThan(10);
-    expect(findCountlessFamilies(scan, readEnglishCatalog())).toEqual([]);
+    expect(findCountlessFamilies(scan, readEnglishCatalog().catalog)).toEqual([]);
   });
 
   it('keeps every NO_AGREEMENT entry documented with a reason', () => {

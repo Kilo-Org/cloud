@@ -555,9 +555,22 @@ export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set
   return problems;
 }
 
-/** The English catalog, flattened. */
+/**
+ * The English catalog, flattened. A caller that cannot read English gets one
+ * problem line and skips only the checks that need English: a read the
+ * filesystem refuses, or a file JSON.parse rejects, leaves the rest of the
+ * audit reporting instead of a stack trace.
+ */
 export function readEnglishCatalog(localesDir = LOCALES_DIR) {
-  return flattenCatalog(JSON.parse(readFileSync(join(localesDir, 'en.json'), 'utf8')));
+  try {
+    return {
+      catalog: flattenCatalog(JSON.parse(readFileSync(join(localesDir, 'en.json'), 'utf8'))),
+      problems: [],
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { catalog: null, problems: [`en: cannot audit catalog: ${message}`] };
+  }
 }
 
 /**
@@ -593,9 +606,14 @@ export function findUnlistedDynamicCalls(scan) {
  * are neither a plural family in English nor a reviewed `NO_AGREEMENT` entry.
  * Empty on a healthy tree; every entry is a message whose count cannot select
  * a form. It projects a scan the caller made once with `auditCountedCalls` and
- * checks it against the `english` catalog the caller read once.
+ * checks it against the `english` catalog the caller read once. Without an
+ * English catalog there is no family to judge against, so every key would look
+ * countless; the caller's one problem line already names the cause instead.
  */
 export function findCountlessFamilies(scan, english) {
+  if (english === null) {
+    return [];
+  }
   return auditKeys(scan).filter(
     key => !NO_AGREEMENT.has(key) && !declaresPluralFamily(english, key)
   );
@@ -606,7 +624,9 @@ function run() {
   const problems = [];
   const report = [];
   const scan = auditCountedCalls(SOURCE_DIR);
-  const english = readEnglishCatalog();
+  const englishRead = readEnglishCatalog();
+  const english = englishRead.catalog;
+  problems.push(...englishRead.problems);
   // The scan already read every file below the source root, the declaration
   // modules included, so it owns their parse diagnostics; the declaration check
   // skips the lines this scan already reported.
@@ -633,7 +653,9 @@ function run() {
     );
   }
 
-  if (!sourceOnly) {
+  // A missing English catalog still lets the scan, declaration and
+  // variable-key problems print; only the locale comparison needs English.
+  if (!sourceOnly && english !== null) {
     let totalKeys = 0;
     for (const tag of catalogTags(LOCALES_DIR)) {
       if (tag === 'en') {

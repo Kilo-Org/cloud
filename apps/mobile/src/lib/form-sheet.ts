@@ -1,11 +1,6 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Keyboard,
-  Platform,
-  StatusBar,
-  useWindowDimensions,
-  type ViewInstance,
-} from 'react-native';
+import { Platform, StatusBar, useWindowDimensions, type ViewInstance } from 'react-native';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import { initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -216,32 +211,6 @@ export function useSheetHeaderTopClearance(topInset: SheetHeaderTopInset | undef
 const SHEET_PRESENT_SAMPLE_MS = [0, 120, 280, 500, 750];
 const SHEET_MOVE_SAMPLE_MS = [0, 100, 200, 320, 450, 600, 800, 1000];
 
-/** The keyboard emitter's shape; the module-level read below may find none. */
-type KeyboardEmitter = {
-  addListener: (
-    event: 'keyboardDidShow' | 'keyboardDidHide',
-    listener: () => void
-  ) => { remove: () => void };
-};
-
-/**
- * The keyboard emitter, or null where the runtime does not expose it.
- *
- * A partial `react-native` mock omits the emitter and vitest throws on the
- * property access itself, so it is read behind a guard (the same one
- * `readInitialWindowMetrics` uses). Without it the presentation burst is the
- * only read, which is what the header had before the movement follow.
- */
-function readKeyboardEmitter(): KeyboardEmitter | null {
-  try {
-    return (Keyboard as KeyboardEmitter | undefined) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-const KEYBOARD_EMITTER = readKeyboardEmitter();
-
 /** What a sheet header reads from the surface it paints on. */
 export type SettledSheetHeaderTopClearance = {
   /** The top clearance the header adds, in dp. */
@@ -272,6 +241,29 @@ export function sheetHeaderSettledTopClearance(input: {
 }
 
 /**
+ * The status-bar band an Android bottom formSheet's content enters while the
+ * keyboard is up, in dp, for a keyboard `keyboardHeight` dp tall.
+ *
+ * react-native-screens lifts the sheet above the keyboard on every keyboard
+ * frame by the room above its full detent (the window's top inset, through
+ * the detent cap) less the bottom system bar (`SheetAnimationCoordinator`), so
+ * a keyboard taller than that room puts the content's top edge at the bottom
+ * inset: 24 dp from the window top inside a 51.8 dp status bar on the emulator.
+ * A worklet, so the header can follow the keyboard's own frames on the UI
+ * thread: a read of the sheet's edge only answers after the sheet has settled,
+ * and the header then moved 27.8 dp about 0.4 s after the sheet stopped (list
+ * settings, Name field).
+ */
+export function sheetHeaderKeyboardTopClearance(input: {
+  insetTop: number;
+  insetBottom: number;
+  keyboardHeight: number;
+}): number {
+  'worklet';
+  return Math.max(0, Math.min(input.insetTop, input.keyboardHeight) - input.insetBottom);
+}
+
+/**
  * The clearance a sheet header adds once its surface has settled, in dp, plus
  * the layout callback that re-reads it.
  *
@@ -289,8 +281,9 @@ export function sheetHeaderSettledTopClearance(input: {
  * change, and whenever the caller reports a new layout. The reserve only grows
  * within a mount, so a sample taken mid-movement never moves a settled header,
  * and a sample that finds the same edge keeps the state identity and costs no
- * render. iOS presents the sheet below the status bar itself, so it keeps the
- * platform's own clearance.
+ * render. The keyboard's own lift is not read here: `SheetHeader` follows it
+ * on the UI thread (`sheetHeaderKeyboardTopClearance`). iOS presents the sheet
+ * below the status bar itself, so it keeps the platform's own clearance.
  */
 export function useSettledSheetHeaderTopClearance(input: {
   topInset: SheetHeaderTopInset | undefined;
@@ -301,10 +294,13 @@ export function useSettledSheetHeaderTopClearance(input: {
 }): SettledSheetHeaderTopClearance {
   const { topInset, clearance, surfaceRef } = input;
   const insetTop = useSafeAreaInsets().top;
+  // Every keyboard change moves the sheet; this is the app's one keyboard read.
+  const keyboardHeight = useKeyboardState(state => (state.isVisible ? state.height : 0));
   const [headerTop, setHeaderTop] = useState<number | null>(null);
   // The burst in flight: a newer one retires every sample of the older ones, so
   // a moving sheet is only ever measured by the burst that followed its move.
   const burstRef = useRef(0);
+  const keyboardHeightRef = useRef(keyboardHeight);
   const readable = topInset !== undefined && Platform.OS === 'android' && insetTop > 0;
 
   const sample = useCallback(() => {
@@ -327,10 +323,16 @@ export function useSettledSheetHeaderTopClearance(input: {
     if (!Number.isFinite(top)) {
       return;
     }
+    // A bottom formSheet's header covers the keyboard's lift itself, frame by
+    // frame (`SheetHeader`), so an edge read while the keyboard is up would
+    // reserve the same band twice and keep it after the keyboard goes down.
+    if (topInset === 'bottom-form-sheet' && keyboardHeightRef.current > 0) {
+      return;
+    }
     // Only a higher edge is news, and an unchanged value keeps the state
     // identity, so a sheet that did not move does not re-render.
     setHeaderTop(current => (current === null || top < current ? top : current));
-  }, [surfaceRef]);
+  }, [surfaceRef, topInset]);
 
   const followMovement = useCallback(
     (delaysMs: readonly number[]) => {
@@ -357,25 +359,17 @@ export function useSettledSheetHeaderTopClearance(input: {
     };
   }, [followMovement, readable]);
 
+  // Every keyboard change moves the sheet, so each one starts a new burst. The
+  // first render is the presentation, which the burst above already follows.
   useEffect(() => {
-    const listeners =
-      readable && KEYBOARD_EMITTER !== null
-        ? [
-            KEYBOARD_EMITTER.addListener('keyboardDidShow', () => {
-              followMovement(SHEET_MOVE_SAMPLE_MS);
-            }),
-            KEYBOARD_EMITTER.addListener('keyboardDidHide', () => {
-              followMovement(SHEET_MOVE_SAMPLE_MS);
-            }),
-          ]
-        : [];
-    return () => {
-      burstRef.current += 1;
-      for (const listener of listeners) {
-        listener.remove();
-      }
-    };
-  }, [followMovement, readable]);
+    if (keyboardHeightRef.current === keyboardHeight) {
+      return;
+    }
+    keyboardHeightRef.current = keyboardHeight;
+    if (readable) {
+      followMovement(SHEET_MOVE_SAMPLE_MS);
+    }
+  }, [followMovement, keyboardHeight, readable]);
 
   const onLayout = useCallback(() => {
     if (readable) {

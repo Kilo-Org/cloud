@@ -10,6 +10,7 @@ import '@/i18n';
 
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const rn = vi.hoisted(() => ({ os: 'ios', statusHeight: 0 }));
+const keyboardMotion = vi.hoisted(() => ({ value: 0 }));
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
@@ -36,6 +37,9 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
+}));
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  useKeyboardMotionHeight: () => keyboardMotion,
 }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
@@ -159,6 +163,7 @@ function HeaderWithActionFeedback({
 describe('SheetHeader', () => {
   beforeEach(() => {
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
+    keyboardMotion.value = 0;
     rn.os = 'ios';
     rn.statusHeight = 0;
   });
@@ -702,6 +707,54 @@ describe('SheetHeader', () => {
 
     renderer.unmount();
   });
+
+  it('grows a band above the row with the keyboard that lifts a bottom formSheet', async () => {
+    // The list settings sheet: the Name field raises the keyboard and
+    // react-native-screens lifts the sheet's content to the bottom inset
+    // (24 dp) inside a 51.81 dp status bar. The band above the row follows the
+    // keyboard's own height, so the row clears the bar in the lift's frames.
+    rn.os = 'android';
+    rn.statusHeight = 48;
+    safeArea.top = 51.81;
+    safeArea.bottom = 24;
+    keyboardMotion.value = 330;
+    const renderer = await mount({
+      title: 'New list',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+      topInset: 'bottom-form-sheet',
+    });
+
+    const wrapper = findSafeAreaWrapper(renderer.root);
+    expect(wrapper.props.style).toBeUndefined();
+    const band = wrapper.children[0];
+    expect(typeof band === 'string' ? undefined : band?.props.style).toEqual({
+      height: expect.closeTo(27.81, 2) as number,
+    });
+
+    renderer.unmount();
+  });
+
+  it.each(['ios', 'android'])(
+    'adds no keyboard band to a sheet that never reaches the window top (%s)',
+    async os => {
+      rn.os = os;
+      rn.statusHeight = 48;
+      safeArea.top = 51.81;
+      safeArea.bottom = 24;
+      keyboardMotion.value = 330;
+      const renderer = await mount({
+        title: 'Mode',
+        onDone: () => undefined,
+        topInset: 'never',
+      });
+
+      const wrapper = findSafeAreaWrapper(renderer.root);
+      expect(wrapper.children).toHaveLength(1);
+
+      renderer.unmount();
+    }
+  );
 
   it.each(['ios', 'android'])(
     'drops the top clearance for a bottom formSheet when only the status bar is known (%s)',

@@ -11,11 +11,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SheetHeader } from './sheet-header';
 import '@/i18n';
 
-const surface = vi.hoisted(() => ({
-  top: 24,
-  show: [] as (() => void)[],
-  hide: [] as (() => void)[],
-}));
+const surface = vi.hoisted(() => ({ top: 24 }));
+const keyboard = vi.hoisted(() => ({ height: 0, listeners: new Set<() => void>() }));
+
+/** The keyboard the provider reports; every change moves the sheet. */
+function setKeyboardHeight(height: number): void {
+  keyboard.height = height;
+  for (const listener of keyboard.listeners) {
+    listener();
+  }
+}
 
 vi.mock('react-native', () => {
   // The header measures its own window edge through the transform-aware rect,
@@ -38,16 +43,22 @@ vi.mock('react-native', () => {
     Platform: { OS: 'android' },
     StatusBar: { currentHeight: 51.81 },
     BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
-    Keyboard: {
-      addListener: (event: string, listener: () => void) => {
-        if (event === 'keyboardDidShow') {
-          surface.show.push(listener);
-        } else {
-          surface.hide.push(listener);
-        }
-        return { remove: vi.fn() };
-      },
-    },
+  };
+});
+vi.mock('react-native-keyboard-controller', async () => {
+  // vi.mock factories run before the file's imports bind, so React loads here.
+  const React = await import('react');
+  return {
+    useKeyboardState: <T,>(selector: (state: { isVisible: boolean; height: number }) => T): T =>
+      React.useSyncExternalStore(
+        listener => {
+          keyboard.listeners.add(listener);
+          return () => {
+            keyboard.listeners.delete(listener);
+          };
+        },
+        () => selector({ isVisible: keyboard.height > 0, height: keyboard.height })
+      ),
   };
 });
 vi.mock('react-native-safe-area-context', () => ({
@@ -129,8 +140,8 @@ function mountHeader(): Promise<TestRenderer.ReactTestRenderer> {
 describe('SheetHeader settled top clearance', () => {
   beforeEach(() => {
     surface.top = 24;
-    surface.show = [];
-    surface.hide = [];
+    keyboard.height = 0;
+    keyboard.listeners.clear();
   });
 
   it('covers the inset the presented sheet left above the header', async () => {
@@ -151,7 +162,7 @@ describe('SheetHeader settled top clearance', () => {
     }
   });
 
-  it('follows the sheet into the status bar when the keyboard expands it', async () => {
+  it('leaves the keyboard lift to the band that follows the keyboard', async () => {
     vi.useFakeTimers();
     try {
       const renderer = await mountHeader();
@@ -161,19 +172,21 @@ describe('SheetHeader settled top clearance', () => {
       });
       expect(topClearance(renderer)).toBeCloseTo(27.81);
 
-      // The Name field raises the keyboard, the sheet expands to the full
-      // detent and its header edge reaches the window top after the samples
-      // taken during the presentation.
+      // The Name field raises the keyboard and the platform lifts the sheet's
+      // edge to the window top. The band above the row follows that lift on
+      // the UI thread, so an edge read now would reserve the band twice.
       surface.top = 0;
+      // The keyboard change renders first; the burst it starts samples later.
       await act(async () => {
-        for (const listener of surface.show) {
-          listener();
-        }
+        setKeyboardHeight(330);
+        await Promise.resolve();
+      });
+      await act(async () => {
         vi.advanceTimersByTime(1100);
         await Promise.resolve();
       });
 
-      expect(topClearance(renderer)).toBeCloseTo(51.81);
+      expect(topClearance(renderer)).toBeCloseTo(27.81);
 
       renderer.unmount();
     } finally {
@@ -181,7 +194,7 @@ describe('SheetHeader settled top clearance', () => {
     }
   });
 
-  it('keeps the reserve when the sheet settles lower again', async () => {
+  it('keeps the presented reserve when the keyboard goes down again', async () => {
     vi.useFakeTimers();
     try {
       const renderer = await mountHeader();
@@ -192,27 +205,28 @@ describe('SheetHeader settled top clearance', () => {
 
       surface.top = 0;
       await act(async () => {
-        for (const listener of surface.show) {
-          listener();
-        }
+        setKeyboardHeight(330);
+        await Promise.resolve();
+      });
+      await act(async () => {
         vi.advanceTimersByTime(1100);
         await Promise.resolve();
       });
-      expect(topClearance(renderer)).toBeCloseTo(51.81);
 
       // Dismissing the keyboard drops the sheet back to the half detent; the
       // reserve only grows within a mount, so the header stays where it is
       // instead of jumping while the sheet moves.
       surface.top = 457.14;
       await act(async () => {
-        for (const listener of surface.hide) {
-          listener();
-        }
+        setKeyboardHeight(0);
+        await Promise.resolve();
+      });
+      await act(async () => {
         vi.advanceTimersByTime(1100);
         await Promise.resolve();
       });
 
-      expect(topClearance(renderer)).toBeCloseTo(51.81);
+      expect(topClearance(renderer)).toBeCloseTo(27.81);
 
       renderer.unmount();
     } finally {

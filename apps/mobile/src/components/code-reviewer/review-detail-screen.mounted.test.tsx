@@ -109,6 +109,7 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
+  useAnimatedStyle: (style: () => object) => style(),
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => routerMock,

@@ -8,10 +8,14 @@ import {
   View,
   type ViewInstance,
 } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useKeyboardMotionHeight } from '@/components/keyboard-motion-provider';
 import { Share, X } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
+  sheetHeaderKeyboardTopClearance,
   type SheetHeaderTopInset,
   useSettledSheetHeaderTopClearance,
   useSheetHeaderTopClearance,
@@ -161,6 +165,26 @@ export function SheetHeader({
           ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
         }
       : undefined;
+  // Android lifts a bottom formSheet into the status bar on every keyboard
+  // frame (`sheetHeaderKeyboardTopClearance`). The band above the row grows in
+  // the same frames on the UI thread, so the row never enters the bar and does
+  // not move once the sheet has stopped; it only adds what the settled
+  // clearance does not already cover.
+  const followsKeyboard = topInset === 'bottom-form-sheet' && Platform.OS === 'android';
+  const windowInsets = useSafeAreaInsets();
+  const windowTop = windowInsets.top;
+  const windowBottom = windowInsets.bottom;
+  const keyboardHeight = useKeyboardMotionHeight();
+  const keyboardBand = useAnimatedStyle(() => ({
+    height: Math.max(
+      0,
+      sheetHeaderKeyboardTopClearance({
+        insetTop: windowTop,
+        insetBottom: windowBottom,
+        keyboardHeight: keyboardHeight.value,
+      }) - topInsetHeight
+    ),
+  }));
   // The busy mark takes the accent the label it replaces carried, so the frame
   // reads as the same control still working. It is the platform indicator rather
   // than the animated wrapper: the wrapper loads Reanimated and the motion
@@ -215,6 +239,7 @@ export function SheetHeader({
       )}
     >
       <View style={safeAreaStyle}>
+        {followsKeyboard ? <Animated.View style={keyboardBand} /> : null}
         <View className="min-h-[48px] flex-row items-center gap-x-3">
           {onShare !== undefined && !closeOnly ? (
             <Pressable

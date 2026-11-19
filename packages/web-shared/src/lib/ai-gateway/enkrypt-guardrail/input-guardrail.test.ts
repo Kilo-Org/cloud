@@ -511,17 +511,38 @@ describe('startEnkryptInputGuardrail', () => {
     ]);
   });
 
-  it('records no added latency when the request never awaited the verdict', async () => {
+  it.each([
+    ['blocking', scan],
+    ['log-only', logOnlyScan],
+  ])(
+    'records no added latency when the request never awaited the %s verdict',
+    async (_name, request) => {
+      mockedScanRequest.mockResolvedValue({
+        verdict: { action: 'allow' },
+        report: scanReport,
+        usageRecords: [call()],
+      });
+
+      startEnkryptInputGuardrail(Promise.resolve(request), signal);
+      await runAfterTasks();
+
+      expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
+    }
+  );
+
+  it('records no wait for a log-only scan that finished before the request awaited the verdict', async () => {
     mockedScanRequest.mockResolvedValue({
       verdict: { action: 'allow' },
-      report: scanReport,
+      report: { ...scanReport, scan: 'log_only' },
       usageRecords: [call()],
     });
 
-    startEnkryptInputGuardrail(Promise.resolve(scan), signal);
+    const guardrail = startEnkryptInputGuardrail(Promise.resolve(logOnlyScan), signal);
+    await guardrail.requestLogs(false);
+    await guardrail.awaitVerdict();
     await runAfterTasks();
 
-    expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: null }]]);
+    expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: 0 }]]);
   });
 
   it('preserves the inference association across a failed blocking scan and a nonblocking log-only scan', async () => {
@@ -621,10 +642,15 @@ describe('startEnkryptInputGuardrail', () => {
     expect(mockedRecordUsage.mock.calls).toEqual([[{ ...call(), addedLatencyMs: 0 }]]);
   });
 
-  it('skips the verdict without waiting when every detector only logs', async () => {
+  it('skips the verdict without waiting when every detector only logs, recording the wait it would have added', async () => {
     const logOnlyResult = Promise.withResolvers<EnkryptGuardrailScanResult>();
     mockedScanRequest.mockReturnValue(logOnlyResult.promise);
-    jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_000.2);
+    // The verdict's wait starts and ends at once; the log-only scan finishes 450.6 ms after it started.
+    jest
+      .spyOn(performance, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_000.2)
+      .mockReturnValueOnce(1_450.6);
 
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(logOnlyScan), signal);
 
@@ -641,11 +667,13 @@ describe('startEnkryptInputGuardrail', () => {
     await runAfterTasks();
 
     expect(mockedRecordUsage.mock.calls).toEqual([
-      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: 0 }],
+      [{ ...call({ decision: 'error', creditsCost: null }), addedLatencyMs: 451 }],
     ]);
     expect(mockedRedisSet.mock.calls).toEqual(
       allowWrites(partKeys(logOnlyScan), ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS)
     );
+    // The report keeps the wait the request actually had.
+    expect((await guardrail.report())?.added_latency_ms).toBe(0);
   });
 
   it('reports the settings, verdict, wait, and each scan with its cache write', async () => {

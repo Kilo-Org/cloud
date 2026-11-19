@@ -175,6 +175,9 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   const scaledFont = (size: TextSize, weight?: Weight) =>
     font({ textStyle: TEXT_STYLES[size], weight });
   const textSizeCap = dynamicTypeSize({ max: 'xLarge' });
+  // Where a card is full at the default size, its secondary lines grow no
+  // further than that size.
+  const defaultTextSize = dynamicTypeSize({ max: 'large' });
   // SwiftUI's default line box for SF Pro: ascent 0.952em over descent 0.241em.
   // eslint-disable-next-line unicorn/consistent-function-scoping, max-params -- the stringified 'widget' layout cannot hoist helpers to module scope; the gap is between two baselines of two sizes
   const gap = (baseline: number, size: number, nextBaseline: number, nextSize: number) =>
@@ -644,7 +647,12 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       'semibold'
     );
   } else if (status === 'waiting') {
-    footer = text(COPY.waiting ?? 'Updating agents', 11, palette.muted);
+    // The medium placeholders fill the card, so its line keeps the default size.
+    footer = (
+      <VStack alignment="leading" spacing={0} modifiers={wide ? [defaultTextSize] : []}>
+        {text(COPY.waiting ?? 'Updating agents', 11, palette.muted)}
+      </VStack>
+    );
   } else if (checkedAt !== null) {
     footer = (
       <HStack spacing={3}>
@@ -1030,7 +1038,10 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       body = (
         <VStack alignment="leading" spacing={0}>
           {lead(106 - 0.952 * 64 - 40)}
-          <HStack alignment="top" spacing={0}>
+          {/* The header and the reason lines keep the default size: three rows
+              and three other counts fill the card, and a larger header would
+              cut "1,234 Working" and push the last row onto the footer. */}
+          <HStack alignment="top" spacing={0} modifiers={[defaultTextSize]}>
             <VStack
               alignment="leading"
               spacing={0}
@@ -1061,7 +1072,13 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
               ]}
             >
               {titleRow(row, 15)}
-              {shifted(gap(202, 15, 219, 12), rowDetail(row, 12, 'long'), 16)}
+              {shifted(
+                gap(202, 15, 219, 12),
+                <VStack alignment="leading" spacing={0} modifiers={[defaultTextSize]}>
+                  {rowDetail(row, 12, 'long')}
+                </VStack>,
+                16
+              )}
             </VStack>
           ))}
           {rows.length === 0 && title !== null
@@ -1079,7 +1096,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       body = (
         <VStack alignment="leading" spacing={0}>
           {lead(120 - 0.952 * 64 - 40)}
-          <HStack alignment="top" spacing={0}>
+          {/* The other counts keep the default size, so "1,234 Working" is not cut. */}
+          <HStack alignment="top" spacing={0} modifiers={[defaultTextSize]}>
             <VStack
               alignment="leading"
               spacing={0}
@@ -1150,11 +1168,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
                 gap(74, 13, 90, 11),
                 // Two agents fill the card, so their reason lines keep the
                 // design size and the larger titles still fit above the footer.
-                <VStack
-                  alignment="leading"
-                  spacing={0}
-                  modifiers={[dynamicTypeSize({ max: 'large' })]}
-                >
+                <VStack alignment="leading" spacing={0} modifiers={[defaultTextSize]}>
                   {rowDetail(row, 11, 'long') ?? (
                     <Spacer minLength={0} modifiers={[frame({ height: 1.193 * 11 })]} />
                   )}

@@ -191,6 +191,16 @@ function textNode(tree: Rendered, value: string): Rendered | undefined {
   return collect(tree).find(node => node.kind === 'Text' && node.props.children === value);
 }
 
+/** The texts under a node that holds Dynamic Type at the default size. */
+function defaultSizeTexts(node: Rendered, capped = false): string[] {
+  const here = capped || modifier(node, 'dynamicTypeSize')?.max === 'large';
+  const own = here && node.kind === 'Text' && typeof node.props.children === 'string';
+  return [
+    ...(own ? [node.props.children as string] : []),
+    ...children(node).flatMap(child => defaultSizeTexts(child, here)),
+  ];
+}
+
 function buttons(tree: Rendered): Record<string, unknown>[] {
   return collect(tree)
     .filter(node => node.kind === 'Button' && typeof node.props.onPress === 'function')
@@ -750,6 +760,11 @@ describe('nothing running, updating, last known', () => {
     expect(intrinsicHeight).toBeLessThanOrEqual(164 - 16 * 2);
   });
 
+  it('keeps the medium updating line at the default size, so it stays out of the band', () => {
+    const tree = render(propsFor([], { status: 'waiting' }), 'systemMedium');
+    expect(defaultSizeTexts(tree)).toEqual(['Updating agents']);
+  });
+
   it.each(HOME_FAMILIES)(
     'keeps last known work with its time and no relative age in %s',
     family => {
@@ -804,6 +819,25 @@ describe('stress', () => {
         )
       ).toBe(false);
     }
+  });
+
+  it('keeps the large needs-input header and reason lines at the default size', () => {
+    const sessions = [
+      ...Array.from({ length: 128 }, () => PERMISSION),
+      ...Array.from({ length: 1234 }, () => BUSY),
+      ...Array.from({ length: 999 }, () => IDLE),
+    ];
+    const tree = render(propsFor(sessions), 'systemLarge');
+    const capped = defaultSizeTexts(tree);
+    // The other counts, so the longest one is never cut beside the big count.
+    expect(capped).toEqual(
+      expect.arrayContaining(['128', 'Needs input', '1,234 Working', '999 Idle'])
+    );
+    // The reason lines, so three rows still clear the footer.
+    expect(capped.filter(value => value === 'Permission required')).toHaveLength(3);
+    // The titles and the footer still grow.
+    expect(capped).not.toContain(PERMISSION.title);
+    expect(capped).not.toContain('Checked');
   });
 
   it.each(HOME_FAMILIES)('names an untitled agent in %s', family => {

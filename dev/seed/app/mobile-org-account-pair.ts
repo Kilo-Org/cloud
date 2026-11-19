@@ -77,40 +77,43 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   ];
   // The ids stay fixed so deep links stay stable, and the pair belongs to one
   // account at a time: a run for another email takes it over instead of adding
-  // that email beside the previous owner.
-  for (const organization of pair) {
-    await db
-      .insert(organizations)
-      .values({
-        id: organization.id,
-        name: organization.name,
-        created_by_kilo_user_id: userId,
-        require_seats: true,
-        plan: 'teams',
-        settings: {},
-      })
-      .onConflictDoUpdate({
-        target: organizations.id,
-        set: { created_by_kilo_user_id: userId },
-      });
-  }
-  await db.delete(organization_memberships).where(
-    and(
-      inArray(
-        organization_memberships.organization_id,
-        pair.map(organization => organization.id)
-      ),
-      ne(organization_memberships.kilo_user_id, userId)
-    )
-  );
-  await db
-    .insert(organization_memberships)
-    .values({ organization_id: OWNER_ORGANIZATION_ID, kilo_user_id: userId, role: 'owner' })
-    .onConflictDoNothing();
-  await db
-    .insert(organization_memberships)
-    .values({ organization_id: MEMBER_ORGANIZATION_ID, kilo_user_id: userId, role: 'member' })
-    .onConflictDoNothing();
+  // that email beside the previous owner. One transaction, so an interrupted
+  // takeover never leaves the organizations without members.
+  await db.transaction(async tx => {
+    for (const organization of pair) {
+      await tx
+        .insert(organizations)
+        .values({
+          id: organization.id,
+          name: organization.name,
+          created_by_kilo_user_id: userId,
+          require_seats: true,
+          plan: 'teams',
+          settings: {},
+        })
+        .onConflictDoUpdate({
+          target: organizations.id,
+          set: { created_by_kilo_user_id: userId },
+        });
+    }
+    await tx.delete(organization_memberships).where(
+      and(
+        inArray(
+          organization_memberships.organization_id,
+          pair.map(organization => organization.id)
+        ),
+        ne(organization_memberships.kilo_user_id, userId)
+      )
+    );
+    await tx
+      .insert(organization_memberships)
+      .values({ organization_id: OWNER_ORGANIZATION_ID, kilo_user_id: userId, role: 'owner' })
+      .onConflictDoNothing();
+    await tx
+      .insert(organization_memberships)
+      .values({ organization_id: MEMBER_ORGANIZATION_ID, kilo_user_id: userId, role: 'member' })
+      .onConflictDoNothing();
+  });
 
   console.log(
     'This fixture represents: one person who owns one organization and belongs to another.'

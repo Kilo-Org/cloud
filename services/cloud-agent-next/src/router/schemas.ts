@@ -970,7 +970,7 @@ export const StartSessionInput = z
     operationKey: z.string().uuid().optional(),
     message: z
       .object({
-        prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
+        prompt: z.string().max(Limits.MAX_PROMPT_LENGTH),
         ...AttachmentFieldsSchema,
         id: MessageIdSchema.optional(),
       })

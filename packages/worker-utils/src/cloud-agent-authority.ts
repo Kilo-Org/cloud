@@ -121,9 +121,11 @@ export const requestedEnvironmentSchema = z
 /**
  * The one rule for a cloud-agent prompt: non-blank after trim, length-bounded.
  * Every boundary that accepts a first-user-instruction prompt applies it here
- * instead of keeping its own copy. A boundary that also accepts attachments
- * applies the same trim rule through an attachment-aware check, so a launch
- * whose instruction is only files stays valid.
+ * instead of keeping its own copy. A prepare boundary is always strict: its
+ * prompt is the whole launch instruction, so a blank one is refused even when
+ * attachments ride along. The grouped `start` and `send` boundaries, whose
+ * message may be files only, apply the same trim rule through an
+ * attachment-aware check.
  */
 export const cloudAgentPromptSchema = z
   .string()

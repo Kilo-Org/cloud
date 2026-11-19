@@ -737,8 +737,8 @@ describe('prepareSession prompt rule', () => {
     ).toBe(true);
   });
 
-  it('refuses a whitespace-only grouped start prompt and keeps a real one', () => {
-    for (const prompt of ['   ', '\n\t ']) {
+  it('refuses a blank grouped start prompt and keeps a real one', () => {
+    for (const prompt of ['   ', '\n\t ', '']) {
       const result = StartSessionInput.safeParse({
         ...baseStartInput,
         message: { ...baseStartInput.message, prompt },
@@ -752,13 +752,15 @@ describe('prepareSession prompt rule', () => {
     expect(StartSessionInput.parse(baseStartInput).message.prompt).toBe('continue');
   });
 
-  it('keeps the attachment-only grouped start exemption', () => {
-    expect(
-      StartSessionInput.safeParse({
-        ...baseStartInput,
-        message: { prompt: '   ', attachments: validAttachments },
-      }).success
-    ).toBe(true);
+  it('accepts a files-only grouped start message, blank or whitespace prompt', () => {
+    for (const prompt of ['', '   ']) {
+      expect(
+        StartSessionInput.safeParse({
+          ...baseStartInput,
+          message: { prompt, attachments: validAttachments },
+        }).success
+      ).toBe(true);
+    }
   });
 });
 

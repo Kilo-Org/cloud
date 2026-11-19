@@ -808,6 +808,8 @@ interface DownloadReport {
   readonly step: DownloadStep | undefined;
   /** The tab the download belongs to: for a `browser_tabs new` step, the tab that step opened. */
   readonly tabId: number;
+  /** The url the browser named it by: the file the approval for this report buys, before it has an item again. */
+  readonly url: string | undefined;
 }
 
 /** A download as a guard sees it: what the ledger needs to open or find its one record. */
@@ -856,6 +858,13 @@ interface OpenWatch {
 /** A download's url, or `undefined` when the browser reports none: the identity its announcement is matched by. */
 const downloadUrlOf = (item: { readonly url?: string | undefined }): string | undefined =>
   item.url === undefined || item.url === '' ? undefined : item.url;
+
+/**
+ * Whether a url names the file a need names. A page that repeats its step can regenerate the query — a counter, a
+ * signed link — so the file is identified by its page (origin and pathname), which is what the human approved.
+ */
+const sameFileUrl = (needUrl: string, url: string | undefined): boolean =>
+  url !== undefined && (url === needUrl || pageOf(url) === pageOf(needUrl));
 
 /** Whether the browser created this item at or after `since`; an item with no readable time is taken as new. */
 const startedSince = (item: BrowserDownloadItem, since: number): boolean => {
@@ -1435,7 +1444,10 @@ export const createBrowserRuntime = ({
       return need.itemId === item.id;
     }
 
-    if ((item.tabId !== undefined && item.tabId !== need.tabId) || item.url !== need.url) {
+    if (
+      (item.tabId !== undefined && item.tabId !== need.tabId) ||
+      !sameFileUrl(need.url, item.url)
+    ) {
       return false;
     }
 
@@ -1457,7 +1469,7 @@ export const createBrowserRuntime = ({
   const approvedNeedUrl = (session: string, url: string, tabId: number): boolean => {
     const need = approvedNeeds.get(session);
 
-    return need !== undefined && need.url === url && need.tabId === tabId;
+    return need !== undefined && need.tabId === tabId && sameFileUrl(need.url, url);
   };
 
   /**
@@ -1635,8 +1647,8 @@ export const createBrowserRuntime = ({
     if (
       approvedNeed !== undefined &&
       approvedNeed.itemId === undefined &&
-      approvedNeed.url === input.url &&
-      approvedNeed.tabId === input.tabId
+      approvedNeed.tabId === input.tabId &&
+      sameFileUrl(approvedNeed.url, input.url)
     ) {
       return undefined;
     }
@@ -2010,6 +2022,7 @@ export const createBrowserRuntime = ({
           kept: record.kind === 'kept',
           step: record.step,
           tabId: record.tabId,
+          url: record.url,
         });
       }
     }
@@ -2517,11 +2530,16 @@ export const createBrowserRuntime = ({
     }
 
     const origin = step?.origin ?? '';
+    // The repeat keeps the one file this report is about: the tab the download belongs to and the url it was named
+    // By. Without it the repeat would run with no guard and every file it starts would be kept and never reported.
+    const need: StepTokenNeed | undefined =
+      started?.url === undefined ? undefined : { tabId: started.tabId, url: started.url };
     const stepToken =
       step === undefined
         ? undefined
         : tokens.issue({
             argumentHash: step.argumentHash,
+            ...(need === undefined ? {} : { need }),
             origin: step.origin,
             reason: SENSITIVE_REASON.download,
             session: step.session,

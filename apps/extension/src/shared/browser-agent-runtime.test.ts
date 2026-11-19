@@ -1963,6 +1963,70 @@ describe('agent browser calls', () => {
     }
   });
 
+  it('guards a late download’s approved repeat, keeping its one file and reporting a second', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    const invoice = `${MAIN_ORIGIN}/invoice.pdf`;
+    let commands = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        const click = Math.floor(commands / 2);
+
+        commands += 1;
+
+        // The approved repeat is the second click: its page starts the file the human approved plus a second one.
+        // The approved file's url is regenerated with a fresh query, as a page that counts its clicks does.
+        if (commands % 2 === 0 && click === 1) {
+          downloads.emit({ id: 102, tabId: TAB_ID, url: `${invoice}?click=2` });
+          downloads.emit({ id: 103, tabId: TAB_ID, url: `${MAIN_ORIGIN}/statement.pdf` });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      // 1. A guarded click answers, and its download only arrives 1.5 s later: the linger stops it.
+      await runTimed(click());
+      await vi.advanceTimersByTimeAsync(1500);
+      downloads.emit({ id: 101, tabId: TAB_ID, url: invoice });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(downloads.cancelled).toStrictEqual([101]);
+
+      // 2. The next call reports it, and its token names the file the approval buys.
+      const reported = await runTimed(click());
+      const stepToken = expectStepToken(reported);
+
+      expect(reported).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+
+      // 3. The approved repeat runs guarded: only the second file is stopped, so exactly one file is kept.
+      const approved = await runTimed(click([stepToken]));
+
+      if (approved.kind !== 'needs_permission') {
+        throw new Error(`expected the second file to be reported, got ${JSON.stringify(approved)}`);
+      }
+
+      expect(approved.afterAction).toBe(true);
+      // 102 is the file the approval bought: it is the only one not stopped, so it is the one left on disk.
+      expect(downloads.cancelled).toStrictEqual([101, 103]);
+      expect(downloads.removed).toStrictEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('queues a download at its announcement, so the very next call reports it before the item exists', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });

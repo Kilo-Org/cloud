@@ -5284,6 +5284,7 @@ describe('agent browser calls', () => {
 
     await expect(runtime.shareActiveTab({ sessionHandle: 'session-1' })).resolves.toStrictEqual({
       groupId: 42,
+      kind: 'shared',
       tabId: TAB_ID,
     });
 

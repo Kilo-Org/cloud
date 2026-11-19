@@ -11,7 +11,7 @@ import type { StepTokenIssue, StepTokenStore } from '../browser-agent-checks';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
 import type { BrowserCaller } from '../browser-caller';
 import type { BrowserToolRunInput, BrowserToolRunOutcome } from '../browser-runtime';
-import type { BrowserTabGroupSessionSummary } from '../browser-tab-groups';
+import type { BrowserShareTabResult, BrowserTabGroupSessionSummary } from '../browser-tab-groups';
 import { BROWSER_TOOL_CONTRACT_SHA } from './envelope';
 import { createRuntimeBrowserBridge } from './browser-bridge';
 import type { LocalAgentBrowserBridge, LocalAgentBrowserRuntime } from './browser-bridge';
@@ -40,7 +40,7 @@ const callerKey = (caller: BrowserCaller): string =>
 const createFakeRuntime = (
   options: {
     readonly outcome?: ((input: BrowserToolRunInput) => BrowserToolRunOutcome) | undefined;
-    readonly share?: { readonly groupId?: number | undefined; readonly tabId: number } | undefined;
+    readonly share?: BrowserShareTabResult | undefined;
     /** What `tabInfo` reports; the default is a tab that finished its navigation. */
     readonly tabInfo?: { readonly title: string; readonly url: string } | undefined;
   } = {}
@@ -68,7 +68,7 @@ const createFakeRuntime = (
       const adopted = [...sessions.entries()].find(([, session]) => session.ended);
 
       if (adopted === undefined) {
-        return {};
+        return { kind: 'none' };
       }
 
       const [endedHandle, state] = adopted;
@@ -80,7 +80,7 @@ const createFakeRuntime = (
         tabs: [...(existing?.tabs ?? []), ...state.tabs],
       });
 
-      return {};
+      return { groupId: 3, kind: 'adopted' };
     },
     closeSession: async ({ sessionHandle }) => {
       const session = sessions.get(sessionHandle);
@@ -136,13 +136,13 @@ const createFakeRuntime = (
       return options.outcome?.(input) ?? { kind: 'result', result: { ok: true, value: 'ok' } };
     },
     shareActiveTab: async ({ sessionHandle }) => {
-      const shared = options.share ?? { tabId: 5 };
-      sessions.get(sessionHandle)?.tabs.push(shared.tabId);
+      const shared = options.share ?? { kind: 'shared', tabId: 5 };
 
-      return {
-        tabId: shared.tabId,
-        ...(shared.groupId === undefined ? {} : { groupId: shared.groupId }),
-      };
+      if (shared.kind === 'shared') {
+        sessions.get(sessionHandle)?.tabs.push(shared.tabId);
+      }
+
+      return shared;
     },
     tabInfo: async () =>
       options.tabInfo ?? { title: 'Started', url: 'https://app.example.com/next' },
@@ -259,7 +259,7 @@ describe('local agent browser bridge', () => {
   });
 
   it('prefers the browser\u2019s active tab when the session owns it', async () => {
-    const fake = createFakeRuntime({ share: { tabId: 5 } });
+    const fake = createFakeRuntime({ share: { kind: 'shared', tabId: 5 } });
     const bridge = createRuntimeBrowserBridge({
       activeTabId: async () => 9,
       runtime: () => fake.runtime,
@@ -273,7 +273,7 @@ describe('local agent browser bridge', () => {
   });
 
   it('falls back to the newest group tab when the active tab is outside the session', async () => {
-    const fake = createFakeRuntime({ share: { tabId: 5 } });
+    const fake = createFakeRuntime({ share: { kind: 'shared', tabId: 5 } });
     const bridge = createRuntimeBrowserBridge({
       activeTabId: async () => 7,
       runtime: () => fake.runtime,
@@ -880,14 +880,55 @@ describe('local agent browser bridge', () => {
   });
 
   it('refuses a share when the browser has no active tab', async () => {
-    const fake = createFakeRuntime({ share: { tabId: 0 } });
+    const fake = createFakeRuntime({ share: { kind: 'no_tab' } });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    await expect(
+      rejectionOf(bridge.shareActiveTab({ controllerId: CONTROLLER, sessionHandle: HANDLE }))
+    ).resolves.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.blocked,
+      message: 'The browser has no active tab to share.',
+    });
+  });
+
+  it('refuses a share of a tab another agent session holds', async () => {
+    const fake = createFakeRuntime({ share: { kind: 'held', tabId: 5 } });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    await expect(
+      rejectionOf(bridge.shareActiveTab({ controllerId: CONTROLLER, sessionHandle: HANDLE }))
+    ).resolves.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.blocked,
+      message:
+        'The active tab belongs to another agent session. Switch to another tab, then share again.',
+    });
+    expect(fake.sessions.get(HANDLE)?.tabs).toStrictEqual([]);
+  });
+
+  it('answers a share with the tab and its group', async () => {
+    const fake = createFakeRuntime({ share: { groupId: 8, kind: 'shared', tabId: 5 } });
     const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
 
     await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
 
     await expect(
       bridge.shareActiveTab({ controllerId: CONTROLLER, sessionHandle: HANDLE })
-    ).rejects.toMatchObject({ code: LOCAL_AGENT_ERROR_CODES.blocked });
+    ).resolves.toStrictEqual({ groupId: 8, tabId: 5 });
+  });
+
+  it('tells the caller when there is no ended group to adopt', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    await expect(
+      bridge.adopt({ controllerId: CONTROLLER, sessionHandle: HANDLE })
+    ).resolves.toStrictEqual({ kind: 'none' });
   });
 
   it('clears the stopped state when a fresh session adopts an ended group', async () => {
@@ -908,7 +949,7 @@ describe('local agent browser bridge', () => {
     });
     await expect(
       bridge.adopt({ controllerId: CONTROLLER, sessionHandle: SECOND_HANDLE })
-    ).resolves.toStrictEqual({});
+    ).resolves.toStrictEqual({ groupId: 3, kind: 'adopted' });
 
     await expect(bridge.callTool(CONTROLLER, snapshotParams(SECOND_HANDLE))).resolves.toMatchObject(
       { content: [{ type: 'text' }] }

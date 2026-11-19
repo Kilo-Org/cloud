@@ -34,6 +34,7 @@ import type {
   BrowserShareTabInput,
   BrowserShareTabResult,
   BrowserTabGroupController,
+  BrowserTabGroupAdoptResult,
   BrowserTabGroupOpenResult,
   BrowserTabGroupSessionSummary,
 } from './browser-tab-groups';
@@ -204,7 +205,7 @@ export interface BrowserTabClaimInput {
 
 export interface BrowserRuntime {
   /** Gives a session its tab group back after it ended (`/browser adopt`). */
-  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupOpenResult>;
+  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupAdoptResult>;
   /**
    * Takes the tab's lease before the caller's first command, so a workflow run
    * navigates under the lease rather than rewriting the page under its holder.
@@ -3460,7 +3461,9 @@ export const createBrowserRuntime = ({
       tabId: created.id,
       title: created.title ?? '',
       url: 'about:blank',
-      ...(shared.groupId === undefined ? {} : { groupId: shared.groupId }),
+      ...(shared.kind === 'shared' && shared.groupId !== undefined
+        ? { groupId: shared.groupId }
+        : {}),
     };
   };
 

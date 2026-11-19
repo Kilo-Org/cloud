@@ -25,9 +25,9 @@
   ],
   // Category defaults are off, so this block lists the checks that apply to every file.
   // The overrides below may add scoped checks as well as relax them: the **/*.ts and
-  // **/*.tsx override adds the TypeScript checks, and the services/**/*.ts and
-  // packages/**/*.ts override adds the type-aware ones. An override that relaxes a
-  // check states why it does.
+  // **/*.tsx override adds the TypeScript checks that apply repo-wide, and the
+  // services/**/*.ts and packages/**/*.ts override adds further strict checks for
+  // those trees. An override that relaxes a check states why it does.
   "rules": {
     "for-direction": "error",
     "no-async-promise-executor": "error",

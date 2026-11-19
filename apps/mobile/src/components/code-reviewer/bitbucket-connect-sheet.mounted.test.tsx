@@ -125,7 +125,9 @@ describe('BitbucketConnectSheet', () => {
 
     expect(root.findAll(node => Object.is(node.type, FORM))).toHaveLength(0);
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
-    expect(denied?.props.description).toBe(i18n.t('prReview.connect.reconnectAdminOnlyDescription'));
+    expect(denied?.props.description).toBe(
+      i18n.t('prReview.connect.reconnectAdminOnlyDescription')
+    );
   });
 
   it('still asks when a background read replaces the form while a token is typed', async () => {

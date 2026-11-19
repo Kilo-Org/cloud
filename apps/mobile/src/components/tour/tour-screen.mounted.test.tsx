@@ -57,6 +57,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  Platform: { OS: 'ios' },
   BackHandler: {
     addEventListener: (_event: string, handler: () => boolean) => backHandler.add(handler),
   },

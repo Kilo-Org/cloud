@@ -9,7 +9,6 @@ import { type AddCreditsDestination } from '@/lib/credits/add-credits-destinatio
 
 import { MessageBubble } from './message-bubble';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
-import { PreparationGroup } from './preparation-group';
 import { SessionContextMetrics } from './session-context-metrics';
 
 // Development-only visual fixture, opened through the development fixture path.
@@ -302,17 +301,19 @@ export function TranscriptStyleFixture({
               onRetryMessage={retryAvailable ? ignoreRetry : undefined}
               addCredits={FIXTURE_ADD_CREDITS}
               retryAvailable={retryAvailable}
-              failureStatedByPreparation={failure === 'preparation'}
               {...(failedRow !== undefined && message.info.id === failedRow.id
-                ? { deliveryState: failedRow.deliveryState, onCopyToComposer: ignoreCopy }
+                ? {
+                    deliveryState: failedRow.deliveryState,
+                    onCopyToComposer: ignoreCopy,
+                    // The transcript hands a failed attempt to the row that
+                    // triggered it, which draws it above the turn's actions.
+                    ...(failure === 'preparation'
+                      ? { failedPreparation: PREPARATION_FAILURE_ATTEMPT }
+                      : {}),
+                  }
                 : {})}
             />
           ))}
-          {/* The transcript emits a failed attempt right after the question that
-              triggered it, so the group closes this turn. */}
-          {failure === 'preparation' ? (
-            <PreparationGroup attempt={PREPARATION_FAILURE_ATTEMPT} />
-          ) : null}
         </DetailScreenScrollView>
       </PartDetailSheetHost>
     </View>

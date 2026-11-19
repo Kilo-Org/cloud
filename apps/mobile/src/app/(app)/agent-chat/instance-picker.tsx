@@ -2,6 +2,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Cloud, RefreshCw, RotateCcw, Server, Terminal } from '@/components/ui/icons';
+import { IconTile } from '@/components/ui/icon-tile';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { View, type ViewStyle } from 'react-native';
@@ -14,6 +15,7 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -200,7 +202,7 @@ export default function InstancePickerScreen() {
           }}
         >
           <View className="min-w-0 flex-1 flex-row items-center gap-3">
-            <InstanceIcon size={18} color={colors.foreground} />
+            <IconTile icon={InstanceIcon} tint={NEUTRAL_TINT} />
             <View className="min-w-0 flex-1">
               <Text className="text-sm font-medium" numberOfLines={1}>
                 {item.name}
@@ -223,7 +225,7 @@ export default function InstancePickerScreen() {
         </ChoiceRow>
       );
     },
-    [currentConnectionId, pendingComputer, colors, handleSelectInstance, t, i18n.language]
+    [currentConnectionId, pendingComputer, handleSelectInstance, t, i18n.language]
   );
 
   if (!bridge) {
@@ -331,7 +333,7 @@ export default function InstancePickerScreen() {
             onPress={handleSelectCloudAgent}
           >
             <View className="min-w-0 flex-1 flex-row items-center gap-3">
-              <Cloud size={18} color={colors.foreground} />
+              <IconTile icon={Cloud} tint={NEUTRAL_TINT} />
               <View className="min-w-0 flex-1">
                 <Text className="text-sm font-medium" numberOfLines={1}>
                   {t('agentChat.instancePicker.cloudAgent')}
@@ -344,31 +346,38 @@ export default function InstancePickerScreen() {
           </ChoiceRow>
         }
         ListEmptyComponent={
+          // The zero-instance state is the CLI group's content, so it sits
+          // under that group's label, as instance rows sit under theirs: without
+          // it the state read as part of the Cloud Agent row above.
+          //
           // The half detent sizes this sheet to its title row; the full stack
           // (bubble, copy and action) then ran past the home indicator and left
           // Refresh off screen. The short form keeps the title, the description
           // and the action, and the list's own bottom clearance keeps the
           // action above the bar.
-          <EmptyState
-            icon={Server}
-            placement="top"
-            inset="gutter"
-            compact
-            title={t('agentChat.instancePicker.noCliInstances')}
-            description={stripInlineCodeMarkers(
-              t('agentChat.instancePicker.noCliInstancesDescription')
-            )}
-            action={
-              <StateAction
-                label={t('common.refresh')}
-                icon={RefreshCw}
-                onPress={() => {
-                  void refetchInstances();
-                }}
-                loading={isRefetching}
-              />
-            }
-          />
+          <View className="gap-3">
+            <SectionHeader inset label={t('agentChat.sessionFilter.platformCli')} />
+            <EmptyState
+              icon={Server}
+              placement="top"
+              inset="gutter"
+              compact
+              title={t('agentChat.instancePicker.noCliInstances')}
+              description={stripInlineCodeMarkers(
+                t('agentChat.instancePicker.noCliInstancesDescription')
+              )}
+              action={
+                <StateAction
+                  label={t('common.refresh')}
+                  icon={RefreshCw}
+                  onPress={() => {
+                    void refetchInstances();
+                  }}
+                  loading={isRefetching}
+                />
+              }
+            />
+          </View>
         }
         renderItem={renderItem}
       />

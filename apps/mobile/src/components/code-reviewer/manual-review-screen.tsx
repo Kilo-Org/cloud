@@ -38,6 +38,7 @@ import {
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
 import { useReviewerBillingRefusal } from '@/lib/hooks/reviewer-refusal';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
+import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -110,6 +111,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
+  const scopeTitle = useReviewerScopeTitle(scope);
   const colors = useThemeColors();
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
@@ -268,10 +270,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     // about to fill instead of the form it may replace.
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader
-          title={t('codeReviewer.manualReview.title')}
-          eyebrow={t('common.codeReviewer')}
-        />
+        <ReviewerHeader title={t('codeReviewer.manualReview.title')} subtitle={scopeTitle} />
         <ManualReviewSkeleton />
       </View>
     );
@@ -286,10 +285,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     const { permanent, variant } = classifyProviderErrorCode(statusErrorCode);
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader
-          title={t('codeReviewer.manualReview.title')}
-          eyebrow={t('common.codeReviewer')}
-        />
+        <ReviewerHeader title={t('codeReviewer.manualReview.title')} subtitle={scopeTitle} />
         <QueryError
           variant={variant}
           title={permanent ? undefined : t('codeReviewer.manualReview.couldNotCheckProviderStatus')}
@@ -320,10 +316,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     const canConnect = permission.status !== 'ready' || canConnectProvider('github', permission);
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader
-          title={t('codeReviewer.manualReview.title')}
-          eyebrow={t('common.codeReviewer')}
-        />
+        <ReviewerHeader title={t('codeReviewer.manualReview.title')} subtitle={scopeTitle} />
         <EmptyState
           icon={GitPullRequest}
           title={t('common.connectProvider')}
@@ -356,10 +349,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader
-        title={t('codeReviewer.manualReview.title')}
-        eyebrow={t('common.codeReviewer')}
-      />
+      <ReviewerHeader title={t('codeReviewer.manualReview.title')} subtitle={scopeTitle} />
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
           ref={scrollRef}

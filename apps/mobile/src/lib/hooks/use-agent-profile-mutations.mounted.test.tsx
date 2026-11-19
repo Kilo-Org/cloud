@@ -93,7 +93,7 @@ describe('useAgentProfileMutations deleteProfile', () => {
 
 type CreateProfile = (input: { name: string; description?: string }) => Promise<unknown>;
 
-/** The composer's Save as Profile path: a write under the session's organization. */
+/** The composer's Save as profile path: a write under the session's organization. */
 function CreateProfileProbe({ holder }: { holder: { current: CreateProfile | null } }) {
   holder.current = useAgentProfileMutations('org-1').create.mutateAsync;
   return null;

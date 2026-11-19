@@ -1,11 +1,18 @@
 import { SignJWT } from 'jose';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_ISSUER,
+  RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH,
   verifyRuntimeProxyAttestation,
 } from './runtime-proxy-attestation.js';
 import { sha256Hex } from './sha256.js';
+import * as kiloTokenVerification from './kilo-token-verification';
+
+vi.mock('./kilo-token-verification', async importOriginal => {
+  const actual = await importOriginal<typeof kiloTokenVerification>();
+  return { ...actual, verifyKiloTokenSignature: vi.fn(actual.verifyKiloTokenSignature) };
+});
 
 const secret = 'runtime-proxy-attestation-secret';
 const now = new Date('2026-01-01T00:00:00.000Z');
@@ -25,6 +32,37 @@ describe('runtime proxy attestation', () => {
     await expect(verifyRuntimeProxyAttestation({ ...input, value: proof, now })).resolves.toBe(
       true
     );
+  });
+
+  it('checks the exported length bound before the token verifier runs', async () => {
+    const verifyTokenSignature = vi.mocked(kiloTokenVerification.verifyKiloTokenSignature);
+    verifyTokenSignature.mockClear();
+
+    const oversized = 'a'.repeat(RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH + 1);
+    await expect(verifyRuntimeProxyAttestation({ ...input, value: oversized, now })).resolves.toBe(
+      false
+    );
+    expect(verifyTokenSignature).not.toHaveBeenCalled();
+
+    verifyTokenSignature.mockClear();
+    const atMaximum = 'a'.repeat(RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH);
+    await expect(verifyRuntimeProxyAttestation({ ...input, value: atMaximum, now })).resolves.toBe(
+      false
+    );
+    expect(verifyTokenSignature).toHaveBeenCalledTimes(1);
+
+    verifyTokenSignature.mockClear();
+    const proof = await issueRuntimeProxyAttestation(input);
+    await expect(verifyRuntimeProxyAttestation({ ...input, value: proof, now })).resolves.toBe(
+      true
+    );
+
+    const oversizedSubject = { ...input, userId: 'u'.repeat(5000) };
+    const oversizedProof = await issueRuntimeProxyAttestation(oversizedSubject);
+    expect(oversizedProof.length).toBeGreaterThan(RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH);
+    await expect(
+      verifyRuntimeProxyAttestation({ ...oversizedSubject, value: oversizedProof, now })
+    ).resolves.toBe(false);
   });
 
   it.each([

@@ -156,7 +156,9 @@ export function ProfilePickerSheet({
       >
         <EmptyState
           icon={Settings2}
-          title={t('agentChat.newSession.couldNotLoadEnvironment')}
+          // The sheet lists profiles, so its failure names what did not load
+          // in the sheet's own words, not the Environment row's.
+          title={t('profiles.loadFailed')}
           description={t('organization.boundary.loadErrorMessage')}
           action={<StateAction label={t('common.retry')} icon={RotateCcw} onPress={onRetry} />}
         />

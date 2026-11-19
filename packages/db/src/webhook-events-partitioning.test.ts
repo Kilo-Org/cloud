@@ -1,6 +1,6 @@
 /**
  * Pins down the PostgreSQL behavior that the daily range partitioning of
- * `webhook_events_v2` (migration 0369, and
+ * `webhook_events_v2` (migration 0372, and
  * `apps/web/src/lib/integrations/db/webhook-event-partitions.ts`) relies on.
  *
  * It builds the same layout in a throwaway schema rather than touching

@@ -216,7 +216,9 @@ export function cacheToolAttachment(
           // The cache was reset while the write ran; this attempt owns nothing
           // anymore, so it publishes no state — not even the on-disk move —
           // into the new generation. The marks it left behind were dropped by
-          // the reset itself.
+          // the reset itself, and its own temp sibling is cleaned up so no
+          // `<final>.tmp-<n>` body outlives the reset.
+          bestEffortDelete(tempFile);
           return;
         }
         await tempFile.move(file, { overwrite: true });

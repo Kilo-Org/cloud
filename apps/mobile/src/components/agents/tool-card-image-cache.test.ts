@@ -558,12 +558,13 @@ describe('cacheToolAttachment write lifetime', () => {
     await drainCacheWrites();
 
     // The rekeyed attempt owns nothing anymore: no pending or dedupe mark, no
-    // latch, no URI, and no wake of its subscribers.
+    // latch, no URI, and no wake of its subscribers. It still cleans up its own
+    // temp sibling, which belongs to this attempt alone.
     expect(getToolCardImageUri('part-stale')).toBeUndefined();
     expect(isToolCardImagePending('part-stale')).toBe(false);
     expect(finalInstances()).toHaveLength(1);
     expect(tempInstanceFor('part-stale.png')?.move).not.toHaveBeenCalled();
-    expect(tempInstanceFor('part-stale.png')?.delete).not.toHaveBeenCalled();
+    expect(tempInstanceFor('part-stale.png')?.delete).toHaveBeenCalledTimes(1);
 
     // In the new generation, the same part id proceeds normally: its own File
     // is constructed, the write runs, and the URI publishes.

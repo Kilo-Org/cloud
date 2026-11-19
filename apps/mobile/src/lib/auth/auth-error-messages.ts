@@ -70,14 +70,22 @@ export function mapError(errorCode: string | undefined): string {
   return i18n.t(mapErrorKey(errorCode));
 }
 
+/** Where the refusal reads: the sign-in screen, or the code step below it. */
+export type SignupStepUpSurface = 'sign-in' | 'code';
+
 /**
  * The `SIGNUP-STEP-UP` message. It names an allowed Apple or Google button only when that button
- * is on this sign-in screen; otherwise it points to the browser sign-in options.
+ * is on this sign-in screen; otherwise it points to the browser sign-in options. On the code step
+ * neither button nor the options control is on screen — only Back is — so it points back there.
  */
 export function signupStepUpMessage(
   methods: readonly string[] | undefined,
-  shown: { apple: boolean; google: boolean }
+  shown: { apple: boolean; google: boolean },
+  surface: SignupStepUpSurface = 'sign-in'
 ): string {
+  if (surface === 'code') {
+    return i18n.t('authErrors.signupStepUpBack');
+  }
   if (shown.apple && methods?.includes('apple')) {
     return i18n.t('authErrors.signupStepUpApple');
   }

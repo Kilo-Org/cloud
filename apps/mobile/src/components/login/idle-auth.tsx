@@ -315,16 +315,16 @@ export function IdleAuth({
           setVerifyError(undefined);
           clearPendingLinkFailure();
         }}
-        onResend={() => {
+        onResend={async () => {
           verifyAttemptRef.current += 1;
           setVerifyError(undefined);
           clearPendingLinkFailure();
-          void (async () => {
-            const ok = await requestEmailCode(otpEmail);
-            if (ok) {
-              toast.success(t('login.codeSent'));
-            }
-          })();
+          const ok = await requestEmailCode(otpEmail);
+          if (ok) {
+            toast.success(t('login.codeSent'));
+          }
+          // The code field empties only when a code was actually sent.
+          return ok;
         }}
         onBack={() => {
           verifyAttemptRef.current += 1;

@@ -20,6 +20,7 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useOrganization } from '@/lib/organization-context';
 import { PRESELECT_CLOUD_RUN_ON, PRESELECT_COMPUTER_RUN_ON } from '@/lib/run-on-destination';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { dismissTour } from '@/lib/tour/tour-dismiss';
 import { useTourCompletion } from '@/lib/tour/tour-completion';
 import { cn } from '@/lib/utils';
@@ -80,10 +81,12 @@ function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionPro
 function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
 
   return (
     <ScrollView
       className="flex-1"
+      style={sideInsetMarginStyle}
       contentContainerClassName={cn(SCREEN_BODY_CLASS, 'grow justify-center pb-6')}
       keyboardShouldPersistTaps="handled"
     >

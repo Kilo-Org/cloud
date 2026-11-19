@@ -25,6 +25,7 @@ import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/p
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body.
@@ -35,6 +36,7 @@ export function ModelPickerContent() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { favorites, favoritesError, addFavorite, removeFavorite } = useModelPreferences(undefined);
   const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
   const { routeKey: rawRouteKey } = useLocalSearchParams<{ routeKey?: string }>();
@@ -291,7 +293,11 @@ export function ModelPickerContent() {
           nestedScrollEnabled
           ref={listRef}
           maintainVisibleContentPosition={{ disabled: true }}
-          style={[listStyle, { backgroundColor: colors.background, marginBottom: bottom }]}
+          style={[
+            listStyle,
+            { backgroundColor: colors.background, marginBottom: bottom },
+            sideInsetMarginStyle,
+          ]}
           data={rows}
           // FlashList stores its props during render. When React discards a
           // deferred search render, FlashList can keep that render's shorter

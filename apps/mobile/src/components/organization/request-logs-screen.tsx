@@ -28,6 +28,7 @@ import { type OrgRequestLogEntry, useOrgRequestLogs } from '@/lib/hooks/use-org-
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { isRetryableTrpcError, trpcErrorVariant, type TrpcErrorVariant } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
@@ -95,6 +96,7 @@ function requestLogsBody(
  */
 export function OrganizationRequestLogsScreen() {
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   // The window's newest end. The anchor is captured once, so "Newer" has a
   // fixed edge to return to instead of sliding with the clock.
@@ -232,70 +234,72 @@ export function OrganizationRequestLogsScreen() {
         title={t('organization.settingsOnWeb.requestLogs')}
         backFallback={ORGANIZATION_HUB_PATH}
       />
-      {/* The window the rows below belong to, and the only filter the phone
-          needs: the procedure answers one hour at a time, so moving the window
-          is both the time range and the paging. The hint states the window's
-          one rule in place, and it never changes, so no row moves when a
-          window loads. */}
-      <View className="gap-2 px-4 pt-3">
-        <View className="gap-0.5">
-          <Text className="text-sm font-medium text-foreground">
-            {formatDate(windowStart, i18n.language, WINDOW_DATE)}
-          </Text>
-          {/* Each time is isolated on its own, so the AM/PM marker it carries
-              stays beside its own clock, and the join is the catalog's, so a
-              right-to-left reader gets the pair in that language's order
-              instead of one reversed run. */}
-          <Text variant="caption" className="tabular-nums">
-            {t('common.timeRange', {
-              start: isolateBidiText(formatClockTime(windowStart, i18n.language)),
-              end: isolateBidiText(formatClockTime(windowEnd, i18n.language)),
-            })}
-          </Text>
-        </View>
-        {/* A step with no further hour is still readable: it takes the muted
-            fill and ink at full strength, where the outline variant would halve
-            both into the page. */}
-        <View className="flex-row gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn('flex-1', !canStepOlder && 'bg-muted opacity-100')}
-            disabled={!canStepOlder}
-            onPress={() => {
-              setWindowEndMs(current => current - HOUR_MS);
-            }}
-            accessibilityLabel={t('organization.requestLogs.older')}
-          >
-            <DirectionalArrowLeft
-              size={16}
-              color={canStepOlder ? colors.foreground : mutedDisabledInk}
-            />
-            <Text className={canStepOlder ? undefined : 'text-muted-foreground'}>
-              {t('organization.requestLogs.older')}
+      <View className="flex-1" style={sideInsetStyle}>
+        {/* The window the rows below belong to, and the only filter the phone
+            needs: the procedure answers one hour at a time, so moving the window
+            is both the time range and the paging. The hint states the window's
+            one rule in place, and it never changes, so no row moves when a
+            window loads. */}
+        <View className="gap-2 px-4 pt-3">
+          <View className="gap-0.5">
+            <Text className="text-sm font-medium text-foreground">
+              {formatDate(windowStart, i18n.language, WINDOW_DATE)}
             </Text>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn('flex-1', !canStepNewer && 'bg-muted opacity-100')}
-            disabled={!canStepNewer}
-            onPress={() => {
-              setWindowEndMs(current => Math.min(current + HOUR_MS, anchorMs));
-            }}
-            accessibilityLabel={t('organization.requestLogs.newer')}
-          >
-            <Text className={canStepNewer ? undefined : 'text-muted-foreground'}>
-              {t('organization.requestLogs.newer')}
+            {/* Each time is isolated on its own, so the AM/PM marker it carries
+                stays beside its own clock, and the join is the catalog's, so a
+                right-to-left reader gets the pair in that language's order
+                instead of one reversed run. */}
+            <Text variant="caption" className="tabular-nums">
+              {t('common.timeRange', {
+                start: isolateBidiText(formatClockTime(windowStart, i18n.language)),
+                end: isolateBidiText(formatClockTime(windowEnd, i18n.language)),
+              })}
             </Text>
-            <DirectionalArrowRight
-              size={16}
-              color={canStepNewer ? colors.foreground : mutedDisabledInk}
-            />
-          </Button>
+          </View>
+          {/* A step with no further hour is still readable: it takes the muted
+              fill and ink at full strength, where the outline variant would halve
+              both into the page. */}
+          <View className="flex-row gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn('flex-1', !canStepOlder && 'bg-muted opacity-100')}
+              disabled={!canStepOlder}
+              onPress={() => {
+                setWindowEndMs(current => current - HOUR_MS);
+              }}
+              accessibilityLabel={t('organization.requestLogs.older')}
+            >
+              <DirectionalArrowLeft
+                size={16}
+                color={canStepOlder ? colors.foreground : mutedDisabledInk}
+              />
+              <Text className={canStepOlder ? undefined : 'text-muted-foreground'}>
+                {t('organization.requestLogs.older')}
+              </Text>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn('flex-1', !canStepNewer && 'bg-muted opacity-100')}
+              disabled={!canStepNewer}
+              onPress={() => {
+                setWindowEndMs(current => Math.min(current + HOUR_MS, anchorMs));
+              }}
+              accessibilityLabel={t('organization.requestLogs.newer')}
+            >
+              <Text className={canStepNewer ? undefined : 'text-muted-foreground'}>
+                {t('organization.requestLogs.newer')}
+              </Text>
+              <DirectionalArrowRight
+                size={16}
+                color={canStepNewer ? colors.foreground : mutedDisabledInk}
+              />
+            </Button>
+          </View>
         </View>
+        {renderBody(body)}
       </View>
-      {renderBody(body)}
     </View>
   );
 }

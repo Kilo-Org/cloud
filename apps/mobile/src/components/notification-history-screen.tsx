@@ -34,6 +34,7 @@ import { isRetiredPushType } from '@/lib/retired-push-types';
 import { type HistoryRow, HistoryRowView } from '@/components/notification-history-row';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import {
@@ -77,6 +78,7 @@ export function NotificationHistoryScreen() {
   const now = useRelativeTimeNow();
   const queryClient = useQueryClient();
   const paddingBottom = useTabBarBottomPadding();
+  const sideInsetStyle = useSideInsetStyle();
   const [category, setCategory] = useState<NotificationHistoryFilter['category']>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -250,7 +252,7 @@ export function NotificationHistoryScreen() {
         showBackButton
         backFallback={PROFILE_TAB_HREF}
       />
-      <View className="flex-1">
+      <View className="flex-1" style={sideInsetStyle}>
         {gate.settled && gate.answered && !gate.pushEnabled ? (
           <View className="px-4 pb-3">
             <Card>
@@ -316,39 +318,43 @@ export function NotificationHistoryScreen() {
             </View>
           ) : null}
 
-          {failure ? (
-            <QueryError
-              placement="top"
-              inset="gutter"
-              message={t('notifications.history.loadError')}
-              onRetry={() => {
-                void query.refetch();
-              }}
-              isRetrying={query.isFetching}
+          {failure || (!loading && !hasListContent) ? (
+            // A state's full stack is taller than a landscape window's body, so
+            // it scrolls like the list and ends clear of the tab bar as the
+            // list's footer does.
+            <ScrollView
               refreshControl={refreshControl}
-            />
-          ) : null}
-
-          {!loading && !failure && !hasListContent ? (
-            <EmptyState
-              placement="top"
-              inset="gutter"
-              icon={BellOff}
-              refreshControl={refreshControl}
-              title={t(
-                category === null
-                  ? 'notifications.history.emptyTitle'
-                  : 'notifications.history.emptyCategoryTitle'
+              contentContainerStyle={{ paddingBottom: paddingBottom + FOOTER_BOTTOM_GAP }}
+            >
+              {failure ? (
+                <QueryError
+                  placement="top"
+                  inset="gutter"
+                  message={t('notifications.history.loadError')}
+                  onRetry={() => void query.refetch()}
+                  isRetrying={query.isFetching}
+                />
+              ) : (
+                <EmptyState
+                  placement="top"
+                  inset="gutter"
+                  icon={BellOff}
+                  title={t(
+                    category === null
+                      ? 'notifications.history.emptyTitle'
+                      : 'notifications.history.emptyCategoryTitle'
+                  )}
+                  // The retention window describes the whole list, not one category.
+                  description={
+                    category === null
+                      ? t('notifications.history.emptyBody', {
+                          days: NOTIFICATION_HISTORY_RETENTION_DAYS,
+                        })
+                      : undefined
+                  }
+                />
               )}
-              // The retention window describes the whole list, not one category.
-              description={
-                category === null
-                  ? t('notifications.history.emptyBody', {
-                      days: NOTIFICATION_HISTORY_RETENTION_DAYS,
-                    })
-                  : undefined
-              }
-            />
+            </ScrollView>
           ) : null}
 
           {!loading && !failure && hasListContent ? (

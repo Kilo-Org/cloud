@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type PreparationAttempt, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { askedMessageId, asMessages } from '@/lib/chat/turns';
 import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
@@ -291,24 +292,28 @@ export function TranscriptStyleFixture({
         }
       />
       <PartDetailSheetHost messages={messages}>
-        {messages.map(message => (
-          <MessageBubble
-            key={message.info.id}
-            message={message}
-            onRetryMessage={retryAvailable ? ignoreRetry : undefined}
-            addCredits={FIXTURE_ADD_CREDITS}
-            retryAvailable={retryAvailable}
-            failureStatedByPreparation={failure === 'preparation'}
-            {...(failedRow !== undefined && message.info.id === failedRow.id
-              ? { deliveryState: failedRow.deliveryState, onCopyToComposer: ignoreCopy }
-              : {})}
-          />
-        ))}
-        {/* The transcript emits a failed attempt right after the question that
-            triggered it, so the group closes this turn. */}
-        {failure === 'preparation' ? (
-          <PreparationGroup attempt={PREPARATION_FAILURE_ATTEMPT} />
-        ) : null}
+        {/* The transcript scrolls and clears the window's side and bottom
+            insets, as the session's own list does. */}
+        <DetailScreenScrollView className="flex-1">
+          {messages.map(message => (
+            <MessageBubble
+              key={message.info.id}
+              message={message}
+              onRetryMessage={retryAvailable ? ignoreRetry : undefined}
+              addCredits={FIXTURE_ADD_CREDITS}
+              retryAvailable={retryAvailable}
+              failureStatedByPreparation={failure === 'preparation'}
+              {...(failedRow !== undefined && message.info.id === failedRow.id
+                ? { deliveryState: failedRow.deliveryState, onCopyToComposer: ignoreCopy }
+                : {})}
+            />
+          ))}
+          {/* The transcript emits a failed attempt right after the question that
+              triggered it, so the group closes this turn. */}
+          {failure === 'preparation' ? (
+            <PreparationGroup attempt={PREPARATION_FAILURE_ATTEMPT} />
+          ) : null}
+        </DetailScreenScrollView>
       </PartDetailSheetHost>
     </View>
   );

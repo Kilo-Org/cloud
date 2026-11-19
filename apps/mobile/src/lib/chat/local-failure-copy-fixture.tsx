@@ -36,9 +36,7 @@ type CaseState = (typeof CASE_STATES)[number];
 
 export type LocalFailureCopyState = (typeof STATES)[number];
 
-export function isLocalFailureCopyState(
-  value: string | undefined
-): value is LocalFailureCopyState {
+export function isLocalFailureCopyState(value: string | undefined): value is LocalFailureCopyState {
   return value !== undefined && STATES.some(state => state === value);
 }
 

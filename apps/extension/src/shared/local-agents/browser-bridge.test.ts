@@ -691,6 +691,43 @@ describe('local agent browser bridge', () => {
     });
   });
 
+  it('maps a take-over thrown by the tab session before the tool ran onto tab_taken', async () => {
+    const fake = createFakeRuntime({
+      outcome: () => {
+        throw new Error(TAB_TAKEN_ERROR);
+      },
+    });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await openAndShare(bridge);
+
+    await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.tabTaken,
+      message: TAB_TAKEN_ERROR,
+    });
+    expect(fake.releasedTabs).toHaveLength(1);
+  });
+
+  it('answers Playwright code with unsupported_in_browser before the gate runs', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await openAndShare(bridge);
+
+    const refusal = await rejectionOf(
+      bridge.callTool(CONTROLLER, {
+        arguments: { code: 'async (page) => page.title()' },
+        authorized: [],
+        name: 'browser_run_code_unsafe',
+        sessionHandle: HANDLE,
+      })
+    );
+
+    expect(refusal?.code).toBe(LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser);
+    expect(refusal?.message).toContain('browser_evaluate');
+    expect(fake.run).toStrictEqual([]);
+  });
+
   it('returns an ordinary tool failure as an error result, not a protocol error', async () => {
     const fake = createFakeRuntime({
       outcome: () => ({ kind: 'result', result: { error: 'No element matches e99.', ok: false } }),

@@ -152,6 +152,9 @@ const isTrustedPanelSender = (sender: unknown, runtimeId: string | undefined): b
   return url.startsWith('chrome-extension://') || url.startsWith('moz-extension://');
 };
 
+/** Enough of an unexpected error's own text to say what failed, without a page's worth of it. */
+const UNEXPECTED_DETAIL_LIMIT = 300;
+
 const errorResponse = (id: string | number, error: unknown) => {
   if (error instanceof LocalAgentRpcError) {
     const frame = buildErrorMessage({
@@ -166,10 +169,16 @@ const errorResponse = (id: string | number, error: unknown) => {
       : { ...frame, error: { ...frame.error, data: error.data } };
   }
 
+  // The model reads this text: it names what failed, never the transport, and says what to do next (SPEC).
+  const detail =
+    error instanceof Error && error.message.trim() !== ''
+      ? error.message.trim().slice(0, UNEXPECTED_DETAIL_LIMIT).replace(/\.$/u, '')
+      : 'an unexpected error';
+
   return buildErrorMessage({
     code: LOCAL_AGENT_ERROR_CODES.internalError,
     id,
-    message: 'Local agent request failed.',
+    message: `The browser could not finish the call: ${detail}. Part of it may have run; take a new page snapshot before retrying.`,
   });
 };
 

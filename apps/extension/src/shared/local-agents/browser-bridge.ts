@@ -7,6 +7,7 @@ import {
   authorizedGrantsSchema,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
+  RUN_CODE_UNSUPPORTED_ERROR,
 } from '../browser-agent-checks';
 import type { BrowserCaller } from '../browser-caller';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
@@ -312,6 +313,14 @@ export const createRuntimeBrowserBridge = ({
         tabId,
         toolName: parsed.name,
       })
+      // A take-over that lands before the tool runs surfaces as the tab session's thrown guard error: same answer as a result.
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.message === TAB_TAKEN_ERROR) {
+          throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabTaken, TAB_TAKEN_ERROR);
+        }
+
+        throw error;
+      })
       // Turn end: this call's lease goes, its refs stay, and the session's other tabs keep theirs.
       .finally(() => {
         runtime().releaseTab({ caller, tabId });
@@ -513,6 +522,14 @@ export const createRuntimeBrowserBridge = ({
       const input = { controllerId, sessionHandle: parsed.data.sessionHandle };
 
       assertLive(input.sessionHandle);
+
+      // Nothing can run it here: answered before the gate, so the CLI never asks for a grant it could not use.
+      if (parsed.data.name === 'browser_run_code_unsafe') {
+        throw new LocalAgentRpcError(
+          LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,
+          RUN_CODE_UNSUPPORTED_ERROR
+        );
+      }
 
       const existing = await targetTab(input.sessionHandle);
 

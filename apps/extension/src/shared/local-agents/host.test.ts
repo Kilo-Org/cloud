@@ -538,6 +538,34 @@ describe('local agents host over a loopback endpoint', () => {
     host.stop();
   });
 
+  it('answers an unexpected failure with what failed, in words the model can act on', async () => {
+    const harness = createHarness();
+    seedEnabledWithEndpoint(harness.storage);
+    harness.bridge.listTools.mockRejectedValueOnce(new Error('No tab with id: 42.'));
+    const host = startHost(harness);
+    await host.ready;
+    const socket = await connectSocketIfNeeded(harness);
+
+    await completeHandshake(socket);
+    socket.handlers.onText(
+      JSON.stringify({
+        controllerId: CONTROLLER_ID,
+        message: { id: 8, jsonrpc: '2.0', method: 'tools.list', params: {} },
+        type: 'rpc',
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(rpcWith(socket.sent, 'id', 8)).toBeDefined();
+    });
+    expect(messageOf(rpcWith(socket.sent, 'id', 8))?.['error']).toStrictEqual({
+      code: -32_603,
+      message:
+        'The browser could not finish the call: No tab with id: 42. Part of it may have run; take a new page snapshot before retrying.',
+    });
+    host.stop();
+  });
+
   it('refuses panel commands from a content-script sender', async () => {
     const harness = createHarness();
     harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: false });

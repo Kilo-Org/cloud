@@ -26,6 +26,7 @@
     "creditHistory": "點數紀錄",
     "sentenceJoiner": "。",
     "listJoiner": "、",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "取消",
     "done": "完成",
     "retry": "再試一次",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "變更",
     "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。",
-    "privateRepositoryA11y": "{{name}}，私有儲存庫"
+    "privateRepositoryA11y": "{{name}}，私有儲存庫",
+    "legalDocumentEnglishOnly": "本文件僅提供英文版本。",
+    "organizationTrialEndedBilling": "組織的試用期已結束，且沒有使用中的方案。您可以更新帳單資訊，然後再試一次。"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -308,9 +311,9 @@
     "passkeyVerifyDescription": "為了保障你的安全，請在變更通行密鑰前確認是你本人。",
     "passkeyVerifyWithPasskey": "使用通行密鑰驗證",
     "passkeyVerifySendCode": "以電子郵件傳送驗證碼給我",
-    "passkeyVerifySendingCode": "正在傳送驗證碼...",
+    "passkeyVerifySendingCode": "正在傳送驗證碼…",
     "passkeyVerifyPasskeyPrompt": "請使用通行密鑰確認身分以繼續。",
-    "passkeyVerifyChecking": "正在檢查驗證碼...",
+    "passkeyVerifyChecking": "正在檢查驗證碼…",
     "passkeyVerifyCodeSent": "請輸入傳送至 {{email}} 的驗證碼。",
     "passkeyVerifyCodeRejected": "驗證碼不符。請重試。",
     "passkeyVerifyPasskeyFailed": "無法使用該通行密鑰確認身分。請重試。",
@@ -318,8 +321,8 @@
     "passkeyVerifyInProgress": "該驗證碼已在檢查中。請稍後重試。",
     "passkeyVerifyTooManyAttempts": "嘗試次數過多。請重新傳送驗證碼。",
     "passkeyVerifySsoRequired": "你的組織要求使用單一登入。請在瀏覽器中核准此變更，然後返回此處。",
-    "passkeyVerifySsoStarting": "正在啟動核准流程...",
-    "passkeyVerifySsoWaiting": "正在等待核准...",
+    "passkeyVerifySsoStarting": "正在啟動核准流程…",
+    "passkeyVerifySsoWaiting": "正在等待核准…",
     "passkeyVerifySsoOpen": "開啟核准頁面",
     "passkeyVerifySsoExpired": "該核准請求已過期或已取消。請重試。",
     "passkeyVerifySsoUnavailable": "目前無法透過單一登入核准。請重試。",
@@ -385,12 +388,24 @@
       "editKeyDescription": "已儲存的值無法顯示。請輸入新的值來取代。",
       "editKeyMappingsWarning": "更換金鑰也會一併取代已儲存的模型對應：請重新輸入您仍需要的所有對應。",
       "saveFailed": "無法儲存金鑰。",
-      "invalidCredentials": "請檢查憑證後再試一次。",
       "fieldRequired": "{{field}} 為必填。",
+      "keyIncomplete": "金鑰缺少必填的值。",
       "incompleteMapping": "對應 {{number}} 需同時填寫閘道模型 slug 和部署名稱。",
       "apiKeyLabel": "API 金鑰",
       "apiKeyPlaceholder": "貼上金鑰",
       "apiKeyRequired": "請輸入金鑰。",
+      "keyAlreadyExists": "你已經有此供應商的金鑰。新增其他金鑰前，請先將其移除。",
+      "keyStoreFailed": "金鑰無法儲存。",
+      "invalidCredentials": "此金鑰不是此供應商預期的格式。請檢查後再試一次。",
+      "testSucceeded": "金鑰可用。供應商：{{provider}}。模型：{{model}}。",
+      "testRejected": "供應商拒絕了此金鑰。請檢查金鑰是否正確且尚未被撤銷。",
+      "testIncomplete": "供應商在測試完成前就結束了。請再試一次。",
+      "testUnsupportedProvider": "此供應商已不再支援。請移除此金鑰。",
+      "testUnreadableKey": "無法讀取已儲存的金鑰。請稍後再試一次。",
+      "testDeprecatedProvider": "此供應商已棄用，因此無法測試其金鑰。",
+      "keyManagedByCodingPlan": "程式設計方案會管理此供應商的金鑰，且該金鑰為唯讀。若要新增自己的金鑰，請取消程式設計方案。",
+      "providerUnavailable": "此供應商尚未上線，因此無法為其新增金鑰。",
+      "testFailed": "金鑰測試失敗。請再試一次。",
       "authMethod": "驗證方式",
       "authMethodAccessKeys": "存取金鑰",
       "resourceName": "Azure 資源名稱",
@@ -481,7 +496,14 @@
       "viewReceipt": "檢視回執"
     },
     "changelog": "最新消息",
-    "changelogVersionPending": "此版本的說明將隨下次應用程式更新提供。"
+    "changelogVersionPending": "{{version}} 版的說明將隨下次應用程式更新提供。",
+    "changelogGroupNew": "新功能",
+    "changelogFixesIn": "{{areas}}的修正與改進。",
+    "changelogFixesPolish": "整個應用程式的修正與改進。",
+    "changelogAreas": {
+      "signIn": "登入",
+      "profileOrganizations": "個人資料與組織"
+    }
   },
   "preferences": {
     "general": "一般",
@@ -673,10 +695,12 @@
       "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。"
     },
     "bitbucketConnect": {
-      "managedOnWeb": "此組織的 Bitbucket 連線需在電腦上透過網頁版管理。",
-      "description": "請建立具有所需權限範圍的工作區存取權杖，並貼到下方。",
+      "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
+      "description": "為 {{organization}} 建立工作區存取權杖，然後貼到下方。",
+      "descriptionReconnect": "為 {{organization}} 建立新的工作區存取權杖，然後貼到下方。",
       "scopes": "帳戶：讀取 · 存放庫：讀取／寫入 · PR：讀取 · Webhook：讀取／寫入",
-      "tokenPlaceholder": "工作區存取權杖"
+      "tokenPlaceholder": "工作區存取權杖",
+      "tokenRefused": "Bitbucket 未接受此工作區存取權杖。請確認其具有上方列出的權限範圍，然後再試一次。"
     },
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循每個存放庫的 REVIEW.md 指示檔案",
@@ -922,13 +946,25 @@
       "repositoryLine": "審查：{{reviews}} · 問題：{{findings}}",
       "empty": "尚無含有分析資料的審查",
       "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
-      "off": "此組織已關閉分析。",
-      "couldNotLoad": "無法載入分析資料"
+      "offTitle": "已關閉 {{platform}} 的分析",
+      "offDescription": "組織的帳務角色（擁有者、管理員與帳務管理員）可在網頁版的組織設定中啟用分析，以記錄已完成的審查。",
+      "couldNotLoad": "無法載入分析資料",
+      "trackedReviewsCaption": "此期間內在啟用分析的狀態下完成的審查。執行中與失敗的審查一律不計入。",
+      "trackedReviewsUncounted": "未計入：組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未擷取結果。",
+      "trackedReviewsUncounted_one": "未計入：組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未擷取結果。",
+      "trackedReviewsUncounted_other": "未計入：組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未擷取結果。"
     },
     "council": {
       "title": "審查小組審查",
       "subtitle": "多位專家分別審查每個提取要求，他們的投票會彙整成一項決定。",
-      "unavailable": "此組織無法使用審查小組審查。",
+      "unavailablePersonallyTitle": "需要 Enterprise 組織",
+      "unavailablePersonally": "審查小組審查不包含在個人帳戶中。",
+      "unavailablePersonallyAction": "建立組織",
+      "unavailablePersonallySwitchAction": "切換組織",
+      "unavailableOrganizationTitle": "審查小組審查目前無法使用",
+      "unavailableForOrganization": "審查小組審查需要具備使用中的訂閱或試用的 Enterprise 方案。此組織目前並未具備此功能。",
+      "unavailableForOrganizationNeutral": "此組織目前無法使用審查小組審查。請稍後再試。",
+      "unavailableOnBitbucket": "審查小組審查不適用於 Bitbucket 存放庫。",
       "noRepositories": "尚未選取任何存放庫。請先在存放庫設定中選取存放庫。",
       "specialists": "專家",
       "labels": "觸發審查小組審查的標籤",
@@ -1570,6 +1606,8 @@
       "renameAccessibility": "重新命名工作階段：{{title}}",
       "cloningSession": "複製工作階段中",
       "couldNotLoadThisSession": "無法載入此工作階段。",
+      "historyTooLarge": "此工作階段的對話記錄過大，無法載入。",
+      "historyUnavailable": "無法讀取此工作階段的對話記錄。",
       "cloneFailedRetry": "無法複製此工作階段。請再試一次。",
       "notEnoughCredits": "點數不足，無法執行此請求。請加值後再試一次。",
       "previousTaskFinishing": "上一個任務仍在收尾。請稍候。",
@@ -1646,6 +1684,7 @@
       "branchDefault": "預設",
       "branchAccessibility": "分支: {{label}}",
       "branchLoading": "正在載入分支",
+      "branchInactive": "選取一個存放庫以載入其分支。",
       "branchLoadError": "無法載入分支",
       "branchUnavailable": "此存放庫沒有可用的分支。檢查你在供應商處的存取權限，然後選取另一個存放庫。",
       "branchEmpty": "沒有可用的分支",
@@ -1878,7 +1917,8 @@
       "customModes": "自訂模式"
     },
     "modeSelector": {
-      "accessibility": "模式：{{label}}"
+      "accessibility": "模式：{{label}}",
+      "customMode": "自訂模式"
     },
     "modeOptions": {
       "code": "寫程式",
@@ -2194,7 +2234,7 @@
       "thinkingEffortAccessibility": "思考程度：{{label}}",
       "thinkingEffortSelected": "思考程度：{{label}}，已選取",
       "thinkingEffortWithModel": "{{model}}，思考程度：{{variant}}",
-      "lockedByAgent": "，已由智慧代理「{{agent}}」鎖定",
+      "lockedByAgent": "已由智慧代理「{{agent}}」鎖定",
       "addToFavorites": "將 {{name}} 加入我的最愛",
       "removeFromFavorites": "將 {{name}} 從我的最愛移除",
       "sessionModel": "工作階段模型"
@@ -2447,7 +2487,6 @@
   },
   "home": {
     "couldNotLoadSessions": "無法載入工作階段。",
-    "couldNotLoadActiveSessions": "無法載入進行中的工作階段。",
     "agentSessions": "目前執行中",
     "newCodingTask": "新增程式設計任務",
     "newTaskFromPicture": "從圖片新增任務",
@@ -2474,6 +2513,7 @@
   "queryError": {
     "neutralDescription": "請再試一次。",
     "offlineTitle": "載入失敗。",
+    "offlineDescription": "無法連線到伺服器。",
     "permissionDescription": "你沒有權限查看這個內容。",
     "notFoundDescription": "這個項目可能已移除，或已無法使用。",
     "serverTitle": "無法載入。",
@@ -2579,7 +2619,6 @@
     "completingPurchase": "正在完成購買…",
     "subscriptionLoading": "正在載入 Kilo Pass 訂閱",
     "retryHint": "重新取得 Kilo Pass 狀態。",
-    "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
     "endedOn": "已於 {{date}} 結束",
     "notAvailableInApp": "Kilo Pass 無法在應用程式內使用。",
     "statusActive": "使用中",
@@ -2764,7 +2803,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
       "gitlabReconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
       "bitbucketNotConnectedTitle": "尚未連結 Bitbucket",
-      "bitbucketAdminOnlyDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
+      "adminOnlyConnectDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
     },
@@ -2861,7 +2900,19 @@
         "fileComment": "檔案留言",
         "outdatedOnPathLines": "{{path}} {{lines}} 的留言已過時",
         "outdatedOnLines": "{{lines}} 的留言已過時",
-        "outdatedOnPath": "{{path}} 的留言已過時"
+        "outdatedOnPath": "{{path}} 的留言已過時",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "左側",
+        "sideRight": "右側",
+        "outdatedOnLinesSide": "{{lines}} ({{side}}) 的留言已過時",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} ({{side}}) 的留言已過時",
+        "outdatedSide": "({{side}}) 已過時",
+        "outdatedOnPathSide": "{{path}} ({{side}}) 已過時"
       },
       "deletedUser": "已刪除的使用者",
       "replyForbiddenTerm": "你沒有權限回覆此{{term}}。",
@@ -3317,6 +3368,7 @@
       "manageOnWeb": "網頁版帳單設定",
       "changePlan": "變更套餐",
       "buySeats": "購買席次",
+      "managedOnWeb": "套餐、席次和自動儲值是在網頁版上管理。",
       "setupAutoTopUp": "設定自動儲值",
       "manageAutoTopUp": "管理自動儲值",
       "opensOnWeb": "在網頁上開啟"
@@ -3328,7 +3380,7 @@
       "loadErrorTitle": "無法載入你的組織清單。",
       "membershipLostNotice": "你已無法存取此組織。已切換至 {{target}}。",
       "noOrganization": "沒有組織",
-      "noOrganizationDescription": "此帳號不屬於任何組織。建立組織即可使用成員邀請、低餘額提醒等組織功能，或前往網頁加入你受邀的組織。",
+      "noOrganizationDescription": "此帳號不屬於任何組織。建立組織即可使用成員邀請、低餘額提醒等組織功能，或透過組織寄給你的電子郵件接受邀請。",
       "organizationUnavailable": "無法存取組織。",
       "selectDescriptionWithOrganizations": "您屬於一個或多個組織。請選取此畫面應使用的帳戶。",
       "selectOrganization": "選取組織",
@@ -3360,7 +3412,8 @@
         "accounting_adjustment": "會計調整",
         "credits_expired": "點數已到期"
       },
-      "truncated": "還有更早的點數記錄可供查看。"
+      "truncated": "還有更早的點數記錄可供查看。",
+      "retentionLimit": "顯示最近的點數記錄。"
     },
     "hub": {
       "balance": "餘額",
@@ -3383,6 +3436,7 @@
       "sendInvite": "傳送邀請",
       "title": "邀請成員",
       "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
+      "organizationUnavailable": "此組織已無法使用。",
       "sendError": "無法傳送邀請。",
       "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
       "alreadyMember": "這個人已經是此組織的成員。",
@@ -3404,7 +3458,8 @@
         "void": "已作廢",
         "uncollectible": "無法收款"
       },
-      "truncated": "還有更早的發票可供查看。"
+      "truncated": "還有更早的發票可供查看。",
+      "retentionLimit": "顯示最近的發票。"
     },
     "lowBalanceAlert": {
       "enableA11y": "啟用餘額不足提醒",
@@ -3467,7 +3522,6 @@
     },
     "settingsOnWeb": {
       "title": "網頁版組織設定",
-      "integrations": "網頁版整合",
       "usageDetails": "使用詳情",
       "providersAndModels": "供應商與模型",
       "groups": "群組",
@@ -3476,9 +3530,18 @@
       "ssoAndDomain": "SSO 與網域",
       "dataCollection": "資料收集",
       "auditLogs": "稽核記錄",
-      "requestLogs": "請求記錄",
-      "subOrganizations": "子組織",
-      "distributeFunds": "分配資金"
+      "requestLogs": "請求記錄"
+    },
+    "requestLogs": {
+      "older": "較早一小時",
+      "newer": "較晚一小時",
+      "truncated": "這一小時的請求多於清單顯示的數量。",
+      "emptyTitle": "這一小時沒有請求",
+      "emptyDescription": "使用「較早一小時」查看較早的請求。",
+      "loadError": "無法載入請求記錄。",
+      "permissionDenied": "只有組織的擁有者、管理員或帳務管理員可以查看其請求記錄。",
+      "tokens": "輸入 {{input}} · 輸出 {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
@@ -3625,8 +3688,7 @@
     "imagesSectionEmpty": "沒有信任的圖片主機",
     "revoke": "撤銷對 {{host}} 的信任",
     "revokeMessage": "前往此主機的連結將再次要求確認。",
-    "revokeImageMessage": "來自此主機的圖片將再次要求確認。",
-    "backToPreferences": "返回偏好設定"
+    "revokeImageMessage": "來自此主機的圖片將再次要求確認。"
   },
   "glanceable": {
     "waiting": "正在更新代理程式狀態",
@@ -3640,7 +3702,7 @@
     "newestSession": "最新: {{title}}",
     "noneWaiting": "沒有等待中的代理程式",
     "newAgent": "新增代理程式",
-    "approving": "正在核准...",
+    "approving": "正在核准…",
     "couldNotApprove": "無法核准",
     "channelName": "執行中的代理程式",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
@@ -3652,6 +3714,7 @@
     "lastKnown": "最後已知",
     "awaitingUpdate": "等待更新",
     "nextRun": "下次執行",
+    "wasDue": "原定",
     "waitingForYou": "等待你回應",
     "nextScheduled": "下次排程",
     "answerNeeded": "等待回答",
@@ -3761,6 +3824,8 @@
       "fieldName": "顯示名稱",
       "fieldUrl": "伺服器 URL",
       "fieldUrlInvalid": "請輸入有效的伺服器 URL。",
+      "duplicateUrl": "該 URL 已儲存。",
+      "serverNotFound": "該伺服器已不再儲存。",
       "enableServer": "啟用此伺服器：{{name}}",
       "editServer": "編輯伺服器",
       "deleteServer": "刪除伺服器",
@@ -3870,6 +3935,8 @@
       "downloading": "下載中：{{written}}／{{total}}",
       "downloadingUnknown": "下載中：{{written}}",
       "paused": "已暫停：{{written}}／{{total}}",
+      "retrying": "正在重試：{{written}}／{{total}}",
+      "retryingUnknown": "正在重試：{{written}}",
       "verifying": "正在檢查下載的檔案…",
       "downloaded": "已下載 · {{size}}",
       "url": "直接下載連結",
@@ -3960,7 +4027,9 @@
         "androidModelUnavailable": "此裝置不支援 Gemini Nano，或 AICore 系統應用程式仍在設定中。請稍後再試。",
         "aicoreUpdateRequired": "請更新 AICore 應用程式和系統軟體，才能使用此模型。",
         "downloadable": "此模型需要先下載一次才能使用。",
-        "downloading": "模型下載中，下載完成後即可使用。"
+        "downloading": "模型下載中，下載完成後即可使用。",
+        "batteryQuota": "裝置端模型已用完目前的電池用量額度。請稍後再試。",
+        "checkFailed": "應用程式無法檢查此模型。請再試一次。"
       },
       "unavailable": "裝置端模型目前無法使用。請在「$t(modelChat.backends.title)」中查看其狀態。",
       "busy": "裝置端模型正在產生另一則回覆，請在完成後再試一次。",
@@ -4198,7 +4267,7 @@
       "topPPlaceholder": "例如 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "我的代理",
-      "promptPlaceholder": "你是一個...",
+      "promptPlaceholder": "你是一個…",
       "tools": "工具",
       "wholeToolRule": "此代理會一次將一條規則套用到所有工具：{{rule}}。這些開關為唯讀。",
       "visibility": "可見性",
@@ -4254,10 +4323,10 @@
       "add": "新增預設值",
       "empty": "沒有配置預設值",
       "emptyDescription": "新增預設值以在啟動儲存庫會話時自動套用設定檔。",
-      "repo": "選擇存儲庫...",
+      "repo": "選擇存儲庫…",
       "profile": "選擇個人資料",
       "removeForRepo": "解綁 {{repo}}",
-      "search": "搜尋儲存庫...",
+      "search": "搜尋儲存庫…",
       "addedToast": "為“{{repo}}”設定的預設設定文件",
       "addFailed": "無法設定預設設定檔",
       "removedToast": "刪除了“{{repo}}”的預設設定文件",
@@ -4273,8 +4342,7 @@
       "repoValue": "存儲庫: {{name}}",
       "profileValue": "個人資料: {{name}}",
       "profileUnavailable": "此個人資料已無法使用。請選擇其他個人資料。",
-      "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。",
-      "pickerEmptyDescriptionOrganizationReadOnly": "組織擁有者或管理員可以建立組織設定檔。"
+      "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。"
     },
     "variablesDeleteFailed": "無法刪除變數",
     "deleteVariable": "刪除變數 {{key}}",
@@ -4322,7 +4390,8 @@
       "purchaseFallback": "點數購買",
       "receipt": "收據",
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
-      "receiptUnavailable": "此筆購買沒有可用的收據。"
+      "receiptUnavailable": "此筆購買沒有可用的收據。",
+      "retentionLimit": "顯示最近的點數紀錄。"
     },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
@@ -4455,17 +4524,21 @@
     "emptyHint": "當排定的簡報有活動時，你的雲端與 CLI 程式設計工作階段會顯示在這裡。",
     "loadError": "無法載入簡報",
     "view": "閱讀簡報",
-    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view)：$t(agentBriefing.selectedSessions) {{sessions}}，$t(agentBriefing.snapshotPullRequests) {{pullRequests}}，$t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}，{{time}}",
+    "filterByContext": "依使用情境篩選",
+    "contextAll": "所有使用情境",
     "dismiss": "忽略簡報",
+    "dismissFailed": "暫時無法忽略此簡報。系統會在背景自動重試。",
     "offline": "離線 · 已儲存的簡報",
-    "cached": "已儲存的報告 · 無法重新整理",
-    "window": "{{start}} – {{end}}",
+    "cached": "已儲存的簡報 · 無法重新整理",
     "summary": "AI 摘要",
     "summaryPending": "AI 摘要產生中，完成後會附加於此。",
-    "summaryUnavailable": "無法使用 AI 摘要。你的結構化報告仍可查看。",
+    "summaryUnavailable": "無法使用 AI 摘要。你的結構化簡報仍可查看。",
     "summaryCharge": "AI 已收費 {{cost}}",
     "summaryChargePending": "AI 費用待核對",
+    "summaryModel": "$t(common.model)：{{model}}",
     "sources": "證據與產出物",
     "timezone": "簡報時區",
     "deviceTimezone": "使用裝置時區",
@@ -4477,22 +4550,22 @@
     "timeHint": "簡報時段結束時，首頁卡片會恢復顯示即時狀態，即使離線也一樣。",
     "invalidSchedule": "請選擇有效的時區，以及非空白的簡報時段。",
     "notificationsHint": "每個排定的簡報會傳送一則一般通知。與付費 AI 摘要無關。",
-    "notificationPermission": "請在$t(common.notifications)中啟用裝置通知以接收簡報。",
+    "notificationPermission": "請開啟推播通知以接收簡報。",
     "defaultModel": "使用 Kilo 的預設模型",
     "duration": "時間上限（分鐘）",
     "spendLimit": "花費上限（USD）",
     "invalidSafeguards": "請輸入大於零的有限時間與花費上限。",
     "estimate": "預估 {{estimate}} · 上限 {{maximum}}",
-    "estimateUnavailable": "這些設定無法提供付費摘要。",
+    "estimateUnavailable": "這些設定無法提供付費摘要。請變更模型或上限，或稍後再試。",
     "confirmPaid": "要為 {{context}} 啟用付費摘要嗎？",
     "paidDisclosure": "預估 {{estimate}}，最高 {{maximum}}，時間上限 {{minutes}} 分鐘。即使產生失敗仍會收費。",
     "enable": "啟用付費摘要",
     "allContexts": "個人與組織的簡報會分開保存。",
     "emptyHistory": "沒有已儲存的簡報",
-    "estimatePermissionUnavailable": "你沒有使用此使用情境餘額的權限。",
-    "estimatePricingUnavailable": "此模型的定價無法取得。",
-    "estimateBalanceUnavailable": "餘額不足以產生付費摘要。",
-    "estimateModelNotAllowed": "此模型在此不受允許。",
+    "estimatePermissionUnavailable": "你沒有使用此使用情境餘額的權限。請聯絡組織擁有者啟用此權限。",
+    "estimatePricingUnavailable": "此模型的定價無法取得。請選擇其他模型。",
+    "estimateBalanceUnavailable": "餘額不足以產生付費摘要。請為此使用情境的餘額加值。",
+    "estimateModelNotAllowed": "此模型在此使用情境中不受允許。請選擇其他模型。",
     "estimateSpendLimitTooLow": "請提高花費上限，才能產生此摘要。",
     "saved": "簡報設定已儲存",
     "selectedSessions": "選取的工作階段",
@@ -4501,16 +4574,35 @@
     "capturedAt": "擷取於 {{time}}",
     "snapshotHint": "在排定的早晨時間，盡力擷取最新可用的工作階段狀態快照。數量僅反映選取的工作階段，不代表整晚的完整活動。",
     "snapshotTruncated": "為限制此快照的大小，部分工作階段或證據已省略。",
-    "snapshotSummaryFailed": "AI 摘要失敗。你的結構化快照仍可查看。",
+    "snapshotSummaryFailed": "AI 摘要失敗。你的結構化簡報仍可查看。",
     "scheduledContextEnabled": "排定的簡報",
     "scheduledContextSettings": "排定的簡報 · {{context}}",
     "scheduledContextHint": "僅為此情境啟用排程擷取與付費 AI 摘要。經挑選並遮蔽敏感資訊的摘錄與結構化資料會傳送至你的模型。摘要會使用你更新簡報設定時所儲存的 App 語言。費用從此情境的餘額扣除。無活動的快照不會使用 AI。",
     "snapshotSafeguards": "每份摘要的時間與花費上限分別套用至每份排定的快照，並非每日預算。",
-    "snapshotEstimateInputTooLarge": "此快照的證據量超出所選模型可處理的範圍。",
+    "snapshotEstimateInputTooLarge": "此快照的證據量超出所選模型可處理的範圍。請選擇具有較大輸入視窗的模型。",
     "quietSnapshot": "此快照未選取任何工作階段活動。未要求 AI 摘要，也未收費。",
     "noEnabledContexts": "未為任何情境啟用排定的簡報",
     "sourceBlocker": "工作階段需要留意",
-    "sourceMetadata": "已擷取的工作階段中繼資料"
+    "sourceMetadata": "已擷取的工作階段中繼資料",
+    "metadataPlan_other": "計畫：已完成 {{displayDone}}/{{displayTotal}} 個步驟",
+    "metadataPlan": "計畫：已完成 {{displayDone}}/{{displayTotal}} 個步驟",
+    "metadataFiles_other": "{{displayCount}} 個檔案已變更",
+    "metadataFiles": "{{displayCount}} 個檔案已變更",
+    "metadataLinesAdded_other": "新增 {{displayCount}} 行",
+    "metadataLinesAdded": "新增 {{displayCount}} 行",
+    "metadataLinesRemoved_other": "刪除 {{displayCount}} 行",
+    "metadataLinesRemoved": "刪除 {{displayCount}} 行",
+    "metadataPlanCurrent": "目前步驟：{{current}}",
+    "metadataFailure": "上一輪失敗：{{kind}}",
+    "sourceActivity": "未命名活動",
+    "metadataFailureProvider": "提供者錯誤",
+    "metadataFailureTool": "工具錯誤",
+    "metadataFailureCancelled": "已取消",
+    "metadataFailureOther": "未指定錯誤",
+    "metadataPlan_one": "計畫：已完成 {{displayDone}}/{{displayTotal}} 個步驟",
+    "metadataFiles_one": "{{displayCount}} 個檔案已變更",
+    "metadataLinesAdded_one": "新增 {{displayCount}} 行",
+    "metadataLinesRemoved_one": "刪除 {{displayCount}} 行"
   },
   "systemSearch": {
     "couldNotOpenResult": "無法開啟此搜尋結果"
@@ -4527,6 +4619,8 @@
     "topModels": "最常用模型",
     "topFeatures": "最常用功能",
     "emptyTitle": "此期間沒有用量",
+    "unavailableTitle": "用量無法使用",
+    "unavailableDescription": "此工作區未回報用量。重試不會有幫助。",
     "orgSelfNotice": "你看到的是你自己在此組織中的用量。",
     "viewDetails": "查看用量詳情"
   },
@@ -4544,10 +4638,14 @@
     "couldNotLoad": "無法載入整合",
     "permissionDenied": "您沒有管理這些整合的權限。",
     "managedByOwner": "請洽詢組織擁有者來變更您無法變更的連結。",
+    "managedByOwnerOrAdmin": "請洽詢組織擁有者或管理員來變更您無法變更的連結。",
+    "managedByOwnerOrBilling": "請洽詢組織擁有者或帳單管理員來變更您無法變更的連結。",
+    "managedByOwnerAdminOrBilling": "請洽詢組織擁有者、管理員或帳單管理員來變更您無法變更的連結。",
     "connectFailed": "無法開啟連結頁面"
   },
   "invoices": {
-    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。"
+    "personalEmptyDescription": "你個人購買的發票會在計費後顯示在這裡。App Store 收據與 Google Play 收據都在點數紀錄中。",
+    "personalPeriod": "最近 12 個月"
   },
   "cloudAgent": {
     "compute": {
@@ -4577,8 +4675,9 @@
       "title": "觸發器與網路鉤子",
       "subtitle": "透過網路鉤子呼叫或排程自動執行 Cloud Agent。",
       "new": "新增觸發器",
+      "create": "建立觸發器",
       "emptyTitle": "尚無觸發器",
-      "emptyDescription": "建立觸發器，以透過網路鉤子呼叫或排程啟動 Cloud Agent 執行。",
+      "emptyDescription": "建立你的第一個觸發器。",
       "loadFailedTitle": "無法載入觸發器",
       "loadFailedDescription": "有連線時請再試一次。",
       "detailLoadFailedTitle": "無法載入此觸發器",
@@ -4630,6 +4729,8 @@
       "created": "已建立觸發器",
       "saved": "已儲存觸發器",
       "statusArrived": "已送達",
+      "defaultPromptWebhook": "描述此網路鉤子請求的內文：\n\n{{body}}",
+      "defaultPromptScheduled": "執行排程工作。觸發時間為 {{scheduledTime}}。",
       "problems": {
         "nameRequired": "請輸入名稱。",
         "nameTooShort": "請使用至少 8 個字元。",
@@ -4678,6 +4779,7 @@
     "superseded": "此連結已在其他裝置上被取代，因此已失效。"
   },
   "sharedSession": {
+    "startedAt": "開始於 {{time}}",
     "title": "已分享的工作階段",
     "someone": "某位使用者",
     "sharedBy": "由 {{owner}} 分享",
@@ -4685,5 +4787,179 @@
     "unavailableDescription": "此分享連結已過期或已被撤銷。",
     "transcriptUnavailableTitle": "無法載入此對話記錄",
     "transcriptUnavailableDescription": "連結仍然有效，請稍後再試一次。"
+  },
+  "organizationGuardrails": {
+    "title": "AI 護欄",
+    "permissionDenied": "只有組織擁有者與管理員可以管理 AI 護欄。",
+    "unavailableTitle": "未啟用 AI 護欄",
+    "unavailable": "Kilo 可依請求為組織啟用 AI 護欄。請聯絡 {{supportEmail}}，Kilo 團隊會為你的組織開啟。",
+    "contactSupport": "聯絡客服",
+    "loadError": "無法載入 AI 護欄",
+    "statusSaving": "儲存中…",
+    "statusSaved": "已儲存",
+    "statusFailed": "無法儲存。",
+    "inputTitle": "輸入護欄",
+    "inputDescription": "使用 Enkrypt AI 掃描每個輸入，包括工具結果。當 Enkrypt 無法使用時，請求不會被拒絕，而是在未經掃描的情況下傳送。",
+    "outputTitle": "輸出護欄",
+    "outputDescription": "在成員收到回應前，使用 Enkrypt AI 掃描回應。除非您開啟，否則為關閉狀態。",
+    "detectorsHint": "封鎖會拒絕被標記的請求。僅記錄只會記錄該請求，不會延遲請求。",
+    "detectorsHintOutput": "封鎖會讓被標記的回應失敗。僅記錄只會記錄該回應，不會延遲回應。",
+    "choiceLog": "僅記錄",
+    "applyTo": "套用至",
+    "applyToAllMembers": "所有成員",
+    "applyKiloDefault": "套用 Kilo 預設值",
+    "invalidSavedTitle": "無法讀取已儲存的輸入偵測器設定",
+    "invalidSavedBody": "在重新儲存輸入偵測器之前，請求會遭到封鎖。下方偵測器會從 Kilo 預設值開始。",
+    "invalidSavedOutputTitle": "無法讀取已儲存的輸出偵測器設定",
+    "invalidSavedOutputBody": "在重新儲存輸出偵測器之前，回應會暫不傳送。請在下方選擇輸出偵測器。",
+    "blockingOutputNote": "封鎖型輸出偵測器會保留回應，直到 Enkrypt 檢查完所有內容。使用「僅記錄」可避免延遲。",
+    "inputDetectorRequired": "請至少開啟一個輸入偵測器。",
+    "outputDetectorRequired": "請至少開啟一個輸出偵測器。",
+    "rulesTooMany": "最多可新增 {{max}} 條規則。",
+    "ruleIdRequired": "請輸入規則 ID。",
+    "ruleIdInvalid": "規則 ID 只能使用字母、數字、點、連字號與底線。",
+    "ruleTextRequired": "描述此規則禁止或要求的事項。",
+    "keywordTooLong": "每個關鍵字最多可有 {{max}} 個字元。",
+    "topicTooLong": "每個主題最多可有 {{max}} 個字元。",
+    "keywordsTooMany": "最多可新增 {{max}} 個關鍵字。",
+    "topicsTooMany": "最多可新增 {{max}} 個主題。",
+    "piiEntityRequired": "請至少選取一種要偵測的資料。",
+    "keywordRequired": "請至少新增一個關鍵字。",
+    "topicRequired": "請至少新增一個主題。",
+    "policyTextRequired": "請輸入政策文字。",
+    "ruleRequired": "請至少新增一條規則。",
+    "ruleIdDuplicate": "每條規則都需要有自己的規則 ID。",
+    "piiEntities": "要偵測的資料",
+    "keywordsLabel": "關鍵字",
+    "keywordsHint": "每行一個關鍵字。",
+    "topicsHint": "每行一個主題。",
+    "policyFormat": "政策格式",
+    "policyFormatRules": "結構化規則",
+    "policyFormatRulesDescription": "每個要求一條規則，並包含類別與嚴重性。建議使用。",
+    "policyFormatText": "政策文字",
+    "policyFormatTextDescription": "將現有政策貼上為純文字。",
+    "rulesEmpty": "尚無規則。每條規則描述輸入不得包含或要求的一件事項。",
+    "addRule": "新增規則",
+    "ruleNumber": "規則 {{number}}",
+    "ruleRemove": "移除規則 {{number}}",
+    "ruleIdLabel": "規則 ID",
+    "ruleNameLabel": "名稱（選填）",
+    "ruleTextLabel": "規則",
+    "ruleRiskCategory": "風險類別",
+    "ruleApplicability": "範圍",
+    "ruleFrameworks": "框架",
+    "detector": {
+      "promptInjection": {
+        "label": "提示注入",
+        "description": "偵測嘗試覆寫指示或越獄模型的行為。"
+      },
+      "policyViolation": {
+        "label": "政策違規",
+        "description": "標記違反您組織政策的輸入，政策以文字或規則撰寫。",
+        "descriptionOutput": "標記違反您組織政策的回應，政策以文字或規則撰寫。"
+      },
+      "pii": {
+        "label": "PII 與機密",
+        "description": "偵測個人資料、憑證、IP 位址與 URL。"
+      },
+      "keywords": {
+        "label": "禁用關鍵字",
+        "descriptionOutput": "偵測包含您所列任何關鍵字的回應。"
+      },
+      "topics": {
+        "label": "主題",
+        "descriptionOutput": "標記涉及您所列任何主題的回應。"
+      },
+      "toxicity": {
+        "label": "毒性",
+        "description": "偵測有毒、侮辱、威脅或仇恨性語言。"
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "偵測色情或其他不宜在工作場所觀看的內容。"
+      },
+      "bias": {
+        "label": "偏見",
+        "description": "偵測帶有偏見或歧視性的語言。"
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "個人資料",
+        "description": "姓名、電子郵件地址、電話號碼。"
+      },
+      "secrets": {
+        "label": "機密",
+        "description": "API 金鑰、權杖、密碼。"
+      },
+      "ipAddress": {
+        "label": "IP 位址",
+        "description": "IPv4 與 IPv6 位址。"
+      },
+      "url": {
+        "label": "URL",
+        "description": "網址。"
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "安全與詐欺",
+      "safetyHarm": "安全與危害",
+      "privacyDataProtection": "隱私與資料保護",
+      "brandReputationTrust": "品牌與聲譽",
+      "biasFairnessEthical": "偏見與公平性",
+      "legalIpLiability": "法律與 IP 責任",
+      "productMisuse": "產品濫用",
+      "performanceQuality": "效能與品質"
+    },
+    "applicability": {
+      "user": "使用者輸入",
+      "userAssistant": "使用者輸入與回應"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 十大風險（2025）",
+      "nist": "NIST AI RMF",
+      "euAiAct": "歐盟 AI 法案",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "企業版功能",
+    "enterpriseOnly": "這是僅限企業版的功能。",
+    "readOnly": "只有組織擁有者與管理員可以變更這些設定。",
+    "loadError": "無法載入供應商與模型",
+    "tabModels": "模型",
+    "tabProviders": "供應商",
+    "tabGateways": "閘道",
+    "modelsDescription": "關閉模型即可對所有成員封鎖該模型。來自允許供應商的模型預設為開啟。",
+    "modelsDeniedOnly": "僅顯示已拒絕",
+    "modelsEmpty": "沒有符合此搜尋的模型。",
+    "modelsDeniedEmpty": "沒有已拒絕的模型。",
+    "modelsDeniedSearchEmpty": "沒有已拒絕的模型符合此搜尋。",
+    "providersDescription": "關閉供應商即可停止 Kilo 為此組織將請求路由至該供應商。",
+    "providersNeedCatalog": "在完整模型目錄載入完成前，供應商開關為唯讀狀態。點一下上方的再試一次即可編輯。",
+    "providersEmpty": "沒有符合此搜尋的供應商。",
+    "allowAllShown": "允許所有顯示項目",
+    "denyAllShown": "拒絕所有顯示項目",
+    "gatewaysDescription": "Kilo 會透過 Vercel AI Gateway 或 OpenRouter 路由模型請求。停用的閘道會使這些請求失敗。",
+    "emptyProviderList": "請至少允許一個供應商。清單為空會封鎖所有 Kilo 模型路由。",
+    "gatewaysUnavailable": "此組織無法使用閘道設定。",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter 請求不會固定到特定區域。",
+    "inferenceRegion": "推論區域",
+    "inferenceRegionDescription": "將 Vercel AI Gateway 請求固定到此區域。在該區域無法使用的模型會失敗。",
+    "disableOpenrouterNote": "停用 OpenRouter 也會封鎖透過其路由請求的 BYOK 金鑰。",
+    "emptyModelList": "請至少保留一個已啟用的模型。拒絕所有模型會導致成員沒有可用的模型。",
+    "catalogUnavailable": "未能載入完整的模型目錄，因此僅顯示已儲存的清單。請重試以載入所有模型。",
+    "region": {
+      "global": "全球",
+      "us": "美國",
+      "eu": "歐盟",
+      "au": "澳洲",
+      "jp": "日本"
+    }
   }
 }

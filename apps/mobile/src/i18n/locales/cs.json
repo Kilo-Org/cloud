@@ -26,6 +26,7 @@
     "creditHistory": "Historie kreditů",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Zrušit",
     "done": "Hotovo",
     "retry": "Zkusit znovu",
@@ -175,7 +176,9 @@
     "durationHourShort": "h",
     "changes": "Změny",
     "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
-    "privateRepositoryA11y": "{{name}}, soukromý repozitář"
+    "privateRepositoryA11y": "{{name}}, soukromý repozitář",
+    "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
+    "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu."
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -308,9 +311,9 @@
     "passkeyVerifyDescription": "Pro vaše zabezpečení potvrďte, že jste to vy, než změníte přístupové klíče.",
     "passkeyVerifyWithPasskey": "Ověřit přístupovým klíčem",
     "passkeyVerifySendCode": "Poslat kód e-mailem",
-    "passkeyVerifySendingCode": "Odesílání kódu...",
+    "passkeyVerifySendingCode": "Odesílání kódu…",
     "passkeyVerifyPasskeyPrompt": "Pokračujte potvrzením přístupovým klíčem.",
-    "passkeyVerifyChecking": "Ověřování kódu...",
+    "passkeyVerifyChecking": "Ověřování kódu…",
     "passkeyVerifyCodeSent": "Zadejte kód, který jsme odeslali na {{email}}.",
     "passkeyVerifyCodeRejected": "Tento kód nesouhlasí. Zkuste to znovu.",
     "passkeyVerifyPasskeyFailed": "Tento přístupový klíč se nepodařilo potvrdit. Zkuste to znovu.",
@@ -318,8 +321,8 @@
     "passkeyVerifyInProgress": "Tento kód se už ověřuje. Zkuste to za chvíli znovu.",
     "passkeyVerifyTooManyAttempts": "Příliš mnoho pokusů. Odešlete nový kód.",
     "passkeyVerifySsoRequired": "Vaše organizace vyžaduje jednotné přihlášení. Schvalte tuto změnu v prohlížeči a vraťte se sem.",
-    "passkeyVerifySsoStarting": "Spouštění schválení...",
-    "passkeyVerifySsoWaiting": "Čekání na schválení...",
+    "passkeyVerifySsoStarting": "Spouštění schválení…",
+    "passkeyVerifySsoWaiting": "Čekání na schválení…",
     "passkeyVerifySsoOpen": "Otevřít stránku schválení",
     "passkeyVerifySsoExpired": "Platnost tohoto schválení vypršela nebo bylo zrušeno. Zkuste to znovu.",
     "passkeyVerifySsoUnavailable": "Schválení jednotného přihlášení teď není dostupné. Zkuste to znovu.",
@@ -385,12 +388,24 @@
       "editKeyDescription": "Uloženou hodnotu nelze zobrazit. Zadejte novou, která ji nahradí.",
       "editKeyMappingsWarning": "Nahrazením klíče se nahradí i uložená mapování modelů: znovu zadejte každé mapování, které ještě potřebujete.",
       "saveFailed": "Klíč se nepodařilo uložit.",
-      "invalidCredentials": "Zkontrolujte přihlašovací údaje a zkuste to znovu.",
       "fieldRequired": "Pole {{field}} je povinné.",
+      "keyIncomplete": "V klíči chybí povinná hodnota.",
       "incompleteMapping": "Mapování {{number}} vyžaduje slug modelu brány i název nasazení.",
       "apiKeyLabel": "Klíč API",
       "apiKeyPlaceholder": "Vložte klíč",
       "apiKeyRequired": "Zadejte klíč.",
+      "keyAlreadyExists": "Klíč pro tohoto poskytovatele už máte. Před přidáním dalšího ho odeberte.",
+      "keyStoreFailed": "Klíč se nepodařilo uložit.",
+      "invalidCredentials": "Tento klíč nemá formát, který tento poskytovatel očekává. Zkontrolujte ho a zkuste to znovu.",
+      "testSucceeded": "Klíč funguje. Poskytovatel: {{provider}}. Model: {{model}}.",
+      "testRejected": "Poskytovatel tento klíč odmítl. Zkontrolujte, že je správný a že nebyl odvolán.",
+      "testIncomplete": "Poskytovatel ukončil test před jeho dokončením. Zkuste to znovu.",
+      "testUnsupportedProvider": "Tento poskytovatel už není podporován. Odeberte klíč.",
+      "testUnreadableKey": "Uložený klíč se nepodařilo přečíst. Zkuste to znovu později.",
+      "testDeprecatedProvider": "Tento poskytovatel je zastaralý, takže jeho klíč nelze otestovat.",
+      "keyManagedByCodingPlan": "Klíč tohoto poskytovatele spravuje programovací tarif a je jen pro čtení. Chcete-li přidat vlastní klíč, zrušte programovací tarif.",
+      "providerUnavailable": "Tento poskytovatel zatím není dostupný, proto pro něj nelze přidat klíč.",
+      "testFailed": "Test klíče selhal. Zkuste to znovu.",
       "authMethod": "Způsob ověření",
       "authMethodAccessKeys": "Přístupové klíče",
       "resourceName": "Název prostředku Azure",
@@ -481,7 +496,14 @@
       "viewReceipt": "Zobrazit potvrzení"
     },
     "changelog": "Co je nového",
-    "changelogVersionPending": "Poznámky k této verzi přijdou s další aktualizací aplikace."
+    "changelogVersionPending": "Poznámky k verzi {{version}} přijdou s další aktualizací aplikace.",
+    "changelogGroupNew": "Novinky",
+    "changelogFixesIn": "Opravy a vylepšení v oblastech: {{areas}}.",
+    "changelogFixesPolish": "Opravy a vylepšení v celé aplikaci.",
+    "changelogAreas": {
+      "signIn": "Přihlášení",
+      "profileOrganizations": "Profil a organizace"
+    }
   },
   "preferences": {
     "general": "Obecné",
@@ -822,7 +844,19 @@
         "fileComment": "Komentář k souboru",
         "outdatedOnPathLines": "Zastaralé: {{path}} {{lines}}",
         "outdatedOnLines": "Zastaralé: {{lines}}",
-        "outdatedOnPath": "Zastaralé: {{path}}"
+        "outdatedOnPath": "Zastaralé: {{path}}",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "Levá strana",
+        "sideRight": "Pravá strana",
+        "outdatedOnLinesSide": "Zastaralé: {{lines}} ({{side}})",
+        "outdatedOnPathLinesSide": "Zastaralé: {{path}} {{lines}} ({{side}})",
+        "outdatedSide": "Zastaralé ({{side}})",
+        "outdatedOnPathSide": "Zastaralé: {{path}} ({{side}})"
       },
       "deletedUser": "smazaný uživatel",
       "replyForbiddenTerm": "Nemáš oprávnění odpovídat v tomto {{term}}.",
@@ -944,7 +978,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatím nemá žádnou organizaci. PR na Bitbucketu půjde kontrolovat, jakmile nějakou vytvoříš nebo se k ní přidáš.",
       "gitlabReconnectAdminOnlyDescription": "Požádejte vlastníka organizace, správce nebo správce fakturace, aby ho znovu připojil.",
       "bitbucketNotConnectedTitle": "Bitbucket není připojen",
-      "bitbucketAdminOnlyDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
+      "adminOnlyConnectDescription": "Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
       "contextLine": "Pro {{organization}}",
       "contextLinePersonal": "Pro osobní účet"
     },
@@ -1397,10 +1431,12 @@
       "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Připojení Bitbucket této organizace se spravuje na webu z počítače.",
-      "description": "Vytvořte přístupový token pracovního prostoru s požadovanými oprávněními a vložte jej níže.",
+      "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",
+      "description": "Vytvořte přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
+      "descriptionReconnect": "Vytvořte nový přístupový token pracovního prostoru pro {{organization}} a vložte jej níže.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
-      "tokenPlaceholder": "Přístupový token pracovního prostoru"
+      "tokenPlaceholder": "Přístupový token pracovního prostoru",
+      "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
     },
     "scopeList": {
       "personalStillAvailable": "Osobní repozitáře jsou stále k dispozici níže.",
@@ -1513,13 +1549,27 @@
       "repositoryLine": "Kontroly: {{reviews}} · Nálezy: {{findings}}",
       "empty": "Zatím žádné kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenává dokončené kontroly, pokud je pro organizaci zapnutá.",
-      "off": "Analytika je pro tuto organizaci vypnutá.",
-      "couldNotLoad": "Analytiku se nepodařilo načíst"
+      "offTitle": "Analytika je pro {{platform}} vypnutá",
+      "offDescription": "Organizační role pro fakturaci mohou zapnout analytiku v nastavení organizace na webu, aby se zaznamenávaly dokončené kontroly.",
+      "couldNotLoad": "Analytiku se nepodařilo načíst",
+      "trackedReviewsCaption": "Dokončené kontroly, které v tomto období skončily se zapnutou analytikou. Probíhající a neúspěšné kontroly se nikdy nepočítají.",
+      "trackedReviewsUncounted": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_few": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_many": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_one": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_other": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen."
     },
     "council": {
       "title": "Kontrola radou",
       "subtitle": "Každý pull request zkontroluje několik specialistů a jejich hlasy se spojí do jednoho rozhodnutí.",
-      "unavailable": "Kontrola radou není pro tuto organizaci dostupná.",
+      "unavailablePersonallyTitle": "Vyžaduje organizaci Enterprise",
+      "unavailablePersonally": "Kontrola radou není součástí osobního účtu.",
+      "unavailablePersonallyAction": "Vytvořit organizaci",
+      "unavailablePersonallySwitchAction": "Přepnout organizaci",
+      "unavailableOrganizationTitle": "Kontrola radou není nyní dostupná",
+      "unavailableForOrganization": "Kontrola radou vyžaduje plán Enterprise s aktivním předplatným nebo zkušebním obdobím. Tato organizace jej nyní nemá.",
+      "unavailableForOrganizationNeutral": "Kontrola radou není pro tuto organizaci nyní dostupná. Zkuste to znovu později.",
+      "unavailableOnBitbucket": "Kontrola radou není dostupná pro repozitáře Bitbucket.",
       "noRepositories": "Zatím nejsou vybrány žádné repozitáře. Nejprve je vyberte v nastavení repozitářů.",
       "specialists": "Specialisté",
       "labels": "Štítky spouštějící kontrolu radou",
@@ -2199,6 +2249,8 @@
       "renameAccessibility": "Přejmenovat relaci: {{title}}",
       "cloningSession": "Klonování relace",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
+      "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
+      "historyUnavailable": "Přepis této relace nelze přečíst.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
       "notEnoughCredits": "Nemáte dost kreditů pro tento požadavek. Dobijte si kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úkol se ještě dokončuje. Chvíli prosím počkejte.",
@@ -2275,6 +2327,7 @@
       "branchDefault": "Výchozí",
       "branchAccessibility": "Větev: {{label}}",
       "branchLoading": "Načítání větví",
+      "branchInactive": "Vyberte repozitář, aby se načetly jeho větve.",
       "branchLoadError": "Větve se nepodařilo načíst",
       "branchUnavailable": "Pro tento repozitář nejsou větve dostupné. Zkontroluj svůj přístup u poskytovatele a vyber jiný repozitář.",
       "branchEmpty": "Žádné dostupné větve",
@@ -2515,7 +2568,8 @@
       "customModes": "Vlastní režimy"
     },
     "modeSelector": {
-      "accessibility": "Režim: {{label}}"
+      "accessibility": "Režim: {{label}}",
+      "customMode": "Vlastní režim"
     },
     "modeOptions": {
       "code": "Programovat",
@@ -2833,7 +2887,7 @@
       "thinkingEffortAccessibility": "Úroveň uvažování: {{label}}",
       "thinkingEffortSelected": "Úroveň uvažování: {{label}}, vybráno",
       "thinkingEffortWithModel": "{{model}}, úroveň uvažování: {{variant}}",
-      "lockedByAgent": ", Uzamčeno agentem „{{agent}}“",
+      "lockedByAgent": "Uzamčeno agentem „{{agent}}“",
       "addToFavorites": "Přidat {{name}} do oblíbených",
       "removeFromFavorites": "Odebrat {{name}} z oblíbených",
       "sessionModel": "Model relace"
@@ -3100,7 +3154,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Relace se nepodařilo načíst.",
-    "couldNotLoadActiveSessions": "Aktivní relace se nepodařilo načíst.",
     "agentSessions": "Právě běží",
     "newCodingTask": "Nový programovací úkol",
     "newTaskFromPicture": "Nový úkol z obrázku",
@@ -3127,6 +3180,7 @@
   "queryError": {
     "neutralDescription": "Zkuste to prosím znovu.",
     "offlineTitle": "Načtení se nezdařilo.",
+    "offlineDescription": "Nepodařilo se připojit k serveru.",
     "permissionDescription": "Nemáš oprávnění k zobrazení tohoto obsahu.",
     "notFoundDescription": "Tato položka mohla být odebrána nebo již není k dispozici.",
     "serverTitle": "Načtení se nepodařilo.",
@@ -3236,7 +3290,6 @@
     "completingPurchase": "Dokončuje se nákup",
     "subscriptionLoading": "Načítá se předplatné Kilo Pass",
     "retryHint": "Znovu načte stav Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. Akce: {{actionLabel}}",
     "endedOn": "Ukončeno {{date}}",
     "notAvailableInApp": "Kilo Pass není v aplikaci k dispozici.",
     "statusActive": "Aktivní",
@@ -3439,6 +3492,7 @@
       "manageOnWeb": "Nastavení fakturace na webu",
       "changePlan": "Změnit plán",
       "buySeats": "Koupit uživatelská místa",
+      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na webu.",
       "setupAutoTopUp": "Nastavit automatické dobití",
       "manageAutoTopUp": "Spravovat automatické dobití",
       "opensOnWeb": "Otevře se na webu"
@@ -3450,7 +3504,7 @@
       "loadErrorTitle": "Vaše organizace se nepodařilo načíst.",
       "membershipLostNotice": "Už nemáte přístup do této organizace. Přepnuto na {{target}}.",
       "noOrganization": "Žádná organizace",
-      "noOrganizationDescription": "Tento účet nepatří do žádné organizace. Vytvořte si ji, abyste mohli používat funkce organizace, jako jsou pozvánky pro členy a upozornění na nízký zůstatek, nebo otevřete web a připojte se k organizaci, do které jste byli pozváni.",
+      "noOrganizationDescription": "Tento účet nepatří do žádné organizace. Vytvořte si ji, abyste mohli používat funkce organizace, jako jsou pozvánky pro členy a upozornění na nízký zůstatek, nebo přijměte pozvánku z e-mailu, který vám organizace poslala.",
       "organizationUnavailable": "Organizace není k dispozici.",
       "selectDescriptionWithOrganizations": "Patříte k jedné nebo více organizacím. Vyberte účet, který má tato obrazovka používat.",
       "selectOrganization": "Vyberte organizaci",
@@ -3482,7 +3536,8 @@
         "accounting_adjustment": "Účetní úprava",
         "credits_expired": "Kredity s prošlou platností"
       },
-      "truncated": "K dispozici jsou i starší pohyby kreditů."
+      "truncated": "K dispozici jsou i starší pohyby kreditů.",
+      "retentionLimit": "Zobrazují se nejnovější pohyby kreditů."
     },
     "inviteMember": {
       "emailError": "Zadejte platnou e-mailovou adresu.",
@@ -3492,6 +3547,7 @@
       "sendInvite": "Odeslat pozvánku",
       "title": "Pozvat člena",
       "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
+      "organizationUnavailable": "Tato organizace již není k dispozici.",
       "sendError": "Pozvánku se nepodařilo odeslat.",
       "pendingInvitation": "Pro tento e-mail již existuje čekající pozvánka.",
       "alreadyMember": "Tato osoba je již členem této organizace.",
@@ -3513,7 +3569,8 @@
         "void": "Stornováno",
         "uncollectible": "Nedobytné"
       },
-      "truncated": "Starší faktury jsou k dispozici."
+      "truncated": "Starší faktury jsou k dispozici.",
+      "retentionLimit": "Zobrazují se nejnovější faktury."
     },
     "lowBalanceAlert": {
       "enableA11y": "Povolit upozornění na nízký zůstatek",
@@ -3576,7 +3633,6 @@
     },
     "settingsOnWeb": {
       "title": "Nastavení organizace na webu",
-      "integrations": "Integrace na webu",
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelé a modely",
       "groups": "Skupiny",
@@ -3585,9 +3641,18 @@
       "ssoAndDomain": "SSO a doména",
       "dataCollection": "Shromažďování dat",
       "auditLogs": "Auditní protokoly",
-      "requestLogs": "Protokoly požadavků",
-      "subOrganizations": "Podorganizace",
-      "distributeFunds": "Rozdělit prostředky"
+      "requestLogs": "Protokoly požadavků"
+    },
+    "requestLogs": {
+      "older": "Starší hodina",
+      "newer": "Novější hodina",
+      "truncated": "V této hodině je více požadavků, než seznam zobrazuje.",
+      "emptyTitle": "Žádné požadavky v této hodině",
+      "emptyDescription": "Pomocí tlačítka „Starší hodina“ zobrazíte dřívější požadavky.",
+      "loadError": "Protokoly požadavků se nepodařilo načíst.",
+      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "tokens": "{{input}} vstup · {{output}} výstup",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",
@@ -3743,8 +3808,7 @@
     "imagesSectionEmpty": "Žádné důvěryhodné domény obrázků",
     "revoke": "Odebrat důvěru doméně {{host}}",
     "revokeMessage": "Odkazy na tuto doménu budou znovu vyžadovat potvrzení.",
-    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení.",
-    "backToPreferences": "Zpět na předvolby"
+    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení."
   },
   "glanceable": {
     "waiting": "Aktualizace agentů",
@@ -3758,7 +3822,7 @@
     "newestSession": "Nejnovější: {{title}}",
     "noneWaiting": "Žádný agent nečeká",
     "newAgent": "Nový agent",
-    "approving": "Schvaluje se...",
+    "approving": "Schvaluje se…",
     "couldNotApprove": "Schválení se nezdařilo",
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
@@ -3770,6 +3834,7 @@
     "lastKnown": "Poslední známý stav",
     "awaitingUpdate": "Čeká na aktualizaci",
     "nextRun": "Příští spuštění",
+    "wasDue": "Očekáváno",
     "waitingForYou": "Čeká na vás",
     "nextScheduled": "Další naplánované",
     "answerNeeded": "Čeká na odpověď",
@@ -3879,6 +3944,8 @@
       "fieldName": "Zobrazovaný název",
       "fieldUrl": "URL serveru",
       "fieldUrlInvalid": "Zadejte platnou URL serveru.",
+      "duplicateUrl": "Tato URL je již uložena.",
+      "serverNotFound": "Tento server již není uložen.",
       "enableServer": "Povolit tento server: {{name}}",
       "editServer": "Upravit server",
       "deleteServer": "Smazat server",
@@ -3990,6 +4057,8 @@
       "downloading": "Stahování: {{written}} z {{total}}",
       "downloadingUnknown": "Stahování: {{written}}",
       "paused": "Pozastaveno: {{written}} z {{total}}",
+      "retrying": "Nový pokus: {{written}} z {{total}}",
+      "retryingUnknown": "Nový pokus: {{written}}",
       "verifying": "Kontrola staženého souboru…",
       "downloaded": "Staženo · {{size}}",
       "url": "Přímý odkaz ke stažení",
@@ -4080,7 +4149,9 @@
         "androidModelUnavailable": "Toto zařízení nepodporuje Gemini Nano, nebo se systémová aplikace AICore ještě nastavuje. Zkuste to později.",
         "aicoreUpdateRequired": "Pokud chcete tento model používat, aktualizujte aplikaci AICore a systémový software.",
         "downloadable": "Před prvním použitím je potřeba tento model jednorázově stáhnout.",
-        "downloading": "Model se stahuje. Bude připraven, jakmile stahování skončí."
+        "downloading": "Model se stahuje. Bude připraven, jakmile stahování skončí.",
+        "batteryQuota": "Model v zařízení prozatím vyčerpal svůj limit baterie. Zkuste to znovu později.",
+        "checkFailed": "Aplikace tento model nemohla zkontrolovat. Zkuste to znovu."
       },
       "unavailable": "Model v zařízení teď není dostupný. Zkontrolujte jeho stav v sekci $t(modelChat.backends.title).",
       "busy": "Model v zařízení právě generuje jinou odpověď. Zkuste to znovu, až skončí.",
@@ -4330,7 +4401,7 @@
       "topPPlaceholder": "např. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Můj agent",
-      "promptPlaceholder": "ty jsi...",
+      "promptPlaceholder": "ty jsi…",
       "tools": "Nástroje",
       "wholeToolRule": "Tento agent aplikuje jedno pravidlo na všechny nástroje najednou: {{rule}}. Tyto přepínače jsou pouze pro čtení.",
       "visibility": "Viditelnost",
@@ -4405,8 +4476,7 @@
       "repoValue": "Úložiště: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Tento profil už není dostupný. Vyberte jiný.",
-      "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Profil organizace může vytvořit vlastník organizace nebo správce."
+      "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi."
     },
     "variablesDeleteFailed": "Proměnnou se nepodařilo smazat",
     "deleteVariable": "Smazat proměnnou {{key}}",
@@ -4454,7 +4524,8 @@
       "purchaseFallback": "Nákup kreditů",
       "receipt": "Účtenka",
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
-      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici."
+      "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
+      "retentionLimit": "Zobrazuje se nejnovější historie kreditů."
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
@@ -4596,16 +4667,20 @@
     "loadError": "Přehledy se nepodařilo načíst",
     "view": "Číst přehled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "Filtrovat podle kontextu",
+    "contextAll": "Všechny kontexty",
     "dismiss": "Skrýt přehled",
+    "dismissFailed": "Přehled se zatím nepodařilo skrýt. Pokus se automaticky opakuje na pozadí.",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený přehled · obnovení nedostupné",
-    "window": "{{start}} – {{end}}",
     "summary": "AI shrnutí",
     "summaryPending": "AI shrnutí se připravuje. Až bude hotové, objeví se zde.",
     "summaryUnavailable": "AI shrnutí není k dispozici. Strukturovaný přehled je stále dostupný.",
     "summaryCharge": "AI účtovala {{cost}}",
     "summaryChargePending": "Poplatek za AI čeká na vyúčtování",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "Důkazy a artefakty",
     "timezone": "Časové pásmo přehledu",
     "deviceTimezone": "Použít časové pásmo zařízení",
@@ -4617,22 +4692,22 @@
     "timeHint": "Karta na domovské obrazovce obnoví živý stav po skončení období přehledu, i offline.",
     "invalidSchedule": "Zvolte platné časové pásmo a neprázdné období přehledu.",
     "notificationsHint": "Jedno obecné oznámení na každý naplánovaný přehled. Nezávisí na placených AI shrnutích.",
-    "notificationPermission": "Pro příjem přehledu povolte oznámení zařízení v sekci $t(common.notifications).",
+    "notificationPermission": "Pro příjem přehledu zapněte push oznámení.",
     "defaultModel": "Použít výchozí model Kilo",
     "duration": "Časový limit (minuty)",
     "spendLimit": "Limit útraty (USD)",
     "invalidSafeguards": "Zadejte kladné konečné limity času a útraty.",
     "estimate": "Odhad {{estimate}} · maximum {{maximum}}",
-    "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné.",
+    "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné. Změňte model nebo limity, případně to zkuste později.",
     "confirmPaid": "Povolit placená shrnutí pro {{context}}?",
     "paidDisclosure": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
     "enable": "Povolit placená shrnutí",
     "allContexts": "Osobní a organizační přehledy zůstávají oddělené.",
     "emptyHistory": "Žádné uložené přehledy",
-    "estimatePermissionUnavailable": "Nemáte oprávnění používat zůstatek tohoto kontextu.",
-    "estimatePricingUnavailable": "Ceny pro tento model nejsou dostupné.",
-    "estimateBalanceUnavailable": "Nedostatečný zůstatek pro placené shrnutí.",
-    "estimateModelNotAllowed": "Tento model zde není povolen.",
+    "estimatePermissionUnavailable": "Nemáte oprávnění používat zůstatek tohoto kontextu. Požádejte vlastníka organizace, aby to povolil.",
+    "estimatePricingUnavailable": "Ceny pro tento model nejsou dostupné. Zvolte jiný model.",
+    "estimateBalanceUnavailable": "Nedostatečný zůstatek pro placené shrnutí. Přidejte kredit na zůstatek tohoto kontextu.",
+    "estimateModelNotAllowed": "Tento model není v tomto kontextu povolen. Zvolte jiný model.",
     "estimateSpendLimitTooLow": "Zvyšte limit výdajů, aby toto shrnutí bylo povoleno.",
     "saved": "Nastavení přehledu bylo uloženo.",
     "selectedSessions": "Vybrané relace",
@@ -4641,16 +4716,43 @@
     "capturedAt": "Zachyceno {{time}}",
     "snapshotHint": "Snímek nejnovějšího dostupného stavu relací zachycený v naplánovaný ranní čas. Nemusí být úplný. Počty se týkají vybraných relací, ne veškeré noční aktivity.",
     "snapshotTruncated": "Některé relace nebo podklady byly vynechány, aby snímek nepřekročil stanovený rozsah.",
-    "snapshotSummaryFailed": "AI shrnutí selhalo. Strukturovaný snímek je stále dostupný.",
+    "snapshotSummaryFailed": "AI shrnutí selhalo. Strukturovaný přehled je stále dostupný.",
     "scheduledContextEnabled": "Naplánované přehledy",
     "scheduledContextSettings": "Naplánované přehledy · {{context}}",
     "scheduledContextHint": "Povolte plánované zachycování stavu a placená AI shrnutí pouze pro tento kontext. Vybrané úryvky s odstraněnými citlivými údaji a strukturovaná fakta se odesílají vašemu modelu. Shrnutí používají jazyk aplikace uložený při uložení změn nastavení přehledu. Poplatky se strhávají z kreditu tohoto kontextu. Snímky bez aktivity nevyužívají AI.",
     "snapshotSafeguards": "Limity času a útraty pro každé shrnutí platí pro každý naplánovaný snímek, nejde o denní rozpočet.",
-    "snapshotEstimateInputTooLarge": "Tento snímek obsahuje příliš mnoho podkladů pro vybraný model.",
+    "snapshotEstimateInputTooLarge": "Tento snímek obsahuje příliš mnoho podkladů pro vybraný model. Zvolte model s větším vstupním oknem.",
     "quietSnapshot": "Pro tento snímek nebyla vybrána žádná aktivita relací. Nebyl odeslán žádný požadavek na AI shrnutí ani účtován žádný poplatek.",
     "noEnabledContexts": "Pro naplánované přehledy nejsou povoleny žádné kontexty",
     "sourceBlocker": "Relace vyžaduje pozornost",
-    "sourceMetadata": "Zachycená metadata relace"
+    "sourceMetadata": "Zachycená metadata relace",
+    "metadataPlan_one": "Plán: {{displayDone}} z {{displayTotal}} kroku hotovo",
+    "metadataPlan_few": "Plán: {{displayDone}} z {{displayTotal}} kroků hotovo",
+    "metadataPlan_many": "Plán: {{displayDone}} z {{displayTotal}} kroku hotovo",
+    "metadataPlan_other": "Plán: {{displayDone}} z {{displayTotal}} kroků hotovo",
+    "metadataPlan": "Plán: {{displayDone}} z {{displayTotal}} kroků hotovo",
+    "metadataFiles_one": "{{displayCount}} soubor změněn",
+    "metadataFiles_few": "{{displayCount}} soubory změněny",
+    "metadataFiles_many": "{{displayCount}} souboru změněno",
+    "metadataFiles_other": "{{displayCount}} souborů změněno",
+    "metadataFiles": "{{displayCount}} souborů změněno",
+    "metadataLinesAdded_one": "{{displayCount}} řádek přidán",
+    "metadataLinesAdded_few": "{{displayCount}} řádky přidány",
+    "metadataLinesAdded_many": "{{displayCount}} řádku přidáno",
+    "metadataLinesAdded_other": "{{displayCount}} řádků přidáno",
+    "metadataLinesAdded": "{{displayCount}} řádků přidáno",
+    "metadataLinesRemoved_one": "{{displayCount}} řádek odebrán",
+    "metadataLinesRemoved_few": "{{displayCount}} řádky odebrány",
+    "metadataLinesRemoved_many": "{{displayCount}} řádku odebráno",
+    "metadataLinesRemoved_other": "{{displayCount}} řádků odebráno",
+    "metadataLinesRemoved": "{{displayCount}} řádků odebráno",
+    "metadataPlanCurrent": "Aktuální krok: {{current}}",
+    "metadataFailure": "Poslední tah selhal: {{kind}}",
+    "sourceActivity": "Aktivita bez názvu",
+    "metadataFailureProvider": "chyba poskytovatele",
+    "metadataFailureTool": "chyba nástroje",
+    "metadataFailureCancelled": "Zrušeno",
+    "metadataFailureOther": "nespecifikovaná chyba"
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepodařilo se otevřít tento výsledek hledání"
@@ -4667,6 +4769,8 @@
     "topModels": "Nejpoužívanější modely",
     "topFeatures": "Nejpoužívanější funkce",
     "emptyTitle": "V tomto období žádné využití",
+    "unavailableTitle": "Využití není k dispozici",
+    "unavailableDescription": "Tento pracovní prostor nevykazuje využití. Opakování nepomůže.",
     "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
     "viewDetails": "Zobrazit podrobnosti o využití"
   },
@@ -4684,10 +4788,14 @@
     "couldNotLoad": "Integrace se nepodařilo načíst",
     "permissionDenied": "Nemáte oprávnění spravovat tyto integrace.",
     "managedByOwner": "Požádejte vlastníka organizace o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerOrAdmin": "Požádejte vlastníka organizace nebo správce o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerOrBilling": "Požádejte vlastníka organizace nebo správce fakturace o změnu připojení, které nemůžete změnit.",
+    "managedByOwnerAdminOrBilling": "Požádejte vlastníka organizace, správce nebo správce fakturace o změnu připojení, které nemůžete změnit.",
     "connectFailed": "Stránku pro připojení se nepodařilo otevřít"
   },
   "invoices": {
-    "personalEmptyDescription": "Faktury za vaše vlastní nákupy se zde zobrazí po vyúčtování."
+    "personalEmptyDescription": "Faktury za vaše vlastní nákupy se zde zobrazí po vyúčtování. Účtenky z App Store a Google Play jsou v Historii kreditů.",
+    "personalPeriod": "Posledních 12 měsíců"
   },
   "cloudAgent": {
     "compute": {
@@ -4717,8 +4825,9 @@
       "title": "Spouštěče a webhooky",
       "subtitle": "Automatizujte spouštění Cloud Agent voláním webhooku nebo podle plánu.",
       "new": "Nový spouštěč",
+      "create": "Vytvořit spouštěč",
       "emptyTitle": "Zatím žádné spouštěče",
-      "emptyDescription": "Vytvořte spouštěč pro spuštění Cloud Agent voláním webhooku nebo podle plánu.",
+      "emptyDescription": "Vytvořte svůj první spouštěč.",
       "loadFailedTitle": "Spouštěče se nepodařilo načíst",
       "loadFailedDescription": "Zkuste to znovu, až budete mít připojení.",
       "detailLoadFailedTitle": "Tento spouštěč se nepodařilo načíst",
@@ -4770,6 +4879,8 @@
       "created": "Spouštěč vytvořen",
       "saved": "Spouštěč uložen",
       "statusArrived": "Dorazilo",
+      "defaultPromptWebhook": "Popište tělo tohoto požadavku webhooku:\n\n{{body}}",
+      "defaultPromptScheduled": "Spusťte naplánovaný úkol. Spuštěno v {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Zadejte název.",
         "nameTooShort": "Použijte alespoň 8 znaků.",
@@ -4818,6 +4929,7 @@
     "superseded": "Tento odkaz byl nahrazen na jiném zařízení, a proto už nefunguje."
   },
   "sharedSession": {
+    "startedAt": "Zahájeno v {{time}}",
     "title": "Sdílená relace",
     "someone": "Někdo",
     "sharedBy": "Sdílí {{owner}}",
@@ -4825,5 +4937,179 @@
     "unavailableDescription": "Platnost tohoto odkazu pro sdílení vypršela nebo byl odkaz zrušen.",
     "transcriptUnavailableTitle": "Tento přepis se nepodařilo načíst",
     "transcriptUnavailableDescription": "Odkaz stále funguje. Zkuste to znovu za chvíli."
+  },
+  "organizationGuardrails": {
+    "title": "Ochranná pravidla AI",
+    "permissionDenied": "Ochranná pravidla AI mohou spravovat jen vlastníci a správci organizace.",
+    "unavailableTitle": "Ochranná pravidla AI nejsou povolena",
+    "unavailable": "Kilo povoluje ochranná pravidla AI pro organizaci na vyžádání. Kontaktujte {{supportEmail}} a tým Kilo je zapne pro vaši organizaci.",
+    "contactSupport": "Kontaktovat podporu",
+    "loadError": "Ochranná pravidla AI se nepodařilo načíst",
+    "statusSaving": "Ukládání…",
+    "statusSaved": "Uloženo",
+    "statusFailed": "Uložení se nezdařilo.",
+    "inputTitle": "Ochranná pravidla pro vstup",
+    "inputDescription": "Kontroluje každý vstup pomocí Enkrypt AI, včetně výsledků nástrojů. Když je Enkrypt nedostupný, požadavky se odesílají bez kontroly, místo aby byly odmítnuty.",
+    "outputTitle": "Ochranná pravidla pro výstup",
+    "outputDescription": "Kontroluje odpovědi pomocí Enkrypt AI dříve, než je členové obdrží. Je vypnuto, dokud ho nezapnete.",
+    "detectorsHint": "Možnost Blokovat označený požadavek odmítne. Možnost Jen zaznamenat ho pouze zaznamená, aniž by požadavek zdržela.",
+    "detectorsHintOutput": "Možnost Blokovat způsobí selhání označené odpovědi. Možnost Jen zaznamenat ji pouze zaznamená, aniž by odpověď zdržela.",
+    "choiceLog": "Jen zaznamenat",
+    "applyTo": "Použít pro",
+    "applyToAllMembers": "Všichni členové",
+    "applyKiloDefault": "Použít výchozí nastavení Kilo",
+    "invalidSavedTitle": "Uložené nastavení vstupních detektorů nelze načíst",
+    "invalidSavedBody": "Požadavky jsou blokovány, dokud vstupní detektory znovu neuložíte. Detektory níže vycházejí z výchozího nastavení Kilo.",
+    "invalidSavedOutputTitle": "Uložené nastavení výstupních detektorů nelze načíst",
+    "invalidSavedOutputBody": "Odpovědi jsou zadržovány, dokud výstupní detektory znovu neuložíte. Výstupní detektory vyberte níže.",
+    "blockingOutputNote": "Blokující výstupní detektor zadrží odpověď, dokud ji Enkrypt celou nezkontroluje. Zdržení se vyhnete volbou Jen zaznamenat.",
+    "inputDetectorRequired": "Zapněte alespoň jeden vstupní detektor.",
+    "outputDetectorRequired": "Zapněte alespoň jeden výstupní detektor.",
+    "rulesTooMany": "Maximální počet pravidel je {{max}}.",
+    "ruleIdRequired": "Zadejte ID pravidla.",
+    "ruleIdInvalid": "ID pravidla může obsahovat jen písmena, číslice, tečky, pomlčky a podtržítka.",
+    "ruleTextRequired": "Popište, co pravidlo zakazuje nebo vyžaduje.",
+    "keywordTooLong": "Každé klíčové slovo může mít nejvýše {{max}} znaků.",
+    "topicTooLong": "Každé téma může mít nejvýše {{max}} znaků.",
+    "keywordsTooMany": "Přidejte nejvýše {{max}} klíčových slov.",
+    "topicsTooMany": "Přidejte nejvýše {{max}} témat.",
+    "piiEntityRequired": "Vyberte alespoň jeden typ dat k detekci.",
+    "keywordRequired": "Přidejte alespoň jedno klíčové slovo.",
+    "topicRequired": "Přidejte alespoň jedno téma.",
+    "policyTextRequired": "Zadejte text zásad.",
+    "ruleRequired": "Přidejte alespoň jedno pravidlo.",
+    "ruleIdDuplicate": "Každé pravidlo musí mít vlastní ID pravidla.",
+    "piiEntities": "Data k detekci",
+    "keywordsLabel": "Klíčová slova",
+    "keywordsHint": "Jedno klíčové slovo na řádek.",
+    "topicsHint": "Jedno téma na řádek.",
+    "policyFormat": "Formát zásad",
+    "policyFormatRules": "Strukturovaná pravidla",
+    "policyFormatRulesDescription": "Jedno pravidlo pro každou podmínku, s kategorií a závažností. Doporučeno.",
+    "policyFormatText": "Text zásad",
+    "policyFormatTextDescription": "Vložte existující zásady jako prostý text.",
+    "rulesEmpty": "Zatím žádná pravidla. Každé pravidlo popisuje jednu věc, kterou vstupy nesmí obsahovat ani o ni žádat.",
+    "addRule": "Přidat pravidlo",
+    "ruleNumber": "Pravidlo {{number}}",
+    "ruleRemove": "Odebrat pravidlo {{number}}",
+    "ruleIdLabel": "ID pravidla",
+    "ruleNameLabel": "Název (nepovinné)",
+    "ruleTextLabel": "Pravidlo",
+    "ruleRiskCategory": "Kategorie rizika",
+    "ruleApplicability": "Rozsah",
+    "ruleFrameworks": "Rámce",
+    "detector": {
+      "promptInjection": {
+        "label": "Injektáž promptu",
+        "description": "Detekuje pokusy přepsat instrukce nebo obejít omezení modelu (jailbreak)."
+      },
+      "policyViolation": {
+        "label": "Porušení zásad",
+        "description": "Označuje vstupy, které porušují zásady vaší organizace zadané jako text nebo pravidla.",
+        "descriptionOutput": "Označuje odpovědi, které porušují zásady vaší organizace zadané jako text nebo pravidla."
+      },
+      "pii": {
+        "label": "Osobní a tajné údaje",
+        "description": "Detekuje osobní údaje, přihlašovací údaje, IP adresy a URL adresy."
+      },
+      "keywords": {
+        "label": "Zakázaná klíčová slova",
+        "descriptionOutput": "Detekuje odpovědi, které obsahují kterékoli z uvedených klíčových slov."
+      },
+      "topics": {
+        "label": "Témata",
+        "descriptionOutput": "Označuje odpovědi týkající se kteréhokoli z uvedených témat."
+      },
+      "toxicity": {
+        "label": "Toxicita",
+        "description": "Detekuje toxický, urážlivý, výhružný nebo nenávistný jazyk."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detekuje sexuální nebo jinak nevhodný obsah (NSFW)."
+      },
+      "bias": {
+        "label": "Předpojatost",
+        "description": "Detekuje předpojatý nebo diskriminační jazyk."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Osobní údaje",
+        "description": "Jména, e-mailové adresy, telefonní čísla."
+      },
+      "secrets": {
+        "label": "Tajné údaje",
+        "description": "Klíče API, tokeny, hesla."
+      },
+      "ipAddress": {
+        "label": "IP adresy",
+        "description": "Adresy IPv4 a IPv6."
+      },
+      "url": {
+        "label": "URL adresy",
+        "description": "Webové adresy."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Zabezpečení a podvody",
+      "safetyHarm": "Bezpečnost a újma",
+      "privacyDataProtection": "Soukromí a ochrana dat",
+      "brandReputationTrust": "Značka a pověst",
+      "biasFairnessEthical": "Předpojatost a férovost",
+      "legalIpLiability": "Právní odpovědnost a duševní vlastnictví",
+      "productMisuse": "Zneužití produktu",
+      "performanceQuality": "Výkon a kvalita"
+    },
+    "applicability": {
+      "user": "Vstup uživatele",
+      "userAssistant": "Vstup uživatele a odpovědi"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akt EU o umělé inteligenci",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funkce pro Enterprise",
+    "enterpriseOnly": "Tato funkce je dostupná pouze v tarifu Enterprise.",
+    "readOnly": "Tato nastavení mohou měnit jen vlastníci a správci organizace.",
+    "loadError": "Poskytovatele a modely se nepodařilo načíst",
+    "tabModels": "Modely",
+    "tabProviders": "Poskytovatelé",
+    "tabGateways": "Brány",
+    "modelsDescription": "Vypnutím modelu ho zablokujete pro všechny členy. Modely od povolených poskytovatelů jsou ve výchozím stavu zapnuté.",
+    "modelsDeniedOnly": "Jen zakázané",
+    "modelsEmpty": "Hledání neodpovídají žádné modely.",
+    "modelsDeniedEmpty": "Žádný model není zakázaný.",
+    "modelsDeniedSearchEmpty": "Hledání neodpovídá žádný zakázaný model.",
+    "providersDescription": "Po vypnutí poskytovatele k němu Kilo pro tuto organizaci přestane směrovat požadavky.",
+    "providersNeedCatalog": "Přepínače poskytovatelů zůstanou jen pro čtení, dokud se nenačte celý katalog modelů. Pokud je chcete upravit, klepněte výše na Zkusit znovu.",
+    "providersEmpty": "Hledání neodpovídají žádní poskytovatelé.",
+    "allowAllShown": "Povolit vše zobrazené",
+    "denyAllShown": "Zakázat vše zobrazené",
+    "gatewaysDescription": "Kilo směruje požadavky na modely přes Vercel AI Gateway nebo OpenRouter. Pokud je brána vypnutá, tyto požadavky selžou.",
+    "emptyProviderList": "Povolte alespoň jednoho poskytovatele. Při prázdném seznamu Kilo nemůže směrovat požadavky na žádný model.",
+    "gatewaysUnavailable": "Nastavení bran není pro tuto organizaci k dispozici.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Požadavky přes OpenRouter nejsou vázány na region.",
+    "inferenceRegion": "Region inference",
+    "inferenceRegionDescription": "Váže požadavky přes Vercel AI Gateway na tento region. Model, který v něm není k dispozici, selže.",
+    "disableOpenrouterNote": "Vypnutím OpenRouter zablokujete i klíče BYOK, které přes něj směrují požadavky.",
+    "emptyModelList": "Nechte zapnutý alespoň jeden model. Pokud zakážete všechny modely, členové nebudou mít co používat.",
+    "catalogUnavailable": "Úplný katalog modelů se nenačetl, proto se zobrazují jen vaše uložené seznamy. Zkuste to znovu a načtěte všechny modely.",
+    "region": {
+      "global": "Globální",
+      "us": "Spojené státy",
+      "eu": "Evropská unie",
+      "au": "Austrálie",
+      "jp": "Japonsko"
+    }
   }
 }

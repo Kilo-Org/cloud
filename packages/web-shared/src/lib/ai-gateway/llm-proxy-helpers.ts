@@ -247,6 +247,19 @@ export function dataCollectionRequiredResponse() {
   );
 }
 
+export function zeroDataRetentionUnavailableResponse() {
+  const error =
+    'Zero data retention is not available for this model. Remove the zdr provider preference or choose another model.';
+  return NextResponse.json(
+    {
+      error: error, // this field is shown in the extension
+      error_type: ProxyErrorType.data_collection_required,
+      message: error,
+    },
+    { status: 400 }
+  );
+}
+
 /** The inference providers that every given provider config's only/ignore lists allow. */
 export function allowedInferenceProviders(
   inferenceProviders: readonly string[],
@@ -263,7 +276,10 @@ export function allowedInferenceProviders(
 }
 
 export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonly string[]) {
-  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
+  const error =
+    inferenceProviders.length > 0
+      ? `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`
+      : 'No eligible provider can serve the selected model.';
   return NextResponse.json(
     {
       error: error,
@@ -271,6 +287,18 @@ export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonl
       message: error,
     },
     { status: 403 }
+  );
+}
+
+/**
+ * Clients route with OpenRouter's `provider` object. The gateway builds the Vercel
+ * `providerOptions` itself, so a client value could bypass provider and region policies.
+ */
+export function providerOptionsNotSupportedResponse() {
+  const error = 'The providerOptions field is not supported. Use provider instead.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.unsupported_field, message: error },
+    { status: 400 }
   );
 }
 

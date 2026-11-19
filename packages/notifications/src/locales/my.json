@@ -2,17 +2,16 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "သင့် agent session တွင် အသစ်အဆန်း ရှိသည်",
+      "cloudAgentSession": "သင့် အေးဂျင့် session တွင် အသစ်အဆန်း ရှိသည်",
       "lowBalance": "သင့်လက်ကျန် အာရုံစိုက်ရန် လိုအပ်သည်",
       "spendAlert": "သင့်အသုံးစရိတ် အာရုံစိုက်ရန် လိုအပ်သည်",
       "securityFinding": "လုံခြုံရေး တွေ့ရှိချက်တစ်ခု အာရုံစိုက်ရန် လိုအပ်သည်",
       "securityUpdate": "လုံခြုံရေး စစ်ဆေးမှုတွင် အသစ်အဆန်း ရှိသည်",
-      "activeAgentsGlanceable": "လုပ်ဆောင်နေသော agent များတွင် အသစ်အဆန်း ရှိသည်"
+      "activeAgentsGlanceable": "လုပ်ဆောင်နေသော အေးဂျင့်များတွင် အသစ်အဆန်း ရှိသည်"
     }
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA ချိုးဖောက်မှု"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "လုံခြုံရေး စစ်ဆေးမှုတွင် အသစ်အဆန်း ရှိသည်"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "သင့် Kilo session ကို သင့်ဖုန်းမှ ထိန်းချုပ်ရန် အသင့်ဖြစ်ပါပြီ"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

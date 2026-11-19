@@ -5,7 +5,7 @@ import { captureCloudAgentException, instrumentCloudAgentWorker } from './sentry
 import type { Context, Next } from 'hono';
 import { trpcServer } from '@hono/trpc-server';
 import { appRouter } from './router.js';
-import type { Env } from './types.js';
+import type { Env, TRPCContext } from './types.js';
 import type { HonoContext } from './hono-context.js';
 import { logger, withLogTags } from './logger.js';
 import {
@@ -47,6 +47,7 @@ import { withoutPreviewMarkers } from './shared/preview-headers.js';
 import { withDORetry } from './utils/do-retry.js';
 import { parseBearerCredential } from './sandbox-control/credential.js';
 import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
+import { admitPreviewTunnelUpgrade } from './preview-tunnel/tunnel-admission.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
 import { registerStartupFailureRoute } from './sandbox-control/startup-failure.js';
@@ -252,7 +253,6 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   await withLogTags({ source: 'worker-entry' }, async () => {
     const url = new URL(c.req.url);
     logger.setTags({ method: c.req.method, path: url.pathname });
-    logger.info('Handling request');
     await next();
   });
 });
@@ -427,6 +427,10 @@ app.post('/internal/byoc/vercel-snapshot-build/cleanup', async (c: Context<HonoC
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
   return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
+});
+
+app.get('/sandbox-preview-tunnel/:sandboxId', async (c: Context<HonoContext>) => {
+  return admitPreviewTunnelUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
 });
 
 app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoContext>) => {
@@ -967,8 +971,24 @@ app.use(
       validatedSessionAccess: c.get('validatedSessionAccess'),
       request: c.req.raw,
     }),
-    onError: ({ error, path }: { error: Error; path?: string }) => {
-      captureCloudAgentException(error, { operation: path ?? 'trpc' });
+    onError: ({
+      error,
+      path,
+      ctx,
+    }: {
+      error: Error;
+      path?: string;
+      ctx?: Pick<TRPCContext, 'userId' | 'validatedSessionAccess'>;
+    }) => {
+      const access = ctx?.validatedSessionAccess;
+      captureCloudAgentException(error, {
+        operation: path ?? 'trpc',
+        userId: ctx?.userId,
+        ...(access && {
+          sessionId: access.cloudAgentSessionId,
+          orgId: access.organizationId ?? '(personal)',
+        }),
+      });
       logger.setTags({ path });
       logger
         .withFields({
@@ -983,7 +1003,7 @@ app.use(
 app.notFound(createNotFoundHandler());
 const errorHandler = createWorkerErrorHandler(logger);
 app.onError((error, c) => {
-  captureCloudAgentException(error, { operation: 'http' });
+  captureCloudAgentException(error, { operation: 'http', userId: c.get('userId') });
   return errorHandler(error, c);
 });
 

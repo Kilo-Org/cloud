@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
-import { GLANCEABLE_STATUS_KINDS } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
+import {
+  GLANCEABLE_STATUS_KINDS,
+  GLANCEABLE_TITLE_LIMIT,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   SESSION_LIVE_COMMAND_LIMIT,
   sessionLiveChangesSchema,
@@ -64,18 +66,18 @@ export const sessionLiveOutcomeSchema = z.object({
 export const sessionLiveActivityContentStateSchema = z.object({
   sessionId: nonEmptyStringSchema,
   /** Trimmed and capped display title; null for an untitled session. */
-  title: z.string().max(HOME_WIDGET_TITLE_LIMIT).nullable(),
+  title: z.string().max(GLANCEABLE_TITLE_LIMIT).nullable(),
   statusKind: z.enum(SESSION_CARD_STATUS_KINDS),
   /** ISO 8601; when the current status kind began. */
-  statusSince: z.string(),
+  statusSince: z.string().datetime(),
   /** ISO 8601 wake time for a scheduled session, else null. */
-  scheduledAt: z.string().nullable(),
+  scheduledAt: z.string().datetime().nullable(),
   /** True only when Approve can answer the waiting permission request. */
   awaitingPermission: z.boolean(),
   /** SHA-256 hex of `JSON.stringify([sessionId, permissionId])`, else null. */
   approvalKey: approvalKeySchema,
   /** ISO 8601; when the server confirmed this content. */
-  updatedAt: z.string(),
+  updatedAt: z.string().datetime(),
   /** The step the agent is on; null when the session is not working. */
   currentStep: sessionLiveStepSchema.nullable().optional(),
   /** Plan progress while the agent works from a todo list. */
@@ -85,7 +87,7 @@ export const sessionLiveActivityContentStateSchema = z.object({
   /** The diff this session produced so far. */
   changes: sessionLiveChangesSchema.nullable().optional(),
   /** ISO 8601; the last activity the server saw. */
-  lastActivityAt: z.string().nullable().optional(),
+  lastActivityAt: z.string().datetime().nullable().optional(),
   /** The cost so far, in microdollars. */
   costMicrodollars: z.number().int().nonnegative().nullable().optional(),
   /** How a finished session ended. */
@@ -93,7 +95,7 @@ export const sessionLiveActivityContentStateSchema = z.object({
   /** Why a finished turn failed; null while nothing failed. */
   failure: sessionLiveFailureSchema.nullable().optional(),
   /** ISO 8601; when the session started. */
-  startedAt: z.string().nullable().optional(),
+  startedAt: z.string().datetime().nullable().optional(),
 });
 
 export type SessionLiveActivityContentState = z.infer<typeof sessionLiveActivityContentStateSchema>;

@@ -16,6 +16,11 @@ const mocks = vi.hoisted(() => ({
   getControl: vi.fn(),
   getDb: vi.fn(),
   diagnostic: vi.fn(),
+  markWorkspaceDeleted: vi.fn(),
+  getWorkspace: vi.fn(),
+}));
+vi.mock('../../control-plane/workspace/workspace-stub', () => ({
+  getWorkspaceStub: mocks.getWorkspace,
 }));
 vi.mock('../../sandbox-control/diagnostics', () => ({ logControlDiagnostic: mocks.diagnostic }));
 vi.mock('../../sandbox-session/session-stub', () => ({
@@ -163,9 +168,39 @@ function fixture(rootCount = 1, childCount = 0) {
   };
 }
 
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocks.markWorkspaceDeleted.mockResolvedValue(undefined);
+  mocks.getWorkspace.mockReturnValue({ markDeleted: mocks.markWorkspaceDeleted });
+});
 
 describe('deleteWorktree authorization and completion', () => {
+  it('ends the workspace Cloud Agent authority once deletion begins, before content deletion', async () => {
+    const f = fixture(1);
+    await f.caller.deleteWorktree({ worktreeId });
+    expect(mocks.getWorkspace).toHaveBeenCalledWith(
+      f.ctx.env,
+      f.ctx.userId,
+      worktreeId.replace('worktree_', 'workspace_')
+    );
+    expect(mocks.markWorkspaceDeleted).toHaveBeenCalledOnce();
+    expect(f.begin.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.markWorkspaceDeleted.mock.invocationCallOrder[0]
+    );
+    expect(mocks.markWorkspaceDeleted.mock.invocationCallOrder[0]).toBeLessThan(
+      f.deleteContent.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('keeps deletion retryable when the workspace authority cannot be ended', async () => {
+    const f = fixture(1);
+    mocks.markWorkspaceDeleted.mockRejectedValue(new Error('workspace unavailable'));
+    await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+    expect(f.deleteContent).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])(
     'reports aggregate phase timings and pending cleanup when runtime cleanup fails=%s',
     async fail => {
@@ -405,6 +440,42 @@ describe('deleteWorktree authorization and completion', () => {
     });
     expect(f.cleanup).not.toHaveBeenCalled();
     expect(f.finishSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('finishes cleanup after every root began deletion', async () => {
+    const f = fixture(2);
+    f.beginSession.mockImplementation(async id => {
+      if (id === workspaceId(0)) throw new Error('DO unavailable');
+      return location;
+    });
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0), kiloId(1)],
+      cleanup: 'pending',
+    });
+    expect(f.finishSession).toHaveBeenCalledTimes(1);
+    expect(f.finishSession).toHaveBeenCalledWith(workspaceId(1));
+    expect(f.complete).not.toHaveBeenCalled();
+  });
+
+  it('aborts the deletion before destroying content when a phase-1 response does not parse', async () => {
+    const f = fixture();
+    mocks.getSession.mockImplementation((_env, _ownerId, id: string) => ({
+      beginWorktreeDeletion: async () => {
+        if (id === workspaceId(0)) return { location: { sandboxId: 42 }, children: [] };
+        return { location, children: [] };
+      },
+      finishWorktreeDeletion: () => f.finishSession(id),
+    }));
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+    expect(f.finishSession).not.toHaveBeenCalled();
+    expect(f.deleteContent).not.toHaveBeenCalled();
+    expect(f.complete).not.toHaveBeenCalled();
+    expect(f.getState().completed).toBe(false);
   });
 
   it('skips runtime locations whose successful cleanup is already journaled', async () => {

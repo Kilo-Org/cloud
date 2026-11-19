@@ -91,6 +91,19 @@ for (const [key, schemes] of Object.entries(URL_SCHEMES)) {
     }
   }
 }
+// KILO_MCP_URL is resolved above (override or the committed production
+// default), so the loop over the raw extra values does not see the default.
+// Assert the resolved value here, the way SESSION_SYNC_URL is asserted; in a
+// production build with no override this is the committed https:// host, which
+// the allowlist accepts.
+if (KILO_MCP_URL) {
+  assertUrlScheme('kiloMcpUrl', KILO_MCP_URL, URL_SCHEMES.kiloMcpUrl, {
+    allowInsecure: __DEV__,
+  });
+  if (runProductionHostCheck) {
+    assertProductionHost('kiloMcpUrl', KILO_MCP_URL, PRODUCTION_HOSTS);
+  }
+}
 
 function optionalLatencyMs(key: keyof typeof OPTIONAL_ENV_KEYS): number {
   const parsed = Number.parseInt(optional(key) ?? '', 10);

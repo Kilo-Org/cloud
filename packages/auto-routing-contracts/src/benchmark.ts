@@ -8,7 +8,7 @@ import {
   benchmarkPairKey,
   RoutingTableSchema,
 } from './routing-table';
-import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
+import { ReasoningEffortSchema, refineVariantExclusivity, VariantSchema } from './reasoning';
 import { addDuplicateKeyIssues } from './duplicate-keys';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
@@ -107,7 +107,7 @@ export const BenchmarkDeciderModelSchema = z
   .object({
     id: z.string().trim().min(1),
     // Canonical catalog variant key. Legacy run snapshots may omit it.
-    variant: z.string().trim().min(1).nullable().optional(),
+    variant: VariantSchema.optional(),
     // Legacy snapshot identity; new benchmark writers emit variant only.
     reasoningEffort: ReasoningEffortSchema.nullable().default(null),
   })
@@ -251,7 +251,7 @@ export const BenchmarkModelSummarySchema = z.object({
   model: z.string(),
   // Exact-pair identity for summary rows. Optional so already-persisted run
   // payloads and old admin-UI responses still parse. Null = default/no variant.
-  variant: z.string().trim().min(1).nullable().optional(),
+  variant: VariantSchema.optional(),
   // '*' for classifier runs, otherwise "<taskType>/<subtaskType>".
   routeKey: z.union([TaxonomyRouteKeySchema, z.literal('*')]),
   accuracy: z.number(),
@@ -370,7 +370,7 @@ export const BenchmarkRegistryResponseSchema = z.object({
     .array(
       z.object({
         model: z.string().trim().min(1),
-        variant: z.string().trim().min(1).nullable(),
+        variant: VariantSchema,
         status: BenchmarkProfileStatusSchema,
       })
     )

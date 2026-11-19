@@ -90,6 +90,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_admin_audit_logs,
   admin_action_audit_logs,
+  blacklisted_domains_settings,
   kiloclaw_cli_runs,
   user_push_tokens,
   user_activity_tokens,
@@ -172,7 +173,6 @@ import { getDeliveredEmailAddress, normalizeEmail } from '@kilocode/web-shared/l
 import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
-import { recordWatchwoodSignupShadow, type WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 import { getDomain } from 'tldts';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import { deleteUserPasskeys } from '@/lib/user/session-revocation';
@@ -328,7 +328,6 @@ export type CreateOrUpdateUserTrackingContext = {
   anonymousId?: string | null;
   locale?: string | null;
   countryCode?: string | null;
-  watchwood?: WatchwoodSignupAssessment;
 };
 
 export type DeferredSignInEvent = {
@@ -757,11 +756,6 @@ export async function createOrUpdateUser(
 
   const normalizedEmail = normalizeEmail(args.google_user_email);
   const operationId = signupOperationId(normalizedEmail);
-  recordWatchwoodSignupShadow({
-    operationId,
-    provider: args.provider,
-    assessment: trackingContext?.watchwood,
-  });
 
   // Never fall through to the insert: its dedup misses legacy rows with a NULL
   // normalized_email that findUserByNormalizedEmail matches case-insensitively.
@@ -1191,6 +1185,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - organization_mcp_connect_events (retained; user ID reference only, no PII, deleted after 90 days)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
+ * - blacklisted_domains_settings (editor PII nulled; settings retained)
  * - model_eval_ingestions (promoter email anonymized)
  * - credit_campaigns (created_by_kilo_user_id anonymized)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
@@ -1359,6 +1354,11 @@ export async function anonymizeCloudUserData(
     actorKiloUserId: userId,
     reason: 'actor account soft-deleted',
   });
+
+  await tx
+    .update(blacklisted_domains_settings)
+    .set({ updated_by: null, updated_by_email: null })
+    .where(eq(blacklisted_domains_settings.updated_by, userId));
 
   // ── 2. Hard-delete PII tables ────────────────────────────────────────
   await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));

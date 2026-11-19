@@ -4,58 +4,38 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const hoisted = vi.hoisted(() => {
-  const client = {
-    register: vi.fn(),
-    setPersonPropertiesForFlags: vi.fn(),
-    onFeatureFlags: vi.fn(),
-    capture: vi.fn(),
-    screen: vi.fn(),
-    identify: vi.fn(),
-    reloadFeatureFlags: vi.fn(),
-    getFeatureFlag: vi.fn(),
-    reset: vi.fn(),
-    setPersistedProperty: vi.fn(),
-    optOut: vi.fn().mockResolvedValue(undefined),
-  };
-  const holder: { options?: Record<string, unknown> } = {};
+// The helper's vi.hoisted object merges into file scope (device and appsFlyer
+// stay file-local). This suite has no controller mock: it needs the real
+// controller, so no controller double is attached.
+import {
+  posthogMockConstructor,
+  postHogPersistedProperty,
+  posthogTestDouble,
+} from '../analytics/posthog-test-double';
 
-  const storage = {
-    sealPostHogStorage: vi.fn(),
-    unsealPostHogStorage: vi.fn(),
-    purgePostHogPersistence: vi.fn(),
-    // oxlint-disable-next-line consistent-type-assertions
-    posthogCustomStorage: {} as Record<string, unknown>,
-  };
+const device = { deviceType: null as number | null };
 
-  const device = { deviceType: null as number | null };
+const appsFlyer = {
+  init: vi.fn().mockResolvedValue(undefined),
+  registerSessionReadyListener: vi.fn(),
+  isSessionReady: vi.fn().mockResolvedValue(false),
+  start: vi.fn().mockResolvedValue(undefined),
+  logEvent: vi.fn().mockResolvedValue(undefined),
+  stop: vi.fn().mockResolvedValue(undefined),
+  setConsentData: vi.fn().mockResolvedValue(undefined),
+  create: vi.fn(),
+  startObservingTransactions: vi.fn(),
+  stopObservingTransactions: vi.fn(),
+};
 
-  const appsFlyer = {
-    init: vi.fn().mockResolvedValue(undefined),
-    registerSessionReadyListener: vi.fn(),
-    isSessionReady: vi.fn().mockResolvedValue(false),
-    start: vi.fn().mockResolvedValue(undefined),
-    logEvent: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn().mockResolvedValue(undefined),
-    setConsentData: vi.fn().mockResolvedValue(undefined),
-    create: vi.fn(),
-    startObservingTransactions: vi.fn(),
-    stopObservingTransactions: vi.fn(),
-  };
-
-  return { client, holder, storage, device, appsFlyer };
-});
+// File-local doubles join the shared double in one merge, so every
+// `hoisted.<name>.*` reference keeps working and the shared double stays
+// unmodified.
+const hoisted = { ...posthogTestDouble, device, appsFlyer };
 
 vi.mock('posthog-react-native', () => ({
-  default: vi.fn(function PostHogMock(_key: string, options: Record<string, unknown>) {
-    hoisted.holder.options = options;
-    return hoisted.client;
-  }),
-  PostHogPersistedProperty: {
-    Queue: 'queue',
-    LogsQueue: 'logs_queue',
-    AiQueue: 'ai_queue',
-  },
+  default: posthogMockConstructor,
+  PostHogPersistedProperty: postHogPersistedProperty,
 }));
 
 vi.mock('expo-application', () => ({

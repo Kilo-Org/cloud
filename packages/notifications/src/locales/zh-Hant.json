@@ -2,17 +2,16 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "您的代理工作階段有更新",
+      "cloudAgentSession": "您的代理程式工作階段有更新",
       "lowBalance": "您的餘額需要留意",
       "spendAlert": "您的支出需要留意",
       "securityFinding": "安全發現需要留意",
       "securityUpdate": "安全檢查有更新",
-      "activeAgentsGlanceable": "使用中的代理有更新"
+      "activeAgentsGlanceable": "使用中的代理程式有更新"
     }
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA 違規"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "安全檢查有更新"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "您的 Kilo 工作階段已就緒，可從手機控制"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

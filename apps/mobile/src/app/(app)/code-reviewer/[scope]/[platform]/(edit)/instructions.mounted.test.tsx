@@ -94,6 +94,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   InputAccessoryView: 'InputAccessoryView',
+  I18nManager: { isRTL: false },
   Keyboard: { dismiss: vi.fn() },
   TextInput: (props: RecordedInput): ReactNode => {
     textInputs.inputs.push(props);
@@ -352,7 +353,7 @@ describe('InstructionsRoute editor', () => {
     // The field grows with a short stored value but stops at ten lines and
     // scrolls its own text: without the cap one long draft makes the page a
     // single oversized text view and pushes the note and Save out of view.
-    expect(classes).toContain('max-h-[196px]');
+    expect(classes).toContain('max-h-56');
   });
 
   // A stored value taller than the capped field would otherwise open scrolled

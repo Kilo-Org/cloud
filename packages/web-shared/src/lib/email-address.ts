@@ -32,13 +32,11 @@ export function normalizeEmail(email: string): string {
   let local = trimmed.slice(0, atIndex);
   const domain = trimmed.slice(atIndex + 1);
 
-  // Strip +alias suffix
   const plusIndex = local.indexOf('+');
   if (plusIndex !== -1) {
     local = local.slice(0, plusIndex);
   }
 
-  // Gmail and Googlemail are the same mailbox; normalize dots and domain
   const isGmail = domain === 'gmail.com' || domain === 'googlemail.com';
   if (isGmail) {
     local = local.replace(/\./g, '');

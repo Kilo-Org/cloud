@@ -206,11 +206,8 @@ export function handleNeedsInputNotificationResponse(
   return dispatch;
 }
 
-// One dispatch per tap: the in-flight dispatch for each OS response, keyed by
-// its notification identifier and action. A body tap is deduped like an action
-// button, because Expo delivers a warm-background tap to both the JS listener
-// and the registered background task. Entries are removed on settle so a retry
-// tap on the replaced notification runs again.
+// One in-flight dispatch per OS response, keyed by its notification identifier
+// and action; removed on settle so a retry tap runs again.
 const inFlightDispatches = new Map<string, Promise<boolean>>();
 
 /** The OS identity of a response: its notification identifier and action id. */

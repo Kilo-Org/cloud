@@ -26,6 +26,7 @@
     "creditHistory": "ක්‍රෙඩිට් ඉතිහාසය",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "අවලංගු කරන්න",
     "done": "අවසන්",
     "retry": "නැවත උත්සාහ කරන්න",
@@ -157,7 +158,7 @@
     "retryLoadingMore": "තවත් පූරණය කිරීමට නැවත උත්සාහ කරන්න",
     "reviewPr": "PR සමාලෝචනය කරන්න",
     "role": "භූමිකාව",
-    "searchModels": "ආකෘති සොයන්න...",
+    "searchModels": "ආකෘති සොයන්න…",
     "selectedRepositories": "තෝරාගත් කේත ගබඩා",
     "selectRepositories": "කේත ගබඩා තෝරන්න",
     "sendMessage": "පණිවිඩය යවන්න",
@@ -175,7 +176,9 @@
     "durationHourShort": "පැය",
     "changes": "වෙනස්කම්",
     "organizationTrialEnded": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. සංවිධාන හිමිකරුවෙකුට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
-    "privateRepositoryA11y": "{{name}}, පුද්ගලික කේත ගබඩාව"
+    "privateRepositoryA11y": "{{name}}, පුද්ගලික කේත ගබඩාව",
+    "legalDocumentEnglishOnly": "මෙම ලේඛනය ඉංග්‍රීසි භාෂාවෙන් පමණක් ලබා ගත හැක.",
+    "organizationTrialEndedBilling": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක."
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -198,7 +201,7 @@
     "openSignInPageInBrowser": "බ්‍රවුසරයේ පිවිසුම් පිටුව විවෘත කරන්න",
     "copySignInLink": "පිවිසුම් සබැඳිය පිටපත් කරන්න",
     "cancelSignIn": "පිවිසුම අවලංගු කරන්න",
-    "startingSignIn": "පිවිසුම ආරම්භ කරමින්...",
+    "startingSignIn": "පිවිසුම ආරම්භ කරමින්…",
     "organizationUsesSso": "ඔබේ සංවිධානය තනි පිවිසුම භාවිතා කරයි.",
     "continueWithSso": "SSO හරහා ඉදිරියට යන්න",
     "useDifferentEmail": "වෙනත් විද්‍යුත් තැපැල් ලිපිනයක් භාවිතා කරන්න",
@@ -206,7 +209,7 @@
     "signInWithGoogle": "Google හරහා පිවිසෙන්න",
     "signInWithPasskey": "ප්‍රවේශ යතුරකින් පිවිසෙන්න",
     "emailAddress": "විද්‍යුත් තැපැල් ලිපිනය",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "ඔබ@example.com",
     "continueWithEmail": "විද්‍යුත් තැපෑල හරහා ඉදිරියට යන්න",
     "enterCodeSentTo": "{{email}} වෙත යැවූ කේතය ඇතුළත් කරන්න.",
     "codeArrivalHint": "මෙම ලිපිනය සුදුසුකම් සපුරන්නේ නම්, මිනිත්තුවක් ඇතුළත කේතය ලැබේ.",
@@ -308,9 +311,9 @@
     "passkeyVerifyDescription": "ඔබේ ආරක්ෂාව සඳහා, ඔබේ ප්‍රවේශ යතුරු වෙනස් කිරීමට පෙර ඒ ඔබ බව තහවුරු කරන්න.",
     "passkeyVerifyWithPasskey": "ප්‍රවේශ යතුරකින් සත්‍යාපනය කරන්න",
     "passkeyVerifySendCode": "මට කේතයක් ඊමේල් කරන්න",
-    "passkeyVerifySendingCode": "කේතය යවමින් පවතී...",
+    "passkeyVerifySendingCode": "කේතය යවමින් පවතී…",
     "passkeyVerifyPasskeyPrompt": "ඉදිරියට යාමට ඔබේ ප්‍රවේශ යතුරෙන් තහවුරු කරන්න.",
-    "passkeyVerifyChecking": "ඔබේ කේතය පරීක්ෂා කරමින් පවතී...",
+    "passkeyVerifyChecking": "ඔබේ කේතය පරීක්ෂා කරමින් පවතී…",
     "passkeyVerifyCodeSent": "{{email}} වෙත යැවූ කේතය ඇතුළත් කරන්න.",
     "passkeyVerifyCodeRejected": "එම කේතය නොගැළපේ. නැවත උත්සාහ කරන්න.",
     "passkeyVerifyPasskeyFailed": "එම ප්‍රවේශ යතුරෙන් තහවුරු කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
@@ -318,8 +321,8 @@
     "passkeyVerifyInProgress": "එම කේතය දැනටමත් පරීක්ෂා කරමින් පවතී. මොහොතකින් නැවත උත්සාහ කරන්න.",
     "passkeyVerifyTooManyAttempts": "උත්සාහ ගණන වැඩියි. නව කේතයක් යවන්න.",
     "passkeyVerifySsoRequired": "ඔබේ ආයතනය තනි පිවිසුම අනිවාර්ය කර ඇත. මෙම වෙනස බ්‍රවුසරයේ අනුමත කර, ඉන්පසු නැවත මෙහි පැමිණෙන්න.",
-    "passkeyVerifySsoStarting": "අනුමත කිරීම ආරම්භ කරමින් පවතී...",
-    "passkeyVerifySsoWaiting": "අනුමැතිය සඳහා රැඳී සිටී...",
+    "passkeyVerifySsoStarting": "අනුමත කිරීම ආරම්භ කරමින් පවතී…",
+    "passkeyVerifySsoWaiting": "අනුමැතිය සඳහා රැඳී සිටී…",
     "passkeyVerifySsoOpen": "අනුමැතිය ලබා දෙන පිටුව විවෘත කරන්න",
     "passkeyVerifySsoExpired": "එම අනුමැතිය කල් ඉකුත් වී හෝ අවලංගු කර ඇත. නැවත උත්සාහ කරන්න.",
     "passkeyVerifySsoUnavailable": "තනි පිවිසුම හරහා අනුමැතිය ලබා දීම මේ මොහොතේ කළ නොහැක. නැවත උත්සාහ කරන්න.",
@@ -385,12 +388,24 @@
       "editKeyDescription": "ගබඩා කළ අගය පෙන්විය නොහැක. එය ප්‍රතිස්ථාපනය කිරීමට නව එකක් ඇතුළත් කරන්න.",
       "editKeyMappingsWarning": "යතුර ප්‍රතිස්ථාපනය කිරීමෙන් ගබඩා කළ මාදිලි සිතියම්ගත කිරීම් ද ප්‍රතිස්ථාපනය වන බැවින් ඔබට තවදුරටත් අවශ්‍ය සෑම සිතියම්ගත කිරීමක්ම නැවත ඇතුළත් කරන්න.",
       "saveFailed": "යතුර සුරැකීමට නොහැකි විය.",
-      "invalidCredentials": "අක්තපත්‍ර පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "fieldRequired": "{{field}} අවශ්‍ය වේ.",
+      "keyIncomplete": "යතුරේ අවශ්‍ය අගයක් නොමැත.",
       "incompleteMapping": "සිතියම්ගත කිරීම {{number}} සඳහා gateway මාදිලි slug සහ deployment නාමය යන දෙකම අවශ්‍ය වේ.",
       "apiKeyLabel": "API යතුර",
       "apiKeyPlaceholder": "යතුර අලවන්න",
       "apiKeyRequired": "යතුර ඇතුළත් කරන්න.",
+      "keyAlreadyExists": "ඔබට මෙම සපයන්නා සඳහා දැනටමත් යතුරක් ඇත. තවත් එකක් එක් කිරීමට පෙර එය ඉවත් කරන්න.",
+      "keyStoreFailed": "යතුර සුරකින්න නොහැකි විය.",
+      "invalidCredentials": "මෙම යතුර මෙම සපයන්නා බලාපොරොත්තු වන ආකෘතියේ නොවේ. එය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "testSucceeded": "යතුර ක්‍රියා කරයි. සපයන්නා: {{provider}}. ආකෘතිය: {{model}}.",
+      "testRejected": "සපයන්නා මෙම යතුර ප්‍රතික්ෂේප කළේය. එය නිවැරදිද සහ අවලංගු කර නොමැතිද යන්න පරීක්ෂා කරන්න.",
+      "testIncomplete": "සපයන්නා පරීක්ෂාව අවසන් වීමට පෙර නතර කළේය. නැවත උත්සාහ කරන්න.",
+      "testUnsupportedProvider": "මෙම සපයන්නා තවදුරටත් සහාය නොදක්වයි. යතුර ඉවත් කරන්න.",
+      "testUnreadableKey": "ගබඩා කර ඇති යතුර කියවිය නොහැකි විය. පසුව නැවත උත්සාහ කරන්න.",
+      "testDeprecatedProvider": "මෙම සපයන්නා යල් පැන ගොස් ඇති බැවින් එහි යතුර පරීක්ෂා කළ නොහැක.",
+      "keyManagedByCodingPlan": "කේතන සැලසුමක් මෙම සපයන්නාගේ යතුර කළමනාකරණය කරන අතර එම යතුර කියවීමට පමණක් වේ. ඔබේම යතුරක් එක් කිරීමට කේතන සැලසුම අවලංගු කරන්න.",
+      "providerUnavailable": "මෙම සපයන්නා තවම ලබාගත නොහැකි බැවින් ඔබට ඒ සඳහා යතුරක් එක් කළ නොහැක.",
+      "testFailed": "යතුර පරීක්ෂාව අසාර්ථක විය. නැවත උත්සාහ කරන්න.",
       "authMethod": "සත්‍යාපන ක්‍රමය",
       "authMethodAccessKeys": "ප්‍රවේශ යතුරු",
       "resourceName": "Azure සම්පත් නාමය",
@@ -481,7 +496,14 @@
       "viewReceipt": "රිසිට්පත බලන්න"
     },
     "changelog": "අලුත් දේ",
-    "changelogVersionPending": "මේ අනුවාදයේ සටහන් ඊළඟ යෙදුම් යාවත්කාලීනය සමඟ ලැබේ."
+    "changelogVersionPending": "{{version}} අනුවාදයේ සටහන් ඊළඟ යෙදුම් යාවත්කාලීනය සමඟ ලැබේ.",
+    "changelogGroupNew": "නව",
+    "changelogFixesIn": "{{areas}} හි නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
+    "changelogFixesPolish": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
+    "changelogAreas": {
+      "signIn": "පුරනය වීම",
+      "profileOrganizations": "පැතිකඩ සහ සංවිධාන"
+    }
   },
   "preferences": {
     "general": "සාමාන්‍ය",
@@ -798,7 +820,19 @@
         "fileComment": "ගොනුව පිළිබඳ අදහස",
         "outdatedOnPathLines": "{{path}} {{lines}} — යල් පැන ඇත",
         "outdatedOnLines": "{{lines}} — යල් පැන ඇත",
-        "outdatedOnPath": "{{path}} — යල් පැන ඇත"
+        "outdatedOnPath": "{{path}} — යල් පැන ඇත",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "වම් පැත්ත",
+        "sideRight": "දකුණු පැත්ත",
+        "outdatedOnLinesSide": "{{lines}} ({{side}}) — යල් පැන ඇත",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} ({{side}}) — යල් පැන ඇත",
+        "outdatedSide": "යල් පැන ඇත ({{side}})",
+        "outdatedOnPathSide": "{{path}} යල් පැන ඇත ({{side}})"
       },
       "deletedUser": "මකා දැමූ පරිශීලකයා",
       "replyForbiddenTerm": "මෙම {{term}}ට පිළිතුරු දීමට ඔබට අවසර නොමැත.",
@@ -910,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "මෙම ගිණුමට තවම සංවිධාන කිසිවක් නොමැත. සංවිධානයක් සෑදීමෙන් හෝ එකකට සම්බන්ධ වීමෙන් පසු Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කළ හැක.",
       "gitlabReconnectAdminOnlyDescription": "එය නැවත සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
       "bitbucketNotConnectedTitle": "Bitbucket සම්බන්ධ වී නොමැත",
-      "bitbucketAdminOnlyDescription": "එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
+      "adminOnlyConnectDescription": "එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
       "contextLine": "{{organization}} සඳහා",
       "contextLinePersonal": "ඔබේ පෞද්ගලික ගිණුම සඳහා"
     },
@@ -1250,7 +1284,7 @@
       "transcriptRetry": "සමාලෝචන පිටපත පූරණය කළ නොහැකි විය.",
       "transcriptLive": "සජීවී",
       "agentIdle": "නියෝජිතයා පොරොත්තුවෙන්",
-      "agentWorking": "නියෝජිතයා වැඩ කරමින් සිටී...",
+      "agentWorking": "නියෝජිතයා වැඩ කරමින් සිටී…",
       "anErrorOccurred": "දෝෂයක් සිදු විය",
       "errorWithMessage": "දෝෂය: {{message}}",
       "executionStarted": "ක්‍රියාත්මක කිරීම ආරම්භ වී ඇත",
@@ -1351,10 +1385,12 @@
       "notConnectedReadOnly": "Bitbucket සම්බන්ධ වී නොමැත. එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "මෙම සංවිධානයේ Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
-      "description": "අවශ්‍ය අවසර සහිත වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
+      "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "description": "{{organization}} සඳහා වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
+      "descriptionReconnect": "{{organization}} සඳහා නව වැඩබිම් ප්‍රවේශ ටෝකනයක් සාදා පහත අලවන්න.",
       "scopes": "ගිණුම: කියවීම · ගබඩා: කියවීම/ලිවීම · PR: කියවීම · වෙබ්හුක්: කියවීම/ලිවීම",
-      "tokenPlaceholder": "වැඩබිම් ප්‍රවේශ ටෝකනය"
+      "tokenPlaceholder": "වැඩබිම් ප්‍රවේශ ටෝකනය",
+      "tokenRefused": "Bitbucket මෙම වැඩබිම් ප්‍රවේශ ටෝකනය පිළිගත්තේ නැත. එහි ඉහත අවසර ඇත්දැයි පරීක්ෂා කර, නැවත උත්සාහ කරන්න."
     },
     "scopeList": {
       "personalStillAvailable": "පුද්ගලික ගබඩා තවමත් පහතින් ලබා ගත හැක.",
@@ -1465,13 +1501,25 @@
       "repositoryLine": "සමාලෝචන: {{reviews}} · ගැටලු: {{findings}}",
       "empty": "තවම විශ්ලේෂණ සහිත සමාලෝචන නොමැත",
       "emptyDescription": "සංවිධානය සඳහා විශ්ලේෂණ සක්‍රීයව ඇති විට එය සම්පූර්ණ වූ සමාලෝචන වාර්තා කරයි.",
-      "off": "මෙම සංවිධානය සඳහා විශ්ලේෂණ අක්‍රීයයි.",
-      "couldNotLoad": "විශ්ලේෂණ පූරණය කළ නොහැකි විය"
+      "offTitle": "{{platform}} සඳහා විශ්ලේෂණ අක්‍රීයයි",
+      "offDescription": "සංවිධාන බිල් කළමනාකාර භූමිකාවලට (හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල් කළමනාකරුවන්ට) සම්පූර්ණ වූ සමාලෝචන වාර්තා කිරීම සඳහා වෙබ් අනුවාදයේ ඇති සංවිධාන සැකසුම් තුළ විශ්ලේෂණ සක්‍රීය කළ හැකිය.",
+      "couldNotLoad": "විශ්ලේෂණ පූරණය කළ නොහැකි විය",
+      "trackedReviewsCaption": "විශ්ලේෂණ සක්‍රීයව ඇති විට මෙම කාල සීමාව තුළ සම්පූර්ණ වූ සමාලෝචන. ක්‍රියාත්මක වන හා අසාර්ථක වූ සමාලෝචන කිසිවිටෙක ගණනය කොට නැත.",
+      "trackedReviewsUncounted": "ගණනය කොට නැත: {{displayCount}} / {{displayTotal}} සංවිධානය සතු අවසන් වූ සමාලෝචන ඒවායේ ප්‍රතිඵලය වාර්තාගත කර නොමැත.",
+      "trackedReviewsUncounted_one": "ගණනය කොට නැත: {{displayCount}} / {{displayTotal}} සංවිධානය සතු අවසන් වූ සමාලෝචන ඒවායේ ප්‍රතිඵලය වාර්තාගත කර නොමැත.",
+      "trackedReviewsUncounted_other": "ගණනය කොට නැත: {{displayCount}} / {{displayTotal}} සංවිධානය සතු අවසන් වූ සමාලෝචන ඒවායේ ප්‍රතිඵලය වාර්තාගත කර නොමැත."
     },
     "council": {
       "title": "කවුන්සිල සමාලෝචනය",
       "subtitle": "විශේෂඥයින් කිහිප දෙනෙක් සෑම පුල් ඉල්ලීමක්ම සමාලෝචනය කරන අතර ඔවුන්ගේ ඡන්ද එක් තීරණයකට එක් වේ.",
-      "unavailable": "මෙම සංවිධානය සඳහා කවුන්සිල සමාලෝචනය නොමැත.",
+      "unavailablePersonallyTitle": "Enterprise සංවිධානයක් අවශ්‍ය වේ",
+      "unavailablePersonally": "කවුන්සිල සමාලෝචනය පෞද්ගලික ගිණුමක කොටසක් නොවේ.",
+      "unavailablePersonallyAction": "සංවිධානයක් සාදන්න",
+      "unavailablePersonallySwitchAction": "සංවිධානය මාරු කරන්න",
+      "unavailableOrganizationTitle": "කවුන්සිල සමාලෝචනය දැනට නොමැත",
+      "unavailableForOrganization": "කවුන්සිල සමාලෝචනයට සක්‍රීය දායකත්වයක් හෝ පරීක්ෂණ කාලයක් සහිත Enterprise සැලැස්මක් අවශ්‍ය වේ. මෙම සංවිධානයට එය දැනට නොමැත.",
+      "unavailableForOrganizationNeutral": "මෙම සංවිධානයට කවුන්සිල සමාලෝචනය දැනට නොමැත. පසුව නැවත උත්සාහ කරන්න.",
+      "unavailableOnBitbucket": "කවුන්සිල සමාලෝචනය Bitbucket කේත ගබඩා සඳහා ලබාගත නොහැක.",
       "noRepositories": "තවම කේත ගබඩා තෝරා නැත. පළමුව කේත ගබඩා සැකසීම්වල කේත ගබඩා තෝරන්න.",
       "specialists": "විශේෂඥයින්",
       "labels": "කවුන්සිල සමාලෝචනය ආරම්භ කරන ලේබල",
@@ -2113,6 +2161,8 @@
       "renameAccessibility": "{{title}} සැසියේ නම වෙනස් කරන්න",
       "cloningSession": "සැසියේ පිටපතක් සාදමින්",
       "couldNotLoadThisSession": "මෙම සැසිය පූරණය කළ නොහැකි විය.",
+      "historyTooLarge": "මෙම සැසියේ සටහන පූරණය කිරීමට බොහෝ විශාලයි.",
+      "historyUnavailable": "මෙම සැසියේ සටහන කියවිය නොහැක.",
       "cloneFailedRetry": "මෙම සැසියේ පිටපතක් සෑදිය නොහැකි විය. නැවත උත්සාහ කරන්න.",
       "notEnoughCredits": "මෙම ඉල්ලීම සඳහා ප්‍රමාණවත් ක්‍රෙඩිට් නොමැත. ක්‍රෙඩිට් එක් කර නැවත උත්සාහ කරන්න.",
       "previousTaskFinishing": "පෙර කාර්යය තවමත් අවසන් වෙමින් පවතී. කරුණාකර මොහොතක් රැඳී සිටින්න.",
@@ -2189,6 +2239,7 @@
       "branchDefault": "පෙරනිමිය",
       "branchAccessibility": "ශාඛාව: {{label}}",
       "branchLoading": "ශාඛා පූරණය වෙමින්",
+      "branchInactive": "එහි ශාඛා පූරණය කිරීමට ගබඩාවක් තෝරන්න.",
       "branchLoadError": "ශාඛා පූරණය කළ නොහැකි විය",
       "branchUnavailable": "මෙම ගබඩාව සඳහා ශාඛා ලබා ගත නොහැක. සැපයුම්කරු සමඟ ඔබේ ප්‍රවේශය පරීක්ෂා කර, පසුව තවත් ගබඩාවක් තෝරන්න.",
       "branchEmpty": "ශාඛා නොමැත",
@@ -2421,7 +2472,8 @@
       "customModes": "අභිරුචි ප්‍රකාර"
     },
     "modeSelector": {
-      "accessibility": "ප්‍රකාරය: {{label}}"
+      "accessibility": "ප්‍රකාරය: {{label}}",
+      "customMode": "අභිරුචි ප්‍රකාරය"
     },
     "modeOptions": {
       "code": "කේත ලියන්න",
@@ -2442,7 +2494,7 @@
       "noMatches": "ගැළපීම් නැත",
       "noRepositories": "ලබාගත හැකි ගබඩා නැත",
       "noRepositoriesDescription": "ඔබේ ගිණුමට සම්බන්ධ වූ ගබඩා නොමැත.",
-      "loading": "පූරණය වෙමින්...",
+      "loading": "පූරණය වෙමින්…",
       "accessibility": "ගබඩාව: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2737,7 +2789,7 @@
       "thinkingEffortAccessibility": "සිතීමේ මට්ටම: {{label}}",
       "thinkingEffortSelected": "සිතීමේ මට්ටම: {{label}}, තෝරා ඇත",
       "thinkingEffortWithModel": "{{model}}, සිතීමේ මට්ටම: {{variant}}",
-      "lockedByAgent": ", \"{{agent}}\" නියෝජිතයා විසින් අගුළු දමා ඇත",
+      "lockedByAgent": "\"{{agent}}\" නියෝජිතයා විසින් අගුළු දමා ඇත",
       "addToFavorites": "ප්‍රියතමයන්ට {{name}} එක් කරන්න",
       "removeFromFavorites": "ප්‍රියතමයන්ගෙන් {{name}} ඉවත් කරන්න",
       "sessionModel": "සැසියේ මාදිලිය"
@@ -2773,8 +2825,8 @@
       "pasteFromClipboard": "පසුරු පුවරුවෙන් අලවන්න",
       "stopGenerating": "ප්‍රතිචාරය ජනනය කිරීම නතර කරන්න",
       "selectModelBeforeSending": "යැවීමට පෙර මාදිලියක් තෝරන්න.",
-      "preparingPlaceholder": "පරිසරය සකසමින්...",
-      "finalizingPlaceholder": "අවසන් කරමින්...",
+      "preparingPlaceholder": "පරිසරය සකසමින්…",
+      "finalizingPlaceholder": "අවසන් කරමින්…",
       "sessionLoadFailed": "සැසිය පූරණය කළ නොහැකි විය. පළමුව නැවත උත්සාහ කරන්න.",
       "cannotReceiveFiles": "මෙම සැසියට ගොනු ලැබිය නොහැක. ඔබේ පණිවිඩය යැවීමට ඇමුණුම් ඉවත් කරන්න.",
       "couldNotAttachFiles": "ගොනු ඇමිණිය නොහැකි විය. නැවත උත්සාහ කිරීමට යැවීමේ බොත්තම තට්ටු කරන්න.",
@@ -2990,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය.",
-    "couldNotLoadActiveSessions": "සක්‍රීය සැසි පූරණය කළ නොහැකි විය.",
     "agentSessions": "දැන් ක්‍රියාත්මකයි",
     "newCodingTask": "නව කේතීකරණ කාර්යය",
     "newTaskFromPicture": "පින්තූරයකින් නව කාර්යය",
@@ -3017,6 +3068,7 @@
   "queryError": {
     "neutralDescription": "කරුණාකර නැවත උත්සාහ කරන්න.",
     "offlineTitle": "පූරණය කිරීම අසාර්ථක විය.",
+    "offlineDescription": "සේවාදායකයට ළඟා විය නොහැකි විය.",
     "permissionDescription": "මෙය බැලීමට ඔබට අවසර නැත.",
     "notFoundDescription": "මෙම අයිතමය ඉවත් කර තිබිය හැකිය, නැතිනම් එය තවදුරටත් ලබාගත නොහැක.",
     "serverTitle": "පූරණය කළ නොහැකි විය.",
@@ -3037,7 +3089,7 @@
     "scheduled": "නියමිතයි"
   },
   "voiceInput": {
-    "listening": "සවන් දෙමින්...",
+    "listening": "සවන් දෙමින්…",
     "onlineTitle": "කථනය මාර්ගගතව සකසනු ලැබේ",
     "onlineMessage": "මෙම උපාංගයට නොබැඳිව හඬ පෙළ බවට පත් කළ නොහැක. ඔබේ පටිගත කිරීම පෙළ බවට පත් කිරීමට {{provider}} වෙත යවයි. Kilo ශ්‍රව්‍යය ගබඩා නොකරයි.",
     "allow": "ඉඩ දෙන්න",
@@ -3059,7 +3111,7 @@
     "useOnlineTranscription": "මාර්ගගත පිටපත්කරණයට ඉඩ දෙන්න",
     "offlineModelDownloadScheduled": "ඔෆ්ලයින් කථන ගොනු පසුබිමින් බාගත වනු ඇත. පසුව හඬ ආදානය නැවත උත්සාහ කරන්න.",
     "listeningStopped": "සවන් දීම නතර විය.",
-    "transcribing": "පෙළට හරිමින්...",
+    "transcribing": "පෙළට හරිමින්…",
     "gatewayUnreachable": "Kilo Gateway වෙත ළඟා විය නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
     "gatewayTimeout": "හඬ පෙළට හැරවීමට වැඩි වේලාවක් ගත විය. නැවත උත්සාහ කරන්න.",
     "gatewayModelUnavailable": "මෙම හඬ පෙළට හැරවීමේ ආකෘතිය ලබා ගත නොහැක. මනාප වලින් තවත් එකක් තෝරන්න.",
@@ -3122,7 +3174,6 @@
     "completingPurchase": "මිලදී ගැනීම සම්පූර්ණ කරමින්",
     "subscriptionLoading": "Kilo Pass දායකත්වය පූරණය කරමින් පවතී",
     "retryHint": "Kilo Pass තත්ත්වය නැවත ලබාගැනීමට උත්සාහ කරයි.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "{{date}} දින අවසන් විය",
     "notAvailableInApp": "Kilo Pass යෙදුමේ ලබාගත නොහැක.",
     "statusActive": "සක්‍රීය",
@@ -3325,6 +3376,7 @@
       "manageOnWeb": "වෙබයේ බිල්පත් සැකසීම්",
       "changePlan": "සැලැස්ම වෙනස් කරන්න",
       "buySeats": "සාමාජික ස්ථාන මිලදී ගන්න",
+      "managedOnWeb": "සැලැස්ම, සාමාජික ස්ථාන සහ ස්වයංක්‍රීය ටොප්-අප් වෙබයේ කළමනාකරණය කෙරේ.",
       "setupAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් සකසන්න",
       "manageAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් කළමනාකරණය කරන්න",
       "opensOnWeb": "වෙබයේ විවෘත වේ"
@@ -3336,7 +3388,7 @@
       "loadErrorTitle": "ඔබේ සංවිධාන පූරණය කළ නොහැකි විය.",
       "membershipLostNotice": "ඔබට මෙම සංවිධානයට තවදුරටත් ප්‍රවේශ වීමට අවසර නොමැත. {{target}} වෙත මාරු විය.",
       "noOrganization": "සංවිධානයක් නැත",
-      "noOrganizationDescription": "මෙම ගිණුම කිසිදු සංවිධානයක කොටසක් නොවේ. සාමාජික ආරාධනා සහ අඩු ශේෂ ඇඟවීම් වැනි සංවිධාන විශේෂාංග භාවිත කිරීමට එකක් සාදන්න, නැතහොත් ඔබට ආරාධනා කළ සංවිධානයකට එක්වීමට වෙබය විවෘත කරන්න.",
+      "noOrganizationDescription": "මෙම ගිණුම කිසිදු සංවිධානයක කොටසක් නොවේ. සාමාජික ආරාධනා සහ අඩු ශේෂ ඇඟවීම් වැනි සංවිධාන විශේෂාංග භාවිත කිරීමට එකක් සාදන්න, නැතහොත් සංවිධානයක් ඔබට එවූ ඊමේල් එකෙන් ආරාධනය පිළිගන්න.",
       "organizationUnavailable": "සංවිධානය ලබා ගත නොහැක.",
       "selectDescriptionWithOrganizations": "ඔබ එකක් හෝ වැඩි සංඛ්‍යාවක සංවිධානවලට අයත් වේ. මෙම තිරය භාවිත කළ යුතු ගිණුම තෝරන්න.",
       "selectOrganization": "සංවිධානයක් තෝරන්න",
@@ -3368,7 +3420,8 @@
         "accounting_adjustment": "ගිණුම්කරණ ගැළපීම",
         "credits_expired": "ක්‍රෙඩිට් කල් ඉකුත් වී ඇත"
       },
-      "truncated": "පෙර ක්‍රෙඩිට් ගනුදෙනු ද බැලිය හැක."
+      "truncated": "පෙර ක්‍රෙඩිට් ගනුදෙනු ද බැලිය හැක.",
+      "retentionLimit": "නවතම ක්‍රෙඩිට් ගනුදෙනු පෙන්වයි."
     },
     "inviteMember": {
       "emailError": "වලංගු ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.",
@@ -3378,6 +3431,7 @@
       "sendInvite": "ආරාධනය යවන්න",
       "title": "සාමාජිකයකුට ආරාධනා කරන්න",
       "alreadyInvited": "දැනටමත් ආරාධනා කර ඇත හෝ දැනටමත් සාමාජිකයෙකි.",
+      "organizationUnavailable": "මෙම සංවිධානය තවදුරටත් නොපවතී.",
       "sendError": "ආරාධනය යැවීමට නොහැකි විය.",
       "pendingInvitation": "මෙම ඊමේල් ලිපිනයට දැනටමත් අපේක්ෂිත ආරාධනයක් ඇත.",
       "alreadyMember": "මෙම පුද්ගලයා දැනටමත් මෙම සංවිධානයේ සාමාජිකයෙකි.",
@@ -3399,7 +3453,8 @@
         "void": "අවලංගු",
         "uncollectible": "අයකරගත නොහැකි"
       },
-      "truncated": "පෙර ඉන්වොයිසි ද බැලිය හැක."
+      "truncated": "පෙර ඉන්වොයිසි ද බැලිය හැක.",
+      "retentionLimit": "නවතම ඉන්වොයිසි පෙන්වයි."
     },
     "lowBalanceAlert": {
       "enableA11y": "ශේෂය අඩු වූ විට දැනුම්දීම සක්‍රීය කරන්න",
@@ -3462,7 +3517,6 @@
     },
     "settingsOnWeb": {
       "title": "වෙබයේ ඇති සංවිධාන සැකසීම්",
-      "integrations": "වෙබයේ ඒකාබද්ධ කිරීම්",
       "usageDetails": "භාවිත විස්තර",
       "providersAndModels": "සපයන්නන් සහ මාදිලි",
       "groups": "කණ්ඩායම්",
@@ -3471,9 +3525,18 @@
       "ssoAndDomain": "SSO සහ වසම",
       "dataCollection": "දත්ත එකතු කිරීම",
       "auditLogs": "විගණන ලොග",
-      "requestLogs": "ඉල්ලීම් ලොග",
-      "subOrganizations": "උප සංවිධාන",
-      "distributeFunds": "අරමුදල් බෙදා හරින්න"
+      "requestLogs": "ඉල්ලීම් ලොග"
+    },
+    "requestLogs": {
+      "older": "පෙර පැය",
+      "newer": "ඊළඟ පැය",
+      "truncated": "ලැයිස්තුවේ පෙන්වන ප්‍රමාණයට වඩා ඉල්ලීම් මෙම පැයේ ඇත.",
+      "emptyTitle": "මෙම පැයේ ඉල්ලීම් නැත",
+      "emptyDescription": "පෙර ඉල්ලීම් බැලීමට පෙර පැය භාවිතා කරන්න.",
+      "loadError": "ඉල්ලීම් ලොග පූරණය කළ නොහැකි විය.",
+      "permissionDenied": "සංවිධානයක ඉල්ලීම් ලොග කියවිය හැක්කේ එහි හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි.",
+      "tokens": "ආදාන {{input}} · ප්‍රතිදාන {{output}}",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "ආදාන ටෝකන",
@@ -3625,8 +3688,7 @@
     "imagesSectionEmpty": "විශ්වාස කළ රූප ධාරක නැත",
     "revoke": "{{host}} වෙත දුන් විශ්වාසය ඉවත් කරන්න",
     "revokeMessage": "මෙම ධාරකයට ඇති සබැඳි නැවත තහවුරු කිරීම ඉල්ලා සිටී.",
-    "revokeImageMessage": "මෙම ධාරකයේ රූප නැවත තහවුරු කිරීම ඉල්ලා සිටී.",
-    "backToPreferences": "මනාප වෙත ආපසු යන්න"
+    "revokeImageMessage": "මෙම ධාරකයේ රූප නැවත තහවුරු කිරීම ඉල්ලා සිටී."
   },
   "glanceable": {
     "waiting": "නියෝජිතයන් යාවත්කාලීන කරමින්",
@@ -3640,7 +3702,7 @@
     "newestSession": "නවතම: {{title}}",
     "noneWaiting": "රැඳී සිටින නියෝජිතයෙක් නැත",
     "newAgent": "නව නියෝජිතයෙක්",
-    "approving": "අනුමත කරමින්...",
+    "approving": "අනුමත කරමින්…",
     "couldNotApprove": "අනුමත කළ නොහැකි විය",
     "channelName": "සක්‍රීය නියෝජිතයන්",
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න.",
@@ -3652,6 +3714,7 @@
     "lastKnown": "අවසන් වරට දන්නා තත්ත්වය",
     "awaitingUpdate": "යාවත්කාලීනයක් එනතුරු",
     "nextRun": "ඊළඟ ක්‍රියාත්මක වීම",
+    "wasDue": "අපේක්ෂිත විය",
     "waitingForYou": "ඔබේ ප්‍රතිචාරය එනතුරු",
     "nextScheduled": "ඊළඟ නියමිත කාර්යයන්",
     "answerNeeded": "පිළිතුරක් අවශ්‍යයි",
@@ -3761,6 +3824,8 @@
       "fieldName": "පෙන්වන නම",
       "fieldUrl": "සේවාදායක URL",
       "fieldUrlInvalid": "වලංගු සේවාදායක URL එකක් ඇතුළත් කරන්න.",
+      "duplicateUrl": "එම URL එක දැනටමත් සුරැකී ඇත.",
+      "serverNotFound": "මෙම සේවාදායකය තවදුරටත් සුරැකී නැත.",
       "enableServer": "මෙම සේවාදායකය සක්‍රීය කරන්න: {{name}}",
       "editServer": "සේවාදායකය සංස්කරණය කරන්න",
       "deleteServer": "සේවාදායකය මකන්න",
@@ -3870,6 +3935,8 @@
       "downloading": "බාගනිමින්: {{total}} න් {{written}}",
       "downloadingUnknown": "බාගනිමින්: {{written}}",
       "paused": "විරාමිතයි: {{total}} න් {{written}}",
+      "retrying": "නැවත උත්සාහ කරමින්: {{total}} න් {{written}}",
+      "retryingUnknown": "නැවත උත්සාහ කරමින්: {{written}}",
       "verifying": "බාගත කළ ගොනුව පරීක්ෂා කරමින්…",
       "downloaded": "බාගත කර ඇත · {{size}}",
       "url": "සෘජු බාගැනීම් සබැඳිය",
@@ -3960,7 +4027,9 @@
         "androidModelUnavailable": "මෙම උපාංගය Gemini Nano සඳහා සහාය නොදක්වයි, නැතහොත් AICore පද්ධති යෙදුම තවමත් සකසමින් පවතී. පසුව නැවත උත්සාහ කරන්න.",
         "aicoreUpdateRequired": "මෙම ආකෘතිය භාවිත කිරීමට AICore යෙදුම සහ ඔබගේ පද්ධති මෘදුකාංගය යාවත්කාලීන කරන්න.",
         "downloadable": "මෙම ආකෘතිය භාවිත කිරීමට පෙර එක් වරක් බාගත කළ යුතුය.",
-        "downloading": "ආකෘතිය බාගත වෙමින් පවතී. බාගැනීම අවසන් වූ පසු එය සූදානම් වනු ඇත."
+        "downloading": "ආකෘතිය බාගත වෙමින් පවතී. බාගැනීම අවසන් වූ පසු එය සූදානම් වනු ඇත.",
+        "batteryQuota": "උපාංගයේ ආකෘතිය දැනට එහි බැටරි වෙන්කළ ප්‍රමාණය භාවිත කර ඇත. පසුව නැවත උත්සාහ කරන්න.",
+        "checkFailed": "මෙම ආකෘතිය පරීක්ෂා කිරීමට යෙදුමට නොහැකි විය. නැවත උත්සාහ කරන්න."
       },
       "unavailable": "උපාංගයේ ආකෘතිය මේ මොහොතේ ලබා ගත නොහැක. එහි තත්ත්වය $t(modelChat.backends.title) තුළ පරීක්ෂා කරන්න.",
       "busy": "උපාංගයේ ආකෘතිය වෙනත් පිළිතුරක් සමඟ කාර්යබහුලයි. එය අවසන් වූ පසු නැවත උත්සාහ කරන්න.",
@@ -4198,7 +4267,7 @@
       "topPPlaceholder": "උදා. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "මගේ නියෝජිතයා",
-      "promptPlaceholder": "ඔබ කෙනෙක්...",
+      "promptPlaceholder": "ඔබ කෙනෙක්…",
       "tools": "මෙවලම්",
       "wholeToolRule": "මෙම නියෝජිතයා සියලු මෙවලම් සඳහා එකවර එකම රීතිය යොදයි: {{rule}}. මෙම ස්විච කියවීමට පමණක් වේ.",
       "visibility": "දෘශ්‍යතාව",
@@ -4254,10 +4323,10 @@
       "add": "පෙරනිමිය එක් කරන්න",
       "empty": "පෙරනිමි කිසිවක් වින්‍යාස කර නැත",
       "emptyDescription": "repo සඳහා සැසි ආරම්භ කරන විට පැතිකඩක් ස්වයංක්‍රීයව යෙදීමට පෙරනිමියක් එක් කරන්න.",
-      "repo": "ගබඩාව තෝරන්න...",
+      "repo": "ගබඩාව තෝරන්න…",
       "profile": "පැතිකඩ තෝරන්න",
       "removeForRepo": "{{repo}} බැඳීම ඉවත් කිරීම",
-      "search": "ගබඩාවන් සොයන්න...",
+      "search": "ගබඩාවන් සොයන්න…",
       "addedToast": "\"{{repo}}\" සඳහා පෙරනිමි පැතිකඩ සකසා ඇත",
       "addFailed": "පෙරනිමි පැතිකඩ සැකසීමට නොහැකි විය",
       "removedToast": "\"{{repo}}\" සඳහා පෙරනිමි පැතිකඩ ඉවත් කර ඇත",
@@ -4273,8 +4342,7 @@
       "repoValue": "ගබඩාව: {{name}}",
       "profileValue": "පැතිකඩ: {{name}}",
       "profileUnavailable": "මෙම පැතිකඩ තවදුරටත් ලබා ගත නොහැක. වෙනත් පැතිකඩක් තෝරන්න.",
-      "pickerEmptyDescriptionOrganization": "සැසි හරහා පරිසර විචල්‍ය, සැකසුම් විධාන සහ කුසලතා නැවත භාවිතා කිරීමට සංවිධාන පැතිකඩක් සාදන්න.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "සංවිධාන හිමිකරුවෙකුට හෝ පරිපාලකයෙකුට සංවිධාන පැතිකඩක් සෑදිය හැක."
+      "pickerEmptyDescriptionOrganization": "සැසි හරහා පරිසර විචල්‍ය, සැකසුම් විධාන සහ කුසලතා නැවත භාවිතා කිරීමට සංවිධාන පැතිකඩක් සාදන්න."
     },
     "variablesDeleteFailed": "විචල්‍යය මකා දැමීමට නොහැකි විය",
     "deleteVariable": "විචල්‍යය {{key}} මකන්න",
@@ -4322,7 +4390,8 @@
       "purchaseFallback": "ක්‍රෙඩිට් මිලදී ගැනීම",
       "receipt": "රිසිට්පත",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} සඳහා රිසිට්පත විවෘත කරන්න",
-      "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත."
+      "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත.",
+      "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි."
     },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",
@@ -4456,16 +4525,20 @@
     "loadError": "වාර්තා පූරණය කළ නොහැකි විය",
     "view": "වාර්තාව කියවන්න",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "සන්දර්භය අනුව පෙරහන් කරන්න",
+    "contextAll": "සියලුම සන්දර්භ",
     "dismiss": "වාර්තාව ඉවතලන්න",
+    "dismissFailed": "මෙම වාර්තාව ඉවතලීමට තවමත් නොහැකි විය. එය පසුබිමේ නැවත උත්සාහ කරනු ඇත.",
     "offline": "නොබැඳි · සුරැකි වාර්තාව",
     "cached": "සුරැකි වාර්තාව · නැවුම් කළ නොහැක",
-    "window": "{{start}} – {{end}}",
     "summary": "AI සාරාංශය",
     "summaryPending": "AI සාරාංශය සකසමින් පවතී. සූදානම් වූ විට මෙහි එක් වේ.",
     "summaryUnavailable": "AI සාරාංශය ලබා ගත නොහැක. ඔබේ ව්‍යුහගත වාර්තාව තවමත් ලබා ගත හැක.",
     "summaryCharge": "AI ගාස්තුව {{cost}}",
     "summaryChargePending": "AI ගාස්තුව සැසඳීම පොරොත්තුවෙන්",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "සාක්ෂි සහ කෘතීන්",
     "timezone": "වාර්තා වේලා කලාපය",
     "deviceTimezone": "උපාංග වේලා කලාපය භාවිත කරන්න",
@@ -4477,22 +4550,22 @@
     "timeHint": "වාර්තා කාල පරාසය අවසන් වූ විට, නොබැඳිව සිටියද, Home කාඩ්පත සජීවී තත්ත්වය යළි පෙන්වයි.",
     "invalidSchedule": "වලංගු වේලා කලාපයක් සහ හිස් නොවන වාර්තා කාල පරාසයක් තෝරන්න.",
     "notificationsHint": "කාලසටහන්ගත වාර්තාවකට එක් සාමාන්‍ය දැනුම්දීමක්. ගෙවන AI සාරාංශවලින් ස්වාධීනයි.",
-    "notificationPermission": "ඔබේ වාර්තාව ලබා ගැනීමට $t(common.notifications) තුළ උපාංග දැනුම්දීම් සක්‍රිය කරන්න.",
+    "notificationPermission": "ඔබේ වාර්තාව ලබා ගැනීමට push දැනුම්දීම් සක්‍රිය කරන්න.",
     "defaultModel": "Kilo හි පෙරනිමි මාදිලිය භාවිත කරන්න",
     "duration": "කාල ආරක්ෂණය (මිනිත්තු)",
     "spendLimit": "වියදම් ආරක්ෂණය (USD)",
     "invalidSafeguards": "ධන, සීමිත කාල සහ වියදම් සීමා ඇතුළත් කරන්න.",
     "estimate": "ඇස්තමේන්තුව {{estimate}} · උපරිමය {{maximum}}",
-    "estimateUnavailable": "මෙම සැකසුම් සඳහා ගෙවූ සාරාංශයක් ලබාගත නොහැක.",
+    "estimateUnavailable": "මෙම සැකසුම් සඳහා ගෙවූ සාරාංශයක් ලබාගත නොහැක. ආකෘතිය හෝ සීමා වෙනස් කරන්න, නැතහොත් පසුව නැවත උත්සාහ කරන්න.",
     "confirmPaid": "{{context}} සඳහා ගෙවන සාරාංශ සක්‍රිය කරන්නද?",
     "paidDisclosure": "ඇස්තමේන්තුව {{estimate}}, උපරිම {{maximum}}, මිනිත්තු {{minutes}} සීමාවක් සමඟ. ජනනය අසාර්ථක වුවද ගාස්තු අය වේ.",
     "enable": "ගෙවන සාරාංශ සක්‍රිය කරන්න",
     "allContexts": "පුද්ගලික සහ සංවිධාන වාර්තා වෙන් වෙන්ව පවතී.",
     "emptyHistory": "සුරැකි වාර්තා නැත",
-    "estimatePermissionUnavailable": "මෙම සන්දර්භයේ ශේෂය භාවිත කිරීමට ඔබට අවසර නැත.",
-    "estimatePricingUnavailable": "මෙම ආකෘතියේ මිල ගණන් ලබාගත නොහැක.",
-    "estimateBalanceUnavailable": "ගෙවූ සාරාංශයක් සඳහා ප්‍රමාණවත් ශේෂයක් නොමැත.",
-    "estimateModelNotAllowed": "මෙම ආකෘතිය මෙහි භාවිත කළ නොහැක.",
+    "estimatePermissionUnavailable": "මෙම සන්දර්භයේ ශේෂය භාවිත කිරීමට ඔබට අවසර නැත. එය සක්‍රිය කිරීමට සංවිධාන හිමියෙකුගෙන් ඉල්ලන්න.",
+    "estimatePricingUnavailable": "මෙම ආකෘතියේ මිල ගණන් ලබාගත නොහැක. වෙනත් ආකෘතියක් තෝරන්න.",
+    "estimateBalanceUnavailable": "ගෙවූ සාරාංශයක් සඳහා ප්‍රමාණවත් ශේෂයක් නොමැත. මෙම සන්දර්භයේ ශේෂයට ක්‍රෙඩිට් එකතු කරන්න.",
+    "estimateModelNotAllowed": "මෙම ආකෘතිය මෙම සන්දර්භය තුළ භාවිත කළ නොහැක. වෙනත් ආකෘතියක් තෝරන්න.",
     "estimateSpendLimitTooLow": "මෙම සාරාංශයට ඉඩ දීමට වියදම් ආරක්ෂක සීමාව ඉහළ නංවන්න.",
     "saved": "වාර්තා සැකසීම් සුරකින ලදී",
     "selectedSessions": "තෝරාගත් සැසි",
@@ -4501,16 +4574,35 @@
     "capturedAt": "සටහන් කළේ {{time}}",
     "snapshotHint": "නියමිත උදෑසන වේලාවේ ලබා ගත හැකි නවතම සැසි තත්ත්වය හැකි උපරිමයෙන් සටහන් කළ තත්ත්ව සටහනකි. ගණන් දැක්වෙන්නේ තෝරාගත් සැසි සඳහා මිස රාත්‍රිය පුරා සිදු වූ සියලු ක්‍රියාකාරකම් සඳහා නොවේ.",
     "snapshotTruncated": "මෙම තත්ත්ව සටහනේ ප්‍රමාණය සීමා කිරීමට සමහර සැසි හෝ සාක්ෂි ඇතුළත් කර නැත.",
-    "snapshotSummaryFailed": "AI සාරාංශය අසාර්ථක විය. ඔබේ ව්‍යුහගත තත්ත්ව සටහන තවමත් ලබා ගත හැක.",
+    "snapshotSummaryFailed": "AI සාරාංශය අසාර්ථක විය. ඔබේ ව්‍යුහගත වාර්තාව තවමත් ලබා ගත හැක.",
     "scheduledContextEnabled": "කාලසටහන්ගත වාර්තා",
     "scheduledContextSettings": "කාලසටහන්ගත වාර්තා · {{context}}",
     "scheduledContextHint": "මෙම සන්දර්භය සඳහා පමණක් කාලසටහන්ගත ග්‍රහණය සහ ගෙවන AI සාරාංශ සක්‍රිය කරන්න. තෝරාගත්, සංවේදී තොරතුරු ඉවත් කළ උපුටා ගැනීම් සහ ව්‍යුහගත කරුණු ඔබේ මාදිලියට යවනු ලැබේ. සාරාංශ සඳහා භාවිත වන්නේ ඔබ වාර්තා සැකසීම් යාවත්කාලීන කරන විට සුරැකෙන යෙදුම් භාෂාවයි. ගාස්තු මෙම සන්දර්භයේ ශේෂයෙන් අය වේ. ක්‍රියාකාරකම් තෝරා නොගත් තත්ත්ව සටහන් සඳහා AI භාවිත නොවේ.",
     "snapshotSafeguards": "සාරාංශයකට නියමිත කාල සහ වියදම් සීමා එක් එක් කාලසටහන්ගත තත්ත්ව සටහනට අදාළ වේ; ඒවා දෛනික අයවැයක් නොවේ.",
-    "snapshotEstimateInputTooLarge": "මෙම තත්ත්ව සටහනේ තෝරාගත් මාදිලියට සැකසිය හැකි ප්‍රමාණයට වඩා සාක්ෂි ඇත.",
+    "snapshotEstimateInputTooLarge": "මෙම තත්ත්ව සටහනේ තෝරාගත් ආකෘතියට සැකසිය හැකි ප්‍රමාණයට වඩා සාක්ෂි ඇත. වඩා විශාල ආදාන කවුළුවක් සහිත ආකෘතියක් තෝරන්න.",
     "quietSnapshot": "මෙම තත්ත්ව සටහන සඳහා කිසිදු සැසි ක්‍රියාකාරකමක් තෝරාගෙන නැත. AI සාරාංශයක් ඉල්ලා නැති අතර, ගාස්තු අය කිරීමක් සිදු වී නැත.",
     "noEnabledContexts": "කාලසටහන්ගත වාර්තා සඳහා කිසිදු සන්දර්භයක් සක්‍රිය කර නැත",
     "sourceBlocker": "සැසියට අවධානය අවශ්‍යයි",
-    "sourceMetadata": "සටහන් කළ සැසි පාරදත්ත"
+    "sourceMetadata": "සටහන් කළ සැසි පාරදත්ත",
+    "metadataPlan_one": "සැලසුම: පියවර {{displayTotal}} න් {{displayDone}}ක් සම්පූර්ණයි",
+    "metadataPlan_other": "සැලසුම: පියවර {{displayTotal}} න් {{displayDone}}ක් සම්පූර්ණයි",
+    "metadataPlan": "සැලසුම: පියවර {{displayTotal}} න් {{displayDone}}ක් සම්පූර්ණයි",
+    "metadataFiles_one": "ගොනු {{displayCount}}ක් වෙනස් විය",
+    "metadataFiles_other": "ගොනු {{displayCount}}ක් වෙනස් විය",
+    "metadataFiles": "ගොනු {{displayCount}}ක් වෙනස් විය",
+    "metadataLinesAdded_one": "පේළි {{displayCount}}ක් එකතු විය",
+    "metadataLinesAdded_other": "පේළි {{displayCount}}ක් එකතු විය",
+    "metadataLinesAdded": "පේළි {{displayCount}}ක් එකතු විය",
+    "metadataLinesRemoved_one": "පේළි {{displayCount}}ක් ඉවත් විය",
+    "metadataLinesRemoved_other": "පේළි {{displayCount}}ක් ඉවත් විය",
+    "metadataLinesRemoved": "පේළි {{displayCount}}ක් ඉවත් විය",
+    "metadataPlanCurrent": "වත්මන් පියවර: {{current}}",
+    "metadataFailure": "පසුගිය වටය අසාර්ථක විය: {{kind}}",
+    "sourceActivity": "ශීර්ෂයක් නොමැති ක්‍රියාකාරකම",
+    "metadataFailureProvider": "සැපයුම්කරු දෝෂය",
+    "metadataFailureTool": "මෙවලම් දෝෂය",
+    "metadataFailureCancelled": "අවලංගු කර ඇත",
+    "metadataFailureOther": "නිශ්චිත නොවන දෝෂය"
   },
   "systemSearch": {
     "couldNotOpenResult": "මෙම සෙවුම් ප්‍රතිඵලය විවෘත කිරීමට නොහැකි විය"
@@ -4527,6 +4619,8 @@
     "topModels": "ප්‍රමුඛ ආකෘති",
     "topFeatures": "ප්‍රමුඛ විශේෂාංග",
     "emptyTitle": "මෙම කාලය තුළ භාවිතයක් නැත",
+    "unavailableTitle": "භාවිතය ලබා ගත නොහැක",
+    "unavailableDescription": "මෙම වර්ක්ස්පේස් භාවිතය වාර්තා නොකරයි. නැවත උත්සාහ කිරීමෙන් ප්‍රයෝජනයක් නැත.",
     "orgSelfNotice": "ඔබ දකින්නේ මෙම සංවිධානයේ ඔබගේම භාවිතයයි.",
     "viewDetails": "භාවිත විස්තර බලන්න"
   },
@@ -4544,10 +4638,14 @@
     "couldNotLoad": "ඒකාබද්ධ කිරීම් පූරණය කළ නොහැකි විය",
     "permissionDenied": "මෙම ඒකාබද්ධ කිරීම් කළමනාකරණය කිරීමට ඔබට අවසර නැත.",
     "managedByOwner": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාවක් වෙනස් කිරීමට සංවිධානයේ හිමිකරුවෙකුගෙන් ඉල්ලා සිටින්න.",
+    "managedByOwnerOrAdmin": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාවක් වෙනස් කිරීමට සංවිධානයේ හිමිකරු හෝ පරිපාලකයෙකුගෙන් ඉල්ලා සිටින්න.",
+    "managedByOwnerOrBilling": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාවක් වෙනස් කිරීමට සංවිධානයේ හිමිකරු හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලා සිටින්න.",
+    "managedByOwnerAdminOrBilling": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාවක් වෙනස් කිරීමට සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලා සිටින්න.",
     "connectFailed": "සම්බන්ධතා පිටුව විවෘත කළ නොහැකි විය"
   },
   "invoices": {
-    "personalEmptyDescription": "ඔබෙන් බිල්පත් අය කළ පසු, ඔබේම මිලදී ගැනීම් සඳහා ඉන්වොයිස් මෙහි දිස් වේ."
+    "personalEmptyDescription": "ඔබෙන් බිල්පත් අය කළ පසු, ඔබේම මිලදී ගැනීම් සඳහා ඉන්වොයිස් මෙහි දිස් වේ. App Store සහ Google Play වෙතින් ලැබුණු රිසිට්පත් ක්‍රෙඩිට් ඉතිහාසයේ ඇත.",
+    "personalPeriod": "පසුගිය මාස 12"
   },
   "cloudAgent": {
     "compute": {
@@ -4577,8 +4675,9 @@
       "title": "ට්රිගර් සහ වෙබ්හුක්",
       "subtitle": "වෙබ්හුක් ඇමතුමකින් හෝ කාලසටහනකින් Cloud Agent ධාවන ස්වයංක්‍රීය කරන්න෴",
       "new": "නව ට්‍රිගර්",
+      "create": "ට්‍රිගර් සාදන්න",
       "emptyTitle": "තවම ට්‍රිගර් නැත",
-      "emptyDescription": "වෙබ්හුක් ඇමතුමකින් හෝ කාලසටහනකට අනුව Cloud Agent ධාවනයක් ආරම්භ කිරීමට ට්‍රිගර් එකක් සාදන්න෴",
+      "emptyDescription": "ඔබේ පළමු ට්‍රිගරය සාදන්න.",
       "loadFailedTitle": "ට්‍රිගර් පූරණය කළ නොහැකි විය",
       "loadFailedDescription": "සම්බන්ධතාවක් ඇති විට නැවත උත්සාහ කරන්න෴",
       "detailLoadFailedTitle": "මෙම ට්‍රිගර් පූරණය කළ නොහැකි විය",
@@ -4630,6 +4729,8 @@
       "created": "ට්‍රිගර් සාදන ලදි",
       "saved": "ට්‍රිගර් සුරකින ලදි",
       "statusArrived": "පැමිණියා",
+      "defaultPromptWebhook": "මෙම වෙබ්හුක් ඉල්ලීමේ බොඩිය විස්තර කරන්න:\n\n{{body}}",
+      "defaultPromptScheduled": "කාලසටහන්ගත කාර්යය ධාවනය කරන්න෴ {{scheduledTime}} වේලාවේ ට්‍රිගර් විය෴",
       "problems": {
         "nameRequired": "නමක් ඇතුළත් කරන්න෴",
         "nameTooShort": "අවම වශයෙන් අක්ෂර 8ක් භාවිත කරන්න෴",
@@ -4678,6 +4779,7 @@
     "superseded": "මෙම සබැඳිය වෙනත් තැනකින් ප්‍රතිස්ථාපනය කර ඇති නිසා එය තවදුරටත් ක්‍රියා නොකරයි."
   },
   "sharedSession": {
+    "startedAt": "{{time}} ට ආරම්භ විය",
     "title": "බෙදාගත් සැසිය",
     "someone": "යමෙක්",
     "sharedBy": "{{owner}} විසින් බෙදාගන්නා ලදී",
@@ -4685,5 +4787,179 @@
     "unavailableDescription": "මෙම බෙදාගැනීමේ සබැඳිය කල් ඉකුත් වී හෝ අවලංගු කර ඇත.",
     "transcriptUnavailableTitle": "මෙම සංවාද සටහන පූරණය කළ නොහැකි විය",
     "transcriptUnavailableDescription": "සබැඳිය තවමත් ක්‍රියා කරයි. මොහොතකින් නැවත උත්සාහ කරන්න."
+  },
+  "organizationGuardrails": {
+    "title": "AI ආරක්ෂක වැටවල්",
+    "permissionDenied": "AI ආරක්ෂක වැටවල් කළමනාකරණය කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකයින්ට පමණයි.",
+    "unavailableTitle": "AI ආරක්ෂක වැටවල් සබල කර නැත",
+    "unavailable": "Kilo ඉල්ලීම මත සංවිධානයක් සඳහා AI ආරක්ෂක වැටවල් සබල කරයි. {{supportEmail}} අමතන්න, Kilo කණ්ඩායම එය ඔබේ සංවිධානය සඳහා සබල කරයි.",
+    "contactSupport": "සහාය කණ්ඩායම අමතන්න",
+    "loadError": "AI ආරක්ෂක වැටවල් පූරණය කළ නොහැකි විය",
+    "statusSaving": "සුරකිමින්…",
+    "statusSaved": "සුරකින ලදී",
+    "statusFailed": "සුරැකිය නොහැකි විය.",
+    "inputTitle": "ආදාන ආරක්ෂක වැටවල්",
+    "inputDescription": "සෑම ආදානයක්ම Enkrypt AI සමඟ පරිලෝකනය කරයි, මෙවලම් ප්‍රතිඵල ඇතුළුව. Enkrypt නොමැති විට ඉල්ලීම් ප්‍රතික්ෂේප කරනු වෙනුවට පරිලෝකනය නොකර යවනු ලැබේ.",
+    "outputTitle": "ප්‍රතිදාන ආරක්ෂක වැටවල්",
+    "outputDescription": "සාමාජිකයින්ට ලැබීමට පෙර ප්‍රතිචාර Enkrypt AI සමඟ පරිලෝකනය කරයි. ඔබ එය සක්‍රිය නොකරන්නේ නම් ක්‍රියා විරහිතයි.",
+    "detectorsHint": "අවහිර කරන්න යන විකල්පය සලකුණු කළ ඉල්ලීමක් ප්‍රතික්ෂේප කරයි. වාර්තා කරන්න පමණක් යන විකල්පය ඉල්ලීම ප්‍රමාද නොකර එය වාර්තා කරයි.",
+    "detectorsHintOutput": "අවහිර කරන්න යන විකල්පය සලකුණු කළ ප්‍රතිචාරයක් අසාර්ථක කරයි. වාර්තා කරන්න පමණක් යන විකල්පය ප්‍රතිචාරය ප්‍රමාද නොකර එය වාර්තා කරයි.",
+    "choiceLog": "වාර්තා කරන්න පමණක්",
+    "applyTo": "යොදන්න",
+    "applyToAllMembers": "සියලුම සාමාජිකයින්ට",
+    "applyKiloDefault": "Kilo පෙරනිමිය යොදන්න",
+    "invalidSavedTitle": "සුරකින ලද ආදාන අනාවරක සැකසුම් කියවිය නොහැක",
+    "invalidSavedBody": "ආදාන අනාවරක නැවත සුරකින තෙක් ඉල්ලීම් අවහිර කෙරේ. පහත අනාවරක Kilo පෙරනිමියෙන් ආරම්භ වේ.",
+    "invalidSavedOutputTitle": "සුරකින ලද ප්‍රතිදාන අනාවරක සැකසුම් කියවිය නොහැක",
+    "invalidSavedOutputBody": "ප්‍රතිදාන අනාවරක නැවත සුරකින තෙක් ප්‍රතිචාර රඳවා ගැනේ. පහත ප්‍රතිදාන අනාවරක තෝරන්න.",
+    "blockingOutputNote": "අවහිර කරන ප්‍රතිදාන අනාවරකයක් Enkrypt මගින් සියල්ල පරීක්ෂා කරන තෙක් ප්‍රතිචාරයක් රඳවා ගනී. ප්‍රමාදය වළක්වා ගැනීමට වාර්තා කරන්න පමණක් භාවිත කරන්න.",
+    "inputDetectorRequired": "අවම වශයෙන් එක් ආදාන අනාවරකයක් සක්‍රිය කරන්න.",
+    "outputDetectorRequired": "අවම වශයෙන් එක් ප්‍රතිදාන අනාවරකයක් සක්‍රිය කරන්න.",
+    "rulesTooMany": "{{max}} දක්වා නීති එකතු කරන්න.",
+    "ruleIdRequired": "නීති හැඳුනුම්පතක් ඇතුළත් කරන්න.",
+    "ruleIdInvalid": "නීති හැඳුනුම්පතකට අකුරු, අංක, තිත්, ඉරි සහ යටි ඉරි පමණක් භාවිත කළ හැක.",
+    "ruleTextRequired": "නීතිය තහනම් කරන හෝ අවශ්‍ය කරන දේ විස්තර කරන්න.",
+    "keywordTooLong": "එක් එක් මූල පදය {{max}} අක්ෂර දක්වා විය හැක.",
+    "topicTooLong": "එක් එක් මාතෘකාව {{max}} අක්ෂර දක්වා විය හැක.",
+    "keywordsTooMany": "{{max}} දක්වා මූල පද එකතු කරන්න.",
+    "topicsTooMany": "{{max}} දක්වා මාතෘකා එකතු කරන්න.",
+    "piiEntityRequired": "හඳුනා ගැනීමට අවම වශයෙන් එක් දත්ත වර්ගයක් තෝරන්න.",
+    "keywordRequired": "අවම වශයෙන් එක් මූල පදයක් එකතු කරන්න.",
+    "topicRequired": "අවම වශයෙන් එක් මාතෘකාවක් එකතු කරන්න.",
+    "policyTextRequired": "ප්‍රතිපත්ති පෙළ ඇතුළත් කරන්න.",
+    "ruleRequired": "අවම වශයෙන් එක් නීතියක් එකතු කරන්න.",
+    "ruleIdDuplicate": "එක් එක් නීතියට තමන්ගේම නීති ID එකක් අවශ්‍ය වේ.",
+    "piiEntities": "හඳුනා ගත යුතු දත්ත",
+    "keywordsLabel": "මූල පද",
+    "keywordsHint": "එක් පේළියකට එක් මූල පදයක්.",
+    "topicsHint": "එක් පේළියකට එක් මාතෘකාවක්.",
+    "policyFormat": "ප්‍රතිපත්ති ආකෘතිය",
+    "policyFormatRules": "ව්‍යුහගත නීති",
+    "policyFormatRulesDescription": "එක් අවශ්‍යතාවකට එක් නීතියක්, වර්ගයක් සහ බරපතලකමක් සමඟ. නිර්දේශිතයි.",
+    "policyFormatText": "ප්‍රතිපත්ති පෙළ",
+    "policyFormatTextDescription": "දැනට ඇති ප්‍රතිපත්තියක් සාමාන්‍ය පෙළ ලෙස අලවන්න.",
+    "rulesEmpty": "තවම නීති නැත. එක් එක් නීතිය ආදානවල අඩංගු නොවිය යුතු හෝ ඉල්ලිය නොයුතු එක් දෙයක් විස්තර කරයි.",
+    "addRule": "නීතිය එකතු කරන්න",
+    "ruleNumber": "නීතිය {{number}}",
+    "ruleRemove": "නීතිය {{number}} ඉවත් කරන්න",
+    "ruleIdLabel": "නීති හැඳුනුම්පත",
+    "ruleNameLabel": "නම (විකල්ප)",
+    "ruleTextLabel": "නීතිය",
+    "ruleRiskCategory": "අවදානම් වර්ගය",
+    "ruleApplicability": "විෂය පථය",
+    "ruleFrameworks": "රාමු",
+    "detector": {
+      "promptInjection": {
+        "label": "ප්‍රොම්ප්ට් ඉන්ජෙක්ෂන්",
+        "description": "උපදෙස් අභිබවා යාමට හෝ ආකෘතිය ජේල්බ්‍රේක් කිරීමට ගන්නා උත්සාහ හඳුනා ගනී."
+      },
+      "policyViolation": {
+        "label": "ප්‍රතිපත්ති උල්ලංඝනය",
+        "description": "පෙළ හෝ නීති ලෙස ලියා ඇති ඔබේ සංවිධාන ප්‍රතිපත්තිය උල්ලංඝනය කරන ආදාන සලකුණු කරයි.",
+        "descriptionOutput": "පෙළ හෝ නීති ලෙස ලියා ඇති ඔබේ සංවිධාන ප්‍රතිපත්තිය උල්ලංඝනය කරන ප්‍රතිචාර සලකුණු කරයි."
+      },
+      "pii": {
+        "label": "PII සහ රහස්",
+        "description": "පුද්ගලික දත්ත, අක්තපත්‍ර, IP ලිපින සහ URL හඳුනා ගනී."
+      },
+      "keywords": {
+        "label": "තහනම් මූල පද",
+        "descriptionOutput": "ඔබ ලැයිස්තුගත කරන ඕනෑම මූල පදයක් අඩංගු ප්‍රතිචාර හඳුනා ගනී."
+      },
+      "topics": {
+        "label": "මාතෘකා",
+        "descriptionOutput": "ඔබ ලැයිස්තුගත කරන ඕනෑම මාතෘකාවක් පිළිබඳ ප්‍රතිචාර සලකුණු කරයි."
+      },
+      "toxicity": {
+        "label": "විෂ සහිත බව",
+        "description": "විෂ සහිත, අවමන් සහගත, තර්ජනාත්මක හෝ ද්වේෂ සහගත භාෂාව හඳුනා ගනී."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "ලිංගික හෝ වෙනත් ආකාරයෙන් රැකියා ස්ථානයට සුදුසු නොවන අන්තර්ගතය හඳුනා ගනී."
+      },
+      "bias": {
+        "label": "අගතිය",
+        "description": "අගතිගාමී හෝ වෙනස්කම් සහගත භාෂාව හඳුනා ගනී."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "පුද්ගලික දත්ත",
+        "description": "නම්, විද්‍යුත් තැපැල් ලිපින සහ දුරකථන අංක."
+      },
+      "secrets": {
+        "label": "රහස්",
+        "description": "API යතුරු, ටෝකන සහ මුරපද."
+      },
+      "ipAddress": {
+        "label": "IP ලිපින",
+        "description": "IPv4 සහ IPv6 ලිපින."
+      },
+      "url": {
+        "label": "URL",
+        "description": "වෙබ් ලිපින."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "ආරක්ෂාව සහ වංචාව",
+      "safetyHarm": "සුරක්ෂිතභාවය සහ හානිය",
+      "privacyDataProtection": "පෞද්ගලිකත්වය සහ දත්ත ආරක්ෂණය",
+      "brandReputationTrust": "වෙළඳ නාමය සහ කීර්තිය",
+      "biasFairnessEthical": "අගතිය සහ සාධාරණත්වය",
+      "legalIpLiability": "නීතිමය සහ IP වගකීම්",
+      "productMisuse": "නිෂ්පාදන අනිසි භාවිතය",
+      "performanceQuality": "කාර්ය සාධනය සහ ගුණාත්මකභාවය"
+    },
+    "applicability": {
+      "user": "පරිශීලක ආදානය",
+      "userAssistant": "පරිශීලක ආදානය සහ ප්‍රතිචාර"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM ප්‍රධාන 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "EU AI පනත",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "ව්‍යවසාය විශේෂාංගය",
+    "enterpriseOnly": "මෙය ව්‍යවසාය සඳහා පමණක් වන විශේෂාංගයකි.",
+    "readOnly": "මෙම සැකසුම් වෙනස් කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකයින්ට පමණයි.",
+    "loadError": "සපයන්නන් සහ ආකෘති පූරණය කළ නොහැකි විය",
+    "tabModels": "ආකෘති",
+    "tabProviders": "සපයන්නන්",
+    "tabGateways": "ද්වාර",
+    "modelsDescription": "සෑම සාමාජිකයෙකුටම එය අවහිර කිරීමට ආකෘතියක් ක්‍රියා විරහිත කරන්න. අනුමත සපයන්නන්ගේ ආකෘති ආරම්භයේ සක්‍රියයි.",
+    "modelsDeniedOnly": "ප්‍රතික්ෂේප කළ ඒවා පමණි",
+    "modelsEmpty": "මෙම සෙවුමට ගැළපෙන ආකෘති නැත.",
+    "modelsDeniedEmpty": "ප්‍රතික්ෂේප කළ ආකෘතියක් නැත.",
+    "modelsDeniedSearchEmpty": "මෙම සෙවුමට ගැළපෙන ප්‍රතික්ෂේප කළ ආකෘති නැත.",
+    "providersDescription": "මෙම සංවිධානය සඳහා Kilo එයට මාර්ගගත කිරීම නැවැත්වීමට සපයන්නෙකු ක්‍රියා විරහිත කරන්න.",
+    "providersNeedCatalog": "සම්පූර්ණ මාදිලි නාමාවලිය පූරණය වන තුරු සපයන්නන්ගේ ස්විච කියවීමට පමණි. ඒවා සංස්කරණය කිරීමට ඉහත ඇති නැවත උත්සාහ කරන්න බොත්තම තට්ටු කරන්න.",
+    "providersEmpty": "මෙම සෙවුමට ගැළපෙන සපයන්නන් නැත.",
+    "allowAllShown": "පෙන්වා ඇති සියල්ලට ඉඩ දෙන්න",
+    "denyAllShown": "පෙන්වා ඇති සියල්ල ප්‍රතික්ෂේප කරන්න",
+    "gatewaysDescription": "Kilo ආකෘති ඉල්ලීම් Vercel AI Gateway හෝ OpenRouter හරහා මාර්ගගත කරයි. ක්‍රියා විරහිත ද්වාරයක් එම ඉල්ලීම් අසාර්ථක කරයි.",
+    "emptyProviderList": "අවම වශයෙන් එක් සපයන්නෙකුට ඉඩ දෙන්න. හිස් ලැයිස්තුවක් සෑම Kilo ආකෘති මාර්ගයක්ම අවහිර කරයි.",
+    "gatewaysUnavailable": "මෙම සංවිධානය සඳහා ද්වාර සැකසීම් ලබා ගත නොහැක.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter ඉල්ලීම් කලාපයකට සවි නොකෙරේ.",
+    "inferenceRegion": "අනුමාන කලාපය",
+    "inferenceRegionDescription": "Vercel AI Gateway ඉල්ලීම් මෙම කලාපයට සවි කරයි. එහි නොමැති ආකෘතියක් අසාර්ථක වේ.",
+    "disableOpenrouterNote": "OpenRouter ක්‍රියා විරහිත කිරීම එය හරහා ඉල්ලීම් මාර්ගගත කරන BYOK යතුරු ද අවහිර කරයි.",
+    "emptyModelList": "අවම වශයෙන් එක් ආකෘතියක් සක්‍රීයව තබන්න. සියලු ආකෘති ප්‍රතික්ෂේප කළහොත් සාමාජිකයින්ට භාවිත කිරීමට කිසිවක් ඉතිරි නොවේ.",
+    "catalogUnavailable": "සම්පූර්ණ ආකෘති නාමාවලිය පූරණය නොවූ බැවින්, ඔබ සුරැකි ලැයිස්තු පමණක් පෙන්වයි. සියලු ආකෘති පූරණය කිරීමට නැවත උත්සාහ කරන්න.",
+    "region": {
+      "global": "ගෝලීය",
+      "us": "එක්සත් ජනපදය",
+      "eu": "යුරෝපීය සංගමය",
+      "au": "ඕස්ට්‍රේලියාව",
+      "jp": "ජපානය"
+    }
   }
 }

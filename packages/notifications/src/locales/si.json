@@ -2,7 +2,7 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "ඔබගේ ඒජන්ත සැසියට යාවත්කාලීනයක් ඇත",
+      "cloudAgentSession": "ඔබගේ නියෝජිත සැසියට යාවත්කාලීනයක් ඇත",
       "lowBalance": "ඔබගේ ශේෂයට අවධානය අවශ්‍යයි",
       "spendAlert": "ඔබගේ වියදමට අවධානය අවශ්‍යයි",
       "securityFinding": "ආරක්ෂක සොයා ගැනීමකට අවධානය අවශ්‍යයි",
@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA උල්ලංඝනය"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "ආරක්ෂක පරීක්ෂාවකට යාවත්කාලීනයක් ඇත"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "ඔබගේ Kilo සැසිය ඔබගේ දුරකථනයෙන් පාලනය කිරීමට සූදානම්"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

@@ -32,6 +32,8 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
   const parsedAmount = parseFloat(amount);
   const isNegative = parsedAmount < 0;
   const hasExpiration = expirationDate.trim() !== '' || Number(expiryHours) > 0 || neverExpire;
+  // A YYYY-MM-DD value is midnight UTC, so the earliest acceptable date is the next UTC day.
+  const minExpiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const isFormValid =
     !isNaN(parsedAmount) &&
     parsedAmount !== 0 &&
@@ -161,6 +163,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
                   type="date"
                   value={expirationDate}
                   onChange={e => setExpirationDate(e.target.value)}
+                  min={minExpiryDate}
                   id="org-expiry-date"
                   disabled={!canManageCredits || neverExpire}
                 />

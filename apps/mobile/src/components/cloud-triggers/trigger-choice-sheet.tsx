@@ -9,12 +9,14 @@
  */
 
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollView } from 'react-native';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { SheetHeader } from '@/components/sheet-header';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export type TriggerChoice = Readonly<{
   /** `null` is the sheet's "nothing chosen" row: no environment, no profile. */
@@ -41,7 +43,7 @@ export function TriggerChoiceSheet({
   onClose,
 }: TriggerChoiceSheetProps) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
+  const bottomPadding = useDetailScreenBottomPadding();
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>
       <SheetHeader
@@ -52,24 +54,25 @@ export function TriggerChoiceSheet({
       />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="px-2 pb-4 pt-2"
+        contentContainerClassName={SCREEN_BODY_CLASS}
+        contentContainerStyle={{ paddingBottom: bottomPadding }}
         showsVerticalScrollIndicator={false}
       >
-        {options.map(option => (
-          <ChoiceRow
-            key={option.value ?? '__default__'}
-            label={option.label}
-            description={option.description}
-            selected={option.value === selected}
-            onPress={() => {
-              onSelect(option.value);
-              onClose();
-            }}
-            className="px-2"
-          />
-        ))}
+        <RowGroup>
+          {options.map(option => (
+            <ChoiceRow
+              key={option.value ?? '__default__'}
+              label={option.label}
+              description={option.description}
+              selected={option.value === selected}
+              onPress={() => {
+                onSelect(option.value);
+                onClose();
+              }}
+            />
+          ))}
+        </RowGroup>
       </ScrollView>
-      <View style={{ height: insets.bottom }} className="bg-background" />
     </SessionPageSheet>
   );
 }

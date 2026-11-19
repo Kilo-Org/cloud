@@ -2,11 +2,16 @@ import { useCallback, useRef, useState } from 'react';
 import { type Href } from 'expo-router';
 
 import {
+  type RemoteSpawnController,
   type RemoteSpawnFailure,
   type UseRemoteSpawnDispatchArgs,
   type UseRemoteSpawnDispatchResult,
 } from './use-remote-spawn-dispatch-types';
 import { useAttemptWatchdog } from './use-attempt-watchdog';
+import {
+  refetchInstanceList,
+  resolveRetryableSettlement,
+} from './remote-spawn-retryable-settlement';
 import { useLatestRef } from './use-latest-ref';
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
@@ -14,10 +19,6 @@ import { i18n } from '@/i18n';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
   buildCreateRemoteSessionInput,
-  type CreateRemoteSessionInput,
-  type CreateSessionOutcome,
-  type CreateSessionSpawnOptions,
-  type RemoteInstanceSpawnStatus,
   useRemoteInstanceSpawn,
 } from '@/lib/hooks/use-remote-instance-spawn';
 import {
@@ -26,14 +27,11 @@ import {
 } from '@/lib/hooks/remote-instance-spawn-classifier';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { resolveLiveInstance } from '@/lib/resolve-live-instance';
-import {
-  remoteSpawnRetryableToast,
-  resolveRemoteSpawnFailure,
-  resolveRemoteSubmitOutcome,
-} from '@/lib/remote-submit-outcome';
+import { remoteSpawnRetryableToast, resolveRemoteSpawnFailure } from '@/lib/remote-submit-outcome';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { resolveRemoteSpawnAdmission } from '@/lib/remote-spawn-admission';
 import { withComposerHandoff } from '@/lib/share-navigation';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 
 export type { RemoteSpawnFailure, UseRemoteSpawnDispatchArgs, UseRemoteSpawnDispatchResult };
 
@@ -84,14 +82,7 @@ export function useRemoteSpawnDispatch({
   // "inherit live context". `?? null` so undefined does not fall through to
   // `useOrganization()` after a later org switch (share-gate keeps zero-arg
   // inherit by calling `useRemoteInstanceSpawn()` with no arg).
-  const remoteSpawn: {
-    status: RemoteInstanceSpawnStatus;
-    spawn: (
-      connectionId: string,
-      opts?: CreateRemoteSessionInput,
-      options?: CreateSessionSpawnOptions
-    ) => Promise<CreateSessionOutcome>;
-  } = useRemoteInstanceSpawn(organizationId ?? null);
+  const remoteSpawn: RemoteSpawnController = useRemoteInstanceSpawn(organizationId ?? null);
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
   // The spawn's inline-rendered failure; the dispatch does not toast it.
   const [remoteSpawnFailure, setRemoteSpawnFailure] = useState<RemoteSpawnFailure | null>(null);
@@ -129,6 +120,11 @@ export function useRemoteSpawnDispatch({
   // state, not a stale snapshot.
   const runOnInstanceRef = useLatestRef(runOnInstance);
 
+  // The reader's part in a trial refusal: the sentence follows the role, and
+  // the step exists only for a role the server would let change the plan.
+  const canManageBilling = useCanManageBilling(organizationId);
+  const billingAction = useBillingAction(organizationId);
+
   // Read the press-time inputs through refs so `onStart` stays stable across
   // renders while always seeing the route's latest values.
   const getSubmitPayloadRef = useLatestRef(getSubmitPayload);
@@ -141,6 +137,8 @@ export function useRemoteSpawnDispatch({
     cloneFromKiloSessionId,
     cloneUpToMessageId,
     forkPrefillText,
+    canManageBilling,
+    billingAction,
   });
   const onSpawnAdmittedRef = useLatestRef(onSpawnAdmitted);
   const onSpawnFailedRef = useLatestRef(onSpawnFailed);
@@ -158,10 +156,21 @@ export function useRemoteSpawnDispatch({
     const admission = resolveRemoteSpawnAdmission({
       instance: runOnInstance,
       payload: submitPayload,
-      plan: { organizationId: fields.organizationId, organizations: fields.organizations },
+      plan: {
+        organizationId: fields.organizationId,
+        organizations: fields.organizations,
+        canManageBilling: fields.canManageBilling,
+      },
     });
     if (!admission.allowed) {
-      setRemoteSpawnFailure({ retryable: false, message: admission.toast });
+      // Only the plan's refusal offers a step, and only a reader who may change
+      // the plan was handed one: a CLI that cannot receive the files keeps its
+      // own copy and no step.
+      setRemoteSpawnFailure({
+        retryable: false,
+        message: admission.toast,
+        action: admission.reason === 'plan' ? fields.billingAction : undefined,
+      });
       return;
     }
     // Clone entry: a full clone is refused only by an explicit
@@ -211,13 +220,7 @@ export function useRemoteSpawnDispatch({
       try {
         // Refetch the live instance list so a rebooted host's new
         // connectionId replaces the stale selection before spawn.
-        let freshList = instanceList;
-        try {
-          const result = await refetchInstances();
-          freshList = result.data?.instances ?? instanceList;
-        } catch {
-          // Refetch failed; continue with the last-known list.
-        }
+        const freshList = await refetchInstanceList(refetchInstances, instanceList);
         // A retry committed while this tail was awaiting owns the state now:
         // this stale attempt's failure must not disarm its draft marker.
         if (attemptRef.current !== attempt) {
@@ -335,28 +338,13 @@ export function useRemoteSpawnDispatch({
         if (outcome.status !== 'retryable') {
           return;
         }
-        // Seed from the fresh pre-spawn list, not the press-time
-        // `instanceList`: if the spawn remapped the selection to a live
-        // connectionId above, the press-time list still holds the stale id. A
-        // post-spawn refetch throw would then make the live id look missing
-        // and reset the selection to Cloud Agent even though the host is live.
-        let refetchedInstances: InstancePickerInstance[] = freshList;
-        try {
-          const result = await refetchInstances();
-          refetchedInstances = result.data?.instances ?? freshList;
-        } catch {
-          // Refetch failed; fall through with the fresh pre-spawn list. The
-          // mapping helper treats an empty list as "disconnected", which
-          // is the right conservative default for a network blip.
-        }
-        const action = resolveRemoteSubmitOutcome({
+        const settlement = await resolveRetryableSettlement({
           outcome,
-          refetchedInstances,
+          refreshFrom: freshList,
           selectedConnectionId,
+          refetchInstances,
         });
-        if (action.kind !== 'retryable') {
-          // Defensive: outcome.status === 'retryable' must produce a
-          // retryable action. If this ever changes we'll want to know.
+        if (settlement === null || !settlement.shouldResetSelectionToCloudAgent) {
           return;
         }
         // kilocode_change - only apply the reset if the selection this
@@ -364,12 +352,9 @@ export function useRemoteSpawnDispatch({
         // the closure-captured `runOnInstance` — see the ref's comment
         // above). Without this check, a stale tail's reset could clobber a
         // newer, unrelated selection the user already made.
-        if (
-          action.shouldResetSelectionToCloudAgent &&
-          runOnInstanceRef.current?.connectionId === selectedConnectionId
-        ) {
+        if (runOnInstanceRef.current?.connectionId === selectedConnectionId) {
           setRunOnInstance(null);
-          setShowInstanceDisconnectedNote(action.showInstanceDisconnectedNote);
+          setShowInstanceDisconnectedNote(settlement.showInstanceDisconnectedNote);
         }
       } finally {
         // A tail that exits without an explicit settle (a thrown helper, a

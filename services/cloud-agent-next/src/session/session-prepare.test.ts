@@ -56,6 +56,8 @@ import {
   type SessionRegistrationContext,
 } from './session-registration.js';
 import { prepareInputToSessionCreateRequest } from '../router/handlers/session-prepare.js';
+import { VERCEL_RUNTIME_UPGRADE_REASON } from '../sandbox-selection.js';
+import { vercelRuntimeBaseDigest } from '../byoc/vercel-runtime-base.js';
 import { PrepareSessionInput, StartSessionInput } from '../router/schemas.js';
 
 const {
@@ -111,6 +113,7 @@ function modernContext(
   organizationId?: string
 ): SessionRegistrationContext {
   ctx.env.NEXTAUTH_SECRET = 'registration-test-secret';
+  ctx.env.ENVIRONMENT = 'development';
   ctx.authToken = jwt.sign(
     {
       kiloUserId: ctx.userId,
@@ -259,8 +262,8 @@ type DoStubOverrides = {
   createSessionWithInitialAdmission?: ReturnType<typeof vi.fn>;
   getMetadata?: ReturnType<typeof vi.fn>;
   getMessageResult?: ReturnType<typeof vi.fn>;
-  recordCloudAgentChildSession?: ReturnType<typeof vi.fn>;
-  authorizeCloudAgentChild?: ReturnType<typeof vi.fn>;
+  recordChild?: ReturnType<typeof vi.fn>;
+  authorizeChild?: ReturnType<typeof vi.fn>;
 };
 
 function makeDoStub(overrides: DoStubOverrides = {}) {
@@ -275,10 +278,9 @@ function makeDoStub(overrides: DoStubOverrides = {}) {
         messageId: INITIAL_MESSAGE_ID,
         compatibilityDelivery: 'queued',
       } satisfies SessionMessageAdmissionResult),
-    recordCloudAgentChildSession:
-      overrides.recordCloudAgentChildSession ?? vi.fn().mockResolvedValue({ success: true }),
-    authorizeCloudAgentChild:
-      overrides.authorizeCloudAgentChild ??
+    recordChild: overrides.recordChild ?? vi.fn().mockResolvedValue({ success: true }),
+    authorizeChild:
+      overrides.authorizeChild ??
       vi.fn().mockResolvedValue({ token: 'runtime-token', seal: 'runtime-seal' }),
     getMetadata:
       overrides.getMetadata ??
@@ -339,6 +341,11 @@ function makeEnv(doStub: ReturnType<typeof makeDoStub>): Env {
       idFromName: vi.fn((name: string) => ({ toString: () => name })),
       get: vi.fn(() => doStub),
     } as unknown as Env['SANDBOX_SESSION'],
+    // One fake answers for the workspace authority and its chats.
+    CLOUD_AGENT_WORKSPACE: {
+      idFromName: vi.fn((name: string) => ({ toString: () => name })),
+      get: vi.fn(() => doStub),
+    } as unknown as Env['CLOUD_AGENT_WORKSPACE'],
     HYPERDRIVE: {
       connectionString: 'postgres://session-create-test',
     } as Env['HYPERDRIVE'],
@@ -731,8 +738,8 @@ describe('explicit sandbox session creation', () => {
     const ctx = modernContext(makeContext(doStub));
     const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
     await registerNewSession(makeRequest({ parentCloudAgentSessionId: parentSessionId }), ctx);
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledTimes(1);
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
+    expect(doStub.recordChild).toHaveBeenCalledTimes(1);
+    expect(doStub.recordChild).toHaveBeenCalledWith(
       expect.objectContaining({ cloudAgentSessionId: WORKSPACE_SESSION_ID })
     );
   });
@@ -742,9 +749,7 @@ describe('explicit sandbox session creation', () => {
     // failure after the session already registered must not turn the create into
     // an unacknowledgeable error.
     const doStub = makeDoStub({
-      recordCloudAgentChildSession: vi
-        .fn()
-        .mockRejectedValue(new Error('Cloud Agent child registry denied')),
+      recordChild: vi.fn().mockRejectedValue(new Error('Cloud Agent child registry denied')),
     });
     const ctx = modernContext(makeContext(doStub));
     const parentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
@@ -754,7 +759,7 @@ describe('explicit sandbox session creation', () => {
     ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
 
     expect(doStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledTimes(1);
+    expect(doStub.recordChild).toHaveBeenCalledTimes(1);
   });
 
   it.each(['vercel-small', 'cloudflare-shared'] as const)(
@@ -773,26 +778,38 @@ describe('explicit sandbox session creation', () => {
   );
 
   it.each([
-    { egressMode: 'allowlist' as const },
-    { egressAudit: true },
-    { egressMode: 'unrestricted' as const, egressAudit: true },
-  ])('rejects egress policy on a resolved legacy Cloudflare sandbox: %j', async policy => {
-    const doStub = makeDoStub();
-    selectControlPlaneSandboxMock.mockResolvedValueOnce({
-      ...PLACED_SANDBOX_DECISION,
-      provider: 'cloudflare',
-    });
-    await expect(
-      registerNewSession(
-        {
-          ...requestForPreset('cloudflare-single'),
-          runtime: { sandboxAllocation: 'cloudflare-single', ...policy },
-        },
-        selectedContext(doStub)
-      )
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-    expect(createCliSessionMock).not.toHaveBeenCalled();
-  });
+    {
+      policy: { egressMode: 'allowlist' as const },
+      message: 'Restricted network access is not available for Cloudflare sandboxes.',
+    },
+    {
+      policy: { egressAudit: true },
+      message: 'Egress audit is not available for Cloudflare sandboxes.',
+    },
+    {
+      policy: { egressMode: 'unrestricted' as const, egressAudit: true },
+      message: 'Egress audit is not available for Cloudflare sandboxes.',
+    },
+  ])(
+    'rejects egress policy on a resolved legacy Cloudflare sandbox: %j',
+    async ({ policy, message }) => {
+      const doStub = makeDoStub();
+      selectControlPlaneSandboxMock.mockResolvedValueOnce({
+        ...PLACED_SANDBOX_DECISION,
+        provider: 'cloudflare',
+      });
+      await expect(
+        registerNewSession(
+          {
+            ...requestForPreset('cloudflare-single'),
+            runtime: { sandboxAllocation: 'cloudflare-single', ...policy },
+          },
+          selectedContext(doStub)
+        )
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message });
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('forwards legacy prepare mode-only input without an explicit allocation', () => {
     const request = prepareInputToSessionCreateRequest(
@@ -2105,10 +2122,7 @@ describe('explicit sandbox session creation', () => {
         options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
       });
 
-    it.each([
-      ['the retired shared sandbox', 'cloudflare-shared', 'has been retired'],
-      ['a Vercel sandbox', 'vercel-small', 'Vercel sandbox'],
-    ] as const)(
+    it.each([['the retired shared sandbox', 'cloudflare-shared', 'has been retired']] as const)(
       'fails a ledger create on %s before admission',
       async (_name, allocation, reason) => {
         const doStub = makeDoStub();
@@ -2124,47 +2138,36 @@ describe('explicit sandbox session creation', () => {
       }
     );
 
-    it("fails a ledger create whose environment's saved allocation is Vercel, before admission", async () => {
-      const doStub = makeDoStub();
-      const ctx = selectedContext(doStub);
-      ctx.env.BYOC_VERCEL_IDS = orgId;
-      fetchByocVercelEnrollmentMock.mockResolvedValueOnce({ setupStatus: 'ready' });
-      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+    it.each([true, false])(
+      "starts a V2 environment on the environment's saved Vercel allocation (resolve before admission: %s)",
+      async resolveSavedAllocationBeforeAdmission => {
+        const doStub = makeDoStub();
+        const ctx = selectedContext(doStub);
+        ctx.env.BYOC_VERCEL_IDS = orgId;
+        fetchByocVercelEnrollmentMock.mockResolvedValue({
+          organizationId: orgId,
+          credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
+          setupStatus: 'ready',
+        });
 
-      await expect(
-        createSessionWithLedger(environmentRequest(v2Environment, undefined, 'vercel-small'), ctx, {
-          ...CREATE_OPTIONS,
-          resolveSavedAllocationBeforeAdmission: true,
-        })
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('Vercel sandbox'),
-      });
-      expect(admitOperationMock).not.toHaveBeenCalled();
-      expectNoAllocation(doStub);
-    });
-
-    it("settles the ledger row failed when the environment's saved Vercel allocation resolves after admission", async () => {
-      const doStub = makeDoStub();
-      const ctx = selectedContext(doStub);
-      ctx.env.BYOC_VERCEL_IDS = orgId;
-      fetchByocVercelEnrollmentMock.mockResolvedValueOnce({ setupStatus: 'ready' });
-
-      // No `resolveSavedAllocationBeforeAdmission`: the row is admitted first.
-      await expect(
-        runCreate(ctx, environmentRequest(v2Environment, undefined, 'vercel-small'))
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('Vercel sandbox'),
-      });
-
-      expect(admitOperationMock).toHaveBeenCalledOnce();
-      expect(settleOperationMock).toHaveBeenCalledOnce();
-      expect(settleOptions(0)?.outboxEvent).toMatchObject({
-        properties: { outcome: 'failed' },
-      });
-      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    });
+        await expect(
+          createSessionWithLedger(
+            environmentRequest(v2Environment, undefined, 'vercel-small'),
+            ctx,
+            {
+              ...CREATE_OPTIONS,
+              resolveSavedAllocationBeforeAdmission,
+            }
+          )
+        ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+        expect(createdMetadata(doStub)?.workspace).toMatchObject({
+          sandboxAllocation: 'vercel-small',
+          sandboxProvider: 'vercel',
+          sandboxKind: 'isolated',
+        });
+        expect(createdMetadata(doStub)?.environment).toMatchObject(v2Environment);
+      }
+    );
 
     it('starts a V2 environment', async () => {
       const doStub = makeDoStub();
@@ -2176,10 +2179,7 @@ describe('explicit sandbox session creation', () => {
       });
     });
 
-    it.each([
-      ['cloudflare-shared', 'has been retired'],
-      ['vercel-small', 'Vercel sandbox'],
-    ] as const)(
+    it.each([['cloudflare-shared', 'has been retired']] as const)(
       'fails a split registration on %s before it allocates',
       async (allocation, reason) => {
         const doStub = makeDoStub();
@@ -2239,12 +2239,7 @@ describe('explicit sandbox session creation', () => {
       }
     );
 
-    it.each([
-      'cloudflare-single',
-      'cloudflare-shared',
-      'isolated-standard',
-      'vercel-small',
-    ] as const)(
+    it.each(['cloudflare-single', 'cloudflare-shared', 'isolated-standard'] as const)(
       'skips an incompatible owner default %s and starts a V2 environment on an isolated sandbox',
       async contextAllocation => {
         getSandboxAllocationCandidatesMock.mockResolvedValue({
@@ -2266,6 +2261,70 @@ describe('explicit sandbox session creation', () => {
         });
       }
     );
+
+    describe('with an egress allowlist', () => {
+      const allowlist = { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'] };
+      function vercelContext(doStub: ReturnType<typeof makeDoStub>) {
+        const ctx = selectedContext(doStub);
+        ctx.env.BYOC_VERCEL_IDS = orgId;
+        fetchByocVercelEnrollmentMock.mockResolvedValue({
+          organizationId: orgId,
+          credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d482',
+          setupStatus: 'ready',
+        });
+        return ctx;
+      }
+
+      it.each([true, false])(
+        'skips a Vercel owner default and starts a V2 environment on Containers (resolve before admission: %s)',
+        async resolveSavedAllocationBeforeAdmission => {
+          getSandboxAllocationCandidatesMock.mockResolvedValue({
+            contextAllocation: 'vercel-small',
+          });
+          const doStub = makeDoStub();
+          const request = environmentRequest(v2Environment);
+          request.runtime = allowlist;
+
+          await expect(
+            createSessionWithLedger(request, vercelContext(doStub), {
+              ...CREATE_OPTIONS,
+              resolveSavedAllocationBeforeAdmission,
+            })
+          ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+          expect(createdMetadata(doStub)?.workspace).toMatchObject({
+            sandboxAllocation: 'cloudflare-containers-standard-3',
+            sandboxProvider: 'cloudflare-containers',
+            sandboxKind: 'isolated',
+            egressMode: 'allowlist',
+            egressAllowlist: ['example.com'],
+          });
+          expect(createdMetadata(doStub)?.environment).toMatchObject(v2Environment);
+        }
+      );
+
+      it.each([true, false])(
+        "fails a V2 environment on the environment's own Vercel allocation (resolve before admission: %s)",
+        async resolveSavedAllocationBeforeAdmission => {
+          getSandboxAllocationCandidatesMock.mockResolvedValue({
+            contextAllocation: 'cloudflare-containers-standard-4',
+          });
+          const doStub = makeDoStub();
+          const request = environmentRequest(v2Environment, undefined, 'vercel-small');
+          request.runtime = allowlist;
+
+          await expect(
+            createSessionWithLedger(request, vercelContext(doStub), {
+              ...CREATE_OPTIONS,
+              resolveSavedAllocationBeforeAdmission,
+            })
+          ).rejects.toMatchObject({
+            code: 'BAD_REQUEST',
+            message: 'Restricted network access is not available for Vercel sandboxes.',
+          });
+          expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+        }
+      );
+    });
 
     it('skips a retired shared owner default for a V1 environment', async () => {
       getSandboxAllocationCandidatesMock.mockResolvedValue({
@@ -2297,26 +2356,80 @@ describe('explicit sandbox session creation', () => {
     });
   });
 
-  it('rejects a fresh explicit Vercel allocation for a security-remediation origin before admission', async () => {
-    const doStub = makeDoStub();
-    const ctx = selectedContext(doStub);
-    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
-    const request = makeRequest({
-      repository: { type: 'github', repo: 'acme/repo' },
-      runtime: { sandboxAllocation: 'vercel-small' },
-      options: {
-        kilocodeOrganizationId: orgId,
-        operationKey: OPERATION_KEY,
-        createdOnPlatform: 'security-remediation',
-      },
+  describe('explicit Vercel allocation and the runtime base', () => {
+    function vercelCreate(createdOnPlatform?: string) {
+      return makeRequest({
+        repository: { type: 'github', repo: 'acme/repo' },
+        runtime: { sandboxAllocation: 'vercel-small' },
+        options: {
+          kilocodeOrganizationId: orgId,
+          operationKey: OPERATION_KEY,
+          ...(createdOnPlatform ? { createdOnPlatform } : {}),
+        },
+      });
+    }
+    function enrolledContext(doStub: ReturnType<typeof makeDoStub>, runtimeDigest?: string | null) {
+      const ctx = selectedContext(doStub);
+      ctx.env.BYOC_VERCEL_IDS = orgId;
+      fetchByocVercelEnrollmentMock.mockResolvedValueOnce({
+        organizationId: orgId,
+        credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d481',
+        setupStatus: 'ready',
+        ...(runtimeDigest === undefined ? {} : { runtimeDigest }),
+      });
+      return ctx;
+    }
+
+    it.each([
+      ['an older base digest', 'downloaded-base-v1:older'],
+      ['no stored digest', null],
+      ['an older web response', undefined],
+    ] as const)(
+      'fails a security-remediation create on %s with the upgrade reason',
+      async (_name, runtimeDigest) => {
+        const doStub = makeDoStub();
+        const ctx = enrolledContext(doStub, runtimeDigest);
+
+        await expect(runCreate(ctx, vercelCreate('security-remediation'))).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: VERCEL_RUNTIME_UPGRADE_REASON,
+        });
+        expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledOnce();
+        // The row was admitted, so it settles failed and does not leave the create hanging.
+        expect(admitOperationMock).toHaveBeenCalledOnce();
+        expect(settleOperationMock).toHaveBeenCalledOnce();
+        expect(settleOptions(0)?.outboxEvent).toMatchObject({
+          properties: { outcome: 'failed' },
+        });
+        expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+        expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+        expect(createCliSessionMock).not.toHaveBeenCalled();
+      }
+    );
+
+    it('starts a security-remediation create on the current base', async () => {
+      const doStub = makeDoStub();
+      const ctx = enrolledContext(doStub, await vercelRuntimeBaseDigest());
+
+      await runCreate(ctx, vercelCreate('security-remediation'));
+
+      expect(createdMetadata(doStub)?.workspace).toMatchObject({
+        sandboxProvider: 'vercel',
+        sandboxAllocation: 'vercel-small',
+      });
     });
 
-    await expect(runCreate(ctx, request)).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'Vercel sandboxes do not include the security-remediation command-line tools',
+    it('starts a normal create on an older base', async () => {
+      const doStub = makeDoStub();
+      const ctx = enrolledContext(doStub, 'downloaded-base-v1:older');
+
+      await runCreate(ctx, vercelCreate());
+
+      expect(createdMetadata(doStub)?.workspace).toMatchObject({
+        sandboxProvider: 'vercel',
+        sandboxAllocation: 'vercel-small',
+      });
     });
-    expect(admitOperationMock).not.toHaveBeenCalled();
-    expectNoAllocation(doStub);
   });
 
   it('replays a settled create of a now-unavailable Vercel GitLab allocation', async () => {
@@ -4372,7 +4485,7 @@ describe('createSessionWithLedger admission ladder', () => {
       worktreeId: WORKTREE_ID,
       replayed: true,
     });
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+    expect(doStub.recordChild).toHaveBeenCalledWith({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       initialMessageId: INITIAL_MESSAGE_ID,
       worktreeId: WORKTREE_ID,
@@ -4396,7 +4509,7 @@ describe('createSessionWithLedger admission ladder', () => {
       }),
     });
     const doStub = makeDoStub({
-      recordCloudAgentChildSession: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
+      recordChild: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
     });
 
     await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
@@ -4519,7 +4632,7 @@ describe('createSessionWithLedger admission ladder', () => {
         workspacePath: expect.stringContaining(expectedWorktreeId),
       }),
     });
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
+    expect(doStub.recordChild).toHaveBeenCalledWith(
       expect.objectContaining({
         cloudAgentSessionId: SANDBOX_SESSION_ID,
         worktreeId: expectedWorktreeId,
@@ -4558,7 +4671,7 @@ describe('createSessionWithLedger admission ladder', () => {
 
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith(
+    expect(doStub.recordChild).toHaveBeenCalledWith(
       expect.objectContaining({
         cloudAgentSessionId: SANDBOX_SESSION_ID,
         worktreeId: expectedWorktreeId,
@@ -4653,7 +4766,7 @@ describe('createSessionWithLedger admission ladder', () => {
 
       expect(createCliSessionMock).not.toHaveBeenCalled();
       expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-      const childCall = doStub.recordCloudAgentChildSession.mock.calls.at(-1)?.[0];
+      const childCall = doStub.recordChild.mock.calls.at(-1)?.[0];
       expect(childCall).not.toHaveProperty('worktreeId');
       if (input.profile?.id) {
         expect(mergeProfileConfiguration).toHaveBeenCalledWith(
@@ -4719,7 +4832,7 @@ describe('createSessionWithLedger admission ladder', () => {
       });
 
       expect(createCliSessionMock).not.toHaveBeenCalled();
-      expect(doStub.recordCloudAgentChildSession).not.toHaveBeenCalled();
+      expect(doStub.recordChild).not.toHaveBeenCalled();
     }
   );
 });
@@ -5067,7 +5180,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+    expect(doStub.recordChild).toHaveBeenCalledWith({
       cloudAgentSessionId: SANDBOX_SESSION_ID,
       initialMessageId: INITIAL_MESSAGE_ID,
     });
@@ -5086,7 +5199,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
       makeDb([[{ sessionId: KILO_SESSION_ID }], [{ email: 'test@example.com' }]])
     );
     const doStub = makeDoStub({
-      recordCloudAgentChildSession: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
+      recordChild: vi.fn().mockRejectedValue(new Error('parent DO unavailable')),
     });
 
     await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
@@ -5544,7 +5657,9 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
     recordOperationProgressMock.mockResolvedValue(undefined);
-    createCliSessionMock.mockReset().mockResolvedValue(undefined);
+    // A resumed ingest create requires a ready acknowledgement, so the default
+    // mock answers with one for paths that reach the ingest.
+    createCliSessionMock.mockReset().mockResolvedValue({ status: 'ready' });
     recordSessionFailureMock.mockResolvedValue(undefined);
   });
 
@@ -6305,6 +6420,36 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(storedProgress[SESSION_CREATE_FINALIZATION_VERSION_KEY]).toBeUndefined();
     }
   );
+
+  it('surfaces SERVICE_UNAVAILABLE session_clone_unavailable when the worktree resume ingest resolves without an acknowledgement', async () => {
+    const input = request();
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await canonicalProgress(input, {
+          [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+        }),
+      }),
+    });
+    // Ownership row absent: the worktree resume re-issues the ingest create,
+    // and a worker without acknowledgement support resolves to undefined.
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    createCliSessionMock.mockResolvedValueOnce(undefined);
+
+    await expect(runCreate(ctx, input)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'session_clone_unavailable',
+    });
+
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
+    expect(settleOperationMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+  });
 
   it('resumes an ownership-absent continuation clone with the worktree placement', async () => {
     const input = request({
@@ -7898,6 +8043,8 @@ describe('createSessionWithLedger clone reconciliation', () => {
         connectionString: ctx.env.HYPERDRIVE.connectionString,
         resourceKind: 'cloud-agent-next',
         resourceId: SANDBOX_SESSION_ID,
+        environment: 'development',
+        onAdmissionRejected: expect.any(Function),
         ...(organizationId ? { organizationId } : {}),
         onBindingRejected: expect.any(Function),
       });
@@ -8110,7 +8257,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
-    expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
+    expect(doStub.recordChild).toHaveBeenCalledWith({
       cloudAgentSessionId: SANDBOX_SESSION_ID,
     });
   });

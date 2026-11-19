@@ -7,14 +7,15 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
+import { ScrollView, type ScrollViewInstance, View } from 'react-native';
 
 import {
   MANUAL_REVIEW_INSTRUCTIONS_MAX_LENGTH,
   matchesCodeReviewUrlSuffix,
 } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { GitHubIcon } from '@/components/icons/github-icon';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
@@ -22,8 +23,10 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { canConnectProvider, classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import {
@@ -33,8 +36,10 @@ import {
   useReviewerPermission,
 } from '@/lib/hooks/use-code-reviewer';
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
+import { useReviewerBillingRefusal } from '@/lib/hooks/reviewer-refusal';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
@@ -114,6 +119,11 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const statusesError = githubStatus.isError || gitlabStatus.isError;
   const firstConnected = MANUAL_REVIEW_PLATFORMS.find(option => isConnected(option));
   const permission = useReviewerPermission(scope);
+  // The organization trial gate refuses a start for the whole organization, so
+  // the reader's role decides the refusal's copy and whether it offers the plan
+  // step. The read resolves against this route's scope, never the device's
+  // selected organization.
+  const refusal = useReviewerBillingRefusal(scope);
   const [platformChoice, setPlatformChoice] = useState<ManualReviewPlatform | null>(null);
   const platform = platformChoice ?? firstConnected ?? 'github';
   // The field names the request the selected platform serves: GitHub calls it a
@@ -218,8 +228,16 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               settle({ message: t('common.takingLonger'), retryable: true });
               return;
             }
-            const failure = manualReviewStartFailure(error, platform);
-            if (!settle(failure)) {
+            const failure = manualReviewStartFailure(error, platform, refusal.canManageBilling);
+            // The step a lapsed plan offers rides with the refusal, from the
+            // same role answer that chose the copy above: a member never sees
+            // a step the server would refuse them.
+            if (
+              !settle({
+                ...failure,
+                action: isTrialExpiredRefusal(error) ? refusal.action : undefined,
+              })
+            ) {
               return;
             }
             if (!failure.retryable) {
@@ -319,18 +337,16 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           }
           action={
             canConnect ? (
-              // `mt-3 w-full` matches the near-identical PR-review connect gate
-              // (pr-review-connect-gate.tsx) and the Code Reviewer
-              // ProviderConnectCard, so the same Connect GitHub action is styled
-              // the same wherever it appears.
-              <Button
-                className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
+              // The near-identical PR-review connect gate and the Code Reviewer
+              // ProviderConnectState use the same `StateAction`, so the same
+              // Connect GitHub action looks the same wherever it appears.
+              <StateAction
+                label={t('common.connectGithub')}
+                icon={GitHubIcon}
                 onPress={() => {
                   pushOnce(`/(app)/code-reviewer/${scope}/github` as Href);
                 }}
-              >
-                <Text>{t('common.connectGithub')}</Text>
-              </Button>
+              />
             ) : undefined
           }
         />
@@ -348,15 +364,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         <ScrollView
           ref={scrollRef}
           className="flex-1"
-          contentContainerClassName="px-6 gap-6 pt-4 pb-4"
+          contentContainerClassName={SCREEN_BODY_CLASS}
           automaticallyAdjustKeyboardInsets
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <View className="gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('common.platform')}
-            </Text>
+          <Section label={t('common.platform')}>
             <ManualReviewPlatformPicker
               platform={platform}
               isConnected={isConnected}
@@ -367,57 +380,52 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 setPlatformChoice(option);
               }}
             />
-          </View>
+          </Section>
 
           <View
-            className="gap-3"
             onLayout={event => {
               urlSectionY.current = event.nativeEvent.layout.y;
             }}
           >
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {urlLabel}
-            </Text>
-            <Input
-              key={platform}
-              // The shared single-line box supplies the touch floor
-              // (`min-h-[44px]`, never a fixed height); the field keeps its
-              // own chrome, horizontal inset and line box. An invalid URL adds
-              // the same destructive border the shared `FormField` gives its
-              // own field, so the error reads on the box as well as below it.
-              className={cn(
-                'rounded-md border border-input bg-background pl-3 pr-3 text-sm leading-[normal] text-foreground',
-                urlError && 'border-destructive'
-              )}
-              placeholder={URL_PLACEHOLDER[platform]}
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              accessibilityLabel={formFieldA11y({
-                label: urlLabel,
-                error: urlError,
-              })}
-              onChangeText={value => {
-                urlRef.current = value;
-                if (urlError) {
-                  setUrlError(null);
-                }
-                start.reset();
-              }}
-            />
-            {/* The shared status renders the visible line and owns the
-                announcement: a polite live region on Android, one imperative
-                iOS announcement per new message. A bare `Text` showed the copy
-                but told a screen reader nothing. */}
-            <AccessibleStatus message={urlError} className="text-xs" />
+            <Section label={urlLabel}>
+              <Input
+                key={platform}
+                // The shared single-line box supplies the touch floor
+                // (`min-h-[44px]`, never a fixed height); the field keeps its
+                // own chrome, horizontal inset and line box. An invalid URL adds
+                // the same destructive border the shared `FormField` gives its
+                // own field, so the error reads on the box as well as below it.
+                className={cn(
+                  'rounded-md border border-input bg-background pl-3 pr-3 text-sm leading-[normal] text-foreground',
+                  urlError && 'border-destructive'
+                )}
+                placeholder={URL_PLACEHOLDER[platform]}
+                placeholderTextColor={colors.mutedForeground}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                accessibilityLabel={formFieldA11y({
+                  label: urlLabel,
+                  error: urlError,
+                })}
+                onChangeText={value => {
+                  urlRef.current = value;
+                  if (urlError) {
+                    setUrlError(null);
+                  }
+                  start.reset();
+                }}
+              />
+              {/* The shared status renders the visible line and owns the
+                  announcement: a polite live region on Android, one imperative
+                  iOS announcement per new message. A bare `Text` showed the copy
+                  but told a screen reader nothing. */}
+              <AccessibleStatus message={urlError} className="text-xs" />
+            </Section>
           </View>
 
-          <View className="gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('codeReviewer.manualReview.instructions')}
-            </Text>
-            <TextInput
+          <Section label={t('codeReviewer.manualReview.instructions')}>
+            <Input
               // The route caps this at the same constant (its zod schema), and
               // the native input clips a longer value (a paste) at `maxLength`
               // before the change reaches JS, so the form cannot produce the
@@ -431,7 +439,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               accessibilityLabel={formFieldA11y({
                 label: t('codeReviewer.manualReview.instructions'),
               })}
-              className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
+              className="h-24 rounded-md border border-input bg-background p-3 text-sm text-foreground focus:border-ring"
               multiline
               textAlignVertical="top"
               placeholder={t('codeReviewer.manualReview.instructionsPlaceholder')}
@@ -443,21 +451,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               }}
             />
             {/* One line at a time: the room left while the draft nears the
-                bound, the bound itself once it is reached. The counted sentence
-                is the row's accessible name, so the number is not read alone. */}
+                bound, the bound itself once it is reached. */}
             {instructionsRemaining > 0 &&
             instructionsRemaining <= INSTRUCTIONS_COUNTER_VISIBLE_REMAINING ? (
-              <View className="flex-row justify-end">
-                {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-                <Text
-                  className="text-xs font-normal text-muted-foreground"
-                  accessibilityLabel={t('agentChat.composer.charactersRemaining', {
-                    count: instructionsRemaining,
-                  })}
-                >
-                  {instructionsRemaining}
-                </Text>
-              </View>
+              <RemainingCharactersCounter remaining={instructionsRemaining} />
             ) : null}
             {instructionsRemaining <= 0 ? (
               <AccessibleStatus
@@ -468,12 +465,9 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 className="text-xs"
               />
             ) : null}
-          </View>
+          </Section>
 
-          <View className="gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('common.model')}
-            </Text>
+          <Section label={t('common.model')}>
             {/* flex-row so the pill hugs its content instead of stretching to column width */}
             <View className="flex-row">
               <ModelSelector
@@ -487,7 +481,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 }}
               />
             </View>
-          </View>
+          </Section>
         </ScrollView>
 
         {/* The primary action is a pinned footer when the form is taller than

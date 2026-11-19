@@ -149,6 +149,12 @@ export function RepositoryBranchSelector({
           </View>
         );
       }
+      case 'inactive': {
+        // A quiet row is not a request: name the catalog key in the comment so
+        // the copy and its key move together (en:
+        // "Choose a repository to load its branches").
+        return renderNote(t('agentChat.newSession.branchInactive'));
+      }
       case 'unavailable': {
         // A refusal a retry cannot fix (no access, repository gone): explain it,
         // and leave the repository selected on its provider default.

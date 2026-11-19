@@ -108,6 +108,39 @@ export const kiloExtras = {
       },
       additionalProperties: false,
     },
+    browser: {
+      description:
+        'Browser automation for agents. Organization policy can turn it off or limit it to the bundled browser.',
+      type: 'object',
+      properties: {
+        backend: {
+          description:
+            'Which browser agents drive: the bundled Playwright browser, the browser connected through the Kilo browser extension, or none',
+          type: 'string',
+          enum: ['playwright', 'extension', 'off'],
+          default: 'playwright',
+        },
+        observation: {
+          description:
+            'What a browser action returns to the model: a full page snapshot after each action, only what changed, or the page URL and title only',
+          type: 'string',
+          enum: ['full', 'diff', 'none'],
+          default: 'full',
+        },
+        allowSensitive: {
+          description:
+            'Let agents complete sensitive browser steps such as passwords, one-time codes, card fields, OAuth consent, uploads, and downloads without asking a human',
+          type: 'boolean',
+          default: false,
+        },
+        target: {
+          description:
+            'Browser or profile id the extension backend drives. Unset means the extension decides.',
+          anyOf: [{ type: 'string' }, { type: 'null' }],
+        },
+      },
+      additionalProperties: false,
+    },
     retention: {
       // Effect Schema models maxAgeDays as number|'NaN'|'Infinity'|'-Infinity',
       // but JSON config can only carry plain numbers, so the editor schema

@@ -228,7 +228,7 @@ function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowPr
 
   return (
     <View
-      className="flex-row items-stretch border-b border-hair-soft"
+      className="flex-row items-stretch border-b-[0.5px] border-hair-soft"
       style={rowStyle}
       accessibilityLabel={describeRow(row, t)}
       testID={rowKeyId}
@@ -275,11 +275,11 @@ export function HunkSideBySideHeader({ hunk }: Readonly<HunkSideBySideHeaderProp
   const { t } = useTranslation();
   return (
     <View
-      className="border-b border-hair-soft bg-secondary px-4 py-1"
+      className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-1"
       accessibilityLabel={t('prReview.hunkRows.hunkHeader', { header: hunk.header })}
     >
       <Text
-        className="font-mono-medium text-[11px]"
+        className="font-mono-medium text-xs"
         // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color + the header's code base direction
         style={{ color: colors.mutedForeground, ...LTR_TEXT_DIRECTION }}
         numberOfLines={1}

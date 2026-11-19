@@ -56,9 +56,11 @@ const native = vi.hoisted(() => {
 vi.mock('@/components/centered-state-surface', () => ({ useStateSurface: () => native.surface }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value * 2) / 2 },
   // Portrait by default, so the short-band flag the scroller publishes stays
   // false and a state inside it keeps its full stack.
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ ...native.window, fontScale: 1 }),
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
@@ -72,13 +74,16 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
+  ArrowLeft: () => null,
   AlertCircle: () => null,
   Lock: () => null,
+  RotateCcw: () => null,
   SearchX: () => null,
   ServerCrash: () => null,
   WifiOff: () => null,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#777777',
   useThemeColors: () => ({ mutedForeground: '#777777' }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));

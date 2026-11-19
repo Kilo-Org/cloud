@@ -9,17 +9,20 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useFocusEffect } from 'expo-router';
-import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FolderGit2, RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
+import { RefusalStatus } from '@/components/refusal-status';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { RowFrame } from '@/components/ui/row-frame';
+import { RowGroup } from '@/components/ui/row-group';
 import { ScreenHeader } from '@/components/screen-header';
 import {
   DashboardSections,
@@ -37,6 +40,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { INLINE_LINK_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
@@ -49,6 +53,8 @@ import {
 import {
   isSecuritySyncInProgress,
   isSecuritySyncRetryable,
+  isSecurityTrialRefusal,
+  isSecurityTrialRefusalCopyKey,
   securitySyncPreconditionFor,
   securitySyncReconcileCopy,
 } from '@/lib/security-agent-ledger';
@@ -66,6 +72,7 @@ import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { type SinglePushRoute, useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
@@ -99,19 +106,19 @@ const METRIC_TONE_CLASS = {
  * The metric tile's frame, shared with its placeholder so the loading state
  * cannot drift from the rendered card.
  */
-const STAT_TILE_CLASS = 'w-[47%] gap-1 rounded-lg bg-secondary p-3';
+const STAT_TILE_CLASS = 'min-w-0 flex-1 basis-2/5';
 
 // One placeholder per tile: the metrics fill four of them with or without SLA
-// deadlines. Each bar is the loaded line's own box at the app's default text
-// size — the `text-xs` label, the `text-xl` value and the `text-[11px]` detail
-// — so the tile's height comes out the same and the loaded cards replace the
-// placeholders without moving anything below them. The detail bar is the one
-// line the loaded tile may not carry, so it is drawn only for the scope shape
-// that carries it.
+// deadlines. Each bar is the loaded line's own box — the `text-xs` label, the
+// `stat` variant's `text-lg` value (one line tall, which is the `h-7` bar) and
+// the `text-xs` detail — so the tile's height comes out the same and the loaded
+// cards replace the placeholders without moving anything below them. The detail
+// bar is the one line the loaded tile may not carry, so it is drawn only for the
+// scope shape that carries it.
 const STAT_TILE_PLACEHOLDERS = [0, 1, 2, 3] as const;
 const STAT_LABEL_LINE_CLASS = 'h-4 rounded';
 const STAT_VALUE_LINE_CLASS = 'h-7 rounded';
-const STAT_DETAIL_LINE_CLASS = 'h-[15px] rounded';
+const STAT_DETAIL_LINE_CLASS = 'h-4 rounded';
 
 export function buildLocalizedMetrics(
   data: DashboardStats,
@@ -265,7 +272,6 @@ function DashboardHeader({
   const { t } = useTranslation();
   return (
     <ScreenHeader
-      className="px-6"
       title={scopeTitle}
       eyebrow={t('common.securityAgent')}
       // The scope name is the one thing that tells two organizations apart,
@@ -310,12 +316,12 @@ function DashboardMetricTiles({ neverSynced }: Readonly<{ neverSynced: boolean }
   return (
     <View className="flex-row flex-wrap gap-3">
       {STAT_TILE_PLACEHOLDERS.map(placeholder => (
-        <View key={placeholder} className={STAT_TILE_CLASS}>
+        <Card key={placeholder} className={STAT_TILE_CLASS}>
           {/* The loaded card's own line boxes: label, value, detail. */}
           <Skeleton className={cn('w-2/3', STAT_LABEL_LINE_CLASS)} />
           <Skeleton className={cn('w-1/2', STAT_VALUE_LINE_CLASS)} />
           {neverSynced ? null : <Skeleton className={cn('w-full', STAT_DETAIL_LINE_CLASS)} />}
-        </View>
+        </Card>
       ))}
     </View>
   );
@@ -337,6 +343,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const scopeTitle = useSecurityScopeTitle(scope);
+  // The step a trial refusal offers, for the reader who can take it. A stored
+  // dismissal failure records which refusal it was, not which reader saw it, so
+  // this one role answer feeds both the sentence a failure card paints and the
+  // step under it, which `useBillingAction` builds from the same predicate; the
+  // two cannot describe different readers.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
@@ -690,6 +703,57 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     syncPrecondition === 'noRepositories' && repositoryPolicyReadOnly
       ? t('securityAgent.mutations.syncNoRepositoriesNoManage')
       : syncFailure?.message;
+  // The lapsed-trial refusal is the one failed sync the reader can end from
+  // here: its fix is the plan, so a reader who can change the plan gets the
+  // step that opens billing, and everyone else keeps the sentence alone. The
+  // precondition and retry actions below are untouched by it — a trial refusal
+  // is terminal and has neither.
+  const syncRefusalAction = isSecurityTrialRefusal(syncFailure) ? billingAction : undefined;
+
+  // The sync failure row. A trial refusal the reader can end routes through
+  // `RefusalStatus`, so its step sits under the sentence the way every other
+  // refusal offers one; every other failure keeps its own sentence and the
+  // precondition or retry control beside it.
+  let syncFailureRow: ReactNode = null;
+  if (syncFailure !== null && !syncFailureInProgress) {
+    syncFailureRow =
+      syncRefusalAction === undefined ? (
+        <View className="flex-row items-center gap-3">
+          {/* While a retry runs this sentence is the failure being retried,
+              not a fresh one, so it steps back from error red — to the warn
+              tone this screen already gives its other degraded state — while
+              the control reports the attempt. */}
+          <Text
+            className={cn(
+              'flex-1 text-xs',
+              triggerSync.isPending ? 'text-warn' : 'text-destructive'
+            )}
+          >
+            {syncFailureMessage}
+          </Text>
+          {syncAction ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              loading={syncAction.pending}
+              // A busy non-primary control dims itself, spinner included, which
+              // left the control the reader just pressed fainter than the
+              // header icon spinning beside it.
+              className={cn(syncAction.pending && 'opacity-100')}
+              onPress={syncAction.handlePress}
+            >
+              <Text>{syncAction.label}</Text>
+            </Button>
+          ) : null}
+        </View>
+      ) : (
+        <RefusalStatus
+          message={syncFailureMessage ?? null}
+          action={syncRefusalAction}
+          className="text-xs"
+        />
+      );
+  }
 
   // A grant that holds nothing blocks every scan, so the repository card's
   // empty state carries the step out of it. A manager opens the repository
@@ -768,7 +832,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -844,42 +908,14 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           <Text className="text-xs text-warn">{refreshFailure.message}</Text>
         ) : null}
 
-        {syncFailure !== null && !syncFailureInProgress ? (
-          <View className="flex-row items-center gap-3">
-            {/* While a retry runs this sentence is the failure being retried,
-                not a fresh one, so it steps back from error red — to the warn
-                tone this screen already gives its other degraded state — while
-                the control reports the attempt. */}
-            <Text
-              className={cn(
-                'flex-1 text-xs',
-                triggerSync.isPending ? 'text-warn' : 'text-destructive'
-              )}
-            >
-              {syncFailureMessage}
-            </Text>
-            {syncAction ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                loading={syncAction.pending}
-                // A busy non-primary control dims itself, spinner included,
-                // which left the control the reader just pressed fainter than
-                // the header icon spinning beside it.
-                className={cn(syncAction.pending && 'opacity-100')}
-                onPress={syncAction.handlePress}
-              >
-                <Text>{syncAction.label}</Text>
-              </Button>
-            ) : null}
-          </View>
-        ) : null}
+        {syncFailureRow}
 
         {dismissFailures.failures.map(failure => (
           <SecurityCommandRetryCard
             key={failure.findingId}
-            lastError={securityDismissFailureCopy(failure)}
+            lastError={securityDismissFailureCopy(failure, canManageBilling)}
             retryable={failure.retryable === true}
+            action={isSecurityTrialRefusalCopyKey(failure.lastErrorKey) ? billingAction : undefined}
             onRetry={() => {
               pushOnce(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
             }}
@@ -950,24 +986,15 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         ) : (
           <View className="flex-row flex-wrap gap-3">
             {metrics.map(metric => (
-              <View key={metric.label} className={STAT_TILE_CLASS}>
+              <Card key={metric.label} className={STAT_TILE_CLASS}>
                 <Text variant="muted" className="text-xs">
                   {metric.label}
                 </Text>
-                <Text
-                  className={cn(
-                    'text-xl font-semibold tabular-nums',
-                    METRIC_TONE_CLASS[metric.tone]
-                  )}
-                >
+                <Text variant="stat" className={METRIC_TONE_CLASS[metric.tone]}>
                   {metric.value}
                 </Text>
-                {metric.detail ? (
-                  <Text variant="muted" className="text-[11px]">
-                    {metric.detail}
-                  </Text>
-                ) : null}
-              </View>
+                {metric.detail ? <Text variant="caption">{metric.detail}</Text> : null}
+              </Card>
             ))}
           </View>
         )}
@@ -985,27 +1012,25 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         // read. Until both hold, this link is the screen's only way there.
         !(repositoryScopeEmpty && data.repoHealth.length === 0 && !lastSync.isPending) ? (
           // The header’s Sync now button already starts this run, so the empty
-          // state offers only the navigation it alone provides. It carries the
-          // dashboard’s card language — the same surface and radius as the
-          // sections below, at the same gap — because bare body text in the
-          // section gap read as a stray label, not a tappable action. The label
-          // takes the accent and a trailing chevron says it navigates.
-          <Pressable
-            onPress={() => {
-              pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-            className={cn(
-              ROW_TARGET_CLASS,
-              'flex-row items-center justify-between gap-2 rounded-lg bg-secondary px-3 active:opacity-70'
-            )}
-          >
-            <Text className="text-sm font-medium text-primary">
-              {t('securityAgent.dashboard.manageRepositories')}
-            </Text>
-            <DirectionalChevronRight size={16} color={colors.primary} />
-          </Pressable>
+          // state offers only the navigation it alone provides. It is the
+          // settings row primitive, in its own group, so the destination reads
+          // with the same anatomy as every other navigation row on the app.
+          <RowGroup leadingTile>
+            {/* The title wraps: "Manage repositories" is a sentence-length
+                label in several catalogs, and a truncated destination names
+                the wrong screen. */}
+            <RowFrame
+              icon={FolderGit2}
+              trailing={{ kind: 'chevron' }}
+              onPress={() => {
+                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+              }}
+            >
+              <Text className="text-sm font-medium text-foreground">
+                {t('securityAgent.dashboard.manageRepositories')}
+              </Text>
+            </RowFrame>
+          </RowGroup>
         ) : null}
 
         {dashboardStats.isError && !data ? (
@@ -1060,7 +1085,7 @@ export function DashboardLoadingView({ scope }: Readonly<{ scope: string }>) {
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         <View className="flex-row items-center justify-between gap-3">

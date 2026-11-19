@@ -87,8 +87,11 @@ configuration and unavailable writes retry under the queue policy,
 then reach the DLQ. Processing logs contain the usage ID when valid, queue message
 ID, delivery attempt count, and categorical outcome/reason.
 
-Writer HTTP 429 and 503 also reject the queue invocation after all messages in the
-batch have been handled. Each successful message keeps its explicit ACK; failed
+Writer HTTP 429 and 503 reject the queue invocation after all messages in the
+batch have been handled, except for a validated tagged write with a recognized
+`queue_limit` 429 and the exact response header `x-usage-class-limit: non_llm`.
+That message takes its usual admission retry. A shared overload in any sibling
+still fails the invocation. Each successful message keeps its explicit ACK; failed
 messages keep their explicit retry using the per-message delay policy below and the shared retry/DLQ budget.
 There is no extra writer attempt within an invocation. Other failures retain
 per-message retries without being classified as overload. Overload retry logs add
@@ -199,13 +202,13 @@ The consumer reads the tag before anything else:
 |---|---|---|---|
 | Untagged | Existing LLM writer at `USAGE_WRITER_URL` | Unchanged | Unchanged |
 | `enkrypt_usage`, `v: 1`, valid record | `/api/internal/enkrypt-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
-| `exa_usage`, `v: 1`, valid record | `/api/internal/exa-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
+| `exa_usage`, `v: 1`, valid record | `/api/internal/exa-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id`, or `rejected` for the same id, which means the writer resolved no payer, recorded nothing, and the message is not redelivered | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
 | `enkrypt_usage` or `exa_usage`, `v: 1`, invalid record or extra key | None | Never | Conservative retry (`invalid_event`) |
 | Any other `kind`, or another `v` | None | Never | Conservative retry (`unsupported_kind`) |
 
 A message that never ACKs exhausts the shared 20-retry budget and goes to the DLQ,
 so the DLQ can hold all three kinds. A recognized admission 429 takes the admission
-retry schedule, and HTTP 429/503 rejects the invocation, exactly as for LLM usage.
+retry schedule. Only the explicitly marked class-only rejection is exempt from invocation failure.
 The invocation launch budget is shared. Consumer settings are unchanged. On the
 writer, these queue writes take the `non_llm` admission class described under
 [writer admission protection](#writer-admission-protection); its ceiling rejection
@@ -224,13 +227,14 @@ not logged). Untagged LLM logs keep exactly their existing fields, so filter LLM
 counts with a missing `usage_kind`. Tagged logs carry only the usage id and kind: no
 payer, user, session, cost or `occurredAt`-derived age.
 
-Deploy order: this consumer first, then the ingress, then the producer with its
-flag off. Never roll the consumer back to a version that does not route a kind
+Deploy order: this consumer first, then the ingress, then the producer (the Exa
+producer publishes only with a valid publisher configuration). Never roll the consumer back to a version that does not route a kind
 while messages of that kind may be in flight or retrying: such a consumer retries
 them as invalid or unsupported events and they reach the DLQ after 20 retries. In
 particular, never roll back to a consumer from before Exa routing while Exa
 messages may be queued. To stop tagged traffic, roll the producer back — revert the
-Enkrypt source, or turn off the Exa fallback flag — and let the consumer drain.
+Enkrypt source, or remove the web app's Exa publisher configuration or revert its producer
+source as described in Exa usage rollout — and let the consumer drain.
 
 ## Observability
 
@@ -243,7 +247,7 @@ diagnosis and log-derived counts/latency. `entrypoint` is `gateway`,
 |---|---|---|
 | Frankfurt gateway direct write or SFO local fallback | `gateway` | `unknown` |
 | Queue consumer through HTTP writer | `writer_endpoint` | `queue` |
-| Staging Vercel queue consumer through HTTP writer | `writer_endpoint` | `queue_vercel` |
+| Retired staging Vercel queue consumer, in older deployments only | `writer_endpoint` | `queue_vercel` |
 | SFO gateway handoff through HTTP writer | `writer_endpoint` | `region_handoff` |
 | HTTP writer without a classified caller, including classifier/grader writes | `writer_endpoint` | `unknown` |
 | Unclassified local caller | `unknown` | `unknown` |
@@ -254,8 +258,9 @@ classifier and benchmark grader, omit the marker. After internal API authenticat
 the writer route accepts only `queue`, `queue_vercel`, or `region_handoff`; missing
 or other values map to `unknown` without logging the raw header. This is caller-supplied diagnostic
 context, not an authorization or accounting input. Older clients remain compatible.
-See the [Vercel queue prototype runbook](../../packages/usage-queue/README.md) for
-the isolated staging transport and its `queue_vercel` caller label.
+The staging Vercel queue prototype is retired and new gateway builds no longer
+publish to it. The writer keeps accepting `queue_vercel` so older staging
+deployments that still contain its consumer can finish any retained work.
 `execution_region` identifies the persistence function's region when available:
 SFO HTTP handoffs record `fra1`; a local fallback in SFO records `sfo1`.
 Missing or unrecognized `VERCEL_REGION` values are reported as `unknown`.
@@ -268,8 +273,7 @@ one, inside a 40-second overall elapsed retry budget. Before retries it uses
 exponential full jitter: uniformly zero up to (excluding) 500 ms, 1,000 ms, then
 2,000 ms. Attempt timeouts and sleeps are clipped to remaining budget; no new
 attempt starts after exhaustion. Runtime scheduling can delay observation of
-these deadlines. Non-retry calls retain one two-second attempt; the separate
-Vercel queue transport is unchanged. Every attempt reuses the same serialized
+these deadlines. Non-retry calls retain one two-second attempt. Every attempt reuses the same serialized
 event and usage ID;
 ambiguous acceptance can create duplicate messages, which the writer deduplicates.
 Configuration failures and HTTP outcomes other than 408/429/5xx are not retried.
@@ -311,8 +315,8 @@ under 1,000 ms is logged only when a stable hash of its usage ID falls in a nomi
 line per attempt, four per publication, and about 1% of publications plus every
 slow, failed or retried attempt. The rows are not a uniform sample: weight fast
 rows by `1 / sample_rate` and do not read either subset as population percentiles.
-An attempt cut off by a process kill writes nothing. Configuration failures and the
-Vercel queue transport make no attempt and log nothing new. If writing the line
+An attempt cut off by a process kill writes nothing. Configuration failures make no
+attempt and log nothing new. If writing the line
 throws, the publisher reports a Sentry warning tagged `usage_publisher_attempt_log`
 and the publication continues with its existing outcome.
 
@@ -374,14 +378,15 @@ and [known limitations](https://developers.cloudflare.com/workers/observability/
 
 ## Queue policy
 
-Production uses batch size 6 and staging keeps batch size 2. Both allow at most
-two writer slots per invocation:
+EU consumers use batch size 6 in production and 2 in staging, with at most
+two writer slots per invocation. Global hedge consumers use batch size 1 and
+can use only one slot:
 
 | Consumer setting | Value | Purpose |
 |---|---|---|
-| `max_batch_size` | `6` in production, `2` in staging | Maximum messages delivered per invocation. |
+| `max_batch_size` | EU: `6` in production, `2` in staging; global hedge: `1` in both | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | `225` in production, `200` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. The [stall hedge](#stall-hedge-to-the-global-queue) consumer adds `25 × 2 = 50` in each environment. |
+| `max_concurrency` | `225` in production, `200` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. The [stall hedge](#stall-hedge-to-the-global-queue) consumer has cap `25` and adds `25 × 1 = 25`, for combined bounds of `475` / `425`. |
 | `max_retries` | `20` | Initial delivery plus up to twenty retries, shared across failure classes. |
 | `retry_delay` | `60` seconds | Fallback for implicit/unexpected failures; handled failures use per-message jitter below. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
@@ -401,7 +406,7 @@ Healthy events still make one HTTP call and ACK only a matching `recorded` or
 `duplicate` result, with no added delay. Failed items make no additional HTTP call
 inside the delivery: the consumer chooses a native `message.retry({delaySeconds})`
 for that item, freeing invocation slots while waiting for redelivery. Successful
-siblings retain their ACKs. Existing HTTP 429/503 overload feedback still rejects
+siblings retain their ACKs. Shared HTTP 429/503 overload feedback still rejects
 the invocation after all sibling processing and dispositions settle; other
 unavailable/configuration failures do not newly trigger that feedback.
 
@@ -483,8 +488,7 @@ because their next failure could immediately dead-letter them. Preserve stable I
 and reconcile ambiguous writes before replay; do not republish to reset attempts
 or discard accepted events.
 
-The isolated staging Vercel queue keeps its own retry settings; it shares only the
-bounded writer-response classification. No new environment knob or worker binding
+No new environment knob or worker binding
 is introduced. This preparation does not claim a healthy-traffic p95 improvement
 or authorize a production rollout, capacity increase, or replay.
 
@@ -551,6 +555,16 @@ shared limit is 1 (pool maximum 3 or less), the ceiling is 1 and a non-LLM call
 can take the only slot. The total limit is unchanged. Like the shared limit, this
 is a per-runtime counter, not a connection reservation, and it makes no
 fleet-wide fairness claim.
+
+The writer marks a class-only rejection when shared slots remain and its pool
+snapshot shows zero waiters and fewer checked-out connections than the shared
+limit. Missing or inconsistent gauges leave the rejection unmarked. Roll out
+the writer first, then the consumer. Either order retains the existing overload
+behavior until both sides support the header. Older consumers ignore it and the
+429 body stays compatible. During an authorized rollout, compare backlog slope,
+native invocation exception ratio and concurrency with pool waiting and LLM 429s.
+Halt rollout if shared pressure rises or backlog growth and exceptions worsen.
+A lower exception ratio alone does not establish recovery.
 
 `usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
 all rejected decisions. Fields contain only the bounded caller/outcome/reason,
@@ -763,32 +777,22 @@ fallback: when the direct write fails, the web app posts the same bare record, w
 `id` and `occurredAt`, to `/exa-usage`, and the ingress wraps it in the tagged envelope. The
 Exa writer is idempotent by the `id`/`occurredAt` pair, so a queued copy of a write that did
 commit returns `duplicate` and makes no second debit; a replay must keep both values. The
-producer is a separate change behind the
-`kilocode-app` flag `EXA_USAGE_QUEUE_FALLBACK_ENABLED`; until it lands with the flag on,
-nothing sends Exa messages.
+`kilocode-app` producer publishes whenever its `USAGE_INGEST_URL` and
+`USAGE_INGEST_PUBLISH_SECRET` form a valid publisher configuration; it has no rollout selector.
 
-Deploy in this order. Each step must be deployed and verified before the next:
+The consumer that routes tagged Exa messages and its `/exa-usage` ingress, together with the
+web app's Exa writer taking the `non_llm` admission class for queue writes, must be deployed
+before any `kilocode-app` deployment whose publisher configuration is valid.
 
-1. This Worker's consumer that routes tagged Exa messages and its `/exa-usage` ingress, and
-   the web app's Exa writer taking the `non_llm` admission class for queue writes. They ship
-   together and nothing posts to the ingress yet. The production Worker deploy is not
-   ordered against the Vercel promotion, so confirm both before step 2.
-2. The web app producer, with the flag off.
-3. The flag on.
+Rollback: remove the web app's publisher configuration and redeploy, or revert the producer
+source change and redeploy with `EXA_USAGE_QUEUE_FALLBACK_ENABLED` absent or not `true`; the
+reverted source still publishes whenever that value is `true`. Failed direct writes then stop publishing, and the consumer drains what the
+queue already accepted. Never roll the consumer back to a version without Exa routing while
+Exa messages may still be in the source queue or in flight: they would fail every retry and
+reach the DLQ.
 
-Rollback: set the flag to anything other than `true` and redeploy the web app. Failed direct
-writes then stop publishing, and the consumer drains what the queue already accepted. Never
-roll the consumer back to a version without Exa routing while Exa messages may still be in
-the source queue or in flight: they would fail every retry and reach the DLQ.
-
-Human-only steps, before the flag is turned on:
-
-- give `kilocode-app` the ingress address and the existing `USAGE_INGEST_PUBLISH_SECRET`;
-  no new Worker secret is needed;
-- name a replay owner for the mixed DLQ, with a replay that handles LLM, Enkrypt and Exa
-  messages;
-- confirm the existing DLQ alerting covers it;
-- set the flag on `kilocode-app` and redeploy.
+The mixed DLQ needs a replay owner whose replay handles LLM, Enkrypt and Exa messages, and the
+existing DLQ alerting must cover it.
 
 ## Retention
 
@@ -921,7 +925,7 @@ unchanged. Authentication, body reads and schema and size checks run first, as b
 | `USAGE_INGEST_HEDGE_DELAY_MS` | Whole milliseconds, clamped to 250–10000 | `1000` when missing or not a whole number |
 | `USAGE_INGEST_HEDGE_PERCENT` | Whole number 0–100; only read when the mode is `on` | `100` when missing or invalid |
 
-Production config sets `on`, delay 1000 and percent 50. Staging sets `on`, delay
+Production config sets `on`, delay 1000 and percent 100. Staging sets `on`, delay
 1000 and percent 100.
 
 - `off`, or an event that is not eligible: the single-queue path and its logs, unchanged.
@@ -962,16 +966,16 @@ so the hedge consumer dead-letters into the global DLQ, which queue preparation 
 at maximum [retention](#retention). Dead-letter alerting must cover
 `usage-ingest-processing-dlq` as well as the EU DLQ.
 
-The hedge consumer stays attached whatever the mode, with production batch 6 and
-staging batch 2, timeout 0, 20 retries, retry delay 60 and `max_concurrency` 25. The
+The hedge consumer stays attached whatever the mode, with production and
+staging batch 1, timeout 0, 20 retries, retry delay 60 and `max_concurrency` 25. The
 consumer handler is queue-agnostic and logs `batch.queue`. So:
 
 - Turning the hedge off stops new hedge sends; copies already in the hedge queue keep
   draining.
 - Turning it on needs nothing else.
-- Capacity: the hedge consumer adds up to 25 invocations × parallelism 2 = 50 writer
-  calls, so the nominal production consumer ceiling is 500 instead of 450 (staging
-  450 instead of 400) while hedged copies are being consumed. Writer admission is
+- Capacity: the hedge consumer adds up to 25 invocations × one message = 25 writer
+  calls, so the nominal production consumer ceiling is 475 instead of 450 (staging
+  425 instead of 400) while hedged copies are being consumed. Writer admission is
   unchanged.
 
 A hedged event can be accepted by both queues. Duplicate deliveries of one LLM usage
@@ -981,12 +985,47 @@ no post-commit side effects. The redelivery test in
 one set of first-usage events for two deliveries of one usage ID. Duplicate
 completions rise by roughly the hedged share.
 
+### Global single-message batch experiment
+
+Only the existing global hedge consumers use `max_batch_size: 1`: production
+`usage-ingest-processing` changes from 6, staging `usage-ingest-processing-staging`
+from 2. EU batches stay 6 in production and 2 in staging. All caps, fill timeouts,
+retry settings, source parallelism, hedge selection/delay, logs and traces stay fixed.
+
+Cloudflare [checks autoscaling after a whole batch finishes](https://developers.cloudflare.com/queues/configuration/consumer-concurrency/).
+Shorter batches may allow faster scaling decisions; this is a hypothesis, not a
+proven cold-start fix or production benefit, and lower lag is not guaranteed.
+Each global invocation can use only one processing slot despite parallelism 2.
+At the configured cap of 25 invocations, the maximum messages held in delivered
+hedge batches falls from 150 to 25 in production (25 × batch 6→1), and from 50
+to 25 in staging (25 × batch 2→1). These are bounds, not observed occupancy.
+This can reduce throughput, increase invocation cost and increase retry pressure.
+It does not force a warm Worker or provide minimum concurrency.
+
+For a separately authorized rollout, first retain a baseline and then verify the
+executing deployment and actual consumer settings in each environment. Compare
+matched traffic, stall windows and mature completion cutoffs before/after: all
+assigned LLM treatment/control completion-age tails (including fast requests that
+never hedge), global handler-entry age, native consumer concurrency, backlog/lag,
+writer rejections, retries, duplicates and extra invocations/cost. Keep sampling
+and coverage limits explicit; acceptance winners are not persistence winners.
+Treat sustained global hedge queue depth or oldest-message age growth under
+matched traffic, or failure to drain after a stall, as a rollback trigger; assess
+it alongside writer rejection/retry pressure and assigned completion-age tails.
+No new telemetry is needed. Roll back in a future small PR by restoring only the
+production global batch 1→6 (staging global 1→2 to restore its baseline), leaving
+EU and the hedge protocol/settings intact; verify readback and recovery afterward.
+
 ### Flipping the toggle
 
 Change the variable in `wrangler.jsonc` in a small PR and redeploy the Worker through
 the normal workflow. `wrangler deploy` replaces dashboard-edited variables, so a
-dashboard change does not last. For the first production trial, set
-`USAGE_INGEST_HEDGE_MODE` to `on` and keep `USAGE_INGEST_HEDGE_PERCENT` at `50`.
+dashboard change does not last. The first production trial set
+`USAGE_INGEST_HEDGE_MODE` to `on` and kept `USAGE_INGEST_HEDGE_PERCENT` at `50`;
+production has since expanded to percent 100. Rolling production back to the
+earlier bounded 50% is a separate follow-up PR that restores
+`USAGE_INGEST_HEDGE_PERCENT` to `50` and redeploys the Worker; it is not an
+automatic or live action.
 
 ### Merge prerequisite
 
@@ -1018,20 +1057,27 @@ first, then remove forward.
 ### Measuring
 
 The Worker's `usage_ingest_hedge` event and `batch.queue` are not in Axiom, but the
-usage ID is. At percent 50, last hex digits `0`–`7` of `usage_id` are the treatment
-and `8`–`f` the control, inside the same stalls. The primary measurement splits by
-that digit within the same hours:
+usage ID is. Production now runs at percent 100, so every eligible LLM usage ID is
+hedged and there is no simultaneous non-eligible control arm. The historical
+treatment/control split — at percent 50, last hex digits `0`–`7` of `usage_id` were
+the treatment and `8`–`f` the control inside the same stalls — no longer describes an
+active arm; those earlier digit-based comparisons are history after activation. The
+primary measurement is a before/after comparison of:
 
 - `usage_record_completion`: age and the over-5 s share of recorded completions,
   especially in stall hours.
 - `usage_publisher_attempt`: `duration_ms` of publisher attempts, and the share of
   5 s or more.
 
-The treatment should show fewer attempts of 5 s or more and a lower over-5 s share,
-with duplicate completions rising by roughly the hedged share. In Cloudflare Workers
-Logs, `usage_ingest_hedge` winner counts show whether the second queue accepts while
-the first is blocked. A before/after comparison is only supporting evidence, because
-stalls vary a lot from day to day. No benefit is claimed before that measurement.
+Expanding 50→100 can roughly double eligible hedge attempts at equal workload; it
+does not double all publications, because a fast EU send still never hedges and
+off-mode or non-hex-digit events are unchanged. Duplicate completions can rise by
+roughly the newly eligible share. The hedge consumer cap of 25 is unchanged and does
+not by itself guarantee the extra traffic is harmless to speed or load. In
+Cloudflare Workers Logs, `usage_ingest_hedge` winner counts show whether the second
+queue accepts while the first is blocked. A before/after comparison is only
+supporting evidence, because stalls vary a lot from day to day. No benefit is
+claimed before that measurement.
 
 ## First writer-admission retry spread
 

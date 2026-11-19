@@ -20,7 +20,10 @@ vi.mock('react-native', () => ({
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX', X: 'X' }));
 vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@shopify/flash-list', async () => {
   // `vi.mock` factories run before the file's imports bind.
   const { createElement: create, forwardRef, useImperativeHandle } = await import('react');
@@ -30,6 +33,7 @@ vi.mock('@shopify/flash-list', async () => {
         data?: RepositoryRow[];
         renderItem: (info: { item: RepositoryRow; index: number }) => ReactNode;
         ListHeaderComponent?: ReactNode;
+        ListFooterComponent?: ReactNode;
       },
       ref: Ref<unknown>
     ) {
@@ -41,7 +45,8 @@ vi.mock('@shopify/flash-list', async () => {
         props.ListHeaderComponent,
         (props.data ?? []).map((item, index) =>
           create('ReviewRow', { key: index }, props.renderItem({ item, index }))
-        )
+        ),
+        props.ListFooterComponent
       );
     }),
   };
@@ -119,6 +124,31 @@ describe('RepositoryRowsList search', () => {
       controls.setSearchable(true);
     });
     expect(rowNames(renderer)).toEqual(['kilo-org/cloud', 'kilo-org/cloud-tools', 'acme/widgets']);
+    unmount();
+  });
+});
+
+describe('RepositoryRowsList footer', () => {
+  it('keeps a full-bleed footer at the page gutter', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(RepositoryRowsList, {
+        repositories: ROWS,
+        selectedIds: [],
+        disabled: false,
+        onToggle: () => undefined,
+        searchable: false,
+        header: null,
+        headerGapClass: 'pb-2',
+        footer: createElement('FooterStub'),
+        style: {},
+        onLayout: () => undefined,
+      })
+    );
+
+    // The rows are full-bleed and the screen's footer content carries no
+    // padding of its own, so the list gives it the page gutter.
+    const footer = renderer.root.findByType('FooterStub');
+    expect(footer.parent?.props.className).toBe('px-4');
     unmount();
   });
 });

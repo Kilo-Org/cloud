@@ -3,15 +3,11 @@ import {
   postSecurityWorkerCommand,
   type AcceptedSecurityWorkerCommand,
 } from './security-sync-worker-client';
-
-type ManualFindingDismissalOwner =
-  | { organizationId: string; userId?: never }
-  | { userId: string; organizationId?: never };
-
-type DismissReason = 'fix_started' | 'no_bandwidth' | 'tolerable_risk' | 'inaccurate' | 'not_used';
+import type { SecurityReviewOwner } from '../core/types';
+import type { DismissReason } from '../core/schemas';
 
 type SubmitManualFindingDismissalParams = {
-  owner: ManualFindingDismissalOwner;
+  owner: SecurityReviewOwner;
   actor: { id: string; email?: string | null };
   findingId: string;
   installationId: string;

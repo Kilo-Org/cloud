@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import {
@@ -22,6 +21,7 @@ import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import {
   openAuthorizationAndWaitForReturn,
@@ -109,7 +109,7 @@ export function useNewSessionRepos({
 }: UseNewSessionReposArgs): UseNewSessionReposResult {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
 
   const githubQuery = useQuery(
     organizationId
@@ -409,8 +409,8 @@ export function useNewSessionRepos({
     }
     // The sheet owns the token form and invalidates this hook's repository read
     // when the connection lands, so there is nothing to wait for here.
-    router.push(bitbucketConnectHref(organizationId));
-  }, [organizationId, router]);
+    pushOnce(bitbucketConnectHref(organizationId));
+  }, [organizationId, pushOnce]);
 
   const openIntegration = useCallback(
     (platform: RepositoryPlatform) => {
@@ -539,7 +539,8 @@ export type RepositoryBranchesState = {
  * The query runs only when a repository is selected. Bitbucket is
  * organization-only, so a personal Bitbucket row never issues a request — the
  * server would refuse it with the org-only message, and the section explains
- * the restriction instead.
+ * the restriction instead. A disabled GitHub or GitLab row is quiet too: the
+ * section renders its own inactive note, not loading.
  *
  * The organization scope is the caller's `organizationId` PROP, not a value
  * read back from a store: the screen owns the route's scope, so passing it in

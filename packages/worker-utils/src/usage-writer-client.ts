@@ -2,6 +2,7 @@ import {
   EnkryptUsageWriteResponseSchema,
   ExaUsageWriteResponseSchema,
   UsageRecordResponseSchema,
+  USAGE_CLASS_LIMIT_HEADER,
   type EnkryptUsageWrite,
   type EnkryptUsageWriteResponse,
   type ExaUsageRecord,
@@ -36,9 +37,12 @@ type UnavailableWrite = {
     | 'request_failed';
   status?: number;
   admissionReason?: AdmissionReason;
+  classOnly?: true;
 };
 
-type AcknowledgedWrite<Result> = { kind: 'recorded' | 'duplicate'; result: Result };
+type WriteSettlement<Result, Status extends string> = { kind: Status; result: Result };
+type WriterStatus = 'recorded' | 'duplicate' | 'rejected';
+type AcknowledgedWrite<Result> = WriteSettlement<Result, 'recorded' | 'duplicate'>;
 
 export type LlmUsageWriteOutcome =
   | AcknowledgedWrite<NonNullable<UsageRecordResponse['result']>>
@@ -48,13 +52,19 @@ export type EnkryptUsageWriteOutcome =
   | AcknowledgedWrite<EnkryptUsageWriteResponse>
   | UnavailableWrite;
 
-export type ExaUsageWriteOutcome = AcknowledgedWrite<ExaUsageWriteResponse> | UnavailableWrite;
+/**
+ * `rejected` is a settled outcome: the writer resolved no payer and recorded nothing, so the
+ * delivery is acknowledged and must not be resent.
+ */
+export type ExaUsageWriteOutcome =
+  | WriteSettlement<ExaUsageWriteResponse, 'recorded' | 'duplicate' | 'rejected'>
+  | UnavailableWrite;
 
-type WriterRequest<Result> = {
+type WriterRequest<Result, Status extends WriterStatus> = {
   usageId: string;
   usageKind?: 'enkrypt_usage' | 'exa_usage';
   body: unknown;
-  acknowledge: (value: unknown) => AcknowledgedWrite<Result> | 'not_recorded' | 'invalid';
+  acknowledge: (value: unknown) => WriteSettlement<Result, Status> | 'not_recorded' | 'invalid';
 };
 
 // The existing writer allows 150 seconds for its database transaction.
@@ -74,11 +84,11 @@ function errorName(error: unknown): string {
     : typeof error;
 }
 
-async function sendUsageWrite<Result>(
-  request: WriterRequest<Result>,
+async function sendUsageWrite<Result, Status extends WriterStatus>(
+  request: WriterRequest<Result, Status>,
   config: UsageWriterConfig,
   fetchWriter: typeof fetch
-): Promise<AcknowledgedWrite<Result> | UnavailableWrite> {
+): Promise<WriteSettlement<Result, Status> | UnavailableWrite> {
   const kindField = request.usageKind === undefined ? {} : { usageKind: request.usageKind };
   const unavailable = (
     reason: UnavailableWrite['reason'],
@@ -138,7 +148,14 @@ async function sendUsageWrite<Result>(
         // A partial, slow or malformed rejection remains generic HTTP 429 overload.
         bodyError = errorName(error);
       }
-      return unavailable('http_error', 429, admissionReason, bodyError);
+      const rejection = unavailable('http_error', 429, admissionReason, bodyError);
+      if (
+        request.usageKind !== undefined &&
+        admissionReason === 'queue_limit' &&
+        response.headers.get(USAGE_CLASS_LIMIT_HEADER) === 'non_llm'
+      )
+        return { ...rejection, classOnly: true };
+      return rejection;
     }
     if (!response.ok) return unavailable('http_error', response.status);
     if (!response.body) return unavailable('invalid_response');
@@ -152,11 +169,12 @@ async function sendUsageWrite<Result>(
     if (acknowledgement === 'not_recorded') return unavailable('not_recorded');
     if (acknowledgement === 'invalid') return unavailable('invalid_response');
 
-    console.info('usage writer acknowledged', {
-      usageId: request.usageId,
-      ...kindField,
-      outcome: acknowledgement.kind,
-    });
+    if (config.source !== 'queue')
+      console.info('usage writer acknowledged', {
+        usageId: request.usageId,
+        ...kindField,
+        outcome: acknowledgement.kind,
+      });
     return acknowledgement;
   } catch (error) {
     return unavailable(

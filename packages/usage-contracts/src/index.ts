@@ -1,12 +1,23 @@
-import { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
+import {
+  ABUSE_CLASSIFICATION,
+  GatewayApiKindSchema,
+  KiloOrganizationIdSchema,
+} from './schema-types';
 import { z } from 'zod';
 import type { EnkryptUsageQueueMessage } from './enkrypt';
 import type { ExaUsageQueueMessage } from './exa';
 
-export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
-export type { AbuseClassification, GatewayApiKind } from './schema-types';
+export const USAGE_CLASS_LIMIT_HEADER = 'x-usage-class-limit';
+
+export {
+  ABUSE_CLASSIFICATION,
+  GatewayApiKindSchema,
+  KiloOrganizationIdSchema,
+} from './schema-types';
+export type { AbuseClassification, GatewayApiKind, KiloOrganizationId } from './schema-types';
 export {
   EXA_ALLOWED_PATHS,
+  EXA_MAX_COST_MICRODOLLARS_PER_CALL,
   EXA_USAGE_FEATURE_ID_MAX_LENGTH,
   EXA_USAGE_TYPE_MAX_LENGTH,
   EXA_USAGE_WRITE_PATH,
@@ -53,7 +64,9 @@ const CoreUsageSchema = z.object({
   cache_discount: bigintAsNumber.nullable(),
   has_error: z.boolean(),
   abuse_classification: z.enum(ABUSE_CLASSIFICATION),
-  organization_id: z.uuid().nullable(),
+  // The `organizations.id` column contract: any stored id passes, so a stricter
+  // check here would reject a legitimate payer. See `KiloOrganizationIdSchema`.
+  organization_id: KiloOrganizationIdSchema.nullable(),
   inference_provider: z.string().nullable(),
   project_id: z.string().nullable(),
 });
@@ -191,7 +204,12 @@ export const UsageRecordResponseSchema = z.object({
   status: z.enum(['recorded', 'duplicate', 'not_recorded']),
   result: z
     .object({
-      usageId: z.string(),
+      // The writer echoes the inserted `microdollar_usage.id`, which is the
+      // request's `core.id` (validated as a UUID above) or a generated UUID.
+      usageId: z.uuid(),
+      // Stays a plain string: this is read back out of PostgreSQL, so the
+      // strict-ISO rule for `created_at` above does not apply. See
+      // packages/db/AGENTS.md "Timestamp boundaries".
       createdAt: z.string(),
       newMicrodollarsUsed: z.number().nullable(),
     })

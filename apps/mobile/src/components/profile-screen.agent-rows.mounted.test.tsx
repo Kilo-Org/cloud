@@ -24,6 +24,7 @@ import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
 
 // Every row here opens its screen through the press-burst guard, and these
 // assertions read the router mock, so the guarded push is that function.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/hooks/use-single-push-route', () => ({
   useSinglePushRoute: () => routerPush,
 }));

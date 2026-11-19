@@ -3,7 +3,7 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { Bot, Loader2 } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { RowChevron } from '@/components/ui/row-chevron';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import {
   type KiloSessionId,
@@ -16,9 +16,11 @@ import {
 
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
+import { cn } from '@/lib/utils';
 
 import {
   type ChildSessionCardState,
@@ -85,7 +87,7 @@ export function ChildSessionSection({
       style={{ borderStartWidth: 2, borderStartColor: borderColor }}
     >
       <Pressable
-        className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 px-3 py-2 active:opacity-70')}
         onPress={() => {
           if (sessionId) {
             onOpenChildSession(sessionId, shownTaskName);
@@ -103,7 +105,7 @@ export function ChildSessionSection({
         accessibilityHint={sessionId ? t('agentChat.childSession.openHint') : undefined}
         accessibilityState={{ disabled: !sessionId }}
       >
-        <DirectionalChevronRight size={14} color={colors.mutedForeground} />
+        <RowChevron />
 
         {isRunning ? (
           <SpinningIcon icon={Loader2} size={16} color={colors.agentSky} />
@@ -253,7 +255,7 @@ export function ChildSessionMessage({
   }
 
   return (
-    <View className="gap-1 rounded-md bg-secondary p-2">
+    <View className="gap-1 border-s-2 border-hair-soft ps-3 py-1">
       {visibleParts.map(p => {
         if (isToolPart(p) && p.tool === 'task') {
           const nestedSessionId = getTaskToolSessionId(p);

@@ -110,7 +110,11 @@ repository.
 9. A session MUST start on the environment's sandbox size when the owner can
    use it. Otherwise the repository override applies, then the owner default,
    then the platform default. A request that names a sandbox wins over all of
-   them.
+   them. When the session has an egress allowlist or an egress audit, a
+   repository override or owner default on a sandbox that cannot enforce it
+   MUST be skipped. The environment's sandbox size and a requested sandbox
+   MUST NOT be skipped for this reason; such a start MUST fail with a specific
+   message.
 10. Saving an environment with a new sandbox size MUST fail when the owner
     cannot use that size for the repository. A saved size that later becomes
     unavailable MUST NOT block other edits to the environment.
@@ -155,9 +159,11 @@ repository.
     at `/workspace/<name>`, and the agent and setup MUST start at `/workspace`.
     Setup MUST run once. Each additional repository MAY have its own branch;
     otherwise it MUST use the session's generated branch.
-19. Saving a multi-repository environment with a Vercel sandbox MUST fail, and
-    so MUST a session request for one. A saved default of that kind (repository
-    or owner) MUST be skipped, and the session MUST start on another sandbox.
+19. A multi-repository environment MUST be able to run on every sandbox that
+    the picker offers, on every provider. A request whose URL names a
+    repository of the environment MUST get only the access of that repository.
+    A request that names no repository, for example a GraphQL request, uses
+    the access of the launch repository (Not Yet Implemented 4).
 20. A new session MUST NOT start on a sandbox that another workspace uses. The
     picker MUST NOT offer a shared sandbox. A request for the retired shared
     sandbox MUST fail with a specific message, and a saved shared default MUST
@@ -474,8 +480,9 @@ repository.
    the workspace, and MUST remain listable and downloadable after the sandbox
    stops. Only the session's owner, or an authorized organization member, MUST
    be able to list, download, or delete them. Deleting a file MUST remove it for
-   the user immediately; a running sandbox MAY keep its local copy. Files MUST
-   expire from the view 14 days after their last change. A replacement sandbox
+   the user immediately; a running sandbox MAY keep its local copy. Saved files
+   MUST remain available until their workspace or standalone session is deleted.
+   Deleting a sibling chat MUST NOT remove shared files. A replacement sandbox
    MUST NOT restore artifacts except from a workspace tail snapshot; outside
    that coverage, saved files remain available from cloud storage but the
    sandbox's `/artifacts` folder MAY be empty.
@@ -834,12 +841,24 @@ The following use SHOULD and are not enforced today:
    - A repository that cannot be authorized fails the start with a generic
      message that does not name it. A timeout while authorizing fails as a
      workspace setup failure.
-   - The sandbox picker does not know the environment. It can show a Vercel
-     default that the session skips.
    - With several repositories, the agent runs at `/workspace` and does not
      load the `AGENTS.md` or skills of each repository.
+5. The sandbox picker SHOULD show the sandbox that the session uses. (The
+   picker does not know the egress policy of the environment. It can show a
+   saved Vercel default that a session with an egress allowlist or audit skips
+   under Start rule 9.)
 
 ## Changelog
+
+### 2026-11-13 -- Multi-repository environments on Vercel
+
+- A multi-repository environment can now run on a Vercel sandbox. Saving one
+  with a Vercel sandbox no longer fails, and a saved Vercel default is no longer
+  skipped for it. Only the retired shared sandbox is still rejected.
+- A session with an egress allowlist or audit skips a saved repository or owner
+  default on a sandbox that cannot enforce the policy, such as Vercel, and
+  starts on another sandbox. The environment's sandbox and a requested sandbox
+  still fail with the egress message.
 
 ### 2026-11-12 -- Organization repository access
 
@@ -860,7 +879,7 @@ The following use SHOULD and are not enforced today:
   remain listable and downloadable after the sandbox stops.
 - Access is owner-only, or for an authorized organization member. Deleting a
   file removes it for the user even when a running sandbox still holds a copy.
-- Saved files expire from the view 14 days after their last change. A
+- Saved files follow the workspace or standalone session lifecycle. A
   replacement sandbox restores them only from a workspace tail snapshot.
 
 ### 2026-11-04 -- Environment start commands

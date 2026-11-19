@@ -17,6 +17,8 @@ import {
 } from '@/components/agents/mode-options';
 import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
+import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
@@ -61,6 +63,14 @@ export function TriggerFormAgent({
   const profiles = useTriggerProfiles(draft.runAsCreator ? undefined : organizationId, true);
   const isCustomAgent = !BUILTIN_AGENT_MODES.some(mode => mode === draft.agent);
   const { markTouched, shownProblem } = useTouchedProblems(problems);
+  // TanStack Query v5 resets a no-data query to `pending` when it refetches,
+  // clearing `error`, so `isError` alone would unmount the failure row (and its
+  // retry) the moment the retry is pressed. Keeping the failed state through
+  // the refetch leaves the row in place and lets the retry show its busy state
+  // until the request settles. Same contract as the tool-summary settings
+  // screen and `use-current-user-id`.
+  const catalogueFailed =
+    (models.isError || (models.isLoading && models.isFetched)) && models.models.length === 0;
 
   const agentOptions: TriggerChoice[] = [
     ...BUILTIN_AGENT_MODES.map(mode => ({
@@ -91,9 +101,7 @@ export function TriggerFormAgent({
           }}
           error={triggerProblemText(shownProblem('agent'))}
         />
-        <Text variant="muted" className="text-xs">
-          {t('cloudAgent.triggers.agentHelp')}
-        </Text>
+        <Text variant="caption">{t('cloudAgent.triggers.agentHelp')}</Text>
       </View>
       {isCustomAgent && (
         <FormField
@@ -112,28 +120,33 @@ export function TriggerFormAgent({
       )}
 
       <View className="gap-2">
-        <View className="flex-row items-center gap-2">
-          <ModelSelector
-            value={draft.model}
-            variant={draft.variant}
-            options={models.models}
-            acceptsVariant
-            onSelect={(model, variant) => {
-              onDraftChange({ ...draft, model, variant });
-            }}
-            onOpen={() => {
-              markTouched('model');
-            }}
-            isLoading={models.isLoading}
+        <ModelSelector
+          value={draft.model}
+          variant={draft.variant}
+          options={models.models}
+          acceptsVariant
+          presentation="field"
+          onSelect={(model, variant) => {
+            onDraftChange({ ...draft, model, variant });
+          }}
+          onOpen={() => {
+            markTouched('model');
+          }}
+          isLoading={models.isLoading}
+          disabled={catalogueFailed}
+        />
+        {catalogueFailed ? (
+          <QueryError
+            placement="top"
+            compact
+            variant="server"
+            title={t('common.couldNotLoadModels')}
+            onRetry={() => void models.refetch()}
+            isRetrying={models.isFetching}
           />
-          {models.isError ? (
-            <Text className="min-w-0 flex-1 text-xs text-destructive">
-              {t('common.couldNotLoadModels')}
-            </Text>
-          ) : null}
-        </View>
+        ) : null}
         {modelProblemText === undefined ? null : (
-          <Text className="text-xs text-destructive">{modelProblemText}</Text>
+          <AccessibleStatus message={modelProblemText} className="text-sm" />
         )}
       </View>
 
@@ -153,9 +166,7 @@ export function TriggerFormAgent({
             onOpenSheetChange('profile');
           }}
         />
-        <Text variant="muted" className="text-xs">
-          {t('cloudAgent.triggers.profileHelp')}
-        </Text>
+        <Text variant="caption">{t('cloudAgent.triggers.profileHelp')}</Text>
       </View>
 
       <TriggerChoiceSheet

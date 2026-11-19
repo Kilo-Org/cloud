@@ -76,7 +76,7 @@ const mockEnsureOrganizationAccess =
     (
       ctx: { user: User },
       organizationId: string,
-      roles?: OrganizationRole[]
+      roles?: readonly OrganizationRole[]
     ) => Promise<OrganizationRole>
   >();
 const mockGetGitHubAppTypeForOrganization =
@@ -108,7 +108,7 @@ jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: (
     ctx: { user: User },
     organizationId: string,
-    roles?: OrganizationRole[]
+    roles?: readonly OrganizationRole[]
   ) => mockEnsureOrganizationAccess(ctx, organizationId, roles),
 }));
 

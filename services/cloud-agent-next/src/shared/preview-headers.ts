@@ -7,6 +7,11 @@ export const PREVIEW_HOST_COOKIE_NAME = '__Host-kilo_preview';
 export const PREVIEW_MARKER_PREFIX = 'x-kilo-preview-';
 export const PREVIEW_MARKER_PORT_HEADER = `${PREVIEW_MARKER_PREFIX}port`;
 export const PREVIEW_MARKER_ALLOCATION_HEADER = `${PREVIEW_MARKER_PREFIX}allocation`;
+/**
+ * Set only by the Worker's tunnel admission: the allocation id it admitted. The
+ * marker prefix makes ingress strip a client copy.
+ */
+export const PREVIEW_TUNNEL_CONNECT_HEADER = `${PREVIEW_MARKER_PREFIX}tunnel-connect`;
 
 export function previewCookieName(secure: boolean): string {
   return secure ? PREVIEW_HOST_COOKIE_NAME : PREVIEW_COOKIE_NAME;

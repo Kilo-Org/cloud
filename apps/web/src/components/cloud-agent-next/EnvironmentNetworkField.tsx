@@ -2,10 +2,7 @@
 
 import { useId } from 'react';
 import { TriangleAlert } from 'lucide-react';
-import {
-  getSandboxAllocationProvider,
-  type SelectableSandboxAllocation,
-} from '@kilocode/worker-utils/sandbox-allocation';
+import type { SelectableSandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -16,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { NetworkAccessDraft, NetworkAccessMode } from './environment-form';
+import { describeRestrictionSupport } from './environment-network-support';
 
 const NETWORK_ACCESS_OPTIONS: readonly {
   value: NetworkAccessMode;
@@ -125,16 +123,4 @@ export function EnvironmentNetworkField({
       )}
     </div>
   );
-}
-
-function describeRestrictionSupport(
-  mode: NetworkAccessMode,
-  allocation: SelectableSandboxAllocation | null
-): string | null {
-  if (mode === 'full') return null;
-  if (!allocation) {
-    return 'Restricted access needs an isolated Cloudflare Containers sandbox. The default sandbox may not support it.';
-  }
-  if (getSandboxAllocationProvider(allocation) === 'cloudflare-containers') return null;
-  return 'Restricted access needs an isolated Cloudflare Containers sandbox. This sandbox cannot enforce it, so sessions will fail to start.';
 }

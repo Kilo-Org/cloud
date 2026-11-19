@@ -42,8 +42,9 @@ export type {
 export type ReadonlyPart = Readonly<Part>;
 
 /**
- * Payload sent to a cloud agent session transport — either a chat prompt or a
- * slash command. Pairs with the SDK transport send types.
+ * The single declaration of the payload sent to a cloud agent session
+ * transport — either a chat prompt or a slash command. Pairs with the SDK
+ * transport send types, which alias this declaration.
  */
 export type SendMessagePayload =
   | {
@@ -124,6 +125,7 @@ export type SessionActivity =
  */
 export type SdkStatusMessageCode =
   | 'agent-connection-lost'
+  | 'agent-connection-reconnecting'
   | 'session-stopped'
   | 'session-terminated'
   | 'setting-up-environment'
@@ -139,6 +141,7 @@ export type SdkStatusMessageCode =
   | 'not-authorized'
   | 'service-unavailable'
   | 'previous-task-in-progress'
+  | 'workspace-deleting'
   | 'service-temporarily-unavailable'
   | 'generic-error'
   | 'connection-lost'
@@ -155,7 +158,13 @@ export type AgentStatus =
       code?: SdkStatusMessageCode;
     }
   | { type: 'error'; message: string; code?: SdkStatusMessageCode }
-  | { type: 'disconnected' }
+  /** `reconnecting` marks a self-recovering transport drop, not a terminal loss. */
+  | {
+      type: 'disconnected';
+      reconnecting?: boolean | undefined;
+      /** Set on the exhausted loss, so surfaces render one canonical copy. */
+      code?: SdkStatusMessageCode | undefined;
+    }
   | { type: 'interrupted' }
   /** Scheduled to wake later; does nothing now. `scheduledAt` is the ISO-8601 wake time when the CLI reported one. */
   | { type: 'scheduled'; scheduledAt?: string };
@@ -356,10 +365,7 @@ export type ResolvedSession =
 
 export type SessionSnapshot = {
   info: SessionInfo;
-  messages: Array<{
-    info: MessageInfo;
-    parts: Part[];
-  }>;
+  messages: ProcessedMessage[];
 };
 
 /**
@@ -438,7 +444,7 @@ export type CachedSessionSnapshotPage = SessionSnapshotPage & {
  * failures (`retryable_failure` for transient DO read issues,
  * `invalid_data` for shape mismatches, `too_large` for oversize pages) so
  * retry semantics can be surfaced without inferring them from the worker's
- * text. `null` represents an access-not-found outcome (worker returns 404).
+ * text.
  */
 export type SessionSnapshotPageOutcome =
   | (SessionSnapshotPage & { kind: 'success' })

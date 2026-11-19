@@ -1,5 +1,8 @@
 import { generateKeyPairSync } from 'node:crypto';
 import jwt from 'jsonwebtoken';
+import { STALE_CACHE_MAX_AGE_MS } from './apple-jwks';
+
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 // The module under test keeps key-set state at module scope, so every test
 // loads a fresh instance instead of sharing cache, cooldown, and in-flight
@@ -11,12 +14,15 @@ describe('verifyAppleJwtWithJwks', () => {
 
   const jwkForKey = (kid: string) => ({ ...publicJwk, kid, use: 'sig', alg: 'RS256' });
 
+  beforeEach(() => {
+    jest.restoreAllMocks();
+  });
+
   const jwksResponse = (keys: ReturnType<typeof jwkForKey>[]) =>
     new Response(JSON.stringify({ keys }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
-
   const signToken = (
     kid: string,
     claims: Record<string, unknown> = {},
@@ -29,6 +35,20 @@ describe('verifyAppleJwtWithJwks', () => {
       audience,
       expiresIn: '5m',
     });
+  // The stale-bound tests advance the mocked clock by days; a token signed
+  // with expiresIn would be expired long before the case ends, so these
+  // carry an explicit 48-hour window from the mocked signing time.
+  const signLongLivedToken = (kid: string, nowMs: number, sub = 'user-1') =>
+    jwt.sign(
+      { sub, iat: Math.floor(nowMs / 1000), exp: Math.floor(nowMs / 1000) + 48 * 3600 },
+      privateKey,
+      {
+        algorithm: 'RS256',
+        keyid: kid,
+        issuer: 'https://appleid.apple.com',
+        audience: 'com.kilocode.kiloapp',
+      }
+    );
 
   const loadFreshModule = async () => {
     jest.resetModules();
@@ -36,10 +56,6 @@ describe('verifyAppleJwtWithJwks', () => {
     // a fresh dynamic import gives each case its own cache and cooldown.
     return import('./apple-jwks');
   };
-
-  beforeEach(() => {
-    jest.restoreAllMocks();
-  });
 
   it('classifies JWT verification failures as client errors', async () => {
     const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
@@ -154,13 +170,13 @@ describe('verifyAppleJwtWithJwks', () => {
   });
 
   it('keeps the cached key set usable when a refresh fails', async () => {
-    const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
+    const { verifyAppleJwtWithJwks } = await loadFreshModule();
     let now = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockImplementation(() => now);
     const fetchMock = jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(jwksResponse([jwkForKey('current-key')]))
-      .mockResolvedValueOnce(new Response(null, { status: 503 }));
+      .mockResolvedValue(new Response(null, { status: 503 }));
 
     const goodToken = signToken('current-key', { sub: 'user-1' });
     await verifyAppleJwtWithJwks(goodToken, 'com.kilocode.kiloapp');
@@ -168,18 +184,134 @@ describe('verifyAppleJwtWithJwks', () => {
 
     now += 31_000;
     const unknownToken = signToken('rotated-away-key');
+    // The first unknown-kid token starts the refresh; its failure falls back
+    // to the cached key set, so the failed-refresh fallback propagates the
+    // fetch error as a server fault while the held kid still verifies. A
+    // propagated failure is reported by the receiving route, not the module.
+    await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
+      'Failed to fetch Apple JWKS: 503'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
+    ).not.toHaveBeenCalled();
+
     await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
       'Failed to fetch Apple JWKS: 503'
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    await expect(verifyAppleJwtWithJwks(unknownToken, 'com.kilocode.kiloapp')).rejects.toThrow(
-      AppleJwtClientError
-    );
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
+    // Within the TTL and the refresh cooldown, the cached key set still
+    // verifies tokens whose kid it holds. The outage was already reported when
+    // the failure was handed to the route, so this verification of the fallback
+    // set adds no second report.
     const payload = await verifyAppleJwtWithJwks(goodToken, 'com.kilocode.kiloapp');
     expect(payload.sub).toBe('user-1');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
+    ).not.toHaveBeenCalled();
+
+    // After the cache TTL expires with refreshes still failing, the cached key
+    // set keeps verifying the kid it holds while the retry stays bounded. The
+    // outage was already reported when the failure was handed to the route, so
+    // this later verification of the fallback set adds no second report.
+    now += 60 * 60 * 1000;
+    await verifyAppleJwtWithJwks(
+      signToken('current-key', { sub: 'user-1' }),
+      'com.kilocode.kiloapp'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(
+      jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
+    ).not.toHaveBeenCalled();
+    // The outage was already reported; a later failed attempt in the same
+    // outage adds no second report and no report per attempt.
+    now += 31_000;
+    await verifyAppleJwtWithJwks(
+      signToken('current-key', { sub: 'user-1' }),
+      'com.kilocode.kiloapp'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(
+      jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
+    ).not.toHaveBeenCalled();
+  });
+
+  it('fails closed once the cached key set is past the stale bound', async () => {
+    const { verifyAppleJwtWithJwks } = await loadFreshModule();
+    let now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(jwksResponse([jwkForKey('current-key')]))
+      .mockResolvedValue(new Response(null, { status: 503 }));
+
+    const token = signLongLivedToken('current-key', now);
+    await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // A failed refresh inside the stale bound still verifies the held kid.
+    now += STALE_CACHE_MAX_AGE_MS;
+    await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // Past the bound the cached key set no longer covers a failed refresh:
+    // the fetch error propagates and the route reports it.
+    now += 31_000;
+    await expect(verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp')).rejects.toThrow(
+      'Failed to fetch Apple JWKS: 503'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // An immediate retry lands on the cooldown branch, which fails closed too.
+    now += 1_000;
+    await expect(verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp')).rejects.toThrow(
+      'Failed to fetch Apple JWKS: 503'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('resets the stale window after a successful refresh', async () => {
+    const { verifyAppleJwtWithJwks } = await loadFreshModule();
+    const captureException = jest.requireMock<{ captureException: jest.Mock }>(
+      '@sentry/nextjs'
+    ).captureException;
+    let now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(jwksResponse([jwkForKey('current-key')]))
+      .mockResolvedValue(new Response(null, { status: 503 }));
+
+    const token = signLongLivedToken('current-key', now);
+    await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Past the bound with refreshes still failing, verification fails closed.
+    // The failure propagates, so the receiving route reports it, not the module.
+    now += STALE_CACHE_MAX_AGE_MS + 31_000;
+    await expect(verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp')).rejects.toThrow(
+      'Failed to fetch Apple JWKS: 503'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(captureException).not.toHaveBeenCalled();
+
+    // A successful refresh stores a new fetchedAt and clears the failure.
+    now += 31_000;
+    fetchMock.mockResolvedValueOnce(jwksResponse([jwkForKey('current-key')]));
+    await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    // The reset window again covers failed refreshes: the cached set verifies
+    // after the cache TTL and another outage, bounded by the cooldown.
+    fetchMock.mockResolvedValue(new Response(null, { status: 503 }));
+    now += 60 * 60 * 1000;
+    await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(captureException).toHaveBeenCalledTimes(1);
+    now += 31_000;
+    await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 });

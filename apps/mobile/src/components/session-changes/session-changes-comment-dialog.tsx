@@ -56,7 +56,7 @@ export function SessionChangesCommentDialog({
         }}
         placeholder={t('agentChat.sessionChanges.commentPlaceholder')}
         accessibilityLabel={t('prReview.composer.commentBody')}
-        className="min-h-[96px] text-base"
+        className="min-h-28"
         testID="session-changes-comment-input"
       />
       {tooLong ? (

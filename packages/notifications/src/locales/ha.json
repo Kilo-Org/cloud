@@ -3,8 +3,8 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Zaman wakilin naka yana da sabuntawa",
-      "lowBalance": "Ma'auninka yana buƙatar kulawa",
-      "spendAlert": "Kashewar ku na buƙatar kulawa",
+      "lowBalance": "Ragowar kuɗinka tana buƙatar kulawa",
+      "spendAlert": "Kashewarka tana buƙatar kulawa",
       "securityFinding": "Wani binciken tsaro yana buƙatar kulawa",
       "securityUpdate": "Wani duban tsaro yana da sabuntawa",
       "activeAgentsGlanceable": "Wakilai da ke aiki suna da sabuntawa"
@@ -12,14 +12,13 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
   "internal": {
     "lowBalance": {
-      "title": "Faɗakarwar ƙarancin ma'auni",
-      "body": "Ma'aunin {{organizationName}} ya faɗi ƙasa da ${{minimumBalanceUsd}}"
+      "title": "Faɗakarwar ƙarancin kuɗi",
+      "body": "Ragowar kuɗin {{organizationName}} ta faɗi ƙasa da ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
       "title": "Faɗakarwar kashewa",
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "Ƙetare SLA"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Wani duban tsaro yana da sabuntawa"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Zaman Kilo naka a shirye don sarrafawa daga wayarka"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

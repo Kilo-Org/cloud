@@ -2,7 +2,7 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Aracı oturumunuzda bir güncelleme var",
+      "cloudAgentSession": "Ajan oturumunuzda bir güncelleme var",
       "lowBalance": "Bakiyeniz dikkat gerektiriyor",
       "spendAlert": "Harcamanız dikkat gerektiriyor",
       "securityFinding": "Bir güvenlik bulgusu dikkat gerektiriyor",
@@ -12,7 +12,6 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
     }
   },
@@ -36,14 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA ihlali"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "Bir güvenlik kontrolünde güncelleme var"
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Kilo oturumunuz telefonunuzdan kontrol edilmeye hazır"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

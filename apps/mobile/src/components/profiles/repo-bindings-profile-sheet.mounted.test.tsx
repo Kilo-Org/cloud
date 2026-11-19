@@ -7,14 +7,32 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { type AgentProfileListItem } from '@/lib/hooks/agent-profile-types';
 
-vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable' }));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+}));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  View: 'View',
+  ScrollView: 'ScrollView',
+  Pressable: 'Pressable',
+  useColorScheme: () => 'light',
+}));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/icons', () => ({ SlidersHorizontal: 'SlidersHorizontal' }));
+vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
+  SlidersHorizontal: 'SlidersHorizontal',
+  Plus: 'Plus',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
@@ -23,7 +41,7 @@ type EmptyStateNode = {
   props: {
     title?: string;
     description?: string;
-    action?: { props: { onPress: () => void; children: { props: { children: string } } } };
+    action?: { props: { label: string; onPress: () => void } };
   };
 };
 
@@ -89,7 +107,7 @@ describe('binding profile picker', () => {
         expect(empty.props.title).toBe('No profiles yet');
         expect(empty.props.description).toBe('Create a profile to reuse environment variables.');
         // EmptyState renders its action as given; the mocked surface keeps it a prop.
-        expect(empty.props.action?.props.children.props.children).toBe('Create profile');
+        expect(empty.props.action?.props.label).toBe('Create profile');
         act(() => {
           empty.props.action?.props.onPress();
         });

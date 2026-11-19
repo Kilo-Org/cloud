@@ -7,9 +7,12 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   extractHeaderAndLimitLength,
+  inferenceProvidersNotAllowedResponse,
   makeErrorReadable,
+  providerOptionsNotSupportedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import {
   dataCollectionPolicyRejection,
   freeModelRateLimitRejection,
@@ -22,9 +25,9 @@ import {
   resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { getRouteInferenceRegion } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
-import { resolveUsageEndpointRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/usage-endpoint-provider';
+import { resolveEmbeddingOrDecisionRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/non-chat-routes';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { getUsageEndpointGatewayOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { getNonChatGatewayOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   logMicrodollarUsageAndReportToBouncer,
@@ -163,6 +166,10 @@ export async function handleSystemOneRequest(request: NextRequest) {
   } catch {
     return errorResponse('Invalid JSON body', 'invalid_request', 400);
   }
+  // As on chat, refused instead of silently stripped by the schema.
+  if (isRecord(body) && body.providerOptions !== undefined) {
+    return providerOptionsNotSupportedResponse();
+  }
   const parsed = systemOneRequestSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
@@ -211,7 +218,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     : undefined;
   // System One is served by OpenRouter, and by the Vercel AI Gateway when the owner's key or the
   // organization's gateway settings route it there. Models only Vercel serves are not supported.
-  const route = await resolveUsageEndpointRoute({
+  const route = await resolveEmbeddingOrDecisionRoute({
     requestedModel: resolvedModel,
     modelType: 'evaluation',
     user,
@@ -271,6 +278,21 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   const dataCollectionRejected = await dataCollectionPolicyRejection(resolvedModel, providerPolicy);
   if (dataCollectionRejected) return dataCollectionRejected;
+
+  // Resolved before bouncer decides: a request no eligible provider can serve never reaches the
+  // provider, so it owes no decide and no usage row.
+  const vercelModelId = isVercelRoute ? await mapModelIdToVercel(resolvedModel) : null;
+  const vercelGatewayOptions = vercelModelId
+    ? await getNonChatGatewayOptions({
+        vercelModelId,
+        userByok,
+        provider: providerPolicy,
+        dataRegion,
+      })
+    : null;
+  if (vercelGatewayOptions?.kind === 'no-eligible-provider') {
+    return inferenceProvidersNotAllowedResponse(vercelGatewayOptions.providers);
+  }
 
   const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt: startedAt });
 
@@ -471,32 +493,26 @@ export async function handleSystemOneRequest(request: NextRequest) {
     );
   }
 
-  const vercelModelId = isVercelRoute ? await mapModelIdToVercel(resolvedModel) : null;
   const upstream = await fetchUpstream({
     provider: isVercelRoute
       ? { ...route.provider, apiUrl: VERCEL_TYPESAFE_API_URL }
       : route.provider,
     path: '/systemone',
     method: 'POST',
-    body: vercelModelId
-      ? {
-          model: vercelModelId,
-          state: parsed.data.state,
-          questions: parsed.data.questions,
-          providerOptions: {
-            gateway: await getUsageEndpointGatewayOptions({
-              vercelModelId,
-              userByok,
-              provider: providerPolicy,
-              dataRegion,
-            }),
+    body:
+      vercelModelId && vercelGatewayOptions
+        ? {
+            model: vercelModelId,
+            state: parsed.data.state,
+            questions: parsed.data.questions,
+            providerOptions: { gateway: vercelGatewayOptions.gateway },
+          }
+        : {
+            ...parsed.data,
+            model: resolvedModel,
+            provider: providerPolicy,
+            user: generateProviderSpecificHash(user.id, route.provider),
           },
-        }
-      : {
-          ...parsed.data,
-          provider: providerPolicy,
-          user: generateProviderSpecificHash(user.id, route.provider),
-        },
     // No `signal`: the provider's outcome decides what this request costs, and a
     // client that leaves does not undo a generation the provider already started.
     // Only the duration bound stops the call, so a disconnect still reaches the

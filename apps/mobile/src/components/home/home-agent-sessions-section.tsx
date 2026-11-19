@@ -23,7 +23,7 @@ import {
   type LiveSessions,
 } from '@/components/home/live-session-state';
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
-import { SectionHeader } from '@/components/home/section-header';
+import { Section } from '@/components/ui/section';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 
 /**
@@ -43,7 +43,7 @@ export function AgentSessionsSection({
   const { reducedMotion } = useMotionPolicy();
   const handleRowPress = useSessionRowPress();
   const content = liveSessionContent(context, sessions);
-  const failureLabel = t('home.couldNotLoadActiveSessions');
+  const failureLabel = t('agents.sessionList.couldNotLoadActive');
   const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
   const showBriefing = briefing?.visible === true;
   const briefingCard = briefing?.card ?? null;
@@ -56,7 +56,7 @@ export function AgentSessionsSection({
       // An object href replaces the route params. A bare string would keep a
       // status param a previous tap left behind, so See all clears them.
       const href: Href = status
-        ? { pathname: '/(app)/(tabs)/(2_agents)/', params: { status } }
+        ? { pathname: '/(app)/(tabs)/(2_agents)', params: { status } }
         : AGENTS_SESSIONS_INDEX_HREF;
       router.navigate(href);
       router.dismissTo(href);
@@ -65,25 +65,23 @@ export function AgentSessionsSection({
   );
 
   return (
-    <View>
-      {/* The header row stays in every state, so settling never adds or
-          removes it. `See all` keeps its box but hides while nothing runs: it
-          would advertise the Agents live index for sessions that do not exist. */}
-      <SectionHeader
-        label={showBriefing ? t('agentBriefing.title') : t('home.agentSessions')}
-        actionLabel={showBriefing ? t('agentBriefing.history') : t('home.seeAll')}
-        actionHidden={!showBriefing && content === 'empty'}
-        reserveLabelAir
-        onActionPress={() => {
-          if (showBriefing) {
-            router.push('/(app)/agent-briefing' as Href);
-            return;
-          }
-          openAgentsIndex();
-        }}
-        notice={notice && <LiveSessionHeaderNotice notice={notice} />}
-      />
-      <View className="mx-4 gap-2">
+    // The header row stays in every state, so settling never adds or removes
+    // it. `See all` keeps its box but hides while nothing runs: it would
+    // advertise the Agents live index for sessions that do not exist.
+    <Section
+      label={showBriefing ? t('agentBriefing.title') : t('home.agentSessions')}
+      actionLabel={showBriefing ? t('agentBriefing.history') : t('home.seeAll')}
+      actionHidden={!showBriefing && content === 'empty'}
+      onActionPress={() => {
+        if (showBriefing) {
+          router.push('/(app)/agent-briefing' as Href);
+          return;
+        }
+        openAgentsIndex();
+      }}
+      notice={notice && <LiveSessionHeaderNotice notice={notice} />}
+    >
+      <View className="gap-2">
         <LiveSessionFeedback
           context={context}
           sessions={sessions}
@@ -103,13 +101,12 @@ export function AgentSessionsSection({
               <AdaptiveHomeCardFrame
                 live={
                   content === 'pending' ? (
-                    <GlanceableActiveCardSkeleton embedded />
+                    <GlanceableActiveCardSkeleton />
                   ) : (
                     <GlanceableActiveCard
                       sessions={sessions.activeSessions}
                       onPressSession={handleRowPress}
                       onPressStatus={openAgentsIndex}
-                      embedded
                     />
                   )
                 }
@@ -121,6 +118,6 @@ export function AgentSessionsSection({
           )}
         </Animated.View>
       </View>
-    </View>
+    </Section>
   );
 }

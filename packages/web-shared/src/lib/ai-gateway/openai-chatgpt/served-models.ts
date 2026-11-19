@@ -3,6 +3,7 @@ import {
   readStoredMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
+import { FAILURE_BACKOFF_MS } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
 
@@ -27,15 +28,15 @@ const MODELS_URL = `${OPENAI_CHATGPT_API_URL}/models`;
 const CACHE_TTL_SECONDS = 60 * 60;
 const CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
 
-/**
- * How long a failed lookup is remembered. Without this, an outage re-issues the
- * request and waits up to `REQUEST_TIMEOUT_MS` on every eligible model check.
- */
-const FAILURE_TTL_MS = 30 * 1000;
-
 /** A slow list must not hold up a request. */
 const REQUEST_TIMEOUT_MS = 2_000;
 
+// This unit hand-rolls the cache instead of using `createCachedFetch` on
+// purpose: that helper serves the last-known-good value after a failed
+// refresh, while this lookup must answer true on a failure and never serve an
+// expired list. Only the failure-window length is shared: `FAILURE_BACKOFF_MS`
+// keeps the "a failure is remembered for a short window" contract with the
+// other cached fetchers.
 let cachedModelIds: Set<string> | null = null;
 let cacheExpiresAt = 0;
 let failureExpiresAt = 0;
@@ -115,7 +116,7 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
  * A missing key, a failed request, a 200 without a usable list, or an unreadable
  * body returns true: a transient problem must not hide the route, and the
  * upstream then answers exactly as it does today. A failure is remembered for
- * `FAILURE_TTL_MS` so a burst of eligible requests does not each pay the lookup
+ * `FAILURE_BACKOFF_MS` so a burst of eligible requests does not each pay the lookup
  * and its timeout, so a bad answer costs the short window and never the hour a
  * good list is reused for. Each lookup reads the list the metadata cache refresh
  * stored, and asks the project directly only when no usable row exists.
@@ -135,7 +136,7 @@ export async function isOpenAiModelServed(apiKey: string, modelId: string): Prom
           cacheExpiresAt = Date.now() + CACHE_TTL_MS;
           failureExpiresAt = 0;
         } else {
-          failureExpiresAt = Date.now() + FAILURE_TTL_MS;
+          failureExpiresAt = Date.now() + FAILURE_BACKOFF_MS;
         }
         return ids;
       })

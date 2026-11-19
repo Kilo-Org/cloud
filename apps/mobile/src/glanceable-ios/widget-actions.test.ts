@@ -6,10 +6,7 @@ import {
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import {
-  EMPTY_HOME_WIDGET_DETAILS,
-  type HomeWidgetDetails,
-} from '@kilocode/app-shared/home-widget';
+import { emptyHomeWidgetDetails, type HomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 
 import { setHomeWidgetDetails } from '@/lib/glanceable/home-widget-data';
 import { _setLastGlanceableSnapshotForTests } from '@/lib/glanceable/persist';
@@ -160,7 +157,7 @@ function snapshotFor(sessions: { status: string }[], now = NOW): GlanceableAgent
 }
 
 const APPROVAL_KEY = 'a'.repeat(64);
-const APPROVABLE: HomeWidgetDetails = { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: APPROVAL_KEY };
+const APPROVABLE: HomeWidgetDetails = { ...emptyHomeWidgetDetails(), approvalKey: APPROVAL_KEY };
 
 // ── marker mapping ──────────────────────────────────────────────────────────
 
@@ -501,7 +498,7 @@ describe('runPendingWidgetActions', () => {
     setHomeWidgetDetails(APPROVABLE);
 
     await runPendingWidgetActions();
-    setHomeWidgetDetails(EMPTY_HOME_WIDGET_DETAILS);
+    setHomeWidgetDetails(emptyHomeWidgetDetails());
 
     expect(mocks.runWidgetApprove).toHaveBeenCalledExactlyOnceWith(APPROVAL_KEY);
 

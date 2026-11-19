@@ -30,11 +30,10 @@ import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 /** Shared minimum frame; text determines the loaded card's height. */
-const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
 const COUNTS_CLASS = 'px-4 py-3';
 const COUNT_ROW_CLASS = `${DENSE_ROW_FRAME_CLASS} flex-row items-center gap-2`;
-const DIVIDER_CLASS = 'h-px bg-border';
-const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
+const DIVIDER_CLASS = 'h-px bg-hair-soft';
+const NEWEST_BLOCK_CLASS = 'min-h-20 justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
 
 type GlanceableActiveCardProps = {
@@ -42,7 +41,6 @@ type GlanceableActiveCardProps = {
   onPressSession: (session: ActiveSession) => void;
   /** Opens the live index narrowed to one state. Rows stay inert without it. */
   onPressStatus?: (kind: GlanceableStatusKind) => void;
-  embedded?: boolean;
 };
 
 /**
@@ -58,7 +56,6 @@ export function GlanceableActiveCard({
   sessions,
   onPressSession,
   onPressStatus,
-  embedded = false,
 }: Readonly<GlanceableActiveCardProps>) {
   const { t } = useTranslation();
   // A minute-bucketed clock keeps the relative age fresh without reading
@@ -91,11 +88,11 @@ export function GlanceableActiveCard({
   return (
     <View
       className={cn(
-        CARD_CLASS,
-        embedded && 'rounded-none border-0 bg-transparent',
+        'overflow-hidden',
         // The frame can be taller than this card: a briefing beside it sets the
-        // row height. The zero state then fills that row and centres its
-        // message inside it, instead of sitting at the top over a blank band.
+        // row height, and a reserved frame sets the minimum. The zero state then
+        // fills that row and centres its message inside it, instead of sitting
+        // at the top over a blank band.
         empty && 'flex-1'
       )}
     >
@@ -183,6 +180,7 @@ export function GlanceableActiveCard({
               centres the message. */}
           <EmptyState
             placement="static"
+            inset="gutter"
             icon={Bot}
             title={t('home.noLiveSessions')}
             description={t('agents.sessionList.noSessionsYetDescription')}
@@ -194,32 +192,30 @@ export function GlanceableActiveCard({
 }
 
 /** The pending placeholder repeats the card's minimum frame and count rows. */
-export function GlanceableActiveCardSkeleton({
-  embedded = false,
-}: { readonly embedded?: boolean } = {}) {
+export function GlanceableActiveCardSkeleton() {
   return (
     <View
-      className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}
+      className="overflow-hidden"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
       <View className={COUNTS_CLASS}>
         {STATUS_FILTER_ORDER.map(line => (
           <View key={line.kind} className={COUNT_ROW_CLASS}>
-            <Skeleton className="size-3 rounded-full" />
-            <Skeleton className="h-3 w-6 rounded" />
-            <Skeleton className="h-3 w-24 rounded" />
+            <Skeleton className="size-3 rounded-full bg-muted-soft" />
+            <Skeleton className="h-3 w-6 rounded bg-muted-soft" />
+            <Skeleton className="h-3 w-24 rounded bg-muted-soft" />
           </View>
         ))}
       </View>
       <View className={DIVIDER_CLASS} />
       <View className={NEWEST_BLOCK_CLASS}>
         <View className="min-h-5 justify-center">
-          <Skeleton className="h-3 w-2/3 rounded" />
+          <Skeleton className="h-3 w-2/3 rounded bg-muted-soft" />
         </View>
         <View className={NEWEST_ROW_CLASS}>
-          <Skeleton className="size-3 rounded-full" />
-          <Skeleton className="h-3 w-20 rounded" />
+          <Skeleton className="size-3 rounded-full bg-muted-soft" />
+          <Skeleton className="h-3 w-20 rounded bg-muted-soft" />
         </View>
       </View>
     </View>

@@ -112,6 +112,15 @@ describe('Cloud Agent list projection from the Session DO', () => {
     });
   });
 
+  it('clamps a future-dated activity report to the database clock', async () => {
+    await publish({ lastActivityAt: '2999-01-01T00:00:00.000Z' });
+    const row = await storedRow();
+    const { rows } = await client.db.execute<{ now: Date }>(sql`SELECT now() AS now`);
+    const dbNowMs = new Date(rows[0]?.now ?? 0).getTime();
+    expect(row.last_activity_at).not.toBeNull();
+    expect(Date.parse(row.last_activity_at ?? '')).toBeLessThanOrEqual(dbNowMs);
+  });
+
   it('applies a native rename over a generated title and announces it', async () => {
     await publish({ title: 'Renamed by the agent' });
     expect((await storedRow()).title).toBe('Renamed by the agent');

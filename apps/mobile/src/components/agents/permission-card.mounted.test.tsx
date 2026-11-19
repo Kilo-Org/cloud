@@ -90,14 +90,15 @@ async function renderCard(overrides: CardOverrides = {}) {
 describe('PermissionCard mounted', () => {
   it('lists the patterns beside the command when a pattern names another text', async () => {
     const renderer = await renderCard({
-      patterns: ['rg todo 2_/dev/null'],
+      patterns: ['rg todo *', 'rg --files *'],
       metadata: { command: 'rg todo 2>/dev/null' },
     });
     const lines = textLines(renderer.root);
 
     expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
     expect(lines).toContain('• ');
-    expect(lines).toContain(isolated('rg todo 2_/dev/null'));
+    expect(lines).toContain(isolated('rg todo *'));
+    expect(lines).toContain(isolated('rg --files *'));
     expect(lines).toContain(i18n.t('profiles.commandLabel'));
     expect(lines).toContain(isolated('rg todo 2>/dev/null'));
   });

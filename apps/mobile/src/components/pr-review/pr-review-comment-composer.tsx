@@ -406,8 +406,10 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const primaryDisabled =
     isSubmitting || (failure !== null && BLOCKING.has(failure.kind)) || (isEdit && !hasBody);
 
-  // The reason is non-null exactly when the Insert button cannot render, so the
-  // two never paint together and the copy never attaches to a hidden control.
+  // One row, never both: the reason is set only when Insert cannot apply, so the
+  // copy can never attach to the button, and the button renders only when there
+  // is no reason. A selected line with the keyboard still closed draws neither —
+  // Insert is available, just withheld until the sheet expands.
   let suggestionControl: ReactNode = null;
   if (suggestionDisabledReason !== null) {
     suggestionControl = (

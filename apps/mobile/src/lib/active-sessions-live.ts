@@ -11,8 +11,8 @@
  * never carry a cloud rename. `session.updated` (ingest title write) does
  * apply. `capabilities` is the hybrid exception: the WS value wins when
  * present (upgrade or downgrade), and the cached value is preserved only
- * when the WS row omits the field (a legacy payload). The functions here
- * never touch React,
+ * when the WS row omits the field (a CLI that predates the capability or
+ * has not reported it yet). The functions here never touch React,
  * the network, or a QueryClient — they are pure and exhaustively
  * unit-tested alongside this file.
  *

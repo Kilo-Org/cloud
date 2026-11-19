@@ -95,8 +95,9 @@ describe('useEffectiveAgentProfile', () => {
     'omits cached profileId and gates Start only during retry (isFetching: %s)',
     isFetching => {
       // React Query keeps `data` on error; the hook must not leak that cached
-      // profile into the form (the error row shows and Start sends no id). A
-      // settled error also leaves the gate false, so Start stays enabled.
+      // profile into the form (the error row shows and the create sends no id).
+      // A settled error with no pick leaves the form's gate ready, so Start
+      // stays enabled on the server's default environment.
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial query result; the hook reads only data/isPending/isFetching/isError/refetch
       vi.mocked(useQuery).mockReturnValue({
         data: [profile({ id: 'cached-default', isDefault: true })],
@@ -111,14 +112,41 @@ describe('useEffectiveAgentProfile', () => {
       expect(personal.isLoading).toBe(isFetching);
       expect(personal.profile).toBeNull();
       expect(personal.profileId).toBeNull();
+      expect(personal.resolvedOverrideProfileId).toBeNull();
+      expect(personal.overrideNeedsAttention).toBe(false);
 
       const org = mountProfile('org-1');
       expect(org.isError).toBe(true);
       expect(org.isLoading).toBe(isFetching);
       expect(org.profile).toBeNull();
       expect(org.profileId).toBeNull();
+      expect(org.resolvedOverrideProfileId).toBeNull();
+      expect(org.overrideNeedsAttention).toBe(false);
     }
   );
+
+  it('flags a pick whose profile read failed, so the form blocks Start until Retry resolves it', () => {
+    // The cached list still names the pick, but a settled error means the pick
+    // cannot be confirmed: nothing is submitted and the row reports attention.
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial query result; the hook reads only data/isPending/isError/refetch
+    vi.mocked(useQuery).mockReturnValue({
+      data: [
+        profile({ id: 'default', name: 'Default', isDefault: true }),
+        profile({ id: 'picked', name: 'Picked' }),
+      ],
+      isPending: false,
+      isFetching: false,
+      isError: true,
+      refetch: vi.fn(),
+    } as never);
+
+    const result = mountProfile(undefined, 'picked');
+    expect(result.isError).toBe(true);
+    expect(result.profile).toBeNull();
+    expect(result.profileId).toBeNull();
+    expect(result.resolvedOverrideProfileId).toBeNull();
+    expect(result.overrideNeedsAttention).toBe(true);
+  });
 
   it('reports loading (not error) while the query is in flight so Start stays blocked', () => {
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial query result; the hook reads only data/isPending/isError/refetch
@@ -169,10 +197,9 @@ describe('useEffectiveAgentProfile', () => {
     } as never);
 
     const result = mountProfile(undefined, 'picked');
-    expect(result.selectedProfileId).toBe('picked');
+    expect(result.resolvedOverrideProfileId).toBe('picked');
     expect(result.profileId).toBe('picked');
     expect(result.profile?.name).toBe('Picked');
-    expect(result.hasOverride).toBe(true);
     expect(result.overrideNeedsAttention).toBe(false);
   });
 
@@ -186,11 +213,11 @@ describe('useEffectiveAgentProfile', () => {
     } as never);
 
     const result = mountProfile(undefined, 'deleted');
-    // The picker can still see which id was picked, but nothing stale is sent.
-    expect(result.selectedProfileId).toBe('deleted');
+    // The read settled, but nothing it returned carries the pick, so no id is
+    // shown or sent and the row asks for a new pick.
+    expect(result.resolvedOverrideProfileId).toBeNull();
     expect(result.profileId).toBeNull();
     expect(result.profile).toBeNull();
-    expect(result.hasOverride).toBe(false);
     expect(result.overrideNeedsAttention).toBe(true);
   });
 
@@ -207,7 +234,8 @@ describe('useEffectiveAgentProfile', () => {
     expect(result.effectiveDefaultId).toBe('default');
     expect(result.allProfiles.map(p => p.id)).toEqual(['a', 'default']);
     expect(result.profileId).toBe('default');
-    expect(result.hasOverride).toBe(false);
+    expect(result.resolvedOverrideProfileId).toBeNull();
+    expect(result.overrideNeedsAttention).toBe(false);
   });
 
   it('composes org and personal profiles for the org picker', () => {

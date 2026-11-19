@@ -52,7 +52,22 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
+});
+// The choice row fires its own selection haptic; the wrapper's real module reaches
+// `expo-haptics` and then `expo`, whose async-require setup reads the app-only
+// `__DEV__` global. Mocking the wrapper keeps `expo` out of the suite.
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
+// The choice row's selection mark reaches the icon barrel, whose lucide modules
+// this project cannot parse in the mounted environment; every sibling form suite
+// mocks it the same way.
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({
     confirm: (request: unknown) => {

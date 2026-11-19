@@ -207,6 +207,7 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       startCommands: true,
       worktreeGit: true,
       transferGrants: true,
+      previewTunnel: true,
     });
     socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     expect(connection.supportsTransferGrants()).toBe(true);
@@ -1039,6 +1040,7 @@ describe('createControlPlaneConnection', () => {
         startCommands: true,
         worktreeGit: true,
         transferGrants: true,
+        previewTunnel: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

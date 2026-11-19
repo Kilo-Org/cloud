@@ -272,11 +272,17 @@ test('writeArtifacts writes one sheet per target in matrix order and lists it', 
     { target: 'home', file: 'sheets/home.png' },
     { target: 'chat', file: 'sheets/chat.png' },
   ]);
-  assert.equal(findings.run.skippedRules.length, 4);
-  assert.ok(findings.run.skippedRules.every(entry => entry.rule === 'safe-area'));
+  assert.equal(findings.run.skippedRules.length, 8);
+  for (const rule of ['safe-area', 'gutter']) {
+    assert.equal(findings.run.skippedRules.filter(entry => entry.rule === rule).length, 4);
+  }
   assert.match(
     fs.readFileSync(path.join(out, 'report.md'), 'utf8'),
     /base · home · safe-area: snapshot has no system-bar inset evidence/
+  );
+  assert.match(
+    fs.readFileSync(path.join(out, 'report.md'), 'utf8'),
+    /base · home · gutter: snapshot has no system-bar inset evidence/
   );
 });
 

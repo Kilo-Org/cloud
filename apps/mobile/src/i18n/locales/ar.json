@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucket غير متصل. يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بهذه المؤسسة عبر الويب من جهاز كمبيوتر.",
-      "description": "أنشئ رمز وصول لمساحة العمل بالصلاحيات المطلوبة والصقه أدناه.",
+      "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
+      "description": "أنشئ رمز وصول لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
+      "descriptionReconnect": "أنشئ رمز وصول جديدًا لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
       "scopes": "الصلاحيات المطلوبة: الحساب: قراءة · المستودعات: قراءة/كتابة · طلبات السحب: قراءة · خطافات الويب: قراءة/كتابة.",
       "tokenPlaceholder": "رمز وصول مساحة العمل",
       "tokenRefused": "لم يقبل Bitbucket رمز وصول مساحة العمل هذا. تحقق من أنه يتضمن الصلاحيات المذكورة أعلاه، ثم أعد المحاولة."
@@ -1689,6 +1690,8 @@
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
       "cloningSession": "جارٍ استنساخ الجلسة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة.",
+      "historyTooLarge": "بروكول هذه الجلسة كبير جدًا بحيث لا يمكن تحميله.",
+      "historyUnavailable": "لا يمكن قراءة بروكول هذه الجلسة.",
       "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
       "notEnoughCredits": "رصيدك غير كافٍ لهذا الطلب. اشحن رصيدك وحاول مرة أخرى.",
       "previousTaskFinishing": "لم تنتهِ المهمة السابقة بعد. انتظر لحظة.",
@@ -1765,6 +1768,7 @@
       "branchDefault": "افتراضي",
       "branchAccessibility": "الفرع: {{label}}",
       "branchLoading": "جارٍ تحميل الفروع",
+      "branchInactive": "اختر مستودعًا لتحميل فروعه.",
       "branchLoadError": "تعذّر تحميل الفروع",
       "branchUnavailable": "الفروع غير متاحة لهذا المستودع. تحقق من صلاحيتك لدى المزوّد، ثم اختر مستودعًا آخر.",
       "branchEmpty": "لا توجد فروع متاحة",
@@ -2615,7 +2619,6 @@
   },
   "home": {
     "couldNotLoadSessions": "تعذّر تحميل الجلسات.",
-    "couldNotLoadActiveSessions": "تعذّر تحميل الجلسات النشطة.",
     "agentSessions": "الجلسات الجارية الآن",
     "newCodingTask": "مهمة برمجة جديدة",
     "newTaskFromPicture": "مهمة جديدة من صورة",
@@ -2956,7 +2959,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "لا توجد مؤسسات في هذا الحساب بعد. يمكنك مراجعة طلبات السحب على Bitbucket بعد إنشاء مؤسسة أو الانضمام إلى واحدة.",
       "gitlabReconnectAdminOnlyDescription": "اطلب من مالك مؤسسة أو مشرف أو مدير الفوترة ربطه.",
       "bitbucketNotConnectedTitle": "Bitbucket غير متصل",
-      "bitbucketAdminOnlyDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
+      "adminOnlyConnectDescription": "يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
       "contextLine": "للمؤسسة: {{organization}}",
       "contextLinePersonal": "لحسابك الشخصي"
     },
@@ -3641,7 +3644,8 @@
         "accounting_adjustment": "تعديل محاسبي",
         "credits_expired": "انتهاء صلاحية الرصيد"
       },
-      "truncated": "تتوفر عمليات أقدم في سجل الرصيد."
+      "truncated": "تتوفر عمليات أقدم في سجل الرصيد.",
+      "retentionLimit": "يتم عرض أحدث عمليات سجل الرصيد."
     },
     "hub": {
       "balance": "الرصيد",
@@ -3686,7 +3690,8 @@
         "void": "ملغاة",
         "uncollectible": "غير قابلة للتحصيل"
       },
-      "truncated": "تتوفر فواتير أقدم."
+      "truncated": "تتوفر فواتير أقدم.",
+      "retentionLimit": "يتم عرض أحدث الفواتير."
     },
     "lowBalanceAlert": {
       "enableA11y": "تفعيل تنبيه انخفاض الرصيد",
@@ -3923,8 +3928,7 @@
     "imagesSectionEmpty": "لا يوجد مضيفو صور موثوقون",
     "revoke": "إلغاء الثقة بالمضيف {{host}}",
     "revokeMessage": "ستطلب الروابط المؤدية إلى هذا المضيف تأكيدًا مرة أخرى.",
-    "revokeImageMessage": "ستطلب الصور من هذا المضيف تأكيدًا مرة أخرى.",
-    "backToPreferences": "العودة إلى التفضيلات"
+    "revokeImageMessage": "ستطلب الصور من هذا المضيف تأكيدًا مرة أخرى."
   },
   "glanceable": {
     "waiting": "جارٍ تحديث الوكلاء",
@@ -4175,6 +4179,8 @@
       "downloading": "جارٍ التنزيل: {{written}} من {{total}}",
       "downloadingUnknown": "جارٍ التنزيل: {{written}}",
       "paused": "متوقف مؤقتًا: {{written}} من {{total}}",
+      "retrying": "جارٍ إعادة المحاولة: {{written}} من {{total}}",
+      "retryingUnknown": "جارٍ إعادة المحاولة: {{written}}",
       "verifying": "جارٍ التحقق من الملف الذي تم تنزيله…",
       "downloaded": "تم التنزيل · {{size}}",
       "url": "رابط تنزيل مباشر",
@@ -4265,7 +4271,9 @@
         "androidModelUnavailable": "هذا الجهاز لا يدعم Gemini Nano، أو أن تطبيق النظام AICore لا يزال قيد الإعداد. حاول مرة أخرى لاحقًا.",
         "aicoreUpdateRequired": "حدّث تطبيق AICore وبرامج النظام لاستخدام هذا النموذج.",
         "downloadable": "يتطلب هذا النموذج تنزيلًا لمرة واحدة قبل استخدامه.",
-        "downloading": "جارٍ تنزيل النموذج. سيصبح جاهزًا عند اكتمال التنزيل."
+        "downloading": "جارٍ تنزيل النموذج. سيصبح جاهزًا عند اكتمال التنزيل.",
+        "batteryQuota": "استنفد النموذج على الجهاز حصة البطارية المخصصة له في الوقت الحالي. حاول مرة أخرى لاحقًا.",
+        "checkFailed": "تعذّر على التطبيق التحقق من هذا النموذج. حاول مرة أخرى."
       },
       "unavailable": "النموذج على الجهاز غير متوفر حاليًا. تحقّق من حالته في $t(modelChat.backends.title).",
       "busy": "النموذج على الجهاز مشغول بردّ آخر. حاول مرة أخرى عند انتهائه.",
@@ -4650,7 +4658,8 @@
       "purchaseFallback": "شراء رصيد",
       "receipt": "الإيصال",
       "receiptA11y": "فتح إيصال {{description}}، {{amount}}، من {{date}}",
-      "receiptUnavailable": "لا يتوفر إيصال لعملية الشراء هذه."
+      "receiptUnavailable": "لا يتوفر إيصال لعملية الشراء هذه.",
+      "retentionLimit": "يتم عرض أحدث حركات سجل الرصيد."
     },
     "title": "شراء الرصيد",
     "description": "الرصيد عملية شراء لمرة واحدة تُضاف إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo. يتقاضى المتجر المبلغ من حسابك وتُضاف الأرصدة بعد تأكيد المتجر للدفع.",
@@ -4929,6 +4938,9 @@
     "couldNotLoad": "تعذّر تحميل التكاملات",
     "permissionDenied": "ليس لديك إذن لإدارة هذه التكاملات.",
     "managedByOwner": "اطلب من مالك المؤسسة تغيير اتصال لا يمكنك تغييره.",
+    "managedByOwnerOrAdmin": "اطلب من مالك المؤسسة أو مشرف تغيير اتصال لا يمكنك تغييره.",
+    "managedByOwnerOrBilling": "اطلب من مالك المؤسسة أو مدير الفوترة تغيير اتصال لا يمكنك تغييره.",
+    "managedByOwnerAdminOrBilling": "اطلب من مالك المؤسسة أو مشرف أو مدير الفوترة تغيير اتصال لا يمكنك تغييره.",
     "connectFailed": "تعذّر فتح صفحة الاتصال"
   },
   "invoices": {
@@ -4965,7 +4977,7 @@
       "new": "مشغل جديد",
       "create": "أنشئ مشغلاً",
       "emptyTitle": "لا توجد مشغلات بعد",
-      "emptyDescription": "أنشئ مشغلاً لبدء تشغيل Cloud Agent من استدعاء ويب هوك أو وفق جدول زمني.",
+      "emptyDescription": "أنشئ أول مشغّل.",
       "loadFailedTitle": "تعذر تحميل المشغلات",
       "loadFailedDescription": "أعد المحاولة عندما يكون لديك اتصال.",
       "detailLoadFailedTitle": "تعذر تحميل هذا المشغل",

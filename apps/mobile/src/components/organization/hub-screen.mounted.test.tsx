@@ -49,9 +49,11 @@ const membersQuery = vi.hoisted(() => ({
     | undefined,
   isLoading: false,
   isError: false,
-  isPaused: false,
   refetch: vi.fn(),
 }));
+// The membership read settles offline (`SETTLE_WHILE_OFFLINE`), so the screen's
+// offline wording reads the committed connectivity state; the harness carries it.
+const connectivity = vi.hoisted(() => ({ value: 'online' as 'online' | 'offline' | 'unknown' }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush }),
@@ -79,15 +81,15 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     isResolving: false,
   }),
   useOrgWithMembers: () => membersQuery,
-  // Mirrors the hook's derivation over the same mocked membership payload.
+  // Mirrors the hook's derivation over the same mocked membership payload: no
+  // payload behind a failed fetch is the only unavailable shape now.
   useOrgParentLink: (_organizationId: string | null, listParentLink: string | null | undefined) => {
     const membershipParentLink = membersQuery.data?.parent_organization_id;
     const reportedParentLink = listParentLink ?? membershipParentLink;
     return {
       membership: membersQuery,
       parentLink: reportedParentLink ?? (membershipParentLink === null ? null : undefined),
-      membershipUnavailable:
-        membersQuery.data == null && (membersQuery.isError || membersQuery.isPaused),
+      membershipUnavailable: membersQuery.data == null && membersQuery.isError,
     };
   },
   useOrgKiloPassSummary: (_organizationId: string, enabled: boolean) => {
@@ -252,6 +254,10 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.value,
+}));
+
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },
   FadeIn: { duration: () => ({}) },
@@ -288,16 +294,18 @@ function hitSlopPerSide(hitSlop: unknown): number {
   return 0;
 }
 
+/** The plan refusal block the header's siblings render, wherever it appears. */
+function refusals(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAllByType('OrganizationPlanRefusal');
+}
+
 function findRenameControl(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
-  // A lapsed plan appends its reason to the control's name, so the search takes
-  // the name the control always starts with rather than the whole string.
   const title = i18n.t('organization.hub.renameTitle');
   return root.findAll(node => {
     if (typeof node.type !== 'string') {
       return false;
     }
-    const label: unknown = node.props.accessibilityLabel;
-    return typeof label === 'string' && (label === title || label.startsWith(`${title}. `));
+    return node.props.accessibilityLabel === title;
   });
 }
 
@@ -325,7 +333,7 @@ beforeEach(() => {
   kiloPassQuery.enabled = [];
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
-  membersQuery.isPaused = false;
+  connectivity.value = 'online';
   membersQuery.refetch.mockClear();
 });
 
@@ -374,6 +382,7 @@ describe('Organization hub card', () => {
 
   it('offers the top-up on the balance line of an empty balance', async () => {
     boundary.balance = 0;
+    storefrontRule.linkAllowed = true;
 
     const { renderer, unmount } = await renderHub();
 
@@ -403,6 +412,23 @@ describe('Organization hub card', () => {
     expect(balance?.props.trailing).toBeUndefined();
     unmount();
   });
+
+  it('leaves an empty balance alone where the platform may not open the top-up', async () => {
+    // The storefront rule refuses the link on every Android build, where the
+    // shared row paints its label as plain text: a bare caption pinned to the
+    // amount would read as a unit of it. The Billing row carries the
+    // destination instead.
+    boundary.balance = 0;
+    storefrontRule.linkAllowed = false;
+
+    const { renderer, unmount } = await renderHub();
+
+    const balance = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+    expect(balance?.props.trailing).toBeUndefined();
+    unmount();
+  });
 });
 
 describe('Organization hub plan', () => {
@@ -410,8 +436,6 @@ describe('Organization hub plan', () => {
     renderer.root
       .findAllByType('KvRow')
       .find(node => node.props.label === i18n.t('organization.hub.plan'));
-  const refusals = (renderer: TestRenderer.ReactTestRenderer) =>
-    renderer.root.findAllByType('OrganizationPlanRefusal');
 
   it('names the plan in every state, in the card the seats belong to', async () => {
     const entitled = await renderHub();
@@ -486,6 +510,9 @@ describe('Organization hub plan', () => {
 
     const [refusal] = refusals(renderer);
     expect(refusal?.props.action).toBeUndefined();
+    // With no action, the sentence has to carry the step.
+    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEnded'));
+    expect(refusal?.props.message).not.toBe(i18n.t('organization.hub.planEnded'));
     expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();
   });
@@ -579,6 +606,15 @@ describe('OrganizationHubScreen rename control', () => {
     unmount();
   });
 
+  it('keeps the rename glyph on the header ink', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    // `colors.foreground` is the token the shared ScreenHeader paints its own
+    // chevron with, so the control beside the title carries the same ink.
+    expect(renderer.root.findAllByType('Pencil')[0]?.props.color).toBe('black');
+    unmount();
+  });
+
   it('compiles the rename control box to at least 28dp with a 44pt reach', async () => {
     const { renderer, unmount } = await renderHub();
 
@@ -621,7 +657,7 @@ describe('OrganizationHubScreen rename control', () => {
     unmount();
   });
 
-  it('states why a lapsed plan cannot rename, keeping the box and the control disabled', async () => {
+  it('keeps a lapsed plan off the rename control and lets the refusal block speak it once', async () => {
     boundary.isTrialExpiredForEnforcement = true;
 
     const { renderer, unmount } = await renderHub();
@@ -634,14 +670,16 @@ describe('OrganizationHubScreen rename control', () => {
     }
 
     // The server refuses every rename while the trial is expired, so the control
-    // says why instead of opening a field whose save cannot succeed. The reason
-    // joins the control's name: React Native maps a hint to Android's tooltip
-    // text, which a screen reader does not announce with the node.
+    // stays disabled instead of opening a field whose save cannot succeed.
     expect(control.props.disabled).toBe(true);
     expect(control.props.accessibilityState).toEqual({ disabled: true });
-    expect(control.props.accessibilityLabel).toBe(
-      `${i18n.t('organization.hub.renameTitle')}. ${i18n.t('organization.hub.planEnded')}`
-    );
+
+    // It keeps its own name and says nothing about the plan: the refusal block
+    // below the header states the reason once, so a label that carried it as
+    // well would have the screen reader speak the same sentence twice.
+    const label = control.props.accessibilityLabel as string;
+    expect(label).toBe(i18n.t('organization.hub.renameTitle'));
+    expect(label).not.toContain(i18n.t('organization.hub.planEnded'));
     expect(control.props.accessibilityHint).toBeUndefined();
     expect(control.props.onPress).toBeUndefined();
 
@@ -649,6 +687,11 @@ describe('OrganizationHubScreen rename control', () => {
     expect(sideFromClass(control.props.className, 'h')).toBeGreaterThanOrEqual(MIN_BOX_DP);
     expect(sideFromClass(control.props.className, 'w')).toBeGreaterThanOrEqual(MIN_BOX_DP);
     expect(String(control.props.className)).toContain('opacity-50');
+
+    // Once on the screen, in the block that owns the sentence.
+    const blocks = refusals(renderer);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.props.message).toBe(i18n.t('organization.hub.planEnded'));
 
     expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(0);
     unmount();
@@ -830,10 +873,12 @@ describe('Organization hub Kilo Pass placeholder', () => {
 });
 
 describe('Organization hub settings availability', () => {
-  it.each(['paused', 'failed'] as const)('retries unavailable settings when %s', async state => {
+  it.each(['offline', 'failed'] as const)('retries unavailable settings when %s', async state => {
+    // Both arms are the same unavailable read (no payload behind a failure);
+    // they differ only in the committed connectivity the offline wording reads.
     membersQuery.data = undefined;
-    membersQuery.isPaused = state === 'paused';
-    membersQuery.isError = state === 'failed';
+    membersQuery.isError = true;
+    connectivity.value = state === 'offline' ? 'offline' : 'online';
     const { renderer, unmount } = await renderHub();
     const row = renderer.root
       .findAllByType('ConfigureRow')
@@ -849,10 +894,26 @@ describe('Organization hub settings availability', () => {
     unmount();
   });
 
-  it('opens configuration with cached settings during a paused refetch failure', async () => {
+  it('names the connection on a confirmed-offline device with no membership payload', async () => {
+    membersQuery.data = undefined;
+    membersQuery.isError = true;
+    connectivity.value = 'offline';
+    const { renderer, unmount } = await renderHub();
+    const row = renderer.root
+      .findAllByType('ConfigureRow')
+      .find(node => node.props.icon === 'Bell');
+    if (!row) {
+      throw new Error('Low-balance row missing');
+    }
+    // The offline wording reads the committed connectivity state now; the read
+    // itself settles (`SETTLE_WHILE_OFFLINE`), so the failure is the trigger.
+    expect(row.props.subtitle).toBe(i18n.t('queryError.offlineTitle'));
+    unmount();
+  });
+
+  it('opens configuration with cached settings during a failed refetch', async () => {
     membersQuery.data = { parent_organization_id: null, settings: { minimum_balance: 15 } };
     membersQuery.isError = true;
-    membersQuery.isPaused = true;
     const { renderer, unmount } = await renderHub();
     const row = renderer.root
       .findAllByType('ConfigureRow')

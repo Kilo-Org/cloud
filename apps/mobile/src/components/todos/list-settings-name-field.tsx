@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Pressable } from 'react-native';
 
 import { showNamePreview } from '@/components/todos/list-settings-name-selection';
-import { Input } from '@/components/ui/input';
+import { Input, INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { cn } from '@/lib/utils';
 
 /**
  * The name box, over the shared `Input`: an unfocused single-line Android
@@ -37,7 +38,10 @@ export function NameField(
         onPress={() => {
           setEditing(true);
         }}
-        className="min-h-[44px] justify-center rounded-lg border border-border bg-secondary pl-3 pr-3"
+        className={cn(
+          INPUT_BOX_SHAPE_CLASS,
+          'justify-center rounded-md border border-input bg-background'
+        )}
       >
         <Text className="text-base text-foreground" numberOfLines={1}>
           {text}
@@ -55,7 +59,7 @@ export function NameField(
       }}
       returnKeyType="done"
       autoFocus={props.autoFocus || editing}
-      className="rounded-lg border border-border bg-secondary text-base text-foreground"
+      className="rounded-md border border-input bg-background text-base text-foreground"
       onFocus={() => {
         setEditing(true);
       }}

@@ -23,6 +23,8 @@ vi.mock('@/components/native-remote/native-remote-demo', () => ({ NativeRemoteDe
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => mocks }));
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => mocks }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/lib/config', () => ({
   get SESSION_SYNC_URL() {
     return mocks.url;

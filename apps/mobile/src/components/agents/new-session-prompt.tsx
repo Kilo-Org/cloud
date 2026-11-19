@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { InputFrame } from '@/components/ui/input-frame';
 import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import {
   type ComposerSelection,
@@ -517,7 +518,7 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+    <InputFrame className="overflow-hidden">
       <View
         className="pb-2"
         onLayout={event => {
@@ -527,13 +528,14 @@ export function NewSessionPrompt({
         {isModelsError && modelOptions.length === 0 ? (
           <QueryError
             placement="top"
+            inset="gutter"
             variant="server"
             title={t('agentChat.newSession.couldNotLoadModels')}
             message={t('organization.boundary.loadErrorMessage')}
             onRetry={() => {
               onRefetchModels();
             }}
-            className="border-b border-border py-4"
+            className="border-b-[0.5px] border-hair-soft py-4"
           />
         ) : (
           <ChatToolbar
@@ -546,7 +548,7 @@ export function NewSessionPrompt({
             isLoadingModels={isLoadingModels}
             modelLocked={modelLocked}
             modelLockLabel={modelLockLabel}
-            className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+            className="border-b-[0.5px] border-hair-soft bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
           />
         )}
         {sharePrefill.failed ? (
@@ -710,6 +712,6 @@ export function NewSessionPrompt({
           </NewSessionPromptControls>
         </View>
       </View>
-    </View>
+    </InputFrame>
   );
 }

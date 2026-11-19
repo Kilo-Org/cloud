@@ -695,8 +695,9 @@
       "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Die Bitbucket-Verbindung dieser Organisation wird im Web über einen Computer verwaltet.",
-      "description": "Erstelle ein Workspace-Zugriffstoken mit den erforderlichen Berechtigungen und füge es unten ein.",
+      "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
+      "description": "Erstelle ein Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
+      "descriptionReconnect": "Erstelle ein neues Workspace-Zugriffstoken für {{organization}} und füge es unten ein.",
       "scopes": "Konto: Lesen · Repositories: Lesen/Schreiben · Pull-Requests: Lesen · Webhooks: Lesen/Schreiben",
       "tokenPlaceholder": "Workspace-Zugriffstoken",
       "tokenRefused": "Bitbucket hat dieses Workspace-Zugriffstoken nicht akzeptiert. Prüfe, ob es die oben genannten Berechtigungen enthält, und versuche es dann erneut."
@@ -1605,6 +1606,8 @@
       "renameAccessibility": "Sitzung umbenennen: {{title}}",
       "cloningSession": "Sitzung wird geklont",
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
+      "historyTooLarge": "Das Protokoll dieser Sitzung ist zum Laden zu groß.",
+      "historyUnavailable": "Das Protokoll dieser Sitzung kann nicht gelesen werden.",
       "cloneFailedRetry": "Diese Sitzung konnte nicht geklont werden. Versuche es erneut.",
       "notEnoughCredits": "Dein Guthaben reicht für diese Anfrage nicht aus. Lade Guthaben auf und versuche es erneut.",
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
@@ -1681,6 +1684,7 @@
       "branchDefault": "Standard",
       "branchAccessibility": "Branch: {{label}}",
       "branchLoading": "Branches werden geladen",
+      "branchInactive": "Wähle ein Repository aus, um seine Branches zu laden.",
       "branchLoadError": "Branches konnten nicht geladen werden",
       "branchUnavailable": "Für dieses Repository sind keine Branches verfügbar. Prüfe deinen Zugriff beim Anbieter und wähle dann ein anderes Repository.",
       "branchEmpty": "Keine Branches verfügbar",
@@ -2483,7 +2487,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Die Sitzungen konnten nicht geladen werden.",
-    "couldNotLoadActiveSessions": "Die aktiven Sitzungen konnten nicht geladen werden.",
     "agentSessions": "Jetzt aktiv",
     "newCodingTask": "Neue Programmieraufgabe",
     "newTaskFromPicture": "Neue Aufgabe aus einem Bild",
@@ -2800,7 +2803,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
       "gitlabReconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
       "bitbucketNotConnectedTitle": "Bitbucket ist nicht verbunden",
-      "bitbucketAdminOnlyDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
+      "adminOnlyConnectDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
     },
@@ -3409,7 +3412,8 @@
         "accounting_adjustment": "Buchhaltungskorrektur",
         "credits_expired": "Verfallenes Guthaben"
       },
-      "truncated": "Es sind ältere Guthabenbewegungen verfügbar."
+      "truncated": "Es sind ältere Guthabenbewegungen verfügbar.",
+      "retentionLimit": "Es werden die neuesten Guthabenbewegungen angezeigt."
     },
     "hub": {
       "balance": "Guthaben",
@@ -3454,7 +3458,8 @@
         "void": "Storniert",
         "uncollectible": "Uneinbringlich"
       },
-      "truncated": "Ältere Rechnungen sind verfügbar."
+      "truncated": "Ältere Rechnungen sind verfügbar.",
+      "retentionLimit": "Es werden die neuesten Rechnungen angezeigt."
     },
     "lowBalanceAlert": {
       "enableA11y": "Warnung bei niedrigem Guthaben aktivieren",
@@ -3683,8 +3688,7 @@
     "imagesSectionEmpty": "Keine vertrauenswürdigen Bild-Hosts",
     "revoke": "Vertrauen in {{host}} widerrufen",
     "revokeMessage": "Links zu diesem Host fragen künftig wieder nach einer Bestätigung.",
-    "revokeImageMessage": "Bilder von diesem Host fragen künftig wieder nach einer Bestätigung.",
-    "backToPreferences": "Zurück zu den Einstellungen"
+    "revokeImageMessage": "Bilder von diesem Host fragen künftig wieder nach einer Bestätigung."
   },
   "glanceable": {
     "waiting": "Agenten werden aktualisiert",
@@ -3931,6 +3935,8 @@
       "downloading": "Wird heruntergeladen: {{written}} von {{total}}",
       "downloadingUnknown": "Wird heruntergeladen: {{written}}",
       "paused": "Pausiert: {{written}} von {{total}}",
+      "retrying": "Erneuter Versuch: {{written}} von {{total}}",
+      "retryingUnknown": "Erneuter Versuch: {{written}}",
       "verifying": "Die heruntergeladene Datei wird überprüft…",
       "downloaded": "Heruntergeladen · {{size}}",
       "url": "Direkter Download-Link",
@@ -4021,7 +4027,9 @@
         "androidModelUnavailable": "Dieses Gerät unterstützt Gemini Nano nicht, oder die System-App AICore wird noch eingerichtet. Versuche es später erneut.",
         "aicoreUpdateRequired": "Aktualisiere die AICore-App und deine Systemsoftware, um dieses Modell zu nutzen.",
         "downloadable": "Dieses Modell muss einmalig heruntergeladen werden, bevor du es nutzen kannst.",
-        "downloading": "Das Modell wird heruntergeladen. Es ist einsatzbereit, sobald der Download abgeschlossen ist."
+        "downloading": "Das Modell wird heruntergeladen. Es ist einsatzbereit, sobald der Download abgeschlossen ist.",
+        "batteryQuota": "Das Modell auf dem Gerät hat sein Batteriekontingent vorerst ausgeschöpft. Versuche es später erneut.",
+        "checkFailed": "Die App konnte dieses Modell nicht prüfen. Versuche es erneut."
       },
       "unavailable": "Das Modell auf dem Gerät ist gerade nicht verfügbar. Prüfe seinen Status unter $t(modelChat.backends.title).",
       "busy": "Das Modell auf dem Gerät erstellt gerade eine andere Antwort. Versuche es erneut, wenn es fertig ist.",
@@ -4382,7 +4390,8 @@
       "purchaseFallback": "Credit-Kauf",
       "receipt": "Beleg",
       "receiptA11y": "Beleg für {{description}}, {{amount}}, vom {{date}} öffnen",
-      "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar."
+      "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar.",
+      "retentionLimit": "Es wird der neueste Credit-Verlauf angezeigt."
     },
     "title": "Guthaben kaufen",
     "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",
@@ -4629,6 +4638,9 @@
     "couldNotLoad": "Integrationen konnten nicht geladen werden",
     "permissionDenied": "Du hast keine Berechtigung, diese Integrationen zu verwalten.",
     "managedByOwner": "Bitte einen Inhaber der Organisation, eine Verbindung zu ändern, die du nicht ändern kannst.",
+    "managedByOwnerOrAdmin": "Bitte einen Inhaber der Organisation oder Admin, eine Verbindung zu ändern, die du nicht ändern kannst.",
+    "managedByOwnerOrBilling": "Bitte einen Inhaber der Organisation oder Abrechnungsmanager, eine Verbindung zu ändern, die du nicht ändern kannst.",
+    "managedByOwnerAdminOrBilling": "Bitte einen Inhaber der Organisation, Admin oder Abrechnungsmanager, eine Verbindung zu ändern, die du nicht ändern kannst.",
     "connectFailed": "Die Verbindungsseite konnte nicht geöffnet werden"
   },
   "invoices": {
@@ -4665,7 +4677,7 @@
       "new": "Neuer Auslöser",
       "create": "Auslöser erstellen",
       "emptyTitle": "Noch keine Auslöser",
-      "emptyDescription": "Erstelle einen Auslöser, um einen Lauf von Cloud Agent per Webhook-Aufruf oder nach Zeitplan zu starten.",
+      "emptyDescription": "Erstelle deinen ersten Auslöser.",
       "loadFailedTitle": "Auslöser konnten nicht geladen werden",
       "loadFailedDescription": "Versuche es erneut, wenn du eine Verbindung hast.",
       "detailLoadFailedTitle": "Dieser Auslöser konnte nicht geladen werden",

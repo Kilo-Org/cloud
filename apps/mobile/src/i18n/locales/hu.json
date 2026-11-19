@@ -944,7 +944,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Ez a fiók még nem tagja egyetlen szervezetnek sem. A Bitbucket-módosítási kérelmek kódellenőrzéséhez hozz létre egy szervezetet, vagy csatlakozz egyhez.",
       "gitlabReconnectAdminOnlyDescription": "Kérd meg egy szervezet tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy újracsatlakoztassa.",
       "bitbucketNotConnectedTitle": "A Bitbucket nincs csatlakoztatva",
-      "bitbucketAdminOnlyDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
+      "adminOnlyConnectDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
       "contextLine": "{{organization}} számára",
       "contextLinePersonal": "Személyes fiókodhoz"
     },
@@ -1385,8 +1385,9 @@
       "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Ennek a szervezetnek a Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
-      "description": "Hozz létre egy hozzáférési tokent a munkaterülethez a szükséges jogosultságokkal, és illeszd be alább.",
+      "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
+      "description": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
+      "descriptionReconnect": "Hozz létre egy új hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "scopes": "Fiók: olvasás · Kódtárak: olvasás/írás · PR-ek: olvasás · Webhookok: olvasás/írás.",
       "tokenPlaceholder": "Munkaterület-hozzáférési token",
       "tokenRefused": "A Bitbucket nem fogadta el ezt a munkaterület-hozzáférési tokent. Ellenőrizd, hogy rendelkezik-e a fenti jogosultságokkal, majd próbáld újra."
@@ -2160,6 +2161,8 @@
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",
       "cloningSession": "Munkamenet klónozása…",
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
+      "historyTooLarge": "Ez a munkamenet leirata túl nagy a betöltéshez.",
+      "historyUnavailable": "Ez a munkamenet leirata nem olvasható.",
       "cloneFailedRetry": "Nem sikerült klónozni ezt a munkamenetet. Próbáld újra.",
       "notEnoughCredits": "Nincs elég kredit ehhez a kéréshez. Töltsd fel az egyenleged, és próbáld újra.",
       "previousTaskFinishing": "Az előző feladat még nem fejeződött be. Várj egy kicsit.",
@@ -2236,6 +2239,7 @@
       "branchDefault": "Alapértelmezett",
       "branchAccessibility": "Ág: {{label}}",
       "branchLoading": "Ágak betöltése",
+      "branchInactive": "Válassz egy adattárat az ágai betöltéséhez.",
       "branchLoadError": "Nem sikerült betölteni az ágakat",
       "branchUnavailable": "Ehhez az adattárhoz nem érhetők el ágak. Ellenőrizd a jogosultságodat a szolgáltatónál, majd válassz másik adattárat.",
       "branchEmpty": "Nincs elérhető ág",
@@ -3038,7 +3042,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nem sikerült betölteni a munkameneteket.",
-    "couldNotLoadActiveSessions": "Nem sikerült betölteni az aktív munkameneteket.",
     "agentSessions": "Most fut",
     "newCodingTask": "Új kódolási feladat",
     "newTaskFromPicture": "Új feladat képből",
@@ -3417,7 +3420,8 @@
         "accounting_adjustment": "Számviteli kiigazítás",
         "credits_expired": "Lejárt kreditek"
       },
-      "truncated": "Korábbi kreditműveletek is elérhetők."
+      "truncated": "Korábbi kreditműveletek is elérhetők.",
+      "retentionLimit": "A legutóbbi kreditműveletek láthatók."
     },
     "inviteMember": {
       "emailError": "Adj meg egy érvényes e-mail-címet.",
@@ -3449,7 +3453,8 @@
         "void": "Érvénytelen",
         "uncollectible": "Behajthatatlan"
       },
-      "truncated": "Korábbi számlák érhetők el."
+      "truncated": "Korábbi számlák érhetők el.",
+      "retentionLimit": "A legutóbbi számlák láthatók."
     },
     "lowBalanceAlert": {
       "enableA11y": "Figyelmeztetés bekapcsolása alacsony egyenleg esetén",
@@ -3683,8 +3688,7 @@
     "imagesSectionEmpty": "Nincsenek megbízható képwebhelyek",
     "revoke": "A megbízható jelölés visszavonása: {{host}}",
     "revokeMessage": "A webhelyre mutató hivatkozások ismét jóváhagyást kérnek majd.",
-    "revokeImageMessage": "A webhelyről származó képek ismét jóváhagyást kérnek majd.",
-    "backToPreferences": "Vissza a beállításokhoz"
+    "revokeImageMessage": "A webhelyről származó képek ismét jóváhagyást kérnek majd."
   },
   "glanceable": {
     "waiting": "Ügynökök frissítése",
@@ -3931,6 +3935,8 @@
       "downloading": "Letöltés: {{written}} / {{total}}",
       "downloadingUnknown": "Letöltés: {{written}}",
       "paused": "Szüneteltetve: {{written}} / {{total}}",
+      "retrying": "Újrapróbálkozás: {{written}} / {{total}}",
+      "retryingUnknown": "Újrapróbálkozás: {{written}}",
       "verifying": "A letöltött fájl ellenőrzése…",
       "downloaded": "Letöltve · {{size}}",
       "url": "Közvetlen letöltési hivatkozás",
@@ -4021,7 +4027,9 @@
         "androidModelUnavailable": "Ez az eszköz nem támogatja a Gemini Nano modellt, vagy az AICore rendszeralkalmazás beállítása még folyamatban van. Próbálja újra később.",
         "aicoreUpdateRequired": "A modell használatához frissítse az AICore alkalmazást és a rendszerszoftvert.",
         "downloadable": "A modell használata előtt egyszeri letöltés szükséges.",
-        "downloading": "A modell letöltése folyamatban van. A letöltés befejeztével használatra kész lesz."
+        "downloading": "A modell letöltése folyamatban van. A letöltés befejeztével használatra kész lesz.",
+        "batteryQuota": "Az eszközön futó modell mostanra kimerítette az akkumulátor-kvótáját. Próbálja újra később.",
+        "checkFailed": "Az alkalmazás nem tudta ellenőrizni ezt a modellt. Próbálja újra."
       },
       "unavailable": "Az eszközön futó modell jelenleg nem érhető el. Ellenőrizze az állapotát itt: $t(modelChat.backends.title).",
       "busy": "Az eszközön futó modell épp egy másik válaszon dolgozik. Próbálja újra, ha végzett.",
@@ -4382,7 +4390,8 @@
       "purchaseFallback": "Kreditvásárlás",
       "receipt": "Nyugta",
       "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
-      "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta."
+      "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta.",
+      "retentionLimit": "A legutóbbi kreditelőzmények láthatók."
     },
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
@@ -4629,6 +4638,9 @@
     "couldNotLoad": "Nem sikerült betölteni az integrációkat",
     "permissionDenied": "Nincs jogosultságod ezeknek az integrációknak a kezeléséhez.",
     "managedByOwner": "Kérd meg a szervezet egyik tulajdonosát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+    "managedByOwnerOrAdmin": "Kérd meg egy szervezet tulajdonosát vagy adminisztrátorát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+    "managedByOwnerOrBilling": "Kérd meg egy szervezet tulajdonosát vagy számlázási felelősét, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+    "managedByOwnerAdminOrBilling": "Kérd meg egy szervezet tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
     "connectFailed": "Nem sikerült megnyitni a csatlakozási oldalt"
   },
   "invoices": {
@@ -4665,7 +4677,7 @@
       "new": "Új trigger",
       "create": "Hozzon létre triggert",
       "emptyTitle": "Még nincsenek triggerek",
-      "emptyDescription": "Hozzon létre egy triggert, amely webhookhívásból vagy ütemezés szerint indít Cloud Agent futtatást.",
+      "emptyDescription": "Hozza létre az első triggerjét.",
       "loadFailedTitle": "Nem sikerült betölteni a triggereket",
       "loadFailedDescription": "Próbálja újra, ha van kapcsolat.",
       "detailLoadFailedTitle": "Nem sikerült betölteni ezt a triggert",

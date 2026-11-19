@@ -147,7 +147,7 @@ export function RenameModal<TSaveResult>({
 
   return (
     <DialogCard onClose={handleClose} placement="top">
-      <Text className="text-base font-semibold">{title}</Text>
+      <Text variant="heading">{title}</Text>
       <Input
         ref={inputRef}
         accessible

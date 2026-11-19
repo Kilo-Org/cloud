@@ -961,7 +961,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Aquest compte encara no té cap organització. Les sol·licituds d'integració de Bitbucket es poden revisar quan creeu o us uniu a una organització.",
       "gitlabReconnectAdminOnlyDescription": "Demana a un Propietari, Administrador o Gestor de facturació de l'organització que la reconnecti.",
       "bitbucketNotConnectedTitle": "Bitbucket no està connectat",
-      "bitbucketAdminOnlyDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
+      "adminOnlyConnectDescription": "Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo.",
       "contextLine": "Per a {{organization}}",
       "contextLinePersonal": "Per a ús personal"
     },
@@ -1408,8 +1408,9 @@
       "notConnectedReadOnly": "Bitbucket no està connectat. Només els propietaris, els administradors i els gestors de facturació de l'organització poden connectar-lo."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "La connexió de Bitbucket d'aquesta organització es gestiona al web des d'un ordinador.",
-      "description": "Crea un testimoni d'accés a l'espai de treball amb els permisos necessaris i enganxa'l a continuació.",
+      "managedOnWeb": "La connexió de Bitbucket amb {{organization}} es gestiona al web des d'un ordinador.",
+      "description": "Crea un testimoni d'accés a l'espai de treball per a {{organization}} i enganxa'l a continuació.",
+      "descriptionReconnect": "Crea un testimoni nou d'accés a l'espai de treball per a {{organization}} i enganxa'l a continuació.",
       "scopes": "Compte: lectura · Repositoris: lectura/escriptura · Sol·licituds d'integració: lectura · Webhooks: lectura/escriptura.",
       "tokenPlaceholder": "Testimoni d'accés a l'espai de treball",
       "tokenRefused": "Bitbucket no ha acceptat aquest testimoni d'accés a l'espai de treball. Comprova que tingui els permisos indicats a dalt i torna-ho a provar."
@@ -2204,6 +2205,8 @@
       "renameAccessibility": "Reanomena la sessió: {{title}}",
       "cloningSession": "Clonant la sessió…",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
+      "historyTooLarge": "La transcripció d'aquesta sessió és massa gran per carregar-la.",
+      "historyUnavailable": "No es pot llegir la transcripció d'aquesta sessió.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
       "notEnoughCredits": "No tens prou crèdits per a aquesta sol·licitud. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara no ha acabat. Espera un moment.",
@@ -2280,6 +2283,7 @@
       "branchDefault": "Per defecte",
       "branchAccessibility": "Branca: {{label}}",
       "branchLoading": "Carregant branques",
+      "branchInactive": "Selecciona un repositori per carregar les seves branques.",
       "branchLoadError": "No s'han pogut carregar les branques",
       "branchUnavailable": "No hi ha branques disponibles per a aquest repositori. Comprova el teu accés amb el proveïdor i tria un altre repositori.",
       "branchEmpty": "No hi ha branques disponibles",
@@ -3094,7 +3098,6 @@
   },
   "home": {
     "couldNotLoadSessions": "No s'han pogut carregar les sessions.",
-    "couldNotLoadActiveSessions": "No s'han pogut carregar les sessions actives.",
     "agentSessions": "En curs ara",
     "newCodingTask": "Nova tasca de programació",
     "newTaskFromPicture": "Nova tasca a partir d'una imatge",
@@ -3475,7 +3478,8 @@
         "accounting_adjustment": "Ajust comptable",
         "credits_expired": "Crèdits caducats"
       },
-      "truncated": "Hi ha moviments de crèdits anteriors disponibles."
+      "truncated": "Hi ha moviments de crèdits anteriors disponibles.",
+      "retentionLimit": "Es mostren els moviments de crèdits més recents."
     },
     "inviteMember": {
       "emailError": "Introdueix una adreça de correu electrònic vàlida.",
@@ -3507,7 +3511,8 @@
         "void": "Anul·lada",
         "uncollectible": "Incobrable"
       },
-      "truncated": "Hi ha factures més antigues disponibles."
+      "truncated": "Hi ha factures més antigues disponibles.",
+      "retentionLimit": "Es mostren les factures més recents."
     },
     "lowBalanceAlert": {
       "enableA11y": "Activa l'avís de saldo baix",
@@ -3743,8 +3748,7 @@
     "imagesSectionEmpty": "No hi ha servidors d'imatges de confiança",
     "revoke": "Deixa de confiar en {{host}}",
     "revokeMessage": "Els enllaços a aquest servidor tornaran a demanar confirmació.",
-    "revokeImageMessage": "Les imatges d'aquest servidor tornaran a demanar confirmació.",
-    "backToPreferences": "Torna a les preferències"
+    "revokeImageMessage": "Les imatges d'aquest servidor tornaran a demanar confirmació."
   },
   "glanceable": {
     "waiting": "S'estan actualitzant els agents",
@@ -3992,6 +3996,8 @@
       "downloading": "S'està descarregant: {{written}} de {{total}}",
       "downloadingUnknown": "S'està descarregant: {{written}}",
       "paused": "En pausa: {{written}} de {{total}}",
+      "retrying": "S'està reintentant: {{written}} de {{total}}",
+      "retryingUnknown": "S'està reintentant: {{written}}",
       "verifying": "S'està comprovant el fitxer descarregat…",
       "downloaded": "Descarregat · {{size}}",
       "url": "Enllaç de descàrrega directa",
@@ -4082,7 +4088,9 @@
         "androidModelUnavailable": "Aquest dispositiu no és compatible amb Gemini Nano, o l'aplicació del sistema AICore encara s'està configurant. Torna-ho a provar més tard.",
         "aicoreUpdateRequired": "Actualitza l'aplicació AICore i el programari del sistema per fer servir aquest model.",
         "downloadable": "Cal baixar aquest model una sola vegada abans de poder-lo fer servir.",
-        "downloading": "El model s'està baixant. Estarà a punt quan acabi la baixada."
+        "downloading": "El model s'està baixant. Estarà a punt quan acabi la baixada.",
+        "batteryQuota": "El model al dispositiu ha esgotat la quota de bateria per ara. Torna-ho a provar més tard.",
+        "checkFailed": "L'app no ha pogut comprovar aquest model. Torna-ho a provar."
       },
       "unavailable": "El model al dispositiu no està disponible ara mateix. Comprova'n l'estat a $t(modelChat.backends.title).",
       "busy": "El model al dispositiu està ocupat amb una altra resposta. Torna-ho a provar quan acabi.",
@@ -4449,7 +4457,8 @@
       "purchaseFallback": "Compra de crèdits",
       "receipt": "Rebut",
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
-      "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra."
+      "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
+      "retentionLimit": "Es mostra l'historial de crèdits més recent."
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
@@ -4704,6 +4713,9 @@
     "couldNotLoad": "No s'han pogut carregar les integracions",
     "permissionDenied": "No tens permís per gestionar aquestes integracions.",
     "managedByOwner": "Demana a un propietari de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerOrAdmin": "Demana a un propietari o administrador de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerOrBilling": "Demana a un propietari o gestor de facturació de l'organització que canviï una connexió que no pots canviar.",
+    "managedByOwnerAdminOrBilling": "Demana a un propietari, administrador o gestor de facturació de l'organització que canviï una connexió que no pots canviar.",
     "connectFailed": "No s'ha pogut obrir la pàgina de connexió"
   },
   "invoices": {
@@ -4740,7 +4752,7 @@
       "new": "Disparador nou",
       "create": "Crea disparador",
       "emptyTitle": "Encara no hi ha disparadors",
-      "emptyDescription": "Crea un disparador per iniciar una execució del Cloud Agent a partir d'una crida de ganxo web o segons una programació.",
+      "emptyDescription": "Crea el teu primer disparador.",
       "loadFailedTitle": "No s'han pogut carregar els disparadors",
       "loadFailedDescription": "Torna-ho a provar quan tinguis connexió.",
       "detailLoadFailedTitle": "No s'ha pogut carregar aquest disparador",

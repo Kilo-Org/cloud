@@ -17,7 +17,7 @@ import { CREDIT_HISTORY_HREF, PROFILE_TAB_HREF } from '@/lib/profile-navigation'
 export function PersonalInvoicesScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { query, entries, hasMore } = usePersonalInvoicesPage();
+  const { query, entries, hasMore, isRetentionLimited } = usePersonalInvoicesPage();
   // An invoice can appear off-screen (a renewal charging while the app is
   // backgrounded), so the list refreshes when the route regains foreground.
   useRouteForegroundRefresh([[['user', 'invoicesPage']]]);
@@ -30,6 +30,7 @@ export function PersonalInvoicesScreen() {
       query={query}
       entries={entries}
       hasMore={hasMore}
+      isRetentionLimited={isRetentionLimited}
       emptyTitle={t('organization.invoices.emptyTitle')}
       emptyDescription={t('invoices.personalEmptyDescription')}
       emptyAction={

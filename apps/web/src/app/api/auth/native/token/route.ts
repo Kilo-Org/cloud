@@ -44,6 +44,7 @@ import {
   createDeviceSession,
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
+  createDeviceSessionWithCredentials,
   revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
 import {
@@ -354,24 +355,30 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
     try {
       const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
-      sessionId = await createDeviceSession({
-        userId: user.id,
-        userAgent: request.headers.get('user-agent') ?? undefined,
-      });
 
       if (data.supportsRefresh) {
-        const pair = await issueSessionCredentials(user, sessionId);
+        const credentials = await createDeviceSessionWithCredentials({
+          userId: user.id,
+          userAgent: request.headers.get('user-agent') ?? undefined,
+          user,
+        });
+        sessionId = credentials.sessionId;
         return NextResponse.json(
           {
-            token: pair.token,
-            refreshToken: pair.refreshToken,
-            expiresIn: pair.expiresIn,
+            token: credentials.token,
+            refreshToken: credentials.refreshToken,
+            expiresIn: credentials.expiresIn,
             created: false,
             ...(pendingLink ? { pendingLink } : {}),
           },
           { status: 200 }
         );
       }
+
+      sessionId = await createDeviceSession({
+        userId: user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      });
 
       return legacyTokenResponse({
         user,
@@ -771,16 +778,17 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     }
 
     if (data.supportsRefresh) {
-      sessionId ??= await createDeviceSession({
+      const credentials = await createDeviceSessionWithCredentials({
         userId: result.user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
+        user: result.user,
       });
-      const pair = await issueSessionCredentials(result.user, sessionId);
+      sessionId = credentials.sessionId;
       return NextResponse.json(
         {
-          token: pair.token,
-          refreshToken: pair.refreshToken,
-          expiresIn: pair.expiresIn,
+          token: credentials.token,
+          refreshToken: credentials.refreshToken,
+          expiresIn: credentials.expiresIn,
           created: result.isNew,
           ...(pendingLink ? { pendingLink } : {}),
         },

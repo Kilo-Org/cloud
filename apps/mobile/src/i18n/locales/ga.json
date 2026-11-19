@@ -995,7 +995,7 @@
       "bitbucketOrgOnlyNoOrganizationDescription": "Níl aon eagraíocht ag an gcuntas seo fós. Is féidir iarratais tharraingthe Bitbucket a athbhreithniú nuair a chruthaíonn tú eagraíocht nó nuair a thagann tú isteach i gceann acu.",
       "gitlabReconnectAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a athnascadh.",
       "bitbucketNotConnectedTitle": "Níl Bitbucket nasctha",
-      "bitbucketAdminOnlyDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
+      "adminOnlyConnectDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
       "contextLine": "Do {{organization}}",
       "contextLinePersonal": "Do do chuntas pearsanta"
     },
@@ -1454,8 +1454,9 @@
       "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "Bainistítear nasc Bitbucket na heagraíochta seo ar an ngréasán ó ríomhaire.",
-      "description": "Cruthaigh comhartha rochtana don spás oibre leis na scóip riachtanacha agus greamaigh thíos é.",
+      "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
+      "description": "Cruthaigh comhartha rochtana don spás oibre do {{organization}} agus greamaigh thíos é.",
+      "descriptionReconnect": "Cruthaigh comhartha rochtana nua don spás oibre do {{organization}} agus greamaigh thíos é.",
       "scopes": "Cuntas: léamh · Stórtha: léamh/scríobh · Iarratais tarraingthe: léamh · Crúcaí gréasáin: léamh/scríobh",
       "tokenPlaceholder": "Comhartha rochtana don spás oibre",
       "tokenRefused": "Níor ghlac Bitbucket leis an gcomhartha rochtana spáis oibre seo. Seiceáil go bhfuil na scóip thuas aige, ansin triail arís."
@@ -2292,6 +2293,8 @@
       "renameAccessibility": "Athainmnigh seisiún: {{title}}",
       "cloningSession": "Ag clónáil an tseisiúin",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
+      "historyTooLarge": "Tá tras-scríbhinn an tseisiúin seo rómhór le lódáil.",
+      "historyUnavailable": "Ní féidir tras-scríbhinn an tseisiúin seo a léamh.",
       "cloneFailedRetry": "Níorbh fhéidir an seisiún seo a chlónáil. Bain triail as arís.",
       "notEnoughCredits": "Níl go leor creidmheasanna agat don iarratas seo. Cuir creidmheasanna leis agus bain triail as arís.",
       "previousTaskFinishing": "Níl an tasc roimhe seo críochnaithe fós. Fan nóiméad, le do thoil.",
@@ -2368,6 +2371,7 @@
       "branchDefault": "Réamhshocraithe",
       "branchAccessibility": "Brainse: {{label}}",
       "branchLoading": "Ag lódáil brainsí",
+      "branchInactive": "Roghnaigh stór lena chraoinsí a lódáil.",
       "branchLoadError": "Níorbh fhéidir na brainsí a lódáil",
       "branchUnavailable": "Níl brainsí ar fáil don stór seo. Seiceáil do rochtain leis an soláthraí, ansin roghnaigh stór eile.",
       "branchEmpty": "Níl aon bhrainse ar fáil",
@@ -3206,7 +3210,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Níorbh fhéidir na seisiúin a lódáil.",
-    "couldNotLoadActiveSessions": "Níorbh fhéidir na seisiúin ghníomhacha a lódáil.",
     "agentSessions": "Ar siúl anois",
     "newCodingTask": "Tasc códaithe nua",
     "newTaskFromPicture": "Tasc nua ó phictiúr",
@@ -3591,7 +3594,8 @@
         "accounting_adjustment": "Coigeartú cuntasaíochta",
         "credits_expired": "Creidmheasanna imithe in éag"
       },
-      "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil."
+      "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil.",
+      "retentionLimit": "Taispeántar an ghníomhaíocht chreidmheasa is déanaí."
     },
     "inviteMember": {
       "emailError": "Iontráil seoladh ríomhphoist bailí.",
@@ -3623,7 +3627,8 @@
         "void": "Ar neamhní",
         "uncollectible": "Dobhailithe"
       },
-      "truncated": "Tá sonraisc níos sine ar fáil."
+      "truncated": "Tá sonraisc níos sine ar fáil.",
+      "retentionLimit": "Taispeántar na sonraisc is déanaí."
     },
     "lowBalanceAlert": {
       "enableA11y": "Cumasaigh foláireamh faoi iarmhéid íseal",
@@ -3863,8 +3868,7 @@
     "imagesSectionEmpty": "Níl aon óstach iontaofa íomhá ann",
     "revoke": "Bain {{host}} de na hóstaigh iontaofa",
     "revokeMessage": "Iarrfaidh naisc chuig an óstach seo deimhniú arís.",
-    "revokeImageMessage": "Iarrfaidh íomhánna ón óstach seo deimhniú arís.",
-    "backToPreferences": "Ar ais go dtí na roghanna"
+    "revokeImageMessage": "Iarrfaidh íomhánna ón óstach seo deimhniú arís."
   },
   "glanceable": {
     "waiting": "Gníomhairí á nuashonrú",
@@ -4114,6 +4118,8 @@
       "downloading": "Á íoslódáil: {{written}} as {{total}}",
       "downloadingUnknown": "Á íoslódáil: {{written}}",
       "paused": "Ar sos: {{written}} as {{total}}",
+      "retrying": "Ag triail arís: {{written}} as {{total}}",
+      "retryingUnknown": "Ag triail arís: {{written}}",
       "verifying": "Ag seiceáil an chomhaid íoslódáilte…",
       "downloaded": "Íoslódáilte · {{size}}",
       "url": "Nasc íoslódála díreach",
@@ -4204,7 +4210,9 @@
         "androidModelUnavailable": "Ní thacaíonn an gléas seo le Gemini Nano, nó tá aip chórais AICore fós á socrú. Bain triail eile as ar ball.",
         "aicoreUpdateRequired": "Nuashonraigh an aip AICore agus bogearraí do chórais chun an tsamhail seo a úsáid.",
         "downloadable": "Ní mór an tsamhail seo a íoslódáil uair amháin sula féidir leat í a úsáid.",
-        "downloading": "Tá an tsamhail á híoslódáil. Beidh sí réidh nuair a bheidh an íoslódáil críochnaithe."
+        "downloading": "Tá an tsamhail á híoslódáil. Beidh sí réidh nuair a bheidh an íoslódáil críochnaithe.",
+        "batteryQuota": "Tá an tsamhail ar an ngléas tar éis a lamháltas ceallra a úsáid suas faoi láthair. Bain triail eile as ar ball.",
+        "checkFailed": "Níorbh fhéidir leis an aip an tsamhail seo a sheiceáil. Bain triail eile as."
       },
       "unavailable": "Níl an tsamhail ar an ngléas ar fáil faoi láthair. Seiceáil a stádas in $t(modelChat.backends.title).",
       "busy": "Tá an tsamhail ar an ngléas gnóthach le freagra eile. Bain triail eile as nuair a bheidh sé críochnaithe.",
@@ -4583,7 +4591,8 @@
       "purchaseFallback": "Ceannach creidmheasa",
       "receipt": "Admháil",
       "receiptA11y": "Oscail an admháil do {{description}}, {{amount}}, ó {{date}}",
-      "receiptUnavailable": "Níl admháil ar fáil don cheannach seo."
+      "receiptUnavailable": "Níl admháil ar fáil don cheannach seo.",
+      "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí."
     },
     "title": "Ceannaigh creidmheasanna",
     "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",
@@ -4854,6 +4863,9 @@
     "couldNotLoad": "Níorbh fhéidir na comhtháthuithe a lódáil",
     "permissionDenied": "Níl cead agat na comhtháthuithe seo a bhainistiú.",
     "managedByOwner": "Iarr ar úinéir eagraíochta ceangal nach féidir leat a athrú.",
+    "managedByOwnerOrAdmin": "Iarr ar úinéir eagraíochta nó riarthóir ceangal nach féidir leat a athrú.",
+    "managedByOwnerOrBilling": "Iarr ar úinéir eagraíochta nó bainisteoir billeála ceangal nach féidir leat a athrú.",
+    "managedByOwnerAdminOrBilling": "Iarr ar úinéir eagraíochta, riarthóir, nó bainisteoir billeála ceangal nach féidir leat a athrú.",
     "connectFailed": "Níorbh fhéidir an leathanach ceangail a oscailt"
   },
   "invoices": {
@@ -4890,7 +4902,7 @@
       "new": "Truicear nua",
       "create": "Cruthaigh truicear",
       "emptyTitle": "Níl truicir ar bith ann fós",
-      "emptyDescription": "Cruthaigh truicear chun rith Cloud Agent a thosú ó ghlao crúca gréasáin nó ar sceideal.",
+      "emptyDescription": "Cruthaigh do chéad truicear.",
       "loadFailedTitle": "Níorbh fhéidir truicir a lódáil",
       "loadFailedDescription": "Bain triail eile as nuair a bheidh nasc agat.",
       "detailLoadFailedTitle": "Níorbh fhéidir an truicear seo a lódáil",

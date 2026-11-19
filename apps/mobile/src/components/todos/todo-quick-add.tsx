@@ -64,7 +64,7 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
 
   return (
     <View className="mx-4 my-2 gap-1">
-      <View className="flex-row items-center gap-2 rounded-lg border border-border bg-secondary pr-1">
+      <View className="flex-row items-center gap-2 rounded-md border border-input bg-background pr-1">
         <Input
           ref={inputRef}
           placeholder={t('todos.list.addPlaceholder')}

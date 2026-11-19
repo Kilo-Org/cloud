@@ -15,6 +15,7 @@ import {
 
 import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { InputFrame } from '@/components/ui/input-frame';
 import { Text } from '@/components/ui/text';
 import { VoiceInputButton } from '@/components/voice-input-control';
 import { useMotionPolicy } from '@/lib/a11y/motion';
@@ -190,10 +191,10 @@ export function ChatComposerInputRow({
           </Pressable>
         ) : null}
 
-        <View
+        <InputFrame
           className={cn(
             COMPOSER_CONTROL_GAP_CLASS,
-            'flex-1 overflow-hidden rounded-[20px] border border-border bg-card',
+            'flex-1 overflow-hidden',
             !inputEditable && 'opacity-50'
           )}
           onLayout={onInputLayout}
@@ -254,7 +255,7 @@ export function ChatComposerInputRow({
             // stops suggesting and autocorrecting this field on Android.
             autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
           />
-        </View>
+        </InputFrame>
 
         {returnSendsMessage ? (
           <View className={COMPOSER_CONTROL_GAP_CLASS}>

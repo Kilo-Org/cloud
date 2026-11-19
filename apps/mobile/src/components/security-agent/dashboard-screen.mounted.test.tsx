@@ -201,9 +201,12 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
   Platform: { OS: 'android' },
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({
+  FolderGit2: 'FolderGit2',
   RefreshCw: 'RefreshCw',
   Settings: 'Settings',
   ShieldAlert: 'ShieldAlert',
@@ -1978,7 +1981,7 @@ describe('DashboardScreen pending stats', () => {
         n =>
           typeof n.type === 'string' &&
           (n.type as string) === 'View' &&
-          String(n.props.className ?? '').includes('rounded-lg bg-secondary p-3')
+          String(n.props.className ?? '').includes('basis-2/5')
       )
       .map(n => String(n.props.className));
   }
@@ -2170,12 +2173,12 @@ describe('DashboardLoadingView frame', () => {
     const skeletons = root.root.findAll(
       n => typeof n.type === 'string' && (n.type as string) === 'Skeleton'
     );
-    // Four tile slots on the loaded card's own class, each with the card's three
+    // Four tile slots on the loaded card's own frame, each with the card's three
     // line boxes (label, value, detail), plus the status line's placeholder,
     // which keeps that line's height until the read lands.
     expect(
       root.root.findAll(
-        n => typeof n.type === 'string' && String(n.props.className).includes('w-[47%]')
+        n => typeof n.type === 'string' && String(n.props.className).includes('basis-2/5')
       )
     ).toHaveLength(4);
     expect(skeletons).toHaveLength(13);

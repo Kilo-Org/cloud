@@ -2,10 +2,9 @@ import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type ScrollViewProps, View } from 'react-native';
 
-import { NewSessionButton } from '@/components/agents/new-session-button';
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
-import { EmptyState } from '@/components/empty-state';
-import { Bot } from '@/components/ui/icons';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { Bot, Plus } from '@/components/ui/icons';
 
 type LiveSessionListEmptyStateProps = {
   organizationId: string | null;
@@ -33,8 +32,9 @@ export function LiveSessionListEmptyState({
       compact={compact}
       action={
         <View className="items-center gap-3">
-          <NewSessionButton
-            compact={compact}
+          <StateAction
+            label={t('common.newSession')}
+            icon={Plus}
             onPress={() => {
               openNewSession(organizationId);
             }}

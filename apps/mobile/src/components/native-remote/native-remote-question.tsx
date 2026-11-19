@@ -70,9 +70,7 @@ function NativeQuestionField({
   return (
     <View className="gap-2">
       <Text>{label}</Text>
-      {field.description && field.title ? (
-        <Text className="text-muted-foreground">{field.description}</Text>
-      ) : null}
+      {field.description && field.title ? <Text variant="muted">{field.description}</Text> : null}
       {field.options?.map(option => (
         <Button
           key={option.value}
@@ -110,7 +108,7 @@ function NativeQuestionField({
           // text (see REWRITTEN_INPUT_AUTO_CORRECT).
           autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
           multiline={multiple}
-          className={multiple ? 'min-h-[88px] leading-[1.25rem]' : undefined}
+          className={multiple ? 'min-h-24 leading-tight' : undefined}
           onChangeText={text => {
             if (!multiple) {
               setSelected([]);

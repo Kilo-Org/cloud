@@ -36,8 +36,11 @@ export type KiloHarnessOptions = {
   log?: (message: string) => void;
 };
 
-/** The fields a session read returns that a reuse decision depends on. */
-const sessionProbeSchema = z.object({ id: z.string(), directory: z.string() });
+/**
+ * The fields a session read returns that a reuse decision depends on. Only `id`
+ * is required: `directory` is compared when the record carries it.
+ */
+const sessionProbeSchema = z.object({ id: z.string(), directory: z.unknown().optional() });
 
 async function sessionExists(
   client: WrapperKiloClient,
@@ -54,10 +57,12 @@ async function sessionExists(
   if (!parsed.success || parsed.data.id !== sessionId) {
     throw new Error('Kilo session probe returned an invalid session');
   }
-  // Reuse requires the session to be recorded under this route's directory.
-  // Otherwise it is treated as absent, so the caller restores or creates its
-  // own session, as the v2 opener does.
-  return sameDirectory(parsed.data.directory, directory);
+  // A session is reused only when the record is stored under this route's
+  // directory. Otherwise the caller restores or creates its own session, as
+  // the v2 opener does.
+  const recorded = parsed.data.directory;
+  if (typeof recorded !== 'string') return false;
+  return sameDirectory(recorded, directory);
 }
 
 export function createKiloHarness(options: KiloHarnessOptions): Harness {

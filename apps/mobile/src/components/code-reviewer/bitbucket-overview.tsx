@@ -36,6 +36,7 @@ import {
   type useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
+import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
 const capabilities = PLATFORM_CAPABILITIES.bitbucket;
 
@@ -55,6 +56,11 @@ export function BitbucketOverview({
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const readiness = useBitbucketReadiness(scope);
+  // Bitbucket is org-only, so the scope always names an organization, and the
+  // connect copy names it. Until the membership list resolves the name, the
+  // screen keeps its skeleton rather than painting an unfilled placeholder.
+  const orgBoundary = useOrgBoundary(scope);
+  const organizationName = orgBoundary.org?.organizationName;
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
   const { reducedMotion } = useMotionPolicy();
@@ -85,7 +91,8 @@ export function BitbucketOverview({
     );
   }
 
-  const isLoading = providerState.status === 'loading' || permissionLoading;
+  const isLoading =
+    providerState.status === 'loading' || permissionLoading || orgBoundary.isResolving;
   const connected = providerState.status === 'connected';
 
   // A connected workspace whose config read failed (no cache to fall back on),
@@ -112,6 +119,10 @@ export function BitbucketOverview({
     // the role rule refuses gets the sentence naming who can connect instead of
     // a press it cannot finish.
     const repair = readinessData === undefined ? null : bitbucketRepair(readinessData);
+    // An organization the membership list cannot resolve has no name for the
+    // connect copy, so the screen shows who can connect and offers no action
+    // that would contradict that sentence.
+    const canConnect = canEdit && organizationName !== undefined;
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
@@ -120,12 +131,12 @@ export function BitbucketOverview({
           iconSize={28}
           title={t('prReview.connect.bitbucketNotConnectedTitle')}
           description={
-            canEdit && readinessData
-              ? t('codeReviewer.bitbucketConnect.description')
+            canConnect && readinessData
+              ? t('codeReviewer.bitbucketConnect.description', { organization: organizationName })
               : t('codeReviewer.bitbucket.notConnectedReadOnly')
           }
           action={
-            canEdit && repair !== null ? (
+            canConnect && repair !== null ? (
               <StateAction
                 label={
                   repair.kind === 'replace-token'

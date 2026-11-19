@@ -500,15 +500,15 @@ describe('ModelPickerContent deferred search', () => {
 
   it('lays the clear control out as its own target frame inside the field', async () => {
     const renderer = await mount();
-    // The rounded field row: its height comes from the input's own
-    // `min-h-[44px]`, so comparing the row's class list across states proves
-    // the control's reveal cannot move the field.
+    // The bordered field row (the shared `SearchField`): its height comes from
+    // the input's own `min-h-[44px]`, so comparing the row's class list across
+    // states proves the control's reveal cannot move the field.
     const emptyFieldRows = findByType(renderer.root, 'View').filter(node =>
-      String(node.props.className).includes('rounded-full')
+      String(node.props.className).includes('rounded-md')
     );
     expect(emptyFieldRows).toHaveLength(1);
     const emptyFieldClass = String(emptyFieldRows[0]?.props.className);
-    expect(emptyFieldClass).toContain('rounded-full');
+    expect(emptyFieldClass).not.toContain('rounded-full');
 
     // Nothing typed: no control. The frame an audit measures is a node's own
     // box, and `hitSlop` never grows it, so a typed query must render a control
@@ -546,10 +546,10 @@ describe('ModelPickerContent deferred search', () => {
     expect(box.height).toBeGreaterThanOrEqual(ICON_TARGET_DP);
     expect(box.width).toBeGreaterThanOrEqual(ICON_TARGET_DP);
 
-    // Placement is the call site's logical trailing margin, not a physical one:
-    // `-me-3` is the pill's own `px-3` (10.5pt at the app's 14pt rem), so the
-    // box's trailing edge lands on the pill's edge and the whole box stays
-    // inside the pill's frame, and RTL mirrors it with the row instead of
+    // Placement is the field's logical trailing margin, not a physical one:
+    // `-me-3` is the frame's own end inset (10.5pt at the app's 14pt rem), so
+    // the box's trailing edge lands on the frame's inner edge and the whole box
+    // stays inside the field, and RTL mirrors it with the row instead of
     // pushing the box onto the wrong side. `compiledDimensions` compiles only
     // `h` / `w` / `min-h` / `min-w`, so the margin is a class check.
     expect(clear.props.className).toContain('-me-3');
@@ -558,7 +558,7 @@ describe('ModelPickerContent deferred search', () => {
     // Same field row in both states: revealing the control leaves the class
     // list — and so the height the input's `min-h-[44px]` sets — untouched.
     const typedFieldRows = findByType(renderer.root, 'View').filter(node =>
-      String(node.props.className).includes('rounded-full')
+      String(node.props.className).includes('rounded-md')
     );
     expect(typedFieldRows).toHaveLength(1);
     expect(String(typedFieldRows[0]?.props.className)).toBe(emptyFieldClass);

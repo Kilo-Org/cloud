@@ -1,11 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { type LayoutChangeEvent } from 'react-native';
+import { type LayoutChangeEvent, View } from 'react-native';
 
 import {
   MODE_TOOL_GROUPS,
   type ModeToolGroup,
 } from '@/components/organization/org-mode-form-model';
-import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
@@ -72,24 +71,26 @@ export function ModeToolsFields({
       </Section>
 
       {groups.includes('edit') ? (
-        <Card onLayout={filePatternLayout}>
-          <FormField
-            label={t('organization.modes.restrictionPattern')}
-            defaultValue={editFileRegex}
-            autoCapitalize="none"
-            autoCorrect={false}
-            disabled={disabled}
-            error={filePatternError}
-            onChangeText={onChangeFilePattern}
-          />
-          <Text variant="caption">{t('organization.modes.restrictionHint')}</Text>
+        <>
+          <View className="gap-1.5" onLayout={filePatternLayout}>
+            <FormField
+              label={t('organization.modes.restrictionPattern')}
+              defaultValue={editFileRegex}
+              autoCapitalize="none"
+              autoCorrect={false}
+              disabled={disabled}
+              error={filePatternError}
+              onChangeText={onChangeFilePattern}
+            />
+            <Text variant="caption">{t('organization.modes.restrictionHint')}</Text>
+          </View>
           <FormField
             label={t('organization.modes.restrictionLabel')}
             defaultValue={editRestrictionLabel}
             disabled={disabled}
             onChangeText={onChangeRestrictionLabel}
           />
-        </Card>
+        </>
       ) : null}
     </>
   );

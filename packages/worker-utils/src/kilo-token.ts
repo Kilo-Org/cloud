@@ -2,6 +2,7 @@ import { SignJWT } from 'jose';
 import { z } from 'zod';
 import { CloudAgentAuthoritySchema } from './cloud-agent-authority';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
+import { RuntimeAdmissionSchema } from './runtime-authorization-contract';
 import {
   assertKiloTokenIssuedAt,
   checkKiloTokenAuthorityClaims,
@@ -10,11 +11,6 @@ import {
 
 export const KILO_TOKEN_VERSION = 3;
 const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);
-const runtimeAdmission = z.object({
-  source: z.enum(['user', 'automation']),
-  authorizationUserId: z.string().min(1),
-  authorizationPepper: z.string().nullable(),
-});
 
 /**
  * All known fields that can appear in a Kilo user JWT, sourced from
@@ -40,7 +36,7 @@ export const kiloTokenPayload = z.object({
   deviceSessionId: z.string().optional(),
   // Org memberships (baked into tokens to avoid DB lookups)
   orgMemberships: z.array(z.object({ orgId: z.string(), role: organizationRole })).optional(),
-  runtimeAdmission: runtimeAdmission.optional(),
+  runtimeAdmission: RuntimeAdmissionSchema.optional(),
   runtimeAuthorization: CloudAgentNextRuntimeAuthorizationClaimSchema.optional(),
   cloudAgentAuthority: CloudAgentAuthoritySchema.optional(),
   // Standard JWT claims

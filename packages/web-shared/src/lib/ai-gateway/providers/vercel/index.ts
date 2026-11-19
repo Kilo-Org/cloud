@@ -106,6 +106,26 @@ function getVercelOnlyProvidersExcludingIgnored(
   );
 }
 
+/**
+ * The `only` list to send Vercel for the request's provider settings: the requested providers in
+ * Vercel's ids, filtered through `provider.ignore` when it is set. Without the model's cached Vercel
+ * providers, an `ignore` list that also names an `only` list is applied to that list alone, and an
+ * `ignore` list without one throws (see `getVercelOnlyProvidersExcludingIgnored`).
+ */
+function effectiveVercelOnlyProviders(
+  provider: Pick<OpenRouterProviderConfig, 'only' | 'ignore'> | undefined,
+  vercelInferenceProviders: string[] | null
+): string[] | undefined {
+  if (!provider?.ignore?.length) {
+    return provider?.only?.map(openRouterToVercelInferenceProviderId);
+  }
+  return getVercelOnlyProvidersExcludingIgnored(
+    provider.ignore,
+    provider.only,
+    vercelInferenceProviders
+  );
+}
+
 /** The `GetProviderInput` fields that decide whether Kilo's own route uses the Vercel AI Gateway. */
 export type VercelRoutingInput = {
   requestedModel: string;
@@ -129,15 +149,17 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (
-    !openRouterDisabled &&
-    !(await isVercelRoutingEnabledForModel(requestedModel)) &&
-    !(await allowsOnlyVercelProviders(requestedModel, await getRoutingProviderConfig()))
-  ) {
-    return false;
+  if (!openRouterDisabled && !(await isVercelRoutingEnabledForModel(requestedModel))) {
+    // The model is opted out, so both halves of the decision need the config. Read it once, so
+    // neither half can observe a different snapshot than the other.
+    const provider = await getRoutingProviderConfig();
+    if (!(await allowsOnlyVercelProviders(requestedModel, provider))) {
+      return false;
+    }
+    return await canRouteToVercel(requestedModel, provider);
   }
 
-  return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+  return await canRouteToVercel(requestedModel, await getRoutingProviderConfig());
 }
 
 /**
@@ -241,7 +263,7 @@ export async function isValidVercelModelId(requestedModel: string) {
  */
 export async function canRouteToVercel(
   requestedModel: string,
-  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
+  provider: OpenRouterProviderConfig | undefined
 ) {
   const vercelModels = await getVercelModelsFromDatabase();
   const vercelModelId = await mapModelIdToVercel(requestedModel);
@@ -250,7 +272,6 @@ export async function canRouteToVercel(
     return false;
   }
 
-  const provider = await getRoutingProviderConfig();
   if (provider && (provider.only || provider.ignore?.length)) {
     const { only, ignore } = provider;
     const vercelInferenceProviders =
@@ -377,16 +398,7 @@ export function convertProviderOptions(
   vercelInferenceProviders: string[] | null
 ): VercelProviderConfig {
   const provider = requestToMutate.body.provider;
-  const only = (() => {
-    if (!provider?.ignore?.length) {
-      return provider?.only?.map(openRouterToVercelInferenceProviderId);
-    }
-    return getVercelOnlyProvidersExcludingIgnored(
-      provider.ignore,
-      provider.only,
-      vercelInferenceProviders
-    );
-  })();
+  const only = effectiveVercelOnlyProviders(provider, vercelInferenceProviders);
 
   const serviceTier = requestToMutate.body.service_tier;
   return {
@@ -442,22 +454,14 @@ export async function getNonChatGatewayOptions(params: {
     provider?.only || provider?.ignore?.length
       ? await getCachedVercelInferenceProviderIdsForModel(vercelModelId)
       : null;
-  const only = (() => {
-    if (!provider?.ignore?.length) {
-      if (
-        provider?.only &&
-        !hasCompatibleVercelInferenceProvider(provider.only, vercelInferenceProviders)
-      ) {
-        return [];
-      }
-      return provider?.only?.map(openRouterToVercelInferenceProviderId);
-    }
-    return getVercelOnlyProvidersExcludingIgnored(
-      provider.ignore,
-      provider.only,
-      vercelInferenceProviders
-    );
-  })();
+  // The chat path was already vetted by `canRouteToVercel`, so it sends a mapped `only` list even
+  // when none of those providers is compatible. This path has no such check, so it rejects instead.
+  const only =
+    provider?.only &&
+    !provider.ignore?.length &&
+    !hasCompatibleVercelInferenceProvider(provider.only, vercelInferenceProviders)
+      ? []
+      : effectiveVercelOnlyProviders(provider, vercelInferenceProviders);
   if (only?.length === 0) {
     return {
       kind: 'no-eligible-provider',

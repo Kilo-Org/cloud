@@ -446,31 +446,36 @@ export function NewSessionConfigureForm({
       }}
     >
       <ScreenFooter keyboard="host">
-        {cloudCreateError && !isRemote ? (
-          <NewSessionCloudCreateError
-            failure={cloudCreateError}
-            onRetry={onRetryCloudCreate}
-            isRetryDisabled={isStartDisabled}
-          />
-        ) : null}
+        {/* One gap between the bar's blocks, and none above the first: the
+            bar's own top pad is the space under its hairline, so a short
+            window keeps that height for the form above it. */}
+        <View className="gap-3">
+          {cloudCreateError && !isRemote ? (
+            <NewSessionCloudCreateError
+              failure={cloudCreateError}
+              onRetry={onRetryCloudCreate}
+              isRetryDisabled={isStartDisabled}
+            />
+          ) : null}
 
-        {isRemote && remoteSpawnFailure !== null ? (
-          <NewSessionRemoteSpawnFailure
-            failure={remoteSpawnFailure}
-            onRetry={onRetryRemoteSpawn}
-            isRetryDisabled={isStartDisabled}
-          />
-        ) : null}
+          {isRemote && remoteSpawnFailure !== null ? (
+            <NewSessionRemoteSpawnFailure
+              failure={remoteSpawnFailure}
+              onRetry={onRetryRemoteSpawn}
+              isRetryDisabled={isStartDisabled}
+            />
+          ) : null}
 
-        <NewSessionStartButton
-          isCloneEntry={isCloneEntry}
-          isRemote={isRemote}
-          isStartDisabled={isStartDisabled}
-          isStarting={isStarting}
-          startBlockedReason={startBlockedReason}
-          startBlockedAction={startBlockedAction}
-          onStartSession={onStartSession}
-        />
+          <NewSessionStartButton
+            isCloneEntry={isCloneEntry}
+            isRemote={isRemote}
+            isStartDisabled={isStartDisabled}
+            isStarting={isStarting}
+            startBlockedReason={startBlockedReason}
+            startBlockedAction={startBlockedAction}
+            onStartSession={onStartSession}
+          />
+        </View>
       </ScreenFooter>
     </View>
   );

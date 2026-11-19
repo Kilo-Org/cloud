@@ -1,5 +1,5 @@
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { Search, Share2, Terminal } from '@/components/ui/icons';
+import { Share2, Terminal } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -12,9 +12,9 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Input } from '@/components/ui/input';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -39,28 +39,6 @@ type ShareDestinationListProps = {
   destinationsDisabled: boolean;
   onSpawnInstance: (row: ShareCliSpawnRow) => void;
 };
-
-function DestinationSearch({ onChange }: { onChange: (next: string) => void }) {
-  const colors = useThemeColors();
-  const { t } = useTranslation();
-  return (
-    <View className="mx-4 mb-3 mt-1 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
-      <Search size={18} color={colors.mutedForeground} />
-      <Input
-        placeholder={t('share.searchPlaceholder')}
-        placeholderTextColor={colors.mutedForeground}
-        autoCapitalize="none"
-        autoCorrect={false}
-        clearButtonMode="while-editing"
-        returnKeyType="search"
-        className="flex-1 pl-0 pr-0 text-base text-foreground"
-        style={{ color: colors.foreground }}
-        onChangeText={onChange}
-        accessibilityLabel={t('share.searchPlaceholder')}
-      />
-    </View>
-  );
-}
 
 function SkeletonRows() {
   return (
@@ -273,7 +251,14 @@ export function ShareDestinationList({
     <>
       <View collapsable={false} className="bg-background">
         {headerContent}
-        {showSearch ? <DestinationSearch onChange={setSearch} /> : null}
+        {showSearch ? (
+          <SearchField
+            className="mx-4 mb-3 mt-1"
+            placeholder={t('share.searchPlaceholder')}
+            hasText={search !== ''}
+            onChangeText={setSearch}
+          />
+        ) : null}
       </View>
       {body}
     </>

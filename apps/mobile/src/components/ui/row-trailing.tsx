@@ -76,6 +76,13 @@ export type RowTrailingSpec =
       onPress: () => void;
       disabled?: boolean;
       /**
+       * The label's ink. `primary` (default) is the accent a screen's one text
+       * action carries; `neutral` is for a list that repeats the same action
+       * on every row, where a column of accent labels would be the strongest
+       * colour on the screen (DESIGN.md: keep the brand yellow scarce).
+       */
+      tone?: 'primary' | 'neutral';
+      /**
        * Replaces the derived disabled-only state. An action whose work is in
        * flight passes its own, so the cell announces `busy` while it keeps the
        * label and the name that say what is running.
@@ -176,7 +183,10 @@ export function renderRowTrailing(trailing: RowTrailingSpec | undefined): ReactN
         >
           <Text
             variant="mono"
-            className={cn(trailing.disabled ? 'text-muted-foreground' : 'text-primary')}
+            className={cn(
+              trailing.disabled && 'text-muted-foreground',
+              !trailing.disabled && (trailing.tone === 'neutral' ? 'text-ink2' : 'text-primary')
+            )}
           >
             {trailing.label}
           </Text>

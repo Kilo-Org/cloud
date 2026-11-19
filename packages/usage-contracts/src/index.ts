@@ -7,6 +7,8 @@ import { z } from 'zod';
 import type { EnkryptUsageQueueMessage } from './enkrypt';
 import type { ExaUsageQueueMessage } from './exa';
 
+export const USAGE_CLASS_LIMIT_HEADER = 'x-usage-class-limit';
+
 export {
   ABUSE_CLASSIFICATION,
   GatewayApiKindSchema,

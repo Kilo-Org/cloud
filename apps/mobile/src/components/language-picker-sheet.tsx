@@ -327,12 +327,12 @@ export function LanguagePickerSheet({
       </PickerSheet>
     );
   }
-  // The field lives in `@/components/language-search-field`: the pill chrome
-  // and the shared single-line `Input`, extracted to keep this sheet within
-  // its max-lines budget.
+  // The field lives in `@/components/language-search-field`, the shared
+  // `SearchField`, extracted to keep this sheet within its max-lines budget.
   const searchField = (
     <LanguageSearchField
       editable={!busy}
+      hasText={query !== ''}
       inputRef={searchInputRef}
       draftRef={searchTextRef}
       onChangeText={text => {

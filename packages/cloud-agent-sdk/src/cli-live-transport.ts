@@ -7,6 +7,7 @@ import {
   replaySnapshotPage,
   sessionSnapshotFailureMessage,
   snapshotPageFromSnapshot,
+  type SessionSnapshotFailure,
 } from './snapshot-page';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
 import {
@@ -67,7 +68,7 @@ type CliLiveTransportConfig = {
    * older-messages cursor is never reset to the latest 50.
    */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
-  onError?: ((message: string) => void) | undefined;
+  onError?: ((message: string, failure?: SessionSnapshotFailure) => void) | undefined;
   onRemoteModelStateChange?: ((state: RemoteModelState) => void) | undefined;
   onRemoteCommandStateChange?: ((state: RemoteCommandState) => void) | undefined;
   onCapabilityChange?: (() => void) | undefined;
@@ -254,11 +255,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       return deepCopyCommands(lastValidCommands);
     }
 
-    function setOwnerConnectionId(nextOwnerConnectionId: string | null): void {
-      if (ownerConnectionId === nextOwnerConnectionId) return;
-
-      const previousOwnerConnectionId = ownerConnectionId;
-      ownerConnectionId = nextOwnerConnectionId;
+    // One definition of what "the owner changed" means for model state, command
+    // state, capabilities and the command cache. Callers own only the state that
+    // is specific to their path, and must assign `ownerConnectionId` first.
+    function resetOwnerState(previousOwnerConnectionId: string | null): void {
       // A new (or absent) owner gets a fresh self-healing budget.
       resetModelDiscoveryBudget();
       catalogRequestGeneration += 1;
@@ -266,16 +266,16 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       commandCatalogRequestGeneration += 1;
       commandCatalogRequestInFlight = null;
       publishRemoteModelState({
-        ownerConnectionId: nextOwnerConnectionId,
+        ownerConnectionId,
         protocol: 'unknown',
-        refresh: nextOwnerConnectionId ? 'loading' : 'idle',
+        refresh: ownerConnectionId ? 'loading' : 'idle',
       });
       // Owner replacement clears the command cache; emit an empty catalog
       // event and the matching idle state so consumers can re-render. A
       // transition from no owner preserves whatever cache exists.
       if (previousOwnerConnectionId) publishCommands([]);
       publishRemoteCommandState({
-        ownerConnectionId: nextOwnerConnectionId,
+        ownerConnectionId,
         refresh: 'idle',
         commands: snapshotCommands(),
         canExitSession: undefined,
@@ -287,6 +287,14 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       // also drives the existing 'idle' reset on the consumer side.
       publishCapabilities(undefined);
       config.onCapabilityChange?.();
+    }
+
+    function setOwnerConnectionId(nextOwnerConnectionId: string | null): void {
+      if (ownerConnectionId === nextOwnerConnectionId) return;
+
+      const previousOwnerConnectionId = ownerConnectionId;
+      ownerConnectionId = nextOwnerConnectionId;
+      resetOwnerState(previousOwnerConnectionId);
 
       if (nextOwnerConnectionId) {
         discoverModels(nextOwnerConnectionId);
@@ -431,6 +439,21 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
     }
 
+    function publishCommandFailure(
+      expectedOwnerConnectionId: string,
+      refresh: RemoteCommandState['refresh'],
+      options?: { message?: string | undefined; clearCatalog?: boolean | undefined }
+    ): void {
+      if (options?.clearCatalog) publishCommands([]);
+      publishRemoteCommandState({
+        ownerConnectionId: expectedOwnerConnectionId,
+        refresh,
+        commands: snapshotCommands(),
+        canExitSession: undefined,
+        ...(options?.message !== undefined ? { message: options.message } : {}),
+      });
+    }
+
     function handleCommandCatalogFailure(
       error: unknown,
       expectedOwnerConnectionId: string,
@@ -459,13 +482,9 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       // composer can prompt the user to upgrade. Never populate the global
       // session error atom for this.
       if (error instanceof UserWebCommandError && error.code === 'CLI_UPGRADE_REQUIRED') {
-        publishCommands([]);
-        publishRemoteCommandState({
-          ownerConnectionId: expectedOwnerConnectionId,
-          refresh: 'upgrade-required',
-          commands: snapshotCommands(),
-          canExitSession: undefined,
+        publishCommandFailure(expectedOwnerConnectionId, 'upgrade-required', {
           message: error.message,
+          clearCatalog: true,
         });
         return;
       }
@@ -473,38 +492,22 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       // Legacy CLI without `list_commands` support: treat as "no commands
       // available" rather than a failure so the composer can hide suggestions.
       if (error instanceof Error && error.message.includes('unknown command')) {
-        publishCommands([]);
-        publishRemoteCommandState({
-          ownerConnectionId: expectedOwnerConnectionId,
-          refresh: 'idle',
-          commands: snapshotCommands(),
-          canExitSession: undefined,
-        });
+        publishCommandFailure(expectedOwnerConnectionId, 'idle', { clearCatalog: true });
         return;
       }
 
       const message = error instanceof Error ? error.message : 'Failed to discover remote commands';
       if (clearCatalog) {
-        publishCommands([]);
-        publishRemoteCommandState({
-          ownerConnectionId: expectedOwnerConnectionId,
-          refresh: 'error',
-          commands: snapshotCommands(),
-          canExitSession: undefined,
+        publishCommandFailure(expectedOwnerConnectionId, 'error', {
           message,
+          clearCatalog: true,
         });
         return;
       }
       // Transient failure on a same-owner refresh: keep the previously
       // published catalog and report the error through state without
       // populating the fatal session error atom.
-      publishRemoteCommandState({
-        ownerConnectionId: expectedOwnerConnectionId,
-        refresh: 'error',
-        commands: snapshotCommands(),
-        canExitSession: undefined,
-        message,
-      });
+      publishCommandFailure(expectedOwnerConnectionId, 'error', { message });
     }
 
     function discoverCommands(expectedOwnerConnectionId: string): void {
@@ -769,32 +772,25 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       cleanup = null;
     }
 
+    // Teardown shared by `disconnect()` and `destroy()`: the generation bump
+    // must happen before the owner reset so in-flight discovery results are
+    // rejected.
+    function detach(): void {
+      generation += 1;
+      setOwnerConnectionId(null);
+      releaseConnection();
+    }
+
     return {
       connect() {
         generation += 1;
         const expectedGeneration = generation;
         releaseConnection();
-        resetModelDiscoveryBudget();
         sessionStopped = false;
-        ownerConnectionId = null;
         lastForwardedHeartbeatStatus = null;
-        catalogRequestGeneration += 1;
-        catalogRequestInFlight = null;
-        commandCatalogRequestGeneration += 1;
-        commandCatalogRequestInFlight = null;
-        publishCapabilities(undefined);
-        publishRemoteModelState({
-          ownerConnectionId: null,
-          protocol: 'unknown',
-          refresh: 'idle',
-        });
-        publishRemoteCommandState({
-          ownerConnectionId: null,
-          refresh: 'idle',
-          commands: snapshotCommands(),
-          canExitSession: undefined,
-        });
-        config.onCapabilityChange?.();
+        const previousOwnerConnectionId = ownerConnectionId;
+        ownerConnectionId = null;
+        resetOwnerState(previousOwnerConnectionId);
         let resyncTimer: ReturnType<typeof setTimeout> | null = null;
 
         let bufferedCliEvents: UserWebCliEvent[] | null = [];
@@ -844,7 +840,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             replaySnapshotPage(sink, page);
             drainBufferedCliEvents();
           };
-          const onError = (error: unknown): void => {
+          const onError = (error: unknown, failure?: SessionSnapshotFailure): void => {
             if (
               expectedGeneration !== generation ||
               expectedSnapshotReplayGeneration !== snapshotReplayGeneration
@@ -853,7 +849,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             }
             if (reportError) {
               const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
-              config.onError?.(message);
+              config.onError?.(message, failure);
             }
             bufferedCliEvents = [
               ...bufferedEventsFromSupersededSnapshot,
@@ -873,7 +869,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
                 onError(new Error('Session not found'));
                 return;
               }
-              onError(new Error(sessionSnapshotFailureMessage(page.kind)));
+              const failure = sessionSnapshotFailureMessage(page.kind);
+              onError(new Error(failure.message), failure);
             }, onError);
             return;
           }
@@ -1107,15 +1104,11 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         }),
 
       disconnect() {
-        generation += 1;
-        setOwnerConnectionId(null);
-        releaseConnection();
+        detach();
       },
 
       destroy() {
-        generation += 1;
-        setOwnerConnectionId(null);
-        releaseConnection();
+        detach();
       },
     };
   };

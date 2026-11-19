@@ -42,6 +42,26 @@ describe('normalize', () => {
     });
   });
 
+  it.each([
+    'The message was interrupted by the user',
+    '[BYOK] The message was interrupted by the user',
+  ])('maps the worker user-interrupt string %j to MessageAbortedError', error => {
+    expect(
+      normalizeCliEvent('message.updated', {
+        info: {
+          id: 'msg_assistant',
+          sessionID: 'ses_root',
+          role: 'assistant',
+          time: { created: 1 },
+          error,
+        },
+      })
+    ).toMatchObject({
+      type: 'message.updated',
+      info: { error: { name: 'MessageAbortedError', data: { message: error } } },
+    });
+  });
+
   describe('envelope unwrapping', () => {
     it('unwraps kilocode-wrapped events', () => {
       const raw = createKilocode('session.idle', { sessionID: 'sid-1' });

@@ -10,7 +10,11 @@ import type {
   KiloGatewayToolCallRequest,
   KiloGatewayToolDefinition,
 } from './kilo-api-client';
-import { runLlmTurn } from './agent-llm-turn-runner-core';
+import {
+  runLlmTurn,
+  STOPPED_MESSAGE,
+  TARGET_TAB_UNAVAILABLE_ABORT_REASON,
+} from './agent-llm-turn-runner-core';
 import { buildGatewayMessagesFromEvents } from './agent-llm-harness';
 
 const kiloApiClientMocks = vi.hoisted(() => ({
@@ -1290,6 +1294,263 @@ describe('continue nudge', () => {
     await runLlmTurn(nudgeOptions(fetch, []));
 
     expect(calls).toBe(3);
+  });
+
+  it('does not nudge a final answer that asks the user to act before it can continue', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      if (calls === 2) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"The tab stays with another Kilo session. Please stop that session or choose another tab, and I\'ll read the page."},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"I still cannot read the page."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+    const appended: AgentConversationEvent[] = [];
+
+    await runLlmTurn(nudgeOptions(fetch, appended));
+
+    // The answer is complete and waiting on the user; a nudge bills a second request for a duplicate paragraph.
+    expect(calls).toBe(2);
+    const appendedTexts = appended.flatMap(event => (event.type === 'message' ? [event.text] : []));
+    expect(appendedTexts).toHaveLength(1);
+    expect(appendedTexts[0]).toContain('another Kilo session');
+  });
+
+  it('still nudges an announcement decorated with a bullet, emphasis or an opener', async () => {
+    const shapes = [
+      "Sure — I'll create the workflow now.",
+      "**I'll** save that as a workflow.",
+      "- I'll search the page next.",
+      '1. First, I will open the page.',
+      "Sure thing: I'll extract the prices.",
+      "All right, I'll open the page.",
+      "Got it — I'll snapshot the page now.",
+      "Sounds good, I'll create the workflow.",
+      'Of course, let me check the page first.',
+      'No problem, I am going to read the page.',
+      'Will do: I will create the workflow.',
+      "Now, I'll create the workflow now.",
+      "Next, I'll search the page.",
+    ];
+    const callsPerShape: number[] = [];
+
+    for (const shape of shapes) {
+      let calls = 0;
+      const fetch: FetchLike = () => {
+        calls += 1;
+        if (calls === 1) {
+          return Promise.resolve(
+            streamResponse([
+              'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+              'data: [DONE]\n\n',
+            ])
+          );
+        }
+        if (calls === 2) {
+          return Promise.resolve(
+            streamResponse([
+              `data: {"choices":[{"delta":{"content":${JSON.stringify(shape)}},"finish_reason":"stop"}]}\n\n`,
+              'data: [DONE]\n\n',
+            ])
+          );
+        }
+
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"Saved."},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      };
+
+      // eslint-disable-next-line no-await-in-loop -- one turn per shape, in order, so the same fixture cannot leak state.
+      await runLlmTurn(nudgeOptions(fetch, []));
+      callsPerShape.push(calls);
+    }
+
+    // A nudged turn bills one extra request, so three calls means the decoration did not hide the announcement.
+    expect(callsPerShape).toStrictEqual(shapes.map(() => 3));
+  });
+
+  it('does not nudge a settled answer that merely opens with an opener word', async () => {
+    const settled = [
+      'Sure thing, the page is already open and idle.',
+      'All right, the page is idle now.',
+      'Got it - the results are already visible.',
+      'No problem, the page shows the submitted status.',
+      'Now the page shows the submitted status.',
+      'Next, the results are already visible and complete.',
+      'The tab stays with another Kilo session. Please stop that session or choose another tab, and I will read the page.',
+    ];
+    const callsPerShape: number[] = [];
+
+    for (const shape of settled) {
+      let calls = 0;
+      const fetch: FetchLike = () => {
+        calls += 1;
+        if (calls === 1) {
+          return Promise.resolve(
+            streamResponse([
+              'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+              'data: [DONE]\n\n',
+            ])
+          );
+        }
+
+        return Promise.resolve(
+          streamResponse([
+            `data: {"choices":[{"delta":{"content":${JSON.stringify(shape)}},"finish_reason":"stop"}]}\n\n`,
+            'data: [DONE]\n\n',
+          ])
+        );
+      };
+
+      // eslint-disable-next-line no-await-in-loop -- one turn per shape, in order, so the same fixture cannot leak state.
+      await runLlmTurn(nudgeOptions(fetch, []));
+      callsPerShape.push(calls);
+    }
+
+    // Two calls means the tool round plus the settled answer, with no nudge billed on top.
+    expect(callsPerShape).toStrictEqual(settled.map(() => 2));
+  });
+
+  it('does not nudge a completing sign-off that offers to keep helping', async () => {
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"The page heading is CLI-TAKE PAGE. Let me know if you want more detail."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn(nudgeOptions(fetch, []));
+
+    expect(calls).toBe(2);
+  });
+});
+
+describe('target tab closed during a turn', () => {
+  const tabClosedOptions = (signal: AbortSignal, appended: AgentConversationEvent[]) => ({
+    apiBaseUrl: 'https://app.kilo.ai',
+    appendEvents: (events: AgentConversationEvent[]) => appended.push(...events),
+    conversationEvents: [createUserMessage('Inspect this page')],
+    executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: 'snap' } }),
+    fetch: (() =>
+      Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      )) satisfies FetchLike,
+    maxToolRounds: 4,
+    model: 'kilo-auto/efficient',
+    noResponseMessage: 'no response',
+    signal,
+    toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+      toolCalls.map(toolCall =>
+        createToolCall({
+          arguments: {},
+          name: 'kilo_browser_snapshot',
+          providerToolCallId: toolCall.id,
+          tabId: 1,
+        })
+      ),
+    token: 'token',
+    tooManyToolRoundsMessage: 'too many rounds',
+    tools: [getPageSnapshotTool],
+    updateAssistantMessage: () => {},
+    updateThinkingBlock: () => {},
+  });
+
+  it('says the target tab went away instead of reporting a Stop the user never pressed', async () => {
+    const abort = new AbortController();
+    const appended: AgentConversationEvent[] = [];
+
+    abort.abort(TARGET_TAB_UNAVAILABLE_ABORT_REASON);
+    await runLlmTurn({
+      ...tabClosedOptions(abort.signal, appended),
+      executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: 'snap' } }),
+    });
+
+    const lastEvent = appended.at(-1);
+    // Pinned as words, not against the constant: a constant compared to itself survives any regression.
+    expect(lastEvent).toMatchObject({ role: 'assistant', type: 'message' });
+    expect(lastEvent?.type === 'message' ? lastEvent.text : '').toContain('no longer available');
+    expect(lastEvent?.type === 'message' ? lastEvent.text : '').toContain(
+      'Open or pick a tab, then ask again.'
+    );
+  });
+
+  it('says the target tab went away when the abort lands mid-stream', async () => {
+    const abort = new AbortController();
+    const appended: AgentConversationEvent[] = [];
+    const fetch: FetchLike = () => {
+      abort.abort(TARGET_TAB_UNAVAILABLE_ABORT_REASON);
+      const error = new Error('The user aborted a request.');
+      error.name = 'AbortError';
+      return Promise.reject(error);
+    };
+
+    await runLlmTurn({ ...tabClosedOptions(abort.signal, appended), fetch });
+
+    const lastEvent = appended.at(-1);
+    expect(lastEvent).toMatchObject({ role: 'assistant', type: 'message' });
+    expect(lastEvent?.type === 'message' ? lastEvent.text : '').toContain('no longer available');
+    expect(lastEvent?.type === 'message' ? lastEvent.text : '').not.toBe(STOPPED_MESSAGE);
+  });
+
+  it('keeps the plain Stopped text when the user pressed Stop', async () => {
+    const abort = new AbortController();
+    const appended: AgentConversationEvent[] = [];
+
+    abort.abort();
+    await runLlmTurn(tabClosedOptions(abort.signal, appended));
+
+    expect(appended.at(-1)).toMatchObject({ role: 'assistant', text: STOPPED_MESSAGE });
+  });
+
+  it('keeps the plain Stopped text when the user stops mid-stream', async () => {
+    const abort = new AbortController();
+    const appended: AgentConversationEvent[] = [];
+    const fetch: FetchLike = () => {
+      abort.abort();
+      const error = new Error('The user aborted a request.');
+      error.name = 'AbortError';
+      return Promise.reject(error);
+    };
+
+    await runLlmTurn({ ...tabClosedOptions(abort.signal, appended), fetch });
+
+    expect(appended.at(-1)).toMatchObject({ role: 'assistant', text: STOPPED_MESSAGE });
   });
 });
 

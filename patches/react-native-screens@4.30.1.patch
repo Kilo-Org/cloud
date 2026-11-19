@@ -1,3 +1,17 @@
+diff --git a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
+index 885c2b0..31b6824 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
+@@ -161,6 +161,9 @@ class DimmingViewManager(
+                     ViewGroup.LayoutParams.MATCH_PARENT,
+                     ViewGroup.LayoutParams.MATCH_PARENT,
+                 )
++            // The tap-outside listener makes this full-window view a clickable node with no label.
++            // Screen reader users close the sheet with Back or the sheet's own close control.
++            importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
+             setOnClickListener {
+                 if (screen.sheetClosesOnTouchOutside) {
+                     (screen.fragment as ScreenStackFragment).dismissSelf()
 diff --git a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt
 index 8004079..4bb4e2d 100644
 --- a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt

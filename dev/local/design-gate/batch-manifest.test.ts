@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  classifyDump,
+  expectationMismatch,
   MANIFEST_COLUMNS,
   parseManifest,
   readManifest,
@@ -177,4 +179,27 @@ test('a failed seed step keeps its error line, and a missing declared key fails 
     'exit 1: Seed runner failed: Error: Failed query: insert into "security_findings"'
   );
   assert.equal(map.steps['security-org-scopes']?.error, 'printed no organizationId');
+});
+
+test('a titled not-found screen meets a not-found row', () => {
+  // T2-G04 on iOS: /(3_profile)/triggers/not-a-seeded-trigger settles on the
+  // trigger screen's own not-found state, titled with what was not found.
+  const state = classifyDump([
+    { text: 'Profile' },
+    { label: 'Profile, tab, 4 of 4' },
+    { text: 'Triggers & webhooks' },
+    { text: 'not-a-seeded-trigger' },
+    { text: 'Trigger not found' },
+  ]);
+  assert.equal(state.notFound, true);
+  assert.equal(
+    expectationMismatch(
+      { kind: 'not-found', screen: '(app)/(tabs)/(3_profile)/triggers/[trigger-id]' },
+      '(app)/(tabs)/(3_profile)/triggers/[trigger-id]',
+      state
+    ),
+    undefined
+  );
+  // Text that only mentions the phrase mid-sentence is not the state.
+  assert.equal(classifyDump([{ text: 'Not found items are listed below' }]).notFound, false);
 });

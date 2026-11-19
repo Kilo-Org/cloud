@@ -1231,6 +1231,119 @@ describe('a second question while the first is being answered', () => {
   });
 });
 
+describe('an answer the person stops', () => {
+  /** What each drawn bubble says, by who said it. */
+  const said = (sessionId: string) =>
+    asMessages(snapshotOf(sessionId)).map(message => [
+      message.info.role,
+      message.parts.flatMap(part => (part.type === 'text' ? [part.text] : [])).join(''),
+    ]);
+
+  it('keeps the words that had arrived under the question, and writes them down', async () => {
+    storedHistory = [];
+    await say(opened, { text: 'tell a story', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    emitEvent?.({ kind: 'delta', text: ' once upon a time' });
+    await settled();
+
+    await stopChat(opened);
+    await settled();
+
+    expect(said(opened)).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'ok once upon a time'],
+    ]);
+    const written = await askedIn(opened);
+    expect(written?.answer).toBe('ok once upon a time');
+  });
+
+  it('keeps the words with the question when a later send takes its slot', async () => {
+    storedHistory = [];
+    await say(opened, { text: 'tell a story', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await stopChat(opened);
+    await settled();
+
+    await say(opened, { text: 'something else', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.answer)).toEqual(['ok']);
+    const written = await keptIn(opened);
+    expect(written.map(one => one.answer)).toEqual(['ok']);
+    expect(said(opened).slice(0, 3)).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'ok'],
+      ['user', 'something else'],
+    ]);
+  });
+
+  it('draws the written words again when the chat opens', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('stopped', place);
+    storedQuestions.set(
+      'chat-asked-target:stopped',
+      JSON.stringify({
+        text: 'tell a story',
+        model: 'kilo/one',
+        effort: null,
+        images: [],
+        answer: 'once upon a time',
+      })
+    );
+
+    await enterChat(place, 'stopped');
+    await settled();
+
+    expect(said('stopped')).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'once upon a time'],
+    ]);
+  });
+
+  it('drops the words of an earlier attempt once the question is asked again', async () => {
+    storedHistory = [];
+    await say(opened, { text: 'tell a story', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await stopChat(opened);
+    await settled();
+
+    await retryChat(opened);
+    await settled();
+
+    // The new attempt's words arrive in the answer, not under the question.
+    expect(snapshotOf(opened).askedAnswer).toBeNull();
+    expect(said(opened)).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'ok'],
+    ]);
+    expect(asMessages(snapshotOf(opened)).at(-1)?.info.id).toBe(`${opened}:answering`);
+  });
+
+  it('keeps the words that had arrived when the stream fails, with the failure and a Retry', async () => {
+    storedHistory = [];
+    await say(opened, { text: 'tell a story', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    emitEvent?.({ kind: 'delta', text: ' once upon a time' });
+    await settled();
+
+    crash?.();
+    await settled();
+
+    const held = snapshotOf(opened);
+    expect(held.status).toBe('idle');
+    expect(held.failureKey).not.toBeNull();
+    expect(held.asked).toBe('tell a story');
+    expect(said(opened)).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'ok once upon a time'],
+    ]);
+    const written = await askedIn(opened);
+    expect(written?.answer).toBe('ok once upon a time');
+    expect(written?.failureKey).toBe(held.failureKey);
+  });
+});
+
 describe('a question with images', () => {
   const image = { media: 'image/jpeg', data: 'AAAA' };
 

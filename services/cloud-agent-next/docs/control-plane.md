@@ -2313,6 +2313,26 @@ under the row lock, applies the existing `status_transition_id` ordering, and
 broadcasts `session.status.updated` through the existing UserConnectionDO. A browser
 still uses one user-level WebSocket for the whole sidebar, not one per session.
 
+Kilo v2 has no session-ingest client, so the same publication also carries what that
+client writes for Kilo v1. `lastActivityAt` is the receipt time of the latest event
+that wrote the transcript (`TRANSCRIPT_EVENT_TYPES` in `list-status.ts`); ingest
+moves `cli_sessions_v2.last_activity_at` forward only, which keeps a working chat in
+the active-session list and dates its row. It rides status changes and refreshes,
+each at most once a minute: busy and retry refresh on any event, and any other
+status refreshes when transcript activity is newer than the last snapshot, so a
+wait on input while subagents keep working still proves the session live.
+`rename` is a native rename of the root: a root `conversation.source` whose source
+names the root too (one naming another session is never stored), whose session title
+differs from the stored source and is not a creation placeholder. A rename forces a
+snapshot and stays in newer snapshots
+until one is delivered, naming the snapshot that first carried it. Ingest applies it
+like a CLI rename report (it replaces a generated title), with a `session.updated`
+notification, in the status transaction and only while the stored
+`status_transition_id` is older than that first snapshot: a late publication cannot
+replace a newer rename, and a repeat of a delivered rename cannot replace a later user
+rename. Kilo v1 never sends `conversation.source`: its CLI keeps reporting its own
+titles.
+
 Publication has one durable, coalescing latest-status obligation per Session DO.
 Its monotonic ULID cursor survives eviction and clock rollback. Each RPC has a
 5-second deadline and failed publication retries on the shared alarm after 30

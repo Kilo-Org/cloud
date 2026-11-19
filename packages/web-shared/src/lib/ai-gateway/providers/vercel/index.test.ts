@@ -355,7 +355,7 @@ describe('shouldRouteToVercel', () => {
       })),
     }));
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
       getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => openRouterModels),
       resolveOpenRouterModelAlias: jest.fn(
@@ -641,7 +641,9 @@ describe('canRouteToVercel', () => {
   async function loadCanRouteToVercel(vercelInferenceProviders: string[] | null = ['anthropic']) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(
+        async () => new Set(['anthropic/claude-sonnet-4.5'])
+      ),
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel')).canRouteToVercel;
@@ -695,7 +697,7 @@ describe('isValidVercelModelId', () => {
   }) {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
       isValidOpenRouterModelId: jest.fn(
         async (modelId: string) =>
           legacyOpenRouterAliases.has(modelId) || openRouterModelIds.includes(modelId)
@@ -1216,7 +1218,7 @@ describe('applyVercelSettings managed requests', () => {
       .mockResolvedValue(vercelInferenceProviders);
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getCachedVercelInferenceProviderIdsForModel: getVercelInferenceProvidersMock,
-      getVercelModelsFromDatabase: jest.fn(),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(),
     }));
     const { applyVercelSettings: applyManagedSettings } =
       await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel');
@@ -1370,7 +1372,7 @@ describe('applyVercelSettings session affinity', () => {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['vertex', 'bedrock']),
-      getVercelModelsFromDatabase: jest.fn(),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
       .applyVercelSettings;
@@ -1432,7 +1434,7 @@ describe('getNonChatGatewayOptions', () => {
     jest.resetModules();
     jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
-      getVercelModelsFromDatabase: jest.fn(),
+      getVercelLanguageModelIdsFromDatabase: jest.fn(),
     }));
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
       .getNonChatGatewayOptions;

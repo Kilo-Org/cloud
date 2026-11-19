@@ -52,6 +52,39 @@ export function clearPostedNeedsInputNotification(kiloSessionId: string): void {
   postedSessions.delete(kiloSessionId);
 }
 
+// The result of an inline reply to a notification the app did not post (a
+// server push), by session. The result replaces that notification in place,
+// under its OS-assigned identifier, so the session's own identifier does not
+// name it. The plan retires it with the session's raise. In-memory like the
+// posted marker: a fresh process has none to retire.
+const replyResults = new Map<string, string>();
+
+/** Record that a reply's result is on screen under an identifier the session does not own. */
+export function markNeedsInputReplyResult(kiloSessionId: string, identifier: string): void {
+  replyResults.set(kiloSessionId, identifier);
+}
+
+/**
+ * Dismiss the session's recorded reply result, when it has one: it belongs to
+ * the session's raise, so it ends with it. A failure goes to `report` and the
+ * raise's own dismissal or post carries on.
+ */
+export async function retireNeedsInputReplyResult(
+  kiloSessionId: string,
+  report: (error: unknown) => void
+): Promise<void> {
+  const identifier = replyResults.get(kiloSessionId);
+  if (identifier === undefined) {
+    return;
+  }
+  replyResults.delete(kiloSessionId);
+  try {
+    await Notifications.dismissNotificationAsync(identifier);
+  } catch (error) {
+    report(error);
+  }
+}
+
 /**
  * What the OS says about the app's own needs-input notification for a session.
  * `unknown` means the OS could not be asked; a caller must never withhold a

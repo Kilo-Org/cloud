@@ -39,7 +39,7 @@ import {
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
-import { upsertByRequestId } from './pending-requests';
+import { removePendingRequest, upsertByRequestId } from './pending-requests';
 import { replayStoredMessages } from './snapshot-page';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
@@ -77,6 +77,8 @@ import type {
   PreparationAttempt,
   SessionCommit,
   SessionConfig,
+  FetchedSessionData,
+  AssociatedPrData,
 } from './types';
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import { splitByContiguousPrefix } from './array-utils';
@@ -334,57 +336,6 @@ function chatEventSessionId(event: NormalizedEvent): string | null {
       return null;
   }
 }
-
-type AssociatedPrData = {
-  url: string;
-  number: number;
-  state: string;
-  title: string | null;
-  headSha: string | null;
-  lastSyncedAt: string;
-  /** PR host (`github`, `gitlab`, …). Populated from `cli_sessions_v2.platform`. */
-  platform?: string | undefined;
-  reviewDecision: 'approved' | 'changes_requested' | 'review_required' | null;
-  reviewDecisionPending: boolean;
-};
-
-type FetchedSessionData = {
-  kiloSessionId: KiloSessionId;
-  cloudAgentSessionId: CloudAgentSessionId | null;
-  title: string | null;
-  organizationId: string | null;
-  gitUrl: string | null;
-  gitBranch: string | null;
-  worktreeId?: string | null;
-  mode: string | null;
-  environmentId?: string | null;
-  model: string | null;
-  variant: string | null;
-  repository: string | null;
-  isInitiated: boolean;
-  isPreparingAsync: boolean;
-  /**
-   * Whether the session currently has a ready route that can own a terminal.
-   * Undefined when the adapter cannot resolve route state. Persisted
-   * `preparedAt`/`initiatedAt` are NOT readiness: a stopped sandbox clears the
-   * route while leaving both set.
-   */
-  routeReady?: boolean;
-  prompt: string | null;
-  initialMessageId: string | null;
-  /** Installed custom agents, including picker visibility and model overrides. */
-  runtimeAgents?: SessionConfig['runtimeAgents'];
-  associatedPr: AssociatedPrData | null;
-  totalCostMicrodollars?: number | null;
-  /** Origin platform (`created_on_platform`). Populated by the mobile adapter only. */
-  createdOnPlatform?: string | null;
-  /**
-   * The profile the session was prepared with, as recorded on the session row.
-   * Null for a session created before profile recording, or one whose create
-   * origin resolved no profile. Populated by the mobile and extension adapters.
-   */
-  profileId?: string | null;
-};
 
 type PrepareInput = {
   prompt: string;
@@ -1129,15 +1080,6 @@ function sameRequestIds(
   return a.every((entry, index) => entry.requestId === b[index]?.requestId);
 }
 
-function removePendingRequest<T extends { requestId: string }>(
-  list: readonly T[],
-  requestId: string
-): readonly T[] {
-  return list.some(entry => entry.requestId === requestId)
-    ? list.filter(entry => entry.requestId !== requestId)
-    : list;
-}
-
 /**
  * Composer readiness from the session's cloud status. No reported status yet,
  * a settled agent, or a failed cloud status all count as ready; an active
@@ -1155,6 +1097,83 @@ function isCloudReady(
     (sessionType === 'cloud-agent' &&
       (cloudStatus.type === 'preparing' || cloudStatus.type === 'finalizing'))
   );
+}
+
+/**
+ * Build the transport payload for one send from the snapshot values `send`
+ * captured before any await. Pure: no atom reads, no state writes — the
+ * branch shape and model precedence must stay in lockstep with the
+ * prompt/command sends in `send`.
+ */
+function buildTransportPayload(args: {
+  payload: SessionManagerSendPayload;
+  sessionType: ActiveSessionType | null;
+  remoteModelOverride: RemoteModelOverride | null;
+  cloudAgentModelOverride: CloudAgentModelOverride | null;
+  sessionConfig: SessionConfig | null;
+}): TransportSendPayload {
+  const {
+    payload: input,
+    sessionType,
+    remoteModelOverride,
+    cloudAgentModelOverride,
+    sessionConfig,
+  } = args;
+  if (input.type === 'command') {
+    if (sessionType === 'remote') {
+      return {
+        type: 'command',
+        command: input.command,
+        arguments: input.arguments,
+      };
+    }
+    // Mirror prompt sends: the in-session override wins over the payload,
+    // so a stale composer selection cannot bypass this source of truth.
+    const cloudModel = cloudAgentModelOverride?.model ?? input.model;
+    const cloudVariant = cloudAgentModelOverride ? cloudAgentModelOverride.variant : input.variant;
+    return {
+      type: 'command',
+      command: input.command,
+      arguments: input.arguments,
+      ...(input.mode ? { mode: input.mode } : {}),
+      ...(cloudModel ? { model: { providerID: 'kilo', modelID: cloudModel } } : {}),
+      ...(cloudModel && cloudVariant ? { variant: cloudVariant } : {}),
+    };
+  }
+  if (sessionType === 'remote') {
+    return {
+      type: 'prompt',
+      prompt: input.prompt,
+      ...(input.mode ? { mode: input.mode } : {}),
+      ...(remoteModelOverride
+        ? {
+            model: remoteModelOverride.selection.model,
+            ...(remoteModelOverride.selection.variant
+              ? { variant: remoteModelOverride.selection.variant }
+              : {}),
+          }
+        : {}),
+    };
+  }
+  const payloadMode = input.mode;
+  const runtimeAgent = payloadMode
+    ? sessionConfig?.runtimeAgents?.find(agent => agent.slug === payloadMode)
+    : undefined;
+  const pinnedModel = runtimeAgent?.model?.trim() || undefined;
+  const pinnedVariant = pinnedModel ? runtimeAgent?.variant?.trim() || undefined : undefined;
+  const cloudModel = pinnedModel ?? cloudAgentModelOverride?.model ?? input.model;
+  const cloudVariant = pinnedModel
+    ? pinnedVariant
+    : cloudAgentModelOverride
+      ? cloudAgentModelOverride.variant
+      : input.variant;
+  return {
+    type: 'prompt',
+    prompt: input.prompt,
+    ...(input.mode ? { mode: input.mode } : {}),
+    ...(cloudModel ? { model: { providerID: 'kilo', modelID: cloudModel } } : {}),
+    ...(cloudModel && cloudVariant ? { variant: cloudVariant } : {}),
+  };
 }
 
 /**
@@ -1194,8 +1213,8 @@ type OpenSessionCallbacks = Pick<
   | 'onResolved'
   | 'onRemoteModelStateChange'
   | 'onRemoteCommandStateChange'
-  | 'onTransportCapabilityChange'
-  | 'onTransportCapabilitiesChange'
+  | 'onComposerCapabilityChange'
+  | 'onCliCapabilitiesReported'
   | 'onReplayComplete'
   | 'onBranchChanged'
   | 'onError'
@@ -1395,8 +1414,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   let previousOrderedMessageIds: readonly string[] = [];
+  // The messages map is a stable reference now: a row upsert rewrites it in
+  // place and republishes through `messagesRevision`, so every derivation that
+  // reads a row must subscribe to the revision too.
   const orderedMessageIdsAtom = atom(get => {
     const storage = get(sessionStorageAtom);
+    if (storage) get(storage.atoms.messagesRevision);
     const next = storage
       ? orderMessageIds(get(storage.atoms.messageIds), get(storage.atoms.messages))
       : [];
@@ -1416,6 +1439,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (storage) {
       const ids = get(orderedMessageIdsAtom);
       const msgMap = get(storage.atoms.messages);
+      get(storage.atoms.messagesRevision);
       const partsMap = get(storage.atoms.parts);
       get(storage.atoms.partsRevision);
       const rootSessionId = get(rootSessionIdAtom);
@@ -1488,6 +1512,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
     const ids = get(orderedMessageIdsAtom);
     const msgMap = get(storage.atoms.messages);
+    get(storage.atoms.messagesRevision);
     const partsMap = get(storage.atoms.parts);
     get(storage.atoms.partsRevision);
     pruneStoredMessageMemo(ids);
@@ -1597,7 +1622,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
-   * `onTransportCapabilitiesChange` callback. Captured here so the
+   * `onCliCapabilitiesReported` callback. Captured here so the
    * `supportsAttachments` gate can be recomputed on every heartbeat-driven
    * capability change (upgrade, downgrade, reconnect, absent) — not only at
    * the initial `onResolved` moment. `undefined` means the CLI has not
@@ -1949,6 +1974,40 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     replayMessagesIntoStorage(storage, messages, updateCursor);
   }
 
+  /**
+   * Fetch one child-session page through the active session's source: the
+   * Cloud Agent paged endpoint when the root is a cloud session, else the
+   * root `fetchSnapshotPage`. Throws the Cloud Agent requirement/mismatch
+   * errors so each caller classifies them with its own try/catch.
+   */
+  async function fetchChildPage(args: {
+    childSessionId: KiloSessionId;
+    cloudSessionId: CloudAgentSessionId | null;
+    cursor?: string;
+  }): Promise<SessionSnapshotPageOutcome | null> {
+    const { childSessionId, cloudSessionId, cursor } = args;
+    if (cloudSessionId) {
+      if (!config.fetchCloudSnapshotPage) {
+        throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
+      }
+      const page = cloudSessionMessagesPageSchema.parse(
+        await config.fetchCloudSnapshotPage(
+          cloudSessionId,
+          cursor === undefined
+            ? { kiloSessionId: childSessionId }
+            : { kiloSessionId: childSessionId, cursor }
+        )
+      );
+      if (page?.kind === 'success' && page.info.id !== childSessionId) {
+        throw new Error('Cloud Agent child session mismatch');
+      }
+      return page;
+    }
+    const fetchSnapshotPage = config.fetchSnapshotPage;
+    if (!fetchSnapshotPage) return null;
+    return fetchSnapshotPage(childSessionId, cursor === undefined ? {} : { cursor });
+  }
+
   async function hydrateChildSession(childSessionId: KiloSessionId): Promise<void> {
     const existingState = store.get(childSessionHydrationStatesAtom).get(childSessionId);
     if (existingState?.status === 'ready') return;
@@ -1971,21 +2030,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (activeCloudSessionId || config.fetchSnapshotPage) {
           let page: SessionSnapshotPageOutcome | null;
           if (activeCloudSessionId) {
-            if (!config.fetchCloudSnapshotPage) {
-              throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
-            }
-            page = cloudSessionMessagesPageSchema.parse(
-              await config.fetchCloudSnapshotPage(activeCloudSessionId, {
-                kiloSessionId: childSessionId,
-              })
-            );
-            if (page?.kind === 'success' && page.info.id !== childSessionId) {
-              throw new Error('Cloud Agent child session mismatch');
-            }
-          } else if (config.fetchSnapshotPage) {
-            page = await config.fetchSnapshotPage(childSessionId, {});
+            page = await fetchChildPage({
+              childSessionId,
+              cloudSessionId: activeCloudSessionId,
+            });
           } else {
-            return;
+            page = await fetchChildPage({
+              childSessionId,
+              cloudSessionId: null,
+            });
           }
           if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
 
@@ -2044,7 +2097,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   async function loadOlderChildMessages(childSessionId: KiloSessionId): Promise<void> {
     const cloudSessionId = activeCloudSessionId;
     if (!cloudSessionId && !config.fetchSnapshotPage) return;
-    const fetchSnapshotPage = config.fetchSnapshotPage;
 
     const state = store.get(childSessionHydrationStatesAtom).get(childSessionId);
     if (!state || state.status !== 'ready') return;
@@ -2066,24 +2118,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     let outcome: SessionSnapshotPageOutcome | null;
     try {
-      if (cloudSessionId) {
-        if (!config.fetchCloudSnapshotPage) {
-          throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
-        }
-        outcome = cloudSessionMessagesPageSchema.parse(
-          await config.fetchCloudSnapshotPage(cloudSessionId, {
-            kiloSessionId: childSessionId,
-            cursor,
-          })
-        );
-        if (outcome?.kind === 'success' && outcome.info.id !== childSessionId) {
-          throw new Error('Cloud Agent child session mismatch');
-        }
-      } else if (fetchSnapshotPage) {
-        outcome = await fetchSnapshotPage(childSessionId, { cursor });
-      } else {
-        return;
-      }
+      outcome = await fetchChildPage({
+        childSessionId,
+        cloudSessionId,
+        cursor,
+      });
     } catch (_err) {
       // Network/transport-level failure maps to a retryable older error. The
       // cursor is preserved so a retry continues from here.
@@ -2185,7 +2224,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   /**
    * Recompute the `supportsAttachments` gate for the active session. Called
    * on every `onResolved` (initial resolution) AND every
-   * `onTransportCapabilitiesChange` (heartbeat upgrade/downgrade/reconnect/
+   * `onCliCapabilitiesReported` (heartbeat upgrade/downgrade/reconnect/
    * absent) so the UI gate tracks the CLI's most recent advertisement — the
    * downgrade lands as soon as an explicit negative is reported.
    *
@@ -3535,7 +3574,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // reflects whatever the mobile-side `resolveSession` adapter had
         // to work with (e.g. the current `activeSessions.list` snapshot).
         // An absent snapshot still reports supported (optimistic); subsequent
-        // heartbeat changes arrive via `onTransportCapabilitiesChange` and
+        // heartbeat changes arrive via `onCliCapabilitiesReported` and
         // overwrite this, including an explicit downgrade.
         currentCapabilities = resolved.type === 'remote' ? resolved.capabilities : undefined;
         recomputeSupportsAttachments(resolved.type);
@@ -3545,11 +3584,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onRemoteCommandStateChange: state => {
         store.set(remoteCommandStateAtom, state);
       },
-      onTransportCapabilityChange: () => {
+      onComposerCapabilityChange: () => {
         const activeSession = getSession();
         if (currentSession === activeSession) updateCapabilityAtoms(activeSession);
       },
-      onTransportCapabilitiesChange: capabilities => {
+      onCliCapabilitiesReported: capabilities => {
         currentCapabilities = capabilities;
         recomputeSupportsAttachments(activeSessionType);
       },
@@ -3841,8 +3880,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onResolved: fence(handlers.onResolved),
       onRemoteModelStateChange: fence(handlers.onRemoteModelStateChange),
       onRemoteCommandStateChange: fence(handlers.onRemoteCommandStateChange),
-      onTransportCapabilityChange: fence(handlers.onTransportCapabilityChange),
-      onTransportCapabilitiesChange: fence(handlers.onTransportCapabilitiesChange),
+      onComposerCapabilityChange: fence(handlers.onComposerCapabilityChange),
+      onCliCapabilitiesReported: fence(handlers.onCliCapabilitiesReported),
       onReplayComplete: fence(handlers.onReplayComplete),
       onBranchChanged: fence(handlers.onBranchChanged),
       onError: fence(handlers.onError),
@@ -3992,70 +4031,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         : input.payload.prompt;
     const remoteModelOverride = store.get(remoteModelOverrideAtom);
     const cloudAgentModelOverride = store.get(cloudAgentModelOverrideAtom);
-    let transportPayload: TransportSendPayload;
-    if (input.payload.type === 'command') {
-      if (sessionType === 'remote') {
-        transportPayload = {
-          type: 'command',
-          command: input.payload.command,
-          arguments: input.payload.arguments,
-        };
-      } else {
-        // Mirror prompt sends: the in-session override wins over the payload,
-        // so a stale composer selection cannot bypass this source of truth.
-        const cloudModel = cloudAgentModelOverride?.model ?? input.payload.model;
-        const cloudVariant = cloudAgentModelOverride
-          ? cloudAgentModelOverride.variant
-          : input.payload.variant;
-        transportPayload = {
-          type: 'command',
-          command: input.payload.command,
-          arguments: input.payload.arguments,
-          ...(input.payload.mode ? { mode: input.payload.mode } : {}),
-          ...(cloudModel ? { model: { providerID: 'kilo', modelID: cloudModel } } : {}),
-          ...(cloudModel && cloudVariant ? { variant: cloudVariant } : {}),
-        };
-      }
-    } else if (sessionType === 'remote') {
-      // Capture mode for `/new` agent inheritance (Decision 6).
-      if (input.payload.mode) {
-        lastPromptMode = input.payload.mode;
-      }
-      transportPayload = {
-        type: 'prompt',
-        prompt: input.payload.prompt,
-        ...(input.payload.mode ? { mode: input.payload.mode } : {}),
-        ...(remoteModelOverride
-          ? {
-              model: remoteModelOverride.selection.model,
-              ...(remoteModelOverride.selection.variant
-                ? { variant: remoteModelOverride.selection.variant }
-                : {}),
-            }
-          : {}),
-      };
-    } else {
-      const sessionConfigAtSend = store.get(sessionConfigAtom);
-      const payloadMode = input.payload.mode;
-      const runtimeAgent = payloadMode
-        ? sessionConfigAtSend?.runtimeAgents?.find(agent => agent.slug === payloadMode)
-        : undefined;
-      const pinnedModel = runtimeAgent?.model?.trim() || undefined;
-      const pinnedVariant = pinnedModel ? runtimeAgent?.variant?.trim() || undefined : undefined;
-      const cloudModel = pinnedModel ?? cloudAgentModelOverride?.model ?? input.payload.model;
-      const cloudVariant = pinnedModel
-        ? pinnedVariant
-        : cloudAgentModelOverride
-          ? cloudAgentModelOverride.variant
-          : input.payload.variant;
-      transportPayload = {
-        type: 'prompt',
-        prompt: input.payload.prompt,
-        ...(input.payload.mode ? { mode: input.payload.mode } : {}),
-        ...(cloudModel ? { model: { providerID: 'kilo', modelID: cloudModel } } : {}),
-        ...(cloudModel && cloudVariant ? { variant: cloudVariant } : {}),
-      };
+    // Capture mode for `/new` agent inheritance (Decision 6). Stays in
+    // `send` on the remote prompt branch; the payload builder is pure.
+    if (input.payload.type === 'prompt' && sessionType === 'remote' && input.payload.mode) {
+      lastPromptMode = input.payload.mode;
     }
+    const transportPayload = buildTransportPayload({
+      payload: input.payload,
+      sessionType,
+      remoteModelOverride,
+      cloudAgentModelOverride,
+      sessionConfig:
+        input.payload.type === 'prompt' && sessionType !== 'remote'
+          ? store.get(sessionConfigAtom)
+          : null,
+    });
 
     // Cloud prompts preserve messageId; their synthetic row keeps delivery failures
     // visible if the native message never arrives. Kilo v2 commands can expand under
@@ -4743,9 +4733,9 @@ export type {
   StoredMessage,
   DeliveredFailedPrompt,
   PendingSendConfirmation,
-  FetchedSessionData,
-  AssociatedPrData,
   PrepareInput,
 };
+
+export type { FetchedSessionData, AssociatedPrData } from './types';
 
 export type { CreateRemoteSessionInput } from './transport';

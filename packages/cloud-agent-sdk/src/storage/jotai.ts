@@ -13,15 +13,15 @@ import {
 } from './lifecycle';
 import type { PartsSnapshot } from './helpers';
 import {
-  EMPTY_PARTS,
   appendPartTextChunks,
-  clonePart,
+  createPartViewCache,
   createReadonlyPartView,
   createSubscriberRegistry,
   insertSortedBy,
   isSupportedDeltaField,
   messageIdKey,
   publishPartsChanged,
+  readPartsSnapshot,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
@@ -31,6 +31,7 @@ type JotaiSessionStorage = SessionStorage & {
   atoms: {
     messageIds: Atom<string[]>;
     messages: Atom<Map<string, MessageInfo>>;
+    messagesRevision: Atom<number>;
     parts: Atom<Map<string, Part[]>>;
     partsRevision: Atom<number>;
   };
@@ -50,7 +51,12 @@ function createJotaiStorage(
       : (cb: () => void) => cb());
 
   const messageIdsAtom = atom<string[]>([]);
-  const messagesAtom = atom<Map<string, MessageInfo>>(new Map());
+  // Stable messages map. The atom holds this one reference for its lifetime;
+  // a row upsert writes into it in place and publishes via
+  // `messagesRevisionAtom` instead of replacing the map.
+  const messagesMap = new Map<string, MessageInfo>();
+  const messagesAtom = atom<Map<string, MessageInfo>>(messagesMap);
+  const messagesRevisionAtom = atom(0);
   // Stable parts map. The atom holds this one reference for its lifetime;
   // mutations write per-message arrays into it in place and publish via
   // `partsRevisionAtom` instead of replacing the map.
@@ -59,6 +65,9 @@ function createJotaiStorage(
   const partsRevisionAtom = atom(0);
 
   const partsSnapshot: PartsSnapshot = new Map<string, readonly ReadonlyPart[] | null>();
+  // Immutable views of the stored parts, per message and kept across snapshot
+  // rebuilds so a rebuild reuses the view of every part that did not change.
+  const partViews = createPartViewCache();
   // Ordering evidence of the last accepted update per part, owned next to the
   // parts it describes (see `upsertPartDroppingStaleSyntheticParts`).
   const partEvidence = new Map<string, number>();
@@ -75,6 +84,10 @@ function createJotaiStorage(
   // and quadratic over a long reasoning/text stream).
   const pendingTextDeltas = new Map<string, Map<string, string[]>>();
   let flushScheduled = false;
+
+  function bumpMessagesRevision(): void {
+    store.set(messagesRevisionAtom, r => r + 1);
+  }
 
   function bumpPartsRevision(): void {
     store.set(partsRevisionAtom, r => r + 1);
@@ -135,13 +148,11 @@ function createJotaiStorage(
 
   const containers: StorageContainers = {
     messages: {
-      has: messageId => store.get(messagesAtom).has(messageId),
+      has: messageId => messagesMap.has(messageId),
       remove: messageId => {
-        const nextMessages = new Map(store.get(messagesAtom));
-        nextMessages.delete(messageId);
-        store.set(messagesAtom, nextMessages);
+        messagesMap.delete(messageId);
       },
-      clear: () => store.set(messagesAtom, new Map()),
+      clear: () => messagesMap.clear(),
       ids: () => store.get(messageIdsAtom),
       setIds: ids => {
         store.set(messageIdsAtom, ids);
@@ -160,27 +171,28 @@ function createJotaiStorage(
       clear: () => partsMap.clear(),
     },
     snapshot: partsSnapshot,
+    views: partViews,
     evidence: partEvidence,
     subscribers,
     beforeStructuralChange: flushPendingDeltas,
     publishPartsRevision: bumpPartsRevision,
+    publishMessagesRevision: bumpMessagesRevision,
   };
 
   const storage: JotaiSessionStorage = {
     atoms: {
       messageIds: messageIdsAtom,
       messages: messagesAtom,
+      messagesRevision: messagesRevisionAtom,
       parts: partsAtom,
       partsRevision: partsRevisionAtom,
     },
 
     upsertMessage(info) {
       flushPendingDeltas();
-      const messages = store.get(messagesAtom);
-      const existing = messages.get(info.id);
-      const next = new Map(messages);
-      next.set(info.id, info);
-      store.set(messagesAtom, next);
+      const existing = messagesMap.get(info.id);
+      messagesMap.set(info.id, info);
+      bumpMessagesRevision();
       if (existing) {
         subscribers.notifyMessage(info.id);
       } else {
@@ -194,7 +206,7 @@ function createJotaiStorage(
     },
 
     getMessageInfo(messageId) {
-      return store.get(messagesAtom).get(messageId);
+      return messagesMap.get(messageId);
     },
 
     upsertPart(messageId, part, eventTime, authoritative) {
@@ -246,15 +258,7 @@ function createJotaiStorage(
       // the deltas that already arrived. Consume them into the parts map
       // without bumping the revision or notifying subscribers.
       applyPendingTextDeltas(messageId);
-      const cached = partsSnapshot.get(messageId);
-      if (cached) return cached;
-
-      const arr = partsMap.get(messageId);
-      if (!arr || arr.length === 0) return EMPTY_PARTS;
-
-      const snapshot = arr.map(part => createReadonlyPartView(clonePart(part)));
-      partsSnapshot.set(messageId, snapshot);
-      return snapshot;
+      return readPartsSnapshot(messageId, partsMap.get(messageId), partsSnapshot, partViews);
     },
 
     getPart(messageId, partId) {

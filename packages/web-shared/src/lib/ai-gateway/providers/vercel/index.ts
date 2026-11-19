@@ -27,7 +27,7 @@ import {
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getOpenRouterModelsMetadataFromDatabase,
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getOpenRouterAliasTarget } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
@@ -227,7 +227,7 @@ export async function isVercelRoutingEnabledForModel(requestedModel: string) {
 /** Whether Vercel serves the model, regardless of the request's routing settings. */
 export async function isVercelModel(requestedModel: string) {
   const [vercelModels, vercelModelId] = await Promise.all([
-    getVercelModelsFromDatabase(),
+    getVercelLanguageModelIdsFromDatabase(),
     mapModelIdToVercel(requestedModel),
   ]);
   return vercelModels.has(vercelModelId);
@@ -243,7 +243,7 @@ export async function isVercelModel(requestedModel: string) {
  */
 export async function isValidVercelModelId(requestedModel: string) {
   const [vercelModels, overrides, vercelModelId] = await Promise.all([
-    getVercelModelsFromDatabase(),
+    getVercelLanguageModelIdsFromDatabase(),
     getVercelModelIdOverrides(),
     mapModelIdToVercel(requestedModel),
   ]);
@@ -265,7 +265,7 @@ export async function canRouteToVercel(
   requestedModel: string,
   provider: OpenRouterProviderConfig | undefined
 ) {
-  const vercelModels = await getVercelModelsFromDatabase();
+  const vercelModels = await getVercelLanguageModelIdsFromDatabase();
   const vercelModelId = await mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
@@ -344,6 +344,15 @@ function getDataHandlingOptions(
     zeroDataRetention: provider?.zdr,
     disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
   };
+}
+
+/**
+ * The zone-scoped inference region both Vercel paths send. Vercel fails the request instead of
+ * leaving the region once one is asked for.
+ * https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+ */
+function inferenceRegionOptions(dataRegion: OrganizationDataRegion) {
+  return { scope: 'zone', geoRegion: dataRegion } as const;
 }
 
 /**
@@ -476,7 +485,7 @@ export async function getNonChatGatewayOptions(params: {
       only,
       order: provider?.order?.map(openRouterToVercelInferenceProviderId),
       ...dataHandling,
-      ...(dataRegion && { inferenceRegion: { scope: 'zone', geoRegion: dataRegion } }),
+      ...(dataRegion && { inferenceRegion: inferenceRegionOptions(dataRegion) }),
     },
   };
 }
@@ -591,12 +600,8 @@ export async function applyVercelSettings(
 
   // The caller passes a region only for a route Kilo pays for (see `getRouteInferenceRegion`).
   if (dataRegion && requestToMutate.body.providerOptions?.gateway) {
-    // Vercel fails the request instead of leaving the region.
-    // https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
-    requestToMutate.body.providerOptions.gateway.inferenceRegion = {
-      scope: 'zone',
-      geoRegion: dataRegion,
-    };
+    requestToMutate.body.providerOptions.gateway.inferenceRegion =
+      inferenceRegionOptions(dataRegion);
   }
 
   if (requestToMutate.body.providerOptions) {

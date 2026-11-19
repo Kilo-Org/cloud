@@ -40,7 +40,7 @@ import {
   getConfiguredAutoFreeModels,
   isAutoFreeEligibleModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterChatModelIdsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   isVercelModel,
   isVercelRoutingEnabledForModel,
@@ -90,7 +90,7 @@ async function getEligibleAutoFreeModels(
   if (!configuredModels) return [AUTO_FREE_FALLBACK_MODEL];
 
   const [openRouterModels, customLlmsById] = await Promise.all([
-    getOpenRouterModelsFromDatabase(),
+    getOpenRouterChatModelIdsFromDatabase(),
     getCustomLlmsById(),
   ]);
   const isEligible = async (model: string) => {

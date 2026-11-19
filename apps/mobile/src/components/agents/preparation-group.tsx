@@ -289,6 +289,10 @@ function PreparationStepRow({
     <View>
       <Pressable
         disabled={!hasDetails}
+        // A row with nothing to expand is a static line: without this the
+        // `Pressable` default keeps a native click listener, and Android exposed
+        // the row as a clickable node with no role and nothing to activate.
+        focusable={hasDetails}
         onPress={() => {
           setExpanded(value => !value);
         }}

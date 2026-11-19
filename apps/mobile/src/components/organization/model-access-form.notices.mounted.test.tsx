@@ -57,6 +57,7 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 type FormOverrides = {
   gateway?: OrgGatewaySettings;
+  gatewayIsError?: boolean;
   planEnded?: boolean;
   canEdit?: boolean;
 };
@@ -74,7 +75,7 @@ function element(overrides: FormOverrides = {}) {
     providerAllowList: undefined,
     modelDenyList: [],
     gateway: overrides.gateway,
-    gatewayIsError: false,
+    gatewayIsError: overrides.gatewayIsError ?? false,
     gatewayIsFetching: false,
     onRetryGateway: () => undefined,
   });
@@ -173,6 +174,20 @@ describe('ModelAccessForm gateways tab', () => {
     expect(segmentValues(next)).toEqual(['models', 'providers']);
     expect(gatewaySections(next)).toHaveLength(0);
   });
+
+  it('keeps the gateways segment offered while the settings read has failed', () => {
+    const root = render({ gateway: undefined, gatewayIsError: true });
+    selectTab(root, 'gateways');
+
+    // The section owns this read's error and retry, so the segment stays
+    // reachable: hiding it would leave a failed read unretryable on this
+    // screen.
+    expect(segmentValues(root)).toEqual(['models', 'providers', 'gateways']);
+    expect(root.findByType('SegmentedControl' as never).props.value).toBe('gateways');
+    const section = gatewaySections(root).at(0);
+    expect(section?.props.isError).toBe(true);
+    expect(section?.props.onRetry).toBeTypeOf('function');
+  });
 });
 
 describe('ModelAccessForm read-only notice', () => {
@@ -202,5 +217,31 @@ describe('ModelAccessForm read-only notice', () => {
 
     expect(copy).not.toContain(appI18n.t('common.organizationTrialEnded'));
     expect(copy).not.toContain(appI18n.t('organizationModelAccess.readOnly'));
+  });
+});
+
+describe('ModelAccessForm lapsed-plan controls', () => {
+  it('holds the status line on the plan-ended sentence while the plan lapsed', () => {
+    const root = render({ canEdit: true, planEnded: true });
+
+    const status = root.findByType('AccessibleStatus' as never).props.message;
+    expect(status).toBe(appI18n.t('common.organizationTrialEnded'));
+  });
+
+  it('disables the save button while the plan lapsed, even with edits', () => {
+    const root = render({ canEdit: true, planEnded: true });
+
+    const buttons = root.findAllByType('Button' as never);
+    const save = buttons.at(-1);
+    expect(save?.props.disabled).toBe(true);
+  });
+
+  it('releases the status line once the plan gate clears', () => {
+    render({ canEdit: true, planEnded: true });
+    const next = rerender({ canEdit: true, planEnded: false });
+
+    expect(next.findByType('AccessibleStatus' as never).props.message).toBeNull();
+    const buttons = next.findAllByType('Button' as never);
+    expect(buttons.at(-1)?.props.disabled).toBe(true);
   });
 });

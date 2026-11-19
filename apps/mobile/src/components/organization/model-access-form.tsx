@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- The form composes the segments, the plan gate, the save machinery and the three lists on one screen. */
+
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -127,7 +129,11 @@ export function ModelAccessForm({
 }: Readonly<{
   organizationId: string;
   canEdit: boolean;
-  /** The organization's plan gate verdict; a lapsed plan blocks every save. */
+  /**
+   * The organization's plan gate verdict: a hard-expired trial refuses every
+   * organization mutation, so this disables the draft controls and the save,
+   * and the plan-ended sentence replaces the read-only role sentence.
+   */
   planEnded: boolean;
   models: readonly AvailableModel[];
   /** The gateway's whole catalog; empty while it is unavailable. */
@@ -180,10 +186,13 @@ export function ModelAccessForm({
 
   // The gateways tab exists only when the settings read reports it is
   // available, like the web page's Advanced policies tab: an unavailable
-  // organization has nothing to show on it. A read that lands or changes while
-  // the tab is selected falls back to the models tab, and the rendered lists
-  // follow that fallback rather than the stale selection.
-  const gatewaysOffered = gateway?.available === true;
+  // organization has nothing to show on it. A read that failed keeps the
+  // segment offered so the section's error-and-retry branch stays reachable —
+  // the section is the only surface that can refetch this read. A read that
+  // lands or changes while the tab is selected falls back to the models tab,
+  // and the rendered lists follow that fallback rather than the stale
+  // selection.
+  const gatewaysOffered = gateway?.available === true || (gateway == null && gatewayIsError);
   const activeTab = gatewaysOffered || tab !== 'gateways' ? tab : 'models';
 
   const dirty = !draftsEqual(draft, baseline);
@@ -197,7 +206,14 @@ export function ModelAccessForm({
   });
   const blockingIssue =
     savePayload.kind === 'ready' ? null : t(BLOCKING_ISSUE_KEYS[savePayload.kind]);
-  const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
+  // A hard-expired trial refuses every organization mutation on the server, so
+  // the form states the blocker on its own controls instead of letting an
+  // owner or admin build a draft only to collect the refusal — the same shape
+  // as the hub's blocked rename control. The plan-ended sentence replaces the
+  // transient status while the gate holds.
+  const cannotSave = planEnded || !dirty || saving || savePayload.kind !== 'ready';
+  const statusOverride =
+    planEnded && feedback.status !== 'failed' ? t('common.organizationTrialEnded') : null;
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
     setForm(previous => ({ ...previous, draft: next }));
@@ -236,12 +252,14 @@ export function ModelAccessForm({
     }
   };
 
-  const statusMessage = settingsSaveStatus({
-    t,
-    feedback,
-    draftIsDirty: dirty,
-    blockingIssue,
-  });
+  const statusMessage =
+    statusOverride ??
+    settingsSaveStatus({
+      t,
+      feedback,
+      draftIsDirty: dirty,
+      blockingIssue,
+    });
 
   // The organization's own catalog omits the models it denies, so the rows come
   // from the whole gateway catalog with its entries added: a denied model has
@@ -332,7 +350,7 @@ export function ModelAccessForm({
           models={denyRows}
           draft={draft}
           onChange={onDraftChange}
-          disabled={!canEdit || saving}
+          disabled={planEnded || !canEdit || saving}
         />
       ) : null}
       {activeTab === 'providers' ? (
@@ -346,7 +364,7 @@ export function ModelAccessForm({
             providers={providers}
             draft={draft}
             onChange={onDraftChange}
-            disabled={!canEdit || saving || catalogUnavailable}
+            disabled={planEnded || !canEdit || saving || catalogUnavailable}
           />
         </View>
       ) : null}
@@ -356,7 +374,7 @@ export function ModelAccessForm({
           settings={gateway}
           isError={gatewayIsError}
           isFetching={gatewayIsFetching}
-          canEdit={canEdit}
+          canEdit={canEdit && !planEnded}
           onRetry={onRetryGateway}
         />
       ) : null}

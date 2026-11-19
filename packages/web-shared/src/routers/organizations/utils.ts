@@ -138,15 +138,36 @@ async function selectCallerRoleRows(
   return [...directRows, ...inheritedRows];
 }
 
+/**
+ * The one highest-role rule: the first role in ORGANIZATION_ROLE_PRIORITY that
+ * the caller holds and the caller's allowed-role filter permits. `roles` is
+ * defaulted to the full priority order, matching the allowed-roles default.
+ */
+function defaultedAllowedRoles(
+  roles?: readonly OrganizationRole[]
+): readonly OrganizationRole[] {
+  return roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
+}
+
+function highestOrganizationRole(
+  roles: readonly OrganizationRole[],
+  allowedRoles?: readonly OrganizationRole[]
+): OrganizationRole | null {
+  return (
+    ORGANIZATION_ROLE_PRIORITY.find(
+      role => (allowedRoles ?? ORGANIZATION_ROLE_PRIORITY).includes(role) && roles.includes(role)
+    ) ?? null
+  );
+}
+
 export function effectiveMembershipRole(
   rows: { role: OrganizationRole }[],
   roles?: readonly OrganizationRole[]
 ): OrganizationRole | null {
-  const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
-  return (
-    ORGANIZATION_ROLE_PRIORITY.find(
-      role => allowedRoles.includes(role) && rows.some(row => row.role === role)
-    ) ?? null
+  const allowedRoles = defaultedAllowedRoles(roles);
+  return highestOrganizationRole(
+    rows.map(row => row.role),
+    allowedRoles
   );
 }
 
@@ -666,7 +687,7 @@ export async function getOrganizationsAccessRoles(
       )
     );
     for (const [organizationId, roles] of rolesByOrg) {
-      const best = ORGANIZATION_ROLE_PRIORITY.find(role => roles.includes(role));
+      const best = highestOrganizationRole(roles);
       if (best) result.set(organizationId, best);
     }
     return result;
@@ -703,11 +724,7 @@ export async function getOrganizationsAccessRoles(
         rolesByOrg === null
           ? null
           : liveIds.every(
-              id =>
-                effectiveMembershipRole(
-                  (rolesByOrg.get(id) ?? []).map(role => ({ role })),
-                  roles
-                ) !== null
+              id => highestOrganizationRole(rolesByOrg.get(id) ?? [], roles) !== null
             ),
     });
     for (const id of liveIds) result.set(id, grant);
@@ -718,7 +735,7 @@ export async function getOrganizationsAccessRoles(
     await selectCallerRoleRows(ctx.user.id, column => inArray(column, uniqueIds), callerRoleFields)
   );
   for (const [organizationId, roles] of rolesByOrg) {
-    const best = ORGANIZATION_ROLE_PRIORITY.find(role => roles.includes(role));
+    const best = highestOrganizationRole(roles);
     if (best) result.set(organizationId, best);
   }
   return result;
@@ -735,7 +752,7 @@ export async function ensureOrganizationsAccess(
   roles?: readonly OrganizationRole[]
 ): Promise<void> {
   const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds, roles);
-  const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
+  const allowedRoles = defaultedAllowedRoles(roles);
   for (const organizationId of new Set(organizationIds)) {
     const role = accessByOrg.get(organizationId);
     if (!role || !allowedRoles.includes(role)) {

@@ -11,8 +11,6 @@ import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-conn
 
 import { PendingPermissionUnreadableError } from './pending-permission-unreadable-error';
 
-export { PendingPermissionUnreadableError };
-
 /**
  * The one read of the cloud-agent pending interactions. The ids live only in the
  * control plane's pending-interaction projection and are sent on stream connect,

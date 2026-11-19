@@ -65,11 +65,13 @@ const { answerSessionPermission, refreshGlanceableSnapshot, runGlanceableApprove
 const { NotApprovableError } = await import('@/lib/glanceable/cloud-agent-session');
 // The pending-permission read is its own module; this suite owns its cases too.
 const {
-  PendingPermissionUnreadableError,
   PendingPermissionTimeoutError,
   resolveLeadingPendingPermissionId,
   resolvePendingPermissionId,
 } = await import('@/lib/glanceable/pending-permission');
+// The unreadable-projection error has its own module; one class per file.
+const { PendingPermissionUnreadableError } =
+  await import('@/lib/glanceable/pending-permission-unreadable-error');
 // The real ack store: the republish's counts must read it, so the suite drives
 // it rather than replacing it.
 const { ackSessionAttention, isAttentionAcked, __resetSessionAttentionForTests } =

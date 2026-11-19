@@ -69,7 +69,7 @@ export type RemoteMcpServers = {
  * person must never read, so the words come from the catalog, in the reader's
  * language; anything that is not a refusal falls back to the generic copy.
  */
-export function refusalKey(
+function refusalKey(
   error: unknown
 ):
   | (typeof REMOTE_MCP_STORE_ERROR_KEYS)[RemoteMcpStoreProblem]

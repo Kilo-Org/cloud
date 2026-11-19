@@ -158,6 +158,30 @@ describe('safeArtifactDisplayName', () => {
     ).toBe('abcde.txt');
   });
 
+  // A name's own text, with the default id and plain-text MIME that a
+  // surviving name makes irrelevant.
+  const nameOf = (name: string) =>
+    safeArtifactDisplayName({ id: fallbackId, name, mime: 'text/plain' });
+
+  it('drops bidi formatting characters and keeps joiners', () => {
+    expect(nameOf('a\u202Eb\u202Cc\u2069d\u202Ae\u2066f.txt')).toBe('abcdef.txt');
+    expect(nameOf('a\u200Cb\u200Dc.txt')).toBe('a\u200Cb\u200Dc.txt');
+  });
+
+  it('drops a bidi override that would reorder the stored extension', () => {
+    expect(nameOf('txt\u202Eexe.pdf')).toBe('txtexe.pdf');
+  });
+
+  it('drops directional marks and keeps the letters of an RTL name', () => {
+    expect(nameOf('\u05D3\u05D5\u05D7\u061C\u200E\u200F.pdf')).toBe('\u05D3\u05D5\u05D7.pdf');
+  });
+
+  it('falls back to the id and MIME extension when only bidi formatting survives', () => {
+    expect(safeArtifactDisplayName({ id: 'part-1', name: '\u202E\u2066', mime: png })).toBe(
+      'part-1.png'
+    );
+  });
+
   it('collapses whitespace runs and trims the ends', () => {
     expect(
       safeArtifactDisplayName({ id: fallbackId, name: '  a   b.txt  ', mime: 'text/plain' })

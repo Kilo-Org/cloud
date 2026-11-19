@@ -49,6 +49,12 @@ describe('safeArtifactSessionName', () => {
     expect(safeArtifactSessionName({ id: 's1', title: 'a\u0000b\u001F  c' })).toBe('ab c');
   });
 
+  it('drops bidi formatting characters from a session folder label', () => {
+    expect(safeArtifactSessionName({ id: 's1', title: '\u202Equarterly report\u2069' })).toBe(
+      'quarterly report'
+    );
+  });
+
   it('falls back to the session id when no title survives', () => {
     expect(safeArtifactSessionName({ id: 's1', title: null })).toBe('Session s1');
     expect(safeArtifactSessionName({ id: 's1', title: '' })).toBe('Session s1');

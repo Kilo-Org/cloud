@@ -28,9 +28,7 @@ function deleteSegments(target: unknown, segments: readonly string[]) {
 export function deleteAtPath(root: unknown, path: string) {
   const segments = path.split('.');
   if (
-    segments.some(
-      segment => segment === '' || REMOVE_FROM_BODY_BLOCKED_SEGMENTS.has(segment)
-    ) ||
+    segments.some(segment => segment === '' || REMOVE_FROM_BODY_BLOCKED_SEGMENTS.has(segment)) ||
     segments[segments.length - 1] === '*'
   ) {
     return;

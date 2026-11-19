@@ -1220,6 +1220,45 @@ describe('createNetworkErrorFetch status policy', () => {
     expect(breadcrumbs).toHaveLength(1);
   });
 
+  it('leaves the claim unspent when the expected answer shares its fingerprint with a later report', async () => {
+    // The 404 and the 500 above are different fingerprints, so they cannot show
+    // that the expected answer left the claim alone. Here both answers are one
+    // fingerprint: the same URL, source, status and outcome. A caller's own
+    // expected-answer rule marks the first; the same answer without that rule
+    // must still file the single event.
+    const url = 'https://example.com/mcp';
+    const wrappedExpected = createNetworkErrorFetch(
+      resolvingFetch(new Response('', { status: 405 })),
+      {
+        isExpectedAnswer: () => true,
+      }
+    );
+    await wrappedExpected(url, { method: 'GET' });
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+
+    // The same fingerprint, this time a real answer: the event must still file.
+    // This is the decisive step — a latch that spent the claim would record
+    // nothing here.
+    const wrappedReal = createNetworkErrorFetch(resolvingFetch(new Response('', { status: 405 })));
+    await wrappedReal(url, { method: 'GET' });
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'fetch', '/mcp', 'http.405'],
+    ]);
+    // The first report leaves no breadcrumb; the trail already holds the
+    // expected answer's one.
+    expect(breadcrumbs).toHaveLength(1);
+
+    // The next repeat leaves the single breadcrumb the report claim allows, and
+    // the one after that records nothing.
+    await wrappedReal(url, { method: 'GET' });
+    expect(breadcrumbs).toHaveLength(2);
+    await wrappedReal(url, { method: 'GET' });
+    expect(breadcrumbs).toHaveLength(2);
+  });
+
   it('bounds the expected-answer latch and refreshes a fingerprint that keeps answering', async () => {
     const answer = (index: number) =>
       respond(`https://example.com/v1/files/${String(index)}`, new Response('', { status: 404 }));

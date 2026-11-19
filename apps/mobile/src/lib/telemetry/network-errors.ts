@@ -937,6 +937,33 @@ function safeShouldReport(url: string, shouldReport: (url: string) => boolean): 
 }
 
 /**
+ * Record one failed response: an expected answer leaves at most one breadcrumb
+ * per fingerprint per process
+ * ({@link claimExpectedAnswerBreadcrumb}), and any other answer files the
+ * process's single event ({@link reportNetworkError}). Never throws: the caller
+ * already holds the response, and its outer `catch` would turn a throw here into
+ * a rejected fetch.
+ */
+function recordFailedResponse(
+  context: NetworkErrorContext,
+  isExpectedAnswer: ((context: NetworkErrorContext) => boolean) | undefined
+): void {
+  try {
+    if (!isExpectedResponse(context, isExpectedAnswer)) {
+      reportNetworkError(context);
+      return;
+    }
+    // An expected answer never spends the fingerprint's event, so a later real
+    // answer for the same endpoint still files its event.
+    if (claimExpectedAnswerBreadcrumb(contextNetworkErrorFingerprint(context))) {
+      recordNetworkErrorBreadcrumb(context);
+    }
+  } catch {
+    // Telemetry must never change what the caller receives.
+  }
+}
+
+/**
  * Wrap a fetch implementation so every error-status http(s) response is
  * reported once at warning level per endpoint and outcome per process and every
  * transport failure (a rejection that is not an abort) leaves one breadcrumb.
@@ -989,15 +1016,7 @@ export function createNetworkErrorFetch(
         if (isBatchEnvelopeWithoutError(context)) {
           return response;
         }
-        if (isExpectedResponse(context, options?.isExpectedAnswer)) {
-          // An expected answer never spends the fingerprint's event, so a
-          // later real answer for the same endpoint still files its event.
-          if (claimExpectedAnswerBreadcrumb(contextNetworkErrorFingerprint(context))) {
-            recordNetworkErrorBreadcrumb(context);
-          }
-        } else {
-          reportNetworkError(context);
-        }
+        recordFailedResponse(context, options?.isExpectedAnswer);
       }
       return response;
     } catch (error) {

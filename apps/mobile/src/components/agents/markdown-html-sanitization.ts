@@ -109,8 +109,12 @@ function sanitizesToEmptyAfterRemovals(value: string): boolean {
 
 /**
  * Drop every removed tag name that starts at `at`, else `undefined`. The name
- * compare is case-insensitive, as the old alternation's `i` flag was; the lower
- * case is a comparison key and never reaches the screen.
+ * compare is case-insensitive, as the old alternation's `i` flag was. A tag
+ * name is an ASCII token, not display text, and the case fold must not consult
+ * the device locale: `INPUT` lowercases to `ınput` under `tr`, which would stop
+ * a removed tag matching on that device. The same locale-independent fold is
+ * what `markdown-html.tsx` and `markdown-html-tree.ts` use for HTML tag names,
+ * and the case guard lists this file for that reason.
  */
 function removedTagNameAt(value: string, at: number): string | undefined {
   TAG_NAME_RUN_RE.lastIndex = at;
@@ -118,7 +122,7 @@ function removedTagNameAt(value: string, at: number): string | undefined {
   if (match === null) {
     return undefined;
   }
-  const name = match[0].toLocaleLowerCase();
+  const name = match[0].toLowerCase();
   return REMOVED_TAG_SET.has(name) ? name : undefined;
 }
 
@@ -189,6 +193,10 @@ function endTagAtOrAfter(offsets: readonly number[], from: number): number | und
  */
 function removeRemovedContainers(value: string): string {
   const endTags = indexRemovedEndTags(value);
+  // Every start tag ends at a `>` at or after its name, so one reverse lookup
+  // answers "can any start tag at or after this point complete?". Without it a
+  // value that never completes a start tag pays the tail walk once per tag.
+  const lastTagEnd = value.lastIndexOf('>');
   let kept = 0;
   let result = '';
   let at = 0;
@@ -201,10 +209,14 @@ function removeRemovedContainers(value: string): string {
     let closerEnd = -1;
     if (name !== undefined) {
       const nameEnd = start + 1 + name.length;
-      const tagEnd = value.indexOf('>', nameEnd);
+      const tagEnd = lastTagEnd < nameEnd ? -1 : value.indexOf('>', nameEnd);
+      if (tagEnd === -1) {
+        // No `>` at or after this point means no start tag later in the value
+        // can complete either, so one truncated tag ends the scan.
+        break;
+      }
       const offsets = endTags.get(name);
-      const closer =
-        offsets === undefined || tagEnd === -1 ? undefined : endTagAtOrAfter(offsets, tagEnd + 1);
+      const closer = offsets === undefined ? undefined : endTagAtOrAfter(offsets, tagEnd + 1);
       if (closer !== undefined) {
         closerEnd = endTagTailAt(value, closer + 2 + name.length);
       }

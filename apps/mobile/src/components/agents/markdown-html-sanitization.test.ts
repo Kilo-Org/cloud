@@ -112,25 +112,59 @@ describe('htmlSanitizesToEmpty', () => {
   it('scans a value with many void removed tags in one linear pass', () => {
     // Regression: the container pattern paired `<input>` and `<source>` with a
     // closer that a void element cannot have, so every occurrence walked the
-    // rest of the value on every streamed publish. Twenty thousand of them cost
-    // a scan quadratic in the value length (about half a second on a work VM);
-    // the linear scan costs about one look per tag. Measure the scaling so the
-    // assertion fails if the tail walk returns.
-    const measure = (tags: number): number => {
+    // rest of the value on every streamed publish. Count the character lookups
+    // instead of timing them: the count is deterministic, so this cannot flake
+    // on a loaded runner.
+    const countOf = (tags: number): number => {
       const value = `${'<input><source><link><meta>'.repeat(tags / 4)}visible`;
-      clearHtmlEmptinessCacheForTests();
-      const start = performance.now();
+      const indexOf = vi.spyOn(String.prototype, 'indexOf');
       expect(htmlSanitizesToEmpty(value)).toBe(false);
-      return performance.now() - start;
+      const scanned = indexOf.mock.calls.length;
+      indexOf.mockRestore();
+      return scanned;
     };
-    // Warm the JIT so the first measurement is not the slow one.
-    measure(4_000);
-    const small = measure(10_000);
-    const large = measure(40_000);
-    // Four times the input costs about four times the work; a quadratic tail
-    // walk would cost about sixteen times. The bound is loose because a shared
-    // VM is noisy, and it only has to separate linear from quadratic.
-    expect(large).toBeLessThan(Math.max(small, 1) * 10);
+    const small = countOf(1_000);
+    const large = countOf(10_000);
+    // Ten times the tags cost about ten times the lookups. A tail walk per
+    // occurrence would cost about a hundred times (occurrences × length).
+    expect(large).toBeLessThan(small * 20);
+    expect(large).toBeLessThan(100_000);
+  });
+
+  it('stops at a truncated start tag instead of walking the tail for each one', () => {
+    // No '>' follows the last start tag, so no start tag in the value can
+    // complete. A scan that re-walks the tail per tag pays lookups proportional
+    // to tags × remaining length; this scan runs in one pass, so its lookups
+    // stay proportional to the tag count. The count is deterministic, so the
+    // assertion cannot flake on a loaded runner.
+    const countOf = (value: string): number => {
+      const indexOf = vi.spyOn(String.prototype, 'indexOf');
+      expect(htmlSanitizesToEmpty(value)).toBe(false);
+      const scanned = indexOf.mock.calls.length;
+      indexOf.mockRestore();
+      return scanned;
+    };
+    const small = countOf(`${'<input><source>'.repeat(500)}<link`);
+    const large = countOf(`${'<input><source>'.repeat(5_000)}<link`);
+    // Ten times the tags cost about ten times the lookups; a tail walk per tag
+    // would cost about a hundred times.
+    expect(large).toBeLessThan(small * 20);
+    expect(large).toBeLessThan(100_000);
+  });
+
+  it('matches a removed tag in upper case regardless of the device locale', () => {
+    // A tag name is an ASCII token, not display text. Folding it with the
+    // device locale would make `INPUT` read as `ınput` under Turkish, so the
+    // removed element would stop matching on that device and the answer would
+    // change. This pins the locale-independent fold the module uses; the
+    // module's source is the other half of the pin, because the case guard
+    // allowlists this comparison beside its HTML-tag peers.
+    expect(htmlSanitizesToEmpty('<INPUT>hidden</INPUT>')).toBe(true);
+    expect(htmlSanitizesToEmpty('<SCRIPT>x</SCRIPT>')).toBe(true);
+    expect(htmlSanitizesToEmpty('<Style>.x{}</Style>')).toBe(true);
+    // A non-ASCII look-alike is not a removed tag name, and its text stays
+    // visible.
+    expect(htmlSanitizesToEmpty('<ınput>text</ınput>')).toBe(false);
   });
 
   it('answers the same as the previous pattern pipeline for generated values', () => {

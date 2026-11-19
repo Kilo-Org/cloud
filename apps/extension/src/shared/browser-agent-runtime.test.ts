@@ -2303,6 +2303,110 @@ describe('agent browser calls', () => {
     }
   });
 
+  it('stops a tab-less download on the tab that owns it when an earlier matching tab does not', async () => {
+    const downloads = createFakeDownloads();
+    // Both tabs sit on the same page, so the item's referrer matches both and only the second one holds it.
+    const secondTab = TAB_ID + 14;
+    const tabAt = (id: number) => ({
+      id,
+      title: 'Example',
+      url: `${MAIN_ORIGIN}/report.txt`,
+      windowId: 1,
+    });
+    const tabsApi: BrowserTabsApi = {
+      get: async (id: number) => tabAt(id),
+      query: async () => [tabAt(TAB_ID), tabAt(secondTab)],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      share: false,
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: TAB_ID });
+    await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: secondTab });
+
+    let clicks = 0;
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        clicks += 1;
+
+        if (clicks === 1) {
+          // The first tab announces a file the browser never creates, and stops another: a record, and no watch.
+          cdp.emit('Browser.downloadWillBegin', {
+            guid: 'first',
+            suggestedFilename: 'announced.bin',
+            url: `${MAIN_ORIGIN}/announced.bin`,
+          });
+          downloads.emit({ id: 81, tabId: TAB_ID, url: `${MAIN_ORIGIN}/one.bin` });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (tabId: number, target: string) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target },
+        caller: agent(),
+        tabId,
+        toolName: 'browser_click',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_take_screenshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      // The first tab leaves a record for another url and no watch; the second leaves a watch and no record.
+      await runTimed(click(TAB_ID, '#first'));
+      await runTimed(click(secondTab, '#second'));
+
+      // The browser reports the file without a tab: the page ties it to both tabs, and only the second owns it.
+      downloads.record({
+        id: 90,
+        referrer: `${MAIN_ORIGIN}/report.txt`,
+        startTime: new Date(Date.now()).toISOString(),
+        url: `${MAIN_ORIGIN}/late.bin`,
+      });
+
+      const reported = await runTimed(shot(), 0);
+
+      // The file is stopped, and the step the report asks to repeat is the second tab's own call.
+      expect([
+        reported.kind,
+        downloads.cancelled.includes(90),
+        reported.kind === 'needs_permission' ? reported.step : undefined,
+      ]).toStrictEqual([
+        'needs_permission',
+        true,
+        { argumentsHash: hashBrowserToolArguments({ target: '#second' }), tool: 'browser_click' },
+      ]);
+
+      if (reported.kind !== 'needs_permission') {
+        throw new Error(`expected a refusal, got ${reported.kind}`);
+      }
+
+      expect(reported.result.ok ? '' : reported.result.error).toContain('late.bin');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('names the requested path, not the whole url, when the kept item has no name yet', async () => {
     const downloads = createFakeDownloads();
     // The browser reports the item while it is still writing, so it has no file name of its own.
@@ -2412,6 +2516,119 @@ describe('agent browser calls', () => {
 
       // The file the browser had already written is named, not reported as deleted.
       expect(reported.result.ok ? '' : reported.result.error).toContain('already saved kept.bin');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('settles and names a stop that outlived its window instead of forgetting the record', async () => {
+    const downloads = createFakeDownloads({ removeRejects: true });
+    const held = Promise.withResolvers<readonly BrowserDownloadItem[]>();
+    const snapshotGate = Promise.withResolvers<void>();
+    const snapshotReached = Promise.withResolvers<void>();
+    let holding = true;
+    let parkedSnapshots = 0;
+    let parking = false;
+    const api: BrowserDownloadsApi = {
+      ...downloads.api,
+      search: query => {
+        if (holding && query.id === 72) {
+          holding = false;
+
+          // The stop's own read of the item never answers: the stop stays running past its window.
+          return held.promise;
+        }
+
+        return downloads.api.search?.(query);
+      },
+    };
+    const { cdp, runtime } = await createHarness({ downloadsApi: api });
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => ({}),
+      // The read is held inside its frame read, so the record falls behind its window while this call is running.
+      'Page.getFrameTree': async () => {
+        if (parking && parkedSnapshots === 0) {
+          parkedSnapshots += 1;
+          snapshotReached.resolve();
+          await snapshotGate.promise;
+        }
+
+        return {
+          frameTree: {
+            childFrames: [],
+            frame: { id: 'main', securityOrigin: MAIN_ORIGIN, url: MAIN_ORIGIN },
+          },
+        };
+      },
+    });
+
+    const click = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+    const read = () =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant] },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_snapshot',
+      });
+
+    vi.useFakeTimers();
+
+    try {
+      await runTimed(click());
+      await vi.advanceTimersByTimeAsync(1500);
+      // The linger stops the file, and its own read does not answer: the stop is still running, and unsettled.
+      downloads.emit({
+        filename: '/home/me/Downloads/overdue.bin',
+        id: 72,
+        state: 'complete',
+        tabId: TAB_ID,
+      });
+
+      // Only this read parks: the click before it has to answer.
+      parking = true;
+
+      const slow = read();
+
+      // This read started inside the stop's window and outlives it: its own drain of the records must not forget a
+      // Stop it cannot settle yet, or the file the browser kept is never named.
+      await snapshotReached.promise;
+      await vi.advanceTimersByTimeAsync(3000);
+
+      snapshotGate.resolve();
+
+      const ran = await slow;
+
+      expect(ran.kind).toBe('result');
+
+      // The next call settles the overdue stop with the truth — the browser would not delete the file — and names it.
+      const reported = await runTimed(read(), 0);
+
+      if (reported.kind !== 'needs_permission') {
+        throw new Error(`expected the kept file to be named, got ${reported.kind}`);
+      }
+
+      expect(reported.result.ok ? '' : reported.result.error).toContain(
+        'already saved overdue.bin'
+      );
+
+      // The parked read answers at last: the late outcome lands on a record that was already reported, once.
+      held.resolve([
+        { filename: '/home/me/Downloads/overdue.bin', id: 72, state: 'complete', tabId: TAB_ID },
+      ]);
+      await vi.advanceTimersByTimeAsync(50);
+
+      const again = await runTimed(read(), 0);
+
+      expect(again.kind).toBe('result');
     } finally {
       vi.useRealTimers();
     }

@@ -419,3 +419,14 @@ index 423ab10f53d43295fd52363cb87348e3e3410007..34c4954a037e9a3d7ee48982ca9d6fc3
        layout.getLineTop(startLine) + textView.paddingTop,
        maxRight,
        layout.getLineBottom(endLine) + textView.paddingTop,
+diff --git a/android/src/main/java/com/swmansion/enriched/markdown/utils/text/view/TextViewSetup.kt b/android/src/main/java/com/swmansion/enriched/markdown/utils/text/view/TextViewSetup.kt
+--- a/android/src/main/java/com/swmansion/enriched/markdown/utils/text/view/TextViewSetup.kt
++++ b/android/src/main/java/com/swmansion/enriched/markdown/utils/text/view/TextViewSetup.kt
+@@ -114,6 +114,5 @@
+ fun AppCompatTextView.applySelectableState(selectable: Boolean) {
+-  if (isTextSelectable == selectable) return
+-  setTextIsSelectable(selectable)
++  if (isTextSelectable != selectable) setTextIsSelectable(selectable)
+   movementMethod = LinkLongPressMovementMethod.createInstance()
+   if (!selectable && !isClickable) isClickable = true
+ }

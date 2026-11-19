@@ -877,7 +877,7 @@ export class NativeSyncClient {
           : snapshotFailures + 1;
       if (snapshotFailures < SNAPSHOT_FAILURE_LIMIT) return undefined;
       const cause = reason(error);
-      const message = `Native transcript is unavailable: ${/[.!?]$/.test(cause) ? cause : `${cause}.`} Refresh to retry.`;
+      const message = `Native transcript is unavailable: ${/[.!?]$/.test(cause) ? cause : `${cause}.`} Open the session again to retry.`;
       snapshotFailure = message;
       integrityError = undefined;
       publish({ snapshotFailure: { error: message }, error: message });
@@ -886,6 +886,17 @@ export class NativeSyncClient {
     const pruneQuarantined = (position: number) => {
       quarantined = quarantined.filter(entry => entry.position > position);
     };
+    /**
+     * A snapshot cycle is successful only when nothing it could not certify remains: a read
+     * that returns, yet still leaves a gap, is a failure cycle.
+     */
+    const transcriptSettled = () =>
+      state.session !== undefined &&
+      quarantined.length === 0 &&
+      !state.pendingSnapshotMessageIDs?.length &&
+      !state.messages.some(
+        message => message.incomplete || hasUnresolvedKilo2Assets(message.message, state.assetURLs)
+      );
     const recoverIncomplete = (epoch: SocketEpoch, force = false) => {
       if (
         recovery ||
@@ -1028,7 +1039,7 @@ export class NativeSyncClient {
               publish({ error: undefined });
             }
             current.completed = true;
-            snapshotFailures = 0;
+            if (transcriptSettled()) snapshotFailures = 0;
             return;
           }
           if (current.attempt >= 4) {
@@ -1070,7 +1081,8 @@ export class NativeSyncClient {
                 throw noteSnapshotFailure(error) ?? error;
               }
               if (!epoch.current()) return;
-              snapshotFailures = 0;
+              // A read that still leaves an uncertified gap has not settled the transcript.
+              if (transcriptSettled()) snapshotFailures = 0;
               lastSeq = frame.seq;
             }
             send({ type: 'subscribe', afterSeq: lastSeq });
@@ -1085,7 +1097,7 @@ export class NativeSyncClient {
               throw noteSnapshotFailure(error) ?? error;
             }
             if (!epoch.current()) return;
-            snapshotFailures = 0;
+            if (transcriptSettled()) snapshotFailures = 0;
             lastSeq = typeof body['seq'] === 'number' ? body['seq'] : frame.seq;
             send({ type: 'subscribe', afterSeq: lastSeq });
             recoverIncomplete(epoch);
@@ -1339,10 +1351,18 @@ export class NativeSyncClient {
       },
       refresh: () => {
         if (closed) return;
+        // A retry is a clean read of the authoritative transcript: the next hello reads it
+        // again instead of resuming from the cursor that preceded the failure, and a reset
+        // transcript at a lower position is accepted.
+        connection.restart();
         snapshotFailures = 0;
         snapshotFailure = undefined;
+        lastSeq = undefined;
+        snapshotPosition = -1;
+        integrityGap = false;
+        // A frame the client could not project keeps its warning until a snapshot read covers it.
+        integrityError = quarantined.length === 0 ? undefined : projectedFrameGap;
         publish({ snapshotFailure: undefined, error: undefined });
-        connection.restart();
       },
       close: () => {
         closed = true;

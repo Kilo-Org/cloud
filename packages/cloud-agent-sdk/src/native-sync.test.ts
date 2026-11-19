@@ -848,6 +848,84 @@ test('refresh after a latch clears the marker and reads a fresh snapshot', async
   connection.close();
 });
 
+test('refresh after a reset-cycle latch re-reads the transcript at its new position', async () => {
+  snapshot.mockResolvedValueOnce(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket(0).frame('hello', hello(), 3);
+  await flush();
+  expect(state?.snapshot?.position).toBe(5);
+  snapshot.mockRejectedValue(new Error('Native state read failed'));
+  for (const index of [0, 1, 2]) {
+    connectedSocket(index).frame('reset_required', { seq: 20 + index }, 20 + index);
+    await flush();
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+  }
+  expect(state?.snapshotFailure?.error).toContain('Native state read failed');
+  expect(FakeSocket.sockets).toHaveLength(3);
+  // The reset transcript restarts behind the position read before it.
+  snapshot.mockResolvedValueOnce({ ...complete(4), revision: 3 });
+  connection.refresh();
+  await flush();
+  expect(state?.snapshotFailure).toBeUndefined();
+  expect(state?.error).toBeUndefined();
+  connectedSocket(3).frame('hello', hello(), 6);
+  await flush();
+  expect(state?.snapshot?.position).toBe(4);
+  expect(state?.messages[0]?.message.content).toEqual([{ type: 'text', text: 'done' }]);
+  expect(state?.error).toBeUndefined();
+  expect(connectedSocket(3).sent).toContainEqual({ type: 'subscribe', afterSeq: 6 });
+  expect(snapshot).toHaveBeenCalledTimes(5);
+  connection.close();
+});
+
+test('refresh keeps a warning for a frame no later snapshot has covered yet', async () => {
+  snapshot.mockResolvedValue(complete(5));
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame(
+    'session.step.started',
+    { syncPosition: 9, data: { data: { id: 'invalid' } } },
+    4,
+    'events'
+  );
+  await flush();
+  expect(state?.error).toContain('skipped an event it could not read');
+  // Three exhausted recoveries latch while the unprojectable frame stays uncovered.
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  socket.frame('reset_required', { seq: 5 }, 5);
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  socket.frame('reset_required', { seq: 6 }, 6);
+  await flush();
+  await jest.advanceTimersByTimeAsync(4000);
+  await flush();
+  expect(state?.snapshotFailure?.error).toContain('recovery is incomplete');
+  // The refreshed read still does not cover the quarantined frame.
+  snapshot.mockResolvedValue(complete(5));
+  connection.refresh();
+  await flush();
+  expect(state?.snapshotFailure).toBeUndefined();
+  connectedSocket(1).frame('hello', hello(), 7);
+  await flush();
+  expect(state?.error).toContain('skipped an event it could not read');
+  connection.close();
+});
+
 test('an unreadable native asset latches on the first snapshot read', async () => {
   snapshot.mockRejectedValueOnce(
     Object.assign(new Error('asset file is not readable'), { code: 'native_asset_not_found' })
@@ -862,7 +940,7 @@ test('an unreadable native asset latches on the first snapshot read', async () =
   await flush();
   expect(state?.connection).toBe('disconnected');
   expect(state?.snapshotFailure?.error).toBe(
-    'Native transcript is unavailable: asset file is not readable. Refresh to retry.'
+    'Native transcript is unavailable: asset file is not readable. Open the session again to retry.'
   );
   expect(snapshot).toHaveBeenCalledTimes(1);
   await jest.advanceTimersByTimeAsync(120_000);
@@ -952,7 +1030,7 @@ test('an unconverged recovery snapshot counts one failed cycle each', async () =
   await flush();
   expect(state?.connection).toBe('disconnected');
   expect(state?.snapshotFailure?.error).toBe(
-    'Native transcript is unavailable: Native transcript recovery is incomplete. Refresh to retry.'
+    'Native transcript is unavailable: Native transcript recovery is incomplete. Open the session again to retry.'
   );
   expect(snapshot).toHaveBeenCalledTimes(13);
   expect(FakeSocket.sockets).toHaveLength(1);

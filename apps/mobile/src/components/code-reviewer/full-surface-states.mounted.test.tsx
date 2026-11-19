@@ -258,6 +258,16 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useGitHubRepositories: () => state.repositories,
   useGitLabRepositories: () => state.repositories,
   useBitbucketReadiness: () => state.bitbucket,
+  // The integration status is the second reading of one connection: these
+  // states never seed an OAuth authorization, so it answers nothing and the
+  // readiness above decides, exactly as it did when it was the only read.
+  useBitbucketIntegrationStatus: () => ({
+    data: undefined,
+    isError: false,
+    isFetching: false,
+    isLoading: false,
+    refetch: () => Promise.resolve(),
+  }),
 }));
 vi.mock('@/lib/hooks/use-code-reviewer-repo-selection', () => ({
   useRepoSelectionToggle: () => state.toggleRepo,

@@ -15,45 +15,33 @@ import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
  */
 export function ReviewerHeader({
   title,
-  titleNumberOfLines,
   reserveTitleSpace = false,
-  eyebrow,
-  reserveEyebrow = false,
-  eyebrowPlaceholder,
+  subtitle,
+  reserveSubtitle = false,
+  subtitlePlaceholder,
   backFallback = CODE_REVIEWER_HOME_PATH,
   onBack,
 }: Readonly<{
-  /** The screen's own title: the scope, the provider, or the list name. */
+  /** The screen's own name: the product, the provider, or the list name. */
   title: string;
-  /** Raise the title's line cap for prose that may wrap; the default is one. */
-  titleNumberOfLines?: number;
   /**
-   * Reserve the title's line cap so a name that arrives with a query, or wraps
-   * to its second line, cannot move the body below the header.
+   * Reserve the title's line so a title that arrives with a query cannot move
+   * the body below the header.
    */
   reserveTitleSpace?: boolean;
   /**
-   * The mono line above the title: the header's category label. Screens that
-   * title themselves with a scope (the platform list, the review list) still
-   * pass what their own header names — the product for the platform list, the
-   * list's own name for the review list — while the provider screens pass
-   * `t('common.codeReviewer')`. The scope list (whose title is the product
-   * name) and the edit routes keep the title-only header they had.
+   * The one line under the title that names what the screen acts on: the
+   * scope (Personal or the organization) or the review's repository. It is the
+   * same two-line header the Instructions and Agents screens paint.
    */
-  eyebrow?: string;
+  subtitle?: string;
   /**
-   * Keep the eyebrow's line in the layout while it has no label yet. A screen
-   * whose eyebrow arrives with a query reserves it so the title above the body
-   * does not move when the payload lands; screens that paint an eyebrow from
-   * their first frame leave it off.
+   * Keep the subtitle's line in the layout while it has no text yet, so the
+   * body does not move when the read that names it lands.
    */
-  reserveEyebrow?: boolean;
-  /**
-   * What the reserved eyebrow line paints while its label loads, such as a bar
-   * one eyebrow line tall. Ignored when the caller passes no `eyebrow` and no
-   * `reserveEyebrow`, because no line is reserved to paint it over.
-   */
-  eyebrowPlaceholder?: React.ReactNode;
+  reserveSubtitle?: boolean;
+  /** What the reserved subtitle line paints while its text loads. */
+  subtitlePlaceholder?: React.ReactNode;
   /** Where Back lands when the screen has no history to pop. */
   backFallback?: Href;
   /** Run this instead of navigating, e.g. while a form confirms a discard. */
@@ -62,11 +50,10 @@ export function ReviewerHeader({
   return (
     <ScreenHeader
       title={title}
-      titleNumberOfLines={titleNumberOfLines}
       reserveTitleSpace={reserveTitleSpace}
-      eyebrow={eyebrow}
-      reserveEyebrow={reserveEyebrow}
-      eyebrowPlaceholder={eyebrowPlaceholder}
+      subtitle={subtitle}
+      reserveSubtitle={reserveSubtitle}
+      subtitlePlaceholder={subtitlePlaceholder}
       backFallback={backFallback}
       onBack={onBack}
     />

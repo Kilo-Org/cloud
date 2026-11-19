@@ -29,6 +29,7 @@ import {
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
 
@@ -84,6 +85,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   // settles a status-bar inset below the window top and the header reserves no
   // clearance of its own (`useFormSheetHeaderTopInset`).
   const headerTopInset = useFormSheetHeaderTopInset();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
   const [reason, setReason] = useState<DismissReason | null>(null);
@@ -172,10 +174,10 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (notFound) {
     return (
       <DismissSheetFrame>
-        <EmptyState
-          icon={ShieldOff}
+        <QueryError
+          variant="not-found"
           title={t('securityAgent.dismiss.notFoundTitle')}
-          description={t('securityAgent.dismiss.notFoundDescription')}
+          message={t('securityAgent.dismiss.notFoundDescription')}
         />
       </DismissSheetFrame>
     );
@@ -272,6 +274,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
       />
       <ScrollView
         className="flex-1"
+        style={sideInsetMarginStyle}
         contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
@@ -282,7 +285,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             truncating — a long title must stay readable to confirm the
             finding. */}
         <Card>
-          <Text className="text-base font-medium">{finding.title}</Text>
+          <Text className="text-base font-medium" direction="auto">
+            {finding.title}
+          </Text>
           <Text variant="muted" className="text-xs">
             {finding.repo_full_name}
           </Text>

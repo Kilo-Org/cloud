@@ -125,17 +125,21 @@ export type AdminAccessAttribution = {
   /** Capability issuance id (`jti`) when the event records a capability mint. */
   issuanceId: string | null;
   /**
-   * Best-effort route identifier. For tRPC this is the exact procedure path;
-   * for REST and server components it is the concrete pathname (`x-pathname`)
-   * when available, falling back to Vercel's matched route pattern
-   * (`x-matched-path`), which may be templated (e.g. `/admin/api/users/[id]/...`).
+   * Route identifier. For tRPC this is the exact procedure path; for REST and
+   * server components it is the route the caller supplied explicitly (see
+   * {@link AdminAuditContext.auditRoute}) when present, otherwise the concrete
+   * pathname (`x-pathname`) when available, falling back to Vercel's matched
+   * route pattern (`x-matched-path`), which may be templated (e.g.
+   * `/admin/api/users/[id]/...`).
    */
   route: string | null;
   /**
    * The tRPC operation type (`query`, `mutation`) on `surface:"trpc"`; the HTTP
-   * method on `surface:"rest"`, forwarded by `proxy.ts` as `x-http-method`.
-   * Null when no reliable value exists (for example a unit test that invokes a
-   * shared helper without the proxy).
+   * method on `surface:"rest"`, taken from the value the caller supplies
+   * explicitly (see {@link AdminAuditContext.auditMethod}) when present,
+   * otherwise from `proxy.ts`'s `x-http-method`. Null when no reliable value
+   * exists (for example a unit test that invokes a shared helper without the
+   * proxy).
    */
   method: string | null;
   ip: string | null;
@@ -410,9 +414,16 @@ export type AdminAuditContext = {
   trpcType?: string;
   /** REST/server-component surface when the caller already knows it. */
   auditSurface?: AdminAccessSurface;
-  /** Route a REST or server-component caller already knows, e.g. from its request headers. */
+  /**
+   * Route a REST or server-component caller already knows, e.g. from its
+   * request headers. Takes precedence over the `x-pathname`/`x-matched-path`
+   * derivation.
+   */
   auditRoute?: string;
-  /** Actual request method for a REST caller. */
+  /**
+   * Actual request method for a REST caller. Takes precedence over the
+   * `x-http-method` derivation.
+   */
   auditMethod?: string;
   delegatedWorkload?: boolean;
 };
@@ -481,6 +492,7 @@ function attributionFromHeaders(params: {
   headersList: Headers;
   surface?: AdminAccessSurface;
   method?: string;
+  route?: string;
   tokenSource?: string | null;
   internalApiUse?: boolean;
   delegatedWorkload?: boolean;
@@ -497,7 +509,7 @@ function attributionFromHeaders(params: {
       internalApiUse: params.internalApiUse,
       delegatedWorkload: params.delegatedWorkload,
     }),
-    route: routeFromHeaders(params.headersList),
+    route: params.route ?? routeFromHeaders(params.headersList),
     method: params.method ?? methodFromHeaders(params.headersList),
     ip: clientIpFromHeaders(params.headersList),
     userAgentProduct: userAgentProductFromHeaders(params.headersList),
@@ -585,6 +597,11 @@ export async function recordKiloAdminElevation(
       target: params.target,
       surface: ctx.auditSurface,
       method: ctx.auditMethod,
+      route: ctx.auditRoute,
+      // Keep every header-derived field on one source when the caller carries
+      // its own request headers: mixing the caller's route with attribution
+      // read from the ambient store would attribute one event to two requests.
+      headersList: ctx.headersList,
       delegatedWorkload: ctx.delegatedWorkload,
       membershipRole: params.membershipRole,
       wouldPassWithoutAdmin: params.wouldPassWithoutAdmin,
@@ -641,6 +658,8 @@ export type KiloAdminElevationRequestParams = {
   surface?: AdminAccessSurface;
   /** The actual Request method when the caller has one. */
   method?: string;
+  /** Route the caller already knows, e.g. from its request context. */
+  route?: string;
   /** Use the caller's request headers instead of the ambient header store. */
   headersList?: Headers;
   internalApiUse?: boolean;

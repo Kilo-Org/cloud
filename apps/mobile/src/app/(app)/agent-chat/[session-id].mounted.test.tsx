@@ -250,6 +250,12 @@ vi.mock('@/components/invalid-route-state', () => ({
   InvalidRouteState: 'InvalidRouteState',
 }));
 
+// The real bubble draws a failed preparation group, whose output block pulls in
+// react-native-gesture-handler; the stored transcripts here carry no attempts.
+vi.mock('@/components/agents/preparation-group', () => ({
+  PreparationGroup: 'PreparationGroup',
+}));
+
 vi.mock('@/lib/hooks/use-session-mutations', () => ({
   useSessionMutations: () => ({ renameSessionAsync: vi.fn() }),
 }));

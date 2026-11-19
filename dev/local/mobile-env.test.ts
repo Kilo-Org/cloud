@@ -38,6 +38,10 @@ test('builds LAN URLs for every mobile-facing local service', () => {
     values.get('LATENCY_INGEST_URL'),
     `http://192.168.1.10:${getService('latency-ingest').port}`
   );
+  assert.equal(
+    values.get('EXPO_PUBLIC_SESSION_SYNC_URL'),
+    `http://192.168.1.10:${getService('cloudflare-session-sync').port}`
+  );
 });
 
 test('rewrites only requested env keys while preserving comments and other values', () => {

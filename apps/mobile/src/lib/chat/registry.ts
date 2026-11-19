@@ -13,6 +13,7 @@ import {
   ToolMissingError,
   type Turn,
 } from '@kilocode/harness-sdk';
+import { type Part } from '@kilocode/cloud-agent-sdk';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
 import { KILO_MCP_URL } from '@/lib/config';
@@ -62,6 +63,7 @@ import {
   migrateAsked,
   moveQuestions,
   newKeptId,
+  recordAskedAnswer,
   recordAskedFailure,
   rememberAsked,
   rememberFirstQuestion,
@@ -693,6 +695,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
          retry: that record is the bubble, so it stays in the transcript where
          it was said and the slot draws no second one. */
       askedFrom: asked?.from ?? null,
+      askedAnswer: asked?.answer ?? null,
       displaced: kept,
       status: 'idle',
       failed: null,
@@ -732,6 +735,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
          retry: that record is the bubble, so it stays in the transcript where
          it was said and the slot draws no second one. */
       askedFrom: asked?.from ?? null,
+      askedAnswer: asked?.answer ?? null,
       displaced: kept,
       record: recordOfChat(database, sessionId),
       askedEffort: asked?.effort ?? null,
@@ -777,18 +781,26 @@ async function keepAsked(sessionId: string): Promise<void> {
   const failureKey = recorded?.failureKey ?? held.failureKey;
   const outcome: Displaced['outcome'] = failureKey === null ? 'stopped' : 'failed';
   const askedFrom = held.askedFrom;
+  /* The words this attempt's Stop left, which replace any an earlier attempt
+     left: the bubble stands for this attempt now. */
+  const answer = held.askedAnswer === null ? {} : { answer: held.askedAnswer };
   if (askedFrom !== null) {
     /* It is already in the transcript, where it was said. This attempt is the
        one its bubble stands for now, so only how it ended is written down. */
     change(sessionId, {
-      displaced: held.displaced.map(one =>
-        one.id === askedFrom ? { ...one, outcome, failureKey } : one
-      ),
+      displaced: held.displaced.map(one => {
+        if (one.id !== askedFrom) {
+          return one;
+        }
+        const { answer: _earlier, ...question } = one;
+        return { ...question, outcome, failureKey, ...answer };
+      }),
       asked: null,
       askedImages: [],
       askedModel: null,
       askedEffort: null,
       askedFrom: null,
+      askedAnswer: null,
     });
     try {
       await replaceKept(sessionId, snapshotOf(sessionId).displaced);
@@ -810,6 +822,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     afterTurns: held.turns.length,
     outcome,
     failureKey,
+    ...answer,
   };
   change(sessionId, {
     displaced: [...snapshotOf(sessionId).displaced, stored],
@@ -818,6 +831,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     askedModel: null,
     askedEffort: null,
     askedFrom: null,
+    askedAnswer: null,
   });
   try {
     await replaceKept(sessionId, snapshotOf(sessionId).displaced);
@@ -906,6 +920,7 @@ async function askInTurn(
       askedModel: model,
       askedEffort: effort,
       askedFrom: from ?? null,
+      askedAnswer: null,
     });
     await rememberAsked(current, {
       text,
@@ -931,6 +946,7 @@ async function askInTurn(
       askedModel: model,
       askedEffort: effort,
       askedFrom: from ?? null,
+      askedAnswer: null,
       failed: null,
       failureKey: null,
       record: { ...snapshotOf(current).record, updatedAt: at },
@@ -948,6 +964,7 @@ async function askInTurn(
       askedModel: model,
       askedEffort: effort,
       askedFrom: from ?? null,
+      askedAnswer: null,
       failed: reason(error),
       failureKey,
     });
@@ -1026,7 +1043,13 @@ export async function retryChat(sessionId: string, displaced?: Displaced): Promi
     /* The slot already holds it, so asking it again takes its place back rather
        than leaving a second copy of itself in the transcript. A retry of a kept
        question stays the retry of it, so its bubble stays where it was said. */
-    change(current, { asked: null, askedImages: [], askedModel: null, askedEffort: null });
+    change(current, {
+      asked: null,
+      askedImages: [],
+      askedModel: null,
+      askedEffort: null,
+      askedAnswer: null,
+    });
     await say(
       current,
       { text: asked, images: askedImages, ...(askedFrom === null ? {} : { from: askedFrom }) },
@@ -1272,7 +1295,8 @@ function says(turn: Turn | undefined, question: Question): boolean {
  *
  * The turns come from the session rather than from what was streamed: the store
  * holds what was written, and a question that failed was never written. That
- * question stays remembered, which is what offers the Retry.
+ * question stays remembered, which is what offers the Retry, and so do the
+ * words its answer had reached before it failed, as they do after a Stop.
  */
 async function settle(
   sessionId: string,
@@ -1334,10 +1358,16 @@ async function settle(
     askedImages: failed === null ? [] : held.askedImages,
     askedModel: failed === null ? null : held.askedModel,
     askedFrom: failed === null ? null : held.askedFrom,
+    askedAnswer: null,
     displaced: kept,
     failed,
     failureKey: failure?.key ?? null,
   });
+  if (failure !== null) {
+    /* In the same tick as the change above, so the screen never draws the
+       question without the words it had already shown. */
+    await keepPartialAnswer(sessionId, held.answering);
+  }
   /* The line moves only when the answer landed. A question that failed keeps
      its Retry, and asking the next one would take the place that Retry hangs
      off — so what is waiting stays waiting until the person deals with it. A
@@ -1948,9 +1978,9 @@ export async function retryKiloMcp(sessionId: string): Promise<void> {
  * Stops the answer that is arriving.
  *
  * Interrupting the reading aborts the request, so the provider stops sending.
- * The question stays remembered: nothing was answered, so the person is left
- * with what they asked and a Retry under it, rather than with a message that
- * vanished.
+ * The question stays remembered, with the words the answer had reached under
+ * it: the person is left with what they asked, what they already read, and a
+ * Retry, rather than with a message that vanished.
  */
 export async function stopChat(sessionId: string): Promise<void> {
   const chat = chats.get(sessionId);
@@ -1958,31 +1988,57 @@ export async function stopChat(sessionId: string): Promise<void> {
     return;
   }
   const stopped = await halt(sessionId, chat);
-  if (stopped) {
+  if (stopped !== null) {
+    await keepPartialAnswer(sessionId, stopped);
     await drain(sessionId, chat, false);
   }
 }
 
 /**
- * Interrupts the answer arriving, and answers whether there was one.
+ * Keeps the words an answer had reached when it was stopped or failed, beside
+ * the question it answers.
+ *
+ * They go on screen first, so a refused write costs only a restart. Only the
+ * words are kept: a tool call the end cut off has no result to show, and the
+ * reasoning is folded away on screen already.
+ */
+async function keepPartialAnswer(sessionId: string, parts: readonly Part[]): Promise<void> {
+  const answer = parts
+    .flatMap(part => (part.type === 'text' && part.text.trim() !== '' ? [part.text] : []))
+    .join('\n\n');
+  if (answer === '') {
+    return;
+  }
+  change(sessionId, { askedAnswer: answer });
+  try {
+    await recordAskedAnswer(sessionId, answer);
+  } catch {
+    /* The words stay on screen for as long as this chat is open. */
+  }
+}
+
+/**
+ * Interrupts the answer arriving, and answers with what of it was on screen,
+ * or null when no answer was arriving.
  *
  * Interrupting the reading aborts the request, so the provider stops sending.
- * It is deliberately only the interrupt: a chat being stopped goes on to ask
- * what is waiting, and a chat being closed does not.
+ * It is deliberately only the interrupt: a chat being stopped goes on to keep
+ * what arrived and ask what is waiting, and a chat being closed does neither.
  */
-async function halt(sessionId: string, chat: Chat): Promise<boolean> {
+async function halt(sessionId: string, chat: Chat): Promise<readonly Part[] | null> {
   if (chat.answering === undefined) {
-    return false;
+    return null;
   }
   const runtime = await runtimeFor(chat);
   await runtime.runPromise(Fiber.interrupt(chat.answering));
   chat.answering = undefined;
+  const arrived = snapshotOf(sessionId).answering;
   change(sessionId, { status: 'idle', answering: [] });
   /* An answer interrupted while its tools ran leaves an on-device generation
      waiting for results nothing will supply. It is released here, the one place
      Stop, a close, a deletion and a sign-out all pass through. */
   await releaseNativeModelRound(sessionId);
-  return true;
+  return arrived;
 }
 
 /**

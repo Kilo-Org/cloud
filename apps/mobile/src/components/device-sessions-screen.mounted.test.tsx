@@ -100,9 +100,11 @@ vi.mock('@/components/ui/icons', () => ({
   Smartphone: 'Smartphone',
   Shield: 'Shield',
   X: 'X',
-  ArrowLeft: 'ArrowLeft',
 }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
+  DirectionalLogOut: 'DirectionalLogOut',
+}));
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ token: 'test-token', signOut: vi.fn() }),
 }));
@@ -325,6 +327,17 @@ describe('device session sign-out controls', () => {
       'Kilo app · Android',
       'هاتف-قديم',
       'axios',
+    ]);
+    // The current row cannot say when it was last seen, and it already names
+    // itself, so its subtitle carries the label instead of a second date.
+    const subtitles = renderer.root
+      .findAll(node => String(node.type) === 'Text' && typeof node.props.children === 'string')
+      .map(node => node.props.children as string)
+      .filter(text => text.startsWith('Signed in '));
+    expect(subtitles).toStrictEqual([
+      'Signed in 2026-01-03 · This device',
+      'Signed in 2026-02-28 · Last seen 2026-03-11',
+      'Signed in 2026-03-04 · Last seen 2026-03-04',
     ]);
     unmount();
   });

@@ -9,7 +9,11 @@ import type { SandboxSessionV2 } from '../../src/control-plane/session/session-d
 import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
 import { logger } from '../../src/logger.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import { createMessageId } from '../../src/session/message-id.js';
+import type {
+  ControlPlaneEvent,
+  ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { waitFor } from './wait-for.js';
@@ -120,13 +124,15 @@ async function readAlarm(stub: DurableObjectStub<SandboxSessionV2>): Promise<num
 
 async function setup(callbackUrl = 'https://callback.test/hook'): Promise<{
   sessionId: string;
+  kiloSessionId: string;
   stub: DurableObjectStub<SandboxSessionV2>;
   peer: FakeSandboxPeer;
 }> {
   const sessionId = newSessionId();
+  const sessionKiloSessionId = kiloSessionId();
   const sandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}`;
   const stub = sessions.getByName(sessionId);
-  const sessionMetadata = metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId });
+  const sessionMetadata = metadata({ sessionId, kiloSessionId: sessionKiloSessionId, sandboxId });
   sessionMetadata.callback = { target: { url: callbackUrl } };
   await stub.registerSessionFromMetadata({
     metadata: sessionMetadata,
@@ -135,7 +141,7 @@ async function setup(callbackUrl = 'https://callback.test/hook'): Promise<{
   const peer = new FakeSandboxPeer();
   peer.prepareView = peer.view('ready');
   await installPeer(stub, peer);
-  return { sessionId, stub, peer };
+  return { sessionId, kiloSessionId: sessionKiloSessionId, stub, peer };
 }
 
 afterEach(async () => {
@@ -812,6 +818,67 @@ describe('SandboxSessionV2 reports and callbacks', () => {
 
     expect(attempts).toBeGreaterThanOrEqual(2);
     expect(callbacks).toHaveLength(1);
+  });
+
+  it('reports the last assistant message of the turn after a mid-turn synthetic message', async () => {
+    const { sessionId, kiloSessionId, stub } = await setup();
+    const captured = await installCapturedQueues(stub);
+    const promptId = createMessageId();
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloSessionId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const conversationMessage = (
+      message: Record<string, unknown>,
+      parentID?: string
+    ): ControlPlaneEvent => ({
+      type: 'conversation.message.updated',
+      properties: {
+        sessionID: kiloSessionId,
+        source,
+        message,
+        ...(parentID === undefined ? {} : { parentID }),
+      },
+    });
+    const assistant = (id: string, text: string, parentID: string) =>
+      conversationMessage(
+        {
+          id,
+          type: 'assistant',
+          time: { created: 2, completed: 3 },
+          content: [{ type: 'text', text }],
+        },
+        parentID
+      );
+
+    await stub.send(promptPayload(promptId));
+    await waitFor(async () => expect(await messageStatus(stub, promptId)).toBe('running'));
+    await stub.onEvents({
+      events: [
+        conversationMessage({ id: promptId, type: 'user', time: { created: 1 }, text: 'hello' }),
+        assistant('msg_assistant_early', 'Start Docker in the background.', promptId),
+        conversationMessage({
+          id: 'msg_synthetic',
+          type: 'synthetic',
+          time: { created: 2 },
+          text: 'Background task finished.',
+        }),
+        assistant('msg_assistant_final', 'Final answer', 'msg_synthetic'),
+      ],
+    });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: promptId });
+    await flush(stub);
+
+    expect(captured.callbacks).toHaveLength(1);
+    expect(captured.callbacks[0]?.payload).toMatchObject({
+      messageId: promptId,
+      status: 'completed',
+      lastAssistantMessageText: 'Final answer',
+    });
   });
 
   it('attributes initial and follow-up turns to the runtime harness the connected wrapper reported', async () => {

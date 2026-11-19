@@ -5,12 +5,20 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Input } from '@/components/ui/input';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
 type FormFieldProps = Omit<TextInputProps, 'value'> &
   React.RefAttributes<TextInput> & {
     label: string;
+    /**
+     * How the visible label paints. `field` (default) is the form label;
+     * `section` paints it as the section eyebrow, 10.5pt above the input, for
+     * a field that sits among labelled sections (a pill group's `Section`) so
+     * the labels beside each other share one style.
+     */
+    labelRole?: 'field' | 'section';
     error?: string;
     /**
      * The gap between the field's label row and its input. The default
@@ -76,7 +84,8 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
  */
 function FormField({
   label,
-  gapClassName = 'gap-1.5',
+  labelRole = 'field',
+  gapClassName = labelRole === 'section' ? 'gap-3' : 'gap-1.5',
   error,
   reserveErrorMessages,
   alwaysReserve,
@@ -122,7 +131,11 @@ function FormField({
           so a shown error or reserved message below the input keeps the
           ordinary spacing whatever the controls above the input need. */}
       <View className={gapClassName}>
-        <FormFieldLabel label={label} />
+        {labelRole === 'section' ? (
+          <SectionHeader label={label} />
+        ) : (
+          <FormFieldLabel label={label} />
+        )}
         <Input
           ref={instance => {
             nativeInput.current = instance;

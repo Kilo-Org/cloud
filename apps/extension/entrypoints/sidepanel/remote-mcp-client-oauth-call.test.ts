@@ -152,4 +152,25 @@ describe('remote MCP tool call against an OAuth server', () => {
       ['srv-2', 'connected'],
     ]);
   });
+
+  it('keeps the stored status unchanged for a failure that is not a sign-in need', async () => {
+    mocks.launchWebAuthFlow.mockReset();
+    mocks.close.mockResolvedValue();
+    mocks.callTool.mockReset();
+    mocks.connect.mockRejectedValueOnce(new Error('boom'));
+    const storage = createStorage([oauthServer]);
+
+    const result = await callRemoteMcpTool({
+      arguments: {},
+      fetch: noopFetch,
+      route,
+      server: oauthServer,
+      storageArea: storage,
+    });
+
+    expect(result).toMatchObject({ isError: true });
+
+    const stored = await loadRemoteMcpStore(storage);
+    expect(stored.servers.find(server => server.id === 'srv-1')?.status).toBe('connected');
+  });
 });

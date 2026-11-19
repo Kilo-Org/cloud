@@ -196,14 +196,15 @@ export const saveRemoteMcpStore = async (
 
 const storeUpdateChain = createSerialAsyncChain();
 
-/* Serialized load-modify-save: a save from an older snapshot would drop another caller's write. */
+/* Serialized load-modify-save: a stale save would drop another caller's write; a no-op update is not rewritten. */
 export const updateRemoteMcpStore = (
   storageArea: RemoteMcpStorageArea,
   update: (store: RemoteMcpStore) => RemoteMcpStore
 ): Promise<void> =>
   storeUpdateChain.enqueue(async () => {
     const store = await loadRemoteMcpStore(storageArea);
-    await saveRemoteMcpStore(storageArea, update(store));
+    const next = update(store);
+    await (next === store ? undefined : saveRemoteMcpStore(storageArea, next));
   });
 
 const createId = (): string => crypto.randomUUID();

@@ -333,12 +333,14 @@ export const callRemoteMcpTool = async ({
      */
     return CallToolResultSchema.parse(result);
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      await persistNeedsAuth(storageArea, server.id);
+    const described = describeConnectFailure(error);
+    if (described.needsAuth) {
+      // The user-facing tool result must not depend on whether the status write lands.
+      await persistNeedsAuth(storageArea, server.id).catch(() => {});
     }
 
     return {
-      content: [{ text: describeConnectFailure(error).message, type: 'text' }],
+      content: [{ text: described.message, type: 'text' }],
       isError: true,
     };
   } finally {

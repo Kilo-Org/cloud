@@ -25,12 +25,19 @@ export type GatewayModelWithEndpoints = GatewayModel & { endpoints: Endpoint[] }
 
 export type GatewayModelMap = Record<string, GatewayModelWithEndpoints>;
 
+export const LATEST_ALIAS_PREFIX = '~';
+
+/** Whether a model id is a `~` latest alias rather than a concrete catalog id. */
+export function isLatestAliasId(modelId: string): boolean {
+  return modelId.startsWith(LATEST_ALIAS_PREFIX);
+}
+
 /** The model a `~` latest alias resolves to, or `undefined` for a non-alias or unresolvable id. */
 export function getOpenRouterAliasTarget(
   models: GatewayModelMap,
   modelId: string
 ): string | undefined {
-  return modelId.startsWith('~') ? models[modelId]?.alias_target?.slug : undefined;
+  return isLatestAliasId(modelId) ? models[modelId]?.alias_target?.slug : undefined;
 }
 
 export const NO_ENDPOINTS_RESOURCE = 'no-endpoints-resource';

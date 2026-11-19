@@ -6,6 +6,7 @@ import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers
 import {
   formatModelIds,
   getOpenRouterAliasTarget,
+  isLatestAliasId,
   joinGatewayModelEndpoints,
   openRouterGatewayModelsSource,
   readStoredGatewayModels,
@@ -73,7 +74,7 @@ export const getOpenRouterModelsMetadataFromDatabase = createGatewayModelsFetche
 );
 
 export async function resolveOpenRouterModelAlias(modelId: string): Promise<string> {
-  if (!modelId.startsWith('~')) {
+  if (!isLatestAliasId(modelId)) {
     return modelId;
   }
 
@@ -164,19 +165,19 @@ function createModelIdsFetcher(
   );
 }
 
-export const getVercelModelsFromDatabase = createModelIdsFetcher(
+export const getVercelLanguageModelIdsFromDatabase = createModelIdsFetcher(
   'vercelLanguageModelIds',
   getVercelModelsMetadataFromDatabase,
   getVercelLanguageModelIds
 );
 
-export const getOpenRouterModelsFromDatabase = createModelIdsFetcher(
+export const getOpenRouterChatModelIdsFromDatabase = createModelIdsFetcher(
   'openRouterChatModelIds',
   getOpenRouterModelsMetadataFromDatabase,
   getOpenRouterChatModelIds
 );
 
-export const getOpenRouterSystemOneModelsFromDatabase = createModelIdsFetcher(
+export const getOpenRouterSystemOneModelIdsFromDatabase = createModelIdsFetcher(
   'openRouterSystemOneModelIds',
   getOpenRouterModelsMetadataFromDatabase,
   getSystemOneModelIds
@@ -190,7 +191,7 @@ export async function isValidOpenRouterModelId(modelId: string): Promise<boolean
   if (legacyOpenRouterAliases.has(modelId)) {
     return true;
   }
-  const openRouterModelIds = await getOpenRouterModelsFromDatabase();
+  const openRouterModelIds = await getOpenRouterChatModelIdsFromDatabase();
   if (openRouterModelIds.size === 0) {
     if (warnedMissingOpenRouterModelMetadataFor !== openRouterModelIds) {
       warnedMissingOpenRouterModelMetadataFor = openRouterModelIds;

@@ -49,9 +49,9 @@ import {
   upstreamRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
-  getOpenRouterModelsFromDatabase,
+  getOpenRouterChatModelIdsFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
-  getVercelModelsFromDatabase,
+  getVercelLanguageModelIdsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
@@ -345,15 +345,15 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
-const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
+const mockedGetOpenRouterChatModelIds = jest.mocked(getOpenRouterChatModelIdsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
-const mockedGetVercelModels = jest.mocked(getVercelModelsFromDatabase);
+const mockedGetVercelLanguageModelIds = jest.mocked(getVercelLanguageModelIdsFromDatabase);
 
 /** Like the OpenRouter catalog stub, Vercel's list accepts every model unless a test narrows it. */
 const everyVercelModel = { has: () => true } as unknown as ReadonlySet<string>;
 
 beforeEach(() => {
-  mockedGetVercelModels.mockResolvedValue(everyVercelModel);
+  mockedGetVercelLanguageModelIds.mockResolvedValue(everyVercelModel);
   jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
 });
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
@@ -536,7 +536,7 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -907,7 +907,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedUpstreamRequest.mockResolvedValue({
@@ -2476,7 +2476,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     'returns 404 when the %s model id is unknown',
     async providerType => {
       mockedIsValidOpenRouterModelId.mockResolvedValue(false);
-      mockedGetVercelModels.mockResolvedValue(new Set(['vendor/other-model']));
+      mockedGetVercelLanguageModelIds.mockResolvedValue(new Set(['vendor/other-model']));
       mockedGetProvider.mockResolvedValue(
         providerResult({
           provider: { ...provider, type: providerType },
@@ -2830,7 +2830,7 @@ describe.each([
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedGetProvider.mockResolvedValue(
       providerResult({
@@ -3255,7 +3255,7 @@ describe('organization data-collection policy on provider-policy exempt routes',
     setUserAuth();
     mockedFindCustomLlm.mockResolvedValue(null);
     mockedIsCustomLlm.mockResolvedValue(false);
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     // Free route shapes reach the free-model rate limit, so pin its default for this block.
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
@@ -3386,7 +3386,7 @@ describe('kilo-auto/efficient classifier billing', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -4296,7 +4296,7 @@ describe('auto-routing shadow classifier', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -4383,7 +4383,7 @@ describe('custom routers and signed auto decisions', () => {
       })
     );
     mockedGetDirectByokModel.mockResolvedValue(null);
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -5078,7 +5078,7 @@ describe('briefing gateway accounting receipts', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedUpstreamRequest.mockResolvedValue({
@@ -5470,7 +5470,7 @@ describe('Enkrypt output guardrail', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     respondUpstream('chat_completions', false);
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
@@ -6258,7 +6258,7 @@ describe('Enkrypt input guardrail', () => {
         bypassAccessCheck: false,
       })
     );
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -8169,7 +8169,7 @@ describe('BYOK failover', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedGetOpenRouterChatModelIds.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);

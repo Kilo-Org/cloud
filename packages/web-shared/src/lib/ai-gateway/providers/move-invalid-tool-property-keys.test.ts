@@ -59,20 +59,20 @@ describe('moveInvalidPropertyKeys', () => {
     expect(regex.test('c')).toBe(false);
   });
 
-  it('keeps existing patternProperties and leaves a name whose pattern is taken', () => {
+  it('keeps existing patternProperties and combines a schema whose pattern is taken', () => {
     const schema = {
       type: 'object',
       properties: { 'a b': { type: 'string' }, 'c d': { type: 'number' } },
-      patternProperties: { '^x-': { type: 'string' }, '^c d$': { type: 'boolean' } },
+      patternProperties: { '^x-': { type: 'string' }, '^c d$': { minimum: 1 } },
     };
 
-    expect(moveInvalidPropertyKeys(schema)).toEqual(['a b']);
+    expect(moveInvalidPropertyKeys(schema)).toEqual(['a b', 'c d']);
     expect(schema).toEqual({
       type: 'object',
-      properties: { 'c d': { type: 'number' } },
+      properties: {},
       patternProperties: {
         '^x-': { type: 'string' },
-        '^c d$': { type: 'boolean' },
+        '^c d$': { allOf: [{ minimum: 1 }, { type: 'number' }] },
         '^a b$': { type: 'string' },
       },
     });

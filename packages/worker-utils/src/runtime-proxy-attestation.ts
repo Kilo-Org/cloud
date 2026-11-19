@@ -8,7 +8,7 @@ export const RUNTIME_PROXY_ATTESTATION_ISSUER = 'kilocode-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_TYPE = 'cloud-agent-next-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_VERSION = 1;
 export const RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS = 30;
-/** Sanity bound on the untrusted header value, checked before any JWT parsing runs. */
+/** Sanity bound on the untrusted header value in characters, checked before any JWT parsing runs. */
 export const RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH = 4096;
 
 export const RuntimeProxyAttestationAudienceSchema = z.enum([

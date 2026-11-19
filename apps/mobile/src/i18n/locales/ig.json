@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Enweghị ike ibudata nnọkọ",
-    "couldNotLoadActiveSessions": "Enweghị ike ibudata nnọkọ na-aga n'ihu",
     "agentSessions": "Na-aga n'ihu ugbu a",
     "newCodingTask": "Ọrụ ịde koodu ọhụrụ",
     "newTaskFromPicture": "Ọrụ ọhụrụ site na foto",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Enweghị saịtị onyonyo a tụkwasịrị obi",
     "revoke": "Kagbuo ntụkwasị obi na {{host}}",
     "revokeMessage": "Njikọ ndị na-aga saịtị a ga-arịọ nkwenye ọzọ.",
-    "revokeImageMessage": "Onyonyo sitere na saịtị a ga-arịọ nkwenye ọzọ.",
-    "backToPreferences": "Laghachi na nhọrọ"
+    "revokeImageMessage": "Onyonyo sitere na saịtị a ga-arịọ nkwenye ọzọ."
   },
   "glanceable": {
     "waiting": "Na-emelite ndị nnọchi anya",

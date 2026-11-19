@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nem sikerült betölteni a munkameneteket.",
-    "couldNotLoadActiveSessions": "Nem sikerült betölteni az aktív munkameneteket.",
     "agentSessions": "Most fut",
     "newCodingTask": "Új kódolási feladat",
     "newTaskFromPicture": "Új feladat képből",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Nincsenek megbízható képwebhelyek",
     "revoke": "A megbízható jelölés visszavonása: {{host}}",
     "revokeMessage": "A webhelyre mutató hivatkozások ismét jóváhagyást kérnek majd.",
-    "revokeImageMessage": "A webhelyről származó képek ismét jóváhagyást kérnek majd.",
-    "backToPreferences": "Vissza a beállításokhoz"
+    "revokeImageMessage": "A webhelyről származó képek ismét jóváhagyást kérnek majd."
   },
   "glanceable": {
     "waiting": "Ügynökök frissítése",

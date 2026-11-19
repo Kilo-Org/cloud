@@ -2483,7 +2483,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Tidak dapat memuat sesi.",
-    "couldNotLoadActiveSessions": "Tidak dapat memuat sesi aktif.",
     "agentSessions": "Sedang berjalan",
     "newCodingTask": "Tugas pemrograman baru",
     "newTaskFromPicture": "Tugas baru dari gambar",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Tidak ada host gambar tepercaya",
     "revoke": "Cabut kepercayaan untuk {{host}}",
     "revokeMessage": "Tautan ke host ini akan meminta konfirmasi lagi.",
-    "revokeImageMessage": "Gambar dari host ini akan meminta konfirmasi lagi.",
-    "backToPreferences": "Kembali ke preferensi"
+    "revokeImageMessage": "Gambar dari host ini akan meminta konfirmasi lagi."
   },
   "glanceable": {
     "waiting": "Memperbarui agen",

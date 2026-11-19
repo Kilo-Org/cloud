@@ -2483,7 +2483,6 @@
   },
   "home": {
     "couldNotLoadSessions": "세션을 불러올 수 없습니다.",
-    "couldNotLoadActiveSessions": "활성 세션을 불러올 수 없습니다.",
     "agentSessions": "현재 실행 중",
     "newCodingTask": "새 코딩 작업",
     "newTaskFromPicture": "사진에서 새 작업",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "신뢰하는 이미지 호스트 없음",
     "revoke": "{{host}} 신뢰 해제",
     "revokeMessage": "이 호스트로 향하는 링크는 다시 확인을 요청합니다.",
-    "revokeImageMessage": "이 호스트의 이미지는 다시 확인을 요청합니다.",
-    "backToPreferences": "환경설정으로 돌아가기"
+    "revokeImageMessage": "이 호스트의 이미지는 다시 확인을 요청합니다."
   },
   "glanceable": {
     "waiting": "에이전트 상태 업데이트 중",

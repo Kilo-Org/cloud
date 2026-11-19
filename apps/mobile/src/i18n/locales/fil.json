@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Hindi ma-load ang mga sesyon.",
-    "couldNotLoadActiveSessions": "Hindi ma-load ang mga aktibong sesyon.",
     "agentSessions": "Kasalukuyang tumatakbo",
     "newCodingTask": "Bagong gawain sa pag-code",
     "newTaskFromPicture": "Bagong gawain mula sa larawan",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Walang pinagkakatiwalaang host ng larawan",
     "revoke": "Bawiin ang tiwala sa {{host}}",
     "revokeMessage": "Muling hihingi ng kumpirmasyon ang mga link sa host na ito.",
-    "revokeImageMessage": "Muling hihingi ng kumpirmasyon ang mga larawan mula sa host na ito.",
-    "backToPreferences": "Bumalik sa mga setting"
+    "revokeImageMessage": "Muling hihingi ng kumpirmasyon ang mga larawan mula sa host na ito."
   },
   "glanceable": {
     "waiting": "Ina-update ang mga agent",

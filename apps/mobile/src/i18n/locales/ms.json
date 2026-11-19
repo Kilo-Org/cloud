@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Tidak dapat memuatkan sesi.",
-    "couldNotLoadActiveSessions": "Tidak dapat memuatkan sesi aktif.",
     "agentSessions": "Sedang aktif",
     "newCodingTask": "Tugas pengekodan baharu",
     "newTaskFromPicture": "Tugas baharu daripada gambar",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Tiada hos imej yang dipercayai",
     "revoke": "Tarik balik kepercayaan terhadap {{host}}",
     "revokeMessage": "Pautan ke hos ini akan meminta pengesahan lagi.",
-    "revokeImageMessage": "Imej daripada hos ini akan meminta pengesahan lagi.",
-    "backToPreferences": "Kembali ke keutamaan"
+    "revokeImageMessage": "Imej daripada hos ini akan meminta pengesahan lagi."
   },
   "glanceable": {
     "waiting": "Mengemas kini ejen",

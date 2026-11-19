@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { CenteredState } from '@/components/centered-state';
 import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 
 import { MessageErrorBoundary } from './message-error-boundary';
 import { SessionPageSheet } from './session-page-sheet';
@@ -46,7 +48,7 @@ export function ToolRunSheet({ visible, parts, onClose, onOpenPart }: Readonly<T
           </View>
         </CenteredState>
       ) : (
-        <ScrollView className="flex-1" contentContainerClassName="gap-2 px-4 pb-6 pt-3">
+        <ScrollView className="flex-1" contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}>
           {parts.map(part => (
             <MessageErrorBoundary key={part.id}>
               <ToolOneLineRow

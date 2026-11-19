@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 
 import {
@@ -39,37 +41,30 @@ function ShareConfiguration({ choice, busy }: Readonly<{ choice: ShareChoice; bu
     label: t(DURATION_LABEL_KEYS[value]),
   }));
   return (
-    <View className="gap-3">
-      <View className="gap-2">
-        <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-          {t('sessionShare.durationLabel')}
-        </Text>
+    <View className="gap-6">
+      <Section label={t('sessionShare.durationLabel')}>
         <SegmentedControl
           options={durationLabels}
           value={choice.duration}
           onChange={choice.handleDurationChange}
           accessibilityLabel={t('sessionShare.durationLabel')}
         />
-      </View>
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="flex-1 gap-1">
-          <Text className="text-sm font-medium text-foreground">
-            {t('sessionShare.includeNewMessages')}
-          </Text>
-          <Text variant="muted" className="text-xs">
-            {choice.includeNewMessages
+      </Section>
+      <RowGroup>
+        <PreferenceRow
+          title={t('sessionShare.includeNewMessages')}
+          subtitle={
+            choice.includeNewMessages
               ? t('sessionShare.includeNewMessagesOn')
-              : t('sessionShare.includeNewMessagesOff')}
-          </Text>
-        </View>
-        <Switch
-          testID="session-share-include-new"
-          accessibilityLabel={t('sessionShare.includeNewMessages')}
+              : t('sessionShare.includeNewMessagesOff')
+          }
           value={choice.includeNewMessages}
           disabled={busy}
           onValueChange={choice.handleIncludeNewMessagesChange}
+          accessibilityLabel={t('sessionShare.includeNewMessages')}
+          testID="session-share-include-new"
         />
-      </View>
+      </RowGroup>
     </View>
   );
 }
@@ -218,7 +213,7 @@ function ReadFailedPanel({
   const { t } = useTranslation();
   return (
     <View className="gap-3">
-      <Text className="text-xs text-destructive" testID="session-share-state-error">
+      <Text variant="caption" className="text-destructive" testID="session-share-state-error">
         {t('common.somethingWentWrong')}
       </Text>
       <Button

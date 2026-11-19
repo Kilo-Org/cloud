@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kunne ikke laste inn øktene.",
-    "couldNotLoadActiveSessions": "Kunne ikke laste inn aktive økter.",
     "agentSessions": "Pågår nå",
     "newCodingTask": "Ny kodeoppgave",
     "newTaskFromPicture": "Ny oppgave fra et bilde",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Ingen godkjente bildeverter",
     "revoke": "Trekk tilbake godkjenningen av {{host}}",
     "revokeMessage": "Lenker til denne verten vil igjen be om bekreftelse.",
-    "revokeImageMessage": "Bilder fra denne verten vil igjen be om bekreftelse.",
-    "backToPreferences": "Tilbake til innstillinger"
+    "revokeImageMessage": "Bilder fra denne verten vil igjen be om bekreftelse."
   },
   "glanceable": {
     "waiting": "Oppdaterer agenter",

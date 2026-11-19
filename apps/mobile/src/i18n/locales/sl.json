@@ -3150,7 +3150,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sej ni bilo mogoče naložiti.",
-    "couldNotLoadActiveSessions": "Aktivnih sej ni bilo mogoče naložiti.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Nova programska naloga",
     "newTaskFromPicture": "Nova naloga iz slike",
@@ -3805,8 +3804,7 @@
     "imagesSectionEmpty": "Ni zaupanja vrednih gostiteljev slik",
     "revoke": "Prekliči zaupanje gostitelju {{host}}",
     "revokeMessage": "Povezave do tega gostitelja bodo znova zahtevale potrditev.",
-    "revokeImageMessage": "Slike s tega gostitelja bodo znova zahtevale potrditev.",
-    "backToPreferences": "Nazaj na nastavitve"
+    "revokeImageMessage": "Slike s tega gostitelja bodo znova zahtevale potrditev."
   },
   "glanceable": {
     "waiting": "Posodabljanje agentov",

@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "سیشنز لوڈ نہیں ہو سکے۔",
-    "couldNotLoadActiveSessions": "فعال سیشنز لوڈ نہیں ہو سکے۔",
     "agentSessions": "ابھی جاری",
     "newCodingTask": "کوڈنگ کا نیا کام",
     "newTaskFromPicture": "تصویر سے نیا کام",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "کوئی قابل اعتماد تصویری ہوسٹ نہیں",
     "revoke": "{{host}} پر اعتماد ختم کریں",
     "revokeMessage": "اس ہوسٹ کے لنکس دوبارہ تصدیق طلب کریں گے۔",
-    "revokeImageMessage": "اس ہوسٹ کی تصاویر دوبارہ تصدیق طلب کریں گی۔",
-    "backToPreferences": "ترجیحات پر واپس جائیں"
+    "revokeImageMessage": "اس ہوسٹ کی تصاویر دوبارہ تصدیق طلب کریں گی۔"
   },
   "glanceable": {
     "waiting": "ایجنٹس کی معلومات اپ ڈیٹ ہو رہی ہیں",

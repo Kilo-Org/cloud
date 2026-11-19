@@ -3094,7 +3094,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nu s-au putut încărca sesiunile.",
-    "couldNotLoadActiveSessions": "Nu s-au putut încărca sesiunile active.",
     "agentSessions": "În curs acum",
     "newCodingTask": "Sarcină nouă de programare",
     "newTaskFromPicture": "Sarcină nouă dintr-o imagine",
@@ -3745,8 +3744,7 @@
     "imagesSectionEmpty": "Nicio gazdă de imagini de încredere",
     "revoke": "Retrage încrederea acordată gazdei {{host}}",
     "revokeMessage": "Linkurile către această gazdă vor cere din nou confirmare.",
-    "revokeImageMessage": "Imaginile de la această gazdă vor cere din nou confirmare.",
-    "backToPreferences": "Înapoi la preferințe"
+    "revokeImageMessage": "Imaginile de la această gazdă vor cere din nou confirmare."
   },
   "glanceable": {
     "waiting": "Se actualizează agenții",

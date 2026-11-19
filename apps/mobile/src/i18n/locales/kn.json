@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-    "couldNotLoadActiveSessions": "ಸಕ್ರಿಯ ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "agentSessions": "ಈಗ ಚಾಲನೆಯಲ್ಲಿರುವವು",
     "newCodingTask": "ಹೊಸ ಕೋಡಿಂಗ್ ಕಾರ್ಯ",
     "newTaskFromPicture": "ಚಿತ್ರದಿಂದ ಹೊಸ ಕಾರ್ಯ",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "ವಿಶ್ವಾಸಾರ್ಹ ಚಿತ್ರ ಹೋಸ್ಟ್‌ಗಳಿಲ್ಲ",
     "revoke": "{{host}} ಗೆ ನೀಡಿದ ಅನುಮತಿಯನ್ನು ಹಿಂಪಡೆಯಿರಿ",
     "revokeMessage": "ಈ ಹೋಸ್ಟ್‌ನ ಲಿಂಕ್‌ಗಳು ಮತ್ತೆ ಅನುಮತಿ ಕೇಳುತ್ತವೆ.",
-    "revokeImageMessage": "ಈ ಹೋಸ್ಟ್‌ನ ಚಿತ್ರಗಳು ಮತ್ತೆ ಅನುಮತಿ ಕೇಳುತ್ತವೆ.",
-    "backToPreferences": "ಆದ್ಯತೆಗಳಿಗೆ ಹಿಂತಿರುಗಿ"
+    "revokeImageMessage": "ಈ ಹೋಸ್ಟ್‌ನ ಚಿತ್ರಗಳು ಮತ್ತೆ ಅನುಮತಿ ಕೇಳುತ್ತವೆ."
   },
   "glanceable": {
     "waiting": "ಏಜೆಂಟ್‌ಗಳನ್ನು ನವೀಕರಿಸಲಾಗುತ್ತಿದೆ",

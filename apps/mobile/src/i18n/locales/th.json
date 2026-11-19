@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "โหลดเซสชันไม่สำเร็จ",
-    "couldNotLoadActiveSessions": "โหลดเซสชันที่ใช้งานอยู่ไม่สำเร็จ",
     "agentSessions": "กำลังทำงานอยู่",
     "newCodingTask": "งานเขียนโค้ดใหม่",
     "newTaskFromPicture": "งานใหม่จากรูปภาพ",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "ไม่มีโฮสต์รูปภาพที่เชื่อถือ",
     "revoke": "เลิกเชื่อถือ {{host}}",
     "revokeMessage": "ลิงก์ไปยังโฮสต์นี้จะขอการยืนยันอีกครั้ง",
-    "revokeImageMessage": "รูปภาพจากโฮสต์นี้จะขอการยืนยันอีกครั้ง",
-    "backToPreferences": "กลับไปที่การตั้งค่า"
+    "revokeImageMessage": "รูปภาพจากโฮสต์นี้จะขอการยืนยันอีกครั้ง"
   },
   "glanceable": {
     "waiting": "กำลังอัปเดตสถานะเอเจนต์",

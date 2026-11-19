@@ -8,6 +8,7 @@ import { OutputGuardrailsSection } from '@/components/organization/guardrails-ou
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { useSaveOrgGuardrails } from '@/lib/hooks/use-org-settings-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
@@ -132,26 +133,22 @@ export function GuardrailsForm({
   });
 
   return (
-    <View className="gap-4">
+    <View className="gap-6">
       {data.invalid_saved_detectors ? (
-        <View className="gap-1 rounded-lg border border-destructive p-3">
+        <Card className="gap-1 border border-destructive">
           <Text className="text-sm font-medium text-foreground">
             {t('organizationGuardrails.invalidSavedTitle')}
           </Text>
-          <Text className="text-xs text-muted-foreground">
-            {t('organizationGuardrails.invalidSavedBody')}
-          </Text>
-        </View>
+          <Text variant="caption">{t('organizationGuardrails.invalidSavedBody')}</Text>
+        </Card>
       ) : null}
       {outputAvailable && data.invalid_saved_output_detectors ? (
-        <View className="gap-1 rounded-lg border border-destructive p-3">
+        <Card className="gap-1 border border-destructive">
           <Text className="text-sm font-medium text-foreground">
             {t('organizationGuardrails.invalidSavedOutputTitle')}
           </Text>
-          <Text className="text-xs text-muted-foreground">
-            {t('organizationGuardrails.invalidSavedOutputBody')}
-          </Text>
-        </View>
+          <Text variant="caption">{t('organizationGuardrails.invalidSavedOutputBody')}</Text>
+        </Card>
       ) : null}
 
       <InputGuardrailsSection

@@ -2549,7 +2549,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nie udało się wczytać sesji.",
-    "couldNotLoadActiveSessions": "Nie udało się wczytać aktywnych sesji.",
     "agentSessions": "Teraz aktywne",
     "newCodingTask": "Nowe zadanie programistyczne",
     "newTaskFromPicture": "Nowe zadanie ze zdjęcia",
@@ -3805,8 +3804,7 @@
     "imagesSectionEmpty": "Brak zaufanych hostów obrazów",
     "revoke": "Cofnij zaufanie do {{host}}",
     "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
-    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie.",
-    "backToPreferences": "Wróć do preferencji"
+    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie."
   },
   "glanceable": {
     "waiting": "Aktualizowanie stanu agentów",

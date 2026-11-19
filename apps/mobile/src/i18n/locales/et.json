@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Seansse ei õnnestunud laadida.",
-    "couldNotLoadActiveSessions": "Aktiivseid seansse ei õnnestunud laadida",
     "agentSessions": "Praegu käimas",
     "newCodingTask": "Uus programmeerimisülesanne",
     "newTaskFromPicture": "Uus ülesanne pildist",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Usaldatud pildihoste pole",
     "revoke": "Lõpeta hosti {{host}} usaldamine",
     "revokeMessage": "Selle hosti lingid küsivad taas kinnitust.",
-    "revokeImageMessage": "Selle hosti pildid küsivad taas kinnitust.",
-    "backToPreferences": "Tagasi eelistuste juurde"
+    "revokeImageMessage": "Selle hosti pildid küsivad taas kinnitust."
   },
   "glanceable": {
     "waiting": "Agentide oleku värskendamine",

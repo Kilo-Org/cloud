@@ -2483,7 +2483,6 @@
   },
   "home": {
     "couldNotLoadSessions": "सत्र लोड नहीं हो सके।",
-    "couldNotLoadActiveSessions": "सक्रिय सत्र लोड नहीं हो सके।",
     "agentSessions": "अभी जारी",
     "newCodingTask": "नया कोडिंग कार्य",
     "newTaskFromPicture": "तस्वीर से नया कार्य",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "कोई विश्वसनीय छवि होस्ट नहीं",
     "revoke": "{{host}} को विश्वसनीय होस्ट से हटाएँ",
     "revokeMessage": "इस होस्ट के लिंक दोबारा पुष्टि माँगेंगे।",
-    "revokeImageMessage": "इस होस्ट की छवियाँ दोबारा पुष्टि माँगेंगी।",
-    "backToPreferences": "प्राथमिकताओं पर वापस जाएँ"
+    "revokeImageMessage": "इस होस्ट की छवियाँ दोबारा पुष्टि माँगेंगी।"
   },
   "glanceable": {
     "waiting": "एजेंट की जानकारी अपडेट हो रही है",

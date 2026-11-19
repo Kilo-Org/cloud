@@ -3206,7 +3206,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Níorbh fhéidir na seisiúin a lódáil.",
-    "couldNotLoadActiveSessions": "Níorbh fhéidir na seisiúin ghníomhacha a lódáil.",
     "agentSessions": "Ar siúl anois",
     "newCodingTask": "Tasc códaithe nua",
     "newTaskFromPicture": "Tasc nua ó phictiúr",
@@ -3865,8 +3864,7 @@
     "imagesSectionEmpty": "Níl aon óstach iontaofa íomhá ann",
     "revoke": "Bain {{host}} de na hóstaigh iontaofa",
     "revokeMessage": "Iarrfaidh naisc chuig an óstach seo deimhniú arís.",
-    "revokeImageMessage": "Iarrfaidh íomhánna ón óstach seo deimhniú arís.",
-    "backToPreferences": "Ar ais go dtí na roghanna"
+    "revokeImageMessage": "Iarrfaidh íomhánna ón óstach seo deimhniú arís."
   },
   "glanceable": {
     "waiting": "Gníomhairí á nuashonrú",

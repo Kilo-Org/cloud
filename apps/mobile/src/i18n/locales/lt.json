@@ -3150,7 +3150,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nepavyko įkelti sesijų",
-    "couldNotLoadActiveSessions": "Nepavyko įkelti aktyvių sesijų",
     "agentSessions": "Vyksta dabar",
     "newCodingTask": "Nauja programavimo užduotis",
     "newTaskFromPicture": "Nauja užduotis iš nuotraukos",
@@ -3805,8 +3804,7 @@
     "imagesSectionEmpty": "Patikimų paveikslėlių svetainių nėra",
     "revoke": "Atšaukti pasitikėjimą svetaine {{host}}",
     "revokeMessage": "Nuorodos į šią svetainę vėl prašys patvirtinimo.",
-    "revokeImageMessage": "Šios svetainės paveikslėliai vėl prašys patvirtinimo.",
-    "backToPreferences": "Grįžti į nuostatas"
+    "revokeImageMessage": "Šios svetainės paveikslėliai vėl prašys patvirtinimo."
   },
   "glanceable": {
     "waiting": "Atnaujinami agentai",

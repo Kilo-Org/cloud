@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය.",
-    "couldNotLoadActiveSessions": "සක්‍රීය සැසි පූරණය කළ නොහැකි විය.",
     "agentSessions": "දැන් ක්‍රියාත්මකයි",
     "newCodingTask": "නව කේතීකරණ කාර්යය",
     "newTaskFromPicture": "පින්තූරයකින් නව කාර්යය",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "විශ්වාස කළ රූප ධාරක නැත",
     "revoke": "{{host}} වෙත දුන් විශ්වාසය ඉවත් කරන්න",
     "revokeMessage": "මෙම ධාරකයට ඇති සබැඳි නැවත තහවුරු කිරීම ඉල්ලා සිටී.",
-    "revokeImageMessage": "මෙම ධාරකයේ රූප නැවත තහවුරු කිරීම ඉල්ලා සිටී.",
-    "backToPreferences": "මනාප වෙත ආපසු යන්න"
+    "revokeImageMessage": "මෙම ධාරකයේ රූප නැවත තහවුරු කිරීම ඉල්ලා සිටී."
   },
   "glanceable": {
     "waiting": "නියෝජිතයන් යාවත්කාලීන කරමින්",

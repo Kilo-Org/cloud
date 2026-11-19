@@ -10,6 +10,8 @@ import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 
 import { MONO_SCROLL_TEXT_MODE_OPTIONS, type MonoScrollTextMode } from './mono-scroll-block-model';
@@ -171,7 +173,7 @@ export function PartDetailSheet({
         <ScrollView
           ref={autoFollow.scrollRef}
           className="flex-1"
-          contentContainerClassName="gap-2 px-4 pb-6 pt-3"
+          contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
           onScroll={autoFollow.handleScroll}
           onScrollBeginDrag={autoFollow.handleScrollBeginDrag}
           onScrollEndDrag={autoFollow.handleScrollEndDrag}

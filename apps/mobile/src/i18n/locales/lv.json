@@ -3094,7 +3094,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas.",
-    "couldNotLoadActiveSessions": "Neizdevās ielādēt aktīvās sesijas.",
     "agentSessions": "Pašlaik aktīvs",
     "newCodingTask": "Jauns programmēšanas uzdevums",
     "newTaskFromPicture": "Jauns uzdevums no attēla",
@@ -3745,8 +3744,7 @@
     "imagesSectionEmpty": "Nav uzticamu attēlu resursdatoru",
     "revoke": "Atsaukt uzticību resursdatoram {{host}}",
     "revokeMessage": "Saites uz šo resursdatoru atkal prasīs apstiprinājumu.",
-    "revokeImageMessage": "Attēli no šī resursdatora atkal prasīs apstiprinājumu.",
-    "backToPreferences": "Atpakaļ uz iestatījumiem"
+    "revokeImageMessage": "Attēli no šī resursdatora atkal prasīs apstiprinājumu."
   },
   "glanceable": {
     "waiting": "Tiek atjaunināta informācija par aģentiem",

@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sessionerne kunne ikke indlæses.",
-    "couldNotLoadActiveSessions": "De aktive sessioner kunne ikke indlæses.",
     "agentSessions": "I gang nu",
     "newCodingTask": "Ny programmeringsopgave",
     "newTaskFromPicture": "Ny opgave fra et billede",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Ingen betroede billeddomæner",
     "revoke": "Fjern tillid til {{host}}",
     "revokeMessage": "Links til dette domæne vil igen bede om bekræftelse.",
-    "revokeImageMessage": "Billeder fra dette domæne vil igen bede om bekræftelse.",
-    "backToPreferences": "Tilbage til indstillinger"
+    "revokeImageMessage": "Billeder fra dette domæne vil igen bede om bekræftelse."
   },
   "glanceable": {
     "waiting": "Opdaterer agenter",

@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kalfadhiyada lama soo dejin karin.",
-    "couldNotLoadActiveSessions": "Kalfadhiyada socda lama soo dejin karin.",
     "agentSessions": "Hadda socda",
     "newCodingTask": "Hawl cusub oo koodh qorista ah",
     "newTaskFromPicture": "Hawl cusub oo sawir laga bilaabo",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Ma jiraan martigeliyeyaal sawir la aaminay",
     "revoke": "Ka noqo aaminaadda {{host}}",
     "revokeMessage": "Xiriiriyeyaasha martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
-    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
-    "backToPreferences": "Ku noqo doorashooyinka"
+    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin."
   },
   "glanceable": {
     "waiting": "Wakiillada ayaa la cusboonaysiinayaa",

@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ସେସନ୍‌ଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-    "couldNotLoadActiveSessions": "ସକ୍ରିୟ ସେସନ୍‌ଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "agentSessions": "ଏବେ ଚାଲିଛି",
     "newCodingTask": "ନୂଆ କୋଡିଂ କାର୍ଯ୍ୟ",
     "newTaskFromPicture": "ଚିତ୍ରରୁ ନୂଆ କାର୍ଯ୍ୟ",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "କୌଣସି ବିଶ୍ୱସ୍ତ ଛବି ହୋଷ୍ଟ ନାହିଁ",
     "revoke": "{{host}} ପ୍ରତି ବିଶ୍ୱାସ ପ୍ରତ୍ୟାହାର କରନ୍ତୁ",
     "revokeMessage": "ଏହି ହୋଷ୍ଟର ଲିଙ୍କଗୁଡ଼ିକ ପୁଣି ଥରେ ଅନୁମତି ମାଗିବ।",
-    "revokeImageMessage": "ଏହି ହୋଷ୍ଟର ଛବିଗୁଡ଼ିକ ପୁଣି ଥରେ ଅନୁମତି ମାଗିବ।",
-    "backToPreferences": "ପସନ୍ଦକୁ ଫେରନ୍ତୁ"
+    "revokeImageMessage": "ଏହି ହୋଷ୍ଟର ଛବିଗୁଡ଼ିକ ପୁଣି ଥରେ ଅନୁମତି ମାଗିବ।"
   },
   "glanceable": {
     "waiting": "ଏଜେଣ୍ଟଙ୍କ ସ୍ଥିତି ଅପଡେଟ୍ ହେଉଛି",

@@ -76,15 +76,16 @@ export function ModelCatalogScreen() {
   let empty = <LoadingRows />;
   if (models.isError && !hasPages) {
     if (isHfGone(models.error)) {
-      empty = <QueryError variant="not-found" placement="top" />;
+      empty = <QueryError variant="not-found" placement="top" inset="gutter" />;
     } else if (isHfRestricted(models.error)) {
-      empty = <QueryError variant="permission" placement="top" />;
+      empty = <QueryError variant="permission" placement="top" inset="gutter" />;
     } else {
       empty = (
         <QueryError
           variant="server"
           title={t('agentChat.newSession.couldNotLoadModels')}
           placement="top"
+          inset="gutter"
           onRetry={() => void models.refetch()}
           isRetrying={models.isFetching}
         />
@@ -97,6 +98,7 @@ export function ModelCatalogScreen() {
         title={t(emptyCopy.titleKey, { query })}
         {...(emptyCopy.descriptionKey ? { description: t(emptyCopy.descriptionKey) } : {})}
         placement="top"
+        inset="gutter"
       />
     );
   }
@@ -104,7 +106,7 @@ export function ModelCatalogScreen() {
   let footer = <View className="h-12" />;
   if (models.isError && hasPages) {
     footer = (
-      <View className="items-center gap-2 px-6 py-4">
+      <View className="items-center gap-2 px-4 py-4">
         <Text variant="muted" className="text-center text-xs">
           {t('common.couldnTLoadMore')}
         </Text>
@@ -131,7 +133,7 @@ export function ModelCatalogScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('modelChat.catalog.title')} />
       <ModelSearchField search={search} />
-      <View className="px-[22px] pb-2">
+      <View className="px-4 pb-2">
         <SegmentedControl
           options={[
             { value: 'fits', label: t('modelChat.catalog.fitsTab') },
@@ -153,7 +155,7 @@ export function ModelCatalogScreen() {
         ListHeaderComponent={
           <View className="gap-3 pt-2">
             {recommended.length > 0 && (
-              <View className="gap-3 px-6 pb-3">
+              <View className="gap-3 px-4 pb-3">
                 <Eyebrow>{t('common.recommended')}</Eyebrow>
                 <Text variant="muted" className="text-xs">
                   {t('modelChat.catalog.recommendationsHelp')}
@@ -166,8 +168,8 @@ export function ModelCatalogScreen() {
                 ))}
               </View>
             )}
-            <Eyebrow className="px-6 pb-1">{t('modelChat.catalog.fromHuggingFace')}</Eyebrow>
-            <Text variant="muted" className="px-6 pb-1 text-xs">
+            <Eyebrow className="px-4 pb-1">{t('modelChat.catalog.fromHuggingFace')}</Eyebrow>
+            <Text variant="muted" className="px-4 pb-1 text-xs">
               {t('modelChat.catalog.compatibilityHelp')}
             </Text>
           </View>

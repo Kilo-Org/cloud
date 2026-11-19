@@ -32,6 +32,10 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#6f6a61' }),
+}));
 vi.mock('@/components/ui/form-field', async () => {
   // `vi.mock` factories hoist above this file's imports, so the factory loads
   // React itself instead of closing over the top-level import.

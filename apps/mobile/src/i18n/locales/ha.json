@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "An kasa loda zaman aiki.",
-    "couldNotLoadActiveSessions": "An kasa loda zaman aikin da ke gudana.",
     "agentSessions": "Masu gudana yanzu",
     "newCodingTask": "Sabon aikin rubuta lambar shiri",
     "newTaskFromPicture": "Sabon aiki daga hoto",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Babu rukunin yanar gizo na hoto da aka amince da shi",
     "revoke": "Soke amincewa da {{host}}",
     "revokeMessage": "Hanyoyin shiga wannan rukunin yanar gizo za su sake neman tabbaci.",
-    "revokeImageMessage": "Hotuna daga wannan rukunin yanar gizo za su sake neman tabbaci.",
-    "backToPreferences": "Koma ga zaɓuɓɓuka"
+    "revokeImageMessage": "Hotuna daga wannan rukunin yanar gizo za su sake neman tabbaci."
   },
   "glanceable": {
     "waiting": "Ana sabunta wakilai",

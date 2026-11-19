@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
-    "couldNotLoadActiveSessions": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
     "agentSessions": "ਹੁਣ ਚੱਲ ਰਹੇ",
     "newCodingTask": "ਨਵਾਂ ਕੋਡਿੰਗ ਕੰਮ",
     "newTaskFromPicture": "ਤਸਵੀਰ ਤੋਂ ਨਵਾਂ ਕੰਮ",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "ਕੋਈ ਭਰੋਸੇਯੋਗ ਚਿੱਤਰ ਹੋਸਟ ਨਹੀਂ",
     "revoke": "{{host}} ਨੂੰ ਭਰੋਸੇਯੋਗ ਹੋਸਟਾਂ ਤੋਂ ਹਟਾਓ",
     "revokeMessage": "ਇਸ ਹੋਸਟ ਦੇ ਲਿੰਕ ਦੁਬਾਰਾ ਪੁਸ਼ਟੀ ਮੰਗਣਗੇ।",
-    "revokeImageMessage": "ਇਸ ਹੋਸਟ ਦੇ ਚਿੱਤਰ ਦੁਬਾਰਾ ਪੁਸ਼ਟੀ ਮੰਗਣਗੇ।",
-    "backToPreferences": "ਤਰਜੀਹਾਂ 'ਤੇ ਵਾਪਸ ਜਾਓ"
+    "revokeImageMessage": "ਇਸ ਹੋਸਟ ਦੇ ਚਿੱਤਰ ਦੁਬਾਰਾ ਪੁਸ਼ਟੀ ਮੰਗਣਗੇ।"
   },
   "glanceable": {
     "waiting": "ਏਜੰਟਾਂ ਦੀ ਜਾਣਕਾਰੀ ਅੱਪਡੇਟ ਹੋ ਰਹੀ ਹੈ",

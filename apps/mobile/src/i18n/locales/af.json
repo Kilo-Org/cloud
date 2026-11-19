@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Die sessies kon nie gelaai word nie.",
-    "couldNotLoadActiveSessions": "Die aktiewe sessies kon nie gelaai word nie.",
     "agentSessions": "Tans aktief",
     "newCodingTask": "Nuwe koderingstaak",
     "newTaskFromPicture": "Nuwe taak vanaf 'n prentjie",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Geen vertroude beeldgashere nie",
     "revoke": "Herroep vertroue in {{host}}",
     "revokeMessage": "Skakels na hierdie gasheer sal weer om bevestiging vra.",
-    "revokeImageMessage": "Beelde van hierdie gasheer sal weer om bevestiging vra.",
-    "backToPreferences": "Terug na voorkeure"
+    "revokeImageMessage": "Beelde van hierdie gasheer sal weer om bevestiging vra."
   },
   "glanceable": {
     "waiting": "Besig om agente op te dateer",

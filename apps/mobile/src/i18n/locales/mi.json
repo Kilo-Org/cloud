@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kāore i taea te uta i ngā wātū",
-    "couldNotLoadActiveSessions": "Kāore i taea te uta i ngā wātū e haere ana",
     "agentSessions": "Kei te haere ināianei",
     "newCodingTask": "Mahi whakawaehere hou",
     "newTaskFromPicture": "Mahi hou mai i te pikitia",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Kāore he tūmau atahanga whirinaki",
     "revoke": "Whakakorea te whirinaki ki {{host}}",
     "revokeMessage": "Ka pātai anō ngā hononga ki tēnei tūmau mō te whakaaetanga.",
-    "revokeImageMessage": "Ka pātai anō ngā atahanga mai i tēnei tūmau mō te whakaaetanga.",
-    "backToPreferences": "Hoki ki ngā manakohanga"
+    "revokeImageMessage": "Ka pātai anō ngā atahanga mai i tēnei tūmau mō te whakaaetanga."
   },
   "glanceable": {
     "waiting": "Kei te whakahou i ngā māngai",

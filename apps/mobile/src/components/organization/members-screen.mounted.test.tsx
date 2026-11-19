@@ -129,6 +129,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title: string; placement?: string; action?: ReactNode }) =>
     createElement('EmptyState', props, `EMPTY_STATE:${props.title}`, props.action),
 }));
@@ -325,15 +326,13 @@ describe('OrganizationMembersScreen section labels', () => {
 
     const cards = renderer.root.findAll(
       node =>
-        typeof node.props.className === 'string' &&
-        node.props.className.includes('mx-6 bg-secondary')
+        typeof node.props.className === 'string' && node.props.className.includes('bg-secondary')
     );
     expect(cards).toHaveLength(1);
     const card = cards[0];
     if (!card) {
       throw new Error('member card not found');
     }
-    expect(card.props.className).toContain('rounded-t-lg');
     unmount();
   });
 

@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ناستې بار نه شوې.",
-    "couldNotLoadActiveSessions": "فعالې ناستې بار نه شوې.",
     "agentSessions": "اوس روانې",
     "newCodingTask": "د کوډ کولو نوې دنده",
     "newTaskFromPicture": "له انځور څخه نوې دنده",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "هېڅ باوري انځور کوربه نشته",
     "revoke": "پر {{host}} باور لغوه کړئ",
     "revokeMessage": "د دې کوربه لینکونه به بیا د تایید غوښتنه وکړي.",
-    "revokeImageMessage": "د دې کوربه انځورونه به بیا د تایید غوښتنه وکړي.",
-    "backToPreferences": "بېرته تنظیماتو ته ورشئ"
+    "revokeImageMessage": "د دې کوربه انځورونه به بیا د تایید غوښتنه وکړي."
   },
   "glanceable": {
     "waiting": "اجنټان تازه کېږي",

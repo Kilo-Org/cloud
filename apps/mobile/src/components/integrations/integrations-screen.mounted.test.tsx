@@ -172,6 +172,13 @@ vi.mock('@/components/screen-header', () => ({
 
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The row primitives notify a selection through the haptic bridge, which loads
+// the expo runtime; the suite asserts structure, not feedback.
+vi.mock('@/lib/haptics', () => ({
+  impactHaptic: () => undefined,
+  notificationHaptic: () => undefined,
+  selectionHaptic: () => undefined,
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({
   Text: (props: { children?: ReactNode }) => createElement('TextMock', null, props.children),
@@ -200,6 +207,9 @@ vi.mock('@/components/ui/configure-row', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
+  Check: 'Check',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
   CircleDot: 'CircleDot',
   GitBranch: 'GitBranch',
   GitCommit: 'GitCommit',
@@ -207,7 +217,15 @@ vi.mock('@/components/ui/icons', () => ({
   MessageSquare: 'MessageSquare',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  Switch: 'Switch',
+  View: 'View',
+  useColorScheme: () => 'light',
+}));
 vi.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'AnimatedView' },
@@ -249,8 +267,9 @@ function rowTitled(root: TestRenderer.ReactTestInstance, title: string) {
   return row;
 }
 
+/** The row's one action: a secondary button, or the trailing cell's text action. */
 function actionOf(row: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance | null {
-  return row.findAllByType('Button')[0] ?? null;
+  return row.findAllByType('Button')[0] ?? row.findAllByType('Pressable')[0] ?? null;
 }
 
 function texts(root: TestRenderer.ReactTestInstance): ReactNode[] {
@@ -602,9 +621,15 @@ describe('IntegrationsScreen', () => {
       error: { data: { code: 'FORBIDDEN' } },
     });
     const renderer = mount('org-1');
-    expect(findOne(renderer.root, 'PermissionDeniedMock')[0]?.props.description).toBe(
+    const [denied] = findOne(renderer.root, 'PermissionDeniedMock');
+    expect(denied?.props.description).toBe(
       'You do not have permission to manage these integrations.'
     );
+    // The header owns the way out, so the state must not repeat a Back action.
+    expect(denied?.props.showBack).toBe(false);
+    const header = findOne(renderer.root, 'ScreenHeaderMock')[0];
+    expect(header?.props.title).toBe('Integrations');
+    expect(header?.props.subtitle).toBe('Acme');
   });
 
   it('waits for an installed GitHub row’s connection list before choosing its action', () => {

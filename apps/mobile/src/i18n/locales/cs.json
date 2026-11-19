@@ -3150,7 +3150,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Relace se nepodařilo načíst.",
-    "couldNotLoadActiveSessions": "Aktivní relace se nepodařilo načíst.",
     "agentSessions": "Právě běží",
     "newCodingTask": "Nový programovací úkol",
     "newTaskFromPicture": "Nový úkol z obrázku",
@@ -3805,8 +3804,7 @@
     "imagesSectionEmpty": "Žádné důvěryhodné domény obrázků",
     "revoke": "Odebrat důvěru doméně {{host}}",
     "revokeMessage": "Odkazy na tuto doménu budou znovu vyžadovat potvrzení.",
-    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení.",
-    "backToPreferences": "Zpět na předvolby"
+    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení."
   },
   "glanceable": {
     "waiting": "Aktualizace agentů",

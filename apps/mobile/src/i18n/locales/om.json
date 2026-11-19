@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Turtiiwwan fe'uun hin danda'amne.",
-    "couldNotLoadActiveSessions": "Turtiiwwan adeemaa jiran fe'uun hin danda'amne.",
     "agentSessions": "Amma adeemaa jiru",
     "newCodingTask": "Hojii koodii haaraa",
     "newTaskFromPicture": "Hojii haaraa suuraa irraa",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Keessummeessitoota suuraa amanaman hin jiran",
     "revoke": "Amanamummaa {{host}} haqi",
     "revokeMessage": "Geessituuwwan gara keessummeessaa kanaa ammas mirkaneessa gaafatu.",
-    "revokeImageMessage": "Suuraan keessummeessaa kanaa irraa ammas mirkaneessa gaafatu.",
-    "backToPreferences": "Gara filannoowwaniitti deebi'i"
+    "revokeImageMessage": "Suuraan keessummeessaa kanaa irraa ammas mirkaneessa gaafatu."
   },
   "glanceable": {
     "waiting": "Eejentoota haaromsaa jira",

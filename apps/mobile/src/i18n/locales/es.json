@@ -2516,7 +2516,6 @@
   },
   "home": {
     "couldNotLoadSessions": "No se pudieron cargar las sesiones.",
-    "couldNotLoadActiveSessions": "No se pudieron cargar las sesiones activas.",
     "agentSessions": "En curso ahora",
     "newCodingTask": "Nueva tarea de programación",
     "newTaskFromPicture": "Nueva tarea a partir de una imagen",
@@ -3745,8 +3744,7 @@
     "imagesSectionEmpty": "No hay dominios de imágenes de confianza",
     "revoke": "Dejar de confiar en {{host}}",
     "revokeMessage": "Los enlaces a este dominio volverán a pedir confirmación.",
-    "revokeImageMessage": "Las imágenes de este dominio volverán a pedir confirmación.",
-    "backToPreferences": "Volver a preferencias"
+    "revokeImageMessage": "Las imágenes de este dominio volverán a pedir confirmación."
   },
   "glanceable": {
     "waiting": "Actualizando el estado de los agentes",

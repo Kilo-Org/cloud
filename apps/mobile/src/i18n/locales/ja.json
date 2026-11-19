@@ -2483,7 +2483,6 @@
   },
   "home": {
     "couldNotLoadSessions": "セッションを読み込めませんでした。",
-    "couldNotLoadActiveSessions": "実行中のセッションを読み込めませんでした。",
     "agentSessions": "現在実行中",
     "newCodingTask": "新しいコーディングタスク",
     "newTaskFromPicture": "画像から新しいタスク",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "信頼済み画像ホストはありません",
     "revoke": "{{host}}を信頼済みホストから削除",
     "revokeMessage": "このホストへのリンクは再び確認を求めます。",
-    "revokeImageMessage": "このホストの画像は再び確認を求めます。",
-    "backToPreferences": "設定に戻る"
+    "revokeImageMessage": "このホストの画像は再び確認を求めます。"
   },
   "glanceable": {
     "waiting": "エージェントの状態を更新中",

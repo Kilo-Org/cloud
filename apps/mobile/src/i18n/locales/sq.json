@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nuk u ngarkuan sesionet.",
-    "couldNotLoadActiveSessions": "Nuk u ngarkuan sesionet aktive.",
     "agentSessions": "Aktive tani",
     "newCodingTask": "Detyrë e re kodimi",
     "newTaskFromPicture": "Detyrë e re nga një imazh",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Nuk ka serverë të besuar të imazheve",
     "revoke": "Hiq besimin për {{host}}",
     "revokeMessage": "Lidhjet për këtë server do të kërkojnë përsëri konfirmim.",
-    "revokeImageMessage": "Imazhet nga ky server do të kërkojnë përsëri konfirmim.",
-    "backToPreferences": "Kthehu te preferencat"
+    "revokeImageMessage": "Imazhet nga ky server do të kërkojnë përsëri konfirmim."
   },
   "glanceable": {
     "waiting": "Po përditësohen agjentët",

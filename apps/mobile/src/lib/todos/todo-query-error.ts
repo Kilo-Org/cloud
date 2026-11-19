@@ -18,3 +18,16 @@ export function selectTodoQueryErrorView(error: unknown): TodoQueryErrorView {
   const code = readTrpcErrorField(error, 'code');
   return { variant: trpcErrorVariant(error), showRetry: !isTerminalTrpcCode(code) };
 }
+
+/**
+ * The detail read's state. Its only input is the to-do id, so a `BAD_REQUEST`
+ * is the server refusing that id itself: a link or param that names no to-do
+ * (the API's ids are UUIDs), which no retry can make resolve. It reads as
+ * not-found instead of as a failure on the server's side.
+ */
+export function selectTodoItemQueryErrorView(error: unknown): TodoQueryErrorView {
+  if (readTrpcErrorField(error, 'code') === 'BAD_REQUEST') {
+    return { variant: 'not-found', showRetry: false };
+  }
+  return selectTodoQueryErrorView(error);
+}

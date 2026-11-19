@@ -3150,7 +3150,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Не атрымалася загрузіць сеансы.",
-    "couldNotLoadActiveSessions": "Не атрымалася загрузіць актыўныя сеансы.",
     "agentSessions": "Зараз выконваюцца",
     "newCodingTask": "Новая задача па праграмаванні",
     "newTaskFromPicture": "Новая задача з малюнка",
@@ -3805,8 +3804,7 @@
     "imagesSectionEmpty": "Няма давераных сайтаў выяў",
     "revoke": "Адклікаць давер да {{host}}",
     "revokeMessage": "Спасылкі на гэты хост зноў будуць запытваць пацвярджэнне.",
-    "revokeImageMessage": "Выявы з гэтага хоста зноў будуць запытваць пацвярджэнне.",
-    "backToPreferences": "Назад да налад"
+    "revokeImageMessage": "Выявы з гэтага хоста зноў будуць запытваць пацвярджэнне."
   },
   "glanceable": {
     "waiting": "Абнаўленне агентаў",

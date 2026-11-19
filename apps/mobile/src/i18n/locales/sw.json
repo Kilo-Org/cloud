@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Imeshindikana kupakia vikao.",
-    "couldNotLoadActiveSessions": "Imeshindikana kupakia vikao vinavyoendelea.",
     "agentSessions": "Vinavyoendelea sasa",
     "newCodingTask": "Kazi mpya ya kuandika msimbo",
     "newTaskFromPicture": "Kazi mpya kutoka kwenye picha",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Hakuna tovuti za picha zinazoaminika",
     "revoke": "Ondoa uaminifu kwa {{host}}",
     "revokeMessage": "Viungo vya tovuti hii vitaomba uthibitisho tena.",
-    "revokeImageMessage": "Picha kutoka tovuti hii zitaomba uthibitisho tena.",
-    "backToPreferences": "Rudi kwenye mapendeleo"
+    "revokeImageMessage": "Picha kutoka tovuti hii zitaomba uthibitisho tena."
   },
   "glanceable": {
     "waiting": "Inasasisha mawakala",

@@ -33,6 +33,22 @@ vi.mock('react-native', () => ({
 // while the test host reads the props they carry (`vi.mock` factories hoist
 // above this file's imports, so the form-field factory loads React itself).
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  ChevronDown: 'ChevronDown',
+  Lock: 'Lock',
+  RotateCcw: 'RotateCcw',
+  SearchX: 'SearchX',
+  ServerCrash: 'ServerCrash',
+  WifiOff: 'WifiOff',
+}));
+// The form's failure rows render `QueryError` -> `StateAction`, whose centered
+// variant measures the native surface; that module loads the Sentry RN SDK,
+// which the Node test project cannot resolve react-native through.
+vi.mock('@sentry/react-native', () => ({ captureException: () => undefined }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#6f6a61' }),
+}));
 vi.mock('@/components/ui/form-field', async () => {
   const { createElement: h } = await import('react');
   return {
@@ -85,7 +101,6 @@ vi.mock('@/components/agents/mode-options', () => ({
 vi.mock('@/components/agents/mode-normalize', () => ({ BUILTIN_AGENT_MODES: ['code'] }));
 
 const FIELD = 'FormField' as ElementType;
-const SELECT_ROW = 'TriggerSelectRow' as ElementType;
 const MODEL_SELECTOR = 'ModelSelector' as ElementType;
 
 /** A draft change the suite under test never makes. */
@@ -190,13 +205,19 @@ describe('trigger form gated problems', () => {
         node => Object.is(node.type, FIELD) && node.props.label === 'Trigger name'
       )[0];
       const repository = root.findAll(
-        node => Object.is(node.type, SELECT_ROW) && node.props.label === 'Repository'
+        node => Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Repository'
       )[0];
       if (!name || !repository) {
         throw new Error('expected the name field and the repository row');
       }
       expect(name.props.error).toBeUndefined();
-      expect(repository.props.error).toBeUndefined();
+      expect(
+        root.findAll(
+          node =>
+            Object.is(node.type, 'Text') &&
+            node.props.children === triggerProblemMessage('repositoryRequired')
+        )
+      ).toHaveLength(0);
 
       act(() => {
         (name.props.onBlur as () => void)();
@@ -211,9 +232,11 @@ describe('trigger form gated problems', () => {
       });
       expect(
         root.findAll(
-          node => Object.is(node.type, SELECT_ROW) && node.props.label === 'Repository'
-        )[0]?.props.error
-      ).toBe(triggerProblemMessage('repositoryRequired'));
+          node =>
+            Object.is(node.type, 'Text') &&
+            node.props.children === triggerProblemMessage('repositoryRequired')
+        )
+      ).toHaveLength(1);
     } finally {
       act(() => {
         view.renderer.unmount();

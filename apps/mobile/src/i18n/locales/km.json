@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "មិនអាចផ្ទុកវគ្គបានទេ។",
-    "couldNotLoadActiveSessions": "មិនអាចផ្ទុកវគ្គកំពុងដំណើរការបានទេ។",
     "agentSessions": "កំពុងដំណើរការ",
     "newCodingTask": "កិច្ចការសរសេរកូដថ្មី",
     "newTaskFromPicture": "កិច្ចការថ្មីពីរូបភាព",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "គ្មានដែនគេហទំព័ររូបភាពដែលជឿទុកចិត្តទេ",
     "revoke": "ដកហូតការជឿទុកចិត្តលើ {{host}}",
     "revokeMessage": "តំណទៅដែននេះនឹងស្នើសុំការបញ្ជាក់ម្តងទៀត។",
-    "revokeImageMessage": "រូបភាពពីដែននេះនឹងស្នើសុំការបញ្ជាក់ម្តងទៀត។",
-    "backToPreferences": "ត្រឡប់ទៅការកំណត់"
+    "revokeImageMessage": "រូបភាពពីដែននេះនឹងស្នើសុំការបញ្ជាក់ម្តងទៀត។"
   },
   "glanceable": {
     "waiting": "កំពុងធ្វើបច្ចុប្បន្នភាពស្ថានភាពភ្នាក់ងារ",

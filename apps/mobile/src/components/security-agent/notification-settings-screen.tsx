@@ -3,6 +3,7 @@ import {
   isPersonalSecurityScope,
   isValidDayCount,
 } from '@kilocode/app-shared/security-agent';
+import { Bell, Clock3 } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -10,15 +11,18 @@ import { View } from 'react-native';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
-import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { Input } from '@/components/ui/input';
+import { FormField } from '@/components/ui/form-field';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { SettingsScreenSkeleton } from '@/components/security-agent/settings-screen-skeleton';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber, parseLocalizedNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import {
   useSecurityAgentSettingsRedirect,
@@ -31,9 +35,7 @@ import {
   useSecurityAgentConfig,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
-import { cn } from '@/lib/utils';
 
 type NotificationSeverity = SecurityAgentConfig['newFindingNotificationMinSeverity'];
 
@@ -49,7 +51,6 @@ const NOTIFICATION_SEVERITY_OPTIONS = [
 ] as const satisfies readonly { value: NotificationSeverity; labelKey: string }[];
 
 export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
@@ -184,7 +185,6 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        className="px-6"
         title={t('common.notifications')}
         onBack={onBack}
         headerRight={
@@ -204,29 +204,17 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        // The personal scope has no section heading between its two switches, so
-        // the break between the two groups carries their separation: it has to
-        // read as a group break, not as the 10dp step down to the severity label
-        // or the 7dp step inside its options, and not as the void a removed
-        // heading would leave. The organization scope keeps the standard gap,
-        // next to its headings. The permission note above the groups only
-        // renders for a scope that cannot manage, which the personal scope
-        // never is.
-        contentContainerClassName={cn('px-6 pt-4', personal ? 'gap-7' : 'gap-6')}
+        contentContainerClassName={SCREEN_BODY_CLASS}
       >
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
             {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
-        <View className="gap-3">
-          {!personal && (
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('securityAgent.notifications.newFindingSection')}
-            </Text>
-          )}
-          <View className="gap-3">
-            <ToggleRow
+        <Section label={personal ? undefined : t('securityAgent.notifications.newFindingSection')}>
+          <RowGroup leadingTile>
+            <PreferenceRow
+              icon={Bell}
               title={
                 personal
                   ? t('securityAgent.notifications.newFindingPersonalTitle')
@@ -248,26 +236,22 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               disabled={!canManage}
               onValueChange={setNewFindingNotificationsEnabled}
             />
-            {newFindingNotificationsEnabled && (
-              <PillGroup
-                label={t('securityAgent.notifications.newFindingSeverityLabel')}
-                options={severityOptions}
-                value={newFindingNotificationMinSeverity}
-                disabled={!canManage}
-                onChange={setNewFindingNotificationMinSeverity}
-              />
-            )}
-          </View>
-        </View>
-
-        <View className="gap-3">
-          {!personal && (
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('securityAgent.notifications.slaSection')}
-            </Text>
+          </RowGroup>
+          {newFindingNotificationsEnabled && (
+            <PillGroup
+              label={t('securityAgent.notifications.newFindingSeverityLabel')}
+              options={severityOptions}
+              value={newFindingNotificationMinSeverity}
+              disabled={!canManage}
+              onChange={setNewFindingNotificationMinSeverity}
+            />
           )}
-          <View className="gap-3">
-            <ToggleRow
+        </Section>
+
+        <Section label={personal ? undefined : t('securityAgent.notifications.slaSection')}>
+          <RowGroup leadingTile>
+            <PreferenceRow
+              icon={Clock3}
               title={
                 personal
                   ? t('securityAgent.notifications.slaPersonalTitle')
@@ -289,52 +273,42 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               disabled={!canManage}
               onValueChange={setSlaNotificationsEnabled}
             />
-            {slaNotificationsEnabled && (
-              <>
-                <PillGroup
-                  label={t('securityAgent.notifications.slaSeverityLabel')}
-                  options={severityOptions}
-                  value={slaNotificationMinSeverity}
-                  disabled={!canManage}
-                  onChange={setSlaNotificationMinSeverity}
-                />
-                <View className="gap-1.5">
-                  <Text className="text-sm font-medium text-muted-foreground">
-                    {t('securityAgent.notifications.slaLeadTimeLabel')}
-                  </Text>
-                  <Input
-                    accessibilityLabel={t('securityAgent.notifications.slaLeadTimeLabel')}
-                    accessibilityHint={
-                      isValidDayCount(slaNotificationWarningDays)
-                        ? undefined
-                        : t('securityAgent.sla.enterWholeNumber')
-                    }
-                    className={cn(
-                      'rounded-lg bg-secondary pl-3 pr-3 text-sm text-foreground',
-                      !canManage && 'opacity-50'
-                    )}
-                    editable={canManage}
-                    keyboardType="number-pad"
-                    defaultValue={warningDaysRef.current}
-                    placeholderTextColor={colors.mutedForeground}
-                    onChangeText={text => {
-                      warningDaysRef.current = text;
-                      const value = parseLocalizedNumber(text, i18n.language);
-                      setSlaNotificationWarningDays(
-                        value !== null && Number.isInteger(value) ? value : Number.NaN
-                      );
-                    }}
-                  />
-                  {!isValidDayCount(slaNotificationWarningDays) && (
-                    <Text className="text-xs text-destructive">
-                      {t('securityAgent.notifications.slaLeadTimeError')}
-                    </Text>
-                  )}
-                </View>
-              </>
-            )}
-          </View>
-        </View>
+          </RowGroup>
+          {slaNotificationsEnabled && (
+            <>
+              <PillGroup
+                label={t('securityAgent.notifications.slaSeverityLabel')}
+                options={severityOptions}
+                value={slaNotificationMinSeverity}
+                disabled={!canManage}
+                onChange={setSlaNotificationMinSeverity}
+              />
+              <FormField
+                label={t('securityAgent.notifications.slaLeadTimeLabel')}
+                error={
+                  isValidDayCount(slaNotificationWarningDays)
+                    ? undefined
+                    : t('securityAgent.notifications.slaLeadTimeError')
+                }
+                accessibilityHint={
+                  isValidDayCount(slaNotificationWarningDays)
+                    ? undefined
+                    : t('securityAgent.sla.enterWholeNumber')
+                }
+                keyboardType="number-pad"
+                disabled={!canManage}
+                defaultValue={warningDaysRef.current}
+                onChangeText={text => {
+                  warningDaysRef.current = text;
+                  const value = parseLocalizedNumber(text, i18n.language);
+                  setSlaNotificationWarningDays(
+                    value !== null && Number.isInteger(value) ? value : Number.NaN
+                  );
+                }}
+              />
+            </>
+          )}
+        </Section>
       </TabScreenScrollView>
       {dialog}
     </View>

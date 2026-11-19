@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ekki tókst að sækja lotur.",
-    "couldNotLoadActiveSessions": "Ekki tókst að sækja virkar lotur.",
     "agentSessions": "Í gangi núna",
     "newCodingTask": "Nýtt forritunarverkefni",
     "newTaskFromPicture": "Nýtt verkefni úr mynd",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Engir traustir myndavefþjónar",
     "revoke": "Afturkalla traust á {{host}}",
     "revokeMessage": "Tenglar á þennan vefþjón munu biðja um staðfestingu aftur.",
-    "revokeImageMessage": "Myndir frá þessum vefþjóni munu biðja um staðfestingu aftur.",
-    "backToPreferences": "Til baka í stillingar"
+    "revokeImageMessage": "Myndir frá þessum vefþjóni munu biðja um staðfestingu aftur."
   },
   "glanceable": {
     "waiting": "Uppfæri fulltrúa",

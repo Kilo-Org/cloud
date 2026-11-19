@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Seanslarni yuklab bo'lmadi.",
-    "couldNotLoadActiveSessions": "Faol seanslarni yuklab bo'lmadi.",
     "agentSessions": "Hozir faol",
     "newCodingTask": "Yangi kodlash vazifasi",
     "newTaskFromPicture": "Rasmdan yangi vazifa",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Ishonchli rasm saytlari yo'q",
     "revoke": "{{host}} saytiga berilgan ishonchni bekor qilish",
     "revokeMessage": "Bu saytga havolalar yana tasdiq so'raydi.",
-    "revokeImageMessage": "Bu saytning rasmlari yana tasdiq so'raydi.",
-    "backToPreferences": "Sozlamalarga qaytish"
+    "revokeImageMessage": "Bu saytning rasmlari yana tasdiq so'raydi."
   },
   "glanceable": {
     "waiting": "Agentlar yangilanmoqda",

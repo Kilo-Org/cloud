@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "სესიების ჩატვირთვა ვერ მოხერხდა.",
-    "couldNotLoadActiveSessions": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
     "agentSessions": "ახლა აქტიურია",
     "newCodingTask": "კოდის წერის ახალი ამოცანა",
     "newTaskFromPicture": "ახალი ამოცანა სურათიდან",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "სანდო სურათების ჰოსტები არ არის",
     "revoke": "{{host}}-ის სანდო ჰოსტებიდან ამოღება",
     "revokeMessage": "ამ ჰოსტის ბმულები კვლავ დადასტურებას მოითხოვს.",
-    "revokeImageMessage": "ამ ჰოსტის სურათები კვლავ დადასტურებას მოითხოვს.",
-    "backToPreferences": "პარამეტრებში დაბრუნება"
+    "revokeImageMessage": "ამ ჰოსტის სურათები კვლავ დადასტურებას მოითხოვს."
   },
   "glanceable": {
     "waiting": "აგენტები ახლდება",

@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "সেশনগুলো লোড করা যায়নি।",
-    "couldNotLoadActiveSessions": "সক্রিয় সেশনগুলো লোড করা যায়নি।",
     "agentSessions": "এখন চলছে",
     "newCodingTask": "নতুন কোডিং কাজ",
     "newTaskFromPicture": "ছবি থেকে নতুন কাজ",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "কোনো বিশ্বস্ত ছবির হোস্ট নেই",
     "revoke": "বিশ্বস্ত হোস্টের তালিকা থেকে {{host}} সরান",
     "revokeMessage": "এই হোস্টের লিঙ্কগুলি আবার নিশ্চিতকরণ চাইবে।",
-    "revokeImageMessage": "এই হোস্টের ছবিগুলি আবার নিশ্চিতকরণ চাইবে।",
-    "backToPreferences": "পছন্দসমূহে ফিরুন"
+    "revokeImageMessage": "এই হোস্টের ছবিগুলি আবার নিশ্চিতকরণ চাইবে।"
   },
   "glanceable": {
     "waiting": "এজেন্টের তথ্য আপডেট হচ্ছে",

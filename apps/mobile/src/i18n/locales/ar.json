@@ -2615,7 +2615,6 @@
   },
   "home": {
     "couldNotLoadSessions": "تعذّر تحميل الجلسات.",
-    "couldNotLoadActiveSessions": "تعذّر تحميل الجلسات النشطة.",
     "agentSessions": "الجلسات الجارية الآن",
     "newCodingTask": "مهمة برمجة جديدة",
     "newTaskFromPicture": "مهمة جديدة من صورة",
@@ -3925,8 +3924,7 @@
     "imagesSectionEmpty": "لا يوجد مضيفو صور موثوقون",
     "revoke": "إلغاء الثقة بالمضيف {{host}}",
     "revokeMessage": "ستطلب الروابط المؤدية إلى هذا المضيف تأكيدًا مرة أخرى.",
-    "revokeImageMessage": "ستطلب الصور من هذا المضيف تأكيدًا مرة أخرى.",
-    "backToPreferences": "العودة إلى التفضيلات"
+    "revokeImageMessage": "ستطلب الصور من هذا المضيف تأكيدًا مرة أخرى."
   },
   "glanceable": {
     "waiting": "جارٍ تحديث الوكلاء",

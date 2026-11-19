@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Istuntoja ei voitu ladata.",
-    "couldNotLoadActiveSessions": "Aktiivisia istuntoja ei voitu ladata.",
     "agentSessions": "Käynnissä nyt",
     "newCodingTask": "Uusi koodaustehtävä",
     "newTaskFromPicture": "Uusi tehtävä kuvasta",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Ei luotettuja kuvien verkkotunnuksia",
     "revoke": "Poista luottamus verkkotunnukseen {{host}}",
     "revokeMessage": "Tämän verkkotunnuksen linkit kysyvät jatkossa vahvistusta uudelleen.",
-    "revokeImageMessage": "Tämän verkkotunnuksen kuvat kysyvät jatkossa vahvistusta uudelleen.",
-    "backToPreferences": "Takaisin asetuksiin"
+    "revokeImageMessage": "Tämän verkkotunnuksen kuvat kysyvät jatkossa vahvistusta uudelleen."
   },
   "glanceable": {
     "waiting": "Päivitetään agentteja",

@@ -3262,7 +3262,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ni ellid llwytho'r sesiynau.",
-    "couldNotLoadActiveSessions": "Ni ellid llwytho'r sesiynau gweithredol.",
     "agentSessions": "Ar waith nawr",
     "newCodingTask": "Tasg codio newydd",
     "newTaskFromPicture": "Tasg newydd o lun",
@@ -3925,8 +3924,7 @@
     "imagesSectionEmpty": "Dim gwesteiwyr delwedd dibynadwy",
     "revoke": "Dirymu ymddiriedaeth yn {{host}}",
     "revokeMessage": "Bydd dolenni i'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
-    "revokeImageMessage": "Bydd delweddau o'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
-    "backToPreferences": "Yn ôl i'r dewisiadau"
+    "revokeImageMessage": "Bydd delweddau o'r gwesteiwr hwn yn gofyn am gadarnhad eto."
   },
   "glanceable": {
     "waiting": "Yn diweddaru asiantau",

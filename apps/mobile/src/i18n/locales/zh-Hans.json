@@ -2483,7 +2483,6 @@
   },
   "home": {
     "couldNotLoadSessions": "无法加载会话。",
-    "couldNotLoadActiveSessions": "无法加载进行中的会话。",
     "agentSessions": "正在进行",
     "newCodingTask": "新建编程任务",
     "newTaskFromPicture": "从图片新建任务",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "暂无受信任的图片主机",
     "revoke": "撤销对 {{host}} 的信任",
     "revokeMessage": "指向此主机的链接将再次请求确认。",
-    "revokeImageMessage": "来自此主机的图片将再次请求确认。",
-    "backToPreferences": "返回偏好设置"
+    "revokeImageMessage": "来自此主机的图片将再次请求确认。"
   },
   "glanceable": {
     "waiting": "正在更新智能体状态",

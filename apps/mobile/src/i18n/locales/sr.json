@@ -3094,7 +3094,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nije moguće učitati sesije.",
-    "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Novi zadatak za programiranje",
     "newTaskFromPicture": "Novi zadatak sa slike",
@@ -3745,8 +3744,7 @@
     "imagesSectionEmpty": "Nema pouzdanih hostova za slike",
     "revoke": "Ukloni {{host}} iz pouzdanih hostova",
     "revokeMessage": "Linkovi ka ovom hostu ponovo će tražiti potvrdu.",
-    "revokeImageMessage": "Slike sa ovog hosta ponovo će tražiti potvrdu.",
-    "backToPreferences": "Nazad na podešavanja"
+    "revokeImageMessage": "Slike sa ovog hosta ponovo će tražiti potvrdu."
   },
   "glanceable": {
     "waiting": "Ažuriranje agenata",

@@ -53,6 +53,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: () => null,
   AlertCircle: () => null,
   Loader2: () => null,
   Lock: () => null,
@@ -61,6 +62,7 @@ vi.mock('@/components/ui/icons', () => ({
   WifiOff: () => null,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#777777',
   useThemeColors: () => ({ mutedForeground: '#777777' }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -102,8 +104,10 @@ describe('RuntimeErrorScreen', () => {
       mounted.renderer.root.findAll(node => node.props.message === 'queryError.neutralDescription')
     ).toHaveLength(1);
 
+    // The action's own element and the host control it renders both carry the
+    // name; the host is the one a press reaches.
     const retry = mounted.renderer.root.findAll(
-      node => node.props.accessibilityLabel === 'common.retry'
+      node => typeof node.type === 'string' && node.props.accessibilityLabel === 'common.retry'
     );
     expect(retry).toHaveLength(1);
     const retryButton = retry[0];

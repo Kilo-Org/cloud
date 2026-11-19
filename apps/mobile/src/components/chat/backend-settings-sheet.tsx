@@ -6,6 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
@@ -26,6 +27,7 @@ import {
 } from '@/lib/chat/backend-store';
 import { backendTargetId } from '@/lib/chat/backend-target';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
 import { BackendForm } from './backend-form';
@@ -44,11 +46,9 @@ export function BackendSettingsControl(selection: ProviderSelection) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [visible, setVisible] = useState(false);
-  // The sheet stays mounted until its native dismissal reports, so it never
-  // loses its content mid-animation and paints an empty card.
+  // Stay mounted until the native dismissal reports: an early unmount paints an empty card.
   const [mounted, setMounted] = useState(false);
-  // A navigation waits for that report: pushing while the sheet is still on
-  // its way down presents the new screen under an empty, closing sheet.
+  // A navigation waits for that report: pushing mid-dismissal clears the screen underneath.
   const afterDismiss = useRef<(() => void) | null>(null);
   const close = useCallback(() => {
     setVisible(false);
@@ -77,7 +77,7 @@ export function BackendSettingsControl(selection: ProviderSelection) {
       >
         <Server size={22} color={colors.foreground} />
       </Pressable>
-      {mounted ? (
+      {mounted && (
         <BackendSettingsContent
           visible={visible}
           onClose={close}
@@ -85,7 +85,7 @@ export function BackendSettingsControl(selection: ProviderSelection) {
           onDismiss={dismissed}
           {...selection}
         />
-      ) : null}
+      )}
     </>
   );
 }
@@ -115,16 +115,17 @@ function BackendSettingsContent({
   const [target, setTarget] = useState<FormTarget | null>(null);
   const [formError, setError] = useState<string | null>(null);
   const backendDirtyRef = useRef(false);
+  const discardDraft = () => {
+    backendDirtyRef.current = false;
+    setTarget(null);
+  };
   const {
     requestClose,
     requestDismiss,
     dialog: discardDialog,
   } = useSheetDismissGuard({
     isDirty: () => backendDirtyRef.current,
-    onDiscard: () => {
-      backendDirtyRef.current = false;
-      setTarget(null);
-    },
+    onDiscard: discardDraft,
   });
   const epoch = useRef(currentAuthEpoch());
   useEffect(() => {
@@ -189,17 +190,17 @@ function BackendSettingsContent({
       />
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
-        <View className="gap-2">
-          <Text className="font-semibold">{t('modelChat.backends.cloud')}</Text>
+        <View className="gap-3">
+          <Text variant="heading">{t('modelChat.backends.cloud')}</Text>
           <CloudProviderChoice {...providerSelection} />
         </View>
-        <View className="gap-2">
-          <Text className="font-semibold">{t('modelChat.localModels.title')}</Text>
-          <Text className="text-sm text-muted-foreground">{t('modelChat.localModels.help')}</Text>
+        <View className="gap-3">
+          <Text variant="heading">{t('modelChat.localModels.title')}</Text>
+          <Text variant="muted">{t('modelChat.localModels.help')}</Text>
           <LocalModelSection {...providerSelection} />
           <GgufModelSection
             {...providerSelection}
@@ -210,17 +211,17 @@ function BackendSettingsContent({
             }}
           />
         </View>
-        <View className="gap-2">
-          <Text className="font-semibold">{t('modelChat.backends.title')}</Text>
+        <View className="gap-3">
+          <Text variant="heading">{t('modelChat.backends.title')}</Text>
           {!loaded ? (
             <Text>{t('common.loading')}</Text>
           ) : (
             <>
               {backends.length === 0 && <Text>{t('modelChat.backends.empty')}</Text>}
               {backends.map(backend => (
-                <View key={backend.id} className="gap-2 rounded-xl border border-border p-4">
-                  <Text className="font-semibold">{backend.name}</Text>
-                  <Text className="text-sm text-muted-foreground">{backend.baseUrl}</Text>
+                <Card key={backend.id}>
+                  <Text className="font-medium">{backend.name}</Text>
+                  <Text variant="muted">{backend.baseUrl}</Text>
                   {backend.models.map(model => (
                     <BackendProviderChoice
                       key={model.id}
@@ -248,7 +249,7 @@ function BackendSettingsContent({
                   >
                     <Text>{t('common.delete')}</Text>
                   </Button>
-                </View>
+                </Card>
               ))}
             </>
           )}
@@ -267,14 +268,7 @@ function BackendSettingsContent({
         </View>
       </ScrollView>
       {target !== null && (
-        <SessionPageSheet
-          visible
-          onClose={() => {
-            backendDirtyRef.current = false;
-            setTarget(null);
-          }}
-          onRequestDismiss={requestDismiss}
-        >
+        <SessionPageSheet visible onClose={discardDraft} onRequestDismiss={requestDismiss}>
           <SheetHeader
             title={t(target.kind === 'add' ? 'modelChat.backends.add' : 'modelChat.backends.edit')}
             onDone={requestClose}
@@ -283,7 +277,7 @@ function BackendSettingsContent({
           />
           <ScrollView
             className="flex-1"
-            contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+            contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-8')}
             automaticallyAdjustKeyboardInsets
             keyboardShouldPersistTaps="handled"
           >

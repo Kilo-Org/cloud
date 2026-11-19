@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { Card } from '@/components/ui/card';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { Cpu, Download, Star } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -18,7 +19,6 @@ import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfListedModel, hfModelName } from '@/lib/chat/hf-catalog';
 import { useHfSmallestDownload } from '@/lib/chat/use-hf-catalog';
 import { formatFileSize } from '@/lib/format';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { GgufDownloadControls } from './gguf-model-section';
 import {
@@ -48,8 +48,8 @@ export function RecommendedRow({
   const [, owner, repo] = new URL(model.url).pathname.split('/');
   const displayName = model.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
   return (
-    <View className="gap-2 rounded-xl border border-border bg-card p-4">
-      <View className="flex-row items-start justify-between gap-3">
+    <Card>
+      <View className="flex-row items-center justify-between gap-3">
         <Text className="min-w-0 shrink font-semibold">{displayName}</Text>
         <FitBadge fit={fit} />
       </View>
@@ -94,7 +94,7 @@ export function RecommendedRow({
           <Text>{t('common.details')}</Text>
         </Button>
       )}
-    </View>
+    </Card>
   );
 }
 
@@ -105,7 +105,6 @@ export function ModelRow({
 }: Readonly<{ model: HfListedModel; budget: DeviceBudget; fitsOnly: boolean }>) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const colors = useThemeColors();
   const smallest = useHfSmallestDownload(model.id, model.parameters);
   const sizeBytes = smallest.data ?? undefined;
   const fit = sizeBytes === undefined ? undefined : deviceFit(sizeBytes, budget);
@@ -129,7 +128,7 @@ export function ModelRow({
         router.push({ pathname: '/model-catalog/[owner]/[repo]', params: { owner, repo } });
       }}
       accessibilityRole="button"
-      className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-6 py-3 active:opacity-70"
+      className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3 active:opacity-70"
     >
       <View className="min-w-0 flex-1 gap-1">
         <View className="flex-row items-center gap-2">
@@ -176,7 +175,7 @@ export function ModelRow({
           />
         </View>
       </View>
-      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
+      <RowChevron />
     </Pressable>
   );
 }
@@ -196,7 +195,7 @@ export function LoadingRows() {
 /** Holds a catalog row's height while its download size, and so its fit, loads. */
 function ModelRowSkeleton() {
   return (
-    <View className="gap-2 border-b-[0.5px] border-hair-soft px-6 py-3">
+    <View className="gap-2 border-b-[0.5px] border-hair-soft px-4 py-3">
       <Skeleton className="h-3.5 w-1/2" />
       <Skeleton className="h-3 w-1/4" />
       <Skeleton className="h-3 w-2/3" />

@@ -8,9 +8,12 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { VoiceTestField } from '@/components/voice-test-field';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganization } from '@/lib/organization-context';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useGatewayTranscriptionModelSelection } from '@/lib/voice-input/gateway/gateway-transcription-model-selection';
@@ -87,7 +90,7 @@ export function VoiceInputSettingsScreen() {
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
-        contentContainerClassName="px-4 gap-3 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
         // The test field and its Clear control live in this scroll view. With
         // the keyboard up, the default ('never') spends the first tap outside
@@ -97,45 +100,46 @@ export function VoiceInputSettingsScreen() {
         // dismiss.
         keyboardShouldPersistTaps="handled"
       >
-        <PreferenceRow
-          icon={Mic}
-          title={t('preferences.gatewayTranscription')}
-          subtitle={t('preferences.gatewayTranscriptionSubtitle')}
-          value={gatewayTranscriptionEnabled}
-          disabled={!gatewayTranscriptionLoaded}
-          onValueChange={setGatewayTranscriptionEnabled}
-          resolveValue={getRequestedGatewayTranscriptionEnabled}
-        />
-        <ConfigureRow
-          icon={Cpu}
-          title={t('preferences.transcriptionModel')}
-          subtitle={modelSubtitle}
-          className="rounded-lg bg-secondary px-3"
-          disabled={modelRowDisabled}
-          onPress={() => {
-            pushOnce('/(app)/transcription-model-picker' as Href);
-          }}
-        />
-        <ConfigureRow
-          icon={Globe}
-          title={t('common.language')}
-          subtitle={languageSubtitle}
-          className="rounded-lg bg-secondary px-3"
-          last
-          disabled={!languageLoaded}
-          onPress={() => {
-            pushOnce('/(app)/voice-language-picker' as Href);
-          }}
-        />
+        <Section>
+          <RowGroup leadingTile>
+            <PreferenceRow
+              icon={Mic}
+              title={t('preferences.gatewayTranscription')}
+              value={gatewayTranscriptionEnabled}
+              disabled={!gatewayTranscriptionLoaded}
+              onValueChange={setGatewayTranscriptionEnabled}
+              resolveValue={getRequestedGatewayTranscriptionEnabled}
+            />
+            <ConfigureRow
+              icon={Cpu}
+              title={t('preferences.transcriptionModel')}
+              subtitle={modelSubtitle}
+              disabled={modelRowDisabled}
+              onPress={() => {
+                pushOnce('/(app)/transcription-model-picker' as Href);
+              }}
+            />
+            <ConfigureRow
+              icon={Globe}
+              title={t('common.language')}
+              subtitle={languageSubtitle}
+              disabled={!languageLoaded}
+              onPress={() => {
+                pushOnce('/(app)/voice-language-picker' as Href);
+              }}
+            />
+          </RowGroup>
+          {/* The explanation is the caption the card answers to, so the switch
+              row keeps its two-line budget whatever the language or width. */}
+          <Text variant="caption">{t('preferences.gatewayTranscriptionSubtitle')}</Text>
+        </Section>
         {status === 'unavailable' ? (
           // A stored model the live catalogue dropped is kept (the engine still
           // has an id) but retry cannot restore it, so the enabled row above
           // opens the picker and this notice names that one action. It must not
           // reuse the dictation error copy, which sends the user to Preferences
           // while they are standing in them.
-          <Text className="px-1 text-xs text-muted-foreground">
-            {t('voiceInput.gatewayModelUnavailableNotice')}
-          </Text>
+          <Text variant="caption">{t('voiceInput.gatewayModelUnavailableNotice')}</Text>
         ) : null}
         {status === 'error' ? (
           <QueryError

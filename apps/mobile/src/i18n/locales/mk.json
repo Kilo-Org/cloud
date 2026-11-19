@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Не успеа вчитувањето на сесиите.",
-    "couldNotLoadActiveSessions": "Не успеа вчитувањето на активните сесии.",
     "agentSessions": "Активни сега",
     "newCodingTask": "Нова задача за кодирање",
     "newTaskFromPicture": "Нова задача од слика",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Нема доверливи хостови за слики",
     "revoke": "Отстрани го {{host}} од доверливите хостови",
     "revokeMessage": "Линковите до овој хост повторно ќе бараат потврда.",
-    "revokeImageMessage": "Сликите од овој хост повторно ќе бараат потврда.",
-    "backToPreferences": "Назад на поставките"
+    "revokeImageMessage": "Сликите од овој хост повторно ќе бараат потврда."
   },
   "glanceable": {
     "waiting": "Се ажурираат агентите",

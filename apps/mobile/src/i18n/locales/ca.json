@@ -3094,7 +3094,6 @@
   },
   "home": {
     "couldNotLoadSessions": "No s'han pogut carregar les sessions.",
-    "couldNotLoadActiveSessions": "No s'han pogut carregar les sessions actives.",
     "agentSessions": "En curs ara",
     "newCodingTask": "Nova tasca de programació",
     "newTaskFromPicture": "Nova tasca a partir d'una imatge",
@@ -3745,8 +3744,7 @@
     "imagesSectionEmpty": "No hi ha servidors d'imatges de confiança",
     "revoke": "Deixa de confiar en {{host}}",
     "revokeMessage": "Els enllaços a aquest servidor tornaran a demanar confirmació.",
-    "revokeImageMessage": "Les imatges d'aquest servidor tornaran a demanar confirmació.",
-    "backToPreferences": "Torna a les preferències"
+    "revokeImageMessage": "Les imatges d'aquest servidor tornaran a demanar confirmació."
   },
   "glanceable": {
     "waiting": "S'estan actualitzant els agents",

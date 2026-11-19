@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sessiyaları yükləmək mümkün olmadı.",
-    "couldNotLoadActiveSessions": "Aktiv sessiyaları yükləmək mümkün olmadı.",
     "agentSessions": "Hazırda aktiv",
     "newCodingTask": "Yeni kodlaşdırma tapşırığı",
     "newTaskFromPicture": "Şəkildən yeni tapşırıq",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Etibarlı şəkil saytı yoxdur",
     "revoke": "{{host}} üçün etibarı ləğv et",
     "revokeMessage": "Bu hosta olan keçidlər yenidən təsdiq tələb edəcək.",
-    "revokeImageMessage": "Bu hostdan olan şəkillər yenidən təsdiq tələb edəcək.",
-    "backToPreferences": "Parametrlərə qayıt"
+    "revokeImageMessage": "Bu hostdan olan şəkillər yenidən təsdiq tələb edəcək."
   },
   "glanceable": {
     "waiting": "Agentlər yenilənir",

@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nou pa t ka chaje sesyon yo.",
-    "couldNotLoadActiveSessions": "Nou pa t ka chaje sesyon aktif yo.",
     "agentSessions": "Aktif kounye a",
     "newCodingTask": "Nouvo travay pwogramasyon",
     "newTaskFromPicture": "Nouvo travay soti nan yon foto",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "Pa gen domèn imaj ou fè konfyans",
     "revoke": "Retire {{host}}",
     "revokeMessage": "Lyen pou domèn sa a ap mande konfimasyon ankò.",
-    "revokeImageMessage": "Imaj ki soti nan domèn sa a ap mande konfimasyon ankò.",
-    "backToPreferences": "Tounen nan preferans yo"
+    "revokeImageMessage": "Imaj ki soti nan domèn sa a ap mande konfimasyon ankò."
   },
   "glanceable": {
     "waiting": "Ap mete ajan yo ajou",

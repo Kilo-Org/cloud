@@ -3038,7 +3038,6 @@
   },
   "home": {
     "couldNotLoadSessions": "بارگذاری نشست‌ها ممکن نشد.",
-    "couldNotLoadActiveSessions": "بارگذاری نشست‌های فعال ممکن نشد.",
     "agentSessions": "در حال اجرا",
     "newCodingTask": "کار کدنویسی جدید",
     "newTaskFromPicture": "کار جدید از یک تصویر",
@@ -3685,8 +3684,7 @@
     "imagesSectionEmpty": "هیچ میزبان تصویر مورد اعتمادی نیست",
     "revoke": "لغو اعتماد به {{host}}",
     "revokeMessage": "پیوندهای این میزبان دوباره درخواست تأیید خواهند کرد.",
-    "revokeImageMessage": "تصاویر این میزبان دوباره درخواست تأیید خواهند کرد.",
-    "backToPreferences": "بازگشت به تنظیمات"
+    "revokeImageMessage": "تصاویر این میزبان دوباره درخواست تأیید خواهند کرد."
   },
   "glanceable": {
     "waiting": "در حال به‌روزرسانی عامل‌ها",

@@ -536,6 +536,28 @@ for (const [name, entrySource, expected, absent] of [
     ],
   ],
   [
+    'throws for the color-mix fixture only',
+    // The fixture CSS is the stub's only input, so a throw it raises for one
+    // fixture leaves the other pins running on the same stylesheet.
+    [
+      'module.exports = {',
+      '  compile(css) {',
+      "    if (css.includes('color-mix')) throw new Error('color-mix fixture exploded');",
+      '    return {',
+      "      warnings() { return { values: { 'text-align': ['start', 'end'] } }; },",
+      '      stylesheet() {',
+      "        return { s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] };",
+      '      },',
+      '    };',
+      '  },',
+      '};',
+    ].join('\n') + '\n',
+    [
+      'the compiler failed on the color-mix over an @theme inline variable fixture (color-mix fixture exploded)',
+    ],
+    'drop the numeric leading rule',
+  ],
+  [
     'still drops only the text-align: start keyword',
     compilerStub({
       warnings: `{ values: { 'text-align': ['start'] } }`,
@@ -549,6 +571,19 @@ for (const [name, entrySource, expected, absent] of [
   [
     'drops neither text-align keyword',
     compilerStub({ warnings: '{ values: {} }', stylesheet: HOLDING_STYLESHEET }),
+    [
+      'text-align: start is no longer dropped — drop the text-start rule',
+      'text-align: end is no longer dropped — drop the text-end rule',
+    ],
+  ],
+  [
+    'reports prose around the keyword instead of the dropped value',
+    // The words `end` and `start` sit inside longer words of a warning
+    // sentence, so neither pin may read them as the dropped keyword.
+    compilerStub({
+      warnings: `{ values: {}, notes: ['text-align rendered is extended, restart'] }`,
+      stylesheet: HOLDING_STYLESHEET,
+    }),
     [
       'text-align: start is no longer dropped — drop the text-start rule',
       'text-align: end is no longer dropped — drop the text-end rule',

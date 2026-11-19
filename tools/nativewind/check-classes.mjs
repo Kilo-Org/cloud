@@ -477,12 +477,13 @@ export function checkCompilerStillDropsThese() {
 
   // `start` and `end` are separate rules, so each keyword is pinned on its
   // own: the compiler handling one keyword retires only that keyword's rule.
-  // The check reads the rest of the warning report as text, so a change to the
-  // report's shape leaves the pin holding instead of retiring the rule.
+  // The check reads the warning report as text, so a change to the report's
+  // shape leaves the pin holding instead of retiring the rule. The keyword is
+  // matched quoted, which cannot land inside a warning sentence.
   for (const keyword of ['start', 'end']) {
     pin(`the text-align: ${keyword} fixture`, () => {
       const report = JSON.stringify(compile(`.x { text-align: ${keyword}; }`).warnings() ?? null);
-      if (report.includes('text-align') && report.includes(keyword)) {
+      if (report.includes('text-align') && report.includes(JSON.stringify(keyword))) {
         return undefined;
       }
       return `check-classes: text-align: ${keyword} is no longer dropped — drop the text-${keyword} rule`;

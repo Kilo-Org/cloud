@@ -104,6 +104,20 @@ function iso(offsetMs: number): string {
   return new Date(Date.now() + offsetMs).toISOString();
 }
 
+/**
+ * One calendar year after `value`, the way `resolvePaidCreditPolicy` writes the
+ * `expiry_date` a `one_year` purchase carries (`addCalendarYearUtc` in
+ * `packages/web-shared/src/lib/paidCreditPolicy.ts`): a February 29 purchase
+ * lands on February 28 of the next year.
+ */
+function oneYearAfter(value: string): string {
+  const date = new Date(value);
+  const month = date.getUTCMonth();
+  date.setUTCFullYear(date.getUTCFullYear() + 1);
+  if (date.getUTCMonth() !== month) date.setUTCDate(0);
+  return date.toISOString();
+}
+
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:mobile-profile-lists ${usage}`);
   console.log('');
@@ -334,6 +348,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // `credit_source: 'promotion'`; an expiry copies its grant's terms and names
   // it through `original_transaction_id` (`packages/db/src/credit-expiration.ts`);
   // a legacy usage deduction has no source.
+  const firstPurchaseAt = iso(-40 * DAY_MS);
+  const secondPurchaseAt = iso(-12 * DAY_MS);
   await db.insert(credit_transactions).values([
     {
       id: creditIds[0],
@@ -344,7 +360,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       credit_source: 'stripe',
       stripe_payment_id: seedPaymentId(userId, 'purchase-1'),
       paid_credit_policy: 'one_year',
-      created_at: iso(-40 * DAY_MS),
+      expiry_date: oneYearAfter(firstPurchaseAt),
+      created_at: firstPurchaseAt,
     },
     {
       id: creditIds[1],
@@ -355,7 +372,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       credit_source: 'stripe',
       stripe_payment_id: seedPaymentId(userId, 'purchase-2'),
       paid_credit_policy: 'one_year',
-      created_at: iso(-12 * DAY_MS),
+      expiry_date: oneYearAfter(secondPurchaseAt),
+      created_at: secondPurchaseAt,
     },
     {
       id: creditIds[2],

@@ -459,7 +459,10 @@ import type { WorktreeRecovery } from '../../shared/worktree-changes-wire.js';
 import type { WorktreeChangeStates } from '../session/worktree-changes.js';
 import type { WorktreeChangesReady } from '../worktree-changes-ready.js';
 import type { WorktreeChangesContext } from '../../sandbox-session/worktree-changes.js';
-import { buildNativeEgressAllowlist } from '../../sandbox-control/egress-policy.js';
+import {
+  buildNativeEgressAllowlist,
+  matchesActiveEgressPolicy,
+} from '../../sandbox-control/egress-policy.js';
 import { nativeEgressAllowlistSchema } from '../../sandbox-control/egress-policy.js';
 import { ByocVercelProviderError, type ByocVercelSource } from '../../byoc/vercel-provider.js';
 import { createProviderAdapter, type StoredProviderPin } from './provider-adapters.js';
@@ -3612,9 +3615,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       if (
         state.kind !== 'stopped' &&
-        (JSON.stringify(selectedPin?.egressAllowlist) !==
-          JSON.stringify(this.providerPin?.egressAllowlist) ||
-          (selectedPin?.egressAudit === true) !== (this.providerPin?.egressAudit === true))
+        !matchesActiveEgressPolicy({
+          stored: this.providerPin,
+          selected: selectedPin,
+          request: sandboxSelection,
+          env: this.env,
+          kiloToken: source.kiloToken,
+          repositoryUrl:
+            source.repository && source.repository.type !== 'github'
+              ? source.repository.url
+              : undefined,
+        })
       ) {
         throw new ProviderCreationError('invalid_configuration');
       }

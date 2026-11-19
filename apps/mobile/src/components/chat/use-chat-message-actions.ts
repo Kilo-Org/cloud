@@ -81,6 +81,8 @@ type BubbleActions = {
   onRetryMessage?: () => void;
   addCredits?: AddCreditsDestination;
   onCopyToComposer?: (text: string) => void;
+  /** The question's words, when its recovery hangs off the words its answer had reached. */
+  composerText?: string;
 };
 
 /**
@@ -127,6 +129,9 @@ export function useChatMessageActions(
   const slotQuestion = slotBubbleId(state);
   const unanswered =
     slotQuestion === undefined ? undefined : recoveryHost(slotQuestion, state.askedAnswer);
+  /* The words Copy to composer puts back when the recovery hangs off the
+     answer's words: the bubble's own text is the answer, not the question. */
+  const slotComposerText = state.askedAnswer === null ? null : state.asked;
   // A question whose answer failed states why on its bubble. A question with no
   // failure was stopped, and one the balance refused offers Add credits.
   const credits = state.failureKey === CREDITS_FAILURE_KEY;
@@ -187,6 +192,7 @@ export function useChatMessageActions(
                 },
               }),
           onCopyToComposer: copyToComposer,
+          ...(slotComposerText === null ? {} : { composerText: slotComposerText }),
         };
       }
       const earlier = kept.get(message.info.id);
@@ -206,11 +212,23 @@ export function useChatMessageActions(
                 },
               }),
           onCopyToComposer: copyToComposer,
+          ...(earlier.question.answer === undefined ? {} : { composerText: earlier.question.text }),
         };
       }
       return { onLongPressDetails: openDetails };
     },
-    [addCredits, asking, copyToComposer, credits, delivery, kept, openDetails, retry, unanswered]
+    [
+      addCredits,
+      asking,
+      copyToComposer,
+      credits,
+      delivery,
+      kept,
+      openDetails,
+      retry,
+      slotComposerText,
+      unanswered,
+    ]
   );
 
   // A message can leave the transcript while its details are open: a model

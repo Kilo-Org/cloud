@@ -1026,6 +1026,7 @@ type BubbleProps = {
   onRetryMessage?: (message: unknown) => void;
   addCredits?: AddCreditsDestination;
   onCopyToComposer?: (text: string) => void;
+  composerText?: string;
 };
 
 type RenderItem = (info: { item: unknown; index: number }) => { props: BubbleProps };
@@ -1291,7 +1292,7 @@ describe('message actions', () => {
     expect(bubble.onRetryMessage).toBeDefined();
   });
 
-  it('states a failed answer once, under the words it had reached, with its Retry', async () => {
+  it('states a failed answer once, under the words it had reached, with Retry and the question to copy', async () => {
     state.status = 'idle';
     state.asked = 'tell a story';
     state.askedAnswer = 'once upon a time';
@@ -1311,6 +1312,9 @@ describe('message actions', () => {
     });
     expect(bubbleFor(tree, 's1:asked').deliveryState).toBeUndefined();
     expect(count(tree, 'AccessibleStatus')).toBe(0);
+    // Copy to composer puts the question back, not the answer's words.
+    expect(words.composerText).toBe('tell a story');
+    expect(words.onCopyToComposer).toBeDefined();
     act(() => {
       words.onRetryMessage?.(state.messages[1]);
     });

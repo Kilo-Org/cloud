@@ -42,6 +42,18 @@ describe('pickFrontApprovableSession', () => {
     expect(pickFrontApprovableSession(rows)?.id).toBe('permission-old');
   });
 
+  it('ranks a PostgreSQL-form timestamp by its real time', () => {
+    // The backend sends PostgreSQL timestamps, which Hermes' own Date.parse
+    // rejects. The shared timestampMs reader parses them, so the older row wins
+    // on its real time instead of sorting last as unparseable.
+    const rows = [
+      row('permission-iso', 'permission', '2026-10-12T10:00:00.000Z'),
+      row('permission-postgres', 'permission', '2026-10-12 09:45:12.945+00'),
+    ];
+
+    expect(pickFrontApprovableSession(rows)?.id).toBe('permission-postgres');
+  });
+
   it('sorts permission rows without a usable timestamp last', () => {
     const rows = [
       row('permission-no-timestamp', 'permission'),

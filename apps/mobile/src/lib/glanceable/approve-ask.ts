@@ -300,7 +300,7 @@ async function answerPendingPermission(
 
 /** One poll cadence tick while the answered session still shows as waiting. */
 const GLANCEABLE_REFRESH_POLL_MS = 1000;
-/** The poll budget: `cli_sessions_v2.status` syncs asynchronously. */
+/** The poll budget in wall-clock time: `cli_sessions_v2.status` syncs asynchronously. */
 const GLANCEABLE_REFRESH_DEADLINE_MS = 10_000;
 
 /** Statuses that still mean the answered ask has not cleared server-side. */
@@ -324,6 +324,8 @@ export type RefreshGlanceableSnapshotDeps = {
   sleep?: (ms: number) => Promise<void>;
   pollIntervalMs?: number;
   deadlineMs?: number;
+  /** The clock the poll budget is measured on; defaults to `Date.now`. */
+  now?: () => number;
 };
 
 async function defaultFetchTrayRows(
@@ -369,8 +371,9 @@ function hasWaitingAnsweredSession(
  * factory the app mounts, so every registered sink (Android notification, iOS
  * activity, widget, persistence) updates. The first real response is published
  * immediately, then polled until the actioned session leaves
- * permission/question or the 10 s budget runs out. A failed fetch ends the poll
- * and leaves the last real snapshot in place: counts are never invented.
+ * permission/question or the 10 s budget runs out. The budget is wall-clock
+ * time, so the poll's own fetches count against it. A failed fetch ends the
+ * poll and leaves the last real snapshot in place: counts are never invented.
  *
  * The counts are the ack-resolved ones (`resolveAnsweredRaises`), like every
  * other republish path (`mount.tsx`, `widget-actions.ts`, `approve-front-agent`):
@@ -420,8 +423,10 @@ export async function refreshGlanceableSnapshot(
   const sleep = deps?.sleep ?? defaultSleep;
   const pollMs = deps?.pollIntervalMs ?? GLANCEABLE_REFRESH_POLL_MS;
   const deadlineMs = deps?.deadlineMs ?? GLANCEABLE_REFRESH_DEADLINE_MS;
+  const now = deps?.now ?? Date.now;
+  // The budget is real elapsed time, so a slow fetch counts against it too.
+  const deadlineAt = now() + deadlineMs;
   const publisher = createPublisher();
-  let elapsedMs = 0;
   for (;;) {
     // eslint-disable-next-line no-await-in-loop -- one fetch per poll tick
     const rows = await fetchTrayRowsOrNull(fetchRows, input.organizationId);
@@ -430,12 +435,11 @@ export async function refreshGlanceableSnapshot(
       break;
     }
     publisher.handleSessions(resolveAnsweredRaises(rows), ctx);
-    if (elapsedMs >= deadlineMs || !hasWaitingAnsweredSession(rows, input.answeredKiloSessionId)) {
+    if (now() >= deadlineAt || !hasWaitingAnsweredSession(rows, input.answeredKiloSessionId)) {
       break;
     }
     // eslint-disable-next-line no-await-in-loop -- 1 s poll cadence
     await sleep(pollMs);
-    elapsedMs += pollMs;
   }
   // The surface reads the ask's request binding at draw time, and the select
   // above starts that read. The headless caller ends with this promise, so wait

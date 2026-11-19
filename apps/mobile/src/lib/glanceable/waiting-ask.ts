@@ -2,6 +2,7 @@ import {
   buildOpaqueScopeKey,
   type GlanceableSessionRow,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { timestampMs } from '@kilocode/app-shared/utils';
 import { z } from 'zod';
 
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
@@ -93,19 +94,6 @@ const waitingAskSchema = z.object({
   boundPermissionId: z.string().nullable().default(null),
 });
 
-/**
- * Epoch ms for a row's status time. An absent or unparseable value sorts after
- * every dated row, so a row whose wait cannot be timed never displaces one that
- * can, and still wins when it is the only row waiting.
- */
-function readStatusTime(statusUpdatedAt: string | null | undefined): number {
-  if (statusUpdatedAt == null) {
-    return Number.POSITIVE_INFINITY;
-  }
-  const at = Date.parse(statusUpdatedAt);
-  return Number.isNaN(at) ? Number.POSITIVE_INFINITY : at;
-}
-
 function isAskingRow(row: WaitingAskRow): row is WaitingAskRow & { id: string } {
   return row.id !== undefined && ASKING_STATUSES.has(row.status);
 }
@@ -137,7 +125,11 @@ export function selectWaitingAsk(
     if (isAskingRow(row)) {
       const approvable =
         row.status === 'permission' && row.connectionId === CLOUD_AGENT_CONNECTION_ID;
-      const at = readStatusTime(row.statusUpdatedAt);
+      // `timestampMs` reads every wire form the backend sends, including the
+      // PostgreSQL one. It answers null when it cannot. A row with no time then
+      // sorts after every dated one, so it never displaces a timed wait. Such a
+      // row still wins when it is the only row waiting.
+      const at = timestampMs(row.statusUpdatedAt) ?? Number.POSITIVE_INFINITY;
       const ranksHigher = approvable && !chosenApprovable;
       const sameRankOlder = approvable === chosenApprovable && at < chosenAt;
       if (chosen === null || ranksHigher || sameRankOlder) {

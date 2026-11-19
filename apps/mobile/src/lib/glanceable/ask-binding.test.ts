@@ -22,11 +22,12 @@ const {
   _resetAskBindingForTests,
   _setAskBindingForTests,
   _whenAskBindsSettledForTests,
+  getAskBindState,
   recordSelectedAsk,
   subscribeAskBound,
   whenAskBindingSettled,
 } = await import('./ask-binding');
-const { _resetWaitingAskForTests, _setSecureStoreForTests, getWaitingAsk } =
+const { _resetWaitingAskForTests, _setSecureStoreForTests, getWaitingAsk, recordWaitingAsk } =
   await import('./waiting-ask');
 
 const NOW = 1_750_000_000_000;
@@ -143,6 +144,7 @@ describe('recordSelectedAsk', () => {
     recordSelectedAsk(askFor());
     await whenAskBindingSettled();
     expect(getWaitingAsk()).toMatchObject({ boundPermissionId: null });
+    expect(getAskBindState()).toEqual({ kind: 'failed' });
 
     clock += ASK_BIND_RETRY_MS - 1;
     recordSelectedAsk(askFor({ recordedAt: clock }));
@@ -155,6 +157,7 @@ describe('recordSelectedAsk', () => {
     await whenAskBindingSettled();
     expect(read).toHaveBeenCalledTimes(2);
     expect(getWaitingAsk()).toMatchObject({ boundPermissionId: 'perm_1' });
+    expect(getAskBindState()).toEqual({ kind: 'bound', permissionId: 'perm_1' });
   });
 
   it('treats an empty projection as unbound, like a failed read', async () => {
@@ -215,6 +218,87 @@ describe('recordSelectedAsk', () => {
 
     expect(read).not.toHaveBeenCalled();
     expect(getWaitingAsk()).toMatchObject({ status: 'question', boundPermissionId: null });
+  });
+});
+
+describe('getAskBindState', () => {
+  it('reports checking while a read for the recorded ask is in flight', async () => {
+    const read = deferredRead();
+    _setAskBindingForTests({ read: read.read, now: () => clock });
+
+    recordSelectedAsk(askFor());
+
+    expect(getWaitingAsk()).toMatchObject({ boundPermissionId: null });
+    expect(getAskBindState()).toEqual({ kind: 'checking' });
+
+    read.resolve(null);
+    await _whenAskBindsSettledForTests();
+  });
+
+  it('reports bound with the permission id once the read lands', async () => {
+    const read = deferredRead();
+    _setAskBindingForTests({ read: read.read, now: () => clock });
+
+    recordSelectedAsk(askFor());
+    read.resolve('perm_1');
+    await whenAskBindingSettled();
+
+    expect(getAskBindState()).toEqual({ kind: 'bound', permissionId: 'perm_1' });
+  });
+
+  it('reports failed after a rejected read and redraws the surfaces once', async () => {
+    const read = vi.fn(async (): Promise<string | null> => {
+      throw new Error('control plane unavailable');
+    });
+    _setAskBindingForTests({ read, now: () => clock });
+    const bound = vi.fn<() => void>();
+    subscribeAskBound(bound);
+
+    recordSelectedAsk(askFor());
+    expect(getAskBindState()).toEqual({ kind: 'checking' });
+    await whenAskBindingSettled();
+
+    expect(getAskBindState()).toEqual({ kind: 'failed' });
+    expect(bound).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports failed after a read that answered nothing', async () => {
+    const read = vi.fn(async () => null);
+    _setAskBindingForTests({ read, now: () => clock });
+    const bound = vi.fn<() => void>();
+    subscribeAskBound(bound);
+
+    recordSelectedAsk(askFor());
+    await whenAskBindingSettled();
+
+    expect(getAskBindState()).toEqual({ kind: 'failed' });
+    expect(bound).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports idle with no ask, and for an ask no approval can answer', () => {
+    expect(getAskBindState()).toEqual({ kind: 'idle' });
+    expect(getAskBindState(null)).toEqual({ kind: 'idle' });
+
+    recordSelectedAsk(askFor({ status: 'question', isCloudAgent: false }));
+    expect(getAskBindState()).toEqual({ kind: 'idle' });
+
+    recordSelectedAsk(askFor({ isCloudAgent: false }));
+    expect(getAskBindState()).toEqual({ kind: 'idle' });
+  });
+
+  it('reports unbound for a record no read started for', () => {
+    // A record filled from the mirror carries the persisted binding alone, so
+    // no read has named its request in this process.
+    recordWaitingAsk(askFor());
+
+    expect(getAskBindState()).toEqual({ kind: 'unbound' });
+  });
+
+  it('reads the ask a surface passes instead of the record', () => {
+    const ask = askFor({ boundPermissionId: 'perm_drawn' });
+
+    expect(getAskBindState(ask)).toEqual({ kind: 'bound', permissionId: 'perm_drawn' });
+    expect(getAskBindState(askFor())).toEqual({ kind: 'unbound' });
   });
 });
 

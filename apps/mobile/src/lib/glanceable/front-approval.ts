@@ -1,4 +1,5 @@
 import { type GlanceableSessionRow } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { timestampMs } from '@kilocode/app-shared/utils';
 
 /**
  * One session row as the front-approval picker reads it: the active-sessions
@@ -15,11 +16,14 @@ export type FrontApprovableRow = GlanceableSessionRow & { id: string };
  * Only `status === 'permission'` rows qualify — a `question` needs an answer
  * and a `retry` needs the provider to come back, so neither is approvable.
  * Among the permission rows the earliest `statusUpdatedAt` wins, mirroring the
- * documented front-of-queue rule in `oldestNeedsInputSince`. A row whose
- * timestamp is missing or unparseable sorts last rather than reading as
- * "waiting since now" (which would let a timestamp-less row cut the queue), and
- * list order breaks every remaining tie, so the result is deterministic for
- * identical rows. Returns null when no permission row waits.
+ * documented front-of-queue rule in `oldestNeedsInputSince`. The time is read
+ * through the shared `timestampMs`. That reader parses the backend's PostgreSQL
+ * form ("2026-10-12 09:45:12.945+00"), which Hermes' own `Date.parse` rejects.
+ * A row whose timestamp is missing or unparseable sorts last, because
+ * `timestampMs` answers null for it. Such a row never reads as "waiting since
+ * now", which would let a timestamp-less row cut the queue. List order breaks
+ * every remaining tie, so the result is deterministic for identical rows.
+ * Returns null when no permission row waits.
  */
 export function pickFrontApprovableSession<T extends FrontApprovableRow>(
   rows: readonly T[]
@@ -39,8 +43,10 @@ export function rankApprovableSessions<T extends FrontApprovableRow>(rows: reado
   const ranked: { row: T; at: number; index: number }[] = [];
   for (const [index, row] of rows.entries()) {
     if (row.status === 'permission') {
-      const parsed = row.statusUpdatedAt == null ? Number.NaN : Date.parse(row.statusUpdatedAt);
-      ranked.push({ row, at: Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed, index });
+      // `timestampMs` reads every wire form the backend sends, including the
+      // PostgreSQL one Hermes cannot parse. It answers null when it cannot.
+      const at = timestampMs(row.statusUpdatedAt);
+      ranked.push({ row, at: at ?? Number.POSITIVE_INFINITY, index });
     }
   }
   // Two untimed rows subtract to NaN, which falls through to list order.

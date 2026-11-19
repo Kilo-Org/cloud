@@ -741,6 +741,19 @@ describe('refreshGlanceableSnapshot', () => {
     return { handleSessions: vi.fn(), redraw: vi.fn() };
   }
 
+  /**
+   * A clock the test drives. The fake sleep moves it by the poll cadence, so
+   * the poll budget measures the same elapsed time a device would see.
+   */
+  function makeClock() {
+    let time = 0;
+    const now = vi.fn(() => time);
+    const sleep = vi.fn(async (ms: number) => {
+      time += ms;
+    });
+    return { now, sleep };
+  }
+
   beforeEach(() => {
     // The ack store is module-level: drop one case's answers before the next.
     __resetSessionAttentionForTests();
@@ -782,33 +795,36 @@ describe('refreshGlanceableSnapshot', () => {
 
   it('polls every interval while the answered session still waits', async () => {
     const publisher = makePublisher();
+    const clock = makeClock();
     const responses = [
       [{ id: 'ses_1', status: 'permission' }],
       [{ id: 'ses_1', status: 'permission' }],
       [{ id: 'ses_1', status: 'busy' }],
     ];
     const fetchRows = vi.fn(async () => responses.shift() ?? []);
-    const sleep = vi.fn();
     await refreshGlanceableSnapshot(
       { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
-      { fetchRows, createPublisher: () => publisher, sleep }
+      { fetchRows, createPublisher: () => publisher, sleep: clock.sleep, now: clock.now }
     );
+    // Each instant fetch leaves the clock where it is, so only the two sleeps
+    // move it: 0, 1000, 2000 ms, all inside the 10 s budget.
     expect(fetchRows).toHaveBeenCalledTimes(3);
     expect(publisher.handleSessions).toHaveBeenCalledTimes(3);
-    expect(sleep).toHaveBeenCalledTimes(2);
+    expect(clock.sleep).toHaveBeenCalledTimes(2);
   });
 
   it('stops at the deadline while the session still waits', async () => {
     const publisher = makePublisher();
+    const clock = makeClock();
     const rows = [{ id: 'ses_1', status: 'permission' }];
     const fetchRows = vi.fn(async () => rows);
-    const sleep = vi.fn();
     await refreshGlanceableSnapshot(
       { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
       {
         fetchRows,
         createPublisher: () => publisher,
-        sleep,
+        sleep: clock.sleep,
+        now: clock.now,
         pollIntervalMs: 1000,
         deadlineMs: 3000,
       }
@@ -816,7 +832,44 @@ describe('refreshGlanceableSnapshot', () => {
     // t=0, 1 s, 2 s, 3 s: four real responses, then the budget ends the poll.
     expect(fetchRows).toHaveBeenCalledTimes(4);
     expect(publisher.handleSessions).toHaveBeenCalledTimes(4);
-    expect(sleep).toHaveBeenCalledTimes(3);
+    expect(clock.sleep).toHaveBeenCalledTimes(3);
+    // The deadline is read from the clock: its last read is the t=3 s check.
+    expect(clock.now).toHaveBeenCalled();
+    expect(clock.now.mock.results.at(-1)?.value).toBe(3000);
+  });
+
+  it('charges the fetch time against the budget', async () => {
+    // The old poll counted only its sleeps, so a slow tray read stretched it
+    // past the deadline. Here each fetch takes 9.5 s of wall clock: the clock
+    // must charge that time, or the poll runs for well over 10 s.
+    const publisher = makePublisher();
+    const rows = [{ id: 'ses_1', status: 'permission' }];
+    let time = 0;
+    const now = vi.fn(() => time);
+    const fetchRows = vi.fn(async () => {
+      time += 9_500;
+      return rows;
+    });
+    const sleep = vi.fn(async (ms: number) => {
+      time += ms;
+    });
+    await refreshGlanceableSnapshot(
+      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
+      {
+        fetchRows,
+        createPublisher: () => publisher,
+        sleep,
+        now,
+        pollIntervalMs: 1000,
+        deadlineMs: 10_000,
+      }
+    );
+    // t=0: the first fetch starts and lands at 9500, under the 10000 deadline,
+    // so one sleep moves the clock to 10500. The second fetch lands at 20000,
+    // publishes, and now() >= 10000 ends the poll: two fetches, one sleep.
+    expect(fetchRows).toHaveBeenCalledTimes(2);
+    expect(publisher.handleSessions).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledTimes(1);
   });
 
   it('stops on a fetch error without publishing fabricated data', async () => {
@@ -833,6 +886,7 @@ describe('refreshGlanceableSnapshot', () => {
 
   it('keeps the last real snapshot when a later fetch fails', async () => {
     const publisher = makePublisher();
+    const clock = makeClock();
     const rows = [{ id: 'ses_1', status: 'permission' }];
     const fetchRows = vi
       .fn()
@@ -840,7 +894,7 @@ describe('refreshGlanceableSnapshot', () => {
       .mockRejectedValueOnce(new Error('offline'));
     await refreshGlanceableSnapshot(
       { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
-      { fetchRows, createPublisher: () => publisher, sleep: vi.fn() }
+      { fetchRows, createPublisher: () => publisher, sleep: clock.sleep, now: clock.now }
     );
     expect(fetchRows).toHaveBeenCalledTimes(2);
     expect(publisher.handleSessions).toHaveBeenCalledTimes(1);

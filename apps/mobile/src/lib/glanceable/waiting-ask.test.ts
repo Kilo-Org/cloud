@@ -176,6 +176,32 @@ describe('selectWaitingAsk', () => {
     ).toBe('dated');
   });
 
+  it('ranks a PostgreSQL-form status time by its real time and a malformed one last', () => {
+    // The backend sends PostgreSQL timestamps, which Hermes' own Date.parse
+    // rejects. The shared timestampMs reader parses them, so the oldest row wins
+    // on its real time.
+    const postgres = selectWaitingAsk(
+      [
+        { id: 'iso', status: 'permission', statusUpdatedAt: '2026-10-12T10:00:00.000Z' },
+        { id: 'postgres', status: 'permission', statusUpdatedAt: '2026-10-12 09:45:12.945+00' },
+      ],
+      CTX,
+      NOW
+    );
+    expect(postgres?.kiloSessionId).toBe('postgres');
+
+    // A value the reader rejects has no time, so it sorts after a dated row.
+    const malformed = selectWaitingAsk(
+      [
+        { id: 'malformed', status: 'permission', statusUpdatedAt: 'not-a-timestamp' },
+        { id: 'dated', status: 'permission', statusUpdatedAt: at(-1) },
+      ],
+      CTX,
+      NOW
+    );
+    expect(malformed?.kiloSessionId).toBe('dated');
+  });
+
   it('marks the cloud-agent row and reuses the snapshot scope key', () => {
     const cloudCtx = { userId: 'u1', organizationId: 'org-1' };
     const ask = selectWaitingAsk(

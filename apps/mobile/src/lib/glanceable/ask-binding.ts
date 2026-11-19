@@ -18,6 +18,12 @@ import { getWaitingAsk, recordWaitingAsk, type WaitingAsk } from './waiting-ask'
  * leaves the ask unbound, which hides Approve; the next select after
  * `ASK_BIND_RETRY_MS` retries, so a transient control-plane failure repairs
  * itself without a timer of its own.
+ *
+ * The record alone cannot tell the two reasons Approve is missing apart.
+ * `boundPermissionId` is null both while a read runs and after one failed.
+ * `getAskBindState` publishes that distinction, and `subscribeAskBound` fires on
+ * every change of it, the failure included. A surface therefore redraws once
+ * the answer is known either way, and never draws Approve for a stale reason.
  */
 
 /** Wait before a failed bind may be read again, keyed by the ask identity. */
@@ -69,10 +75,60 @@ let readForTests: ReadPermissionId | null = null;
 let clock: () => number = () => Date.now();
 
 /**
- * Tell the surfaces a binding landed. They read the recorded ask at draw time,
- * so the frame they already hold has to be written again for Approve to appear.
+ * Why an aggregate Approve is (not) offered for the recorded ask, as the
+ * surfaces read it at draw time.
+ *
+ * The recorded `boundPermissionId` is null while a read runs, and null again
+ * after one failed. It cannot separate the two. This state names the reason.
+ * It is process-local and derived on every read, never persisted: the mirror
+ * keeps the binding alone.
  */
-function notifyBound(): void {
+export type AskBindState =
+  /** The read landed: this request is the one the surface may answer. */
+  | { kind: 'bound'; permissionId: string }
+  /** A control-plane read for this ask identity is in flight. */
+  | { kind: 'checking' }
+  /** The last read failed or answered nothing; a select retries after `ASK_BIND_RETRY_MS`. */
+  | { kind: 'failed' }
+  /**
+   * Recorded with no read started for its identity: a record filled from the
+   * mirror, or one written outside a select. The next select starts the read.
+   */
+  | { kind: 'unbound' }
+  /** No ask is recorded, or the recorded ask cannot be approved. */
+  | { kind: 'idle' };
+
+/**
+ * The bind state of the recorded ask, or of `ask` when a surface passes the ask
+ * it draws. Synchronous: a surface calls it while building the frame.
+ */
+export function getAskBindState(ask: WaitingAsk | null = getWaitingAsk()): AskBindState {
+  if (ask === null) {
+    return { kind: 'idle' };
+  }
+  if (ask.status !== 'permission' || !ask.isCloudAgent) {
+    return { kind: 'idle' };
+  }
+  if (ask.boundPermissionId !== null) {
+    return { kind: 'bound', permissionId: ask.boundPermissionId };
+  }
+  const identity = askIdentity(ask);
+  if (inFlight.has(identity)) {
+    return { kind: 'checking' };
+  }
+  if (lastFailed?.identity === identity) {
+    return { kind: 'failed' };
+  }
+  return { kind: 'unbound' };
+}
+
+/**
+ * Tell the surfaces the bind state changed, so they redraw and read it. They
+ * read `getAskBindState` at draw time, so the frame they hold must be written
+ * again. That redraw makes Approve appear after a bind, or stop promising one
+ * after a failed read.
+ */
+function notifyBindState(): void {
   for (const listener of boundListeners) {
     try {
       listener();
@@ -83,7 +139,10 @@ function notifyBound(): void {
   }
 }
 
-/** Run one surface redraw after a binding lands. Returns the unsubscribe. */
+/**
+ * Run one surface redraw after the bind state changes, bound or failed. The
+ * listener reads `getAskBindState` for the reason. Returns the unsubscribe.
+ */
 export function subscribeAskBound(listener: () => void): () => void {
   boundListeners.add(listener);
   return () => {
@@ -91,7 +150,10 @@ export function subscribeAskBound(listener: () => void): () => void {
   };
 }
 
-async function bind(ask: WaitingAsk, identity: string): Promise<void> {
+/** What one read did to the bind state. */
+type BindOutcome = 'bound' | 'failed' | 'stale';
+
+async function bind(ask: WaitingAsk, identity: string): Promise<BindOutcome> {
   let permissionId: string | null = null;
   try {
     permissionId = await (readForTests ?? readPermissionId)({
@@ -103,18 +165,21 @@ async function bind(ask: WaitingAsk, identity: string): Promise<void> {
   }
   if (permissionId === null) {
     // Unbound, not cleared: the ask still waits, and the next select after the
-    // cooldown reads again.
+    // cooldown reads again. The caller notifies once the read has left the
+    // in-flight map, so a listener that redraws reads 'failed' and not
+    // 'checking'.
     lastFailed = { identity, at: clock() };
-    return;
+    return 'failed';
   }
   const current = getWaitingAsk();
   if (current === null || askIdentity(current) !== identity) {
     // The ask moved on while the read ran: its binding is the older surface's.
-    return;
+    return 'stale';
   }
   recordWaitingAsk({ ...current, boundPermissionId: permissionId });
   lastFailed = null;
-  notifyBound();
+  notifyBindState();
+  return 'bound';
 }
 
 function kickBind(ask: WaitingAsk): void {
@@ -126,10 +191,14 @@ function kickBind(ask: WaitingAsk): void {
     return;
   }
   const settled = (async () => {
+    let outcome: BindOutcome = 'stale';
     try {
-      await bind(ask, identity);
+      outcome = await bind(ask, identity);
     } finally {
       inFlight.delete(identity);
+    }
+    if (outcome === 'failed') {
+      notifyBindState();
     }
   })();
   inFlight.set(identity, settled);

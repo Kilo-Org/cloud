@@ -1372,8 +1372,10 @@ answered nothing at all — no tool call and no text — which is not a judgemen
 not something a description can fix, and it answered normally on every run
 since. `tried` now retries an empty answer on the other shape and keeps a second
 one, because twice is a finding. That is the second time this run measured the
-wrong thing, and both are recorded here so the third is caught in review. The subagent
-description was not, and what it cost is the point of keeping this run:
+wrong thing, and both are recorded here so the third is caught in review. The
+subagent description was not a wrong measurement of the model: it read as
+allowing two uses, and the table below is the delegation rate for each of the
+description's three versions:
 
 | Description | Delegated |
 |---|---:|
@@ -2090,6 +2092,8 @@ Add a row when you turn one off, and give the reason.
 | `import/max-dependencies` | Off for tests only. A test wires every plugin it exercises. |
 | `import/no-namespace` | Off for `src/index.test.ts` only. Asking what a barrel exports needs the namespace; there is no other way to read it. |
 | `typescript/no-unsafe-type-assertion` | Off for `src/plugins/remote-mcp/validator.ts` only. The permissive validator hands its `unknown` input back as the SDK's generic `T`, and an assertion is how it returns the value unchanged. |
+| `import/no-nodejs-modules` | Off for the eleven files that import a Node built-in: the Node store, its four tests, `expo-fixture.ts`, the two remote-mcp fixtures, `conformance.test.ts`, `resume-fixture.ts` and `image.test.ts`. The store opens `node:sqlite` and the remote-mcp fixtures serve over `node:http`, and no bundle reaches any of these files. The override is file-scoped in `.oxlintrc.json` rather than broad, so a test that runs in Node still fails if it imports a built-in it does not need. |
+| `unicorn/no-null` | Off for `src/plugins/remote-mcp/app.ts` only. `AppBridge` names `null` as the value of its first argument when the caller registers the handlers by hand, and this file does exactly that, so the argument is the SDK's `null` and not one this package invents. |
 
 The block under `no-underscore-dangle` in `.oxlintrc.json` — `node/no-sync`,
 `one-var`, the `typescript/*`, `unicorn/*` and `vitest/*` rules that follow it —

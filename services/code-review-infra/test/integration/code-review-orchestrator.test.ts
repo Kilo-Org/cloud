@@ -1792,6 +1792,73 @@ describe('CodeReviewOrchestrator recovery', () => {
     await expect(stub.cancel('superseded')).resolves.toBe(false);
   });
 
+  it('records the pending cancellation when the status callback recovers', async () => {
+    const stub = getReviewStub();
+    let statusCallbackHealthy = false;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        if (statusCallbackHealthy) {
+          return Response.json({ success: true });
+        }
+        return new Response('status unavailable', { status: 500 });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-unexpected',
+          kiloSessionId: 'ses_unexpected',
+        });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    const outcome = await runInDurableObject(
+      stub,
+      async (instance: CodeReviewOrchestrator, state) => {
+        await state.storage.put('state', codeReview());
+
+        let cancellationError: string | null = null;
+        try {
+          await instance.cancel('superseded');
+        } catch (error) {
+          cancellationError = error instanceof Error ? error.message : String(error);
+        }
+
+        statusCallbackHealthy = true;
+
+        // The queued fallback fires after the backend recovered.
+        await instance.runReview();
+
+        return {
+          cancellationError,
+          storedState: await state.storage.get<CodeReview>('state'),
+          alarm: await state.storage.getAlarm(),
+        };
+      }
+    );
+
+    expect(outcome.cancellationError).toMatch(/Failed to update DB status/);
+    expect(outcome.storedState).toMatchObject({
+      status: 'cancelled',
+      errorMessage: 'Review cancelled',
+    });
+    expect(outcome.alarm).toEqual(expect.any(Number));
+    if (outcome.alarm === null) {
+      throw new Error('Expected a cleanup alarm after the recorded cancellation');
+    }
+    expect(outcome.alarm).toBeGreaterThanOrEqual(Date.now() + 6 * 24 * 60 * 60 * 1000);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
+
+    // The fallback recorded the cancellation through the backend, not just locally.
+    const cancelledPosts = fetchMock.mock.calls.filter(
+      ([request, init]) =>
+        String(request).includes('/api/internal/code-review-status/') &&
+        String((init as RequestInit | undefined)?.body).includes('"status":"cancelled"')
+    );
+    expect(cancelledPosts).toHaveLength(2);
+  });
+
   it('does not prepare a session when the review is cancelled during the first status update', async () => {
     const stub = getReviewStub();
     const runningUpdateStarted = deferredSignal();

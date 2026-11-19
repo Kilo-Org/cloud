@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive unit suite for the remote MCP settings logic: draft building, storage application and formatting helpers */
 import { describe, expect, it } from 'vitest';
 import type { RemoteMcpStore } from '../../src/shared/remote-mcp';
 import {
@@ -244,9 +245,40 @@ describe('remote-mcp-settings pure logic', () => {
     };
     const savedOAuthAuth = { oauth: savedOAuth, type: 'oauth' as const };
 
-    it('oauth edit — existing oauth state is preserved', () => {
-      const draft = buildDraftFromForm({ ...baseFields, authType: 'oauth' }, savedOAuthAuth);
+    it('oauth edit — existing oauth state is preserved when the URL is unchanged', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'oauth' },
+        savedOAuthAuth,
+        baseFields.url
+      );
       expect(draft.auth).toStrictEqual(savedOAuthAuth);
+    });
+
+    it('oauth edit — cosmetic URL difference still preserves the blob', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'oauth', url: 'https://example.com/mcp/' },
+        savedOAuthAuth,
+        'https://example.com/mcp'
+      );
+      expect(draft.auth).toStrictEqual(savedOAuthAuth);
+    });
+
+    it('oauth edit — changed URL drops the blob', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'oauth', url: 'https://other.example.com/mcp' },
+        savedOAuthAuth,
+        'https://example.com/mcp'
+      );
+      expect(draft.auth).toStrictEqual({ type: 'oauth' });
+    });
+
+    it('oauth edit — invalid existing URL drops the blob instead of throwing', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'oauth' },
+        savedOAuthAuth,
+        'not a url'
+      );
+      expect(draft.auth).toStrictEqual({ type: 'oauth' });
     });
 
     it('oauth edit without existing state — no oauth blob', () => {

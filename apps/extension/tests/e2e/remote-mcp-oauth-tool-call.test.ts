@@ -334,7 +334,11 @@ const writeStoredServers = (page: Page, store: unknown): Promise<void> =>
 
 const storedOAuthStateSchema = z
   .object({
-    clientInformation: z.object({ client_id: z.string() }).loose().optional(),
+    // The SDK stamps the authorization-server origin it registered the client with.
+    clientInformation: z
+      .object({ client_id: z.string(), issuer: z.string().optional() })
+      .loose()
+      .optional(),
     tokens: z.object({ access_token: z.string(), token_type: z.string() }).loose().optional(),
   })
   .loose();
@@ -638,6 +642,70 @@ test('editing an OAuth server keeps its stored credentials', async () => {
   } finally {
     await context.close();
     await mcp.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('changing a server URL drops its saved credentials', async () => {
+  const fixture = await startFixtureServer();
+  const mcp = await startOAuthMcpFixtureServer();
+  const other = await startOAuthMcpFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, turnMockConfig);
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await openSidePanel(context, extensionId);
+    await addOAuthServerAndAllowInSafeMode(sidePanel, mcp.url);
+
+    await writeServerOAuthState(sidePanel, {
+      clientInformation: { client_id: CLIENT_ID },
+      tokens: { access_token: ACCESS_TOKEN, token_type: 'Bearer' },
+    });
+    await reloadUntilToolCached(sidePanel);
+
+    // Only the edit's own requests matter, so drop the setup traffic first.
+    mcp.requests.length = 0;
+    other.requests.length = 0;
+
+    await sidePanel.getByRole('button', { name: 'Edit Fixture MCP' }).click();
+    await sidePanel.getByLabel('URL').fill(other.url);
+    await sidePanel.getByRole('button', { name: 'Save' }).click();
+
+    /*
+     * The auth type survives the edit but the credentials belong to the origin
+     * that issued them, so the saved server has no token left and saving
+     * reconnects without one.
+     */
+    await expect(sidePanel.getByRole('button', { exact: true, name: 'Connect' })).toBeEnabled({
+      timeout: 60_000,
+    });
+
+    const store = await readStoredStore(sidePanel);
+    const edited = store.servers.find(server => server.displayName === 'Fixture MCP');
+    expect(edited?.auth.oauth?.tokens).toBeUndefined();
+    /*
+     * The saved edit dropped the whole OAuth state, so the reconnect had to
+     * register a fresh client: the stored one is stamped with the new origin,
+     * not the seeded registration the old server was using.
+     */
+    expect(edited?.auth.oauth?.clientInformation?.issuer).toBe(new URL(other.url).origin);
+
+    // The reconnect did reach the new origin, and the old origin's token never did.
+    expect(other.requests.length).toBeGreaterThan(0);
+    expect(other.requests.map(request => request.authorization)).not.toContain(
+      `Bearer ${ACCESS_TOKEN}`
+    );
+    // The edit never opened the authorization page on the server it replaced.
+    expect(authorizeRequests(mcp.requests)).toStrictEqual([]);
+  } finally {
+    await context.close();
+    await mcp.close();
+    await other.close();
     await fixture.close();
     await rm(userDataDir, { force: true, recursive: true });
   }

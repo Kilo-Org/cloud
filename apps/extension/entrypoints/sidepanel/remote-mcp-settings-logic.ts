@@ -7,6 +7,7 @@ import type {
 } from '../../src/shared/remote-mcp';
 import type { RemoteMcpServerDraft } from '../../src/shared/remote-mcp-storage';
 import { upsertRemoteMcpServer } from '../../src/shared/remote-mcp-storage';
+import { normalizeRemoteMcpUrl } from '../../src/shared/remote-mcp-url';
 
 export const getConnectButtonLabel = (status: RemoteMcpStatus): 'Connect' | 'Refresh' =>
   status === 'untested' || status === 'needs_auth' ? 'Connect' : 'Refresh';
@@ -19,6 +20,19 @@ export const getConnectButtonLabel = (status: RemoteMcpStatus): 'Connect' | 'Ref
 export const needsCredentials = (server: RemoteMcpServer): boolean =>
   server.status === 'needs_auth' && server.auth.type !== 'oauth';
 
+/*
+ * OAuth tokens and the client registration belong to the origin that issued
+ * them, so a server whose URL was re-pointed has to sign in again. A URL that
+ * does not normalize fails the save anyway, so it compares as changed.
+ */
+const isSameRemoteMcpUrl = (left: string, right: string): boolean => {
+  try {
+    return normalizeRemoteMcpUrl(left) === normalizeRemoteMcpUrl(right);
+  } catch {
+    return false;
+  }
+};
+
 const buildAuth = (
   fields: {
     authType: 'none' | 'bearer' | 'header' | 'oauth';
@@ -26,7 +40,8 @@ const buildAuth = (
     headerName: string;
     headerValue: string;
   },
-  existingAuth?: RemoteMcpAuth
+  existingAuth?: RemoteMcpAuth,
+  keepOAuthState = false
 ): RemoteMcpAuth => {
   switch (fields.authType) {
     case 'bearer': {
@@ -52,7 +67,7 @@ const buildAuth = (
       return { headerName: fields.headerName, type: 'header' };
     }
     case 'oauth': {
-      if (existingAuth?.type === 'oauth' && existingAuth.oauth !== undefined) {
+      if (keepOAuthState && existingAuth?.type === 'oauth' && existingAuth.oauth !== undefined) {
         return { oauth: existingAuth.oauth, type: 'oauth' };
       }
       return { type: 'oauth' };
@@ -75,10 +90,15 @@ export const buildDraftFromForm = (
     allowInSafeMode: boolean;
     id?: string;
   },
-  existingAuth?: RemoteMcpAuth
+  existingAuth?: RemoteMcpAuth,
+  existingUrl?: string
 ): RemoteMcpServerDraft => ({
   allowInSafeMode: fields.allowInSafeMode,
-  auth: buildAuth(fields, existingAuth),
+  auth: buildAuth(
+    fields,
+    existingAuth,
+    existingUrl !== undefined && isSameRemoteMcpUrl(fields.url, existingUrl)
+  ),
   displayName: fields.displayName,
   enabled: fields.enabled,
   url: fields.url,

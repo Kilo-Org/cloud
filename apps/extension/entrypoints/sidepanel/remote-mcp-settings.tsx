@@ -492,8 +492,8 @@ export const RemoteMcpSettings = (): JSX.Element => {
        was set), so the upsert runs on the store the serialized update loads and
        takes the saved auth from that store rather than from the atom. */
     const saved = await updateRemoteMcpStore<SaveOutcome>(storage, freshStore => {
-      const existingAuth = freshStore.servers.find(server => server.id === form.id)?.auth;
-      const draft = buildDraftFromForm(form, existingAuth);
+      const existingServer = freshStore.servers.find(server => server.id === form.id);
+      const draft = buildDraftFromForm(form, existingServer?.auth, existingServer?.url);
       const previousIds = new Set(freshStore.servers.map(server => server.id));
       const upserted = applyUpsert(freshStore, draft);
       if (upserted.error !== null) {

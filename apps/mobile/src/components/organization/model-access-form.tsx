@@ -13,6 +13,7 @@ import {
   useSaveOrgModelAccess,
 } from '@/lib/hooks/use-org-settings-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import {
   type AvailableModel,
   type CatalogModel,
@@ -220,7 +221,7 @@ export function ModelAccessForm({
     } catch (error) {
       attempt.fail({
         kind: 'save-failed',
-        message: error instanceof Error ? error.message : t('organizationGuardrails.statusFailed'),
+        message: knownServerErrorMessage(error) ?? t('organizationGuardrails.statusFailed'),
       });
     }
   };

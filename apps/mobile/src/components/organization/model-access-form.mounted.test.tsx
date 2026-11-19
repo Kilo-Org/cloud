@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 
 import '@/i18n';
+import { i18n } from '@/i18n';
 import { ModelAccessForm } from './model-access-form';
 import {
   type CatalogModel,
@@ -20,6 +21,7 @@ import {
   toggleModel,
   toggleProvider,
 } from '@/lib/organization/model-access';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise<void>>() }));
 
@@ -363,5 +365,37 @@ describe('ModelAccessForm with both rebases in one render', () => {
       organizationId: 'org-1',
       model_deny_list: ['anthropic/claude', 'openai/gpt'],
     });
+  });
+});
+
+describe('ModelAccessForm save copy', () => {
+  it('shows the localized trial-ended line for the lapsed-plan refusal', async () => {
+    const root = render(undefined);
+    saved.mutateAsync.mockRejectedValue(
+      Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+        data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+      })
+    );
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, setModelsAllowed(draft, ['anthropic/claude'], true));
+    await pressSave(root);
+
+    expect(String(statusMessage(root))).toBe(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('falls back to the status-failed line for an unrecognized refusal', async () => {
+    const root = render(undefined);
+    saved.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Failed to update allow lists'), {
+        data: { code: 'PATCH_FAILED', message: 'Failed to update allow lists' },
+      })
+    );
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, setModelsAllowed(draft, ['anthropic/claude'], true));
+    await pressSave(root);
+
+    expect(String(statusMessage(root))).toBe(i18n.t('organizationGuardrails.statusFailed'));
   });
 });

@@ -4430,7 +4430,7 @@
     "instructionsHint": "قواعد Markdown تُطبَّق على كل جلسة تستخدم هذا الملف الشخصي.",
     "instructionsEmpty": "لا توجد ملفات تعليمات بعد",
     "instructionsEmptyDescription": "أضف ملفات قواعد تُطبّقها كل جلسة تستخدم هذا الملف الشخصي.",
-    "instructionsEmptyDescriptionReadOnly": "تُطبَّق ملفات القواعد المضافة هنا على كل جلسة تستخدم هذا الملف التعريفي.",
+    "instructionsEmptyDescriptionReadOnly": "تُطبَّق ملفات القواعد المضافة هنا على كل جلسة تستخدم هذا الملف الشخصي.",
     "instructionNameRequired": "أدخل اسم ملف",
     "instructionNameTooLong": "يجب ألا يتجاوز اسم الملف {{max}} حرفًا",
     "instructionNameInvalid": "ابدأ بحرف أو رقم واستخدم أحرفًا إنجليزية صغيرة وأرقامًا وشرطات فقط",

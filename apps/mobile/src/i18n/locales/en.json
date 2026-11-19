@@ -4232,7 +4232,7 @@
     "instructionsHint": "Rules markdown applied to every session that uses this profile.",
     "instructionsEmpty": "No instruction files yet",
     "instructionsEmptyDescription": "Add rule files that every session using this profile applies.",
-    "instructionsEmptyDescriptionReadOnly": "Rules files added here are applied to every session that uses this profile.",
+    "instructionsEmptyDescriptionReadOnly": "Rule files added here are applied to every session that uses this profile.",
     "instructionNameRequired": "Enter a file name",
     "instructionNameTooLong": "File name must be {{max}} characters or fewer",
     "instructionNameInvalid": "Start with a letter or digit and use only lowercase letters, digits, and dashes",

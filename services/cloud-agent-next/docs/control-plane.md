@@ -1792,14 +1792,15 @@ This preserves old runtime and HOME identities. A `worktree` runtime HOME is
 
 Deploy in this order:
 
-1. Deploy `services/session-ingest` from the first stack PR. Wait for deployment success.
+1. Deploy `services/session-ingest` after the first stack PR merges. Wait for deployment success.
 2. Deploy `services/cloud-agent-next` and its wrapper image from the complete stack, including these
    compatibility fixes. Keep API, web, and automated callers running.
 3. Check an existing allocation: send a follow-up and add a sibling session.
    Check a fresh allocation: prepare a profile/permission session and two chats in one worktree.
    The fresh compatible allocation must share a runtime and handle; the existing allocation must keep its layout.
 
-Use the `Deploy Cloudflare Workers` workflow (`deploy-workers.yml`) with the selected release ref.
+Use the `Deploy Cloudflare Workers` workflow (`deploy-workers.yml`) from `main` only: it deploys no
+Worker on any other ref, so dispatch each step after its own pull request merges.
 Set `worker` to the service path above and `target_environment` to the target environment.
 Its automatic changed-worker matrix runs services concurrently, so deploy the ingest prerequisite
 separately before releasing the remaining stack.

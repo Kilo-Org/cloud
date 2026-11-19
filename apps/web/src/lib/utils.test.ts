@@ -3,6 +3,7 @@ import {
   toNonNullish,
   parseResultJsonWithZodSchema,
   formatIsoDateString_UsaDateOnlyFormat,
+  formatIsoDateTime_IsoOrderNoSeconds,
   isDateOnlyString,
 } from './utils';
 import * as z from 'zod';
@@ -246,6 +247,22 @@ describe('formatIsoDateString_UsaDateOnlyFormat', () => {
 
   it('returns em-dash for an Invalid Date object', () => {
     expect(formatIsoDateString_UsaDateOnlyFormat(new Date('invalid'))).toBe('—');
+  });
+});
+
+describe('formatIsoDateTime_IsoOrderNoSeconds', () => {
+  it('returns em-dash for a malformed string', () => {
+    expect(formatIsoDateTime_IsoOrderNoSeconds('not-a-date')).toBe('—');
+  });
+
+  it('returns em-dash for null input', () => {
+    expect(formatIsoDateTime_IsoOrderNoSeconds(null)).toBe('—');
+  });
+
+  it('formats a local Date as YYYY-MM-DD HH:mm', () => {
+    // Local components keep the assertion independent of the runner time zone.
+    const date = new Date(2026, 3, 21, 13, 5);
+    expect(formatIsoDateTime_IsoOrderNoSeconds(date)).toBe('2026-04-21 13:05');
   });
 });
 

@@ -26,6 +26,7 @@ import {
 import { formatCents, formatPaymentMethodDescription } from '@/lib/utils';
 import { OrganizationAutoTopUpConfigureDialog } from './OrganizationAutoTopUpConfigureDialog';
 import { CreditExpiryNotice } from '@/components/payment/CreditExpiryNotice';
+import { AutoTopUpLoadFailure } from '@/components/payment/AutoTopUpLoadFailure';
 
 type Props = {
   organizationId: string;
@@ -37,9 +38,12 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data: configData, isLoading } = useQuery(
-    trpc.organizations.autoTopUp.getConfig.queryOptions({ organizationId })
-  );
+  const {
+    data: configData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery(trpc.organizations.autoTopUp.getConfig.queryOptions({ organizationId }));
 
   const enabled = configData?.enabled ?? false;
   const currentAmount = configData?.amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
@@ -154,6 +158,10 @@ export function OrganizationAutoTopUpToggle({ organizationId }: Props) {
         <p className="text-muted-foreground text-sm">Loading auto-top-up settings...</p>
       </div>
     );
+  }
+
+  if (isError) {
+    return <AutoTopUpLoadFailure onRetry={() => void refetch()} />;
   }
 
   if (!enabled) {

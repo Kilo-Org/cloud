@@ -1,5 +1,6 @@
 import { getShareExtensionKey } from 'expo-share-intent';
 
+import { agentChatPickerFixtureRoute } from '@/lib/agent-chat-picker-fixture';
 import { handleAppActionPath } from '@/lib/app-actions/action-url-handler';
 import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
@@ -7,6 +8,7 @@ import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
+import { handleLoginFixturePath } from '@/lib/login-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
 import { handleOrganizationInviteMemberFixturePath } from '@/lib/organization-invite-member-fixture';
 import { handlePrReviewCopyFixturePath } from '@/lib/pr-review/pr-review-copy-fixture-route';
@@ -62,6 +64,22 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     const instancePickerRoute = instancePickerFixtureRoute(path);
     if (instancePickerRoute) {
       return instancePickerRoute;
+    }
+    // Dev-only branch, folder, mode and repository sheets, opened with the
+    // bridge the composer writes (`dev/<picker>-picker-fixture/<state>`).
+    const agentChatPickerRoute = agentChatPickerFixtureRoute(path);
+    if (agentChatPickerRoute) {
+      return agentChatPickerRoute;
+    }
+    // Dev-only sign-in states (`dev/login-fixture/<state>`): the handler writes
+    // the resumed sign-in record and navigates itself, so this returns falsy.
+    if (handleLoginFixturePath(path)) {
+      return null;
+    }
+    // Dev-only chat conversation in a fixed state (`dev/chat-fixture/<state>`).
+    const chatFixture = /(?:^|\/)dev\/chat-fixture\/([a-z]+)\/?(?:[?#].*)?$/.exec(path);
+    if (chatFixture) {
+      return `/(app)/chat-fixture?state=${chatFixture[1]}`;
     }
     // Dev-only: open a Security Agent screen as its group's only route
     // (`kiloapp:///dev/security-agent-single-route-fixture/<scope>/<route…>`).

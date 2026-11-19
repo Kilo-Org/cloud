@@ -25,6 +25,7 @@ import {
   CatalogStat,
   compactNumber,
   FitBadge,
+  fitLabelKey,
   useCatalogDownload,
 } from './model-catalog-parts';
 
@@ -60,9 +61,14 @@ export function RecommendedRow({
         // full-width "Details" button repeated in every card. The press spans
         // the card's top inset and the gap under the line, so its own node
         // reaches the 44pt target without moving the line.
+        // An explicit label replaces the children's text for assistive
+        // technology, so it carries the fit the badge shows as well.
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('modelChat.catalog.detailsA11y', { name: displayName })}
+          accessibilityLabel={[
+            t('modelChat.catalog.detailsA11y', { name: displayName }),
+            t(fitLabelKey(fit)),
+          ].join(', ')}
           onPress={() => {
             router.push({
               pathname: '/model-catalog/[owner]/[repo]',

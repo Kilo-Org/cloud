@@ -2616,24 +2616,25 @@ describe('createPreparationManager', () => {
 
   it('prepares the new roots when the re-prepare adds a repository', async () => {
     const harness = createHarness();
-    // A launch repository, so the first preparation is a real one and the route
-    // directory holds a prepared workspace when the re-prepare arrives.
-    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git' } });
+    // A launch repository and the session's commands, so the first preparation
+    // is a real one that runs the commands in the route directory.
+    const spec = routeSpec({
+      git: { url: 'https://github.com/acme/repo.git' },
+      setupCommands: ['npm install'],
+      startCommands: ['serve'],
+    });
     await harness.manager.prepare(spec);
     expect(harness.ensureCalls()).toBe(1);
+    // The commands ran once, on the preparation that created this workspace.
+    expect(harness.setupCalls).toEqual(['npm install', 'serve']);
     harness.frames.length = 0;
     harness.preparedRoutes.length = 0;
     harness.gitCalls.length = 0;
-    harness.setupCalls.length = 0;
 
     const app = path.join(spec.directory, 'app');
     const lib = path.join(spec.directory, 'lib');
     const incoming: ControlPlaneRouteSpec = {
       ...spec,
-      // Setup and start commands already ran on the prepared workspace; the
-      // picture below proves they do not run a second time.
-      setupCommands: ['npm install'],
-      startCommands: ['serve'],
       roots: [
         {
           directory: app,
@@ -2668,7 +2669,9 @@ describe('createPreparationManager', () => {
     expect(harness.preparedRoutes.at(-1)!.roots).toEqual(incoming.roots);
     // The workspace was already prepared, so its setup and start commands do not
     // run again; a start command would launch a second server beside the first.
-    expect(harness.setupCalls).toEqual([]);
+    // The recorder still holds the first preparation's runs, so each command
+    // appears exactly once across both preparations.
+    expect(harness.setupCalls).toEqual(['npm install', 'serve']);
     expect(harness.logs.some(line => line.includes('workspace setup skipped'))).toBe(true);
   });
 

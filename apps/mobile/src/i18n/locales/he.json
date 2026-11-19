@@ -172,6 +172,7 @@
     "generating": "יוצר…",
     "working": "בפעולה",
     "yourOwnRepositories": "המאגרים שלך",
+    "organizationRepositories": "מאגרי הארגון",
     "dismissed": "סומן להתעלמות",
     "agent": "סוֹכֵן",
     "durationMinuteShort": "min",
@@ -669,7 +670,7 @@
     },
     "instructions": {
       "title": "הוראות מותאמות אישית",
-      "deprecation": "התמיכה בהוראות מותאמות אישית צפויה להסתיים. העבר את ההנחיות האלה לקובץ REVIEW.md במאגר שלך.",
+      "deprecation": "ההוראות המותאמות אישית יוסרו. העבר את ההנחיות האלה לקובץ REVIEW.md במאגר שלך.",
       "placeholder": "לדוגמה: הקפדה על כללי הטיפול בשגיאות שלנו…",
       "clearTitle": "להסיר את ההוראות המותאמות אישית?",
       "clearMessage": "שמירת שדה ריק תמחק את ההוראות המותאמות אישית שנשמרו עבור סוקר הקוד הזה."
@@ -700,6 +701,7 @@
       "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
       "description": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
       "descriptionReconnect": "צור אסימון גישה חדש לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
+      "descriptionOverview": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו במסך הבא.",
       "scopes": "חשבון: קריאה · מאגרים: קריאה/כתיבה · בקשות משיכה: קריאה · התראות אוטומטיות: קריאה/כתיבה",
       "tokenPlaceholder": "אסימון גישה לסביבת העבודה",
       "tokenRefused": "Bitbucket לא קיבל את אסימון הגישה לסביבת העבודה הזה. בדוק שיש לו את ההרשאות שלמעלה, ולאחר מכן נסה שוב."
@@ -2664,6 +2666,8 @@
     "retryHint": "טעינת המצב של Kilo Pass שוב.",
     "endedOn": "הסתיים ב-{{date}}",
     "notAvailableInApp": "Kilo Pass אינו זמין באפליקציה.",
+    "notAvailableTitle": "Kilo Pass אינו מוצע באפליקציה",
+    "noPassDescription": "לחשבון זה אין Kilo Pass.",
     "statusActive": "פעיל",
     "statusTrialing": "בתקופת ניסיון",
     "statusPastDue": "התשלום באיחור",
@@ -3295,6 +3299,10 @@
     },
     "tabs": {
       "discussion": "דיון",
+      "discussionAccessibility": "{{title}}: {{displayCount}} תגובות",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} תגובות",
+      "discussionAccessibility_one": "{{title}}: תגובה אחת",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} תגובות",
       "files": "קבצים",
       "overview": "סקירה כללית"
     },
@@ -3484,8 +3492,7 @@
     "hub": {
       "balance": "יתרה",
       "lowBalanceBelow": "מתחת ל-{{amount}}",
-      "organizationSeats": "רישיונות הארגון",
-      "plan": "תוכנית הארגון",
+      "plan": "תוכנית",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · הסתיים",
@@ -3528,7 +3535,7 @@
       "retentionLimit": "מוצגות החשבוניות העדכניות ביותר."
     },
     "lowBalanceAlert": {
-      "enableA11y": "הפעלת התראה על יתרה נמוכה",
+      "subtitle": "שלח התראה בדוא״ל לכתובות שציינת כאשר היתרה של הארגון יורדת מתחת לסכום שהגדרת.",
       "notifyEmailsLabel": "כתובות דוא״ל לקבלת התראות",
       "permissionDenied": "אין לך הרשאה לנהל התראות חיוב.",
       "separateEmailsHint": "אם הזנת כמה כתובות דוא״ל, הפרד ביניהן בפסיקים.",
@@ -3707,7 +3714,8 @@
     "signupStepUp": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "כדי להשלים את יצירת החשבון שלך, בחר ב-'$t(login.signInWithGoogle)'.",
-    "invalidCode": "הקוד שגוי. נסה שוב.",
+    "signupStepUpBack": "כדי להשלים את יצירת החשבון שלך, חזור אחורה ובחר ב-'$t(login.moreSignInOptions)'.",
+    "invalidCode": "הקוד שגוי או שפג תוקפו. נסה שוב או בחר ב-'$t(login.resendCode)'.",
     "codeInProgress": "הקוד שלך נבדק. המתן רגע ונסה שוב.",
     "tooManyAttempts": "יותר מדי ניסיונות. בקש קוד חדש.",
     "invalidToken": "ההתחברות נכשלה. אפשר לנסות שוב.",
@@ -3977,6 +3985,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) שולחת בקשת הסקה קצרה לנקודת הקצה הזו באמצעות הפרוטוקול והמודל שנבחרו. הספק עשוי לגבות תשלום על כך.",
       "connectionSucceeded": "המודל השלים בקשה באמצעות הפרוטוקול הזה.",
       "connectionFailed": "המודל לא הצליח להשלים בקשה. בדקו את כתובת הבסיס של ה-API, הפרוטוקול, פרטי ההזדהות ומזהה המודל.",
+      "requestTimedOut": "נקודת הקצה לא השיבה בזמן. בדקו את כתובת הבסיס של ה-API ואת החיבור שלכם, ואז נסו שוב.",
+      "requestUnauthorized": "נקודת הקצה דחתה את פרטי ההזדהות. בדקו את מפתח ה-API ואת הכותרות המותאמות, ואז נסו שוב.",
+      "requestNotFound": "נקודת הקצה או המודל לא נמצאו. בדקו את כתובת הבסיס של ה-API ואת מזהה המודל.",
+      "requestRateLimited": "נקודת הקצה מגבילה את קצב הבקשות. המתינו רגע ונסו שוב.",
+      "requestUnavailable": "נקודת הקצה אינה זמינה כרגע. נסו שוב בעוד רגע.",
+      "requestUnreachable": "לא ניתן היה להגיע לנקודת הקצה. בדקו את כתובת הבסיס של ה-API ואת החיבור שלכם.",
+      "requestInvalidResponse": "נקודת הקצה לא השיבה בפורמט הצפוי. בדקו שכתובת הבסיס של ה-API והפרוטוקול תואמים לשרת, ואז נסו שוב.",
+      "discoveryNoModels": "נקודת הקצה לא הציגה מודלים. הזינו מודלים באופן ידני.",
+      "connectionIncomplete": "המודל השיב אך לא סיים. נסו שוב, או בדקו את מזהה המודל ואת הפרוטוקול.",
       "invalidInput": "הזינו שם שרת, כותרות תקינות ולפחות מודל אחד עם מזהה ושם ייחודיים. מגבלות האסימונים חייבות להיות מספרים שלמים חיוביים.",
       "invalidUrl": "הזינו כתובת בסיס של API המשתמשת ב-HTTP או ב-HTTPS, ללא פרטי הזדהות, שאילתה או מקטע.",
       "publicHttp": "נקודות קצה ציבוריות המשתמשות ב-HTTP אינן מותרות. השתמשו ב-HTTPS או בנקודת קצה מקומית פרטית.",
@@ -4115,7 +4132,11 @@
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"
     },
-    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו."
+    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו.",
+    "providerKeyRefused": "הספק דחה את פרטי ההזדהות. בדקו את מפתח ה-API שלו, ואז שלחו שוב.",
+    "providerModelMissing": "השרת הזה לא מספק עוד את המודל הזה. בחרו אחר.",
+    "providerRateLimited": "הספק מגביל את קצב הבקשות. המתינו רגע ושלחו שוב.",
+    "providerUnavailable": "הספק אינו זמין כרגע. שלחו שוב בקרוב."
   },
   "settingsTools": {
     "confirmTitle": "לאשר את השינוי הזה?"
@@ -4496,6 +4517,7 @@
     "pickPackToBuyAgain": "בחרו חבילה למעלה כדי להתחיל רכישה חדשה.",
     "purchasePending": "החנות עדיין מעבדת את התשלום הזה. הקרדיטים שלך יגיעו ברגע שהיא תאשר את החיוב.",
     "buyAgain": "לקנות שוב",
+    "checkPurchase": "בדיקת הרכישה",
     "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
     "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
   },
@@ -4593,7 +4615,9 @@
     },
     "saveSheet": {
       "title": "שמירה ברשימה",
-      "saved": "נשמר ברשימה {{list}}"
+      "saved": "נשמר ברשימה {{list}}",
+      "saveFailed": "לא הצלחנו לשמור את המשימה. בדקו את החיבור ונסו שוב.",
+      "saveRefused": "לא הצלחנו לשמור את המשימה ברשימה הזו. בחרו רשימה אחרת."
     }
   },
   "agentBriefing": {
@@ -4605,6 +4629,7 @@
     "empty": "אין פעילות בחלון הדוח הזה",
     "emptyHint": "סשנים שלך לקידוד בענן וב-CLI יופיעו כאן כשיש פעילות בדוח מתוזמן.",
     "loadError": "לא ניתן לטעון דוחות",
+    "estimateLoadError": "לא ניתן לטעון את הערכת העלות.",
     "view": "קריאת הדוח",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5014,7 +5039,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "תכונת ארגונים",
-    "enterpriseOnly": "זוהי תכונה לארגונים בלבד.",
+    "enterpriseOnly": "ספקים ומודלים זמינים בתוכנית Enterprise.",
     "readOnly": "רק בעלי הארגון והמנהלים יכולים לשנות הגדרות אלה.",
     "loadError": "לא ניתן היה לטעון ספקים ומודלים",
     "tabModels": "מודלים",

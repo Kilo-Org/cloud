@@ -2,11 +2,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { createDrizzleClient, getWorkerDb, type DrizzleClient } from '@kilocode/db/client';
 import type * as DbClient from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import type { PublishCloudAgentSessionStatusParams } from '@kilocode/session-ingest-contracts';
+import type {
+  PublishCloudAgentSessionStatusParams,
+  SessionLiveSummary,
+} from '@kilocode/session-ingest-contracts';
 import { sql } from 'drizzle-orm';
 import type * as SessionEvents from '../../src/session-events';
 import { notifyUserSessionEvent } from '../../src/session-events';
 import { SessionIngestRPC } from '../../src/session-ingest-rpc';
+import { refreshGlanceableSessions } from '../../src/remote-session-notifications';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {},
@@ -66,6 +70,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   vi.mocked(notifyUserSessionEvent).mockClear();
+  vi.mocked(refreshGlanceableSessions).mockClear();
   await client.db.execute(sql`TRUNCATE pg_temp.cli_sessions_v2`);
   await client.db.insert(cli_sessions_v2).values({
     session_id: sessionId,
@@ -94,11 +99,25 @@ async function storedRow() {
       status: cli_sessions_v2.status,
       title: cli_sessions_v2.title,
       last_activity_at: cli_sessions_v2.last_activity_at,
+      live_summary: cli_sessions_v2.live_summary,
+      total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
     })
     .from(cli_sessions_v2);
   return {
     ...row,
     last_activity_at: row?.last_activity_at ? new Date(row.last_activity_at).toISOString() : null,
+  };
+}
+
+function summary(
+  target: string,
+  failure: SessionLiveSummary['failure'] = null
+): SessionLiveSummary {
+  return {
+    step: { verb: 'editing', target },
+    plan: { done: 1, total: 3, current: 'Write the tests' },
+    changes: null,
+    failure,
   };
 }
 
@@ -203,12 +222,98 @@ describe('Cloud Agent list projection from the Session DO', () => {
       cloudAgentSessionId: 'workspace_22222222-2222-4222-8222-222222222222',
       lastActivityAt: '2026-01-01T00:05:00.000Z',
       rename: { title: 'Renamed by the agent', transitionId: firstTransitionId },
+      liveSummary: summary('index.ts'),
+      totalCostMicrodollars: 1_500,
     });
     expect(await storedRow()).toEqual({
       status: null,
       title: 'Generated from the first prompt',
       last_activity_at: null,
+      live_summary: null,
+      total_cost_microdollars: null,
     });
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    expect(refreshGlanceableSessions).not.toHaveBeenCalled();
+  });
+
+  it('records the Kilo v2 session card summary and cost total', async () => {
+    await publish({ liveSummary: summary('index.ts'), totalCostMicrodollars: 1_500 });
+    expect(await storedRow()).toMatchObject({
+      status: 'busy',
+      live_summary: summary('index.ts'),
+      total_cost_microdollars: 1_500,
+    });
+  });
+
+  it('keeps the newer summary and the higher cost when an older publication lands late', async () => {
+    await publish({
+      status: 'idle',
+      occurredAt: '2026-01-01T00:06:00.000Z',
+      transitionId: laterTransitionId,
+      liveSummary: summary('newer.ts', { kind: 'provider' }),
+      totalCostMicrodollars: 3_000,
+    });
+    await publish({ liveSummary: summary('older.ts'), totalCostMicrodollars: 1_500 });
+    expect(await storedRow()).toMatchObject({
+      status: 'idle',
+      live_summary: summary('newer.ts', { kind: 'provider' }),
+      total_cost_microdollars: 3_000,
+    });
+  });
+
+  it('raises the cost from a publication whose status is stale', async () => {
+    await publish({
+      status: 'idle',
+      occurredAt: '2026-01-01T00:06:00.000Z',
+      transitionId: laterTransitionId,
+      totalCostMicrodollars: 1_500,
+    });
+    // Cost only grows, so a higher total stands whichever publication carried it.
+    await publish({ totalCostMicrodollars: 3_000 });
+    expect(await storedRow()).toMatchObject({ status: 'idle', total_cost_microdollars: 3_000 });
+  });
+
+  it('refreshes a followed session card when the summary changes under an unchanged status', async () => {
+    await publish({ liveSummary: summary('first.ts') });
+    // The status change refreshes every card of the session itself.
+    expect(refreshGlanceableSessions).toHaveBeenCalledTimes(1);
+    expect(refreshGlanceableSessions).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ cardFollowSessionIds: [sessionId] })
+    );
+    await publish({
+      occurredAt: '2026-01-01T00:01:00.000Z',
+      transitionId: laterTransitionId,
+      liveSummary: summary('second.ts'),
+    });
+    expect((await storedRow()).live_summary).toEqual(summary('second.ts'));
+    expect(refreshGlanceableSessions).toHaveBeenCalledTimes(2);
+    expect(refreshGlanceableSessions).toHaveBeenLastCalledWith(env, {
+      userId,
+      cliSessionIds: [sessionId],
+      cardFollowSessionIds: [sessionId],
+    });
+  });
+
+  it('neither rewrites nor announces an unchanged summary', async () => {
+    await publish({ liveSummary: summary('index.ts') });
+    vi.mocked(refreshGlanceableSessions).mockClear();
+    await publish({
+      occurredAt: '2026-01-01T00:01:00.000Z',
+      transitionId: laterTransitionId,
+      liveSummary: summary('index.ts'),
+    });
+    expect((await storedRow()).live_summary).toEqual(summary('index.ts'));
+    expect(refreshGlanceableSessions).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when a report repeats a cost the row already holds', async () => {
+    await publish({ totalCostMicrodollars: 1_500 });
+    const before = await rowVersion();
+    // The same snapshot retried: the status transition is already stored, so the cost write is
+    // the only one that could touch the row.
+    await publish({ totalCostMicrodollars: 1_500 });
+    expect(await rowVersion()).toEqual(before);
+    expect((await storedRow()).total_cost_microdollars).toBe(1_500);
   });
 });

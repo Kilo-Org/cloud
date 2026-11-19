@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { isolateBidiText, isolateLtrBidiText } from '@/lib/bidi';
 import { transcriptText } from '@/lib/native-remote/projections';
 import { type NativeRemoteSession } from '@/lib/native-remote/use-native-session';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 import { NativeRemoteQuestion } from './native-remote-question';
 import { NativeRemoteMessages } from './native-remote-lists';
 
@@ -167,6 +168,10 @@ function NativeRemoteComposer({ remote }: { remote: NativeRemoteSession }) {
         placeholder={t('nativeRemote.prompt')}
         defaultValue=""
         multiline
+        // Submit clears this field once the send confirms, so Android keeps
+        // the framework suggestion popup off — it crashes against rewritten
+        // text (see REWRITTEN_INPUT_AUTO_CORRECT).
+        autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
         className="min-h-24 leading-tight"
         autoCapitalize="sentences"
         onChangeText={text => {

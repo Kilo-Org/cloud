@@ -9,7 +9,7 @@
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
 
@@ -96,6 +96,8 @@ const dismissDraft = vi.hoisted(() => ({
 // The sheet's commit is its header's Done control, so the harness records the
 // header props the screen passes instead of looking for an inline button.
 const sheetHeader = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
+const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
+const keyboard = vi.hoisted(() => ({ height: 0 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -109,6 +111,14 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   I18nManager: { isRTL: false },
 }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: sideInsets.left, right: sideInsets.right }),
+}));
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: (select: (state: { height: number }) => number) =>
+    select({ height: keyboard.height }),
+}));
+vi.mock('@/lib/tab-bar-clearance', () => ({ useEffectiveTabBarHeight: () => 0 }));
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff' }));
 vi.mock('expo-router', () => ({
@@ -271,6 +281,11 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     dismissDraft.clear.mockClear();
   });
 
+  afterEach(() => {
+    sideInsets.left = 0;
+    sideInsets.right = 0;
+  });
+
   it('names the finding it dismisses above the reason group', () => {
     const tree = renderScreen();
     const texts = renderedTexts(tree.root);
@@ -279,6 +294,46 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     expect(texts).toContain(
       `${FINDING_IDENTITY.package_name} (${FINDING_IDENTITY.package_ecosystem})`
     );
+  });
+
+  // The loaded form's scroller clears the landscape cutout, so the loading
+  // body must sit inside the same insets or it jumps sideways when the finding
+  // arrives.
+  it('keeps the loading body inside the side insets the loaded form clears', () => {
+    sideInsets.left = 47;
+    sideInsets.right = 59;
+    finding.isLoading = true;
+    finding.data = undefined;
+    const loading = renderScreen();
+    const insetWrappers = loading.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        JSON.stringify(n.props.style) === JSON.stringify({ paddingLeft: 47, paddingRight: 59 })
+    );
+    expect(insetWrappers).toHaveLength(1);
+
+    finding.isLoading = false;
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    const loaded = renderScreen();
+    expect(loaded.root.findByType(ScrollView).props.style).toEqual([
+      undefined,
+      { marginBottom: 0, marginLeft: 47, marginRight: 59 },
+    ]);
+  });
+
+  it('ends the Android scroll frame at the keyboard top so the comment field can clear it', () => {
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    keyboard.height = 883;
+    try {
+      const tree = renderScreen();
+      expect(tree.root.findByType(ScrollView).props.style).toEqual([
+        undefined,
+        { marginBottom: 883 },
+      ]);
+    } finally {
+      keyboard.height = 0;
+    }
   });
 
   it.each(['finding', 'permissions'] as const)(

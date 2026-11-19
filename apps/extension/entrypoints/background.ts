@@ -456,7 +456,7 @@ export const handleTabDebuggerRequest = async ({
           ok: true,
           takeOver: {
             holderKind: 'agent',
-            sessionTitle: outcome.holder.title ?? 'Kilo CLI session',
+            sessionTitle: outcome.owner.title ?? 'Kilo CLI session',
             tabId: request.tabId,
           },
           type: BROWSER_TOOL_MESSAGE,

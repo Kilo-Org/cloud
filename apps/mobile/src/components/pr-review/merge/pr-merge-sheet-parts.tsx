@@ -13,6 +13,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { SEGMENTED_FRAME_HEIGHT_CLASS } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
@@ -161,14 +162,7 @@ export function MergeSheetFormSkeleton(props: {
           {props.methodOptions.length === 0 ? (
             <Skeleton className="h-11 rounded-md" />
           ) : (
-            <View className="flex-row flex-wrap gap-2">
-              {props.methodOptions.map(option => (
-                <Skeleton
-                  key={option.value}
-                  className={cn(TOUCH_TARGET_CLASS, 'w-20 rounded-full')}
-                />
-              ))}
-            </View>
+            <Skeleton className={cn(SEGMENTED_FRAME_HEIGHT_CLASS, 'rounded-lg')} />
           )}
         </View>
         {props.showTitle ? (
@@ -320,9 +314,9 @@ export function MergeSheetFormBody(props: {
           onPress={onDismiss}
           disabled={isMutating}
           className="mt-2"
-          accessibilityLabel={t('common.cancel')}
+          accessibilityLabel={t('common.discard')}
         >
-          <Text>{t('common.cancel')}</Text>
+          <Text>{t('common.discard')}</Text>
         </Button>
       </PrFormSheetFooter>
     </>

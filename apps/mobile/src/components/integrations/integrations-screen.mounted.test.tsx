@@ -336,7 +336,8 @@ describe('IntegrationsScreen', () => {
       'Linear',
     ]);
     expect(rowTitled(root, 'Slack').props.subtitle).toBe('Connected to Acme Slack');
-    expect(rowTitled(root, 'GitHub').props.subtitle).toBe('Not connected');
+    // The Connect action already says the row is not connected.
+    expect(rowTitled(root, 'GitHub').props.subtitle).toBeUndefined();
 
     const connect = actionOf(rowTitled(root, 'GitHub'));
     expect(connect?.props.accessibilityLabel).toBe('Connect. GitHub');
@@ -347,11 +348,15 @@ describe('IntegrationsScreen', () => {
   it('states an empty scope once, through each row, with no page-level line', () => {
     const renderer = mount();
 
-    // The rows carry the state, so the page adds no second line that says the
-    // same thing for every row at once.
+    // The rows carry the state through their Connect action, so the page adds
+    // no line that says the same thing for every row at once, and no row
+    // repeats it as a subtitle.
     expect(texts(renderer.root)).not.toContain('No integrations connected yet.');
-    expect(rowTitled(renderer.root, 'GitHub').props.subtitle).toBe('Not connected');
-    expect(rowTitled(renderer.root, 'Linear').props.subtitle).toBe('Not connected');
+    for (const title of ['GitHub', 'Linear']) {
+      const row = rowTitled(renderer.root, title);
+      expect(row.props.subtitle).toBeUndefined();
+      expect(actionOf(row)?.props.accessibilityLabel).toBe(`Connect. ${title}`);
+    }
   });
 
   it('reports an ambiguous GitHub organization as web-managed', () => {

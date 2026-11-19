@@ -172,6 +172,7 @@
     "generating": "Ustvarjanje…",
     "working": "V teku",
     "yourOwnRepositories": "Tvoji repozitoriji",
+    "organizationRepositories": "Repozitoriji organizacije",
     "dismissed": "Zavrženo",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -1070,7 +1071,12 @@
     "tabs": {
       "overview": "Pregled",
       "files": "Datoteke",
-      "discussion": "Razprava"
+      "discussion": "Razprava",
+      "discussionAccessibility_one": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentarjev",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentarjev",
+      "discussionAccessibility_two": "{{title}}: {{displayCount}} komentarja",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} komentarji"
     },
     "fileStatus": {
       "modified": "Spremenjeno",
@@ -1269,7 +1275,7 @@
     },
     "instructions": {
       "title": "Navodila po meri",
-      "deprecation": "Navodila po meri bodo ukinjena. Te smernice raje premakni v datoteko REVIEW.md v svojem skladišču.",
+      "deprecation": "Navodila po meri bodo odstranjena. Te smernice raje premakni v datoteko REVIEW.md v svojem skladišču.",
       "placeholder": "npr. upoštevanje naših pravil za obravnavo napak…",
       "clearTitle": "Odstranim navodila po meri?",
       "clearMessage": "Če shraniš prazno polje, izbrišeš navodila po meri, shranjena za tega pregledovalca."
@@ -1435,6 +1441,7 @@
       "managedOnWeb": "Povezava Bitbucket za {{organization}} se upravlja v spletu z računalnika.",
       "description": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
       "descriptionReconnect": "Ustvari nov žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
+      "descriptionOverview": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi na naslednjem zaslonu.",
       "scopes": "Račun: branje · Skladišča: branje/pisanje · Zahteve za združitev: branje · Spletni povratni klici: branje/pisanje",
       "tokenPlaceholder": "Žeton za dostop do delovnega prostora",
       "tokenRefused": "Bitbucket ni sprejel tega žetona za dostop do delovnega prostora. Preveri, ali ima zgoraj navedena dovoljenja, nato poskusi znova."
@@ -3299,6 +3306,8 @@
     "retryHint": "Znova poskusi naložiti stanje naročnine Kilo Pass.",
     "endedOn": "Končano {{date}}",
     "notAvailableInApp": "Kilo Pass v aplikaciji ni na voljo.",
+    "notAvailableTitle": "Kilo Pass ni v aplikaciji",
+    "noPassDescription": "Ta račun nima naročnine Kilo Pass.",
     "statusActive": "Aktiven",
     "statusTrialing": "Preizkusno obdobje",
     "statusPastDue": "Plačilo v zamudi",
@@ -3581,7 +3590,7 @@
       "retentionLimit": "Prikazani so najnovejši računi."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Omogoči opozorilo o nizkem stanju",
+      "subtitle": "Pošlji opozorilo po e-pošti na navedene naslove, ko stanje te organizacije pade pod nastavljeni znesek.",
       "notifyEmailsLabel": "E-poštni naslovi za obvestila",
       "permissionDenied": "Nimaš dovoljenja za upravljanje obračunskih opozoril.",
       "separateEmailsHint": "Več e-poštnih naslovov loči z vejicami.",
@@ -3730,8 +3739,7 @@
       "renameTitle": "Preimenuj organizacijo",
       "renamePlaceholder": "Ime organizacije",
       "balance": "Stanje",
-      "organizationSeats": "Uporabniška mesta organizacije",
-      "plan": "Načrt organizacije",
+      "plan": "Načrt",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · je potekel",
@@ -3767,7 +3775,8 @@
     "signupStepUp": "Za dokončanje ustvarjanja računa izberi »$t(login.moreSignInOptions)«.",
     "signupStepUpApple": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithApple)«.",
     "signupStepUpGoogle": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithGoogle)«.",
-    "invalidCode": "Ta koda ni pravilna. Poskusi znova.",
+    "signupStepUpBack": "Za dokončanje ustvarjanja računa se vrni nazaj in izberi »$t(login.moreSignInOptions)«.",
+    "invalidCode": "Ta koda ni pravilna ali je potekla. Poskusi znova ali uporabi »$t(login.resendCode)«.",
     "codeInProgress": "Tvoja koda se obdeluje. Počakaj trenutek in poskusi znova.",
     "tooManyAttempts": "Preveč poskusov. Zahtevaj novo kodo.",
     "invalidToken": "Prijava ni uspela. Poskusi znova.",
@@ -4038,6 +4047,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) pošlje kratko zahtevo za sklepanje na to končno točko z izbranim protokolom in modelom. Ponudnik jo lahko zaračuna.",
       "connectionSucceeded": "Model je uspešno obdelal zahtevo s tem protokolom.",
       "connectionFailed": "Model ni mogel obdelati zahteve. Preveri osnovni URL API, protokol, poverilnice in ID modela.",
+      "requestTimedOut": "Končna točka se ni odzvala pravočasno. Preveri osnovni URL API in povezavo, nato poskusi znova.",
+      "requestUnauthorized": "Končna točka je zavrnila poverilnice. Preveri ključ API in glave po meri, nato poskusi znova.",
+      "requestNotFound": "Končne točke ali modela ni bilo mogoče najti. Preveri osnovni URL API in ID modela.",
+      "requestRateLimited": "Končna točka omejuje zahteve. Počakaj trenutek in poskusi znova.",
+      "requestUnavailable": "Končna točka trenutno ni na voljo. Poskusi znova čez trenutek.",
+      "requestUnreachable": "Končne točke ni bilo mogoče doseči. Preveri osnovni URL API in povezavo.",
+      "requestInvalidResponse": "Končna točka ni odgovorila v pričakovani obliki. Preveri, ali se osnovni URL API in protokol ujemata s strežnikom, in poskusi znova.",
+      "discoveryNoModels": "Končna točka ni navedla nobenega modela. Modele vnesi ročno.",
+      "connectionIncomplete": "Model je odgovoril, vendar ni dokončal. Poskusi znova ali preveri ID modela in protokol.",
       "invalidInput": "Vnesi ime zaledja, veljavne glave in vsaj en model z edinstvenim ID in imenom. Omejitve števila žetonov morajo biti pozitivna cela števila.",
       "invalidUrl": "Vnesi osnovni URL API s protokolom HTTP ali HTTPS brez poverilnic, poizvedbe ali fragmenta.",
       "publicHttp": "Javne končne točke HTTP niso dovoljene. Uporabi HTTPS ali zasebno lokalno končno točko.",
@@ -4176,7 +4194,11 @@
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"
     },
-    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila."
+    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila.",
+    "providerKeyRefused": "Ponudnik je zavrnil poverilnice. Preveri ključ API ponudnika in znova pošlji.",
+    "providerModelMissing": "To zaledje ne ponuja več tega modela. Izberi drugega.",
+    "providerRateLimited": "Ponudnik omejuje zahteve. Počakaj trenutek in znova pošlji.",
+    "providerUnavailable": "Ponudnik trenutno ni na voljo. Znova pošlji kmalu."
   },
   "settingsTools": {
     "confirmTitle": "Potrdim to spremembo?"
@@ -4563,6 +4585,7 @@
     "pickPackToBuyAgain": "Za začetek novega nakupa izberite paket zgoraj.",
     "purchasePending": "Trgovina to plačilo še obdeluje. Krediti bodo prispeli, ko bo odobrila bremenitev.",
     "buyAgain": "Kupi znova",
+    "checkPurchase": "Preveri nakup",
     "purchaseOwnedByAnotherAccount": "Krediti v tem računu Apple Account pripadajo drugemu računu Kilo. Za uporabo se prijavi v ta račun Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na tem Google Play računu pripadajo drugemu Kilo računu. Za uporabo se prijavite v ta Kilo račun."
   },
@@ -4664,7 +4687,9 @@
     },
     "saveSheet": {
       "title": "Shrani na seznam",
-      "saved": "Shranjeno na seznam {{list}}"
+      "saved": "Shranjeno na seznam {{list}}",
+      "saveFailed": "Naloge ni bilo mogoče shraniti. Preverite povezavo in poskusite znova.",
+      "saveRefused": "Naloge ni bilo mogoče shraniti na ta seznam. Izberite drug seznam."
     }
   },
   "agentBriefing": {
@@ -4676,6 +4701,7 @@
     "empty": "Ni dejavnosti v tem časovnem obdobju poročila.",
     "emptyHint": "Vaše seje kodiranja v oblaku in CLI se prikažejo tukaj, ko ima načrtovano poročilo dejavnost.",
     "loadError": "Poročil ni bilo mogoče naložiti",
+    "estimateLoadError": "Ocene ni bilo mogoče naložiti.",
     "view": "Preberi poročilo",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5089,7 +5115,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Funkcija za podjetja",
-    "enterpriseOnly": "To je funkcija samo za podjetja.",
+    "enterpriseOnly": "Ponudniki in modeli so na voljo v paketu Enterprise.",
     "readOnly": "Samo lastniki in skrbniki organizacije lahko spremenijo te nastavitve.",
     "loadError": "Ponudnikov in modelov ni bilo mogoče naložiti",
     "tabModels": "Modeli",

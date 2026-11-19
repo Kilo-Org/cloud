@@ -88,6 +88,12 @@ type MessageBubbleProps = {
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
   /**
+   * The words Copy to composer puts back when they are not this row's own: a
+   * chat states a question's failure under the words its answer had reached,
+   * an assistant row, and the words to edit and send again are the question's.
+   */
+  composerText?: string;
+  /**
    * The failed preparation of this turn, drawn between the row and its failure
    * footer: the group names the stage that failed and the reason, so it comes
    * before the actions that recover from it. A generic response-failure
@@ -128,6 +134,7 @@ function MessageBubbleImpl({
   addCredits,
   retryAvailable,
   onCopyToComposer,
+  composerText,
   failedPreparation,
   onRestoreQueued,
   noReplyRecorded,
@@ -174,8 +181,11 @@ function MessageBubbleImpl({
   );
   // Copy-to-composer re-sends only the first human-authored text part, so a
   // synthesized attachment notice is not copied and a file-only row hides the
-  // button entirely.
-  const copyText = useMemo(() => (isUser ? firstHumanText(parts) : ''), [isUser, parts]);
+  // button entirely. A row that states another row's failure names its text.
+  const copyText = useMemo(
+    () => composerText ?? (isUser ? firstHumanText(parts) : ''),
+    [composerText, isUser, parts]
+  );
 
   // Keep actions on the separate host so interactive descendants remain reachable.
   // Accessible Copy retains the existing ActionSheet path; details matches long-press.

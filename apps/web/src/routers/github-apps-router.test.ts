@@ -6,12 +6,18 @@ import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import type { UpsertPlatformIntegrationResult } from '@/lib/integrations/db/platform-integrations';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  GITHUB_LISTING_BUDGET_MESSAGE,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/adapter';
 
 type TestIntegration = {
   id: string;
   platform_installation_id: string;
   platform_account_login: string;
   github_app_type: GitHubAppType | null;
+  owned_by_user_id?: string | null;
+  owned_by_organization_id?: string | null;
 };
 
 type InstallationDetails = {
@@ -154,6 +160,7 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+  ...(jest.requireActual('@/lib/integrations/platforms/github/adapter') as object),
   fetchGitHubInstallationDetails: (installationId: string, appType: GitHubAppType) =>
     mockFetchGitHubInstallationDetails(installationId, appType),
   fetchGitHubRepositories: (
@@ -720,6 +727,22 @@ describe('githubAppsRouter.refreshInstallation', () => {
       appType: 'standard',
     });
   });
+
+  it('answers a listing past the pagination budget as PAYLOAD_TOO_LARGE', async () => {
+    mockFetchGitHubRepositories.mockRejectedValue(
+      new GitHubListingBudgetExceededError(
+        'GitHub pagination limit exceeded: repository listing returned more than 100 pages'
+      )
+    );
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await expect(caller.refreshInstallation()).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: GITHUB_LISTING_BUDGET_MESSAGE,
+    });
+
+    expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+  });
 });
 
 describe('githubAppsRouter.devSeedUserGithubToken', () => {
@@ -833,6 +856,32 @@ describe('githubAppsRouter.devAddInstallation', () => {
     const [, details] = mockUpsertPlatformIntegrationForOwner.mock.calls[0] ?? [];
     expect(details).not.toHaveProperty('kiloUserId');
     expect(details).not.toHaveProperty('githubUserId');
+  });
+
+  it('answers a listing past the pagination budget as PAYLOAD_TOO_LARGE', async () => {
+    Object.assign(process.env, { NODE_ENV: 'development' });
+    mockFindIntegrationByInstallationId.mockResolvedValue({
+      id: 'integration-1',
+      platform_installation_id: '555',
+      platform_account_login: 'octocat',
+      github_app_type: 'standard',
+      owned_by_user_id: 'user-1',
+    });
+    mockFetchGitHubRepositories.mockRejectedValue(
+      new GitHubListingBudgetExceededError(
+        'GitHub pagination limit exceeded: repository listing returned more than 100 pages'
+      )
+    );
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await expect(
+      caller.devAddInstallation({ installationId: '555', accountLogin: 'octocat' })
+    ).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: GITHUB_LISTING_BUDGET_MESSAGE,
+    });
+
+    expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
   });
 });
 

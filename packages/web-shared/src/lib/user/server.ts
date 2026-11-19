@@ -368,9 +368,14 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
  * Reads the browser session only. A request that presents a credential is
  * refused, never downgraded to its session, because these callers mint or
  * exchange credentials and must not do so for a bearer caller.
+ *
+ * Both session-only entry points (`resolveSessionOnly` and
+ * `getUserFromSessionForCredentialIssuanceOrRedirect`) take the
+ * credential-presence answer from `authViaTokenFromHeaders` and differ only in
+ * their outcome, a 401 versus a redirect, so the presence rule has one home.
  */
 async function resolveSessionOnly(opts: RequiredPermissions): Promise<GetAuthResponse> {
-  if ((await headers()).has('authorization')) {
+  if (authViaTokenFromHeaders(await headers())) {
     return authError(401, 'Unauthorized', '?');
   }
 
@@ -393,7 +398,7 @@ export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   loggedOutRedirectUrl = '/users/sign_in'
 ): Promise<User> {
-  if ((await headers()).has('authorization')) {
+  if (authViaTokenFromHeaders(await headers())) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
 
@@ -617,6 +622,7 @@ async function resolveUserFromAuth(
       tokenSource,
       deviceSessionId,
       cloudAgentAuthority: scope,
+      cloudAgentRuntimeProxied: authorizationValidationResult.cloudAgentRuntimeProxied,
     });
     if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
       return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
@@ -626,13 +632,7 @@ async function resolveUserFromAuth(
         cloudAgentAuthority: scope,
       });
     }
-    return result.user
-      ? {
-          ...result,
-          cloudAgentAuthority: scope,
-          cloudAgentRuntimeProxied: authorizationValidationResult.cloudAgentRuntimeProxied,
-        }
-      : result;
+    return result;
   }
 
   return resolveUserFromSession(opts, readDb);
@@ -754,6 +754,8 @@ type UserAuthorizationRequest = {
   tokenSource?: string;
   deviceSessionId?: string;
   cloudAgentAuthority?: CloudAgentAuthority;
+  /** True only for a token whose runtime claim the Cloud Agent runtime proxy attested. */
+  cloudAgentRuntimeProxied?: boolean;
   webSession?: {
     id?: string;
     pepper?: string | null;
@@ -774,6 +776,7 @@ async function validateUserAuthorization({
   tokenSource,
   deviceSessionId,
   cloudAgentAuthority,
+  cloudAgentRuntimeProxied,
   webSession,
 }: UserAuthorizationRequest): Promise<GetAuthResponse> {
   if (!user) {
@@ -866,6 +869,8 @@ async function validateUserAuthorization({
     botId,
     tokenSource,
     deviceSessionId,
+    cloudAgentAuthority,
+    cloudAgentRuntimeProxied,
     webSessionId: webSession?.id,
     webSessionPepper: webSession?.pepper,
     authenticatedAt: webSession?.authenticatedAt,

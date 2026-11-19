@@ -19,9 +19,13 @@ type SuccessFields = object;
 /**
  * Rejects every payload the object spread would reshape or drop.
  *
- * The `Record` check is the effective one: it requires the fields the spread
- * would copy. Arrays and callables are named first because they satisfy
- * `Record` and would otherwise pass.
+ * The `Record<string, unknown>` member is the effective check: it admits only
+ * object types the spread copies faithfully. TypeScript gives that
+ * assignability to a `type` alias of an object literal type, not to an
+ * `interface` or a class instance: neither has an implicit index signature, and
+ * internal-slot state is not copied either. A payload declared as an interface
+ * must therefore become a type alias. Arrays and callables are checked first
+ * because they satisfy `Record` and would otherwise pass.
  */
 type SpreadablePayload<TOk> = TOk extends readonly unknown[]
   ? never

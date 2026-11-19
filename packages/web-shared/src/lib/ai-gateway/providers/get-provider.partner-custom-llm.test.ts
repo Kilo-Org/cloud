@@ -591,6 +591,7 @@ describe('getProvider skips the partner', () => {
     test.each([
       ['reasoning-content', 'medium', 'high', true],
       ['reasoning-content', 'high', 'medium', false],
+      ['reasoning-content', 'none', 'high', true],
       ['reasoning', 'medium', 'high', true],
       ['reasoning', 'high', 'medium', false],
     ] as const)(

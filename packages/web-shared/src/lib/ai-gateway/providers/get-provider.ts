@@ -405,14 +405,14 @@ function getUpstreamReasoningEffort(
   const replacesReasoningObject =
     transform === ReasoningDetailsTransform.ReasoningContent ||
     transform === ReasoningDetailsTransform.Reasoning;
-  const disabledByReasoningObject =
-    !replacesReasoningObject &&
-    request.kind === 'chat_completions' &&
-    request.body.reasoning?.enabled === false;
-  if (disabledByReasoningObject || isReasoningExplicitlyDisabled(request)) return 'none';
   if (replacesReasoningObject && request.kind === 'chat_completions') {
-    return request.body.reasoning_effort ?? request.body.reasoning?.effort ?? null;
+    const effort = request.body.reasoning_effort ?? request.body.reasoning?.effort;
+    if (effort) return effort;
+    return isReasoningExplicitlyDisabled(request) ? 'none' : null;
   }
+  const disabledByReasoningObject =
+    request.kind === 'chat_completions' && request.body.reasoning?.enabled === false;
+  if (disabledByReasoningObject || isReasoningExplicitlyDisabled(request)) return 'none';
   return getReasoningEffort(request);
 }
 

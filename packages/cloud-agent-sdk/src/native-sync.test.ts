@@ -2033,6 +2033,71 @@ test('a replaced native asset re-reports stale references through already covere
   connection.close();
 });
 
+test('an unresolved private asset keeps the notice and starts recovery', async () => {
+  const key = kilo2AssetKey('msg_file_000000_file_0', 'file:///owned/stale.png', 'image/png');
+  const fileMessage = {
+    message: {
+      id: 'msg_file',
+      type: 'assistant',
+      time: { created: 1, completed: 5 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call',
+          name: 'read',
+          time: { created: 1, ran: 1, completed: 1 },
+          state: {
+            status: 'completed' as const,
+            input: { path: 'stale.png' },
+            content: [{ type: 'file', uri: 'file:///owned/stale.png', mime: 'image/png' }],
+          },
+        },
+      ],
+    },
+    seq: 1,
+  };
+  snapshot.mockResolvedValueOnce({
+    position: 5,
+    revision: 2,
+    session: sessionMetadata,
+    entities: [],
+    messages: [fileMessage],
+  });
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  connectedSocket().frame('hello', hello(), 3);
+  await flush();
+  if (!state) throw new Error('Missing native state');
+  // The shared projection already reports the unresolved reference as an incomplete message.
+  expect(readNativeConversation(state).error).toContain('recovery is incomplete');
+  // No pending identity names this message, yet the unresolved asset is a gap, so recovery
+  // reads the canonical snapshot that can authorize its bytes.
+  await jest.advanceTimersByTimeAsync(250);
+  await flush();
+  expect(snapshot.mock.calls.length).toBeGreaterThan(1);
+  connectedSocket().frame('subscribed', { seq: 6 }, 6);
+  await flush();
+  expect(readNativeConversation(state).error).toContain('recovery is incomplete');
+  snapshot.mockResolvedValueOnce({
+    position: 6,
+    revision: 3,
+    session: sessionMetadata,
+    entities: [],
+    assetURLs: { [key]: 'data:image/png;base64,c3RhbGU=' },
+    messages: [fileMessage],
+  });
+  await jest.advanceTimersByTimeAsync(500);
+  await flush();
+  expect(state.pendingSnapshotMessageIDs).toBeUndefined();
+  expect(state.error).toBeUndefined();
+  expect(readNativeConversation(state).error).toBeUndefined();
+  connection.close();
+});
+
 test('a reset keeps its integrity error through snapshots, reconnect and subscribed', async () => {
   snapshot.mockResolvedValue(complete(5));
   const { client } = fixture();

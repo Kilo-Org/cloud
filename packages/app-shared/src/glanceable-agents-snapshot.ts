@@ -61,6 +61,17 @@ export const GLANCEABLE_SNAPSHOT_STATUSES = [
 
 export type GlanceableAgentsSnapshotStatus = (typeof GLANCEABLE_SNAPSHOT_STATUSES)[number];
 
+/**
+ * The statuses a caller may force on a built snapshot. `happy` and `empty` are
+ * not among them: those two come from the counts alone, so a forced value
+ * could only contradict the counts and details built beside it. A caller that
+ * wants one of them omits the override.
+ */
+export type GlanceableSnapshotStatusOverride = Exclude<
+  GlanceableAgentsSnapshotStatus,
+  'happy' | 'empty'
+>;
+
 /** The one kind vocabulary every surface reads (membership only; consumers own presentation order). */
 export const GLANCEABLE_STATUS_KINDS = ['needsInput', 'running', 'idle', 'scheduled'] as const;
 
@@ -442,7 +453,7 @@ export type BuildGlanceableSnapshotInput = {
   previousRevision?: number;
   accountEpoch?: number;
   /** Overrides the happy/empty derivation for waiting, stale, expired, signed_out, privacy. */
-  status?: GlanceableAgentsSnapshotStatus;
+  status?: GlanceableSnapshotStatusOverride;
 };
 
 /**

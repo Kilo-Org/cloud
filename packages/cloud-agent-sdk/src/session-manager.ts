@@ -1414,8 +1414,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   let previousOrderedMessageIds: readonly string[] = [];
+  // The messages map is a stable reference now: a row upsert rewrites it in
+  // place and republishes through `messagesRevision`, so every derivation that
+  // reads a row must subscribe to the revision too.
   const orderedMessageIdsAtom = atom(get => {
     const storage = get(sessionStorageAtom);
+    if (storage) get(storage.atoms.messagesRevision);
     const next = storage
       ? orderMessageIds(get(storage.atoms.messageIds), get(storage.atoms.messages))
       : [];
@@ -1435,6 +1439,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (storage) {
       const ids = get(orderedMessageIdsAtom);
       const msgMap = get(storage.atoms.messages);
+      get(storage.atoms.messagesRevision);
       const partsMap = get(storage.atoms.parts);
       get(storage.atoms.partsRevision);
       const rootSessionId = get(rootSessionIdAtom);
@@ -1507,6 +1512,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
     const ids = get(orderedMessageIdsAtom);
     const msgMap = get(storage.atoms.messages);
+    get(storage.atoms.messagesRevision);
     const partsMap = get(storage.atoms.parts);
     get(storage.atoms.partsRevision);
     pruneStoredMessageMemo(ids);

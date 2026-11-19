@@ -5504,6 +5504,44 @@ describe('createSessionManager', () => {
       expect((streamingAfter?.parts[0] as TextPart | undefined)?.text).toBe('hello');
     });
 
+    it('a row-only update republishes the list without touching the unrelated row', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const updated = createStoredMessage('msg-updated', 'ses-root', 'assistant', 1);
+      const untouched = createStoredMessage('msg-untouched', 'ses-root', 'assistant', 2);
+      latestStorage.upsertMessage(updated.info);
+      latestStorage.upsertMessage(untouched.info);
+
+      const before = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const updatedBefore = before.find(m => m.info.id === updated.info.id);
+      const untouchedBefore = before.find(m => m.info.id === untouched.info.id);
+      if (updatedBefore?.info.role !== 'assistant') throw new Error('expected an assistant row');
+
+      // A `message.updated` that only rewrites the row's own fields stores a new
+      // info object and leaves every parts array alone. Without a messages
+      // revision read, the stable messages map would make the atom return the
+      // stale array and the new cost would never reach the reader.
+      latestStorage.upsertMessage({ ...updatedBefore.info, cost: 7 });
+
+      const after = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const updatedAfter = after.find(m => m.info.id === updated.info.id);
+      const untouchedAfter = after.find(m => m.info.id === untouched.info.id);
+      if (updatedAfter?.info.role !== 'assistant') throw new Error('expected an assistant row');
+
+      expect(updatedAfter.info.cost).toBe(7);
+      expect(updatedAfter).not.toBe(updatedBefore);
+      expect(untouchedAfter).toBe(untouchedBefore);
+      expect(atomValue<number>(config.store, mgr.atoms.totalCost)).toBe(8);
+    });
+
     it('a no-parts row keeps object identity across a delta on another row', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

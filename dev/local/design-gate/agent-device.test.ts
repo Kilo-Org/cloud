@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { agentDeviceArgs, agentDeviceToProbeDump } from './agent-device';
+import { agentDeviceArgs, agentDeviceToProbeDump, withScreenshotScale } from './agent-device';
 import { InfraError } from './capture';
 import { normalize } from './rules';
 import { checkTouchOverlap } from './rules/screen';
@@ -134,7 +134,7 @@ test('agent-device snapshot converts app nodes to a ProbeDump in dp', () => {
   assert.equal(dump.nodes[5]?.pressable, true);
 });
 
-test('agent-device snapshot without Android density is an infra failure', () => {
+test('agent-device snapshot that is neither iOS nor Android with density is an infra failure', () => {
   assert.throws(() => agentDeviceToProbeDump(JSON.stringify({ data: { nodes: [] } })), InfraError);
 });
 

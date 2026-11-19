@@ -72,12 +72,22 @@ function collect(dir, skip, files) {
  * symlink as the link itself, so the link has to be followed to see a file
  * behind it; `throwIfNoEntry: false` makes a link with no target report no
  * stat, which leaves it out of the walk instead of throwing on it.
+ *
+ * A stat the filesystem refuses leaves the path out the same way. A pair of
+ * links that point at each other fails with `ELOOP`, which `throwIfNoEntry`
+ * does not cover; admitting the path would hand every audit a file nobody can
+ * read, and letting the error out would end the walk the audit was making.
  */
 function isRegularFile(path, entry) {
   if (entry.isFile()) {
     return true;
   }
-  const target = statSync(path, { throwIfNoEntry: false });
+  let target;
+  try {
+    target = statSync(path, { throwIfNoEntry: false });
+  } catch {
+    return false;
+  }
   return target?.isFile() === true;
 }
 

@@ -50,6 +50,29 @@ test('leaves out a dangling .ts symlink instead of throwing', context => {
   assert.deepEqual(sourceFiles(root, isTestArtifact), [join(root, 'a-ok.ts')]);
 });
 
+test('leaves out a .ts symlink loop instead of throwing', context => {
+  const root = mkdtempSync(join(tmpdir(), 'source-files-'));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+
+  writeFileSync(join(root, 'ordinary.ts'), '');
+  // Two links that point at each other have no file behind them: following
+  // either one fails with ELOOP. `throwIfNoEntry` covers a missing target, not
+  // a loop, so the walk has to leave the pair out like a dangling link rather
+  // than end on the stat error.
+  symlinkSync(join(root, 'b.ts'), join(root, 'a.ts'));
+  symlinkSync(join(root, 'a.ts'), join(root, 'b.ts'));
+
+  // Neither link leads to a regular file, so neither is admitted; the ordinary
+  // file beside them still is, and nothing throws.
+  assert.deepEqual(sourceFiles(root, isTestArtifact), [join(root, 'ordinary.ts')]);
+  const entries = [...parseSourceTree(root, root, isTestArtifact)];
+  assert.deepEqual(
+    entries.map(entry => entry.path),
+    ['ordinary.ts']
+  );
+  assert.deepEqual(entries[0].problems, []);
+});
+
 test('keeps a .ts file behind a symlink to a real file', context => {
   const root = mkdtempSync(join(tmpdir(), 'source-files-'));
   context.after(() => rmSync(root, { recursive: true, force: true }));

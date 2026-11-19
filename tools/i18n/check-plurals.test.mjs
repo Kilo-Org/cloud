@@ -200,6 +200,48 @@ test('reports an unreadable file through the command and invents no key for it',
   }
 });
 
+test('reports an unreadable declaration module once through the command', context => {
+  // The scan and the declaration check both read the module; one wording for
+  // both means the second read's line is dropped, not printed beside the
+  // first.
+  if (process.getuid?.() === 0) {
+    context.skip('root reads any file, so chmod 000 leaves it readable');
+    return;
+  }
+  const root = cliFixture(standardFiles());
+  const locked = join(root, [...DYNAMIC_COUNTED_KEYS.values()][0].source);
+  chmodSync(locked, 0o000);
+  try {
+    const result = cli(root);
+    assert.equal(result.status, 1, result.stderr);
+    const readLines = result.stderr.split('\n').filter(line => /cannot read/.test(line));
+    assert.equal(readLines.length, 1, `expected one cannot-read line, got:\n${result.stderr}`);
+    assert.match(readLines[0], /: cannot read: /);
+    assert.match(result.stderr, /check-plurals: 1 problem\(s\)/);
+  } finally {
+    chmodSync(locked, 0o644);
+  }
+});
+
+test('reports an unreadable declaration module once from the declaration check', context => {
+  if (process.getuid?.() === 0) {
+    context.skip('root reads any file, so chmod 000 leaves it readable');
+    return;
+  }
+  const root = fixture(standardFiles());
+  const locked = join(root, [...DYNAMIC_COUNTED_KEYS.values()][0].source);
+  chmodSync(locked, 0o000);
+  try {
+    const problems = checkDynamicCountedKeySources(root);
+    // Called alone, with nothing reported yet, the check still names the file —
+    // in the walk's wording, so a caller that scanned the tree can drop it.
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /: cannot read: /);
+  } finally {
+    chmodSync(locked, 0o644);
+  }
+});
+
 test('projects one scan into sorted keys, unlisted calls and countless families', () => {
   const root = fixture(
     standardFiles({

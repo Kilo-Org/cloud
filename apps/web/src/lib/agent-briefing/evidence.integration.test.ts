@@ -430,6 +430,21 @@ it('does not repeat a successful answer whose body cannot be read', async () => 
   expect(failed?.summary.error).toBe('generation_failed');
 });
 
+it('records a provider answer that does not match the response shape as a generation failure', async () => {
+  const { now } = await scheduled();
+  await sweepAgentBriefings(now);
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  if (!row) throw new Error('No captured snapshot');
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(Response.json({ error: { message: 'provider envelope' } }));
+  await runBriefingSummary(row.id);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const [failed] = await db.select().from(agent_briefing_snapshots);
+  expect(failed?.summary.status).toBe('failed');
+  expect(failed?.summary.error).toBe('generation_failed');
+});
+
 it('does not repeat a decline the gateway answers after an accounted generation', async () => {
   const { now } = await scheduled();
   await sweepAgentBriefings(now);

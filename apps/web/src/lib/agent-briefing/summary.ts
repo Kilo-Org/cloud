@@ -644,16 +644,24 @@ function briefingFailureCode(error: unknown): z.infer<typeof briefingSummaryErro
   // than by `instanceof Error`.
   const name = error instanceof Error || error instanceof DOMException ? error.name : null;
   if (name === 'TimeoutError' || name === 'AbortError') return 'time_limit';
-  // The row-level checks throw shapes without schema members: a refusal TRPCError
-  // over the row's context or sources, and a ZodError from parsing the row's own
-  // facts or authorization against a newer schema. Both say the stored row is no
-  // longer admissible, so they map like the row's own checks do.
-  if (error instanceof TRPCError && (error.code === 'FORBIDDEN' || error.code === 'NOT_FOUND'))
-    return 'permission_unavailable';
-  if (error instanceof ZodError) return 'permission_unavailable';
   return briefingSummaryErrorSchema
     .catch('generation_failed')
     .parse(error instanceof Error ? error.message : null);
+}
+
+/**
+ * The code an admission check reports for a shape without a schema member: a
+ * refusal TRPCError over the row's context or sources, and a ZodError from
+ * parsing the row's own facts or authorization against a newer schema. Both say
+ * the stored row is no longer admissible, so they map like the row's own checks
+ * do. Only the admission path uses this: the billed request parses a provider
+ * answer, and a body that does not match stays a generation failure.
+ */
+function briefingAdmissionCode(error: unknown): z.infer<typeof briefingSummaryErrorSchema> {
+  if (error instanceof TRPCError && (error.code === 'FORBIDDEN' || error.code === 'NOT_FOUND'))
+    return 'permission_unavailable';
+  if (error instanceof ZodError) return 'permission_unavailable';
+  return briefingFailureCode(error);
 }
 
 /**
@@ -760,7 +768,7 @@ async function admitBriefingSummary(reportId: string): Promise<BriefingAdmission
   } catch (error) {
     // A code that does not describe the row means a check could not decide, so the
     // rethrow budget below applies before its cause is recorded.
-    const code = briefingFailureCode(error);
+    const code = briefingAdmissionCode(error);
     if (CODE_DESCRIBES_ROW[code]) {
       await refuseBriefingAdmission(reportId, code);
       return undefined;

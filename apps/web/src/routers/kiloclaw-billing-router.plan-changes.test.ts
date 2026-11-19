@@ -205,126 +205,60 @@ describe('cancelSubscription', () => {
 });
 
 describe('reactivateSubscription', () => {
-  it('blocks reactivation of an ambiguous legacy Commit subscription', async () => {
-    const futureCommitEnd = new Date(Date.now() + 90 * 86_400_000).toISOString();
-    await insertPersonalSubscriptionFixture({
-      stripe_subscription_id: 'sub_reactivate',
-      plan: 'commit',
-      status: 'active',
-      cancel_at_period_end: true,
-      commit_ends_at: futureCommitEnd,
-    });
+  const reactivationUnavailable = {
+    code: 'FORBIDDEN',
+    message:
+      'KiloClaw subscriptions can no longer be reactivated. Hosting runs until the end of the current paid period.',
+  };
 
-    const caller = await createCallerForUser(user.id);
-    await expect(caller.kiloclaw.reactivateSubscription()).rejects.toThrow(
-      'Commit retirement state requires support review.'
-    );
-    expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
+  it.each(['legacy', 'per-instance'] as const)(
+    '%s reactivation is rejected without touching Stripe or the pending cancellation',
+    async mutationPath => {
+      const instance = await createKiloclawInstance(user.id);
+      const [subscription] = await db
+        .insert(kiloclaw_subscriptions)
+        .values({
+          user_id: user.id,
+          instance_id: instance.id,
+          stripe_subscription_id: `sub_reactivate_blocked_${mutationPath}`,
+          plan: 'standard',
+          status: 'active',
+          cancel_at_period_end: true,
+        })
+        .returning();
+      if (!subscription) throw new Error('Failed to insert blocked reactivation fixture');
 
-    const [row] = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, user.id))
-      .limit(1);
-    expect(row.cancel_at_period_end).toBe(true);
-  });
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        mutationPath === 'legacy'
+          ? caller.kiloclaw.reactivateSubscription()
+          : caller.kiloclaw.reactivateSubscriptionAtInstance({ instanceId: instance.id })
+      ).rejects.toMatchObject(reactivationUnavailable);
 
-  it('restores auto intro schedule after reactivating a standard intro-price subscription', async () => {
-    await insertPersonalSubscriptionFixture({
-      stripe_subscription_id: 'sub_reactivate_intro',
-      plan: 'standard',
-      status: 'active',
-      cancel_at_period_end: true,
-    });
+      expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
+      expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
+      expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
+      expect(stripeMock.subscriptionSchedules.update).not.toHaveBeenCalled();
 
-    stripeMock.subscriptions.update.mockResolvedValue({});
-    // ensureAutoIntroSchedule will call stripe.subscriptions.retrieve
-    // Return intro price to trigger schedule creation
-    stripeMock.subscriptions.retrieve.mockResolvedValue({
-      schedule: null,
-      items: { data: [{ price: { id: 'price_standard_intro' } }] },
-    });
-    stripeMock.subscriptionSchedules.create.mockResolvedValue({
-      id: 'sub_sched_restored',
-      phases: [
-        {
-          items: [{ price: 'price_standard_intro' }],
-          start_date: 1000,
-          end_date: 2000,
-        },
-      ],
-    });
-    stripeMock.subscriptionSchedules.update.mockResolvedValue({});
+      const [row] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.id, subscription.id));
+      expect(row.cancel_at_period_end).toBe(true);
 
-    const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.reactivateSubscription();
-
-    expect(result).toEqual({ success: true });
-    // Schedule should have been created
-    expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalled();
-  });
-
-  it('reactivates the effective paid subscription when a canceled trial also exists', async () => {
-    const { paidSubscription, trialSubscription } = await createCanceledTrialAndPaidSubscriptions({
-      paidStripeSubscriptionId: 'sub_reactivate_effective',
-      paidCancelAtPeriodEnd: true,
-    });
-
-    stripeMock.subscriptions.update.mockResolvedValue({});
-    stripeMock.subscriptions.retrieve.mockResolvedValue({
-      schedule: null,
-      items: { data: [{ price: { id: 'price_standard' } }] },
-    });
-
-    const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.reactivateSubscription();
-
-    expect(result).toEqual({ success: true });
-    expect(stripeMock.subscriptions.update).toHaveBeenCalledWith('sub_reactivate_effective', {
-      cancel_at_period_end: false,
-    });
-
-    const rows = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, user.id));
-    const updatedPaid = rows.find(row => row.id === paidSubscription.id);
-    const unchangedTrial = rows.find(row => row.id === trialSubscription.id);
-
-    expect(updatedPaid?.cancel_at_period_end).toBe(false);
-    expect(unchangedTrial?.cancel_at_period_end).toBe(false);
-  });
-
-  it('succeeds even if ensureAutoIntroSchedule throws after reactivation', async () => {
-    await insertPersonalSubscriptionFixture({
-      stripe_subscription_id: 'sub_reactivate_fail',
-      plan: 'standard',
-      status: 'active',
-      cancel_at_period_end: true,
-    });
-
-    stripeMock.subscriptions.update.mockResolvedValue({});
-    // Make ensureAutoIntroSchedule fail
-    stripeMock.subscriptions.retrieve.mockRejectedValue(new Error('Stripe timeout'));
-
-    const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.reactivateSubscription();
-
-    // Should still succeed — reactivation is the primary operation
-    expect(result).toEqual({ success: true });
-    const [row] = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, user.id))
-      .limit(1);
-    expect(row.cancel_at_period_end).toBe(false);
-  });
+      const logs = await db
+        .select()
+        .from(kiloclaw_subscription_change_log)
+        .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+      expect(logs).toHaveLength(0);
+    }
+  );
 
   it('rejects when the user has no subscriptions', async () => {
     const caller = await createCallerForUser(user.id);
 
-    await expect(caller.kiloclaw.reactivateSubscription()).rejects.toThrow(
-      'No pending cancellation to reactivate.'
+    await expect(caller.kiloclaw.reactivateSubscription()).rejects.toMatchObject(
+      reactivationUnavailable
     );
   });
 });
@@ -1003,36 +937,6 @@ describe('personal billing mutations do not affect org subscriptions', () => {
     expect(unchangedOrg?.cancel_at_period_end).toBe(false);
   });
 
-  it('reactivateSubscription targets the personal subscription, not the org one', async () => {
-    const { orgSub, personalSub } = await createPersonalAndOrgSubscriptions({
-      personalCancelAtPeriodEnd: true,
-    });
-
-    stripeMock.subscriptions.update.mockResolvedValue({});
-    stripeMock.subscriptions.retrieve.mockResolvedValue({
-      schedule: null,
-      items: { data: [{ price: { id: 'price_standard' } }] },
-    });
-
-    const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.reactivateSubscription();
-
-    expect(result).toEqual({ success: true });
-    expect(stripeMock.subscriptions.update).toHaveBeenCalledWith('sub_personal_coexist', {
-      cancel_at_period_end: false,
-    });
-
-    const rows = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, user.id));
-    const updatedPersonal = rows.find(row => row.id === personalSub.id);
-    const unchangedOrg = rows.find(row => row.id === orgSub.id);
-
-    expect(updatedPersonal?.cancel_at_period_end).toBe(false);
-    expect(unchangedOrg?.cancel_at_period_end).toBe(false);
-  });
-
   it('switchPlan targets the personal subscription, not the org one', async () => {
     setTestSystemTime(PRE_COMMIT_CUTOFF_TIME);
     const { orgSub, personalSub } = await createPersonalAndOrgSubscriptions();
@@ -1574,17 +1478,16 @@ describe('pure credit cancel/reactivate', () => {
     expect(row.scheduled_by).toBeNull();
   });
 
-  it('reactivates pure credit subscription without Stripe API call', async () => {
+  it('rejects pure credit reactivation and keeps the pending cancellation', async () => {
     await createPureCreditSubscription(user.id, 'standard', {
       cancel_at_period_end: true,
     });
 
     const caller = await createCallerForUser(user.id);
-    const result = await caller.kiloclaw.reactivateSubscription();
+    await expect(caller.kiloclaw.reactivateSubscription()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
 
-    expect(result).toEqual({ success: true });
-
-    // No Stripe calls
     expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
 
     const [row] = await db
@@ -1593,7 +1496,7 @@ describe('pure credit cancel/reactivate', () => {
       .where(eq(kiloclaw_subscriptions.user_id, user.id))
       .limit(1);
 
-    expect(row.cancel_at_period_end).toBe(false);
+    expect(row.cancel_at_period_end).toBe(true);
   });
 
   it('switches plan for pure credit subscription locally', async () => {

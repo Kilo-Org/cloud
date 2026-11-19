@@ -154,7 +154,8 @@ function ActiveSubscriptionCard({
   const isCreditFunded = !sub.hasStripeFunding && sub.paymentSource === 'credits';
   const renewalDate =
     isCreditFunded && sub.creditRenewalAt ? sub.creditRenewalAt : sub.currentPeriodEnd;
-  const showConversion = sub.showConversionPrompt && !conversionDismissed;
+  const showConversion =
+    sub.showConversionPrompt && !conversionDismissed && !retirement.isFinalCommitTerm;
 
   async function handleManageBilling() {
     if (!instanceId) return;
@@ -298,7 +299,7 @@ function ActiveSubscriptionCard({
             <p>
               {retirement.standardContinuationScheduled
                 ? `Standard starts on ${formatBillingDate(finalCommitEndsAt)} at ${standardContinuationPrice} using ${futureFundingSource}.`
-                : `Your final Commit term ends on ${formatBillingDate(finalCommitEndsAt)}. Hosting ends unless you continue month-to-month at ${standardContinuationPrice} using ${futureFundingSource}.`}
+                : `Your final Commit term ends on ${formatBillingDate(finalCommitEndsAt)}. Hosting ends on that date.`}
             </p>
           </AlertDescription>
         </Alert>
@@ -355,15 +356,7 @@ function ActiveSubscriptionCard({
             >
               Cancel month-to-month continuation
             </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={() => setConfirmationAction('continueMonthToMonth')}
-              disabled={!instanceId}
-            >
-              Continue month-to-month
-            </Button>
-          )
+          ) : null
         ) : hasUserRequestedSwitch ? (
           <Button
             variant="outline"
@@ -441,8 +434,6 @@ function ActiveSubscriptionCard({
 
 function ConvertingSubscriptionCard({
   billing,
-  onReactivateClick,
-  isReactivating,
 }: {
   billing: ClawBillingStatus;
   onReactivateClick: () => void;
@@ -469,27 +460,12 @@ function ConvertingSubscriptionCard({
           balance.
         </AlertDescription>
       </Alert>
-
-      <div className="flex flex-wrap gap-2 pt-1">
-        <Button onClick={onReactivateClick} disabled={isReactivating} aria-busy={isReactivating}>
-          {isReactivating ? (
-            <>
-              <Loader2 className="animate-spin" aria-hidden="true" />
-              Reactivating…
-            </>
-          ) : (
-            'Keep Stripe billing'
-          )}
-        </Button>
-      </div>
     </KiloClawCardShell>
   );
 }
 
 function CancelingSubscriptionCard({
   billing,
-  onReactivateClick,
-  isReactivating,
 }: {
   billing: ClawBillingStatus;
   onReactivateClick: () => void;
@@ -517,23 +493,9 @@ function CancelingSubscriptionCard({
           <p>
             Your subscription cancels on{' '}
             <span className="tabular-nums">{formatBillingDate(sub.currentPeriodEnd)}</span>.
-            Reactivate to keep it renewing.
           </p>
         </AlertDescription>
       </Alert>
-
-      <div className="flex flex-wrap gap-2 pt-1">
-        <Button onClick={onReactivateClick} disabled={isReactivating} aria-busy={isReactivating}>
-          {isReactivating ? (
-            <>
-              <Loader2 className="animate-spin" aria-hidden="true" />
-              Reactivating…
-            </>
-          ) : (
-            'Reactivate'
-          )}
-        </Button>
-      </div>
     </KiloClawCardShell>
   );
 }

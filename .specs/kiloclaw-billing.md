@@ -222,8 +222,9 @@ lapses, with email notifications at each stage.
    surfaces MUST omit KiloClaw entirely for those contexts; a directly opened
    KiloClaw route MAY show the unavailable state.
 4. Existing live instances and current subscriptions MUST retain their access,
-   conversion, renewal, reactivation, cancellation, management, and
-   configuration-update behavior.
+   conversion, renewal, cancellation, management, and configuration-update
+   behavior. Reactivation of a subscription that is pending cancellation is
+   no longer available (see Cancellation and Reactivation rule 7).
 5. Provisioning services and post-checkout fulfillment paths MUST enforce the
    same current-subscription boundary before creating infrastructure or
    subscription state, including stale or already-completed checkout sessions.
@@ -339,12 +340,13 @@ lapses, with email notifications at each stage.
    final Commit term MUST NOT renew into another Commit term. Its final
    boundary MAY move later only when an approved KiloClaw free-month reward
    extends it.
-5. A final Commit customer MAY explicitly choose Standard at any point before
-   the final boundary. Standard MUST begin at that boundary, preserve the
-   subscription lineage's price version, and use that lineage's Standard
-   price. Standard continuation MUST preserve the current funding source
-   unless the customer explicitly accepts Stripe-to-credits conversion.
-6. Standard continuation MUST require explicit user consent recorded as
+5. A final Commit customer MUST NOT be able to newly choose Standard
+   continuation. A continuation request MUST be rejected before any payment
+   provider call or local database write. Standard continuation that was
+   already recorded MUST begin at the final boundary, preserve the
+   subscription lineage's price version and current funding source, and use
+   that lineage's Standard price.
+6. Recorded Standard continuation MUST carry explicit user consent recorded as
    `scheduled_plan = 'standard'` and `scheduled_by = 'user'`. Provider schedule
    shape, cancellation removal, viewing a billing surface, or inferred behavior
    MUST NOT count as consent. A customer MAY undo Standard continuation before
@@ -354,15 +356,14 @@ lapses, with email notifications at each stage.
    cancel at its final boundary. A pure-credit final term MUST cancel without
    a Commit deduction, bonus projection, auto top-up, past-due transition, or
    period advancement. A Stripe-funded final term MUST be made non-renewing
-   beginning 30 days before its verified final boundary, while allowing a
-   later explicit Standard choice to replace that cancellation.
+   beginning 30 days before its verified final boundary.
 8. A pending pre-cutoff Standard-to-Commit switch MAY be canceled before it
    starts, leaving the customer on Standard. Once that qualified switch starts,
    the resulting Commit period is the final Commit term.
-9. A final Commit customer's Stripe-to-credits conversion MUST also record
-   explicit pure-credit Standard continuation at the final boundary. Undoing
-   Standard continuation before the boundary MUST clear the pending conversion
-   and leave the final term to end.
+9. A final Commit customer's Stripe-to-credits conversion request MUST be
+   rejected, because it would record Standard continuation. Undoing an
+   already recorded Standard continuation before the boundary MUST clear the
+   pending conversion and leave the final term to end.
 10. Commit invoices or deductions MAY settle after the cutoff only when they
     are proven to be the authorized final term, a pre-cutoff confirmed
     checkout, a qualified pending switch, or recovery for a pre-cutoff renewal
@@ -371,8 +372,8 @@ lapses, with email notifications at each stage.
 11. A paid post-cutoff Commit term that lacks authorization MUST preserve only paid access supported by canonical state and block future renewal. Missing, conflicting, or misaligned qualification, boundary, schedule, provider, or timeout-after-commit evidence MUST fail closed. Runtime MUST attempt provider non-renewal when possible, report non-sensitive context through logs and Sentry, and retry or recompute from existing subscription fields and change-log history rather than guessing.
 12. Commit retirement MUST add no review table, retirement field, status, action, index, or migration. It MUST NOT depend on durable review lifecycle or operator resolution. Existing subscription fields and append-only change log remain canonical.
 13. Runtime enforcement MUST NOT bulk-change active Commit subscriptions or provider schedules at the cutoff. Qualification MUST be reconstructed and validated from its source-specific canonical authority; no qualification capture, retirement-column backfill, or dual-write agreement is required.
-14. Every KiloClaw billing surface MUST communicate final-term state and offer
-    a direct `Continue month-to-month` action. The system MUST NOT add
+14. Every KiloClaw billing surface MUST communicate final-term state and MUST
+    NOT offer a `Continue month-to-month` action. The system MUST NOT add
     retirement-specific transactional emails; customer outreach is a separate
     campaign.
 
@@ -767,12 +768,11 @@ conversion eliminates that charge by transitioning to pure credit.
 5. After the transition in rule 4, the credit renewal sweep handles
    subsequent renewals as a pure credit subscription, deducting
    from the user's Kilo Pass-funded credit balance. For a final Commit term,
-   accepting conversion MUST also schedule explicit pure-credit Standard
-   continuation; the next deduction is Standard, never Commit.
+   conversion MUST be rejected (see Commit Retirement rule 9).
 6. If the user declines or ignores the prompt, the Stripe-funded hosting
    subscription MUST keep its current funding source. Ordinary Standard
    renewal continues unchanged. A final Commit term remains non-renewing and
-   ends at its final boundary unless the customer separately chooses Standard.
+   ends at its final boundary.
    The system MAY re-present the prompt at a later time.
 
 ### Stripe-Funded Credit Settlement
@@ -895,11 +895,10 @@ rows renew.
 ### Plan Switching
 
 1. The system MUST allow plan switching only for active subscriptions. At or
-   after the Commit sales cutoff, the only permitted switch involving a final
-   Commit term is explicit continuation into Standard.
+   after the Commit sales cutoff, no switch involving a final Commit term is
+   permitted, including continuation into Standard.
 2. The system MUST reject a switch if the user is already on the requested
-   plan, except that a final Commit customer's continuation action MAY repair
-   missing provider schedule state while preserving existing consent.
+   plan.
 3. Before the cutoff, a Standard-to-Commit request MAY schedule one Commit
    phase using the subscription's price version. The request MUST capture
    authoritative qualification evidence, and the Commit phase MUST be the
@@ -974,19 +973,16 @@ rows renew.
    cancel-at-period-end flag in the local database only. No payment
    provider API call is needed. The credit renewal sweep handles the
    period-end transition (see Credit Renewal rule 5).
-7. The system MUST allow reactivation of an ordinary Standard subscription
-   that is pending cancellation. Reactivating a canceling final Commit term
-   MUST mean explicit Standard continuation at the final boundary, never
-   Commit renewal.
-8. On reactivation of an ordinary Stripe-funded Standard subscription, the
-   system MUST clear the cancel-at-period-end flag on both the payment
-   provider and in the local database. For a final Commit term, cancellation
-   may be cleared only as part of confirmed Standard continuation.
-9. On reactivation of an ordinary pure-credit Standard subscription, the
-   system MUST clear the cancel-at-period-end flag in the local database only.
-   For a final Commit term, it MUST also record explicit Standard consent and
-   schedule Standard.
-10. Reactivation before final cancellation MUST preserve the existing price
+7. The system MUST NOT allow a user to reactivate a subscription that is
+   pending cancellation. A reactivation request MUST be rejected before any
+   payment provider call or local database write, and the
+   cancel-at-period-end flag MUST remain set. Hosting continues until the
+   end of the current paid period.
+8. KiloClaw surfaces MUST NOT offer a reactivation action or state that a
+   pending cancellation can be reversed by reactivating.
+9. A final Commit term MUST NOT be continued into Standard by reactivation,
+   continuation, or conversion requests (see Commit Retirement rules 5 and 9).
+10. A pending cancellation MUST preserve the existing price
     version. Re-enrollment after final cancellation MUST follow Pricing
     Versions and Legacy Lineages rule 9 and MUST offer Standard only.
 
@@ -1530,6 +1526,11 @@ rows renew.
    requirements on credit transaction records.
 
 ### Changelog
+
+#### 2026-11-19 -- Remove subscription reactivation
+
+- Rejected user reactivation of subscriptions pending cancellation and removed reactivation actions from KiloClaw surfaces; hosting runs until the end of the current paid period.
+- Rejected new Standard continuation of a final Commit term, including through Stripe-to-credits conversion, and removed the `Continue month-to-month` action. Already recorded continuation and its undo are unchanged.
 
 #### 2026-08-05 -- Close fresh KiloClaw instance provisioning
 

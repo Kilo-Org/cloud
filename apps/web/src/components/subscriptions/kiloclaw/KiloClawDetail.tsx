@@ -368,7 +368,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
                   <p>
                     {retirement.standardContinuationScheduled
                       ? `Standard starts on ${finalCommitEndLabel} at ${standardContinuationPrice} using ${futureFundingSource}. Your current ${currentFundingSource} funding stays active through the final Commit term.`
-                      : `Your final Commit term ends on ${finalCommitEndLabel}. Hosting ends unless you continue month-to-month at ${standardContinuationPrice} using ${futureFundingSource}.`}
+                      : `Your final Commit term ends on ${finalCommitEndLabel}. Hosting ends on that date.`}
                   </p>
                 </AlertDescription>
               </Alert>
@@ -403,11 +403,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
               <Button variant="outline" onClick={() => setConfirmationAction('cancelPlanSwitch')}>
                 Cancel month-to-month continuation
               </Button>
-            ) : (
-              <Button onClick={() => setConfirmationAction('continueMonthToMonth')}>
-                Continue month-to-month
-              </Button>
-            )
+            ) : null
           ) : subscription.plan !== 'trial' ? (
             hasUserRequestedSwitch ? (
               <Button variant="outline" onClick={() => setConfirmationAction('cancelPlanSwitch')}>
@@ -421,9 +417,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
           ) : null}
 
           {!retirement.isFinalCommitTerm ? (
-            subscription.cancelAtPeriodEnd ? (
-              <Button onClick={() => setConfirmationAction('reactivate')}>Reactivate</Button>
-            ) : (
+            subscription.cancelAtPeriodEnd ? null : (
               <Button
                 variant="outline"
                 className="text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -434,7 +428,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
             )
           ) : null}
 
-          {subscription.showConversionPrompt ? (
+          {subscription.showConversionPrompt && !retirement.isFinalCommitTerm ? (
             <Button variant="outline" onClick={() => setConfirmationAction('switchToCredits')}>
               Switch to credits
             </Button>

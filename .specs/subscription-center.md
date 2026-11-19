@@ -26,6 +26,7 @@ Updated 2026-05-28 -- Coding Plans API key configuration summary.
 Updated 2026-05-28 -- Coding Plans billing history USD amount display.
 Updated 2026-06-05 -- KiloClaw final Commit term continuation behavior.
 Updated 2026-06-19 -- Current Coding Plan quota presentation and routing independence.
+Updated 2026-11-19 -- KiloClaw final Commit continuation removed.
 Updated 2026-08-05 -- Current Coding Plan quota summary on live subscription cards.
 Updated 2026-07-01 -- Coding Plans installed-key deletion blocked in BYOK.
 Updated 2026-06-26 -- MiniMax token plan tiers and provider-level Coding Plan exclusivity.
@@ -246,19 +247,18 @@ future, the system MUST redirect from the old path to the new one.
       cancelled)
     - Select Standard for fresh enrollment; Commit MUST remain visible only
       for active or historical records and qualified pending obligations
-    - For a final Commit term, explicitly continue month-to-month as Standard
-      or cancel that scheduled continuation before the final boundary
+    - For a final Commit term with an already scheduled Standard
+      continuation, cancel that continuation before the final boundary
     - Cancel subscription
-    - Switch payment source (Stripe / credits) where applicable; final Commit
-      Stripe-to-credits conversion also schedules pure-credit Standard
+    - Switch payment source (Stripe / credits) where applicable; not
+      available for a final Commit term
 
 26. Each KiloClaw detail page MUST display:
     - Instance identifier and status
     - Current plan and billing period
     - Payment source
     - For a final Commit term: persistent final-term notice, final date,
-      lineage-priced Standard monthly price, current and future funding source,
-      default cancellation outcome, and `Continue month-to-month` action
+      and cancellation outcome; no `Continue month-to-month` action
     - After Standard opt-in: scheduled Standard start date and an action to
       cancel month-to-month continuation
     - Trial status and expiration date (if trialing)
@@ -272,8 +272,8 @@ KiloClaw summary cards and detail views MUST display the pricing applicable
 to the subscription, including subscriptions enrolled under earlier pricing.
 Scheduled or requested plan changes MUST display pricing that will apply if
 the change completes. Every final Commit summary card and detail view MUST
-state that hosting ends on the final date unless the customer continues
-month-to-month, and MUST expose the continuation action directly. When retirement state cannot be derived safely, the surface MUST hide unsafe billing actions, preserve only access supported by canonical state, and show a generic temporary billing-state error without exposing internal reason codes.
+state that hosting ends on the final date and MUST NOT expose a continuation
+action. When retirement state cannot be derived safely, the surface MUST hide unsafe billing actions, preserve only access supported by canonical state, and show a generic temporary billing-state error without exposing internal reason codes.
 
 When the user has no current personal KiloClaw subscription, the KiloClaw group
 MUST state that new instances are unavailable and MUST NOT show a signup,
@@ -518,6 +518,10 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-11-19 -- KiloClaw final Commit continuation removed
+
+- Removed the `Continue month-to-month` action and final Commit Stripe-to-credits conversion; final Commit surfaces state that hosting ends on the final date. Canceling an already scheduled continuation remains available.
 
 ### 2026-08-11 -- BytePlus Enterprise Coding Plan catalog copy
 

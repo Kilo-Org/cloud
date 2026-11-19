@@ -124,7 +124,7 @@ export function KiloClawGroup({
               : retirement.isFinalCommitTerm
                 ? retirement.standardContinuationScheduled
                   ? `Standard starts ${finalDate} at ${formatStandardContinuationPrice(retirement.standardContinuationPriceMicrodollars)} using ${formatKiloClawFundingSource(retirement.futureFundingSource)}.`
-                  : `Final Commit term ends ${finalDate}. Hosting ends unless you continue month-to-month at ${formatStandardContinuationPrice(retirement.standardContinuationPriceMicrodollars)} using ${formatKiloClawFundingSource(retirement.futureFundingSource)}.`
+                  : `Final Commit term ends ${finalDate}. Hosting ends on that date.`
                 : getKiloclawStatusNote(subscription);
 
             return (
@@ -180,7 +180,9 @@ export function KiloClawGroup({
                             : undefined
                   }
                   action={
-                    retirement.isFinalCommitTerm && !retirement.needsSupportReview ? (
+                    retirement.isFinalCommitTerm &&
+                    retirement.standardContinuationScheduled &&
+                    !retirement.needsSupportReview ? (
                       <Button
                         size="sm"
                         variant={retirement.standardContinuationScheduled ? 'outline' : 'default'}

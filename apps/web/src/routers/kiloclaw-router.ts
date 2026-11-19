@@ -2501,6 +2501,13 @@ async function acceptKiloclawConversionForRow(params: {
   });
 }
 
+const KILOCLAW_REACTIVATION_UNAVAILABLE_MESSAGE =
+  'KiloClaw subscriptions can no longer be reactivated. Hosting runs until the end of the current paid period.';
+
+const KILOCLAW_COMMIT_CONTINUATION_UNAVAILABLE_MESSAGE =
+  'KiloClaw Commit terms can no longer continue month-to-month. Hosting runs until the end of the final Commit term.';
+
+// oxlint-disable-next-line no-unused-vars -- reactivation is disabled; helper removal is deferred to the KiloClaw end-of-life cleanup
 async function reactivateKiloclawSubscriptionForRow(params: {
   subscription: typeof kiloclaw_subscriptions.$inferSelect;
   userId: string;
@@ -4838,16 +4845,11 @@ export const kiloclawRouter = createTRPCRouter({
   continueCommitAsStandard: baseProcedure
     .input(KiloclawInstanceInputSchema)
     .output(KiloclawMutationResultSchema)
-    .mutation(async ({ ctx, input }) => {
-      const row = await getKiloclawPersonalSubscriptionRow({
-        userId: ctx.user.id,
-        instanceId: input.instanceId,
+    .mutation(() => {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: KILOCLAW_COMMIT_CONTINUATION_UNAVAILABLE_MESSAGE,
       });
-      await continueFinalCommitAsStandardForRow({
-        subscription: row.subscription,
-        userId: ctx.user.id,
-      });
-      return { success: true };
     }),
 
   acceptConversionAtInstance: baseProcedure
@@ -4862,10 +4864,9 @@ export const kiloclawRouter = createTRPCRouter({
         classifyKiloClawCommitTerm(await getCommitRetirementEvidence(row.subscription)) ===
         'final_term'
       ) {
-        await continueFinalCommitAsStandardForRow({
-          subscription: row.subscription,
-          userId: ctx.user.id,
-          convertToCredits: true,
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: KILOCLAW_COMMIT_CONTINUATION_UNAVAILABLE_MESSAGE,
         });
       } else {
         await acceptKiloclawConversionForRow({
@@ -4879,16 +4880,11 @@ export const kiloclawRouter = createTRPCRouter({
   reactivateSubscriptionAtInstance: baseProcedure
     .input(KiloclawInstanceInputSchema)
     .output(KiloclawMutationResultSchema)
-    .mutation(async ({ ctx, input }) => {
-      const row = await getKiloclawPersonalSubscriptionRow({
-        userId: ctx.user.id,
-        instanceId: input.instanceId,
+    .mutation(() => {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: KILOCLAW_REACTIVATION_UNAVAILABLE_MESSAGE,
       });
-      await reactivateKiloclawSubscriptionForRow({
-        subscription: row.subscription,
-        userId: ctx.user.id,
-      });
-      return { success: true };
     }),
 
   switchPlanAtInstance: baseProcedure
@@ -5544,10 +5540,9 @@ export const kiloclawRouter = createTRPCRouter({
     if (
       classifyKiloClawCommitTerm(await getCommitRetirementEvidence(subscription)) === 'final_term'
     ) {
-      await continueFinalCommitAsStandardForRow({
-        subscription,
-        userId: ctx.user.id,
-        convertToCredits: true,
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: KILOCLAW_COMMIT_CONTINUATION_UNAVAILABLE_MESSAGE,
       });
     } else {
       await acceptKiloclawConversionForRow({
@@ -5558,21 +5553,11 @@ export const kiloclawRouter = createTRPCRouter({
     return { success: true };
   }),
 
-  reactivateSubscription: baseProcedure.mutation(async ({ ctx }) => {
-    const { subscription } = await getDisplayedPersonalKiloclawSubscription({
-      userId: ctx.user.id,
+  reactivateSubscription: baseProcedure.mutation(() => {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: KILOCLAW_REACTIVATION_UNAVAILABLE_MESSAGE,
     });
-    if (!subscription) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'No pending cancellation to reactivate.',
-      });
-    }
-    await reactivateKiloclawSubscriptionForRow({
-      subscription,
-      userId: ctx.user.id,
-    });
-    return { success: true };
   }),
 
   switchPlan: baseProcedure

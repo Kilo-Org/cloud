@@ -87,7 +87,17 @@ function getBannerIcon(state: ClawBannerState) {
   }
 }
 
-function getBannerContent(state: ClawBannerState, billing: ClawBillingStatus) {
+type BannerContent = {
+  title: string;
+  message: string;
+  cta: string | null;
+  action: 'subscribe' | 'reactivate' | 'add_credits' | 'update_payment' | null;
+};
+
+function getBannerContent(
+  state: ClawBannerState,
+  billing: ClawBillingStatus
+): BannerContent | null {
   switch (state) {
     case 'trial_active':
       return {
@@ -144,10 +154,9 @@ function getBannerContent(state: ClawBannerState, billing: ClawBillingStatus) {
     case 'subscription_canceling':
       return {
         title: `Your plan ends on ${formatBillingDate(billing.subscription?.currentPeriodEnd ?? '')}`,
-        message:
-          'After this date your instance will be stopped. You can reactivate anytime before then.',
-        cta: 'Reactivate',
-        action: 'reactivate' as const,
+        message: 'After this date your instance will be stopped.',
+        cta: null,
+        action: null,
       };
     case 'subscription_past_due':
       if (

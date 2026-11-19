@@ -122,6 +122,8 @@ export async function createChildOrganization(
   const organization = await db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
     if (userId) {
+      // The result only feeds the trial decision in `createOrganization`;
+      // child organizations never carry a trial.
       await enforceOrganizationCreationLimit(tx, userId);
     }
 

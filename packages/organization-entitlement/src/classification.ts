@@ -20,10 +20,12 @@ export function classifyOrganizationEntitlement({
     organization.created_at,
     now
   );
-  // An organization created without a trial has no window to run out: hold the
-  // count past the soft-expiry grace so the stage and its display stay stable.
+  // An organization created without a trial stores no window, so hold the count
+  // past the soft-expiry grace to keep the stage and its display stable. An
+  // explicit stored deadline is a real window (for example when an admin sets it)
+  // and is honored unchanged.
   const daysRemaining =
-    organization.trial_granted === false
+    organization.trial_granted === false && organization.free_trial_end_at == null
       ? Math.min(measuredDaysRemaining, -ORGANIZATION_TRIAL_SOFT_EXPIRY_GRACE_DAYS - 1)
       : measuredDaysRemaining;
   const trialStatus = getOrgTrialStatusFromDays(daysRemaining);

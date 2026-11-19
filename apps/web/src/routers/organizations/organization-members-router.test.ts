@@ -69,7 +69,10 @@ async function withOrganizationSeats(
 /**
  * An organization that has bought seats. A freshly created one has none, and
  * the invite procedure refuses a seat-consuming invitation to a full
- * organization, so a test about another rule buys the seats it needs.
+ * organization, so a test about another rule buys the seats it needs. A later
+ * organization for the same owner is created without a trial, so the trial
+ * window is granted here as well, otherwise the entitlement middleware refuses
+ * before the invite rule the test targets.
  */
 async function createOrganizationWithSeats(
   name: string,
@@ -79,7 +82,11 @@ async function createOrganizationWithSeats(
   const organization = await createOrganization(name, ownerId);
   await db
     .update(organizations)
-    .set({ seat_count: seats })
+    .set({
+      seat_count: seats,
+      trial_granted: true,
+      free_trial_end_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    })
     .where(eq(organizations.id, organization.id));
   return organization;
 }

@@ -131,19 +131,35 @@ describe('classifyOrganizationEntitlement', () => {
     });
   });
 
-  it('enforces an organization created without a trial whatever its stored deadline', () => {
+  it('honors an explicit stored deadline and hard-expires only without one', () => {
     const futureTrialEnd = new Date(NOW.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    for (const freeTrialEndAt of [futureTrialEnd, softExpiredTrialEnd, null]) {
-      expect(classify({ free_trial_end_at: freeTrialEndAt, trial_granted: false })).toMatchObject({
-        bypassReason: null,
-        daysRemaining: -4,
-        displayStatus: 'trial_expired_hard',
-        hasEntitlement: false,
-        isTrialExpiredForEnforcement: true,
-        trialStatus: 'trial_expired_hard',
-      });
-    }
+    expect(classify({ free_trial_end_at: futureTrialEnd, trial_granted: false })).toMatchObject({
+      bypassReason: null,
+      daysRemaining: 30,
+      displayStatus: 'trial_active',
+      hasEntitlement: true,
+      isTrialExpiredForEnforcement: false,
+      trialStatus: 'trial_active',
+    });
+    expect(
+      classify({ free_trial_end_at: softExpiredTrialEnd, trial_granted: false })
+    ).toMatchObject({
+      bypassReason: null,
+      daysRemaining: -2,
+      displayStatus: 'trial_expired_soft',
+      hasEntitlement: true,
+      isTrialExpiredForEnforcement: false,
+      trialStatus: 'trial_expired_soft',
+    });
+    expect(classify({ free_trial_end_at: null, trial_granted: false })).toMatchObject({
+      bypassReason: null,
+      daysRemaining: -4,
+      displayStatus: 'trial_expired_hard',
+      hasEntitlement: false,
+      isTrialExpiredForEnforcement: true,
+      trialStatus: 'trial_expired_hard',
+    });
   });
 
   it('leaves an unspecified trial grant on the previous behavior', () => {

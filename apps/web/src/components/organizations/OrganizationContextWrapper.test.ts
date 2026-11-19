@@ -27,7 +27,15 @@ jest.mock('next-auth/react', () => ({
 
 jest.mock('@/app/api/organizations/hooks', () => ({
   useOrganizationWithMembers: () => ({ data: mockOrganization }),
-  useOrganizationTrialStatus: () => 'trial_ending_soon',
+  useOrganizationTrialClassification: () => ({
+    bypassReason: null,
+    daysRemaining: 2,
+    displayStatus: 'trial_ending_soon',
+    hasEntitlement: true,
+    hasPaidSeatEntitlement: false,
+    isTrialExpiredForEnforcement: false,
+    trialStatus: 'trial_ending_soon',
+  }),
 }));
 
 jest.mock('next/navigation', () => ({

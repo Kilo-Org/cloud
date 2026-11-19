@@ -360,6 +360,21 @@ describe('organization trial eligibility', () => {
     expect(new Date(organization.free_trial_end_at ?? 0).getTime()).toBeGreaterThan(Date.now());
   });
 
+  test('grants a trial to every organization an internal staff account creates', async () => {
+    const user = await insertTestUser({
+      google_user_email: `staff-${crypto.randomUUID()}@kilocode.ai`,
+    });
+
+    const first = await createOrganization('First Staff Organization', user.id);
+    const second = await createOrganization('Second Staff Organization', user.id);
+
+    for (const organization of [first, second]) {
+      expect(organization.trial_granted).toBe(true);
+      expect(organization.free_trial_end_at).not.toBeNull();
+      expect(new Date(organization.free_trial_end_at ?? 0).getTime()).toBeGreaterThan(Date.now());
+    }
+  });
+
   test('creates later organizations without a trial until a seat is purchased', async () => {
     const user = await insertTestUser();
     await createOrganization('First Organization', user.id);

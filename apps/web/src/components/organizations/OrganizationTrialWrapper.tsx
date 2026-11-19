@@ -3,14 +3,14 @@
 import { useState, useMemo } from 'react';
 import {
   useOrganizationWithMembers,
-  useOrganizationTrialStatus,
+  useOrganizationTrialClassification,
 } from '@/app/api/organizations/hooks';
 import { FreeTrialWarningDialog } from './FreeTrialWarningDialog';
 import { FreeTrialWarningBanner } from './FreeTrialWarningBanner';
 import { UpgradeTrialDialog } from './UpgradeTrialDialog';
 import {
-  getDaysRemainingInTrial,
   isStatusReadOnly,
+  type OrganizationTrialDisplayStatus,
 } from '@kilocode/web-shared/lib/organizations/trial-utils';
 import { OrganizationUpgradeProvider } from '@/contexts/OrganizationUpgradeContext';
 import { LockableContainerProvider } from '@/contexts/LockableContainerContext';
@@ -36,17 +36,17 @@ export function OrganizationTrialWrapper({
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
 
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
-  const trialStatus = useOrganizationTrialStatus(organizationId);
+  const classification = useOrganizationTrialClassification(organizationId);
   const { assumedRole } = useRoleTesting();
 
+  const trialStatus: OrganizationTrialDisplayStatus | 'loading' | 'error' =
+    classification === 'loading' || classification === 'error'
+      ? classification
+      : classification.displayStatus;
   const isTrialLoading = trialStatus === 'loading' || trialStatus === 'error';
   const isLocked = !isTrialLoading && isStatusReadOnly(trialStatus);
-  const daysRemaining = organizationData
-    ? getDaysRemainingInTrial(
-        organizationData.free_trial_end_at ?? null,
-        organizationData.created_at
-      )
-    : 0;
+  const daysRemaining =
+    classification === 'loading' || classification === 'error' ? 0 : classification.daysRemaining;
 
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role;
 

@@ -3,6 +3,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import type { Organization } from '@kilocode/db/schema';
 import {
   classifyOrganizationEntitlement,
+  type OrganizationEntitlementClassification,
   type OrganizationTrialDisplayStatus,
 } from '@kilocode/web-shared/lib/organizations/trial-utils';
 import { z } from 'zod';
@@ -758,9 +759,13 @@ export function useOrganizationAIAdoptionTimeseries(
   return { ...data, error, isLoading };
 }
 
-export function useOrganizationTrialStatus(
+/**
+ * The canonical entitlement classification for an organization, shared by every
+ * client consumer so a countdown and a lock state can never disagree.
+ */
+export function useOrganizationTrialClassification(
   organizationId: string
-): OrganizationTrialDisplayStatus | 'loading' | 'error' {
+): OrganizationEntitlementClassification | 'loading' | 'error' {
   const sub = useOrganizationLatestSeatPurchaseStatus(organizationId);
   const org = useOrganizationWithMembers(organizationId);
 
@@ -773,11 +778,21 @@ export function useOrganizationTrialStatus(
     return 'loading';
   }
 
-  const classification = classifyOrganizationEntitlement({
+  return classifyOrganizationEntitlement({
     organization: org.data,
     latestSeatPurchaseStatus: sub.data.latestSeatPurchaseStatus,
     now: new Date(),
   });
+}
+
+export function useOrganizationTrialStatus(
+  organizationId: string
+): OrganizationTrialDisplayStatus | 'loading' | 'error' {
+  const classification = useOrganizationTrialClassification(organizationId);
+
+  if (classification === 'loading' || classification === 'error') {
+    return classification;
+  }
 
   return classification.displayStatus;
 }

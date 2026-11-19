@@ -2207,20 +2207,33 @@ describe('organization admin router', () => {
       }
     });
 
-    it('leaves organizations created without a trial out of the filter', async () => {
+    it('includes an organization with a stored date even when the creation grant is false', async () => {
       const searchPrefix = `Admin No Trial ${crypto.randomUUID()}`;
       const grantedOrg = await createTestOrganization(`${searchPrefix} granted`, adminUser.id, 0);
-      const noTrialOrg = await createTestOrganization(`${searchPrefix} no trial`, adminUser.id, 0);
+      const noTrialDatedOrg = await createTestOrganization(
+        `${searchPrefix} no trial dated`,
+        adminUser.id,
+        0
+      );
+      const noTrialUndatedOrg = await createTestOrganization(
+        `${searchPrefix} no trial undated`,
+        adminUser.id,
+        0
+      );
 
       try {
         await db
           .update(organizations)
           .set({ free_trial_end_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString() })
-          .where(inArray(organizations.id, [grantedOrg.id, noTrialOrg.id]));
+          .where(inArray(organizations.id, [grantedOrg.id, noTrialDatedOrg.id]));
+        await db
+          .update(organizations)
+          .set({ trial_granted: false, free_trial_end_at: null })
+          .where(eq(organizations.id, noTrialUndatedOrg.id));
         await db
           .update(organizations)
           .set({ trial_granted: false })
-          .where(eq(organizations.id, noTrialOrg.id));
+          .where(eq(organizations.id, noTrialDatedOrg.id));
 
         const caller = await createCallerForUser(adminUser.id);
         const result = await caller.organizations.admin.list({
@@ -2234,12 +2247,16 @@ describe('organization admin router', () => {
           trial_ending_in_future: true,
         });
 
-        expect(result.organizations.map(organization => organization.id)).toEqual([grantedOrg.id]);
-        expect(result.pagination.total).toBe(1);
+        expect(result.organizations.map(organization => organization.id).sort()).toEqual(
+          [grantedOrg.id, noTrialDatedOrg.id].sort()
+        );
+        expect(result.pagination.total).toBe(2);
       } finally {
         await db
           .delete(organizations)
-          .where(inArray(organizations.id, [grantedOrg.id, noTrialOrg.id]));
+          .where(
+            inArray(organizations.id, [grantedOrg.id, noTrialDatedOrg.id, noTrialUndatedOrg.id])
+          );
       }
     });
   });

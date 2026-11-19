@@ -299,13 +299,13 @@ export async function createOrganization(
   plan?: 'teams' | 'enterprise'
 ): Promise<Organization> {
   const organization = await db.transaction(async tx => {
-    if (userId) {
-      await enforceOrganizationCreationLimit(tx, userId);
-    }
+    const creationLimit = userId ? await enforceOrganizationCreationLimit(tx, userId) : null;
     // Only the first organization a user creates receives a trial window. The
     // lookup intentionally ignores soft deletion: removing an organization
-    // must not restore the offer.
+    // must not restore the offer. Internal staff accounts keep a trial on every
+    // organization they create.
     const hasPriorTrialOrganization =
+      creationLimit?.internalAccount !== true &&
       userId != null &&
       (
         await tx
@@ -319,7 +319,7 @@ export async function createOrganization(
           )
           .limit(1)
       ).length > 0;
-    const grantsTrial = !hasPriorTrialOrganization;
+    const grantsTrial = creationLimit?.internalAccount === true || !hasPriorTrialOrganization;
     const now = new Date();
     const trialEndDate = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
 

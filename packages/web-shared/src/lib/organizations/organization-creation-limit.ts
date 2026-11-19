@@ -9,10 +9,22 @@ import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
 export const MAX_ORGANIZATIONS_PER_USER = 25;
 
+const INTERNAL_ACCOUNT_DOMAIN = 'kilocode.ai';
+
+/**
+ * Staff at `kilocode.ai` organize test and support work, so they are exempt
+ * from the per-user creation cap and keep a trial on every organization they
+ * create.
+ */
+export function isInternalAccountEmail(email: string | null | undefined): boolean {
+  if (email == null) return false;
+  return getLowerDomainFromEmail(email) === INTERNAL_ACCOUNT_DOMAIN;
+}
+
 export async function enforceOrganizationCreationLimit(
   tx: DrizzleTransaction,
   userId: User['id']
-): Promise<void> {
+): Promise<{ internalAccount: boolean }> {
   // Both creation paths must acquire this lock before counting organizations.
   const [user] = await tx
     .select({ email: kilocode_users.google_user_email })
@@ -23,8 +35,8 @@ export async function enforceOrganizationCreationLimit(
   if (!user) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
   }
-  if (getLowerDomainFromEmail(user.email) === 'kilocode.ai') {
-    return;
+  if (isInternalAccountEmail(user.email)) {
+    return { internalAccount: true };
   }
 
   const directOrganizations = tx
@@ -65,4 +77,6 @@ export async function enforceOrganizationCreationLimit(
       message: `You have reached the maximum number of organizations (${MAX_ORGANIZATIONS_PER_USER}) allowed. Please contact support if you need more.`,
     });
   }
+
+  return { internalAccount: false };
 }

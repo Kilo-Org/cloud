@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -35,7 +35,11 @@ export function BitbucketConnectForm({
   scope: string;
   integrationId: string | null;
   onConnected: () => void;
-  /** Reports whether the token field holds text, so the sheet can guard its leave. */
+  /**
+   * Reports whether a dismissal would drop a draft: text in the token field
+   * that no submit has taken yet. A connect already running owns that token, so
+   * the sheet lets a Back leave without asking while it is in flight.
+   */
   onDirtyChange?: (dirty: boolean) => void;
 }>) {
   const { t } = useTranslation();
@@ -43,10 +47,19 @@ export function BitbucketConnectForm({
   // ref and the state below only tracks whether submit can run.
   const tokenRef = useRef('');
   const [hasToken, setHasToken] = useState(false);
+  /** Text in the field that a submit would send: the sheet's leave-guard draft. */
+  const [holdsDraft, setHoldsDraft] = useState(false);
   const { feedback, begin, clearWhere } = useSurfaceFeedback<BitbucketFailure>();
   const connect = useConnectBitbucket(scope);
   const replaceToken = useReplaceBitbucketToken(scope);
   const submitting = feedback.status === 'pending';
+
+  // A submit takes the draft: while a connect runs, its token is already sent,
+  // so the sheet's dismissal is not dropping anything a person typed. The
+  // effect covers both edges, so a failed connect arms the guard again.
+  useEffect(() => {
+    onDirtyChange?.(holdsDraft && !submitting);
+  }, [holdsDraft, onDirtyChange, submitting]);
 
   const onSubmit = () => {
     const field = readBitbucketToken(tokenRef.current);
@@ -121,11 +134,12 @@ export function BitbucketConnectForm({
         onChangeText={value => {
           tokenRef.current = value;
           setHasToken(readBitbucketToken(value).kind === 'ready');
+          // Whitespace is what a submit would not send, so it is no draft either.
+          setHoldsDraft(value.trim().length > 0);
           // Only a failure another token can repair is what a new one answers;
           // a lost role or a connection that changed underneath keeps the submit
           // disabled until the sheet is reopened.
           clearWhere(settled => repairNeedsAnotherToken(settled.kind));
-          onDirtyChange?.(value.trim().length > 0);
         }}
       />
 

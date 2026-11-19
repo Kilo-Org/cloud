@@ -208,11 +208,30 @@ describe('BitbucketConnectForm', () => {
     expect(submitButton(root).props.disabled).toBe(false);
   });
 
-  it('reports a token in the field as a draft and an emptied field as clean', async () => {
+  it('reports a draft until a submit takes it, and gives it back when the connect fails', async () => {
+    const landing = Promise.withResolvers<unknown>();
+    mutations.connect.mockImplementation(() => landing.promise);
     const onDirtyChange = vi.fn<(dirty: boolean) => void>();
     const { root } = await mount(null, vi.fn<() => void>(), onDirtyChange);
 
     await edit(root, 'workspace-token');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+    // The submit already sent this token, so a Back while the connect runs
+    // drops nothing the person typed.
+    await act(async () => {
+      (submitButton(root).props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+    // A refused token is still in the field, so the sheet guards it again.
+    await act(async () => {
+      landing.reject({
+        data: { code: 'UNAUTHORIZED', message: 'Bitbucket rejected the Workspace Access Token' },
+      });
+      await Promise.resolve();
+    });
     expect(onDirtyChange).toHaveBeenLastCalledWith(true);
 
     // Whitespace is what a submit would not send, so it is not an edit either.

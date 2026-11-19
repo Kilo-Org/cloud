@@ -149,19 +149,53 @@ export function codeFieldTextStyle(): TextStyle {
   };
 }
 
+/** A letter: the strong characters a paragraph's direction resolves from. */
+const LETTER = /\p{L}/u;
+
+/** The first letter of a React child tree, or `undefined` when it has none. */
+function firstLetter(node: ReactNode): string | undefined {
+  if (Array.isArray(node)) {
+    for (const child of node as ReactNode[]) {
+      const letter = firstLetter(child);
+      if (letter !== undefined) {
+        return letter;
+      }
+    }
+    return undefined;
+  }
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return firstLetter(node.props.children);
+  }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
+  if (typeof node === 'string') {
+    return LETTER.exec(node)?.[0];
+  }
+  return undefined;
+}
+
+const CONTENT_LTR_DIRECTION: TextStyle = { writingDirection: 'ltr' };
+
 /**
  * Base direction for copy the app did not write — a server's message, a user's
- * own text, an issue body. Each paragraph resolves from its own first strong
- * character, so English content keeps its left edge and the punctuation that
- * ends it, while Arabic content still lays out and aligns to the right. Naming
- * the paragraph's own direction is also what makes the natural alignment
- * resolve (`RTL_WRITING_DIRECTION` names the other direction for app copy).
+ * own text, an issue body. The paragraph takes the direction of its own first
+ * letter, so English content keeps its left edge and the punctuation that ends
+ * it inside a right-to-left interface, and Arabic content still aligns to the
+ * right. `undefined` when the copy has no letter: it then keeps the interface's
+ * direction.
  *
- * iOS reads the paragraph from `writingDirection`; Android resolves a paragraph
- * from its first strong character when no direction is named, so the constant
- * carries nothing to do there.
+ * The direction is named, not left to `writingDirection: 'auto'`: iOS resolves
+ * an `auto` paragraph's punctuation from its content but its natural alignment
+ * from the interface, so an English block stayed on the right edge of an
+ * Arabic screen. A named direction resolves both, and unlike `textAlign` it
+ * leaves an explicit `text-center` alone.
  */
-export const CONTENT_TEXT_DIRECTION: TextStyle = { writingDirection: 'auto' };
+export function contentTextDirection(children: ReactNode): TextStyle | undefined {
+  const letter = firstLetter(children);
+  if (letter === undefined) {
+    return undefined;
+  }
+  return RTL_SCRIPT.test(letter) ? RTL_WRITING_DIRECTION : CONTENT_LTR_DIRECTION;
+}
 
 /**
  * A joined script's letters connect into one shape, so `letter-spacing` — a

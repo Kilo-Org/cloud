@@ -153,16 +153,16 @@ describe('Text mounted letter spacing', () => {
   });
 });
 
-// Content copy (`direction="auto"`) names its own direction; app copy names
-// the interface's.
+// Content copy (`direction="auto"`) names its own first letter's direction;
+// app copy names the interface's.
 describe('Text content direction', () => {
-  it('lays content copy out by its own direction in an RTL interface', () => {
+  it('lays English content out left to right in an RTL interface', () => {
     i18nManager.isRTL = true;
     const text = hostText(
       mountTextTree(createElement(Text, { direction: 'auto' }, 'Prototype pollution.'))
     );
 
-    expect(ownStyles(text)).toContainEqual({ writingDirection: 'auto' });
+    expect(ownStyles(text)).toContainEqual({ writingDirection: 'ltr' });
     expect(ownStyles(text)).not.toContainEqual({ writingDirection: 'rtl' });
   });
 
@@ -171,13 +171,20 @@ describe('Text content direction', () => {
     const text = hostText(mountTextTree(createElement(Text, {}, 'Prototype pollution.')));
 
     expect(ownStyles(text)).toContainEqual({ writingDirection: 'rtl' });
-    expect(ownStyles(text)).not.toContainEqual({ writingDirection: 'auto' });
+    expect(ownStyles(text)).not.toContainEqual({ writingDirection: 'ltr' });
   });
 
-  it('lays content copy out by its own direction in an LTR interface', () => {
+  it('lays Arabic content out right to left in an LTR interface', () => {
     const text = hostText(mountTextTree(createElement(Text, { direction: 'auto' }, 'نص')));
 
-    expect(ownStyles(text)).toContainEqual({ writingDirection: 'auto' });
+    expect(ownStyles(text)).toContainEqual({ writingDirection: 'rtl' });
+  });
+
+  it('keeps content with no letter on the interface direction', () => {
+    i18nManager.isRTL = true;
+    const text = hostText(mountTextTree(createElement(Text, { direction: 'auto' }, '42')));
+
+    expect(ownStyles(text)).toContainEqual({ writingDirection: 'rtl' });
   });
 });
 

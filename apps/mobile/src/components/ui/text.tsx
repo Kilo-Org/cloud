@@ -8,7 +8,7 @@ import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
 
 import {
   containsJoinedScript,
-  CONTENT_TEXT_DIRECTION,
+  contentTextDirection,
   hasRtlScript,
   NATURAL_LETTER_SPACING,
   RTL_WRITING_DIRECTION,
@@ -118,7 +118,7 @@ function Text({
      * message, a finding's description, a user's own text — which names its
      * own direction, so English content keeps its left edge and the
      * punctuation that ends it inside a right-to-left interface
-     * (`CONTENT_TEXT_DIRECTION`).
+     * (`contentTextDirection`).
      */
     direction?: 'auto';
   }) {
@@ -169,11 +169,14 @@ function Text({
     className
   );
   // The paragraph's base direction: the interface's for app copy, and the
-  // copy's own for content (`direction="auto"`), which is what makes a Latin
-  // sentence keep its left edge and the punctuation that ends it inside a
-  // right-to-left interface.
+  // copy's own first letter's for content (`direction="auto"`), which is what
+  // makes a Latin sentence keep its left edge and the punctuation that ends it
+  // inside a right-to-left interface.
   const interfaceDirection: TextStyle | undefined = isRTL ? RTL_WRITING_DIRECTION : undefined;
-  const writingDirection = direction === 'auto' ? CONTENT_TEXT_DIRECTION : interfaceDirection;
+  const writingDirection =
+    direction === 'auto'
+      ? (contentTextDirection(props.children) ?? interfaceDirection)
+      : interfaceDirection;
   // The direction and reset land in the same array the component has always
   // built, so a non-eyebrow text node's style never grows an empty entry; the
   // eyebrow's line box leads its own array, before `props.style`, so a caller's

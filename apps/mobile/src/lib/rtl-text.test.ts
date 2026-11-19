@@ -1,10 +1,10 @@
 import { createElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   codeFieldTextStyle,
   containsJoinedScript,
-  CONTENT_TEXT_DIRECTION,
+  contentTextDirection,
   hasRtlScript,
   ltrValueTextStyle,
   withoutMonoFamily,
@@ -187,13 +187,30 @@ describe('withoutMonoFamily', () => {
   });
 });
 
-describe('CONTENT_TEXT_DIRECTION', () => {
-  // Copy the app did not write — a server's message, a user's own text — lays
-  // itself out from its own first strong character, so an English sentence
-  // keeps its left edge and the punctuation that ends it inside an Arabic
-  // interface, and an Arabic one still aligns to the right.
-  it('names the paragraph its own direction', () => {
-    expect(CONTENT_TEXT_DIRECTION).toEqual({ writingDirection: 'auto' });
+describe('contentTextDirection', () => {
+  afterEach(() => {
+    i18nManager.isRTL = false;
+  });
+
+  // Copy the app did not write takes the direction of its own first letter, so
+  // an English sentence keeps its left edge inside an Arabic interface, and an
+  // Arabic one still aligns to the right.
+  it.each([false, true])('names English content left to right (isRTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    expect(contentTextDirection('1. Prototype pollution: لا')).toEqual({
+      writingDirection: 'ltr',
+    });
+  });
+
+  it.each([false, true])('names Arabic content right to left (isRTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    expect(contentTextDirection(['  ', createElement('Text', null, 'تلوث Prototype')])).toEqual({
+      writingDirection: 'rtl',
+    });
+  });
+
+  it('leaves copy with no letter to the interface', () => {
+    expect(contentTextDirection(['42 · ', 7])).toBeUndefined();
   });
 });
 

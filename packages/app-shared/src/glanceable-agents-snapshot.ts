@@ -536,8 +536,8 @@ export function isStartableGlanceableWork(counts: GlanceableCounts): boolean {
 }
 
 /** True when every connected agent is idle: eligible work, but nothing happening. */
-export function isIdleOnlyGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
-  return isEligibleGlanceableWork(snapshot) && !isStartableGlanceableWork(snapshot);
+export function isIdleOnlyGlanceableWork(counts: GlanceableCounts): boolean {
+  return isEligibleGlanceableWork(counts) && !isStartableGlanceableWork(counts);
 }
 
 /**

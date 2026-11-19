@@ -93,6 +93,8 @@ const TEXT_INPUT_TAGS = new Set([
   'RCTMultilineTextInputView',
 ]);
 const SCREEN_TAGS = new Set(['RNSScreen']);
+/** The track a UISwitch draws, as an iOS accessibility snapshot reports it. */
+export const IOS_SWITCH_TRACK_TAG = 'UISwitch';
 const STACK_TAGS = new Set(['RNSScreenStack']);
 /**
  * `@expo/ui` renders its Android `ModalBottomSheet` in a dialog window of its
@@ -351,18 +353,29 @@ function hidden(node: ProbeNode): boolean {
     (node.owners ?? []).some(owner => IGNORED_OWNERS.has(owner)) ||
     node.style?.display === 'none' ||
     node.style?.opacity === 0 ||
-    (tags.isScreen(node.tag) && node.screenState === 0)
+    ((tags.isScreen(node.tag) || node.tag === IOS_MODAL_TAG) && node.screenState === 0)
   );
 }
 
-// A native stack keeps every pushed screen mounted and active; only its last screen is on top.
+// A native stack keeps every pushed screen mounted and active; only its last screen
+// is on top. A modal covers nothing below it (a sheet leaves the screen it opened
+// from painted), but anything the stack presents after a modal covers the modal.
 function coveredScreens(nodes: readonly ProbeNode[]): Set<number> {
   const lastScreen = new Map<number, number>();
+  const lastModal = new Map<number, number>();
   const covered = new Set<number>();
   nodes.forEach((node, index) => {
-    if (!tags.isScreen(node.tag) || node.parent < 0) return;
+    const modal = node.tag === IOS_MODAL_TAG;
+    if ((!tags.isScreen(node.tag) && !modal) || node.parent < 0) return;
     const stack = nodes[node.parent];
     if (!stack || !tags.isStack(stack.tag)) return;
+    const openModal = lastModal.get(node.parent);
+    if (openModal !== undefined) covered.add(openModal);
+    if (modal) {
+      lastModal.set(node.parent, index);
+      return;
+    }
+    lastModal.delete(node.parent);
     const previous = lastScreen.get(node.parent);
     if (previous !== undefined) covered.add(previous);
     lastScreen.set(node.parent, index);

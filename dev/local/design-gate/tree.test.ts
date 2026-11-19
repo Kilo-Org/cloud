@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { dump } from './rules/test-dump';
-import { contentBox, layoutRect, normalize, parseDump, type LayoutTree } from './tree';
+import {
+  contentBox,
+  layoutRect,
+  normalize,
+  parseDump,
+  type LayoutTree,
+  type ProbeNode,
+} from './tree';
 
 test('parseDump accepts JSON strings and rejects malformed dumps', () => {
   const valid = dump([{ parent: 0, tag: 'Paragraph', rect: [0, 0, 10, 10], text: 'x' }]);
@@ -213,6 +220,43 @@ test('normalize places an iOS @expo/ui sheet above the bottom inset and leaves o
   );
   assert.deepEqual(ios.nodes[3].presented, { space: 1, dy: 62 });
   assert.equal(ios.nodes[4].presented, undefined);
+});
+
+test('normalize drops an inactive iOS modal and one a later presentation covers', () => {
+  const ios = { platform: 'ios', window: { width: 402, height: 874 } };
+  const stack = (first: Partial<ProbeNode>, second?: Partial<ProbeNode>) =>
+    normalize(
+      dump(
+        [
+          { parent: 0, tag: 'RNSScreenStack', rect: [0, 0, 402, 874] },
+          { parent: 1, tag: 'RNSScreen', rect: [0, 0, 402, 874], screenState: 2 },
+          { parent: 2, tag: 'Paragraph', rect: [14, 100, 200, 24], text: 'Profile' },
+          { parent: 1, tag: 'RNSModalScreen', rect: [0, 0, 402, 423], screenState: 2, ...first },
+          { parent: 4, tag: 'Paragraph', rect: [14, 30, 200, 24], text: 'Language' },
+          ...(second
+            ? [
+                {
+                  parent: 1,
+                  tag: 'RNSModalScreen',
+                  rect: [0, 0, 402, 812],
+                  screenState: 2,
+                  ...second,
+                },
+                { parent: 6, tag: 'Paragraph', rect: [14, 30, 200, 24], text: 'Credits' },
+              ]
+            : []),
+        ] as ProbeNode[],
+        ios
+      )
+    );
+  const texts = (layout: LayoutTree) =>
+    layout.nodes.flatMap(node => (node.probe.text ? [node.probe.text] : []));
+  // An active sheet leaves the screen it opened from painted behind it.
+  assert.deepEqual(texts(stack({})), ['Profile', 'Language']);
+  // A sheet react-native-screens keeps mounted but inactive is not on screen.
+  assert.deepEqual(texts(stack({ screenState: 0 })), ['Profile']);
+  // A sheet presented over another covers it.
+  assert.deepEqual(texts(stack({}, {})), ['Profile', 'Credits']);
 });
 
 test('normalize places an iOS form sheet and page sheet at the window bottom', () => {

@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
+  alsoStoppedDownloadsText,
   canStartDownload,
   createStepTokenStore,
   DOWNLOAD_PERMISSION_MISSING_ERROR,
@@ -2689,6 +2690,8 @@ export const createBrowserRuntime = ({
     context: {
       readonly keptFiles: readonly string[];
       readonly origin: string;
+      /** The files the same call stopped besides this one: one click can start several, and each needs its own. */
+      readonly alsoStopped?: readonly DownloadReport[];
       /** The file was announced where nothing could hold it: the text names the permission that would. */
       readonly unguarded?: boolean;
     },
@@ -2696,13 +2699,16 @@ export const createBrowserRuntime = ({
   ): BrowserToolRunOutcome => {
     const { step } = file;
     const { keptFiles, origin } = context;
+    const also = context.alsoStopped ?? [];
+    const alsoText =
+      also.length === 0 ? '' : ` ${alsoStoppedDownloadsText(also.map(one => one.filename))}`;
 
     if (context.unguarded === true) {
       return needsPermissionOutcome(
         [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
         {
           afterAction: true,
-          error: `${file.filename}: ${DOWNLOAD_PERMISSION_MISSING_ERROR}`,
+          error: `${file.filename}: ${DOWNLOAD_PERMISSION_MISSING_ERROR}${alsoText}`,
           keptFiles,
         }
       );
@@ -2730,9 +2736,11 @@ export const createBrowserRuntime = ({
 
     return needsPermissionOutcome([{ class: 'sensitive', origin, reason }], {
       afterAction: true,
-      error: file.kept
-        ? `${file.filename} may have been saved: the browser had written it before the download could be stopped. Downloading a file needs your approval.`
-        : `The download of ${file.filename} was stopped before it was saved: downloading a file needs your approval. Repeat that ${step?.noun ?? 'step'} after the download is approved to receive the file.`,
+      error: `${
+        file.kept
+          ? `${file.filename} may have been saved: the browser had written it before the download could be stopped. Downloading a file needs your approval.`
+          : `The download of ${file.filename} was stopped before it was saved: downloading a file needs your approval. Repeat that ${step?.noun ?? 'step'} after the download is approved to receive the file.`
+      }${alsoText}`,
       keptFiles,
       ...(step === undefined
         ? {}
@@ -3326,8 +3334,11 @@ export const createBrowserRuntime = ({
         // The step this call is: what a download it starts is reported against, and what the token then binds.
         // The moment the guard is armed, which its settle window is measured from and a navigate expectation covers.
         const guardArmedAt = Date.now();
+        // The hold decides every download of the profile, so it learns the tab and the step of any agent call that
+        // Can start one — whatever extra guard the tier picks, and even when the call's own approval covers it.
+        // Without that, the file such a call starts is attributed to its tab's older step, or to nothing at all.
         const downloadStep: DownloadStep | undefined =
-          (guardDownloads || holdGuards) && preflight?.ok
+          agentContext !== undefined && downloadCapable && preflight?.ok
             ? {
                 argumentHash: stepHash,
                 ...downloadStepText(stepToolName, stepArgumentsRecord),
@@ -3366,18 +3377,19 @@ export const createBrowserRuntime = ({
               url: destination ?? '',
             });
           }
+        }
 
-          if (approvedFile !== null) {
-            // The approval the repeat just redeemed is the one file the hold lets through.
-            downloadHold.arm({
-              expiresAt: Date.now() + STEP_TOKEN_TTL_MS,
-              kind: 'armed',
-              session: approvedFile.session,
-              step: downloadStep,
-              tabId: approvedFile.need.tabId,
-              target: targetOf(approvedFile.need.url),
-            });
-          }
+        // The approval the repeat redeemed is the one file the hold lets through, and the item is held while the
+        // Tool runs: it has to be armed before the tool starts, whatever step the call is.
+        if (downloadHold !== undefined && approvedFile !== null) {
+          downloadHold.arm({
+            expiresAt: Date.now() + STEP_TOKEN_TTL_MS,
+            kind: 'armed',
+            session: approvedFile.session,
+            step: downloadStep,
+            tabId: approvedFile.need.tabId,
+            target: targetOf(approvedFile.need.url),
+          });
         }
 
         const downloadGuard =
@@ -3573,6 +3585,8 @@ export const createBrowserRuntime = ({
           ...settlement.kept,
           ...late.filter(file => file.kept).map(file => file.filename),
         ];
+        // The files this call started besides the one its approval bought: named on the success it earned.
+        let alsoStopped: readonly DownloadReport[] = [];
 
         if (agentContext !== undefined && intercepted.stopped.length > 0) {
           // The pause failed the response before any byte was written, so no file exists under these names. Without
@@ -3630,14 +3644,26 @@ export const createBrowserRuntime = ({
             }
           }
 
-          const [ownRefusal] = ownLate;
+          // An approval that was spent bought its one file: the files the same gesture started besides it are
+          // Named on the success, because a refusal would say the call that did what was approved did nothing.
+          const bought = downloadApproved && downloadHold.needOf(sessionKey)?.kind === 'spent';
 
-          if (ownRefusal !== undefined) {
-            return downloadRefusal(
-              ownRefusal,
-              { keptFiles, origin: preflight?.ok ? preflight.origin : '' },
-              runTabId
-            );
+          if (bought) {
+            alsoStopped = ownLate;
+          } else {
+            const [ownRefusal, ...otherOwn] = ownLate;
+
+            if (ownRefusal !== undefined) {
+              return downloadRefusal(
+                ownRefusal,
+                {
+                  ...(otherOwn.length === 0 ? {} : { alsoStopped: otherOwn }),
+                  keptFiles,
+                  origin: preflight?.ok ? preflight.origin : '',
+                },
+                runTabId
+              );
+            }
           }
         } else if (agentContext !== undefined && stoppedFiles + settlement.kept.length === 0) {
           // Nothing of this call's own was stopped: the report is about an earlier call's download, so its token
@@ -3819,8 +3845,16 @@ export const createBrowserRuntime = ({
           }
         }
 
+        const alsoText =
+          alsoStopped.length === 0 || (!settled.ok && successText === undefined)
+            ? undefined
+            : alsoStoppedDownloadsText(alsoStopped.map(file => file.filename));
+        const resultText =
+          alsoText === undefined
+            ? successText
+            : [successText, alsoText].filter((part): part is string => part !== undefined).join(' ');
         const finalResult: EvalTabResult =
-          successText === undefined ? settled : { ok: true, value: successText };
+          resultText === undefined ? settled : { ok: true, value: resultText };
 
         if (agentContext === undefined) {
           return { kind: 'result', result: finalResult };

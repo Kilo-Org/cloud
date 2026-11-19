@@ -23,6 +23,8 @@ import {
 } from './browser-agent-checks';
 import { createRuntimeBrowserBridge } from './local-agents/browser-bridge';
 import { LOCAL_AGENT_ERROR_CODES } from './local-agents/jsonrpc';
+import { createDownloadHold } from './browser-download-hold';
+import type { DownloadHold, DownloadHoldReport } from './browser-download-hold';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
 import type {
@@ -465,6 +467,7 @@ const createFakeDownloads = (
 
 const createHarness = async (
   options: {
+    readonly downloadHold?: DownloadHold | undefined;
     readonly downloadsApi?: BrowserDownloadsApi | undefined;
     readonly downloadsGranted?: boolean;
     readonly downloadsResolver?: () => BrowserDownloadsApi | undefined;
@@ -492,6 +495,7 @@ const createHarness = async (
   const runtime = createBrowserRuntime({
     debuggerApi: cdp.api,
     ...(downloadsApi === undefined ? {} : { downloadsApi }),
+    ...(options.downloadHold === undefined ? {} : { downloadHold: options.downloadHold }),
     leases,
     scriptingApi: undefined,
     ...(options.tabGroups === undefined ? {} : { tabGroups: options.tabGroups }),
@@ -5694,5 +5698,170 @@ describe('agent browser calls', () => {
     expect(String(result.value)).toContain('leaked frame text');
     expect(withheldFrames).toBeUndefined();
     expect(ORIGIN_CHANGED_ERROR).toBeTruthy();
+  });
+});
+
+describe('the download hold on a real call', () => {
+  /** A hold over the fake downloads, with the reports it queued in order. */
+  const holdOver = (downloads: ReturnType<typeof createFakeDownloads>) => {
+    const reports: DownloadHoldReport[] = [];
+    const hold = createDownloadHold({
+      cancel: downloads.api.cancel,
+      erase: downloads.api.erase,
+      onReport: report => reports.push(report),
+      search: async itemId => downloads.api.search({ id: itemId }),
+    });
+
+    return { hold, reports };
+  };
+
+  it('names browser_tabs new for a file the step’s own tab started, not the earlier navigate on the caller’s', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const openedListeners: ((tab: { readonly id?: number; readonly openerTabId?: number }) => void)[] =
+      [];
+    const created: Record<string, unknown>[] = [];
+    const newTab = TAB_ID + 6;
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: dashboard, windowId: 1 },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: () => {},
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: dashboard, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+    const authorized = [readGrant, actGrant, { class: 'navigate' as const, origin: MAIN_ORIGIN }];
+
+    // A navigation downloads with no referrer and no announcement: the item's url, and the call's own
+    // Expectation, are the only ties the hold has to the tab that asked for the file.
+    cdp.setHandlers({
+      'Page.navigate': (_params, target) => {
+        if (target?.tabId === newTab) {
+          hold.handle({ id: 71, url }, () => {});
+        }
+
+        return { frameId: 'main' };
+      },
+    });
+
+    // The caller's tab navigated a moment ago, so its expectation is still live while the tabs call runs.
+    const navigated = await runtime.runTool({
+      agent: { authorized },
+      arguments: { url: dashboard },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_navigate',
+    });
+
+    expect(navigated.kind).toBe('result');
+
+    const guarded = await runtime.runTool({
+      agent: { authorized },
+      arguments: { action: 'new', url },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_tabs',
+    });
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
+    // The file belongs to the tab the step opened, so the step the model repeats is the call it made.
+    expect(guarded.step).toStrictEqual({
+      argumentsHash: hashBrowserToolArguments({ action: 'new', url }),
+      tool: 'browser_tabs',
+    });
+    expect(downloads.cancelled).toStrictEqual([71]);
+    // The tab opens blank, and the url loads through the guarded navigate on it.
+    expect([created.length, created[0]?.['url']]).toStrictEqual([1, 'about:blank']);
+  });
+
+  it('arms the approval before the tool runs, so its file lands and the second file is refused and reported', async () => {
+    const downloads = createFakeDownloads();
+    const { hold } = holdOver(downloads);
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const first = { filename: 'report.txt', id: 71, url: `${MAIN_ORIGIN}/report.txt` };
+    const second = { filename: 'second.txt', id: 72, url: `${MAIN_ORIGIN}/second.txt` };
+    const suggested: number[] = [];
+
+    // One click starts two files: the approved target, then the one the approval does not cover. The press is the
+    // Event that starts them, and the release that follows starts nothing.
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          for (const file of [first, second]) {
+            hold.handle({ id: file.id, referrer: dashboard, url: file.url }, () => {
+              suggested.push(file.id);
+            });
+          }
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const guarded = await click();
+
+    expect(guarded.kind).toBe('needs_permission');
+    expect(suggested).toStrictEqual([71, 72]);
+    // Both files were stopped, and both are named: the approval is for one of them.
+    expect(guarded.kind === 'needs_permission' ? guarded.result.error : '').toContain('second.txt');
+
+    const token = expectStepToken(guarded);
+
+    suggested.length = 0;
+
+    const approved = await click([token]);
+
+    if (approved.kind !== 'result') {
+      throw new Error(`expected the approved file to land, got ${JSON.stringify(approved)}`);
+    }
+
+    // The approved file was let through before the tool ran, and the second was stopped in the same gesture.
+    expect(hold.needOf('session-1')?.kind).toBe('spent');
+    expect(suggested).toStrictEqual([71, 72]);
+    expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');
+    expect(downloads.cancelled).toStrictEqual([71, 72, 72]);
   });
 });

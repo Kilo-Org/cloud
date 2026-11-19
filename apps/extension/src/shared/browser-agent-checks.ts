@@ -202,6 +202,18 @@ export const downloadStoppedWithoutPermissionError = (filename: string): string 
   `The download of ${filename} was stopped before it was saved. Granting the optional Downloads permission lets this download be approved and repeated.`;
 
 /**
+ * The line for the files one call started besides the file its approval bought:
+ * one click can start several, and the approval names exactly one of them. The
+ * call did what the human approved, so these are named as stopped — a refusal
+ * would read as "the approved file never landed".
+ */
+export const alsoStoppedDownloadsText = (filenames: readonly string[]): string => {
+  const names = [...new Set(filenames)].join(', ');
+
+  return `${names}: the download was stopped before it was saved — each file needs its own approval.`;
+};
+
+/**
  * The refusal for an approval that could not produce its file: Chrome's own
  * multiple-downloads limiter blocks the approved repeat, so the browser creates
  * no item at all. The approval is still unspent — a second human approval must

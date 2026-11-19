@@ -1,7 +1,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { selectionHaptic } from '@/lib/haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, Info, SearchX, X } from '@/components/ui/icons';
+import { AlertCircle, Info, Plus, SearchX, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { type TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { PickerSheet } from '@/components/picker-sheet';
 import { SearchField } from '@/components/ui/search-field';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
+import { providerKeyAddHref } from '@/lib/byok/provider-key-scope';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -250,7 +251,9 @@ export function ModelPickerContent() {
   // a dead row with no explanation of why it could not be picked. The state
   // sits in the list header rather than in the zero-rows branch so the row the
   // session is on, the search field and the sheet's height keep their places;
-  // `instance-picker`'s zero-instance state is the same shape.
+  // `instance-picker`'s zero-instance state is the same shape. The state also
+  // owns the way out: an unavailable model is a missing credential, so its one
+  // action opens the provider-key form instead of leaving the sheet a dead end.
   const allOptionsUnavailable =
     bridge.options.length > 0 && bridge.options.every(option => option.unavailable === true);
 
@@ -324,12 +327,31 @@ export function ModelPickerContent() {
           ListHeaderComponent={
             allOptionsUnavailable ? (
               <EmptyState
+                // The sheet's sections sit 21pt apart; the state is the
+                // first block above them, so it ends at the same gap.
+                className="mb-6"
                 icon={Info}
                 placement="top"
                 inset="gutter"
                 compact
                 title={t('agentChat.modelPicker.allUnavailableTitle')}
                 description={t('agentChat.modelPicker.allUnavailableDescription')}
+                // The state is not a dead end: the only surface that can make
+                // these models pickable again holds the provider keys.
+                action={
+                  <StateAction
+                    label={t('profile.providerKeys.add')}
+                    icon={Plus}
+                    onPress={() => {
+                      // The slot is cleared when the sheet loses focus, so
+                      // opening the key flow on top of it would come back to
+                      // an expired picker: close the sheet with no pick, then
+                      // open the provider-key flow from the chat surface.
+                      cancelPicker();
+                      router.push(providerKeyAddHref({ kind: 'personal' }));
+                    }}
+                  />
+                }
               />
             ) : undefined
           }

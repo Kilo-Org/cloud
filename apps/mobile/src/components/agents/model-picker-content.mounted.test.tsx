@@ -34,6 +34,9 @@ const slotState = vi.hoisted(() => ({ bridge: undefined as unknown }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0 }));
 
 const routerBack = vi.hoisted(() => vi.fn());
+// The provider-key flow the all-unavailable state opens instead of leaving the
+// picker a dead end. Recorded so a test can prove the sheet closes first.
+const routerPush = vi.hoisted(() => vi.fn());
 // The keyboard the applied pick closes. Recorded so a test can prove the pick
 // takes the search field's keyboard with it instead of leaving it up.
 const keyboardDismiss = vi.hoisted(() => vi.fn());
@@ -123,7 +126,7 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: routerBack, push: vi.fn() }),
+  useRouter: () => ({ back: routerBack, push: routerPush }),
   useLocalSearchParams: () => ({}),
   useFocusEffect: vi.fn(),
 }));
@@ -162,6 +165,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Info: 'Info',
+  Plus: 'Plus',
   Search: 'Search',
   SearchX: 'SearchX',
   X: 'X',
@@ -654,7 +658,9 @@ describe('ModelPickerContent deferred search', () => {
 // as one row carrying `unavailable: true`, so the catalog has rows but nothing
 // selectable. The sheet must explain that state above the rows — the row and
 // the search field keep their places — instead of drawing a dead row with no
-// reason. The zero-rows branch keeps its own copy and is not this state.
+// reason. The zero-rows branch keeps its own copy and is not this state. The
+// state is not a dead end: its one action closes the sheet and opens the
+// provider-key form, the only place a missing credential can be added.
 describe('ModelPickerContent all models unavailable', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -662,6 +668,7 @@ describe('ModelPickerContent all models unavailable', () => {
     listCommitLengths.values.length = 0;
     safeAreaInsets.bottom = 0;
     routerBack.mockClear();
+    routerPush.mockClear();
   });
 
   it('explains the dead row above the list when every model is unavailable', async () => {
@@ -683,6 +690,38 @@ describe('ModelPickerContent all models unavailable', () => {
       i18n.t('agentChat.modelPicker.allUnavailableDescription')
     );
     /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    // The state's one way out: the existing "Add key" copy, a press that
+    // closes the sheet first (its blur clears the model slot, so pushing on
+    // top of it would come back to an expired picker) and then opens the
+    // provider-key form that can make a model pickable again.
+    const actions = findByType(renderer.root, 'StateAction');
+    expect(actions).toHaveLength(1);
+    const action = actions[0];
+    if (!action) {
+      throw new Error('provider key action not found');
+    }
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect(action.props.label).toBe(i18n.t('profile.providerKeys.add'));
+    const onPress = action.props.onPress as (() => void) | undefined;
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+    if (typeof onPress !== 'function') {
+      throw new TypeError('provider key action is not pressable');
+    }
+
+    act(() => {
+      onPress();
+    });
+
+    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    // A personal-scope href is its bare route; `providerKeyAddHref` hands an
+    // object only to the organization scope, so the pushed target is the path
+    // `provider-keys-screen`'s own test asserts.
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/provider-key-add');
+    expect(routerBack.mock.invocationCallOrder[0]).toBeLessThan(
+      routerPush.mock.invocationCallOrder[0] ?? 0
+    );
 
     act(() => {
       renderer.unmount();

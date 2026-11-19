@@ -1,8 +1,8 @@
 import { createServiceState } from './service-state';
-import type { ServiceStateConfig } from './service-state';
+import type { ServiceState, ServiceStateConfig } from './service-state';
 import type { Session, QuestionInfo } from '@kilocode/app-shared/opencode';
 import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
-import { autocommitCompletedDataSchema, preparingDataSchema } from './schemas';
+import { autocommitCompletedDataSchema, preparingDataSchema, SESSION_MAX_COMMITS } from './schemas';
 import type { SessionCommit, SessionGoal } from './types';
 
 function makeConfig(overrides?: Partial<ServiceStateConfig>): ServiceStateConfig {
@@ -2455,6 +2455,43 @@ describe('createServiceState', () => {
       state.reset();
       state.process({ type: 'autocommit_completed', success: true, ...localCommit });
       expect(state.getCommits()).toEqual([localCommit]);
+    });
+
+    const commitAtIndex = (index: number): SessionCommit => ({
+      ...localCommit,
+      commitHash: index.toString(16).padStart(40, '0'),
+      messageId: `message-${index}`,
+      committedAt: new Date(Date.UTC(2026, 8, 1, 10, 0, 0) + index * 1_000).toISOString(),
+    });
+
+    const fillCommits = (state: ServiceState, count: number): void => {
+      for (let index = 0; index < count; index += 1) {
+        state.process({ type: 'autocommit_completed', success: true, ...commitAtIndex(index) });
+      }
+    };
+
+    it('trims the autocommit list to its newest budget', () => {
+      const state = createServiceState(makeConfig());
+      fillCommits(state, SESSION_MAX_COMMITS + 20);
+      const retained = state.getCommits();
+      expect(retained).toHaveLength(SESSION_MAX_COMMITS);
+      expect(retained[0]).toEqual(commitAtIndex(20));
+      expect(retained.at(-1)).toEqual(commitAtIndex(SESSION_MAX_COMMITS + 19));
+    });
+
+    it('does not resurrect a trimmed commit on replay', () => {
+      const state = createServiceState(makeConfig());
+      fillCommits(state, SESSION_MAX_COMMITS + 20);
+      state.process({ type: 'autocommit_completed', success: true, ...commitAtIndex(0) });
+      state.process({
+        type: 'autocommit_completed',
+        success: true,
+        ...commitAtIndex(0),
+        commitMessage: 'Replayed with a different message',
+      });
+      const retained = state.getCommits();
+      expect(retained).toHaveLength(SESSION_MAX_COMMITS);
+      expect(retained[0]).toEqual(commitAtIndex(20));
     });
 
     it.each([

@@ -497,7 +497,7 @@
     },
     "changelog": "Okusha",
     "changelogVersionPending": "Amanothi enguqulo {{version}} azofika nesibuyekezo esilandelayo sohlelo lokusebenza.",
-    "changelogGroupNew": "Okusha",
+    "changelogGroupNew": "Izinto ezintsha",
     "changelogFixesIn": "Ukulungiswa nokuthuthukiswa kulezi zingxenye: {{areas}}.",
     "changelogFixesPolish": "Ukulungiswa nokuthuthukiswa kulo lonke uhlelo lokusebenza.",
     "changelogAreas": {

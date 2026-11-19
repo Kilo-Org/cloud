@@ -69,6 +69,21 @@ function isInvalidNativeTokenError(error: unknown): boolean {
   return error instanceof NativeIdTokenError || error instanceof AppleJwtClientError;
 }
 
+/**
+ * A session minted for a sign-in that ends without delivering its credentials
+ * stays revocable, and a failed revoke must not replace the original outcome.
+ */
+async function revokeAbandonedSession(sessionId: string | undefined) {
+  if (!sessionId) {
+    return;
+  }
+  try {
+    await revokeDeviceSession(sessionId, 'sign_in_not_completed');
+  } catch {
+    captureMessage('native_token_session_cleanup_failed');
+  }
+}
+
 function eligibilityResponse(
   eligibility: Exclude<Awaited<ReturnType<typeof checkDomainSignInEligibility>>, { ok: true }>
 ) {
@@ -339,35 +354,45 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       return rateLimited;
     }
 
-    const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+    let sessionId: string | undefined;
 
-    if (data.supportsRefresh) {
-      const credentials = await createDeviceSessionWithCredentials({
+    try {
+      const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+
+      if (data.supportsRefresh) {
+        const credentials = await createDeviceSessionWithCredentials({
+          userId: user.id,
+          userAgent: request.headers.get('user-agent') ?? undefined,
+          user,
+        });
+        sessionId = credentials.sessionId;
+        return NextResponse.json(
+          {
+            token: credentials.token,
+            refreshToken: credentials.refreshToken,
+            expiresIn: credentials.expiresIn,
+            created: false,
+            ...(pendingLink ? { pendingLink } : {}),
+          },
+          { status: 200 }
+        );
+      }
+
+      sessionId = await createDeviceSession({
         userId: user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
-        user: user,
       });
-      return NextResponse.json(
-        {
-          token: credentials.token,
-          refreshToken: credentials.refreshToken,
-          expiresIn: credentials.expiresIn,
-          created: false,
-          ...(pendingLink ? { pendingLink } : {}),
-        },
-        { status: 200 }
-      );
-    }
 
-    return legacyTokenResponse({
-      user,
-      deviceSessionId: await createDeviceSession({
-        userId: user.id,
-        userAgent: request.headers.get('user-agent') ?? undefined,
-      }),
-      created: false,
-      ...(pendingLink ? { pendingLink } : {}),
-    });
+      return legacyTokenResponse({
+        user,
+        deviceSessionId: sessionId,
+        created: false,
+        ...(pendingLink ? { pendingLink } : {}),
+      });
+    } catch (error) {
+      await revokeAbandonedSession(sessionId);
+      throw error;
+    }
   }
 
   if (data.provider === 'apple') {
@@ -477,17 +502,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     // them must revoke what it created.
     let preparedSessionId: string | undefined;
     let preparedCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
-
-    const abandonPreparedCredentials = async () => {
-      if (!preparedSessionId) {
-        return;
-      }
-      try {
-        await revokeDeviceSession(preparedSessionId, 'sign_in_not_completed');
-      } catch {
-        captureMessage('native_token_session_cleanup_failed');
-      }
-    };
 
     try {
       const eligibility = await checkDomainSignInEligibility(email);
@@ -615,7 +629,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       if (!committed) {
         const consumed = await consumeSignInCode(data.email, data.code, data.challengeId);
         if (!consumed) {
-          await abandonPreparedCredentials();
+          await revokeAbandonedSession(preparedSessionId);
           return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
         }
         captureMessage('native_token_code_reservation_lapsed');
@@ -649,12 +663,16 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       });
     } catch (error) {
       // Nothing was delivered, so nothing minted for this request stays usable.
-      await abandonPreparedCredentials();
+      await revokeAbandonedSession(preparedSessionId);
       phase = 'release';
       throw error;
     } finally {
       if (phase === 'release') {
-        await releaseSignInCode(data.email, data.code, data.challengeId);
+        try {
+          await releaseSignInCode(data.email, data.code, data.challengeId);
+        } catch {
+          captureMessage('native_token_reservation_release_failed');
+        }
       }
     }
   }
@@ -690,6 +708,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   }
 
   // ── Step 6: Persist attested key after settlement ────────────────────────
+  let sessionId: string | undefined;
   let refreshCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
 
   // Cross-user ownership: a key bound to another account cannot sign this one
@@ -707,85 +726,91 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     return rateLimited;
   }
 
-  if (data.supportsRefresh) {
-    // Bind key persistence and session creation in one transaction.
-    try {
-      const combined = await createDeviceSessionWithAttestedKey({
+  try {
+    if (data.supportsRefresh) {
+      // Bind key persistence and session creation in one transaction.
+      try {
+        const combined = await createDeviceSessionWithAttestedKey({
+          userId: result.user.id,
+          userAgent: request.headers.get('user-agent') ?? undefined,
+          user: result.user,
+          verification: admissionVerification,
+        });
+        sessionId = combined.sessionId;
+        refreshCredentials = {
+          token: combined.token,
+          refreshToken: combined.refreshToken,
+          expiresIn: combined.expiresIn,
+        };
+      } catch (err) {
+        if (err instanceof KeyCollisionError) {
+          captureMessage('native_attested_key_cross_user_collision');
+          return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+        }
+        captureMessage('native_attested_key_persist_failed_after_settlement');
+      }
+    } else {
+      try {
+        await persistAttestedKey(result.user.id, admissionVerification);
+      } catch (err) {
+        if (err instanceof KeyCollisionError) {
+          captureMessage('native_attested_key_cross_user_collision');
+          return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+        }
+        captureMessage('native_attested_key_persist_failed_after_settlement');
+      }
+    }
+
+    // Emit deferred sign-in analytics after all gates pass.
+    if (result.deferredSignInEvent) {
+      posthogClient.capture(result.deferredSignInEvent);
+    }
+    const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, result.user.id);
+
+    if (refreshCredentials) {
+      return NextResponse.json(
+        {
+          token: refreshCredentials.token,
+          refreshToken: refreshCredentials.refreshToken,
+          expiresIn: refreshCredentials.expiresIn,
+          created: result.isNew,
+          ...(pendingLink ? { pendingLink } : {}),
+        },
+        { status: 200 }
+      );
+    }
+
+    if (data.supportsRefresh) {
+      const credentials = await createDeviceSessionWithCredentials({
         userId: result.user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
         user: result.user,
-        verification: admissionVerification,
       });
-      refreshCredentials = {
-        token: combined.token,
-        refreshToken: combined.refreshToken,
-        expiresIn: combined.expiresIn,
-      };
-    } catch (err) {
-      if (err instanceof KeyCollisionError) {
-        captureMessage('native_attested_key_cross_user_collision');
-        return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-      }
-      captureMessage('native_attested_key_persist_failed_after_settlement');
+      sessionId = credentials.sessionId;
+      return NextResponse.json(
+        {
+          token: credentials.token,
+          refreshToken: credentials.refreshToken,
+          expiresIn: credentials.expiresIn,
+          created: result.isNew,
+          ...(pendingLink ? { pendingLink } : {}),
+        },
+        { status: 200 }
+      );
     }
-  } else {
-    try {
-      await persistAttestedKey(result.user.id, admissionVerification);
-    } catch (err) {
-      if (err instanceof KeyCollisionError) {
-        captureMessage('native_attested_key_cross_user_collision');
-        return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-      }
-      captureMessage('native_attested_key_persist_failed_after_settlement');
-    }
-  }
 
-  // Emit deferred sign-in analytics after all gates pass.
-  if (result.deferredSignInEvent) {
-    posthogClient.capture(result.deferredSignInEvent);
-  }
-  const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, result.user.id);
-
-  if (refreshCredentials) {
-    return NextResponse.json(
-      {
-        token: refreshCredentials.token,
-        refreshToken: refreshCredentials.refreshToken,
-        expiresIn: refreshCredentials.expiresIn,
-        created: result.isNew,
-        ...(pendingLink ? { pendingLink } : {}),
-      },
-      { status: 200 }
-    );
-  }
-
-  if (data.supportsRefresh) {
-    // The attested-key path either returned its pair above or logged a
-    // persistence failure and fell through, so no prepared session exists here.
-    const credentials = await createDeviceSessionWithCredentials({
+    sessionId ??= await createDeviceSession({
       userId: result.user.id,
       userAgent: request.headers.get('user-agent') ?? undefined,
-      user: result.user,
     });
-    return NextResponse.json(
-      {
-        token: credentials.token,
-        refreshToken: credentials.refreshToken,
-        expiresIn: credentials.expiresIn,
-        created: result.isNew,
-        ...(pendingLink ? { pendingLink } : {}),
-      },
-      { status: 200 }
-    );
+    return legacyTokenResponse({
+      user: result.user,
+      deviceSessionId: sessionId,
+      created: result.isNew,
+      ...(pendingLink ? { pendingLink } : {}),
+    });
+  } catch (error) {
+    await revokeAbandonedSession(sessionId);
+    throw error;
   }
-
-  return legacyTokenResponse({
-    user: result.user,
-    deviceSessionId: await createDeviceSession({
-      userId: result.user.id,
-      userAgent: request.headers.get('user-agent') ?? undefined,
-    }),
-    created: result.isNew,
-    ...(pendingLink ? { pendingLink } : {}),
-  });
 });

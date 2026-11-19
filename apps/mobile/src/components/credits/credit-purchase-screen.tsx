@@ -497,6 +497,12 @@ export function CreditPurchaseScreen() {
                 // drops them when initialization fails), so even a priced row
                 // cannot complete: keep every row disabled until it reconnects.
                 const disabled = purchasing || !connected || !hasStorePrice;
+                // A disabled row recedes by its own labels, never by its whole
+                // surface: the title and price sit at reduced foreground ink (70%),
+                // which still outranks the muted ink of the note under them, so the
+                // title stays the strongest line while the row reads lighter than an
+                // enabled one. The note keeps its muted ink at full strength.
+                const labelClass = disabled ? 'text-foreground opacity-70' : 'text-foreground';
                 // The trailing slot holds the store price only: it keeps its one
                 // line and its full width, so the title yields and a price a user
                 // pays is never truncated.
@@ -541,15 +547,19 @@ export function CreditPurchaseScreen() {
                   .join(', ');
 
                 return (
+                  // A disabled row recedes by its own labels, never by its shell:
+                  // the title and the price sit at reduced foreground ink (70%),
+                  // above the muted ink of the one line under them, so the title
+                  // stays the row's strongest line while the note still states
+                  // when the credits expire at full muted strength. The row's
+                  // shell, border, padding, accessibility label and
+                  // accessibilityState do not change.
                   <Pressable
                     key={pack.backend.appleProductId}
                     accessibilityLabel={rowAccessibilityLabel}
                     accessibilityRole="button"
                     accessibilityState={{ busy: rowCompleting, disabled }}
-                    className={cn(
-                      'justify-center rounded-xl border border-border bg-card px-5 active:opacity-80',
-                      disabled && 'opacity-50'
-                    )}
+                    className="justify-center rounded-xl border border-border bg-card px-5 active:opacity-80"
                     disabled={disabled}
                     onPress={() => {
                       handlePackPress(pack);
@@ -561,11 +571,16 @@ export function CreditPurchaseScreen() {
                         reserves, so a longer pack name truncates instead of
                         growing the row. */}
                     <View className="flex-row items-start justify-between gap-4">
-                      <Text className="flex-1 font-semibold text-foreground" numberOfLines={1}>
+                      <Text className={cn('flex-1 font-semibold', labelClass)} numberOfLines={1}>
                         {packLabel}
                       </Text>
                       {storePrice !== null && (
-                        <Text className="shrink-0 text-base font-semibold text-foreground tabular-nums">
+                        <Text
+                          className={cn(
+                            'shrink-0 text-base font-semibold tabular-nums',
+                            labelClass
+                          )}
+                        >
                           {storePrice}
                         </Text>
                       )}

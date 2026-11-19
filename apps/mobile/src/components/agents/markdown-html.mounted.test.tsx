@@ -109,6 +109,8 @@ const palette: MarkdownPalette = {
   textColor: '#111111',
   mutedTextColor: '#666666',
   codeBackground: '#eeeeee',
+  codeSurface: '#eeeeee',
+  diagramSurface: '#eeeeee',
   borderColor: '#cccccc',
 };
 

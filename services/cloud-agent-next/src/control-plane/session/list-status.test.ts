@@ -166,6 +166,31 @@ describe('session-list status outbox', () => {
     ]);
   });
 
+  it.each(['idle', 'question', 'permission', 'failed'] as const)(
+    'refreshes newer transcript activity under an unchanged %s status at most once per minute',
+    async status => {
+      const { outbox, publish } = fixture();
+      const refreshedActivityAt = 1500 + LIST_STATUS_REFRESH_MS;
+      outbox.record(identity, status, 1000, { activityAt: 900 });
+      await outbox.repair(1000);
+      outbox.record(identity, status, 1000 + LIST_STATUS_REFRESH_MS - 1, { activityAt: 1500 });
+      await outbox.repair(1000 + LIST_STATUS_REFRESH_MS - 1);
+      outbox.record(identity, status, 1000 + LIST_STATUS_REFRESH_MS, {
+        activityAt: refreshedActivityAt,
+      });
+      await outbox.repair(1000 + LIST_STATUS_REFRESH_MS);
+      // Without newer activity the status is not refreshed on a timer.
+      outbox.record(identity, status, 1000 + 3 * LIST_STATUS_REFRESH_MS, {
+        activityAt: refreshedActivityAt,
+      });
+      await outbox.repair(1000 + 3 * LIST_STATUS_REFRESH_MS);
+      expect(publish.mock.calls.map(([update]) => [update.status, update.lastActivityAt])).toEqual([
+        [status, new Date(900).toISOString()],
+        [status, new Date(refreshedActivityAt).toISOString()],
+      ]);
+    }
+  );
+
   it('publishes a native rename without waiting for the next status change', async () => {
     const { outbox, publish } = fixture();
     outbox.record(identity, 'busy', 1000);

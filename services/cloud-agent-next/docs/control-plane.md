@@ -2317,8 +2317,11 @@ Kilo v2 has no session-ingest client, so the same publication also carries what 
 client writes for Kilo v1. `lastActivityAt` is the receipt time of the latest event
 that wrote the transcript (`TRANSCRIPT_EVENT_TYPES` in `list-status.ts`); ingest
 moves `cli_sessions_v2.last_activity_at` forward only, which keeps a working chat in
-the active-session list and dates its row. It rides status changes and busy/retry
-refreshes and never triggers a publication itself. `rename` is a native rename of the
+the active-session list and dates its row. It rides status changes and refreshes,
+each at most once a minute: busy and retry refresh on any event, and any other
+status refreshes when transcript activity is newer than the last snapshot, so a
+wait on input while subagents keep working still proves the session live.
+`rename` is a native rename of the
 root: a `conversation.source` whose session title differs from the stored source and
 is not a creation placeholder. A rename forces a snapshot and stays in newer snapshots
 until one is delivered, naming the snapshot that first carried it. Ingest applies it

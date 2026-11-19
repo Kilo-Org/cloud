@@ -105,12 +105,19 @@ export function createSessionListStatusOutbox(input: {
     observed: { activityAt?: number; title?: string } = {}
   ): void {
     const previous = current();
+    const recordedActivityAt =
+      previous?.update.lastActivityAt === undefined
+        ? -Infinity
+        : Date.parse(previous.update.lastActivityAt);
+    const activityAt = Math.max(observed.activityAt ?? -Infinity, recordedActivityAt);
     // Refresh on observed activity, not a timer that would keep a silent or
-    // disconnected runtime looking fresh indefinitely.
+    // disconnected runtime looking fresh indefinitely. Busy and retry refresh on
+    // any event; other statuses on newer transcript activity, so a wait on input
+    // while subagents keep working still proves the session live.
     if (
       observed.title === undefined &&
       previous?.update.status === status &&
-      ((status !== 'busy' && status !== 'retry') ||
+      ((status !== 'busy' && status !== 'retry' && activityAt <= recordedActivityAt) ||
         now - Date.parse(previous.update.occurredAt) < LIST_STATUS_REFRESH_MS)
     )
       return;
@@ -119,12 +126,6 @@ export function createSessionListStatusOutbox(input: {
     const at = Math.max(
       now,
       previous === undefined ? 0 : decodeTime(previous.update.transitionId) + 1
-    );
-    const activityAt = Math.max(
-      observed.activityAt ?? -Infinity,
-      previous?.update.lastActivityAt === undefined
-        ? -Infinity
-        : Date.parse(previous.update.lastActivityAt)
     );
     const transitionId = ulid(at);
     const rename =

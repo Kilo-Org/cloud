@@ -227,10 +227,17 @@ export function RowFrame({
     // label (a preference row). A content press that opens a surface of its own
     // is named instead, so a reader reaches both controls.
     const contentOwnsName = contentAccessibilityLabel !== undefined;
+    // A label-only press leaves the accessibility tree on both platforms, and
+    // `focusable={false}` drops the native click listener `Pressable` installs by
+    // default: without it Android keeps a clickable, role-less node beside the
+    // switch (a second focus stop for a keyboard, and for any reader that
+    // includes views marked unimportant). The touch still reaches `onPress`.
     const contentProps = {
       onPress,
       disabled,
       accessible: contentOwnsName,
+      focusable: contentOwnsName,
+      accessibilityElementsHidden: !contentOwnsName,
       importantForAccessibility: contentOwnsName
         ? ('yes' as const)
         : ('no-hide-descendants' as const),

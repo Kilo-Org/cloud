@@ -51,17 +51,55 @@ export function isPaidOrganizationSeatSubscriptionStatus(
   return paidSeatSubscriptionStatuses.has(status);
 }
 
-// Keep this type in step with the provider's subscription status registry and
-// the stored value the seat-purchase writer records.
+/**
+ * Keep this list in step with the provider's subscription status registry and
+ * the value the seat-purchase writer records (`organization-seats.ts` stores
+ * the provider's `subscription.status`, or `'ended'`).
+ */
+export const ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES = [
+  'active',
+  'trialing',
+  'past_due',
+  'ended',
+  'incomplete',
+  'incomplete_expired',
+  'canceled',
+  'unpaid',
+  'paused',
+] as const;
+
+export type KnownOrganizationSeatPurchaseSubscriptionStatus =
+  (typeof ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES)[number];
+
+/**
+ * Sentinel for a stored seat-purchase status that is not in the known set. It
+ * is never a paying state, so trial enforcement stays in force exactly as an
+ * unknown raw string did before.
+ */
+export const UNRECOGNIZED_ORGANIZATION_SEAT_PURCHASE_STATUS = 'unrecognized' as const;
+
 export type OrganizationSeatPurchaseSubscriptionStatus =
-  | PaidOrganizationSeatSubscriptionStatus
-  | 'ended'
-  | 'incomplete'
-  | 'incomplete_expired'
-  | 'canceled'
-  | 'unpaid'
-  | 'paused'
-  | (string & {});
+  | KnownOrganizationSeatPurchaseSubscriptionStatus
+  | typeof UNRECOGNIZED_ORGANIZATION_SEAT_PURCHASE_STATUS;
+
+const knownSeatPurchaseSubscriptionStatuses: ReadonlySet<string> = new Set(
+  ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES
+);
+
+export function isKnownOrganizationSeatPurchaseSubscriptionStatus(
+  status: string
+): status is KnownOrganizationSeatPurchaseSubscriptionStatus {
+  return knownSeatPurchaseSubscriptionStatuses.has(status);
+}
+
+/** Narrows one stored seat-purchase status from the database. */
+export function toOrganizationSeatPurchaseSubscriptionStatus(
+  status: string
+): OrganizationSeatPurchaseSubscriptionStatus {
+  return isKnownOrganizationSeatPurchaseSubscriptionStatus(status)
+    ? status
+    : UNRECOGNIZED_ORGANIZATION_SEAT_PURCHASE_STATUS;
+}
 
 export type OrganizationEntitlementSettings = {
   suppress_trial_messaging?: boolean;
@@ -77,6 +115,13 @@ export type OrganizationEntitlementOrganization = {
 
 export type OrganizationEntitlementInput = {
   organization: OrganizationEntitlementOrganization;
-  latestSeatPurchaseStatus: OrganizationSeatPurchaseSubscriptionStatus | null;
+  /**
+   * The stored seat-purchase status, exactly as the database holds it. The
+   * column's type is the provider's open status set, so this boundary takes the
+   * raw string and narrows it once through
+   * {@link toOrganizationSeatPurchaseSubscriptionStatus}; nothing downstream
+   * handles an arbitrary string.
+   */
+  latestSeatPurchaseStatus: string | null;
   now: Date;
 };

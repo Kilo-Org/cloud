@@ -4114,6 +4114,8 @@
       "downloading": "Qed jitniżżel: {{written}} minn {{total}}",
       "downloadingUnknown": "Qed jitniżżel: {{written}}",
       "paused": "Ippawżat: {{written}} minn {{total}}",
+      "retrying": "Qed jerġa' jipprova: {{written}} minn {{total}}",
+      "retryingUnknown": "Qed jerġa' jipprova: {{written}}",
       "verifying": "Qed jiġi vverifikat il-fajl imniżżel…",
       "downloaded": "Imniżżel · {{size}}",
       "url": "Link dirett għat-tniżżil",
@@ -4204,7 +4206,9 @@
         "androidModelUnavailable": "Dan l-apparat ma jappoġġjax Gemini Nano, jew l-app tas-sistema AICore għadha qed titħejja. Erġa' pprova aktar tard.",
         "aicoreUpdateRequired": "Aġġorna l-app AICore u s-software tas-sistema biex tuża dan il-mudell.",
         "downloadable": "Dan il-mudell jeħtieġ jitniżżel darba qabel ma tkun tista' tużah.",
-        "downloading": "Il-mudell qed jitniżżel. Ikun lest meta jispiċċa t-tniżżil."
+        "downloading": "Il-mudell qed jitniżżel. Ikun lest meta jispiċċa t-tniżżil.",
+        "batteryQuota": "Il-mudell fuq l-apparat uża l-kwota tal-batterija tiegħu għal issa. Erġa' pprova aktar tard.",
+        "checkFailed": "L-app ma setgħetx tiċċekkja dan il-mudell. Erġa' pprova."
       },
       "unavailable": "Il-mudell fuq l-apparat mhux disponibbli bħalissa. Iċċekkja l-istatus tiegħu f'$t(modelChat.backends.title).",
       "busy": "Il-mudell fuq l-apparat għadu qed iwieġeb messaġġ ieħor. Erġa' pprova meta jispiċċa.",

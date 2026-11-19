@@ -4053,6 +4053,8 @@
       "downloading": "Sťahovanie: {{written}} z {{total}}",
       "downloadingUnknown": "Sťahovanie: {{written}}",
       "paused": "Pozastavené: {{written}} z {{total}}",
+      "retrying": "Opakovanie: {{written}} z {{total}}",
+      "retryingUnknown": "Opakovanie: {{written}}",
       "verifying": "Kontrola stiahnutého súboru…",
       "downloaded": "Stiahnuté · {{size}}",
       "url": "Priamy odkaz na stiahnutie",
@@ -4143,7 +4145,9 @@
         "androidModelUnavailable": "Toto zariadenie nepodporuje Gemini Nano alebo sa systémová aplikácia AICore ešte nastavuje. Skúste to neskôr.",
         "aicoreUpdateRequired": "Ak chcete použiť tento model, aktualizujte aplikáciu AICore a systémový softvér.",
         "downloadable": "Pred prvým použitím je potrebné tento model jednorazovo stiahnuť.",
-        "downloading": "Model sa sťahuje. Bude pripravený po dokončení sťahovania."
+        "downloading": "Model sa sťahuje. Bude pripravený po dokončení sťahovania.",
+        "batteryQuota": "Model v zariadení vyčerpal povolený limit batérie. Skúste to neskôr.",
+        "checkFailed": "Aplikácia nemohla skontrolovať tento model. Skúste to znova."
       },
       "unavailable": "Model v zariadení momentálne nie je dostupný. Skontrolujte jeho stav v sekcii $t(modelChat.backends.title).",
       "busy": "Model v zariadení práve generuje inú odpoveď. Skúste to znova, keď skončí.",

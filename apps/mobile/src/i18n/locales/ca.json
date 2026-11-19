@@ -3992,6 +3992,8 @@
       "downloading": "S'està descarregant: {{written}} de {{total}}",
       "downloadingUnknown": "S'està descarregant: {{written}}",
       "paused": "En pausa: {{written}} de {{total}}",
+      "retrying": "S'està reintentant: {{written}} de {{total}}",
+      "retryingUnknown": "S'està reintentant: {{written}}",
       "verifying": "S'està comprovant el fitxer descarregat…",
       "downloaded": "Descarregat · {{size}}",
       "url": "Enllaç de descàrrega directa",
@@ -4082,7 +4084,9 @@
         "androidModelUnavailable": "Aquest dispositiu no és compatible amb Gemini Nano, o l'aplicació del sistema AICore encara s'està configurant. Torna-ho a provar més tard.",
         "aicoreUpdateRequired": "Actualitza l'aplicació AICore i el programari del sistema per fer servir aquest model.",
         "downloadable": "Cal baixar aquest model una sola vegada abans de poder-lo fer servir.",
-        "downloading": "El model s'està baixant. Estarà a punt quan acabi la baixada."
+        "downloading": "El model s'està baixant. Estarà a punt quan acabi la baixada.",
+        "batteryQuota": "El model al dispositiu ha esgotat la quota de bateria per ara. Torna-ho a provar més tard.",
+        "checkFailed": "L'app no ha pogut comprovar aquest model. Torna-ho a provar."
       },
       "unavailable": "El model al dispositiu no està disponible ara mateix. Comprova'n l'estat a $t(modelChat.backends.title).",
       "busy": "El model al dispositiu està ocupat amb una altra resposta. Torna-ho a provar quan acabi.",

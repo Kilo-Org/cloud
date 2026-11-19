@@ -4114,6 +4114,8 @@
       "downloading": "Á íoslódáil: {{written}} as {{total}}",
       "downloadingUnknown": "Á íoslódáil: {{written}}",
       "paused": "Ar sos: {{written}} as {{total}}",
+      "retrying": "Ag triail arís: {{written}} as {{total}}",
+      "retryingUnknown": "Ag triail arís: {{written}}",
       "verifying": "Ag seiceáil an chomhaid íoslódáilte…",
       "downloaded": "Íoslódáilte · {{size}}",
       "url": "Nasc íoslódála díreach",
@@ -4204,7 +4206,9 @@
         "androidModelUnavailable": "Ní thacaíonn an gléas seo le Gemini Nano, nó tá aip chórais AICore fós á socrú. Bain triail eile as ar ball.",
         "aicoreUpdateRequired": "Nuashonraigh an aip AICore agus bogearraí do chórais chun an tsamhail seo a úsáid.",
         "downloadable": "Ní mór an tsamhail seo a íoslódáil uair amháin sula féidir leat í a úsáid.",
-        "downloading": "Tá an tsamhail á híoslódáil. Beidh sí réidh nuair a bheidh an íoslódáil críochnaithe."
+        "downloading": "Tá an tsamhail á híoslódáil. Beidh sí réidh nuair a bheidh an íoslódáil críochnaithe.",
+        "batteryQuota": "Tá an tsamhail ar an ngléas tar éis a lamháltas ceallra a úsáid suas faoi láthair. Bain triail eile as ar ball.",
+        "checkFailed": "Níorbh fhéidir leis an aip an tsamhail seo a sheiceáil. Bain triail eile as."
       },
       "unavailable": "Níl an tsamhail ar an ngléas ar fáil faoi láthair. Seiceáil a stádas in $t(modelChat.backends.title).",
       "busy": "Tá an tsamhail ar an ngléas gnóthach le freagra eile. Bain triail eile as nuair a bheidh sé críochnaithe.",

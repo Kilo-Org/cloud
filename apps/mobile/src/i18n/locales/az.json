@@ -3931,6 +3931,8 @@
       "downloading": "Yüklənir: {{written}} / {{total}}",
       "downloadingUnknown": "Yüklənir: {{written}}",
       "paused": "Dayandırıldı: {{written}} / {{total}}",
+      "retrying": "Yenidən cəhd edilir: {{written}} / {{total}}",
+      "retryingUnknown": "Yenidən cəhd edilir: {{written}}",
       "verifying": "Yüklənmiş fayl yoxlanılır…",
       "downloaded": "Yükləndi · {{size}}",
       "url": "Birbaşa yükləmə linki",
@@ -4021,7 +4023,9 @@
         "androidModelUnavailable": "Bu cihaz Gemini Nano-nu dəstəkləmir və ya AICore sistem tətbiqi hələ quraşdırılır. Sonra yenidən cəhd edin.",
         "aicoreUpdateRequired": "Bu modeldən istifadə etmək üçün AICore tətbiqini və sistem proqram təminatını yeniləyin.",
         "downloadable": "Bu modeldən istifadə etməzdən əvvəl onu bir dəfə endirmək lazımdır.",
-        "downloading": "Model endirilir. Endirmə bitdikdən sonra istifadəyə hazır olacaq."
+        "downloading": "Model endirilir. Endirmə bitdikdən sonra istifadəyə hazır olacaq.",
+        "batteryQuota": "Cihazdakı model batareya kvotasını hazırda tükədib. Daha sonra yenidən cəhd edin.",
+        "checkFailed": "Tətbiq bu modeli yoxlaya bilmədi. Yenidən cəhd edin."
       },
       "unavailable": "Cihazdakı model hazırda əlçatan deyil. Onun statusunu $t(modelChat.backends.title) bölməsində yoxlayın.",
       "busy": "Cihazdakı model başqa cavabla məşğuldur. O bitdikdən sonra yenidən cəhd edin.",

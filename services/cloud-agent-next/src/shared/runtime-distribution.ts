@@ -79,6 +79,8 @@ export const GIT_CREDENTIAL_HELPER = {
 } as const;
 
 export const RUNTIME_INSTALL_DIR = '/usr/local/bin';
+/** The bootstrap starts the supervisor, and so Kilo, with only this `PATH`. */
+export const RUNTIME_PROCESS_PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
 export const RUNTIME_RESERVED_ROOT = '/opt/kilo-cloud';
 
 export function runtimeInstallPath(installName: string): string {
@@ -91,16 +93,22 @@ export function wrapperBundle(entry: string): WrapperBundle {
   return bundle;
 }
 
-export const RUNTIME_REQUIRED_BINARIES = [
+/**
+ * Commands every runtime base (the Cloudflare runtime-free image and the Vercel
+ * base snapshot) must resolve on `RUNTIME_PROCESS_PATH`. The downloaded release
+ * adds `kilo`; no base carries it.
+ */
+export const BASE_REQUIRED_BINARIES = [
   'bun',
   'node',
+  'npm',
+  'npx',
   'pnpm',
   'git',
   'git-lfs',
   'gh',
   'glab',
   'rg',
-  'kilo',
 ] as const;
 
 /** The bootstrap owns this value. User or profile env must not select the runtime. */

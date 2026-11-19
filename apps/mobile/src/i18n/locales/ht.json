@@ -3931,6 +3931,8 @@
       "downloading": "Ap telechaje: {{written}} sou {{total}}",
       "downloadingUnknown": "Ap telechaje: {{written}}",
       "paused": "An pòz: {{written}} sou {{total}}",
+      "retrying": "N ap eseye ankò: {{written}} sou {{total}}",
+      "retryingUnknown": "N ap eseye ankò: {{written}}",
       "verifying": "Ap verifye fichye ki telechaje a…",
       "downloaded": "Telechaje · {{size}}",
       "url": "Lyen telechajman dirèk",
@@ -4021,7 +4023,9 @@
         "androidModelUnavailable": "Aparèy sa a pa sipòte Gemini Nano, oswa aplikasyon sistèm AICore a toujou ap prepare. Eseye ankò pita.",
         "aicoreUpdateRequired": "Mete aplikasyon AICore a ak lojisyèl sistèm ou a ajou pou w ka sèvi ak modèl sa a.",
         "downloadable": "Fòk ou telechaje modèl sa a yon sèl fwa anvan ou ka sèvi avè l.",
-        "downloading": "Modèl la ap telechaje. L ap pare lè telechajman an fini."
+        "downloading": "Modèl la ap telechaje. L ap pare lè telechajman an fini.",
+        "batteryQuota": "Modèl sou aparèy la fin itilize kota batri li pou kounye a. Eseye ankò pita.",
+        "checkFailed": "Aplikesyon an pa t ka tcheke modèl sa a. Eseye ankò."
       },
       "unavailable": "Modèl sou aparèy la pa disponib kounye a. Verifye estati li nan $t(modelChat.backends.title).",
       "busy": "Modèl sou aparèy la okipe ak yon lòt repons. Eseye ankò lè li fini.",

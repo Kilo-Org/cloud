@@ -3931,6 +3931,8 @@
       "downloading": "Ń gbà sílẹ̀: {{written}} nínú {{total}}",
       "downloadingUnknown": "Ń gbà sílẹ̀: {{written}}",
       "paused": "Dúró: {{written}} nínú {{total}}",
+      "retrying": "Ń gbìyànjú lẹ́ẹ̀kan sí i: {{written}} nínú {{total}}",
+      "retryingUnknown": "Ń gbìyànjú lẹ́ẹ̀kan sí i: {{written}}",
       "verifying": "Ń yẹ fáìlì tí a gbà sílẹ̀ wò…",
       "downloaded": "Ti gbà sílẹ̀ · {{size}}",
       "url": "Ìjápọ̀ ìgbà sílẹ̀ tààrà",
@@ -4021,7 +4023,9 @@
         "androidModelUnavailable": "Ẹ̀rọ yìí kò ṣe àtìlẹ́yìn fún Gemini Nano, tàbí áàpù ètò AICore ṣì ń múra sílẹ̀. Gbìyànjú lẹ́ẹ̀kan sí i nígbà míì.",
         "aicoreUpdateRequired": "Ṣe àtúnṣe áàpù AICore àti sọ́fítíwọ̀ ètò rẹ kí o tó lè lo awoṣe yìí.",
         "downloadable": "Awoṣe yìí nílò ìgbàsílẹ̀ ẹ̀ẹ̀kan ṣoṣo kí o tó lè lò ó.",
-        "downloading": "Awoṣe náà ń gbà sílẹ̀. Yóò ṣetán tí ìgbàsílẹ̀ bá parí."
+        "downloading": "Awoṣe náà ń gbà sílẹ̀. Yóò ṣetán tí ìgbàsílẹ̀ bá parí.",
+        "batteryQuota": "Awoṣe lórí ẹ̀rọ ti lo ìpín bátírì tí a fún òun fún ìgbà yìí. Gbìyànjú lẹ́ẹ̀kan sí i nígbà míì.",
+        "checkFailed": "App kò lè yẹ awoṣe yìí wò. Gbìyànjú lẹ́ẹ̀kan sí i."
       },
       "unavailable": "Awoṣe lórí ẹ̀rọ kò sí lárọ̀ọ́wọ́tó báyìí. Ṣàyẹ̀wò ipò rẹ̀ nínú $t(modelChat.backends.title).",
       "busy": "Awoṣe lórí ẹ̀rọ ń dá èsì míì lọ́wọ́. Gbìyànjú lẹ́ẹ̀kan sí i tí ó bá parí.",

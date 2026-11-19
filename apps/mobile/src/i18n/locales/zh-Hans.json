@@ -3931,6 +3931,8 @@
       "downloading": "正在下载：{{written}} / {{total}}",
       "downloadingUnknown": "正在下载：{{written}}",
       "paused": "已暂停：{{written}} / {{total}}",
+      "retrying": "正在重试：{{written}} / {{total}}",
+      "retryingUnknown": "正在重试：{{written}}",
       "verifying": "正在检查下载的文件…",
       "downloaded": "已下载 · {{size}}",
       "url": "直接下载链接",
@@ -4021,7 +4023,9 @@
         "androidModelUnavailable": "此设备不支持 Gemini Nano，或 AICore 系统应用仍在设置中。请稍后再试。",
         "aicoreUpdateRequired": "请更新 AICore 应用和系统软件后再使用此模型。",
         "downloadable": "此模型需要先下载一次才能使用。",
-        "downloading": "模型正在下载，下载完成后即可使用。"
+        "downloading": "模型正在下载，下载完成后即可使用。",
+        "batteryQuota": "本机模型已用完当前的电池用量额度。请稍后再试。",
+        "checkFailed": "应用无法检查此模型。请重试。"
       },
       "unavailable": "本机模型目前不可用。请在“$t(modelChat.backends.title)”中查看其状态。",
       "busy": "本机模型正忙于生成另一条回复，请在其完成后再试。",

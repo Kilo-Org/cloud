@@ -1,3 +1,4 @@
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import type { AgentSandboxProvider } from '../../types.js';
 import type { AllocationKind } from './allocation.js';
 import type { RouteRecord } from './routes.js';
@@ -48,7 +49,7 @@ export type PreviewTargetSnapshot = {
 export function resolvePreviewTarget(snapshot: PreviewTargetSnapshot): PreviewTargetResult {
   // Vercel has no preview upstream, and the retired Cloudflare Sandbox runtime
   // is not started for any allocation, including a persisted one.
-  if (snapshot.provider === 'vercel' || snapshot.provider === 'cloudflare') {
+  if (!providerSupports(snapshot.provider, 'preview')) {
     return { status: 'unsupported_provider' };
   }
 

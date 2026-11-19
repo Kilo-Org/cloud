@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { Skeleton } from '@/components/ui/skeleton';
-import { isolateLtrBidiText } from '@/lib/bidi';
+import { isolateBidiText, isolateLtrBidiText } from '@/lib/bidi';
 import { transcriptText } from '@/lib/native-remote/projections';
 import { type NativeRemoteSession } from '@/lib/native-remote/use-native-session';
 import { NativeRemoteQuestion } from './native-remote-question';
@@ -72,7 +72,10 @@ export function NativeRemoteTranscript({
             ))}
           </View>
           {permission.message ? (
-            <Text>{isolateLtrBidiText(displaySafeText(permission.message))}</Text>
+            // The message is prose, so it keeps the direction of its own first
+            // strong character; the action and resources are machine values and
+            // stay pinned left to right.
+            <Text>{isolateBidiText(displaySafeText(permission.message))}</Text>
           ) : null}
           <View className="flex-row flex-wrap gap-2">
             <Button

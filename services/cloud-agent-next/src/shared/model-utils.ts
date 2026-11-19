@@ -1,4 +1,4 @@
-export const LOCAL_FAKE_DETERMINISTIC_MODEL_ID = 'fake-deterministic';
+import { LOCAL_FAKE_DETERMINISTIC_MODEL_ID } from '@kilocode/app-shared/local-fake-llm';
 
 export function normalizeKilocodeModel(model: string | undefined | null): string | undefined {
   if (!model) return undefined;

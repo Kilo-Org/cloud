@@ -15,6 +15,12 @@
 
 import { createHash } from 'node:crypto';
 
+import {
+  LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
+  LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS,
+  type LocalFakeTranscriptionModelId,
+} from '@kilocode/app-shared/local-fake-llm';
+
 import { isAdminAuthorized } from './fake-llm-admin.js';
 import { supervisionScenario } from './fake-llm-supervision.js';
 import { backgroundActivityScenario } from './fake-llm-background-activity.js';
@@ -956,7 +962,7 @@ function readFileContents(result: string): string {
  * this model as `kilo/fake-deterministic` (provider prefix + bare id).
  */
 const FAKE_MODEL = {
-  id: 'fake-deterministic',
+  id: LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
   name: 'Fake Deterministic',
   description: 'Deterministic fake model for cloud-agent E2E harness.',
   context_length: 200000,
@@ -980,30 +986,35 @@ function modelsCatalogue(): { data: Array<typeof FAKE_MODEL> } {
 
 /**
  * Speech-to-text catalogue served for `GET /api/openrouter/models` with
- * `output_modalities=transcription`. Two ids: the happy path the mobile e2e
- * scenarios address, and a broken one whose transcription request 404s so the
- * non-retryable unhappy state is provable without an upstream key.
+ * `output_modalities=transcription`. The ids come from the shared list the web
+ * gateway routes to this fake, so a rename cannot leave a stale copy here; the
+ * metadata record below must name every shared id, and only those.
+ *
+ * Field order matches the previously served bytes: `name` and `description`
+ * are taken by name because the shared record holds them without `created`
+ * between them.
  */
-const TRANSCRIPTION_MODELS = [
-  {
-    id: 'fake-transcribe',
+const TRANSCRIPTION_MODEL_METADATA: Record<
+  LocalFakeTranscriptionModelId,
+  { name: string; description: string }
+> = {
+  'fake-transcribe': {
     name: 'Fake Transcribe',
-    created: 0,
     description: 'Deterministic fake speech-to-text model for cloud-agent E2E harness.',
-    architecture: {
-      input_modalities: ['audio'],
-      output_modalities: ['text'],
-      tokenizer: 'fake',
-    },
-    top_provider: { is_moderated: false, context_length: 128000 },
-    context_length: 128000,
-    pricing: { prompt: '0', completion: '0' },
   },
-  {
-    id: 'fake-transcribe-broken',
+  'fake-transcribe-broken': {
     name: 'Broken Transcriber',
-    created: 0,
     description: 'Fake speech-to-text model whose transcription request 404s.',
+  },
+};
+
+const TRANSCRIPTION_MODELS = LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS.map(id => {
+  const metadata = TRANSCRIPTION_MODEL_METADATA[id];
+  return {
+    id,
+    name: metadata.name,
+    created: 0,
+    description: metadata.description,
     architecture: {
       input_modalities: ['audio'],
       output_modalities: ['text'],
@@ -1012,8 +1023,11 @@ const TRANSCRIPTION_MODELS = [
     top_provider: { is_moderated: false, context_length: 128000 },
     context_length: 128000,
     pricing: { prompt: '0', completion: '0' },
-  },
-];
+  };
+});
+
+/** The shared id whose transcription request 404s. */
+const BROKEN_TRANSCRIPTION_MODEL_ID: LocalFakeTranscriptionModelId = 'fake-transcribe-broken';
 
 type ToolCallDelta = {
   index: number;
@@ -2132,7 +2146,7 @@ async function handleAudioTranscriptions(
     fail(400, 'model field is required', 'invalid_request', 'missing-model');
     return;
   }
-  if (model === 'fake-transcribe-broken') {
+  if (model === BROKEN_TRANSCRIPTION_MODEL_ID) {
     fail(404, `model not found: ${model}`, 'model_not_found', 'model-not-found');
     return;
   }

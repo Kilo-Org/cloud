@@ -18,6 +18,8 @@ import { canManageOrganization } from '@kilocode/app-shared/organizations';
 type FreeTrialWarningBannerProps = {
   organization: OrganizationWithMembersResponse;
   daysRemaining: number;
+  /** False when the organization was never given a trial window. */
+  hasTrialWindow: boolean;
   userRole: OrganizationRole;
   onUpgradeClick: () => void;
 };
@@ -98,9 +100,15 @@ function getButtonVariantForState(state: OrganizationTrialDisplayStatus): Button
   }
 }
 
-function getTrialMessage(daysRemaining: number, isOwner: boolean): string {
+function getTrialMessage(daysRemaining: number, isOwner: boolean, hasTrialWindow: boolean): string {
   const ownerPrefix = isOwner ? 'Your' : "Your organization's";
   const contactOwner = isOwner ? '' : ' Contact an owner to create a subscription.';
+
+  // An organization that was never given a trial has nothing to count down, so
+  // it reports the missing plan instead of a misleading elapsed count.
+  if (!hasTrialWindow) {
+    return `${ownerPrefix} organization does not include a free trial.${contactOwner}`;
+  }
 
   if (daysRemaining === 0) {
     return `${ownerPrefix} trial ends today.${contactOwner}`;
@@ -122,6 +130,7 @@ function getTrialMessage(daysRemaining: number, isOwner: boolean): string {
 export function FreeTrialWarningBanner({
   organization,
   daysRemaining,
+  hasTrialWindow,
   userRole,
   onUpgradeClick,
 }: FreeTrialWarningBannerProps) {
@@ -130,7 +139,8 @@ export function FreeTrialWarningBanner({
   const styles = getStylesForState(state, planName);
   const canManage = canManageOrganization(userRole);
   const buttonVariant = getButtonVariantForState(state);
-  const message = getTrialMessage(daysRemaining, canManage);
+  const message = getTrialMessage(daysRemaining, canManage, hasTrialWindow);
+  const title = hasTrialWindow ? styles.title : `Free Kilo ${planName} Trial Not Included`;
   const pathname = usePathname();
   const shouldShowUpgradeButton = canManage && !pathname.endsWith('/subscriptions');
 
@@ -151,7 +161,7 @@ export function FreeTrialWarningBanner({
       {/* Content */}
       <div className="flex-1">
         <div className="mb-1 flex items-center gap-2 text-sm">
-          <span className="font-bold">{styles.title}</span>
+          <span className="font-bold">{title}</span>
           {daysRemaining > 0 && (
             <span className="flex gap-1 opacity-70">
               <span>•</span>

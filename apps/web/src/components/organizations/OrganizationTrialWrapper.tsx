@@ -47,6 +47,11 @@ export function OrganizationTrialWrapper({
   const isLocked = !isTrialLoading && isStatusReadOnly(trialStatus);
   const daysRemaining =
     classification === 'loading' || classification === 'error' ? 0 : classification.daysRemaining;
+  // An organization created without a trial has no window to report on, so the
+  // banner and the lock dialog describe the missing plan rather than elapsed days.
+  const hasTrialWindow =
+    organizationData != null &&
+    !(organizationData.trial_granted === false && organizationData.free_trial_end_at == null);
 
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role;
 
@@ -71,6 +76,7 @@ export function OrganizationTrialWrapper({
           <FreeTrialWarningDialog
             trialStatus={trialStatus}
             daysExpired={Math.abs(daysRemaining)}
+            hasTrialWindow={hasTrialWindow}
             organization={organizationData}
             onClose={
               trialStatus === 'trial_expired_soft' ? () => setSoftLockDismissed(true) : undefined
@@ -95,6 +101,7 @@ export function OrganizationTrialWrapper({
             <FreeTrialWarningBanner
               organization={organizationData}
               daysRemaining={daysRemaining}
+              hasTrialWindow={hasTrialWindow}
               userRole={currentRole}
               onUpgradeClick={() => setShowUpgradeDialog(true)}
             />

@@ -16,6 +16,8 @@ import type { OrganizationTrialDisplayStatus } from '@kilocode/web-shared/lib/or
 type FreeTrialWarningDialogProps = {
   trialStatus: OrganizationTrialDisplayStatus;
   daysExpired: number;
+  /** False when the organization was never given a trial window. */
+  hasTrialWindow: boolean;
   organization: OrganizationWithMembersResponse;
   onClose?: () => void;
   onUpgradeClick: () => void;
@@ -26,6 +28,7 @@ type FreeTrialWarningDialogProps = {
 export function FreeTrialWarningDialog({
   trialStatus,
   daysExpired,
+  hasTrialWindow,
   organization,
   onClose,
   onUpgradeClick,
@@ -55,15 +58,18 @@ export function FreeTrialWarningDialog({
             Access Blocked
           </DialogTitle>
           <DialogDescription className="text-center text-base">
-            Your trial expired {daysExpired === 1 ? 'yesterday' : `${daysExpired} days ago`}
+            {hasTrialWindow
+              ? `Your trial expired ${daysExpired === 1 ? 'yesterday' : `${daysExpired} days ago`}`
+              : 'Your organization does not include a free trial'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="my-4 rounded-lg border border-red-900 bg-red-950/50 p-4">
           <p className="text-center text-sm text-gray-300">
-            <strong>{organization.name}</strong> has been locked due to an expired trial. Editing
-            and new actions are disabled. Upgrade now to restore full access to all features and
-            data.
+            <strong>{organization.name}</strong>{' '}
+            {hasTrialWindow
+              ? 'has been locked due to an expired trial. Editing and new actions are disabled. Upgrade now to restore full access to all features and data.'
+              : 'has been locked because the organization does not include a free trial. Editing and new actions are disabled. Upgrade now to restore full access to all features and data.'}
           </p>
         </div>
 

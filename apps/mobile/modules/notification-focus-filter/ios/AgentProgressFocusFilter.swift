@@ -20,12 +20,12 @@ import Foundation
 /// stay quoted; that plugin exists because Expo's own writer emits them bare.
 @available(iOS 16.0, *)
 struct AgentProgressFocusFilter: SetFocusFilterIntent {
-  // The key below is also the intent's display title; both `title` and
-  // `displayRepresentation` must resolve the same catalog entry, so the
-  // literal exists once.
-  private static let agentNotificationsTitle: LocalizedStringResource = "Agent notifications"
-
-  static var title: LocalizedStringResource { agentNotificationsTitle }
+  // This is the one declaration of the title key. App Intents requires the
+  // intent title to be a stored compile-time static value, so it cannot be a
+  // separate constant behind a computed property; the display representation
+  // reads this same declaration, so the two surfaces cannot resolve different
+  // catalog entries.
+  static var title: LocalizedStringResource = "Agent notifications"
 
   static var description = IntentDescription(
     "Keep notifications that need your input and silence agent progress for this Focus."
@@ -35,7 +35,7 @@ struct AgentProgressFocusFilter: SetFocusFilterIntent {
   var agentProgress: Bool?
 
   var displayRepresentation: DisplayRepresentation {
-    DisplayRepresentation(title: Self.agentNotificationsTitle)
+    DisplayRepresentation(title: Self.title)
   }
 
   func perform() async throws -> some IntentResult {

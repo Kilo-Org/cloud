@@ -68,3 +68,79 @@ describe('derivedChatText', () => {
     expect(derivedChatText('😀'.repeat(200))).toBe(cutTo('😀', DERIVED_CHAT_TEXT_MAX_LENGTH - 1));
   });
 });
+
+describe('derivedChatText with inline markdown', () => {
+  it('reduces strong text to the words it wraps', () => {
+    expect(derivedChatText("That's the classic **Lorem ipsum** placeholder text")).toBe(
+      "That's the classic Lorem ipsum placeholder text"
+    );
+    expect(derivedChatText('__strong__')).toBe('strong');
+  });
+
+  it('reduces emphasis to the word it wraps', () => {
+    expect(derivedChatText('*em*')).toBe('em');
+    expect(derivedChatText('_em_')).toBe('em');
+  });
+
+  it('reduces inline code to its content', () => {
+    expect(derivedChatText('run `code` now')).toBe('run code now');
+  });
+
+  it('reduces strikethrough to the word it wraps', () => {
+    expect(derivedChatText('~~gone~~')).toBe('gone');
+  });
+
+  it('keeps a link label and drops its destination', () => {
+    expect(derivedChatText('see [the docs](https://example.com/x)')).toBe('see the docs');
+  });
+
+  it('keeps an image alt text and drops its source', () => {
+    expect(derivedChatText('![a diagram](https://example.com/a.png)')).toBe('a diagram');
+  });
+
+  it('leaves arithmetic and identifiers alone', () => {
+    expect(derivedChatText('2 * 3 * 4')).toBe('2 * 3 * 4');
+    expect(derivedChatText('snake_case_name')).toBe('snake_case_name');
+  });
+
+  it('leaves an unmatched marker alone', () => {
+    expect(derivedChatText('an unmatched * here')).toBe('an unmatched * here');
+  });
+
+  it('drops the backslash of an escape and keeps the character it escaped', () => {
+    expect(derivedChatText(String.raw`\*literal\*`)).toBe('*literal*');
+  });
+
+  it('answers empty for a body that is nothing but markup', () => {
+    expect(derivedChatText('---')).toBe('');
+  });
+
+  it('caps a long emphasized body at the plain-text length', () => {
+    const derived = derivedChatText('**ipsum** '.repeat(40));
+
+    expect(derived).toHaveLength(DERIVED_CHAT_TEXT_MAX_LENGTH);
+    expect(derived.endsWith('…')).toBe(true);
+    expect(derived.includes('*')).toBe(false);
+  });
+
+  it('collapses whitespace around the markdown it reduced', () => {
+    expect(derivedChatText('  **first**   line\n\nsecond\t`line`  ')).toBe(
+      'first line second line'
+    );
+  });
+
+  it('keeps a heading, a quote, and list items from running into each other', () => {
+    expect(derivedChatText('# Release\n\nchecklist for the app')).toBe(
+      'Release checklist for the app'
+    );
+    expect(derivedChatText('- one\n- two')).toBe('one two');
+    expect(derivedChatText('1. Bump the version\n2. Build the bundle\n3. Upload')).toBe(
+      'Bump the version Build the bundle Upload'
+    );
+    expect(derivedChatText('> quoted line\n\nnext paragraph')).toBe('quoted line next paragraph');
+  });
+
+  it('keeps table cells apart', () => {
+    expect(derivedChatText('x | y\n--- | ---\n1 | 2')).toBe('x y 1 2');
+  });
+});

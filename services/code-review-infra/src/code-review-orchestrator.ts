@@ -1094,7 +1094,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
   /**
    * RPC method: Cancel a running review.
-   * Prevents retries and interrupts the Cloud Agent Next session.
+   * Prevents retries, interrupts the Cloud Agent Next session, and keeps the
+   * review cancellable when the terminal status write fails.
    */
   async cancel(reason?: string): Promise<boolean> {
     await this.loadState();
@@ -1112,9 +1113,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     this.cancelled = true;
 
     const errorMessage = reason ? `Review cancelled: ${reason}` : 'Review cancelled';
-    await this.updateStatus('cancelled', { errorMessage });
 
-    // If we have a sessionId, interrupt the cloud agent session to stop it from posting comments
+    // Stop the remote execution first: it must not depend on the status write.
     if (this.state.sessionId) {
       try {
         await this.interruptCloudAgentSession(this.state.sessionId);
@@ -1123,13 +1123,38 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
           sessionId: this.state.sessionId,
         });
       } catch (interruptError) {
-        // Log but don't fail - the review is already marked as cancelled
         console.warn('[CodeReviewOrchestrator] Failed to interrupt cloud agent session', {
           reviewId: this.state.reviewId,
           sessionId: this.state.sessionId,
           error: interruptError instanceof Error ? interruptError.message : String(interruptError),
         });
       }
+    }
+
+    // Snapshot the durable inputs so a failed status write can be rolled back.
+    const previousState = structuredClone(this.state);
+    const previousAlarm = await this.ctx.storage.getAlarm();
+
+    try {
+      await this.updateStatus('cancelled', { errorMessage });
+    } catch (error) {
+      this.state = previousState;
+      await this.saveState();
+
+      if (previousAlarm === null) {
+        await this.ctx.storage.deleteAlarm();
+      } else {
+        await this.ctx.storage.setAlarm(previousAlarm);
+      }
+
+      console.warn('[CodeReviewOrchestrator] Cancellation status write failed; restored state', {
+        reviewId: this.state.reviewId,
+        attemptId: this.state.attemptId,
+        status: this.state.status,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      throw error;
     }
 
     console.log('[CodeReviewOrchestrator] Review cancelled', {

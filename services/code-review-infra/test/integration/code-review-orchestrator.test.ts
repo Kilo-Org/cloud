@@ -1614,6 +1614,113 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
   });
 
+  it('interrupts the cloud agent session when the status callback fails', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return new Response('status unavailable', { status: 500 });
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: true });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({ status: 'running', sessionId: 'agent-status-write-fails' })
+      );
+    });
+
+    const cancellationError = await runInDurableObject(
+      stub,
+      async (instance: CodeReviewOrchestrator) => {
+        try {
+          await instance.cancel('superseded');
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error);
+        }
+        return null;
+      }
+    );
+    expect(cancellationError).toMatch(/Failed to update DB status/);
+
+    expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
+
+    const interruptIndex = fetchMock.mock.calls.findIndex(([request]) =>
+      String(request).includes('/trpc/interruptSession')
+    );
+    const cancelledPostIndex = fetchMock.mock.calls.findIndex(
+      ([request, init]) =>
+        String(request).includes('/api/internal/code-review-status/') &&
+        String((init as RequestInit | undefined)?.body).includes('"status":"cancelled"')
+    );
+    expect(interruptIndex).toBeGreaterThanOrEqual(0);
+    expect(cancelledPostIndex).toBeGreaterThanOrEqual(0);
+    expect(interruptIndex).toBeLessThan(cancelledPostIndex);
+
+    await expect(storedReview(stub)).resolves.toMatchObject({ status: 'running' });
+  });
+
+  it('keeps the review cancellable when the status callback fails', async () => {
+    const stub = getReviewStub();
+    let statusCallbackHealthy = false;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        if (statusCallbackHealthy) {
+          return Response.json({ success: true });
+        }
+        return new Response('status unavailable', { status: 500 });
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: true });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({ status: 'running', sessionId: 'agent-status-write-retry' })
+      );
+    });
+
+    const cancellationError = await runInDurableObject(
+      stub,
+      async (instance: CodeReviewOrchestrator) => {
+        try {
+          await instance.cancel('superseded');
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error);
+        }
+        return null;
+      }
+    );
+    expect(cancellationError).toMatch(/Failed to update DB status/);
+    await expect(storedReview(stub)).resolves.toMatchObject({ status: 'running' });
+
+    statusCallbackHealthy = true;
+
+    await expect(stub.cancel('superseded')).resolves.toBe(true);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'cancelled',
+      errorMessage: 'Review cancelled: superseded',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(2);
+
+    const alarm = await storedAlarm(stub);
+    expect(alarm).toEqual(expect.any(Number));
+    if (alarm === null) {
+      throw new Error('Expected cleanup alarm to be scheduled');
+    }
+    expect(alarm).toBeGreaterThan(Date.now());
+  });
+
   it('does not prepare a session when the review is cancelled during the first status update', async () => {
     const stub = getReviewStub();
     const runningUpdateStarted = deferredSignal();

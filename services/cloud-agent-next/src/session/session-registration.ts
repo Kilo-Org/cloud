@@ -20,7 +20,10 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
-import { ByocAwsProviderError, fetchAwsProviderConnection } from '../byoc/aws-credential-resolver.js';
+import {
+  ByocAwsProviderError,
+  fetchAwsProviderConnection,
+} from '../byoc/aws-credential-resolver.js';
 import {
   isSelectableSandboxAllocation,
   sandboxAllocationSchema,

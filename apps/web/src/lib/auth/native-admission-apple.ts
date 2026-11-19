@@ -5,7 +5,6 @@ import { AsnParser } from '@peculiar/asn1-schema';
 import { Certificate } from '@peculiar/asn1-x509';
 import * as asn1js from 'asn1js';
 import { APPLE_APP_BUNDLE_ID, APPLE_TEAM_ID } from '@kilocode/web-shared/lib/config.server';
-import { captureMessage } from '@sentry/nextjs';
 
 /**
  * Apple App Attest attestation verifier.
@@ -17,6 +16,12 @@ import { captureMessage } from '@sentry/nextjs';
  *
  * CBOR, X.509, and ASN.1 decoding are delegated to `cbor2`, `@peculiar/asn1-x509`,
  * and `asn1js`. Only the App Attest rules live here.
+ *
+ * Every refusal this verifier returns is counted by the admission layer
+ * (`countAdmissionCondition('apple_attestation_failed:<error>')`), so this
+ * module reports nothing itself: a refusal carries no per-request event and no
+ * client-supplied detail such as a certificate fingerprint or nonce prefix.
+ * Provider and infrastructure faults are reported where they are thrown.
  */
 
 /**
@@ -179,11 +184,9 @@ export async function verifyAppleAttestation(
   if (terminalFingerprint !== ROOT_CA_SHA256) {
     try {
       if (!terminalCert.verify(APPLE_APP_ATTEST_ROOT_CERT.publicKey)) {
-        captureMessage(`apple_attest_unknown_ca: ${terminalFingerprint}`);
         return { ok: false, error: 'CERT_CHAIN_INVALID' };
       }
     } catch {
-      captureMessage(`apple_attest_unknown_ca: ${terminalFingerprint}`);
       return { ok: false, error: 'CERT_CHAIN_INVALID' };
     }
   }
@@ -225,9 +228,6 @@ export async function verifyAppleAttestation(
 
   const nonceExt = extractAppleAttestNonce(credCertBuf);
   if (!nonceExt || nonceExt.toString('hex') !== expectedNonce) {
-    captureMessage(
-      `apple_attest_nonce_mismatch: expected=${expectedNonce.substring(0, 16)}... got=${nonceExt?.toString('hex').substring(0, 16) ?? 'null'}...`
-    );
     return { ok: false, error: 'NONCE_MISMATCH' };
   }
 

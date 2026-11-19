@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection)では、選択したプロトコルとモデルを使用して、このエンドポイントに短い推論リクエストを送信します。プロバイダーから料金が請求される場合があります。",
       "connectionSucceeded": "モデルはこのプロトコルでリクエストを完了しました。",
       "connectionFailed": "モデルはリクエストを完了できませんでした。APIルートURL、プロトコル、認証情報、モデルIDを確認してください。",
+      "requestTimedOut": "エンドポイントが時間内に応答しませんでした。APIルートURLと接続を確認して、もう一度お試しください。",
+      "requestUnauthorized": "エンドポイントが認証情報を拒否しました。APIキーとカスタムヘッダーを確認して、もう一度お試しください。",
+      "requestNotFound": "エンドポイントまたはモデルが見つかりませんでした。APIルートURLとモデルIDを確認してください。",
+      "requestRateLimited": "エンドポイントがリクエストを制限しています。しばらく待ってからもう一度お試しください。",
+      "requestUnavailable": "エンドポイントは現在利用できません。しばらくしてからもう一度お試しください。",
+      "requestUnreachable": "エンドポイントに到達できませんでした。APIルートURLと接続を確認してください。",
+      "discoveryInvalidResponse": "エンドポイントからモデル一覧ではない応答が返されました。APIルートURLとプロトコルがサーバーと一致しているか確認してください。",
+      "discoveryNoModels": "エンドポイントにモデルが一覧にありませんでした。モデルを手動で入力してください。",
+      "connectionIncomplete": "モデルは応答しましたが、完了しませんでした。もう一度お試しいただくか、モデルIDとプロトコルを確認してください。",
       "invalidInput": "バックエンド名、有効なヘッダー、および一意のIDと名前を持つモデルを少なくとも1つ入力してください。トークン数の上限には正の整数を指定してください。",
       "invalidUrl": "認証情報、クエリ、フラグメントを含まないHTTPまたはHTTPSのAPIルートURLを入力してください。",
       "publicHttp": "公開HTTPエンドポイントは許可されません。HTTPSまたは非公開のローカルエンドポイントを使用してください。",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"
     },
-    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。"
+    "creditsRequired": "このメッセージを送信するにはクレジットが足りません。",
+    "providerKeyRefused": "バックエンドが認証情報を拒否しました。このバックエンドのAPIキーを確認して、再送信してください。",
+    "providerModelMissing": "このバックエンドではこのモデルを提供していません。別のモデルを選択してください。",
+    "providerRateLimited": "プロバイダーがリクエストを制限しています。しばらく待ってから再送信してください。",
+    "providerUnavailable": "プロバイダーは現在利用できません。しばらくしてから再送信してください。"
   },
   "settingsTools": {
     "confirmTitle": "この変更を確認しますか？"

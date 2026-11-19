@@ -3951,6 +3951,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) envia um breve pedido de inferência a este ponto de acesso usando o protocolo e o modelo selecionados. O fornecedor pode cobrar por este pedido.",
       "connectionSucceeded": "O modelo concluiu um pedido usando este protocolo.",
       "connectionFailed": "O modelo não conseguiu concluir um pedido. Verifica o URL base da API, o protocolo, as credenciais e o ID do modelo.",
+      "requestTimedOut": "O ponto de acesso não respondeu a tempo. Verifica o URL base da API e a tua ligação e tenta novamente.",
+      "requestUnauthorized": "O ponto de acesso recusou as credenciais. Verifica a chave da API e os cabeçalhos personalizados e tenta novamente.",
+      "requestNotFound": "O ponto de acesso ou o modelo não foi encontrado. Verifica o URL base da API e o ID do modelo.",
+      "requestRateLimited": "O ponto de acesso está a limitar pedidos. Aguarda um momento e tenta novamente.",
+      "requestUnavailable": "O ponto de acesso está indisponível neste momento. Tenta novamente dentro de instantes.",
+      "requestUnreachable": "Não foi possível alcançar o ponto de acesso. Verifica o URL base da API e a tua ligação.",
+      "discoveryInvalidResponse": "O ponto de acesso respondeu com algo que não é uma lista de modelos. Confirma que o URL base da API e o protocolo correspondem ao servidor.",
+      "discoveryNoModels": "O ponto de acesso não listou nenhum modelo. Introduz os modelos manualmente.",
+      "connectionIncomplete": "O modelo respondeu mas não terminou. Tenta novamente ou verifica o ID do modelo e o protocolo.",
       "invalidInput": "Introduz um nome de serviço, cabeçalhos válidos e pelo menos um modelo com ID e nome únicos. Os limites de tokens têm de ser números inteiros positivos.",
       "invalidUrl": "Introduz um URL base da API com HTTP ou HTTPS, sem credenciais, parâmetros de consulta ou fragmentos.",
       "publicHttp": "Não são permitidos pontos de acesso HTTP públicos. Usa HTTPS ou um ponto de acesso local privado.",
@@ -4085,7 +4094,11 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo suporta esforço de raciocínio"
     },
-    "creditsRequired": "Não há créditos suficientes para enviar esta mensagem."
+    "creditsRequired": "Não há créditos suficientes para enviar esta mensagem.",
+    "providerKeyRefused": "O backend recusou as credenciais. Verifica a chave da API deste backend e volta a enviar.",
+    "providerModelMissing": "Este backend já não disponibiliza este modelo. Escolhe outro modelo.",
+    "providerRateLimited": "O fornecedor está a limitar pedidos. Aguarda um momento e volta a enviar.",
+    "providerUnavailable": "O fornecedor está indisponível neste momento. Volta a enviar dentro de instantes."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar esta alteração?"

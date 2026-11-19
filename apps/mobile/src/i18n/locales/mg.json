@@ -3884,6 +3884,15 @@
       "checkHelp": "Mandefa fangatahana fohy hamokarana valiny amin'ity adiresy fifandraisana ity ny $t(modelChat.backends.checkConnection), amin'ny alalan'ny fitsipika fifandraisana sy ny modely voafidy. Mety hampandoa vola amin'izany ny mpamatsy.",
       "connectionSucceeded": "Nahavita fangatahana tamin'ity fitsipika fifandraisana ity ny modely.",
       "connectionFailed": "Tsy nahavita fangatahana ny modely. Hamarino ny fototry ny API, ny fitsipika fifandraisana, ny mombamomba ny fidirana ary ny famantarana ny modely.",
+      "requestTimedOut": "Tsy namaly ara-potoana ny adiresy fifandraisana. Hamarino ny fototry ny API sy ny fifandraisanao, dia andramo indray.",
+      "requestUnauthorized": "Nolavin'ny adiresy fifandraisana ny mombamomba ny fidirana. Hamarino ny lakile API sy ny lohapejy namboarinao, dia andramo indray.",
+      "requestNotFound": "Tsy hita ny adiresy fifandraisana na ny modely. Hamarino ny fototry ny API sy ny famantarana ny modely.",
+      "requestRateLimited": "Mampetra ny fangatahana ny adiresy fifandraisana. Andraso kely dia andramo indray.",
+      "requestUnavailable": "Tsy misy amin'izao fotoana izao ny adiresy fifandraisana. Andramo indray rahoway kely.",
+      "requestUnreachable": "Tsy tratra ny adiresy fifandraisana. Hamarino ny fototry ny API sy ny fifandraisanao.",
+      "discoveryInvalidResponse": "Namaly zavatra tsy lisitry ny modely ny adiresy fifandraisana. Hamarino fa mifanaraka amin'ny servera ny fototry ny API sy ny fitsipika fifandraisana.",
+      "discoveryNoModels": "Tsy nisy modely notanisain'ny adiresy fifandraisana. Ampidiro amin'ny tanana ny modely.",
+      "connectionIncomplete": "Namaly ny modely fa tsy nahavita. Andramo indray, na hamarino ny famantarana ny modely sy ny fitsipika fifandraisana.",
       "invalidInput": "Ampidiro ny anaran'ny rafitra mpizara, ny sahan-doha manan-kery ary modely iray farafahakeliny manana famantarana sy anarana tsy miverina. Tsy maintsy isa manontolo miabo ny fetran'ny singa lahatsoratra.",
       "invalidUrl": "Ampidiro ny fototry ny API mampiasa HTTP na HTTPS, tsy misy mombamomba ny fidirana, masontsivana fikarohana na sombin'ny URL.",
       "publicHttp": "Tsy azo ampiasaina ny adiresy fifandraisana HTTP ho an'ny daholobe. Mampiasà HTTPS na adiresy fifandraisana eo an-toerana tsy azon'ny daholobe idirana.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
     },
-    "creditsRequired": "Tsy ampy kireditra handefasana ity hafatra ity."
+    "creditsRequired": "Tsy ampy kireditra handefasana ity hafatra ity.",
+    "providerKeyRefused": "Nolavin'ny backend ny mombamomba ny fidirana. Hamarino ny lakile API an'ity backend ity, dia alefaso indray.",
+    "providerModelMissing": "Tsy manolotra ity modely ity intsony ity backend ity. Misafidiana modely hafa.",
+    "providerRateLimited": "Mampetra ny fangatahana ny mpamatsy. Andraso kely dia alefaso indray.",
+    "providerUnavailable": "Tsy misy amin'izao fotoana izao ny mpamatsy. Alefaso indray rahoway kely."
   },
   "settingsTools": {
     "confirmTitle": "Hamafiso ity fanovana ity?"

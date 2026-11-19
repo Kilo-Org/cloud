@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file -- the input and request problem classes share one store contract file, and every consumer imports both names from here */
 import { type ApiKind } from '@kilocode/harness-sdk';
 import { type RemoteModelConfig } from '@kilocode/harness-sdk/plugins/remote-model';
 import { randomUUID } from 'expo-crypto';
@@ -57,6 +58,41 @@ export class BackendInputError extends Error {
 
   constructor(problem: BackendInputProblem) {
     // Never expose Zod issues: they may include a credential or custom header.
+    super(problem);
+    this.problem = problem;
+  }
+}
+
+export type BackendRequestProblem =
+  | 'cancelled'
+  | 'timedOut'
+  | 'unauthorized'
+  | 'notFound'
+  | 'rateLimited'
+  | 'unavailable'
+  | 'unreachable'
+  | 'invalidResponse'
+  | 'noModels'
+  | 'incomplete';
+
+/** Every problem a person can act on. A caller cancel has no copy, because nothing renders it. */
+export const BACKEND_REQUEST_ERROR_KEYS = {
+  timedOut: 'modelChat.backends.requestTimedOut',
+  unauthorized: 'modelChat.backends.requestUnauthorized',
+  notFound: 'modelChat.backends.requestNotFound',
+  rateLimited: 'modelChat.backends.requestRateLimited',
+  unavailable: 'modelChat.backends.requestUnavailable',
+  unreachable: 'modelChat.backends.requestUnreachable',
+  invalidResponse: 'modelChat.backends.discoveryInvalidResponse',
+  noModels: 'modelChat.backends.discoveryNoModels',
+  incomplete: 'modelChat.backends.connectionIncomplete',
+} as const satisfies Record<Exclude<BackendRequestProblem, 'cancelled'>, string>;
+
+export class BackendRequestError extends Error {
+  readonly problem: BackendRequestProblem;
+
+  constructor(problem: BackendRequestProblem) {
+    // Provider text can echo authorization headers or API keys, so the message is the problem name.
     super(problem);
     this.problem = problem;
   }

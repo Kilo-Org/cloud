@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) menghantar permintaan inferens ringkas ke titik akhir ini menggunakan protokol dan model yang dipilih. Penyedia mungkin mengenakan caj untuk permintaan ini.",
       "connectionSucceeded": "Model berjaya menyelesaikan permintaan menggunakan protokol ini.",
       "connectionFailed": "Model tidak dapat menyelesaikan permintaan. Periksa URL akar API, protokol, bukti kelayakan dan ID model.",
+      "requestTimedOut": "Titik akhir tidak menjawab dalam masa yang ditetapkan. Periksa URL akar API dan sambungan anda, kemudian cuba lagi.",
+      "requestUnauthorized": "Titik akhir menolak bukti kelayakan. Periksa kunci API dan pengepala tersuai, kemudian cuba lagi.",
+      "requestNotFound": "Titik akhir atau model tidak ditemui. Periksa URL akar API dan ID model.",
+      "requestRateLimited": "Titik akhir sedang mengehadkan permintaan. Tunggu sebentar dan cuba lagi.",
+      "requestUnavailable": "Titik akhir tidak tersedia buat masa ini. Cuba lagi sebentar lagi.",
+      "requestUnreachable": "Titik akhir tidak dapat dihubungi. Periksa URL akar API dan sambungan anda.",
+      "discoveryInvalidResponse": "Titik akhir menjawab dengan sesuatu yang bukan senarai model. Pastikan URL akar API dan protokol sepadan dengan pelayan.",
+      "discoveryNoModels": "Titik akhir tidak menyenaraikan sebarang model. Masukkan model secara manual.",
+      "connectionIncomplete": "Model menjawab tetapi tidak selesai. Cuba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama sistem pelayan, pengepala yang sah dan sekurang-kurangnya satu model dengan ID dan nama yang unik. Had token mestilah nombor bulat positif.",
       "invalidUrl": "Masukkan URL akar API HTTP atau HTTPS tanpa bukti kelayakan, pertanyaan atau fragmen.",
       "publicHttp": "Titik akhir HTTP awam tidak dibenarkan. Gunakan HTTPS atau titik akhir setempat persendirian.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Model ini menyokong tahap pemikiran"
     },
-    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini."
+    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini.",
+    "providerKeyRefused": "Backend menolak bukti kelayakan. Periksa kunci API backend ini, kemudian hantar semula.",
+    "providerModelMissing": "Backend ini tidak lagi menyediakan model ini. Pilih model lain.",
+    "providerRateLimited": "Penyedia sedang mengehadkan permintaan. Tunggu sebentar dan hantar semula.",
+    "providerUnavailable": "Penyedia tidak tersedia buat masa ini. Hantar semula sebentar lagi."
   },
   "settingsTools": {
     "confirmTitle": "Sahkan perubahan ini?"

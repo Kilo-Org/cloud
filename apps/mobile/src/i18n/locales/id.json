@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) mengirim permintaan inferensi singkat ke titik akhir ini menggunakan protokol dan model yang dipilih. Penyedia mungkin mengenakan biaya untuk permintaan ini.",
       "connectionSucceeded": "Model berhasil menyelesaikan permintaan menggunakan protokol ini.",
       "connectionFailed": "Model tidak dapat menyelesaikan permintaan. Periksa URL dasar API, protokol, kredensial, dan ID model.",
+      "requestTimedOut": "Titik akhir tidak menjawab tepat waktu. Periksa URL dasar API dan koneksi Anda, lalu coba lagi.",
+      "requestUnauthorized": "Titik akhir menolak kredensial. Periksa kunci API dan tajuk kustom, lalu coba lagi.",
+      "requestNotFound": "Titik akhir atau model tidak ditemukan. Periksa URL dasar API dan ID model.",
+      "requestRateLimited": "Titik akhir membatasi permintaan. Tunggu sebentar dan coba lagi.",
+      "requestUnavailable": "Titik akhir tidak tersedia saat ini. Coba lagi sebentar lagi.",
+      "requestUnreachable": "Titik akhir tidak dapat dijangkau. Periksa URL dasar API dan koneksi Anda.",
+      "discoveryInvalidResponse": "Titik akhir menjawab dengan sesuatu yang bukan daftar model. Periksa apakah URL dasar API dan protokol cocok dengan server.",
+      "discoveryNoModels": "Titik akhir tidak mencantumkan model apa pun. Masukkan model secara manual.",
+      "connectionIncomplete": "Model menjawab tetapi tidak menyelesaikan permintaan. Coba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama layanan, tajuk yang valid, dan setidaknya satu model dengan ID dan nama yang unik. Batas token harus berupa bilangan bulat positif.",
       "invalidUrl": "Masukkan URL dasar API HTTP atau HTTPS tanpa kredensial, kueri, atau fragmen.",
       "publicHttp": "Titik akhir HTTP publik tidak diizinkan. Gunakan HTTPS atau titik akhir lokal privat.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
     },
-    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini."
+    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini.",
+    "providerKeyRefused": "Layanan menolak kredensial. Periksa kunci API layanan ini, lalu kirim lagi.",
+    "providerModelMissing": "Layanan ini tidak lagi menyediakan model ini. Pilih model lain.",
+    "providerRateLimited": "Penyedia membatasi permintaan. Tunggu sebentar dan kirim lagi.",
+    "providerUnavailable": "Penyedia tidak tersedia saat ini. Kirim lagi sebentar lagi."
   },
   "settingsTools": {
     "confirmTitle": "Konfirmasi perubahan ini?"

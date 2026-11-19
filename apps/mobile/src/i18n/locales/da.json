@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sender en kort inferensforespørgsel til dette endepunkt med den valgte protokol og model. Udbyderen kan opkræve betaling for det.",
       "connectionSucceeded": "Modellen gennemførte en forespørgsel med denne protokol.",
       "connectionFailed": "Modellen kunne ikke gennemføre en forespørgsel. Tjek API-roden, protokollen, loginoplysningerne og model-ID'et.",
+      "requestTimedOut": "Endepunktet svarede ikke i tide. Tjek API-roden og din forbindelse, og prøv igen.",
+      "requestUnauthorized": "Endepunktet afviste loginoplysningerne. Tjek API-nøglen og de tilpassede headere, og prøv igen.",
+      "requestNotFound": "Endepunktet eller modellen blev ikke fundet. Tjek API-roden og model-ID'et.",
+      "requestRateLimited": "Endepunktet begrænser forespørgsler. Vent et øjeblik, og prøv igen.",
+      "requestUnavailable": "Endepunktet er utilgængeligt lige nu. Prøv igen om et øjeblik.",
+      "requestUnreachable": "Der kunne ikke opnås forbindelse til endepunktet. Tjek API-roden og din forbindelse.",
+      "discoveryInvalidResponse": "Endepunktet svarede med noget, der ikke er en modelliste. Tjek, at API-roden og protokollen svarer til serveren.",
+      "discoveryNoModels": "Endepunktet angav ingen modeller. Tilføj modeller manuelt.",
+      "connectionIncomplete": "Modellen svarede, men blev ikke færdig. Prøv igen, eller tjek model-ID'et og protokollen.",
       "invalidInput": "Indtast et servernavn, gyldige headere og mindst én model med et entydigt ID og navn. Tokengrænser skal være positive heltal.",
       "invalidUrl": "Indtast en HTTP- eller HTTPS-API-rod uden loginoplysninger, forespørgselsparametre eller et fragment.",
       "publicHttp": "Offentlige HTTP-endepunkter er ikke tilladt. Brug HTTPS eller et privat lokalt endepunkt.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"
     },
-    "creditsRequired": "Ikke nok kreditter til at sende denne besked."
+    "creditsRequired": "Ikke nok kreditter til at sende denne besked.",
+    "providerKeyRefused": "Serveren afviste loginoplysningerne. Tjek denne servers API-nøgle, og send igen.",
+    "providerModelMissing": "Denne server leverer ikke længere denne model. Vælg en anden model.",
+    "providerRateLimited": "Udbyderen begrænser forespørgsler. Vent et øjeblik, og send igen.",
+    "providerUnavailable": "Udbyderen er utilgængelig lige nu. Send igen om kort tid."
   },
   "settingsTools": {
     "confirmTitle": "Bekræft denne ændring?"

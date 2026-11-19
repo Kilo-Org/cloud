@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) yana aika gajeriyar buƙatar samar da amsa zuwa wannan wurin haɗi ta amfani da ƙa'ida da samfurin da aka zaɓa. Mai samar da sabis na iya karɓar kuɗin hakan.",
       "connectionSucceeded": "Samfurin ya kammala buƙata ta amfani da wannan ƙa'ida.",
       "connectionFailed": "Samfurin bai iya kammala buƙata ba. Duba tushen API, ƙa'idar, bayanan shiga, da ID na samfurin.",
+      "requestTimedOut": "Wurin haɗi bai amsa cikin lokaci ba. Duba tushen API da haɗin ka, sannan ka sake gwadawa.",
+      "requestUnauthorized": "Wurin haɗi ya ƙi bayanan shiga. Duba maɓallin API da kanun buƙata na musamman, sannan ka sake gwadawa.",
+      "requestNotFound": "Ba a sami wurin haɗi ko samfurin ba. Duba tushen API da ID na samfurin.",
+      "requestRateLimited": "Wurin haɗi yana iyakance buƙatu. Jira kaɗan ka sake gwadawa.",
+      "requestUnavailable": "Wurin haɗi ba ya samuwa a yanzu. Sake gwadawa nan da wani ɗan lokaci.",
+      "requestUnreachable": "Ba a iya isa wurin haɗi ba. Duba tushen API da haɗin ka.",
+      "discoveryInvalidResponse": "Wurin haɗi ya amsa da wani abu da ba jerin samfura ba ne. Tabbatar cewa tushen API da ƙa'idar sun dace da uwar garke.",
+      "discoveryNoModels": "Wurin haɗi bai lissafa wani samfuri ba. Shigar da samfura da hannu.",
+      "connectionIncomplete": "Samfurin ya amsa amma bai kammala ba. Sake gwadawa, ko duba ID na samfurin da ƙa'idar.",
       "invalidInput": "Shigar da sunan uwar garke, ingantattun kanun buƙata, da aƙalla samfurin guda ɗaya mai ID da suna da ba a maimaita ba. Iyakokin gutsuren rubutu dole ne su zama cikakkun lambobi masu girma fiye da sifili.",
       "invalidUrl": "Shigar da tushen API na HTTP ko HTTPS ba tare da bayanan shiga, tambayar URL, ko ɓangaren URL ba.",
       "publicHttp": "Ba a yarda da wuraren haɗin HTTP na jama'a ba. Yi amfani da HTTPS, ko wurin haɗi na cikin gida mai zaman kansa.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Wannan samfurin yana goyon bayan matakin tunani"
     },
-    "creditsRequired": "Kuɗin amfani bai isa don aika wannan saƙon ba."
+    "creditsRequired": "Kuɗin amfani bai isa don aika wannan saƙon ba.",
+    "providerKeyRefused": "Uwar garken ya ƙi bayanan shiga. Duba maɓallin API na wannan uwar garken, sannan ka sake aikawa.",
+    "providerModelMissing": "Wannan uwar garken ba ta ƙara ba da wannan samfurin ba. Zaɓi wani samfuri.",
+    "providerRateLimited": "Mai bayar da sabis yana iyakance buƙatu. Jira kaɗan ka sake aikawa.",
+    "providerUnavailable": "Mai bayar da sabis ba ya samuwa a yanzu. Sake aikawa nan ba da daɗewa ba."
   },
   "settingsTools": {
     "confirmTitle": "A tabbatar da wannan canji?"

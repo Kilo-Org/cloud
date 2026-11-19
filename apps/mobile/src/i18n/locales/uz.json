@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) tanlangan protokol va model yordamida bu ulanish manziliga javob yaratish uchun qisqa soʻrov yuboradi. Xizmat koʻrsatuvchi buning uchun haq olishi mumkin.",
       "connectionSucceeded": "Model bu protokol orqali soʻrovni bajardi.",
       "connectionFailed": "Model soʻrovni bajara olmadi. API asosiy manzili, protokol, kirish maʼlumotlari va model ID sini tekshiring.",
+      "requestTimedOut": "Ulanish manzili oʻz vaqtida javob bermadi. API asosiy manzilini va internet aloqasini tekshirib, qaytadan urinib koʻring.",
+      "requestUnauthorized": "Ulanish manzili kirish maʼlumotlarini rad etdi. API kaliti va maxsus sarlavhalarni tekshirib, qaytadan urinib koʻring.",
+      "requestNotFound": "Ulanish manzili yoki model topilmadi. API asosiy manzili va model ID sini tekshiring.",
+      "requestRateLimited": "Ulanish manzili soʻrovlarni cheklayapti. Biroz kuting va qaytadan urinib koʻring.",
+      "requestUnavailable": "Ulanish manzili hozir mavjud emas. Birozdan soʻng qaytadan urinib koʻring.",
+      "requestUnreachable": "Ulanish manziliga yetib boʻlmadi. API asosiy manzili va internet aloqasini tekshiring.",
+      "discoveryInvalidResponse": "Ulanish manzili model roʻyxati boʻlmagan javob qaytardi. API asosiy manzili va protokol serverga mos kelishini tekshiring.",
+      "discoveryNoModels": "Ulanish manzili hech qanday model koʻrsatmadi. Modellarni qoʻlda kiriting.",
+      "connectionIncomplete": "Model javob berdi, lekin tugatmadi. Qaytadan urinib koʻring yoki model ID si va protokolni tekshiring.",
       "invalidInput": "Server nomi, yaroqli sarlavhalar va takrorlanmaydigan ID hamda nomga ega kamida bitta modelni kiriting. Token chegaralari musbat butun sonlar boʻlishi kerak.",
       "invalidUrl": "Kirish maʼlumotlari, soʻrov parametrlari yoki fragmentsiz HTTP yoki HTTPS API asosiy manzilini kiriting.",
       "publicHttp": "Ommaviy HTTP ulanish manzillariga ruxsat berilmaydi. HTTPS yoki xususiy mahalliy ulanish manzilidan foydalaning.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
     },
-    "creditsRequired": "Bu xabarni yuborish uchun kreditlar yetarli emas."
+    "creditsRequired": "Bu xabarni yuborish uchun kreditlar yetarli emas.",
+    "providerKeyRefused": "Backend kirish maʼlumotlarini rad etdi. Ushbu backendning API kalitini tekshirib, qaytadan yuboring.",
+    "providerModelMissing": "Bu backend endi bu modelga xizmat koʻrsatmaydi. Boshqa modelni tanlang.",
+    "providerRateLimited": "Xizmat koʻrsatuvchi soʻrovlarni cheklayapti. Biroz kuting va qaytadan yuboring.",
+    "providerUnavailable": "Xizmat koʻrsatuvchi hozir mavjud emas. Birozdan soʻng qaytadan yuboring."
   },
   "settingsTools": {
     "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?"

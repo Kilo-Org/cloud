@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) dërgon një kërkesë të shkurtër inference te kjo pikë fundore duke përdorur protokollin dhe modelin e zgjedhur. Ofruesi mund të kërkojë pagesë për të.",
       "connectionSucceeded": "Modeli përfundoi një kërkesë duke përdorur këtë protokoll.",
       "connectionFailed": "Modeli nuk arriti të përfundonte një kërkesë. Kontrollo URL-në bazë të API-së, protokollin, të dhënat e hyrjes dhe ID-në e modelit.",
+      "requestTimedOut": "Pika fundore nuk u përgjigj në kohë. Kontrollo URL-në bazë të API-së dhe lidhjen, pastaj provo sërish.",
+      "requestUnauthorized": "Pika fundore i refuzoi të dhënat e hyrjes. Kontrollo çelësin API dhe header-at e personalizuar, pastaj provo sërish.",
+      "requestNotFound": "Pika fundore ose modeli nuk u gjet. Kontrollo URL-në bazë të API-së dhe ID-në e modelit.",
+      "requestRateLimited": "Pika fundore po kufizon kërkesat. Prit një çast dhe provo sërish.",
+      "requestUnavailable": "Pika fundore nuk është e disponueshme tani. Provo sërish pas një çasti.",
+      "requestUnreachable": "Pika fundore nuk u arrit dot. Kontrollo URL-në bazë të API-së dhe lidhjen.",
+      "discoveryInvalidResponse": "Pika fundore u përgjigj me diçka që nuk është listë modelesh. Kontrollo që URL-ja bazë e API-së dhe protokolli të përputhen me serverin.",
+      "discoveryNoModels": "Pika fundore nuk renditi asnjë model. Fut modelet manualisht.",
+      "connectionIncomplete": "Modeli u përgjigj, por nuk përfundoi. Provo sërish, ose kontrollo ID-në e modelit dhe protokollin.",
       "invalidInput": "Fut një emër për shërbimin mbështetës, kryefusha të vlefshme dhe të paktën një model me ID dhe emër unik. Kufijtë e tokenëve duhet të jenë numra të plotë pozitivë.",
       "invalidUrl": "Fut një URL bazë API me HTTP ose HTTPS, pa të dhëna hyrjeje, parametra kërkimi ose fragment.",
       "publicHttp": "Pikat fundore publike HTTP nuk lejohen. Përdor HTTPS ose një pikë fundore lokale private.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"
     },
-    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh."
+    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh.",
+    "providerKeyRefused": "Backend-i i refuzoi të dhënat e hyrjes. Kontrollo çelësin API të këtij backend-i, pastaj dërgo sërish.",
+    "providerModelMissing": "Ky backend nuk ofron më këtë model. Zgjidh një model tjetër.",
+    "providerRateLimited": "Ofruesi po kufizon kërkesat. Prit një çast dhe dërgo sërish.",
+    "providerUnavailable": "Ofruesi nuk është i disponueshëm tani. Dërgo sërish pas pak."
   },
   "settingsTools": {
     "confirmTitle": "Të konfirmohet ky ndryshim?"

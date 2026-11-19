@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sendir stutta ályktunarbeiðni á þennan endapunkt með valinni samskiptareglu og líkani. Þjónustuveitandinn gæti rukkað fyrir hana.",
       "connectionSucceeded": "Líkanið afgreiddi beiðni með þessari samskiptareglu.",
       "connectionFailed": "Líkanið gat ekki afgreitt beiðni. Athugaðu grunnslóð API, samskiptareglu, auðkenningarupplýsingar og auðkenni líkans.",
+      "requestTimedOut": "Endapunkturinn svaraði ekki í tæka tíð. Athugaðu grunnslóð API og tenginguna þína, og reyndu aftur.",
+      "requestUnauthorized": "Endapunkturinn hafnaði auðkenningarupplýsingunum. Athugaðu API-lykilinn og sérsniðna hausa, og reyndu aftur.",
+      "requestNotFound": "Endapunkturinn eða líkanið fannst ekki. Athugaðu grunnslóð API og auðkenni líkans.",
+      "requestRateLimited": "Endapunkturinn takmarkar beiðnir. Bíddu aðeins og reyndu aftur.",
+      "requestUnavailable": "Endapunkturinn er ekki í boði núna. Reyndu aftur eftir smástund.",
+      "requestUnreachable": "Ekki náðist samband við endapunktinn. Athugaðu grunnslóð API og tenginguna þína.",
+      "discoveryInvalidResponse": "Endapunkturinn svaraði með einhverju öðru en lista yfir líkön. Athugaðu að grunnslóð API og samskiptaregla séu í samræmi við þjóninn.",
+      "discoveryNoModels": "Endapunkturinn skilaði engum líkönum. Sláðu inn líkön handvirkt.",
+      "connectionIncomplete": "Líkanið svaraði en lauk ekki. Reyndu aftur, eða athugaðu auðkenni líkans og samskiptareglu.",
       "invalidInput": "Sláðu inn heiti bakenda, gilda hausa og að minnsta kosti eitt líkan með einkvæmu auðkenni og heiti. Táknamörk verða að vera jákvæðar heiltölur.",
       "invalidUrl": "Sláðu inn HTTP- eða HTTPS-grunnslóð API án auðkenningarupplýsinga, fyrirspurnarhluta eða brotahluta.",
       "publicHttp": "Opinberir HTTP-endapunktar eru ekki leyfðir. Notaðu HTTPS eða einkarekinn endapunkt á staðarneti.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"
     },
-    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð."
+    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð.",
+    "providerKeyRefused": "Bakendinn hafnaði auðkenningarupplýsingunum. Athugaðu API-lykil þessa bakenda og sendu aftur.",
+    "providerModelMissing": "Þessi bakendi þjónar ekki lengur þessu líkani. Veldu annað líkan.",
+    "providerRateLimited": "Þjónustuveitandinn takmarkar beiðnir. Bíddu aðeins og sendu aftur.",
+    "providerUnavailable": "Þjónustuveitandinn er ekki í boði núna. Sendu aftur eftir smástund."
   },
   "settingsTools": {
     "confirmTitle": "Staðfesta þessa breytingu?"

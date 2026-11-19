@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) stuurt een kort inferentieverzoek naar dit eindpunt met het geselecteerde protocol en model. De aanbieder kan hiervoor kosten in rekening brengen.",
       "connectionSucceeded": "Het model heeft een verzoek via dit protocol voltooid.",
       "connectionFailed": "Het model kon een verzoek niet voltooien. Controleer de API-basis-URL, het protocol, de aanmeldgegevens en de model-ID.",
+      "requestTimedOut": "Het eindpunt heeft niet op tijd geantwoord. Controleer de API-basis-URL en je verbinding en probeer het opnieuw.",
+      "requestUnauthorized": "Het eindpunt heeft de aanmeldgegevens geweigerd. Controleer de API-sleutel en de aangepaste headers en probeer het opnieuw.",
+      "requestNotFound": "Het eindpunt of model is niet gevonden. Controleer de API-basis-URL en de model-ID.",
+      "requestRateLimited": "Het eindpunt beperkt het aantal verzoeken. Wacht even en probeer het opnieuw.",
+      "requestUnavailable": "Het eindpunt is op dit moment niet beschikbaar. Probeer het zo opnieuw.",
+      "requestUnreachable": "Het eindpunt kon niet worden bereikt. Controleer de API-basis-URL en je verbinding.",
+      "discoveryInvalidResponse": "Het eindpunt antwoordde met iets dat geen modellenlijst is. Controleer of de API-basis-URL en het protocol bij de server passen.",
+      "discoveryNoModels": "Het eindpunt gaf geen modellen. Voer modellen handmatig in.",
+      "connectionIncomplete": "Het model heeft geantwoord maar is niet klaar. Probeer het opnieuw of controleer de model-ID en het protocol.",
       "invalidInput": "Voer een naam voor de chatserver, geldige verzoekheaders en minstens één model met een unieke ID en naam in. Tokenlimieten moeten positieve gehele getallen zijn.",
       "invalidUrl": "Voer een HTTP- of HTTPS-basis-URL voor de API in zonder aanmeldgegevens, query of fragment.",
       "publicHttp": "Openbare HTTP-eindpunten zijn niet toegestaan. Gebruik HTTPS of een privé-eindpunt op het lokale netwerk.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Dit model ondersteunt denkinspanning"
     },
-    "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden."
+    "creditsRequired": "Niet genoeg tegoed om dit bericht te verzenden.",
+    "providerKeyRefused": "De backend heeft de aanmeldgegevens geweigerd. Controleer de API-sleutel van deze backend en verzend opnieuw.",
+    "providerModelMissing": "Deze backend levert dit model niet meer. Kies een ander model.",
+    "providerRateLimited": "De aanbieder beperkt het aantal verzoeken. Wacht even en verzend opnieuw.",
+    "providerUnavailable": "De aanbieder is op dit moment niet beschikbaar. Verzend het zo opnieuw."
   },
   "settingsTools": {
     "confirmTitle": "Deze wijziging bevestigen?"

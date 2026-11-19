@@ -45,6 +45,26 @@ const PAYMENT_REQUIRED = 402;
  */
 const CREDITS_ERROR_TYPE = 'usage_limit_exceeded';
 
+/** The provider answers a status class stands for, named by what the person can change. */
+type ProviderStatusProblem = 'keyRefused' | 'modelMissing' | 'rateLimited' | 'unavailable';
+
+const PROVIDER_STATUS_KEYS = {
+  keyRefused: 'modelChat.providerKeyRefused',
+  modelMissing: 'modelChat.providerModelMissing',
+  rateLimited: 'modelChat.providerRateLimited',
+  unavailable: 'modelChat.providerUnavailable',
+} as const satisfies Record<ProviderStatusProblem, string>;
+
+/** The provider refused the credential it was given. */
+const UNAUTHORIZED = 401;
+const FORBIDDEN = 403;
+/** The provider does not serve the model at the path it was asked for. */
+const NOT_FOUND = 404;
+const METHOD_NOT_ALLOWED = 405;
+const TOO_MANY_REQUESTS = 429;
+/** The first status that says the provider itself failed, not the request. */
+const SERVER_ERROR = 500;
+
 /** What a gateway refusal body names, which is how its cause is told apart. */
 const errorBodySchema = z.object({ error_type: z.string() });
 /** The same body as the call keeps it: the raw text of the reply. */
@@ -91,10 +111,43 @@ function paymentRequired(error: unknown, model: string | undefined): boolean {
 }
 
 /**
+ * The copy a status alone can name, or nothing when it names none.
+ *
+ * The status class comes from the status code; the body is never read, because
+ * it can echo the key that was refused. The credential and missing-model copy is
+ * limited to a custom backend: that key and that model are the ones the person
+ * entered in this app, so the copy tells them what to edit.
+ */
+function providerStatusKey(error: unknown, model: string | undefined): string | null {
+  const custom = model !== undefined && chatTargetKind(model) === 'custom';
+  // The routed model client reports a status failure as a ModelError cause.
+  for (const failure of [error, error instanceof ModelError ? error.cause : undefined]) {
+    if (failure instanceof ModelError && failure.reason === 'status') {
+      const status = failure.status;
+      if (custom && (status === UNAUTHORIZED || status === FORBIDDEN)) {
+        return PROVIDER_STATUS_KEYS.keyRefused;
+      }
+      if (custom && (status === NOT_FOUND || status === METHOD_NOT_ALLOWED)) {
+        return PROVIDER_STATUS_KEYS.modelMissing;
+      }
+      if (status === TOO_MANY_REQUESTS) {
+        return PROVIDER_STATUS_KEYS.rateLimited;
+      }
+      if (status !== undefined && status >= SERVER_ERROR) {
+        return PROVIDER_STATUS_KEYS.unavailable;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Fixed UI copy only: provider failures may contain credentials or response bodies.
  *
  * `model` is the model whose call failed. It is what tells a bill the person can
- * settle in this app from one they can only settle elsewhere.
+ * settle in this app from one they can only settle elsewhere, and whose
+ * credential a refusal names. A status class is derived from the status alone;
+ * only the credential and missing-model copy is limited to a custom backend.
  */
 export function backendFailureKey(error: unknown, model?: string): string {
   // The routed model client reports target and local failures as a ModelError cause.
@@ -108,6 +161,10 @@ export function backendFailureKey(error: unknown, model?: string): string {
   }
   if (paymentRequired(error, model)) {
     return CREDITS_FAILURE_KEY;
+  }
+  const statusKey = providerStatusKey(error, model);
+  if (statusKey !== null) {
+    return statusKey;
   }
   // A remote model fails with no connection, and an on-device one does not.
   // Saying so tells the person what to change instead of only that it failed.

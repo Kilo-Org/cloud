@@ -3884,6 +3884,15 @@
       "checkHelp": "A „$t(modelChat.backends.checkConnection)” rövid következtetési kérést küld erre a végpontra a kiválasztott protokoll és modell használatával. A szolgáltató ezért díjat számíthat fel.",
       "connectionSucceeded": "A modell sikeresen teljesített egy kérést ezzel a protokollal.",
       "connectionFailed": "A modell nem tudta teljesíteni a kérést. Ellenőrizd az API alap-URL-címét, a protokollt, a hitelesítési adatokat és a modellazonosítót.",
+      "requestTimedOut": "A végpont nem válaszolt időben. Ellenőrizd az API alap-URL-címét és a kapcsolatot, majd próbáld újra.",
+      "requestUnauthorized": "A végpont elutasította a hitelesítési adatokat. Ellenőrizd az API-kulcsot és az egyéni fejléceket, majd próbáld újra.",
+      "requestNotFound": "A végpont vagy a modell nem található. Ellenőrizd az API alap-URL-címét és a modellazonosítót.",
+      "requestRateLimited": "A végpont korlátozza a kéréseket. Várj egy kicsit, és próbáld újra.",
+      "requestUnavailable": "A végpont jelenleg nem érhető el. Próbáld újra egy pillanat múlva.",
+      "requestUnreachable": "A végpontot nem sikerült elérni. Ellenőrizd az API alap-URL-címét és a kapcsolatot.",
+      "discoveryInvalidResponse": "A végpont olyan választ adott, amely nem modelllista. Ellenőrizd, hogy az API alap-URL-címe és a protokoll illeszkedik-e a szerverhez.",
+      "discoveryNoModels": "A végpont nem sorolt fel modelleket. Add meg a modelleket kézzel.",
+      "connectionIncomplete": "A modell válaszolt, de nem fejezte be. Próbáld újra, vagy ellenőrizd a modellazonosítót és a protokollt.",
       "invalidInput": "Adj meg egy háttérrendszernevet, érvényes fejléceket és legalább egy modellt egyedi azonosítóval és névvel. A tokenkorlátoknak pozitív egész számoknak kell lenniük.",
       "invalidUrl": "Adj meg egy HTTP vagy HTTPS API alap-URL-címet hitelesítési adatok, lekérdezési paraméterek és töredékazonosító nélkül.",
       "publicHttp": "Nyilvános HTTP-végpontok nem engedélyezettek. Használj HTTPS-t vagy privát helyi végpontot.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"
     },
-    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez."
+    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez.",
+    "providerKeyRefused": "A háttérrendszer elutasította a hitelesítési adatokat. Ellenőrizd a háttérrendszer API-kulcsát, majd küldd el újra.",
+    "providerModelMissing": "Ez a háttérrendszer már nem szolgálja ki ezt a modellt. Válassz másik modellt.",
+    "providerRateLimited": "A szolgáltató korlátozza a kéréseket. Várj egy kicsit, és küldd el újra.",
+    "providerUnavailable": "A szolgáltató jelenleg nem érhető el. Küldd el újra hamarosan."
   },
   "settingsTools": {
     "confirmTitle": "Megerősíted ezt a módosítást?"

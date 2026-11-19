@@ -4067,6 +4067,15 @@
       "checkHelp": "Seolann $t(modelChat.backends.checkConnection) iarratas gairid tátail chuig an gcríochphointe seo leis an bprótacal agus an tsamhail roghnaithe. D'fhéadfadh an soláthraí táille a ghearradh air.",
       "connectionSucceeded": "Chuir an tsamhail iarratas i gcrích leis an bprótacal seo.",
       "connectionFailed": "Níorbh fhéidir leis an tsamhail iarratas a chur i gcrích. Seiceáil fréamh an API, an prótacal, na dintiúir agus aitheantas na samhla.",
+      "requestTimedOut": "Níor fhreagair an críochphointe in am. Seiceáil fréamh an API agus do nasc, agus bain triail eile as.",
+      "requestUnauthorized": "Dhiúltaigh an críochphointe do na dintiúir. Seiceáil an eochair API agus na ceanntásca saincheaptha, agus bain triail eile as.",
+      "requestNotFound": "Níor aimsíodh an críochphointe ná an tsamhail. Seiceáil fréamh an API agus aitheantas na samhla.",
+      "requestRateLimited": "Tá an críochphointe ag teorannú iarratas. Fan nóiméad agus bain triail eile as.",
+      "requestUnavailable": "Níl an críochphointe ar fáil faoi láthair. Bain triail eile as i gceann nóiméid.",
+      "requestUnreachable": "Níorbh fhéidir teacht ar an críochphointe. Seiceáil fréamh an API agus do nasc.",
+      "discoveryInvalidResponse": "D'fhreagair an críochphointe le rud nach liosta samhlacha é. Seiceáil go n-oireann fréamh an API agus an prótacal don fhreastalaí.",
+      "discoveryNoModels": "Níor liostaigh an críochphointe aon samhail. Cuir isteach samhlacha de láimh.",
+      "connectionIncomplete": "D'fhreagair an tsamhail ach níor chríochnaigh sí. Bain triail eile as, nó seiceáil aitheantas na samhla agus an prótacal.",
       "invalidInput": "Cuir isteach ainm cúlchórais, ceanntásca bailí agus samhail amháin ar a laghad a bhfuil aitheantas agus ainm uathúil aici. Ní mór gur slánuimhreacha deimhneacha iad na teorainneacha comharthaí.",
       "invalidUrl": "Cuir fréamh API HTTP nó HTTPS isteach gan dintiúir, teaghrán fiosrúcháin ná blúire.",
       "publicHttp": "Ní cheadaítear críochphointí poiblí HTTP. Úsáid HTTPS nó críochphointe áitiúil príobháideach.",
@@ -4201,7 +4210,11 @@
     "reasoningEffort": {
       "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"
     },
-    "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh."
+    "creditsRequired": "Níl creidmheasanna go leor chun an teachtaireacht seo a sheoladh.",
+    "providerKeyRefused": "Dhiúltaigh an cúlchóras do na dintiúir. Seiceáil eochair API an chúlchórais seo, agus seol arís.",
+    "providerModelMissing": "Ní fhreastalaíonn an cúlchóras seo ar an tsamhail seo a thuilleadh. Roghnaigh samhail eile.",
+    "providerRateLimited": "Tá an soláthraí ag teorannú iarratas. Fan nóiméad agus seol arís.",
+    "providerUnavailable": "Níl an soláthraí ar fáil faoi láthair. Seol arís go luath."
   },
   "settingsTools": {
     "confirmTitle": "An bhfuil tú cinnte faoin athrú seo?"

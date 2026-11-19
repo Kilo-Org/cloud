@@ -4006,6 +4006,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) pošlje kratko zahtevo za sklepanje na to končno točko z izbranim protokolom in modelom. Ponudnik jo lahko zaračuna.",
       "connectionSucceeded": "Model je uspešno obdelal zahtevo s tem protokolom.",
       "connectionFailed": "Model ni mogel obdelati zahteve. Preveri osnovni URL API, protokol, poverilnice in ID modela.",
+      "requestTimedOut": "Končna točka se ni odzvala pravočasno. Preveri osnovni URL API in povezavo, nato poskusi znova.",
+      "requestUnauthorized": "Končna točka je zavrnila poverilnice. Preveri ključ API in glave po meri, nato poskusi znova.",
+      "requestNotFound": "Končne točke ali modela ni bilo mogoče najti. Preveri osnovni URL API in ID modela.",
+      "requestRateLimited": "Končna točka omejuje zahteve. Počakaj trenutek in poskusi znova.",
+      "requestUnavailable": "Končna točka trenutno ni na voljo. Poskusi znova čez trenutek.",
+      "requestUnreachable": "Končne točke ni bilo mogoče doseči. Preveri osnovni URL API in povezavo.",
+      "discoveryInvalidResponse": "Končna točka je odgovorila z nečim, kar ni seznam modelov. Preveri, ali se osnovni URL API in protokol ujemata s strežnikom.",
+      "discoveryNoModels": "Končna točka ni navedla nobenega modela. Modele vnesi ročno.",
+      "connectionIncomplete": "Model je odgovoril, vendar ni dokončal. Poskusi znova ali preveri ID modela in protokol.",
       "invalidInput": "Vnesi ime zaledja, veljavne glave in vsaj en model z edinstvenim ID in imenom. Omejitve števila žetonov morajo biti pozitivna cela števila.",
       "invalidUrl": "Vnesi osnovni URL API s protokolom HTTP ali HTTPS brez poverilnic, poizvedbe ali fragmenta.",
       "publicHttp": "Javne končne točke HTTP niso dovoljene. Uporabi HTTPS ali zasebno lokalno končno točko.",
@@ -4140,7 +4149,11 @@
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"
     },
-    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila."
+    "creditsRequired": "Ni dovolj kreditov za pošiljanje tega sporočila.",
+    "providerKeyRefused": "Zaledje je zavrnilo poverilnice. Preveri ključ API tega zaledja in znova pošlji.",
+    "providerModelMissing": "To zaledje ne ponuja več tega modela. Izberi drug model.",
+    "providerRateLimited": "Ponudnik omejuje zahteve. Počakaj trenutek in znova pošlji.",
+    "providerUnavailable": "Ponudnik trenutno ni na voljo. Znova pošlji kmalu."
   },
   "settingsTools": {
     "confirmTitle": "Potrdim to spremembo?"

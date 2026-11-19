@@ -4006,6 +4006,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) odešle na tento koncový bod krátký inferenční požadavek s použitím vybraného protokolu a modelu. Poskytovatel ho může zpoplatnit.",
       "connectionSucceeded": "Model úspěšně zpracoval požadavek s použitím tohoto protokolu.",
       "connectionFailed": "Model nedokázal zpracovat požadavek. Zkontrolujte základní URL API, protokol, přihlašovací údaje a ID modelu.",
+      "requestTimedOut": "Koncový bod včas neodpověděl. Zkontrolujte základní URL API a připojení a zkuste to znovu.",
+      "requestUnauthorized": "Koncový bod odmítl přihlašovací údaje. Zkontrolujte klíč API a vlastní hlavičky a zkuste to znovu.",
+      "requestNotFound": "Koncový bod nebo model nebyl nalezen. Zkontrolujte základní URL API a ID modelu.",
+      "requestRateLimited": "Koncový bod omezuje požadavky. Chvíli počkejte a zkuste to znovu.",
+      "requestUnavailable": "Koncový bod je nyní nedostupný. Zkuste to znovu za chvíli.",
+      "requestUnreachable": "Koncový bod nebylo možné kontaktovat. Zkontrolujte základní URL API a připojení.",
+      "discoveryInvalidResponse": "Koncový bod odpověděl něčím, co není seznam modelů. Zkontrolujte, že základní URL API a protokol odpovídají serveru.",
+      "discoveryNoModels": "Koncový bod neuvádí žádné modely. Zadejte modely ručně.",
+      "connectionIncomplete": "Model odpověděl, ale nedokončil odpověď. Zkuste to znovu, nebo zkontrolujte ID modelu a protokol.",
       "invalidInput": "Zadejte název serveru, platné hlavičky a alespoň jeden model s jedinečným ID a názvem. Limity tokenů musí být kladná celá čísla.",
       "invalidUrl": "Zadejte základní URL API s HTTP nebo HTTPS bez přihlašovacích údajů, parametrů dotazu a fragmentu.",
       "publicHttp": "Veřejné koncové body HTTP nejsou povoleny. Použijte HTTPS nebo soukromý místní koncový bod.",
@@ -4140,7 +4149,11 @@
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje úroveň uvažování"
     },
-    "creditsRequired": "Nedostatek kreditů k odeslání této zprávy."
+    "creditsRequired": "Nedostatek kreditů k odeslání této zprávy.",
+    "providerKeyRefused": "Server odmítl přihlašovací údaje. Zkontrolujte klíč API tohoto serveru a odešlete znovu.",
+    "providerModelMissing": "Tento server již tento model neposkytuje. Vyberte jiný model.",
+    "providerRateLimited": "Poskytovatel omezuje požadavky. Chvíli počkejte a odešlete znovu.",
+    "providerUnavailable": "Poskytovatel je nyní nedostupný. Odešlete znovu za chvíli."
   },
   "settingsTools": {
     "confirmTitle": "Potvrdit tuto změnu?"

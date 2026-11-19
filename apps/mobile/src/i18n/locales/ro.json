@@ -3945,6 +3945,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) trimite o scurtă cerere de inferență către acest endpoint folosind protocolul și modelul selectate. Furnizorul o poate taxa.",
       "connectionSucceeded": "Modelul a finalizat o cerere folosind acest protocol.",
       "connectionFailed": "Modelul nu a putut finaliza o cerere. Verifică rădăcina API, protocolul, credențialele și ID-ul modelului.",
+      "requestTimedOut": "Endpointul nu a răspuns la timp. Verifică rădăcina API și conexiunea, apoi încearcă din nou.",
+      "requestUnauthorized": "Endpointul a refuzat credențialele. Verifică cheia API și antetele personalizate, apoi încearcă din nou.",
+      "requestNotFound": "Endpointul sau modelul nu a fost găsit. Verifică rădăcina API și ID-ul modelului.",
+      "requestRateLimited": "Endpointul limitează cererile. Așteaptă puțin și încearcă din nou.",
+      "requestUnavailable": "Endpointul este indisponibil acum. Încearcă din nou în câteva momente.",
+      "requestUnreachable": "Endpointul nu a putut fi contactat. Verifică rădăcina API și conexiunea.",
+      "discoveryInvalidResponse": "Endpointul a răspuns cu ceva care nu este o listă de modele. Verifică dacă rădăcina API și protocolul corespund serverului.",
+      "discoveryNoModels": "Endpointul nu a listat niciun model. Introdu modelele manual.",
+      "connectionIncomplete": "Modelul a răspuns, dar nu a terminat. Încearcă din nou sau verifică ID-ul modelului și protocolul.",
       "invalidInput": "Introdu un nume de backend, antete valide și cel puțin un model cu ID și nume unice. Limitele de tokenuri trebuie să fie numere întregi pozitive.",
       "invalidUrl": "Introdu o rădăcină API HTTP sau HTTPS fără credențiale, interogare sau fragment.",
       "publicHttp": "Endpointurile HTTP publice nu sunt permise. Folosește HTTPS sau un endpoint local privat.",
@@ -4079,7 +4088,11 @@
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
     },
-    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj."
+    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj.",
+    "providerKeyRefused": "Backendul a refuzat credențialele. Verifică cheia API a acestui backend, apoi trimite din nou.",
+    "providerModelMissing": "Acest backend nu mai servește acest model. Alege alt model.",
+    "providerRateLimited": "Furnizorul limitează cererile. Așteaptă puțin și trimite din nou.",
+    "providerUnavailable": "Furnizorul este indisponibil acum. Trimite din nou în curând."
   },
   "settingsTools": {
     "confirmTitle": "Confirmi această modificare?"

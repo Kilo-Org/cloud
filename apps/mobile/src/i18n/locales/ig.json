@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) na-eziga obere arịrịọ mmepụta azịza n'ebe njikọ a site na usoro na ihe nlereanya ahọpụtara. Onye na-enye ọrụ nwere ike ịnata ụgwọ maka ya.",
       "connectionSucceeded": "Ihe nlereanya ahụ mezuru arịrịọ site n'usoro a.",
       "connectionFailed": "Ihe nlereanya ahụ enweghị ike imezu arịrịọ. Lelee mgbọrọgwụ API, usoro, ozi njirimara, na ID ihe nlereanya.",
+      "requestTimedOut": "Ebe njikọ ahụ azaghị n'oge. Lelee mgbọrọgwụ API na njikọ gị, wee nwaa ọzọ.",
+      "requestUnauthorized": "Ebe njikọ ahụ jụrụ ozi njirimara. Lelee nkụnye ziri ezi API na ozi njirimara omenala, wee nwaa ọzọ.",
+      "requestNotFound": "Ahụghị ebe njikọ ma ọ bụ ihe nlereanya. Lelee mgbọrọgwụ API na ID ihe nlereanya.",
+      "requestRateLimited": "Ebe njikọ ahụ na-egbochi arịrịọ. Chere ntakịrị ma nwaa ọzọ.",
+      "requestUnavailable": "Ebe njikọ adịghị ugbu a. Nwaa ọzọ n'oge na-adịghị anya.",
+      "requestUnreachable": "Enweghị ike iru ebe njikọ ahụ. Lelee mgbọrọgwụ API na njikọ gị.",
+      "discoveryInvalidResponse": "Ebe njikọ ahụ zara ihe na-abụghị ndepụta ihe nlereanya. Lelee na mgbọrọgwụ API na usoro kwekọrọ na sava ahụ.",
+      "discoveryNoModels": "Ebe njikọ ahụ edepụtaghị ihe nlereanya ọ bụla. Tinye ihe nlereanya ji aka.",
+      "connectionIncomplete": "Ihe nlereanya ahụ zara mana emezughị. Nwaa ọzọ, ma ọ bụ lelee ID ihe nlereanya na usoro.",
       "invalidInput": "Tinye aha sava, nkụnye ziri ezi, na opekata mpe otu ihe nlereanya nwere ID na aha pụrụ iche. Oke iberibe ederede ga-abụ ọnụọgụgụ zuru ezu karịrị efu.",
       "invalidUrl": "Tinye mgbọrọgwụ API HTTP ma ọ bụ HTTPS na-enweghị ozi njirimara, ajụjụ URL, ma ọ bụ ibe URL.",
       "publicHttp": "A naghị ekwe ka e jiri ebe njikọ HTTP ọha na eze. Jiri HTTPS, ma ọ bụ ebe njikọ nzuzo dị na netwọkụ mpaghara.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Ihe nlereanya a na-akwado mgbalị iche echiche"
     },
-    "creditsRequired": "Ego ojiji ezughị oke izipu ozi a."
+    "creditsRequired": "Ego ojiji ezughị oke izipu ozi a.",
+    "providerKeyRefused": "Sava ahụ jụrụ ozi njirimara. Lelee nkụnye ziri ezi API nke sava a, wee ziga ọzọ.",
+    "providerModelMissing": "Sava a anaghịzi enye ihe nlereanya a. Họrọ ihe nlereanya ọzọ.",
+    "providerRateLimited": "Onye na-enye ọrụ na-egbochi arịrịọ. Chere ntakịrị ma ziga ọzọ.",
+    "providerUnavailable": "Onye na-enye ọrụ adịghị ugbu a. Ziga ọzọ n'oge na-adịghị anya."
   },
   "settingsTools": {
     "confirmTitle": "Kwenye mgbanwe a?"

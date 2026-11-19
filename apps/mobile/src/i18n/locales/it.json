@@ -3945,6 +3945,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) invia una breve richiesta di inferenza a questo indirizzo di accesso usando il protocollo e il modello selezionati. Il fornitore potrebbe addebitare un costo.",
       "connectionSucceeded": "Il modello ha completato una richiesta usando questo protocollo.",
       "connectionFailed": "Il modello non è riuscito a completare una richiesta. Controlla l'URL di base dell'API, il protocollo, le credenziali e l'ID del modello.",
+      "requestTimedOut": "L'indirizzo di accesso non ha risposto in tempo. Controlla l'URL di base dell'API e la tua connessione, poi riprova.",
+      "requestUnauthorized": "L'indirizzo di accesso ha rifiutato le credenziali. Controlla la chiave API e le intestazioni personalizzate, poi riprova.",
+      "requestNotFound": "L'indirizzo di accesso o il modello non è stato trovato. Controlla l'URL di base dell'API e l'ID del modello.",
+      "requestRateLimited": "L'indirizzo di accesso sta limitando le richieste. Attendi un momento e riprova.",
+      "requestUnavailable": "L'indirizzo di accesso non è disponibile in questo momento. Riprova tra un momento.",
+      "requestUnreachable": "Impossibile raggiungere l'indirizzo di accesso. Controlla l'URL di base dell'API e la tua connessione.",
+      "discoveryInvalidResponse": "L'indirizzo di accesso ha risposto con qualcosa che non è un elenco di modelli. Controlla che l'URL di base dell'API e il protocollo corrispondano al server.",
+      "discoveryNoModels": "L'indirizzo di accesso non ha elencato alcun modello. Inserisci i modelli manualmente.",
+      "connectionIncomplete": "Il modello ha risposto ma non ha completato la richiesta. Riprova, oppure controlla l'ID del modello e il protocollo.",
       "invalidInput": "Inserisci un nome per il servizio, intestazioni valide e almeno un modello con ID e nome univoci. I limiti dei token devono essere numeri interi positivi.",
       "invalidUrl": "Inserisci un URL di base dell'API HTTP o HTTPS senza credenziali, parametri di ricerca o un frammento.",
       "publicHttp": "Gli indirizzi di accesso HTTP pubblici non sono consentiti. Usa HTTPS o un indirizzo di accesso locale privato.",
@@ -4079,7 +4088,11 @@
     "reasoningEffort": {
       "modelFlag": "Questo modello supporta il livello di ragionamento"
     },
-    "creditsRequired": "Crediti insufficienti per inviare questo messaggio."
+    "creditsRequired": "Crediti insufficienti per inviare questo messaggio.",
+    "providerKeyRefused": "Il servizio ha rifiutato le credenziali. Controlla la chiave API di questo servizio, poi invia di nuovo.",
+    "providerModelMissing": "Questo servizio non fornisce più questo modello. Scegli un altro modello.",
+    "providerRateLimited": "Il fornitore sta limitando le richieste. Attendi un momento e invia di nuovo.",
+    "providerUnavailable": "Il fornitore non è disponibile in questo momento. Invia di nuovo a breve."
   },
   "settingsTools": {
     "confirmTitle": "Confermare questa modifica?"

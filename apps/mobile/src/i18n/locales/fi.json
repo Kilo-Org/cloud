@@ -3884,6 +3884,15 @@
       "checkHelp": "Painike ”$t(modelChat.backends.checkConnection)” lähettää tähän päätepisteeseen lyhyen päättelypyynnön valittua protokollaa ja mallia käyttäen. Palveluntarjoaja saattaa veloittaa siitä.",
       "connectionSucceeded": "Malli suoritti pyynnön tällä protokollalla.",
       "connectionFailed": "Malli ei voinut suorittaa pyyntöä. Tarkista API:n juuriosoite, protokolla, tunnistetiedot ja mallin tunniste.",
+      "requestTimedOut": "Päätepiste ei vastannut ajoissa. Tarkista API:n juuriosoite ja yhteytesi ja yritä sitten uudelleen.",
+      "requestUnauthorized": "Päätepiste hylkäsi tunnistetiedot. Tarkista API-avain ja mukautetut otsakkeet ja yritä sitten uudelleen.",
+      "requestNotFound": "Päätepistettä tai mallia ei löytynyt. Tarkista API:n juuriosoite ja mallin tunniste.",
+      "requestRateLimited": "Päätepiste rajoittaa pyyntöjä. Odota hetki ja yritä uudelleen.",
+      "requestUnavailable": "Päätepiste ei ole juuri nyt käytettävissä. Yritä uudelleen hetken kuluttua.",
+      "requestUnreachable": "Päätepisteeseen ei saatu yhteyttä. Tarkista API:n juuriosoite ja yhteytesi.",
+      "discoveryInvalidResponse": "Päätepiste vastasi jollakin, joka ei ole malliluettelo. Tarkista, että API:n juuriosoite ja protokolla vastaavat palvelinta.",
+      "discoveryNoModels": "Päätepiste ei luetellut malleja. Lisää mallit käsin.",
+      "connectionIncomplete": "Malli vastasi mutta ei suorittanut pyyntöä loppuun. Yritä uudelleen tai tarkista mallin tunniste ja protokolla.",
       "invalidInput": "Anna taustapalvelun nimi, kelvolliset otsakkeet ja vähintään yksi malli, jolla on yksilöllinen tunniste ja nimi. Tokenrajojen on oltava positiivisia kokonaislukuja.",
       "invalidUrl": "Anna API:n HTTP- tai HTTPS-juuriosoite ilman tunnistetietoja, kyselyä tai fragmenttia.",
       "publicHttp": "Julkisia HTTP-päätepisteitä ei sallita. Käytä HTTPS-yhteyttä tai yksityistä paikallista päätepistettä.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
     },
-    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen."
+    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen.",
+    "providerKeyRefused": "Taustapalvelu hylkäsi tunnistetiedot. Tarkista tämän taustapalvelun API-avain ja lähetä sitten uudelleen.",
+    "providerModelMissing": "Tämä taustapalvelu ei enää tarjoa tätä mallia. Valitse toinen malli.",
+    "providerRateLimited": "Palveluntarjoaja rajoittaa pyyntöjä. Odota hetki ja lähetä uudelleen.",
+    "providerUnavailable": "Palveluntarjoaja ei ole juuri nyt käytettävissä. Lähetä uudelleen pian."
   },
   "settingsTools": {
     "confirmTitle": "Vahvistetaanko tämä muutos?"

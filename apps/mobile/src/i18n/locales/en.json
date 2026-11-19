@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sends a short inference request to this endpoint using the selected protocol and model. The provider may charge for it.",
       "connectionSucceeded": "The model completed a request using this protocol.",
       "connectionFailed": "The model could not complete a request. Check the API root, protocol, credentials, and model ID.",
+      "requestTimedOut": "The endpoint did not answer in time. Check the API root and your connection, then try again.",
+      "requestUnauthorized": "The endpoint refused the credentials. Check the API key and custom headers, then try again.",
+      "requestNotFound": "The endpoint or model was not found. Check the API root and the model ID.",
+      "requestRateLimited": "The endpoint is limiting requests. Wait a moment and try again.",
+      "requestUnavailable": "The endpoint is unavailable right now. Try again in a moment.",
+      "requestUnreachable": "The endpoint could not be reached. Check the API root and your connection.",
+      "discoveryInvalidResponse": "The endpoint answered with something that is not a model list. Check that the API root and protocol match the server.",
+      "discoveryNoModels": "The endpoint listed no models. Enter models manually.",
+      "connectionIncomplete": "The model answered but did not finish. Try again, or check the model ID and protocol.",
       "invalidInput": "Enter a backend name, valid headers, and at least one model with a unique ID and name. Token limits must be positive whole numbers.",
       "invalidUrl": "Enter an HTTP or HTTPS API root without credentials, a query, or a fragment.",
       "publicHttp": "Public HTTP endpoints are not allowed. Use HTTPS, or a private local endpoint.",
@@ -4084,7 +4093,11 @@
       "signInA11y": "Sign in to this server: {{name}}",
       "signInFailed": "Couldn't sign in to {{name}}. Try again."
     },
-    "creditsRequired": "Not enough credits to send this message."
+    "creditsRequired": "Not enough credits to send this message.",
+    "providerKeyRefused": "The backend refused the credentials. Check this backend's API key, then send again.",
+    "providerModelMissing": "This backend no longer serves this model. Choose another model.",
+    "providerRateLimited": "The provider is limiting requests. Wait a moment and send again.",
+    "providerUnavailable": "The provider is unavailable right now. Send again shortly."
   },
   "settingsTools": {
     "confirmTitle": "Confirm this change?"

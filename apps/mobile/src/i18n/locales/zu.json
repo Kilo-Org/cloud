@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) ithumela isicelo esifushane sokukhiqiza impendulo kule ndawo yokuxhumana isebenzisa iphrothokholi nemodeli ekhethiwe. Umhlinzeki angase akukhokhise ngalokhu.",
       "connectionSucceeded": "Imodeli iqede isicelo isebenzisa le phrothokholi.",
       "connectionFailed": "Imodeli ayikwazanga ukuqeda isicelo. Hlola i-URL eyisisekelo ye-API, iphrothokholi, imininingwane yokungena, kanye ne-ID yemodeli.",
+      "requestTimedOut": "Indawo yokuxhumana ayiphendulanga ngesikhathi. Hlola i-URL eyisisekelo ye-API nokuxhumana kwakho, bese uzama futhi.",
+      "requestUnauthorized": "Indawo yokuxhumana yenqabile imininingwane yokungena. Hlola ukhiye we-API nama-header angokwezifiso, bese uzama futhi.",
+      "requestNotFound": "Indawo yokuxhumana noma imodeli ayitholakalanga. Hlola i-URL eyisisekelo ye-API ne-ID yemodeli.",
+      "requestRateLimited": "Indawo yokuxhumana inciphisa izicelo. Linda isikhashana bese uzama futhi.",
+      "requestUnavailable": "Indawo yokuxhumana ayitholakali okwamanje. Zama futhi ngemva kwesikhashana.",
+      "requestUnreachable": "Akukwazekanga ukufinyelela endaweni yokuxhumana. Hlola i-URL eyisisekelo ye-API nokuxhumana kwakho.",
+      "discoveryInvalidResponse": "Indawo yokuxhumana iphendule ngokungeluhlu lwamamodeli. Hlola ukuthi i-URL eyisisekelo ye-API nephrothokholi ziyafana neseva.",
+      "discoveryNoModels": "Indawo yokuxhumana ayibonisanga mamodeli. Faka amamodeli ngokwakho.",
+      "connectionIncomplete": "Imodeli iphendulile kodwa ayiqedanga. Zama futhi, noma uhlole i-ID yemodeli nephrothokholi.",
       "invalidInput": "Faka igama lohlelo olungemuva, izihloko ezivumelekile, kanye nemodeli okungenani eyodwa ene-ID negama okungaphindiwe. Imikhawulo yamathokheni kufanele ibe izinombolo eziphelele ezingaphezu kukaqanda.",
       "invalidUrl": "Faka i-URL eyisisekelo ye-API ye-HTTP noma ye-HTTPS engenayo imininingwane yokungena, umbuzo, noma ingxenye yokugcina ye-URL.",
       "publicHttp": "Izindawo zokuxhumana ze-HTTP zomphakathi azivunyelwe. Sebenzisa i-HTTPS, noma indawo yokuxhumana yangasese yasendaweni.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Le modeli isekela umzamo wokucabanga"
     },
-    "creditsRequired": "Ayikho imikhredithi eyanele yokuthumela lo myalezo."
+    "creditsRequired": "Ayikho imikhredithi eyanele yokuthumela lo myalezo.",
+    "providerKeyRefused": "I-backend inqabile imininingwane yokungena. Hlola ukhiye we-API wale backend, bese uthumela futhi.",
+    "providerModelMissing": "Le backend ayisanikezi le modeli. Khetha enye imodeli.",
+    "providerRateLimited": "Umhlinzeki unciphisa izicelo. Linda isikhashana bese uthumela futhi.",
+    "providerUnavailable": "Umhlinzeki akatholakali okwamanje. Thumela futhi ngemva kwesikhashana."
   },
   "settingsTools": {
     "confirmTitle": "Qinisekisa lolu shintsho?"

@@ -3951,6 +3951,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) envia uma requisição curta de inferência a este endereço de acesso usando o protocolo e o modelo selecionados. O provedor pode cobrar por isso.",
       "connectionSucceeded": "O modelo concluiu uma requisição usando este protocolo.",
       "connectionFailed": "O modelo não conseguiu concluir uma requisição. Verifique a URL raiz da API, o protocolo, as credenciais e o ID do modelo.",
+      "requestTimedOut": "O endereço de acesso não respondeu a tempo. Verifique a URL raiz da API e sua conexão e tente novamente.",
+      "requestUnauthorized": "O endereço de acesso recusou as credenciais. Verifique a chave de API e os cabeçalhos personalizados e tente novamente.",
+      "requestNotFound": "O endereço de acesso ou o modelo não foi encontrado. Verifique a URL raiz da API e o ID do modelo.",
+      "requestRateLimited": "O endereço de acesso está limitando solicitações. Aguarde um momento e tente novamente.",
+      "requestUnavailable": "O endereço de acesso está indisponível no momento. Tente novamente em instantes.",
+      "requestUnreachable": "Não foi possível conectar ao endereço de acesso. Verifique a URL raiz da API e sua conexão.",
+      "discoveryInvalidResponse": "O endereço de acesso respondeu com algo que não é uma lista de modelos. Verifique se a URL raiz da API e o protocolo correspondem ao servidor.",
+      "discoveryNoModels": "O endereço de acesso não listou nenhum modelo. Insira modelos manualmente.",
+      "connectionIncomplete": "O modelo respondeu, mas não concluiu. Tente novamente ou verifique o ID do modelo e o protocolo.",
       "invalidInput": "Insira um nome de servidor, cabeçalhos válidos e pelo menos um modelo com ID e nome exclusivos. Os limites de tokens devem ser números inteiros positivos.",
       "invalidUrl": "Insira uma URL raiz de API HTTP ou HTTPS sem credenciais, parâmetros de consulta ou fragmento.",
       "publicHttp": "Endereços de acesso HTTP públicos não são permitidos. Use HTTPS ou um endereço de acesso local privado.",
@@ -4085,7 +4094,11 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo aceita esforço de raciocínio"
     },
-    "creditsRequired": "Créditos insuficientes para enviar esta mensagem."
+    "creditsRequired": "Créditos insuficientes para enviar esta mensagem.",
+    "providerKeyRefused": "O servidor recusou as credenciais. Verifique a chave de API deste servidor e envie novamente.",
+    "providerModelMissing": "Este servidor não disponibiliza mais este modelo. Escolha outro modelo.",
+    "providerRateLimited": "O provedor está limitando solicitações. Aguarde um momento e envie novamente.",
+    "providerUnavailable": "O provedor está indisponível no momento. Envie novamente em instantes."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar esta alteração?"

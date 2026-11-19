@@ -4006,6 +4006,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) wysyła krótkie żądanie wnioskowania do tego punktu końcowego, używając wybranego protokołu i modelu. Dostawca może za to naliczyć opłatę.",
       "connectionSucceeded": "Model ukończył żądanie przy użyciu tego protokołu.",
       "connectionFailed": "Model nie mógł ukończyć żądania. Sprawdź główny adres API, protokół, dane uwierzytelniające i ID modelu.",
+      "requestTimedOut": "Punkt końcowy nie odpowiedział na czas. Sprawdź główny adres API i połączenie, a następnie spróbuj ponownie.",
+      "requestUnauthorized": "Punkt końcowy odrzucił dane uwierzytelniające. Sprawdź klucz API i niestandardowe nagłówki, a następnie spróbuj ponownie.",
+      "requestNotFound": "Nie znaleziono punktu końcowego lub modelu. Sprawdź główny adres API i ID modelu.",
+      "requestRateLimited": "Punkt końcowy ogranicza liczbę żądań. Odczekaj chwilę i spróbuj ponownie.",
+      "requestUnavailable": "Punkt końcowy jest teraz niedostępny. Spróbuj ponownie za chwilę.",
+      "requestUnreachable": "Nie udało się połączyć z punktem końcowym. Sprawdź główny adres API i połączenie.",
+      "discoveryInvalidResponse": "Punkt końcowy odpowiedział czymś, co nie jest listą modeli. Sprawdź, czy główny adres API i protokół są zgodne z serwerem.",
+      "discoveryNoModels": "Punkt końcowy nie zwrócił żadnych modeli. Wprowadź modele ręcznie.",
+      "connectionIncomplete": "Model odpowiedział, ale nie ukończył żądania. Spróbuj ponownie lub sprawdź ID modelu i protokół.",
       "invalidInput": "Wprowadź nazwę backendu, prawidłowe nagłówki i co najmniej jeden model z unikalnym ID i nazwą. Limity tokenów muszą być dodatnimi liczbami całkowitymi.",
       "invalidUrl": "Wprowadź główny adres API HTTP lub HTTPS bez danych uwierzytelniających, zapytania ani fragmentu.",
       "publicHttp": "Publiczne punkty końcowe HTTP są niedozwolone. Użyj HTTPS lub prywatnego lokalnego punktu końcowego.",
@@ -4140,7 +4149,11 @@
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"
     },
-    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość."
+    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość.",
+    "providerKeyRefused": "Backend odrzucił dane uwierzytelniające. Sprawdź klucz API tego backendu, a następnie wyślij ponownie.",
+    "providerModelMissing": "Ten backend nie obsługuje już tego modelu. Wybierz inny model.",
+    "providerRateLimited": "Dostawca ogranicza liczbę żądań. Odczekaj chwilę i wyślij ponownie.",
+    "providerUnavailable": "Dostawca jest teraz niedostępny. Wyślij ponownie za chwilę."
   },
   "settingsTools": {
     "confirmTitle": "Potwierdzić tę zmianę?"

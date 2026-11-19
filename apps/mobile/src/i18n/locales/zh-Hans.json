@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection)会使用所选协议和模型向此端点发送一个简短的推理请求。提供商可能会对此收费。",
       "connectionSucceeded": "模型已使用此协议完成请求。",
       "connectionFailed": "模型无法完成请求。请检查 API 根地址、协议、凭据和模型 ID。",
+      "requestTimedOut": "端点未及时响应。请检查 API 根地址和网络连接，然后重试。",
+      "requestUnauthorized": "端点拒绝了凭据。请检查 API 密钥和自定义请求头，然后重试。",
+      "requestNotFound": "未找到端点或模型。请检查 API 根地址和模型 ID。",
+      "requestRateLimited": "端点正在限制请求。请稍等片刻后重试。",
+      "requestUnavailable": "端点当前不可用。请稍后重试。",
+      "requestUnreachable": "无法连接到端点。请检查 API 根地址和网络连接。",
+      "discoveryInvalidResponse": "端点返回的内容不是模型列表。请确认 API 根地址和协议与服务器匹配。",
+      "discoveryNoModels": "端点未列出任何模型。请手动输入模型。",
+      "connectionIncomplete": "模型已响应但未完成。请重试，或检查模型 ID 和协议。",
       "invalidInput": "请输入后端名称、有效的请求头，以及至少一个具有唯一 ID 和名称的模型。词元数限制必须为正整数。",
       "invalidUrl": "请输入 HTTP 或 HTTPS API 根地址，且不包含凭据、查询参数或片段。",
       "publicHttp": "不允许使用公共 HTTP 端点。请使用 HTTPS 或私有本地端点。",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "此模型支持思考强度"
     },
-    "creditsRequired": "额度不足，无法发送此消息。"
+    "creditsRequired": "额度不足，无法发送此消息。",
+    "providerKeyRefused": "后端拒绝了凭据。请检查该后端的 API 密钥，然后重新发送。",
+    "providerModelMissing": "此后端不再提供此模型。请选择其他模型。",
+    "providerRateLimited": "提供商正在限制请求。请稍等片刻后重新发送。",
+    "providerUnavailable": "提供商当前不可用。请稍后重新发送。"
   },
   "settingsTools": {
     "confirmTitle": "确认此更改？"

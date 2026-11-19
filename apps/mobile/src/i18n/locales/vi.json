@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) gửi một yêu cầu suy luận ngắn đến điểm cuối này bằng giao thức và mô hình đã chọn. Nhà cung cấp có thể tính phí cho yêu cầu này.",
       "connectionSucceeded": "Mô hình đã hoàn thành một yêu cầu bằng giao thức này.",
       "connectionFailed": "Mô hình không thể hoàn thành yêu cầu. Kiểm tra URL gốc của API, giao thức, thông tin xác thực và ID mô hình.",
+      "requestTimedOut": "Điểm cuối không phản hồi kịp. Kiểm tra URL gốc của API và kết nối của bạn, rồi thử lại.",
+      "requestUnauthorized": "Điểm cuối đã từ chối thông tin xác thực. Kiểm tra khóa API và header tùy chỉnh, rồi thử lại.",
+      "requestNotFound": "Không tìm thấy điểm cuối hoặc mô hình. Kiểm tra URL gốc của API và ID mô hình.",
+      "requestRateLimited": "Điểm cuối đang giới hạn yêu cầu. Đợi một lát rồi thử lại.",
+      "requestUnavailable": "Điểm cuối hiện không khả dụng. Hãy thử lại sau một lát.",
+      "requestUnreachable": "Không thể kết nối tới điểm cuối. Kiểm tra URL gốc của API và kết nối của bạn.",
+      "discoveryInvalidResponse": "Điểm cuối trả về nội dung không phải danh sách mô hình. Kiểm tra xem URL gốc của API và giao thức có khớp với máy chủ không.",
+      "discoveryNoModels": "Điểm cuối không liệt kê mô hình nào. Hãy nhập mô hình thủ công.",
+      "connectionIncomplete": "Mô hình đã phản hồi nhưng không hoàn tất. Hãy thử lại, hoặc kiểm tra ID mô hình và giao thức.",
       "invalidInput": "Nhập tên máy chủ, các trường tiêu đề hợp lệ và ít nhất một mô hình có ID và tên không trùng lặp. Giới hạn token phải là số nguyên dương.",
       "invalidUrl": "Nhập URL gốc của API dùng HTTP hoặc HTTPS, không có thông tin xác thực, chuỗi truy vấn hoặc phần định danh đoạn.",
       "publicHttp": "Không cho phép các điểm cuối HTTP công khai. Hãy dùng HTTPS hoặc một điểm cuối riêng trong mạng cục bộ.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
     },
-    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này."
+    "creditsRequired": "Không đủ tín dụng để gửi tin nhắn này.",
+    "providerKeyRefused": "Máy chủ phụ trợ đã từ chối thông tin xác thực. Kiểm tra khóa API của máy chủ phụ trợ này, rồi gửi lại.",
+    "providerModelMissing": "Máy chủ phụ trợ này không còn phục vụ mô hình này. Hãy chọn mô hình khác.",
+    "providerRateLimited": "Nhà cung cấp đang giới hạn yêu cầu. Đợi một lát rồi gửi lại.",
+    "providerUnavailable": "Nhà cung cấp hiện không khả dụng. Hãy gửi lại sau ít phút."
   },
   "settingsTools": {
     "confirmTitle": "Xác nhận thay đổi này?"

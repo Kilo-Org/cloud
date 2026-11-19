@@ -4006,6 +4006,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) – tai trumpa išvedimo užklausa į šį prieigos tašką su pasirinktu protokolu ir modeliu. Paslaugos teikėjas gali už ją taikyti mokestį.",
       "connectionSucceeded": "Modelis įvykdė užklausą naudodamas šį protokolą.",
       "connectionFailed": "Modelis negalėjo įvykdyti užklausos. Patikrinkite bazinį API URL, protokolą, prisijungimo duomenis ir modelio ID.",
+      "requestTimedOut": "Prieigos taškas laiku neatsakė. Patikrinkite bazinį API URL ir ryšį, tada bandykite dar kartą.",
+      "requestUnauthorized": "Prieigos taškas atmetė prisijungimo duomenis. Patikrinkite API raktą ir pasirinktines antraštes, tada bandykite dar kartą.",
+      "requestNotFound": "Prieigos taškas arba modelis nerastas. Patikrinkite bazinį API URL ir modelio ID.",
+      "requestRateLimited": "Prieigos taškas riboja užklausas. Palaukite akimirką ir bandykite dar kartą.",
+      "requestUnavailable": "Prieigos taškas šiuo metu nepasiekiamas. Bandykite dar kartą po akimirkos.",
+      "requestUnreachable": "Nepavyko pasiekti prieigos taško. Patikrinkite bazinį API URL ir ryšį.",
+      "discoveryInvalidResponse": "Prieigos taškas grąžino ne modelių sąrašą. Patikrinkite, ar bazinis API URL ir protokolas atitinka serverį.",
+      "discoveryNoModels": "Prieigos taškas nepateikė nė vieno modelio. Įveskite modelius rankiniu būdu.",
+      "connectionIncomplete": "Modelis atsakė, bet nebaigė. Bandykite dar kartą arba patikrinkite modelio ID ir protokolą.",
       "invalidInput": "Įveskite serverio pavadinimą, galiojančias antraštes ir bent vieną modelį su unikaliu ID ir pavadinimu. Žetonų skaičiaus ribos turi būti teigiami sveikieji skaičiai.",
       "invalidUrl": "Įveskite bazinį HTTP arba HTTPS API URL be prisijungimo duomenų, užklausos parametrų ar fragmento.",
       "publicHttp": "Viešieji HTTP prieigos taškai neleidžiami. Naudokite HTTPS arba privatų vietinį prieigos tašką.",
@@ -4140,7 +4149,11 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     },
-    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti."
+    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti.",
+    "providerKeyRefused": "Backendas atmetė prisijungimo duomenis. Patikrinkite šio backendo API raktą, tada siųskite dar kartą.",
+    "providerModelMissing": "Šis backendas nebeteikia šio modelio. Pasirinkite kitą modelį.",
+    "providerRateLimited": "Paslaugos teikėjas riboja užklausas. Palaukite akimirką ir siųskite dar kartą.",
+    "providerUnavailable": "Paslaugos teikėjas šiuo metu nepasiekiamas. Netrukus siųskite dar kartą."
   },
   "settingsTools": {
     "confirmTitle": "Patvirtinti šį pakeitimą?"

@@ -4128,6 +4128,15 @@
       "checkHelp": "Mae $t(modelChat.backends.checkConnection) yn anfon cais casglu byr i'r pwynt terfyn hwn gan ddefnyddio'r protocol a'r model a ddewiswyd. Gall y darparwr godi tâl amdano.",
       "connectionSucceeded": "Cwblhaodd y model gais gan ddefnyddio'r protocol hwn.",
       "connectionFailed": "Ni allai'r model gwblhau cais. Gwiriwch wraidd yr API, y protocol, y manylion adnabod ac ID y model.",
+      "requestTimedOut": "Ni atebodd y pwynt terfyn mewn pryd. Gwiriwch wraidd yr API a'ch cysylltiad, yna rhowch gynnig arall arni.",
+      "requestUnauthorized": "Gwrthododd y pwynt terfyn y manylion adnabod. Gwiriwch yr allwedd API a'r penawdau personol, yna rhowch gynnig arall arni.",
+      "requestNotFound": "Nid oedd y pwynt terfyn na'r model i'w cael. Gwiriwch wraidd yr API ac ID y model.",
+      "requestRateLimited": "Mae'r pwynt terfyn yn cyfyngu ceisiadau. Arhoswch eiliad a rhowch gynnig arall arni.",
+      "requestUnavailable": "Nid yw'r pwynt terfyn ar gael ar hyn o bryd. Rhowch gynnig arall arni mewn eiliad.",
+      "requestUnreachable": "Ni ellid cyrraedd y pwynt terfyn. Gwiriwch wraidd yr API a'ch cysylltiad.",
+      "discoveryInvalidResponse": "Atebodd y pwynt terfyn gyda rhywbeth nad yw'n rhestr modelau. Gwiriwch fod gwraidd yr API a'r protocol yn cyfateb i'r gweinydd.",
+      "discoveryNoModels": "Ni restrir unrhyw fodelau gan y pwynt terfyn. Rhowch fodelau i mewn â llaw.",
+      "connectionIncomplete": "Atebodd y model ond ni orffennodd. Rhowch gynnig arall arni, neu gwiriwch ID y model a'r protocol.",
       "invalidInput": "Rhowch enw ôl-ben, penawdau dilys ac o leiaf un model ag ID ac enw unigryw. Rhaid i derfynau tocynnau fod yn gyfanrifau positif.",
       "invalidUrl": "Rhowch wraidd API HTTP neu HTTPS heb fanylion adnabod, ymholiad na darn.",
       "publicHttp": "Ni chaniateir pwyntiau terfyn HTTP cyhoeddus. Defnyddiwch HTTPS neu bwynt terfyn lleol preifat.",
@@ -4262,7 +4271,11 @@
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
     },
-    "creditsRequired": "Dim digon o gredydau i anfon y neges hon."
+    "creditsRequired": "Dim digon o gredydau i anfon y neges hon.",
+    "providerKeyRefused": "Gwrthododd yr ôl-ben y manylion adnabod. Gwiriwch allwedd API'r ôl-ben hwn, yna anfonwch eto.",
+    "providerModelMissing": "Nid yw'r ôl-ben hwn yn gwasanaethu'r model hwn mwyach. Dewiswch fodel arall.",
+    "providerRateLimited": "Mae'r darparwr yn cyfyngu ar geisiadau. Arhoswch eiliad ac anfonwch eto.",
+    "providerUnavailable": "Nid yw'r darparwr ar gael ar hyn o bryd. Anfonwch eto cyn bo hir."
   },
   "settingsTools": {
     "confirmTitle": "Cadarnhau'r newid hwn?"

@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection), seçilen protokolü ve modeli kullanarak bu uç noktaya kısa bir çıkarım isteği gönderir. Sağlayıcı bunun için ücret alabilir.",
       "connectionSucceeded": "Model bu protokolü kullanarak bir isteği tamamladı.",
       "connectionFailed": "Model isteği tamamlayamadı. API kök adresini, protokolü, kimlik bilgilerini ve model ID'sini kontrol edin.",
+      "requestTimedOut": "Uç nokta zamanında yanıt vermedi. API kök adresini ve bağlantınızı kontrol edin, sonra tekrar deneyin.",
+      "requestUnauthorized": "Uç nokta kimlik bilgilerini reddetti. API anahtarını ve özel başlıkları kontrol edin, sonra tekrar deneyin.",
+      "requestNotFound": "Uç nokta veya model bulunamadı. API kök adresini ve model ID'sini kontrol edin.",
+      "requestRateLimited": "Uç nokta istekleri sınırlıyor. Kısa bir süre bekleyip tekrar deneyin.",
+      "requestUnavailable": "Uç nokta şu anda kullanılamıyor. Birazdan tekrar deneyin.",
+      "requestUnreachable": "Uç noktaya ulaşılamadı. API kök adresini ve bağlantınızı kontrol edin.",
+      "discoveryInvalidResponse": "Uç nokta model listesi olmayan bir yanıt verdi. API kök adresinin ve protokolün sunucuyla eşleştiğini kontrol edin.",
+      "discoveryNoModels": "Uç nokta hiçbir model listelemedi. Modelleri elle girin.",
+      "connectionIncomplete": "Model yanıt verdi ancak tamamlamadı. Tekrar deneyin veya model ID'sini ve protokolü kontrol edin.",
       "invalidInput": "Bir arka uç adı, geçerli başlıklar ve benzersiz bir ID'ye ve ada sahip en az bir model girin. Belirteç sınırları pozitif tam sayılar olmalıdır.",
       "invalidUrl": "Kimlik bilgileri, sorgu veya parça tanımlayıcısı içermeyen bir HTTP veya HTTPS API kök adresi girin.",
       "publicHttp": "Herkese açık HTTP uç noktalarına izin verilmez. HTTPS veya özel bir yerel uç nokta kullanın.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Bu model düşünme düzeyini destekler"
     },
-    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok."
+    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok.",
+    "providerKeyRefused": "Arka uç kimlik bilgilerini reddetti. Bu arka ucun API anahtarını kontrol edin, sonra tekrar gönderin.",
+    "providerModelMissing": "Bu arka uç artık bu modeli sunmuyor. Başka bir model seçin.",
+    "providerRateLimited": "Sağlayıcı istekleri sınırlıyor. Kısa bir süre bekleyip tekrar gönderin.",
+    "providerUnavailable": "Sağlayıcı şu anda kullanılamıyor. Kısa süre sonra tekrar gönderin."
   },
   "settingsTools": {
     "confirmTitle": "Bu değişiklik onaylansın mı?"

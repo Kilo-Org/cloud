@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection)은 선택한 프로토콜과 모델을 사용하여 이 엔드포인트에 짧은 추론 요청을 보냅니다. 제공업체에서 요금을 청구할 수 있습니다.",
       "connectionSucceeded": "모델이 이 프로토콜을 사용하여 요청을 완료했습니다.",
       "connectionFailed": "모델이 요청을 완료하지 못했습니다. API 루트, 프로토콜, 인증 정보 및 모델 ID를 확인하세요.",
+      "requestTimedOut": "엔드포인트가 시간 안에 응답하지 않았습니다. API 루트와 연결을 확인한 후 다시 시도하세요.",
+      "requestUnauthorized": "엔드포인트가 인증 정보를 거부했습니다. API 키와 사용자 지정 헤더를 확인한 후 다시 시도하세요.",
+      "requestNotFound": "엔드포인트 또는 모델을 찾을 수 없습니다. API 루트와 모델 ID를 확인하세요.",
+      "requestRateLimited": "엔드포인트가 요청을 제한하고 있습니다. 잠시 기다린 후 다시 시도하세요.",
+      "requestUnavailable": "엔드포인트를 지금 사용할 수 없습니다. 잠시 후 다시 시도하세요.",
+      "requestUnreachable": "엔드포인트에 연결할 수 없습니다. API 루트와 연결을 확인하세요.",
+      "discoveryInvalidResponse": "엔드포인트가 모델 목록이 아닌 응답을 반환했습니다. API 루트와 프로토콜이 서버와 일치하는지 확인하세요.",
+      "discoveryNoModels": "엔드포인트에 모델이 없습니다. 모델을 직접 입력하세요.",
+      "connectionIncomplete": "모델이 응답했지만 완료하지 못했습니다. 다시 시도하거나 모델 ID와 프로토콜을 확인하세요.",
       "invalidInput": "백엔드 이름, 유효한 헤더, 고유한 ID와 이름이 있는 모델을 하나 이상 입력하세요. 토큰 한도는 양의 정수여야 합니다.",
       "invalidUrl": "인증 정보, 쿼리 또는 프래그먼트가 없는 HTTP 또는 HTTPS API 루트를 입력하세요.",
       "publicHttp": "공개 HTTP 엔드포인트는 허용되지 않습니다. HTTPS 또는 비공개 로컬 엔드포인트를 사용하세요.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "이 모델은 추론 강도를 지원합니다"
     },
-    "creditsRequired": "이 메시지를 보낼 크레딧이 부족합니다."
+    "creditsRequired": "이 메시지를 보낼 크레딧이 부족합니다.",
+    "providerKeyRefused": "백엔드가 인증 정보를 거부했습니다. 이 백엔드의 API 키를 확인한 후 다시 보내세요.",
+    "providerModelMissing": "이 백엔드에서 더 이상 이 모델을 제공하지 않습니다. 다른 모델을 선택하세요.",
+    "providerRateLimited": "제공자가 요청을 제한하고 있습니다. 잠시 기다린 후 다시 보내세요.",
+    "providerUnavailable": "제공자를 지금 사용할 수 없습니다. 잠시 후 다시 보내세요."
   },
   "settingsTools": {
     "confirmTitle": "이 변경 사항을 확인할까요?"

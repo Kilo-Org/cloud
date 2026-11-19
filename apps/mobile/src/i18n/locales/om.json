@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) pirootokoolii fi moodeela filataman fayyadamuun gaaffii tilmaamaa gabaabaa gara bakka walqunnamtii kanaatti erga. Dhiyeessaan kaffaltii si gaafachuu danda'a.",
       "connectionSucceeded": "Moodeelli pirootokoolii kana fayyadamuun gaaffii raawwateera.",
       "connectionFailed": "Moodeelli gaaffii raawwachuu hin dandeenye. Hundee API, pirootokoolii, odeeffannoo mirkaneessa eenyummaa fi ID moodeelaa ilaali.",
+      "requestTimedOut": "Bakki walqunnamtii yeroon isaaf qabame keessatti deebii hin kennine. Hundee API fi walqunnamtii kee ilaali, sana booda irra deebi'ii yaali.",
+      "requestUnauthorized": "Bakki walqunnamtii mirkaneessa eenyummaa fudhachuu dide. Furtuu API fi mata-duree addaa ilaali, sana booda irra deebi'ii yaali.",
+      "requestNotFound": "Bakki walqunnamtii ykn moodeelli hin argamne. Hundee API fi ID moodeelaa ilaali.",
+      "requestRateLimited": "Bakki walqunnamtii gaaffiiwwan daangessaa jira. Yeroo gabaabaa eegii irra deebi'ii yaali.",
+      "requestUnavailable": "Bakki walqunnamtii amma argamuu hin danda'u. Yeroo gabaabaa booda irra deebi'ii yaali.",
+      "requestUnreachable": "Bakka walqunnamtiitti bira ga'uun hin danda'amne. Hundee API fi walqunnamtii kee ilaali.",
+      "discoveryInvalidResponse": "Bakki walqunnamtii waan tarree moodeelaa hin taane deebise. Hundee API fi pirootokooliin sarvii kanaa wajjin tokko ta'uu mirkaneessi.",
+      "discoveryNoModels": "Bakki walqunnamtii moodeela tokkoon iyyuu hin tarreessine. Moodeelota harkaan galchi.",
+      "connectionIncomplete": "Moodeelli deebii kenneera garuu hin xumurre. Irra deebi'ii yaali, ykn ID moodeelaa fi pirootokoolii ilaali.",
       "invalidInput": "Maqaa sirna duubaa, matadureewwan sirrii fi yoo xiqqaate moodeela tokko ID fi maqaa adda ta'e qabu galchi. Daangaawwan tokanootaa lakkoofsota guutuu zeeroo caalan ta'uu qabu.",
       "invalidUrl": "Hundee API HTTP ykn HTTPS odeeffannoo mirkaneessa eenyummaa, gaaffii barbaachaa ykn kutaa URL hin qabne galchi.",
       "publicHttp": "Bakkeewwan walqunnamtii HTTP uummataaf banaa ta'an hin hayyamaman. HTTPS ykn bakka walqunnamtii naannoo dhuunfaa fayyadami.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Moodeelli kun sadarkaa xiinxalaa ni deeggara"
     },
-    "creditsRequired": "Kiriiditiin ergaa kanaa erguuf gahaa miti."
+    "creditsRequired": "Kiriiditiin ergaa kanaa erguuf gahaa miti.",
+    "providerKeyRefused": "Sarviin kun mirkaneessa eenyummaa fudhachuu dide. Furtuu API sarvii kanaa ilaali, sana booda irra deebi'ii ergi.",
+    "providerModelMissing": "Sarviin kun moodeela kana amma hin kennu. Moodeela biraa filadhu.",
+    "providerRateLimited": "Dhiyeessaan gaaffiiwwan daangessaa jira. Yeroo gabaabaa eegii irra deebi'ii ergi.",
+    "providerUnavailable": "Dhiyeessaan amma argamuu hin danda'u. Yeroo gabaabaa keessatti irra deebi'ii ergi."
   },
   "settingsTools": {
     "confirmTitle": "Jijjiirama kana mirkaneessuu?"

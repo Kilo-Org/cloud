@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sendet eine kurze Inferenzanfrage mit dem ausgewählten Protokoll und Modell an diesen Endpunkt. Der Anbieter kann dafür Gebühren berechnen.",
       "connectionSucceeded": "Das Modell hat eine Anfrage mit diesem Protokoll erfolgreich ausgeführt.",
       "connectionFailed": "Das Modell konnte eine Anfrage nicht ausführen. Prüfe die API-Basis-URL, das Protokoll, die Zugangsdaten und die Modell-ID.",
+      "requestTimedOut": "Der Endpunkt hat nicht rechtzeitig geantwortet. Prüfe die API-Basis-URL und deine Verbindung und versuche es dann erneut.",
+      "requestUnauthorized": "Der Endpunkt hat die Zugangsdaten abgelehnt. Prüfe den API-Schlüssel und die benutzerdefinierten Header und versuche es dann erneut.",
+      "requestNotFound": "Der Endpunkt oder das Modell wurde nicht gefunden. Prüfe die API-Basis-URL und die Modell-ID.",
+      "requestRateLimited": "Der Endpunkt begrenzt Anfragen. Warte einen Moment und versuche es erneut.",
+      "requestUnavailable": "Der Endpunkt ist derzeit nicht verfügbar. Versuche es gleich noch einmal.",
+      "requestUnreachable": "Der Endpunkt konnte nicht erreicht werden. Prüfe die API-Basis-URL und deine Verbindung.",
+      "discoveryInvalidResponse": "Der Endpunkt hat mit etwas geantwortet, das keine Modellliste ist. Prüfe, ob API-Basis-URL und Protokoll zum Server passen.",
+      "discoveryNoModels": "Der Endpunkt hat keine Modelle aufgelistet. Gib Modelle manuell ein.",
+      "connectionIncomplete": "Das Modell hat geantwortet, aber nicht abgeschlossen. Versuche es erneut oder prüfe die Modell-ID und das Protokoll.",
       "invalidInput": "Gib einen Backend-Namen, gültige Header und mindestens ein Modell mit eindeutiger ID und eindeutigem Namen ein. Token-Limits müssen positive ganze Zahlen sein.",
       "invalidUrl": "Gib eine HTTP- oder HTTPS-API-Basis-URL ohne Zugangsdaten, Abfrageparameter oder Fragment ein.",
       "publicHttp": "Öffentliche HTTP-Endpunkte sind nicht erlaubt. Verwende HTTPS oder einen privaten lokalen Endpunkt.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
     },
-    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden."
+    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden.",
+    "providerKeyRefused": "Das Backend hat die Zugangsdaten abgelehnt. Prüfe den API-Schlüssel dieses Backends und sende dann erneut.",
+    "providerModelMissing": "Dieses Backend stellt dieses Modell nicht mehr bereit. Wähle ein anderes Modell.",
+    "providerRateLimited": "Der Anbieter begrenzt Anfragen. Warte einen Moment und sende dann erneut.",
+    "providerUnavailable": "Der Anbieter ist derzeit nicht verfügbar. Sende in Kürze erneut."
   },
   "settingsTools": {
     "confirmTitle": "Diese Änderung bestätigen?"

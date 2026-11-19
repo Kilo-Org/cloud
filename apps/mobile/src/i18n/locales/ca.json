@@ -3945,6 +3945,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) envia una sol·licitud breu d'inferència a aquest punt de connexió amb el protocol i el model seleccionats. El proveïdor pot cobrar per aquesta sol·licitud.",
       "connectionSucceeded": "El model ha completat una sol·licitud amb aquest protocol.",
       "connectionFailed": "El model no ha pogut completar una sol·licitud. Comprova l'arrel de l'API, el protocol, les credencials i l'ID del model.",
+      "requestTimedOut": "El punt de connexió no ha respost a temps. Comprova l'arrel de l'API i la teva connexió, i torna-ho a provar.",
+      "requestUnauthorized": "El punt de connexió ha rebutjat les credencials. Comprova la clau de l'API i les capçaleres personalitzades, i torna-ho a provar.",
+      "requestNotFound": "No s'ha trobat el punt de connexió ni el model. Comprova l'arrel de l'API i l'ID del model.",
+      "requestRateLimited": "El punt de connexió està limitant les sol·licituds. Espera un moment i torna-ho a provar.",
+      "requestUnavailable": "El punt de connexió no està disponible ara mateix. Torna-ho a provar d'aquí a un moment.",
+      "requestUnreachable": "No s'ha pogut arribar al punt de connexió. Comprova l'arrel de l'API i la teva connexió.",
+      "discoveryInvalidResponse": "El punt de connexió ha respost amb una cosa que no és una llista de models. Comprova que l'arrel de l'API i el protocol coincideixin amb el servidor.",
+      "discoveryNoModels": "El punt de connexió no ha llistat cap model. Introdueix els models manualment.",
+      "connectionIncomplete": "El model ha respost però no ha acabat. Torna-ho a provar o comprova l'ID del model i el protocol.",
       "invalidInput": "Introdueix un nom de servidor, capçaleres vàlides i almenys un model amb un ID i un nom únics. Els límits de tòkens han de ser nombres enters positius.",
       "invalidUrl": "Introdueix una arrel d'API HTTP o HTTPS sense credencials, consulta ni fragment.",
       "publicHttp": "No es permeten punts de connexió HTTP públics. Utilitza HTTPS o un punt de connexió local privat.",
@@ -4079,7 +4088,11 @@
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"
     },
-    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge."
+    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge.",
+    "providerKeyRefused": "El servidor ha rebutjat les credencials. Comprova la clau de l'API d'aquest servidor i torna a enviar.",
+    "providerModelMissing": "Aquest servidor ja no ofereix aquest model. Tria un altre model.",
+    "providerRateLimited": "El proveïdor està limitant les sol·licituds. Espera un moment i torna a enviar.",
+    "providerUnavailable": "El proveïdor no està disponible ara mateix. Torna a enviar d'aquí a poc."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar aquest canvi?"

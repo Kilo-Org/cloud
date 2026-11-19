@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) envía unha petición breve de inferencia a este punto de acceso co protocolo e o modelo seleccionados. O provedor pode cobrar por ela.",
       "connectionSucceeded": "O modelo completou unha petición usando este protocolo.",
       "connectionFailed": "O modelo non puido completar unha petición. Comproba o URL raíz da API, o protocolo, as credenciais e o ID do modelo.",
+      "requestTimedOut": "O punto de acceso non respondeu a tempo. Comproba o URL raíz da API e a túa conexión e téntao de novo.",
+      "requestUnauthorized": "O punto de acceso rexeitou as credenciais. Comproba a clave da API e as cabeceiras personalizadas e téntao de novo.",
+      "requestNotFound": "Non se atopou o punto de acceso nin o modelo. Comproba o URL raíz da API e o ID do modelo.",
+      "requestRateLimited": "O punto de acceso está a limitar as peticións. Agarda un momento e téntao de novo.",
+      "requestUnavailable": "O punto de acceso non está dispoñible agora mesmo. Téntao de novo nun momento.",
+      "requestUnreachable": "Non se puido acceder ao punto de acceso. Comproba o URL raíz da API e a túa conexión.",
+      "discoveryInvalidResponse": "O punto de acceso respondeu con algo que non é unha lista de modelos. Comproba que o URL raíz da API e o protocolo coinciden co servidor.",
+      "discoveryNoModels": "O punto de acceso non listou ningún modelo. Introduce os modelos manualmente.",
+      "connectionIncomplete": "O modelo respondeu pero non rematou. Téntao de novo ou comproba o ID do modelo e o protocolo.",
       "invalidInput": "Introduce un nome de servizo, cabeceiras válidas e polo menos un modelo cun ID único e un nome. Os límites de tókens deben ser números enteiros positivos.",
       "invalidUrl": "Introduce un URL raíz da API con HTTP ou HTTPS, sen credenciais, parámetros de consulta nin un fragmento.",
       "publicHttp": "Non se permiten puntos de acceso HTTP públicos. Usa HTTPS ou un punto de acceso local privado.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esforzo de razoamento"
     },
-    "creditsRequired": "Non hai créditos suficientes para enviar esta mensaxe."
+    "creditsRequired": "Non hai créditos suficientes para enviar esta mensaxe.",
+    "providerKeyRefused": "O servizo rexeitou as credenciais. Comproba a clave de API deste servizo e envía de novo.",
+    "providerModelMissing": "Este servizo xa non ofrece este modelo. Escolle outro modelo.",
+    "providerRateLimited": "O provedor está a limitar as peticións. Agarda un momento e envía de novo.",
+    "providerUnavailable": "O provedor non está dispoñible agora mesmo. Envía de novo en breve."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar este cambio?"

@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) skickar en kort inferensbegäran till den här slutpunkten med valt protokoll och vald modell. Leverantören kan ta betalt för den.",
       "connectionSucceeded": "Modellen slutförde en begäran med det här protokollet.",
       "connectionFailed": "Modellen kunde inte slutföra en begäran. Kontrollera API-roten, protokollet, inloggningsuppgifterna och modell-ID:t.",
+      "requestTimedOut": "Slutpunkten svarade inte i tid. Kontrollera API-roten och din anslutning och försök igen.",
+      "requestUnauthorized": "Slutpunkten nekade inloggningsuppgifterna. Kontrollera API-nyckeln och de anpassade rubrikerna och försök igen.",
+      "requestNotFound": "Slutpunkten eller modellen hittades inte. Kontrollera API-roten och modell-ID:t.",
+      "requestRateLimited": "Slutpunkten begränsar antalet förfrågningar. Vänta ett ögonblick och försök igen.",
+      "requestUnavailable": "Slutpunkten är inte tillgänglig just nu. Försök igen om en stund.",
+      "requestUnreachable": "Det gick inte att nå slutpunkten. Kontrollera API-roten och din anslutning.",
+      "discoveryInvalidResponse": "Slutpunkten svarade med något som inte är en modellista. Kontrollera att API-roten och protokollet matchar servern.",
+      "discoveryNoModels": "Slutpunkten listade inga modeller. Ange modeller manuellt.",
+      "connectionIncomplete": "Modellen svarade men slutförde inte. Försök igen eller kontrollera modell-ID:t och protokollet.",
       "invalidInput": "Ange ett backendnamn, giltiga headers och minst en modell med unikt ID och namn. Tokengränser måste vara positiva heltal.",
       "invalidUrl": "Ange en HTTP- eller HTTPS-API-rot utan inloggningsuppgifter, frågesträng eller fragment.",
       "publicHttp": "Publika HTTP-slutpunkter är inte tillåtna. Använd HTTPS eller en privat lokal slutpunkt.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"
     },
-    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet."
+    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet.",
+    "providerKeyRefused": "Backenden nekade inloggningsuppgifterna. Kontrollera API-nyckeln för den här backenden och skicka igen.",
+    "providerModelMissing": "Den här backenden tillhandahåller inte längre den här modellen. Välj en annan modell.",
+    "providerRateLimited": "Leverantören begränsar antalet förfrågningar. Vänta ett ögonblick och skicka igen.",
+    "providerUnavailable": "Leverantören är inte tillgänglig just nu. Skicka igen om en stund."
   },
   "settingsTools": {
     "confirmTitle": "Bekräfta denna ändring?"

@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) voye yon ti demann enferans nan pwen aksè sa a avèk pwotokòl ak modèl ou chwazi yo. Founisè a ka fè w peye pou li.",
       "connectionSucceeded": "Modèl la trete yon demann avèk pwotokòl sa a.",
       "connectionFailed": "Modèl la pa t kapab trete yon demann. Verifye rasin API a, pwotokòl la, enfòmasyon pou otantifikasyon yo ak ID modèl la.",
+      "requestTimedOut": "Pwen aksè a pa t reponn alè. Verifye rasin API a ak koneksyon ou, epi eseye ankò.",
+      "requestUnauthorized": "Pwen aksè a refize kont idantifikasyon yo. Verifye kle API a ak antèt ou yo, epi eseye ankò.",
+      "requestNotFound": "Yo pa t jwenn pwen aksè a oswa modèl la. Verifye rasin API a ak ID modèl la.",
+      "requestRateLimited": "Pwen aksè a ap limite demann yo. Tann yon ti moman epi eseye ankò.",
+      "requestUnavailable": "Pwen aksè a pa disponib kounye a. Eseye ankò nan yon ti moman.",
+      "requestUnreachable": "Pa t kapab rive jwenn pwen aksè a. Verifye rasin API a ak koneksyon ou.",
+      "discoveryInvalidResponse": "Pwen aksè a reponn ak yon bagay ki pa yon lis modèl. Verifye ke rasin API a ak pwotokòl la koresponn ak sèvè a.",
+      "discoveryNoModels": "Pwen aksè a pa t bay okenn modèl. Antre modèl yo alamen.",
+      "connectionIncomplete": "Modèl la reponn men li pa t fini. Eseye ankò, oswa verifye ID modèl la ak pwotokòl la.",
       "invalidInput": "Antre yon non sèvis, antèt ki valab ak omwen yon modèl ki gen yon ID ak yon non ki pa repete. Limit jeton yo dwe nonb antye ki pi gran pase zewo.",
       "invalidUrl": "Antre yon rasin API HTTP oswa HTTPS san enfòmasyon pou otantifikasyon, paramèt rechèch oswa fragman.",
       "publicHttp": "Pwen aksè HTTP piblik yo pa otorize. Sèvi ak HTTPS oswa yon pwen aksè lokal prive.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Modèl sa a sipòte efò refleksyon"
     },
-    "creditsRequired": "Ou pa gen ase kredi pou voye mesaj sa a."
+    "creditsRequired": "Ou pa gen ase kredi pou voye mesaj sa a.",
+    "providerKeyRefused": "Sèvis la refize kont idantifikasyon yo. Verifye kle API sèvis sa a, epi voye ankò.",
+    "providerModelMissing": "Sèvis sa a pa sèvi ak modèl sa a ankò. Chwazi yon lòt modèl.",
+    "providerRateLimited": "Founisè a ap limite demann yo. Tann yon ti moman epi voye ankò.",
+    "providerUnavailable": "Founisè a pa disponib kounye a. Voye ankò talè."
   },
   "settingsTools": {
     "confirmTitle": "Konfime chanjman sa a?"

@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) waxay codsi gaaban oo jawaab soo saarid ah u dirtaa bartan adeegga iyadoo adeegsanaysa hab-maamuuska iyo moodeelka la doortay. Adeeg-bixiyuhu lacag ayuu ku dalaci karaa.",
       "connectionSucceeded": "Moodeelku wuxuu dhammeeyay codsi isagoo adeegsanaya hab-maamuuskan.",
       "connectionFailed": "Moodeelku ma dhammeeyn karin codsiga. Hubi URL-ka asalka API, hab-maamuuska, xogta aqoonsiga, iyo aqoonsiga moodeelka.",
+      "requestTimedOut": "Barta adeegga waqti ka dhaaftay. Hubi URL-ka asalka API iyo xiriirkaaga, ka dibna isku day mar kale.",
+      "requestUnauthorized": "Barta adeegga xogta aqoonsiga wuu diiday. Hubi furaha API iyo madaxyada gaarka ah, ka dibna isku day mar kale.",
+      "requestNotFound": "Barta adeegga ama moodeelka lama helin. Hubi URL-ka asalka API iyo aqoonsiga moodeelka.",
+      "requestRateLimited": "Barta adeegga codsiyada way ku xaddaysaa. Sug waqti gaaban, isku dayna mar kale.",
+      "requestUnavailable": "Barta adeegga hadda ma heli karo. Isku day mar kale waqti gaaban kadib.",
+      "requestUnreachable": "Barta adeegga lama gaari karin. Hubi URL-ka asalka API iyo xiriirkaaga.",
+      "discoveryInvalidResponse": "Jawaabta barta adeeggu ma aha liiska moodeellada. Hubi in URL-ka asalka API iyo hab-maamuusku ay u dhigmaan kuwa adeegga.",
+      "discoveryNoModels": "Liiska barta adeegga ma ku jirin moodeellada. Moodeellada gacanta ku geli.",
+      "connectionIncomplete": "Moodeelka jawaabu wuu bixiyay, laakiin waanu dhammeeyn. Isku dayna mar kale, ama hubi aqoonsiga moodeelka iyo hab-maamuuska.",
       "invalidInput": "Geli magaca adeegga gadaale, madaxyo sax ah, iyo ugu yaraan hal moodeel oo leh aqoonsi iyo magac u gaar ah. Xaddidaadaha unugyada qoraalku waa inay noqdaan tirooyin dhan oo ka weyn eber.",
       "invalidUrl": "Geli URL-ka asalka API ee HTTP ama HTTPS oo aan lahayn xogta aqoonsiga, qaybta weydiinta, ama jajabka URL-ka.",
       "publicHttp": "Baraha adeegga HTTP ee dadweynaha lama oggola. Isticmaal HTTPS, ama bar adeeg oo gaar ah oo shabakadda gudaha ah.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Moodeelkani wuxuu taageeraa heerka fikirka"
     },
-    "creditsRequired": "Lacagta isticmaalka kuma filna farriintan la soo diray."
+    "creditsRequired": "Lacagta isticmaalka kuma filna farriintan la soo diray.",
+    "providerKeyRefused": "Backend-ka xogta aqoonsiga wuu diiday. Hubi furaha API backend-kan, ka dibna dib u dir farriinta.",
+    "providerModelMissing": "Backend-kan hadda ma adeegsado moodeelkan. Dooro moodeel kale.",
+    "providerRateLimited": "Adeeg-bixiyuhu codsiyada lama xaddayaa. Sug waqti gaaban, dib u dir farriinta.",
+    "providerUnavailable": "Adeeg-bixiyuhu hadda ma heli karo. Dib u dir farriinta dhawaan."
   },
   "settingsTools": {
     "confirmTitle": "Ma xaqiijinayaa isbeddelkan?"

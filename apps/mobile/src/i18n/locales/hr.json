@@ -3945,6 +3945,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) šalje kratak zahtjev za izvođenje modela ovoj krajnjoj točki koristeći odabrani protokol i model. Pružatelj usluge može ga naplatiti.",
       "connectionSucceeded": "Model je uspješno obradio zahtjev koristeći ovaj protokol.",
       "connectionFailed": "Model nije mogao obraditi zahtjev. Provjeri osnovni URL API-ja, protokol, vjerodajnice i ID modela.",
+      "requestTimedOut": "Krajnja točka nije odgovorila na vrijeme. Provjeri osnovni URL API-ja i vezu, pa pokušaj ponovno.",
+      "requestUnauthorized": "Krajnja točka odbila je vjerodajnice. Provjeri API ključ i prilagođena zaglavlja, pa pokušaj ponovno.",
+      "requestNotFound": "Krajnja točka ili model nisu pronađeni. Provjeri osnovni URL API-ja i ID modela.",
+      "requestRateLimited": "Krajnja točka ograničava zahtjeve. Pričekaj trenutak i pokušaj ponovno.",
+      "requestUnavailable": "Krajnja točka trenutačno nije dostupna. Pokušaj ponovno za trenutak.",
+      "requestUnreachable": "Do krajnje točke nije se moglo doći. Provjeri osnovni URL API-ja i vezu.",
+      "discoveryInvalidResponse": "Krajnja točka odgovorila je nečim što nije popis modela. Provjeri da osnovni URL API-ja i protokol odgovaraju poslužitelju.",
+      "discoveryNoModels": "Krajnja točka nije prikazala nijedan model. Unesi modele ručno.",
+      "connectionIncomplete": "Model je odgovorio, ali nije dovršio. Pokušaj ponovno ili provjeri ID modela i protokol.",
       "invalidInput": "Unesi naziv pozadinskog sustava, valjana zaglavlja i barem jedan model s jedinstvenim ID-jem i nazivom. Ograničenja broja tokena moraju biti pozitivni cijeli brojevi.",
       "invalidUrl": "Unesi osnovni HTTP ili HTTPS URL API-ja bez vjerodajnica, upita ili fragmenta.",
       "publicHttp": "Javne HTTP krajnje točke nisu dopuštene. Koristi HTTPS ili privatnu lokalnu krajnju točku.",
@@ -4079,7 +4088,11 @@
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
     },
-    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke."
+    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke.",
+    "providerKeyRefused": "Pozadinski sustav odbio je vjerodajnice. Provjeri API ključ ovog pozadinskog sustava, pa pošalji ponovno.",
+    "providerModelMissing": "Ovaj pozadinski sustav više ne poslužuje ovaj model. Odaberi drugi model.",
+    "providerRateLimited": "Pružatelj ograničava zahtjeve. Pričekaj trenutak i pošalji ponovno.",
+    "providerUnavailable": "Pružatelj trenutačno nije dostupan. Pošalji ponovno uskoro."
   },
   "settingsTools": {
     "confirmTitle": "Potvrditi ovu promjenu?"

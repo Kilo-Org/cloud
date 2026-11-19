@@ -3884,6 +3884,15 @@
       "checkHelp": "Nupp „$t(modelChat.backends.checkConnection)“ saadab sellele lõpp-punktile lühikese järelduspäringu, kasutades valitud protokolli ja mudelit. Teenusepakkuja võib selle eest tasu küsida.",
       "connectionSucceeded": "Mudel täitis päringu selle protokolli abil.",
       "connectionFailed": "Mudel ei suutnud päringut täita. Kontrolli API juur-URL-i, protokolli, autentimisandmeid ja mudeli ID-d.",
+      "requestTimedOut": "Lõpp-punkt ei vastanud õigel ajal. Kontrolli API juur-URL-i ja ühendust, seejärel proovi uuesti.",
+      "requestUnauthorized": "Lõpp-punkt keeldus autentimisandmetest. Kontrolli API-võtit ja kohandatud päiseid, seejärel proovi uuesti.",
+      "requestNotFound": "Lõpp-punkti ega mudelit ei leitud. Kontrolli API juur-URL-i ja mudeli ID-d.",
+      "requestRateLimited": "Lõpp-punkt piirab päringuid. Oota hetk ja proovi uuesti.",
+      "requestUnavailable": "Lõpp-punkt pole praegu saadaval. Proovi hetke pärast uuesti.",
+      "requestUnreachable": "Lõpp-punktini ei õnnestunud jõuda. Kontrolli API juur-URL-i ja ühendust.",
+      "discoveryInvalidResponse": "Lõpp-punkt vastas millegagi, mis pole mudelite loend. Kontrolli, et API juur-URL ja protokoll vastaksid serverile.",
+      "discoveryNoModels": "Lõpp-punkt ei loetlenud ühtki mudelit. Sisesta mudelid käsitsi.",
+      "connectionIncomplete": "Mudel vastas, kuid ei lõpetanud. Proovi uuesti või kontrolli mudeli ID-d ja protokolli.",
       "invalidInput": "Sisesta taustsüsteemi nimi, kehtivad päised ja vähemalt üks kordumatu ID ja nimega mudel. Tokenite piirangud peavad olema positiivsed täisarvud.",
       "invalidUrl": "Sisesta HTTP või HTTPS API juur-URL ilma autentimisandmete, päringustringi ja fragmendita.",
       "publicHttp": "Avalikud HTTP lõpp-punktid pole lubatud. Kasuta HTTPS-i või privaatset kohalikku lõpp-punkti.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
     },
-    "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks."
+    "creditsRequired": "Krediiti ei piisa selle sõnumi saatmiseks.",
+    "providerKeyRefused": "Taustsüsteem keeldus autentimisandmetest. Kontrolli selle taustsüsteemi API-võtit, seejärel saada uuesti.",
+    "providerModelMissing": "See taustsüsteem ei teeninda enam seda mudelit. Vali mõni teine mudel.",
+    "providerRateLimited": "Teenusepakkuja piirab päringuid. Oota hetk ja saada uuesti.",
+    "providerUnavailable": "Teenusepakkuja pole praegu saadaval. Saada varsti uuesti."
   },
   "settingsTools": {
     "confirmTitle": "Kas kinnitada see muudatus?"

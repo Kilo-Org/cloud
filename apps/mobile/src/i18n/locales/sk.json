@@ -4006,6 +4006,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) odošle na tento koncový bod krátku požiadavku na inferenciu pomocou vybraného protokolu a modelu. Poskytovateľ si za ňu môže účtovať poplatok.",
       "connectionSucceeded": "Model úspešne spracoval požiadavku pomocou tohto protokolu.",
       "connectionFailed": "Model nedokázal spracovať požiadavku. Skontrolujte základnú URL API, protokol, prihlasovacie údaje a ID modelu.",
+      "requestTimedOut": "Koncový bod včas neodpovedal. Skontrolujte základnú URL API a pripojenie a skúste to znova.",
+      "requestUnauthorized": "Koncový bod odmietol prihlasovacie údaje. Skontrolujte API kľúč a vlastné hlavičky a skúste to znova.",
+      "requestNotFound": "Koncový bod alebo model sa nenašiel. Skontrolujte základnú URL API a ID modelu.",
+      "requestRateLimited": "Koncový bod obmedzuje požiadavky. Chvíľu počkajte a skúste to znova.",
+      "requestUnavailable": "Koncový bod je teraz nedostupný. Skúste to o chvíľu znova.",
+      "requestUnreachable": "Koncový bod sa nepodarilo dosiahnuť. Skontrolujte základnú URL API a pripojenie.",
+      "discoveryInvalidResponse": "Koncový bod odpovedal obsahom, ktorý nie je zoznam modelov. Skontrolujte, či základná URL API a protokol zodpovedajú serveru.",
+      "discoveryNoModels": "Koncový bod neuviedol žiadne modely. Zadajte modely ručne.",
+      "connectionIncomplete": "Model odpovedal, ale nedokončil odpoveď. Skúste to znova alebo skontrolujte ID modelu a protokol.",
       "invalidInput": "Zadajte názov servera, platné hlavičky a aspoň jeden model s jedinečným ID a názvom. Limity tokenov musia byť kladné celé čísla.",
       "invalidUrl": "Zadajte základnú URL API s HTTP alebo HTTPS bez prihlasovacích údajov, parametrov dopytu alebo fragmentu.",
       "publicHttp": "Verejné koncové body HTTP nie sú povolené. Použite HTTPS alebo súkromný lokálny koncový bod.",
@@ -4140,7 +4149,11 @@
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
     },
-    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov."
+    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov.",
+    "providerKeyRefused": "Backend odmietol prihlasovacie údaje. Skontrolujte API kľúč tohto backendu a skúste odoslať znova.",
+    "providerModelMissing": "Tento backend už tento model neposkytuje. Vyberte iný model.",
+    "providerRateLimited": "Poskytovateľ obmedzuje požiadavky. Chvíľu počkajte a skúste odoslať znova.",
+    "providerUnavailable": "Poskytovateľ je teraz nedostupný. O chvíľu skúste odoslať znova."
   },
   "settingsTools": {
     "confirmTitle": "Potvrdiť túto zmenu?"

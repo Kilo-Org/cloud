@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sender en kort inferensforespørsel til dette endepunktet med den valgte protokollen og modellen. Leverandøren kan ta betalt for dette.",
       "connectionSucceeded": "Modellen fullførte en forespørsel med denne protokollen.",
       "connectionFailed": "Modellen kunne ikke fullføre en forespørsel. Sjekk API-rotadressen, protokollen, påloggingsinformasjonen og modell-ID-en.",
+      "requestTimedOut": "Endepunktet svarte ikke i tide. Sjekk API-rotadressen og tilkoblingen, og prøv igjen.",
+      "requestUnauthorized": "Endepunktet avviste påloggingsinformasjonen. Sjekk API-nøkkelen og egendefinerte headere, og prøv igjen.",
+      "requestNotFound": "Endepunktet eller modellen ble ikke funnet. Sjekk API-rotadressen og modell-ID-en.",
+      "requestRateLimited": "Endepunktet begrenser antall forespørsler. Vent litt og prøv igjen.",
+      "requestUnavailable": "Endepunktet er utilgjengelig akkurat nå. Prøv igjen om et øyeblikk.",
+      "requestUnreachable": "Det var ikke mulig å nå endepunktet. Sjekk API-rotadressen og tilkoblingen.",
+      "discoveryInvalidResponse": "Endepunktet svarte med noe som ikke er en modelliste. Sjekk at API-rotadressen og protokollen stemmer med serveren.",
+      "discoveryNoModels": "Endepunktet listet ingen modeller. Legg inn modeller manuelt.",
+      "connectionIncomplete": "Modellen svarte, men fullførte ikke. Prøv igjen, eller sjekk modell-ID-en og protokollen.",
       "invalidInput": "Skriv inn et navn på baksystemet, gyldige meldingshoder og minst én modell med unik ID og unikt navn. Tokengrensene må være positive heltall.",
       "invalidUrl": "Skriv inn en HTTP- eller HTTPS-rotadresse for API-et uten påloggingsinformasjon, spørring eller fragment.",
       "publicHttp": "Offentlige HTTP-endepunkter er ikke tillatt. Bruk HTTPS eller et privat, lokalt endepunkt.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Denne modellen støtter resonneringsinnsats"
     },
-    "creditsRequired": "Ikke nok kreditter til å sende denne meldingen."
+    "creditsRequired": "Ikke nok kreditter til å sende denne meldingen.",
+    "providerKeyRefused": "Backend-en avviste påloggingsinformasjonen. Sjekk API-nøkkelen for denne backend-en, og send på nytt.",
+    "providerModelMissing": "Denne backend-en leverer ikke lenger denne modellen. Velg en annen modell.",
+    "providerRateLimited": "Leverandøren begrenser antall forespørsler. Vent litt og send på nytt.",
+    "providerUnavailable": "Leverandøren er utilgjengelig akkurat nå. Send på nytt om litt."
   },
   "settingsTools": {
     "confirmTitle": "Bekrefte denne endringen?"

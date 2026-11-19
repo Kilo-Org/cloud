@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) stuur 'n kort inferensieversoek na hierdie eindpunt met die gekose protokol en model. Die verskaffer kan daarvoor geld vra.",
       "connectionSucceeded": "Die model het 'n versoek met hierdie protokol voltooi.",
       "connectionFailed": "Die model kon nie 'n versoek voltooi nie. Kontroleer die API-basis-URL, protokol, aanmeldbesonderhede en model-ID.",
+      "requestTimedOut": "Die eindpunt het nie betyds geantwoord nie. Kontroleer die API-basis-URL en jou verbinding en probeer dan weer.",
+      "requestUnauthorized": "Die eindpunt het die aanmeldbesonderhede geweier. Kontroleer die API-sleutel en pasgemaakte kopvelde en probeer dan weer.",
+      "requestNotFound": "Die eindpunt of model is nie gevind nie. Kontroleer die API-basis-URL en die model-ID.",
+      "requestRateLimited": "Die eindpunt beperk versoeke. Wag 'n oomblik en probeer weer.",
+      "requestUnavailable": "Die eindpunt is tans onbeskikbaar. Probeer oor 'n oomblik weer.",
+      "requestUnreachable": "Die eindpunt kon nie bereik word nie. Kontroleer die API-basis-URL en jou verbinding.",
+      "discoveryInvalidResponse": "Die eindpunt het geantwoord met iets wat nie 'n modellys is nie. Kontroleer dat die API-basis-URL en protokol by die bediener pas.",
+      "discoveryNoModels": "Die eindpunt het geen modelle gelys nie. Voer modelle handmatig in.",
+      "connectionIncomplete": "Die model het geantwoord maar nie klaargemaak nie. Probeer weer of kontroleer die model-ID en protokol.",
       "invalidInput": "Voer 'n agtergrondstelselnaam, geldige kopvelde en minstens een model met 'n unieke ID en naam in. Die perke vir tekseenhede moet positiewe heelgetalle wees.",
       "invalidUrl": "Voer 'n HTTP- of HTTPS-API-basis-URL sonder aanmeldbesonderhede, 'n navraag of 'n fragment in.",
       "publicHttp": "Openbare HTTP-eindpunte word nie toegelaat nie. Gebruik HTTPS of 'n private plaaslike eindpunt.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Hierdie model ondersteun denkinspanning"
     },
-    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie."
+    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie.",
+    "providerKeyRefused": "Die agtergrondstelsel het die aanmeldbesonderhede geweier. Kontroleer hierdie agtergrondstelsel se API-sleutel en stuur dan weer.",
+    "providerModelMissing": "Hierdie agtergrondstelsel bedien nie meer hierdie model nie. Kies 'n ander model.",
+    "providerRateLimited": "Die verskaffer beperk versoeke. Wag 'n oomblik en stuur weer.",
+    "providerUnavailable": "Die verskaffer is tans onbeskikbaar. Stuur binnekort weer."
   },
   "settingsTools": {
     "confirmTitle": "Bevestig hierdie verandering?"

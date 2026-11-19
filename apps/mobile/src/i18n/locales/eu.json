@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) aukerak inferentzia-eskaera labur bat bidaltzen du amaierako puntu honetara, hautatutako protokoloa eta modeloa erabiliz. Hornitzaileak hori kobratu dezake.",
       "connectionSucceeded": "Modeloak eskaera bat osatu du protokolo hau erabiliz.",
       "connectionFailed": "Modeloak ezin izan du eskaera bat osatu. Egiaztatu APIaren erroa, protokoloa, kredentzialak eta modeloaren IDa.",
+      "requestTimedOut": "Amaiera-puntuak ez du garaiz erantzun. Egiaztatu APIaren erroa eta zure konexioa, eta saiatu berriro.",
+      "requestUnauthorized": "Amaiera-puntuak kredentzialak baztertu ditu. Egiaztatu APIaren gakoa eta goiburu pertsonalizatuak, eta saiatu berriro.",
+      "requestNotFound": "Ez da amaiera-puntua edo modeloa aurkitu. Egiaztatu APIaren erroa eta modeloaren IDa.",
+      "requestRateLimited": "Amaiera-puntua eskaerak mugatzen ari da. Itxaron une bat eta saiatu berriro.",
+      "requestUnavailable": "Amaiera-puntua ez dago erabilgarri une honetan. Saiatu berriro une bat barru.",
+      "requestUnreachable": "Ezin izan da amaiera-puntura iritsi. Egiaztatu APIaren erroa eta zure konexioa.",
+      "discoveryInvalidResponse": "Amaiera-puntuak modelo-zerrenda ez den zerbait erantzun du. Egiaztatu APIaren erroa eta protokoloa zerbitzariarekin bat datozela.",
+      "discoveryNoModels": "Amaiera-puntuak ez du modelorik zerrendatu. Sartu modeloak eskuz.",
+      "connectionIncomplete": "Modeloak erantzun du, baina ez du amaitu. Saiatu berriro, edo egiaztatu modeloaren IDa eta protokoloa.",
       "invalidInput": "Sartu atzeko zerbitzuaren izena, baliozko goiburuak eta gutxienez ID eta izen bakarrak dituen modelo bat. Tokenen mugek zenbaki oso positiboak izan behar dute.",
       "invalidUrl": "Sartu HTTP edo HTTPS APIaren erro bat, kredentzialik, kontsultarik edo zatirik gabe.",
       "publicHttp": "Ez dira onartzen HTTP amaierako puntu publikoak. Erabili HTTPS edo tokiko amaierako puntu pribatu bat.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
     },
-    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko."
+    "creditsRequired": "Ez dago kreditu nahiko mezu hau bidaltzeko.",
+    "providerKeyRefused": "Atzeko zerbitzuak kredentzialak baztertu ditu. Egiaztatu atzeko zerbitzu honen APIaren gakoa, eta bidali berriro.",
+    "providerModelMissing": "Atzeko zerbitzu honek jada ez du modelo hau eskaintzen. Aukeratu beste modelo bat.",
+    "providerRateLimited": "Hornitzailea eskaerak mugatzen ari da. Itxaron une bat eta bidali berriro.",
+    "providerUnavailable": "Hornitzailea ez dago erabilgarri une honetan. Bidali berriro laster."
   },
   "settingsTools": {
     "confirmTitle": "Aldaketa hau berretsi?"

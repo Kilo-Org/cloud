@@ -4067,6 +4067,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) jibgħat talba qasira ta' inferenza lil dan il-punt ta' aċċess permezz tal-protokoll u l-mudell magħżula. Il-fornitur jista' jitlob ħlas għaliha.",
       "connectionSucceeded": "Il-mudell lesta talba permezz ta' dan il-protokoll.",
       "connectionFailed": "Il-mudell ma setax ilesti talba. Iċċekkja l-URL bażi tal-API, il-protokoll, il-kredenzjali u l-ID tal-mudell.",
+      "requestTimedOut": "Il-punt ta' aċċess ma wieġebx fil-ħin. Iċċekkja l-URL bażi tal-API u l-konnessjoni tiegħek, imbagħad erġa' pprova.",
+      "requestUnauthorized": "Il-punt ta' aċċess irrifjuta l-kredenzjali. Iċċekkja ċ-ċavetta API u l-headers personalizzati, imbagħad erġa' pprova.",
+      "requestNotFound": "Il-punt ta' aċċess jew il-mudell ma nstabx. Iċċekkja l-URL bażi tal-API u l-ID tal-mudell.",
+      "requestRateLimited": "Il-punt ta' aċċess qed jillimita t-talbiet. Stenna ftit u erġa' pprova.",
+      "requestUnavailable": "Il-punt ta' aċċess mhux disponibbli bħalissa. Erġa' pprova fi ftit ħin.",
+      "requestUnreachable": "Il-punt ta' aċċess ma setax jintlaħaq. Iċċekkja l-URL bażi tal-API u l-konnessjoni tiegħek.",
+      "discoveryInvalidResponse": "Il-punt ta' aċċess wieġeb b'xi ħaġa li mhijiex lista ta' mudelli. Iċċekkja li l-URL bażi tal-API u l-protokoll jaqblu mas-server.",
+      "discoveryNoModels": "Il-punt ta' aċċess ma llista l-ebda mudell. Daħħal il-mudelli manwalment.",
+      "connectionIncomplete": "Il-mudell wieġeb iżda ma lestiex. Erġa' pprova, jew iċċekkja l-ID tal-mudell u l-protokoll.",
       "invalidInput": "Daħħal isem għas-servizz, intestaturi validi u mill-inqas mudell wieħed b'ID u isem uniċi. Il-limiti tal-unitajiet tat-test iridu jkunu numri sħaħ pożittivi.",
       "invalidUrl": "Daħħal URL bażi tal-API li juża HTTP jew HTTPS mingħajr kredenzjali, parametri ta' mistoqsija jew framment.",
       "publicHttp": "Punti ta' aċċess pubbliċi li jużaw HTTP mhumiex permessi. Uża HTTPS jew punt ta' aċċess lokali privat.",
@@ -4201,7 +4210,11 @@
     "reasoningEffort": {
       "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
     },
-    "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ."
+    "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ.",
+    "providerKeyRefused": "Il-backend irrifjuta l-kredenzjali. Iċċekkja ċ-ċavetta API ta' dan il-backend, imbagħad erġa' ibgħat.",
+    "providerModelMissing": "Dan il-backend m'għadux jipprovdi dan il-mudell. Agħżel mudell ieħor.",
+    "providerRateLimited": "Il-fornitur qed jillimita t-talbiet. Stenna ftit u erġa' ibgħat.",
+    "providerUnavailable": "Il-fornitur mhux disponibbli bħalissa. Erġa' ibgħat fi ftit ħin."
   },
   "settingsTools": {
     "confirmTitle": "Tikkonferma din il-bidla?"

@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) hutuma ombi fupi la uzalishaji wa jibu kwenye sehemu hii ya muunganisho kwa kutumia itifaki na modeli zilizochaguliwa. Mtoa huduma anaweza kutoza ada kwa ombi hilo.",
       "connectionSucceeded": "Modeli imekamilisha ombi kwa kutumia itifaki hii.",
       "connectionFailed": "Modeli haikuweza kukamilisha ombi. Angalia URL ya msingi ya API, itifaki, taarifa za uthibitishaji na kitambulisho cha modeli.",
+      "requestTimedOut": "Sehemu ya muunganisho haikujibu kwa wakati. Angalia URL ya msingi ya API na muunganisho wako, kisha ujaribu tena.",
+      "requestUnauthorized": "Sehemu ya muunganisho imekataa taarifa za uthibitishaji. Angalia ufunguo wa API na vichwa maalum, kisha ujaribu tena.",
+      "requestNotFound": "Sehemu ya muunganisho au modeli haijapatikana. Angalia URL ya msingi ya API na kitambulisho cha modeli.",
+      "requestRateLimited": "Sehemu ya muunganisho inaweka kikomo kwa maombi. Subiri kidogo kisha ujaribu tena.",
+      "requestUnavailable": "Sehemu ya muunganisho haipatikani kwa sasa. Jaribu tena baada ya muda mfupi.",
+      "requestUnreachable": "Sehemu ya muunganisho haikuweza kufikiwa. Angalia URL ya msingi ya API na muunganisho wako.",
+      "discoveryInvalidResponse": "Sehemu ya muunganisho ilijibu kwa kitu ambacho si orodha ya modeli. Angalia kwamba URL ya msingi ya API na itifaki zinaoana na seva.",
+      "discoveryNoModels": "Sehemu ya muunganisho haikuorodhesha modeli yoyote. Ingiza modeli mwenyewe.",
+      "connectionIncomplete": "Modeli ilijibu lakini haikukamilisha. Jaribu tena, au angalia kitambulisho cha modeli na itifaki.",
       "invalidInput": "Weka jina la huduma, vichwa halali na angalau modeli moja yenye kitambulisho na jina la kipekee. Vikomo vya tokeni lazima viwe namba kamili kubwa kuliko sifuri.",
       "invalidUrl": "Weka URL ya msingi ya API inayotumia HTTP au HTTPS bila taarifa za uthibitishaji, hoja ya utafutaji au kipande cha URL.",
       "publicHttp": "Sehemu za muunganisho za HTTP za umma haziruhusiwi. Tumia HTTPS au sehemu ya muunganisho ya ndani ya mtandao binafsi.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
     },
-    "creditsRequired": "Salio halitoshi kutuma ujumbe huu."
+    "creditsRequired": "Salio halitoshi kutuma ujumbe huu.",
+    "providerKeyRefused": "Backend imekataa taarifa za uthibitishaji. Angalia ufunguo wa API wa backend hii, kisha utume tena.",
+    "providerModelMissing": "Backend hii haitoi modeli hii tena. Chagua modeli nyingine.",
+    "providerRateLimited": "Mtoa huduma anaweka kikomo kwa maombi. Subiri kidogo kisha utume tena.",
+    "providerUnavailable": "Mtoa huduma hapatikani kwa sasa. Tuma tena baada ya muda mfupi."
   },
   "settingsTools": {
     "confirmTitle": "Thibitisha mabadiliko haya?"

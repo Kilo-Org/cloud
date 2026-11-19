@@ -3884,6 +3884,15 @@
       "checkHelp": "Ka tukuna e te pāwhiri i te $t(modelChat.backends.checkConnection) he tono whakatau poto ki tēnei pūwāhi mā te kawa me te tauira kua kōwhiria. Ka utu pea te kaiwhakarato mō taua tono.",
       "connectionSucceeded": "I oti i te tauira tētahi tono mā tēnei kawa.",
       "connectionFailed": "Kāore i taea e te tauira te whakaoti i tētahi tono. Tirohia te pūtake API, te kawa, ngā taipitopito motuhēhēnga, me te tautuhi tauira.",
+      "requestTimedOut": "Kāore te pūwāhi i whakautu i te wā tika. Tirohia te pūtake API me tō hononga, kātahi ka ngana anō.",
+      "requestUnauthorized": "I whakakore te pūwāhi i ngā taipitopito motuhēhēnga. Tirohia te kī API me ngā upoko ritenga, kātahi ka ngana anō.",
+      "requestNotFound": "Kāore i kitea te pūwāhi, te tauira rānei. Tirohia te pūtake API me te tautuhi tauira.",
+      "requestRateLimited": "Kei te whakawhāiti te pūwāhi i ngā tono. Tatari mō tētahi wā poto, kātahi ka ngana anō.",
+      "requestUnavailable": "Kāore te pūwāhi e wātea ana ināianei. Ngana anō ā tētahi wā poto.",
+      "requestUnreachable": "Kāore i taea te toro atu ki te pūwāhi. Tirohia te pūtake API me tō hononga.",
+      "discoveryInvalidResponse": "Ehara te whakautu a te pūwāhi i te rārangi tauira. Tirohia mēnā e hāngai ana te pūtake API me te kawa ki te tūmau.",
+      "discoveryNoModels": "Kāore te pūwāhi i whakarārangi tauira. Whakaurua ā-ringa ngā tauira.",
+      "connectionIncomplete": "I whakautu te tauira, engari kāore i oti te tono. Ngana anō, tirohia rānei te tautuhi tauira me te kawa.",
       "invalidInput": "Whakaurua he ingoa pūnaha tuarā, he pane tika, me tētahi tauira neke atu rānei, he tautuhi me te ingoa ahurei tō ia tauira. Me tau tōpū nui ake i te kore ngā tepe waeine kupu.",
       "invalidUrl": "Whakaurua he pūtake API HTTP, HTTPS rānei, kāore he taipitopito motuhēhēnga, he uiui, he wāhanga URL rānei.",
       "publicHttp": "Kāore e whakaaetia ngā pūwāhi HTTP tūmatanui. Whakamahia te HTTPS, tētahi pūwāhi paetata tūmataiti rānei.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Ka tautoko tēnei tauira i te kaha whakaaro"
     },
-    "creditsRequired": "Kāore i te nui ake ngā moni tōmua hei tuku i tēnei karere."
+    "creditsRequired": "Kāore i te nui ake ngā moni tōmua hei tuku i tēnei karere.",
+    "providerKeyRefused": "I whakakore te taha muri i ngā taipitopito motuhēhēnga. Tirohia te kī API o tēnei taha muri, kātahi ka tuku anō.",
+    "providerModelMissing": "Kua kore tēnei taha muri e whakarato i tēnei tauira. Kōwhiria tētahi atu tauira.",
+    "providerRateLimited": "Kei te whakawhāiti te kaiwhakarato i ngā tono. Tatari mō tētahi wā poto, kātahi ka tuku anō.",
+    "providerUnavailable": "Kāore te kaiwhakarato e wātea ana ināianei. Tuku anō ā tētahi wā poto."
   },
   "settingsTools": {
     "confirmTitle": "Whakaū i tēnei huringa?"

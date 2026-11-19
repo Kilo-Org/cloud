@@ -3884,6 +3884,15 @@
       "checkHelp": "Ang $t(modelChat.backends.checkConnection) ay nagpapadala ng maikling kahilingan sa paghihinuha sa endpoint na ito gamit ang napiling protokol at modelo. Maaaring maningil ang tagapagbigay para rito.",
       "connectionSucceeded": "Nakumpleto ng modelo ang isang kahilingan gamit ang protokol na ito.",
       "connectionFailed": "Hindi nakumpleto ng modelo ang isang kahilingan. Suriin ang pangunahing URL ng API, protokol, mga kredensyal, at ID ng modelo.",
+      "requestTimedOut": "Hindi sumagot ang endpoint sa takdang oras. Suriin ang pangunahing URL ng API at ang iyong koneksyon, pagkatapos ay subukang muli.",
+      "requestUnauthorized": "Tinanggihan ng endpoint ang mga kredensyal. Suriin ang API key at mga custom na header, pagkatapos ay subukang muli.",
+      "requestNotFound": "Hindi natagpuan ang endpoint o modelo. Suriin ang pangunahing URL ng API at ang ID ng modelo.",
+      "requestRateLimited": "Nililimitahan ng endpoint ang mga kahilingan. Maghintay sandali at subukang muli.",
+      "requestUnavailable": "Hindi available ang endpoint sa ngayon. Subukang muli sa ilang sandali.",
+      "requestUnreachable": "Hindi maabot ang endpoint. Suriin ang pangunahing URL ng API at ang iyong koneksyon.",
+      "discoveryInvalidResponse": "Sumagot ang endpoint ng isang bagay na hindi listahan ng modelo. Tiyakin na tumutugma ang pangunahing URL ng API at protocol sa server.",
+      "discoveryNoModels": "Walang nakalista na modelo ang endpoint. Maglagay ng mga modelo nang manu-mano.",
+      "connectionIncomplete": "Sumagot ang modelo ngunit hindi natapos. Subukang muli, o suriin ang ID ng modelo at protocol.",
       "invalidInput": "Maglagay ng pangalan ng sistema, mga wastong header, at kahit isang modelo na may natatanging ID at pangalan. Ang mga limitasyon sa token ay dapat mga positibong buong bilang.",
       "invalidUrl": "Maglagay ng pangunahing URL ng API na gumagamit ng HTTP o HTTPS at walang mga kredensyal, mga parameter ng query, o fragment.",
       "publicHttp": "Hindi pinapayagan ang mga pampublikong HTTP endpoint. Gumamit ng HTTPS o isang pribadong lokal na endpoint.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
     },
-    "creditsRequired": "Kulang ang kredito para ipadala ang mensaheng ito."
+    "creditsRequired": "Kulang ang kredito para ipadala ang mensaheng ito.",
+    "providerKeyRefused": "Tinanggihan ng backend ang mga kredensyal. Suriin ang API key ng backend na ito, pagkatapos ay muling ipadala.",
+    "providerModelMissing": "Hindi na nag-aalok ang backend na ito ng modelong ito. Pumili ng ibang modelo.",
+    "providerRateLimited": "Nililimitahan ng provider ang mga kahilingan. Maghintay sandali at muling ipadala.",
+    "providerUnavailable": "Hindi available ang provider sa ngayon. Muling ipadala sa ilang sandali."
   },
   "settingsTools": {
     "confirmTitle": "Kumpirmahin ang pagbabagong ito?"

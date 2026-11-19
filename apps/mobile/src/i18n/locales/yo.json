@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) ń fi ìbéèrè ìṣírò àbájáde kúkúrú ránṣẹ́ sí ibi ìsopọ̀ yìí ní lílo ìlànà àti awoṣe tí a yàn. Olùpèsè lè gba owó fún un.",
       "connectionSucceeded": "Awoṣe náà parí ìbéèrè kan ní lílo ìlànà yìí.",
       "connectionFailed": "Awoṣe náà kò lè parí ìbéèrè kan. Ṣàyẹ̀wò ìpìlẹ̀ API, ìlànà, àwọn ẹ̀rí ìwọlé, àti ID awoṣe.",
+      "requestTimedOut": "Ibi ìsopọ̀ kò dáhùn ní àkókò. Ṣàyẹ̀wò ìpìlẹ̀ API àti ìsopọ̀ rẹ, kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
+      "requestUnauthorized": "Ibi ìsopọ̀ kọ àwọn ẹ̀rí ìwọlé. Ṣàyẹ̀wò kọ́kọ́rọ́ API àti àwọn àkọlé àdáni, kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
+      "requestNotFound": "A kò rí ibi ìsopọ̀ tàbí awoṣe náà. Ṣàyẹ̀wò ìpìlẹ̀ API àti ID awoṣe.",
+      "requestRateLimited": "Ibi ìsopọ̀ ń dín àwọn ìbéèrè kù. Dúró díẹ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
+      "requestUnavailable": "Ibi ìsopọ̀ kò sí lárọ̀ọ́wọ́tó báyìí. Gbìyànjú lẹ́ẹ̀kan sí i ní kété.",
+      "requestUnreachable": "A kò lè dé ibi ìsopọ̀. Ṣàyẹ̀wò ìpìlẹ̀ API àti ìsopọ̀ rẹ.",
+      "discoveryInvalidResponse": "Ibi ìsopọ̀ dáhùn pẹ̀lú nǹkan tí kì í ṣe àkójọ awoṣe. Ṣàyẹ̀wò pé ìpìlẹ̀ API àti ìlànà bá sérífà náà mu.",
+      "discoveryNoModels": "Ibi ìsopọ̀ kò ṣe àkójọ awoṣe kankan. Tẹ àwọn awoṣe sí fúnra rẹ.",
+      "connectionIncomplete": "Awoṣe náà dáhùn ṣùgbọ́n kò parí. Gbìyànjú lẹ́ẹ̀kan sí i, tàbí ṣàyẹ̀wò ID awoṣe àti ìlànà.",
       "invalidInput": "Tẹ orúkọ ètò ẹ̀yìn, àwọn akọlé tó tọ́, àti ó kéré tán awoṣe kan tí ó ní ID àti orúkọ tí kò tún ara wọn ṣe sí. Ààlà iye àwọn àmì gbọ́dọ̀ jẹ́ odindi nọ́ńbà tí ó tóbi ju òdo lọ.",
       "invalidUrl": "Tẹ ìpìlẹ̀ API HTTP tàbí HTTPS tí kò ní àwọn ẹ̀rí ìwọlé, ìbéèrè inú URL, tàbí àjákù URL sí.",
       "publicHttp": "A kò gba àwọn ibi ìsopọ̀ HTTP ti gbogbogbò láàyè. Lo HTTPS tàbí ibi ìsopọ̀ àdáni lórí nẹ́tíwọ́ọ̀kì agbègbè.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Awoṣe yìí ṣe àtìlẹ́yìn fún ìwọ̀n ìrònú"
     },
-    "creditsRequired": "Kirẹ́dítì kò tó láti fi ìfiránṣẹ́ yìí ránṣẹ́."
+    "creditsRequired": "Kirẹ́dítì kò tó láti fi ìfiránṣẹ́ yìí ránṣẹ́.",
+    "providerKeyRefused": "Ẹ̀yìn ìsopọ̀ náà kọ àwọn ẹ̀rí ìwọlé. Ṣàyẹ̀wò kọ́kọ́rọ́ API ti ẹ̀yìn yìí, kí o sì tún ránṣẹ́.",
+    "providerModelMissing": "Ẹ̀yìn yìí kò tún fi awoṣe yìí ṣiṣẹ́ mọ́. Yan awoṣe mìíràn.",
+    "providerRateLimited": "Olùpèsè ń dín àwọn ìbéèrè kù. Dúró díẹ̀ kí o sì tún ránṣẹ́.",
+    "providerUnavailable": "Olùpèsè kò sí lárọ̀ọ́wọ́tó báyìí. Tún ránṣẹ́ ní kété."
   },
   "settingsTools": {
     "confirmTitle": "Ìjẹ́rìí ìyípadà yìí?"

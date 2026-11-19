@@ -3945,6 +3945,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) envoie une courte requête d'inférence à ce point de terminaison avec le protocole et le modèle sélectionnés. Le fournisseur peut la facturer.",
       "connectionSucceeded": "Le modèle a traité une requête avec ce protocole.",
       "connectionFailed": "Le modèle n'a pas pu traiter une requête. Vérifiez l'URL racine de l'API, le protocole, les identifiants d'authentification et l'identifiant du modèle.",
+      "requestTimedOut": "Le point de terminaison n'a pas répondu à temps. Vérifiez l'URL racine de l'API et votre connexion, puis réessayez.",
+      "requestUnauthorized": "Le point de terminaison a refusé les identifiants d'authentification. Vérifiez la clé d'API et les en-têtes personnalisés, puis réessayez.",
+      "requestNotFound": "Le point de terminaison ou le modèle est introuvable. Vérifiez l'URL racine de l'API et l'identifiant du modèle.",
+      "requestRateLimited": "Le point de terminaison limite les requêtes. Patientez un instant, puis réessayez.",
+      "requestUnavailable": "Le point de terminaison est actuellement indisponible. Réessayez dans un instant.",
+      "requestUnreachable": "Le point de terminaison n'a pas pu être joint. Vérifiez l'URL racine de l'API et votre connexion.",
+      "discoveryInvalidResponse": "Le point de terminaison a renvoyé une réponse qui n'est pas une liste de modèles. Vérifiez que l'URL racine de l'API et le protocole correspondent au serveur.",
+      "discoveryNoModels": "Le point de terminaison n'a listé aucun modèle. Saisissez les modèles manuellement.",
+      "connectionIncomplete": "Le modèle a commencé à répondre, mais n'a pas terminé. Réessayez, ou vérifiez l'identifiant du modèle et le protocole.",
       "invalidInput": "Saisissez un nom de service, des en-têtes valides et au moins un modèle avec un identifiant unique et un nom. Les limites de jetons doivent être des nombres entiers strictement positifs.",
       "invalidUrl": "Saisissez une URL racine d'API HTTP ou HTTPS sans identifiants d'authentification, paramètres de requête ni fragment.",
       "publicHttp": "Les points de terminaison HTTP publics ne sont pas autorisés. Utilisez HTTPS ou un point de terminaison local privé.",
@@ -4079,7 +4088,11 @@
     "reasoningEffort": {
       "modelFlag": "Ce modèle prend en charge le niveau de réflexion"
     },
-    "creditsRequired": "Pas assez de crédits pour envoyer ce message."
+    "creditsRequired": "Pas assez de crédits pour envoyer ce message.",
+    "providerKeyRefused": "Le service a refusé les identifiants d'authentification. Vérifiez la clé d'API de ce service, puis renvoyez le message.",
+    "providerModelMissing": "Ce service ne propose plus ce modèle. Choisissez un autre modèle.",
+    "providerRateLimited": "Le fournisseur limite les requêtes. Patientez un instant, puis renvoyez le message.",
+    "providerUnavailable": "Le fournisseur est indisponible pour le moment. Renvoyez le message dans quelques instants."
   },
   "settingsTools": {
     "confirmTitle": "Confirmer cette modification ?"

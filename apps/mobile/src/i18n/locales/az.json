@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) seçilmiş protokol və modeldən istifadə edərək bu son nöqtəyə qısa nəticə çıxarma sorğusu göndərir. Təchizatçı buna görə ödəniş tuta bilər.",
       "connectionSucceeded": "Model bu protokoldan istifadə edərək sorğunu tamamladı.",
       "connectionFailed": "Model sorğunu tamamlaya bilmədi. API-nin kök ünvanını, protokolu, giriş məlumatlarını və model ID-sini yoxlayın.",
+      "requestTimedOut": "Son nöqtə vaxtında cavab vermədi. API-nin kök ünvanını və bağlantınızı yoxlayın, sonra yenidən cəhd edin.",
+      "requestUnauthorized": "Son nöqtə giriş məlumatlarını rədd etdi. API açarını və fərdi başlıqları yoxlayın, sonra yenidən cəhd edin.",
+      "requestNotFound": "Son nöqtə və ya model tapılmadı. API-nin kök ünvanını və model ID-sini yoxlayın.",
+      "requestRateLimited": "Son nöqtə sorğuları məhdudlaşdırır. Bir az gözləyin və yenidən cəhd edin.",
+      "requestUnavailable": "Son nöqtə hazırda əlçatan deyil. Bir azdan yenidən cəhd edin.",
+      "requestUnreachable": "Son nöqtə ilə əlaqə qurula bilmədi. API-nin kök ünvanını və bağlantınızı yoxlayın.",
+      "discoveryInvalidResponse": "Son nöqtə model siyahısı olmayan cavab qaytardı. API-nin kök ünvanının və protokolun serverə uyğun olduğunu yoxlayın.",
+      "discoveryNoModels": "Son nöqtə heç bir model siyahılamadı. Modelləri əl ilə daxil edin.",
+      "connectionIncomplete": "Model cavab verdi, lakin tamamlamadı. Yenidən cəhd edin və ya model ID-sini və protokolu yoxlayın.",
       "invalidInput": "Arxa xidmətin adını, etibarlı başlıqları və unikal ID-si və adı olan ən azı bir modeli daxil edin. Token limitləri müsbət tam ədədlər olmalıdır.",
       "invalidUrl": "Giriş məlumatları, sorğu parametrləri və ya fraqment olmadan HTTP və ya HTTPS API kök ünvanını daxil edin.",
       "publicHttp": "İctimai HTTP son nöqtələrinə icazə verilmir. HTTPS və ya özəl yerli son nöqtədən istifadə edin.",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
     },
-    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur."
+    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur.",
+    "providerKeyRefused": "Arxa xidmət giriş məlumatlarını rədd etdi. Bu arxa xidmətin API açarını yoxlayın, sonra yenidən göndərin.",
+    "providerModelMissing": "Bu arxa xidmət artıq bu modeli təqdim etmir. Başqa model seçin.",
+    "providerRateLimited": "Provayder sorğuları məhdudlaşdırır. Bir az gözləyin və yenidən göndərin.",
+    "providerUnavailable": "Provayder hazırda əlçatan deyil. Bir az sonra yenidən göndərin."
   },
   "settingsTools": {
     "confirmTitle": "Bu dəyişiklik təsdiqlənsin?"

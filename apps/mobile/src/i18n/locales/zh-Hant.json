@@ -3884,6 +3884,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) 會使用所選的協定與模型，向此端點傳送簡短的推論請求。供應商可能會對此收費。",
       "connectionSucceeded": "模型已使用此協定完成請求。",
       "connectionFailed": "模型無法完成請求。請檢查 API 根 URL、協定、驗證憑證與模型 ID。",
+      "requestTimedOut": "端點未及時回應。請檢查 API 根 URL 與網路連線，然後再試一次。",
+      "requestUnauthorized": "端點拒絕了驗證憑證。請檢查 API 金鑰與自訂標頭，然後再試一次。",
+      "requestNotFound": "找不到端點或模型。請檢查 API 根 URL 與模型 ID。",
+      "requestRateLimited": "端點正在限制請求。請稍候片刻再試一次。",
+      "requestUnavailable": "端點目前無法使用。請稍後再試一次。",
+      "requestUnreachable": "無法連線至端點。請檢查 API 根 URL 與網路連線。",
+      "discoveryInvalidResponse": "端點回應的內容不是模型清單。請確認 API 根 URL 與協定符合該伺服器。",
+      "discoveryNoModels": "端點未列出任何模型。請手動輸入模型。",
+      "connectionIncomplete": "模型已回應但未完成。請再試一次，或檢查模型 ID 與協定。",
       "invalidInput": "請輸入後端名稱、有效的標頭，以及至少一個具有唯一 ID 和名稱的模型。詞元上限必須為正整數。",
       "invalidUrl": "請輸入 HTTP 或 HTTPS API 根 URL，且不得包含驗證憑證、查詢參數或片段識別碼。",
       "publicHttp": "不允許使用公開的 HTTP 端點。請使用 HTTPS 或私有的本機端點。",
@@ -4018,7 +4027,11 @@
     "reasoningEffort": {
       "modelFlag": "此模型支援思考程度"
     },
-    "creditsRequired": "點數不足，無法傳送此訊息。"
+    "creditsRequired": "點數不足，無法傳送此訊息。",
+    "providerKeyRefused": "後端拒絕了驗證憑證。請檢查此後端的 API 金鑰，然後重新傳送。",
+    "providerModelMissing": "此後端已不再提供此模型。請選擇其他模型。",
+    "providerRateLimited": "供應商正在限制請求。請稍候片刻再重新傳送。",
+    "providerUnavailable": "供應商目前無法使用。請稍後再重新傳送。"
   },
   "settingsTools": {
     "confirmTitle": "確認此變更？"

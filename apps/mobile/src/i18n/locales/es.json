@@ -3945,6 +3945,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) envía una solicitud breve de inferencia a este punto de acceso usando el protocolo y el modelo seleccionados. El proveedor puede cobrar por ella.",
       "connectionSucceeded": "El modelo ha completado una solicitud usando este protocolo.",
       "connectionFailed": "El modelo no ha podido completar una solicitud. Comprueba la URL raíz de la API, el protocolo, las credenciales y el ID del modelo.",
+      "requestTimedOut": "El punto de acceso no ha respondido a tiempo. Comprueba la URL raíz de la API y tu conexión, y vuelve a intentarlo.",
+      "requestUnauthorized": "El punto de acceso ha rechazado las credenciales. Comprueba la clave de API y las cabeceras personalizadas, y vuelve a intentarlo.",
+      "requestNotFound": "No se ha encontrado el punto de acceso ni el modelo. Comprueba la URL raíz de la API y el ID del modelo.",
+      "requestRateLimited": "El punto de acceso está limitando las solicitudes. Espera un momento y vuelve a intentarlo.",
+      "requestUnavailable": "El punto de acceso no está disponible en este momento. Vuelve a intentarlo en un momento.",
+      "requestUnreachable": "No se ha podido alcanzar el punto de acceso. Comprueba la URL raíz de la API y tu conexión.",
+      "discoveryInvalidResponse": "El punto de acceso ha respondido con algo que no es una lista de modelos. Comprueba que la URL raíz de la API y el protocolo coincidan con los del servidor.",
+      "discoveryNoModels": "El punto de acceso no ha listado ningún modelo. Introduce los modelos manualmente.",
+      "connectionIncomplete": "El modelo ha respondido pero no ha terminado. Vuelve a intentarlo o comprueba el ID del modelo y el protocolo.",
       "invalidInput": "Introduce un nombre de servicio, cabeceras válidas y al menos un modelo con un ID único y un nombre. Los límites de tokens deben ser números enteros positivos.",
       "invalidUrl": "Introduce una URL raíz de la API con HTTP o HTTPS, sin credenciales, parámetros de consulta ni un fragmento.",
       "publicHttp": "No se permiten puntos de acceso HTTP públicos. Usa HTTPS o un punto de acceso local privado.",
@@ -4079,7 +4088,11 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esfuerzo de razonamiento"
     },
-    "creditsRequired": "No hay suficientes créditos para enviar este mensaje."
+    "creditsRequired": "No hay suficientes créditos para enviar este mensaje.",
+    "providerKeyRefused": "El servicio ha rechazado las credenciales. Comprueba la clave de API de este servicio y vuelve a enviar el mensaje.",
+    "providerModelMissing": "Este servicio ya no ofrece este modelo. Elige otro modelo.",
+    "providerRateLimited": "El proveedor está limitando las solicitudes. Espera un momento y vuelve a enviar el mensaje.",
+    "providerUnavailable": "El proveedor no está disponible en este momento. Vuelve a enviar el mensaje en breve."
   },
   "settingsTools": {
     "confirmTitle": "¿Confirmar este cambio?"

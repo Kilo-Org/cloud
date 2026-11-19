@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   agentColor,
   isPlaceholderTint,
+  NEUTRAL_TINT,
   PLACEHOLDER_TINT,
   stateTint,
   toneColor,
@@ -38,24 +39,26 @@ describe('stateTint', () => {
     expect(stateTint('live').hueTextClass).toBe('text-agent-sky');
   });
 
-  it('pins idle to its own muted-cool step, distinct from live', () => {
+  it('pins idle to the muted neutral, distinct from live and from every other state', () => {
     // The state contract: idle and live are opposite states on a real
-    // session, so each must pin its own ramp entry — never the entry another
-    // state already took, and never an agent hash. (The English word's own
-    // hash is not the pin: both words hash to sky, the shared value this
-    // change unwinds.)
+    // session, so each must pin its own token. Idle takes the quiet neutral
+    // (it is the inactive state), not a ramp entry: the English word's own
+    // hash is not the pin (both words hash to sky, the shared value this
+    // change unwinds), and a ramp step keeps moving as the ramp grows.
     const idle = stateTint('idle');
-    expect(idle.hueTextClass).toBe('text-agent-cloud');
-    expect(idle.hueClass).toBe('bg-agent-cloud');
-    expect(idle.hueThemeKey).toBe('agentCloud');
+    expect(idle).toBe(NEUTRAL_TINT);
+    expect(idle.hueTextClass).toBe('text-secondary-foreground');
+    expect(idle.hueClass).toBe('bg-hair-soft');
     expect(idle).not.toBe(stateTint('live'));
     expect(idle).not.toBe(stateTint('unknown'));
+    expect(idle).not.toBe(stateTint('platform'));
+    expect(idle).not.toBe(stateTint('repository'));
   });
 
   it('collapses no two states onto one token, so no state tint distinguishes nothing', () => {
-    // The regression the doc's table guards: a ramp edit that re-collapses
-    // two states fails here before the palette ships. The muted trio shares
-    // PLACEHOLDER_TINT by design; idle and live each own one ramp entry.
+    // The regression the doc's table guards: a palette edit that re-collapses
+    // two states fails here before it ships. Idle and live own one token
+    // each; the muted trio shares PLACEHOLDER_TINT by design.
     const tints = {
       unknown: stateTint('unknown'),
       platform: stateTint('platform'),

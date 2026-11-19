@@ -162,21 +162,22 @@ export function isPlaceholderTint(tint: Tint): boolean {
  * comparing the rendered string.
  *
  * The unknown origin, `platform` and `repository` name the row's context
- * rather than the session, so each takes {@link PLACEHOLDER_TINT} and the
- * title leads. Idle and live are states on a real session, so each is pinned
- * to its own step of the ramp, and no two states in this table share one
- * entry:
+ * rather than the session, so the three of them share the muted
+ * {@link PLACEHOLDER_TINT} by design and the title leads. Idle and live are
+ * opposite states on a real session, so each pins a distinct token no other
+ * state took:
  *
  * | State        | Tint            |
  * | ------------ | --------------- |
  * | `unknown`    | PLACEHOLDER_TINT |
  * | `platform`   | PLACEHOLDER_TINT |
  * | `repository` | PLACEHOLDER_TINT |
- * | `idle`       | AGENT_RAMP[0] (`agent-cloud`) |
+ * | `idle`       | NEUTRAL_TINT    |
  * | `live`       | AGENT_RAMP[4] (`agent-sky`) |
  *
- * A later ramp change must keep `idle` and `live` on distinct entries, or the
- * two opposite states stop being separable by colour again.
+ * A later ramp change must keep `live` on an entry no other state took, and
+ * `idle` off both the ramp's sky and the placeholder pair, or the two
+ * opposite states stop being separable by colour again.
  */
 
 /** Tint for a row whose eyebrow names a state, a type or its context, not an agent. */
@@ -184,10 +185,10 @@ export function stateTint(state: 'unknown' | 'platform' | 'repository' | 'idle' 
   if (state === 'unknown' || state === 'platform' || state === 'repository') {
     return PLACEHOLDER_TINT;
   }
-  // Idle and live pin to different ramp entries so the two opposite states
-  // stay separable by colour. Literal indexes into the `as const` ramp
-  // resolve non-null (same rule as `agentColor` below).
-  return state === 'idle' ? AGENT_RAMP[0] : AGENT_RAMP[4];
+  // The two session states pin to distinct tokens so they stay separable by
+  // colour: idle takes the muted neutral (it is the inactive state), live
+  // keeps the sky ramp entry it already rendered.
+  return state === 'idle' ? NEUTRAL_TINT : AGENT_RAMP[4];
 }
 
 /** Deterministic agent hue from the agent name. */
